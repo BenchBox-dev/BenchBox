@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:48:35.829591+00:00",
+  "bundle_file": "h2odb_sf01_sqlite_sql_20260502_193914_f149f12f.json",
+  "bundle_hash": "a3b1d103b40c1e57c2edf2bc3a73534eb020242e0e5d2146264f66f963c71c08",
+  "companion_hashes": {},
+  "benchmark": "H2O Database",
+  "platform": "SQLite",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

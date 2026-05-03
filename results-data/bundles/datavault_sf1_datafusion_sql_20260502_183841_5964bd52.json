@@ -1,0 +1,1391 @@
+{
+  "version": "2.1",
+  "run": {
+    "id": "5964bd52",
+    "timestamp": "2026-05-02T18:38:41.841575",
+    "total_duration_ms": 20477,
+    "query_time_ms": 5044,
+    "iterations": 3,
+    "streams": 3
+  },
+  "benchmark": {
+    "id": "datavault",
+    "name": "Data Vault",
+    "scale_factor": 1.0,
+    "test_type": "power"
+  },
+  "platform": {
+    "name": "DataFusion",
+    "version": "53.0.0",
+    "client_version": "53.0.0",
+    "config": {
+      "execution_mode": "sql",
+      "connection_mode": "in-memory",
+      "working_dir": "/Users/joe/Developer/benchmark_runs/databases/datavault_sf1/datavault_sf1_notuning_noconstraints.datafusion",
+      "memory_limit": "12GB",
+      "target_partitions": 10,
+      "data_format": "parquet",
+      "batch_size": 8192,
+      "result_cache_enabled": false,
+      "driver_version_actual": "53.0.0",
+      "driver_runtime_strategy": "current-process",
+      "driver_version_resolved": "53.0.0",
+      "driver_package": "datafusion",
+      "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-03/.venv/bin/python3"
+    },
+    "deployment": {
+      "deployment_type": "embedded",
+      "connection_mode": "in-memory",
+      "endpoint_class": "embedded_process",
+      "metadata_source": "inferred",
+      "collection_status": "partial"
+    },
+    "cloud": {
+      "source": "unavailable",
+      "collection_status": "unavailable"
+    },
+    "compute": {
+      "result_cache_enabled": false,
+      "source": "requested",
+      "collection_status": "partial"
+    },
+    "storage": {
+      "source": "unavailable",
+      "collection_status": "unavailable"
+    },
+    "raw_config": {
+      "working_dir": "/Users/joe/Developer/benchmark_runs/databases/datavault_sf1/datavault_sf1_notuning_noconstraints.datafusion",
+      "memory_limit": "12GB",
+      "target_partitions": 10,
+      "data_format": "parquet",
+      "batch_size": 8192,
+      "force_recreate": false,
+      "tuning_config": "UnifiedTuningConfiguration(primary_keys=PrimaryKeyConfiguration(enabled=False, enforce_uniqueness=True, nullable=False), foreign_keys=ForeignKeyConfiguration(enabled=False, enforce_referential_integrity=True, on_delete_action='RESTRICT', on_update_action='RESTRICT'), unique_constraints=UniqueConstraintConfiguration(enabled=False, ignore_nulls=False), check_constraints=CheckConstraintConfiguration(enabled=False, enforce_on_insert=True, enforce_on_update=True), platform_optimizations=PlatformOptimizationConfiguration(z_ordering_enabled=False, z_ordering_columns=[], liquid_clustering_enabled=False, liquid_clustering_columns=[], databricks_clustering_strategy='z_order', sorted_ingestion_mode='off', sorted_ingestion_method='auto', auto_optimize_enabled=False, auto_compact_enabled=False, bloom_filters_enabled=False, bloom_filter_columns=[], materialized_views_enabled=False), table_tunings={})",
+      "result_cache_enabled": false
+    },
+    "raw_metadata": {
+      "driver_version_actual": "53.0.0",
+      "driver_runtime_strategy": "current-process",
+      "driver_version_resolved": "53.0.0"
+    },
+    "driver_actual_version": "53.0.0",
+    "driver_package": "datafusion",
+    "driver_resolved_version": "53.0.0",
+    "driver_runtime_strategy": "current-process"
+  },
+  "config": {
+    "compression": {
+      "type": "zstd",
+      "level": null
+    },
+    "phases": [
+      "load",
+      "power"
+    ],
+    "platform_options": {
+      "force_recreate": false,
+      "show_query_plans": false,
+      "force_upload": false
+    },
+    "platform_option_sources": {
+      "force_recreate": "saved_config",
+      "show_query_plans": "saved_config",
+      "force_upload": "saved_config"
+    },
+    "mode": "sql"
+  },
+  "summary": {
+    "queries": {
+      "total": 66,
+      "passed": 18,
+      "failed": 48
+    },
+    "timing": {
+      "total_ms": 5044,
+      "avg_ms": 280.2,
+      "min_ms": 62,
+      "max_ms": 548,
+      "geometric_mean_ms": 235.4,
+      "stdev_ms": 148.4,
+      "p90_ms": 547,
+      "p95_ms": 548,
+      "p99_ms": 548
+    },
+    "data": {
+      "rows_loaded": 24983730,
+      "load_time_ms": 13373.6
+    },
+    "validation": "partial"
+  },
+  "phases": {
+    "data_generation": {
+      "status": "SUCCESS",
+      "duration_ms": 0
+    },
+    "schema_creation": {
+      "status": "SUCCESS",
+      "duration_ms": 0
+    },
+    "data_loading": {
+      "status": "SUCCESS",
+      "duration_ms": 13373
+    },
+    "validation": {
+      "status": "PASSED",
+      "duration_ms": 50
+    },
+    "power_test": {
+      "status": "COMPLETED",
+      "duration_ms": 7039
+    },
+    "throughput_test": {
+      "status": "NOT_RUN"
+    }
+  },
+  "queries": [
+    {
+      "id": "1",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "2",
+      "ms": 298,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "3",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "4",
+      "ms": 497,
+      "rows": 5,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "5",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "6",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "7",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "8",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "9",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "10",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "11",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "12",
+      "ms": 254,
+      "rows": 2,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "13",
+      "ms": 277,
+      "rows": 42,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "14",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "15",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "16",
+      "ms": 63,
+      "rows": 18314,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "17",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "18",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "19",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "20",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "21",
+      "ms": 592,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "22",
+      "ms": 0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "FAILED"
+    },
+    {
+      "id": "1",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "2",
+      "ms": 273,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "3",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "4",
+      "ms": 325,
+      "rows": 5,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "5",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "6",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "7",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "8",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "9",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "10",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "11",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "12",
+      "ms": 220,
+      "rows": 2,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "13",
+      "ms": 247,
+      "rows": 42,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "14",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "15",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "16",
+      "ms": 62,
+      "rows": 18314,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "17",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "18",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "19",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "20",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "21",
+      "ms": 543,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "22",
+      "ms": 0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "1",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "2",
+      "ms": 274,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "3",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "4",
+      "ms": 334,
+      "rows": 5,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "5",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "6",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "7",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "8",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "9",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "10",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "11",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "12",
+      "ms": 218,
+      "rows": 2,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "13",
+      "ms": 250,
+      "rows": 42,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "14",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "15",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "16",
+      "ms": 63,
+      "rows": 18314,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "17",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "18",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "19",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "20",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "21",
+      "ms": 548,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "22",
+      "ms": 0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "1",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "2",
+      "ms": 272,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "3",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "4",
+      "ms": 328,
+      "rows": 5,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "5",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "6",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "7",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "8",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "9",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "10",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "11",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "12",
+      "ms": 227,
+      "rows": 2,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "13",
+      "ms": 249,
+      "rows": 42,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "14",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "15",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "16",
+      "ms": 64,
+      "rows": 18314,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "17",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "18",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "19",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "20",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    },
+    {
+      "id": "21",
+      "ms": 547,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "22",
+      "ms": 0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "FAILED"
+    }
+  ],
+  "tables": {
+    "hub_customer": {
+      "rows": 150000
+    },
+    "hub_lineitem": {
+      "rows": 6001215
+    },
+    "hub_nation": {
+      "rows": 25
+    },
+    "hub_order": {
+      "rows": 1500000
+    },
+    "hub_part": {
+      "rows": 200000
+    },
+    "hub_region": {
+      "rows": 5
+    },
+    "hub_supplier": {
+      "rows": 10000
+    },
+    "link_customer_nation": {
+      "rows": 150000
+    },
+    "link_lineitem": {
+      "rows": 6001215
+    },
+    "link_nation_region": {
+      "rows": 25
+    },
+    "link_order_customer": {
+      "rows": 1500000
+    },
+    "link_part_supplier": {
+      "rows": 800000
+    },
+    "link_supplier_nation": {
+      "rows": 10000
+    },
+    "sat_customer": {
+      "rows": 150000
+    },
+    "sat_lineitem": {
+      "rows": 6001215
+    },
+    "sat_nation": {
+      "rows": 25
+    },
+    "sat_order": {
+      "rows": 1500000
+    },
+    "sat_part": {
+      "rows": 200000
+    },
+    "sat_partsupp": {
+      "rows": 800000
+    },
+    "sat_region": {
+      "rows": 5
+    },
+    "sat_supplier": {
+      "rows": 10000
+    }
+  },
+  "cost": {
+    "total_usd": 0,
+    "model": "estimated"
+  },
+  "normalized_cost": {
+    "normalized_cost_usd": "0",
+    "cost_usd": null,
+    "cost_model_version": "2025.11",
+    "cost_model_source": "benchbox.core.cost.pricing",
+    "cost_scope": "compute_only",
+    "cost_status": "not_applicable_local",
+    "billing_unit": "not_applicable",
+    "pricing_region": "not_applicable",
+    "deployment": {
+      "cloud_provider": null,
+      "cloud_region": null,
+      "instance_type": null,
+      "warehouse_size": null,
+      "node_count": null,
+      "cluster_size": null,
+      "storage_format": null,
+      "storage_tier": null
+    }
+  },
+  "execution": {
+    "entry_point": "cli",
+    "timestamp": "2026-05-02T18:38:21.321543",
+    "phases": [
+      "load",
+      "power"
+    ],
+    "compression": {
+      "type": "zstd"
+    },
+    "mode": "sql",
+    "driver_package": "datafusion",
+    "driver_version_resolved": "53.0.0",
+    "driver_version_actual": "53.0.0",
+    "driver_runtime_strategy": "current-process",
+    "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-03/.venv/bin/python3",
+    "non_interactive": true
+  },
+  "environment": {
+    "os": "Darwin",
+    "arch": "arm64",
+    "python": "3.12.11",
+    "client_host": {
+      "os": "Darwin",
+      "arch": "arm64",
+      "python": "3.12.11",
+      "machine_id": "machine_45d1a3ef31a1728d"
+    },
+    "platform_runtime": {
+      "runtime_type": "local_process",
+      "collection_status": "partial",
+      "source": "inferred",
+      "engine_host": "host_51e3fb6b450f"
+    },
+    "machine_id": "machine_45d1a3ef31a1728d"
+  },
+  "errors": [
+    {
+      "phase": "query",
+      "query_id": "1",
+      "type": "Error during planning",
+      "message": "Error during planning: Internal error: Function 'sum' failed to match any signature, errors: Error during planning: Function 'sum' requires TypeSignatureClass::Decimal, but received String (DataType: Utf8View).,Error during planning: Function 'sum' requires TypeSignatureClass::Native(LogicalType(Native(UInt64), UInt64)), but received String (DataType: Utf8View).,Error during planning: Function 'sum' requires TypeSignatureClass::Native(LogicalType(Native(Int64), Int64)), but received String (DataType: Utf8View).,Error during planning: Function 'sum' requires TypeSignatureClass::Native(LogicalType(Native(Float64), Float64)), but received String (DataType: Utf8View).,Error during planning: Function 'sum' requires TypeSignatureClass::Duration, but received String (DataType: Utf8View)..\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d No function matches the given name and argument types 'sum(Utf8View)'. You might need to add explicit type casts.\n\tCandidate functions:\n\tsum(Coercion(TypeSignatureClass::Decimal))\n\tsum(Coercion(TypeSignatureClass::Native(LogicalType(Native(UInt64), UInt64)), implicit_coercion=ImplicitCoercion([Native(LogicalType(Native(UInt8), UInt8)), Native(LogicalType(Native(UInt16), UInt16)), Native(LogicalType(Native(UInt32), UInt32))], default_type=UInt64))\n\tsum(Coercion(TypeSignatureClass::Native(LogicalType(Native(Int64), Int64)), implicit_coercion=ImplicitCoercion([Native(LogicalType(Native(Int8), Int8)), Native(LogicalType(Native(Int16), Int16)), Native(LogicalType(Native(Int32), Int32))], default_type=Int64))\n\tsum(Coercion(TypeSignatureClass::Native(LogicalType(Native(Float64), Float64)), implicit_coercion=ImplicitCoercion([Float], default_type=Float64))\n\tsum(Coercion(TypeSignatureClass::Duration))"
+    },
+    {
+      "phase": "query",
+      "query_id": "1",
+      "type": "Error during planning",
+      "message": "Error during planning: Internal error: Function 'sum' failed to match any signature, errors: Error during planning: Function 'sum' requires TypeSignatureClass::Decimal, but received String (DataType: Utf8View).,Error during planning: Function 'sum' requires TypeSignatureClass::Native(LogicalType(Native(UInt64), UInt64)), but received String (DataType: Utf8View).,Error during planning: Function 'sum' requires TypeSignatureClass::Native(LogicalType(Native(Int64), Int64)), but received String (DataType: Utf8View).,Error during planning: Function 'sum' requires TypeSignatureClass::Native(LogicalType(Native(Float64), Float64)), but received String (DataType: Utf8View).,Error during planning: Function 'sum' requires TypeSignatureClass::Duration, but received String (DataType: Utf8View)..\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d No function matches the given name and argument types 'sum(Utf8View)'. You might need to add explicit type casts.\n\tCandidate functions:\n\tsum(Coercion(TypeSignatureClass::Decimal))\n\tsum(Coercion(TypeSignatureClass::Native(LogicalType(Native(UInt64), UInt64)), implicit_coercion=ImplicitCoercion([Native(LogicalType(Native(UInt8), UInt8)), Native(LogicalType(Native(UInt16), UInt16)), Native(LogicalType(Native(UInt32), UInt32))], default_type=UInt64))\n\tsum(Coercion(TypeSignatureClass::Native(LogicalType(Native(Int64), Int64)), implicit_coercion=ImplicitCoercion([Native(LogicalType(Native(Int8), Int8)), Native(LogicalType(Native(Int16), Int16)), Native(LogicalType(Native(Int32), Int32))], default_type=Int64))\n\tsum(Coercion(TypeSignatureClass::Native(LogicalType(Native(Float64), Float64)), implicit_coercion=ImplicitCoercion([Float], default_type=Float64))\n\tsum(Coercion(TypeSignatureClass::Duration))"
+    },
+    {
+      "phase": "query",
+      "query_id": "1",
+      "type": "Error during planning",
+      "message": "Error during planning: Internal error: Function 'sum' failed to match any signature, errors: Error during planning: Function 'sum' requires TypeSignatureClass::Decimal, but received String (DataType: Utf8View).,Error during planning: Function 'sum' requires TypeSignatureClass::Native(LogicalType(Native(UInt64), UInt64)), but received String (DataType: Utf8View).,Error during planning: Function 'sum' requires TypeSignatureClass::Native(LogicalType(Native(Int64), Int64)), but received String (DataType: Utf8View).,Error during planning: Function 'sum' requires TypeSignatureClass::Native(LogicalType(Native(Float64), Float64)), but received String (DataType: Utf8View).,Error during planning: Function 'sum' requires TypeSignatureClass::Duration, but received String (DataType: Utf8View)..\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d No function matches the given name and argument types 'sum(Utf8View)'. You might need to add explicit type casts.\n\tCandidate functions:\n\tsum(Coercion(TypeSignatureClass::Decimal))\n\tsum(Coercion(TypeSignatureClass::Native(LogicalType(Native(UInt64), UInt64)), implicit_coercion=ImplicitCoercion([Native(LogicalType(Native(UInt8), UInt8)), Native(LogicalType(Native(UInt16), UInt16)), Native(LogicalType(Native(UInt32), UInt32))], default_type=UInt64))\n\tsum(Coercion(TypeSignatureClass::Native(LogicalType(Native(Int64), Int64)), implicit_coercion=ImplicitCoercion([Native(LogicalType(Native(Int8), Int8)), Native(LogicalType(Native(Int16), Int16)), Native(LogicalType(Native(Int32), Int32))], default_type=Int64))\n\tsum(Coercion(TypeSignatureClass::Native(LogicalType(Native(Float64), Float64)), implicit_coercion=ImplicitCoercion([Float], default_type=Float64))\n\tsum(Coercion(TypeSignatureClass::Duration))"
+    },
+    {
+      "phase": "query",
+      "query_id": "1",
+      "type": "Error during planning",
+      "message": "Error during planning: Internal error: Function 'sum' failed to match any signature, errors: Error during planning: Function 'sum' requires TypeSignatureClass::Decimal, but received String (DataType: Utf8View).,Error during planning: Function 'sum' requires TypeSignatureClass::Native(LogicalType(Native(UInt64), UInt64)), but received String (DataType: Utf8View).,Error during planning: Function 'sum' requires TypeSignatureClass::Native(LogicalType(Native(Int64), Int64)), but received String (DataType: Utf8View).,Error during planning: Function 'sum' requires TypeSignatureClass::Native(LogicalType(Native(Float64), Float64)), but received String (DataType: Utf8View).,Error during planning: Function 'sum' requires TypeSignatureClass::Duration, but received String (DataType: Utf8View)..\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d No function matches the given name and argument types 'sum(Utf8View)'. You might need to add explicit type casts.\n\tCandidate functions:\n\tsum(Coercion(TypeSignatureClass::Decimal))\n\tsum(Coercion(TypeSignatureClass::Native(LogicalType(Native(UInt64), UInt64)), implicit_coercion=ImplicitCoercion([Native(LogicalType(Native(UInt8), UInt8)), Native(LogicalType(Native(UInt16), UInt16)), Native(LogicalType(Native(UInt32), UInt32))], default_type=UInt64))\n\tsum(Coercion(TypeSignatureClass::Native(LogicalType(Native(Int64), Int64)), implicit_coercion=ImplicitCoercion([Native(LogicalType(Native(Int8), Int8)), Native(LogicalType(Native(Int16), Int16)), Native(LogicalType(Native(Int32), Int32))], default_type=Int64))\n\tsum(Coercion(TypeSignatureClass::Native(LogicalType(Native(Float64), Float64)), implicit_coercion=ImplicitCoercion([Float], default_type=Float64))\n\tsum(Coercion(TypeSignatureClass::Duration))"
+    },
+    {
+      "phase": "query",
+      "query_id": "10",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "10",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "10",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "10",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "11",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Utf8View * Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "11",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Utf8View * Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "11",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Utf8View * Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "11",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Utf8View * Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "14",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "14",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "14",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "14",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "15",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "15",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "15",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "15",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "17",
+      "type": "Error during planning",
+      "message": "Error during planning: Internal error: Function 'avg' failed to match any signature, errors: Error during planning: Function 'avg' requires TypeSignatureClass::Decimal, but received String (DataType: Utf8View).,Error during planning: Function 'avg' requires TypeSignatureClass::Duration, but received String (DataType: Utf8View).,Error during planning: Function 'avg' requires TypeSignatureClass::Native(LogicalType(Native(Float64), Float64)), but received String (DataType: Utf8View)..\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d No function matches the given name and argument types 'avg(Utf8View)'. You might need to add explicit type casts.\n\tCandidate functions:\n\tavg(Coercion(TypeSignatureClass::Decimal))\n\tavg(Coercion(TypeSignatureClass::Duration))\n\tavg(Coercion(TypeSignatureClass::Native(LogicalType(Native(Float64), Float64)), implicit_coercion=ImplicitCoercion([Integer, Float], default_type=Float64))"
+    },
+    {
+      "phase": "query",
+      "query_id": "17",
+      "type": "Error during planning",
+      "message": "Error during planning: Internal error: Function 'avg' failed to match any signature, errors: Error during planning: Function 'avg' requires TypeSignatureClass::Decimal, but received String (DataType: Utf8View).,Error during planning: Function 'avg' requires TypeSignatureClass::Duration, but received String (DataType: Utf8View).,Error during planning: Function 'avg' requires TypeSignatureClass::Native(LogicalType(Native(Float64), Float64)), but received String (DataType: Utf8View)..\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d No function matches the given name and argument types 'avg(Utf8View)'. You might need to add explicit type casts.\n\tCandidate functions:\n\tavg(Coercion(TypeSignatureClass::Decimal))\n\tavg(Coercion(TypeSignatureClass::Duration))\n\tavg(Coercion(TypeSignatureClass::Native(LogicalType(Native(Float64), Float64)), implicit_coercion=ImplicitCoercion([Integer, Float], default_type=Float64))"
+    },
+    {
+      "phase": "query",
+      "query_id": "17",
+      "type": "Error during planning",
+      "message": "Error during planning: Internal error: Function 'avg' failed to match any signature, errors: Error during planning: Function 'avg' requires TypeSignatureClass::Decimal, but received String (DataType: Utf8View).,Error during planning: Function 'avg' requires TypeSignatureClass::Duration, but received String (DataType: Utf8View).,Error during planning: Function 'avg' requires TypeSignatureClass::Native(LogicalType(Native(Float64), Float64)), but received String (DataType: Utf8View)..\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d No function matches the given name and argument types 'avg(Utf8View)'. You might need to add explicit type casts.\n\tCandidate functions:\n\tavg(Coercion(TypeSignatureClass::Decimal))\n\tavg(Coercion(TypeSignatureClass::Duration))\n\tavg(Coercion(TypeSignatureClass::Native(LogicalType(Native(Float64), Float64)), implicit_coercion=ImplicitCoercion([Integer, Float], default_type=Float64))"
+    },
+    {
+      "phase": "query",
+      "query_id": "17",
+      "type": "Error during planning",
+      "message": "Error during planning: Internal error: Function 'avg' failed to match any signature, errors: Error during planning: Function 'avg' requires TypeSignatureClass::Decimal, but received String (DataType: Utf8View).,Error during planning: Function 'avg' requires TypeSignatureClass::Duration, but received String (DataType: Utf8View).,Error during planning: Function 'avg' requires TypeSignatureClass::Native(LogicalType(Native(Float64), Float64)), but received String (DataType: Utf8View)..\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d No function matches the given name and argument types 'avg(Utf8View)'. You might need to add explicit type casts.\n\tCandidate functions:\n\tavg(Coercion(TypeSignatureClass::Decimal))\n\tavg(Coercion(TypeSignatureClass::Duration))\n\tavg(Coercion(TypeSignatureClass::Native(LogicalType(Native(Float64), Float64)), implicit_coercion=ImplicitCoercion([Integer, Float], default_type=Float64))"
+    },
+    {
+      "phase": "query",
+      "query_id": "18",
+      "type": "Error during planning",
+      "message": "Error during planning: Internal error: Function 'sum' failed to match any signature, errors: Error during planning: Function 'sum' requires TypeSignatureClass::Decimal, but received String (DataType: Utf8View).,Error during planning: Function 'sum' requires TypeSignatureClass::Native(LogicalType(Native(UInt64), UInt64)), but received String (DataType: Utf8View).,Error during planning: Function 'sum' requires TypeSignatureClass::Native(LogicalType(Native(Int64), Int64)), but received String (DataType: Utf8View).,Error during planning: Function 'sum' requires TypeSignatureClass::Native(LogicalType(Native(Float64), Float64)), but received String (DataType: Utf8View).,Error during planning: Function 'sum' requires TypeSignatureClass::Duration, but received String (DataType: Utf8View)..\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d No function matches the given name and argument types 'sum(Utf8View)'. You might need to add explicit type casts.\n\tCandidate functions:\n\tsum(Coercion(TypeSignatureClass::Decimal))\n\tsum(Coercion(TypeSignatureClass::Native(LogicalType(Native(UInt64), UInt64)), implicit_coercion=ImplicitCoercion([Native(LogicalType(Native(UInt8), UInt8)), Native(LogicalType(Native(UInt16), UInt16)), Native(LogicalType(Native(UInt32), UInt32))], default_type=UInt64))\n\tsum(Coercion(TypeSignatureClass::Native(LogicalType(Native(Int64), Int64)), implicit_coercion=ImplicitCoercion([Native(LogicalType(Native(Int8), Int8)), Native(LogicalType(Native(Int16), Int16)), Native(LogicalType(Native(Int32), Int32))], default_type=Int64))\n\tsum(Coercion(TypeSignatureClass::Native(LogicalType(Native(Float64), Float64)), implicit_coercion=ImplicitCoercion([Float], default_type=Float64))\n\tsum(Coercion(TypeSignatureClass::Duration))"
+    },
+    {
+      "phase": "query",
+      "query_id": "18",
+      "type": "Error during planning",
+      "message": "Error during planning: Internal error: Function 'sum' failed to match any signature, errors: Error during planning: Function 'sum' requires TypeSignatureClass::Decimal, but received String (DataType: Utf8View).,Error during planning: Function 'sum' requires TypeSignatureClass::Native(LogicalType(Native(UInt64), UInt64)), but received String (DataType: Utf8View).,Error during planning: Function 'sum' requires TypeSignatureClass::Native(LogicalType(Native(Int64), Int64)), but received String (DataType: Utf8View).,Error during planning: Function 'sum' requires TypeSignatureClass::Native(LogicalType(Native(Float64), Float64)), but received String (DataType: Utf8View).,Error during planning: Function 'sum' requires TypeSignatureClass::Duration, but received String (DataType: Utf8View)..\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d No function matches the given name and argument types 'sum(Utf8View)'. You might need to add explicit type casts.\n\tCandidate functions:\n\tsum(Coercion(TypeSignatureClass::Decimal))\n\tsum(Coercion(TypeSignatureClass::Native(LogicalType(Native(UInt64), UInt64)), implicit_coercion=ImplicitCoercion([Native(LogicalType(Native(UInt8), UInt8)), Native(LogicalType(Native(UInt16), UInt16)), Native(LogicalType(Native(UInt32), UInt32))], default_type=UInt64))\n\tsum(Coercion(TypeSignatureClass::Native(LogicalType(Native(Int64), Int64)), implicit_coercion=ImplicitCoercion([Native(LogicalType(Native(Int8), Int8)), Native(LogicalType(Native(Int16), Int16)), Native(LogicalType(Native(Int32), Int32))], default_type=Int64))\n\tsum(Coercion(TypeSignatureClass::Native(LogicalType(Native(Float64), Float64)), implicit_coercion=ImplicitCoercion([Float], default_type=Float64))\n\tsum(Coercion(TypeSignatureClass::Duration))"
+    },
+    {
+      "phase": "query",
+      "query_id": "18",
+      "type": "Error during planning",
+      "message": "Error during planning: Internal error: Function 'sum' failed to match any signature, errors: Error during planning: Function 'sum' requires TypeSignatureClass::Decimal, but received String (DataType: Utf8View).,Error during planning: Function 'sum' requires TypeSignatureClass::Native(LogicalType(Native(UInt64), UInt64)), but received String (DataType: Utf8View).,Error during planning: Function 'sum' requires TypeSignatureClass::Native(LogicalType(Native(Int64), Int64)), but received String (DataType: Utf8View).,Error during planning: Function 'sum' requires TypeSignatureClass::Native(LogicalType(Native(Float64), Float64)), but received String (DataType: Utf8View).,Error during planning: Function 'sum' requires TypeSignatureClass::Duration, but received String (DataType: Utf8View)..\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d No function matches the given name and argument types 'sum(Utf8View)'. You might need to add explicit type casts.\n\tCandidate functions:\n\tsum(Coercion(TypeSignatureClass::Decimal))\n\tsum(Coercion(TypeSignatureClass::Native(LogicalType(Native(UInt64), UInt64)), implicit_coercion=ImplicitCoercion([Native(LogicalType(Native(UInt8), UInt8)), Native(LogicalType(Native(UInt16), UInt16)), Native(LogicalType(Native(UInt32), UInt32))], default_type=UInt64))\n\tsum(Coercion(TypeSignatureClass::Native(LogicalType(Native(Int64), Int64)), implicit_coercion=ImplicitCoercion([Native(LogicalType(Native(Int8), Int8)), Native(LogicalType(Native(Int16), Int16)), Native(LogicalType(Native(Int32), Int32))], default_type=Int64))\n\tsum(Coercion(TypeSignatureClass::Native(LogicalType(Native(Float64), Float64)), implicit_coercion=ImplicitCoercion([Float], default_type=Float64))\n\tsum(Coercion(TypeSignatureClass::Duration))"
+    },
+    {
+      "phase": "query",
+      "query_id": "18",
+      "type": "Error during planning",
+      "message": "Error during planning: Internal error: Function 'sum' failed to match any signature, errors: Error during planning: Function 'sum' requires TypeSignatureClass::Decimal, but received String (DataType: Utf8View).,Error during planning: Function 'sum' requires TypeSignatureClass::Native(LogicalType(Native(UInt64), UInt64)), but received String (DataType: Utf8View).,Error during planning: Function 'sum' requires TypeSignatureClass::Native(LogicalType(Native(Int64), Int64)), but received String (DataType: Utf8View).,Error during planning: Function 'sum' requires TypeSignatureClass::Native(LogicalType(Native(Float64), Float64)), but received String (DataType: Utf8View).,Error during planning: Function 'sum' requires TypeSignatureClass::Duration, but received String (DataType: Utf8View)..\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d No function matches the given name and argument types 'sum(Utf8View)'. You might need to add explicit type casts.\n\tCandidate functions:\n\tsum(Coercion(TypeSignatureClass::Decimal))\n\tsum(Coercion(TypeSignatureClass::Native(LogicalType(Native(UInt64), UInt64)), implicit_coercion=ImplicitCoercion([Native(LogicalType(Native(UInt8), UInt8)), Native(LogicalType(Native(UInt16), UInt16)), Native(LogicalType(Native(UInt32), UInt32))], default_type=UInt64))\n\tsum(Coercion(TypeSignatureClass::Native(LogicalType(Native(Int64), Int64)), implicit_coercion=ImplicitCoercion([Native(LogicalType(Native(Int8), Int8)), Native(LogicalType(Native(Int16), Int16)), Native(LogicalType(Native(Int32), Int32))], default_type=Int64))\n\tsum(Coercion(TypeSignatureClass::Native(LogicalType(Native(Float64), Float64)), implicit_coercion=ImplicitCoercion([Float], default_type=Float64))\n\tsum(Coercion(TypeSignatureClass::Duration))"
+    },
+    {
+      "phase": "query",
+      "query_id": "19",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "19",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "19",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "19",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "20",
+      "type": "Error during planning",
+      "message": "Error during planning: table 'datafusion.public.part' not found"
+    },
+    {
+      "phase": "query",
+      "query_id": "20",
+      "type": "Error during planning",
+      "message": "Error during planning: table 'datafusion.public.part' not found"
+    },
+    {
+      "phase": "query",
+      "query_id": "20",
+      "type": "Error during planning",
+      "message": "Error during planning: table 'datafusion.public.part' not found"
+    },
+    {
+      "phase": "query",
+      "query_id": "20",
+      "type": "Error during planning",
+      "message": "Error during planning: table 'datafusion.public.part' not found"
+    },
+    {
+      "phase": "query",
+      "query_id": "22",
+      "type": "Error during planning",
+      "message": "Error during planning: Internal error: Function 'avg' failed to match any signature, errors: Error during planning: Function 'avg' requires TypeSignatureClass::Decimal, but received String (DataType: Utf8View).,Error during planning: Function 'avg' requires TypeSignatureClass::Duration, but received String (DataType: Utf8View).,Error during planning: Function 'avg' requires TypeSignatureClass::Native(LogicalType(Native(Float64), Float64)), but received String (DataType: Utf8View)..\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d No function matches the given name and argument types 'avg(Utf8View)'. You might need to add explicit type casts.\n\tCandidate functions:\n\tavg(Coercion(TypeSignatureClass::Decimal))\n\tavg(Coercion(TypeSignatureClass::Duration))\n\tavg(Coercion(TypeSignatureClass::Native(LogicalType(Native(Float64), Float64)), implicit_coercion=ImplicitCoercion([Integer, Float], default_type=Float64))"
+    },
+    {
+      "phase": "query",
+      "query_id": "22",
+      "type": "Error during planning",
+      "message": "Error during planning: Internal error: Function 'avg' failed to match any signature, errors: Error during planning: Function 'avg' requires TypeSignatureClass::Decimal, but received String (DataType: Utf8View).,Error during planning: Function 'avg' requires TypeSignatureClass::Duration, but received String (DataType: Utf8View).,Error during planning: Function 'avg' requires TypeSignatureClass::Native(LogicalType(Native(Float64), Float64)), but received String (DataType: Utf8View)..\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d No function matches the given name and argument types 'avg(Utf8View)'. You might need to add explicit type casts.\n\tCandidate functions:\n\tavg(Coercion(TypeSignatureClass::Decimal))\n\tavg(Coercion(TypeSignatureClass::Duration))\n\tavg(Coercion(TypeSignatureClass::Native(LogicalType(Native(Float64), Float64)), implicit_coercion=ImplicitCoercion([Integer, Float], default_type=Float64))"
+    },
+    {
+      "phase": "query",
+      "query_id": "22",
+      "type": "Error during planning",
+      "message": "Error during planning: Internal error: Function 'avg' failed to match any signature, errors: Error during planning: Function 'avg' requires TypeSignatureClass::Decimal, but received String (DataType: Utf8View).,Error during planning: Function 'avg' requires TypeSignatureClass::Duration, but received String (DataType: Utf8View).,Error during planning: Function 'avg' requires TypeSignatureClass::Native(LogicalType(Native(Float64), Float64)), but received String (DataType: Utf8View)..\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d No function matches the given name and argument types 'avg(Utf8View)'. You might need to add explicit type casts.\n\tCandidate functions:\n\tavg(Coercion(TypeSignatureClass::Decimal))\n\tavg(Coercion(TypeSignatureClass::Duration))\n\tavg(Coercion(TypeSignatureClass::Native(LogicalType(Native(Float64), Float64)), implicit_coercion=ImplicitCoercion([Integer, Float], default_type=Float64))"
+    },
+    {
+      "phase": "query",
+      "query_id": "22",
+      "type": "Error during planning",
+      "message": "Error during planning: Internal error: Function 'avg' failed to match any signature, errors: Error during planning: Function 'avg' requires TypeSignatureClass::Decimal, but received String (DataType: Utf8View).,Error during planning: Function 'avg' requires TypeSignatureClass::Duration, but received String (DataType: Utf8View).,Error during planning: Function 'avg' requires TypeSignatureClass::Native(LogicalType(Native(Float64), Float64)), but received String (DataType: Utf8View)..\nThis issue was likely caused by a bug in DataFusion's code. Please help us to resolve this by filing a bug report in our issue tracker: endpoint_94597eb8d35d No function matches the given name and argument types 'avg(Utf8View)'. You might need to add explicit type casts.\n\tCandidate functions:\n\tavg(Coercion(TypeSignatureClass::Decimal))\n\tavg(Coercion(TypeSignatureClass::Duration))\n\tavg(Coercion(TypeSignatureClass::Native(LogicalType(Native(Float64), Float64)), implicit_coercion=ImplicitCoercion([Integer, Float], default_type=Float64))"
+    },
+    {
+      "phase": "query",
+      "query_id": "3",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "3",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "3",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "3",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "5",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "5",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "5",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "5",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "6",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Utf8View * Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "6",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Utf8View * Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "6",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Utf8View * Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "6",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Utf8View * Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "7",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "7",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "7",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "7",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "8",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "8",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "8",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "8",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "9",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "9",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "9",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    },
+    {
+      "phase": "query",
+      "query_id": "9",
+      "type": "Error during planning",
+      "message": "Error during planning: Cannot coerce arithmetic expression Int64 - Utf8View to valid types"
+    }
+  ],
+  "export": {
+    "timestamp": "2026-05-02T18:38:41.865072",
+    "tool": "benchbox-exporter",
+    "anonymized": true
+  }
+}

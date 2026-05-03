@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:52:08.385607+00:00",
+  "bundle_file": "tpch_skew_sf01_duckdb_sql_20260502_182144_1e30fc13.json",
+  "bundle_hash": "7d55ffe462848a89c62da20457427b8d5a40ea1b76e8d2c19ff5f2372b4bf76d",
+  "companion_hashes": {},
+  "benchmark": "TPC-H Skew Benchmark (moderate)",
+  "platform": "DuckDB",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

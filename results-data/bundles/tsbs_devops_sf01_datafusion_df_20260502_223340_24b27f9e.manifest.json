@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:53:13.209806+00:00",
+  "bundle_file": "tsbs_devops_sf01_datafusion_df_20260502_223340_24b27f9e.json",
+  "bundle_hash": "4af3065488cb125e955955435092b5472394f14b6c35842b161a0eb71d863f4a",
+  "companion_hashes": {},
+  "benchmark": "TSBS DevOps",
+  "platform": "DataFusion",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

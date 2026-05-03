@@ -1,0 +1,1073 @@
+{
+  "version": "2.1",
+  "run": {
+    "id": "9ad87dca",
+    "timestamp": "2026-05-02T18:22:36.042308",
+    "total_duration_ms": 1750,
+    "query_time_ms": 288,
+    "iterations": 3,
+    "streams": 3
+  },
+  "benchmark": {
+    "id": "datavault",
+    "name": "Data Vault",
+    "scale_factor": 0.01,
+    "test_type": "power"
+  },
+  "platform": {
+    "name": "DuckDB",
+    "version": "1.3.2",
+    "client_version": "1.3.2",
+    "config": {
+      "execution_mode": "sql",
+      "connection_mode": "file",
+      "database_path": "path_257e1eaa5dc5",
+      "memory_limit": "12GB",
+      "enable_progress_bar": false,
+      "result_cache_enabled": false,
+      "driver_version_actual": "1.3.2",
+      "driver_runtime_strategy": "current-process",
+      "driver_version_resolved": "1.3.2",
+      "driver_package": "duckdb",
+      "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-03/.venv/bin/python3"
+    },
+    "deployment": {
+      "deployment_type": "embedded",
+      "connection_mode": "file",
+      "endpoint_class": "embedded_process",
+      "metadata_source": "inferred",
+      "collection_status": "partial"
+    },
+    "cloud": {
+      "source": "unavailable",
+      "collection_status": "unavailable"
+    },
+    "compute": {
+      "result_cache_enabled": false,
+      "source": "requested",
+      "collection_status": "partial"
+    },
+    "storage": {
+      "source": "unavailable",
+      "collection_status": "unavailable"
+    },
+    "raw_config": {
+      "database_path": "path_257e1eaa5dc5",
+      "memory_limit": "12GB",
+      "force_recreate": false,
+      "tuning_config": "UnifiedTuningConfiguration(primary_keys=PrimaryKeyConfiguration(enabled=False, enforce_uniqueness=True, nullable=False), foreign_keys=ForeignKeyConfiguration(enabled=False, enforce_referential_integrity=True, on_delete_action='RESTRICT', on_update_action='RESTRICT'), unique_constraints=UniqueConstraintConfiguration(enabled=False, ignore_nulls=False), check_constraints=CheckConstraintConfiguration(enabled=False, enforce_on_insert=True, enforce_on_update=True), platform_optimizations=PlatformOptimizationConfiguration(z_ordering_enabled=False, z_ordering_columns=[], liquid_clustering_enabled=False, liquid_clustering_columns=[], databricks_clustering_strategy='z_order', sorted_ingestion_mode='off', sorted_ingestion_method='auto', auto_optimize_enabled=False, auto_compact_enabled=False, bloom_filters_enabled=False, bloom_filter_columns=[], materialized_views_enabled=False), table_tunings={})",
+      "driver_package": "duckdb",
+      "driver_version_resolved": "1.3.2",
+      "driver_version_actual": "1.3.2",
+      "driver_runtime_strategy": "current-process",
+      "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-03/.venv/bin/python3",
+      "driver_auto_install": false,
+      "driver_auto_install_used": false,
+      "enable_progress_bar": false,
+      "result_cache_enabled": false
+    },
+    "raw_metadata": {
+      "driver_version_actual": "1.3.2",
+      "driver_runtime_strategy": "current-process",
+      "driver_version_resolved": "1.3.2"
+    },
+    "driver_actual_version": "1.3.2",
+    "driver_package": "duckdb",
+    "driver_resolved_version": "1.3.2",
+    "driver_runtime_strategy": "current-process"
+  },
+  "config": {
+    "compression": {
+      "type": "zstd",
+      "level": null
+    },
+    "phases": [
+      "load",
+      "power"
+    ],
+    "platform_options": {
+      "memory_limit": "8GB",
+      "force_recreate": false,
+      "show_query_plans": false,
+      "force_upload": false
+    },
+    "platform_option_sources": {
+      "memory_limit": "registered_default",
+      "force_recreate": "saved_config",
+      "show_query_plans": "saved_config",
+      "force_upload": "saved_config"
+    },
+    "mode": "sql"
+  },
+  "summary": {
+    "queries": {
+      "total": 66,
+      "passed": 66,
+      "failed": 0
+    },
+    "timing": {
+      "total_ms": 288,
+      "avg_ms": 4.4,
+      "min_ms": 0,
+      "max_ms": 12,
+      "stdev_ms": 2.9,
+      "p90_ms": 8,
+      "p95_ms": 9,
+      "p99_ms": 12
+    },
+    "data": {
+      "rows_loaded": 250410,
+      "load_time_ms": 1275.8
+    },
+    "validation": "passed"
+  },
+  "phases": {
+    "data_generation": {
+      "status": "SUCCESS",
+      "duration_ms": 0
+    },
+    "schema_creation": {
+      "status": "SUCCESS",
+      "duration_ms": 3
+    },
+    "data_loading": {
+      "status": "SUCCESS",
+      "duration_ms": 1275
+    },
+    "validation": {
+      "status": "PASSED",
+      "duration_ms": 50
+    },
+    "power_test": {
+      "status": "COMPLETED",
+      "duration_ms": 437
+    },
+    "throughput_test": {
+      "status": "NOT_RUN"
+    }
+  },
+  "queries": [
+    {
+      "id": "1",
+      "ms": 6,
+      "rows": 4,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "2",
+      "ms": 5,
+      "rows": 4,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "3",
+      "ms": 11,
+      "rows": 10,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "4",
+      "ms": 5,
+      "rows": 5,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "5",
+      "ms": 7,
+      "rows": 5,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "6",
+      "ms": 1,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "7",
+      "ms": 5,
+      "rows": 4,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "8",
+      "ms": 5,
+      "rows": 2,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "9",
+      "ms": 6,
+      "rows": 173,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "10",
+      "ms": 9,
+      "rows": 20,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "11",
+      "ms": 2,
+      "rows": 359,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "12",
+      "ms": 3,
+      "rows": 2,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "13",
+      "ms": 2,
+      "rows": 33,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "14",
+      "ms": 5,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "15",
+      "ms": 2,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "16",
+      "ms": 1,
+      "rows": 296,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "17",
+      "ms": 0,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "18",
+      "ms": 6,
+      "rows": 2,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "19",
+      "ms": 2,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "20",
+      "ms": 4,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "21",
+      "ms": 13,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "22",
+      "ms": 1,
+      "rows": 7,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "1",
+      "ms": 6,
+      "rows": 4,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "2",
+      "ms": 4,
+      "rows": 4,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "3",
+      "ms": 8,
+      "rows": 10,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "4",
+      "ms": 5,
+      "rows": 5,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "5",
+      "ms": 7,
+      "rows": 5,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "6",
+      "ms": 1,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "7",
+      "ms": 5,
+      "rows": 4,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "8",
+      "ms": 5,
+      "rows": 2,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "9",
+      "ms": 6,
+      "rows": 173,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "10",
+      "ms": 9,
+      "rows": 20,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "11",
+      "ms": 2,
+      "rows": 359,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "12",
+      "ms": 3,
+      "rows": 2,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "13",
+      "ms": 2,
+      "rows": 33,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "14",
+      "ms": 5,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "15",
+      "ms": 2,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "16",
+      "ms": 1,
+      "rows": 296,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "17",
+      "ms": 0,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "18",
+      "ms": 6,
+      "rows": 2,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "19",
+      "ms": 2,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "20",
+      "ms": 4,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "21",
+      "ms": 12,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "22",
+      "ms": 1,
+      "rows": 7,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "1",
+      "ms": 6,
+      "rows": 4,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "2",
+      "ms": 4,
+      "rows": 4,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "3",
+      "ms": 8,
+      "rows": 10,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "4",
+      "ms": 5,
+      "rows": 5,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "5",
+      "ms": 6,
+      "rows": 5,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "6",
+      "ms": 1,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "7",
+      "ms": 5,
+      "rows": 4,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "8",
+      "ms": 5,
+      "rows": 2,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "9",
+      "ms": 6,
+      "rows": 173,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "10",
+      "ms": 9,
+      "rows": 20,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "11",
+      "ms": 2,
+      "rows": 359,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "12",
+      "ms": 3,
+      "rows": 2,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "13",
+      "ms": 2,
+      "rows": 33,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "14",
+      "ms": 5,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "15",
+      "ms": 2,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "16",
+      "ms": 2,
+      "rows": 296,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "17",
+      "ms": 0,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "18",
+      "ms": 6,
+      "rows": 2,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "19",
+      "ms": 3,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "20",
+      "ms": 4,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "21",
+      "ms": 12,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "22",
+      "ms": 1,
+      "rows": 7,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "1",
+      "ms": 6,
+      "rows": 4,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "2",
+      "ms": 4,
+      "rows": 4,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "3",
+      "ms": 8,
+      "rows": 10,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "4",
+      "ms": 5,
+      "rows": 5,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "5",
+      "ms": 6,
+      "rows": 5,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "6",
+      "ms": 1,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "7",
+      "ms": 5,
+      "rows": 4,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "8",
+      "ms": 5,
+      "rows": 2,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "9",
+      "ms": 6,
+      "rows": 173,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "10",
+      "ms": 9,
+      "rows": 20,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "11",
+      "ms": 2,
+      "rows": 359,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "12",
+      "ms": 3,
+      "rows": 2,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "13",
+      "ms": 2,
+      "rows": 33,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "14",
+      "ms": 5,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "15",
+      "ms": 2,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "16",
+      "ms": 1,
+      "rows": 296,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "17",
+      "ms": 0,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "18",
+      "ms": 6,
+      "rows": 2,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "19",
+      "ms": 2,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "20",
+      "ms": 4,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "21",
+      "ms": 12,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "22",
+      "ms": 1,
+      "rows": 7,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    }
+  ],
+  "tables": {
+    "hub_customer": {
+      "rows": 1500
+    },
+    "hub_lineitem": {
+      "rows": 60175
+    },
+    "hub_nation": {
+      "rows": 25
+    },
+    "hub_order": {
+      "rows": 15000
+    },
+    "hub_part": {
+      "rows": 2000
+    },
+    "hub_region": {
+      "rows": 5
+    },
+    "hub_supplier": {
+      "rows": 100
+    },
+    "link_customer_nation": {
+      "rows": 1500
+    },
+    "link_lineitem": {
+      "rows": 60175
+    },
+    "link_nation_region": {
+      "rows": 25
+    },
+    "link_order_customer": {
+      "rows": 15000
+    },
+    "link_part_supplier": {
+      "rows": 8000
+    },
+    "link_supplier_nation": {
+      "rows": 100
+    },
+    "sat_customer": {
+      "rows": 1500
+    },
+    "sat_lineitem": {
+      "rows": 60175
+    },
+    "sat_nation": {
+      "rows": 25
+    },
+    "sat_order": {
+      "rows": 15000
+    },
+    "sat_part": {
+      "rows": 2000
+    },
+    "sat_partsupp": {
+      "rows": 8000
+    },
+    "sat_region": {
+      "rows": 5
+    },
+    "sat_supplier": {
+      "rows": 100
+    }
+  },
+  "cost": {
+    "total_usd": 0,
+    "model": "actual"
+  },
+  "normalized_cost": {
+    "normalized_cost_usd": "0",
+    "cost_usd": null,
+    "cost_model_version": "2025.11",
+    "cost_model_source": "benchbox.core.cost.pricing",
+    "cost_scope": "compute_only",
+    "cost_status": "not_applicable_local",
+    "billing_unit": "not_applicable",
+    "pricing_region": "not_applicable",
+    "deployment": {
+      "cloud_provider": null,
+      "cloud_region": null,
+      "instance_type": null,
+      "warehouse_size": null,
+      "node_count": null,
+      "cluster_size": null,
+      "storage_format": null,
+      "storage_tier": null
+    }
+  },
+  "execution": {
+    "entry_point": "cli",
+    "timestamp": "2026-05-02T18:22:34.256778",
+    "phases": [
+      "load",
+      "power"
+    ],
+    "compression": {
+      "type": "zstd"
+    },
+    "mode": "sql",
+    "driver_package": "duckdb",
+    "driver_version_resolved": "1.3.2",
+    "driver_version_actual": "1.3.2",
+    "driver_runtime_strategy": "current-process",
+    "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-03/.venv/bin/python3",
+    "non_interactive": true
+  },
+  "environment": {
+    "os": "Darwin",
+    "arch": "arm64",
+    "python": "3.12.11",
+    "client_host": {
+      "os": "Darwin",
+      "arch": "arm64",
+      "python": "3.12.11",
+      "machine_id": "machine_45d1a3ef31a1728d"
+    },
+    "platform_runtime": {
+      "runtime_type": "local_process",
+      "collection_status": "partial",
+      "source": "inferred",
+      "engine_host": "host_f8fb0209c83d"
+    },
+    "machine_id": "machine_45d1a3ef31a1728d"
+  },
+  "export": {
+    "timestamp": "2026-05-02T18:22:36.061226",
+    "tool": "benchbox-exporter",
+    "anonymized": true
+  }
+}

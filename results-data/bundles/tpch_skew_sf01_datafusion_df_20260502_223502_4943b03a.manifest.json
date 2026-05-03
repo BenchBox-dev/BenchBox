@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:52:06.037399+00:00",
+  "bundle_file": "tpch_skew_sf01_datafusion_df_20260502_223502_4943b03a.json",
+  "bundle_hash": "6c4ed525a41464effb22749d575ae683f92208cf367bd3c5b572c6ebc3d5fa72",
+  "companion_hashes": {},
+  "benchmark": "TPC-H Skew",
+  "platform": "DataFusion",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

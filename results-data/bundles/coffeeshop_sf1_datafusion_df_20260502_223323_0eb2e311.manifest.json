@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:47:28.435076+00:00",
+  "bundle_file": "coffeeshop_sf1_datafusion_df_20260502_223323_0eb2e311.json",
+  "bundle_hash": "a0cdbb436e1840cfbb4d474862fe02d91fd9c08560aa8230a478151e0d7615d0",
+  "companion_hashes": {},
+  "benchmark": "CoffeeShop",
+  "platform": "DataFusion",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

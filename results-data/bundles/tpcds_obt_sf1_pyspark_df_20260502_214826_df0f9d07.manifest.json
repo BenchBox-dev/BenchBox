@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:50:58.998460+00:00",
+  "bundle_file": "tpcds_obt_sf1_pyspark_df_20260502_214826_df0f9d07.json",
+  "bundle_hash": "6d43af39e8e679b1206e31a100b81b8b27a0d48be41b7e1592dea372dabe8b41",
+  "companion_hashes": {},
+  "benchmark": "TPC-DS-OBT",
+  "platform": "PySpark",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

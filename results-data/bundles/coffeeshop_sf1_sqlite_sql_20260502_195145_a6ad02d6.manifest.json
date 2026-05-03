@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:47:33.046611+00:00",
+  "bundle_file": "coffeeshop_sf1_sqlite_sql_20260502_195145_a6ad02d6.json",
+  "bundle_hash": "b3bc4c1d49dd0506146ebb695b2ba075a50ff227da75983aa940209240cd1abd",
+  "companion_hashes": {},
+  "benchmark": "CoffeeShop",
+  "platform": "SQLite",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}

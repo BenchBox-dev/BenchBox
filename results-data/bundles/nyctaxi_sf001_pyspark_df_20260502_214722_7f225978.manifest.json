@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:49:09.678149+00:00",
+  "bundle_file": "nyctaxi_sf001_pyspark_df_20260502_214722_7f225978.json",
+  "bundle_hash": "3626d7cef3b2ea1012e8fb5bdaaa64927a6dd02271b4d1cc581d35e33926d1a9",
+  "companion_hashes": {},
+  "benchmark": "NYC Taxi",
+  "platform": "PySpark",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "BenchBox UAT"
+}
