@@ -2,8 +2,9 @@ id: results-explorer-uat-defect-zero-query-timing-bundles
 title: "UAT defect: submitted bundles contain all-zero query timings"
 worktree: main
 priority: "High"
-status: "In Progress"
+status: "Completed"
 category: "Core Functionality"
+completed_date: "2026-05-03"
 
 description: |
   W5 full-package validation reported 54 occurrences where all query timings
