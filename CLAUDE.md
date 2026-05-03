@@ -226,6 +226,7 @@ file-first capture flow when you want to record one explicitly outside a review.
 | lint | `uv run ruff check .` |
 | lint+fix | `uv run ruff check --fix .` |
 | typecheck | `uv run ty check` |
+| sweep validator-clean rate (sweep-shape UATs) | `uv run -- python scripts/uat_validator_rollup.py <results-dir> --output -` (see `docs/operations/uat-methodology.md`) |
 
 ### CLI
 ```bash
