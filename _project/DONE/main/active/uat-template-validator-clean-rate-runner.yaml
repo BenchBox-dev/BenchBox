@@ -2,8 +2,9 @@ id: uat-template-validator-clean-rate-runner
 title: "Add validator-clean-rate runner step + roll-up TSV for sweep-shape UATs"
 worktree: main
 priority: "Medium"
-status: "Not Started"
+status: "Completed"
 category: "Testing and Quality Assurance"
+completed_date: "2026-05-03"
 
 description: |
   Promotes the validator-clean rate from a manual reconciliation step
@@ -75,7 +76,7 @@ work:
 - id: w4
   summary: "Document in docs/operations/uat-methodology.md (or similar) plus a CLAUDE.md note"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Short docs entry: when to run, what the TSV columns mean, how to
     read the per-platform rate. Add a one-line CLAUDE.md note pointing
