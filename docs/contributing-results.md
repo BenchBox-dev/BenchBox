@@ -39,6 +39,9 @@ Use `uv run -- benchbox submit` to create a submission package:
 # Package the most recent result
 uv run -- benchbox submit --last --output ./submission
 
+# Show exact result paths if you need to choose a specific run
+uv run -- benchbox results --paths --limit 25
+
 # Or specify a result file directly
 uv run -- benchbox submit benchmark_runs/results/tpch_sf001_duckdb_20260401_120000.json --output ./submission
 

@@ -724,3 +724,10 @@ def test_submit_submitted_by_in_help_output() -> None:
     result = CliRunner().invoke(sub.submit, ["--help"])
     assert result.exit_code == 0
     assert "--submitted-by" in result.output
+
+
+def test_submit_help_mentions_results_paths_affordance() -> None:
+    """Submit help points contributors to exact result path discovery."""
+    result = CliRunner().invoke(sub.submit, ["--help"])
+    assert result.exit_code == 0
+    assert "benchbox results --paths" in result.output

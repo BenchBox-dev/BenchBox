@@ -102,6 +102,12 @@ Display exported benchmark results and execution history.
 - `--limit INTEGER`: Number of results to show (default: 10)
 - `--submitted`: Show hosted submission history sidecars instead of exported
   benchmark result files
+- `--paths`: Print copyable primary result JSON paths for use with
+  `benchbox submit`, `benchbox export`, or `benchbox results show-cli`
+
+`--paths` lists the primary schema-v2 result JSON files returned by the result
+history and excludes companion files such as `.plans.json`, `.tuning.json`, and
+hosted `.submission.json` sidecars.
 
 ### Usage Examples
 
@@ -111,6 +117,9 @@ benchbox results
 
 # Show more results
 benchbox results --limit 25
+
+# Show exact result file paths accepted by submit/export
+benchbox results --paths
 
 # Show hosted submissions and public URLs
 benchbox results --submitted
