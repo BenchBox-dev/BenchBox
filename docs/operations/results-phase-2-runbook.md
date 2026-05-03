@@ -98,6 +98,13 @@ Use `workflow_dispatch` only after confirming there is no newer push already reb
 The explorer pipeline treats sidecar presence as the trust-label contract for community
 submissions.
 
+`published-results` is a slim, corpus-only branch by design. The exact allowlist of
+paths that may live on it (and the matching exclusion list applied at the slim-down)
+is documented in
+[`docs/development/adr/adr-published-results-slim-corpus-branch.md`](../development/adr/adr-published-results-slim-corpus-branch.md).
+A submission PR that adds files outside the allowlist should be redirected to
+`develop` instead.
+
 ## 8. Code Locations
 
 | Surface | Path |
