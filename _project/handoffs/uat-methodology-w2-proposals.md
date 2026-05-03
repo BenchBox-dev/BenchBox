@@ -15,14 +15,32 @@
 behaviour — new top-level fields validate today without a schema edit.
 Work-unit objects (TODO_SCHEMA.yaml:86–117) do not set
 `additionalProperties: false` either, so per-work-unit additions also
-validate. **No new field below requires a schema change to be accepted by
-the existing validator.** The schema edit is only needed if we want
-strict-mode authors to get a clean error.
+validate.
 
-This shifts the cost/benefit of every "new convention" proposal: the
-authoring overhead is real, but the schema/tooling overhead is zero unless
-we want enforcement teeth. That decision lives with the user (Open
-Question Q1 / Q3 in the parent TODO).
+**Important exception (caught while testing the W2 snippets):**
+`open_questions` items are explicitly typed `string` (TODO_SCHEMA.yaml:303–307).
+Object-form entries — proposed below for Finding 3 — fail validation
+today regardless of strict mode. Empirically tested:
+
+```text
+$ uv run --project _project/scripts -- python _project/scripts/validate_todo.py /tmp/uat_test.yaml
+❌ /tmp/uat_test.yaml is invalid:
+   • open_questions -> 1: {'question': '...', 'gating': True, ...} is not of type 'string'
+```
+
+So the cost picture is:
+- **Findings 1 & 2** (coverage_checklist on a work unit;
+  validator-clean-rate strings in success_metrics): zero schema change.
+  Tested empirically — both validate today.
+- **Finding 3** (object-form `open_questions`): requires a small,
+  backwards-compatible schema relaxation to `oneOf [string, object]`.
+  String-form gating questions can land as a convention without a
+  schema change, but the structured `affects:` link — the value-add
+  over a string — is what needs the relaxation.
+
+The authoring/enforcement cost decision (does tooling enforce, or only
+reviewer attention?) lives with the user. Per-finding recommendations are
+embedded in each section's verification mechanism.
 
 ---
 
@@ -92,23 +110,22 @@ unaffected unless explicitly retrofitted.
 
 ### c. Verification mechanism
 
-Two layers:
+**Recommendation: convention only, no tooling.** Coverage gaps are easy
+to spot in the W7 report (an empty subsection or missing
+absence-of-findings note is obvious to a reviewer), and false-positive
+risk from tooling — refusing `done` on a unit whose checklist entry is
+satisfied via an absence-of-findings note — is non-trivial. The cost
+of tooling exceeds its catch.
 
-1. **Convention (zero tooling).** TODO authors agree that any
-   `coverage_checklist` entry without satisfied `evidence_required`
-   blocks the work unit from `done`. The W7 / final-report writer
-   explicitly addresses each entry.
+What this looks like:
+- TODO authors include `coverage_checklist:` on cross-cutting work units
+  (W4 design doc lists when this applies).
+- The W7 / final-report writer addresses each entry by ID.
+- A reviewer flags any unaddressed entry before the TODO is moved to DONE.
 
-2. **Tooling (optional, separate implementation TODO).** Extend
-   `_project/scripts/todo_cli.py done <slug> <work-id>` to refuse the
-   transition if the work unit has a non-empty `coverage_checklist` and
-   no `coverage_evidence` field on the same unit. The schema already
-   allows this; tooling enforcement is the only missing piece. File as
-   `uat-template-coverage-checklist-tooling` IF the user wants
-   enforcement; otherwise convention is enough.
-
-The W4 design document should surface this as a per-user choice: cheap
-convention (recommended starting point) vs. stronger tooling.
+If a future UAT shows the convention drifting (an entry was missed and
+not caught by review), revisit and file a tooling TODO at that point
+with concrete evidence of the failure mode.
 
 ### d. Migration plan
 
@@ -168,23 +185,23 @@ they make the divergence visible *at completion time*, not after the fact.
 
 ### c. Verification mechanism
 
+**Recommendation: convention + a small runner step (one new
+implementation TODO).** No `todo_cli.py` enforcement.
+
 1. **Authoring convention.** The validator-clean rate metric is
    *required* for any UAT that produces a result corpus. The W4 design
    document lists the canonical phrasing for the W5 author to copy.
-
-2. **Runtime check.** Add to the sweep driver (or a post-sweep step) an
-   automated `validate_submission.py` pass over every captured bundle,
-   plus a roll-up TSV. The W7 report consumes the roll-up directly. The
-   parent UAT effectively did this manually
-   (`submission_validation_20260502.log` reported `188 error(s)` over 376
-   bundles); making it a first-class step formalises the metric. File as a
-   separate implementation TODO.
-
-3. **Floor enforcement at completion.** When the actual rate is below
-   the declared floor, `todo_cli.py done` (or a manual W7 review)
-   surfaces the breach. Either fix in scope or document the exception
-   explicitly. Today this is a manual check; tooling enforcement is
-   future work and out of scope for this plan.
+2. **Runner step.** File ONE implementation TODO to add a sweep-driver
+   step (or post-sweep helper) that runs `validate_submission.py` over
+   every captured bundle and emits a roll-up TSV. The parent UAT
+   effectively did this by hand; formalising it removes the manual
+   reconciliation step from every future W7. Cheap to write, high
+   leverage; the metric otherwise relies on the W5 author remembering
+   to capture it.
+3. **Floor surfacing at completion.** Manual reviewer check during W7.
+   Tooling enforcement is out of scope — false-positive cost (a
+   defensible exception to the floor blocks `done`) is higher than
+   reviewer-catch cost.
 
 ### d. Migration plan
 
@@ -260,9 +277,11 @@ success_metrics:
 
 **Piece 2 — `gating: true` on open questions that change `success_metrics`.**
 Allow `open_questions:` entries to be either a string (legacy) or an
-object with `question`, `gating`, `affects`. The schema is already
-permissive (`additionalProperties: true`), so this is purely an authoring
-convention; tooling enforcement is a follow-up.
+object with `question`, `gating`, `affects`. **This requires a small
+schema relaxation** — the current schema explicitly types
+`open_questions` items as `string`, so the object form fails validation
+today. Schema change is backwards-compatible: string-form entries continue
+to validate.
 
 ```yaml
 open_questions:
@@ -282,17 +301,14 @@ question is resolved (either deleted or answered with `resolved_with:`).
 
 ### c. Verification mechanism
 
+**Recommendation: convention + schema relaxation (one
+implementation TODO bundling both pieces). No `todo_cli.py` enforcement
+in this plan.**
+
 1. **Authoring convention.** Submission-flow success metrics use the
-   four-word vocabulary verbatim. The W4 design document is the
-   reference.
-
-2. **`gating: true` enforcement** is a tooling change in
-   `todo_cli.py done` (and probably `validate_todo.py`). File as a
-   separate implementation TODO. Without enforcement, the convention
-   relies on reviewer attention.
-
-3. **Schema update (optional).** To make the object form first-class,
-   `open_questions` becomes:
+   four-word vocabulary verbatim. The W4 design document is the reference.
+2. **Schema relaxation** (required for Piece 2 to validate). Update
+   `TODO_SCHEMA.yaml` `open_questions` to:
 
    ```yaml
    open_questions:
@@ -310,7 +326,12 @@ question is resolved (either deleted or answered with `resolved_with:`).
              resolved_with: { type: string }
    ```
 
-   This is backwards-compatible: string-form entries still pass.
+   Backwards-compatible: string-form entries still pass.
+3. **`gating: true` runtime enforcement** (refusing `todo_cli.py done`
+   on a unit listed in `affects:` of a still-gating question) is **out of
+   scope for this plan.** File only if a future UAT shows the convention
+   drifting. Reviewer attention is sufficient initially because the
+   `affects:` field makes the gate visible at completion-time review.
 
 ### d. Migration plan
 
@@ -330,20 +351,27 @@ question is resolved (either deleted or answered with `resolved_with:`).
 
 ## Cross-cutting decisions left for the user (W4 will surface)
 
-1. **Tooling enforcement vs convention only?** Each finding has a "tooling
-   makes it real, convention makes it cheap" tradeoff. Recommend:
-   convention-only for now; revisit after the next UAT exercises all
-   three.
-2. **Schema strict mode default?** Today `additionalProperties: true` at
+1. **Implementation TODO count.** Recommended: **two** TODOs filed in W5,
+   not three.
+   - `uat-template-validator-clean-rate-runner` — runner step that
+     reports validator-clean rate after every UAT sweep. Covers Finding
+     2's runner step.
+   - `uat-template-success-metric-terminal-state-and-gating` — combined:
+     adds the terminal-state vocabulary doc and the schema relaxation
+     for object-form `open_questions`. Covers Finding 3.
+   - Finding 1 (coverage_checklist) is convention-only; **no
+     implementation TODO** beyond merging this plan's example into the
+     W4 design document.
+   - Plus optional retrofit of `external-contributor-submission-dry-run`
+     (one-line success-metrics tightening), which can be folded into
+     either the Finding 3 TODO or filed as its own micro-TODO depending
+     on review preference.
+2. **Schema strict-mode default?** Today `additionalProperties: true` at
    top level means even malformed conventions validate. Flipping the
    default to strict would catch typos but breaks any legacy TODO with
    extra fields. Recommend: leave as-is; rely on reviewer attention plus
    explicit documentation.
 3. **Project-wide UAT policy doc vs per-TODO conventions?** Per-TODO is
    easier to drift from but easier to author. Recommend: per-TODO for
-   the next two UATs; promote to a UAT_TEMPLATE.yaml once the
-   conventions have proven their cost/benefit.
-4. **Spec home: `_project/specs/` (forward-looking) vs `_project/decisions/`
-   (ADR)?** Recommend `_project/specs/` per the parent TODO. ADR fits
-   if the user wants this captured as a decision-of-record after the
-   plan ships.
+   the next two UATs; promote to a `UAT_TEMPLATE.yaml` subtemplate once
+   the conventions have proven their cost/benefit.
