@@ -57,7 +57,7 @@ needed.
 | UAT | Catches the failure? | False-positive risk? | Authoring cost |
 |---|---|---|---|
 | 2026-04-28 Cowork | Terminal state was `local-stage` ("would-have-pushed"); the parent TODO didn't specify. Vocab would have made it explicit. Cowork's blocker (no GitHub auth) was structural, not a gating-question failure — `gating: true` doesn't apply. | Low — vocab is descriptive. Reviewer-attention model for gating questions can under- or over-flag. | One-line vocab swap; gating field only used when applicable. |
-| 2026-04-29 Codex | Terminal state was "stopped at local validator due to hash mismatch" — outside the four-word vocab. Recommend prose handles partial-stop states; vocab covers the intentional terminal states. The hash mismatch wasn't gated by Q3 (publish vs draft PR), so `gating: true` doesn't help here. | Low. | Minimal. |
+| 2026-04-29 Codex | Terminal state was "stopped at local validator due to hash mismatch" — **prose-only by design**: the vocab is for *intended* terminal states, not blocker-truncated runs. The four words stay tight; partial-stop runs are reported as "stopped at <phase>: <reason>" in prose. The hash mismatch wasn't gated by Q3 (publish vs draft PR), so `gating: true` doesn't help here. | Low. | Minimal. |
 | 2026-05-02 sweep | **Direct hit on both pieces.** Vocab disambiguates the W5 success metric. `gating: true` on Q3 would have forced resolution before W5 started, removing the "agent inferred from evidence" pattern. The schema relaxation is what makes the structured `affects:` link possible. | Schema relaxation: nil — `oneOf` is backwards-compatible. Gating-attention model: low; reviewer can flag at completion-time review. | Vocab line + optional object-form question. Minimal. |
 
 **Verdict:** Survives replay. Direct hit on source case; harmless for
@@ -99,7 +99,40 @@ Tooling overhead delivered by W5:
    and from formalising what the 2026-05-02 sweep had to do by hand.
 4. **No new blind spots surfaced** during the stress test. Replays were
    all "no false positives, low cost, catches the source failure" —
-   suggesting either (a) the proposals are well-targeted, or (b) the
-   stress-test surface (three retrospectives) is too narrow. To partly
-   address (b), a future fourth UAT (single result, on a clean release)
-   would be a useful third data point for the single-result shape.
+   which could mean (a) the proposals are well-targeted, (b) the
+   stress-test surface (three retrospectives) is too narrow, or
+   (c) **proposer self-bias**: the same agent designed both the
+   proposals and this stress-test, and naturally filtered out the
+   obvious failure modes during drafting. Mitigations: a future fourth
+   UAT would broaden the surface; an independent review of the
+   proposals (separate /code review pass beyond the W2 self-review;
+   user critique at W4) would partly counter the self-bias.
+
+## Strongest argument for dropping each proposal
+
+Adversarial framing inserted to counter proposer self-bias (see
+`_project/blind-spots/2026-05-03-084354-stress-test-self-bias.md`):
+
+- **Drop Proposal 1?** "coverage_checklist is a glorified checklist that
+  duplicates what a competent W7 reviewer already does. The 2026-05-02
+  W7 reviewer caught the cross-scale gap *during the L2 audit step* of
+  this very review — without the checklist." Counter: the L2 audit
+  caught it post-hoc, not at completion-time. The checklist front-loads
+  the obligation.
+- **Drop Proposal 2?** "validator-clean rate is downstream of underlying
+  contract bugs (normalised cost, zero query timings); the rate is a
+  symptom, not a cause. Filing the contract-bug TODOs already addresses
+  the failure; the rate metric is decorative." Counter: a sweep that
+  produces a 45% invalid corpus still ships a misleading W3 success
+  count. The rate makes the discrepancy visible at the same time as
+  the success count, which a defect TODO does not.
+- **Drop Proposal 3?** "Terminal-state vocab is solvable by clearer
+  prose. `gating: true` on open questions is a process gate; the same
+  effect is achievable by moving the question into `must_preserve` or
+  `description`. The proposal adds structure for a problem solvable by
+  better authoring discipline." Counter: 'better authoring discipline'
+  is what the parent UAT did and the gap still happened. The structured
+  `affects:` link is the part that prose alone cannot replicate.
+
+None of these adversarial cases were strong enough to override the
+W3 verdict, but the framing is now on record.
