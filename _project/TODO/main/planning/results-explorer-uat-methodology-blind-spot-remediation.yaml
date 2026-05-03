@@ -1,0 +1,241 @@
+id: results-explorer-uat-methodology-blind-spot-remediation
+title: "Plan: address the three UAT-20260502 methodology blind spots before the next sweep"
+worktree: main
+priority: "Medium-High"
+status: "Not Started"
+category: "Testing and Quality Assurance"
+
+description: |
+  The 2026-05-03 code review of `results-explorer-uat-multi-scale-corpus-sweep`
+  produced a Blind-Spot Audit (L2) with three methodology findings,
+  captured under `_project/blind-spots/`:
+
+    1. `2026-05-03-081920-uat-cross-scale-deliverable-not-guarded.md`
+       — UAT framework declared a headline deliverable (cross-scale
+       comparison UX) but had no enforcement; the agent's W6 findings
+       drifted to easier surfaces.
+    2. `2026-05-03-081921-uat-invalid-bundle-rate-not-tracked.md`
+       — Triage classified failures per-cluster but never tracked the
+       overall "passed-but-validator-rejected" rate (~45% in this sweep)
+       as a methodology metric.
+    3. `2026-05-03-081922-uat-submit-success-metric-ambiguity.md`
+       — "Submitted via the BenchBox submission flow" conflated local
+       staging, draft PR, and merged-to-`published-results`; Open Question
+       Q3 sat in the deferred-resolution position when it actually gated
+       the W5 deliverable.
+
+  This TODO produces a **plan**, not the implementation. The deliverable
+  is a single design document covering each finding's root cause,
+  proposed template/process change, and verification mechanism, plus a
+  set of follow-up implementation TODOs filed once the plan is approved.
+
+  Producing the plan now (rather than implementing inline) follows the
+  precedent set by the parent UAT TODO itself, which observed and reported
+  but explicitly deferred fixes. The findings are about how UAT TODOs are
+  authored and verified — touching that surface without an explicit plan
+  risks scattershot template edits that don't actually close the gaps.
+
+work:
+- id: w1
+  summary: "Read the three blind-spot files and the parent UAT retrospective"
+  status: pending
+  notes: |
+    Inputs:
+      - `_project/blind-spots/2026-05-03-08192{0,1,2}-*.md`
+      - `_project/handoffs/results-explorer-uat-retrospective-20260502.md`
+      - `_project/DONE/main/active/results-explorer-uat-multi-scale-corpus-sweep.yaml`
+      - `_project/TODO_ENTRY_TEMPLATE.yaml` (the surface most edits will
+        touch)
+      - `_project/TODO/main/planning/external-contributor-submission-dry-run.yaml`
+        (parallel UAT-style TODO that may share the success-metric
+        ambiguity)
+    Note any other in-flight UAT/dry-run TODOs that exhibit the same
+    patterns; they may need to be retrofitted by the implementation
+    TODOs filed in w5.
+
+- id: w2
+  summary: "Draft remediation proposals for each of the three findings"
+  needs: [w1]
+  status: pending
+  notes: |
+    For each finding, produce:
+      a. Root cause: what specifically in the UAT TODO format failed.
+      b. Proposed template change: concrete additions or restructurings to
+         `_project/TODO_ENTRY_TEMPLATE.yaml` or a new
+         `_project/UAT_TEMPLATE.yaml` subtemplate. Include exact YAML
+         snippets, not prose.
+      c. Verification mechanism: what the W7 final report or a new
+         pre-completion check must demonstrate. For finding 1, an
+         enumerated coverage checklist; for finding 2, a numeric
+         validator-clean-rate floor in success_metrics; for finding 3,
+         an explicit terminal-state declaration plus a `gating: true`
+         marker on open_questions that change success_metrics.
+      d. Migration plan: which existing TODOs are retrofitted vs left
+         as-is. Default to "retrofit only the active UAT/dry-run TODOs;
+         leave Completed ones alone."
+
+- id: w3
+  summary: "Stress-test the proposals against historical UATs"
+  needs: [w2]
+  status: pending
+  notes: |
+    For each proposal, replay against:
+      - the 2026-04-28 Cowork agent-proxy dry-run
+        (`_project/handoffs/external-dry-run-retrospective-2026-04-28.md`),
+      - the 2026-04-29 Codex agent-proxy dry-run
+        (`_project/handoffs/external-dry-run-retrospective-2026-04-29.md`),
+      - the 2026-05-02 sweep retrospective.
+    For each historical UAT, ask: would the proposed change have caught
+    the failure mode? Would it have generated false positives? Would the
+    template have been onerous to author? Document the answers — if any
+    proposal looks expensive vs prior UATs without a corresponding
+    benefit, drop it or simplify before w4.
+
+- id: w4
+  summary: "Compile the design document and route to user for approval"
+  needs: [w3]
+  status: pending
+  notes: |
+    Output file:
+      `_project/specs/uat-methodology-blind-spot-remediation.md`
+    Sections:
+      1. Executive summary (recommendation + main tradeoff).
+      2. Per-finding remediation (one section each, structured per w2).
+      3. Template diff preview (before/after of
+         `_project/TODO_ENTRY_TEMPLATE.yaml` if that's the surface
+         touched).
+      4. Migration plan + retrofit list.
+      5. Open questions for the user.
+      6. Implementation TODO list (titles only — files in w5).
+    Surface in chat for user review. Do not proceed to w5 until the user
+    explicitly approves; the plan is itself the deliverable.
+
+- id: w5
+  summary: "After approval, file implementation TODOs and triage the blind-spot files"
+  needs: [w4]
+  status: pending
+  notes: |
+    File one TODO per accepted remediation under
+    `_project/TODO/main/planning/`. Slug each so the link to the
+    originating finding is obvious (e.g.,
+    `uat-template-cross-scale-coverage-checklist`,
+    `uat-template-validator-clean-rate-metric`,
+    `uat-template-success-metric-terminal-state`).
+
+    Then update each blind-spot file via:
+      `uv run --project _project/scripts -- python
+       _project/scripts/sweep_blind_spots.py triage <id>
+       --action promote --todo-id <implementation-todo-slug>`
+
+    If the user rejects a remediation outright, mark that finding
+    `--action dismiss --reason "..."` instead.
+
+verification:
+- description: "Design document exists at the agreed location with all six required sections."
+  command: "test -f _project/specs/uat-methodology-blind-spot-remediation.md"
+  expected_output: "file exists"
+- description: "All three blind-spot files have status `merged-to-todo` (or `dismissed` for explicitly rejected ones)."
+  command: "uv run --project _project/scripts -- python _project/scripts/sweep_blind_spots.py list --status open | grep -E '081920|081921|081922' || echo 'all triaged'"
+  expected_output: "all triaged"
+- description: "Implementation TODOs exist for each accepted remediation."
+  command: "ls _project/TODO/main/planning/uat-template-*.yaml 2>/dev/null"
+  expected_output: "one yaml per accepted remediation"
+
+must_preserve:
+- "Backwards compatibility of `_project/TODO_ENTRY_TEMPLATE.yaml` — any new fields are additive, optional, and ignored by older TODOs."
+- "Existing UAT TODO format used by other in-flight items (`external-contributor-submission-dry-run`, etc.) continues to validate unchanged unless explicitly retrofitted."
+- "The blind-spot directory protocol (`_project/blind-spots/README.md`) — triage uses the existing sweep script, not new tooling."
+
+approach: |
+  Treat this as a spec-before-code task. The plan IS the deliverable;
+  implementation goes in separate, narrower TODOs filed in w5. Lean on
+  existing project infrastructure (`_project/TODO_ENTRY_TEMPLATE.yaml`,
+  `_project/blind-spots/README.md`, `sweep_blind_spots.py`) rather than
+  proposing new tooling. Retrofit existing UATs only where the cost is
+  visibly less than the catch — bias toward "apply to next UAT, leave
+  Completed ones alone."
+
+  Use `_project/specs/` as the spec home (consistent with other
+  spec-style design docs). The /spec workflow under the todo skill
+  describes the structure; we are using it for a process change rather
+  than a feature, but the assumption-surfacing and human-review-gate
+  patterns apply.
+
+anti_patterns:
+- "DO NOT implement template edits during this TODO -- because the deliverable is the plan, and inline implementation muddies the user-review gate -- file separate implementation TODOs in w5."
+- "DO NOT collapse the three findings into a single homogeneous remediation -- because they have different shapes (deliverable enforcement / metric definition / policy resolution) -- preserve the per-finding structure through to w5."
+- "DO NOT propose new tooling unless the existing scripts genuinely cannot express the change -- because the project already has working blind-spot triage and TODO indexing -- prefer additive YAML conventions."
+- "DO NOT auto-promote findings without user approval -- because two of the three are policy-flavored (terminal state, gating questions) and need explicit human sign-off -- route through w4."
+
+scope_limit:
+  only_modify:
+  - "_project/specs/uat-methodology-blind-spot-remediation.md"
+  - "_project/TODO/main/planning/results-explorer-uat-methodology-blind-spot-remediation.yaml"
+  - "_project/TODO/main/planning/uat-template-*.yaml"
+  - "_project/blind-spots/2026-05-03-08192*.md"
+  - "_project/handoffs/uat-methodology-*.md"
+  do_not_modify:
+  - "_project/TODO_ENTRY_TEMPLATE.yaml"
+  - "_project/blind-spots/README.md"
+  - "benchbox/"
+  - "results-explorer/"
+  - "scripts/"
+
+success_metrics:
+- "Single design document delivered covering all three findings (root cause / proposal / verification / migration)."
+- "Each accepted remediation has a corresponding implementation TODO filed; each rejected one has a dismissal reason in the blind-spot triage log."
+- "All three blind-spot files have status `merged-to-todo` or `dismissed` after w5."
+- "Plan stress-tested against >=2 historical UATs and false-positive / cost concerns documented."
+
+open_questions:
+- "Should the cross-scale coverage checklist live as a free-form `notes` field on the W6 work unit, or as a structured `coverage_checklist:` block in the TODO schema? Free-form is cheaper; structured is enforceable by validate_todo.py."
+- "Where does the validator-clean-rate floor go — `success_metrics` (per-TODO) or a new project-wide UAT policy doc? Per-TODO is local; project-wide makes drift across sweeps harder."
+- "Do gating questions need a tooling change (e.g., todo_cli.py blocks `done` on unresolved gating questions) or is the convention enough? Convention-only is fastest; tooling enforces it."
+- "Is `_project/specs/` the right home, or should this go under `_project/decisions/` (ADR) or `docs/operations/`? Spec is closer to forward-looking; ADR is decision-of-record after the fact."
+
+deferred:
+- summary: "Implementing the accepted remediations"
+  reason: "Each accepted remediation gets its own narrow TODO in w5. Mixing planning and implementation here repeats the exact mistake the parent UAT avoided (and which the open dry-run TODOs document as a hard-won lesson)."
+- summary: "Retrofitting Completed UAT TODOs with the new conventions"
+  reason: "Default plan is to apply changes to the next UAT and to currently-active UAT-style TODOs only. Completed ones are historical record; rewriting them buys nothing and risks audit confusion."
+- summary: "Generalising the conventions beyond UAT TODOs (e.g., to all dry-run / observation TODOs)"
+  reason: "Out of scope until the UAT-specific changes have shipped and proved their cost/benefit. Premature generalisation is itself one of the patterns the blind-spots flag."
+
+metadata:
+  tags:
+  - uat
+  - methodology
+  - blind-spots
+  - process-improvement
+  - templates
+  estimated_effort: "Small-Medium (1 session for plan; w5 file-creation is mechanical)"
+  created_date: "2026-05-03"
+
+impact:
+  business_value: |
+    Increases the signal density of future UAT sweeps. A UAT that misses
+    its headline deliverable, overstates corpus health, or ends without
+    publication burns a session of wall-clock time for less than its full
+    value; closing those gaps once compounds across every future sweep.
+  user_impact: |
+    Indirect: external users see a more reliable corpus and a more
+    consistent submission story when the next UAT lands.
+  technical_debt: |
+    Closes the loop on the L2 audit produced by the 2026-05-03 review —
+    findings printed only in chat get lost; this TODO is the action half
+    of the file-first capture protocol.
+
+context_sections:
+  "Relationship to the parent UAT TODO": |
+    The parent TODO (`results-explorer-uat-multi-scale-corpus-sweep`) was
+    itself observation-only by design. Its W7 spawned 14 defect TODOs.
+    This TODO spawns the *methodology* counterparts of those defects —
+    not bugs in the explorer or submission flow, but bugs in how the UAT
+    was scoped and verified. Treating those as first-class is what makes
+    "observe, then plan" a reliable pattern instead of a coincidence.
+  "Why a separate plan TODO instead of inline edits": |
+    Two of the three findings are policy-flavored (success-metric
+    terminal state, gating-question convention). Editing the template
+    inline would lock those policies without a review gate — and they
+    affect every future TODO author, not just UAT ones. The user-review
+    step at w4 is load-bearing, not bureaucratic.
