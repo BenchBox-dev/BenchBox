@@ -2,8 +2,9 @@ id: results-explorer-uat-defect-normalized-cost-unavailable-bundles
 title: "UAT defect: submitted bundles emit cost totals with unavailable cost status"
 worktree: main
 priority: "High"
-status: "In Progress"
+status: "Completed"
 category: "Core Functionality"
+completed_date: "2026-05-03"
 
 description: |
   W5 full-package validation rejected many bundles because `cost.total_usd` was
