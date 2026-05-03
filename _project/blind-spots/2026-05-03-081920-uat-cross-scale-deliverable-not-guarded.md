@@ -1,7 +1,7 @@
 ---
 id: 2026-05-03-081920-uat-cross-scale-deliverable-not-guarded
 date: 2026-05-03
-status: open
+status: actioned
 finding_kind: framework-gap
 review_context: "code review of completed TODO _project/DONE/main/active/results-explorer-uat-multi-scale-corpus-sweep.yaml (W6 cross-scale UX deliverable)"
 related_paths:
@@ -40,3 +40,7 @@ final report explicitly answers, not a prose ask the agent might honor.
 - [ ] For the next UAT, add an enumerated cross-scale checklist (e.g. "for at least 3 platforms, open the same benchmark at SF=0.01/0.1/1.0 and capture cross-scale comparison findings") to W6 work unit notes.
 - [ ] Update `_project/TODO_ENTRY_TEMPLATE.yaml` (or a UAT-specific subtemplate) so headline deliverables are declared as `success_metrics` entries with measurable coverage commands, not prose-only goals.
 - [ ] Audit other in-flight UAT-style TODOs (e.g. `external-contributor-submission-dry-run`) for the same pattern and decide whether to retrofit explicit coverage checklists.
+
+## Triage log
+
+- 2026-05-03: actioned — Convention-only remediation captured in _project/specs/uat-methodology-blind-spot-remediation.md §2 Finding 1; per W4 user approval, no follow-up TODO needed (coverage_checklist is convention only).

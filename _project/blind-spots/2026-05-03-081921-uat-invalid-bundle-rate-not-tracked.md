@@ -1,7 +1,7 @@
 ---
 id: 2026-05-03-081921-uat-invalid-bundle-rate-not-tracked
 date: 2026-05-03
-status: open
+status: merged-to-todo
 finding_kind: missed-axis
 review_context: "code review of completed TODO _project/DONE/main/active/results-explorer-uat-multi-scale-corpus-sweep.yaml (W5 submission flow validation)"
 related_paths:
@@ -9,7 +9,7 @@ related_paths:
   - _project/DONE/main/active/results-explorer-uat-defect-normalized-cost-unavailable-bundles.yaml
   - _project/DONE/main/active/results-explorer-uat-defect-zero-query-timing-bundles.yaml
 suggested_sweep: "treat 'attempted-pass-but-validator-rejected' as its own corpus-quality metric and add it to UAT success_metrics with an explicit budget"
-todo_id: null
+todo_id: uat-template-validator-clean-rate-runner
 ---
 
 # UAT triaged failures per-cluster but never tracked the overall invalid-bundle rate as a methodology metric
@@ -43,3 +43,7 @@ language is failing to track what actually matters.
 - [ ] Add a "validator-clean rate" metric to UAT `success_metrics`: e.g. ">=80% of W3-passed cells produce bundles that pass `scripts/validate_submission.py`."
 - [ ] Capture the rate per-platform and per-benchmark in the W7 report — clusters with low validator-clean rates are higher-priority defect targets than clusters with low W3-pass rates.
 - [ ] Reconsider whether `--phases load,power` plus default validation is the right floor for a UAT corpus when so many bundles fail downstream contract validation; possibly add a pre-submission validator pass to W3 itself.
+
+## Triage log
+
+- 2026-05-03: promoted to TODO `uat-template-validator-clean-rate-runner`
