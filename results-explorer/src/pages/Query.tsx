@@ -851,6 +851,10 @@ function formatDateWindowLabel(value: string): string {
   return `Last ${value}`;
 }
 
+function formatFacetAccessibleName(groupLabel: string, optionLabel: string, count: number): string {
+  return `${groupLabel}: ${optionLabel} (${count.toLocaleString()})`;
+}
+
 function FacetSection({
   label,
   buckets,
@@ -874,6 +878,7 @@ function FacetSection({
             <span class="inline-flex items-center gap-2">
               <input
                 type="checkbox"
+                aria-label={formatFacetAccessibleName(label, formatLabel(bucket.value), bucket.count)}
                 checked={selected.includes(bucket.value)}
                 onChange={() => onToggle(bucket.value)}
               />

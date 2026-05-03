@@ -33,18 +33,19 @@ work:
 - id: w2
   summary: "Disambiguate accessible names without making visible labels noisy"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Work-unit-owned files before editing:
     - `results-explorer/src/pages/Query.tsx`
     - `results-explorer/src/components/FacetRail.tsx`
+    - `results-explorer/src/pages/__tests__/Query.test.tsx` (update existing component selectors affected by
+      accessible-name changes)
 - id: w3
   summary: "Add browser or component coverage for ambiguous facet labels"
   needs: [w2]
   status: pending
   notes: |
     Work-unit-owned files before editing:
-    - `results-explorer/src/pages/__tests__/Query.test.tsx`
     - `results-explorer/e2e/routes/query.spec.ts`
 
 approach: |
@@ -80,7 +81,8 @@ must_preserve:
 - "Screen-reader accessible names remain descriptive enough to identify facet group and value."
 
 anti_patterns:
-- "DO NOT solve this by hiding cost or deployment facets -- because both are needed for corpus filtering -- disambiguate names instead."
+- "DO NOT solve this by hiding cost or deployment facets -- because both are needed for corpus filtering -- disambiguate names
+  instead."
 
 metadata:
   tags: [uat, results-explorer, accessibility, facets]

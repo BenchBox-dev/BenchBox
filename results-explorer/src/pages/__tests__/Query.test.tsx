@@ -260,7 +260,7 @@ describe("Query", () => {
 
     const dialog = screen.getByRole("dialog", { name: "Filter results" });
     expect(within(dialog).getByText("Benchmark")).toBeTruthy();
-    expect(within(dialog).getByLabelText("clickbench")).toBeTruthy();
+    expect(within(dialog).getByLabelText(/^Benchmark: clickbench/)).toBeTruthy();
     expect(within(dialog).getAllByText("Has cost").length).toBeGreaterThan(0);
   });
 
@@ -376,10 +376,10 @@ describe("Query", () => {
     const deployment = screen.getByText("Deployment").closest("section")!;
     const cloudProvider = screen.getByText("Cloud provider").closest("section")!;
     const shape = screen.getByText("Instance / warehouse").closest("section")!;
-    fireEvent.click(within(costStatus).getByLabelText(/normalized/i));
-    fireEvent.click(within(deployment).getByLabelText(/^cloud/i));
-    fireEvent.click(within(cloudProvider).getByLabelText(/^aws/i));
-    fireEvent.click(within(shape).getByLabelText(/MEDIUM/i));
+    fireEvent.click(within(costStatus).getByLabelText(/^Cost status: normalized/i));
+    fireEvent.click(within(deployment).getByLabelText(/^Deployment: cloud/i));
+    fireEvent.click(within(cloudProvider).getByLabelText(/^Cloud provider: aws/i));
+    fireEvent.click(within(shape).getByLabelText(/^Instance \/ warehouse: MEDIUM/i));
 
     await waitFor(() => {
       const selectCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) => isDefaultResultSelect(sql));
