@@ -2,7 +2,8 @@ id: results-explorer-uat-methodology-blind-spot-remediation
 title: "Plan: address the three UAT-20260502 methodology blind spots before the next sweep"
 worktree: main
 priority: "Medium-High"
-status: "In Progress"
+status: "Completed"
+completed_date: "2026-05-03"
 category: "Testing and Quality Assurance"
 
 description: |
@@ -113,7 +114,7 @@ work:
 - id: w5
   summary: "After approval, file implementation TODOs and triage the blind-spot files"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     File one TODO per accepted remediation under
     `_project/TODO/main/planning/`. Slug each so the link to the
