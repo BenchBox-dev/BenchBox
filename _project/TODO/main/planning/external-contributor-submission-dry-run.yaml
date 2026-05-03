@@ -134,6 +134,9 @@ verification:
   command: "git log published-results --format='%s' | grep -i 'community'"
   expected_output: "at least one merge commit referencing the contribution"
 
+success_metrics:
+- "Submission terminal state: merged-to-published-results (PR opened, CI green, merge complete)"
+
 must_preserve:
 - The contributor's autonomy - no real-time hand-holding during the dry-run.
 - Production review rigor - if the submission has defects, it is asked to be fixed, not silently merged.

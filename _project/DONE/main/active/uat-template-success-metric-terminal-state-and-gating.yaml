@@ -2,8 +2,9 @@ id: uat-template-success-metric-terminal-state-and-gating
 title: "Add submission terminal-state vocab + open_questions gating schema relaxation"
 worktree: main
 priority: "Medium"
-status: "Not Started"
+status: "Completed"
 category: "Testing and Quality Assurance"
+completed_date: "2026-05-03"
 
 description: |
   Closes the remediation for blind-spot finding
@@ -75,7 +76,7 @@ work:
 - id: w3
   summary: "Optional retrofit of external-contributor-submission-dry-run"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Add to `_project/TODO/main/planning/external-contributor-submission-dry-run.yaml`:
 
