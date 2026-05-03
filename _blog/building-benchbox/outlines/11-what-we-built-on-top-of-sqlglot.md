@@ -2,7 +2,7 @@
 
 > SQLGlot is the foundation, not the finished house. This post is the punchlist of what we still had to build.
 
-**TL;DR**: BenchBox runs benchmarks across 36 SQL platforms. SQLGlot does the transpilation heavy lifting (and the recent mypyc work makes it dramatically faster), but real cross-engine portability needs ~2,500 lines of additional infrastructure: dialect normalization, post-generation fixups, engine-aware semantic rewrites, a 19-platform DDL rewrite registry, hand-written query overrides where translation can't deliver, and a SQL-to-DataFrame layer that SQLGlot doesn't address. We catalog the gaps with file paths and concrete examples.
+**TL;DR**: BenchBox runs benchmarks across 36 SQL platforms. SQLGlot does the transpilation heavy lifting (and the recent mypyc work makes it dramatically faster), but real cross-engine portability needs a substantial additional layer: dialect normalization, post-generation fixups, engine-aware semantic rewrites, a 19-platform DDL rewrite registry, hand-written query overrides where translation can't deliver, and a SQL-to-DataFrame facade for engines that don't speak SQL. We catalog the gaps with file paths and concrete examples.
 
 ---
 
@@ -68,7 +68,7 @@ tags: [benchbox, sqlglot, sql, transpilation, dialects, dataframe, architecture,
 
 **Layer 3: Per-platform query transformers**. When a single platform's quirks were too platform-specific for the wrapper, we extracted them:
 - `clickhouse/query_transformer.py` (case folding, division safety, type casts)
-- `questdb_rewriter.py` (450 lines of post-AST rewrites)
+- `questdb_rewriter.py` (dedicated post-AST rewrites)
 - `datafusion_query_transformer.py` (engine-semantic query rewrites)
 
 **Layer 4: A SQL compatibility registry** (`benchbox/sql_compat/`). When the per-platform code grew structure, we built explicit rule families:
@@ -126,7 +126,7 @@ Three platforms required dedicated transformer modules.
 - DECIMAL division-by-zero NULL wrapping
 - TPC-DS Q23/Q87 subquery aliasing: we tried AST injection, it corrupted GROUP BY in Q23 and aliases inside `EXCEPT/INTERSECT` in Q87. We fell back to a session setting (`joined_subquery_requires_alias=0`) because the AST rewrite was unsafe.
 
-**QuestDB** (`platforms/questdb_rewriter.py`, ~450 lines):
+**QuestDB** (`platforms/questdb_rewriter.py`):
 - Implicit comma joins -> explicit `INNER JOIN ... ON` (every TPC-H, TPC-DS, SSB query)
 - `INTERVAL` arithmetic -> `dateadd('d', n, ts)` (TPC-H Q1, Q4, Q6, Q17)
 - `SUBSTRING(s FROM p FOR l)` -> `substring(s, p, l)`
@@ -188,7 +188,7 @@ Same pattern in `nyctaxi_variants.py`, `coffeeshop_variants.py`, `tpcdi_variants
 
 Half of BenchBox's targets are DataFrame engines: Polars, Pandas, DataFusion-Python, PySpark, Dask, Modin, cuDF, LakeSail. SQLGlot doesn't address translating SQL into Polars expressions; that's a different problem.
 
-Our `platforms/dataframe/unified_frame.py` (~2,200 lines) is a SQL-shaped facade over per-engine DataFrame APIs. Polars' own SQL frontend was tried and removed: "fundamental limitations" in our notes. DataFusion's expression AST has to be parsed post-translation for aggregate arithmetic.
+Our `platforms/dataframe/unified_frame.py` (about 4,200 lines, the largest single file in the cross-platform layer) is a SQL-shaped facade over per-engine DataFrame APIs. Polars' own SQL frontend was tried and removed: "fundamental limitations" in our notes. DataFusion's expression AST has to be parsed post-translation for aggregate arithmetic.
 
 This isn't a SQLGlot gap; it's the boundary of what a SQL transpiler is for. But anyone shopping for "a SQL portability layer" should know it exists.
 
@@ -249,14 +249,14 @@ We'd love to hear about gaps you've hit in your own SQLGlot-based projects. Open
 ## Research Status
 
 - [x] Fivetran post (2026-05-01) reviewed for performance numbers and capability claims
-- [x] BenchBox SQL infrastructure audit (~2,500 lines across 7 categories, file paths verified)
+- [x] BenchBox SQL infrastructure audit covers seven categories with verified file paths
 - [x] DataFusion silent-corruption queries (Q11, Q16, Q18, Q20) confirmed in `datafusion_query_transformer.py`
-- [x] QuestDB rewriter line count and rewrite categories confirmed
+- [x] QuestDB rewriter scope (comma joins, INTERVAL arithmetic, SUBSTRING form, CTE column lists) confirmed
 - [x] 19 DDL rewrite modules enumerated under `sql_compat/rules/ddl_optimize/`
 - [x] H2O Q9 hand-written variants confirmed in `h2odb_variants.py`
 - [x] Subquery alias injection failure documented in `clickhouse_session_policy.py`
-- [x] DataFrame `unified_frame.py` line count (~2,200) confirmed
-- [ ] Verify exact line counts in draft via `wc -l` before publish
+- [x] DataFrame `unified_frame.py` is the dominant file in the layer (verified via `wc -l` at write time)
+- [x] SQLGlot pin recorded (`>=20.0.0,<31.0.0` in `pyproject.toml`; resolved 30.6.0 in `uv.lock`)
 - [ ] Confirm DataFusion engine version that triggers Q11/Q16/Q18/Q20 issues for citation
 
 ## Visual Elements for Draft

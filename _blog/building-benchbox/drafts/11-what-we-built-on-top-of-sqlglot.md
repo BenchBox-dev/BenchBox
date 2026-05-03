@@ -12,7 +12,7 @@ status: draft
 
 > SQLGlot is the foundation, not the finished house. This post is the punchlist of what we still had to build.
 
-**TL;DR**: BenchBox runs benchmarks across 36 SQL platforms. SQLGlot does the transpilation heavy lifting, and the recent mypyc work makes it dramatically faster, but real cross-engine portability needs about 2,500 lines of additional infrastructure on top: dialect normalization, post-generation fixups, engine-aware semantic rewrites, a 19-platform DDL rewrite registry, hand-written query overrides where translation cannot deliver, and a SQL-to-DataFrame layer that SQLGlot does not address. We catalog the seven categories of work with file paths and concrete examples.
+**TL;DR**: BenchBox runs benchmarks across 36 SQL platforms. SQLGlot does the transpilation heavy lifting, and the recent mypyc work makes it dramatically faster, but real cross-engine portability needs a substantial additional layer on top: dialect normalization, post-generation fixups, engine-aware semantic rewrites, a 19-platform DDL rewrite registry, hand-written query overrides where translation cannot deliver, and a SQL-to-DataFrame facade for engines that do not speak SQL. We catalog the seven categories of work with file paths and concrete examples.
 
 ---
 
@@ -24,6 +24,8 @@ That promise is built on cross-dialect SQL translation, and SQLGlot[^1] is the o
 
 Last week the SQLGlot team at Fivetran shipped a milestone[^2]: they compiled SQLGlot's hot Python with mypyc and got a roughly 5x parser speedup, 2.5x generator speedup, and 2x optimizer speedup while keeping the pure-Python path intact as a fallback. For a project that translates tens of thousands of TPC-DS queries on every release, this is a meaningful improvement, and worth saying out loud. Our experience with SQLGlot is overwhelmingly positive; without it, BenchBox would not exist as a multi-platform tool.
 
+We have not yet rigorously measured SQLGlot's share of the BenchBox runtime budget, so we treat the mypyc speedups as an opportunity rather than a quantified need. Worth flagging up front so the rest of the post is not read as "we have benchmarked this and have nothing to add."
+
 The Fivetran post closes with: "It has never been faster or easier to translate between different SQL dialects so that you can use different query engines." The first half of that sentence is unambiguously true. The second half is where our experience can add nuance. Running the same benchmark on different query engines is *partly* about transpilation, and *partly* about everything else. This post is what "everything else" looked like for us.
 
 ## How we got here: starting simple, ending with a registry
@@ -34,7 +36,7 @@ We did not set out to build SQL infrastructure. We set out to call `sqlglot.tran
 
 **Layer 2: A centralized wrapper** at `benchbox/utils/dialect_utils.py`. Once we hit the second post-generation regex fixup, we centralized. Today this layer normalizes 8 dialects with no SQLGlot entry to their nearest peer (mostly `postgres`) and applies four generic post-generation fixups that affect multiple dialects.
 
-**Layer 3: Per-platform query transformers.** When a single platform's quirks were too platform-specific for the wrapper, we extracted them: a ClickHouse transformer for case folding and division safety, a 450-line QuestDB rewriter for syntax gaps, a DataFusion transformer for engine-semantic query rewrites.
+**Layer 3: Per-platform query transformers.** When a single platform's quirks were too platform-specific for the wrapper, we extracted them: a ClickHouse transformer for case folding and division safety, a dedicated QuestDB rewriter for syntax gaps, a DataFusion transformer for engine-semantic query rewrites.
 
 **Layer 4: A SQL compatibility registry** under `benchbox/sql_compat/`. When the per-platform code grew structure of its own, we built explicit rule families: `ddl_optimize/` for DDL semantics across 19 platforms, `query_source/` for hand-written platform-specific queries, `query_adapter/` for post-translation query rewrites, `schema_emit/` for schema generation rules, `benchmark_gate/` for platform-by-benchmark compatibility checks, plus an `inventory.py` and `registry.py` for governance.
 
@@ -78,7 +80,7 @@ Three platforms required dedicated transformer modules.
 
 The TPC-DS Q23 and Q87 case is worth telling. ClickHouse rejects derived tables without aliases, so we wrote an AST visitor that walks the parsed query and injects `AS _sqN` on every unaliased subquery. The visitor was correct in isolation. On real queries, it corrupted Q23 (it pulled the GROUP BY clause out of a subquery boundary) and Q87 (it injected aliases inside `EXCEPT/INTERSECT`, where they are not allowed). We disabled the rewriter and shipped a session setting instead (`joined_subquery_requires_alias=0`). The lesson, which we will return to, is that even with full AST control, the safe move was to abandon the rewrite and twist the engine knob.
 
-**QuestDB** (`platforms/questdb_rewriter.py`, about 450 lines) is a post-AST rewriter for:
+**QuestDB** (`platforms/questdb_rewriter.py`) is a dedicated post-AST rewriter for:
 
 - Implicit comma joins, converted to explicit `INNER JOIN ... ON` (every TPC-H, TPC-DS, and SSB query, since the legacy specs use comma joins)
 - `INTERVAL` arithmetic, converted to `dateadd('d', n, ts)` (TPC-H Q1, Q4, Q6, Q17, and others)
@@ -103,6 +105,8 @@ DataFusion has a SQLGlot dialect entry. SQLGlot translates four TPC-H queries in
 | Q20 | Nested correlated IN: incorrect join cardinality | Extract to CTEs with explicit joins |
 
 Critical framing: these are engine planner semantics, not SQLGlot bugs in any strict sense. But the user-visible failure mode for someone using SQLGlot to run their workload across engines is "I transpiled and got wrong results." A syntactic transpiler structurally cannot catch this; the SQL is well-formed in both dialects, the bug lives in the target engine's planner. Someone has to know which query *shapes* trigger which engine bugs, and write a rewrite that produces the same answer through a different shape. Today, every team that hits these issues discovers them privately. We discovered ours by validating BenchBox results against TPC-H reference answers and watching four queries fail validation while running.
+
+You could push back on this position: if SQLGlot's pitch is portability across engines, and the engines have known bugs that break portability, isn't that within scope for SQLGlot to ship rewrite recipes for? It is a fair argument. We do not adopt the position because we think SQLGlot's job is dialect-correct emission, and an engine-bug registry is a different artifact: it could live alongside SQLGlot, in a sidecar project, or in project-specific layers like ours. We would happily contribute to such an artifact if one emerges. The structural argument is not "SQLGlot should never know about engine bugs"; it is "knowing about engine bugs is a separable concern from translating SQL between dialects."
 
 ### 5. DDL semantics, across 19 platforms
 
@@ -139,13 +143,13 @@ This is a category, not a one-off. Every benchmark we ship has a few queries whe
 
 Half of BenchBox's targets are DataFrame engines: Polars, Pandas, DataFusion's Python frontend, PySpark, Dask, Modin, cuDF, LakeSail. SQLGlot does not address translating SQL into Polars expressions, which is a different problem from translating SQL into more SQL.
 
-Our `platforms/dataframe/unified_frame.py` is about 2,200 lines of SQL-shaped facade over per-engine DataFrame APIs, with bespoke parsing of DataFusion's expression AST for aggregate arithmetic. Polars' own SQL frontend was tried and removed earlier in BenchBox's history; "fundamental limitations" is the note we left ourselves.
+Our `platforms/dataframe/unified_frame.py` is the SQL-shaped facade over per-engine DataFrame APIs, with bespoke parsing of DataFusion's expression AST for aggregate arithmetic. It is the largest single file in our cross-platform layer (about 4,200 lines), which surprised us, and is part of why we treat DataFrame translation as a separate problem from SQL translation. Polars' own SQL frontend was tried and removed earlier in BenchBox's history; "fundamental limitations" is the note we left ourselves.
 
 This is not a SQLGlot gap; it is the boundary of what a SQL transpiler is for. But it is worth flagging for anyone shopping for a "SQL portability layer." Transpilation only takes you to engines that speak SQL.
 
 ## What we learned
 
-**1. "Supported dialects" is a one-bit signal that needs more bits.** SQLGlot's "34 dialects" is accurate as a count. It is less useful as a maturity signal. The Postgres support is rock-solid. The Doris support emits `VARCHAR` to `STRING` in a way that breaks key columns. A per-dialect maturity matrix (A-grade tested, best effort, parser-only) would be transformative for production users. We would happily contribute test cases for the dialects we exercise heavily.
+**1. "Supported dialects" is a one-bit signal that needs more bits.** SQLGlot's "34 dialects" is accurate as a count. It is less useful as a maturity signal. The Postgres support is rock-solid. The Doris support emits `VARCHAR` to `STRING` in a way that breaks key columns. A per-dialect maturity matrix (A-grade tested, best effort, parser-only) would be transformative for production users. We would happily contribute test cases for the dialects we exercise heavily, and bug fixes in dialect generators where we have isolated reproductions; this is our standing position on upstreaming, regardless of whatever else lands in our own layer.
 
 **2. Engine-semantic bugs are the most dangerous category.** The DataFusion TPC-H rewrites are not in any "transpilation correctness" framework's failure list, because the transpilation is correct. The engine's planner is the proximate cause of the wrong answer. Yet the user-visible failure mode is "I transpiled and got wrong results." A community-maintained registry of "this query shape produces wrong results on engine X version >= Y," with rewrite recipes, would help every team that hits these. Today every team rediscovers them privately.
 
@@ -191,19 +195,19 @@ We would love to hear about gaps you have hit in your own SQLGlot-based projects
 
 The patterns described here are taken from the BenchBox codebase as of v0.2.1, with additional details verified against:
 
-- SQLGlot main branch as of May 2026
+- SQLGlot pinned `>=20.0.0,<31.0.0` in `pyproject.toml`; resolved version in `uv.lock` was 30.6.0 at time of writing
 - DataFusion versions current to the BenchBox v0.2.1 platform matrix
 - ClickHouse Cloud and self-hosted 25.x
 - QuestDB 9.3.4
 - Doris 2.1.x
 
-The line counts cited (450 lines for the QuestDB rewriter, 2,200 for `unified_frame.py`, 19 DDL rewrite modules) are file-level counts from `wc -l` on the listed paths. The dialect coverage gap (8 platforms with no SQLGlot entry) is from `dialect_utils.normalize_dialect_for_sqlglot`. The DataFusion silent-corruption queries (Q11, Q16, Q18, Q20) are documented in `datafusion_query_transformer.py` with the rewrite recipes.
+The 19 DDL rewrite modules under `benchbox/sql_compat/rules/ddl_optimize/` and the dialect coverage gap (8 platforms with no SQLGlot entry, normalized by `dialect_utils.normalize_dialect_for_sqlglot`) are verifiable directly in the listed paths. The DataFusion silent-corruption queries (Q11, Q16, Q18, Q20) are documented in `datafusion_query_transformer.py` with the rewrite recipes inline.
 
 ## Limitations
 
 - This post catalogs *what we built*, not the full set of SQLGlot gaps a different project might hit. Workloads with heavy DDL automation, ETL with stored procedure translation, or live query rewriting against a SaaS warehouse will have a different list.
 - The "categories" framing is post-hoc; the code grew organically. A team starting today with the same platform list might land on a different decomposition.
-- Engine versions matter. Some of the silent-corruption cases on DataFusion may resolve in future planner releases. We re-validate on each platform upgrade.
+- Engine versions matter. Some of the silent-corruption cases on DataFusion may resolve in future planner releases, at which point the rewrite becomes a candidate for retirement: we run the rewrite-bypass version against TPC-H reference answers, and remove the rule only if validation passes. Retirement is opt-in; we do not auto-retire.
 
 ---
 

@@ -31,10 +31,11 @@ release since. SQLGlot is excellent and the recent mypyc compilation work
 delivered meaningful speedups for our workload (parser ~5x, generator ~2.5x,
 optimizer ~2x).
 
-This ADR exists because, over the last 12 months, BenchBox accreted ~2,500
-lines of SQL infrastructure on top of SQLGlot: post-generation fixups, three
-per-platform query transformers, a 19-platform DDL rewrite registry, hand-
-written query overrides, a SQL-to-DataFrame facade, and the
+This ADR exists because, over the last 12 months, BenchBox accreted a
+substantial layer of SQL infrastructure on top of SQLGlot, organized into
+seven categories: dialect normalization, post-generation fixups, three
+per-platform query transformers, a 19-platform DDL rewrite registry,
+hand-written query overrides, a SQL-to-DataFrame facade, and the
 [`sql_compat` rule engine](adr-sql-compat-phase-aware-pipeline.md). The
 answer to "why do we need so much code on top of a transpiler?" has
 structural reasons rooted in what a SQL transpiler is and is not, and those
@@ -198,11 +199,18 @@ under [`benchbox/sql_compat/rules/ddl_optimize/`](../../../benchbox/sql_compat/r
 plus the per-adapter `_optimize_table_definition()` hook documented in the
 [phase-aware pipeline ADR](adr-sql-compat-phase-aware-pipeline.md).
 
-Fabric Warehouse is a documented exception: its `_optimize_table_definition`
-injects a schema-qualified table name from runtime adapter state, which is
-operational context (not DDL compatibility), so it is intentionally not in
-the registry. See the parent ADR's "Fabric Warehouse Decision" section for
-the full reasoning.
+Fabric Warehouse occupies a third path between "in the registry" and
+"not in the registry":
+[`fabric_dw_ddl_rewrites.py`](../../../benchbox/sql_compat/rules/ddl_optimize/fabric_dw_ddl_rewrites.py)
+registers a `governance_only=True` rule so `compat_lint` can audit that
+DDL rewriting is happening for the platform, but the runtime
+transformation lives in `FabricWarehouseAdapter._optimize_table_definition()`
+because the schema prefix it injects depends on runtime adapter state
+(the adapter's configured `self.schema`). The registry rule is the
+governance marker; the rewrite is operational. The parent ADR's
+"Fabric Warehouse Decision" section captures the original reasoning for
+keeping the runtime logic in the adapter; the governance-only rule was
+added afterwards as a `compat_lint` accountability hook.
 
 **Fallback**: Explicit DDL rewrite registered per platform. The rule engine
 applies the rewrite at the `ddl_optimize` phase before the DDL reaches the
@@ -350,10 +358,10 @@ tractable.
 
 ### Negative / Risks
 
-- The infrastructure on top of SQLGlot is 2,500+ lines and continues to
-  grow as we add platforms. Any contributor evaluating BenchBox's
-  cross-engine support has to read this ADR plus the phase-aware pipeline
-  ADR to understand the scope.
+- The infrastructure on top of SQLGlot covers seven categories and
+  continues to grow as we add platforms. Any contributor evaluating
+  BenchBox's cross-engine support has to read this ADR plus the
+  phase-aware pipeline ADR to understand the scope.
 - Engine version drift can re-open closed semantic-rewrite cases. If a
   DataFusion release fixes Q16 NULL semantics, our rewrite becomes
   redundant; we do not aggressively retire rewrites because the
