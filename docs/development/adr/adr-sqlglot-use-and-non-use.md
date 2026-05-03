@@ -4,6 +4,18 @@
 
 Accepted (codifies existing practice as of 2026-05-03)
 
+**SQLGlot version at acceptance**: pinned `>=20.0.0,<31.0.0` in
+`pyproject.toml`; the resolved version in `uv.lock` was 30.6.0 at time of
+acceptance. Decisions in this ADR were validated against that version; gaps
+may have changed since.
+
+**Maintenance protocol**: Re-review this ADR when (a) a new SQLGlot major
+version is adopted, (b) the phase taxonomy in the sibling
+[phase-aware pipeline ADR](adr-sql-compat-phase-aware-pipeline.md) changes,
+or (c) `sqlglot[c]` is adopted in production. The ADR records a snapshot of
+the boundary; the boundary itself is durable, but the version of SQLGlot it
+was validated against is not.
+
 ## Date
 
 2026-05-03
@@ -23,11 +35,11 @@ This ADR exists because, over the last 12 months, BenchBox accreted ~2,500
 lines of SQL infrastructure on top of SQLGlot: post-generation fixups, three
 per-platform query transformers, a 19-platform DDL rewrite registry, hand-
 written query overrides, a SQL-to-DataFrame facade, and the
-[`sql_compat` rule engine](adr-sql-compat-phase-aware-pipeline.md). Reasonable
-contributors and reviewers ask: "Why do we need so much code on top of a
-transpiler?" The answer has structural reasons rooted in what a SQL transpiler
-is and is not, and those reasons deserve to be written down explicitly so
-future contributors understand the boundary.
+[`sql_compat` rule engine](adr-sql-compat-phase-aware-pipeline.md). The
+answer to "why do we need so much code on top of a transpiler?" has
+structural reasons rooted in what a SQL transpiler is and is not, and those
+reasons deserve to be written down explicitly so future contributors
+understand the boundary.
 
 This is a complement to the
 [`sql_compat` phase-aware pipeline ADR](adr-sql-compat-phase-aware-pipeline.md),
@@ -126,6 +138,22 @@ the dialect generator. It does not know which query *shapes* trigger which
 engine planner bugs. The SQL is correct in both dialects; the bug lives in the
 target engine's planner.
 
+**FailureMode classification**: These cases are tagged
+`failure_mode=SILENT_CORRUPTION` in the rule registry; see the `FailureMode`
+enum in the
+[phase-aware pipeline ADR](adr-sql-compat-phase-aware-pipeline.md) for the
+full taxonomy.
+
+**Steelman and rebuttal**: One could argue that a portability-focused
+transpiler should ship rewrite recipes for known engine bugs, since the
+user-visible failure mode ("I transpiled and got wrong results") is
+indistinguishable from a transpilation bug. We do not adopt this position.
+SQLGlot's job is dialect-correct emission; an engine-bug registry is its own
+artifact and could live alongside SQLGlot, in a sidecar project, or in
+project-specific layers like ours. We would happily contribute to such an
+artifact if one emerges, but its absence does not make these gaps SQLGlot's
+responsibility.
+
 **Where it lives in BenchBox**:
 - [`benchbox/platforms/datafusion_query_transformer.py`](../../../benchbox/platforms/datafusion_query_transformer.py)
   rewrites four TPC-H queries (Q11, Q16, Q18, Q20) to avoid query shapes that
@@ -139,6 +167,14 @@ target engine's planner.
 producing an equivalent query through a different shape that the engine plans
 correctly. Each rewrite is validated against TPC-H reference answers in the
 normal validation pipeline.
+
+**Retirement protocol**: A rewrite is a candidate for retirement when (a) the
+engine release notes claim the underlying bug is fixed, (b) we run the
+rewrite-bypass version against TPC-H reference answers in the validation
+pipeline and it passes, and (c) we remove the rule and re-run validation in
+CI. Retirement is opt-in; we do not auto-retire stale rewrites, because the
+cost of leaving a now-unnecessary rewrite in place is low, and the cost of
+removing one prematurely is silent corruption.
 
 ### 2. DDL Physical-Design Semantics
 
@@ -157,10 +193,16 @@ design depends on deployment context (table format choice, cluster topology,
 catalog setup, version-gated capabilities). It is correctly outside the scope
 of a transpiler.
 
-**Where it lives in BenchBox**: Nineteen platform-specific DDL rewrite modules
+**Where it lives in BenchBox**: 19 platform-specific DDL rewrite modules
 under [`benchbox/sql_compat/rules/ddl_optimize/`](../../../benchbox/sql_compat/rules/ddl_optimize/),
 plus the per-adapter `_optimize_table_definition()` hook documented in the
 [phase-aware pipeline ADR](adr-sql-compat-phase-aware-pipeline.md).
+
+Fabric Warehouse is a documented exception: its `_optimize_table_definition`
+injects a schema-qualified table name from runtime adapter state, which is
+operational context (not DDL compatibility), so it is intentionally not in
+the registry. See the parent ADR's "Fabric Warehouse Decision" section for
+the full reasoning.
 
 **Fallback**: Explicit DDL rewrite registered per platform. The rule engine
 applies the rewrite at the `ddl_optimize` phase before the DDL reaches the
@@ -208,7 +250,7 @@ instead.
 **Where it lives in BenchBox**:
 - [`benchbox/platforms/dataframe/unified_frame.py`](../../../benchbox/platforms/dataframe/unified_frame.py)
   is a SQL-shaped facade over per-engine DataFrame APIs
-  (~2,200 lines)
+  (approximately 4,200 lines)
 - DataFusion's expression AST is parsed post-translation for aggregate
   arithmetic
 - The `sql_compat` registry `dataframe_filter` phase is the dedicated home
@@ -243,7 +285,7 @@ this layer.
 
 ## Alternatives Considered
 
-### A. SQLGlot only (no infrastructure on top)
+### SQLGlot only (no infrastructure on top)
 
 **Considered, rejected.** This is the implicit "what SQLGlot promises"
 position: write canonical SQL, transpile to the target dialect, run. We
@@ -255,50 +297,35 @@ in the "Deliberately Not Used" section above is something we tried *not*
 doing, and shipped wrong answers as a result. Once validation surfaced the
 failures, we built the infrastructure.
 
-### B. Replace SQLGlot with a custom parser/transpiler
+### Replace SQLGlot with a custom parser/transpiler
 
 **Considered, rejected.** Building a maintained SQL parser/transpiler covering
 20+ dialects is years of work. SQLGlot does it. The 20% we add is at the
 boundary, not the core. There is no realistic scenario where rebuilding
 the core is cheaper than working around the edges.
 
-### C. Replace SQLGlot with sqlglotrs (Rust) for performance
+### Replace SQLGlot with sqlglotrs (Rust) for performance
 
 **Considered, rejected for now.** The Fivetran post on mypyc compilation
 demonstrates that pure-Python compilation gets us most of the speedup
 without a Rust toolchain dependency. We track sqlglotrs but have not
 needed it; SQLGlot's performance has not been a BenchBox bottleneck.
 
-### D. Adopt sqlglot[c] (mypyc) immediately
+### Adopt sqlglot[c] (mypyc) immediately
 
-**Deferred.** The mypyc speedups are real and meaningful for our workload, but
+**Deferred.** The mypyc speedups are real and would benefit our workload, but
 we want to verify wheel availability across the Python versions and
-architectures we test against before flipping the import. Tracked as a
-future evaluation; this ADR does not block it.
+architectures we test against before flipping the import. We have also not
+rigorously measured SQLGlot's share of the BenchBox runtime budget; without
+that measurement, the speedups are an opportunity rather than a quantified
+need. Tracked as a future evaluation; this ADR does not block it.
 
-### E. Push our infrastructure upstream into SQLGlot
-
-**Partially in scope.** We are open to contributing patches upstream where
-they fit SQLGlot's mission:
-- Bug fixes in dialect generators (e.g., `GROUP BY ALL` quoting in DuckDB)
-- New tests for dialects we exercise heavily (Doris, QuestDB, DataFusion)
-
-We do *not* expect SQLGlot to absorb:
-- Engine-semantic rewrites (different scope)
-- DDL physical-design (different scope)
-- Hand-written variants (project-specific)
-- DataFrame translation (different scope)
-- Compatibility governance (project-specific)
-
-When we contribute upstream, it is in the spirit of patches, not scope
-expansion.
-
-### F. Hand-write SQL per platform with no transpilation
+### Hand-write SQL per platform with no transpilation
 
 **Considered, rejected.** This is the alternative for projects that ship
 small numbers of curated queries per engine. BenchBox ships 22 TPC-H
 queries plus 99 TPC-DS queries plus several other benchmark suites across
-36 platforms; manually maintaining ~22 * 36 = 792 TPC-H query variants alone
+36 platforms; manually maintaining 22 * 36 = 792 TPC-H query variants alone
 is operationally infeasible. SQLGlot is the leverage that makes the project
 tractable.
 
@@ -342,6 +369,27 @@ tractable.
   If we adopt `sqlglot[c]` in the future, this ADR does not need updating;
   the boundary is the same regardless of how SQLGlot itself is compiled.
 
+### Upstream Contribution Policy
+
+This is not an alternative to the decision above; it is a standing policy
+that runs alongside it. We are open to contributing patches upstream into
+SQLGlot where they fit SQLGlot's mission:
+
+- Bug fixes in dialect generators (e.g., `GROUP BY ALL` quoting in DuckDB)
+- New tests for dialects we exercise heavily (Doris, QuestDB, DataFusion)
+
+We do *not* expect SQLGlot to absorb:
+
+- Engine-semantic rewrites (different scope)
+- DDL physical-design (different scope)
+- Hand-written variants (project-specific)
+- DataFrame translation (different scope)
+- Compatibility governance (project-specific)
+
+When we contribute upstream, it is in the spirit of patches, not scope
+expansion. Adoption of this ADR does not preclude or require any specific
+upstream contribution.
+
 ---
 
 ## How to Decide Where New Work Goes
@@ -360,6 +408,15 @@ When a contributor hits a new compatibility case, the decision tree is:
    results?** Add a rule in `query_adapter` with a `REWRITE_QUERY` action
    that produces an equivalent query through a different shape. Validate
    against reference answers.
+   - **4a.** If the AST rewrite turns out to be structurally unsafe (corrupts
+     queries that exercise `EXCEPT`/`INTERSECT`, `GROUP BY` at subquery
+     boundaries, or other constructs the grammar allows but real query
+     corpora exercise irregularly) and the engine offers a session knob,
+     prefer `SET_SESSION_POLICY` at `query_adapter` over `REWRITE_QUERY`.
+     The ClickHouse TPC-DS Q23/Q87
+     `joined_subquery_requires_alias=0` rule is the canonical example: an
+     AST-correct alias-injection rewrite still produced a semantically
+     broken query, so the safe fix was the engine knob.
 5. **Is the issue in DDL?** Add a rule in `ddl_optimize` and implement the
    transformation in the platform's `_optimize_table_definition()` hook.
 6. **Does SQLGlot's emitter produce SQL the engine refuses, with no clean
@@ -393,7 +450,8 @@ existing taxonomy needs to extend.
   - Upstream.
 - [Fivetran post on compiling SQLGlot with mypyc (2026-05-01)](https://www.fivetran.com/blog/how-we-accelerated-transpilation-by-compiling-sqlglot-with-mypyc)
   - Context for the deferred `sqlglot[c]` adoption decision.
-- [Building BenchBox blog post 11: "What we built on top of SQLGlot (and why
-  transpilation isn't enough)"](../../../_blog/building-benchbox/published/11-what-we-built-on-top-of-sqlglot.md)
-  - External-facing explanation of the same boundary, written for a general
-    SQL tooling audience.
+- BenchBox blog post: *"What we built on top of SQLGlot (and why transpilation
+  isn't enough)"* in the `building-benchbox` series. External-facing
+  explanation of the same boundary, written for a general SQL tooling
+  audience. The published copy lives on the public BenchBox blog; the
+  internal series source is under `_blog/building-benchbox/`.
