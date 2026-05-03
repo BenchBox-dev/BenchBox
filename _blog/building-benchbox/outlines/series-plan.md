@@ -37,6 +37,7 @@
 | 8   | BenchBox v0.2.0: Alpha to Beta | PUBLISHED | Beta promotion: cloud platform hardening, on-demand answer downloads, 80% coverage, Redshift reliability |
 | 9   | BenchBox v0.2.1: MPP wave, vector search, and harmonized scale factors | OUTLINED | 6 new platforms (Doris, CedarDB, StarRocks, SingleStore, QuestDB, Gluten+Velox), Vector Search and FlightData benchmarks, NYC Taxi expansion, ClickHouse split into 3 deployment modes |
 | 10  | One SF, one gigabyte: harmonizing scale factors across BenchBox | OUTLINED | Backwards-incompatible by intent: 7 adjustable benchmarks now target ~1 GB at SF=1; spec-locked benchmarks unchanged; covers second-order constraints (TSBS quadratic growth, NYC Taxi/FlightData corpus ceilings) |
+| 11  | What we built on top of SQLGlot (and why transpilation isn't enough) | OUTLINED | SQLGlot does the transpilation 80%; the other ~2,500 lines (dialect normalization, DataFusion semantic rewrites, QuestDB syntax fixups, 19-platform DDL registry, hand-written query overrides, SQL-to-DataFrame layer) are what production cross-engine work looks like |
 
 ---
 
