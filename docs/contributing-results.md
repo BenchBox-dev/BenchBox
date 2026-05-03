@@ -40,6 +40,7 @@ Use `uv run -- benchbox submit` to create a submission package:
 uv run -- benchbox submit --last --output ./submission
 
 # Show exact result paths if you need to choose a specific run
+# (--paths writes one path per line to stdout, safe to pipe to xargs)
 uv run -- benchbox results --paths --limit 25
 
 # Or specify a result file directly

@@ -140,9 +140,13 @@ uv run -- benchbox submit results/tpch_sf1_duckdb.json
 # Package the most recent result
 uv run -- benchbox submit --last
 
-# Print exact result paths, then package one result by path
+# Print exact result paths (one per line, pipeable), then package one result by path
 uv run -- benchbox results --paths
 uv run -- benchbox submit benchmark_runs/results/tpch_sf001_duckdb_20260401_120000.json --output ./submission
+
+# Or loop over every recent result
+uv run -- benchbox results --paths --limit 100 \
+  | xargs -n1 -I{} uv run -- benchbox submit {} --output ./submissions
 
 # Package the most recent TPC-H result
 uv run -- benchbox submit --last --benchmark tpch
