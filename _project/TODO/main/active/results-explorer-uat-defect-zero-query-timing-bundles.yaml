@@ -1,0 +1,88 @@
+id: results-explorer-uat-defect-zero-query-timing-bundles
+title: "UAT defect: submitted bundles contain all-zero query timings"
+worktree: main
+priority: "High"
+status: "In Progress"
+category: "Core Functionality"
+
+description: |
+  W5 full-package validation reported 54 occurrences where all query timings
+  were `0ms`, which the hosted submission validator treats as likely invalid
+  data. These bundles were excluded from the validator-clean Explorer UAT subset.
+
+work:
+- id: w1
+  summary: "Identify which platform/result paths emit all-zero query timings"
+  status: done
+  notes: |
+    W1 trace result (2026-05-03):
+      - The full UAT submission package at
+        `~/Developer/benchmark_runs/submissions/uat_20260502/bundle`
+        contains 54 all-zero timing bundles out of 376. The validator-clean
+        subset at
+        `~/Developer/benchmark_runs/submissions/uat_20260502_valid/bundle`
+        contains 0 all-zero timing bundles out of 205.
+      - Affected platforms in the full package: DataFusion 20, Pandas 8,
+        Polars 7, Dask 6, PySpark 6, SQLite 4, ClickHouse Local 3. Affected
+        benchmarks: tpcdi 15, datavault 12, transaction_primitives 12,
+        joinorder 4, nyctaxi 3, tsbs_devops 3, flightdata 2,
+        metadata_primitives 2, tpchavoc 1.
+      - The submitted invalid rows are dominated by failed/skipped query
+        rows: 3145 FAILED rows, 55 SUCCESS rows, and 36 SKIPPED rows across
+        the 54 all-zero bundles. Representative examples include
+        `datavault_sf001_datafusion_df_20260502_223505_ffc2a449.json`
+        (66 failed queries, validation partial) and
+        `transaction_primitives_sf001_pyspark_df_20260502_214438_c695537b.json`
+        (all skipped query rows).
+      - `scripts/validate_submission.py` is behaving correctly: lines
+        431-454 only count query rows with `ms > 0` as non-zero timing
+        signal, and lines 457-471 reject bundles where no query has positive
+        timing.
+      - Schema-v2 export is the publish-surface that exposes the problem:
+        `benchbox/core/results/schema.py::_build_query_results_section`
+        writes `entry["ms"] = round(exec_time_ms, 1)` for every query row
+        with timing data, including failed, skipped, warmup, metadata, and
+        summary rows.
+      - Producer paths that intentionally emit zero timing for non-measured
+        work include DataFrame skipped rows and skip summaries in
+        `benchbox/platforms/dataframe/benchmark_mixin.py`, DataFrame
+        measurement exception fallback rows in the same module, and SQL
+        execution exception fallback rows in
+        `benchbox/platforms/base/execution.py`.
+      - W2 owned implementation file:
+        `benchbox/core/results/schema.py`.
+      - W3 owned test files:
+        `tests/unit/core/results/test_schema_timing_contract.py` and
+        `tests/unit/scripts/test_validate_submission.py`.
+      - Validator semantics should remain unchanged; it correctly rejects
+        all-zero submitted bundles. The fix should either omit
+        non-measurement/non-success zero rows from exported timing signal or
+        make zero-timing export non-publishable without fabricating timings.
+- id: w2
+  summary: "Fix timing export or classify zero-timing results as non-publishable"
+  needs: [w1]
+  status: pending
+- id: w3
+  summary: "Add regression coverage for zero-timing rejection"
+  needs: [w2]
+  status: pending
+
+verification:
+- description: "Submission validation rejects or repairs all-zero timing bundles deterministically."
+  command: "uv run -- python scripts/validate_submission.py results-data/bundles"
+  expected_output: "no all-query-timings-zero errors for publishable bundles"
+- description: "Timing policy still passes."
+  command: "uv run _project/scripts/timing_policy_check.py --strict"
+  expected_output: "strict timing policy passes"
+
+must_preserve:
+- "Measured durations continue to use monotonic timing."
+- "Failed or unsupported query timings are not fabricated."
+
+anti_patterns:
+- "DO NOT replace zero timings with arbitrary epsilon values -- because that corrupts benchmark metrics -- fix the measurement/export
+  source or reject the result."
+
+metadata:
+  tags: [uat, submission, timing]
+  created_date: "2026-05-03"
