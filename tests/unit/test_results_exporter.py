@@ -16,11 +16,39 @@ from benchbox.core.results.models import (
     SetupPhase,
     TableCreationStats,
 )
+from scripts.validate_submission import ValidationResult, _validate_bundle
 
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
+
+
+def _minimal_result(platform: str) -> BenchmarkResults:
+    return BenchmarkResults(
+        benchmark_name="TPCH",
+        platform=platform,
+        scale_factor=0.01,
+        execution_id=f"cost-{platform}",
+        timestamp=datetime(2026, 5, 3),
+        duration_seconds=1.0,
+        total_queries=1,
+        successful_queries=1,
+        failed_queries=0,
+        query_results=[{"query_id": "Q1", "execution_time_ms": 1, "rows_returned": 1, "status": "SUCCESS"}],
+    )
+
+
+def _export_payload(tmp_path, result: BenchmarkResults) -> dict:
+    exported = ResultExporter(output_dir=tmp_path, anonymize=False).export_result(result, formats=["json"])
+    with open(exported["json"], encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def _assert_submission_valid(payload: dict) -> None:
+    vr = ValidationResult("export")
+    _validate_bundle(payload, vr)
+    assert vr.ok, vr.errors
 
 
 def test_exporter_serializes_execution_phases(tmp_path):
@@ -87,6 +115,24 @@ def test_exporter_serializes_execution_phases(tmp_path):
     assert payload["platform"]["name"] == "duckdb"
     # Successful phases won't create errors
     assert "errors" not in payload
+
+
+def test_exporter_omits_direct_total_for_unavailable_normalized_cost(tmp_path):
+    payload = _export_payload(tmp_path, _minimal_result("snowflake"))
+
+    assert payload["normalized_cost"]["cost_status"] == "unavailable"
+    assert payload["normalized_cost"]["normalized_cost_usd"] is None
+    assert "total_usd" not in payload.get("cost", {})
+    _assert_submission_valid(payload)
+
+
+def test_exporter_preserves_local_zero_total_with_normalized_provenance(tmp_path):
+    payload = _export_payload(tmp_path, _minimal_result("duckdb"))
+
+    assert payload["normalized_cost"]["cost_status"] == "not_applicable_local"
+    assert payload["normalized_cost"]["normalized_cost_usd"] == "0"
+    assert payload["cost"]["total_usd"] == 0
+    _assert_submission_valid(payload)
 
 
 def test_exporter_rejects_unsupported_type(tmp_path, caplog) -> None:

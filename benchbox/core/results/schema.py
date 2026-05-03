@@ -574,11 +574,20 @@ def _add_cost_section(payload: dict[str, Any], result: BenchmarkResults) -> None
         if isinstance(normalized_cost, dict):
             payload["normalized_cost"] = normalized_cost
         cost_block: dict[str, Any] = {}
-        if "total_cost" in result.cost_summary:
+        if "total_cost" in result.cost_summary and _normalized_cost_allows_direct_total(normalized_cost):
             cost_block["total_usd"] = result.cost_summary["total_cost"]
         cost_block["model"] = result.cost_summary.get("cost_model", "estimated")
         if cost_block:
             payload["cost"] = cost_block
+
+
+def _normalized_cost_allows_direct_total(normalized_cost: Any) -> bool:
+    """Return True when legacy direct cost totals can satisfy the public contract."""
+    if not isinstance(normalized_cost, dict):
+        return False
+    if normalized_cost.get("cost_status") not in {"normalized", "not_applicable_local"}:
+        return False
+    return normalized_cost.get("normalized_cost_usd") is not None
 
 
 def _add_execution_section(payload: dict[str, Any], result: BenchmarkResults, driver_metadata: dict[str, Any]) -> None:
