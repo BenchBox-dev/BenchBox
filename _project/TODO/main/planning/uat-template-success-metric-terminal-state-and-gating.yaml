@@ -1,0 +1,174 @@
+id: uat-template-success-metric-terminal-state-and-gating
+title: "Add submission terminal-state vocab + open_questions gating schema relaxation"
+worktree: main
+priority: "Medium"
+status: "Not Started"
+category: "Testing and Quality Assurance"
+
+description: |
+  Closes the remediation for blind-spot finding
+  `2026-05-03-081922-uat-submit-success-metric-ambiguity` per the
+  approved design document at
+  `_project/specs/uat-methodology-blind-spot-remediation.md`.
+
+  Bundles three small edits that share a single PR surface:
+    1. Schema relaxation: `TODO_SCHEMA.yaml` `open_questions` items
+       become `oneOf [string, object]` (backwards-compatible — existing
+       string-form questions still validate).
+    2. Template additions: `_project/TODO_ENTRY_TEMPLATE.yaml` learns
+       three example snippets — terminal-state vocabulary in
+       `success_metrics`, validator-clean-rate metric, and
+       per-work-unit `coverage_checklist` block.
+    3. Optional retrofit: `external-contributor-submission-dry-run`
+       gets a one-line terminal-state addition to its `success_metrics`
+       (its `verification` block already names "PR is merged"
+       unambiguously, but the explicit success-metric line is the
+       remediation Finding 3 prescribes for in-flight UATs).
+
+  Spec §2 Finding 3, §3 template/schema diff preview, §6 implementation
+  TODO 2 contain the full rationale and the exact YAML to apply.
+
+work:
+- id: w1
+  summary: "Schema relaxation: open_questions oneOf [string, object]"
+  status: pending
+  notes: |
+    Update `_project/TODO_SCHEMA.yaml` `open_questions` to:
+
+      open_questions:
+        type: array
+        description: "Unresolved questions or uncertainties"
+        items:
+          oneOf:
+            - type: string
+            - type: object
+              required: [question]
+              properties:
+                question: { type: string }
+                gating: { type: boolean }
+                affects: { type: array, items: { type: string } }
+                default: { type: string }
+                resolved_with: { type: string }
+
+    Verify: `validate_todo.py` continues to pass on every existing TODO
+    in `_project/TODO/` and `_project/DONE/`. Add a new fixture or unit
+    test that confirms the object form validates.
+
+- id: w2
+  summary: "Template additions: terminal-state vocab + validator-clean rate + coverage_checklist examples"
+  needs: [w1]
+  status: pending
+  notes: |
+    Update `_project/TODO_ENTRY_TEMPLATE.yaml` per the spec's §3
+    "Template diff preview" exactly. Specifically:
+      - In the `work[]` example, add a commented `coverage_checklist:`
+        block scoped to "OPTIONAL — for work units with cross-cutting
+        deliverables only".
+      - In the `success_metrics` example, add commented examples for
+        the four-word terminal-state vocab and the validator-clean
+        rate (with a "corpus-shaped UATs only" guard).
+      - In the `open_questions` example, add a commented object-form
+        gating question after the existing string-form example.
+    Keep template comments concise; readers should be able to copy
+    snippets without untangling dense prose.
+
+- id: w3
+  summary: "Optional retrofit of external-contributor-submission-dry-run"
+  needs: [w2]
+  status: pending
+  notes: |
+    Add to `_project/TODO/main/planning/external-contributor-submission-dry-run.yaml`:
+
+      success_metrics:
+      - "Submission terminal state: merged-to-published-results (PR opened, CI green, merge complete)"
+
+    No other edits to that file. The existing `verification` block
+    already implies this terminal state; the success_metric makes it
+    explicit. If the user prefers to skip the retrofit, drop this work
+    unit; the rest of the TODO stands.
+
+verification:
+- description: "Schema accepts object-form open_questions"
+  command: |
+    cat > /tmp/uat_test_oq.yaml <<'EOF'
+    title: "Test"
+    worktree: main
+    priority: Low
+    status: "Not Started"
+    description: "Test that the schema relaxation works."
+    open_questions:
+    - "Legacy string"
+    - question: "Object form"
+      gating: true
+      affects: ["w1"]
+    EOF
+    uv run --project _project/scripts -- python _project/scripts/validate_todo.py /tmp/uat_test_oq.yaml
+  expected_output: "✅ valid"
+- description: "Existing TODOs still validate"
+  command: "uv run --project _project/scripts -- python _project/scripts/validate_todo.py --all"
+  expected_output: "all files valid"
+
+must_preserve:
+- "Backwards compatibility: existing string-form `open_questions` entries continue to validate (the schema becomes oneOf string|object, not object-only)."
+- "All currently-tracked TODOs in `_project/TODO/` and `_project/DONE/` continue to validate without modification."
+- "Template structure: comments stay terse; snippets remain copy-pastable."
+
+approach: |
+  Implement w1 first (schema), regression-test against the full TODO
+  corpus, then w2 (template additions), then w3 (retrofit if accepted).
+  The schema change is the only non-additive piece and so carries the
+  regression risk; everything else is purely additive comment/example
+  edits.
+
+anti_patterns:
+- "DO NOT add `additionalProperties: false` to the new object form — because we explicitly want forward-compatibility for future fields like `resolved_with` — leave additionalProperties at its default (true)."
+- "DO NOT enforce `gating: true` runtime semantics in todo_cli.py — because the spec scopes that to a future TODO if reviewer attention proves insufficient — this TODO is template + schema only."
+- "DO NOT bundle in the coverage_checklist tooling change — because Finding 1 was approved as convention-only — that lives behind a separate (currently un-filed) TODO if a future UAT shows the convention drifting."
+
+scope_limit:
+  only_modify:
+  - "_project/TODO_SCHEMA.yaml"
+  - "_project/TODO_ENTRY_TEMPLATE.yaml"
+  - "_project/scripts/validate_todo.py"  # only if a regression test is added
+  - "_project/scripts/tests/"  # if a fixture/unit test lands here
+  - "_project/TODO/main/planning/external-contributor-submission-dry-run.yaml"
+  do_not_modify:
+  - "benchbox/"
+  - "results-explorer/"
+  - "scripts/"
+  - "_project/DONE/"
+
+success_metrics:
+- "Schema accepts object-form `open_questions` items; string form still validates."
+- "Template demonstrates the three new conventions with copy-pastable snippets."
+- "If retrofit accepted: `external-contributor-submission-dry-run` names its terminal state explicitly in `success_metrics`."
+- "All existing TODO/DONE files continue to validate."
+
+deferred:
+- summary: "`gating: true` runtime enforcement in todo_cli.py done"
+  reason: "Spec §2 Finding 3 scopes this to a future follow-up if reviewer attention proves insufficient. Premature tooling adds false-positive risk (defensible exceptions get blocked)."
+- summary: "Coverage checklist tooling enforcement"
+  reason: "Finding 1 was approved as convention-only per the W4 design. File separately if a future UAT shows the convention drifting."
+- summary: "_project/UAT_TEMPLATE.yaml subtemplate extraction"
+  reason: "Q4 in the design defaulted to wait. Promote per-TODO conventions into a subtemplate after the next two UATs prove their cost/benefit."
+
+metadata:
+  tags:
+  - uat
+  - methodology
+  - submission-flow
+  - schema
+  - templates
+  estimated_effort: "Small"
+  created_date: "2026-05-03"
+
+impact:
+  business_value: |
+    Removes ambiguity from submission-flow success metrics, reducing the
+    chance of a future agent inferring the wrong terminal state from
+    evidence rather than authorisation. Schema relaxation enables
+    structured `gating: true` questions whose `affects:` link makes
+    deliverable-changing questions visible at completion review.
+  user_impact: |
+    Indirect: future UAT outcomes more clearly align with what was
+    actually authorised.
