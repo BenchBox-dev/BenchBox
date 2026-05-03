@@ -1,0 +1,88 @@
+id: results-explorer-uat-defect-flightdata-sf1-corpus-integrity
+title: "UAT defect: FlightData SF1 corpus fails across engines"
+worktree: main
+priority: "Medium-High"
+status: "In Progress"
+category: "Testing and Quality Assurance"
+
+description: |
+  FlightData SF 1.0 failed across several SQL and DataFrame platforms during the
+  UAT sweep. Representative logs include
+  `datafusion_flightdata_1.0_20260502_182841.log:13`,
+  `clickhouse-local_flightdata_1.0_20260502_185846.log:15`, and
+  `polars-df_flightdata_1.0_20260502_211319.log:8`, all pointing at the
+  `flightdata_1.0/flights.csv.zst` source file being truncated, incomplete, or
+  otherwise unreadable.
+
+work:
+- id: w1
+  summary: "Confirm source-file integrity and exact affected loader paths"
+  status: done
+- id: w2
+  summary: "Repair or quarantine the bad FlightData SF1 corpus path"
+  needs: [w1]
+  status: pending
+- id: w3
+  summary: "Add integrity/preflight coverage for FlightData source files"
+  needs: [w2]
+  status: pending
+
+verification:
+- description: "FlightData SF1 smoke succeeds on at least one SQL and one DataFrame platform."
+  command: "uv run -- benchbox run --platform duckdb --benchmark flightdata --scale 1.0 --phases load,power --non-interactive"
+  expected_output: "run completes without source-file corruption errors"
+- description: "FlightData SF1 DataFrame smoke succeeds."
+  command: "uv run -- benchbox run --platform polars-df --benchmark flightdata --scale 1.0 --phases load,power --non-interactive"
+  expected_output: "run completes without source-file corruption errors"
+- description: "Fast tests remain green."
+  command: "uv run -- python -m pytest -m fast -q"
+  expected_output: "all selected tests pass"
+
+must_preserve:
+- "Existing smaller FlightData scales continue to load."
+- "Data generation/cache reuse remains deterministic."
+- "Reusable datagen corpora stay reusable; cleanup removes run-owned databases, spill directories, and output artifacts, not
+  shared source corpora such as TPC-H reused by read primitives."
+
+anti_patterns:
+- "DO NOT patch individual adapters to ignore bad rows -- because the same corpus failed across engines -- validate or repair
+  the shared source data."
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/flightdata/downloader.py"
+  - "benchbox/core/flightdata/benchmark.py"
+  - "benchbox/platforms/base/data_loading.py"
+  - "benchbox/platforms/datafusion.py"
+  - "benchbox/platforms/dataframe/shared_loading.py"
+  - "tests/unit/core/flightdata/"
+  - "tests/unit/core/test_runner_manifest_reuse.py"
+  do_not_modify:
+  - "Platform-specific row-skipping logic outside the shared loading contract"
+
+approach: |
+  Treat the current SF1 file as a cache-layout compatibility defect, not as
+  malformed CSV rows: `zstd -t` succeeds for flights/airlines/airports, and a
+  streaming Python CSV scan reads 25,457,793 data rows with 28 columns and no
+  malformed rows.
+
+  Repair the shared source path by replacing or quarantining the legacy single
+  large `flights.csv.zst` layout with deterministic FlightData `flights` shards
+  recorded as multiple manifest entries with explicit CSV dialect metadata.
+  Keep the fix at the source/manifest contract where practical so DataFusion,
+  ClickHouse local, DuckDB, and DataFrame loaders resolve the same repaired
+  table mapping.
+
+notes:
+- "W1 evidence: `/Users/joe/Developer/benchmark_runs/datagen/flightdata_1.0/flights.csv.zst` matches the manifest row count
+  and passes zstd stream validation; rows cited by UAT failures (around 10,584,442 and 10,585,540) have the expected 28 CSV
+  columns."
+- "Affected loader path: `_ensure_data_generated()` validates only manifest sizes, `_populate_tables_from_manifest()` repopulates
+  `benchmark.tables`, `DataSourceResolver` then selects `BenchmarkTablesSource`, and DataFusion/ClickHouse local/DataFrame
+  loaders all consume the same single `flights.csv.zst` path."
+- "W2 owned files before editing: start in `benchbox/core/flightdata/downloader.py` plus focused FlightData tests; expand
+  to shared loader files only if sharded manifest handling exposes a common contract bug."
+
+metadata:
+  tags: [uat, flightdata, corpus-integrity]
+  created_date: "2026-05-03"
