@@ -58,7 +58,19 @@ work:
 - id: w3
   summary: "Add targeted ClickBench DuckDB regression coverage"
   needs: [w2]
-  status: pending
+  status: done
+  notes: |
+    Added targeted regression coverage in `tests/unit/test_clickbench_csv_loading.py`: an in-memory DuckDB native pipe
+    load verifies an empty ClickBench `Referer` field survives insertion into a NOT NULL table as `''`, and an external
+    scan SQL test verifies `csv_null_marker: None` emits the no-null-conversion sentinel instead of DuckDB's default
+    empty-string null marker.
+
+    W3 review found no actionable issues. Verification passed: ruff, ruff format --check, ty check, targeted
+    `tests/unit/test_clickbench_csv_loading.py`, shared-root DuckDB ClickBench SF1 load/power smoke, and the 10-worker
+    fast suite. The smoke produced result JSON
+    `/Users/joe/Developer/benchmark_runs/results/clickbench_sf1_duckdb_sql_20260503_031240_722b7b76.json`.
+    Run-owned loaded database artifacts under `/Users/joe/Developer/benchmark_runs/databases/clickbench_sf1` were
+    deleted after verification; reusable datagen was preserved.
 
 verification:
 - description: "DuckDB ClickBench SF1 load/power smoke reaches a classified terminal result."
