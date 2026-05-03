@@ -2,7 +2,7 @@ id: results-explorer-uat-defect-explorer-build-output-contract-docs
 title: "UAT defect: explorer build help documents stale manifest output"
 worktree: main
 priority: "Medium"
-status: "In Progress"
+status: "Completed"
 category: "Developer Experience"
 
 description: |
@@ -73,3 +73,4 @@ scope_limit:
 metadata:
   tags: [uat, results-explorer, docs]
   created_date: "2026-05-03"
+  completed_date: "2026-05-03"
