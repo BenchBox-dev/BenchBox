@@ -31,7 +31,7 @@ description: |
 work:
 - id: w1
   summary: "Schema relaxation: open_questions oneOf [string, object]"
-  status: pending
+  status: done
   notes: |
     Update `_project/TODO_SCHEMA.yaml` `open_questions` to:
 
@@ -109,7 +109,8 @@ verification:
   expected_output: "all files valid"
 
 must_preserve:
-- "Backwards compatibility: existing string-form `open_questions` entries continue to validate (the schema becomes oneOf string|object, not object-only)."
+- "Backwards compatibility: existing string-form `open_questions` entries continue to validate (the schema becomes oneOf string|object,
+  not object-only)."
 - "All currently-tracked TODOs in `_project/TODO/` and `_project/DONE/` continue to validate without modification."
 - "Template structure: comments stay terse; snippets remain copy-pastable."
 
@@ -121,9 +122,12 @@ approach: |
   edits.
 
 anti_patterns:
-- "DO NOT add `additionalProperties: false` to the new object form — because we explicitly want forward-compatibility for future fields like `resolved_with` — leave additionalProperties at its default (true)."
-- "DO NOT enforce `gating: true` runtime semantics in todo_cli.py — because the spec scopes that to a future TODO if reviewer attention proves insufficient — this TODO is template + schema only."
-- "DO NOT bundle in the coverage_checklist tooling change — because Finding 1 was approved as convention-only — that lives behind a separate (currently un-filed) TODO if a future UAT shows the convention drifting."
+- "DO NOT add `additionalProperties: false` to the new object form — because we explicitly want forward-compatibility for
+  future fields like `resolved_with` — leave additionalProperties at its default (true)."
+- "DO NOT enforce `gating: true` runtime semantics in todo_cli.py — because the spec scopes that to a future TODO if reviewer
+  attention proves insufficient — this TODO is template + schema only."
+- "DO NOT bundle in the coverage_checklist tooling change — because Finding 1 was approved as convention-only — that lives
+  behind a separate (currently un-filed) TODO if a future UAT shows the convention drifting."
 
 scope_limit:
   only_modify:
@@ -146,11 +150,14 @@ success_metrics:
 
 deferred:
 - summary: "`gating: true` runtime enforcement in todo_cli.py done"
-  reason: "Spec §2 Finding 3 scopes this to a future follow-up if reviewer attention proves insufficient. Premature tooling adds false-positive risk (defensible exceptions get blocked)."
+  reason: "Spec §2 Finding 3 scopes this to a future follow-up if reviewer attention proves insufficient. Premature tooling
+    adds false-positive risk (defensible exceptions get blocked)."
 - summary: "Coverage checklist tooling enforcement"
-  reason: "Finding 1 was approved as convention-only per the W4 design. File separately if a future UAT shows the convention drifting."
+  reason: "Finding 1 was approved as convention-only per the W4 design. File separately if a future UAT shows the convention
+    drifting."
 - summary: "_project/UAT_TEMPLATE.yaml subtemplate extraction"
-  reason: "Q4 in the design defaulted to wait. Promote per-TODO conventions into a subtemplate after the next two UATs prove their cost/benefit."
+  reason: "Q4 in the design defaulted to wait. Promote per-TODO conventions into a subtemplate after the next two UATs prove
+    their cost/benefit."
 
 metadata:
   tags:

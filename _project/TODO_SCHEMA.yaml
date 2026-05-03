@@ -304,7 +304,22 @@ properties:
     type: array
     description: "Unresolved questions or uncertainties"
     items:
-      type: string
+      oneOf:
+        - type: string
+        - type: object
+          required: [question]
+          properties:
+            question:
+              type: string
+            gating:
+              type: boolean
+            affects:
+              type: array
+              items: { type: string }
+            default:
+              type: string
+            resolved_with:
+              type: string
 
   commits:
     type: array
