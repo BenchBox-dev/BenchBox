@@ -45,14 +45,15 @@ work:
 - id: w3
   summary: "Run terminating Explorer browser smoke against the facet-coverage corpus"
   needs: [w2]
-  status: pending
+  status: done
 
 verification:
 - description: "Generated browser fixture snapshot contains non-unknown environment facet values."
   command: "cd results-explorer && npm run test:e2e:fixtures"
   expected_output: "fixture verification passes and reports cloud/provider/region/shape coverage"
 - description: "Browser smoke validates environment facet filtering without npm dev server."
-  command: "cd results-explorer && npm run test:e2e:chromium -- --grep Query"
+  command: "cd results-explorer && npm run test:e2e:fixtures && npm run build && npm exec -- playwright test --project=chromium
+    --workers=1 e2e/routes/query.spec.ts"
   expected_output: "Query/environment facet browser coverage passes"
 
 must_preserve:
