@@ -32,6 +32,7 @@ from benchbox.core.explorer_pipeline.models import (
     get_ranking_config,
 )
 from benchbox.core.labels import disambiguate_platform_labels
+from benchbox.core.results.status import bundle_failed_query_count, normalize_validation_status
 
 logger = logging.getLogger(__name__)
 
@@ -196,11 +197,20 @@ def _validation_status(data: dict[str, Any]) -> str | None:
     if not isinstance(summary, dict):
         return None
     val = summary.get("validation")
+    failed_queries = bundle_failed_query_count(data)
     if isinstance(val, str):
-        return val.lower() if val else None
+        normalized = normalize_validation_status(val)
+        if failed_queries and normalized in {None, "passed"}:
+            return "partial"
+        return normalized
     if isinstance(val, dict):
         s = val.get("status")
-        return str(s).lower() if s else None
+        normalized = normalize_validation_status(s)
+        if failed_queries and normalized in {None, "passed"}:
+            return "partial"
+        return normalized
+    if failed_queries:
+        return "partial"
     return None
 
 
@@ -666,6 +676,7 @@ class BundleTransformer:
 
         summary = bundle_data.get("summary", {})
         query_count = summary.get("queries", {}).get("total", 0) if isinstance(summary, dict) else 0
+        failed_query_count = bundle_failed_query_count(bundle_data)
 
         # Same _query_timings → _build_display_timings pass also runs in
         # to_detail_result; a shared intermediate could halve the work for
@@ -698,6 +709,7 @@ class BundleTransformer:
             tuning_hash=_tuning_hash(bundle_data),
             test_type=_test_type(bundle_data),
             validation_status=_validation_status(bundle_data),
+            failed_query_count=failed_query_count,
             cost_usd=_cost_usd_alias(normalized_cost),
             normalized_cost=normalized_cost.to_dict(),
             deployment_class=environment_facets["deployment_class"],
@@ -767,6 +779,7 @@ class BundleTransformer:
             tuning_hash=_tuning_hash(bundle_data),
             test_type=_test_type(bundle_data),
             validation_status=_validation_status(bundle_data),
+            failed_query_count=bundle_failed_query_count(bundle_data),
             cost_usd=_cost_usd_alias(normalized_cost),
             normalized_cost=normalized_cost.to_dict(),
             compliance_class=_compliance_class(bundle_data),

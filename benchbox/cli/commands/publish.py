@@ -23,6 +23,7 @@ from benchbox.cli.shared import console
 from benchbox.core.publishing.bundle_publisher import COMPANION_SUFFIXES, VALID_LABELS, BundlePublisher
 from benchbox.core.publishing.store import PublicationStore
 from benchbox.core.results.loader import ResultLoadError, UnsupportedSchemaError, load_result_file
+from benchbox.core.results.status import result_non_clean_reason
 
 # ---------------------------------------------------------------------------
 # publish group
@@ -105,6 +106,12 @@ def publish_run(ctx, result_file, target, label, last, benchmark, platform, dry_
                 "   To publish anyway, add: [bold]--label unofficial-research[/bold]\n"
                 "   Note: unofficial results must not be used for comparative benchmarking.\n"
                 "   See _sources/tpcds-subscale-contract.md for details."
+            )
+            raise SystemExit(1)
+        if _non_clean_reason := result_non_clean_reason(_result):
+            console.print(
+                f"\n[red]❌ Publish refused: result is not a clean pass ({_non_clean_reason})[/red]\n"
+                "   Partial runs remain available as local artifacts but are not publishable."
             )
             raise SystemExit(1)
     except (ResultLoadError, UnsupportedSchemaError, FileNotFoundError):
@@ -349,6 +356,12 @@ def publish_bundle(
                 f"'{_compliance_class}' and cannot be published under label "
                 f"'{label}'. Add [bold]--label unofficial-research[/bold] to "
                 "publish unofficial TPC-DS results."
+            )
+            return None
+        if _non_clean_reason := result_non_clean_reason(_result):
+            console.print(
+                "[red]Publish refused:[/red] This result is not a clean pass "
+                f"({_non_clean_reason}) and cannot be published."
             )
             return None
     except (ResultLoadError, UnsupportedSchemaError, FileNotFoundError):

@@ -30,6 +30,15 @@ def _fake_result(compliance_class: str | None = None) -> SimpleNamespace:
     return ns
 
 
+def _partial_query_failure_result() -> SimpleNamespace:
+    result = _fake_result("official")
+    result.total_queries = 2
+    result.successful_queries = 1
+    result.failed_queries = 1
+    result.validation_status = "PARTIAL"
+    return result
+
+
 # ---------------------------------------------------------------------------
 # publish run - compliance guardrail
 # ---------------------------------------------------------------------------
@@ -123,6 +132,24 @@ def test_publish_run_label_check_is_case_insensitive(monkeypatch: pytest.MonkeyP
     assert result.exit_code == 0
 
 
+def test_publish_run_refuses_partial_query_failure(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    src = tmp_path / "tpch_partial.json"
+    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+
+    monkeypatch.setattr(pub, "load_result_file", lambda *_a, **_k: (_partial_query_failure_result(), {}))
+    monkeypatch.setattr(
+        pub,
+        "BundlePublisher",
+        lambda **_kw: (_ for _ in ()).throw(AssertionError("partial results must not publish")),
+    )
+
+    result = CliRunner().invoke(pub.publish_run, [str(src)])
+
+    assert result.exit_code == 1
+    assert "not a clean pass" in result.output
+    assert "1 failed query" in result.output
+
+
 # ---------------------------------------------------------------------------
 # publish_bundle - programmatic entry point guardrail
 # ---------------------------------------------------------------------------
@@ -205,3 +232,19 @@ def test_publish_bundle_official_result_not_blocked(monkeypatch: pytest.MonkeyPa
     result = pub.publish_bundle(src, label="maintainer-run")
 
     assert result == "file:///ref"
+
+
+def test_publish_bundle_refuses_partial_query_failure(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    src = tmp_path / "tpch_partial.json"
+    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+
+    monkeypatch.setattr(pub, "load_result_file", lambda *_a, **_k: (_partial_query_failure_result(), {}))
+    monkeypatch.setattr(
+        pub,
+        "BundlePublisher",
+        lambda **_kw: (_ for _ in ()).throw(AssertionError("partial results must not publish")),
+    )
+
+    result = pub.publish_bundle(src, label="maintainer-run")
+
+    assert result is None

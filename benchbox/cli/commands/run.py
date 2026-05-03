@@ -63,6 +63,7 @@ from benchbox.cli.tuning_runtime import (
 )
 from benchbox.core.config import DatabaseConfig
 from benchbox.core.platform_registry import PlatformRegistry
+from benchbox.core.results.status import result_non_clean_reason
 from benchbox.core.schemas import ExecutionContext
 from benchbox.platforms import is_dataframe_platform, list_available_dataframe_platforms
 from benchbox.utils.cloud_storage import is_cloud_path
@@ -1485,7 +1486,7 @@ def _direct_handle_result(
     benchmark_config: BenchmarkConfig,
 ) -> None:
     """Export results and perform post-run actions for the direct branch."""
-    ctx = s.ctx
+    non_clean_reason = result_non_clean_reason(result)
     if result.validation_status not in ["FAILED", "INTERRUPTED"]:
         if not s.quiet:
             console.print("\n[bold]Exporting results...[/bold]")
@@ -1505,25 +1506,29 @@ def _direct_handle_result(
             for _format_name, filepath in exported_files.items():
                 click.echo(filepath)
         else:
-            console.print(f"\n[green]✅ Benchmark completed: {result.validation_status}[/green]")
+            if non_clean_reason:
+                console.print(
+                    f"\n[yellow]⚠ Benchmark completed with non-clean status: {result.validation_status}[/yellow]\n"
+                    f"[yellow]Reason:[/yellow] {non_clean_reason}"
+                )
+            else:
+                console.print(f"\n[green]✅ Benchmark completed: {result.validation_status}[/green]")
             for format_name, filepath in exported_files.items():
                 console.print(f"{format_name.upper()}: [dim]{filepath}[/dim]")
 
         _render_post_run_charts(result, console, s.quiet)
 
-        if s.publish:
-            json_bundle = exported_files.get("json")
-            if json_bundle:
-                from benchbox.cli.commands.publish import publish_bundle
+        if s.publish and not non_clean_reason and (json_bundle := exported_files.get("json")):
+            from benchbox.cli.commands.publish import publish_bundle
 
-                if not s.quiet:
-                    console.print("\n[bold]Publishing result bundle...[/bold]")
-                publish_bundle(
-                    source_bundle=json_bundle,
-                    target=s.publish_target,
-                    label=s.publish_label,
-                    quiet=bool(s.quiet),
-                )
+            if not s.quiet:
+                console.print("\n[bold]Publishing result bundle...[/bold]")
+            publish_bundle(
+                source_bundle=json_bundle,
+                target=s.publish_target,
+                label=s.publish_label,
+                quiet=bool(s.quiet),
+            )
 
         from benchbox.cli.preferences import save_last_run_config
 
@@ -1542,9 +1547,11 @@ def _direct_handle_result(
             output=s.output,
             additional_options={"table_mode": s.table_mode},
         )
+        if non_clean_reason:
+            s.ctx.exit(1)
     else:
         console.print(f"\n[red]❌ Benchmark failed: {result.validation_status}[/red]")
-        ctx.exit(1)
+        s.ctx.exit(1)
 
 
 def _data_or_load_build_db_config(s: types.SimpleNamespace, db_manager: DatabaseManager) -> DatabaseConfig | None:

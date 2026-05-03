@@ -31,6 +31,7 @@ from benchbox.core.results.loader import (
     find_latest_result,
     load_result_file,
 )
+from benchbox.core.results.status import result_non_clean_reason
 from benchbox.core.results.submission_history import record_hosted_submission
 
 # Submission manifest phase - indicates the result schema generation (v2.0 = phase 2).
@@ -553,6 +554,16 @@ def submit(
             "   must not be submitted as a comparable result. Only results with\n"
             "   compliance_class=official may be submitted.\n"
             "   See _sources/tpcds-subscale-contract.md for details."
+        )
+        ctx.exit(1)
+        return
+
+    non_clean_reason = result_non_clean_reason(result)
+    if non_clean_reason:
+        console.print(
+            f"\n[red]❌ Submission refused: result is not a clean pass ({non_clean_reason})[/red]\n"
+            "   Query-level failures remain visible in the result artifact, but\n"
+            "   partial runs are not eligible for public submission or leaderboard display."
         )
         ctx.exit(1)
         return

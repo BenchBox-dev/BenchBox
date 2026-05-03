@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 
 from benchbox.core.cost.models import NormalizedCost
 from benchbox.core.cost.pricing import PRICING_VERSION
+from benchbox.core.results.status import validation_status_is_non_clean
 
 _COST_MODEL_SOURCE = "benchbox.core.cost.pricing"
 
@@ -108,6 +109,7 @@ class ManifestEntry(BaseModel):
     tuning_hash: str | None = None
     test_type: str | None = None
     validation_status: str | None = None
+    failed_query_count: int = 0
     cost_usd: float | None = None
     normalized_cost: dict[str, Any] = Field(default_factory=unavailable_normalized_cost_payload)
     deployment_class: str | None = None
@@ -166,6 +168,7 @@ class DetailResult(BaseModel):
     tuning_hash: str | None = None
     test_type: str | None = None
     validation_status: str | None = None
+    failed_query_count: int = 0
     cost_usd: float | None = None
     normalized_cost: dict[str, Any] = Field(default_factory=unavailable_normalized_cost_payload)
     compliance_class: str | None = None
@@ -180,7 +183,12 @@ class DetailResult(BaseModel):
 
 def is_ranking_eligible(entry: ManifestEntry) -> bool:
     """Return True if this entry may appear in ranked tables."""
-    return entry.visibility in RANKING_ELIGIBLE_VISIBILITIES and entry.trust_label in RANKING_ELIGIBLE_TRUST_LABELS
+    return (
+        entry.visibility in RANKING_ELIGIBLE_VISIBILITIES
+        and entry.trust_label in RANKING_ELIGIBLE_TRUST_LABELS
+        and entry.failed_query_count == 0
+        and not validation_status_is_non_clean(entry.validation_status)
+    )
 
 
 def select_canonical_row(entries: list[ManifestEntry]) -> ManifestEntry | None:

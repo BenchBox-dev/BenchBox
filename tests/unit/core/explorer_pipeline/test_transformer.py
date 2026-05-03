@@ -320,6 +320,36 @@ class TestExtendedManifestFields:
 
         assert entry.validation_status == "passed"
 
+    def test_partial_query_failure_count_and_status_extracted(self, tmp_path: Path) -> None:
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["summary"]["queries"] = {"total": 2, "passed": 1, "failed": 1}
+        data["summary"]["validation"] = "passed"
+        data["queries"][1]["status"] = "ERROR"
+        bundle = tmp_path / "partial_query_failure.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        entry = transformer.to_manifest_entry(bundle)
+        detail = transformer.to_detail_result(bundle, result_id="partial-query-failure")
+
+        assert entry.failed_query_count == 1
+        assert detail.failed_query_count == 1
+        assert entry.validation_status == "partial"
+        assert detail.validation_status == "partial"
+
+    def test_missing_status_does_not_create_partial_query_failure(self, tmp_path: Path) -> None:
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        for query in data["queries"]:
+            del query["status"]
+        bundle = tmp_path / "legacy_no_query_status.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        entry = transformer.to_manifest_entry(bundle)
+
+        assert entry.failed_query_count == 0
+        assert entry.validation_status == "passed"
+
     def test_cost_usd_none_when_absent(self, bundle_file: Path) -> None:
         transformer = BundleTransformer()
         entry = transformer.to_manifest_entry(bundle_file)
