@@ -53,10 +53,88 @@ def test_platform_options_capture_merges_values_and_records_sources() -> None:
     assert sources == {
         "warehouse": "cli_option",
         "region": "saved_config",
-        "cache_enabled": "registered_default",
+        # cache_enabled was already populated from database_options; a registered
+        # default that happens to match must not rewrite the saved_config
+        # provenance.
+        "cache_enabled": "saved_config",
         "access_token": "saved_config",
         "password": "cli_option",
     }
+
+
+def test_registered_default_does_not_overwrite_saved_config_provenance() -> None:
+    """w17 regression: when a saved value matches a registered default, the
+    source must remain ``saved_config`` so debugging/audit flows that rely on
+    origin tracking aren't misled."""
+    values, sources = build_platform_options_capture(
+        requested_options={"foo": "bar"},
+        requested_sources={"foo": "registered_default"},
+        database_options={"foo": "bar"},
+    )
+
+    assert values == {"foo": "bar"}
+    assert sources == {"foo": "saved_config"}
+
+
+def test_registered_default_recorded_when_no_saved_value() -> None:
+    """w17: registered defaults should still be recorded as such when there is
+    no prior saved_config value to preserve."""
+    values, sources = build_platform_options_capture(
+        requested_options={"foo": "bar"},
+        requested_sources={"foo": "registered_default"},
+        database_options=None,
+    )
+
+    assert values == {"foo": "bar"}
+    assert sources == {"foo": "registered_default"}
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "sessionToken",
+        "SessionToken",
+        "session-token",
+        "session.token",
+        "AccessKeyId",
+        "accessKeyId",
+        "access-key-id",
+        "ConnectionString",
+        "connectionString",
+        "connection-string",
+        "PrivateKey",
+        "privateKey",
+        "private-key",
+        "Credential",
+        "AwsCredentials",
+    ],
+)
+def test_camelcase_kebabcase_secret_keys_are_redacted(key: str) -> None:
+    """w3 regression: secret-key matching must collapse non-alphanumerics so
+    camelCase / PascalCase / kebab-case credential keys are detected."""
+    from benchbox.core.results.platform_options import is_secret_option_key
+
+    assert is_secret_option_key(key), f"{key!r} should be classified as a secret key"
+
+
+def test_sanitize_redacts_camelcase_secret_values() -> None:
+    """w3 regression: end-to-end check that camelCase secret keys are redacted
+    in the sanitized output."""
+    from benchbox.core.results.platform_options import sanitize_platform_options
+
+    sanitized = sanitize_platform_options(
+        {
+            "sessionToken": "raw-session",
+            "accessKeyId": "AKIA-RAW",
+            "ConnectionString": "Server=...;Pwd=raw",
+            "warehouse": "WH",
+        }
+    )
+
+    assert sanitized["sessionToken"] == REDACTED_VALUE
+    assert sanitized["accessKeyId"] == REDACTED_VALUE
+    assert sanitized["ConnectionString"] == REDACTED_VALUE
+    assert sanitized["warehouse"] == "WH"
 
 
 def test_lifecycle_run_config_persists_sanitized_platform_options_with_provenance() -> None:

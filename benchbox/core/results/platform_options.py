@@ -2,20 +2,33 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from typing import Any
 
 REDACTED_VALUE = "<redacted>"
 
-_SECRET_KEY_PARTS = (
-    "password",
-    "token",
-    "secret",
-    "access_key",
-    "private_key",
-    "session_token",
-    "connection_string",
-    "credential",
+_NON_ALNUM_RE = re.compile(r"[^a-z0-9]")
+
+
+def _normalize_secret_key(key: str) -> str:
+    """Lowercase ``key`` and strip non-alphanumerics so ``sessionToken``,
+    ``session-token`` and ``session_token`` all collapse to ``sessiontoken``."""
+    return _NON_ALNUM_RE.sub("", key.lower())
+
+
+_SECRET_KEY_PARTS = tuple(
+    _normalize_secret_key(part)
+    for part in (
+        "password",
+        "token",
+        "secret",
+        "access_key",
+        "private_key",
+        "session_token",
+        "connection_string",
+        "credential",
+    )
 )
 _INTERNAL_OPTION_KEYS = {
     "_explicit_platform_options",
@@ -49,7 +62,7 @@ _INTERNAL_OPTION_KEYS = {
 
 
 def is_secret_option_key(key: str) -> bool:
-    normalized = key.lower()
+    normalized = _normalize_secret_key(key)
     return any(part in normalized for part in _SECRET_KEY_PARTS)
 
 
@@ -80,7 +93,7 @@ def build_platform_options_capture(
     and may include registered defaults. ``database_options`` are the resolved
     options from ``DatabaseConfig`` after credentials/config builders have run.
     CLI-provided options override resolved config values; registered defaults do
-    not override saved/config-derived values.
+    not override saved/config-derived values, including their provenance.
     """
     values: dict[str, Any] = {}
     sources: dict[str, str] = {}
@@ -93,8 +106,9 @@ def build_platform_options_capture(
     for key, value in _iter_public_options(requested_options):
         requested_source = source_map.get(key, "requested")
         if requested_source == "registered_default" and key in values:
-            if values[key] == value:
-                sources[key] = "registered_default"
+            # Saved config already populated this key; preserve its provenance
+            # rather than rewriting the source to "registered_default" just
+            # because the values happen to match.
             continue
         values[key] = value
         sources[key] = requested_source
