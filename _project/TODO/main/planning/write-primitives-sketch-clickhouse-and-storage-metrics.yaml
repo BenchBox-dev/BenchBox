@@ -2,49 +2,26 @@ id: write-primitives-sketch-clickhouse-and-storage-metrics
 title: "Write Primitives: ClickHouse-native sketch variants + storage-size validation for headline ★ ops"
 worktree: main
 priority: Medium-High
-status: "Blocked"
+status: "Not Started"
 category: "Core Functionality"
 
 description: |
-  ## BLOCKED — implementation attempt 2026-05-02 (PR #133)
+  ## Unblocked by `write-primitives-architecture-fixes` (2026-05-04)
 
-  Two architectural gaps in write_primitives surfaced when this TODO
-  was attempted; both must be resolved before the catalog work below
-  can land cross-engine. Findings captured as blind-spot files:
+  The validation_query.platform_overrides extension point landed; the
+  `_run_operation_validation` runtime now resolves per-platform validation
+  SQL. ClickHouse-native `-State`/`-Merge` overrides can declare their own
+  ClickHouse-only validation bodies (or `null` skip) without crashing on
+  default DuckDB SQL. Spike-confirmed empirical observations from PR #133
+  (chDB validated uniqState/uniqMerge, quantileTDigestState/Merge(0.5),
+  topKState(8)/Merge(8); storage sizes theta ~60KB, KLL ~3.5KB, topK
+  ~317B) remain valid inputs to w5 bounds when implementation resumes.
 
-    - `_project/blind-spots/2026-05-02-155448-validation-query-no-per-platform-override.md`
-      `validation_queries[]` are sent raw to `connection.execute()`
-      with no per-platform override mechanism. The 3 ★ headline ops
-      use DuckDB-only `datasketch_*` syntax in their validation_query
-      bodies, so any ClickHouse `write_sql` override would fail
-      validation immediately (the validation runs DuckDB SQL on
-      ClickHouse and crashes). Resolving requires extending
-      `WriteOperation.validation_queries[]` schema + `loader.py` +
-      `_run_operation_validation` to support
-      `validation_query.platform_overrides`. All three files are in
-      `scope_limit.do_not_modify` for this TODO.
-
-    - `_project/blind-spots/2026-05-02-155524-duckdb-datasketches-extension-drift.md`
-      The DuckDB community datasketches extension at the version
-      BenchBox installs (commit `2e38607` for v1.3.2) does not export
-      `datasketch_theta` or `datasketch_frequent_items`. 4/8 sketch
-      ops fail end-to-end on a clean develop install today,
-      contradicting PR #114's smoke-verification claim — the upstream
-      build appears to have been rebuilt without the families.
-      Resolving needs vendoring the extension binary or
-      switching the broken ops to `datasketch_hll` substitution.
-
-  Spike findings that DO survive: the chDB local verification of
-  `uniqState`/`uniqMerge`, `quantileTDigestState`/`quantileTDigestMerge(0.5)`,
-  and `topKState(8)`/`topKMerge(8)` was confirmed end-to-end. Storage
-  sizes were observed empirically (theta merged state ~60KB, KLL
-  ~3.5KB, topK ~317B) — these would inform w5 bounds when implementation
-  resumes. The catalog work in the work[] block is otherwise still
-  the correct shape.
-
-  Re-attempt after `write-primitives-architecture-fixes` lands. This
-  TODO now has a `deps.needs:` edge to that fix-class TODO. Keep this
-  TODO's scope_limit unchanged.
+  Note: the DuckDB community datasketches extension drift captured in
+  `_project/blind-spots/2026-05-02-155524-duckdb-datasketches-extension-drift.md`
+  is a separate dependency-management problem, not a write_primitives
+  architecture gap. Treat it as a parallel blocker if you hit
+  function-not-found during w3 bound retuning; otherwise out of scope.
 
   ## Original description
 

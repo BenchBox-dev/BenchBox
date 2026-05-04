@@ -2,36 +2,23 @@ id: write-primitives-sketch-duckdb-cpc-req-families
 title: "Write Primitives sketch: add DuckDB-only CPC and REQ sketch families"
 worktree: main
 priority: Medium
-status: "Blocked"
+status: "Not Started"
 category: "Core Functionality"
 
 description: |
-  ## BLOCKED — transitively blocked via `write-primitives-sketch-clickhouse-and-storage-metrics`
+  ## Unblocked by `write-primitives-architecture-fixes` (2026-05-04)
 
-  The dep edge in `deps.needs:` points at the ClickHouse + storage-
-  metrics TODO. That TODO is itself Blocked (PR #133, 2026-05-02) on
-  two write_primitives architectural gaps:
+  validation_query.platform_overrides shipped, removing the catalog-side
+  blocker. The DuckDB community datasketches extension drift recorded in
+  `_project/blind-spots/2026-05-02-155524-duckdb-datasketches-extension-drift.md`
+  remains an open dependency-management risk — w1 and w2 must smoke-test
+  `datasketch_cpc` / `datasketch_req` against the exact installed extension
+  build before relying on the function families.
 
-    - validation_query has no per-platform override mechanism
-      (`_project/blind-spots/2026-05-02-155448-validation-query-no-per-platform-override.md`)
-    - DuckDB community datasketches extension at the version BenchBox
-      installs has dropped the theta + frequent-items families
-      (`_project/blind-spots/2026-05-02-155524-duckdb-datasketches-extension-drift.md`)
-
-  This TODO additionally inherits the second blocker as a reliability
-  risk: the current community extension build does expose
-  `datasketch_cpc` and `datasketch_req`, but the same unpinned CDN
-  artifact already dropped theta + frequent-items without a BenchBox
-  version change. CPC/REQ implementation must smoke-test the exact
-  function family and merge semantics before relying on it. Both gaps
-  need a fix-class TODO before any sketch work in the matrix can land
-  cross-engine.
-
-  Resolution path: `write-primitives-architecture-fixes` unblocks
-  the shared architecture gaps, then
-  `write-primitives-sketch-clickhouse-and-storage-metrics` can resume
-  the transitive sketch groundwork. Re-attempt after both deps land;
-  keep the scope_limit and work[] block unchanged.
+  Implementation order is unchanged: this TODO depends on
+  `write-primitives-sketch-clickhouse-and-storage-metrics` so the
+  storage-size validation methodology lands first and CPC vs Theta
+  storage comparisons in w3 docs can reuse it.
 
   ## Original description
 

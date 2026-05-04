@@ -2,43 +2,25 @@ id: write-primitives-sketch-pyspark-dataframe-surface
 title: "Write Primitives sketch: add PySpark-only DataFrame surface for sketch persist + merge"
 worktree: main
 priority: Medium
-status: "Blocked"
+status: "Not Started"
 category: "Core Functionality"
 
 description: |
-  ## BLOCKED — w1 research spike 2026-05-02 (PR #136)
+  ## Unblocked by `write-primitives-architecture-fixes` (2026-05-04)
 
-  w1's research spike confirmed BenchBox's DataFrame execution model
-  has no extension point for sketch-shaped ops. Finding captured as:
+  `WriteOperationType.AGGREGATE_PERSIST` and `AGGREGATE_MERGE` landed
+  with `DataFrameWriteCapabilities.supports_aggregate_persist` /
+  `supports_aggregate_merge` flags and dispatch methods
+  (`execute_aggregate_persist` / `execute_aggregate_merge`) that accept
+  caller-supplied callables for the engine-specific sketch chain. PySpark
+  presets enable both flags. The implementation pattern documented in the
+  architecture-fixes TODO matches w2-w3 below: the consumer closes over
+  the spark session + source data + group cols inside the builder
+  callable; the manager owns timing/durability/result-envelope.
 
-    - `_project/blind-spots/2026-05-02-163132-write-primitives-dataframe-execution-model-no-sketch-shape.md`
-
-  `benchbox/core/write_primitives/dataframe_operations.py` exposes a
-  closed `WriteOperationType` enum (INSERT, BULK_LOAD, UPDATE, DELETE,
-  MERGE, TRANSACTION) routed through the row-level maintenance
-  interface. Sketch persistence is structurally different (per-group
-  HLL state build, persist, merge, extract scalar) and does not fit
-  any existing op type.
-
-  The TODO's own anti-pattern is the explicit hard-block trigger:
-  > "DO NOT extend BenchBox's DataFrame execution model beyond what
-  > dataframe_operations.py already supports — because that's a
-  > structural change with broader scope implications — surface the
-  > need to the user before extending."
-
-  Resolution requires a fix-class TODO that adds aggregate-state op
-  shape support: likely `WriteOperationType.AGGREGATE_PERSIST` and
-  `WriteOperationType.AGGREGATE_MERGE` with a build-fn / merge-fn /
-  extract-fn registration similar to read_primitives' existing
-  `expression_impl` / `pandas_impl` pattern. That extension would
-  also unlock potential ClickHouse / Polars / DataFusion sketch ops
-  later, plus any future aggregate-state-persistence benchmark
-  category (materialised views, summary tables, ML feature stores).
-
-  Re-attempt after `write-primitives-architecture-fixes` lands. This
-  TODO now has a `deps.needs:` edge to that fix-class TODO. Keep w2-w5
-  work specifications below unchanged — they remain the correct shape
-  once the model accepts aggregate-state ops.
+  w1 (research spike) is now obsolete since the framework decision is
+  made — proceed directly to w2 (HLL persist+merge), w3 (top-K, Spark 4.1+
+  guarded), w4 (docs), w5 (changelog).
 
   ## Original description
 
