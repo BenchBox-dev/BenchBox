@@ -29,7 +29,7 @@ remaining `FAIL` lines indicate the workaround in BenchBox is still load-bearing
 
 | # | Item | Tier | Repro result | BenchBox workaround | Action |
 |---|------|------|--------------|---------------------|--------|
-| 1 | DuckDB `GROUP/ORDER BY ALL` quoted under `identify=True` | B (verify) | **PASS** (no longer reproduces) | `dialect_utils._restore_group_order_by_all_keyword` | **Retire workaround in BenchBox.** Do not file. |
+| 1 | DuckDB `GROUP/ORDER BY ALL` quoted under `identify=True` | B (verify) | PASS for `read=duckdb`; **FAIL for `read=postgres,write=duckdb`** (the path BenchBox actually exercises) | `dialect_utils._restore_group_order_by_all_keyword` | **Keep workaround.** PR #3756 fixed direct DuckDB only; cross-dialect path still emits `ORDER BY "ALL"` on `sqlglot==30.6.0`. Do not file (narrower repro warranted before). |
 | 2 | SQLite `DATE + INTERVAL` not lowered to date modifier | A | FAIL | `dialect_utils._fix_sqlite_unsupported_syntax` | File: `issues/02-sqlite-interval-date-arithmetic.md` |
 | 3 | SQLite `EXTRACT` not lowered to `STRFTIME` | B (verify) | FAIL | `dialect_utils._fix_sqlite_unsupported_syntax` | File: `issues/03-sqlite-extract-not-lowered-to-strftime.md` (refs prior #2592) |
 | 4 | Postgres `date + integer` not promoted to `INTERVAL` | D | n/a (AST-ambiguous) | `dialect_utils.fix_postgres_date_arithmetic` | Do not file. Keep as BenchBox pre-processor. |
@@ -48,7 +48,7 @@ remaining `FAIL` lines indicate the workaround in BenchBox is still load-bearing
   [#7277](https://github.com/tobymao/sqlglot/pull/7277),
   [#3351](https://github.com/tobymao/sqlglot/pull/3351),
   [#3325](https://github.com/tobymao/sqlglot/pull/3325).
-- DuckDB `ORDER BY ALL` parsing: [#3755](https://github.com/tobymao/sqlglot/issues/3755) closed by [#3756](https://github.com/tobymao/sqlglot/pull/3756) (merged). Our repro confirms this fix also covers the `identify=True` case.
+- DuckDB `ORDER BY ALL` parsing: [#3755](https://github.com/tobymao/sqlglot/issues/3755) closed by [#3756](https://github.com/tobymao/sqlglot/pull/3756) (merged in v25.6.0). Our repro confirms the fix covers the `identify=True` case for `read="duckdb", write="duckdb"`. The fix does **not** cover the `read="postgres", write="duckdb"` path BenchBox uses for Netezza/Postgres-shaped TPC sources — that still emits `ORDER BY "ALL"` on `sqlglot==30.6.0`, which is why the BenchBox post-fixup stays.
 - SQLite `EXTRACT`: prior [#2592](https://github.com/tobymao/sqlglot/issues/2592) (2023, closed without linked fix).
 
 ## Pre-flight before filing
@@ -60,7 +60,7 @@ remaining `FAIL` lines indicate the workaround in BenchBox is still load-bearing
 
 ## Follow-up TODOs (not part of this prep)
 
-- Retire `_restore_group_order_by_all_keyword` and its branch in `translate_sql_query` once we drop support for `sqlglot < 30.<release-where-#3756-landed>`. The PASS in our repro means this code is no longer load-bearing on currently pinned versions.
+- Extend `repros/repro_all.py` to also exercise `read="postgres", write="duckdb"` for the `GROUP/ORDER BY ALL` case. The current single-dialect repro mis-classified item #1 as fully fixed by PR #3756; a cross-dialect probe would have flagged the narrower remaining gap. Until the harness covers BenchBox's actual call shape, retirement decisions for this row should be made by hand against `dialect_utils.translate_sql_query`, not the harness alone.
 - If maintainers accept the QuestDB dialect contribution offer, the
   rewriter in `benchbox/platforms/questdb_rewriter.py` becomes the natural
   starting point.

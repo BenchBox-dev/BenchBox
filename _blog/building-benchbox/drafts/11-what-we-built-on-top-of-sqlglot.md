@@ -37,7 +37,7 @@ We did not set out to build SQL infrastructure. Each layer below got added becau
 
 **Layer 1: `sqlglot.transpile()` directly.** Handles the bulk of common translation work: joins, CTEs, window functions, most aggregates, basic types, identifier quoting, `LIMIT` to `TOP N`, `EXTRACT` to `DATE_PART`, dialect function renames. The standard cases are by far the largest population of cases.
 
-**Layer 2: A centralized wrapper** at `benchbox/utils/dialect_utils.py`. Once we hit the second post-generation fixup, we centralized. This layer normalizes five dialects with no SQLGlot entry to their nearest peer (mostly `postgres`) and applies three generic post-generation fixups.
+**Layer 2: A centralized wrapper** at `benchbox/utils/dialect_utils.py`. Once we hit the second post-generation fixup, we centralized. This layer normalizes five dialects with no SQLGlot entry to their nearest peer (mostly `postgres`) and applies three generic post-generation fixups. One of those fixes remains active because SQLGlot's DuckDB `ORDER BY ALL` issue is fixed for direct DuckDB translation but not for every source-to-DuckDB path BenchBox exercises.
 
 **Layer 3: Per-platform query transformers.** For platform-specific quirks: a ClickHouse transformer for case folding and division safety, a dedicated QuestDB rewriter for syntax gaps, a DataFusion transformer for engine-semantic rewrites.
 
@@ -55,11 +55,11 @@ Our list includes Netezza, Greenplum, Vertica, DataFusion, plus a "raw ANSI" tar
 
 ### 2. Post-generation fixups
 
-SQLGlot emits standard SQL. Sometimes the standard form fails on the target engine. We carry three fixes that affect everyday TPC-H and TPC-DS expressions:
+SQLGlot emits standard SQL. Sometimes the standard form fails on the target engine. We carry three fixes that affect everyday TPC-H and TPC-DS expressions. The DuckDB row is intentionally specific: SQLGlot issue #3755 and PR #3756 fixed direct DuckDB parsing and generation for `ORDER BY ALL`, but `postgres`/`netezza` source SQL translated to DuckDB can still produce `ORDER BY "ALL"` on `sqlglot==30.6.0`.[^3]
 
 | Fix | What SQLGlot emits | What the engine accepts | Affects |
 |-----|---------------------|--------------------------|---------|
-| `_restore_group_order_by_all_keyword` | `GROUP BY "ALL"` (quoted) | `GROUP BY ALL` (keyword) | DuckDB |
+| `_restore_group_order_by_all_keyword` | `GROUP BY "ALL"` or `ORDER BY "ALL"` on Postgres/Netezza-to-DuckDB paths | `GROUP BY ALL`, `ORDER BY ALL` | DuckDB |
 | `_fix_sqlite_unsupported_syntax` | `DATE + INTERVAL '5' DAY`, `EXTRACT(part FROM date)` | `DATE(..., '+5 days')`, `STRFTIME(...)` | SQLite |
 | `fix_postgres_date_arithmetic` | `d_date + 5` | `d_date + INTERVAL '5' DAY` | Postgres, DataFusion |
 
@@ -184,7 +184,7 @@ We would love to hear about gaps you have hit in your own SQLGlot-based projects
 
 ## Test environment
 
-- SQLGlot pinned `>=20.0.0,<31.0.0` in `pyproject.toml`; resolved to 30.6.0 in `uv.lock` at time of writing
+- SQLGlot pinned `>=25.6.0,<31.0.0` in `pyproject.toml`; resolved to 30.6.0 in `uv.lock` at time of writing. The lower bound is the first release containing SQLGlot PR #3756, but BenchBox still carries the DuckDB ALL workaround for the Postgres/Netezza-to-DuckDB path described above.
 - DataFusion Python `>=50.1.0` in `pyproject.toml`; resolved to 53.0.0 in `uv.lock` at time of writing. The Q11/Q16/Q18/Q20 rewrites in this post are pinned to that resolved version.
 - ClickHouse Cloud and self-hosted 25.x
 - QuestDB 9.3.4
@@ -205,5 +205,7 @@ The 19 DDL rewrite modules under `benchbox/sql_compat/rules/ddl_optimize/` and t
 [^1]: [SQLGlot project repository](https://github.com/tobymao/sqlglot), accessed May 2026.
 
 [^2]: Evangelos Danias, ["How we accelerated transpilation by compiling SQLGlot with mypyc"](https://www.fivetran.com/blog/how-we-accelerated-transpilation-by-compiling-sqlglot-with-mypyc), Fivetran blog, 2026-05-01.
+
+[^3]: SQLGlot issue [#3755](https://github.com/tobymao/sqlglot/issues/3755) and PR [#3756](https://github.com/tobymao/sqlglot/pull/3756). BenchBox's remaining case is narrower than the original upstream issue: `ORDER BY ALL` can still be quoted when translating Postgres/Netezza-shaped source SQL to DuckDB.
 
 *Questions or feedback? [Open an issue](https://github.com/joeharris76/BenchBox/issues) or join the discussion.*
