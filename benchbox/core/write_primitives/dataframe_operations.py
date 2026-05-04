@@ -1080,12 +1080,187 @@ def get_dataframe_write_manager(
     )
 
 
+# ---------------------------------------------------------------------------
+# PySpark sketch helpers (write-primitives-sketch-pyspark-dataframe-surface)
+# ---------------------------------------------------------------------------
+#
+# Factory functions that produce the `state_builder` and `merge_extract`
+# callables expected by `DataFrameWriteOperationsManager.execute_aggregate_persist`
+# and `execute_aggregate_merge`. The factories let consumers close over the
+# spark session, source data path, group columns, and value column without
+# the manager needing to know about Spark.
+#
+# The CLI integration (`benchbox run --platform pyspark --queries
+# sketch_df_hll_persist_merge`) is intentionally NOT wired here — it requires
+# changes to operations.yaml and benchmark.py that are outside this TODO's
+# scope_limit. See the recorded blind-spot
+# `_project/blind-spots/2026-05-04-011321-pyspark-sketch-todo-scope-vs-verification-mismatch.md`
+# for the follow-up.
+
+
+def pyspark_supports_approx_top_k(spark_session: Any) -> bool:
+    """Return whether the active Spark runtime exposes approx_top_k_accumulate.
+
+    `pyspark.sql.functions.approx_top_k_accumulate` ships with Spark 4.1+.
+    BenchBox's PySpark adapter targets Spark 3.5+, so callers must guard
+    top-K aggregate-state ops on the runtime version. Returns False on
+    older Spark versions or when the function symbol is not available.
+
+    Args:
+        spark_session: A SparkSession.
+
+    Returns:
+        True if approx_top_k_accumulate is callable on this Spark runtime.
+    """
+    if spark_session is None:
+        return False
+    try:
+        version = str(spark_session.version)
+    except Exception:
+        return False
+    parts = version.split(".")
+    try:
+        major = int(parts[0])
+        minor = int(parts[1]) if len(parts) > 1 else 0
+    except (ValueError, IndexError):
+        return False
+    if (major, minor) < (4, 1):
+        return False
+    try:
+        from pyspark.sql import functions as F  # noqa: F401, N812
+
+        return hasattr(F, "approx_top_k_accumulate")
+    except ImportError:
+        return False
+
+
+def make_pyspark_hll_persist_builder(
+    spark_session: Any,
+    source_path: Path | str,
+    group_cols: list[str],
+    value_col: str,
+    sketch_alias: str = "sketch",
+) -> Any:
+    """Factory: build the `state_builder` callable for HLL persist on PySpark.
+
+    Reads the source table at `source_path`, groups by `group_cols`, and
+    builds an HLL sketch of `value_col` per group via `F.hll_sketch_agg`
+    (Spark 3.5+). The callable returned has no arguments — the manager
+    invokes it during `execute_aggregate_persist` and writes the resulting
+    DataFrame to Parquet.
+
+    Args:
+        spark_session: A SparkSession.
+        source_path: Parquet directory or table path the source rows live at.
+        group_cols: Group-by column names for per-partition state.
+        value_col: Column whose distinct count the sketch tracks.
+        sketch_alias: Output column name for the HLL state (default "sketch").
+
+    Returns:
+        A zero-arg callable suitable for `manager.execute_aggregate_persist`.
+    """
+    source_str = str(source_path)
+
+    def builder() -> Any:
+        from pyspark.sql import functions as F  # noqa: N812
+
+        return (
+            spark_session.read.parquet(source_str)
+            .groupBy(*group_cols)
+            .agg(F.hll_sketch_agg(value_col).alias(sketch_alias))
+        )
+
+    return builder
+
+
+def make_pyspark_hll_merge_extract(
+    spark_session: Any,
+    sketch_col: str = "sketch",
+) -> Any:
+    """Factory: build the `merge_extract` callable for HLL merge on PySpark.
+
+    Reads the persisted state from `state_path`, unions the per-partition
+    HLL sketches via `F.hll_union_agg`, extracts the distinct count via
+    `F.hll_sketch_estimate`, and returns the float estimate. The manager
+    times the call and records the value in `result.metrics["aggregate_value"]`.
+
+    Args:
+        spark_session: A SparkSession.
+        sketch_col: Column name holding the per-partition HLL state
+            (must match the alias used by the persist builder).
+
+    Returns:
+        A `(Path) -> float` callable suitable for `manager.execute_aggregate_merge`.
+    """
+
+    def merge_extract(state_path: Path) -> float:
+        from pyspark.sql import functions as F  # noqa: N812
+
+        state = spark_session.read.parquet(str(state_path))
+        row = state.agg(F.hll_sketch_estimate(F.hll_union_agg(sketch_col))).collect()[0]
+        return float(row[0])
+
+    return merge_extract
+
+
+def make_pyspark_topk_persist_builder(
+    spark_session: Any,
+    source_path: Path | str,
+    group_cols: list[str],
+    value_col: str,
+    sketch_alias: str = "sketch",
+) -> Any:
+    """Factory: build the top-K `state_builder` callable on PySpark.
+
+    Requires Spark 4.1+ for `F.approx_top_k_accumulate`. Callers must
+    `pyspark_supports_approx_top_k(spark)` before invoking this factory;
+    otherwise it raises at call time inside the builder.
+    """
+    source_str = str(source_path)
+
+    def builder() -> Any:
+        from pyspark.sql import functions as F  # noqa: N812
+
+        return (
+            spark_session.read.parquet(source_str)
+            .groupBy(*group_cols)
+            .agg(F.approx_top_k_accumulate(value_col).alias(sketch_alias))
+        )
+
+    return builder
+
+
+def make_pyspark_topk_merge_extract(
+    spark_session: Any,
+    sketch_col: str = "sketch",
+) -> Any:
+    """Factory: build the top-K `merge_extract` callable on PySpark (Spark 4.1+).
+
+    Returns the count of frequent items in the merged sketch (i.e.,
+    `len(approx_top_k_estimate(...))`).
+    """
+
+    def merge_extract(state_path: Path) -> float:
+        from pyspark.sql import functions as F  # noqa: N812
+
+        state = spark_session.read.parquet(str(state_path))
+        row = state.agg(F.size(F.approx_top_k_estimate(F.approx_top_k_combine(sketch_col)))).collect()[0]
+        return float(row[0])
+
+    return merge_extract
+
+
 __all__ = [
     "WriteOperationType",
     "DataFrameWriteCapabilities",
     "DataFrameWriteResult",
     "DataFrameWriteOperationsManager",
     "get_dataframe_write_manager",
+    "make_pyspark_hll_persist_builder",
+    "make_pyspark_hll_merge_extract",
+    "make_pyspark_topk_persist_builder",
+    "make_pyspark_topk_merge_extract",
+    "pyspark_supports_approx_top_k",
     "POLARS_WRITE_CAPABILITIES",
     "PANDAS_WRITE_CAPABILITIES",
     "PYSPARK_WRITE_CAPABILITIES",
