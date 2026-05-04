@@ -2,10 +2,29 @@ id: write-primitives-sketch-parameter-sweeps
 title: "Write Primitives sketch: parameter-sweep variants for sketch tuning surface (lg_k, k, lg_max_map_size)"
 worktree: main
 priority: Low
-status: "Not Started"
+status: "Blocked"
 category: "Core Functionality"
 
 description: |
+  ## BLOCKED — DuckDB datasketches extension drift confirmed 2026-05-04
+
+  W1 cannot be implemented safely in the current agent environment because
+  the installed DuckDB community `datasketches` extension no longer registers
+  the baseline `datasketch_theta` function used by
+  `sketch_query_theta_union_merge`. A direct DuckDB function-inventory probe
+  after `INSTALL datasketches FROM community; LOAD datasketches;` exposed HLL,
+  KLL, CPC, REQ, quantiles, and T-Digest functions, but no Theta or frequent-
+  items family. The baseline BenchBox run also fails before any sweep variants
+  are added:
+
+    uv run -- benchbox run --platform duckdb --benchmark write_primitives \
+      --scale 0.01 --queries sketch_query_theta_union_merge --non-interactive
+
+  Result: `sketch_query_theta_union_merge` fails with `Catalog Error: Scalar
+  Function ... datasketch_theta does not exist`. Parameter sweeps depend on
+  mirroring the working baseline op and empirically tuning bounds against that
+  baseline, so the extension drift must be resolved first.
+
   ## Unblocked by `write-primitives-architecture-fixes` (2026-05-04)
 
   validation_query.platform_overrides shipped, so the per-cell validation
@@ -142,6 +161,12 @@ deps:
     - write-primitives-architecture-fixes
     - write-primitives-sketch-clickhouse-and-storage-metrics
 
+blockers:
+  - date: "2026-05-04"
+    work: [w1, w2, w3, w4, w5]
+    reason: "DuckDB community datasketches extension loaded in this environment does not expose the baseline `datasketch_theta` function required by `sketch_query_theta_union_merge`; the baseline op fails before sweep variants can be implemented or empirically tuned."
+    unblock: "Resolve the existing DuckDB datasketches extension drift first: either pin/ship an extension build that still exposes the documented Theta and frequent-items functions, or intentionally migrate the baseline sketch catalog and docs to the currently available function families with fresh verification."
+
 metadata:
   owners:
     - joeharris76
@@ -153,7 +178,7 @@ metadata:
     - benchmark-catalog
   estimated_effort: "0.5 day"
   created_date: "2026-05-02"
-  last_updated: "2026-05-02"
+  last_updated: "2026-05-04T08:42:57-04:00"
 
 impact:
   business_value: |
