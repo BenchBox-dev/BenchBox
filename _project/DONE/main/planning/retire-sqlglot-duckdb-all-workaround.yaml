@@ -2,8 +2,29 @@ id: retire-sqlglot-duckdb-all-workaround
 title: "Retire obsolete _restore_group_order_by_all_keyword DuckDB workaround and update related docs"
 worktree: main
 priority: Medium
-status: In Progress
+status: Completed
 category: Code Quality
+completed_date: "2026-05-04"
+
+outcome: |
+  Investigated 2026-05-04. Conclusion: workaround stays.
+
+  W0+W1 confirmed the floor bump (>=25.6.0) is the correct minimum for
+  PR #3756, and the floor bump landed on this branch. W3 (helper deletion)
+  was implemented and reverted within 2 minutes once a cross-dialect probe
+  showed PR #3756 only fixed `read="duckdb", write="duckdb"`; BenchBox's
+  actual call shape is `read="postgres", write="duckdb"` (after the
+  netezza→postgres normalization in `dialect_utils.translate_sql_query`),
+  and that path still emits `ORDER BY "ALL"` on `sqlglot==30.6.0`.
+
+  W4 and W5 cancelled (depended on W3). W6 re-scoped to documenting the
+  narrower remaining gap in blog post 11 and `_project/sqlglot-upstream/
+  README.md` instead of announcing retirement.
+
+  Root cause of the original mis-classification: `repros/repro_all.py`
+  only exercises the single-dialect case for item #1. A cross-dialect
+  probe would have flagged this. Captured as a follow-up TODO in the
+  upstream README and as a blind-spot finding alongside this PR.
 
 description: |
   The repro harness at `_project/sqlglot-upstream/repros/repro_all.py`
@@ -102,75 +123,66 @@ work:
 
 - id: w3
   summary: "Remove _restore_group_order_by_all_keyword and _query_has_group_or_order_by_all"
-  status: pending
+  status: done
   needs: [w1]
   notes: |
-    In `benchbox/utils/dialect_utils.py`:
-      - Delete the two helper functions.
-      - Delete the `if tgt == "duckdb" and _query_has_group_or_order_by_all(query): translated = _restore_group_order_by_all_keyword(translated)` branch
-        inside `translate_sql_query`.
-    In `benchbox/platforms/base/dialect_translation.py`:
-      - Drop the imports for the two helpers.
-      - Delete the `has_all = _query_has_group_or_order_by_all(sql)` branch
-        and its dependent `_restore_group_order_by_all_keyword(stmt)` call.
-    Leave the surrounding `translate_sql_query` flow control unchanged.
+    CANCELLED 2026-05-04: implemented as 89eb06d9c, then reverted as
+    ab08064b2 within 2 minutes once the cross-dialect path was checked.
+    The repro harness only tested `read="duckdb", write="duckdb"`, but
+    BenchBox's actual call goes through `read="postgres", write="duckdb"`
+    (after netezza→postgres normalization in `dialect_utils.translate_sql_query`).
+    On `sqlglot==30.6.0` that cross-dialect path still emits
+    `ORDER BY "ALL"`, so the helpers are still load-bearing. Verified
+    with a direct `sqlglot.transpile(..., read='postgres', write='duckdb',
+    identify=True)` probe.
+
+    The workaround stays. Retirement requires either a follow-up upstream
+    fix that covers the cross-dialect path, or a deliberate decision to
+    drop Postgres/Netezza source SQL inputs to the DuckDB target.
 
 - id: w4
   summary: "Prune direct private-helper test references; keep existing public-path regression tests"
-  status: pending
+  status: done
   needs: [w3]
   notes: |
-    Existing `translate_sql_query`-level regression coverage already
-    lives at `tests/unit/utils/test_dialect_utils.py` lines 178 and 191
-    (`Test DuckDB translation keeps ORDER BY ALL as a keyword`,
-    `Test DuckDB translation keeps GROUP BY ALL as a keyword`). KEEP
-    these — they are the regression contract. Do NOT add duplicates.
-
-    In `tests/unit/utils/test_dialect_utils.py`:
-      - Remove the import of `_query_has_group_or_order_by_all` from
-        line 10 (it is the only private helper imported there;
-        `_restore_group_order_by_all_keyword` is not imported).
-      - Remove the direct call at line 206
-        (`assert _query_has_group_or_order_by_all(query) is False`)
-        and the test method that wraps it.
-    In `tests/unit/sql_compat/test_translate_sql_delegation.py`:
-      - Update the docstring/comment block on/near line 149 that
-        references the old workaround (`AFTER: _restore_group_order_by_all_keyword()
-        strips the quotes.`) to reflect that the upstream fix now
-        handles this directly.
+    CANCELLED 2026-05-04: depends on w3, which is cancelled. The private
+    helpers stay in place, so the test imports and direct-call assertions
+    that exercise them stay too — they remain a useful regression contract
+    against accidental deletion.
 
 - id: w5
   summary: "Live regression: TPC-H/TPC-DS/SSB on DuckDB SF 0.01"
-  status: pending
+  status: done
   needs: [w4]
   notes: |
-    Run `benchbox run --platform duckdb --benchmark tpch --scale 0.01
-    --validation full` and the equivalent for `tpcds` and `ssb`. All
-    runs must pass validation (or match the validation status they
-    had before the change). Capture the pre/post status in the PR
-    description. This is the load-bearing evidence that `--identify`
-    DuckDB output still works without the workaround in the full path.
+    CANCELLED 2026-05-04: w3 was reverted, so there is no risky code
+    change for this gate to protect. The dialect_utils call path is
+    unchanged on this branch except for the floor bump in w1 (which is
+    a constraint, not a runtime change).
 
 - id: w6
   summary: "Update blog post 11 and SQLGlot upstream README to reflect retirement"
-  status: pending
+  status: done
   needs: [w5]
   notes: |
-    In `_blog/building-benchbox/drafts/11-what-we-built-on-top-of-sqlglot.md`:
-      - Section 2 "Post-generation fixups": remove the
-        `_restore_group_order_by_all_keyword` row from the table.
-      - Update the surrounding prose: "We carry three fixes" -> "We
-        carry two fixes". Add a one-sentence aside explaining that the
-        DuckDB ALL fix landed upstream in SQLGlot PR #3756 and the
-        workaround was retired.
+    DONE 2026-05-04 (re-scoped): instead of "reflect retirement", the
+    documentation updates now reflect that the workaround stays and
+    document the narrower remaining gap.
 
-    In `_project/sqlglot-upstream/README.md`:
-      - Move row #1 in the verdict table out of "Action: Retire
-        workaround in BenchBox" and into "Action: Retired in PR <#>"
-        with the merge SHA / PR link.
-      - Remove the corresponding bullet from "Follow-up TODOs"
-        (`Retire _restore_group_order_by_all_keyword ...`) since the
-        work is captured by this TODO.
+    Blog post 11 (commit 92c78e937): clarifies in section "Post-generation
+    fixups" that PR #3756 fixed direct DuckDB only and that BenchBox's
+    Postgres/Netezza→DuckDB path still produces quoted ALL. Adds a
+    footnote citing #3755/#3756 with the narrower scope. Updates the
+    "Test environment" line to reflect the new floor and explicitly
+    notes the workaround stays.
+
+    Upstream README (this commit): row #1 verdict updated from
+    "Retire workaround" to "Keep workaround", explaining that the upstream
+    fix only covers `read=duckdb`. The "Follow-up TODOs" bullet that
+    asked us to retire the helper is replaced with a follow-up to extend
+    `repros/repro_all.py` so the harness exercises the cross-dialect path
+    BenchBox actually uses (the original mis-classification was a harness
+    coverage gap, not an upstream regression).
       - Update the SQLGlot floor reference in the README if w2 changed it.
 
 deferred:
