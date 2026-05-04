@@ -4,23 +4,30 @@ series: building-benchbox
 post_number: 11
 type: architecture-design
 tags: [benchbox, sqlglot, sql, transpilation, dialects, dataframe, architecture, datafusion, clickhouse, questdb]
-meta_description: "BenchBox runs benchmarks on 36 SQL platforms using SQLGlot for transpilation. Here are the seven categories of SQL infrastructure we still had to build on top."
+meta_description: "BenchBox runs benchmarks on 42 SQL platforms using SQLGlot for transpilation. Here are the seven categories of SQL infrastructure we still had to build on top."
 status: draft
 ---
 
 # What we built on top of SQLGlot (and why transpilation isn't enough)
 
-> SQLGlot is the foundation, not the finished house. This post is the punchlist of what we still had to build.
+> A query can transpile cleanly and still fail at table creation, engine planning, or result validation. This post catalogs the layer BenchBox built around SQLGlot to close that gap.
 
-**TL;DR**: BenchBox runs benchmarks across 36 SQL platforms. SQLGlot does the transpilation heavy lifting, and the recent mypyc work makes it dramatically faster, but real cross-engine portability needs a substantial additional layer on top: dialect normalization, post-generation fixups, engine-aware semantic rewrites, a 19-platform DDL rewrite registry, hand-written query overrides where translation cannot deliver, and a SQL-to-DataFrame facade for engines that do not speak SQL. We catalog the seven categories with file paths and concrete examples.
+**TL;DR**: SQLGlot does the cross-dialect translation heavy lifting BenchBox depends on across 42 SQL platforms and 9 DataFrame engines. Production portability still required seven extra layers: dialect normalization, post-generation fixups, engine-semantic rewrites, DDL rules, query overrides, registry governance, and a SQL-to-DataFrame facade.
 
 ---
 
 ## Introduction
 
-BenchBox's promise is "one benchmark, every engine." We run TPC-H, TPC-DS, ClickBench, SSB, H2O, NYC Taxi, and a dozen other benchmark specs across 36 SQL platforms (DuckDB, Snowflake, Databricks, BigQuery, Redshift, ClickHouse, Trino, Athena, Doris, StarRocks, Postgres, MySQL, Vertica, SingleStore, QuestDB, DataFusion, Firebolt, Synapse, and more) plus a fleet of DataFrame engines (Polars, Pandas, DataFusion-Python, PySpark, Dask, Modin, cuDF, LakeSail). Multiplied out, that is thousands of (query, dialect) combinations per release.
+BenchBox's promise is "one benchmark, every engine." We run TPC-H, TPC-DS, ClickBench, SSB, H2O, NYC Taxi, and a dozen other benchmark specs across:
 
-That promise is built on cross-dialect SQL translation, and SQLGlot[^1] is the obvious tool. We use it on every release. The Fivetran team's recent mypyc compilation work[^2] gets a roughly 5x parser, 2.5x generator, and 2x optimizer speedup while keeping the pure-Python path intact. For our workload that is meaningful, and worth saying out loud: without SQLGlot, BenchBox would not exist as a multi-platform tool. We have not rigorously measured SQLGlot's share of our runtime budget, so we treat the speedups as an opportunity rather than a quantified need.
+- **42 SQL platforms**: embedded engines (DuckDB, SQLite, DataFusion), open-source servers (Postgres, ClickHouse, Doris, StarRocks, QuestDB, SingleStore, Firebolt), cloud warehouses (Snowflake, Databricks, BigQuery, Redshift, Synapse, Fabric), and Spark-flavored runtimes (Trino, Athena, EMR, Dataproc, LakeSail).
+- **9 DataFrame engines**: Polars, Pandas, DataFusion-Python, PySpark, Dask, Modin, cuDF, Databricks-DF, LakeSail-DF.
+
+Multiplied out, that is thousands of (query, dialect) combinations per release.
+
+That promise is built on cross-dialect SQL translation, and SQLGlot[^1] is the standard tool for the job. We use it on every release.
+
+The Fivetran team's recent mypyc compilation work[^2] reports roughly 5x parser, 2.5x generator, and 2x optimizer speedups while keeping the pure-Python path intact. We have not rigorously measured SQLGlot's share of our runtime budget, so we treat the speedups as an opportunity rather than a quantified need. Without SQLGlot, BenchBox would not exist as a multi-platform tool.
 
 The Fivetran post closes with: "It has never been faster or easier to translate between different SQL dialects so that you can use different query engines." The first half is unambiguously true. The second half is where our experience adds nuance. Running the same benchmark on different engines is *partly* about transpilation, and *partly* about everything else. This post is what "everything else" looked like for us.
 
@@ -28,7 +35,7 @@ The Fivetran post closes with: "It has never been faster or easier to translate 
 
 We did not set out to build SQL infrastructure. Each layer below got added because the previous one left an observable gap.
 
-**Layer 1: `sqlglot.transpile()` directly.** Handles the obvious 80%: joins, CTEs, window functions, most aggregates, basic types, identifier quoting, `LIMIT` to `TOP N`, `EXTRACT` to `DATE_PART`, dialect function renames. The easy cases are by far the largest population of cases.
+**Layer 1: `sqlglot.transpile()` directly.** Handles the bulk of common translation work: joins, CTEs, window functions, most aggregates, basic types, identifier quoting, `LIMIT` to `TOP N`, `EXTRACT` to `DATE_PART`, dialect function renames. The standard cases are by far the largest population of cases.
 
 **Layer 2: A centralized wrapper** at `benchbox/utils/dialect_utils.py`. Once we hit the second post-generation fixup, we centralized. This layer normalizes five dialects with no SQLGlot entry to their nearest peer (mostly `postgres`) and applies three generic post-generation fixups.
 
@@ -42,7 +49,9 @@ We did not design this in advance. It accreted: each new layer existed because t
 
 ### 1. Dialect normalization
 
-SQLGlot's headline metric is "supports 34 SQL dialects." Accurate as a count of parser/generator pairs. Our list includes Netezza, Greenplum, Vertica, DataFusion, plus a "raw ANSI" target, none of which have native SQLGlot dialect entries. We map them to the nearest peer (`postgres`) in `dialect_utils.py`. The "34 dialects" claim is best read as "34 parser/generator pairs," not "34 production engines you can ship to."
+Public dialect counts are a coarse signal. The Fivetran post puts SQLGlot at "34 different SQL dialects"[^2]; SQLGlot's current GitHub README[^1] says "31 different dialects." Both numbers are accurate as counts of parser/generator pairs. Neither directly answers "which engines can I ship to."
+
+Our list includes Netezza, Greenplum, Vertica, DataFusion, plus a "raw ANSI" target, none of which have native SQLGlot dialect entries. We map them to the nearest peer (`postgres`) in `dialect_utils.py`. The "N dialects" headline is best read as "N parser/generator pairs," not "N production engines you can ship to."
 
 ### 2. Post-generation fixups
 
@@ -60,9 +69,22 @@ None of these are exotic. They round-trip the AST cleanly; they just fail at the
 
 Three platforms required dedicated modules.
 
-**ClickHouse** (`platforms/clickhouse/query_transformer.py`): case folding for unquoted identifiers; DECIMAL division-by-zero NULL wrapping; subquery aliasing for TPC-DS Q23 and Q87. The Q23/Q87 case is worth telling: we wrote an AST visitor to inject `AS _sqN` on every unaliased subquery, but it corrupted Q23 (pulled `GROUP BY` out of a subquery) and Q87 (injected aliases inside `EXCEPT/INTERSECT`). The fix that shipped was a session setting, `joined_subquery_requires_alias=0`. The lesson: even with full AST control, the safe move was to abandon the rewrite and twist the engine knob.
+**ClickHouse** (`platforms/clickhouse/query_transformer.py`) handles three concerns:
 
-**QuestDB** (`platforms/questdb_rewriter.py`): a dedicated post-AST rewriter for implicit comma joins (converted to explicit `INNER JOIN ... ON`), `INTERVAL` arithmetic (to `dateadd('d', n, ts)`), `SUBSTRING(s FROM p FOR l)` (to `substring(s, p, l)`), and CTE column-alias lists (stripped). QuestDB has a SQLGlot dialect entry; the dialect entry doesn't cover what real QuestDB 9.3.4 actually accepts. Without our rewriter, every TPC-H, TPC-DS, and SSB query fails before the first row.
+- Case folding for unquoted identifiers.
+- DECIMAL division-by-zero NULL wrapping.
+- Subquery aliasing for TPC-DS Q23 and Q87.
+
+The Q23/Q87 case is worth telling. We wrote an AST visitor to inject `AS _sqN` on every unaliased subquery, but it corrupted Q23 (pulled `GROUP BY` out of a subquery) and Q87 (injected aliases inside `EXCEPT/INTERSECT`). The fix that shipped was a session setting, `joined_subquery_requires_alias=0`. The lesson: even with full AST control, the safer move was to abandon the rewrite and use the session setting the engine already exposed.
+
+**QuestDB** (`platforms/questdb_rewriter.py`) is a dedicated post-AST rewriter for four constructs the SQLGlot dialect entry does not fully cover:
+
+- Implicit comma joins, converted to explicit `INNER JOIN ... ON`.
+- `INTERVAL` arithmetic, converted to `dateadd('d', n, ts)`.
+- `SUBSTRING(s FROM p FOR l)`, converted to `substring(s, p, l)`.
+- CTE column-alias lists, stripped.
+
+QuestDB has a SQLGlot dialect entry; the dialect entry does not cover what QuestDB 9.3.4 actually accepts. Without our rewriter, every TPC-H, TPC-DS, and SSB query fails before the first row.
 
 **DataFusion** is its own category, and it is the most expensive one we have.
 
@@ -70,9 +92,9 @@ Three platforms required dedicated modules.
 
 This is the category we worry about most. SQLGlot transpiles cleanly. The SQL executes. The results are wrong.
 
-DataFusion has a SQLGlot dialect entry. SQLGlot translates four TPC-H queries into syntactically valid DataFusion SQL that the engine runs to completion and returns the wrong answer for:
+DataFusion has a SQLGlot dialect entry. We observed that SQLGlot translates four TPC-H queries into syntactically valid DataFusion SQL that the engine runs to completion and returns the wrong answer for. These observations are pinned to the BenchBox `uv.lock` resolved version of the `datafusion` Python package (53.0.0); upstream planner work may resolve any of them in later releases.
 
-| TPC-H query | Issue | Our rewrite |
+| TPC-H query | Issue (observed on DataFusion Python 53.0.0) | Our rewrite |
 |--------------|-------|-------------|
 | Q11 | HAVING with scalar subquery: planner miscomputes the threshold | Hoist threshold into a CTE, filter with WHERE |
 | Q16 | NOT IN with NULLs: SQL three-valued logic not honored | Rewrite to NOT EXISTS |
@@ -112,11 +134,15 @@ MYSQL_Q9_SQL      = "...verbatim ANSI WITHIN GROUP, bypasses SQLGlot..."
 
 ### 7. SQL to DataFrame translation
 
-Alongside the SQL platforms, BenchBox targets eight DataFrame engines: Polars, Pandas, DataFusion-Python, PySpark, Dask, Modin, cuDF, LakeSail. SQLGlot translates SQL into more SQL; that is a different problem. Our `platforms/dataframe/unified_frame.py` is the SQL-shaped facade over per-engine DataFrame APIs (about 4,200 lines, the largest single file in our cross-platform layer), with bespoke parsing of DataFusion's expression AST for aggregate arithmetic. Polars' own SQL frontend was tried and removed earlier ("fundamental limitations" in our notes). This is not a SQLGlot gap; it is the boundary of what a SQL transpiler is for.
+Alongside the SQL platforms, BenchBox targets 9 DataFrame engines: Polars, Pandas, DataFusion-Python, PySpark, Dask, Modin, cuDF, Databricks-DF, LakeSail-DF. SQLGlot translates SQL into more SQL; targeting a DataFrame API is a different problem.
+
+Our `platforms/dataframe/unified_frame.py` is a SQL-shaped facade over per-engine DataFrame APIs (about 4,200 lines, the largest single file in our cross-platform layer), with bespoke parsing of DataFusion's expression AST for aggregate arithmetic. Polars' own SQL frontend was tried and removed earlier ("fundamental limitations" in our notes). This is not a SQLGlot gap; it is the boundary of what a SQL transpiler is for.
 
 ## What we learned
 
-**1. "Supported dialects" is a one-bit signal that needs more bits.** SQLGlot's "34 dialects" is accurate as a count, less useful as a maturity signal. Postgres support is rock-solid; Doris emits `VARCHAR` to `STRING` in a way that breaks key columns. A per-dialect maturity matrix (A-grade tested, best effort, parser-only) would be transformative for production users. Our standing position on upstreaming: test cases for dialects we exercise heavily, plus bug fixes in dialect generators where we have isolated reproductions.
+**1. "Supported dialects" is a one-bit signal that needs more bits.** Public dialect counts (31 in SQLGlot's README, 34 in the Fivetran post) are accurate as parser/generator pair counts but less useful as maturity signals.
+
+In our experience, Postgres support is the most reliable dialect we exercise; the Doris generator emits `VARCHAR` to `STRING` in a way that breaks key columns. A per-dialect maturity matrix (A-grade tested, best effort, parser-only) would be valuable for production users. Our standing position on upstreaming: test cases for dialects we exercise heavily, plus bug fixes in dialect generators where we have isolated reproductions.
 
 **2. Engine-semantic bugs are the most dangerous category.** The DataFusion rewrites are not in any "transpilation correctness" failure list because the transpilation is correct. The user-visible failure mode is "I transpiled and got wrong results." A community-maintained registry of "this query shape produces wrong results on engine X version >= Y," with rewrite recipes, would help every team that hits these.
 
@@ -152,14 +178,14 @@ Source code pointers:
 - `benchbox/sql_compat/rules/query_source/h2odb_variants.py` (hand-written overrides)
 - `benchbox/platforms/dataframe/unified_frame.py` (SQL-shaped DataFrame facade)
 
-We would love to hear about gaps you have hit in your own SQLGlot-based projects. Open an issue on the BenchBox repo, we likely have either a workaround or a kindred scar.
+We would love to hear about gaps you have hit in your own SQLGlot-based projects. Open an issue on the BenchBox repo; chances are we have either a workaround or a similar war story to compare notes on.
 
 ---
 
 ## Test environment
 
-- SQLGlot pinned `>=20.0.0,<31.0.0` in `pyproject.toml`; resolved version 30.6.0 in `uv.lock` at time of writing
-- DataFusion versions current to the BenchBox v0.2.1 platform matrix
+- SQLGlot pinned `>=20.0.0,<31.0.0` in `pyproject.toml`; resolved to 30.6.0 in `uv.lock` at time of writing
+- DataFusion Python `>=50.1.0` in `pyproject.toml`; resolved to 53.0.0 in `uv.lock` at time of writing. The Q11/Q16/Q18/Q20 rewrites in this post are pinned to that resolved version.
 - ClickHouse Cloud and self-hosted 25.x
 - QuestDB 9.3.4
 - Doris 2.1.x
@@ -170,7 +196,7 @@ The 19 DDL rewrite modules under `benchbox/sql_compat/rules/ddl_optimize/` and t
 
 - This post catalogs *what we built*, not the full set of SQLGlot gaps a different project might hit. Workloads with heavy DDL automation, ETL with stored procedure translation, or live query rewriting against a SaaS warehouse will produce a different list.
 - The "categories" framing is post-hoc; the code grew organically.
-- Engine versions matter. Some silent-corruption cases on DataFusion may resolve in future planner releases, at which point the rewrite is a candidate for retirement: we run the rewrite-bypass version against TPC-H reference answers, and remove the rule only if validation passes. Retirement is opt-in.
+- Engine versions matter. The DataFusion rewrites above are verified against `datafusion` Python 53.0.0 from the BenchBox lockfile. Some silent-corruption cases may resolve in later DataFusion planner releases, at which point a rewrite becomes a candidate for retirement: we run the rewrite-bypass version against TPC-H reference answers, and remove the rule only if validation passes. Retirement is opt-in.
 
 ---
 
