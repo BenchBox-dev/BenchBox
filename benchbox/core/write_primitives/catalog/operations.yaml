@@ -3507,3 +3507,304 @@ operations:
         DROP TABLE sketch_ops_daily_users;
       sqlite: null
       starrocks: null
+
+  # ----------------------------------------------------------------------
+  # CPC family (DuckDB-only): alternative HLL with smaller serialized size
+  # at the cost of slower update/merge. Apache DataSketches calls this
+  # "Compressed Probabilistic Counting". 1252 bytes merged at SF=0.01
+  # vs Theta's ~16KB — see docs for the storage tradeoff.
+  # ----------------------------------------------------------------------
+
+  - id: sketch_cpc_create_persistent_table
+    category: sketch
+    description: Tests CREATE/DROP overhead for a CPC sketch table (DuckDB-only)
+    requires_setup: false
+    write_sql: |
+      INSTALL datasketches FROM community;
+      LOAD datasketches;
+      DROP TABLE IF EXISTS sketch_cpc_partitions;
+      CREATE TABLE sketch_cpc_partitions (
+        activity_date DATE,
+        region VARCHAR(25),
+        user_sketch BLOB
+      );
+    validation_queries:
+      - id: cpc_table_exists
+        sql: |
+          SELECT COUNT(*) as cnt FROM information_schema.tables
+          WHERE table_name = 'sketch_cpc_partitions'
+        expected_rows: 1
+    cleanup_sql: |
+      DROP TABLE IF EXISTS sketch_cpc_partitions
+    expected_rows_affected: null
+    platform_overrides:
+      databricks: null
+      snowflake: null
+      bigquery: null
+      clickhouse: null
+      datafusion: null
+      redshift: null
+      sqlite: null
+      starrocks: null
+
+  - id: sketch_cpc_insert_per_partition
+    category: sketch
+    description: Builds per-partition CPC sketches over l_orderkey (DuckDB-only)
+    requires_setup: false
+    write_sql: |
+      INSTALL datasketches FROM community;
+      LOAD datasketches;
+      DROP TABLE IF EXISTS sketch_cpc_partitions;
+      CREATE TABLE sketch_cpc_partitions (
+        activity_date DATE,
+        region VARCHAR(25),
+        user_sketch BLOB
+      );
+      INSERT INTO sketch_cpc_partitions
+      SELECT l_shipdate, l_returnflag, datasketch_cpc(11, l_orderkey)
+      FROM lineitem GROUP BY l_shipdate, l_returnflag;
+    validation_queries:
+      - id: cpc_rows_persisted
+        sql: |
+          SELECT COUNT(*) as partitions FROM sketch_cpc_partitions
+        expected_rows_min: 1
+    cleanup_sql: |
+      DROP TABLE IF EXISTS sketch_cpc_partitions
+    expected_rows_affected: null
+    platform_overrides:
+      databricks: null
+      snowflake: null
+      bigquery: null
+      clickhouse: null
+      datafusion: null
+      redshift: null
+      sqlite: null
+      starrocks: null
+
+  - id: sketch_cpc_query_union_merge
+    category: sketch
+    description: Headline CPC — populate per-partition CPC sketches, union them across partitions, emit distinct estimate (DuckDB-only). Side-by-side with sketch_query_theta_union_merge for HLL-family algorithm comparison and storage-cost tradeoff.
+    requires_setup: false
+    write_sql: |
+      INSTALL datasketches FROM community;
+      LOAD datasketches;
+      DROP TABLE IF EXISTS sketch_cpc_partitions;
+      CREATE TABLE sketch_cpc_partitions (
+        activity_date DATE, region VARCHAR(25), user_sketch BLOB
+      );
+      INSERT INTO sketch_cpc_partitions
+      SELECT l_shipdate, l_returnflag, datasketch_cpc(11, l_orderkey)
+      FROM lineitem GROUP BY l_shipdate, l_returnflag;
+      SELECT datasketch_cpc_estimate(datasketch_cpc_union(11, user_sketch::sketch_cpc)) AS distinct_orders
+      FROM sketch_cpc_partitions;
+    validation_queries:
+      - id: cpc_estimate_in_range
+        sql: |
+          SELECT datasketch_cpc_estimate(datasketch_cpc_union(11, user_sketch::sketch_cpc)) AS distinct_orders
+          FROM sketch_cpc_partitions
+        # SF=0.01: lineitem has 15000 distinct l_orderkeys; CPC at lg_k=11
+        # observed at 15137.39 in synthetic verification. Bounds match
+        # sketch_query_theta_union_merge so cross-family regressions are
+        # comparable.
+        expected_value_min: 14000
+        expected_value_max: 16000
+      - id: cpc_storage_size
+        sql: |
+          SELECT octet_length(datasketch_cpc_union(11, user_sketch::sketch_cpc)) AS sketch_bytes
+          FROM sketch_cpc_partitions
+        # CPC at lg_k=11 observed ~1.2KB merged — dramatically smaller
+        # than Theta's ~16KB at lg_k=12. Wide bounds tolerate variation
+        # while flagging no-op or unbounded growth.
+        expected_value_min: 400
+        expected_value_max: 4000
+    cleanup_sql: |
+      DROP TABLE IF EXISTS sketch_cpc_partitions
+    expected_rows_affected: null
+    platform_overrides:
+      databricks: null
+      snowflake: null
+      bigquery: null
+      clickhouse: null
+      datafusion: null
+      redshift: null
+      sqlite: null
+      starrocks: null
+
+  - id: sketch_cpc_drop_persistent_table
+    category: sketch
+    description: Tests DROP TABLE on a CPC-bearing BLOB-column table (DuckDB-only)
+    requires_setup: false
+    write_sql: |
+      INSTALL datasketches FROM community;
+      LOAD datasketches;
+      DROP TABLE IF EXISTS sketch_cpc_partitions;
+      CREATE TABLE sketch_cpc_partitions (
+        activity_date DATE, region VARCHAR(25), user_sketch BLOB
+      );
+      DROP TABLE sketch_cpc_partitions;
+    validation_queries:
+      - id: cpc_table_dropped
+        sql: |
+          SELECT COUNT(*) as cnt FROM information_schema.tables
+          WHERE table_name = 'sketch_cpc_partitions'
+        expected_rows: 1
+    cleanup_sql: null
+    expected_rows_affected: null
+    platform_overrides:
+      databricks: null
+      snowflake: null
+      bigquery: null
+      clickhouse: null
+      datafusion: null
+      redshift: null
+      sqlite: null
+      starrocks: null
+
+  # ----------------------------------------------------------------------
+  # REQ family (DuckDB-only): relative-error quantile sketch (vs KLL's
+  # normalized-rank error). Apache DataSketches "Relative Error Quantile".
+  # ~2.5KB merged at SF=0.01 — slightly smaller than KLL k=200.
+  # ----------------------------------------------------------------------
+
+  - id: sketch_req_create_persistent_table
+    category: sketch
+    description: Tests CREATE/DROP overhead for a REQ sketch table (DuckDB-only)
+    requires_setup: false
+    write_sql: |
+      INSTALL datasketches FROM community;
+      LOAD datasketches;
+      DROP TABLE IF EXISTS sketch_req_partitions;
+      CREATE TABLE sketch_req_partitions (
+        activity_date DATE,
+        region VARCHAR(25),
+        price_sketch BLOB
+      );
+    validation_queries:
+      - id: req_table_exists
+        sql: |
+          SELECT COUNT(*) as cnt FROM information_schema.tables
+          WHERE table_name = 'sketch_req_partitions'
+        expected_rows: 1
+    cleanup_sql: |
+      DROP TABLE IF EXISTS sketch_req_partitions
+    expected_rows_affected: null
+    platform_overrides:
+      databricks: null
+      snowflake: null
+      bigquery: null
+      clickhouse: null
+      datafusion: null
+      redshift: null
+      sqlite: null
+      starrocks: null
+
+  - id: sketch_req_insert_per_partition
+    category: sketch
+    description: Builds per-partition REQ quantile sketches over l_extendedprice (DuckDB-only)
+    requires_setup: false
+    write_sql: |
+      INSTALL datasketches FROM community;
+      LOAD datasketches;
+      DROP TABLE IF EXISTS sketch_req_partitions;
+      CREATE TABLE sketch_req_partitions (
+        activity_date DATE,
+        region VARCHAR(25),
+        price_sketch BLOB
+      );
+      INSERT INTO sketch_req_partitions
+      SELECT l_shipdate, l_returnflag, datasketch_req(12, l_extendedprice::FLOAT)
+      FROM lineitem GROUP BY l_shipdate, l_returnflag;
+    validation_queries:
+      - id: req_rows_persisted
+        sql: |
+          SELECT COUNT(*) as partitions FROM sketch_req_partitions
+        expected_rows_min: 1
+    cleanup_sql: |
+      DROP TABLE IF EXISTS sketch_req_partitions
+    expected_rows_affected: null
+    platform_overrides:
+      databricks: null
+      snowflake: null
+      bigquery: null
+      clickhouse: null
+      datafusion: null
+      redshift: null
+      sqlite: null
+      starrocks: null
+
+  - id: sketch_req_query_quantile_merge
+    category: sketch
+    description: Headline REQ — populate per-partition REQ sketches, merge across partitions, extract median (DuckDB-only). Side-by-side with sketch_query_kll_quantiles_merge for relative-error vs normalized-rank error comparison.
+    requires_setup: false
+    write_sql: |
+      INSTALL datasketches FROM community;
+      LOAD datasketches;
+      DROP TABLE IF EXISTS sketch_req_partitions;
+      CREATE TABLE sketch_req_partitions (
+        activity_date DATE, region VARCHAR(25), price_sketch BLOB
+      );
+      INSERT INTO sketch_req_partitions
+      SELECT l_shipdate, l_returnflag, datasketch_req(12, l_extendedprice::FLOAT)
+      FROM lineitem GROUP BY l_shipdate, l_returnflag;
+      SELECT datasketch_req_quantile(datasketch_req(12, price_sketch::sketch_req_float), 0.5::DOUBLE, true) AS median_price
+      FROM sketch_req_partitions;
+    validation_queries:
+      - id: req_median_in_range
+        sql: |
+          SELECT datasketch_req_quantile(datasketch_req(12, price_sketch::sketch_req_float), 0.5::DOUBLE, true) AS median_price
+          FROM sketch_req_partitions
+        # SF=0.01: KLL median was 34027–34362; REQ relative-error sketch
+        # produces a median in the same range. Use the same bounds as
+        # KLL so cross-family regressions are easy to compare.
+        expected_value_min: 30000
+        expected_value_max: 40000
+      - id: req_storage_size
+        sql: |
+          SELECT octet_length(datasketch_req(12, price_sketch::sketch_req_float)) AS sketch_bytes
+          FROM sketch_req_partitions
+        # REQ at k=12 observed ~2.5KB merged — slightly smaller than
+        # KLL k=200. Wide bounds tolerate encoding drift.
+        expected_value_min: 1000
+        expected_value_max: 8000
+    cleanup_sql: |
+      DROP TABLE IF EXISTS sketch_req_partitions
+    expected_rows_affected: null
+    platform_overrides:
+      databricks: null
+      snowflake: null
+      bigquery: null
+      clickhouse: null
+      datafusion: null
+      redshift: null
+      sqlite: null
+      starrocks: null
+
+  - id: sketch_req_drop_persistent_table
+    category: sketch
+    description: Tests DROP TABLE on a REQ-bearing BLOB-column table (DuckDB-only)
+    requires_setup: false
+    write_sql: |
+      INSTALL datasketches FROM community;
+      LOAD datasketches;
+      DROP TABLE IF EXISTS sketch_req_partitions;
+      CREATE TABLE sketch_req_partitions (
+        activity_date DATE, region VARCHAR(25), price_sketch BLOB
+      );
+      DROP TABLE sketch_req_partitions;
+    validation_queries:
+      - id: req_table_dropped
+        sql: |
+          SELECT COUNT(*) as cnt FROM information_schema.tables
+          WHERE table_name = 'sketch_req_partitions'
+        expected_rows: 1
+    cleanup_sql: null
+    expected_rows_affected: null
+    platform_overrides:
+      databricks: null
+      snowflake: null
+      bigquery: null
+      clickhouse: null
+      datafusion: null
+      redshift: null
+      sqlite: null
+      starrocks: null

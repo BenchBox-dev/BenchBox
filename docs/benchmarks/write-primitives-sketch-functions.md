@@ -146,6 +146,28 @@ safely, so each Redshift override emits its DDL inline.
 | ClickHouse | `topKState(8)(x)`                                     | (merge implicit in `topKMerge`)                | `topKMerge(8)(sketch)` → `Array(String)`                     |
 | DuckDB ext | `datasketch_frequent_items(8, x)`                     | `datasketch_frequent_items(8, sketch)`         | `datasketch_frequent_items_get_frequent(sketch, 'NO_FALSE_POSITIVES')` |
 
+### CPC (compressed probabilistic counting — alternative HLL family)
+
+DuckDB-only. CPC trades update/merge throughput for dramatically smaller
+serialized state size — the headline "smaller-than-Theta" sketch. Apache
+DataSketches calls this Compressed Probabilistic Counting.
+
+| Engine     | Build                            | Merge (aggregate)                                  | Estimate (scalar)                       |
+|------------|----------------------------------|----------------------------------------------------|------------------------------------------|
+| DuckDB ext | `datasketch_cpc(lg_k, x)`        | `datasketch_cpc_union(lg_k, sketch::sketch_cpc)`   | `datasketch_cpc_estimate(sketch)`        |
+| All others | — (no native CPC surface today)  | —                                                  | —                                        |
+
+### REQ (relative-error quantile — alternative quantile family)
+
+DuckDB-only. REQ provides relative-error guarantees (vs KLL's
+normalized-rank error) — useful when caller cares about the percentile's
+accuracy relative to the quantile value rather than its rank position.
+
+| Engine     | Build                                    | Merge (aggregate)                                            | Extract median                                                          |
+|------------|------------------------------------------|--------------------------------------------------------------|--------------------------------------------------------------------------|
+| DuckDB ext | `datasketch_req(k, x)`                   | `datasketch_req(k, sketch::sketch_req_float)` (fold-merge)   | `datasketch_req_quantile(sketch, 0.5::DOUBLE, true)`                    |
+| All others | — (no native REQ surface today)          | —                                                            | —                                                                        |
+
 ClickHouse's `-State` / `-Merge` aggregate combinators are *algorithmically*
 comparable to DataSketches Theta / KLL / frequent-items but are **not
 binary-portable** with the Apache DataSketches binary format — different
@@ -186,6 +208,19 @@ alone doesn't surface.
 | `sketch_query_theta_union_merge`  | ~16KB (Theta lg_k=12) | ~60KB (uniq HLL++ default) | [4000, 100000] |
 | `sketch_query_kll_quantiles_merge`| ~3KB (KLL k=200)   | ~3.8KB (T-Digest comp=100) | [1000, 8000]   |
 | `sketch_query_topk_combine`       | ~600B (lg_max_map_size=8) | ~294B (topK K=8)    | [200, 2000]    |
+| `sketch_cpc_query_union_merge`    | ~1.2KB (CPC lg_k=11)  | — (DuckDB-only)            | [400, 4000]    |
+| `sketch_req_query_quantile_merge` | ~2.5KB (REQ k=12)     | — (DuckDB-only)            | [1000, 8000]   |
+
+CPC vs Theta storage: CPC at ~1.2KB is roughly **13× smaller** than Theta
+at ~16KB on the same 15K distinct keys at SF=0.01. The tradeoff is
+slower update/merge throughput — measure both in a single run by
+comparing `sketch_query_theta_union_merge` and
+`sketch_cpc_query_union_merge` head-to-head.
+
+REQ vs KLL: REQ at ~2.5KB is slightly smaller than KLL at ~3KB. The
+algorithmic tradeoff is the error guarantee — KLL gives normalized-rank
+error, REQ gives relative-error. Cross-reference
+`sketch_query_kll_quantiles_merge` and `sketch_req_query_quantile_merge`.
 
 Per-engine SQL is wired through `validation_query.platform_overrides`:
 
