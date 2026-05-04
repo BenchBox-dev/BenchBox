@@ -590,7 +590,16 @@ def _add_cost_section(payload: dict[str, Any], result: BenchmarkResults) -> None
 
 
 def _normalized_cost_allows_direct_total(normalized_cost: Any) -> bool:
-    """Return True when legacy direct cost totals can satisfy the public contract."""
+    """Return True when legacy direct cost totals can satisfy the public contract.
+
+    A genuinely missing normalized_cost block (legacy bundles produced before
+    the normalized_cost contract existed) means we have nothing to *reject*
+    — the direct total is the only signal available, so allow it. Only an
+    explicitly-rejected normalized_cost dict (e.g. ``cost_status="unavailable"``)
+    blocks emitting the direct total.
+    """
+    if normalized_cost is None:
+        return True
     if not isinstance(normalized_cost, dict):
         return False
     if normalized_cost.get("cost_status") not in {"normalized", "not_applicable_local"}:

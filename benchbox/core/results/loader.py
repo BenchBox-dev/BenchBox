@@ -217,7 +217,7 @@ def reconstruct_benchmark_results(
     environment_section = data.get("environment", {})
     system_profile = _extract_system_profile(environment_section)
     execution_environment = _extract_execution_environment(environment_section)
-    cost_summary = _extract_cost_summary(data.get("cost", {}))
+    cost_summary = _extract_cost_summary(data.get("cost", {}), data.get("normalized_cost"))
     plans_captured, plan_failures = _extract_plans_info(plans_data)
 
     queries_counts = summary_section.get("queries", {})
@@ -391,14 +391,26 @@ def _extract_execution_environment(environment_section: dict[str, Any]) -> dict[
     return normalized or None
 
 
-def _extract_cost_summary(cost_section: dict[str, Any]) -> dict[str, Any] | None:
-    """Extract cost summary from cost section."""
+def _extract_cost_summary(
+    cost_section: dict[str, Any],
+    normalized_cost_section: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    """Extract cost summary from cost section.
+
+    Preserves the ``normalized_cost`` block when present so a re-export round-
+    trips ``cost.total_usd`` correctly for bundles that have one. Legacy
+    bundles without a normalized_cost block still round-trip their direct
+    total via the schema-side missing-vs-rejected distinction.
+    """
     if not cost_section:
         return None
-    return {
+    summary: dict[str, Any] = {
         "total_cost": cost_section.get("total_usd"),
         "cost_model": cost_section.get("model", "estimated"),
     }
+    if isinstance(normalized_cost_section, dict):
+        summary["normalized_cost"] = normalized_cost_section
+    return summary
 
 
 def _extract_plans_info(plans_data: dict[str, Any] | None) -> tuple[int, int]:

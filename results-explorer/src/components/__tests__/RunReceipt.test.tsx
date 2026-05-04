@@ -92,8 +92,8 @@ describe("RunReceipt", () => {
     expect(workload).toHaveTextContent("5");
   });
 
-  it("renders bundle and reproduce artifacts without requiring public plans", () => {
-    render(<RunReceipt detail={makeDetail({ has_plans: true })} />);
+  it("renders bundle and reproduce artifacts; only shows a Download plans link when plans are actually published", () => {
+    render(<RunReceipt detail={makeDetail({ has_plans: true, plans_published: true })} />);
 
     const receipt = screen.getByRole("region", { name: "Run receipt" });
     expect(within(receipt).getByRole("link", { name: "Download bundle" })).toHaveAttribute(
@@ -108,11 +108,32 @@ describe("RunReceipt", () => {
       .toBeTruthy();
   });
 
-  it("derives the plans companion URL only when plan capture is present", () => {
-    expect(planDownloadUrl(makeDetail({ has_plans: true }))).toBe(
+  it("does NOT render a Download plans link when has_plans is true but plans were not published (w1 regression)", () => {
+    render(<RunReceipt detail={makeDetail({ has_plans: true })} />);
+
+    const receipt = screen.getByRole("region", { name: "Run receipt" });
+    // Download bundle link must still render — only the plans link is gated.
+    expect(within(receipt).getByRole("link", { name: "Download bundle" })).toBeTruthy();
+    expect(within(receipt).queryByRole("link", { name: "Download plans" })).toBeNull();
+    // The non-link "Plans available" fallback string is shown instead.
+    expect(within(receipt).getByText("Plans available")).toBeTruthy();
+  });
+
+  it("derives the plans companion URL only when publication is signaled (w1 regression)", () => {
+    // Pre-w1 behavior gated only on has_plans; the URL would resolve to a
+    // 404 for every published bundle because the explorer pipeline excludes
+    // *.plans.json from bundle discovery. Post-w1, the link only renders
+    // when plans_published is explicitly true.
+    expect(planDownloadUrl(makeDetail({ has_plans: true, plans_published: true }))).toBe(
       "https://example.test/bundles/abcdef1234567890.plans.json",
     );
-    expect(planDownloadUrl(makeDetail({ has_plans: false }))).toBeNull();
-    expect(planDownloadUrl(makeDetail({ has_plans: true, bundle_download_url: "" }))).toBeNull();
+    expect(planDownloadUrl(makeDetail({ has_plans: true }))).toBeNull();
+    expect(planDownloadUrl(makeDetail({ has_plans: true, plans_published: false }))).toBeNull();
+    expect(planDownloadUrl(makeDetail({ has_plans: false, plans_published: true }))).toBeNull();
+    expect(
+      planDownloadUrl(
+        makeDetail({ has_plans: true, plans_published: true, bundle_download_url: "" }),
+      ),
+    ).toBeNull();
   });
 });

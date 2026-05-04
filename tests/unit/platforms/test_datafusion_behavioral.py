@@ -343,3 +343,75 @@ class TestExternalTableSupport:
         # Verify the method exists (it aliases load_data)
         assert hasattr(adapter, "create_external_tables")
         assert callable(adapter.create_external_tables)
+
+
+# ---------------------------------------------------------------------------
+# w9: empty common-prefix glob guard for multi-file CSV registration
+# ---------------------------------------------------------------------------
+
+
+class _FakeConnection:
+    """Capture SQL passed to .sql() and return a fake row count for COUNT(*)."""
+
+    def __init__(self) -> None:
+        self.statements: list[str] = []
+
+    def sql(self, statement: str) -> _FakeResult:
+        self.statements.append(statement)
+        return _FakeResult()
+
+
+class _FakeResult:
+    def collect(self) -> list[_FakeBatch]:
+        return [_FakeBatch()]
+
+
+class _FakeBatch:
+    def column(self, _index: int) -> list[int]:
+        # Pretend the table has 7 rows so the wrapper has a number to return.
+        return [7]
+
+
+class TestMultiFileCsvEmptyPrefixGuard:
+    """w9 regression: when shard filenames share no common prefix, a
+    `parent_dir/*` glob would silently include unrelated files in the
+    directory and corrupt row counts. The guard must register each shard
+    by exact path and union them via a view instead."""
+
+    def test_empty_common_prefix_registers_per_shard_via_union(self, adapter, tmp_path):
+        shard_dir = tmp_path / "csvshards"
+        shard_dir.mkdir()
+        # No shared filename prefix — UUID-style names.
+        shard_a = shard_dir / "abc-data.csv"
+        shard_b = shard_dir / "def-data.csv"
+        shard_c = shard_dir / "999-data.csv"
+        for shard in (shard_a, shard_b, shard_c):
+            shard.write_text("col1,col2\n1,2\n", encoding="utf-8")
+
+        conn = _FakeConnection()
+        # Schema info isn't required by the helper for the SQL-shape assertion
+        # below; the per-shard CREATE EXTERNAL TABLE and UNION ALL view are
+        # what matter.
+        adapter._create_external_table_union(
+            conn,
+            "tbl",
+            [shard_a, shard_b, shard_c],
+            schema_clause="(col1 INT, col2 INT)",
+            delimiter=",",
+            has_header=True,
+        )
+
+        joined = "\n".join(conn.statements)
+        # Must NOT use a parent-directory glob.
+        assert f"{shard_dir}/*" not in joined
+        assert "/*'" not in joined
+        # Each shard was registered by exact path.
+        assert str(shard_a) in joined
+        assert str(shard_b) in joined
+        assert str(shard_c) in joined
+        # Per-shard external tables and a UNION ALL view bind them as `tbl`.
+        assert "CREATE EXTERNAL TABLE tbl__shard_0" in joined
+        assert "CREATE EXTERNAL TABLE tbl__shard_1" in joined
+        assert "CREATE EXTERNAL TABLE tbl__shard_2" in joined
+        assert "CREATE OR REPLACE VIEW tbl AS" in joined
+        assert "UNION ALL" in joined

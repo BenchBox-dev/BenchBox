@@ -367,10 +367,44 @@ def _extract_platform_config_from_results(results: BenchmarkResults) -> dict[str
                 "For accurate cost estimation, ensure databricks-sdk is installed."
             )
 
+    else:
+        # Generic fallback for cloud adapters that emit `platform_type` values
+        # not covered above (e.g. "athena", "azure_synapse", future
+        # "clickhouse-cloud"). These adapters still populate `platform_info`
+        # with `region` and `cloud_provider`, but without this branch the cost
+        # calculator would warn `pricing region metadata missing` and force
+        # `cost_status="unavailable"`, blocking public cost totals in
+        # submission validation.
+        cloud_default = _DEFAULT_CLOUD_BY_PLATFORM_TYPE.get(platform_type, "aws")
+        region_default = _DEFAULT_REGION_BY_CLOUD.get(cloud_default, "us-east-1")
+        config["cloud"] = _value_or_default(
+            platform_info, "cloud_provider", cloud_default, defaulted_fields, alias="cloud"
+        )
+        config["region"] = _value_or_default(platform_info, "region", region_default, defaulted_fields)
+
     if defaulted_fields:
         config["_defaulted_fields"] = sorted(set(defaulted_fields))
 
     return config
+
+
+_DEFAULT_CLOUD_BY_PLATFORM_TYPE: dict[str, str] = {
+    "athena": "aws",
+    "azure_synapse": "azure",
+    "azure-synapse": "azure",
+    "synapse": "azure",
+    "clickhouse-cloud": "aws",
+    "motherduck": "aws",
+    "fabric": "azure",
+    "fabric_warehouse": "azure",
+}
+
+
+_DEFAULT_REGION_BY_CLOUD: dict[str, str] = {
+    "aws": "us-east-1",
+    "azure": "eastus",
+    "gcp": "us-central1",
+}
 
 
 def _value_or_default(

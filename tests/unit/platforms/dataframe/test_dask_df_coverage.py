@@ -290,6 +290,46 @@ def test_profiled_tpch_q10_guard_returns_failure_profile():
     assert profile.metrics["resource_envelope_guarded"] is True
 
 
+def test_q10_skip_dropped_when_external_scheduler_address_set():
+    """w8 regression: an external scheduler means the run is no longer in the
+    constrained local envelope that motivated the OOM guard. Q10 must run."""
+    adapter = _make_adapter()
+    adapter.scheduler_address = "tcp://scheduler.example:8786"
+    benchmark = SimpleNamespace(name="TPC-H Benchmark")
+
+    skip_query_ids = adapter._collect_skip_query_ids(benchmark)
+
+    assert "Q10" not in skip_query_ids
+    assert adapter._resource_envelope_skip_query_ids == set()
+
+
+def test_q10_skip_dropped_when_use_distributed_true():
+    """w8 regression: explicit distributed-cluster opt-in (without an external
+    scheduler) likewise opts out of the local-envelope OOM guard."""
+    adapter = _make_adapter()
+    adapter.use_distributed = True
+    adapter.scheduler_address = None
+    benchmark = SimpleNamespace(name="TPC-H Benchmark")
+
+    skip_query_ids = adapter._collect_skip_query_ids(benchmark)
+
+    assert "Q10" not in skip_query_ids
+
+
+def test_q10_skip_kept_for_local_envelope():
+    """w8 regression: the local single-machine cluster envelope still skips
+    Q10. Without a scheduler_address and without use_distributed, the guard
+    must remain active."""
+    adapter = _make_adapter()
+    adapter.scheduler_address = None
+    adapter.use_distributed = False
+    benchmark = SimpleNamespace(name="TPC-H Benchmark")
+
+    skip_query_ids = adapter._collect_skip_query_ids(benchmark)
+
+    assert "Q10" in skip_query_ids
+
+
 def test_close_and_del_cleanup():
     adapter = _make_adapter()
     adapter._client = SimpleNamespace(close=lambda: None)

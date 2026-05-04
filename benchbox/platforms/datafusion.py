@@ -911,8 +911,23 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
             parent_dir = file_paths[0].parent
             if all(f.parent == parent_dir for f in file_paths):
                 common_prefix = os.path.commonprefix([f.name for f in file_paths])
-                location = str(parent_dir / f"{common_prefix}*")
-                self.log_very_verbose(f"Using glob pattern for {table_name}: {location}")
+                if common_prefix:
+                    location = str(parent_dir / f"{common_prefix}*")
+                    self.log_very_verbose(f"Using glob pattern for {table_name}: {location}")
+                else:
+                    # No shared filename prefix (e.g. UUID/hash-named shards):
+                    # `parent/*` would register every file in the directory and
+                    # silently pull in other tables' data. Register each shard
+                    # by exact path via UNION ALL instead so row counts stay
+                    # correct.
+                    return self._create_external_table_union(
+                        connection,
+                        table_name,
+                        file_paths,
+                        schema_clause=schema_clause,
+                        delimiter=delimiter,
+                        has_header=dialect.has_header,
+                    )
             else:
                 # Files in different directories - fall back to first file with warning
                 location = str(file_paths[0])
@@ -953,6 +968,63 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
             return row_count
         except Exception as e:
             self.log_verbose(f"Error counting rows in {table_name}: {e}")
+            raise RuntimeError(f"Failed to count rows in {table_name}: {e}") from e
+
+    def _create_external_table_union(
+        self,
+        connection: Any,
+        table_name: str,
+        file_paths: list[Path],
+        *,
+        schema_clause: str,
+        delimiter: str,
+        has_header: bool,
+    ) -> int:
+        """Register a multi-shard CSV table by exact path then UNION ALL.
+
+        Used when ``os.path.commonprefix`` returns ``""`` for the shard names.
+        A bare ``parent/*`` glob would silently include unrelated files in the
+        same directory; per-shard registration keeps row counts correct.
+        """
+        shard_options_clause = ", ".join(
+            (
+                f"'has_header' '{str(has_header).lower()}'",
+                f"'delimiter' '{delimiter}'",
+            )
+        )
+        shard_table_names: list[str] = []
+        for index, shard_path in enumerate(file_paths):
+            shard_table = f"{table_name}__shard_{index}"
+            shard_sql = f"""
+                CREATE EXTERNAL TABLE {shard_table} {schema_clause}
+                STORED AS CSV
+                LOCATION '{shard_path}'
+                OPTIONS ({shard_options_clause})
+            """
+            try:
+                connection.sql(shard_sql)
+            except Exception as e:
+                self.log_verbose(f"Error creating shard external table {shard_table}: {e}")
+                raise RuntimeError(f"Failed to create shard external table {shard_table}: {e}") from e
+            shard_table_names.append(shard_table)
+
+        union_body = " UNION ALL ".join(f"SELECT * FROM {name}" for name in shard_table_names)
+        view_sql = f"CREATE OR REPLACE VIEW {table_name} AS {union_body}"
+        try:
+            connection.sql(view_sql)
+            self.log_very_verbose(
+                f"Created external table view {table_name} unioning {len(shard_table_names)} shard(s) "
+                "(no shared filename prefix; avoiding parent-glob to keep row counts correct)"
+            )
+        except Exception as e:
+            self.log_verbose(f"Error creating union view {table_name}: {e}")
+            raise RuntimeError(f"Failed to create union view {table_name}: {e}") from e
+
+        try:
+            result = connection.sql(f"SELECT COUNT(*) FROM {table_name}").collect()
+            return int(result[0].column(0)[0])
+        except Exception as e:
+            self.log_verbose(f"Error counting rows in {table_name} (union view): {e}")
             raise RuntimeError(f"Failed to count rows in {table_name}: {e}") from e
 
     def _map_to_arrow_type(self, sql_type: str) -> str:

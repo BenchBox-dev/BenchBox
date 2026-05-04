@@ -1139,6 +1139,48 @@ class TestCLICommands:
         assert "Some platforms need attention" in result.output
         mock_check_readiness.assert_called_once_with("lakesail-df")
 
+    @patch("benchbox.cli.platform.check_platform_readiness")
+    @patch("benchbox.cli.platform.get_platform_manager")
+    def test_check_platforms_disabled_with_readiness_failure_does_not_fail_command(
+        self, mock_get_manager, mock_check_readiness
+    ):
+        """w12 regression: an available-but-disabled platform whose readiness
+        probe fails must be reported as informational ("Available but disabled")
+        and must NOT cause ``benchbox platforms check`` to exit non-zero. The
+        user has opted out of running this platform; environment gaps don't
+        apply."""
+        mock_manager = Mock()
+        mock_manager.detect_platforms.return_value = {
+            "lakesail": PlatformInfo(
+                name="lakesail",
+                display_name="LakeSail Sail",
+                description="Spark Connect",
+                libraries=[],
+                available=True,
+                enabled=False,
+                requirements=[],
+                installation_command="uv add pyspark",
+                category="analytical",
+            )
+        }
+        mock_get_manager.return_value = mock_manager
+        mock_check_readiness.return_value = (
+            PlatformReadinessResult(
+                platform="lakesail",
+                check="spark_connect_endpoint",
+                status="environment_skip",
+                summary="LakeSail endpoint is not reachable.",
+                detail="Benchmark should be skipped until provisioning is complete.",
+                remediation="Start a Sail server.",
+            ),
+        )
+
+        result = self.runner.invoke(check_platforms, ["lakesail"])
+
+        assert result.exit_code == 0, result.output
+        assert "Available but disabled" in result.output
+        assert "Environment not ready" not in result.output
+
     @patch("benchbox.cli.platform.get_platform_manager")
     def test_check_platforms_enabled_only_with_none_enabled(self, mock_get_manager):
         """Enabled-only mode should short-circuit when nothing is enabled."""
