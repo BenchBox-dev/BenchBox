@@ -168,6 +168,44 @@ class TestExplorerPipelineRun:
         bundle_copy = output / "bundles" / f"{result_id}.json"
         assert bundle_copy.exists()
 
+    def test_publishes_plans_sidecar_when_present(self, tmp_path: Path) -> None:
+        """w1 wire-up: when a ``*.plans.json`` sidecar exists alongside a
+        bundle, the pipeline must copy it to ``out/bundles/<result_id>.plans.json``
+        AND set ``plans_published=true`` on the result row.
+
+        Pre-wire-up (PR #179 added ``plans_published`` only to the consumer
+        side), the field was never set anywhere → always falsy → the explorer
+        UI never rendered a download link even for bundles that genuinely had
+        plans. This test confirms the producer side now fills the field."""
+        bundles_dir = tmp_path / "data" / "bundles"
+        bundles_dir.mkdir(parents=True)
+        bundle_path = bundles_dir / "with_plans.json"
+        bundle_path.write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
+        bundle_path.with_name("with_plans.plans.json").write_text(
+            '{"queries": [{"query_id": "Q1", "plan": "SCAN tpch.lineitem"}]}',
+            encoding="utf-8",
+        )
+
+        output = tmp_path / "out"
+        ExplorerPipeline().run(tmp_path / "data", output)
+
+        rows = _duckdb_results(output)
+        assert len(rows) == 1
+        result_id = rows[0]["result_id"]
+        assert rows[0]["plans_published"] is True
+        assert (output / "bundles" / f"{result_id}.plans.json").exists()
+
+    def test_plans_published_false_when_no_sidecar(self, data_dir: Path, tmp_path: Path) -> None:
+        """w1 wire-up (negative side): without a ``*.plans.json`` sidecar,
+        ``plans_published`` must remain false and no plans file should be
+        written to the published bundles directory."""
+        output = tmp_path / "out"
+        ExplorerPipeline().run(data_dir, output)
+
+        rows = _duckdb_results(output)
+        assert all(row["plans_published"] is False for row in rows)
+        assert not list((output / "bundles").glob("*.plans.json"))
+
     def test_discovers_nested_bundle_layout(self, tmp_path: Path) -> None:
         nested_dir = tmp_path / "data" / "bundles" / "tpch" / "duckdb" / "sf0.1"
         nested_dir.mkdir(parents=True)

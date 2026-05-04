@@ -54,6 +54,7 @@ export interface ResultRow extends CostDeploymentFields {
   compliance_class: string | null;
   is_ranking_eligible: boolean;
   has_plans: boolean;
+  plans_published: boolean;
   has_tuning: boolean;
   bundle_download_url: string;
 }
@@ -339,6 +340,7 @@ export async function getDetailResult(resultId: string): Promise<DetailResult | 
     queries,
     display_timings,
     has_plans: wide.has_plans,
+    plans_published: wide.plans_published,
     has_tuning: wide.has_tuning,
     bundle_download_url: wide.bundle_download_url,
     trust_label: wide.trust_label,

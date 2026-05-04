@@ -383,6 +383,7 @@ class DuckDBSnapshotBuilder:
                 compliance_class     VARCHAR,
                 is_ranking_eligible  BOOLEAN  NOT NULL,
                 has_plans            BOOLEAN  NOT NULL,
+                plans_published      BOOLEAN  NOT NULL,
                 has_tuning           BOOLEAN  NOT NULL,
                 bundle_download_url  VARCHAR  NOT NULL
             )
@@ -430,6 +431,7 @@ class DuckDBSnapshotBuilder:
                 r.storage_tier,
                 r.compliance_class,
                 r.has_plans,
+                r.plans_published,
                 r.has_tuning,
                 r.bundle_download_url,
                 e.os,
@@ -634,6 +636,7 @@ class DuckDBSnapshotBuilder:
         for entry in entries:
             detail = details_map.get(entry.result_id)
             has_plans = detail.has_plans if detail is not None else False
+            plans_published = detail.plans_published if detail is not None else False
             has_tuning = detail.has_tuning if detail is not None else False
             bundle_download_url = f"{bundle_url_prefix}/{entry.result_id}.json"
             rows.append(
@@ -665,6 +668,7 @@ class DuckDBSnapshotBuilder:
                     entry.compliance_class,
                     is_ranking_eligible(entry),
                     has_plans,
+                    plans_published,
                     has_tuning,
                     bundle_download_url,
                 )

@@ -522,6 +522,20 @@ class ExplorerPipeline:
                     continue
                 shutil.copy2(bundle_path, dest_bundle)
 
+                # Publish the plans sidecar alongside the bundle when present
+                # and set ``plans_published`` on the detail so the explorer UI
+                # only renders a download link for plans that actually exist
+                # at the published URL. Without this wire-up, the consumer-side
+                # gate (results-explorer/src/components/RunReceipt.tsx) sees
+                # ``plans_published=undefined`` and never renders a link, so
+                # the feature stays dark even when plans are available.
+                plans_src = bundle_path.with_name(f"{bundle_path.stem}.plans.json")
+                if plans_src.exists():
+                    plans_dest = (out_bundles_dir / f"{result_id}.plans.json").resolve()
+                    if plans_dest.is_relative_to(out_bundles_dir.resolve()):
+                        shutil.copy2(plans_src, plans_dest)
+                        detail.plans_published = True
+
                 # Accumulate for benchmark summary artifacts.
                 phase = detail.test_type or "power"
                 summary_key: _SummaryKey = (entry.benchmark, entry.scale_factor, phase)
