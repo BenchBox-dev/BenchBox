@@ -1,0 +1,96 @@
+id: write-primitives-sketch-storage-bounds-touchups
+title: "Write Primitives sketch: tighten/widen sweep variant storage bounds after PR #184 lands"
+worktree: main
+priority: Low
+status: "Not Started"
+category: "Verification"
+
+description: |
+  ## Background
+
+  Captured during the multi-PR review of the write-primitives sketch
+  cluster. PR #184 (parameter-sweep variants) was OPEN at review time
+  and the lgmm10 storage-size lower bound `[500, 5000]` was flagged
+  as potentially too tight: at `lg_max_map_size=10` (1024 buckets)
+  over only 7 distinct shipmodes in TPC-H lineitem, the merged
+  frequent-items sketch may stay near its empty-state baseline
+  (~600B-ish) and false-fail.
+
+  The fix could not land in the current followup PR
+  (`fix/write-primitives-review-followups`) because the lgmm10 op
+  doesn't exist on `develop` until PR #184 merges. This TODO
+  captures the deferred bound-retouchup work.
+
+  ## What this delivers
+
+  1. Re-run `sketch_query_topk_combine_lgmm10` (and its lgmm8
+     counterpart for symmetry) at SF=0.01 against the installed
+     datasketches extension. Capture observed storage-size bytes.
+
+  2. Adjust bounds in
+     `benchbox/core/write_primitives/catalog/operations.yaml` to
+     bracket the observation ±50% (or wider if the variance is high).
+
+  3. While there: spot-check the Theta `_lgk10` and `_lgk14` storage
+     bounds against the current build if/when the
+     `datasketch_theta` extension drift is resolved
+     (`_project/blind-spots/2026-05-02-155524-duckdb-datasketches-extension-drift.md`).
+     Inherit-broken-from-parent bounds were spec-derived, not
+     measured.
+
+  ## Verification
+
+  ```bash
+  uv run -- benchbox run --platform duckdb --benchmark write_primitives \
+    --scale 0.01 \
+    --queries sketch_query_topk_combine_lgmm10,sketch_query_topk_combine_lgmm8
+  ```
+
+  Expected: both ops pass with the re-tuned bounds; observed storage
+  size is captured in inline comments next to the bound.
+
+context_sections:
+  "Why this is deferred": |
+    The lgmm10 op doesn't exist on develop until PR #184 lands. The
+    review-followups PR cannot reference a sketch_query_topk_combine_lgmm10
+    op that develop doesn't see yet without creating a merge conflict.
+    Right answer: land bound retuning as a separate small PR after
+    PR #184 merges.
+
+  "Why low priority": |
+    Sweep variants are exploratory benchmarks; a too-tight bound
+    causes a false-fail on a low-priority op, not silent data loss.
+    Address opportunistically.
+
+work:
+  - id: w1
+    summary: "Run lgmm10 / lgmm8 / lgk10 / lgk14 ops at SF=0.01 on the installed extension and capture observed bytes"
+    status: pending
+    notes: |
+      Theta lgk10/lgk14 only if the datasketch_theta extension drift
+      is resolved; otherwise skip those and re-flag via the existing
+      blind-spot.
+
+  - id: w2
+    summary: "Retune each variant's storage_size bounds to bracket the observation"
+    needs: [w1]
+    status: pending
+
+  - id: w3
+    summary: "Update inline yaml comments with the observed value"
+    needs: [w2]
+    status: pending
+
+scope_limit:
+  only_modify:
+    - benchbox/core/write_primitives/catalog/operations.yaml
+    - CHANGELOG.md
+  do_not_modify:
+    - benchbox/core/write_primitives/benchmark.py
+    - benchbox/core/write_primitives/dataframe_operations.py
+  rationale: |
+    Bound-retune is a yaml-only change.
+
+deps:
+  needs:
+    - write-primitives-sketch-parameter-sweeps

@@ -138,13 +138,6 @@ class TestResolveValidationSql:
         assert "redshift" in skip
         assert "v1" in skip
 
-    def test_handles_mock_validationquery_without_field(self):
-        """Defensive guard: test fixtures sometimes mock val_query without the new field."""
-        vq = SimpleNamespace(id="v1", sql="DEFAULT")  # no platform_overrides attr
-        sql, skip = _resolve_validation_sql(vq, "clickhouse")
-        assert sql == "DEFAULT"
-        assert skip is None
-
 
 # ---------------------------------------------------------------------------
 # Integration: _run_operation_validation

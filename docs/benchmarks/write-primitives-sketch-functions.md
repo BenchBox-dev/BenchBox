@@ -168,6 +168,21 @@ accuracy relative to the quantile value rather than its rank position.
 | DuckDB ext | `datasketch_req(k, x)`                   | `datasketch_req(k, sketch::sketch_req_float)` (fold-merge)   | `datasketch_req_quantile(sketch, 0.5::DOUBLE, true)`                    |
 | All others | — (no native REQ surface today)          | —                                                            | —                                                                        |
 
+#### Per-family persistence tables for CPC and REQ
+
+CPC and REQ each persist into their own table (`sketch_cpc_partitions`,
+`sketch_req_partitions`) rather than sharing a mega-sketch table with
+the Theta/KLL/Top-K families. The reasoning: each family carries a
+different storage column type and parameter knob (CPC's `lg_k` vs
+Theta's `lg_k` vs KLL's `k` vs frequent-items' `lg_max_map_size`), and
+the cast pattern at merge time differs (`sketch::sketch_cpc` vs
+`sketch::sketch_kll_double` vs `sketch::sketch_req_float`). A combined
+table would either need to widen to all column types (carrying nulls
+across rows) or normalize via a tagged-union column (forcing additional
+casts per query). Per-family tables keep each op self-contained and
+make the storage-size validation queries trivial — `octet_length` is
+applied to the column whose type already matches the family.
+
 ClickHouse's `-State` / `-Merge` aggregate combinators are *algorithmically*
 comparable to DataSketches Theta / KLL / frequent-items but are **not
 binary-portable** with the Apache DataSketches binary format — different
@@ -197,19 +212,31 @@ lands.
 
 ## Storage-size methodology
 
-Each ★ headline op carries a second `validation_query` (`*_storage_size`)
-that measures the byte length of the merged sketch state. This certifies
-the persisted sketch hasn't regressed to zero or grown unboundedly — the
-cost-per-byte side of the persistence-vs-recompute tradeoff that latency
-alone doesn't surface.
+Each ★ headline op carries a pair of `*_storage_size_<engine>`
+`validation_query` entries that measure the byte length of the merged
+sketch state. This certifies the persisted sketch hasn't regressed to
+zero or grown unboundedly — the cost-per-byte side of the
+persistence-vs-recompute tradeoff that latency alone doesn't surface.
 
-| Op                                | DuckDB observed    | ClickHouse observed   | Bounds          |
-|-----------------------------------|--------------------|------------------------|-----------------|
-| `sketch_query_theta_union_merge`  | ~16KB (Theta lg_k=12) | ~60KB (uniq HLL++ default) | [4000, 100000] |
-| `sketch_query_kll_quantiles_merge`| ~3KB (KLL k=200)   | ~3.8KB (T-Digest comp=100) | [1000, 8000]   |
-| `sketch_query_topk_combine`       | ~600B (lg_max_map_size=8) | ~294B (topK K=8)    | [200, 2000]    |
-| `sketch_cpc_query_union_merge`    | ~1.2KB (CPC lg_k=11)  | — (DuckDB-only)            | [400, 4000]    |
-| `sketch_req_query_quantile_merge` | ~2.5KB (REQ k=12)     | — (DuckDB-only)            | [1000, 8000]   |
+The split into per-engine variants (rather than a single cross-engine
+validation with a wide envelope) is deliberate: a wide envelope spanning
+DuckDB's ~16KB and ClickHouse's ~60KB would let DuckDB silently grow 5x
+before alarming. Each variant runs only on its target engine via explicit
+`null` overrides for every other engine.
+
+| Op                                | DuckDB variant + bounds                        | ClickHouse variant + bounds                       |
+|-----------------------------------|-------------------------------------------------|---------------------------------------------------|
+| `sketch_query_theta_union_merge`  | `theta_storage_size_duckdb` [4000, 32000]       | `theta_storage_size_clickhouse` [16000, 100000]   |
+| `sketch_query_kll_quantiles_merge`| `kll_storage_size_duckdb` [1000, 6000]          | `kll_storage_size_clickhouse` [1500, 8000]        |
+| `sketch_query_topk_combine`       | `topk_storage_size_duckdb` [300, 1200]          | `topk_storage_size_clickhouse` [150, 800]         |
+| `sketch_cpc_query_union_merge`    | `cpc_storage_size` [400, 4000] (DuckDB-only)    | —                                                  |
+| `sketch_req_query_quantile_merge` | `req_storage_size` [1000, 8000] (DuckDB-only)   | —                                                  |
+
+Observed sizes at SF=0.01 (the source of the bounds): Theta lg_k=12 ~16KB
+on DuckDB and ~60KB on ClickHouse (uniq HLL++ default precision); KLL
+k=200 ~3KB on DuckDB and ~3.8KB on ClickHouse (T-Digest compression=100);
+frequent-items lg_max_map_size=8 ~600B on DuckDB and ~294B on ClickHouse
+(topK K=8); CPC lg_k=11 ~1.2KB merged; REQ k=12 ~2.5KB merged.
 
 CPC vs Theta storage: CPC at ~1.2KB is roughly **13× smaller** than Theta
 at ~16KB on the same 15K distinct keys at SF=0.01. The tradeoff is
@@ -224,19 +251,19 @@ error, REQ gives relative-error. Cross-reference
 
 Per-engine SQL is wired through `validation_query.platform_overrides`:
 
-- DuckDB: `octet_length(<merged_sketch>)` against the `BLOB` column
+- DuckDB: `octet_length(<merged_sketch>)` against the `BLOB` column.
 - ClickHouse: `length(toString(<agg>MergeState(...)))` against the
   `AggregateFunction(...)` column. `length()` doesn't accept
   AggregateFunction directly, so `toString()` serializes the merged state
-  to its bytes-of-string representation.
-- Other engines: skipped via explicit `null` overrides (per-engine
-  byte-length probes for sketch state aren't yet wired). Add them in
+  to its bytes-of-string representation. Caveat: this is the textual
+  representation length, not the on-disk binary state length — these are
+  correlated and stable enough across runs for regression detection, but
+  do not interpret the absolute number as the storage cost a ClickHouse
+  user actually pays.
+- Other engines (Databricks, Snowflake, BigQuery, Redshift, DataFusion,
+  SQLite, StarRocks): skipped via explicit `null` overrides because their
+  byte-length probes for sketch state aren't yet wired. Add them in
   follow-up TODOs as cloud verification lands.
-
-Bounds span both engines so a single validation passes on whichever
-engine the op runs on. Per-engine tightening (separate
-`*_storage_size_<engine>` validations with engine-specific bounds) is a
-future option if drift detection needs to be tighter.
 
 ## Single-query scope: what this benchmark is **not**
 
@@ -357,6 +384,17 @@ the spark-read / groupBy / agg chain by hand:
 Top-K requires `F.approx_top_k_accumulate`, which ships with Spark 4.1+.
 Guard with `pyspark_supports_approx_top_k(spark)` before calling the
 top-K factory; older runtimes should skip cleanly with a logged reason.
+The guard is conservative: it requires both the version gate (≥4.1) and
+the function symbol — distributions that backport the function to a
+3.5.x build will be rejected by the version check. If you hit that case,
+bypass the guard or open a TODO to add a backport-detection branch.
+
+The current factory tests are MagicMock-based and verify call patterns
+without booting a real Spark session. Until the CLI integration follow-up
+runs the persist+merge cycle against Spark 3.5+ at least once, treat
+type-shape concerns (e.g. whether `F.hll_sketch_estimate` accepts the
+`Column` produced by `F.hll_union_agg` directly inside an `agg(...)`)
+as unverified.
 
 KLL is intentionally **not** implemented at the DataFrame layer because
 Spark's KLL surface is SQL-UDAF-only today; using `percentile_approx`

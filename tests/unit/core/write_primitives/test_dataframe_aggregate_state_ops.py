@@ -174,6 +174,41 @@ class TestExecuteAggregatePersist:
         assert "builder blew up" in result.error_message
         assert result.operation_type == WriteOperationType.AGGREGATE_PERSIST
 
+    def test_persist_failure_cleans_up_empty_target_dir(self, tmp_path: Path, monkeypatch):
+        caps = DataFrameWriteCapabilities(platform_name="test", supports_aggregate_persist=True)
+        manager = _make_manager_with_caps(caps)
+        builder = MagicMock(return_value=MagicMock(name="state_df"))
+
+        def boom_persist(df, path, compression):
+            raise RuntimeError("write blew up")
+
+        monkeypatch.setattr(manager, "_persist_dataframe_to_parquet", boom_persist)
+
+        target = tmp_path / "state"
+        result = manager.execute_aggregate_persist(target, builder)
+        assert result.success is False
+        # Failed persist should not leak an empty directory.
+        assert not target.exists()
+
+    def test_persist_failure_preserves_pre_existing_target_dir(self, tmp_path: Path, monkeypatch):
+        caps = DataFrameWriteCapabilities(platform_name="test", supports_aggregate_persist=True)
+        manager = _make_manager_with_caps(caps)
+        builder = MagicMock(return_value=MagicMock(name="state_df"))
+        monkeypatch.setattr(
+            manager,
+            "_persist_dataframe_to_parquet",
+            lambda df, path, compression: (_ for _ in ()).throw(RuntimeError("boom")),
+        )
+        target = tmp_path / "state"
+        target.mkdir()
+        sentinel = target / "marker.txt"
+        sentinel.write_text("preexisting")
+        result = manager.execute_aggregate_persist(target, builder)
+        assert result.success is False
+        # Caller-owned directories must not be removed even if persist fails.
+        assert target.exists()
+        assert sentinel.read_text() == "preexisting"
+
 
 class TestExecuteAggregateMerge:
     def test_returns_failure_when_unsupported(self, tmp_path: Path):

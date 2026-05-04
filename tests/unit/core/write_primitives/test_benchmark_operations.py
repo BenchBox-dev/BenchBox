@@ -68,6 +68,7 @@ class TestRunOperationValidation:
             expected_rows_max=None,
             expected_values=None,
             check_expression=None,
+            platform_overrides={},
         )
         operation = SimpleNamespace(validation_queries=[val_query])
         conn = MagicMock()
@@ -86,6 +87,7 @@ class TestRunOperationValidation:
             expected_rows_max=None,
             expected_values=None,
             check_expression=None,
+            platform_overrides={},
         )
         operation = SimpleNamespace(validation_queries=[val_query])
         conn = MagicMock()
