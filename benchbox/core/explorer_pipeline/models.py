@@ -157,6 +157,12 @@ class DetailResult(BaseModel):
     queries: list[QueryTiming]
     display_timings: list[QueryDisplayTiming] = []
     has_plans: bool
+    # True only when the pipeline has actually copied a ``*.plans.json`` sidecar
+    # to the published bundles directory. The explorer UI gates the plan
+    # download link on this — ``has_plans`` reflects only source-side detection
+    # and is unsafe as a download-link gate because the pipeline may exclude
+    # plan sidecars from publication.
+    plans_published: bool = False
     has_tuning: bool
     bundle_download_url: str
     trust_label: str
