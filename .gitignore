@@ -160,6 +160,7 @@ _sources/tpc-h/dbgen/dbgen_x86_64
 !_project/research/
 !_project/blind-spots/
 !_project/specs/
+!_project/sqlglot-upstream/
 !_project/TODO_SCHEMA.yaml
 !_project/PROJECT_TODO.md
 !_project/PROJECT_TODO.yaml
