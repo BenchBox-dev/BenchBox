@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### New
 
+- **write_primitives sketch** — DuckDB-only parameter-sweep variants
+  (`sketch_query_*_{lgk10,lgk14,k100,k1000,lgmm8,lgmm10}`) so users can
+  measure the size / accuracy / latency tradeoff per sketch family
+  rather than guessing. Theta `lg_k ∈ {10, 14}`, KLL `k ∈ {100, 1000}`,
+  Top-K `lg_max_map_size ∈ {8, 10}`. KLL variants verified end-to-end
+  on the installed datasketches extension (~2KB merged at k=100, ~18KB
+  at k=1000); Theta and frequent-items variants inherit the parent
+  ops' extension-drift status. Cloud-engine sweeps are deferred.
 - **write_primitives sketch** — DuckDB-only CPC and REQ sketch families.
   CPC (Compressed Probabilistic Counting) is an HLL-family alternative
   with dramatically smaller serialized state (~1.2KB merged vs Theta's

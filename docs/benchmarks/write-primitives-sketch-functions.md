@@ -238,6 +238,41 @@ engine the op runs on. Per-engine tightening (separate
 `*_storage_size_<engine>` validations with engine-specific bounds) is a
 future option if drift detection needs to be tighter.
 
+## Parameter sweeps (DuckDB-only)
+
+The default headline ops use one parameter value per sketch family
+(Theta lg_k≈12, KLL k=200, frequent-items lg_max_map_size=8). Real
+workloads tune these because the size / accuracy / latency tradeoff is
+real and workload-dependent. Six sweep variants pin the parameter
+explicitly so users can measure the tradeoff in a single run rather
+than guessing.
+
+| Family            | Variants                                | Default               | Range                     |
+|-------------------|------------------------------------------|------------------------|----------------------------|
+| Theta `lg_k`      | `_lgk10`, `_lgk14`                       | 12 (4096 entries)     | 10 (1024) ↔ 14 (16384)    |
+| KLL `k`           | `_k100`, `_k1000`                        | 200 (~3KB)            | 100 (~2KB) ↔ 1000 (~18KB) |
+| Top-K `lg_max_map`| `_lgmm8`, `_lgmm10`                      | 8 (256 buckets)       | 8 (~600B) ↔ 10 (~2KB)     |
+
+Naming convention: `sketch_query_<family>_<merge>_<param>`. Example:
+`sketch_query_kll_quantiles_merge_k1000`.
+
+Top-K only sweeps two values because `lg_max_map_size=6` (64 buckets)
+is too small for TPC-H lineitem's 7 distinct shipmodes — the merged
+sketch would saturate.
+
+Cloud-engine sweep variants are deferred. Each cloud engine has
+different parameter knobs (Snowflake `APPROX_TOP_K` `counters` vs
+DataSketches `lg_max_map_size`, etc.); 6 families × 3 cloud engines is
+out of proportion with the analytical value. DuckDB-only sweep is
+enough to demonstrate the tradeoff; cloud users tune at their end with
+vendor-specific knobs.
+
+KLL variants are end-to-end verified on the installed datasketches
+extension (k=100: ~2KB merged at SF=0.01, median=7395 vs true=7500;
+k=1000: ~18KB merged, median=7509). Theta and frequent-items variants
+share the parent ops' fate w.r.t. the recorded extension drift in
+`_project/blind-spots/2026-05-02-155524-duckdb-datasketches-extension-drift.md`.
+
 ## Single-query scope: what this benchmark is **not**
 
 This benchmark measures **latency under approximate semantics**, not

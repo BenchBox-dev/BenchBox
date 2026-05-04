@@ -2,7 +2,8 @@ id: write-primitives-sketch-parameter-sweeps
 title: "Write Primitives sketch: parameter-sweep variants for sketch tuning surface (lg_k, k, lg_max_map_size)"
 worktree: main
 priority: Low
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-05-04"
 category: "Core Functionality"
 
 description: |
@@ -72,7 +73,7 @@ context_sections:
 work:
   - id: w1
     summary: "Add 2 sketch_query_theta_union_merge variants at lg_k=10 and lg_k=14"
-    status: pending
+    status: done
     notes: |
       Mirror the existing `sketch_query_theta_union_merge` with two
       new ops: `sketch_query_theta_union_merge_lgk10` and `_lgk14`.
@@ -86,7 +87,7 @@ work:
   - id: w2
     summary: "Add 2 sketch_query_kll_quantiles_merge variants at k=100 and k=1000"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Mirror `sketch_query_kll_quantiles_merge` with `_k100` and
       `_k1000` variants. Bounds reflect the relative accuracy: k=100
@@ -96,7 +97,7 @@ work:
   - id: w3
     summary: "Add 2 sketch_query_topk_combine variants at lg_max_map_size=8 and 10 (skip 6 — too small for TPC-H)"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Mirror `sketch_query_topk_combine` with `_lgmm8` (current
       default; explicit variant for sweep symmetry) and `_lgmm10`.
@@ -107,7 +108,7 @@ work:
   - id: w4
     summary: "Update cross-platform sketch docs with parameter-sweep methodology and observed numbers"
     needs: [w1, w2, w3]
-    status: pending
+    status: done
     notes: |
       Add a "Parameter sweeps" section to
       `docs/benchmarks/write-primitives-sketch-functions.md`:
@@ -125,7 +126,7 @@ work:
   - id: w5
     summary: "Add changelog entry under unreleased"
     needs: [w4]
-    status: pending
+    status: done
     notes: |
       Terse user-facing bullet:
       "write_primitives sketch: add parameter-sweep variants
