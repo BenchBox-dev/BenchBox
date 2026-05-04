@@ -123,6 +123,7 @@ safely, so each Redshift override emits its DDL inline.
 | Snowflake  | `DATASKETCHES_THETA_ACCUMULATE(x)`      | `DATASKETCHES_THETA_COMBINE(sketch)`       | `DATASKETCHES_THETA_ESTIMATE(sketch)`    |
 | BigQuery   | `HLL_COUNT.INIT(x)` (HLL, not Theta)    | `HLL_COUNT.MERGE(sketch)`                  | (merge returns count directly)           |
 | Redshift   | `HLL_CREATE_SKETCH(x)` (HLL, not Theta) | `HLL_COMBINE(sketch)`                      | `HLL_CARDINALITY(sketch)`                |
+| ClickHouse | `uniqState(x)` (HLL++, not Theta)       | (merge implicit in `uniqMerge`)            | `uniqMerge(sketch)`                      |
 | DuckDB ext | `datasketch_theta(x)`                   | `datasketch_theta(sketch)`                 | `datasketch_theta_estimate(sketch)`      |
 
 ### KLL (quantile)
@@ -132,6 +133,7 @@ safely, so each Redshift override emits its DDL inline.
 | Databricks | `kll_sketch_agg(x)`                     | `kll_sketch_agg(sketch)`                    | `kll_sketch_estimate_quantile(sketch, 0.5)`       |
 | Snowflake  | `DATASKETCHES_KLL_ACCUMULATE(x)`        | `DATASKETCHES_KLL_COMBINE(sketch)`          | `DATASKETCHES_KLL_GET_QUANTILE(sketch, 0.5)`      |
 | BigQuery   | `KLL_QUANTILES.INIT_INT64(x)`           | (merge implicit in extract)                 | `KLL_QUANTILES.MERGE_POINT_INT64(sketch, 0.5)`    |
+| ClickHouse | `quantileTDigestState(0.5)(x)` (T-Digest, not KLL) | (merge implicit in `quantileTDigestMerge`) | `quantileTDigestMerge(0.5)(sketch)` |
 | DuckDB ext | `datasketch_kll(200, x)`                | `datasketch_kll(200, sketch::sketch_kll_double)` | `datasketch_kll_quantile(sketch, 0.5::DOUBLE, true)` |
 
 ### Top-K (frequent items)
@@ -141,7 +143,18 @@ safely, so each Redshift override emits its DDL inline.
 | Databricks | `approx_top_k_accumulate(x)`                          | `approx_top_k_combine(sketch)`                 | `approx_top_k_estimate(sketch)` → `ARRAY<STRUCT<item, count>>` |
 | Snowflake  | `APPROX_TOP_K_ACCUMULATE(x, k)`                       | `APPROX_TOP_K_COMBINE(sketch)`                 | `APPROX_TOP_K_ESTIMATE(sketch)` → `ARRAY`                    |
 | BigQuery   | — (no native top-K accumulator; skipped)              | —                                              | —                                                            |
+| ClickHouse | `topKState(8)(x)`                                     | (merge implicit in `topKMerge`)                | `topKMerge(8)(sketch)` → `Array(String)`                     |
 | DuckDB ext | `datasketch_frequent_items(8, x)`                     | `datasketch_frequent_items(8, sketch)`         | `datasketch_frequent_items_get_frequent(sketch, 'NO_FALSE_POSITIVES')` |
+
+ClickHouse's `-State` / `-Merge` aggregate combinators are *algorithmically*
+comparable to DataSketches Theta / KLL / frequent-items but are **not
+binary-portable** with the Apache DataSketches binary format — different
+hash families and serialization layouts. The persist+merge+requery shape
+is identical; portability across engines via raw bytes is not. The
+storage column types are parameterised: `AggregateFunction(uniq, UInt64)`,
+`AggregateFunction(quantileTDigest(0.5), Float64)`,
+`AggregateFunction(topK(8), String)` — different from the BINARY-portable
+columns the other engines use.
 
 ## Validation tolerance methodology
 
@@ -159,6 +172,36 @@ sketch but tight enough to catch a regression to a no-op (sketch
 returning 0) or a wildly off estimate. Cloud engines may shift the
 ranges; tolerances will need re-tuning when first-class cloud coverage
 lands.
+
+## Storage-size methodology
+
+Each ★ headline op carries a second `validation_query` (`*_storage_size`)
+that measures the byte length of the merged sketch state. This certifies
+the persisted sketch hasn't regressed to zero or grown unboundedly — the
+cost-per-byte side of the persistence-vs-recompute tradeoff that latency
+alone doesn't surface.
+
+| Op                                | DuckDB observed    | ClickHouse observed   | Bounds          |
+|-----------------------------------|--------------------|------------------------|-----------------|
+| `sketch_query_theta_union_merge`  | ~16KB (Theta lg_k=12) | ~60KB (uniq HLL++ default) | [4000, 100000] |
+| `sketch_query_kll_quantiles_merge`| ~3KB (KLL k=200)   | ~3.8KB (T-Digest comp=100) | [1000, 8000]   |
+| `sketch_query_topk_combine`       | ~600B (lg_max_map_size=8) | ~294B (topK K=8)    | [200, 2000]    |
+
+Per-engine SQL is wired through `validation_query.platform_overrides`:
+
+- DuckDB: `octet_length(<merged_sketch>)` against the `BLOB` column
+- ClickHouse: `length(toString(<agg>MergeState(...)))` against the
+  `AggregateFunction(...)` column. `length()` doesn't accept
+  AggregateFunction directly, so `toString()` serializes the merged state
+  to its bytes-of-string representation.
+- Other engines: skipped via explicit `null` overrides (per-engine
+  byte-length probes for sketch state aren't yet wired). Add them in
+  follow-up TODOs as cloud verification lands.
+
+Bounds span both engines so a single validation passes on whichever
+engine the op runs on. Per-engine tightening (separate
+`*_storage_size_<engine>` validations with engine-specific bounds) is a
+future option if drift detection needs to be tighter.
 
 ## Single-query scope: what this benchmark is **not**
 
