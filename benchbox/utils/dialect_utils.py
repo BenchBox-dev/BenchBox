@@ -8,6 +8,22 @@ import re
 from typing import Callable
 
 
+def _query_has_group_or_order_by_all(query: str) -> bool:
+    """Return True when the original query explicitly uses GROUP BY ALL or ORDER BY ALL."""
+
+    return bool(re.search(r"(?i)\b(?:GROUP|ORDER)\s+BY\s+ALL\b", query))
+
+
+def _restore_group_order_by_all_keyword(query: str) -> str:
+    """Restore ALL keyword when SQLGlot quoted it as an identifier."""
+
+    return re.sub(
+        r"(?i)\b((?:GROUP|ORDER)\s+BY)\s+(\"ALL\"|`ALL`|\[ALL\])",
+        r"\1 ALL",
+        query,
+    )
+
+
 def _fix_sqlite_unsupported_syntax(query: str) -> str:
     """Rewrite SQLGlot output that SQLite cannot execute."""
 
@@ -160,8 +176,11 @@ def translate_sql_query(
         translated = sqlglot.transpile(processed_query, read=src, write=tgt, identify=should_identify)[0]
 
         # Built-in optional post-fix:
-        # SQLite has no INTERVAL or EXTRACT — rewrite to its supported equivalents.
-        if tgt == "sqlite":
+        # SQLGlot + identify=True can emit ORDER/GROUP BY "ALL" for DuckDB,
+        # but DuckDB expects ALL as a keyword in these clauses.
+        if tgt == "duckdb" and _query_has_group_or_order_by_all(query):
+            translated = _restore_group_order_by_all_keyword(translated)
+        elif tgt == "sqlite":
             translated = _fix_sqlite_unsupported_syntax(translated)
 
         # Apply post-processors (e.g., TPC-DS Query 58 ambiguity fix)

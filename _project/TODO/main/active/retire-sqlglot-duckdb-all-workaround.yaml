@@ -102,7 +102,7 @@ work:
 
 - id: w3
   summary: "Remove _restore_group_order_by_all_keyword and _query_has_group_or_order_by_all"
-  status: done
+  status: pending
   needs: [w1]
   notes: |
     In `benchbox/utils/dialect_utils.py`:
