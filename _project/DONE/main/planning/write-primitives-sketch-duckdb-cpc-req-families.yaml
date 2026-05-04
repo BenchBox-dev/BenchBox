@@ -2,7 +2,8 @@ id: write-primitives-sketch-duckdb-cpc-req-families
 title: "Write Primitives sketch: add DuckDB-only CPC and REQ sketch families"
 worktree: main
 priority: Medium
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-05-04"
 category: "Core Functionality"
 
 description: |
@@ -67,7 +68,7 @@ context_sections:
 work:
   - id: w1
     summary: "Add 4 sketch_cpc_* ops (DDL, insert, query merge, drop) following the existing theta-op pattern"
-    status: pending
+    status: done
     notes: |
       Mirror the structure of the theta op family:
         sketch_cpc_create_persistent_table  (BLOB column, like the
@@ -90,7 +91,7 @@ work:
   - id: w2
     summary: "Add 4 sketch_req_* ops following the KLL-op pattern"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Mirror the structure of the KLL op family:
         sketch_req_create_persistent_table
@@ -109,7 +110,7 @@ work:
   - id: w3
     summary: "Update cross-platform sketch docs with CPC and REQ family rows"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Extend `docs/benchmarks/write-primitives-sketch-functions.md`:
         - Add CPC and REQ rows to the family × engine support matrix.
@@ -125,7 +126,7 @@ work:
   - id: w4
     summary: "Add changelog entry under unreleased"
     needs: [w3]
-    status: pending
+    status: done
     notes: |
       Terse user-facing bullet:
       "write_primitives sketch: add DuckDB-only CPC (alternative HLL,
