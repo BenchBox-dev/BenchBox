@@ -38,6 +38,13 @@ class ValidationQuery:
     # at load time because they describe a different validation kind.
     expected_value_min: float | None = None
     expected_value_max: float | None = None
+    # Per-platform override for the validation SQL body. Mirrors the
+    # operation-level platform_overrides semantics: a string replaces the
+    # default sql for that platform; an explicit `null` skips validation
+    # on that platform with a logged reason (the op result stays passed
+    # because skip means "not applicable on this engine", not "failed").
+    # Platforms with no key in this mapping fall through to the default sql.
+    platform_overrides: dict[str, str | None] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -101,6 +108,7 @@ def _parse_validation_queries(operation_id: str, raw_validations: object) -> lis
                 f"Validation query '{val_id}' in operation '{operation_id}' missing 'sql'"
             )
         expected_value_min, expected_value_max = _parse_expected_value_bounds(operation_id, val_id, val_entry)
+        platform_overrides = _parse_validation_platform_overrides(operation_id, val_id, val_entry)
         queries.append(
             ValidationQuery(
                 id=val_id.strip(),
@@ -112,9 +120,48 @@ def _parse_validation_queries(operation_id: str, raw_validations: object) -> lis
                 check_expression=val_entry.get("check_expression"),
                 expected_value_min=expected_value_min,
                 expected_value_max=expected_value_max,
+                platform_overrides=platform_overrides,
             )
         )
     return queries
+
+
+def _parse_validation_platform_overrides(
+    operation_id: str,
+    val_id: str,
+    val_entry: dict,
+) -> dict[str, str | None]:
+    """Parse and validate per-platform validation SQL overrides.
+
+    Each value must be either a non-empty string (replacement SQL for that
+    platform) or `null` (explicit skip with a logged reason at runtime).
+    Empty strings and other types are rejected at load time so a typo cannot
+    silently disable validation.
+    """
+    raw = val_entry.get("platform_overrides")
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise WritePrimitivesCatalogError(
+            f"Validation query '{val_id}' in operation '{operation_id}' platform_overrides must be a mapping"
+        )
+    overrides: dict[str, str | None] = {}
+    for platform_key, override in raw.items():
+        if not isinstance(platform_key, str) or not platform_key.strip():
+            raise WritePrimitivesCatalogError(
+                f"Validation query '{val_id}' in operation '{operation_id}' "
+                "platform_overrides keys must be non-empty platform names"
+            )
+        if override is None:
+            overrides[platform_key.strip()] = None
+            continue
+        if not isinstance(override, str) or not override.strip():
+            raise WritePrimitivesCatalogError(
+                f"Validation query '{val_id}' in operation '{operation_id}' "
+                f"platform_overrides['{platform_key}'] must be a non-empty string or null"
+            )
+        overrides[platform_key.strip()] = override
+    return overrides
 
 
 def _parse_expected_value_bounds(
