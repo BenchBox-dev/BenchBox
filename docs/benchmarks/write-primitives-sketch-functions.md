@@ -171,3 +171,95 @@ deliberately deferred (see TODO `deferred:` block).
 Cross-engine sketch portability tests (write a sketch on engine A,
 query it on engine B) are also deferred — this needs two-engine
 orchestration that BenchBox does not have today.
+
+## Catalog extension points (architecture-fixes 2026-05-04)
+
+Two catalog extension points support engine-specific sketch work without
+abusing existing schemas. Both were added so cross-engine sketch follow-ups
+(ClickHouse-native `-State`/`-Merge`, PySpark DataFrame HLL, etc.) can land
+without forcing per-engine SQL into a single body or routing aggregate-state
+DataFrame ops through row-level mutation APIs.
+
+### `validation_query.platform_overrides`
+
+The shape mirrors operation-level `platform_overrides`:
+
+```yaml
+operations:
+  - id: sketch_query_theta_union_merge
+    write_sql: "SELECT datasketch_theta_estimate(...) FROM ..."  # default (DuckDB)
+    platform_overrides:
+      clickhouse: "SELECT uniqMerge(user_sketch) FROM ..."
+    validation_queries:
+      - id: scalar_bounds
+        sql: "SELECT datasketch_theta_estimate(...) FROM ..."   # default
+        expected_value_min: 14500
+        expected_value_max: 15500
+        platform_overrides:
+          clickhouse: "SELECT uniqMerge(user_sketch) FROM ..."  # ClickHouse-native validation
+          redshift: null                                        # explicit skip
+```
+
+Resolution rules (see `_resolve_validation_sql` in `benchmark.py`):
+
+- **No override key** → the active platform falls through to the default
+  `sql`. Existing catalog entries are unchanged.
+- **String override** → the per-platform SQL replaces the default for that
+  platform; the resolved SQL is recorded in `validation_results[*].sql` so
+  observers see what actually ran.
+- **`null` override** → the validation is skipped on that platform with a
+  logged reason. The op still passes (skip means "not applicable on this
+  engine", not "failed"). The skip is captured in `validation_results[*]`
+  as `skipped: true` and `skip_reason: "..."`.
+
+Strict load-time validation rejects empty strings and non-mapping types so a
+typo cannot silently disable validation. Use the explicit `null` form when
+you want to skip; do not rely on omission.
+
+### `AGGREGATE_PERSIST` / `AGGREGATE_MERGE` DataFrame op types
+
+`WriteOperationType` now models DataFrame-layer aggregate-state work as two
+distinct types so the persist and merge phases produce separate user-facing
+measurements (write latency + persisted state size vs. merge+extract
+latency).
+
+Engines that expose DataFrame-layer sketch APIs flip
+`DataFrameWriteCapabilities.supports_aggregate_persist` /
+`supports_aggregate_merge` on. PySpark presets do this today (Spark 3.5+
+ships `hll_sketch_agg`/`hll_union_agg`); Polars and pandas do not.
+
+The dispatch methods are deliberately engine-agnostic — they accept caller-
+supplied callables that own the engine-specific sketch chain:
+
+```python
+manager = get_dataframe_write_manager("pyspark-df", spark_session=spark)
+
+def build_state():
+    return (
+        spark.read.parquet(source)
+        .groupBy("activity_date", "region")
+        .agg(F.hll_sketch_agg("l_orderkey").alias("user_sketch"))
+    )
+
+persist = manager.execute_aggregate_persist(target_path, build_state, compression="zstd")
+
+def merge_extract(path):
+    state = spark.read.parquet(str(path))
+    estimate = state.agg(F.hll_sketch_estimate(F.hll_union_agg("user_sketch"))).collect()[0][0]
+    return float(estimate)
+
+merge = manager.execute_aggregate_merge(target_path, merge_extract)
+# merge.metrics["aggregate_value"] holds the extracted scalar
+```
+
+The manager owns timing, durability (Parquet write to a target dir),
+byte/file-count bookkeeping, and the `DataFrameWriteResult` envelope. The
+callable owns the sketch surface. Engines without a DataFrame-layer sketch
+API short-circuit through `supports_operation` and return a structured
+failure with a clear "use the SQL surface or skip this op" message.
+
+Cleanup of the persisted state directory is the consumer's responsibility
+today (the persist phase leaves a Parquet directory at `target_path`;
+remove it with `shutil.rmtree` after the merge phase). A dedicated
+`execute_aggregate_cleanup` helper may land later if symmetry becomes
+load-bearing — surface the request in a follow-up TODO if you need it.
