@@ -153,33 +153,43 @@ def _build_submission_manifest(
 
 
 def _load_submission_validator_module() -> ModuleType:
+    # Resolve only against the installed package's repo root so packaged installs
+    # never load `scripts/validate_submission.py` from an arbitrary current
+    # working directory (security: arbitrary code execution surface).
     repo_root = Path(__file__).resolve().parents[3]
-    candidate_paths = (
-        repo_root / "scripts" / "validate_submission.py",
-        Path.cwd() / "scripts" / "validate_submission.py",
-    )
+    validator_path = repo_root / "scripts" / "validate_submission.py"
 
-    for validator_path in candidate_paths:
-        if not validator_path.is_file():
-            continue
-        spec = importlib.util.spec_from_file_location("_benchbox_submission_validator", validator_path)
-        if spec is None or spec.loader is None:
-            continue
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        return module
+    if not validator_path.is_file():
+        raise FileNotFoundError(f"scripts/validate_submission.py not found at {validator_path}")
 
-    locations = ", ".join(str(path) for path in candidate_paths)
-    raise FileNotFoundError(f"scripts/validate_submission.py not found in: {locations}")
+    spec = importlib.util.spec_from_file_location("_benchbox_submission_validator", validator_path)
+    if spec is None or spec.loader is None:
+        raise FileNotFoundError(f"scripts/validate_submission.py at {validator_path} has no loader")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _validate_submission_bundle_for_dry_run(ctx: click.Context, source_path: Path) -> None:
-    """Run the same local bundle validator used by published-results CI."""
+    """Run the same local bundle validator used by published-results CI.
+
+    When the validator script is not available (typical for packaged wheel
+    installs that don't ship ``scripts/``), downgrade to a soft warning so
+    ``--dry-run`` still emits its preview output. Hard exit is reserved for
+    the case where the validator is found but errors during execution.
+    """
 
     try:
         validator = _load_submission_validator_module()
         validate_bundles = validator.validate_bundles
         format_summary = validator.format_summary
+    except FileNotFoundError:
+        console.print(
+            "\n[yellow]Dry-run preview without schema validation:[/yellow] "
+            "scripts/validate_submission.py is not packaged with this install."
+        )
+        console.print("[dim]Run from a BenchBox source checkout for full local schema validation.[/dim]")
+        return
     except Exception as exc:
         console.print(
             f"\n[red]Submission validation unavailable:[/red] could not load scripts.validate_submission ({exc})."
