@@ -1,6 +1,6 @@
 ---
 blogpost: false
-status: outlined
+status: drafted
 date: TBD
 author: Joe Harris
 series: building-benchbox
@@ -266,5 +266,5 @@ Per the building-benchbox series template:
 
 - **Length target**: ~2,300-2,500 words (sits inside the 1,500-2,500 envelope; the cross-engine matrices push toward the upper end).
 - **Conflicts checked**: no overlap with any planned outline. Posts #1-11 are unrelated topics. The benchbox-in-action series is methodology-driven (no overlap with this engineering-decision framing).
-- **Next step**: gather the in-scope benchmark runs only after separating verified local claims from deferred or blocked paths. Do not draft around DuckDB Theta/Top-K numbers until the datasketches extension drift is fixed or the post explicitly labels those paths as blocked. Cloud verification stays deferred and is called out as a follow-up.
+- **Next step**: run editorial critique and gather any in-scope benchmark charts only after separating verified local claims from deferred or blocked paths. Do not draft around DuckDB Theta/Top-K numbers until the datasketches extension drift is fixed or the post explicitly labels those paths as blocked. Cloud verification stays deferred and is called out as a follow-up.
 - **Series-plan update**: row #12 added.
