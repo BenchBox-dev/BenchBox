@@ -6,24 +6,47 @@ status: "Blocked"
 category: "Core Functionality"
 
 description: |
-  ## BLOCKED — DuckDB datasketches extension drift confirmed 2026-05-04
+  ## BLOCKED — DuckDB datasketches version gap confirmed 2026-05-04
 
-  W1 cannot be implemented safely in the current agent environment because
-  the installed DuckDB community `datasketches` extension no longer registers
-  the baseline `datasketch_theta` function used by
-  `sketch_query_theta_union_merge`. A direct DuckDB function-inventory probe
-  after `INSTALL datasketches FROM community; LOAD datasketches;` exposed HLL,
-  KLL, CPC, REQ, quantiles, and T-Digest functions, but no Theta or frequent-
-  items family. The baseline BenchBox run also fails before any sweep variants
-  are added:
+  W1 is blocked under BenchBox's current DuckDB dependency policy, but this is
+  a specific version gap rather than a generic or unexplained extension drift.
+  BenchBox currently pins `duckdb>=1.0.0,<1.4.0`; the locked local runtime is
+  DuckDB 1.3.2 on `osx_arm64`, which installs datasketches extension commit
+  `2e38607`. That extension build exposes HLL, KLL, CPC, REQ, quantiles, and
+  T-Digest functions, but not Theta or Frequent Items / Top-K.
+
+  Version matrix from isolated probes with
+  `INSTALL datasketches FROM community; LOAD datasketches;`:
+
+    DuckDB 1.0.0: datasketches unavailable for osx_arm64
+    DuckDB 1.1.3: extension 2e02577; HLL/KLL yes; Theta/Top-K no
+    DuckDB 1.2.2: extension 67b11e5; HLL/KLL yes; Theta/Top-K no
+    DuckDB 1.3.2: extension 2e38607; HLL/KLL yes; Theta/Top-K no
+    DuckDB 1.4.2: extension 8411c9a; HLL/KLL yes; Theta/Top-K no
+    DuckDB 1.5.2: extension d085dc1; HLL/KLL/Theta/Top-K yes
+
+  The upstream datasketches repo added Theta and Frequent Items in commit
+  `5868dcd` on 2025-12-12. DuckDB extension binaries are tied to the DuckDB
+  engine version and platform, so BenchBox cannot load the 1.5.2 extension
+  binary while staying on DuckDB 1.3.2.
+
+  The baseline BenchBox run fails before any sweep variants are added:
 
     uv run -- benchbox run --platform duckdb --benchmark write_primitives \
       --scale 0.01 --queries sketch_query_theta_union_merge --non-interactive
 
   Result: `sketch_query_theta_union_merge` fails with `Catalog Error: Scalar
-  Function ... datasketch_theta does not exist`. Parameter sweeps depend on
-  mirroring the working baseline op and empirically tuning bounds against that
-  baseline, so the extension drift must be resolved first.
+  Function ... datasketch_theta does not exist`.
+
+  Implementation choices:
+    1. Keep the current dependency policy and block W1/W3 until BenchBox can
+       move to DuckDB >=1.5; W2 KLL sweeps are technically runnable on 1.3.2
+       but currently depend on W1 in the TODO graph.
+    2. Split W2 out so KLL sweeps land now, while Theta and Top-K remain
+       blocked by the DuckDB version gate.
+    3. Migrate the DuckDB "Theta" surface to HLL under the current 1.3.2 pin.
+       This is technically viable but changes semantics and docs; it should be
+       a separate design decision, not a silent implementation of this TODO.
 
   ## Unblocked by `write-primitives-architecture-fixes` (2026-05-04)
 
@@ -163,9 +186,9 @@ deps:
 
 blockers:
   - date: "2026-05-04"
-    work: [w1, w2, w3, w4, w5]
-    reason: "DuckDB community datasketches extension loaded in this environment does not expose the baseline `datasketch_theta` function required by `sketch_query_theta_union_merge`; the baseline op fails before sweep variants can be implemented or empirically tuned."
-    unblock: "Resolve the existing DuckDB datasketches extension drift first: either pin/ship an extension build that still exposes the documented Theta and frequent-items functions, or intentionally migrate the baseline sketch catalog and docs to the currently available function families with fresh verification."
+    work: [w1, w3]
+    reason: "BenchBox currently pins DuckDB <1.4 and resolves DuckDB 1.3.2, whose community datasketches extension commit 2e38607 does not include `datasketch_theta` or `datasketch_frequent_items`. Isolated probes show those families become available with DuckDB 1.5.2 / datasketches d085dc1."
+    unblock: "Either validate and raise BenchBox's DuckDB cap to a version whose datasketches binary includes Theta/Frequent Items, split KLL sweeps so W2 can land independently on DuckDB 1.3.2, or explicitly redesign the DuckDB sweep surface around HLL/KLL instead of Theta/Top-K."
 
 metadata:
   owners:
