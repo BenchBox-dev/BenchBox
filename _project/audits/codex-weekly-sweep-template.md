@@ -53,11 +53,24 @@ review window by `/code review`, `/blind-spot`, or other paths. Codex
 threads will not surface these — they came from local agents.
 
 ```bash
-# Findings filed during the review window.
-ls _project/blind-spots/${START_DATE:0:7}-* 2>/dev/null
+# Findings filed during the review window. Use explicit start/end dates so
+# the listing is bounded to the actual sweep range; ${START_DATE:0:7} only
+# scopes to a calendar month, which can pull pre-window findings or omit
+# late-week ones.
+ls _project/blind-spots/ \
+  | awk -v s="$START_DATE" -v e="$END_DATE" '
+      /^[0-9]{4}-[0-9]{2}-[0-9]{2}-/ {
+        prefix = substr($0, 1, 10)
+        if (prefix >= s && prefix <= e) print
+      }
+    '
 
-# Or, more precisely, all findings whose `date:` frontmatter falls in window.
-make blind-spots-list
+# Note: `make blind-spots-list` (sweep_blind_spots.py list) filters by
+# status/kind only and has no --since/--until. Do NOT use it to scope this
+# axis: it pulls historical open findings outside the window and can omit
+# in-window non-open findings, making the sweep scope inconsistent. If a
+# date-window flag is added to sweep_blind_spots.py, replace the awk filter
+# above with that command.
 ```
 
 For each in-window finding:
@@ -84,8 +97,11 @@ failure mode. The bug class is "assertion-loosening alongside fix lands
 without a guard"; the original scan template had no axis for it.
 
 ```bash
-# Source: the same merge range as Axis 1.
-git log --since="$START_DATE" --until="$END_DATE" -p \
+# Source: the same merge range as Axis 1. Match Axis 1's inclusive end-of-day
+# bound — bare `--until=$END_DATE` resolves to midnight at the *start* of
+# END_DATE, which excludes test changes merged later on the closing day
+# (precisely the changes this axis exists to catch).
+git log --since="$START_DATE 00:00:00 -0400" --until="$END_DATE 23:59:59 -0400" -p \
   --diff-filter=M --pretty='format:%H %s' origin/develop \
   -- '*.spec.ts' '*.spec.tsx' '*test*.py' 'tests/' \
   | rg -B 5 -A 5 'toHaveCount\(.*\) ->|\.length\) ?=>|count.*>\s*0|expect\(.*\)\.toBeGreaterThan\(0\)|assert.*> 0'

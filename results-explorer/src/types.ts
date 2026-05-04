@@ -63,6 +63,13 @@ export interface DetailResult extends CostDeploymentFields {
   queries: QueryTiming[];
   display_timings: QueryDisplayTiming[];
   has_plans: boolean;
+  // True only when the explorer pipeline has actually copied a *.plans.json
+  // sidecar to the published bundles directory. ``has_plans`` reflects only
+  // source-side detection and is unsafe to use as a download-link gate
+  // because the pipeline excludes plan sidecars from bundle discovery
+  // (see benchbox/core/explorer_pipeline/pipeline.py). Optional so older
+  // SQL paths that don't yet emit this field default to undefined → falsy.
+  plans_published?: boolean | null;
   has_tuning: boolean;
   bundle_download_url: string;
   trust_label: string;

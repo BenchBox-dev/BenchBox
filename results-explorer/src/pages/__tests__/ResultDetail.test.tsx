@@ -160,8 +160,10 @@ describe("ResultDetail - median-first contract", () => {
     expect(receipt).toHaveTextContent("Download bundle");
   });
 
-  it("links captured execution plans without requiring a plan viewer route", async () => {
-    vi.mocked(getDetailResult).mockResolvedValue(makeDetail({ has_plans: true }));
+  it("links captured execution plans only when plans_published is true", async () => {
+    vi.mocked(getDetailResult).mockResolvedValue(
+      makeDetail({ has_plans: true, plans_published: true }),
+    );
 
     render(<ResultDetail resultId="r1" />);
     await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
@@ -169,5 +171,17 @@ describe("ResultDetail - median-first contract", () => {
     const planLinks = screen.getAllByRole("link", { name: "Download plans" }) as HTMLAnchorElement[];
     expect(planLinks.length).toBeGreaterThanOrEqual(1);
     expect(planLinks[0]?.getAttribute("href")).toBe("https://example.test/download/r1.plans.json");
+  });
+
+  it("does not render a Download plans link when plans were not actually published (w1 regression)", async () => {
+    // Source-side has_plans is true but the explorer pipeline excludes
+    // *.plans.json from bundle discovery, so the published file does not
+    // exist. Pre-w1 the link rendered and 404'd; post-w1 it must not render.
+    vi.mocked(getDetailResult).mockResolvedValue(makeDetail({ has_plans: true }));
+
+    render(<ResultDetail resultId="r1" />);
+    await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
+
+    expect(screen.queryAllByRole("link", { name: "Download plans" })).toHaveLength(0);
   });
 });

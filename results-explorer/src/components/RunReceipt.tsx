@@ -137,6 +137,9 @@ function renderBundleLink(url: string) {
 function renderPlansStatus(detail: DetailResult) {
   if (!detail.has_plans) return "Plans not published";
   const plansUrl = planDownloadUrl(detail);
+  // ``has_plans`` is true (the source bundle had plan capture) but no public
+  // download exists — surface the non-link "Plans available" string instead
+  // of a 404-bound link.
   if (plansUrl === null) return "Plans available";
   return (
     <a href={plansUrl} class="text-xs font-medium no-underline" download>
@@ -146,6 +149,13 @@ function renderPlansStatus(detail: DetailResult) {
 }
 
 export function planDownloadUrl(detail: DetailResult) {
+  // Gate on the explicit publication signal, not source-side detection.
+  // ``has_plans`` reflects "the source bundle had a *.plans.json sidecar",
+  // but the explorer pipeline excludes plan sidecars from bundle discovery
+  // (benchbox/core/explorer_pipeline/pipeline.py:439), so plan files are
+  // never copied to the published bundles directory and this URL would 404.
+  // Only render a link when the pipeline has actually published the file.
+  if (!detail.plans_published) return null;
   if (!detail.has_plans || !detail.bundle_download_url) return null;
   if (!detail.bundle_download_url.endsWith(".json")) return null;
   return detail.bundle_download_url.replace(/\.json$/, ".plans.json");

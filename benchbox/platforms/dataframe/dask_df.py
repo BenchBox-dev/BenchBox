@@ -445,14 +445,38 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
         )
 
     def _collect_skip_query_ids(self, benchmark_instance: Any | None) -> set[str]:
-        """Add Dask resource-envelope skips to benchmark-provided skip lists."""
+        """Add Dask resource-envelope skips to benchmark-provided skip lists.
+
+        The TPC-H Q10 OOM that motivated this guard is specific to the local
+        single-machine cluster envelope. When the user provides an external
+        ``scheduler_address`` or explicitly requests a distributed cluster,
+        Q10 should run normally — skipping it for those runs would lose
+        legitimate full-suite coverage.
+        """
         skip_query_ids = super()._collect_skip_query_ids(benchmark_instance)
         self._resource_envelope_skip_query_ids: set[str] = set()
-        if self._is_tpch_benchmark(benchmark_instance):
+        if self._is_tpch_benchmark(benchmark_instance) and self._is_local_envelope():
             self._resource_envelope_skip_query_ids = set(_RESOURCE_ENVELOPE_SKIP_QUERY_IDS)
             skip_query_ids |= self._resource_envelope_skip_query_ids
-            logger.warning("Skipping TPC-H Q10 for dask-df: %s", self._tpch_q10_resource_envelope_diagnostic())
+            logger.warning(
+                "Skipping TPC-H Q10 for dask-df local envelope: %s. "
+                "Pass --platform-option scheduler_address=tcp://... to run Q10 on an external cluster.",
+                self._tpch_q10_resource_envelope_diagnostic(),
+            )
         return skip_query_ids
+
+    def _is_local_envelope(self) -> bool:
+        """Return True only for runs that use the constrained local single-machine cluster.
+
+        Treat any external scheduler or explicit distributed cluster request as
+        out-of-envelope: those runs have provisioned their own resources and
+        must not lose Q10 coverage to the local-OOM guard.
+        """
+        if getattr(self, "scheduler_address", None):
+            return False
+        if getattr(self, "use_distributed", False):
+            return False
+        return True
 
     def _build_skipped_results(self, filtered_skip_query_ids: set[str]) -> list[dict[str, Any]]:
         """Build skipped results, preserving Dask resource-envelope skip reasons."""

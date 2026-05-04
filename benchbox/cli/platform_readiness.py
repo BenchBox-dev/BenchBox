@@ -260,6 +260,30 @@ def _check_lakesail(platform: str, timeout_seconds: float) -> tuple[PlatformRead
         return tuple(results)
 
     pysail_available = _module_available("pysail")
+    # The SQL adapter (`lakesail`) can auto-start a local pysail server at run
+    # time via LakeSailAdapter._ensure_server_ready, so an unreachable endpoint
+    # is not a real readiness failure when pysail is importable. The DataFrame
+    # adapter (`lakesail-df`) still requires an already-running endpoint.
+    is_sql_adapter = platform == "lakesail"
+    if pysail_available and is_sql_adapter:
+        results.append(
+            PlatformReadinessResult(
+                platform=platform,
+                check="spark_connect_endpoint",
+                status="ready",
+                summary=(
+                    f"LakeSail Spark Connect endpoint is not reachable at {endpoint}, "
+                    "but the SQL adapter can auto-start a local pysail server at run time."
+                ),
+                detail=(
+                    "pysail is importable; LakeSailAdapter._ensure_server_ready will "
+                    "start a local Sail server when the benchmark runs."
+                ),
+                endpoint=endpoint,
+            )
+        )
+        return tuple(results)
+
     auto_start_detail = (
         "The SQL adapter can auto-start a local pysail server at run time, but this readiness check does not "
         "start it. LakeSail DataFrame mode still needs an already-running endpoint."

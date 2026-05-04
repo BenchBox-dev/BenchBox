@@ -821,6 +821,49 @@ class TestCheckValidationQuery:
         q = self._make_query(expected_value_min=6, expected_value_max=8)
         assert _check_validation_query(q, actual_rows=1, val_result=[(7,)]) is True
 
+    # w4 regression: every row of expected_value_* must be in range, not just [0][0].
+
+    def test_value_bounds_multi_row_all_in_range_passes(self):
+        from benchbox.core.write_primitives.benchmark import _check_validation_query
+
+        q = self._make_query(expected_value_min=10, expected_value_max=20)
+        assert _check_validation_query(q, actual_rows=3, val_result=[(11,), (15,), (19,)]) is True
+
+    def test_value_bounds_multi_row_first_out_of_range_fails(self):
+        from benchbox.core.write_primitives.benchmark import _check_validation_query
+
+        q = self._make_query(expected_value_min=10, expected_value_max=20)
+        assert _check_validation_query(q, actual_rows=3, val_result=[(0,), (15,), (19,)]) is False
+
+    def test_value_bounds_multi_row_middle_out_of_range_fails(self):
+        """Pre-w4 behavior would have passed because only [0][0] was inspected;
+        post-w4 we walk every row and fail on the first out-of-range value."""
+        from benchbox.core.write_primitives.benchmark import _check_validation_query
+
+        q = self._make_query(expected_value_min=10, expected_value_max=20)
+        assert _check_validation_query(q, actual_rows=3, val_result=[(11,), (999,), (19,)]) is False
+
+    def test_value_bounds_multi_row_last_out_of_range_fails(self):
+        from benchbox.core.write_primitives.benchmark import _check_validation_query
+
+        q = self._make_query(expected_value_min=10, expected_value_max=20)
+        assert _check_validation_query(q, actual_rows=3, val_result=[(11,), (15,), (0,)]) is False
+
+    def test_value_bounds_empty_result_fails(self):
+        """Empty result (after the bounds branch is taken) must fail rather than
+        silently pass — there's nothing to validate."""
+        from benchbox.core.write_primitives.benchmark import _check_validation_query
+
+        q = self._make_query(expected_value_min=10, expected_value_max=20)
+        assert _check_validation_query(q, actual_rows=0, val_result=None) is False
+
+    def test_value_bounds_empty_row_fails(self):
+        """A row with no columns can't be coerced to a scalar; treat as failure."""
+        from benchbox.core.write_primitives.benchmark import _check_validation_query
+
+        q = self._make_query(expected_value_min=10, expected_value_max=20)
+        assert _check_validation_query(q, actual_rows=2, val_result=[(15,), ()]) is False
+
 
 # ============================================================================
 # Fast-lane coverage tests (pytest.mark.fast)

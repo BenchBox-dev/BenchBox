@@ -878,13 +878,17 @@ def check_platforms(platforms_to_check: tuple, enabled_only: bool):
         readiness_results = check_platform_readiness(readiness_platform)
         readiness_failed = has_readiness_failures(readiness_results)
 
-        if info.available and readiness_failed:
+        # Disabled platforms are always informational. A readiness failure on
+        # an available-but-disabled platform must not fail `platforms check`,
+        # since the user has opted out of running it; only an enabled platform
+        # with a failed readiness probe is a real environment problem.
+        if info.available and not info.enabled:
+            console.print(f"[yellow]○ {info.display_name}: Available but disabled[/yellow]")
+        elif info.available and readiness_failed:
             console.print(f"[yellow]⚠️ {info.display_name}: Environment not ready[/yellow]")
             all_good = False
         elif info.enabled and info.available:
             console.print(f"[green]✅ {info.display_name}: Ready[/green]")
-        elif info.available:
-            console.print(f"[yellow]○ {info.display_name}: Available but disabled[/yellow]")
         else:
             console.print(f"[red]❌ {info.display_name}: Missing dependencies[/red]")
             console.print(f"   Install: {info.installation_command}")

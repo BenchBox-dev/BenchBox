@@ -112,9 +112,11 @@ def _check_validation_query(val_query: Any, actual_rows: int, val_result: list |
     Three validation modes (mutually exclusive at load time — see catalog loader):
     - expected_rows: exact row-count match
     - expected_rows_min/max: row-count range
-    - expected_value_min/max: scalar value from row[0][0] must fall in [min, max].
-      Used by approximate-aggregate sketch ops where a single tolerance-bounded
-      number certifies correctness without strict cross-engine equality.
+    - expected_value_min/max: scalar value(s) from each row's first column must
+      fall in [min, max]. Used by approximate-aggregate sketch ops where a
+      tolerance-bounded number certifies correctness without strict cross-engine
+      equality. Multi-row results (e.g. partition-aggregation validation
+      queries) must have *every* row in range, not just the first.
     """
     expected_rows = val_query.expected_rows
     if expected_rows is not None:
@@ -127,13 +129,18 @@ def _check_validation_query(val_query: Any, actual_rows: int, val_result: list |
         getattr(val_query, "expected_value_min", None) is not None
         and getattr(val_query, "expected_value_max", None) is not None
     ):
-        if not val_result or not val_result[0]:
+        if not val_result:
             return False
-        try:
-            scalar = float(val_result[0][0])
-        except (TypeError, ValueError):
-            return False
-        return val_query.expected_value_min <= scalar <= val_query.expected_value_max
+        for row in val_result:
+            if not row:
+                return False
+            try:
+                scalar = float(row[0])
+            except (TypeError, ValueError):
+                return False
+            if not (val_query.expected_value_min <= scalar <= val_query.expected_value_max):
+                return False
+        return True
     return True
 
 

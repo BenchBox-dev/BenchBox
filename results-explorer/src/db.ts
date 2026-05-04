@@ -41,38 +41,52 @@ let initError: Error | null = null;
 
 type DuckDBConnection = Awaited<ReturnType<duckdb.AsyncDuckDB["connect"]>>;
 
+// Required scans must be queryable AND non-empty for the snapshot to be
+// considered ready. Optional scans must be queryable (so we know the table
+// is attached and the schema exists), but an empty result is acceptable —
+// the explorer's detail/query/short-id paths already handle missing data
+// gracefully, so blocking the entire UI on these is an over-strict gate
+// that produces an infinite spinner for valid snapshots.
 const SNAPSHOT_READY_SCANS = [
   {
     label: "results",
     sql: "SELECT result_id FROM bench.results LIMIT 1",
+    required: true,
   },
   {
     label: "platform_index_rows",
     sql: "SELECT result_id FROM bench.platform_index_rows LIMIT 1",
+    required: true,
   },
   {
     label: "benchmark_rankings",
     sql: "SELECT result_id FROM bench.benchmark_rankings LIMIT 1",
+    required: true,
   },
   {
     label: "benchmark_matrix_cells",
     sql: "SELECT result_id FROM bench.benchmark_matrix_cells LIMIT 1",
+    required: true,
   },
   {
     label: "result_detail_metrics",
     sql: "SELECT result_id FROM bench.result_detail_metrics LIMIT 1",
+    required: true,
   },
   {
     label: "query_display_timings",
     sql: "SELECT result_id FROM bench.query_display_timings LIMIT 1",
+    required: false,
   },
   {
     label: "query_executions",
     sql: "SELECT result_id FROM bench.query_executions LIMIT 1",
+    required: false,
   },
   {
     label: "short_ids",
     sql: "SELECT result_id FROM bench.short_ids LIMIT 1",
+    required: false,
   },
 ] as const;
 
@@ -85,18 +99,35 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => globalThis.setTimeout(resolve, ms));
 }
 
+// Exported for unit-test coverage of w5 (optional snapshot tables must not
+// block readiness when empty). Not part of the public surface — call sites
+// outside this module should keep going through `getDb()`.
+export async function _waitForSnapshotRowsForTest(
+  conn: DuckDBConnection,
+): Promise<void> {
+  return waitForSnapshotRows(conn);
+}
+
 async function waitForSnapshotRows(conn: DuckDBConnection): Promise<void> {
   let lastError: unknown = null;
   for (let attempt = 1; attempt <= SNAPSHOT_READY_ATTEMPTS; attempt += 1) {
     try {
-      const counts: Array<readonly [string, number]> = [];
+      const requiredCounts: Array<readonly [string, number]> = [];
       for (const scan of SNAPSHOT_READY_SCANS) {
         const result = await conn.query(scan.sql);
-        counts.push([scan.label, result.toArray().length] as const);
+        if (scan.required) {
+          requiredCounts.push([scan.label, result.toArray().length] as const);
+        }
+        // Optional scans only need to be queryable; we don't track row counts
+        // because empty is acceptable.
       }
-      const emptyScans = counts.filter(([, rowCount]) => rowCount === 0).map(([label]) => label);
-      if (emptyScans.length === 0) return;
-      lastError = new Error(`DuckDB snapshot readiness returned empty scan(s): ${emptyScans.join(", ")}`);
+      const emptyRequired = requiredCounts
+        .filter(([, rowCount]) => rowCount === 0)
+        .map(([label]) => label);
+      if (emptyRequired.length === 0) return;
+      lastError = new Error(
+        `DuckDB snapshot readiness returned empty required scan(s): ${emptyRequired.join(", ")}`,
+      );
     } catch (error: unknown) {
       lastError = error;
       if (!isTransientDuckDbSnapshotError(error)) throw error;

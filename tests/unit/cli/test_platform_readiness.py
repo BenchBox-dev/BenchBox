@@ -66,6 +66,44 @@ def test_lakesail_unreachable_endpoint_reports_environment_skip_without_starting
     assert module_checks == ["pyspark", "pysail"]
 
 
+def test_lakesail_sql_unreachable_endpoint_is_ready_when_pysail_importable(monkeypatch):
+    """w23 regression: when the Spark Connect endpoint is unreachable but
+    pysail is importable, the SQL adapter (`lakesail`) can auto-start a local
+    Sail server at run time, so readiness must report ``ready`` rather than
+    ``environment_skip`` (which would fail ``benchbox platforms check`` for a
+    legitimately runnable adapter)."""
+    module_checks: list[str] = []
+
+    def module_available(name: str) -> bool:
+        module_checks.append(name)
+        return name in {"pyspark", "pysail"}
+
+    monkeypatch.setattr(readiness, "_module_available", module_available)
+    monkeypatch.setattr(readiness, "_configured_lakesail_endpoint", lambda: "sc://localhost:50051")
+    monkeypatch.setattr(readiness, "_tcp_reachable", lambda host, port, timeout: False)
+
+    results = readiness.check_platform_readiness("lakesail")
+
+    assert [result.check for result in results] == ["pyspark_client", "spark_connect_endpoint"]
+    assert all(result.ready for result in results), [(r.check, r.status, r.summary) for r in results]
+    assert results[1].status == "ready"
+    assert "auto-start" in results[1].summary or "auto-start" in (results[1].detail or "")
+
+
+def test_lakesail_dataframe_mode_still_requires_running_endpoint(monkeypatch):
+    """w23 regression (negative side): the DataFrame adapter (`lakesail-df`)
+    cannot auto-start; pysail being importable does NOT make it ready when
+    the endpoint is unreachable."""
+    monkeypatch.setattr(readiness, "_module_available", lambda name: name in {"pyspark", "pysail"})
+    monkeypatch.setattr(readiness, "_configured_lakesail_endpoint", lambda: "sc://localhost:50051")
+    monkeypatch.setattr(readiness, "_tcp_reachable", lambda host, port, timeout: False)
+
+    results = readiness.check_platform_readiness("lakesail-df")
+
+    assert results[1].check == "spark_connect_endpoint"
+    assert results[1].status == "environment_skip"
+
+
 def test_lakesail_reachable_endpoint_is_ready(monkeypatch):
     monkeypatch.setattr(readiness, "_module_available", lambda name: name == "pyspark")
     monkeypatch.setattr(readiness, "_configured_lakesail_endpoint", lambda: "sc://sail-host:50052")
