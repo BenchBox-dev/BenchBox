@@ -93,7 +93,37 @@ describe("facet URL contract", () => {
     expect(readFacetParam(params, "benchmark")).toEqual(["tpch", "ssb"]);
     expect(readFacetParam(params, "date_window")).toBe("30d");
     expect(readFacetParam(params, "deployment_class")).toEqual(["cloud"]);
-    expect(readFacetParam(params, "instance_or_warehouse")).toEqual(["m6i.large"]);
+    // w16: when both ?instance_type= and ?warehouse_size= are present, the
+    // shared `instance_or_warehouse` facet must merge them rather than
+    // dropping one. Pre-w16 this returned only ["m6i.large"], silently
+    // discarding the warehouse_size value on the next mount.
+    expect(readFacetParam(params, "instance_or_warehouse")).toEqual(["m6i.large", "MEDIUM"]);
+  });
+
+  it("merges multiple legacy aliases for instance_or_warehouse (w16)", () => {
+    // Multi-value aliases on each side: both halves of the union should
+    // survive after dedupe.
+    const params = new URLSearchParams("instance_type=m6i.large,c5.xlarge&warehouse_size=MEDIUM,LARGE");
+    expect(readFacetParam(params, "instance_or_warehouse")).toEqual([
+      "m6i.large",
+      "c5.xlarge",
+      "MEDIUM",
+      "LARGE",
+    ]);
+  });
+
+  it("dedupes overlapping alias values when merging (w16)", () => {
+    const params = new URLSearchParams("instance_type=foo,bar&warehouse_size=bar,baz");
+    expect(readFacetParam(params, "instance_or_warehouse")).toEqual(["foo", "bar", "baz"]);
+  });
+
+  it("canonical key takes precedence over aliases when both are present (w16)", () => {
+    // The canonical URL key for instance_or_warehouse is `shape` (see
+    // FACET_URL_KEYS); aliases include `instance_type` and `warehouse_size`.
+    const params = new URLSearchParams(
+      "shape=canonical&instance_type=foo&warehouse_size=bar",
+    );
+    expect(readFacetParam(params, "instance_or_warehouse")).toEqual(["canonical"]);
   });
 
   it("treats legacy all sentinel values as default selections", () => {

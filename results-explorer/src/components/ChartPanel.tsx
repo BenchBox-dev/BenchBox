@@ -35,6 +35,12 @@ interface ChartPanelProps {
   context: ChartContext;
   baselineIndex?: number;
   onBaselineIndexChange?: (baselineIndex: number) => void;
+  // w18: thread the Compare-page guardrail (cohort mismatch → suppress
+  // winner language) into chart-level summaries. Without this, ChartPanel
+  // could still surface "Best power" / "Best geomean" claims even when the
+  // page-level decision summary correctly avoided them.
+  suppressWinnerClaims?: boolean;
+  suppressionReason?: string;
 }
 
 interface CompareQueryRow {
@@ -68,7 +74,13 @@ const CHART_BUTTON_LABELS: Record<string, string> = {
   rank_table: "Ranks",
 };
 
-export function ChartPanel({ context, baselineIndex, onBaselineIndexChange }: ChartPanelProps) {
+export function ChartPanel({
+  context,
+  baselineIndex,
+  onBaselineIndexChange,
+  suppressWinnerClaims = false,
+  suppressionReason,
+}: ChartPanelProps) {
   const charts = useMemo(() => applicableCharts(context), [context]);
   const chartGroups = useMemo(() => groupChartsByQuestion(charts), [charts]);
   const summary = useMemo(() => buildRenderableSummary(context), [context]);
@@ -235,6 +247,8 @@ export function ChartPanel({ context, baselineIndex, onBaselineIndexChange }: Ch
           compareRows,
           compareGroups,
           baselineIdx,
+          suppressWinnerClaims,
+          suppressionReason,
         })}
       </div>
     </section>
@@ -287,6 +301,8 @@ function renderChart(
     compareRows,
     compareGroups,
     baselineIdx,
+    suppressWinnerClaims = false,
+    suppressionReason,
   }: {
     context: ChartContext;
     summary: BenchmarkSummary | null;
@@ -294,6 +310,8 @@ function renderChart(
     compareRows: CompareQueryRow[];
     compareGroups: { queryId: string; values: { label: string; value: number | null; color: string }[] }[];
     baselineIdx: number;
+    suppressWinnerClaims?: boolean;
+    suppressionReason?: string;
   },
 ) {
   switch (chart.id) {
@@ -350,7 +368,15 @@ function renderChart(
         />
       ) : null;
     case "summary_box":
-      return <SummaryBoxPanel context={context} summary={summary} historical={historical} />;
+      return (
+        <SummaryBoxPanel
+          context={context}
+          summary={summary}
+          historical={historical}
+          suppressWinnerClaims={suppressWinnerClaims}
+          suppressionReason={suppressionReason}
+        />
+      );
     case "percentile_ladder":
       return summary ? (
         <PercentileLadder
@@ -589,10 +615,14 @@ function SummaryBoxPanel({
   context,
   summary,
   historical,
+  suppressWinnerClaims = false,
+  suppressionReason,
 }: {
   context: ChartContext;
   summary: BenchmarkSummary | null;
   historical: ChartHistoricalEntry[];
+  suppressWinnerClaims?: boolean;
+  suppressionReason?: string;
 }) {
   if (context.kind === "summary" && context.summary === null) {
     const benchmarks = new Set(historical.map((entry) => entry.benchmark));
@@ -636,14 +666,23 @@ function SummaryBoxPanel({
       <SummaryStat label="Platforms" value={String(summary.platforms.length)} />
       <SummaryStat label="Queries" value={String(summary.query_ids.length)} />
       <SummaryStat
-        label={primaryMetric === "power_score" ? "Best power" : "Best geomean"}
+        label={
+          suppressWinnerClaims
+            ? primaryMetric === "power_score"
+              ? "Highest power score in cohort"
+              : "Lowest geomean in cohort"
+            : primaryMetric === "power_score"
+              ? "Best power"
+              : "Best geomean"
+        }
         value={
           best
             ? `${best.platform} · ${
                 primaryMetric === "power_score" ? fmtScore(best.power_score) : fmtGeomean(best.display_geomean_ms)
-              }`
+              }${suppressWinnerClaims ? " (cohort mismatch — not comparable)" : ""}`
             : "-"
         }
+        title={suppressWinnerClaims ? suppressionReason : undefined}
       />
       <SummaryStat
         label={sampleCount !== null ? "Median samples" : "Phase"}
@@ -653,9 +692,9 @@ function SummaryBoxPanel({
   );
 }
 
-function SummaryStat({ label, value }: { label: string; value: string }) {
+function SummaryStat({ label, value, title }: { label: string; value: string; title?: string }) {
   return (
-    <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+    <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3" title={title}>
       <div class="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</div>
       <div class="mt-1 text-sm font-semibold text-gray-900">{value}</div>
     </div>

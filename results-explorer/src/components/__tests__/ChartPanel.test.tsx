@@ -420,4 +420,36 @@ describe("ChartPanel", () => {
     expect(screen.queryByRole("button", { name: "Normalized Speedup" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Performance Trend" })).toBeNull();
   });
+
+  it("uses winner language by default in the summary box", () => {
+    render(
+      <ChartPanel
+        context={{
+          kind: "summary",
+          summary: makeSummary(),
+        }}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Summary Box" }));
+    expect(screen.getByText("Best geomean")).toBeTruthy();
+    expect(screen.queryByText(/Lowest geomean in cohort/)).toBeNull();
+    expect(screen.queryByText(/cohort mismatch/)).toBeNull();
+  });
+
+  it("suppresses winner language in the summary box when suppressWinnerClaims is on (w18)", () => {
+    render(
+      <ChartPanel
+        context={{
+          kind: "summary",
+          summary: makeSummary(),
+        }}
+        suppressWinnerClaims
+        suppressionReason="benchmarks differ across results"
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Summary Box" }));
+    expect(screen.queryByText("Best geomean")).toBeNull();
+    expect(screen.getByText("Lowest geomean in cohort")).toBeTruthy();
+    expect(screen.getByText(/cohort mismatch — not comparable/)).toBeTruthy();
+  });
 });

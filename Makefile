@@ -16,6 +16,15 @@ DEV_LOOP_METRICS_LIMIT ?= 100
 # 5 GB. Override to 0 to bypass the check (e.g. during low-space CI).
 POOL_MIN_FREE_KB ?= 5000000
 
+# Age threshold (in seconds) before a `.benchbox/claim_in_progress` marker
+# is treated as evidence of an aborted claim by `worktree-pool-check`.
+# Fresh markers indicate an in-flight `worktree-claim` and must not be
+# reported as aborted: `worktree-pool-check` is documented as safe for
+# periodic / cron use, and `worktree-claim` writes the marker at the
+# start of a normal claim and only removes it at the end. Default 600s
+# (10 min); concurrent claim runs typically finish in seconds.
+POOL_CLAIM_MARKER_STALE_SECONDS ?= 600
+
 # Shell command snippet that resolves the main clone's directory name
 # (e.g. "BenchBox"). Pool worktree paths derive from it as
 # $(WORKTREE_POOL_PARENT)/$(POOL_REPO_CMD).pool-NN. Inlined as a Make
@@ -1247,6 +1256,7 @@ worktree-pool-check:
 	missing_count=0; \
 	aborted_count=0; \
 	i=1; \
+	now_epoch=$$(date +%s); \
 	while [ "$$i" -le "$(POOL_SIZE)" ]; do \
 		pool=$$(printf 'pool-%02d' "$$i"); \
 		wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.$$pool"; \
@@ -1254,9 +1264,13 @@ worktree-pool-check:
 			violations="$$violations  - $$pool: missing ($$wt is not a git worktree)\n"; \
 			missing_count=$$((missing_count + 1)); \
 		elif [ -f "$$wt/.benchbox/claim_in_progress" ]; then \
+			marker_mtime_epoch=$$(stat -f %m "$$wt/.benchbox/claim_in_progress" 2>/dev/null || stat -c %Y "$$wt/.benchbox/claim_in_progress" 2>/dev/null || echo 0); \
+			marker_age_seconds=$$((now_epoch - marker_mtime_epoch)); \
 			marker_age=$$(date -u -r "$$wt/.benchbox/claim_in_progress" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo "?"); \
-			violations="$$violations  - $$pool: aborted (claim_in_progress marker present, mtime $$marker_age)\n"; \
-			aborted_count=$$((aborted_count + 1)); \
+			if [ "$$marker_age_seconds" -ge "$(POOL_CLAIM_MARKER_STALE_SECONDS)" ]; then \
+				violations="$$violations  - $$pool: aborted (claim_in_progress marker present, mtime $$marker_age, age $${marker_age_seconds}s >= $(POOL_CLAIM_MARKER_STALE_SECONDS)s)\n"; \
+				aborted_count=$$((aborted_count + 1)); \
+			fi; \
 		fi; \
 		i=$$((i + 1)); \
 	done; \
