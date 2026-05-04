@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### New
 
+- **write_primitives sketch** — DuckDB-only CPC and REQ sketch families.
+  CPC (Compressed Probabilistic Counting) is an HLL-family alternative
+  with dramatically smaller serialized state (~1.2KB merged vs Theta's
+  ~16KB at SF=0.01) at the cost of slower update/merge throughput. REQ
+  (Relative Error Quantile) is an alternative quantile sketch with
+  relative-error guarantees vs KLL's normalized-rank error. 8 new ops
+  total: `sketch_cpc_{create,insert,query_union_merge,drop}` and
+  `sketch_req_{create,insert,query_quantile_merge,drop}`. Cloud engines
+  skip cleanly (no native CPC/REQ surface today). Storage-cost
+  side-by-side against Theta and KLL documented in
+  `docs/benchmarks/write-primitives-sketch-functions.md`.
 - **write_primitives sketch** — ClickHouse-native variants for the eight
   sketch ops using `uniqState`/`uniqMerge`,
   `quantileTDigestState`/`quantileTDigestMerge(0.5)`, and
