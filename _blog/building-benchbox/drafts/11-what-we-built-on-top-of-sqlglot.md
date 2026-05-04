@@ -77,14 +77,14 @@ Three platforms required dedicated modules.
 
 The Q23/Q87 case is worth telling. We wrote an AST visitor to inject `AS _sqN` on every unaliased subquery, but it corrupted Q23 (pulled `GROUP BY` out of a subquery) and Q87 (injected aliases inside `EXCEPT/INTERSECT`). The fix that shipped was a session setting, `joined_subquery_requires_alias=0`. The lesson: even with full AST control, the safer move was to abandon the rewrite and use the session setting the engine already exposed.
 
-**QuestDB** (`platforms/questdb_rewriter.py`) is a dedicated post-AST rewriter for four constructs the SQLGlot dialect entry does not fully cover:
+**QuestDB** (`platforms/questdb_rewriter.py`) is a dedicated post-AST rewriter for four constructs SQLGlot's `postgres` output does not transform for QuestDB:
 
 - Implicit comma joins, converted to explicit `INNER JOIN ... ON`.
 - `INTERVAL` arithmetic, converted to `dateadd('d', n, ts)`.
 - `SUBSTRING(s FROM p FOR l)`, converted to `substring(s, p, l)`.
 - CTE column-alias lists, stripped.
 
-QuestDB has a SQLGlot dialect entry; the dialect entry does not cover what QuestDB 9.3.4 actually accepts. Without our rewriter, every TPC-H, TPC-DS, and SSB query fails before the first row.
+QuestDB is not in SQLGlot's dialect list (verified against `sqlglot==30.6.0`); we map it to `postgres` in `dialect_utils.normalize_dialect_for_sqlglot` and apply this rewriter on top. Without it, every TPC-H, TPC-DS, and SSB query fails before the first row on QuestDB 9.3.4.
 
 **DataFusion** is its own category, and it is the most expensive one we have.
 
@@ -92,7 +92,7 @@ QuestDB has a SQLGlot dialect entry; the dialect entry does not cover what Quest
 
 This is the category we worry about most. SQLGlot transpiles cleanly. The SQL executes. The results are wrong.
 
-DataFusion has a SQLGlot dialect entry. We observed that SQLGlot translates four TPC-H queries into syntactically valid DataFusion SQL that the engine runs to completion and returns the wrong answer for. These observations are pinned to the BenchBox `uv.lock` resolved version of the `datafusion` Python package (53.0.0); upstream planner work may resolve any of them in later releases.
+DataFusion is not in SQLGlot's dialect list either; we transpile to `postgres` and run the result on DataFusion. We observed that this `postgres`-targeted SQL is syntactically valid for DataFusion's parser and runs to completion, but four TPC-H queries return the wrong answer. These observations are pinned to the BenchBox `uv.lock` resolved version of the `datafusion` Python package (53.0.0); upstream planner work may resolve any of them in later releases.
 
 | TPC-H query | Issue (observed on DataFusion Python 53.0.0) | Our rewrite |
 |--------------|-------|-------------|
