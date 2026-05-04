@@ -3,7 +3,7 @@ title: "Single-repo migration phase 6: delete the release scripts, sync module, 
 worktree: main
 priority: Medium-High
 status: Completed
-completed_date: 2026-04-27
+completed_date: "2026-04-27"
 category: Release Tooling
 
 deps:
@@ -143,21 +143,21 @@ verification:
   expected_output: "0"
 
 must_preserve:
-- The actual benchbox package functionality (CLI, MCP, platforms, benchmarks) is unchanged. Only the release-machinery 
+- The actual benchbox package functionality (CLI, MCP, platforms, benchmarks) is unchanged. Only the release-machinery
   is removed.
 - update_version.py is retained - the Makefile release target uses it.
 - generate_changelog_entry.py from Phase 3 is retained - the Makefile release target uses it.
-- benchbox/release/__init__.py may be retained as an empty stub if the package import structure relies on it; otherwise 
+- benchbox/release/__init__.py may be retained as an empty stub if the package import structure relies on it; otherwise
   delete the whole directory.
 
 anti_patterns:
-- DO NOT skip the test-suite run in w7 - because deleting modules silently breaks importers; tests are the cheapest way 
+- DO NOT skip the test-suite run in w7 - because deleting modules silently breaks importers; tests are the cheapest way
   to find them.
 - DO NOT keep "just in case" wrappers around deleted scripts - because they accumulate; if you need any of these scripts
   back, pull them from git history.
-- DO NOT delete update_version.py - because the new release flow depends on it; check it has no transitive imports of 
+- DO NOT delete update_version.py - because the new release flow depends on it; check it has no transitive imports of
   the deleted modules first (w6).
-- DO NOT delete tests/unit/test_xdist_safety.py without checking - because it tested xdist behaviour that may still 
+- DO NOT delete tests/unit/test_xdist_safety.py without checking - because it tested xdist behaviour that may still
   apply to the ambient CI in Phase 2; review before removing.
 
 scope_limit:

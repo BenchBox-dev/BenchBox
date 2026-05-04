@@ -3,7 +3,7 @@ title: "Single-repo migration phase 3: Makefile release target and GitHub Action
 worktree: main
 priority: High
 status: Completed
-completed_date: 2026-04-27
+completed_date: "2026-04-27"
 category: Release Tooling
 
 deps:

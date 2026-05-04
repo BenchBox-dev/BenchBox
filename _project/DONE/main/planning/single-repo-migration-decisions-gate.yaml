@@ -3,7 +3,7 @@ title: "Single-repo migration: decisions gate (D1-D8) before any code or repo ch
 worktree: main
 priority: Critical
 status: Completed
-completed_date: 2026-04-27
+completed_date: "2026-04-27"
 category: Release Tooling
 
 description: |

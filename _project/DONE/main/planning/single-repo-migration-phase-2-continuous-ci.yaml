@@ -3,7 +3,7 @@ title: "Single-repo migration phase 2: continuous CI on push to main and every P
 worktree: main
 priority: High
 status: Completed
-completed_date: 2026-04-27
+completed_date: "2026-04-27"
 category: Release Tooling
 
 deps:

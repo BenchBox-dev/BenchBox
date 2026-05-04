@@ -38,16 +38,16 @@ work:
     status: done
 
   - id: w3
-    summary: "Wire into pytest integration tests over (benchmark, platform) pairs at SF=0.01; keep the first matrix local/no-credentials"
+    summary: "Create follow-up for pytest integration tests over (benchmark, platform) pairs at SF=0.01"
     needs: [w2]
-    status: deferred
-    note: "Split to follow-up quality-cross-platform-validation-integration-matrix - live matrix + nightly workflow bundled there to keep this TODO's review surface bounded."
+    status: done
+    notes: "Split to follow-up quality-cross-platform-validation-integration-matrix - live matrix + nightly workflow bundled there to keep this TODO's review surface bounded."
 
   - id: w4
-    summary: "Add nightly GitHub Actions workflow .github/workflows/cross-platform-validation.yml running the cross-platform pytest suite and publishing structured diff artifacts on failure"
+    summary: "Create follow-up for nightly cross-platform validation workflow and diff artifacts"
     needs: [w3]
-    status: deferred
-    note: "Split to follow-up quality-cross-platform-validation-integration-matrix."
+    status: done
+    notes: "Split to follow-up quality-cross-platform-validation-integration-matrix."
 
   - id: w5
     summary: "Document the validation contract in docs/development/result-validation.md including how to run the pytest suite locally, how to add new platforms, and how tolerance overrides are justified"
@@ -62,6 +62,12 @@ files_affected:
   deferred_to_follow_up:
     - "tests/integration/validation/test_cross_platform.py"
     - ".github/workflows/cross-platform-validation.yml"
+
+deferred:
+  - summary: "Wire cross-platform result validation into integration tests over local platform pairs at SF=0.01"
+    reason: "Split to follow-up quality-cross-platform-validation-integration-matrix to keep this completed TODO's review surface bounded."
+  - summary: "Add nightly cross-platform validation workflow with structured diff artifacts"
+    reason: "Split to follow-up quality-cross-platform-validation-integration-matrix after the comparator semantics stabilize."
 
 must_preserve:
   - "Existing per-platform tests continue to run on PR; this is a new layer, not a replacement"
