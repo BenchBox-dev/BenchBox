@@ -35,8 +35,8 @@ class DialectTranslationMixin:
 
         Delegates to the centralized dialect_utils pipeline, gaining dialect
         normalization, identifier quoting policy, and platform-specific
-        post-fixes (DuckDB GROUP BY ALL, SQLite syntax rewrites). Handles
-        multi-statement schema SQL that translate_sql_query() does not.
+        SQLite syntax rewrites. Handles multi-statement schema SQL that
+        translate_sql_query() does not.
 
         Args:
             sql: SQL query or schema block (may contain multiple statements)
@@ -50,8 +50,6 @@ class DialectTranslationMixin:
 
         from benchbox.utils.dialect_utils import (
             _fix_sqlite_unsupported_syntax,
-            _query_has_group_or_order_by_all,
-            _restore_group_order_by_all_keyword,
             normalize_dialect_for_sqlglot,
         )
 
@@ -64,12 +62,9 @@ class DialectTranslationMixin:
 
             translated_statements = sqlglot.transpile(sql, read=src, write=tgt, identify=should_identify)
 
-            has_all = _query_has_group_or_order_by_all(sql)
             fixed = []
             for stmt in translated_statements:
-                if tgt == "duckdb" and has_all:
-                    stmt = _restore_group_order_by_all_keyword(stmt)
-                elif tgt == "sqlite":
+                if tgt == "sqlite":
                     stmt = _fix_sqlite_unsupported_syntax(stmt)
                 fixed.append(stmt)
 
