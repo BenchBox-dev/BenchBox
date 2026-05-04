@@ -3,7 +3,7 @@ title: "Single-repo migration phase 7: docs and meta-files reflect the new workf
 worktree: main
 priority: Medium-High
 status: Completed
-completed_date: 2026-04-27
+completed_date: "2026-04-27"
 category: Documentation
 
 deps:
@@ -145,16 +145,16 @@ verification:
   expected_output: "between 200 and 800 words"
 
 must_preserve:
-- All other docs (benchmarks, platforms, MCP server, getting-started) are unchanged. This phase only touches 
+- All other docs (benchmarks, platforms, MCP server, getting-started) are unchanged. This phase only touches
   release-related docs and meta-files.
 - docs/operations/results-phase-2-runbook.md (results publishing) is unchanged - it covers a different runbook.
 
 anti_patterns:
-- DO NOT duplicate the Makefile release target into the release guide - because the Makefile is canonical; the guide 
+- DO NOT duplicate the Makefile release target into the release guide - because the Makefile is canonical; the guide
   should reference and explain, not paste-and-replicate.
-- DO NOT write a long history section - because the guide describes how to release TODAY; migration history belongs in 
+- DO NOT write a long history section - because the guide describes how to release TODAY; migration history belongs in
   MIGRATION-NOTES.md (if kept) or git history.
-- DO NOT add screenshots - because they rot quickly and the existing docs are text-only; ASCII tables and code blocks 
+- DO NOT add screenshots - because they rot quickly and the existing docs are text-only; ASCII tables and code blocks
   are sufficient.
 
 scope_limit:

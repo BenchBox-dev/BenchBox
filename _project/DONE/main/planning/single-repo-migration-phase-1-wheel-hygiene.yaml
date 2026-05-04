@@ -3,7 +3,7 @@ title: "Single-repo migration phase 1: pyproject.toml and MANIFEST.in excludes f
 worktree: main
 priority: High
 status: Completed
-completed_date: 2026-04-27
+completed_date: "2026-04-27"
 category: Release Tooling
 
 deps:

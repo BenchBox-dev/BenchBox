@@ -3,7 +3,7 @@ title: "Single-repo migration phase 5: dev locus migration (archive private repo
 worktree: main
 priority: Critical
 status: Completed
-completed_date: 2026-04-27
+completed_date: "2026-04-27"
 category: Release Tooling
 amendment_2026-04-27: |
   Phase 4 v0.3.0 release cut deferred per user direction. Phase 5
@@ -216,16 +216,16 @@ must_preserve:
 - PyPI wheels for previously-published versions remain installable (PyPI is independent of repo state).
 
 anti_patterns:
-- DO NOT delete benchbox-private from GitHub at the end of this phase - because external links, forks, and stars (if 
+- DO NOT delete benchbox-private from GitHub at the end of this phase - because external links, forks, and stars (if
   any) point to it; archiving preserves them with read-only access. Deletion is Phase 9 (optional).
-- DO NOT delete the renamed local clone (BenchBox.retired-YYYYMMDD/) at the end of this phase - because it is the 
+- DO NOT delete the renamed local clone (BenchBox.retired-YYYYMMDD/) at the end of this phase - because it is the
   ultimate "did I lose any in-flight work" reference for 60+ days.
-- DO NOT enable branch-protection's linear-history rule before Phase 4 w6 lands - because that merge commit is a 
+- DO NOT enable branch-protection's linear-history rule before Phase 4 w6 lands - because that merge commit is a
   non-linear one-time event; the rule applies from-this-point-forward, not retroactively.
-- DO NOT push commits to public main from the retired private clone after w5 - because the retired clone has stale 
-  knowledge of public's history (curated mirror, before the migration commits) and any push from there would create 
+- DO NOT push commits to public main from the retired private clone after w5 - because the retired clone has stale
+  knowledge of public's history (curated mirror, before the migration commits) and any push from there would create
   divergent history. Only push from ~/Developer/benchbox-public going forward.
-- DO NOT change the canonical repo URL or rename joeharris76/BenchBox - because that triggers an irreversible 
+- DO NOT change the canonical repo URL or rename joeharris76/BenchBox - because that triggers an irreversible
   visibility-event chain that Option B specifically avoided (vs. Option A which did rename).
 
 scope_limit:
