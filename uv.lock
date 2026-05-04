@@ -862,7 +862,7 @@ requires-dist = [
     { name = "sphinx-design", marker = "extra == 'docs'", specifier = ">=0.6.0" },
     { name = "sphinx-tags", marker = "extra == 'docs'", specifier = ">=0.4.0" },
     { name = "sphinxcontrib-mermaid", marker = "extra == 'docs'", specifier = ">=0.8.1" },
-    { name = "sqlglot", specifier = ">=20.0.0,<31.0.0" },
+    { name = "sqlglot", specifier = ">=25.6.0,<31.0.0" },
     { name = "textblob", marker = "extra == 'ai-primitives'", specifier = ">=0.17.0" },
     { name = "textcharts", specifier = ">=0.1.0" },
     { name = "tomli", marker = "python_full_version < '3.11'", specifier = ">=2.0.0" },

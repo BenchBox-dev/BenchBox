@@ -56,6 +56,10 @@ context_sections:
     - There are two test files referencing these helpers:
       `tests/unit/utils/test_dialect_utils.py` and
       `tests/unit/sql_compat/test_translate_sql_delegation.py`.
+    - First fix release: sqlglot v25.6.0 (2024-07-17). PR #3756 was
+      merged 2024-07-11 (squashed as commit 70a1f65b on main); v25.5.1
+      (2024-07-04) precedes the merge, v25.6.0 (2024-07-17) is the first
+      tagged release that contains it.
 
   "Why this is Medium, not High": |
     The code is harmless when running against modern `sqlglot`; this is
@@ -81,7 +85,7 @@ work:
 
 - id: w1
   summary: "Identify min sqlglot release containing PR #3756, bump floor, relock"
-  status: pending
+  status: done
   needs: [w0]
   notes: |
     Lookup: read sqlglot's CHANGELOG/release notes/git tags around the
