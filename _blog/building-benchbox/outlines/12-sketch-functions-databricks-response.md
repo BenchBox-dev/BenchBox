@@ -70,14 +70,14 @@ This is reusable: it applies to any vendor announcement framed as "stored, merge
   - **Option A**: Add sketch-aggregate queries to `read_primitives`. Benefit: cheap, single-PR, measures latency. Weakness: it claims to cover the announcement while only exercising the latency-only path.
   - **Option B**: Add a new `sketch` category to `write_primitives`. Benefit: it actually exercises persist + merge + requery. Cost: requires platform_overrides for cross-dialect DDL, BINARY column type translation, tolerance-based validation for non-deterministic sketch outputs, and explicit Redshift HLL-substitution.
 - The decision: do both, with explicit cross-references in both docs explaining which capability each benchmark covers.
-- A second-order finding from implementation: the architecture itself wasn't ready. Two write_primitives architectural gaps surfaced when the ClickHouse + cloud verification work started:
+- A second-order finding from implementation: the `write_primitives` architecture itself wasn't ready. Two gaps surfaced when ClickHouse + cloud verification work started:
   - `validation_query` had no per-platform override mechanism (`2026-05-02-155448`)
   - `WriteOperationType` enum had no aggregate-state shape for DataFrame engines (`2026-05-02-163132`)
 - Both fixes landed in the architecture-fixes work-item. Follow-on work is split by risk: ClickHouse-native variants and parameter sweeps can be verified locally; DuckDB Theta/Top-K remains blocked by the datasketches extension drift until we pin/vendor or substitute; cloud verification is deferred until credentials are available. Cross-cloud measurements are not in this announcement.
 
 **Key data points**:
-- Catalog of architectural gaps surfaced (table linking blind-spot file → resolution TODO).
-- Why "skip the persistence half" was rejected (it's the differentiated claim).
+- Catalog of architectural gaps surfaced (table linking blind-spot file → resolution PR).
+- Why "skip the persistence half" was rejected (it's the central claim of the announcement).
 
 ### 3. What We Built (~600 words): The two-benchmark coverage with cross-engine matrices
 
@@ -93,7 +93,7 @@ This is reusable: it applies to any vendor announcement framed as "stored, merge
 | `approx_quantiles_array` | Vector quantiles per group | redshift, datafusion, sqlite |
 | `approx_top_k_lineitem` | Approximate top-K | redshift, datafusion, sqlite |
 
-Cross-engine function reference table (compressed; full version in docs):
+Cross-engine function-name reference (DuckDB / Snowflake / BigQuery / Databricks / ClickHouse / Redshift / DataFusion) lives in [`docs/benchmarks/read-primitives-approximate-functions.md`](https://github.com/joeharris76/BenchBox/blob/develop/docs/benchmarks/read-primitives-approximate-functions.md). Sample row to anchor the post:
 
 | Engine | Distinct | Quantile | Top-K |
 |--------|----------|----------|-------|
@@ -105,7 +105,7 @@ Cross-engine function reference table (compressed; full version in docs):
 | Redshift | `APPROXIMATE COUNT(DISTINCT x)` | `APPROXIMATE PERCENTILE_DISC(0.5)...` | no top-K |
 | DataFusion | `approx_distinct` | `approx_percentile_cont(x, 0.5)` | no top-K |
 
-DataFrame surface (separate matrix; sketch-backed vs exact-fallback distinction):
+DataFrame surface — sketch-backed vs exact-fallback distinction:
 
 | Query | Polars | PySpark | DataFusion | pandas / Modin / cuDF | Dask |
 |-------|--------|---------|-----------|-----------------------|------|
@@ -113,7 +113,7 @@ DataFrame surface (separate matrix; sketch-backed vs exact-fallback distinction)
 | `approx_quantile_groupby` | exact | `percentile_approx` (KLL) | `approx_percentile_cont` (T-Digest) | exact | exact |
 | `approx_quantiles_array`, `approx_top_k_lineitem` | (skip) | (skip) | (skip) | (skip) | (skip) |
 
-Honest accounting: pandas / Modin / cuDF have no native sketch surface, so their "approximate" rows fall back to exact aggregates and are not directly comparable to sketch-backed engines on the same row.
+Pandas / Modin / cuDF have no native sketch surface, so their "approximate" rows fall back to exact aggregates — the benchmark still runs and reports a number, but it's the exact aggregate's latency, not directly comparable to sketch-backed engines on the same row.
 
 #### `write_primitives` sketch category (persist + merge + requery)
 
@@ -130,13 +130,15 @@ Honest accounting: pandas / Modin / cuDF have no native sketch surface, so their
 | ★ `sketch_query_topk_combine` | MERGE | HEADLINE: frequent items count from merge |
 | `sketch_drop_persistent_table` | DDL | DROP overhead |
 
-Sketch-family × engine support (compressed):
+Sketch-family × engine support, post-PR #180:
 
-| Family | DataSketches binary-portable | Native-but-distinct | No support |
-|--------|------------------------------|----------------------|------------|
-| Theta (distinct) | Databricks, Snowflake, BigQuery (HLL substitution), DuckDB ext | ClickHouse (`-State`/`-Merge`), Redshift (HLL substitution) | DataFusion |
-| KLL (quantile) | Databricks, Snowflake, BigQuery, DuckDB ext | ClickHouse (`quantileTDigestState`) | Redshift, DataFusion |
-| Top-K | Databricks, Snowflake, DuckDB ext | ClickHouse (`topKState`) | Redshift, BigQuery, DataFusion |
+| Family | DataSketches binary-portable | ClickHouse-native combinators | HLL substitution | No support |
+|--------|------------------------------|--------------------------------|------------------|-----------|
+| Theta (distinct) | Databricks, Snowflake, DuckDB ext | ClickHouse (`uniqState`/`uniqMerge`) | BigQuery, Redshift | DataFusion |
+| KLL (quantile) | Databricks, Snowflake, BigQuery, DuckDB ext | ClickHouse (`quantileTDigestState`) | — | Redshift, DataFusion |
+| Top-K | Databricks, Snowflake, DuckDB ext | ClickHouse (`topKState(8)`) | — | BigQuery, Redshift, DataFusion |
+| CPC | DuckDB ext only | — | — | all others |
+| REQ | DuckDB ext only | — | — | all others |
 
 Tuple-sketch scope note: Databricks' announcement includes Tuple sketches for distinct-count-plus-metric summaries. BenchBox should acknowledge that fourth family directly, then defer it because the first write-primitives category is already large enough with Theta/KLL/Top-K and because Tuple parity across BigQuery, Redshift, and ClickHouse is not the same coverage story.
 
@@ -268,3 +270,4 @@ Per the building-benchbox series template:
 - **Conflicts checked**: no overlap with any planned outline. Posts #1-11 are unrelated topics. The benchbox-in-action series is methodology-driven (no overlap with this engineering-decision framing).
 - **Next step**: run editorial critique and gather any in-scope benchmark charts only after separating verified local claims from deferred or blocked paths. Do not draft around DuckDB Theta/Top-K numbers until the datasketches extension drift is fixed or the post explicitly labels those paths as blocked. Cloud verification stays deferred and is called out as a follow-up.
 - **Series-plan update**: row #12 added.
+- **Publication timing**: vendor-response posts have a 1-2 week shelf life; aim to draft and publish soon after the 6 runs land.

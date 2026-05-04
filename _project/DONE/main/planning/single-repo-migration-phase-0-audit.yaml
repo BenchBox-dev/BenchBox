@@ -3,7 +3,7 @@ title: "Single-repo migration phase 0: gitleaks scan and content audit (working 
 worktree: main
 priority: Critical
 status: Completed
-completed_date: 2026-04-27
+completed_date: "2026-04-27"
 category: Release Tooling
 
 deps:

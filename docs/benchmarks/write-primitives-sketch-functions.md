@@ -376,3 +376,57 @@ today (the persist phase leaves a Parquet directory at `target_path`;
 remove it with `shutil.rmtree` after the merge phase). A dedicated
 `execute_aggregate_cleanup` helper may land later if symmetry becomes
 load-bearing — surface the request in a follow-up TODO if you need it.
+
+### PySpark sketch factory helpers
+
+`benchbox.core.write_primitives.dataframe_operations` exposes factory
+functions that produce the `state_builder` and `merge_extract` callables
+for the persist+merge cycle on PySpark, so consumers don't have to repeat
+the spark-read / groupBy / agg chain by hand:
+
+| Family | Persist factory                          | Merge factory                          | Spark floor |
+|--------|------------------------------------------|----------------------------------------|-------------|
+| HLL    | `make_pyspark_hll_persist_builder(...)`  | `make_pyspark_hll_merge_extract(...)`  | 3.5         |
+| Top-K  | `make_pyspark_topk_persist_builder(...)` | `make_pyspark_topk_merge_extract(...)` | 4.1         |
+
+Top-K requires `F.approx_top_k_accumulate`, which ships with Spark 4.1+.
+Guard with `pyspark_supports_approx_top_k(spark)` before calling the
+top-K factory; older runtimes should skip cleanly with a logged reason.
+
+KLL is intentionally **not** implemented at the DataFrame layer because
+Spark's KLL surface is SQL-UDAF-only today; using `percentile_approx`
+would be one-shot (no separate persist+merge measurement), defeating the
+whole point.
+
+Example consumer pattern using the factories:
+
+```python
+from benchbox.core.write_primitives.dataframe_operations import (
+    get_dataframe_write_manager,
+    make_pyspark_hll_persist_builder,
+    make_pyspark_hll_merge_extract,
+)
+
+manager = get_dataframe_write_manager("pyspark-df", spark_session=spark)
+target = Path("/tmp/sketch_state/hll")
+
+builder = make_pyspark_hll_persist_builder(
+    spark, "/data/lineitem",
+    group_cols=["l_shipdate", "l_returnflag"],
+    value_col="l_orderkey",
+)
+persist = manager.execute_aggregate_persist(target, builder, compression="zstd")
+
+merge_extract = make_pyspark_hll_merge_extract(spark, sketch_col="sketch")
+merge = manager.execute_aggregate_merge(target, merge_extract)
+distinct_estimate = merge.metrics["aggregate_value"]
+```
+
+**CLI integration gap.** `benchbox run --platform pyspark --benchmark
+write_primitives --queries sketch_df_hll_persist_merge` does not yet
+dispatch through these factories — the catalog has no `sketch_df_*`
+entries and `_execute_dataframe_sql_parity_workload` always routes to
+embedded DuckDB. The factory helpers are usable today via direct manager
+calls (covered by `tests/unit/core/write_primitives/test_pyspark_sketch_factories.py`);
+wiring them into the benchmark CLI is tracked as a follow-up. See
+`_project/blind-spots/2026-05-04-011321-pyspark-sketch-todo-scope-vs-verification-mismatch.md`.

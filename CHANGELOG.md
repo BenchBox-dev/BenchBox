@@ -17,6 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on the installed datasketches extension (~2KB merged at k=100, ~18KB
   at k=1000); Theta and frequent-items variants inherit the parent
   ops' extension-drift status. Cloud-engine sweeps are deferred.
+- **write_primitives DataFrame** — PySpark sketch factory helpers
+  (`make_pyspark_hll_persist_builder` / `make_pyspark_hll_merge_extract`
+  for HLL on Spark 3.5+; `make_pyspark_topk_persist_builder` /
+  `make_pyspark_topk_merge_extract` for top-K on Spark 4.1+, guarded by
+  `pyspark_supports_approx_top_k`). The factories produce the closures
+  expected by `manager.execute_aggregate_persist` / `execute_aggregate_merge`
+  so PySpark sketch persist+merge cycles can run via the architecture-
+  fixes dispatch primitives. KLL is intentionally omitted at the
+  DataFrame layer — Spark's KLL surface is SQL-UDAF-only today.
+  CLI integration (`benchbox run --queries sketch_df_*`) is a tracked
+  follow-up; today the helpers are usable via direct manager calls.
 - **write_primitives sketch** — DuckDB-only CPC and REQ sketch families.
   CPC (Compressed Probabilistic Counting) is an HLL-family alternative
   with dramatically smaller serialized state (~1.2KB merged vs Theta's
