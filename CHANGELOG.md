@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### New
 
+- **write_primitives sketch** — ClickHouse-native variants for the eight
+  sketch ops using `uniqState`/`uniqMerge`,
+  `quantileTDigestState`/`quantileTDigestMerge(0.5)`, and
+  `topKState(8)`/`topKMerge(8)` over `AggregateFunction(...)` columns.
+  ClickHouse goes from 0/8 (all skipped) to 8/8 supported, completing
+  the cross-engine sketch matrix for the persist+merge+requery story.
+- **write_primitives sketch** — add storage-size validation
+  (`*_storage_size`) on the three ★ headline ops alongside the existing
+  scalar-bounds validation. Per-engine SQL via the new
+  `validation_query.platform_overrides`: `octet_length(<sketch>)` on
+  DuckDB, `length(toString(<agg>MergeState(...)))` on ClickHouse. Bounds
+  span both engines' observed merged-state sizes (theta ~16KB DuckDB /
+  ~60KB ClickHouse, KLL ~3KB / ~3.8KB, topK ~600B / ~294B). Surfaces the
+  cost-per-byte side of the persistence-vs-recompute tradeoff.
+- **write_primitives validation** — `ValidationQuery.platform_overrides`
+  schema extension: each validation query can declare per-platform SQL
+  bodies (or explicit `null` skip). Mirrors operation-level
+  `platform_overrides` and unblocks engine-specific sketch validation
+  without forcing dialect probes into a single SQL body. See
+  `docs/benchmarks/write-primitives-sketch-functions.md`.
+- **write_primitives DataFrame** — `WriteOperationType.AGGREGATE_PERSIST`
+  and `WriteOperationType.AGGREGATE_MERGE` op types with capability flags
+  (`supports_aggregate_persist`/`supports_aggregate_merge`) and dispatch
+  methods (`execute_aggregate_persist`/`execute_aggregate_merge`).
+  PySpark presets enable both; concrete sketch wiring is deferred to a
+  follow-up (write-primitives-sketch-pyspark-dataframe-surface).
 - **read_primitives** — add approximate-aggregate query coverage
   (`approx_count_distinct_*`, `approx_quantile*`, `approx_top_k_*`).
   `intrinsic_appx_median` renamed to `approx_quantile_groupby` (its

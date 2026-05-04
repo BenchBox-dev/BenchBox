@@ -2,7 +2,8 @@ id: write-primitives-sketch-clickhouse-and-storage-metrics
 title: "Write Primitives: ClickHouse-native sketch variants + storage-size validation for headline ★ ops"
 worktree: main
 priority: Medium-High
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-05-04"
 category: "Core Functionality"
 
 description: |
@@ -102,7 +103,7 @@ context_sections:
 work:
   - id: w1
     summary: "Add ClickHouse override for sketch_ddl_create_persistent_table"
-    status: pending
+    status: done
     notes: |
       The current override is `clickhouse: null`. Replace with a real
       DDL block that creates a table with `AggregateFunction(uniq,
@@ -122,7 +123,7 @@ work:
   - id: w2
     summary: "Add ClickHouse overrides for the 3 sketch_insert_* ops"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       For each insert op, add a `clickhouse:` override that uses the
       `-State` combinator:
@@ -149,7 +150,7 @@ work:
   - id: w3
     summary: "Add ClickHouse overrides for the 3 ★ sketch_query_* merge ops"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       For each headline op, add a `clickhouse:` override that uses the
       `-Merge` combinator:
@@ -174,14 +175,14 @@ work:
   - id: w4
     summary: "Add ClickHouse override for sketch_drop_persistent_table"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Trivial: just `DROP TABLE IF EXISTS sketch_ops_daily_users` and
       then `CREATE TABLE ... DROP TABLE` for the measurement op.
 
   - id: w5
     summary: "Add storage-size validation_queries to the 3 ★ headline ops"
-    status: pending
+    status: done
     notes: |
       For each of `sketch_query_theta_union_merge`,
       `sketch_query_kll_quantiles_merge`, `sketch_query_topk_combine`,
@@ -201,7 +202,7 @@ work:
   - id: w6
     summary: "Update cross-platform sketch docs with ClickHouse column types and storage-size methodology"
     needs: [w3, w5]
-    status: pending
+    status: done
     notes: |
       In `docs/benchmarks/write-primitives-sketch-functions.md`:
         - Add a row for ClickHouse to the function-name reference
@@ -221,7 +222,7 @@ work:
   - id: w7
     summary: "Add changelog entry under unreleased"
     needs: [w4, w6]
-    status: pending
+    status: done
     notes: |
       Two terse user-facing bullets:
       "write_primitives sketch: add ClickHouse-native variants

@@ -2810,7 +2810,19 @@ operations:
           user_sketch BYTES,
           rev_sketch BYTES
         );
-      clickhouse: null  # Uses -State/-Merge with non-portable serialization (deferred)
+      # ClickHouse uses parameterised AggregateFunction columns rather
+      # than a portable BINARY surface. The DDL stores theta-equivalent
+      # state via uniq's AggregateFunction(uniq, UInt64); KLL-equivalent
+      # and topK-equivalent live in their own per-family tables created
+      # by the matching insert ops.
+      clickhouse: |
+        DROP TABLE IF EXISTS sketch_ops_daily_users;
+        CREATE TABLE sketch_ops_daily_users (
+          activity_date Date,
+          region String,
+          user_sketch AggregateFunction(uniq, UInt64),
+          rev_sketch AggregateFunction(uniq, UInt64)
+        ) ENGINE = MergeTree() ORDER BY (activity_date, region);
       datafusion: null  # No DML
       # Redshift's HLLSKETCH covers HLL only — no Theta / KLL / Top-K
       # equivalents. DDL must use DISTSTYLE EVEN (HLLSKETCH cannot be
@@ -2889,7 +2901,22 @@ operations:
                HLL_COUNT.INIT(l_orderkey),
                HLL_COUNT.INIT(CAST(l_extendedprice AS INT64))
         FROM lineitem GROUP BY l_shipdate, l_returnflag;
-      clickhouse: null
+      # ClickHouse uses uniqState combinator + AggregateFunction(uniq, UInt64)
+      # column type. Cast Decimal to UInt64 because uniq aggregate doesn't
+      # accept Decimal directly. -State produces the per-partition state
+      # that the matching merge query unions via uniqMerge.
+      clickhouse: |
+        DROP TABLE IF EXISTS sketch_ops_daily_users;
+        CREATE TABLE sketch_ops_daily_users (
+          activity_date Date, region String,
+          user_sketch AggregateFunction(uniq, UInt64),
+          rev_sketch AggregateFunction(uniq, UInt64)
+        ) ENGINE = MergeTree() ORDER BY (activity_date, region);
+        INSERT INTO sketch_ops_daily_users
+        SELECT l_shipdate, l_returnflag,
+               uniqState(toUInt64(l_orderkey)),
+               uniqState(toUInt64(l_extendedprice))
+        FROM lineitem GROUP BY l_shipdate, l_returnflag;
       datafusion: null
       # Redshift HLL substitution: HLL_CREATE_SKETCH builds an HLLSKETCH
       # per (date, region) partition. Same persist+merge+requery shape
@@ -2966,7 +2993,20 @@ operations:
         SELECT l_shipdate, l_returnflag,
                KLL_QUANTILES.INIT_INT64(CAST(l_extendedprice AS INT64))
         FROM lineitem GROUP BY l_shipdate, l_returnflag;
-      clickhouse: null
+      # ClickHouse uses quantileTDigestState combinator; the column type
+      # must be parameterised with the target quantile because quantileTDigest
+      # is fundamentally one-quantile-per-aggregate. Median (0.5) here.
+      # Decimal cast to Float64 because quantileTDigest accepts Float64.
+      clickhouse: |
+        DROP TABLE IF EXISTS sketch_ops_kll_partitions;
+        CREATE TABLE sketch_ops_kll_partitions (
+          activity_date Date, region String,
+          price_sketch AggregateFunction(quantileTDigest(0.5), Float64)
+        ) ENGINE = MergeTree() ORDER BY (activity_date, region);
+        INSERT INTO sketch_ops_kll_partitions
+        SELECT l_shipdate, l_returnflag,
+               quantileTDigestState(0.5)(toFloat64(l_extendedprice))
+        FROM lineitem GROUP BY l_shipdate, l_returnflag;
       datafusion: null
       redshift: null  # Redshift has no KLL or T-Digest sketch family
       sqlite: null
@@ -3018,7 +3058,18 @@ operations:
                APPROX_TOP_K_ACCUMULATE(l_shipmode, 1024)
         FROM lineitem GROUP BY MOD(l_orderkey, 8);
       bigquery: null  # No native top-K accumulator function
-      clickhouse: null
+      # ClickHouse uses topKState(K) combinator; column type is
+      # AggregateFunction(topK(K), T). K=8 matches DuckDB's topk parameter.
+      clickhouse: |
+        DROP TABLE IF EXISTS sketch_ops_topk;
+        CREATE TABLE sketch_ops_topk (
+          shard_id Int32,
+          topk_sketch AggregateFunction(topK(8), String)
+        ) ENGINE = MergeTree() ORDER BY shard_id;
+        INSERT INTO sketch_ops_topk
+        SELECT toInt32(l_orderkey % 8),
+               topKState(8)(l_shipmode)
+        FROM lineitem GROUP BY l_orderkey % 8;
       datafusion: null
       redshift: null  # Redshift has no top-K function family
       sqlite: null
@@ -3052,9 +3103,47 @@ operations:
         # SF=0.01: lineitem has 15000 distinct l_orderkeys; theta merge
         # observed at 14836.89 (deterministic over 5 runs). Bounds are
         # intentionally tighter than the original [14000, 16000] while
-        # still catching only material regressions.
+        # still catching only material regressions. ClickHouse uniq is
+        # HyperLogLog++ with default precision (m=2^17, RSE ~0.4%);
+        # observed estimate stays well within [14500, 15500].
         expected_value_min: 14500
         expected_value_max: 15500
+        platform_overrides:
+          clickhouse: |
+            SELECT uniqMerge(user_sketch) AS distinct_orders
+            FROM sketch_ops_daily_users
+      # Storage-size validation: octet_length() of the merged sketch state
+      # certifies the persisted bytes haven't regressed to zero or grown
+      # unbounded. Bounds tuned per engine because uniq's HLL++ encoding
+      # produces meaningfully different sizes than DataSketches Theta.
+      # Skipped on platforms whose merged-sketch byte length isn't
+      # interesting / accessible via the same shape.
+      - id: theta_storage_size
+        sql: |
+          SELECT octet_length(datasketch_theta(user_sketch)) AS sketch_bytes
+          FROM sketch_ops_daily_users
+        # Bounds span both engines' observed merged-state sizes:
+        #   DuckDB DataSketches Theta lg_k=12 → ~16KB
+        #   ClickHouse uniq HLL++ default precision → ~60KB (verified chDB)
+        # Wide enough to absorb encoding drift on either family, tight
+        # enough to flag a sketch becoming a no-op (size 0) or growing
+        # unboundedly. Per-engine tightening can land in a follow-up.
+        expected_value_min: 4000
+        expected_value_max: 100000
+        platform_overrides:
+          # ClickHouse AggregateFunction columns aren't a length() input;
+          # toString() serializes the merged state to its bytes-of-string
+          # representation which is what we want to measure.
+          clickhouse: |
+            SELECT length(toString(uniqMergeState(user_sketch))) AS sketch_bytes
+            FROM sketch_ops_daily_users
+          databricks: null
+          snowflake: null
+          bigquery: null
+          redshift: null
+          datafusion: null
+          sqlite: null
+          starrocks: null
     cleanup_sql: |
       DROP TABLE IF EXISTS sketch_ops_daily_users
     expected_rows_affected: null
@@ -3092,7 +3181,24 @@ operations:
         FROM lineitem GROUP BY l_shipdate, l_returnflag;
         SELECT HLL_COUNT.MERGE(user_sketch) AS distinct_orders
         FROM sketch_ops_daily_users;
-      clickhouse: null
+      # Full persist+merge+requery cycle for ClickHouse. uniqState builds
+      # the per-partition state into AggregateFunction(uniq, UInt64); the
+      # final SELECT uses uniqMerge to union states across rows and
+      # extract the distinct estimate.
+      clickhouse: |
+        DROP TABLE IF EXISTS sketch_ops_daily_users;
+        CREATE TABLE sketch_ops_daily_users (
+          activity_date Date, region String,
+          user_sketch AggregateFunction(uniq, UInt64),
+          rev_sketch AggregateFunction(uniq, UInt64)
+        ) ENGINE = MergeTree() ORDER BY (activity_date, region);
+        INSERT INTO sketch_ops_daily_users
+        SELECT l_shipdate, l_returnflag,
+               uniqState(toUInt64(l_orderkey)),
+               uniqState(toUInt64(l_extendedprice))
+        FROM lineitem GROUP BY l_shipdate, l_returnflag;
+        SELECT uniqMerge(user_sketch) AS distinct_orders
+        FROM sketch_ops_daily_users;
       datafusion: null
       # Redshift HLL substitution: full persist+merge+requery cycle in
       # one op, mirroring the DuckDB Theta path. HLL_COMBINE unions
@@ -3151,8 +3257,38 @@ operations:
         # observed at 34027–34362 over 5 runs (varies with merge order).
         # [30000, 40000] is generous and tolerant of SF=0.1 drift while
         # still catching a sketch regressing to 0 or a wildly off median.
+        # ClickHouse quantileTDigest at default compression (100) easily
+        # produces a median in the same range.
         expected_value_min: 30000
         expected_value_max: 40000
+        platform_overrides:
+          clickhouse: |
+            SELECT quantileTDigestMerge(0.5)(price_sketch) AS median_price
+            FROM sketch_ops_kll_partitions
+      - id: kll_storage_size
+        sql: |
+          SELECT octet_length(datasketch_kll(200, price_sketch::sketch_kll_double)) AS sketch_bytes
+          FROM sketch_ops_kll_partitions
+        # DuckDB DataSketches KLL k=200 merged state observed ~3KB at
+        # SF=0.01. Bounds intentionally wide enough to absorb encoding
+        # drift but tight enough to catch a no-op regression.
+        expected_value_min: 1000
+        expected_value_max: 8000
+        platform_overrides:
+          # ClickHouse quantileTDigest merged state observed ~3.8KB in
+          # spike (chDB, SF=0.01); compression=100 produces similar bytes
+          # to KLL k=200, fitting inside the DuckDB bounds. Use toString()
+          # because length() doesn't accept an AggregateFunction directly.
+          clickhouse: |
+            SELECT length(toString(quantileTDigestMergeState(0.5)(price_sketch))) AS sketch_bytes
+            FROM sketch_ops_kll_partitions
+          databricks: null
+          snowflake: null
+          bigquery: null
+          redshift: null
+          datafusion: null
+          sqlite: null
+          starrocks: null
     cleanup_sql: |
       DROP TABLE IF EXISTS sketch_ops_kll_partitions
     expected_rows_affected: null
@@ -3189,7 +3325,22 @@ operations:
         FROM lineitem GROUP BY l_shipdate, l_returnflag;
         SELECT KLL_QUANTILES.MERGE_POINT_INT64(price_sketch, 0.5) AS median_price
         FROM sketch_ops_kll_partitions;
-      clickhouse: null
+      # ClickHouse quantileTDigest with -State/-Merge combinators. The
+      # quantile parameter (0.5 = median) is bound at column-type
+      # creation time because quantileTDigest is a quantile-specific
+      # aggregate.
+      clickhouse: |
+        DROP TABLE IF EXISTS sketch_ops_kll_partitions;
+        CREATE TABLE sketch_ops_kll_partitions (
+          activity_date Date, region String,
+          price_sketch AggregateFunction(quantileTDigest(0.5), Float64)
+        ) ENGINE = MergeTree() ORDER BY (activity_date, region);
+        INSERT INTO sketch_ops_kll_partitions
+        SELECT l_shipdate, l_returnflag,
+               quantileTDigestState(0.5)(toFloat64(l_extendedprice))
+        FROM lineitem GROUP BY l_shipdate, l_returnflag;
+        SELECT quantileTDigestMerge(0.5)(price_sketch) AS median_price
+        FROM sketch_ops_kll_partitions;
       datafusion: null
       redshift: null  # Redshift has no KLL or T-Digest sketch family
       sqlite: null
@@ -3224,9 +3375,37 @@ operations:
         # frequent-items merge reports all 7 deterministically across runs.
         # Lower bound at 6 catches a sketch losing one mode; upper at 8
         # would flag a frequent-items false-positive (NO_FALSE_POSITIVES
-        # mode should not return more than 7).
+        # mode should not return more than 7). ClickHouse topK(8) is
+        # also bounded by K=8, so the same [6, 8] envelope holds.
         expected_value_min: 6
         expected_value_max: 8
+        platform_overrides:
+          clickhouse: |
+            SELECT length(topKMerge(8)(topk_sketch)) AS frequent_count
+            FROM sketch_ops_topk
+      - id: topk_storage_size
+        sql: |
+          SELECT octet_length(datasketch_frequent_items(8, topk_sketch)) AS sketch_bytes
+          FROM sketch_ops_topk
+        # DuckDB DataSketches frequent-items lg_max_map_size=8 (256 buckets)
+        # merged state observed ~600 bytes at SF=0.01.
+        expected_value_min: 200
+        expected_value_max: 2000
+        platform_overrides:
+          # ClickHouse topK(8) merged state observed ~294 bytes in spike
+          # (chDB, SF=0.01); much smaller than DataSketches frequent-items
+          # but fits inside the DuckDB bounds. Use toString() because
+          # length() doesn't accept an AggregateFunction directly.
+          clickhouse: |
+            SELECT length(toString(topKMergeState(8)(topk_sketch))) AS sketch_bytes
+            FROM sketch_ops_topk
+          databricks: null
+          snowflake: null
+          bigquery: null
+          redshift: null
+          datafusion: null
+          sqlite: null
+          starrocks: null
     cleanup_sql: |
       DROP TABLE IF EXISTS sketch_ops_topk
     expected_rows_affected: null
@@ -3250,7 +3429,21 @@ operations:
         SELECT ARRAY_SIZE(APPROX_TOP_K_ESTIMATE(APPROX_TOP_K_COMBINE(topk_sketch))) AS frequent_count
         FROM sketch_ops_topk;
       bigquery: null  # No native top-K accumulator
-      clickhouse: null
+      # ClickHouse topK with -State/-Merge combinators. K=8 matches
+      # DuckDB's frequent-items parameter; length() of the merged TopK
+      # array gives the count of frequent items.
+      clickhouse: |
+        DROP TABLE IF EXISTS sketch_ops_topk;
+        CREATE TABLE sketch_ops_topk (
+          shard_id Int32,
+          topk_sketch AggregateFunction(topK(8), String)
+        ) ENGINE = MergeTree() ORDER BY shard_id;
+        INSERT INTO sketch_ops_topk
+        SELECT toInt32(l_orderkey % 8),
+               topKState(8)(l_shipmode)
+        FROM lineitem GROUP BY l_orderkey % 8;
+        SELECT length(topKMerge(8)(topk_sketch)) AS frequent_count
+        FROM sketch_ops_topk;
       datafusion: null
       redshift: null  # Redshift has no top-K function family
       sqlite: null
@@ -3296,7 +3489,14 @@ operations:
           activity_date DATE, region STRING, user_sketch BYTES, rev_sketch BYTES
         );
         DROP TABLE sketch_ops_daily_users;
-      clickhouse: null
+      clickhouse: |
+        DROP TABLE IF EXISTS sketch_ops_daily_users;
+        CREATE TABLE sketch_ops_daily_users (
+          activity_date Date, region String,
+          user_sketch AggregateFunction(uniq, UInt64),
+          rev_sketch AggregateFunction(uniq, UInt64)
+        ) ENGINE = MergeTree() ORDER BY (activity_date, region);
+        DROP TABLE sketch_ops_daily_users;
       datafusion: null
       redshift: |
         DROP TABLE IF EXISTS sketch_ops_daily_users;
