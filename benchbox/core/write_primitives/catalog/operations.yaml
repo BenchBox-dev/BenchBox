@@ -2973,7 +2973,7 @@ operations:
           activity_date DATE, region STRING, price_sketch BINARY
         ) USING DELTA;
         INSERT INTO sketch_ops_kll_partitions
-        SELECT l_shipdate, l_returnflag, kll_sketch_agg(l_extendedprice)
+        SELECT l_shipdate, l_returnflag, kll_sketch_agg_double(CAST(l_extendedprice AS DOUBLE))
         FROM lineitem GROUP BY l_shipdate, l_returnflag;
       snowflake: |
         DROP TABLE IF EXISTS sketch_ops_kll_partitions;
@@ -3262,6 +3262,9 @@ operations:
         expected_value_min: 30000
         expected_value_max: 40000
         platform_overrides:
+          databricks: |
+            SELECT kll_sketch_get_quantile_double(kll_merge_agg_double(price_sketch), 0.5) AS median_price
+            FROM sketch_ops_kll_partitions
           clickhouse: |
             SELECT quantileTDigestMerge(0.5)(price_sketch) AS median_price
             FROM sketch_ops_kll_partitions
@@ -3299,9 +3302,9 @@ operations:
           activity_date DATE, region STRING, price_sketch BINARY
         ) USING DELTA;
         INSERT INTO sketch_ops_kll_partitions
-        SELECT l_shipdate, l_returnflag, kll_sketch_agg(l_extendedprice)
+        SELECT l_shipdate, l_returnflag, kll_sketch_agg_double(CAST(l_extendedprice AS DOUBLE))
         FROM lineitem GROUP BY l_shipdate, l_returnflag;
-        SELECT kll_sketch_estimate_quantile(kll_sketch_agg(price_sketch), 0.5) AS median_price
+        SELECT kll_sketch_get_quantile_double(kll_merge_agg_double(price_sketch), 0.5) AS median_price
         FROM sketch_ops_kll_partitions;
       snowflake: |
         DROP TABLE IF EXISTS sketch_ops_kll_partitions;

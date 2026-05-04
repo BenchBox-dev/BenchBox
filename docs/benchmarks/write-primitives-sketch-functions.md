@@ -130,7 +130,7 @@ safely, so each Redshift override emits its DDL inline.
 
 | Engine     | Build                                    | Merge                                       | Extract median                                    |
 |------------|------------------------------------------|---------------------------------------------|---------------------------------------------------|
-| Databricks | `kll_sketch_agg(x)`                     | `kll_sketch_agg(sketch)`                    | `kll_sketch_estimate_quantile(sketch, 0.5)`       |
+| Databricks | `kll_sketch_agg_double(CAST(x AS DOUBLE))` | `kll_merge_agg_double(sketch)`           | `kll_sketch_get_quantile_double(sketch, 0.5)`     |
 | Snowflake  | `DATASKETCHES_KLL_ACCUMULATE(x)`        | `DATASKETCHES_KLL_COMBINE(sketch)`          | `DATASKETCHES_KLL_GET_QUANTILE(sketch, 0.5)`      |
 | BigQuery   | `KLL_QUANTILES.INIT_INT64(x)`           | (merge implicit in extract)                 | `KLL_QUANTILES.MERGE_POINT_INT64(sketch, 0.5)`    |
 | ClickHouse | `quantileTDigestState(0.5)(x)` (T-Digest, not KLL) | (merge implicit in `quantileTDigestMerge`) | `quantileTDigestMerge(0.5)(sketch)` |
