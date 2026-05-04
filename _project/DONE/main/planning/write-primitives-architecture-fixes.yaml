@@ -2,7 +2,8 @@ id: write-primitives-architecture-fixes
 title: "Write Primitives: architecture fixes for sketch validation and DataFrame aggregate-state ops"
 worktree: main
 priority: Medium-High
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-05-04"
 category: "Core Functionality"
 
 description: |
@@ -79,7 +80,7 @@ context_sections:
 work:
   - id: w1
     summary: "Extend validation_queries schema with platform_overrides"
-    status: pending
+    status: done
     notes: |
       Add optional `platform_overrides` support to each
       `ValidationQuery` entry, mirroring the operation-level override
@@ -101,7 +102,7 @@ work:
 
   - id: w2
     summary: "Add DataFrame aggregate-state write operation types"
-    status: pending
+    status: done
     notes: |
       Extend `WriteOperationType` with `AGGREGATE_PERSIST` and
       `AGGREGATE_MERGE`, then add manager dispatch paths that can
@@ -119,7 +120,7 @@ work:
   - id: w3
     summary: "Add focused tests and docs for both new extension points"
     needs: [w1, w2]
-    status: pending
+    status: done
     notes: |
       Add unit tests for validation-query override resolution,
       including default inheritance, platform-specific SQL, and null
@@ -134,7 +135,7 @@ work:
   - id: w4
     summary: "Restore the four blocked sketch TODOs to ready follow-up state"
     needs: [w3]
-    status: pending
+    status: done
     notes: |
       Once the code/docs/tests land, update these four TODOs:
 

@@ -2,36 +2,22 @@ id: write-primitives-sketch-parameter-sweeps
 title: "Write Primitives sketch: parameter-sweep variants for sketch tuning surface (lg_k, k, lg_max_map_size)"
 worktree: main
 priority: Low
-status: "Blocked"
+status: "Not Started"
 category: "Core Functionality"
 
 description: |
-  ## BLOCKED — transitively blocked via `write-primitives-sketch-clickhouse-and-storage-metrics`
+  ## Unblocked by `write-primitives-architecture-fixes` (2026-05-04)
 
-  The dep edge in `deps.needs:` points at the ClickHouse + storage-
-  metrics TODO. That TODO is itself Blocked (PR #133, 2026-05-02) on
-  two write_primitives architectural gaps:
+  validation_query.platform_overrides shipped, so the per-cell validation
+  blast-radius concern is gone. This TODO still depends on
+  `write-primitives-sketch-clickhouse-and-storage-metrics` so the
+  storage-size validation methodology lands first — sweep variants reuse
+  the same `octet_length` bounds shape per parameter value.
 
-    - validation_query has no per-platform override mechanism
-      (`_project/blind-spots/2026-05-02-155448-validation-query-no-per-platform-override.md`)
-    - DuckDB community datasketches extension at the version BenchBox
-      installs has dropped the theta + frequent-items families
-      (`_project/blind-spots/2026-05-02-155524-duckdb-datasketches-extension-drift.md`)
-
-  Parameter sweeps multiply the number of (op × engine × parameter)
-  cells that have to validate end-to-end. Until both upstream gaps
-  are resolved, the parameter-sweep variants would expand the
-  blast-radius of the existing failures rather than measure anything
-  useful — every cell that depends on a broken-extension function
-  name or a non-portable validation_query would fail in the same
-  way. The size of the sweep makes it especially worth waiting for
-  the underlying architecture to be solid before adding axes.
-
-  Resolution path: `write-primitives-architecture-fixes` unblocks
-  the shared architecture gaps, then
-  `write-primitives-sketch-clickhouse-and-storage-metrics` can resume
-  the transitive sketch groundwork. Re-attempt after both deps land;
-  keep the scope_limit and work[] block unchanged.
+  The DuckDB community datasketches extension drift (recorded in
+  `_project/blind-spots/2026-05-02-155524-duckdb-datasketches-extension-drift.md`)
+  remains a parallel risk; smoke-test the exact installed extension build
+  during w1 before fanning out the sweep variants.
 
   ## Original description
 

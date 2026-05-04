@@ -137,6 +137,29 @@ def _check_validation_query(val_query: Any, actual_rows: int, val_result: list |
     return True
 
 
+def _resolve_validation_sql(val_query: Any, platform_key: str | None) -> tuple[str | None, str | None]:
+    """Resolve the effective validation SQL for the active platform.
+
+    Returns (sql, skip_reason). If skip_reason is not None, the validation must be
+    skipped (still treated as passed since skip = "not applicable on this engine",
+    not "failed"). Mirrors `_get_effective_write_sql` for the operation-level
+    overrides.
+    """
+    # `getattr` with a default is intentional defensive coding — test fixtures
+    # mock val_query as MagicMock without the new field, and production callers
+    # always have the dataclass-default empty dict.
+    overrides = getattr(val_query, "platform_overrides", None) or {}
+    if not platform_key or platform_key not in overrides:
+        return val_query.sql, None
+    override = overrides[platform_key]
+    if override is None:
+        return None, (
+            f"Validation '{val_query.id}' explicitly skipped on platform '{platform_key}' "
+            "via null platform_overrides entry"
+        )
+    return override, None
+
+
 class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
     """Write Primitives benchmark implementation.
 
@@ -866,7 +889,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
 
             # Execute validation queries
             validation_passed, validation_results, validation_duration_ms = self._run_operation_validation(
-                operation, connection, operation_id
+                operation, connection, operation_id, platform_key=platform_key
             )
 
             # Execute cleanup if specified
@@ -918,16 +941,45 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         return rows_affected
 
     def _run_operation_validation(
-        self, operation: Any, connection: DatabaseConnection, operation_id: str
+        self,
+        operation: Any,
+        connection: DatabaseConnection,
+        operation_id: str,
+        platform_key: str | None = None,
     ) -> tuple[bool, list[dict], float]:
-        """Run validation queries for a write operation."""
+        """Run validation queries for a write operation.
+
+        Resolves per-platform validation SQL via `ValidationQuery.platform_overrides`
+        before execution: a string override replaces the default sql for that
+        platform; an explicit `null` override skips that validation with a logged
+        reason (the op stays passed because skip means "not applicable on this
+        engine"). Platforms with no override key fall through to the default sql.
+        """
         self.log_verbose(f"Validating operation: {operation_id}")
         validation_start = time.perf_counter()
         validation_results = []
         validation_passed = True
 
         for val_query in operation.validation_queries:
-            val_sql = self._replace_placeholders(val_query.sql)
+            effective_sql, skip_reason = _resolve_validation_sql(val_query, platform_key)
+
+            if skip_reason is not None:
+                self.log_verbose(f"Skipping validation '{val_query.id}' for {operation_id}: {skip_reason}")
+                validation_results.append(
+                    {
+                        "query_id": val_query.id,
+                        "sql": val_query.sql,
+                        "expected_rows": val_query.expected_rows,
+                        "actual_rows": 0,
+                        "passed": True,
+                        "skipped": True,
+                        "skip_reason": skip_reason,
+                        "sample": [],
+                    }
+                )
+                continue
+
+            val_sql = self._replace_placeholders(effective_sql)
             val_result = connection.execute(val_sql).fetchall()
             actual_rows = len(val_result)
             passed = _check_validation_query(val_query, actual_rows, val_result)
@@ -936,7 +988,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             validation_results.append(
                 {
                     "query_id": val_query.id,
-                    "sql": val_query.sql,
+                    "sql": effective_sql,
                     "expected_rows": val_query.expected_rows,
                     "actual_rows": actual_rows,
                     "passed": passed,
