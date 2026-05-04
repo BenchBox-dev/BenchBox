@@ -175,6 +175,11 @@ _project/TODO/_indexes/
 _project/DONE/_indexes/
 _project/blind-spots/_indexes/
 
+# uv lockfile for the _project/scripts tooling project. Generated on first
+# `uv run --project _project/scripts ...` and was repeatedly leaving fresh
+# pool worktrees "dirty", blocking `make worktree-release`.
+_project/scripts/uv.lock
+
 # Firebolt data and core data directories
 /firebolt-data
 /firebolt-core-data
