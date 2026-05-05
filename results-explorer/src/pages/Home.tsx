@@ -15,12 +15,19 @@ import { MetaLeaderboard } from "@/components/MetaLeaderboard";
 import type { MetaLeaderboardMode } from "@/components/MetaLeaderboard";
 import {
   FACET_KEYS,
-  FACET_URL_KEYS,
   useFacetState,
-  type DateWindowFacet,
   type FacetKey,
   type FacetState,
 } from "@/lib/facetModel";
+import {
+  appendFacetParams,
+  matchesFacetRow,
+  singleFacetValue,
+  toggleFacetValue,
+  toDateWindowFacet,
+} from "@/lib/facetMatching";
+import { normalizedCostLabel, normalizedCostValue } from "@/lib/costDisplay";
+import { formatFacetDisplayValue } from "@/lib/facetDisplay";
 import { stringSerde, useUrlState } from "@/lib/useUrlState";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import {
@@ -44,9 +51,9 @@ export function Home(_: RoutableProps) {
   const [modeRaw, setModeRaw] = useUrlState<string>("mode", "times", stringSerde);
   const benchmarkFilters = facets.benchmark;
   const scaleFilters = facets.scale_factor;
-  const phaseFilter = singleFacetValue(facets.phase);
-  const tuningFilter = singleFacetValue(facets.tuning_mode);
-  const trustFilter = singleFacetValue(facets.trust_tier);
+  const phaseFilter = singleFacetValue(facets.phase, "all");
+  const tuningFilter = singleFacetValue(facets.tuning_mode, "all");
+  const trustFilter = singleFacetValue(facets.trust_tier, "all");
   const dateWindow = facets.date_window;
 
   useEffect(() => {
@@ -154,13 +161,13 @@ export function Home(_: RoutableProps) {
     if (!metaLeaderboard) return null;
 
     const visibleCohorts = metaLeaderboard.cohorts.filter((cohort) => {
-      if (!matchesMultiFilter(cohort.benchmark, benchmarkFilters)) return false;
-      if (!matchesMultiFilter(String(cohort.scale_factor), scaleFilters)) return false;
+      if (benchmarkFilters.length > 0 && !benchmarkFilters.includes(cohort.benchmark)) return false;
+      if (scaleFilters.length > 0 && !scaleFilters.includes(String(cohort.scale_factor))) return false;
       if (phaseFilter !== "all" && cohort.phase !== phaseFilter) return false;
 
       return (cohort.platforms ?? []).some((row) => {
         const result = resultById.get(row.result_id);
-        return result !== undefined && matchesEntryFacets(result, facets);
+        return result !== undefined && matchesFacetRow(result, facets);
       });
     });
 
@@ -172,7 +179,7 @@ export function Home(_: RoutableProps) {
             if (!visibleCohortKeys.has(cohortKey)) return false;
             const resultId = cohortPlatformIndex.get(cohortKey)?.get(platform.platform_id);
             const result = resultId ? resultById.get(resultId) : undefined;
-            return result !== undefined && matchesEntryFacets(result, facets);
+            return result !== undefined && matchesFacetRow(result, facets);
           }),
         ) as Record<string, MetaRank>;
 
@@ -705,112 +712,8 @@ function formatFacetValue(
   platformIdToName: ReadonlyMap<string, string>,
 ): string {
   if (key === "benchmark") return humanizeBenchmark(value);
-  if (key === "scale_factor") return `SF ${value}`;
   if (key === "platform") return platformIdToName.get(value) ?? value;
-  if (key === "date_window") return value === "all" ? "All time" : `Last ${value}`;
-  return value.split("_").join(" ");
-}
-
-function appendFacetParams(params: URLSearchParams, facets: FacetState, omit: ReadonlySet<FacetKey>) {
-  for (const key of FACET_KEYS) {
-    if (omit.has(key)) continue;
-    const value = facets[key];
-    if (Array.isArray(value)) {
-      if (value.length > 0) params.set(FACET_URL_KEYS[key], value.join(","));
-    } else if (value !== "all") {
-      params.set(FACET_URL_KEYS[key], value);
-    }
-  }
-}
-
-function singleFacetValue(values: string[]): string {
-  return values.length === 1 ? (values[0] ?? "all") : "all";
-}
-
-// w13: preserve multi-select semantics when the user clicks an option in the
-// dropdown. URL state already models bm/sf as arrays (e.g. ?bm=tpch,clickbench),
-// but the prior `[value]` replacement collapsed any subsequent click to a
-// single-element array, breaking cross-benchmark / cross-scale comparison
-// flows. Toggling keeps the rest of the selection intact.
-export function toggleFacetValue(current: string[], value: string): string[] {
-  const next = current.includes(value)
-    ? current.filter((entry) => entry !== value)
-    : [...current, value];
-  return next;
-}
-
-function toDateWindowFacet(value: string): DateWindowFacet {
-  if (value === "30d" || value === "90d" || value === "365d") return value;
-  return "all";
-}
-
-function matchesEntryFacets(entry: ResultRow, facets: FacetState): boolean {
-  if (!matchesMultiFilter(entry.benchmark, facets.benchmark)) return false;
-  if (!matchesMultiFilter(String(entry.scale_factor), facets.scale_factor)) return false;
-  if (!matchesOptionalFilter(entry.test_type, facets.phase)) return false;
-  if (!matchesPlatformFacet(entry, facets.platform)) return false;
-  if (!matchesOptionalFilter(entry.execution_mode, facets.execution_mode)) return false;
-  if (!matchesTuningFacet(entry, facets.tuning_mode)) return false;
-  if (!matchesMultiFilter(entry.trust_label, facets.trust_tier)) return false;
-  if (!matchesOptionalFilter(entry.validation_status, facets.validation_status)) return false;
-  if (!matchesDeploymentFacet(entry, facets.deployment_class)) return false;
-  if (!matchesOptionalFilter(entry.cloud_provider, facets.cloud_provider)) return false;
-  if (!matchesOptionalFilter(entry.cloud_region, facets.cloud_region)) return false;
-  if (!matchesOptionalFilter(entryShape(entry), facets.instance_or_warehouse)) return false;
-  if (!matchesOptionalFilter(entry.storage_format, facets.storage_format)) return false;
-  if (!matchesOptionalFilter(entry.cost_status, facets.cost_status)) return false;
-  return matchesDateWindow(entry.run_date, facets.date_window);
-}
-
-function matchesDateWindow(runDate: string, windowValue: DateWindowFacet): boolean {
-  if (windowValue === "all") return true;
-  const days = Number(windowValue.replace("d", ""));
-  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
-  return new Date(runDate).getTime() >= cutoff;
-}
-
-function matchesMultiFilter(value: string, selected: string[]): boolean {
-  return selected.length === 0 || selected.includes(value);
-}
-
-function matchesOptionalFilter(value: string | null | undefined, selected: string[]): boolean {
-  return selected.length === 0 || (value !== null && value !== undefined && selected.includes(value));
-}
-
-function matchesPlatformFacet(entry: ResultRow, selected: string[]): boolean {
-  return selected.length === 0 || selected.includes(entry.platform) || selected.includes(entry.platform_id);
-}
-
-function matchesTuningFacet(entry: ResultRow, selected: string[]): boolean {
-  return selected.length === 0 || selected.includes(entry.tuning_mode ?? "untuned");
-}
-
-function matchesDeploymentFacet(entry: ResultRow, selected: string[]): boolean {
-  if (selected.length === 0) return true;
-  const deployment = entryDeploymentClass(entry);
-  return deployment !== null && selected.includes(deployment);
-}
-
-function entryDeploymentClass(entry: ResultRow): string | null {
-  return entry.deployment_class ?? null;
-}
-
-function entryShape(entry: ResultRow): string | null {
-  return entry.instance_or_warehouse ?? null;
-}
-
-function normalizedCostValue(entry: ResultRow): number | null {
-  if (entry.cost_status !== "normalized") return null;
-  if (entry.normalized_cost_usd === null || entry.normalized_cost_usd === undefined) return null;
-  return Number.isFinite(entry.normalized_cost_usd) ? entry.normalized_cost_usd : null;
-}
-
-function normalizedCostLabel(entry: ResultRow): string {
-  const value = normalizedCostValue(entry);
-  if (value !== null) return `$${value.toFixed(2)}`;
-  if (entry.cost_status === "not_applicable_local") return "local";
-  if (entry.cost_status === "unavailable") return "unavailable";
-  return "-";
+  return formatFacetDisplayValue(key, value);
 }
 
 function StatCard({

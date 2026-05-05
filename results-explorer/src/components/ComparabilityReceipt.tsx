@@ -1,5 +1,6 @@
 import type { DetailResult, Environment } from "@/types";
 import { humanizeBenchmark } from "@/utils";
+import { costModelSummary, costScopeSummary, normalizedCostLabel } from "@/lib/costDisplay";
 
 interface ComparabilityReceiptProps {
   results: DetailResult[];
@@ -58,11 +59,9 @@ export function buildComparabilityFields(results: DetailResult[]): Comparability
     compareValues("Tuning", results, formatTuning),
     compareValues("Validation", results, (result) => valueOrMissing(result.validation_status)),
     buildEnvironmentField(results),
-    {
-      label: "Cost model",
-      status: "missing",
-      summary: "Cost metadata not published",
-    },
+    compareValues("Normalized cost", results, normalizedCostLabel),
+    compareValues("Cost model", results, costModelSummary),
+    compareValues("Cost scope", results, costScopeSummary),
   ];
 }
 

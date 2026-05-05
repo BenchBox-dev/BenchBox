@@ -5,7 +5,9 @@ import type { BenchmarkSummary, PlatformRow, SortDirection, SortState } from "@/
 import type { ResultRow } from "@/lib/duckdbQueries";
 import { getBenchmarkSummaryFromDuckDB, listResults } from "@/lib/duckdbQueries";
 import { humanizeBenchmark, isKnownBenchmark, fmtScore, fmtGeomean, errMsg, complianceLabel } from "@/utils";
-import { facetsToWhereClause, useFacetState, type DateWindowFacet, type FacetState } from "@/lib/facetModel";
+import { facetsToWhereClause, useFacetState, type FacetKey, type FacetState } from "@/lib/facetModel";
+import { hasActiveFacets, matchesFacetRow, singleFacetValue } from "@/lib/facetMatching";
+import { buildCompareUrl, compareIdForRow, displayCompareId } from "@/lib/resultLinks";
 import { BenchmarkMatrixSkeleton } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { Breadcrumb } from "@/components/Breadcrumb";
@@ -25,6 +27,32 @@ type ViewMode = "matrix" | "ranks" | "list";
 type BenchmarkListSortKey = "platform" | "scale_factor" | "run_date" | "power_score" | "display_geomean_ms" | "query_count";
 const TABLE_RENDER_LIMIT = 200;
 const TABLE_RENDER_INCREMENT = 200;
+const BENCHMARK_RESULT_FACET_KEYS: FacetKey[] = [
+  "platform",
+  "execution_mode",
+  "validation_status",
+  "deployment_class",
+  "cloud_provider",
+  "cloud_region",
+  "instance_or_warehouse",
+  "storage_format",
+  "cost_status",
+  "date_window",
+];
+const BENCHMARK_ROW_FACET_KEYS: FacetKey[] = [
+  "platform",
+  "execution_mode",
+  "tuning_mode",
+  "trust_tier",
+  "validation_status",
+  "deployment_class",
+  "cloud_provider",
+  "cloud_region",
+  "instance_or_warehouse",
+  "storage_format",
+  "cost_status",
+  "date_window",
+];
 
 const TRUST_LABEL_ABBREV: Record<string, string> = {
   "maintainer-run": "Maintainer",
@@ -48,8 +76,8 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   // Filter state - URL-synced so views are shareable.
   const { facets, setFacet } = useFacetState();
   const requestedSf = singleFacetValue(facets.scale_factor);
-  const phaseFilter = singleFacetValue(facets.phase) ?? "power";
-  const tuningFilter = singleFacetValue(facets.tuning_mode) ?? "all";
+  const phaseFilter = singleFacetValue(facets.phase, "power") ?? "power";
+  const tuningFilter = singleFacetValue(facets.tuning_mode, "all") ?? "all";
   const trustFilter = facets.trust_tier.length === 0 ? null : new Set(facets.trust_tier);
   const benchmarkResultWhere = useMemo(
     () =>
@@ -211,7 +239,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
         />
       );
     }
-    if (hasActiveBenchmarkResultFacets(facets)) {
+    if (hasActiveFacets(facets, BENCHMARK_RESULT_FACET_KEYS)) {
       return (
         <div class="mx-auto max-w-7xl px-4 py-24 text-center sm:px-6 lg:px-8">
           <Breadcrumb crumbs={[{ label: "Results", href: "/results/" }, { label: humanizeBenchmark(benchmark) }]} />
@@ -270,18 +298,18 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     ? {
         ...summaryWithResultMetadata,
         platforms: summaryWithResultMetadata.platforms.filter((p) => {
-          return matchesFacetFields(p, facets);
+          return matchesFacetRow(p, facets, { keys: BENCHMARK_ROW_FACET_KEYS });
         }),
       }
     : null;
   const historicalEntries = benchmarkResults.filter((result) => {
     if (String(result.scale_factor) !== effectiveSf) return false;
     if ((result.test_type ?? "power") !== effectivePhase) return false;
-    return matchesFacetFields(result, facets);
+    return matchesFacetRow(result, facets, { keys: BENCHMARK_ROW_FACET_KEYS });
   });
 
   const selectedCompareRowsById = new Map(
-    (summaryWithResultMetadata?.platforms ?? []).map((row) => [compareIdForBenchmarkRow(row), row]),
+    (summaryWithResultMetadata?.platforms ?? []).map((row) => [compareIdForRow(row), row]),
   );
   const selectedCompareRows = [...selectedIds]
     .map((id) => selectedCompareRowsById.get(id))
@@ -532,7 +560,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
                 aria-label="Selected compare results"
               >
                 {selectedCompareRows.map((row) => {
-                  const id = compareIdForBenchmarkRow(row);
+                  const id = compareIdForRow(row);
                   const cohortBenchmark = summaryWithResultMetadata?.benchmark ?? benchmark;
                   const cohortScale = summaryWithResultMetadata?.scale_factor ?? effectiveSf;
                   const cohortPhase = summaryWithResultMetadata?.phase ?? effectivePhase;
@@ -575,93 +603,6 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Shared facet helpers for benchmark-scoped row and platform filtering.
-// ---------------------------------------------------------------------------
-
-function singleFacetValue(values: string[]): string | null {
-  return values.length === 1 ? (values[0] ?? null) : null;
-}
-
-function hasActiveBenchmarkResultFacets(facets: FacetState): boolean {
-  return (
-    facets.platform.length > 0 ||
-    facets.execution_mode.length > 0 ||
-    facets.validation_status.length > 0 ||
-    facets.deployment_class.length > 0 ||
-    facets.cloud_provider.length > 0 ||
-    facets.cloud_region.length > 0 ||
-    facets.instance_or_warehouse.length > 0 ||
-    facets.storage_format.length > 0 ||
-    facets.cost_status.length > 0 ||
-    facets.date_window !== "all"
-  );
-}
-
-function matchesFacetFields(row: ResultRow | PlatformRow, facets: FacetState): boolean {
-  if (!matchesPlatformFacet(row, facets.platform)) return false;
-  if (!matchesOptionalFilter(row.execution_mode, facets.execution_mode)) return false;
-  if (!matchesTuningFacet(row, facets.tuning_mode)) return false;
-  if (!matchesMultiFilter(row.trust_label, facets.trust_tier)) return false;
-  if (!matchesOptionalFilter(row.validation_status, facets.validation_status)) return false;
-  if (!matchesDeploymentFacet(row, facets.deployment_class)) return false;
-  if (!matchesOptionalFilter(row.cloud_provider, facets.cloud_provider)) return false;
-  if (!matchesOptionalFilter(row.cloud_region, facets.cloud_region)) return false;
-  if (!matchesOptionalFilter(rowShape(row), facets.instance_or_warehouse)) return false;
-  if (!matchesOptionalFilter(row.storage_format, facets.storage_format)) return false;
-  if (!matchesOptionalFilter(row.cost_status, facets.cost_status)) return false;
-  return matchesDateWindow(row.run_date, facets.date_window);
-}
-
-function matchesMultiFilter(value: string, selected: string[]): boolean {
-  return selected.length === 0 || selected.includes(value);
-}
-
-function matchesOptionalFilter(value: string | null | undefined, selected: string[]): boolean {
-  return selected.length === 0 || (value !== null && value !== undefined && selected.includes(value));
-}
-
-function matchesPlatformFacet(row: ResultRow | PlatformRow, selected: string[]): boolean {
-  return selected.length === 0 || selected.includes(row.platform) || selected.includes(row.platform_id);
-}
-
-function matchesTuningFacet(row: ResultRow | PlatformRow, selected: string[]): boolean {
-  return selected.length === 0 || selected.includes(row.tuning_mode ?? "untuned");
-}
-
-function matchesDeploymentFacet(row: ResultRow | PlatformRow, selected: string[]): boolean {
-  if (selected.length === 0) return true;
-  const deployment = rowDeploymentClass(row);
-  return deployment !== null && selected.includes(deployment);
-}
-
-function rowDeploymentClass(row: ResultRow | PlatformRow): string | null {
-  return row.deployment_class ?? null;
-}
-
-function rowShape(row: ResultRow | PlatformRow): string | null {
-  return row.instance_or_warehouse ?? null;
-}
-
-function compareIdForBenchmarkRow(row: PlatformRow): string {
-  return row.short_id || row.result_id;
-}
-
-function buildCompareUrl(ids: string[]): string {
-  return `/results/compare?ids=${ids.map(encodeURIComponent).join(",")}`;
-}
-
-function displayCompareId(id: string): string {
-  return id.length > 12 ? `${id.slice(0, 8)}...` : id;
-}
-
-function matchesDateWindow(runDate: string, windowValue: DateWindowFacet): boolean {
-  if (windowValue === "all") return true;
-  const days = Number(windowValue.replace("d", ""));
-  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
-  return new Date(runDate).getTime() >= cutoff;
-}
-
-// ---------------------------------------------------------------------------
 // List view - sorted table of all result rows for the benchmark
 // ---------------------------------------------------------------------------
 
@@ -686,7 +627,7 @@ function ListTable({
   const byScale = benchmarkResults.filter((r) => String(r.scale_factor) === scaleFactor);
 
   const filtered = byScale
-    .filter((row) => matchesFacetFields(row, facets))
+    .filter((row) => matchesFacetRow(row, facets, { keys: BENCHMARK_ROW_FACET_KEYS }))
     .sort((a, b) => compareListRows(a, b, sort));
   const visibleRows = filtered.slice(0, visibleLimit);
 

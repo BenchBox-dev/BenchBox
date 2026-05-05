@@ -793,11 +793,10 @@ Every user-visible metric read, current data source, and DuckDB target:
 | `PlatformIndex.tsx` | `manifest.json` via `getManifest()` | power_score, geomean_ms, run_date, trust_label, tuning_mode | `results` (filtered by platform_id) |
 | `BenchmarkIndex.tsx` | `manifest.json` via `getManifest()` | scale_factor list, phase list, display_geomean_ms (list view) | `results` (filtered by benchmark) |
 | `BenchmarkIndex.tsx` | `benchmarks/*.json.gz` via `getBenchmarkSummary()` | timings (display_ms per query/platform), power_score, display_geomean_ms, is_ranking_eligible, percentile_stats, compliance_class | `benchmark_matrix_cells` + `benchmark_rankings` |
-| `Compare.tsx` | `short_ids.json` via `resolveShortId()` / `toShortIds()` | short_id → result_id mapping | `short_ids` |
-| `Compare.tsx` | `compare/{hash16}.json` via `getComparisonArtifact()` | display_geomean_ms, power_score, speedup_vs_slowest_per_row, fastest_ms, display_ms per query | DuckDB query over `query_display_timings` + `results` |
-| `Compare.tsx` | `details/{id}.json` via `getDetail()` (fallback) | same as above | DuckDB query (fallback path deleted once W4 lands) |
-| `ResultDetail.tsx` | `details/{id}.json` via `getDetail()` | power_score, geomean_ms, display_geomean_ms, total_duration_s, display_timings (display_ms + sample_count), queries (raw timings), environment | `result_detail_metrics` VIEW + `query_display_timings` + `query_executions` |
-| `Query.tsx` | `results_schema.json` (fetch) | schema column names + types (column picker) | DuckDB introspection (`duckdb_columns`/`DESCRIBE`) or `schema_metadata` table |
+| `Compare.tsx` | DuckDB `short_ids` + detail/result queries | short_id → result_id mapping, display_geomean_ms, power_score, display_ms per query | `short_ids`, `result_detail_metrics`, `query_display_timings`, `results` |
+| `Compare.tsx` | Legacy deleted: `compare/{hash16}.json`, `details/{id}.json` | no steady-state metric reads | DuckDB is canonical |
+| `ResultDetail.tsx` | DuckDB detail queries | power_score, geomean_ms, display_geomean_ms, total_duration_s, display_timings (display_ms + sample_count), queries (raw timings), environment | `result_detail_metrics` VIEW + `query_display_timings` + `query_executions` |
+| `Query.tsx` | DuckDB introspection | schema column names + types (column picker) | `duckdb_columns`/`DESCRIBE` |
 | `Query.tsx` | `bench.results` in DuckDB | all `results` columns for workbench queries | `results` (already DuckDB - keep as-is) |
 
 **Bootstrap JSON surviving after W7 (non-metric only):**
@@ -864,7 +863,7 @@ every user-visible metric as `raw_copy` (source-fidelity contract) or `derived`
 |-----------|----------|--------------|
 | `chartMath.ts: computeRankTable` | Per-query rank across platforms in a cohort | Port into `benchbox/core/explorer_pipeline/` and materialize into `benchmark_matrix_cells` or a companion rank table |
 | `chartMath.ts: perQuerySpeedup` | `slowest_ms / fastest_ms` spread | Not persisted; computed as SQL window function `MAX/MIN` in the Compare DuckDB query - no Python porting needed |
-| `chartMath.ts: vsSlowestRatio` | `slowest_ms / this_ms` per result per query | Already pre-computed in `transformer.build_comparison_artifact()` for the comparison artifact path; for the DuckDB path, computed as a SQL window function in the Compare query |
+| `chartMath.ts: vsSlowestRatio` | `slowest_ms / this_ms` per result per query | Computed from DuckDB query_display_timings/results at read time; the legacy comparison artifact path has been removed |
 | `chartMath.ts: colorForCell`, `lightnessForCell` | Heatmap color from timing ratio | Presentation-only (CSS hue/lightness from `display_ms`). No metric value. Stays TS-side. |
 | `ranking.ts: primaryMetricFor` | Benchmark → primary metric enum | Already in `models.get_ranking_config()`. Used in Compare.tsx as a fallback when loading DetailResult files. In the DuckDB path, `benchmark_rankings.primary_metric` column carries this. No new Python needed. |
 | `compliance.ts: complianceLabel` | Compliance class → display string | Presentation-only formatting. Stays TS-side. |

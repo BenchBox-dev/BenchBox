@@ -12,7 +12,8 @@ import {
   EXPLORER_PERFORMANCE_MEASURES,
   clearExplorerPerformanceEntriesForTests,
 } from "@/lib/performanceMarks";
-import { Home, toggleFacetValue } from "@/pages/Home";
+import { toggleFacetValue } from "@/lib/facetMatching";
+import { Home } from "@/pages/Home";
 
 /**
  * ResultRow fixtures - shape mirrors `bench.results` (SELECT * FROM bench.results).

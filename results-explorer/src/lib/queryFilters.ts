@@ -1,3 +1,5 @@
+import { dateWindowCutoffIso, type DateWindowFacet } from "@/lib/facetModel";
+
 export interface QueryFilterState {
   benchmarks: string[];
   platforms: string[];
@@ -15,7 +17,7 @@ export interface QueryFilterState {
   warehouseSizes: string[];
   storageFormats: string[];
   hasCost: "all" | "yes" | "no";
-  dateWindow: "all" | "30d" | "90d" | "365d";
+  dateWindow: DateWindowFacet;
 }
 
 export interface QuerySort {
@@ -78,13 +80,6 @@ function expandListFilter(
   params.push(...values);
 }
 
-function cutoffIso(dateWindow: QueryFilterState["dateWindow"]): string | null {
-  if (dateWindow === "all") return null;
-  const days = Number(dateWindow.replace("d", ""));
-  if (Number.isNaN(days)) return null;
-  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
-}
-
 export function buildWhereClause(filters: QueryFilterState): BuiltQuery {
   const clauses: string[] = [];
   const params: unknown[] = [];
@@ -118,7 +113,7 @@ export function buildWhereClause(filters: QueryFilterState): BuiltQuery {
   if (filters.hasCost === "yes") clauses.push("cost_usd IS NOT NULL");
   if (filters.hasCost === "no") clauses.push("cost_usd IS NULL");
 
-  const cutoff = cutoffIso(filters.dateWindow);
+  const cutoff = dateWindowCutoffIso(filters.dateWindow);
   if (cutoff) {
     clauses.push("run_date >= ?");
     params.push(cutoff);
@@ -196,9 +191,9 @@ export function buildFacetCountQuery(
   }
 
   if (options.derived === "date_window") {
-    const cutoff30 = cutoffIso("30d")!;
-    const cutoff90 = cutoffIso("90d")!;
-    const cutoff365 = cutoffIso("365d")!;
+    const cutoff30 = dateWindowCutoffIso("30d")!;
+    const cutoff90 = dateWindowCutoffIso("90d")!;
+    const cutoff365 = dateWindowCutoffIso("365d")!;
     const baseParams = where.params;
     // When other filters produce a WHERE clause, append AND; otherwise open a
     // fresh WHERE. Without this, an empty where.sql produces invalid SQL like

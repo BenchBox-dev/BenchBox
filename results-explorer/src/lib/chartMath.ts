@@ -115,6 +115,62 @@ export function latencyScaleTicks(scale: LatencyBarScale): number[] {
 }
 
 // ---------------------------------------------------------------------------
+// Shared log latency axis
+// Used by SVG views that plot latency distributions on a log2 ms axis.
+// ---------------------------------------------------------------------------
+
+export const LOG_LATENCY_TICKS_MS = [0.1, 1, 10, 100, 1000, 10000];
+
+export interface LogLatencyScale {
+  logMin: number;
+  logMax: number;
+  logRange: number;
+  floorMs: number;
+}
+
+export function logLatencyValue(ms: number, floorMs = 0.1): number {
+  return Math.log2(Math.max(ms, floorMs));
+}
+
+export function buildLogLatencyScale(
+  values: readonly number[],
+  options: {
+    lowerPad?: number;
+    upperPad?: number;
+    floorMs?: number;
+    minValue?: number;
+    maxValue?: number;
+  } = {},
+): LogLatencyScale | null {
+  const valid = values.filter((value) => value > 0 && Number.isFinite(value));
+  if (valid.length === 0) return null;
+
+  const floorMs = options.floorMs ?? 0.1;
+  const minValue = options.minValue ?? Math.min(...valid);
+  const maxValue = options.maxValue ?? Math.max(...valid);
+  const logMin = logLatencyValue(minValue, floorMs) - (options.lowerPad ?? 0);
+  const logMax = logLatencyValue(maxValue, floorMs) + (options.upperPad ?? 0);
+  return {
+    logMin,
+    logMax,
+    logRange: logMax - logMin || 1,
+    floorMs,
+  };
+}
+
+export function logLatencyFraction(ms: number, scale: LogLatencyScale): number {
+  return (logLatencyValue(ms, scale.floorMs) - scale.logMin) / scale.logRange;
+}
+
+export function logLatencyTicks(scale: LogLatencyScale, tolerance = 0.05): number[] {
+  return LOG_LATENCY_TICKS_MS.filter(
+    (ms) =>
+      logLatencyValue(ms, scale.floorMs) >= scale.logMin - tolerance &&
+      logLatencyValue(ms, scale.floorMs) <= scale.logMax + tolerance,
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Heatmap color math
 // Python reference: benchbox/core/visualization/ascii/heatmap.py
 // (log10-ratio → hue mapping)

@@ -14,6 +14,7 @@
 import type { BenchmarkSummary, PlatformRow } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
 import { paletteColor } from "@/lib/chartTheme";
+import { costModelDisclosure, normalizedCostValue } from "@/lib/costDisplay";
 
 const AXIS_W = 54;
 const AXIS_H = 32;
@@ -103,7 +104,7 @@ export function CostScatter({ summary }: Props) {
   }
 
   const metricLabel = metric === "power_score" ? "Power@Size (↑ better)" : "Geomean ms (↓ better)";
-  const modelDisclosure = costModelDisclosure(pts);
+  const modelDisclosure = costModelDisclosure(summary.platforms);
 
   return (
     <div ref={containerRef} class="w-full overflow-x-auto">
@@ -242,30 +243,6 @@ export function CostScatter({ summary }: Props) {
   );
 }
 
-function normalizedCostValue(row: PlatformRow): number | null {
-  if (row.cost_status !== "normalized") return null;
-  if (row.normalized_cost_usd === null || row.normalized_cost_usd === undefined) return null;
-  return Number.isFinite(row.normalized_cost_usd) ? row.normalized_cost_usd : null;
-}
-
-function costModelDisclosure(points: ScatterPoint[]): string {
-  const versions = uniqueNonEmpty(points.map((point) => point.modelVersion));
-  const scopes = uniqueNonEmpty(points.map((point) => point.scope).map(formatCostScope));
-  const versionText =
-    versions.length === 1
-      ? `model ${versions[0]}`
-      : versions.length > 1
-        ? `multiple models: ${versions.join(", ")}`
-        : "model unavailable";
-  const scopeText =
-    scopes.length === 1
-      ? scopes[0]
-      : scopes.length > 1
-        ? `mixed scopes: ${scopes.join(", ")}`
-        : "scope unavailable";
-  return `Normalized USD, ${scopeText}, ${versionText}`;
-}
-
 function normalizedCostEmptyReason(platforms: PlatformRow[]): string {
   if (platforms.length === 0) return "No platforms are present in the selected cohort.";
   if (platforms.every((platform) => platform.cost_status === undefined || platform.cost_status === null)) {
@@ -289,13 +266,4 @@ function normalizedCostEmptyReason(platforms: PlatformRow[]): string {
     return `Missing normalized-cost metadata: ${[...missing].join(", ")}.`;
   }
   return "No row has cost_status=normalized with a finite normalized_cost_usd value.";
-}
-
-function formatCostScope(scope: string | null | undefined): string | null {
-  if (!scope) return null;
-  return scope.split("_").join(" ");
-}
-
-function uniqueNonEmpty(values: Array<string | null | undefined>): string[] {
-  return [...new Set(values.filter((value): value is string => Boolean(value)))];
 }

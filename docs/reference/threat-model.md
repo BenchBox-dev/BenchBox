@@ -15,7 +15,7 @@ services. This threat model applies exclusively to Phase 3.
 |---|---|---|---|---|
 | Raw canonical bundles (schema-v2 JSON + companions) | Sensitive - content-addressed, immutable after commit | Object store (S3/R2), `bundles/` prefix | Download link on result detail page; not browsable | Ingest service (write), CDN (read) |
 | Durable submission metadata (submission_id, bundle_hash, visibility state, trust labels) | Sensitive - controls public visibility | Metadata DB (Postgres) | Indirect - reflected in public read models only | API server |
-| Public read models (`results.duckdb`, `results_schema.json`, copied bundles) | Public | Derived store → GitHub Pages / CDN | Fully public | CI pipeline (write), CDN (read) |
+| Public read models (`results.duckdb`, copied bundles) | Public | Derived store → GitHub Pages / CDN | Fully public | CI pipeline (write), CDN (read) |
 | Service API keys / user tokens | Secret | Metadata DB (hashed) + `~/.benchbox/credentials.yaml` (client) | Never - server stores hash only | Auth service |
 | Actor identity records (actor_id, contact, trust tier) | Private | Metadata DB | Not exposed publicly; used internally for attribution and moderation | API server |
 | Explorer static site (benchbox.dev/results/) | Public | GitHub Pages | Fully public - read-only | GitHub Actions CI |

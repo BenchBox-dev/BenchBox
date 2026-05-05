@@ -16,18 +16,13 @@
 import type { BenchmarkSummary } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
 import { paletteColor } from "@/lib/chartTheme";
-import { computeBoxStats } from "@/lib/chartMath";
+import { buildLogLatencyScale, computeBoxStats, logLatencyFraction, logLatencyTicks } from "@/lib/chartMath";
 
-const LOG_TICKS_MS = [0.1, 1, 10, 100, 1000, 10000];
 const LABEL_W = 144;
 const ROW_H = 48;
 const AXIS_H = 24;
 const PADDING_TOP = 12;
 const PADDING_RIGHT = 12;
-
-function toLog2(ms: number): number {
-  return Math.log2(Math.max(ms, 0.1));
-}
 
 interface Props {
   summary: BenchmarkSummary;
@@ -52,18 +47,18 @@ export function DistributionBox({ summary }: Props) {
   if (rows.length === 0) return null;
 
   const allMs = rows.flatMap((r) => [r.stats.min, r.stats.q1, r.stats.median, r.stats.q3, r.stats.max]);
-  const logMax = toLog2(Math.max(...allMs)) + 0.3;
-  const logMin = toLog2(Math.min(...allMs)) - 0.3;
-  const logRange = logMax - logMin || 1;
+  const scale = buildLogLatencyScale(allMs, { lowerPad: 0.3, upperPad: 0.3 });
+  if (scale === null) return null;
+  const logScale = scale;
 
   const plotW = w - LABEL_W - PADDING_RIGHT;
   const totalH = PADDING_TOP + rows.length * ROW_H + AXIS_H;
 
   function xFor(ms: number): number {
-    return LABEL_W + ((toLog2(ms) - logMin) / logRange) * plotW;
+    return LABEL_W + logLatencyFraction(ms, logScale) * plotW;
   }
 
-  const xTicks = LOG_TICKS_MS.filter((ms) => toLog2(ms) >= logMin - 0.05 && toLog2(ms) <= logMax + 0.05);
+  const xTicks = logLatencyTicks(logScale);
 
   return (
     <div ref={containerRef} class="w-full overflow-x-auto">

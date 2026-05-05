@@ -46,6 +46,13 @@ function makeDetail(overrides: Partial<DetailResult> = {}): DetailResult {
     test_type: "power",
     validation_status: "exact",
     cost_usd: null,
+    normalized_cost_usd: null,
+    cost_model_version: "2026.05.0",
+    cost_model_source: "benchbox.core.cost.pricing",
+    cost_scope: "compute_only",
+    cost_status: "unavailable",
+    billing_unit: "unknown",
+    pricing_region: "unknown",
     compliance_class: "unofficial_subscale",
     ...overrides,
   };
@@ -77,7 +84,26 @@ describe("RunReceipt", () => {
     expect(within(receipt).getByText("Eligible")).toBeTruthy();
     expect(within(receipt).getByText("abc12345")).toBeTruthy();
     expect(within(receipt).getByText("Plans not published")).toBeTruthy();
-    expect(within(receipt).getAllByText("Not available").length).toBe(3);
+    expect(within(receipt).getByText("unavailable")).toBeTruthy();
+    expect(within(receipt).getByText("2026.05.0 (benchbox.core.cost.pricing)")).toBeTruthy();
+    expect(within(receipt).getByText("compute only, billing: unknown, region: unknown")).toBeTruthy();
+  });
+
+  it("renders normalized cost metadata when it is present", () => {
+    render(
+      <RunReceipt
+        detail={makeDetail({
+          normalized_cost_usd: 0.42,
+          cost_status: "normalized",
+          billing_unit: "warehouse_hour",
+          pricing_region: "us-east-1",
+        })}
+      />,
+    );
+
+    const receipt = screen.getByRole("region", { name: "Run receipt" });
+    expect(within(receipt).getByText("$0.42")).toBeTruthy();
+    expect(within(receipt).getByText("compute only, billing: warehouse_hour, region: us-east-1")).toBeTruthy();
   });
 
   it("keeps logical query count separate from measurement samples", () => {

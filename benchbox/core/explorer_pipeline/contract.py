@@ -16,7 +16,6 @@ EXPLORER_BUILD_CONTRACT = {
     "outputs": {
         "required": [
             "results.duckdb",
-            "results_schema.json",
             "bundles/{result_id}.json",
         ],
         "removed_legacy": [
@@ -26,6 +25,7 @@ EXPLORER_BUILD_CONTRACT = {
             "compare/",
             "meta_leaderboard.json",
             "short_ids.json",
+            "results_schema.json",
         ],
     },
 }
