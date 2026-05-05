@@ -901,13 +901,21 @@ codex-pr-review-followups-list:
 		$(if $(CODEX_REVIEW_UNTIL),--until "$(CODEX_REVIEW_UNTIL)")
 
 # One-comment-at-a-time Codex follow-up loop for merged PR review findings.
-# Replies to each actioned source comment with a marker, then submits one PR
-# through the normal pr-preflight + pr-open workflow. Useful overrides:
+# Each actioned comment lands as its own commit *before* the GitHub marker
+# reply is posted, so a mid-sweep crash never leaves a phantom-actioned
+# thread on GitHub. After the loop, the routine runs pr-preflight and
+# opens one PR through the normal pr-open workflow.
+#
+# Useful overrides:
 #   CODEX_REVIEW_MAX_COMMENTS=N   cap an iteration batch
 #   CODEX_REVIEW_SINCE=YYYY-MM-DD scope by merged-at date
 #   CODEX_REVIEW_MODEL=<model>    choose the nested codex exec model
-#   CODEX_REVIEW_REPLY=0          skip GitHub replies
-#   CODEX_REVIEW_SUBMIT=0         skip final pr-open
+#   CODEX_REVIEW_REPLY=0          skip GitHub replies. Only the literals
+#                                 0|false|no disable; anything else
+#                                 (including "1" or "true") is treated as
+#                                 the default, so the reply is posted.
+#   CODEX_REVIEW_SUBMIT=0         skip final pr-open. Same accepted values
+#                                 as CODEX_REVIEW_REPLY above.
 codex-pr-review-followups:
 	@uv run --project _project/scripts -- python _project/scripts/codex_pr_review_followups.py run \
 		--base "$(CODEX_REVIEW_BASE)" \
