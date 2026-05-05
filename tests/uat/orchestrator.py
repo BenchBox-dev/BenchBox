@@ -60,7 +60,12 @@ def run_sweep(
     validator_rollup_tsv: Path | None = None
 
     for phase in config.phases:
-        if config.dry_run:
+        if config.dry_run and phase != "enumerate":
+            # Enumerate is cheap and pure (no subprocesses, no FS writes
+            # for the cells themselves). Run it even in dry_run so a
+            # malformed config — unknown platform group, retired
+            # benchmark in a frozen YAML — surfaces as a non-zero
+            # phase exit instead of silently passing through.
             phase_exit_codes[phase] = 0
             continue
         if phase == "preflight":
@@ -77,7 +82,17 @@ def run_sweep(
                 abort_reason = result.abort_reason
                 break
         elif phase == "enumerate":
-            phase_exit_codes[phase] = 0  # enumerate's effect is realised by execute.
+            # Materialise the cell list eagerly so a malformed config
+            # (unknown platform group, missing benchmark) fails here
+            # rather than at execute or — under dry_run — never at all.
+            try:
+                exec_phase.enumerate_cells(config.raw)
+                phase_exit_codes[phase] = 0
+            except (ValueError, KeyError) as exc:
+                phase_exit_codes[phase] = 2
+                aborted_phase = phase
+                abort_reason = str(exc)
+                break
         elif phase == "execute":
             execute_outcome = exec_phase.run_execute(
                 config,
