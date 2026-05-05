@@ -1,24 +1,42 @@
 # BenchBox Agent Guide
 
-Consistent tooling, safe defaults, minimal surprises. Research first, make scoped changes, verify before return.
+Consistent tooling, safe defaults, minimal surprises. Research first, make
+scoped changes, verify before return.
 
-## Core Rules
+## Workflow
 
-- Use `rg`; read files in focused chunks.
-- Python tooling is `uv` only: use `uv run -- ...`, `uv add`, `uv sync`, `uv lock`. Do not use bare `python`, `pytest`, `ruff`, `pip`, conda, poetry, manual venvs, or `requirements.txt`.
-- `make` wrappers are fine when present. Common commands still run through uv when Python is direct: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format .`, `uv run -- ty check`.
-- Do not use `git add -A`; stage explicit paths only.
-- Do not run live cloud tests or destructive git/filesystem commands without explicit approval.
-- No credentials in repo. Use env vars or gitignored `.env`; redact secrets in logs.
-- Stop on user interrupt or redirect. Do not revert user changes unless explicitly asked.
+Use `rg`; read files in focused chunks. Prefer existing local helpers and
+patterns. For write work, research the affected path, change the narrowest
+surface that solves the problem, verify, then commit only authorized files.
+
+## Tooling
+
+`make` wrappers are preferred when present. Direct Python tools still run
+through `uv run -- ...`. Do not use destructive git/filesystem commands or live
+cloud tests without explicit approval.
 
 ## Code Style
 
-Python 3.10+, 4 spaces, 120 columns, Ruff only, type hints on public APIs. Prefer existing local patterns and helpers over new abstractions. Standardize where it reduces real duplication; avoid generic frameworks for one-off cases.
+Python 3.10+, 4 spaces, 120 columns, Ruff only, type hints on public APIs.
+Standardize where it reduces real duplication; avoid generic frameworks for
+one-off cases.
+
+## Package Management
+
+Python tooling is `uv` only: use `uv run -- ...`, `uv add`, `uv sync`, and
+`uv lock`. Do not use bare `python`, `pytest`, `ruff`, `pip`, conda, poetry,
+manual venvs, or `requirements.txt`.
+
+Common commands:
+
+```bash
+uv run -- python -m pytest -m fast -q
+uv run -- ruff check .
+uv run -- ruff format .
+uv run -- ty check
+```
 
 ## Tests
-
-Markers: `fast`, `unit`, `integration`, `tpch`, `tpcds`, `ssb`, `platform_smoke`, `docker_integration`, `live_integration`, `slow`, `resource_heavy`, `stress`.
 
 - Smoke: `uv run -- python -m pytest -m fast -q`
 - Standards: `uv run -- python -m pytest -m "tpch or tpcds" --tb=short`
@@ -26,19 +44,35 @@ Markers: `fast`, `unit`, `integration`, `tpch`, `tpcds`, `ssb`, `platform_smoke`
 - Docker: `make test-docker-<platform>`
 - Cloud: `make test-live-<platform>` only with approval
 
-`tests/conftest.py` excludes slow/stress/live/resource-heavy unless requested. `pytest -n auto` uses `~/.benchbox/test.lock`; concurrent runs fail fast.
+`tests/conftest.py` excludes slow/stress/live/resource-heavy unless requested.
+`pytest -n auto` uses `~/.benchbox/test.lock`; concurrent runs fail fast.
 
-## BenchBox Runtime
+## Sandbox & Security
 
-CLI supports non-interactive mode with `--non-interactive` or `BENCHBOX_NON_INTERACTIVE=true`. Dry-run: `benchbox run --dry-run <DIR> --platform <plat> --benchmark <bm> --scale <sf> [--phases ...]`.
+No credentials in repo. Use env vars or gitignored `.env`; redact secrets in
+logs. Stop on user interrupt or redirect. Do not revert user changes unless
+explicitly asked.
 
-Phases: `generate`, `load`, `power`, `throughput`, `maintenance`. Defaults are generate+load+execute; always propagate `--phases`. Use `--seed <int>` for deterministic runs. Scale >=1 must be whole integer; default smoke is 0.01.
+## CLI Modes
 
-Outputs go under `benchmark_runs/`; manifests enable reuse. Compression defaults to zstd and may fall back to none. Quick restart state is `~/.benchbox/last_run.yaml`.
+CLI supports non-interactive mode with `--non-interactive` or
+`BENCHBOX_NON_INTERACTIVE=true`. Dry-run:
+
+```bash
+benchbox run --dry-run <DIR> --platform <plat> --benchmark <bm> --scale <sf> [--phases ...]
+```
+
+Phases: `generate`, `load`, `power`, `throughput`, `maintenance`. Defaults are
+generate+load+execute; always propagate `--phases`. Use `--seed <int>` for
+deterministic runs. Scale >=1 must be whole integer; default smoke is 0.01.
 
 ## DataFrame Support
 
-Production DataFrame platforms include `polars-df`, `pandas-df`, `datafusion-df`, and `dask-df`; others may need Spark/Ray/CUDA/cloud credentials. Most SQL benchmarks have matching `dataframe_queries/` implementations. Expression-family platforms use lazy context; pandas-family uses eager frames. Validate against DuckDB SQL at SF=0.01.
+Production DataFrame platforms include `polars-df`, `pandas-df`,
+`datafusion-df`, and `dask-df`; others may need Spark/Ray/CUDA/cloud
+credentials. Most SQL benchmarks have matching `dataframe_queries/`
+implementations. Expression-family platforms use lazy context; pandas-family
+uses eager frames. Validate against DuckDB SQL at SF=0.01.
 
 Examples:
 
@@ -47,32 +81,19 @@ benchbox run --platform polars-df --benchmark tpch --scale 0.01 --queries Q1,Q6
 benchbox run --platform pandas-df --benchmark tpch --scale 0.01 --non-interactive
 ```
 
-## Timing And Validation
+## Data/Reporting/Logging/Timing
 
-Measured durations must use `benchbox.utils.clock.mono_time()` / `elapsed_seconds()`. Wall-clock is allowed only for event/audit timestamps and OS metadata. Canonical result key is `execution_time_seconds`; `execution_time_ms` is compatibility-only.
+Outputs go under `benchmark_runs/`; manifests enable reuse. Compression
+defaults to zstd and may fall back to none. Quick restart state is
+`~/.benchbox/last_run.yaml`. Canonical result key is
+`execution_time_seconds`; `execution_time_ms` is compatibility-only.
 
-Audits:
+## Commits & PRs
 
-```bash
-uv run -- python _project/scripts/timing_audit.py --report
-uv run -- python _project/scripts/timing_policy_check.py --strict
-```
-
-Validation modes: `exact`, `loose`, `range`, `full`, `disabled`. Use CLI `--validation <mode>` or stage toggles (`--preflight`, `--postgen-manifest`, `--postload`). Cross-platform validation compares row-by-row and reports diff samples.
-
-## Adapter Authoring
-
-Add SQL platforms by subclassing `PlatformAdapter`, implementing connection/execution/load hooks, registering with `@register_platform`, and keeping SDK imports lazy. Check `docs/development/adapter-refactor-map.md` before adding base responsibilities.
-
-Every adapter CREATE TABLE rewrite must be registered in `benchbox/sql_compat/rules/ddl_optimize/<platform>_ddl_rewrites.py` under `Phase.DDL_OPTIMIZE`; adapters inherit `BaseDdlOptimizer`. `compat_lint --check-ddl-drift` enforces this.
-
-## Dependency Bounds
-
-Default is unbounded. Current high-risk caps: `sqlglot<31`, `click<9`, `pydantic<3`, `pyarrow<24`, `duckdb<2`. Add caps only for known breaking release history or deep internal coupling. Bump only after validating the new major on fast + standards suites, then update `pyproject.toml` rationale and `uv.lock`.
-
-## Git, PRs, Worktrees
-
-Repo: `origin` -> `joeharris76/BenchBox`. Long-lived branches: `develop` for dev, `main` for release. Dev PRs target `develop`, squash-merge, linear history. `develop` is PR-gated; do not direct-push routine work.
+Do not use `git add -A`; stage explicit paths only. Repo `origin` is
+`joeharris76/BenchBox`. Long-lived branches: `develop` for dev, `main` for
+release. Dev PRs target `develop`, squash-merge, linear history. `develop` is
+PR-gated; do not direct-push routine work.
 
 Standard one-shot flow from a feature branch:
 
@@ -81,7 +102,9 @@ make pr-preflight
 make pr-open
 ```
 
-`pr-open` is idempotent: pushes, opens/reuses a PR to `develop`, and enables squash auto-merge when CI passes. Do not poll; post-merge safety opens a revert PR or incident issue if `develop` goes red.
+`pr-open` is idempotent: pushes, opens/reuses a PR to `develop`, and enables
+squash auto-merge when CI passes. Do not poll; post-merge safety opens a
+revert PR or incident issue if `develop` goes red.
 
 Use retained pool worktrees for parallel work:
 
@@ -92,13 +115,20 @@ make pr-preflight && make pr-open
 make worktree-release
 ```
 
-Inspect with `make worktree-pool-status`; sweep with `make worktree-pool-sweep-stale`. Use `make worktree-pool-reset POOL=NN` only when intentionally discarding a slot. Claude Code should prefer project `/pr` over global `/commit-push-pr`.
+Inspect with `make worktree-pool-status`; sweep with
+`make worktree-pool-sweep-stale`. Use `make worktree-pool-reset POOL=NN` only
+when intentionally discarding a slot. Claude Code should prefer project `/pr`
+over global `/commit-push-pr`.
 
-Release flow is `make release-cut VERSION=X.Y.Z` then `make release-finalize VERSION=X.Y.Z`; see `docs/operations/release-guide.md`.
+Release flow is `make release-cut VERSION=X.Y.Z` then
+`make release-finalize VERSION=X.Y.Z`; see `docs/operations/release-guide.md`.
 
-## TODOs And Planning
+## Planning & TODOs
 
-TODOs live in `_project/TODO/{worktree}/{phase}/{item}.yaml`; completed items move to `_project/DONE/`. Stable `id` is filename slug. Use flat `work[]` with `needs` edges; inter-item deps go in `deps.needs`; deferred work goes in `deferred[]`.
+TODOs live in `_project/TODO/{worktree}/{phase}/{item}.yaml`; completed items
+move to `_project/DONE/`. Stable `id` is filename slug. Use flat `work[]` with
+`needs` edges; inter-item deps go in `deps.needs`; deferred work goes in
+`deferred[]`.
 
 CLI:
 
@@ -106,13 +136,88 @@ CLI:
 uv run --project _project/scripts -- python _project/scripts/todo_cli.py list|show|stats|ready|next|done|check-graph|validate|reindex|cleanup
 ```
 
-Indexes under `_project/{TODO|DONE}/_indexes/` are generated. Guardrails: `must_preserve`, `approach`, `anti_patterns`, `verification`, `scope_limit`.
+Indexes under `_project/{TODO|DONE}/_indexes/` are generated. Guardrails:
+`must_preserve`, `approach`, `anti_patterns`, `verification`, `scope_limit`.
 
-## Skills And Workflows
+## Skills & Workflow
 
-High-level wrappers remain stable: `code`, `test`, `todo`, `blog`, `docs`, `benchbox-workflow`, `skill-sync`, `tidy-perms`. Preserve action names and triggers. Review-shaped actions are read-only except local capture; write-shaped actions require research, verification, explicit-path commit, and push when authorized.
+High-level wrappers remain stable: `code`, `test`, `todo`, `blog`, `docs`,
+`benchbox-workflow`, `skill-sync`, `tidy-perms`. Preserve action names and
+triggers. Review-shaped actions are read-only except local capture;
+write-shaped actions require research, verification, explicit-path commit, and
+push when authorized.
 
-BenchBox workflow actions: `test`, `quality`, `compliance`, `dialect`, `binary`, `compare`, `live`, `architecture`, `plan`.
+BenchBox workflow actions: `test`, `quality`, `compliance`, `dialect`,
+`binary`, `compare`, `live`, `architecture`, `plan`.
+
+Skill source of truth is `/Users/joe/.skill-sync/skills`. Project-local
+`.claude/skills`, `.codex/skills`, and `.gemini/skills` are generated mirrors;
+regenerate them with `make skill-sync` instead of editing them directly.
+`/Users/joe/.claude/skills` may be a symlink to canonical, so writes through it
+can mutate the canonical repo.
+
+## Recipes
+
+```bash
+make skill-sync-check
+uv run -- python _project/scripts/timing_audit.py --report
+uv run -- python _project/scripts/timing_policy_check.py --strict
+uv run -- python _project/scripts/reference_usage_audit.py --summary
+```
+
+## Structure
+
+- `benchbox/`: runtime, adapters, SQL compatibility, and CLI code.
+- `tests/`: fast/unit/integration and benchmark-specific suites.
+- `docs/`: user, operations, and development documentation.
+- `_project/`: TODOs, blind spots, audits, and project scripts.
+- `benchmark_runs/`: generated run artifacts, normally not hand-edited.
+
+## Timing Policy
+
+Measured durations must use `benchbox.utils.clock.mono_time()` /
+`elapsed_seconds()`. Wall-clock is allowed only for event/audit timestamps and
+OS metadata.
+
+Audits:
+
+```bash
+uv run -- python _project/scripts/timing_audit.py --report
+uv run -- python _project/scripts/timing_policy_check.py --strict
+```
+
+## Result Validation
+
+Validation modes: `exact`, `loose`, `range`, `full`, `disabled`. Use CLI
+`--validation <mode>` or stage toggles (`--preflight`, `--postgen-manifest`,
+`--postload`). Cross-platform validation compares row-by-row and reports diff
+samples.
+
+## Adapter Authoring
+
+Add SQL platforms by subclassing `PlatformAdapter`, implementing
+connection/execution/load hooks, registering with `@register_platform`, and
+keeping SDK imports lazy. Check `docs/development/adapter-refactor-map.md`
+before adding base responsibilities.
+
+Every adapter CREATE TABLE rewrite must be registered in
+`benchbox/sql_compat/rules/ddl_optimize/<platform>_ddl_rewrites.py` under
+`Phase.DDL_OPTIMIZE`; adapters inherit `BaseDdlOptimizer`.
+`compat_lint --check-ddl-drift` enforces this.
+
+## Dependency Upper Bounds
+
+Default is unbounded. Current high-risk caps: `sqlglot<31`, `click<9`,
+`pydantic<3`, `pyarrow<24`, `duckdb<2`. Add caps only for known breaking
+release history or deep internal coupling. Bump only after validating the new
+major on fast + standards suites, then update `pyproject.toml` rationale and
+`uv.lock`.
+
+## Test Markers
+
+Markers: `fast`, `unit`, `integration`, `tpch`, `tpcds`, `ssb`,
+`platform_smoke`, `docker_integration`, `live_integration`, `slow`,
+`resource_heavy`, `stress`.
 
 ## Further Reading
 
