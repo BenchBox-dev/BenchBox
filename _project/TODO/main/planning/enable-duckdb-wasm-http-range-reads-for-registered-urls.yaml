@@ -1,7 +1,7 @@
 id: enable-duckdb-wasm-http-range-reads-for-registered-urls
 title: "Enable DuckDB-WASM HTTP range-reads for URLs registered via registerFileURL"
 worktree: main
-priority: Medium
+priority: Low
 status: Blocked
 category: Performance
 

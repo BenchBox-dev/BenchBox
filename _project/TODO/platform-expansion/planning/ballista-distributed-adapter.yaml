@@ -1,7 +1,7 @@
 id: ballista-distributed-adapter
 title: "Add Apache DataFusion Ballista Distributed Query Platform Adapter"
 worktree: platform-expansion
-priority: Medium
+priority: Low
 status: Not Started
 category: Platform Expansion
 description: |
