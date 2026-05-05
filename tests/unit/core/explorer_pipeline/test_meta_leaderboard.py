@@ -218,6 +218,60 @@ class TestMetaRankNullMetric:
         assert duckdb["ranks"][cohort_key]["total"] == 2
 
 
+class TestMetaRankEligibility:
+    def test_ineligible_platform_does_not_affect_rank_total_or_speedup(self) -> None:
+        """Visible but ineligible rows keep metrics, but are excluded from official ranking math."""
+        ranking = RankingConfig(
+            primary_metric="display_geomean_ms",
+            secondary_metric="display_geomean_ms",
+            primary_order="asc",
+        )
+        rows = [
+            _make_platform_row("duckdb", display_geomean_ms=100.0),
+            _make_platform_row("community", display_geomean_ms=50.0, is_ranking_eligible=False),
+            _make_platform_row("sqlite", display_geomean_ms=200.0),
+        ]
+        summary = _make_summary(benchmark="clickbench", ranking=ranking, platforms=rows)
+        data = _build_meta_leaderboard([(("clickbench", 0.1, "power"), summary)], _GENERATED_AT)
+
+        cohort_key = "clickbench-sf0.1-power"
+        cohort = next(c for c in data["cohorts"] if c["key"] == cohort_key)
+        assert cohort["platform_count"] == 2
+
+        by_platform = {p["platform_id"]: p for p in cohort["platforms"]}
+        assert by_platform["community"]["rank"] is None
+        assert by_platform["community"]["metric_value"] == pytest.approx(50.0)
+        assert by_platform["community"]["speedup_vs_best"] is None
+
+        duckdb = next(p for p in data["platforms"] if p["platform_id"] == "duckdb")
+        sqlite = next(p for p in data["platforms"] if p["platform_id"] == "sqlite")
+        assert duckdb["ranks"][cohort_key]["rank"] == 1
+        assert duckdb["ranks"][cohort_key]["total"] == 2
+        assert duckdb["ranks"][cohort_key]["speedup_vs_best"] == pytest.approx(1.0)
+        assert sqlite["ranks"][cohort_key]["rank"] == 2
+        assert sqlite["ranks"][cohort_key]["total"] == 2
+        assert sqlite["ranks"][cohort_key]["speedup_vs_best"] == pytest.approx(0.5)
+
+        assert not any(p["platform_id"] == "community" for p in data["platforms"])
+
+    def test_cohort_with_fewer_than_two_rankable_platforms_is_excluded(self) -> None:
+        ranking = RankingConfig(
+            primary_metric="display_geomean_ms",
+            secondary_metric="display_geomean_ms",
+            primary_order="asc",
+        )
+        rows = [
+            _make_platform_row("duckdb", display_geomean_ms=100.0),
+            _make_platform_row("community", display_geomean_ms=50.0, is_ranking_eligible=False),
+        ]
+        summary = _make_summary(benchmark="clickbench", ranking=ranking, platforms=rows)
+
+        data = _build_meta_leaderboard([(("clickbench", 0.1, "power"), summary)], _GENERATED_AT)
+
+        assert data["cohorts"] == []
+        assert data["platforms"] == []
+
+
 # ---------------------------------------------------------------------------
 # Tests: edge cases - empty summaries, single-platform cohort, multi-cohort avg
 # ---------------------------------------------------------------------------

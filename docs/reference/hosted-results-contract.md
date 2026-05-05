@@ -289,6 +289,11 @@ pairwise comparison, but they are excluded from any sorted table that is
 presented as a ranking. This prevents unverified results from affecting the
 official leaderboard within a cohort.
 
+Ranking totals and cohort-relative speedups count only ranking-eligible rows
+with non-null primary metrics. Visible rows that are not eligible keep their
+raw metrics for browse and comparison surfaces, but carry `rank = null` and do
+not define the cohort's best or slowest ranked value.
+
 The explorer must not display a ranked table that mixes `public-curated` and
 `public-self-reported` results without clear visual separation. If a cohort
 contains only `public-self-reported` results, the view renders as a browse list,

@@ -30,7 +30,7 @@ from benchbox.core.explorer_pipeline.models import (
     get_ranking_config,
     is_ranking_eligible,
 )
-from benchbox.core.explorer_pipeline.ranking import rank_platforms
+from benchbox.core.explorer_pipeline.ranking import RankedCohort, rank_platforms
 from benchbox.core.explorer_pipeline.transformer import (
     BundleTransformer,
     _platform_percentile_stats,
@@ -209,13 +209,15 @@ def _rank_platforms_in_cohort(
     summary: BenchmarkSummary,
     cohort_key: str,
     full_to_short: dict[str, str],
+    ranked: RankedCohort | None = None,
 ) -> tuple[list[dict[str, Any]], str, bool]:
     """Rank platforms within a single cohort and return (platform_entries, primary_metric, higher_is_better).
 
     Platform entries include rank, speedup_vs_best, and all display fields needed
     by both the cohort_platforms list and the platform_agg accumulator.
     """
-    ranked = rank_platforms(summary)
+    if ranked is None:
+        ranked = rank_platforms(summary)
 
     entries: list[dict[str, Any]] = []
     for ranked_row in ranked.rows:
@@ -269,11 +271,12 @@ def _build_meta_leaderboard(
 ) -> dict[str, Any]:
     """Build the cross-benchmark meta-leaderboard artifact.
 
-    Only cohorts with ≥2 platforms are included.  Platforms are ranked 1-based
-    by the cohort's primary metric within each cohort.  Platforms with a null
-    primary metric (all queries failed) are assigned no rank for that cohort.
-    Per-platform average rank is computed across cohorts in which the platform
-    participated (N/A cohorts are excluded from the average, not penalised).
+    Only cohorts with ≥2 ranking-eligible platforms are included. Platforms
+    are ranked 1-based by the cohort's primary metric within each cohort.
+    Platforms that are not ranking-eligible, or have a null primary metric,
+    are assigned no rank for that cohort. Per-platform average rank is computed
+    across cohorts in which the platform participated (N/A cohorts are excluded
+    from the average, not penalised).
 
     When the same platform_id appears more than once in a cohort (different
     tuning_mode or trust_label), cohort_platforms keeps every variant - the
@@ -285,7 +288,8 @@ def _build_meta_leaderboard(
     """
     if full_to_short is None:
         full_to_short = {}
-    eligible = [(key, s) for key, s in summaries if len(s.platforms) >= 2]
+    ranked_summaries = [(key, s, rank_platforms(s)) for key, s in summaries]
+    eligible = [(key, s, ranked) for key, s, ranked in ranked_summaries if ranked.total_ranked >= 2]
     if not eligible:
         return {"generated_at": generated_at, "cohorts": [], "platforms": []}
 
@@ -293,32 +297,33 @@ def _build_meta_leaderboard(
     # platform_id → {"platform_id", "platform", "ranks": {cohort_key: {rank, total, ...}}}
     platform_agg: dict[str, dict[str, Any]] = {}
 
-    for (benchmark, scale_factor, phase), summary in eligible:
+    for (benchmark, scale_factor, phase), summary, ranked in eligible:
         sf = _sf_str(scale_factor)
         cohort_key = f"{benchmark}-sf{sf}-{phase}"
         label = f"{_humanize_benchmark(benchmark)} SF{sf}"
 
         platform_entries, primary_metric, higher_is_better = _rank_platforms_in_cohort(
-            summary, cohort_key, full_to_short
+            summary, cohort_key, full_to_short, ranked
         )
 
         for entry in platform_entries:
-            pid = entry["platform_id"]
             rank = entry["rank"]
+            if rank is None:
+                continue
+            pid = entry["platform_id"]
             if pid not in platform_agg:
                 platform_agg[pid] = {"platform_id": pid, "platform": entry["platform"], "ranks": {}}
-            if rank is not None:
-                # When the same platform ranks in this cohort more than once
-                # (variant rows), keep the best rank. Worse variants must not
-                # clobber better ones via last-write-wins.
-                existing = platform_agg[pid]["ranks"].get(cohort_key)
-                if existing is None or rank < existing["rank"]:
-                    platform_agg[pid]["ranks"][cohort_key] = {
-                        "rank": rank,
-                        "total": entry["total"],
-                        "metric_value": entry["metric_value"],
-                        "speedup_vs_best": entry["speedup_vs_best"],
-                    }
+            # When the same platform ranks in this cohort more than once
+            # (variant rows), keep the best rank. Worse variants must not
+            # clobber better ones via last-write-wins.
+            existing = platform_agg[pid]["ranks"].get(cohort_key)
+            if existing is None or rank < existing["rank"]:
+                platform_agg[pid]["ranks"][cohort_key] = {
+                    "rank": rank,
+                    "total": entry["total"],
+                    "metric_value": entry["metric_value"],
+                    "speedup_vs_best": entry["speedup_vs_best"],
+                }
 
         # Strip internal "total" field before storing in cohort record.
         cohort_platforms = [{k: v for k, v in e.items() if k != "total"} for e in platform_entries]
@@ -330,7 +335,7 @@ def _build_meta_leaderboard(
                 "phase": phase,
                 "label": label,
                 "href": f"/results/{benchmark}/?sf={scale_factor}&phase={phase}",
-                "platform_count": len(summary.platforms),
+                "platform_count": ranked.total_ranked,
                 "primary_metric": primary_metric,
                 "primary_order": "desc" if higher_is_better else "asc",
                 "platforms": cohort_platforms,

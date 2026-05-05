@@ -766,7 +766,7 @@ class DuckDBSnapshotBuilder:
                         ranked.primary_metric,
                         ranked.primary_order,
                         ranked_row.rank,
-                        len(ranked.rows),
+                        ranked_row.total_ranked,
                         ps.p50 if ps else None,
                         ps.p90 if ps else None,
                         ps.p95 if ps else None,

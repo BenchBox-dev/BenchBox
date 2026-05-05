@@ -28,6 +28,7 @@ class RankedCohort:
     primary_metric: str
     primary_order: str
     higher_is_better: bool
+    total_ranked: int
     best_value: float | None
     slowest_value: float | None
 
@@ -36,7 +37,8 @@ def rank_platforms(summary: BenchmarkSummary) -> RankedCohort:
     """Rank a benchmark summary with standard competition ranking.
 
     Tied rows share the same rank and the next distinct row skips by the tie
-    size. Null primary metrics sort last and receive no rank.
+    size. Rows that are not ranking-eligible, or have null primary metrics,
+    sort after rankable rows and receive no rank.
     """
 
     ranking = summary.ranking
@@ -47,37 +49,49 @@ def rank_platforms(summary: BenchmarkSummary) -> RankedCohort:
     def metric_value(row: PlatformRow) -> float | None:
         return row.power_score if primary_metric == "power_score" else row.display_geomean_ms
 
-    def sort_key(row: PlatformRow) -> tuple[bool, float]:
+    def is_rankable(row: PlatformRow) -> bool:
+        return row.is_ranking_eligible and metric_value(row) is not None
+
+    def sort_key(row: PlatformRow) -> tuple[bool, float, str, str]:
         value = metric_value(row)
-        if value is None:
-            return (True, 0.0)
-        return (False, -value if higher_is_better else value)
+        if not is_rankable(row):
+            return (True, 0.0, row.platform_id, row.result_id)
+        assert value is not None
+        return (False, -value if higher_is_better else value, row.platform_id, row.result_id)
 
     sorted_rows = sorted(summary.platforms, key=sort_key)
-    values = [value for value in (metric_value(row) for row in sorted_rows) if value is not None]
-    best_value = (max(values) if higher_is_better else min(values)) if values else None
-    slowest_value = (min(values) if higher_is_better else max(values)) if values else None
+    rankable_values = [
+        value for value in (metric_value(row) for row in sorted_rows if row.is_ranking_eligible) if value is not None
+    ]
+    best_value = (max(rankable_values) if higher_is_better else min(rankable_values)) if rankable_values else None
+    slowest_value = (min(rankable_values) if higher_is_better else max(rankable_values)) if rankable_values else None
 
     ranked_rows: list[RankedPlatform] = []
     current_rank = 1
+    rankable_index = 0
     previous_value: float | None = None
-    for idx, row in enumerate(sorted_rows):
+    for row in sorted_rows:
         value = metric_value(row)
-        if value is None:
+        if not is_rankable(row):
             rank = None
+            rank_speedup_vs_best = None
+            rank_speedup_vs_slowest = None
         else:
+            rankable_index += 1
             if previous_value is not None and value != previous_value:
-                current_rank = idx + 1
+                current_rank = rankable_index
             rank = current_rank
             previous_value = value
+            rank_speedup_vs_best = speedup_vs_best(value, best_value, higher_is_better=higher_is_better)
+            rank_speedup_vs_slowest = speedup_vs_slowest(value, slowest_value, higher_is_better=higher_is_better)
         ranked_rows.append(
             RankedPlatform(
                 row=row,
                 metric_value=value,
                 rank=rank,
-                total_ranked=len(values),
-                speedup_vs_best=speedup_vs_best(value, best_value, higher_is_better=higher_is_better),
-                speedup_vs_slowest=speedup_vs_slowest(value, slowest_value, higher_is_better=higher_is_better),
+                total_ranked=len(rankable_values),
+                speedup_vs_best=rank_speedup_vs_best,
+                speedup_vs_slowest=rank_speedup_vs_slowest,
             )
         )
 
@@ -86,6 +100,7 @@ def rank_platforms(summary: BenchmarkSummary) -> RankedCohort:
         primary_metric=primary_metric,
         primary_order=primary_order,
         higher_is_better=higher_is_better,
+        total_ranked=len(rankable_values),
         best_value=best_value,
         slowest_value=slowest_value,
     )

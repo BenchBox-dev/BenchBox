@@ -211,9 +211,12 @@ Schema](#derived-read-model-schema), the pipeline emits:
    allow compact Compare URLs without breaking existing long-form URLs.
 
 3. **`meta_leaderboard.json`** - cross-benchmark rank aggregation used
-   by the home page. Platforms ranked within each cohort (cohorts with
-   ≥2 platforms only), then aggregated as simple mean of ranks across
-   appearances. No weighted composite score.
+   by the home page. Ranking-eligible platforms with non-null primary metrics
+   are ranked within each cohort (cohorts with ≥2 rankable platforms only),
+   then aggregated as simple mean of ranks across appearances. Visible but
+   unranked variants may be preserved with `rank: null`, but they do not affect
+   cohort totals, best/slowest speedups, or average ranks. No weighted
+   composite score.
 
 ### Revised UX surfaces
 
