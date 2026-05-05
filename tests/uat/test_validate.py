@@ -65,3 +65,43 @@ def test_parse_rollup_missing_status_column_errors(tmp_path: Path):
 
 def test_has_rollup_script_in_repo():
     assert validate.has_rollup_script() is True
+
+
+def test_run_validate_surfaces_nonzero_subprocess_via_exit_code(tmp_path: Path):
+    """Validator non-zero exit must NOT raise when a TSV is still produced."""
+    tsv = tmp_path / "rollup.tsv"
+
+    def fake_runner(argv, check):
+        _write_tsv(tsv, ["clean", "clean"])
+
+        class Completed:
+            returncode = 7
+
+        return Completed()
+
+    out = validate.run_validate(
+        tmp_path / "results",
+        output_tsv=tsv,
+        runner=fake_runner,
+    )
+    assert out.script_returncode == 7
+    assert out.exit_code() == 7
+    assert out.clean_count == 2
+
+
+def test_run_validate_raises_when_subprocess_fails_and_no_tsv(tmp_path: Path):
+    """No TSV → ValidatePhaseError, never CalledProcessError."""
+    missing_tsv = tmp_path / "rollup.tsv"
+
+    def fake_runner(argv, check):
+        class Completed:
+            returncode = 5
+
+        return Completed()
+
+    with pytest.raises(validate.ValidatePhaseError, match="exited 5"):
+        validate.run_validate(
+            tmp_path / "results",
+            output_tsv=missing_tsv,
+            runner=fake_runner,
+        )

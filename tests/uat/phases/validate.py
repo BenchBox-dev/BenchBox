@@ -30,11 +30,18 @@ class ValidateResult:
     clean_rate: float
     floor: float
     floor_breached: bool
+    script_returncode: int = 0
 
     def exit_code(self) -> int:
+        if self.script_returncode != 0:
+            return self.script_returncode
         if self.floor_breached:
             return 1
         return 0
+
+
+class ValidatePhaseError(RuntimeError):
+    """Raised when the validator subprocess fails before producing a TSV."""
 
 
 def run_validate(
@@ -44,8 +51,17 @@ def run_validate(
     floor: float = 0.80,
     extra_args: tuple[str, ...] = (),
     rollup_script: Path | None = None,
+    runner=subprocess.run,
 ) -> ValidateResult:
-    """Execute the validate phase against results_dir, writing the rollup to output_tsv."""
+    """Execute the validate phase against results_dir, writing the rollup to output_tsv.
+
+    Does NOT raise on non-zero validator exit. The returncode is surfaced
+    through `ValidateResult.script_returncode` and folded into
+    `exit_code()` so the orchestrator can keep the phase contract uniform
+    (set phase_exit_codes, never propagate CalledProcessError).
+    Raises `ValidatePhaseError` only when the subprocess fails AND no TSV
+    was produced — in that case there is nothing to parse.
+    """
     script = rollup_script or ROLLUP_SCRIPT
     if not script.exists():
         raise FileNotFoundError(f"validator rollup helper not found at {script}")
@@ -58,8 +74,25 @@ def run_validate(
         str(output_tsv),
         *extra_args,
     ]
-    subprocess.run(argv, check=True)
-    return parse_rollup(output_tsv, floor=floor)
+    completed = runner(argv, check=False)
+    rc = getattr(completed, "returncode", 0)
+    if rc != 0 and not output_tsv.exists():
+        raise ValidatePhaseError(f"validator subprocess exited {rc} without producing {output_tsv}")
+    parsed = parse_rollup(output_tsv, floor=floor)
+    if rc == 0:
+        return parsed
+    return ValidateResult(
+        rollup_tsv_path=parsed.rollup_tsv_path,
+        clean_count=parsed.clean_count,
+        warning_count=parsed.warning_count,
+        error_count=parsed.error_count,
+        refused_count=parsed.refused_count,
+        total=parsed.total,
+        clean_rate=parsed.clean_rate,
+        floor=parsed.floor,
+        floor_breached=parsed.floor_breached,
+        script_returncode=rc,
+    )
 
 
 def parse_rollup(rollup_tsv: Path, *, floor: float = 0.80) -> ValidateResult:

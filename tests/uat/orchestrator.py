@@ -102,7 +102,7 @@ def run_sweep(
                     )
             phase_exit_codes[phase] = 0 if all(r.status == "passed" for r in execute_outcome.results) else 1
         elif phase == "validate":
-            from tests.uat.phases.validate import run_validate
+            from tests.uat.phases.validate import ValidatePhaseError, run_validate
 
             validate_cfg = config.raw.get("validate") or {}
             results_dir = log_dir
@@ -114,7 +114,7 @@ def run_sweep(
                     floor=float(validate_cfg.get("validator_clean_rate_floor", 0.80)),
                 )
                 phase_exit_codes[phase] = vr.exit_code()
-            except FileNotFoundError as exc:
+            except (FileNotFoundError, ValidatePhaseError) as exc:
                 phase_exit_codes[phase] = 2
                 aborted_phase = phase
                 abort_reason = str(exc)
