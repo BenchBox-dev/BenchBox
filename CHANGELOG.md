@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Verified
+
+- **write_primitives sketch** — live `benchbox run --platform clickhouse-local`
+  smoke test against the eight ClickHouse-native sketch ops at SF=0.01
+  (8/8 pass, all scalar-bounds and `*_storage_size_clickhouse` validations
+  pass). Replaces the original chDB-only spike with a real adapter-driven
+  run. Observed merged state sizes on clickhouse-local 25.4.2: theta
+  60003 bytes, KLL 4314 bytes, topK 317 bytes — all inside existing bounds.
+  Inline tolerance comments and `docs/benchmarks/write-primitives-sketch-functions.md`
+  updated with the live numbers and a "Try it locally" snippet so new users
+  can reproduce without cloud creds.
+
 ### New
 
 - **write_primitives DataFrame** — PySpark sketch factory helpers

@@ -233,10 +233,12 @@ before alarming. Each variant runs only on its target engine via explicit
 | `sketch_req_query_quantile_merge` | `req_storage_size` [1000, 8000] (DuckDB-only)   | —                                                  |
 
 Observed sizes at SF=0.01 (the source of the bounds): Theta lg_k=12 ~16KB
-on DuckDB and ~60KB on ClickHouse (uniq HLL++ default precision); KLL
-k=200 ~3KB on DuckDB and ~3.8KB on ClickHouse (T-Digest compression=100);
-frequent-items lg_max_map_size=8 ~600B on DuckDB and ~294B on ClickHouse
-(topK K=8); CPC lg_k=11 ~1.2KB merged; REQ k=12 ~2.5KB merged.
+on DuckDB and ~60KB on ClickHouse (60003 bytes verified clickhouse-local
+25.4.2, uniq HLL++ default precision); KLL k=200 ~3KB on DuckDB and ~4.3KB
+on ClickHouse (4314 bytes verified clickhouse-local 25.4.2, T-Digest
+compression=100); frequent-items lg_max_map_size=8 ~600B on DuckDB and
+~317B on ClickHouse (317 bytes verified clickhouse-local 25.4.2, topK K=8);
+CPC lg_k=11 ~1.2KB merged; REQ k=12 ~2.5KB merged.
 
 CPC vs Theta storage: CPC at ~1.2KB is roughly **13× smaller** than Theta
 at ~16KB on the same 15K distinct keys at SF=0.01. The tradeoff is
@@ -264,6 +266,35 @@ Per-engine SQL is wired through `validation_query.platform_overrides`:
   SQLite, StarRocks): skipped via explicit `null` overrides because their
   byte-length probes for sketch state aren't yet wired. Add them in
   follow-up TODOs as cloud verification lands.
+
+## Try it locally on clickhouse-local
+
+ClickHouse Local (`clickhouse local`, the embeddable single-binary build
+that ships with the standard Homebrew / DEB / RPM ClickHouse package)
+runs the headline ClickHouse sketch overrides without any cloud
+credentials. Install via `brew install clickhouse` (or your distro
+equivalent) and run:
+
+```bash
+uv run -- benchbox run --platform clickhouse-local --benchmark write_primitives \
+  --scale 0.01 \
+  --queries sketch_ddl_create_persistent_table,\
+sketch_insert_theta_per_partition,\
+sketch_insert_kll_per_partition,\
+sketch_insert_topk_per_shard,\
+sketch_query_theta_union_merge,\
+sketch_query_kll_quantiles_merge,\
+sketch_query_topk_combine,\
+sketch_drop_persistent_table
+```
+
+Expected: 8/8 ops pass, both scalar-bounds and per-engine
+`*_storage_size_clickhouse` validations report passed (DuckDB
+`*_storage_size_duckdb` siblings are skipped via `null` overrides on
+ClickHouse and vice versa). Live observations from clickhouse-local
+25.4.2 at SF=0.01: theta merged state 60003 bytes, KLL merged state
+4314 bytes, topK merged state 317 bytes — all inside the bounds in
+`operations.yaml`.
 
 ## Single-query scope: what this benchmark is **not**
 

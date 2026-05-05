@@ -2,7 +2,8 @@ id: write-primitives-sketch-clickhouse-local-smoke
 title: "Write Primitives sketch: real benchbox-run smoke test for ClickHouse-native sketch overrides"
 worktree: main
 priority: Low
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-05-04"
 category: "Verification"
 
 description: |
@@ -72,43 +73,43 @@ context_sections:
     clickhouse-cli only.
 
 work:
-  - id: w1
-    summary: "Run the verification command against a clickhouse-local install"
-    status: pending
-    notes: |
-      Install clickhouse-local locally (homebrew or container).
-      Run the full 8-op verification set at SF=0.01. If anything
-      fails, capture the error, identify whether it's syntax,
-      adapter, or bound, and decide: fix-here vs file-fix-class TODO.
+- id: w1
+  summary: "Run the verification command against a clickhouse-local install"
+  status: done
+  notes: |
+    Install clickhouse-local locally (homebrew or container).
+    Run the full 8-op verification set at SF=0.01. If anything
+    fails, capture the error, identify whether it's syntax,
+    adapter, or bound, and decide: fix-here vs file-fix-class TODO.
 
-  - id: w2
-    summary: "Update inline tolerance comments with live observed values"
-    needs: [w1]
-    status: pending
-    notes: |
-      Replace "verified chDB" comments in the storage-size validation
-      blocks with "verified clickhouse-local SF=0.01" plus the actual
-      observation. If the observation falls outside the current
-      bounds, retune the per-engine bounds to bracket the live value
-      ±20%.
+- id: w2
+  summary: "Update inline tolerance comments with live observed values"
+  needs: [w1]
+  status: done
+  notes: |
+    Replace "verified chDB" comments in the storage-size validation
+    blocks with "verified clickhouse-local SF=0.01" plus the actual
+    observation. If the observation falls outside the current
+    bounds, retune the per-engine bounds to bracket the live value
+    ±20%.
 
-  - id: w3
-    summary: "Add a ClickHouse-only fast-test invocation to the docs"
-    needs: [w2]
-    status: pending
-    notes: |
-      `docs/benchmarks/write-primitives-sketch-functions.md` should
-      gain a "Try it locally" snippet for clickhouse-local so users
-      can reproduce the headline numbers without cloud creds.
+- id: w3
+  summary: "Add a ClickHouse-only fast-test invocation to the docs"
+  needs: [w2]
+  status: done
+  notes: |
+    `docs/benchmarks/write-primitives-sketch-functions.md` should
+    gain a "Try it locally" snippet for clickhouse-local so users
+    can reproduce the headline numbers without cloud creds.
 
 scope_limit:
   only_modify:
-    - benchbox/core/write_primitives/catalog/operations.yaml
-    - docs/benchmarks/write-primitives-sketch-functions.md
-    - CHANGELOG.md
+  - benchbox/core/write_primitives/catalog/operations.yaml
+  - docs/benchmarks/write-primitives-sketch-functions.md
+  - CHANGELOG.md
   do_not_modify:
-    - benchbox/core/write_primitives/benchmark.py
-    - benchbox/core/write_primitives/dataframe_operations.py
+  - benchbox/core/write_primitives/benchmark.py
+  - benchbox/core/write_primitives/dataframe_operations.py
   rationale: |
     Surface a smoke test, not a refactor. Bound retuning happens
     in operations.yaml; structural changes belong in a different
