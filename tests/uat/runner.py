@@ -22,8 +22,10 @@ from tests.uat.matrix import benchbox_run_argv
 from tests.uat.timeouts import TimeoutResult, run_with_timeout
 
 # Mirrors scripts/local_stress_test.sh:478 — match either an absolute or
-# relative `benchmark_runs/results/.../*.json` path.
-RESULT_PATH_RE = re.compile(r"(?:/[^\s]+/)?benchmark_runs/results/[^\s]+\.json")
+# relative `benchmark_runs/results/.../*.json` path. The `[^\s,;]+` is
+# narrower than `[^\s]+` so a comma- or semicolon-separated log line
+# does not collapse two paths into a single match.
+RESULT_PATH_RE = re.compile(r"(?:/[^\s,;]+/)?benchmark_runs/results/[^\s,;]+\.json")
 
 
 @dataclass(frozen=True)

@@ -65,3 +65,81 @@ def test_parse_rollup_missing_status_column_errors(tmp_path: Path):
 
 def test_has_rollup_script_in_repo():
     assert validate.has_rollup_script() is True
+
+
+def test_run_validate_surfaces_nonzero_subprocess_via_exit_code(tmp_path: Path):
+    """Validator non-zero exit must NOT raise when a TSV is still produced."""
+    tsv = tmp_path / "rollup.tsv"
+
+    def fake_runner(argv, check):
+        _write_tsv(tsv, ["clean", "clean"])
+
+        class Completed:
+            returncode = 7
+
+        return Completed()
+
+    out = validate.run_validate(
+        tmp_path / "results",
+        output_tsv=tsv,
+        runner=fake_runner,
+    )
+    assert out.script_returncode == 7
+    assert out.exit_code() == 7
+    assert out.clean_count == 2
+
+
+def test_parse_validator_status_by_path_round_trip(tmp_path: Path):
+    tsv = tmp_path / "rollup.tsv"
+    _write_tsv(tsv, ["clean", "warning_only", "error"])
+    status_by_path = validate.parse_validator_status_by_path(tsv)
+    # _write_tsv writes /tmp/rN.json result_path values.
+    keys = {str(p) for p in status_by_path}
+    assert "/tmp/r0.json" in keys
+    assert status_by_path[Path("/tmp/r0.json")] == "clean"
+    assert status_by_path[Path("/tmp/r1.json")] == "warning_only"
+    assert status_by_path[Path("/tmp/r2.json")] == "error"
+
+
+def test_parse_validator_status_by_path_handles_missing_columns(tmp_path: Path):
+    tsv = tmp_path / "rollup.tsv"
+    tsv.write_text("foo\tbar\n", encoding="utf-8")
+    assert validate.parse_validator_status_by_path(tsv) == {}
+
+
+def test_run_validate_raises_when_subprocess_fails_and_no_tsv(tmp_path: Path):
+    """No TSV → ValidatePhaseError, never CalledProcessError."""
+    missing_tsv = tmp_path / "rollup.tsv"
+
+    def fake_runner(argv, check):
+        class Completed:
+            returncode = 5
+
+        return Completed()
+
+    with pytest.raises(validate.ValidatePhaseError, match="exited 5"):
+        validate.run_validate(
+            tmp_path / "results",
+            output_tsv=missing_tsv,
+            runner=fake_runner,
+        )
+
+
+def test_run_validate_ignores_stale_tsv_when_subprocess_fails(tmp_path: Path):
+    """A previous rollup must not make a failed validator look parseable."""
+    stale_tsv = tmp_path / "rollup.tsv"
+    _write_tsv(stale_tsv, ["clean"])
+
+    def fake_runner(argv, check):
+        class Completed:
+            returncode = 5
+
+        return Completed()
+
+    with pytest.raises(validate.ValidatePhaseError, match="exited 5"):
+        validate.run_validate(
+            tmp_path / "results",
+            output_tsv=stale_tsv,
+            runner=fake_runner,
+        )
+    assert not stale_tsv.exists()

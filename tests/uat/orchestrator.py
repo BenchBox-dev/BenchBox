@@ -57,9 +57,15 @@ def run_sweep(
 
     cells_jsonl = log_dir / "cells.jsonl"
     execute_outcome = None
+    validator_rollup_tsv: Path | None = None
 
     for phase in config.phases:
-        if config.dry_run:
+        if config.dry_run and phase != "enumerate":
+            # Enumerate is cheap and pure (no subprocesses, no FS writes
+            # for the cells themselves). Run it even in dry_run so a
+            # malformed config — unknown platform group, retired
+            # benchmark in a frozen YAML — surfaces as a non-zero
+            # phase exit instead of silently passing through.
             phase_exit_codes[phase] = 0
             continue
         if phase == "preflight":
@@ -76,7 +82,17 @@ def run_sweep(
                 abort_reason = result.abort_reason
                 break
         elif phase == "enumerate":
-            phase_exit_codes[phase] = 0  # enumerate's effect is realised by execute.
+            # Materialise the cell list eagerly so a malformed config
+            # (unknown platform group, missing benchmark) fails here
+            # rather than at execute or — under dry_run — never at all.
+            try:
+                exec_phase.enumerate_cells(config.raw)
+                phase_exit_codes[phase] = 0
+            except (ValueError, KeyError) as exc:
+                phase_exit_codes[phase] = 2
+                aborted_phase = phase
+                abort_reason = str(exc)
+                break
         elif phase == "execute":
             execute_outcome = exec_phase.run_execute(
                 config,
@@ -102,7 +118,7 @@ def run_sweep(
                     )
             phase_exit_codes[phase] = 0 if all(r.status == "passed" for r in execute_outcome.results) else 1
         elif phase == "validate":
-            from tests.uat.phases.validate import run_validate
+            from tests.uat.phases.validate import ValidatePhaseError, run_validate
 
             validate_cfg = config.raw.get("validate") or {}
             results_dir = log_dir
@@ -114,7 +130,8 @@ def run_sweep(
                     floor=float(validate_cfg.get("validator_clean_rate_floor", 0.80)),
                 )
                 phase_exit_codes[phase] = vr.exit_code()
-            except FileNotFoundError as exc:
+                validator_rollup_tsv = vr.rollup_tsv_path
+            except (FileNotFoundError, ValidatePhaseError) as exc:
                 phase_exit_codes[phase] = 2
                 aborted_phase = phase
                 abort_reason = str(exc)
@@ -151,16 +168,26 @@ def run_sweep(
             )
             phase_exit_codes[phase] = result.exit_code()
         elif phase == "report":
+            from tests.uat.phases.validate import parse_validator_status_by_path
+
             report_cfg = config.raw.get("report") or {}
             tsv_path = log_dir / report_cfg.get("matrix_summary_tsv", "matrix_summary.tsv")
             cells = execute_outcome.results if execute_outcome else []
             scales_cfg = config.raw.get("scales") or {}
             rungs = scales_cfg.get("rungs")
+            # Wire validator status into the cross-scale check when a
+            # validate phase ran earlier in this sweep. Without this,
+            # cross_scale_clean_pair_count silently degrades to a
+            # passed-only check.
+            validator_status_by_path: dict[Path, str] | None = None
+            if validator_rollup_tsv is not None and validator_rollup_tsv.exists():
+                validator_status_by_path = parse_validator_status_by_path(validator_rollup_tsv)
             summary = report_phase.write_report(
                 cells,
                 output_path=tsv_path,
                 rungs=[float(r) for r in rungs] if rungs else None,
                 cross_scale_floor=report_cfg.get("cross_scale_coverage_min_pairs"),
+                validator_status_by_path=validator_status_by_path,
             )
             phase_exit_codes[phase] = summary.exit_code()
 

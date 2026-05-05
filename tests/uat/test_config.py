@@ -49,6 +49,21 @@ def test_validate_config_rejects_zero_timeout():
         config.validate_config({"name": "smoke", "execute": {"per_cell_timeout_s": 0}})
 
 
+def test_validate_config_rejects_float_timeout():
+    with pytest.raises(config.ConfigError, match="per_cell_timeout_s"):
+        config.validate_config({"name": "smoke", "execute": {"per_cell_timeout_s": 60.5}})
+
+
+def test_validate_config_accepts_string_int_timeout():
+    cfg = config.validate_config({"name": "smoke", "execute": {"per_cell_timeout_s": "120"}})
+    assert cfg.execute.per_cell_timeout_s == 120
+
+
+def test_validate_config_rejects_bool_timeout():
+    with pytest.raises(config.ConfigError, match="per_cell_timeout_s"):
+        config.validate_config({"name": "smoke", "execute": {"per_cell_timeout_s": True}})
+
+
 def test_load_config_round_trip(tmp_path: Path):
     p = _write(
         tmp_path,

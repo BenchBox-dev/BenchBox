@@ -105,3 +105,56 @@ def test_package_counts_failures(tmp_path: Path):
     assert result.success_count == 2
     assert result.failure_count == 1
     assert result.exit_code() == 1
+
+
+@pytest.mark.parametrize("state", sorted(package.PR_STUB_TERMINAL_STATES))
+def test_package_warns_for_pr_stub_states(tmp_path: Path, state: str):
+    cfg = validate_config({"name": "x", "package": {"submit_terminal_state": state}})
+    runner = _fake_runner_factory([0])
+    warnings: list[str] = []
+    package.run_package(
+        cfg,
+        result_paths=[tmp_path / "r.json"],
+        submissions_dir=tmp_path / "subs",
+        runner=runner,
+        warn=warnings.append,
+    )
+    assert warnings, f"no warning emitted for stub state {state!r}"
+    assert state in warnings[0]
+    assert "stub" in warnings[0].lower()
+
+
+def test_package_local_stage_does_not_warn(tmp_path: Path):
+    cfg = validate_config({"name": "x", "package": {"submit_terminal_state": "local-stage"}})
+    runner = _fake_runner_factory([0])
+    warnings: list[str] = []
+    package.run_package(
+        cfg,
+        result_paths=[tmp_path / "r.json"],
+        submissions_dir=tmp_path / "subs",
+        runner=runner,
+        warn=warnings.append,
+    )
+    assert warnings == []
+
+
+def test_package_cloud_uploaded_does_not_warn(tmp_path: Path):
+    cfg = validate_config(
+        {
+            "name": "x",
+            "package": {
+                "submit_terminal_state": "cloud-uploaded",
+                "service": "https://results.example.com",
+            },
+        }
+    )
+    runner = _fake_runner_factory([0])
+    warnings: list[str] = []
+    package.run_package(
+        cfg,
+        result_paths=[tmp_path / "r.json"],
+        submissions_dir=tmp_path / "subs",
+        runner=runner,
+        warn=warnings.append,
+    )
+    assert warnings == []

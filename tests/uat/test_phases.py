@@ -162,3 +162,164 @@ def test_default_log_dir_substitutes_date_and_name():
     out = exec_phase.default_log_dir(cfg, now=_dt.datetime(2026, 5, 5))
     assert "20260505" in str(out)
     assert "uat-2026-05-02" not in str(out)  # default template uses {date} only
+
+
+def test_topological_sort_moves_source_before_consumer():
+    consumer_to_sources = {
+        "read_primitives": ["tpch"],
+        "write_primitives": ["tpch"],
+    }
+    out = exec_phase._topological_sort(
+        ["read_primitives", "tpch", "write_primitives"],
+        consumer_to_sources,
+    )
+    assert out.index("tpch") < out.index("read_primitives")
+    assert out.index("tpch") < out.index("write_primitives")
+
+
+def test_topological_sort_stable_when_no_constraint():
+    """Benchmarks unconstrained by SOURCE_REUSE_GRAPH keep input order."""
+    out = exec_phase._topological_sort(["clickbench", "ssb", "h2odb"], {})
+    assert out == ["clickbench", "ssb", "h2odb"]
+
+
+def test_topological_sort_keeps_available_unrelated_benchmark_before_source():
+    """Stable order should move sources only as far left as dependency constraints require."""
+    consumer_to_sources = {
+        "read_primitives": ["tpch"],
+        "write_primitives": ["tpch"],
+        "transaction_primitives": ["tpch"],
+        "ai_primitives": ["tpch"],
+    }
+    out = exec_phase._topological_sort(
+        [
+            "read_primitives",
+            "clickbench",
+            "tpch",
+            "write_primitives",
+            "transaction_primitives",
+            "ai_primitives",
+        ],
+        consumer_to_sources,
+    )
+    assert out == [
+        "clickbench",
+        "tpch",
+        "read_primitives",
+        "write_primitives",
+        "transaction_primitives",
+        "ai_primitives",
+    ]
+
+
+def test_execute_reorders_consumer_before_source(tmp_path):
+    """Even if include lists read_primitives first, tpch must run first."""
+    matrix.reset_reachability_cache()
+    cfg = validate_config(
+        {
+            "name": "fake",
+            "platforms": {"include": ["duckdb"]},
+            # Order deliberately puts the consumer first.
+            "benchmarks": {"include": ["read_primitives", "tpch"]},
+            "scales": {"rungs": [0.01]},
+        }
+    )
+    invocations: list[str] = []
+
+    def recording_runner(platform, benchmark, scale, **kwargs):
+        invocations.append(benchmark)
+        return CellResult(
+            platform=platform,
+            benchmark=benchmark,
+            scale=scale,
+            status="passed",
+            exit_code=0,
+            elapsed_s=1.0,
+            log_path=Path("/tmp/x.log"),
+            result_path=None,
+        )
+
+    exec_phase.run_execute(
+        cfg,
+        log_dir=tmp_path,
+        databases_root=tmp_path / "databases",
+        runner=recording_runner,
+    )
+    assert "tpch" in invocations and "read_primitives" in invocations
+    assert invocations.index("tpch") < invocations.index("read_primitives")
+
+
+def test_execute_prunes_source_after_consumer_completes(tmp_path):
+    """The tpch DB should be pruned once its only consumer (read_primitives) finishes."""
+    matrix.reset_reachability_cache()
+    cfg = validate_config(
+        {
+            "name": "fake",
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch", "read_primitives"]},
+            "scales": {"rungs": [0.01]},
+        }
+    )
+    db_root = tmp_path / "databases"
+    # Create a fake on-disk source DB so prune_database_dir has something to remove.
+    (db_root / "duckdb" / "tpch" / "0.01").mkdir(parents=True)
+    (db_root / "duckdb" / "tpch" / "0.01" / "data.duckdb").write_text("stub")
+
+    runner = _stub_runner_factory(
+        elapsed_map={0.01: 1.0},
+        pass_map={0.01: True},
+    )
+    exec_phase.run_execute(
+        cfg,
+        log_dir=tmp_path,
+        databases_root=db_root,
+        runner=runner,
+    )
+    # After read_primitives completes, the tpch source DB should have been pruned.
+    assert not (db_root / "duckdb" / "tpch" / "0.01").exists()
+
+
+def test_execute_does_not_prune_source_while_consumer_pending(tmp_path):
+    """During the (duckdb, tpch) cleanup pass, read_primitives is still pending — DB stays."""
+    matrix.reset_reachability_cache()
+    cfg = validate_config(
+        {
+            "name": "fake",
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch", "read_primitives"]},
+            "scales": {"rungs": [0.01]},
+        }
+    )
+    db_root = tmp_path / "databases"
+    (db_root / "duckdb" / "tpch" / "0.01").mkdir(parents=True)
+    (db_root / "duckdb" / "tpch" / "0.01" / "data.duckdb").write_text("stub")
+
+    # Stop after tpch finishes, before read_primitives runs.
+    invocations: list[str] = []
+
+    def stop_after_tpch(platform, benchmark, scale, **kwargs):
+        invocations.append(benchmark)
+        if benchmark == "read_primitives":
+            raise RuntimeError("should be reachable but we want to inspect mid-state")
+        return CellResult(
+            platform=platform,
+            benchmark=benchmark,
+            scale=scale,
+            status="passed",
+            exit_code=0,
+            elapsed_s=1.0,
+            log_path=Path("/tmp/x.log"),
+            result_path=None,
+        )
+
+    with pytest.raises(RuntimeError):
+        exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=db_root,
+            runner=stop_after_tpch,
+        )
+    # tpch ran; read_primitives was attempted next (before its cleanup);
+    # the tpch DB must NOT have been pruned because read_primitives is
+    # the consumer that gates the prune.
+    assert (db_root / "duckdb" / "tpch" / "0.01").exists()
