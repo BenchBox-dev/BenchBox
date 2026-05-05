@@ -175,9 +175,10 @@ class MotherDuckAdapter(PlatformAdapter):
             "benchmark": config.get("benchmark"),
         }
 
-        # Map CLI args to config
-        if config.get("motherduck_database"):
-            adapter_config["database"] = config["motherduck_database"]
+        # Map the legacy argparse-style key and normalized DatabaseConfig key.
+        database = config.get("motherduck_database") or config.get("database")
+        if database:
+            adapter_config["database"] = database
         if config.get("motherduck_token"):
             adapter_config["token"] = config["motherduck_token"]
         if config.get("memory_limit"):

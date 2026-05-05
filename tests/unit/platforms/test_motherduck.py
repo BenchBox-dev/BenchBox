@@ -283,6 +283,34 @@ class TestMotherDuckConfigBuilder:
 
         assert config.options["database"] == "cli_db"
 
+    def test_wizard_database_reaches_adapter_from_runtime_config(self, monkeypatch):
+        from benchbox.core.platform_config import get_platform_config
+        from benchbox.platforms.motherduck import MotherDuckAdapter, _build_motherduck_config
+
+        class _FakeCredentialManager:
+            def get_platform_credentials(self, key: str):
+                assert key == "motherduck"
+                return {"database": "wizard_saved_db", "token_env_var": "MOTHERDUCK_TOKEN"}
+
+        monkeypatch.setattr(
+            "benchbox.security.credentials.CredentialManager",
+            lambda: _FakeCredentialManager(),
+        )
+        monkeypatch.setenv("MOTHERDUCK_TOKEN", "env-token")
+
+        database_config = _build_motherduck_config(
+            "motherduck",
+            options={},
+            overrides={"benchmark": "tpch", "scale_factor": 0.01},
+            info=None,
+        )
+        runtime_config = get_platform_config(database_config, None, benchmark_name="tpch", scale_factor=0.01)
+
+        adapter = MotherDuckAdapter.from_config(runtime_config)
+
+        assert runtime_config["database"] == "wizard_saved_db"
+        assert adapter.database == "wizard_saved_db"
+
 
 class TestMotherDuckCreateConnection:
     """Test create_connection with a mocked duckdb.connect."""
