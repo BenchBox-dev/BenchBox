@@ -38,6 +38,22 @@ historical DONE verification commands when they are still executable
 documentation, and skips future reprocessing only after it has posted a reply
 containing the `benchbox-codex-review-followup-actioned` marker.
 
+If the routine crashes mid-sweep (transient `gh api` failures and pre-commit
+hook auto-fixes will normally retry; anything else exits with a non-zero
+status), re-drive it on the same worktree with `CODEX_REVIEW_RESUME=1`:
+
+```bash
+make codex-pr-review-followups CODEX_REVIEW_RESUME=1 CODEX_REVIEW_SINCE=YYYY-MM-DD
+```
+
+`--resume` (or its env-var form) implies `--allow-dirty` so the prior
+per-comment commits on the branch are accepted, and parses
+`git log origin/<base>..HEAD` for the per-comment commit subject to skip
+comments whose fix already landed locally. The GitHub-marker check still
+catches threads where both the commit and the reply already succeeded, so
+`--resume` only needs to short-circuit the codex re-run for half-completed
+work. Use it after any unplanned exit; do not use it on a fresh branch.
+
 ## Trust model — review the resulting PR before merge
 
 The routine runs `codex exec --sandbox workspace-write -c approval_policy=never`

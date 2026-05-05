@@ -925,6 +925,12 @@ codex-pr-review-followups-list:
 #                                 the default, so the reply is posted.
 #   CODEX_REVIEW_SUBMIT=0         skip final pr-open. Same accepted values
 #                                 as CODEX_REVIEW_REPLY above.
+#   CODEX_REVIEW_RESUME=1         re-drive the routine on a branch that
+#                                 already carries per-comment commits from a
+#                                 prior crashed sweep. Implies --allow-dirty
+#                                 and skips comments already committed
+#                                 locally. Only the literals 1|true|yes
+#                                 enable it.
 codex-pr-review-followups:
 	@uv run --project _project/scripts -- python _project/scripts/codex_pr_review_followups.py run \
 		--base "$(CODEX_REVIEW_BASE)" \
@@ -937,7 +943,8 @@ codex-pr-review-followups:
 		$(if $(CODEX_REVIEW_UNTIL),--until "$(CODEX_REVIEW_UNTIL)") \
 		$(if $(CODEX_REVIEW_MODEL),--codex-model "$(CODEX_REVIEW_MODEL)") \
 		$(if $(filter 0 false no,$(CODEX_REVIEW_REPLY)),--no-reply) \
-		$(if $(filter 0 false no,$(CODEX_REVIEW_SUBMIT)),--no-submit)
+		$(if $(filter 0 false no,$(CODEX_REVIEW_SUBMIT)),--no-submit) \
+		$(if $(filter 1 true yes,$(CODEX_REVIEW_RESUME)),--resume)
 
 dev-loop-metrics:
 	@set -e; \

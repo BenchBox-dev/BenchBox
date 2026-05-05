@@ -18,9 +18,10 @@ import re
 import subprocess
 import sys
 import textwrap
+import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence
 
 DEFAULT_CODEX_AUTHORS = ("chatgpt-codex-connector[bot]", "chatgpt-codex-connector")
 ACTION_MARKER = "benchbox-codex-review-followup-actioned"
@@ -30,6 +31,16 @@ PER_COMMENT_COMMIT_PREFIX = "fix(codex-followup)"
 MAX_REPLY_SUMMARY_CHARS = 8000
 PROMPT_TEMPLATE_PATH = Path(__file__).resolve().parent / "prompts" / "codex_pr_review_followup.md"
 MIN_CODEX_VERSION = (0, 20, 0)
+PER_COMMENT_COMMIT_SUBJECT_REGEX = re.compile(
+    rf"^{re.escape(PER_COMMENT_COMMIT_PREFIX)}: PR #(\d+) comment (\d+) "
+)
+GH_API_RETRY_ATTEMPTS = 3
+# Sleep schedule (seconds) consumed in order between retries. Three values are
+# defined so the schedule remains stable if the attempt cap is later raised; at
+# GH_API_RETRY_ATTEMPTS == 3 only the first two are used (1s before retry 2,
+# 4s before retry 3).
+GH_API_RETRY_BACKOFFS: tuple[int, ...] = (1, 4, 9)
+HOOK_AUTOFIX_STDERR_MARKER = "files were modified by this hook"
 
 
 @dataclass(frozen=True)
@@ -482,6 +493,25 @@ def local_commit_count(runner: CommandRunner, base_ref: str) -> int:
     return int(result.stdout.strip() or "0")
 
 
+def discover_locally_committed_pairs(
+    runner: CommandRunner, base_ref: str
+) -> set[tuple[int, int]]:
+    """Return (pr_number, comment_id) pairs for per-comment commits already on HEAD.
+
+    Used by `--resume` to skip pending comments whose fix already landed
+    locally during a prior crashed sweep. Only the per-comment subject format
+    produced by `commit_message_for_result` matches; the fallback batch commit
+    in `finalize_changes` does not.
+    """
+    result = checked(runner, ["git", "log", "--format=%s", f"{base_ref}..HEAD"])
+    pairs: set[tuple[int, int]] = set()
+    for line in result.stdout.splitlines():
+        match = PER_COMMENT_COMMIT_SUBJECT_REGEX.match(line)
+        if match:
+            pairs.add((int(match.group(1)), int(match.group(2))))
+    return pairs
+
+
 def current_branch(runner: CommandRunner) -> str:
     return checked(runner, ["git", "branch", "--show-current"]).stdout.strip()
 
@@ -624,6 +654,28 @@ def commit_message_for_result(result: ActionResult) -> str:
     return f"{subject}\n\n{body}"
 
 
+def _porcelain_paths_with_worktree_mods(porcelain: str) -> set[str]:
+    """Return paths from `git status --porcelain` whose work-tree column is non-space.
+
+    The work-tree column (Y in `XY <path>`) is non-space whenever the file has
+    uncommitted changes relative to the index. After a pre-commit auto-fix this
+    is exactly how a previously-staged path surfaces.
+    """
+    paths: set[str] = set()
+    for line in porcelain.splitlines():
+        if len(line) < 4 or line[2] != " ":
+            continue
+        worktree_status = line[1]
+        if worktree_status == " ":
+            continue
+        path = line[3:]
+        # Renames: `R  <old> -> <new>`. Take the destination path.
+        if " -> " in path:
+            path = path.split(" -> ", 1)[1]
+        paths.add(path)
+    return paths
+
+
 def commit_changes_for_result(
     runner: CommandRunner, result: ActionResult
 ) -> bool:
@@ -633,6 +685,13 @@ def commit_changes_for_result(
     is posted so a crash between codex and reply leaves no phantom-actioned
     state on GitHub: either the commit landed (next run sees no change), or
     nothing happened (next run reprocesses the comment cleanly).
+
+    A pre-commit hook that auto-formats the staged paths (e.g. `ruff-format`)
+    aborts the first commit with the marker `files were modified by this hook`
+    and leaves the formatted change in the work tree. We re-stage the same
+    paths and retry once. We deliberately do NOT generalise this to all commit
+    failures: a hook that detects a real bug (a test runner, a banned-pattern
+    grep) must still surface as a hard failure.
     """
     if result.disposition != "fixed":
         return False
@@ -646,7 +705,22 @@ def commit_changes_for_result(
     staged_paths = checked(runner, ["git", "diff", "--cached", "--name-only"]).stdout.splitlines()
     if not staged_paths:
         return False
-    checked(runner, ["git", "commit", "-m", commit_message_for_result(result)])
+    commit_args = ["git", "commit", "-m", commit_message_for_result(result)]
+    commit_result = runner.run(commit_args)
+    if commit_result.returncode == 0:
+        return True
+    stderr = commit_result.stderr or ""
+    if HOOK_AUTOFIX_STDERR_MARKER not in stderr:
+        raise CommandError(commit_args, commit_result)
+    porcelain = checked(runner, ["git", "status", "--porcelain"]).stdout
+    auto_fixed = _porcelain_paths_with_worktree_mods(porcelain)
+    if not auto_fixed.intersection(staged_paths):
+        # The hook ran, but the working-tree mods (if any) don't overlap the
+        # paths we just staged — treat as a genuine pre-commit failure.
+        raise CommandError(commit_args, commit_result)
+    print("==> pre-commit hook auto-fixed staged paths; re-staging and retrying once")
+    stage_paths(runner, staged_paths)
+    checked(runner, commit_args)
     return True
 
 
@@ -670,11 +744,67 @@ def build_reply_body(result: ActionResult, *, branch: str) -> str:
     ).strip()
 
 
-def reply_to_comment(runner: CommandRunner, *, repo: str, result: ActionResult, branch: str) -> None:
+_TRANSIENT_GH_STDERR_REGEX = re.compile(
+    r"error connecting to|check your internet connection|\bHTTP 5\d\d\b|\bHTTP 429\b",
+    re.IGNORECASE,
+)
+
+
+def _is_transient_gh_failure(stderr: str) -> bool:
+    """True for connection failures, HTTP 5xx, or HTTP 429.
+
+    Permanent 4xx (e.g. 404 — comment deleted upstream) returns False so the
+    caller fails loud instead of looping on a request that will never succeed.
+    """
+    if not stderr:
+        return False
+    return bool(_TRANSIENT_GH_STDERR_REGEX.search(stderr))
+
+
+def _gh_api_with_retry(
+    runner: CommandRunner,
+    args: Sequence[str],
+    *,
+    attempts: int = GH_API_RETRY_ATTEMPTS,
+    backoffs: Sequence[int] = GH_API_RETRY_BACKOFFS,
+    sleeper: Callable[[float], None] = time.sleep,
+) -> subprocess.CompletedProcess[str]:
+    """Run a `gh api` call, retrying only on transient failures.
+
+    Targeted at the reply-posting path: a flaky network or transient GitHub 5xx
+    aborted multiple sweeps in 2026-05-04. Permanent failures (e.g. 404) still
+    raise immediately — see `_is_transient_gh_failure`.
+    """
+    for attempt in range(1, attempts + 1):
+        result = runner.run(args)
+        if result.returncode == 0:
+            return result
+        stderr = result.stderr or ""
+        if not _is_transient_gh_failure(stderr) or attempt >= attempts:
+            raise CommandError(args, result)
+        backoff = backoffs[attempt - 1] if attempt - 1 < len(backoffs) else backoffs[-1]
+        print(
+            f"Transient gh api failure on attempt {attempt}/{attempts}; retrying in {backoff}s.",
+            file=sys.stderr,
+            flush=True,
+        )
+        sleeper(backoff)
+    # Defensive: the loop always returns or raises above.
+    raise RuntimeError("_gh_api_with_retry exited without returning or raising")
+
+
+def reply_to_comment(
+    runner: CommandRunner,
+    *,
+    repo: str,
+    result: ActionResult,
+    branch: str,
+    sleeper: Callable[[float], None] = time.sleep,
+) -> None:
     pr_number = result.pending.pr.number
     comment_id = result.pending.comment.id
     body = build_reply_body(result, branch=branch)
-    checked(
+    _gh_api_with_retry(
         runner,
         [
             "gh",
@@ -685,6 +815,7 @@ def reply_to_comment(runner: CommandRunner, *, repo: str, result: ActionResult, 
             "-f",
             f"body={body}",
         ],
+        sleeper=sleeper,
     )
     print(f"Replied to PR #{pr_number} comment {comment_id}.")
 
@@ -763,12 +894,17 @@ def run_action_loop(args: argparse.Namespace, runner: CommandRunner) -> int:
     until = parse_bound(args.until, end_of_day=True)
     authors = set(args.author)
     branch = ""
+    resume = bool(getattr(args, "resume", False))
     if args.command == "run":
         if not args.dry_run:
             branch = current_branch(runner)
             ensure_action_branch(branch, no_submit=args.no_submit)
             check_codex_version(runner)
-        ensure_clean_start(runner, allow_dirty=args.allow_dirty or args.dry_run, base_ref=f"origin/{args.base}")
+        ensure_clean_start(
+            runner,
+            allow_dirty=args.allow_dirty or args.dry_run or resume,
+            base_ref=f"origin/{args.base}",
+        )
     pending = discover_pending_comments(
         runner,
         repo=repo,
@@ -778,6 +914,18 @@ def run_action_loop(args: argparse.Namespace, runner: CommandRunner) -> int:
         until=until,
         author_logins=authors,
     )
+    if resume and args.command == "run":
+        already = discover_locally_committed_pairs(runner, f"origin/{args.base}")
+        if already:
+            before = len(pending)
+            pending = [
+                item for item in pending
+                if (item.pr.number, item.comment.id) not in already
+            ]
+            print(
+                f"--resume: skipping {before - len(pending)} comment(s) already "
+                f"committed locally on this branch."
+            )
     if args.max_comments > 0:
         pending = pending[: args.max_comments]
 
@@ -833,6 +981,16 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--allow-dirty", action="store_true")
     run_parser.add_argument("--no-reply", action="store_true")
     run_parser.add_argument("--no-submit", action="store_true")
+    run_parser.add_argument(
+        "--resume",
+        action="store_true",
+        help=(
+            "Skip pending comments whose per-comment fix already landed locally "
+            "(parses `git log origin/<base>..HEAD` for the per-comment commit "
+            "subject). Implies --allow-dirty so a branch with prior commits is "
+            "accepted. Use this after a crashed sweep to re-drive the routine."
+        ),
+    )
     run_parser.add_argument("--codex-model", default=os.environ.get("CODEX_REVIEW_MODEL"))
     run_parser.add_argument(
         "--codex-sandbox",

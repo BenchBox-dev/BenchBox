@@ -37,10 +37,20 @@ codex_pr_review_followups = _load_script()
 
 
 class RecordingRunner:
-    def __init__(self, responses: dict[tuple[str, ...], subprocess.CompletedProcess[str]] | None = None) -> None:
+    def __init__(
+        self,
+        responses: dict[tuple[str, ...], subprocess.CompletedProcess[str]] | None = None,
+        *,
+        scripted: dict[tuple[str, ...], list[subprocess.CompletedProcess[str]]] | None = None,
+    ) -> None:
         self.commands: list[list[str]] = []
         self.inputs: list[str | None] = []
         self.responses = responses or {}
+        # Per-call queue keyed by argv tuple. Earlier entries are consumed first;
+        # once exhausted, the runner falls back to `responses` then to a 0-rc
+        # default. Patch 2 needs this so the same argv (`git commit -m ...`) can
+        # return rc=1 once and rc=0 the next time.
+        self.scripted = {key: list(values) for key, values in (scripted or {}).items()}
         self.cwd = Path.cwd()
 
     def run(self, args: Sequence[str], input_text: str | None = None) -> subprocess.CompletedProcess[str]:
@@ -48,6 +58,8 @@ class RecordingRunner:
         self.commands.append(argv)
         self.inputs.append(input_text)
         key = tuple(argv)
+        if key in self.scripted and self.scripted[key]:
+            return self.scripted[key].pop(0)
         if key in self.responses:
             return self.responses[key]
         return subprocess.CompletedProcess(argv, 0, "", "")
@@ -399,3 +411,360 @@ def test_run_action_loop_commits_before_replying(monkeypatch, tmp_path) -> None:
         text=True,
     ).stdout
     assert "comment 999" in log_out
+
+
+# ---------------------------------------------------------------------------
+# Patch 1 — reply_to_comment retries transient gh api failures
+# ---------------------------------------------------------------------------
+
+
+def _reply_args(repo: str, pr_number: int, comment_id: int) -> tuple[str, ...]:
+    return (
+        "gh",
+        "api",
+        "-X",
+        "POST",
+        f"repos/{repo}/pulls/{pr_number}/comments/{comment_id}/replies",
+    )
+
+
+def test_reply_to_comment_retries_transient_gh_failure_then_succeeds() -> None:
+    """A flaky `gh api` (network drop, 5xx) must be retried, not crash the sweep."""
+    transient = subprocess.CompletedProcess(
+        [],
+        1,
+        "",
+        "error connecting to api.github.com\ncheck your internet connection or https://githubstatus.com\n",
+    )
+    success = subprocess.CompletedProcess([], 0, "", "")
+    pending = codex_pr_review_followups.PendingComment(pr=_pr(), comment=_comment(33), replies=())
+    result = codex_pr_review_followups.ActionResult(pending=pending, disposition="fixed", summary="ok")
+
+    sleeps: list[float] = []
+
+    class GhScriptedRunner(RecordingRunner):
+        def __init__(self) -> None:
+            super().__init__()
+            self.gh_responses = [transient, success]
+
+        def run(self, args, input_text=None):  # type: ignore[override]
+            argv = list(args)
+            self.commands.append(argv)
+            self.inputs.append(input_text)
+            if (
+                argv[:4] == ["gh", "api", "-X", "POST"]
+                and "/replies" in (argv[4] if len(argv) > 4 else "")
+                and self.gh_responses
+            ):
+                return self.gh_responses.pop(0)
+            return subprocess.CompletedProcess(argv, 0, "", "")
+
+    runner = GhScriptedRunner()
+
+    codex_pr_review_followups.reply_to_comment(
+        runner,
+        repo="joeharris76/BenchBox",
+        result=result,
+        branch="fix/sample",
+        sleeper=sleeps.append,
+    )
+
+    reply_calls = [cmd for cmd in runner.commands if cmd[:4] == ["gh", "api", "-X", "POST"]]
+    assert len(reply_calls) == 2, "transient failure should be retried exactly once before success"
+    assert sleeps == [1], "first retry must use the 1s backoff slot"
+    assert not runner.gh_responses, "scripted responses should be exhausted"
+
+
+def test_reply_to_comment_does_not_retry_permanent_4xx() -> None:
+    """A 404 (comment deleted upstream) must fail loud on the first attempt."""
+    permanent = subprocess.CompletedProcess(
+        [],
+        1,
+        "",
+        "gh: HTTP 404: Not Found (https://api.github.com/repos/x/y/pulls/1/comments/1/replies)\n",
+    )
+    pending = codex_pr_review_followups.PendingComment(pr=_pr(), comment=_comment(34), replies=())
+    result = codex_pr_review_followups.ActionResult(pending=pending, disposition="fixed", summary="ok")
+
+    sleeps: list[float] = []
+
+    class GhPermFailRunner(RecordingRunner):
+        def run(self, args, input_text=None):  # type: ignore[override]
+            argv = list(args)
+            self.commands.append(argv)
+            self.inputs.append(input_text)
+            if argv[:4] == ["gh", "api", "-X", "POST"]:
+                return permanent
+            return subprocess.CompletedProcess(argv, 0, "", "")
+
+    runner = GhPermFailRunner()
+
+    with pytest.raises(codex_pr_review_followups.CommandError, match="HTTP 404"):
+        codex_pr_review_followups.reply_to_comment(
+            runner,
+            repo="joeharris76/BenchBox",
+            result=result,
+            branch="fix/sample",
+            sleeper=sleeps.append,
+        )
+
+    reply_calls = [cmd for cmd in runner.commands if cmd[:4] == ["gh", "api", "-X", "POST"]]
+    assert len(reply_calls) == 1, "permanent 4xx must not retry"
+    assert sleeps == [], "no backoff sleep should have happened"
+
+
+def test_is_transient_gh_failure_classification() -> None:
+    """Sanity-check the discriminator covers the flagged classes and nothing else."""
+    assert codex_pr_review_followups._is_transient_gh_failure("error connecting to api.github.com")
+    assert codex_pr_review_followups._is_transient_gh_failure(
+        "check your internet connection or https://githubstatus.com"
+    )
+    assert codex_pr_review_followups._is_transient_gh_failure("gh: HTTP 503: Service Unavailable")
+    assert codex_pr_review_followups._is_transient_gh_failure("gh: HTTP 429: Too Many Requests")
+    assert not codex_pr_review_followups._is_transient_gh_failure("gh: HTTP 404: Not Found")
+    assert not codex_pr_review_followups._is_transient_gh_failure("gh: HTTP 422: Validation failed")
+    assert not codex_pr_review_followups._is_transient_gh_failure("")
+
+
+# ---------------------------------------------------------------------------
+# Patch 2 — commit_changes_for_result retries when a hook auto-fixes paths
+# ---------------------------------------------------------------------------
+
+
+def test_commit_changes_for_result_retries_after_hook_autofix() -> None:
+    """ruff-format reformats a staged file, commit aborts, second commit succeeds."""
+    pending = codex_pr_review_followups.PendingComment(
+        pr=_pr(), comment=_comment(55, body="[P1] Add the missing test"), replies=()
+    )
+    result = codex_pr_review_followups.ActionResult(pending=pending, disposition="fixed", summary="ok")
+    expected_message = codex_pr_review_followups.commit_message_for_result(result)
+    commit_argv = ("git", "commit", "-m", expected_message)
+
+    target_path = "tests/unit/example.py"
+    diff_name = subprocess.CompletedProcess([], 0, f"{target_path}\n", "")
+    diff_cached_name_empty = subprocess.CompletedProcess([], 0, "", "")
+    ls_files = subprocess.CompletedProcess([], 0, f"{target_path}\n", "")
+    diff_cached_after_stage = subprocess.CompletedProcess([], 0, f"{target_path}\n", "")
+    commit_hook_failure = subprocess.CompletedProcess(
+        [],
+        1,
+        "",
+        "ruff-format..............................................................Failed\n"
+        "- hook id: ruff-format\n"
+        f"- files were modified by this hook\n\nReformatted: {target_path}\n",
+    )
+    porcelain_after_hook = subprocess.CompletedProcess([], 0, f"AM {target_path}\n", "")
+    commit_success = subprocess.CompletedProcess([], 0, "ok\n", "")
+
+    runner = RecordingRunner(
+        scripted={
+            ("git", "diff", "--name-only"): [diff_name],
+            ("git", "diff", "--cached", "--name-only"): [
+                # First call: from git_changed_paths — nothing pre-staged.
+                diff_cached_name_empty,
+                # Second call: post-stage_paths to verify staged content.
+                diff_cached_after_stage,
+            ],
+            ("git", "ls-files", "--others", "--exclude-standard"): [ls_files],
+            commit_argv: [commit_hook_failure, commit_success],
+            ("git", "status", "--porcelain"): [porcelain_after_hook],
+        }
+    )
+
+    landed = codex_pr_review_followups.commit_changes_for_result(runner, result)
+
+    assert landed is True
+    commit_calls = [tuple(cmd) for cmd in runner.commands if tuple(cmd) == commit_argv]
+    assert len(commit_calls) == 2, "hook auto-fix must trigger exactly one retry commit"
+    add_calls = [cmd for cmd in runner.commands if cmd[:3] == ["git", "add", "--"]]
+    assert len(add_calls) == 2, "second `git add` must re-stage the hook-modified path"
+    assert add_calls[1] == ["git", "add", "--", target_path]
+
+
+def test_commit_changes_for_result_does_not_retry_genuine_hook_failure() -> None:
+    """If the hook fails without auto-fixing the staged paths, fail loud."""
+    pending = codex_pr_review_followups.PendingComment(
+        pr=_pr(), comment=_comment(56, body="[P1] do something"), replies=()
+    )
+    result = codex_pr_review_followups.ActionResult(pending=pending, disposition="fixed", summary="ok")
+    expected_message = codex_pr_review_followups.commit_message_for_result(result)
+    commit_argv = ("git", "commit", "-m", expected_message)
+
+    target_path = "tests/unit/example.py"
+    diff_name = subprocess.CompletedProcess([], 0, f"{target_path}\n", "")
+    diff_cached_empty = subprocess.CompletedProcess([], 0, "", "")
+    ls_files = subprocess.CompletedProcess([], 0, "", "")
+    diff_cached_after_stage = subprocess.CompletedProcess([], 0, f"{target_path}\n", "")
+    # Genuine pre-commit failure (e.g. a test runner detected a real bug):
+    # commit fails, but porcelain shows no fresh work-tree mods.
+    commit_failure = subprocess.CompletedProcess(
+        [], 1, "", "test-runner..............................................................Failed\n"
+    )
+    porcelain_clean = subprocess.CompletedProcess([], 0, "", "")
+
+    runner = RecordingRunner(
+        scripted={
+            ("git", "diff", "--name-only"): [diff_name],
+            ("git", "diff", "--cached", "--name-only"): [
+                diff_cached_empty,
+                diff_cached_after_stage,
+            ],
+            ("git", "ls-files", "--others", "--exclude-standard"): [ls_files],
+            commit_argv: [commit_failure],
+            ("git", "status", "--porcelain"): [porcelain_clean],
+        }
+    )
+
+    with pytest.raises(codex_pr_review_followups.CommandError):
+        codex_pr_review_followups.commit_changes_for_result(runner, result)
+
+    commit_calls = [tuple(cmd) for cmd in runner.commands if tuple(cmd) == commit_argv]
+    assert len(commit_calls) == 1, "genuine hook failure must not retry"
+
+
+def test_porcelain_paths_with_worktree_mods_parses_added_modified_and_renamed() -> None:
+    porcelain = (
+        "AM tests/unit/example.py\nM  src/module.py\n M docs/notes.md\n?? new_file.txt\nR  old_name.py -> new_name.py\n"
+    )
+
+    paths = codex_pr_review_followups._porcelain_paths_with_worktree_mods(porcelain)
+
+    # AM, " M", "??" all have non-space work-tree column -> included.
+    # "M  " has a space work-tree column -> excluded (purely staged).
+    # "R  " rename has space work-tree column -> excluded.
+    assert paths == {"tests/unit/example.py", "docs/notes.md", "new_file.txt"}
+
+
+# ---------------------------------------------------------------------------
+# Patch 3 — --resume skips comments already committed locally
+# ---------------------------------------------------------------------------
+
+
+def test_resume_skips_comments_already_committed_locally(monkeypatch, tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    subprocess.run(["git", "init", "-q", str(repo_root)], check=True)
+    subprocess.run(["git", "-C", str(repo_root), "config", "user.email", "test@example.com"], check=True)
+    subprocess.run(["git", "-C", str(repo_root), "config", "user.name", "Test"], check=True)
+    subprocess.run(["git", "-C", str(repo_root), "config", "commit.gpgsign", "false"], check=True)
+    (repo_root / "README").write_text("ok\n")
+    subprocess.run(["git", "-C", str(repo_root), "add", "README"], check=True)
+    subprocess.run(["git", "-C", str(repo_root), "commit", "-q", "-m", "init"], check=True)
+    subprocess.run(["git", "-C", str(repo_root), "branch", "-M", "develop"], check=True)
+    head = subprocess.run(
+        ["git", "-C", str(repo_root), "rev-parse", "HEAD"], check=True, capture_output=True, text=True
+    ).stdout.strip()
+    subprocess.run(["git", "-C", str(repo_root), "update-ref", "refs/remotes/origin/develop", head], check=True)
+    subprocess.run(["git", "-C", str(repo_root), "checkout", "-q", "-b", "fix/codex-resume"], check=True)
+    # A per-comment commit from a prior crashed sweep: PR #999, comment 12345.
+    (repo_root / "fix.txt").write_text("prior fix\n")
+    subprocess.run(["git", "-C", str(repo_root), "add", "fix.txt"], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo_root),
+            "commit",
+            "-q",
+            "-m",
+            "fix(codex-followup): PR #999 comment 12345 — recovered fix",
+        ],
+        check=True,
+    )
+
+    already_pr = codex_pr_review_followups.PullRequest(
+        number=999, title="prior", merged_at="2026-05-01T00:00:00Z", url="https://example/999"
+    )
+    already_comment = codex_pr_review_followups.ReviewComment(
+        id=12345,
+        body="[P1] already done",
+        path="fix.txt",
+        html_url="https://example/999#12345",
+        user_login="chatgpt-codex-connector[bot]",
+        created_at="2026-04-30T00:00:00Z",
+    )
+    fresh_pr = codex_pr_review_followups.PullRequest(
+        number=777, title="new", merged_at="2026-05-04T00:00:00Z", url="https://example/777"
+    )
+    fresh_comment = codex_pr_review_followups.ReviewComment(
+        id=88888,
+        body="[P1] still to do",
+        path="other.txt",
+        html_url="https://example/777#88888",
+        user_login="chatgpt-codex-connector[bot]",
+        created_at="2026-05-03T00:00:00Z",
+    )
+    pending_already = codex_pr_review_followups.PendingComment(pr=already_pr, comment=already_comment, replies=())
+    pending_fresh = codex_pr_review_followups.PendingComment(pr=fresh_pr, comment=fresh_comment, replies=())
+
+    seen_codex_calls: list[int] = []
+
+    monkeypatch.setattr(codex_pr_review_followups, "resolve_repo", lambda runner, repo: "joeharris76/BenchBox")
+    monkeypatch.setattr(
+        codex_pr_review_followups,
+        "discover_pending_comments",
+        lambda runner, **_: [pending_already, pending_fresh],
+    )
+    monkeypatch.setattr(codex_pr_review_followups, "check_codex_version", lambda runner: (0, 128, 0))
+    monkeypatch.setattr(
+        codex_pr_review_followups,
+        "run_codex_for_comment",
+        lambda runner, item, **_: (
+            seen_codex_calls.append(item.comment.id)
+            or codex_pr_review_followups.ActionResult(pending=item, disposition="no-current-action", summary="skip")
+        ),
+    )
+    monkeypatch.setattr(codex_pr_review_followups, "commit_changes_for_result", lambda runner, result: False)
+    monkeypatch.setattr(codex_pr_review_followups, "reply_to_comment", lambda runner, **_: None)
+    monkeypatch.setattr(codex_pr_review_followups, "finalize_changes", lambda runner, **_: None)
+
+    runner = codex_pr_review_followups.CommandRunner(repo_root)
+    args = codex_pr_review_followups.build_parser().parse_args(
+        [
+            "run",
+            "--repo",
+            "joeharris76/BenchBox",
+            "--base",
+            "develop",
+            "--no-submit",
+            "--resume",
+        ]
+    )
+
+    rc = codex_pr_review_followups.run_action_loop(args, runner)
+
+    assert rc == 0
+    assert seen_codex_calls == [88888], (
+        "comment 12345 was already committed locally and must be skipped; "
+        "only the unrelated comment 88888 should reach run_codex_for_comment"
+    )
+
+
+def test_discover_locally_committed_pairs_matches_per_comment_subjects(tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    subprocess.run(["git", "init", "-q", str(repo_root)], check=True)
+    subprocess.run(["git", "-C", str(repo_root), "config", "user.email", "t@e.com"], check=True)
+    subprocess.run(["git", "-C", str(repo_root), "config", "user.name", "T"], check=True)
+    subprocess.run(["git", "-C", str(repo_root), "config", "commit.gpgsign", "false"], check=True)
+    (repo_root / "f").write_text("a\n")
+    subprocess.run(["git", "-C", str(repo_root), "add", "f"], check=True)
+    subprocess.run(["git", "-C", str(repo_root), "commit", "-q", "-m", "init"], check=True)
+    head = subprocess.run(
+        ["git", "-C", str(repo_root), "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+    ).stdout.strip()
+    subprocess.run(["git", "-C", str(repo_root), "update-ref", "refs/remotes/origin/develop", head], check=True)
+    for subject in (
+        "fix(codex-followup): PR #1 comment 100 — first",
+        "chore: unrelated commit",
+        "fix(codex-followup): PR #2 comment 200 — second",
+    ):
+        path = repo_root / f"x_{subject[-5:].strip()}.txt"
+        path.write_text(subject)
+        subprocess.run(["git", "-C", str(repo_root), "add", path.name], check=True)
+        subprocess.run(["git", "-C", str(repo_root), "commit", "-q", "-m", subject], check=True)
+
+    runner = codex_pr_review_followups.CommandRunner(repo_root)
+    pairs = codex_pr_review_followups.discover_locally_committed_pairs(runner, "origin/develop")
+
+    assert pairs == {(1, 100), (2, 200)}
