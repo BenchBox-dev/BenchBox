@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import duckdb
@@ -275,35 +274,13 @@ class TestDuckDBSnapshotBuilder:
         with pytest.raises(ValueError, match=message):
             builder.build([entry], tmp_path / "results.duckdb")
 
-    def test_results_schema_json_emitted(self, tmp_path: Path) -> None:
-        """results_schema.json is written next to results.duckdb."""
+    def test_results_schema_json_not_emitted(self, tmp_path: Path) -> None:
+        """The browser reads schema from DuckDB introspection, not a JSON sidecar."""
         builder = DuckDBSnapshotBuilder()
         out = tmp_path / "results.duckdb"
         builder.build([_make_entry()], out)
 
-        schema_path = tmp_path / "results_schema.json"
-        assert schema_path.exists(), "results_schema.json not emitted"
-        schema = json.loads(schema_path.read_text())
-        assert "columns" in schema
-        col_names = [c["name"] for c in schema["columns"]]
-        assert "result_id" in col_names
-        assert "benchmark" in col_names
-        assert "geomean_ms" in col_names
-        # All _COLUMNS names appear
-        expected_names = [name for name, _ in DuckDBSnapshotBuilder._COLUMNS]
-        assert col_names == expected_names
-
-    def test_results_schema_json_column_types(self, tmp_path: Path) -> None:
-        """results_schema.json columns carry their DuckDB type strings."""
-        builder = DuckDBSnapshotBuilder()
-        out = tmp_path / "results.duckdb"
-        builder.build([], out)
-
-        schema = json.loads((tmp_path / "results_schema.json").read_text())
-        by_name = {c["name"]: c["type"] for c in schema["columns"]}
-        assert by_name["result_id"] == "VARCHAR"
-        assert by_name["scale_factor"] == "DOUBLE"
-        assert by_name["query_count"] == "INTEGER"
+        assert not (tmp_path / "results_schema.json").exists()
 
     def test_overwrites_existing_file(self, tmp_path: Path) -> None:
         builder = DuckDBSnapshotBuilder()

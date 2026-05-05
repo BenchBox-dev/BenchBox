@@ -364,81 +364,6 @@ class BenchmarkSummary(BaseModel):
     ranking: RankingConfig | None = None
 
 
-# ---------------------------------------------------------------------------
-# Comparison artifact (pre-computed per ordered set of result_ids)
-# ---------------------------------------------------------------------------
-
-
-class ComparisonRow(BaseModel):
-    """One platform's summary data in a ComparisonArtifact."""
-
-    result_id: str
-    platform: str  # raw platform name from the bundle
-    # Human-readable label, after disambiguation (e.g. "DuckDB v1.2.0").
-    display_label: str
-    platform_id: str
-    driver_version: str | None
-    trust_label: str
-    run_date: str
-    display_geomean_ms: float | None
-    # Raw all-sample geomean retained for audit (see TODO must_preserve).
-    geomean_ms: float | None
-    power_score: float | None
-    total_duration_s: float | None
-    execution_mode: str | None
-    tuning_mode: str | None
-    test_type: str | None
-    compliance_class: str | None = None
-    query_count: int  # number of queries the result covers (drives parity with buildComparabilityWarnings)
-
-
-class ComparisonQueryCell(BaseModel):
-    """Pre-computed per-query metrics for one query across all rows in a ComparisonArtifact."""
-
-    query_id: str
-    # display_ms for each row (same order as ComparisonArtifact.rows); None = absent/failed.
-    display_ms_per_row: list[float | None]
-    fastest_ms: float | None  # min of non-null display_ms_per_row
-    slowest_ms: float | None  # max of non-null display_ms_per_row
-    # slowest_ms / display_ms_per_row[i]; None when either is absent.
-    speedup_vs_slowest_per_row: list[float | None]
-
-
-class ComparabilityWarning(BaseModel):
-    """Structured comparability concern surfaced on the Compare page.
-
-    Shape mirrors the TypeScript ``ComparabilityWarning`` in
-    ``ComparabilityBanner.tsx`` so the artifact's warnings can be rendered
-    directly by the explorer with no translation.
-    """
-
-    dimension: str
-    values: list[str]
-    message: str
-
-
-class ComparisonArtifact(BaseModel):
-    """Pre-computed comparison data for an ordered set of result_ids.
-
-    Written to ``data/compare/{hash16}.json`` by the explorer pipeline.
-    Hash is sha256(sorted_result_ids_csv)[:16] - deterministic on sorted
-    input so both CLI and browser compute the same path.
-
-    ``schema_version`` must be incremented when the shape changes in a
-    breaking way. The explorer hard-fails on version mismatch.
-    """
-
-    schema_version: int = 2
-    benchmark: str
-    scale_factor: float
-    generated_at: str
-    rows: list[ComparisonRow]
-    query_cells: list[ComparisonQueryCell]
-    comparability_warnings: list[ComparabilityWarning]
-    # "power_score" for tpch/tpcds; "display_geomean_ms" for all others.
-    ranking_primary_metric: str
-
-
 class MetaRank(BaseModel):
     """Per-platform rank cell inside a cohort of the meta leaderboard.
 
@@ -456,10 +381,6 @@ class MetaRank(BaseModel):
 
 __all__ = [
     "BenchmarkSummary",
-    "ComparabilityWarning",
-    "ComparisonArtifact",
-    "ComparisonQueryCell",
-    "ComparisonRow",
     "DetailResult",
     "ManifestEntry",
     "PercentileStats",

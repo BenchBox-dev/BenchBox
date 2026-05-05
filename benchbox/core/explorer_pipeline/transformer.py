@@ -10,8 +10,6 @@ import hashlib
 import json
 import logging
 import math
-import re
-from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, cast
@@ -19,19 +17,13 @@ from typing import Any, cast
 from benchbox.core.cost.models import CostScope, CostStatus, DeploymentMetadata, NormalizedCost
 from benchbox.core.cost.pricing import PRICING_VERSION
 from benchbox.core.explorer_pipeline.models import (
-    ComparabilityWarning,
-    ComparisonArtifact,
-    ComparisonQueryCell,
-    ComparisonRow,
     DetailResult,
     ManifestEntry,
     PercentileStats,
     QueryDisplayTiming,
     QueryTiming,
     _platform_id,
-    get_ranking_config,
 )
-from benchbox.core.labels import disambiguate_platform_labels
 from benchbox.core.results.status import bundle_failed_query_count, normalize_validation_status
 
 logger = logging.getLogger(__name__)
@@ -787,175 +779,4 @@ class BundleTransformer:
         )
 
 
-def _comparability_warnings(details: list[DetailResult]) -> list[ComparabilityWarning]:
-    """Build comparability warnings for a set of DetailResults.
-
-    Mirrors the TypeScript ``buildComparabilityWarnings`` in
-    ``ComparabilityBanner.tsx`` - the artifact ships the same
-    ``{dimension, values, message}`` shape and the same first-occurrence
-    value ordering (TS uses ``[...new Set(arr)]``), so the explorer
-    renders artifact-path and fallback-path warnings identically.
-    """
-    warnings: list[ComparabilityWarning] = []
-    if len(details) < 2:
-        return warnings
-
-    # dict.fromkeys preserves input order while deduplicating - matches
-    # the TypeScript `[...new Set(...)]` semantics exactly.
-    modes = list(dict.fromkeys(d.execution_mode for d in details if d.execution_mode))
-    if len(modes) > 1:
-        warnings.append(
-            ComparabilityWarning(
-                dimension="Execution mode",
-                values=modes,
-                message=(
-                    "results may not reflect platform SQL performance differences - "
-                    "compare sql vs sql or dataframe vs dataframe for a fair comparison"
-                ),
-            )
-        )
-
-    tunings = list(dict.fromkeys(d.tuning_mode for d in details if d.tuning_mode))
-    if len(tunings) > 1:
-        warnings.append(
-            ComparabilityWarning(
-                dimension="Tuning config",
-                values=tunings,
-                message=(
-                    "tuning differences can dominate platform differences - "
-                    "consider comparing results with the same tuning mode"
-                ),
-            )
-        )
-
-    test_types = list(dict.fromkeys(d.test_type for d in details if d.test_type))
-    if len(test_types) > 1:
-        warnings.append(
-            ComparabilityWarning(
-                dimension="Test type",
-                values=test_types,
-                message="power and throughput tests measure different workloads and are not directly comparable",
-            )
-        )
-
-    counts = list(dict.fromkeys(len({dt.query_id for dt in d.display_timings}) for d in details))
-    if len(counts) > 1:
-        warnings.append(
-            ComparabilityWarning(
-                dimension="Query scope",
-                values=[str(c) for c in counts],
-                message="results cover different numbers of queries - geomean is comparable only when the same query set is used",
-            )
-        )
-
-    return warnings
-
-
-def comparison_artifact_hash(result_ids: list[str]) -> str:
-    """Compute the 16-char deterministic hash used to locate a comparison artifact.
-
-    Algorithm: ``sha256(sorted_result_ids_csv)[:16]``.  Shared by the CLI
-    subcommand, the pipeline pre-emit step, and the browser frontend so all
-    three compute the same path.
-    """
-    sorted_csv = ",".join(sorted(result_ids))
-    return hashlib.sha256(sorted_csv.encode()).hexdigest()[:16]
-
-
-def _natural_query_id_key(s: str) -> list[int | str]:
-    """Natural sort key for query IDs (e.g. Q1, Q2, ..., Q10 instead of lex Q1, Q10, Q2)."""
-    return [int(c) if c.isdigit() else c.lower() for c in re.split(r"(\d+)", s)]
-
-
-def build_comparison_artifact(details: list[DetailResult]) -> ComparisonArtifact:
-    """Build a ComparisonArtifact from an ordered list of DetailResults.
-
-    Pure function - no I/O.  The caller writes the JSON.
-
-    Raises:
-        ValueError: if results span different benchmarks or scale factors.
-    """
-    if not details:
-        raise ValueError("Cannot build comparison artifact from empty result list")
-
-    benchmarks = {d.benchmark for d in details}
-    if len(benchmarks) > 1:
-        raise ValueError(f"All results must share the same benchmark; got {benchmarks}")
-
-    scale_factors = {d.scale_factor for d in details}
-    if len(scale_factors) > 1:
-        raise ValueError(f"All results must share the same scale factor; got {scale_factors}")
-
-    benchmark = details[0].benchmark
-    scale_factor = details[0].scale_factor
-    ranking = get_ranking_config(benchmark)
-
-    display_labels = disambiguate_platform_labels(details)  # type: ignore[arg-type]
-
-    rows = [
-        ComparisonRow(
-            result_id=d.result_id,
-            platform=d.platform,
-            display_label=display_labels[i],
-            platform_id=d.platform_id,
-            driver_version=d.driver_version,
-            trust_label=d.trust_label,
-            run_date=d.run_date,
-            display_geomean_ms=d.display_geomean_ms,
-            geomean_ms=d.geomean_ms,
-            power_score=d.power_score,
-            total_duration_s=d.total_duration_s,
-            execution_mode=d.execution_mode,
-            tuning_mode=d.tuning_mode,
-            test_type=d.test_type,
-            compliance_class=d.compliance_class,
-            query_count=len({dt.query_id for dt in d.display_timings}),
-        )
-        for i, d in enumerate(details)
-    ]
-
-    all_query_ids = sorted(
-        {dt.query_id for d in details for dt in d.display_timings},
-        key=_natural_query_id_key,
-    )
-
-    timing_maps = [{dt.query_id: dt for dt in d.display_timings} for d in details]
-    query_cells: list[ComparisonQueryCell] = []
-    for qid in all_query_ids:
-        ms_per_row: list[float | None] = []
-        for tm in timing_maps:
-            timing = tm.get(qid)
-            ms = timing.display_ms if timing is not None else None
-            # Filter zero/negative to None so downstream ratios can't divide by zero.
-            ms_per_row.append(ms if ms is not None and ms > 0 else None)
-
-        valid = [v for v in ms_per_row if v is not None]
-        fastest_ms = min(valid) if valid else None
-        slowest_ms = max(valid) if valid else None
-
-        speedup_vs_slowest: list[float | None] = [
-            (slowest_ms / ms) if (ms is not None and slowest_ms is not None and ms > 0) else None for ms in ms_per_row
-        ]
-
-        query_cells.append(
-            ComparisonQueryCell(
-                query_id=qid,
-                display_ms_per_row=ms_per_row,
-                fastest_ms=fastest_ms,
-                slowest_ms=slowest_ms,
-                speedup_vs_slowest_per_row=speedup_vs_slowest,
-            )
-        )
-
-    return ComparisonArtifact(
-        benchmark=benchmark,
-        scale_factor=scale_factor,
-        generated_at=datetime.now(timezone.utc).isoformat(),
-        rows=rows,
-        query_cells=query_cells,
-        comparability_warnings=_comparability_warnings(details),
-        ranking_primary_metric=ranking.primary_metric,
-    )
-
-
-__all__ = ["BundleTransformer", "build_comparison_artifact", "comparison_artifact_hash"]
+__all__ = ["BundleTransformer"]

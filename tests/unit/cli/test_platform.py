@@ -33,11 +33,19 @@ from benchbox.cli.platform import (
     setup_platforms,
 )
 from benchbox.cli.platform_readiness import PlatformReadinessResult
+from benchbox.core.platform_registry import PlatformRegistry
 
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
+
+
+def reset_platform_registry_test_state() -> None:
+    """Reset lazy adapter registration after importlib-mocking tests."""
+    PlatformRegistry._adapters = {}
+    PlatformRegistry._auto_registered = False
+    PlatformRegistry.clear_cache()
 
 
 # Skip marker for tests that use mock.patch on CLI module attributes (Python 3.10 incompatible)
@@ -180,6 +188,7 @@ class TestPlatformManager:
 
     def setup_method(self):
         """Set up test environment."""
+        reset_platform_registry_test_state()
         self.temp_dir = Path(tempfile.mkdtemp())
         self.config_path = self.temp_dir / "test_platforms.yaml"
         self.manager = PlatformManager(config_path=self.config_path)
@@ -187,6 +196,7 @@ class TestPlatformManager:
     def teardown_method(self):
         """Clean up test environment."""
         shutil.rmtree(self.temp_dir)
+        reset_platform_registry_test_state()
 
     def test_platform_registry_exists(self):
         """Test that platform registry is properly initialized."""

@@ -55,25 +55,6 @@ interface ValueLabelPlacement {
   placement: "outside" | "inside" | "gutter";
 }
 
-const CHART_BUTTON_LABELS: Record<string, string> = {
-  performance_bar: "Performance",
-  power_bar: "Power",
-  distribution_box: "Box Plot",
-  query_heatmap: "Heatmap",
-  query_histogram: "Histogram",
-  cost_scatter: "Cost",
-  time_series: "Trend",
-  comparison_bar: "Compare",
-  diverging_bar: "Diverging",
-  summary_box: "Summary",
-  percentile_ladder: "Percentiles",
-  normalized_speedup: "Speedup",
-  stacked_phase: "Phases",
-  sparkline_table: "Sparklines",
-  cdf_chart: "CDF",
-  rank_table: "Ranks",
-};
-
 export function ChartPanel({
   context,
   baselineIndex,
@@ -256,7 +237,7 @@ export function ChartPanel({
 }
 
 function chartButtonLabel(chart: ChartRegistryEntry): string {
-  return CHART_BUTTON_LABELS[chart.id] ?? chart.title;
+  return chart.shortTitle;
 }
 
 function normalizeBaselineIndex(platformCount: number, baselineIndex: number) {

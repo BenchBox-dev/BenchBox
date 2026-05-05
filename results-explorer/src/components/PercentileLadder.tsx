@@ -13,6 +13,7 @@
 import type { PercentileStats } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
 import { paletteColor } from "@/lib/chartTheme";
+import { buildLogLatencyScale, logLatencyFraction, logLatencyTicks } from "@/lib/chartMath";
 
 // Neutral gray for opacity-only legend swatches (shows opacity levels, not platform identity).
 const LEGEND_SWATCH_COLOR = "#6b7280"; // Tailwind gray-500
@@ -35,14 +36,6 @@ interface Props {
 const RUNG_OPACITY = [0.18, 0.32, 0.5, 1.0] as const; // P99, P95, P90, P50
 const PERCENTILE_LABELS = ["P99", "P95", "P90", "P50"] as const;
 
-// Log-scale helpers - use log2 for human-readable axis stops.
-function toLog(ms: number): number {
-  return Math.log2(Math.max(ms, 0.1));
-}
-
-// Axis ticks at clean log2 stops.
-const AXIS_TICKS_MS = [0.1, 1, 10, 100, 1000, 10000];
-
 const ROW_H = 36;
 const LABEL_W = 140;
 const AXIS_H = 22;
@@ -55,24 +48,24 @@ export function PercentileLadder({ rows }: Props) {
   if (rows.length === 0) return null;
 
   const maxP99 = Math.max(...rows.map((r) => r.percentile_stats.p99));
-  const logMax = toLog(maxP99 * 1.05); // 5% headroom
-  // logMin is pinned to toLog(0.1) (the same floor used by toLog itself) so
+  // logMin is pinned to 0.1ms so
   // the axis always starts at 0.1ms regardless of the fastest p50 observed.
   // This keeps the ladder visually anchored to a shared left edge across
   // benchmarks and prevents sub-ms platforms from stretching their rungs
   // to fill the whole area.
-  const logMin = toLog(0.1);
-  const logRange = logMax - logMin;
+  const scale = buildLogLatencyScale([0.1, maxP99], { minValue: 0.1, maxValue: maxP99 * 1.05 });
+  if (scale === null) return null;
+  const logScale = scale;
 
   const barAreaWidth = drawWidth - LABEL_W - 8;
 
   function xForMs(ms: number): number {
-    return LABEL_W + ((toLog(ms) - logMin) / logRange) * barAreaWidth;
+    return LABEL_W + logLatencyFraction(ms, logScale) * barAreaWidth;
   }
 
   const totalHeight = PADDING_TOP + rows.length * ROW_H + AXIS_H;
 
-  const axisTicks = AXIS_TICKS_MS.filter((ms) => toLog(ms) >= logMin - 0.1 && toLog(ms) <= logMax + 0.1);
+  const axisTicks = logLatencyTicks(logScale, 0.1);
 
   return (
     <div ref={containerRef} class="w-full overflow-x-auto">

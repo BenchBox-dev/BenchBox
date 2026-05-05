@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "preact/hooks";
 import type { RoutableProps } from "preact-router";
 import { getDb, queryRows } from "@/db";
 import { ErrorMessage } from "@/components/ErrorMessage";
-import { FacetDrawer, type ActiveFacetChip, type FacetGroup } from "@/components/FacetRail";
+import { FacetDrawer, FacetRail, type ActiveFacetChip, type FacetGroup } from "@/components/FacetRail";
 import { QueryRowsSkeleton } from "@/components/LoadingSpinner";
 import { arraySerde, stringSerde, useUrlState } from "@/lib/useUrlState";
 import {
@@ -16,7 +16,8 @@ import {
   type QuerySort,
 } from "@/lib/queryFilters";
 import { getTableSchema, type SchemaColumn } from "@/lib/duckdbSchema";
-import { useFacetField, type DateWindowFacet } from "@/lib/facetModel";
+import { useFacetField } from "@/lib/facetModel";
+import { toDateWindowFacet, toggleFacetValue } from "@/lib/facetMatching";
 import { STARTER_QUERY_CATEGORIES, starterQueriesByCategory, type StarterQueryCategory } from "@/lib/starterQueries";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { memoizedSnapshotQueryRows } from "@/lib/duckdbQueries";
@@ -251,7 +252,7 @@ export function Query(_: RoutableProps) {
   }
 
   const columnNames = schema.map((column) => column.name);
-  const mobileFacetGroups: FacetGroup[] = [
+  const facetGroups: FacetGroup[] = [
     makeFacetGroup("benchmark", "Benchmark", facetCounts.benchmark ?? [], benchmarks),
     makeFacetGroup("platform", "Platform", facetCounts.platform ?? [], platforms),
     makeFacetGroup("scale_factor", "Scale", facetCounts.scale_factor ?? [], scaleFactors, (value) => `SF ${value}`),
@@ -321,8 +322,7 @@ export function Query(_: RoutableProps) {
   ];
 
   function toggleMulti(value: string, selected: string[], setSelected: (next: string[]) => void) {
-    const next = selected.includes(value) ? selected.filter((candidate) => candidate !== value) : [...selected, value];
-    setSelected(next);
+    setSelected(toggleFacetValue(selected, value));
   }
 
   function toggleColumn(column: string) {
@@ -553,7 +553,7 @@ export function Query(_: RoutableProps) {
 
           <div data-testid="query-mobile-filter-drawer" class="order-2 lg:hidden">
             <FacetDrawer
-              groups={mobileFacetGroups}
+              groups={facetGroups}
               resultCount={rows.length}
               activeChips={activeFilterChips}
               onToggle={toggleQueryFacet}
@@ -711,96 +711,12 @@ export function Query(_: RoutableProps) {
           data-testid="query-desktop-filters"
           class="hidden space-y-4 lg:sticky lg:top-4 lg:col-start-1 lg:row-start-1 lg:block lg:self-start"
         >
-          <FacetSection
-            label="Benchmark"
-            buckets={facetCounts.benchmark ?? []}
-            selected={benchmarks}
-            onToggle={(value) => toggleMulti(value, benchmarks, setBenchmarks)}
-          />
-          <FacetSection
-            label="Platform"
-            buckets={facetCounts.platform ?? []}
-            selected={platforms}
-            onToggle={(value) => toggleMulti(value, platforms, setPlatforms)}
-          />
-          <FacetSection
-            label="Scale"
-            buckets={facetCounts.scale_factor ?? []}
-            selected={scaleFactors}
-            onToggle={(value) => toggleMulti(value, scaleFactors, setScaleFactors)}
-            formatLabel={(value) => `SF ${value}`}
-          />
-          <FacetSection
-            label="Tuning"
-            buckets={facetCounts.tuning_mode ?? []}
-            selected={tuningModes}
-            onToggle={(value) => toggleMulti(value, tuningModes, setTuningModes)}
-          />
-          <FacetSection
-            label="Trust"
-            buckets={facetCounts.trust_label ?? []}
-            selected={trustTiers}
-            onToggle={(value) => toggleMulti(value, trustTiers, setTrustTiers)}
-          />
-          <FacetSection
-            label="Validation"
-            buckets={facetCounts.validation_status ?? []}
-            selected={validationStatuses}
-            onToggle={(value) => toggleMulti(value, validationStatuses, setValidationStatuses)}
-          />
-          <FacetSection
-            label="Cost status"
-            buckets={facetCounts.cost_status ?? []}
-            selected={costStatuses}
-            onToggle={(value) => toggleMulti(value, costStatuses, setCostStatuses)}
-          />
-          <FacetSection
-            label="Cost model"
-            buckets={facetCounts.cost_model_version ?? []}
-            selected={costModelVersions}
-            onToggle={(value) => toggleMulti(value, costModelVersions, setCostModelVersions)}
-          />
-          <FacetSection
-            label="Deployment"
-            buckets={facetCounts.deployment_class ?? []}
-            selected={deploymentClasses}
-            onToggle={(value) => toggleMulti(value, deploymentClasses, setDeploymentClasses)}
-          />
-          <FacetSection
-            label="Cloud provider"
-            buckets={facetCounts.cloud_provider ?? []}
-            selected={cloudProviders}
-            onToggle={(value) => toggleMulti(value, cloudProviders, setCloudProviders)}
-          />
-          <FacetSection
-            label="Cloud region"
-            buckets={facetCounts.cloud_region ?? []}
-            selected={cloudRegions}
-            onToggle={(value) => toggleMulti(value, cloudRegions, setCloudRegions)}
-          />
-          <FacetSection
-            label="Instance / warehouse"
-            buckets={facetCounts.instance_or_warehouse ?? []}
-            selected={instanceOrWarehouses}
-            onToggle={(value) => toggleMulti(value, instanceOrWarehouses, setInstanceOrWarehouses)}
-          />
-          <FacetSection
-            label="Storage"
-            buckets={facetCounts.storage_format ?? []}
-            selected={storageFormats}
-            onToggle={(value) => toggleMulti(value, storageFormats, setStorageFormats)}
-          />
-          <SingleFacetSection
-            label="Has cost"
-            options={[{ value: "all", count: rows.length }, ...(facetCounts.has_cost ?? [])]}
-            current={hasCost}
-            onSelect={setHasCost}
-          />
-          <SingleFacetSection
-            label="Date window"
-            options={[{ value: "all", count: rows.length }, ...(facetCounts.date_window ?? [])]}
-            current={dateWindow}
-            onSelect={setDateWindow}
+          <FacetRail
+            groups={facetGroups}
+            resultCount={rows.length}
+            activeChips={activeFilterChips}
+            onToggle={toggleQueryFacet}
+            onReset={resetQueryFilters}
           />
         </aside>
       </div>
@@ -849,79 +765,6 @@ function formatHasCostLabel(value: string): string {
 function formatDateWindowLabel(value: string): string {
   if (value === "all") return "All";
   return `Last ${value}`;
-}
-
-function formatFacetAccessibleName(groupLabel: string, optionLabel: string, count: number): string {
-  return `${groupLabel}: ${optionLabel} (${count.toLocaleString()})`;
-}
-
-function FacetSection({
-  label,
-  buckets,
-  selected,
-  onToggle,
-  formatLabel = (value: string) => value,
-}: {
-  label: string;
-  buckets: FacetBucket[];
-  selected: string[];
-  onToggle: (value: string) => void;
-  formatLabel?: (value: string) => string;
-}) {
-  if (buckets.length === 0) return null;
-  return (
-    <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-      <h2 class="mb-3 text-sm font-semibold text-gray-900">{label}</h2>
-      <div class="space-y-2">
-        {buckets.map((bucket) => (
-          <label key={bucket.value} class="flex items-center justify-between gap-2 text-sm text-gray-600">
-            <span class="inline-flex items-center gap-2">
-              <input
-                type="checkbox"
-                aria-label={formatFacetAccessibleName(label, formatLabel(bucket.value), bucket.count)}
-                checked={selected.includes(bucket.value)}
-                onChange={() => onToggle(bucket.value)}
-              />
-              {formatLabel(bucket.value)}
-            </span>
-            <span class="text-xs text-gray-400">{bucket.count}</span>
-          </label>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function SingleFacetSection({
-  label,
-  options,
-  current,
-  onSelect,
-}: {
-  label: string;
-  options: FacetBucket[];
-  current: string;
-  onSelect: (value: string) => void;
-}) {
-  return (
-    <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-      <h2 class="mb-3 text-sm font-semibold text-gray-900">{label}</h2>
-      <div class="flex flex-wrap gap-2">
-        {options.map((option) => (
-          <button
-            key={option.value}
-            class={`rounded-full px-3 py-1 text-xs font-medium ${
-              current === option.value ? "bg-brand-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
-            onClick={() => onSelect(option.value)}
-          >
-            {option.value}
-            {option.count > 0 ? ` (${option.count})` : ""}
-          </button>
-        ))}
-      </div>
-    </section>
-  );
 }
 
 function formatCell(value: unknown): string {
@@ -997,11 +840,6 @@ function applySchemaFilterSupport(filters: QueryFilterState, schema: SchemaColum
     warehouseSizes: [],
     storageFormats: columns.has("storage_format") ? filters.storageFormats : [],
   };
-}
-
-function toDateWindowFacet(value: string): DateWindowFacet {
-  if (value === "30d" || value === "90d" || value === "365d") return value;
-  return "all";
 }
 
 function StarterQueries({ onSelect }: { onSelect: (sql: string) => void }) {

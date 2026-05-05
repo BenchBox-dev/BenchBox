@@ -30,6 +30,7 @@ from benchbox.core.explorer_pipeline.models import (
     get_ranking_config,
     is_ranking_eligible,
 )
+from benchbox.core.explorer_pipeline.ranking import rank_platforms
 from benchbox.core.explorer_pipeline.transformer import (
     BundleTransformer,
     _platform_percentile_stats,
@@ -214,46 +215,11 @@ def _rank_platforms_in_cohort(
     Platform entries include rank, speedup_vs_best, and all display fields needed
     by both the cohort_platforms list and the platform_agg accumulator.
     """
-    ranking = summary.ranking
-    primary_metric = ranking.primary_metric if ranking else "display_geomean_ms"
-    higher_is_better = (ranking.primary_order == "desc") if ranking else False
-
-    def _get_val(row: PlatformRow, _pm: str = primary_metric) -> float | None:
-        return row.power_score if _pm == "power_score" else row.display_geomean_ms
-
-    def _sort_key(row: PlatformRow, _hib: bool = higher_is_better) -> tuple[bool, float]:
-        val = _get_val(row)
-        if val is None:
-            return (True, 0.0)
-        return (False, -val if _hib else val)
-
-    sorted_rows = sorted(summary.platforms, key=_sort_key)
-    non_null_vals = [_get_val(r) for r in sorted_rows if _get_val(r) is not None]
-    best_val: float | None = (
-        (min(non_null_vals) if not higher_is_better else max(non_null_vals)) if non_null_vals else None
-    )
-    # Assign ranks with standard competition ranking (ties share the lowest rank;
-    # the rank after a tie group jumps by the tie size - matches computeRankTable).
-    ranks_by_idx: list[int | None] = []
-    current_rank = 1
-    for i, row in enumerate(sorted_rows):
-        val = _get_val(row)
-        if val is None:
-            ranks_by_idx.append(None)
-        else:
-            if i > 0:
-                prev_val = _get_val(sorted_rows[i - 1])
-                if prev_val is not None and val != prev_val:
-                    current_rank = i + 1
-            ranks_by_idx.append(current_rank)
+    ranked = rank_platforms(summary)
 
     entries: list[dict[str, Any]] = []
-    for i, row in enumerate(sorted_rows):
-        val = _get_val(row)
-        rank = ranks_by_idx[i]
-        speedup: float | None = None
-        if val is not None and best_val is not None and best_val != 0:
-            speedup = val / best_val if higher_is_better else best_val / val
+    for ranked_row in ranked.rows:
+        row = ranked_row.row
         entries.append(
             {
                 "platform_id": row.platform_id,
@@ -262,13 +228,13 @@ def _rank_platforms_in_cohort(
                 "short_id": full_to_short.get(row.result_id, ""),
                 "tuning_mode": row.tuning_mode,
                 "trust_label": row.trust_label,
-                "rank": rank,
-                "total": len(non_null_vals),
-                "metric_value": val,
-                "speedup_vs_best": speedup,
+                "rank": ranked_row.rank,
+                "total": ranked_row.total_ranked,
+                "metric_value": ranked_row.metric_value,
+                "speedup_vs_best": ranked_row.speedup_vs_best,
             }
         )
-    return entries, primary_metric, higher_is_better
+    return entries, ranked.primary_metric, ranked.higher_is_better
 
 
 def _compute_average_ranks(platform_agg: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:

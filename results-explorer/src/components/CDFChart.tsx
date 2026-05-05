@@ -11,9 +11,8 @@
 import type { BenchmarkSummary } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
 import { timeSeriesColor } from "@/lib/chartTheme";
-import { computeECDFPoints } from "@/lib/chartMath";
+import { buildLogLatencyScale, computeECDFPoints, logLatencyFraction, logLatencyTicks } from "@/lib/chartMath";
 
-const LOG_TICKS_MS = [0.1, 1, 10, 100, 1000, 10000];
 const Y_TICKS_PCT = [0, 25, 50, 75, 100];
 
 const LABEL_W = 36;
@@ -21,10 +20,6 @@ const AXIS_H = 28;
 const PADDING_TOP = 30; // legend space
 const PADDING_RIGHT = 12;
 const PLOT_H = 180;
-
-function toLog2(ms: number): number {
-  return Math.log2(Math.max(ms, 0.1));
-}
 
 interface Props {
   summary: BenchmarkSummary;
@@ -45,23 +40,21 @@ export function CDFChart({ summary }: Props) {
   if (series.length === 0) return null;
 
   const allMs = series.flatMap((s) => s.points.map((p) => p.x));
-  const rawLogMax = toLog2(Math.max(...allMs));
-  const rawLogMin = toLog2(Math.min(...allMs));
-  const logMax = rawLogMax + 0.2;
-  const logMin = rawLogMin - 0.2;
-  const logRange = logMax - logMin || 1;
+  const scale = buildLogLatencyScale(allMs, { lowerPad: 0.2, upperPad: 0.2 });
+  if (scale === null) return null;
+  const logScale = scale;
 
   const plotW = w - LABEL_W - PADDING_RIGHT;
   const totalH = PADDING_TOP + PLOT_H + AXIS_H;
 
   function xFor(ms: number): number {
-    return LABEL_W + ((toLog2(ms) - logMin) / logRange) * plotW;
+    return LABEL_W + logLatencyFraction(ms, logScale) * plotW;
   }
   function yFor(pct: number): number {
     return PADDING_TOP + PLOT_H * (1 - pct / 100);
   }
 
-  const xTicks = LOG_TICKS_MS.filter((ms) => toLog2(ms) >= logMin - 0.05 && toLog2(ms) <= logMax + 0.05);
+  const xTicks = logLatencyTicks(logScale);
 
   return (
     <div ref={containerRef} class="w-full overflow-x-auto">

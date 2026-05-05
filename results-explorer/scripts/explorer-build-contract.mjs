@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const EXPECTED_CONTRACT_VERSION = "2";
 const REQUIRED_FLAGS = ["--data-dir", "--output", "--trust-label", "--visibility"];
-const REQUIRED_OUTPUTS = ["results.duckdb", "results_schema.json", "bundles/{result_id}.json"];
+const REQUIRED_OUTPUTS = ["results.duckdb", "bundles/{result_id}.json"];
 const REMOVED_LEGACY_OUTPUTS = [
   "manifest.json",
   "benchmarks/",
@@ -12,6 +12,7 @@ const REMOVED_LEGACY_OUTPUTS = [
   "compare/",
   "meta_leaderboard.json",
   "short_ids.json",
+  "results_schema.json",
 ];
 const EXPECTED_COMMAND = "benchbox explorer build";
 const ALIGNMENT_HINT =

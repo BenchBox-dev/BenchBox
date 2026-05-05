@@ -16,7 +16,7 @@
  *   - cli_equivalent  name in chart_types.py (always === id for now)
  */
 
-import type { BenchmarkSummary, DetailResult } from "@/types";
+import type { BenchmarkSummary, DetailResult, PlatformRow } from "@/types";
 
 /**
  * Narrow shape consumed by historical/trend charts (TimeSeries, summary_box).
@@ -73,6 +73,7 @@ export interface ChartRegistryEntry {
   /** Canonical ID - matches chart_types.py ALL_CHART_TYPES entry. */
   id: string;
   title: string;
+  shortTitle: string;
   description: string;
   /** Analytical question this chart answers in Explorer navigation. */
   questionGroup: ChartQuestionGroupId;
@@ -132,6 +133,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
   {
     id: "performance_bar",
     title: "Performance Bar",
+    shortTitle: "Performance",
     description: "Bar chart comparing total runtime across platforms",
     questionGroup: "overview",
     requires: { requiresSummary: true },
@@ -140,6 +142,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
   {
     id: "power_bar",
     title: "Power@Size Bar",
+    shortTitle: "Power",
     description: "Bar chart comparing TPC Power@Size metric across platforms (higher is better)",
     questionGroup: "overview",
     requires: { requiresSummary: true, requiresPowerScore: true },
@@ -148,6 +151,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
   {
     id: "distribution_box",
     title: "Distribution Box Plot",
+    shortTitle: "Box Plot",
     description: "Box plot showing query execution time distribution",
     questionGroup: "distribution",
     requires: { requiresSummary: true, requiresQueryTimings: true },
@@ -156,6 +160,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
   {
     id: "query_heatmap",
     title: "Query Heatmap",
+    shortTitle: "Heatmap",
     description: "Heatmap comparing per-query execution times across platforms",
     questionGroup: "per_query",
     requires: { requiresSummary: true, requiresQueryTimings: true },
@@ -164,6 +169,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
   {
     id: "query_histogram",
     title: "Query Histogram",
+    shortTitle: "Histogram",
     description:
       "Vertical bar histogram showing latency per query (auto-splits for >33 queries)",
     questionGroup: "per_query",
@@ -173,6 +179,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
   {
     id: "cost_scatter",
     title: "Cost vs Performance Scatter",
+    shortTitle: "Cost",
     description: "Scatter plot of normalized cost vs performance with cost-status empty states",
     questionGroup: "cost",
     requires: { requiresSummary: true },
@@ -181,6 +188,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
   {
     id: "time_series",
     title: "Performance Trend",
+    shortTitle: "Trend",
     description: "Line chart showing performance trends over time",
     questionGroup: "trend",
     requires: { requiresHistorical: true },
@@ -189,6 +197,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
   {
     id: "comparison_bar",
     title: "Comparison Bar",
+    shortTitle: "Compare",
     description:
       "Paired side-by-side bars comparing two runs per query with % change annotations",
     questionGroup: "per_query",
@@ -198,6 +207,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
   {
     id: "diverging_bar",
     title: "Diverging Bar",
+    shortTitle: "Diverging",
     description:
       "Centered-zero chart showing regression/improvement distribution sorted by magnitude",
     questionGroup: "per_query",
@@ -207,6 +217,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
   {
     id: "summary_box",
     title: "Summary Box",
+    shortTitle: "Summary",
     description:
       "Bordered panel with aggregate stats (geo mean, total time, improved/regressed counts)",
     questionGroup: "overview",
@@ -216,6 +227,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
   {
     id: "percentile_ladder",
     title: "Percentile Ladder",
+    shortTitle: "Percentiles",
     description: "Percentile ladder chart (P50/P90/P95/P99) across platforms",
     questionGroup: "distribution",
     requires: { requiresSummary: true, requiresPercentileStats: true },
@@ -224,6 +236,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
   {
     id: "normalized_speedup",
     title: "Normalized Speedup",
+    shortTitle: "Speedup",
     description: "Normalized speedup chart relative to a selected baseline platform",
     questionGroup: "per_query",
     requires: { requiresTwoResults: true },
@@ -232,6 +245,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
   {
     id: "stacked_phase",
     title: "Stacked Phase Breakdown",
+    shortTitle: "Phases",
     description: "Stacked phase breakdown chart across benchmark execution phases",
     questionGroup: "overview",
     requires: { requiresSummary: true, requiresPhaseDurations: true },
@@ -240,6 +254,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
   {
     id: "sparkline_table",
     title: "Sparkline Table",
+    shortTitle: "Sparklines",
     description: "Compact sparkline table of key metrics across platforms",
     questionGroup: "overview",
     requires: { requiresSummary: true },
@@ -248,6 +263,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
   {
     id: "cdf_chart",
     title: "CDF Chart",
+    shortTitle: "CDF",
     description: "Cumulative distribution chart of per-query execution latency",
     questionGroup: "distribution",
     requires: { requiresSummary: true, requiresQueryTimings: true },
@@ -256,6 +272,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
   {
     id: "rank_table",
     title: "Rank Table",
+    shortTitle: "Ranks",
     description: "Per-query platform ranking table (1st=fastest)",
     questionGroup: "rank",
     requires: { requiresSummary: true, requiresQueryTimings: true },
@@ -314,53 +331,12 @@ function buildDetailSummary(
   detail: DetailResult,
   primaryMetric: "power_score" | "display_geomean_ms" | undefined,
 ): BenchmarkSummary {
-  const timings = Object.fromEntries(
-    detail.display_timings.map((timing) => [timing.query_id, timing.display_ms]),
-  );
-
   return {
     benchmark: detail.benchmark,
     scale_factor: detail.scale_factor,
     phase: detail.test_type ?? "power",
     query_ids: detail.display_timings.map((timing) => timing.query_id),
-    platforms: [
-      {
-        result_id: detail.result_id,
-        short_id: detail.result_id.slice(0, 8),
-        platform_id: detail.platform_id,
-        platform: detail.platform,
-        platform_version: detail.platform_version,
-        tuning_mode: detail.tuning_mode,
-        tuning_hash: detail.tuning_hash,
-        execution_mode: detail.execution_mode,
-        trust_label: detail.trust_label,
-        run_date: detail.run_date,
-        is_ranking_eligible: true,
-        power_score: detail.power_score,
-        display_geomean_ms: detail.display_geomean_ms,
-        sample_geomean_ms: detail.geomean_ms,
-        cost_usd: detail.cost_usd,
-        normalized_cost_usd: detail.normalized_cost_usd,
-        cost_model_version: detail.cost_model_version,
-        cost_model_source: detail.cost_model_source,
-        cost_scope: detail.cost_scope,
-        cost_status: detail.cost_status,
-        billing_unit: detail.billing_unit,
-        pricing_region: detail.pricing_region,
-        cloud_provider: detail.cloud_provider,
-        cloud_region: detail.cloud_region,
-        instance_type: detail.instance_type,
-        warehouse_size: detail.warehouse_size,
-        node_count: detail.node_count,
-        cluster_size: detail.cluster_size,
-        storage_format: detail.storage_format,
-        storage_tier: detail.storage_tier,
-        compliance_class: detail.compliance_class,
-        percentile_stats: null,
-        phase_durations: null,
-        timings,
-      },
-    ],
+    platforms: [detailToPlatformRow(detail)],
     cell_reduction: "median",
     ranking: {
       ...rankingFromPrimaryMetric(primaryMetric),
@@ -384,49 +360,53 @@ function buildCompareSummary(
     scale_factor: results[0]!.scale_factor,
     phase: results[0]!.test_type ?? "power",
     query_ids: queryIds,
-    platforms: results.map((result) => ({
-      result_id: result.result_id,
-      short_id: result.result_id.slice(0, 8),
-      platform_id: result.platform_id,
-      platform: result.platform,
-      platform_version: result.platform_version,
-      tuning_mode: result.tuning_mode,
-      tuning_hash: result.tuning_hash,
-      execution_mode: result.execution_mode,
-      trust_label: result.trust_label,
-      run_date: result.run_date,
-      is_ranking_eligible: true,
-      power_score: result.power_score,
-      display_geomean_ms: result.display_geomean_ms,
-      sample_geomean_ms: result.geomean_ms,
-      cost_usd: result.cost_usd,
-      normalized_cost_usd: result.normalized_cost_usd,
-      cost_model_version: result.cost_model_version,
-      cost_model_source: result.cost_model_source,
-      cost_scope: result.cost_scope,
-      cost_status: result.cost_status,
-      billing_unit: result.billing_unit,
-      pricing_region: result.pricing_region,
-      cloud_provider: result.cloud_provider,
-      cloud_region: result.cloud_region,
-      instance_type: result.instance_type,
-      warehouse_size: result.warehouse_size,
-      node_count: result.node_count,
-      cluster_size: result.cluster_size,
-      storage_format: result.storage_format,
-      storage_tier: result.storage_tier,
-      compliance_class: result.compliance_class,
-      percentile_stats: null,
-      phase_durations: null,
-      timings: Object.fromEntries(
-        result.display_timings.map((timing) => [timing.query_id, timing.display_ms]),
-      ),
-    })),
+    platforms: results.map(detailToPlatformRow),
     cell_reduction: "median",
     ranking: {
       ...rankingFromPrimaryMetric(primaryMetric),
       secondary_metric: "platform",
     },
+  };
+}
+
+function detailToPlatformRow(detail: DetailResult): PlatformRow {
+  return {
+    result_id: detail.result_id,
+    short_id: detail.result_id.slice(0, 8),
+    platform_id: detail.platform_id,
+    platform: detail.platform,
+    platform_version: detail.platform_version,
+    tuning_mode: detail.tuning_mode,
+    tuning_hash: detail.tuning_hash,
+    execution_mode: detail.execution_mode,
+    trust_label: detail.trust_label,
+    run_date: detail.run_date,
+    is_ranking_eligible: true,
+    power_score: detail.power_score,
+    display_geomean_ms: detail.display_geomean_ms,
+    sample_geomean_ms: detail.geomean_ms,
+    cost_usd: detail.cost_usd,
+    normalized_cost_usd: detail.normalized_cost_usd,
+    cost_model_version: detail.cost_model_version,
+    cost_model_source: detail.cost_model_source,
+    cost_scope: detail.cost_scope,
+    cost_status: detail.cost_status,
+    billing_unit: detail.billing_unit,
+    pricing_region: detail.pricing_region,
+    deployment_class: detail.deployment_class,
+    cloud_provider: detail.cloud_provider,
+    cloud_region: detail.cloud_region,
+    instance_or_warehouse: detail.instance_or_warehouse,
+    instance_type: detail.instance_type,
+    warehouse_size: detail.warehouse_size,
+    node_count: detail.node_count,
+    cluster_size: detail.cluster_size,
+    storage_format: detail.storage_format,
+    storage_tier: detail.storage_tier,
+    compliance_class: detail.compliance_class,
+    percentile_stats: null,
+    phase_durations: null,
+    timings: Object.fromEntries(detail.display_timings.map((timing) => [timing.query_id, timing.display_ms])),
   };
 }
 

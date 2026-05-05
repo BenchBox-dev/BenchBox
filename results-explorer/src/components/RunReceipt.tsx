@@ -1,6 +1,7 @@
 import type { ComponentChildren } from "preact";
 import type { DetailResult } from "@/types";
 import { humanizeBenchmark } from "@/utils";
+import { costModelSummary, costScopeSummary, normalizedCostLabel } from "@/lib/costDisplay";
 
 interface RunReceiptProps {
   detail: DetailResult;
@@ -82,9 +83,9 @@ export function RunReceipt({
     {
       title: "Cost",
       rows: [
-        { label: "Normalized cost", value: "Not available" },
-        { label: "Cost model", value: "Not available" },
-        { label: "Cost scope", value: "Not available" },
+        { label: "Normalized cost", value: normalizedCostLabel(detail) },
+        { label: "Cost model", value: costModelSummary(detail) },
+        { label: "Cost scope", value: costScopeSummary(detail) },
       ],
     },
   ];

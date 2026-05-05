@@ -8,8 +8,9 @@
 // Python reference: textcharts.sparkline_table.SparklineTable
 // ---------------------------------------------------------------------------
 
-import type { BenchmarkSummary, PlatformRow } from "@/types";
+import type { BenchmarkSummary } from "@/types";
 import { paletteColor } from "@/lib/chartTheme";
+import { costModelDisclosure, costStatusLabel, normalizedCostValue } from "@/lib/costDisplay";
 
 interface Props {
   summary: BenchmarkSummary;
@@ -25,28 +26,6 @@ function fmtMs(ms: number | null): string {
 function fmtScore(s: number | null): string {
   if (s === null) return "-";
   return s.toLocaleString(undefined, { maximumFractionDigits: 0 });
-}
-
-function normalizedCostValue(row: PlatformRow): number | null {
-  if (row.cost_status !== "normalized") return null;
-  return row.normalized_cost_usd ?? null;
-}
-
-function costStatusLabel(row: PlatformRow): string {
-  if (row.cost_status === "not_applicable_local") return "local";
-  if (row.cost_status === "unavailable") return "unavailable";
-  return "-";
-}
-
-function normalizedCostHeader(platforms: PlatformRow[]): string {
-  const normalized = platforms.filter((platform) => normalizedCostValue(platform) !== null);
-  const versions = [...new Set(normalized.map((platform) => platform.cost_model_version).filter(Boolean))];
-  const scopes = [
-    ...new Set(normalized.map((platform) => platform.cost_scope?.split("_").join(" ")).filter(Boolean)),
-  ];
-  const version = versions.length === 1 ? `model ${versions[0]}` : versions.length > 1 ? "multiple models" : "model unavailable";
-  const scope = scopes.length === 1 ? scopes[0] : scopes.length > 1 ? "mixed scopes" : "scope unavailable";
-  return `Normalized USD, ${scope}, ${version}`;
 }
 
 // Inline bar: MAX_BAR_PX pixels = full-width bar.
@@ -119,7 +98,7 @@ export function SparklineTable({ summary }: Props) {
               <th class="text-right px-2 py-1.5 text-gray-500 font-normal">P99</th>
             )}
             {showCost && (
-              <th class="text-right px-2 py-1.5 text-gray-500 font-normal" title={normalizedCostHeader(platforms)}>
+              <th class="text-right px-2 py-1.5 text-gray-500 font-normal" title={costModelDisclosure(platforms)}>
                 Normalized cost
               </th>
             )}

@@ -491,7 +491,7 @@ function addNullableSentinelClause(
   if (subclauses.length > 0) clauses.push(`(${subclauses.join(" OR ")})`);
 }
 
-function dateWindowCutoffIso(value: DateWindowFacet, now = new Date()): string | null {
+export function dateWindowCutoffIso(value: DateWindowFacet, now = new Date()): string | null {
   if (value === "all") return null;
   const days = DATE_WINDOW_DAYS[value];
   return new Date(now.getTime() - days * 24 * 60 * 60 * 1000).toISOString();

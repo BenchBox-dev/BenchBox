@@ -2,29 +2,22 @@
 
 Creates results.duckdb containing all canonical browser metric tables and views.
 This file is loaded by DuckDB-WASM in the browser for filtering and analysis.
-
-Also emits results_schema.json next to results.duckdb so the frontend column
-picker doesn't need to hardcode _COLUMNS.
 """
 
 from __future__ import annotations
 
-import json
 import logging
 import math
 from pathlib import Path
 from typing import Any
 
-from benchbox.core.explorer_pipeline.compare_math import (
-    speedup_vs_best as _speedup_vs_best,
-    speedup_vs_slowest as _speedup_vs_slowest,
-)
 from benchbox.core.explorer_pipeline.models import (
     BenchmarkSummary,
     DetailResult,
     ManifestEntry,
     is_ranking_eligible,
 )
+from benchbox.core.explorer_pipeline.ranking import rank_platforms
 
 logger = logging.getLogger(__name__)
 
@@ -255,11 +248,6 @@ class DuckDBSnapshotBuilder:
                 con.executemany(f"INSERT INTO results VALUES ({placeholders})", rows)
 
         logger.info("Wrote %d rows to %s", len(rows), output_path)
-
-        schema_path = output_path.with_name("results_schema.json")
-        schema = {"columns": [{"name": name, "type": dtype} for name, dtype in self._COLUMNS]}
-        schema_path.write_text(json.dumps(schema, indent=2))
-        logger.info("Wrote schema to %s", schema_path)
 
     def build_full(
         self,
@@ -750,38 +738,11 @@ class DuckDBSnapshotBuilder:
     ) -> None:
         rows: list[tuple] = []
         for (benchmark, scale_factor, phase), summary in summaries:
-            ranking = summary.ranking
-            primary_metric = ranking.primary_metric if ranking else "display_geomean_ms"
-            primary_order = ranking.primary_order if ranking else "asc"
-            higher_is_better = primary_order == "desc"
+            ranked = rank_platforms(summary)
 
-            def _metric_val(row: Any, _pm: str = primary_metric) -> float | None:
-                return row.power_score if _pm == "power_score" else row.display_geomean_ms
-
-            def _rank_key(row: Any, _hib: bool = higher_is_better) -> tuple:
-                val = _metric_val(row)
-                if val is None:
-                    return (True, 0.0)
-                return (False, -val if _hib else val)
-
-            sorted_rows = sorted(summary.platforms, key=_rank_key)
-            total_in_cohort = len(sorted_rows)
-
-            # Best and slowest metric values across the cohort - used to
-            # materialise per-result speedup_vs_best / speedup_vs_slowest so
-            # TS-side speedup math can be retired.
-            cohort_vals = [v for v in (_metric_val(r) for r in sorted_rows) if v is not None and v > 0]
-            best_val = (max(cohort_vals) if higher_is_better else min(cohort_vals)) if cohort_vals else None
-            slowest_val = (min(cohort_vals) if higher_is_better else max(cohort_vals)) if cohort_vals else None
-
-            for i, platform_row in enumerate(sorted_rows):
-                val = _metric_val(platform_row)
-                rank = (i + 1) if val is not None else None
+            for ranked_row in ranked.rows:
+                platform_row = ranked_row.row
                 ps = platform_row.percentile_stats
-                # Defer the semantics to the canonical reference functions -
-                # same module referenced as canonical_ref in visible_metrics.yaml.
-                speedup_vs_best = _speedup_vs_best(val, best_val, higher_is_better=higher_is_better)
-                speedup_vs_slowest = _speedup_vs_slowest(val, slowest_val, higher_is_better=higher_is_better)
                 rows.append(
                     (
                         benchmark,
@@ -802,16 +763,16 @@ class DuckDBSnapshotBuilder:
                         platform_row.display_geomean_ms,
                         platform_row.sample_geomean_ms,
                         platform_row.cost_usd,
-                        primary_metric,
-                        primary_order,
-                        rank,
-                        total_in_cohort,
+                        ranked.primary_metric,
+                        ranked.primary_order,
+                        ranked_row.rank,
+                        len(ranked.rows),
                         ps.p50 if ps else None,
                         ps.p90 if ps else None,
                         ps.p95 if ps else None,
                         ps.p99 if ps else None,
-                        speedup_vs_best,
-                        speedup_vs_slowest,
+                        ranked_row.speedup_vs_best,
+                        ranked_row.speedup_vs_slowest,
                     )
                 )
         if rows:

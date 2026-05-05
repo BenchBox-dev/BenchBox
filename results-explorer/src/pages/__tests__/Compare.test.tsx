@@ -501,7 +501,8 @@ describe("Compare", () => {
 
     expect(receipt).toHaveTextContent("Benchmark");
     expect(receipt).toHaveTextContent("Query scope");
-    expect(receipt).toHaveTextContent("Cost metadata not published");
+    expect(receipt).toHaveTextContent("Normalized cost");
+    expect(receipt).toHaveTextContent("Cost model");
     expect(receipt.compareDocumentPosition(chartsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(receipt.compareDocumentPosition(queryDiffHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });

@@ -35,12 +35,19 @@ function makeDetail(overrides: Partial<DetailResult> = {}): DetailResult {
     validation_status: "exact",
     compliance_class: null,
     cost_usd: null,
+    normalized_cost_usd: null,
+    cost_model_version: "2026.05.0",
+    cost_model_source: "benchbox.core.cost.pricing",
+    cost_scope: "compute_only",
+    cost_status: "unavailable",
+    billing_unit: "unknown",
+    pricing_region: "unknown",
     ...overrides,
   };
 }
 
 describe("ComparabilityReceipt", () => {
-  it("renders workload matches and leaves cost metadata unpublished", () => {
+  it("renders workload matches and published cost metadata", () => {
     render(<ComparabilityReceipt results={[makeDetail(), makeDetail({ result_id: "r2", platform: "SQLite" })]} />);
 
     const receipt = screen.getByRole("region", { name: "Comparability receipt" });
@@ -50,7 +57,25 @@ describe("ComparabilityReceipt", () => {
     expect(receipt).toHaveTextContent("Query scope");
     expect(receipt).toHaveTextContent("2 queries");
     expect(receipt).toHaveTextContent("Cost model");
-    expect(receipt).toHaveTextContent("Cost metadata not published");
+    expect(receipt).toHaveTextContent("2026.05.0 (benchbox.core.cost.pricing)");
+  });
+
+  it("flags normalized cost metadata differences", () => {
+    const fields = buildComparabilityFields([
+      makeDetail({ normalized_cost_usd: 0.42, cost_status: "normalized" }),
+      makeDetail({
+        result_id: "r2",
+        platform: "SQLite",
+        platform_id: "sqlite",
+        normalized_cost_usd: null,
+        cost_status: "unavailable",
+      }),
+    ]);
+
+    expect(fields.find((field) => field.label === "Normalized cost")).toMatchObject({
+      status: "diff",
+      detail: "DuckDB: $0.42; SQLite: unavailable",
+    });
   });
 
   it("warns when selected runs differ in methodology or environment fields", () => {

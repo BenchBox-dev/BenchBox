@@ -632,6 +632,32 @@ def variant_db_path(tmp_path_factory: pytest.TempPathFactory) -> Path:
     return output_dir / "results.duckdb"
 
 
+@pytest.fixture(scope="module")
+def tie_db_path(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Three-platform fixture where two rows tie on the primary metric."""
+    import copy
+    import json
+
+    bundles = []
+    for platform, power_score in (("duckdb", 5000.0), ("sqlite", 5000.0), ("polars", 1000.0)):
+        bundle = copy.deepcopy(MINIMAL_BUNDLE)
+        bundle["run"]["id"] = f"run-{platform}"
+        bundle["platform"]["name"] = platform
+        bundle["summary"]["tpc_metrics"]["power_at_size"] = power_score
+        bundles.append((platform, bundle))
+
+    base = tmp_path_factory.mktemp("tie_pipeline_output")
+    data_dir = base / "data"
+    bundles_dir = data_dir / "bundles"
+    bundles_dir.mkdir(parents=True)
+    for platform, bundle in bundles:
+        (bundles_dir / f"{platform}.json").write_text(json.dumps(bundle), encoding="utf-8")
+
+    output_dir = base / "out"
+    ExplorerPipeline().run(data_dir, output_dir, bundle_url_prefix="/results/data/bundles")
+    return output_dir / "results.duckdb"
+
+
 class TestCohortVariantPreservation:
     def test_cohort_metadata_keeps_all_variants(self, variant_db_path: Path) -> None:
         with _connect(variant_db_path) as con:
@@ -682,6 +708,16 @@ class TestCohortVariantPreservation:
             f"avg_rank must be 1.0 (best variant wins), got {avg_rank} - platform_agg last-write-wins regression"
         )
         assert n_cohorts == 1
+
+
+class TestBenchmarkRankingTieHandling:
+    def test_benchmark_rankings_use_competition_ranking_for_ties(self, tie_db_path: Path) -> None:
+        with _connect(tie_db_path) as con:
+            rows = con.execute(
+                "SELECT platform, rank FROM benchmark_rankings WHERE benchmark = 'tpch' ORDER BY rank, platform"
+            ).fetchall()
+
+        assert rows == [("duckdb", 1), ("sqlite", 1), ("polars", 3)]
 
 
 # ---------------------------------------------------------------------------

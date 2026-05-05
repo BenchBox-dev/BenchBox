@@ -243,7 +243,7 @@ Sample IDs (pick at least one from each combination):
 ## S6 — Compare (`/results/compare?ids=…`)
 
 ### S6.1 Two-result compare (same benchmark + SF)
-- Use two sample IDs from above. Renders charts + comparison table. ComparabilityBanner is absent or "no warnings".
+- Use two sample IDs from above. Renders charts, comparison table, and a comparability receipt with no differences.
 
 ### S6.2 N-result compare (3+)
 - Pile in 4 IDs from one cohort (same benchmark + SF). Verify rendering and that no chart visually breaks at higher N.
