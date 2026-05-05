@@ -10,7 +10,7 @@ related_paths:
   - tests/uat/matrix.py
   - scripts/local_stress_test.sh
 suggested_sweep: "in any future bash→Python port, treat structural parity (same dict keys/values) and behavioral parity (same outcome under boundary inputs) as separate test contracts."
-todo_id: null
+todo_id: uat-framework-review-followups
 ---
 
 # "Bash parity" tested at dictionary level, not behavioral level
