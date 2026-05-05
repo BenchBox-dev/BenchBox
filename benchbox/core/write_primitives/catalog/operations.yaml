@@ -3112,6 +3112,9 @@ operations:
           clickhouse: |
             SELECT uniqMerge(user_sketch) AS distinct_orders
             FROM sketch_ops_daily_users
+          redshift: |
+            SELECT HLL_CARDINALITY(HLL_COMBINE(user_sketch)) AS distinct_orders
+            FROM sketch_ops_daily_users
       # Storage-size validation: octet_length() of the merged sketch state
       # certifies the persisted bytes haven't regressed to zero or grown
       # unbounded. Split into two engine-specific validations so each engine

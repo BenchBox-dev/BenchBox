@@ -435,23 +435,26 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
         query_name = str(getattr(query, "query_name", "")).strip().lower()
         if query_id.strip().upper() != "Q10" or query_name != _GUARDED_TPCH_Q10_NAME:
             return None
+        if not self._is_local_envelope():
+            return None
 
         return (
             "Dask resource-envelope failure before query execution: TPC-H Q10 Returned Item Reporting "
             "is guarded because this Pandas-family Dask graph has been observed to terminate the parent "
             f"benchmark process with exit 137 on local runs. Envelope: {self._resource_envelope_settings()}. "
-            "The query was not executed to preserve process stability; use a query subset excluding Q10 "
-            "or another DataFrame platform when Q10 coverage is required."
+            "The query was not executed to preserve process stability; use a query subset excluding Q10, "
+            "an external scheduler, explicit local Dask resource settings, or another DataFrame platform "
+            "when Q10 coverage is required."
         )
 
     def _collect_skip_query_ids(self, benchmark_instance: Any | None) -> set[str]:
         """Add Dask resource-envelope skips to benchmark-provided skip lists.
 
-        The TPC-H Q10 OOM that motivated this guard is specific to the local
-        single-machine cluster envelope. When the user provides an external
-        ``scheduler_address`` or explicitly requests a distributed cluster,
-        Q10 should run normally — skipping it for those runs would lose
-        legitimate full-suite coverage.
+        The TPC-H Q10 OOM that motivated this guard is specific to the default
+        local single-machine distributed envelope. When the user provides an
+        external ``scheduler_address`` or explicit local resource settings, Q10
+        should run normally; skipping it for those runs would lose legitimate
+        full-suite coverage.
         """
         skip_query_ids = super()._collect_skip_query_ids(benchmark_instance)
         self._resource_envelope_skip_query_ids: set[str] = set()
@@ -460,23 +463,35 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
             skip_query_ids |= self._resource_envelope_skip_query_ids
             logger.warning(
                 "Skipping TPC-H Q10 for dask-df local envelope: %s. "
-                "Pass --platform-option scheduler_address=tcp://... to run Q10 on an external cluster.",
+                "Pass --platform-option scheduler_address=tcp://... or explicit local resource options "
+                "to run Q10 with provisioned resources.",
                 self._tpch_q10_resource_envelope_diagnostic(),
             )
         return skip_query_ids
 
     def _is_local_envelope(self) -> bool:
-        """Return True only for runs that use the constrained local single-machine cluster.
+        """Return True only for the default constrained local distributed envelope.
 
-        Treat any external scheduler or explicit distributed cluster request as
-        out-of-envelope: those runs have provisioned their own resources and
-        must not lose Q10 coverage to the local-OOM guard.
+        External schedulers and explicitly provisioned local resources are
+        out-of-envelope: those runs have taken ownership of the resource budget
+        and must not lose Q10 coverage to the default local-OOM guard.
         """
         if getattr(self, "scheduler_address", None):
             return False
-        if getattr(self, "use_distributed", False):
+        if not getattr(self, "use_distributed", False):
             return False
-        return True
+        return not self._has_explicit_local_resource_settings()
+
+    def _has_explicit_local_resource_settings(self) -> bool:
+        """Return whether local Dask resource sizing came from user configuration."""
+        return any(
+            getattr(self, flag_name, False)
+            for flag_name in (
+                "_n_workers_configured",
+                "_threads_per_worker_configured",
+                "_memory_limit_configured",
+            )
+        )
 
     def _build_skipped_results(self, filtered_skip_query_ids: set[str]) -> list[dict[str, Any]]:
         """Build skipped results, preserving Dask resource-envelope skip reasons."""
@@ -509,8 +524,9 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
         return (
             "Dask resource-envelope guard: TPC-H Q10 Returned Item Reporting is skipped because this "
             "Pandas-family Dask graph has been observed to terminate the parent benchmark process with "
-            f"exit 137 on local runs. Envelope: {self._resource_envelope_settings()}. Use another "
-            "DataFrame platform when Q10 coverage is required."
+            f"exit 137 on default local-envelope runs. Envelope: {self._resource_envelope_settings()}. "
+            "Use an external scheduler, explicitly provision local Dask resources, or another DataFrame "
+            "platform when Q10 coverage is required."
         )
 
     # =========================================================================

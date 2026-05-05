@@ -16,6 +16,7 @@ from typing import Dict, List, Set, Tuple
 
 import yaml
 from jsonschema import Draft7Validator
+from yaml.nodes import MappingNode, Node, ScalarNode, SequenceNode
 
 
 class TodoValidator:
@@ -106,6 +107,59 @@ class TodoValidator:
             warnings.append(f"DEPRECATED: '{file_path.name}' uses 'dependencies' - migrate to 'deps'")
         return warnings
 
+    def _mapping_value_node(self, node: Node, key: str) -> Node | None:
+        """Return a YAML mapping value node by scalar key."""
+        if not isinstance(node, MappingNode):
+            return None
+        for key_node, value_node in node.value:
+            if isinstance(key_node, ScalarNode) and key_node.value == key:
+                return value_node
+        return None
+
+    def _iter_verification_command_nodes(self, root: Node) -> List[ScalarNode]:
+        """Find structured verification.command scalar nodes in the raw YAML tree."""
+        verification = self._mapping_value_node(root, "verification")
+        if verification is None:
+            return []
+
+        command_nodes: List[ScalarNode] = []
+        if isinstance(verification, SequenceNode):
+            for step in verification.value:
+                command = self._mapping_value_node(step, "command")
+                if isinstance(command, ScalarNode):
+                    command_nodes.append(command)
+        elif isinstance(verification, MappingNode):
+            commands = self._mapping_value_node(verification, "commands")
+            if isinstance(commands, SequenceNode):
+                command_nodes.extend(node for node in commands.value if isinstance(node, ScalarNode))
+        return command_nodes
+
+    def _check_verification_command_source(self, raw_text: str, data: dict, file_path: Path) -> List[str]:
+        """Reject ambiguous wrapped shell commands on non-completed TODOs."""
+        path_parts = file_path.parts
+        project_index = path_parts.index("_project") if "_project" in path_parts else -1
+        in_done_tree = (
+            project_index >= 0 and len(path_parts) > project_index + 1 and path_parts[project_index + 1] == "DONE"
+        )
+        if in_done_tree or data.get("status") == "Completed":
+            return []
+
+        root = yaml.compose(raw_text)
+        if root is None:
+            return []
+
+        errors = []
+        for command in self._iter_verification_command_nodes(root):
+            spans_multiple_lines = command.end_mark.line > command.start_mark.line
+            if spans_multiple_lines and command.style != "|":
+                line = command.start_mark.line + 1
+                errors.append(
+                    f"verification command at line {line} spans multiple physical lines; "
+                    "keep shell commands on one line or use 'command: |' for intentional multi-line scripts"
+                )
+
+        return errors
+
     def validate_file(self, file_path: Path) -> Tuple[bool, List[str]]:
         """
         Validate a single TODO file.
@@ -116,8 +170,8 @@ class TodoValidator:
         errors = []
 
         try:
-            with open(file_path) as f:
-                data = yaml.safe_load(f)
+            raw_text = file_path.read_text(encoding="utf-8")
+            data = yaml.safe_load(raw_text)
 
             if data is None:
                 return False, ["File is empty"]
@@ -133,6 +187,10 @@ class TodoValidator:
             # Validate work unit DAG
             dag_errors = self._check_work_dag(data, file_path)
             errors.extend(dag_errors)
+
+            # Validate raw command formatting that YAML's parsed value can hide.
+            command_source_errors = self._check_verification_command_source(raw_text, data, file_path)
+            errors.extend(command_source_errors)
 
             # Deprecation warnings (printed but don't fail validation)
             if self.warn_deprecated:

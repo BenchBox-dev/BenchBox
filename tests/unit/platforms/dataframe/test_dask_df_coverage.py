@@ -262,6 +262,7 @@ def test_resource_envelope_diagnostic_ignores_unrelated_errors():
 
 def test_tpch_q10_guard_and_skip_result_classification():
     adapter = _make_adapter()
+    adapter.use_distributed = True
     query = SimpleNamespace(query_id="Q10", query_name="Returned Item Reporting")
 
     result = adapter.execute_query(SimpleNamespace(), query)
@@ -281,6 +282,7 @@ def test_tpch_q10_guard_and_skip_result_classification():
 
 def test_profiled_tpch_q10_guard_returns_failure_profile():
     adapter = _make_adapter()
+    adapter.use_distributed = True
     query = SimpleNamespace(query_id="Q10", query_name="Returned Item Reporting")
 
     result, profile = adapter.execute_query_profiled(SimpleNamespace(), query)
@@ -294,35 +296,44 @@ def test_q10_skip_dropped_when_external_scheduler_address_set():
     """w8 regression: an external scheduler means the run is no longer in the
     constrained local envelope that motivated the OOM guard. Q10 must run."""
     adapter = _make_adapter()
+    adapter.use_distributed = True
     adapter.scheduler_address = "tcp://scheduler.example:8786"
     benchmark = SimpleNamespace(name="TPC-H Benchmark")
+    query = SimpleNamespace(query_id="Q10", query_name="Returned Item Reporting")
 
     skip_query_ids = adapter._collect_skip_query_ids(benchmark)
 
     assert "Q10" not in skip_query_ids
     assert adapter._resource_envelope_skip_query_ids == set()
+    assert adapter._guarded_resource_query_diagnostic(query, "Q10") is None
 
 
-def test_q10_skip_dropped_when_use_distributed_true():
-    """w8 regression: explicit distributed-cluster opt-in (without an external
-    scheduler) likewise opts out of the local-envelope OOM guard."""
+def test_q10_skip_dropped_when_local_resources_explicitly_configured():
+    """w8 regression: an explicitly provisioned local Dask run must not lose Q10 coverage."""
     adapter = _make_adapter()
     adapter.use_distributed = True
     adapter.scheduler_address = None
+    adapter.n_workers = 8
+    adapter.threads_per_worker = 4
+    adapter._memory_limit = "16GB"
+    adapter._n_workers_configured = True
+    adapter._threads_per_worker_configured = True
+    adapter._memory_limit_configured = True
     benchmark = SimpleNamespace(name="TPC-H Benchmark")
+    query = SimpleNamespace(query_id="Q10", query_name="Returned Item Reporting")
 
     skip_query_ids = adapter._collect_skip_query_ids(benchmark)
 
     assert "Q10" not in skip_query_ids
+    assert adapter._resource_envelope_skip_query_ids == set()
+    assert adapter._guarded_resource_query_diagnostic(query, "Q10") is None
 
 
-def test_q10_skip_kept_for_local_envelope():
-    """w8 regression: the local single-machine cluster envelope still skips
-    Q10. Without a scheduler_address and without use_distributed, the guard
-    must remain active."""
+def test_q10_skip_kept_for_default_local_distributed_envelope():
+    """w8 regression: default local LocalCluster runs remain inside the Q10 guard."""
     adapter = _make_adapter()
     adapter.scheduler_address = None
-    adapter.use_distributed = False
+    adapter.use_distributed = True
     benchmark = SimpleNamespace(name="TPC-H Benchmark")
 
     skip_query_ids = adapter._collect_skip_query_ids(benchmark)
