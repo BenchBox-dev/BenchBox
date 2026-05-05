@@ -328,7 +328,12 @@ export function Home(_: RoutableProps) {
                 allLabel="All benchmarks"
                 options={benchmarkOptions}
                 current={benchmarkFilters}
-                onSelect={(value) => setFacet("benchmark", value === "all" ? [] : [value])}
+                onSelect={(value) =>
+                  setFacet(
+                    "benchmark",
+                    value === "all" ? [] : toggleFacetValue(benchmarkFilters, value),
+                  )
+                }
                 format={(value) => humanizeBenchmark(value)}
               />
               <MultiSelectFilter
@@ -336,7 +341,12 @@ export function Home(_: RoutableProps) {
                 allLabel="All scales"
                 options={scaleOptions}
                 current={scaleFilters}
-                onSelect={(value) => setFacet("scale_factor", value === "all" ? [] : [value])}
+                onSelect={(value) =>
+                  setFacet(
+                    "scale_factor",
+                    value === "all" ? [] : toggleFacetValue(scaleFilters, value),
+                  )
+                }
                 format={(value) => `SF ${value}`}
               />
               <SelectFilter
@@ -715,6 +725,18 @@ function appendFacetParams(params: URLSearchParams, facets: FacetState, omit: Re
 
 function singleFacetValue(values: string[]): string {
   return values.length === 1 ? (values[0] ?? "all") : "all";
+}
+
+// w13: preserve multi-select semantics when the user clicks an option in the
+// dropdown. URL state already models bm/sf as arrays (e.g. ?bm=tpch,clickbench),
+// but the prior `[value]` replacement collapsed any subsequent click to a
+// single-element array, breaking cross-benchmark / cross-scale comparison
+// flows. Toggling keeps the rest of the selection intact.
+export function toggleFacetValue(current: string[], value: string): string[] {
+  const next = current.includes(value)
+    ? current.filter((entry) => entry !== value)
+    : [...current, value];
+  return next;
 }
 
 function toDateWindowFacet(value: string): DateWindowFacet {

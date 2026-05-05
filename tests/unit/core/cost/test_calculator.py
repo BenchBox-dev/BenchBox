@@ -201,6 +201,43 @@ class TestCostCalculator:
         assert normalized_cost.normalized_cost_usd == 0
         assert normalized_cost.cost_usd is None
 
+    def test_dataframe_variant_platforms_are_local(self):
+        """w14 regression: every registered DataFrame variant whose primary
+        execution is on the developer's machine must be classified as local
+        so cost normalization yields ``not_applicable_local`` rather than
+        ``unavailable``. Prior to w14, ``datafusion-df`` and ``pyspark-df``
+        were missing from the allowlist, polluting cost facets and the
+        empty-state logic that depends on ``cost_status``."""
+        calculator = CostCalculator()
+        for platform_id in [
+            "datafusion",
+            "datafusion-df",
+            "polars",
+            "polars-df",
+            "pandas-df",
+            "cudf-df",
+            "modin-df",
+            "dask-df",
+            "pyspark",
+            "pyspark-df",
+            "lakesail",
+            "lakesail-df",
+            "duckdb",
+            "sqlite",
+        ]:
+            assert calculator.is_local_platform(platform_id), (
+                f"{platform_id!r} should be classified as a local platform"
+            )
+
+    def test_cloud_platforms_are_not_local(self):
+        """w14 sanity check: known cloud platforms remain non-local so cost
+        normalization keeps trying to resolve their region/cloud pricing."""
+        calculator = CostCalculator()
+        for platform_id in ["snowflake", "bigquery", "redshift", "databricks", "athena"]:
+            assert not calculator.is_local_platform(platform_id), (
+                f"{platform_id!r} should NOT be classified as a local platform"
+            )
+
     def test_normalized_benchmark_cost_unavailable_when_metadata_defaulted(self):
         """Cloud rows with defaulted pricing metadata do not become comparable normalized costs."""
         calculator = CostCalculator()

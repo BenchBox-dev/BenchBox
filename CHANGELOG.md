@@ -21,6 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### New
 
+- **write_primitives sketch** — DuckDB-only parameter-sweep variants
+  (`sketch_query_*_{lgk10,lgk14,k100,k1000,lgmm8,lgmm10}`) so users can
+  measure the size / accuracy / latency tradeoff per sketch family
+  rather than guessing. Theta `lg_k ∈ {10, 14}`, KLL `k ∈ {100, 1000}`,
+  Top-K `lg_max_map_size ∈ {8, 10}`. KLL variants verified end-to-end
+  on the installed datasketches extension (~2KB merged at k=100, ~18KB
+  at k=1000); Theta and frequent-items variants inherit the parent
+  ops' extension-drift status. Cloud-engine sweeps are deferred.
 - **write_primitives DataFrame** — PySpark sketch factory helpers
   (`make_pyspark_hll_persist_builder` / `make_pyspark_hll_merge_extract`
   for HLL on Spark 3.5+; `make_pyspark_topk_persist_builder` /

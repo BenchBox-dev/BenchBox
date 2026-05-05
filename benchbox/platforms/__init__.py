@@ -661,6 +661,14 @@ try:
     # These platforms use lazy config builders to avoid importing heavy SDKs
     # at module load time. Option specs are registered unconditionally.
 
+    # MotherDuck — the credential wizard saves a `database` field, but the
+    # default builder did not call CredentialManager, so the configured
+    # database was silently dropped at run time. Routing through a lazy
+    # config builder pulls the wizard-saved database into runtime config.
+    PlatformHookRegistry.register_config_builder(
+        "motherduck", _make_lazy_config_builder(".motherduck", "_build_motherduck_config")
+    )
+
     # Databricks
     PlatformHookRegistry.register_config_builder(
         "databricks", _make_lazy_config_builder(".databricks", "_build_databricks_config")

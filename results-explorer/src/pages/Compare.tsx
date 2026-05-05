@@ -367,6 +367,8 @@ export function Compare(_: RoutableProps) {
             context={{ kind: "compare", results, primaryMetric }}
             baselineIndex={normalizedBaselineIndex}
             onBaselineIndexChange={setBaselineIndex}
+            suppressWinnerClaims={severeMismatchReason !== null}
+            suppressionReason={severeMismatchReason ?? undefined}
           />
         </div>
       )}

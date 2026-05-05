@@ -220,3 +220,77 @@ def test_hosted_manifest_schema_matches_pr_flow_for_required_keys(tmp_path: Path
     # for the same source file — the manifests differ only in metadata.
     for key in ("bundle_file", "bundle_hash", "benchmark", "platform", "scale_factor"):
         assert pr_manifest[key] == hosted_manifest[key], f"{key} drift"
+
+
+def test_hosted_and_pr_manifest_built_via_dispatch_call_sites(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """w21 regression: drive each manifest through its dispatching call site
+    (the hosted-service path and the PR-package path) rather than calling
+    ``_build_submission_manifest`` directly with hard-coded arguments. If a
+    future iteration of either dispatch mutates the manifest after
+    construction or starts passing different arguments, the parity check
+    below catches it; the previous direct-construction test could not."""
+    from click.testing import CliRunner
+
+    sub = importlib.import_module("benchbox.cli.commands.submit")
+
+    src = tmp_path / "tpch_duckdb.json"
+    src.write_text(json.dumps(_minimal_schema_v2_bundle()), encoding="utf-8")
+
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
+
+    # ----- Drive the PR-package path through the CLI to capture its manifest -----
+    out_dir = tmp_path / "submission"
+    pr_result = CliRunner().invoke(sub.submit, [str(src), "--output", str(out_dir)])
+    assert pr_result.exit_code == 0, pr_result.output
+    pr_manifest_path = out_dir / "tpch_duckdb.manifest.json"
+    assert pr_manifest_path.exists(), pr_result.output
+    pr_manifest = json.loads(pr_manifest_path.read_text(encoding="utf-8"))
+
+    # ----- Drive the hosted dispatch path with stubbed network calls --------
+    captured_manifest: dict[str, dict] = {}
+
+    def fake_submit_hosted_bundle(*, manifest: dict, bundle_hash: str, **_kwargs):
+        captured_manifest["payload"] = manifest
+        from benchbox.cli.submit_service import HostedSubmitResult, make_idempotency_key
+
+        return HostedSubmitResult(
+            status="accepted",
+            idempotency_key=make_idempotency_key("https://hosted.invalid", bundle_hash),
+            submission_id="fake-id",
+        )
+
+    monkeypatch.setattr(sub, "submit_hosted_bundle", fake_submit_hosted_bundle)
+    monkeypatch.setattr(
+        sub,
+        "resolve_submission_token",
+        lambda _service_url: SimpleNamespace(token="fake-token"),
+    )
+    monkeypatch.setattr(
+        sub,
+        "record_hosted_submission",
+        lambda **_kwargs: tmp_path / "fake_history.json",
+    )
+
+    hosted_result = CliRunner().invoke(
+        sub.submit,
+        [
+            str(src),
+            "--service",
+            "https://hosted.invalid",
+            "--no-wait",
+            "--visibility",
+            "public",
+        ],
+    )
+    assert hosted_result.exit_code == 0, hosted_result.output
+    assert "payload" in captured_manifest, "hosted dispatch never called submit_hosted_bundle"
+    hosted_manifest = captured_manifest["payload"]
+
+    # Same key set; hosted vs PR diverges only in submission_path metadata.
+    assert set(pr_manifest.keys()) == set(hosted_manifest.keys()), (
+        f"hosted vs PR manifest key drift via dispatch call sites. PR={set(pr_manifest)}, hosted={set(hosted_manifest)}"
+    )
+    assert pr_manifest["submission_path"] == "PR-based"
+    assert hosted_manifest["submission_path"] == "hosted-service"
+    for key in ("bundle_file", "bundle_hash", "benchmark", "platform", "scale_factor"):
+        assert pr_manifest[key] == hosted_manifest[key], f"{key} drift via dispatch call sites"

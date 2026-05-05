@@ -38,6 +38,38 @@ historical DONE verification commands when they are still executable
 documentation, and skips future reprocessing only after it has posted a reply
 containing the `benchbox-codex-review-followup-actioned` marker.
 
+## Trust model — review the resulting PR before merge
+
+The routine runs `codex exec --sandbox workspace-write -c approval_policy=never`
+against the contents of comments authored by `chatgpt-codex-connector[bot]`.
+That gives codex unattended write access to the repo for the duration of the
+sweep. The trust boundary is the **author filter** (`--author` /
+`CODEX_REVIEW_AUTHOR`). Anyone with repo write can change that flag to action
+comments from any author. Treat the routine accordingly:
+
+- The codex sandbox (`workspace-write`) permits codex to read the whole repo
+  and write any file under the worktree. It does not get network access by
+  default, but it can run any local command (including `git`, `uv`, `make`).
+- `approval_policy=never` means codex never prompts before running a local
+  command — including ones that mutate state. The routine is intentionally
+  unattended, so this is required.
+- Per-comment commits land **before** the GitHub marker reply is posted, and
+  each commit message includes the source PR# + comment id (see
+  `commit_message_for_result`). This means a crash mid-sweep leaves a
+  reviewable diff on the branch and no phantom-actioned thread on GitHub.
+- The reviewer of the resulting PR should: (a) skim each per-comment commit
+  to confirm the change matches the source comment's intent, (b) reject any
+  commit that pulled in unrelated edits, (c) verify that a "fixed"
+  disposition actually corresponds to a change on disk (a stale Codex run
+  could in principle fabricate an evidence block while leaving the tree
+  unchanged — the per-commit diff is the ground truth).
+- Prompt-injection content inside a Codex comment body is treated as input,
+  not instruction; the prompt template
+  (`_project/scripts/prompts/codex_pr_review_followup.md`) tells codex to
+  verify against the current tree and to make the smallest coherent fix.
+  Reviewers should still be alert to PRs that touch suspiciously broad
+  surface area for a single Codex finding.
+
 ## Required scope axes
 
 The frame "unresolved Codex review threads from PRs #N–#M" is good at

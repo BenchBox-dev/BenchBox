@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -103,10 +104,36 @@ def test_pool_check_fails_when_claim_in_progress_marker_present(tmp_path: Path) 
     marker = pool_parent / "BenchBox.pool-01" / ".benchbox" / "claim_in_progress"
     marker.parent.mkdir(parents=True, exist_ok=True)
     marker.write_text("pid=99999 started=2026-05-02T00:00:00Z branch=feature/dead\n", encoding="utf-8")
+    # w20: pool-check ignores fresh `claim_in_progress` markers (an in-flight
+    # `worktree-claim` writes one at the start of a normal claim and removes
+    # it at the end), so for the aborted-detection test we need to either
+    # backdate the marker beyond the stale threshold, or override the
+    # threshold to 0 for the test invocation. Backdate the mtime to one
+    # hour ago so the test exercises a genuinely stale marker.
+    one_hour_ago = time.time() - 3600
+    os.utime(marker, (one_hour_ago, one_hour_ago))
     result = invoke_check(main, pool_parent, pool_size=2)
     assert result.returncode != 0
     assert "aborted" in result.stderr
     assert "pool-01" in result.stderr
+
+
+def test_pool_check_ignores_fresh_claim_in_progress_marker(tmp_path: Path) -> None:
+    """w20 regression: a fresh ``.benchbox/claim_in_progress`` marker
+    indicates an active concurrent claim, not an aborted slot. The check
+    is documented as periodic / cron-safe; flagging in-flight claims as
+    aborted produces false positives that mask real pool problems."""
+    main, pool_parent = setup_pool(tmp_path, num_slots=2)
+    marker = pool_parent / "BenchBox.pool-01" / ".benchbox" / "claim_in_progress"
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text("pid=99999 started=2026-05-02T00:00:00Z branch=feature/active\n", encoding="utf-8")
+    # Fresh mtime (newly written above) — must NOT be flagged as aborted.
+    result = invoke_check(main, pool_parent, pool_size=2)
+    assert result.returncode == 0, (
+        f"pool-check flagged a fresh claim_in_progress marker as aborted "
+        f"(stdout={result.stdout!r}, stderr={result.stderr!r})"
+    )
+    assert "aborted" not in result.stderr.lower()
 
 
 def test_pool_check_fails_when_extra_slot_beyond_pool_size(tmp_path: Path) -> None:

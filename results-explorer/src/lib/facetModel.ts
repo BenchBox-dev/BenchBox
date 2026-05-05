@@ -182,10 +182,49 @@ export function readFacetParam<K extends FacetKey>(
   params: URLSearchParams,
   key: K,
 ): FacetState[K] {
-  const raw = findFirstParam(params, [FACET_URL_KEYS[key], ...(FACET_URL_ALIASES[key] ?? [])]);
   const fallback = defaultFacetValue(key);
-  if (raw === null) return fallback;
   const serde = FACET_URL_SERDES[key] as unknown as UrlSerde<FacetState[K]>;
+  const canonicalKey = FACET_URL_KEYS[key];
+  const aliases = FACET_URL_ALIASES[key] ?? [];
+
+  // w16: when the canonical URL key is absent and multiple legacy aliases
+  // are present, merge their values into the canonical list rather than
+  // keeping only the first hit. Example: `?instance_type=foo&warehouse_size=bar`
+  // for `instance_or_warehouse` previously kept just one and silently dropped
+  // the other on the next mount; now both flow through.
+  if (params.get(canonicalKey) === null && aliases.length > 0) {
+    const aliasRaws = aliases
+      .map((alias) => params.get(alias))
+      .filter((value): value is string => value !== null);
+    if (aliasRaws.length > 0) {
+      const decodedValues = aliasRaws
+        .map((raw) => serde.decode(raw))
+        .filter((value): value is FacetState[K] => value !== null);
+      if (decodedValues.length === 0) return fallback;
+      // For array-valued facets, concatenate then dedupe; for scalar facets
+      // (e.g. date_window) the first decoded value wins, matching the
+      // pre-w16 single-source behavior since they don't have multi-alias
+      // arrays in practice.
+      const first = decodedValues[0]!;
+      if (Array.isArray(first)) {
+        const merged: string[] = [];
+        const seen = new Set<string>();
+        for (const decoded of decodedValues as unknown as readonly string[][]) {
+          for (const item of decoded) {
+            if (!seen.has(item)) {
+              seen.add(item);
+              merged.push(item);
+            }
+          }
+        }
+        return normalizeFacetValue(key, merged as FacetState[K]);
+      }
+      return normalizeFacetValue(key, first);
+    }
+  }
+
+  const raw = findFirstParam(params, [canonicalKey, ...aliases]);
+  if (raw === null) return fallback;
   const decoded = serde.decode(raw);
   return decoded === null ? fallback : normalizeFacetValue(key, decoded);
 }

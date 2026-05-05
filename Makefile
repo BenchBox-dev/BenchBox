@@ -16,6 +16,15 @@ DEV_LOOP_METRICS_LIMIT ?= 100
 # 5 GB. Override to 0 to bypass the check (e.g. during low-space CI).
 POOL_MIN_FREE_KB ?= 5000000
 
+# Age threshold (in seconds) before a `.benchbox/claim_in_progress` marker
+# is treated as evidence of an aborted claim by `worktree-pool-check`.
+# Fresh markers indicate an in-flight `worktree-claim` and must not be
+# reported as aborted: `worktree-pool-check` is documented as safe for
+# periodic / cron use, and `worktree-claim` writes the marker at the
+# start of a normal claim and only removes it at the end. Default 600s
+# (10 min); concurrent claim runs typically finish in seconds.
+POOL_CLAIM_MARKER_STALE_SECONDS ?= 600
+
 # Shell command snippet that resolves the main clone's directory name
 # (e.g. "BenchBox"). Pool worktree paths derive from it as
 # $(WORKTREE_POOL_PARENT)/$(POOL_REPO_CMD).pool-NN. Inlined as a Make
@@ -901,13 +910,21 @@ codex-pr-review-followups-list:
 		$(if $(CODEX_REVIEW_UNTIL),--until "$(CODEX_REVIEW_UNTIL)")
 
 # One-comment-at-a-time Codex follow-up loop for merged PR review findings.
-# Replies to each actioned source comment with a marker, then submits one PR
-# through the normal pr-preflight + pr-open workflow. Useful overrides:
+# Each actioned comment lands as its own commit *before* the GitHub marker
+# reply is posted, so a mid-sweep crash never leaves a phantom-actioned
+# thread on GitHub. After the loop, the routine runs pr-preflight and
+# opens one PR through the normal pr-open workflow.
+#
+# Useful overrides:
 #   CODEX_REVIEW_MAX_COMMENTS=N   cap an iteration batch
 #   CODEX_REVIEW_SINCE=YYYY-MM-DD scope by merged-at date
 #   CODEX_REVIEW_MODEL=<model>    choose the nested codex exec model
-#   CODEX_REVIEW_REPLY=0          skip GitHub replies
-#   CODEX_REVIEW_SUBMIT=0         skip final pr-open
+#   CODEX_REVIEW_REPLY=0          skip GitHub replies. Only the literals
+#                                 0|false|no disable; anything else
+#                                 (including "1" or "true") is treated as
+#                                 the default, so the reply is posted.
+#   CODEX_REVIEW_SUBMIT=0         skip final pr-open. Same accepted values
+#                                 as CODEX_REVIEW_REPLY above.
 codex-pr-review-followups:
 	@uv run --project _project/scripts -- python _project/scripts/codex_pr_review_followups.py run \
 		--base "$(CODEX_REVIEW_BASE)" \
@@ -1247,6 +1264,7 @@ worktree-pool-check:
 	missing_count=0; \
 	aborted_count=0; \
 	i=1; \
+	now_epoch=$$(date +%s); \
 	while [ "$$i" -le "$(POOL_SIZE)" ]; do \
 		pool=$$(printf 'pool-%02d' "$$i"); \
 		wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.$$pool"; \
@@ -1254,9 +1272,14 @@ worktree-pool-check:
 			violations="$$violations  - $$pool: missing ($$wt is not a git worktree)\n"; \
 			missing_count=$$((missing_count + 1)); \
 		elif [ -f "$$wt/.benchbox/claim_in_progress" ]; then \
+			marker_mtime_epoch=$$(stat -c %Y "$$wt/.benchbox/claim_in_progress" 2>/dev/null || stat -f %m "$$wt/.benchbox/claim_in_progress" 2>/dev/null || echo 0); \
+			case "$$marker_mtime_epoch" in ''|*[!0-9]*) marker_mtime_epoch=0 ;; esac; \
+			marker_age_seconds=$$((now_epoch - marker_mtime_epoch)); \
 			marker_age=$$(date -u -r "$$wt/.benchbox/claim_in_progress" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo "?"); \
-			violations="$$violations  - $$pool: aborted (claim_in_progress marker present, mtime $$marker_age)\n"; \
-			aborted_count=$$((aborted_count + 1)); \
+			if [ "$$marker_age_seconds" -ge "$(POOL_CLAIM_MARKER_STALE_SECONDS)" ]; then \
+				violations="$$violations  - $$pool: aborted (claim_in_progress marker present, mtime $$marker_age, age $${marker_age_seconds}s >= $(POOL_CLAIM_MARKER_STALE_SECONDS)s)\n"; \
+				aborted_count=$$((aborted_count + 1)); \
+			fi; \
 		fi; \
 		i=$$((i + 1)); \
 	done; \
