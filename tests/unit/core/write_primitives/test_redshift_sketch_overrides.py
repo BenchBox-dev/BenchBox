@@ -41,6 +41,17 @@ def test_redshift_hll_distinct_bounds_are_tightened_from_initial_theta_bounds() 
     assert validation.expected_value_max == 15500
 
 
+def test_redshift_hll_distinct_validation_uses_redshift_hll_functions() -> None:
+    """Redshift should not inherit DuckDB/DataSketches validation SQL for the HLL substitute."""
+    operation = load_write_primitives_catalog().operations["sketch_query_theta_union_merge"]
+    validation_sql = operation.validation_queries[0].platform_overrides["redshift"]
+    parsed = sqlglot.parse(validation_sql, read="redshift")
+
+    assert parsed
+    assert "HLL_CARDINALITY(HLL_COMBINE(USER_SKETCH))" in validation_sql.upper()
+    assert "DATASKETCH_THETA" not in validation_sql.upper()
+
+
 def test_redshift_hll_overrides_avoid_hllsketch_key_and_grouping_clauses() -> None:
     """HLLSKETCH columns cannot be dist/sort keys or grouping/order/distinct keys."""
     operations = load_write_primitives_catalog().operations
