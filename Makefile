@@ -1495,7 +1495,7 @@ blind-spots-sweep: blind-spots-report
 # Operator-only; not exposed as `benchbox` CLI subcommands. UAT is a
 # project-developer concern, benchbox is a project-user concern.
 # ----------------------------------------------------------------------
-.PHONY: uat-cell uat-execute uat-validate uat-package uat-explorer-smoke
+.PHONY: uat-cell uat-execute uat-validate uat-package uat-explorer-smoke uat-report
 
 # make uat-cell PLATFORM=duckdb BENCHMARK=tpch SCALE=0.01
 uat-cell:
@@ -1522,6 +1522,18 @@ uat-validate:
 		--results-dir "$(RESULTS_DIR)" \
 		--output-tsv "$(OUTPUT_TSV)" \
 		$(if $(FLOOR),--floor "$(FLOOR)",)
+
+# make uat-report CELLS_JSONL=<path> OUTPUT_TSV=<path> [RUNGS=0.01,0.1,1.0] [CROSS_SCALE_FLOOR=N]
+uat-report:
+	@if [ -z "$(CELLS_JSONL)" ] || [ -z "$(OUTPUT_TSV)" ]; then \
+		echo "Usage: make uat-report CELLS_JSONL=<path> OUTPUT_TSV=<path> [RUNGS=...] [CROSS_SCALE_FLOOR=N]" >&2; \
+		exit 2; \
+	fi
+	@uv run --no-sync -- python -m tests.uat._cli report \
+		--cells-jsonl "$(CELLS_JSONL)" \
+		--output-tsv "$(OUTPUT_TSV)" \
+		$(if $(RUNGS),--rungs "$(RUNGS)",) \
+		$(if $(CROSS_SCALE_FLOOR),--cross-scale-floor "$(CROSS_SCALE_FLOOR)",)
 
 # make uat-explorer-smoke BUNDLES_DIR=<path> OUTPUT_DIR=<path> LOG_DIR=<path> [BROWSERS=chromium]
 uat-explorer-smoke:

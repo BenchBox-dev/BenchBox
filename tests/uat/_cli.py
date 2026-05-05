@@ -55,6 +55,67 @@ def cell_main(argv: list[str] | None = None) -> int:
     return 0 if result.status == "passed" else 1
 
 
+def report_main(argv: list[str] | None = None) -> int:
+    """Implements `make uat-report`. Reads cells from a JSON-lines stream."""
+    import json as _json
+
+    from tests.uat.phases.report import write_report
+    from tests.uat.runner import CellResult
+
+    parser = argparse.ArgumentParser(prog="uat-report")
+    parser.add_argument("--cells-jsonl", required=True)
+    parser.add_argument("--output-tsv", required=True)
+    parser.add_argument(
+        "--rungs",
+        default=None,
+        help="Comma-separated rung scales for cross-scale coverage",
+    )
+    parser.add_argument("--cross-scale-floor", type=int, default=None)
+    args = parser.parse_args(argv)
+
+    cells = []
+    with open(args.cells_jsonl, encoding="utf-8") as fh:
+        for line in fh:
+            if not line.strip():
+                continue
+            payload = _json.loads(line)
+            cells.append(
+                CellResult(
+                    platform=payload["platform"],
+                    benchmark=payload["benchmark"],
+                    scale=float(payload["scale"]),
+                    status=payload["status"],
+                    exit_code=int(payload.get("exit_code", 0)),
+                    elapsed_s=float(payload.get("elapsed_s", 0.0)),
+                    log_path=Path(payload.get("log_path", "")),
+                    result_path=(Path(payload["result_path"]) if payload.get("result_path") else None),
+                )
+            )
+    rungs = [float(s) for s in args.rungs.split(",")] if args.rungs else None
+    summary = write_report(
+        cells,
+        output_path=Path(args.output_tsv),
+        rungs=rungs,
+        cross_scale_floor=args.cross_scale_floor,
+    )
+    print(
+        json.dumps(
+            {
+                "tsv": str(summary.tsv_path),
+                "rows": summary.rows,
+                "passed": summary.pass_count,
+                "failed": summary.fail_count,
+                "timed_out": summary.timeout_count,
+                "cross_scale_clean_pairs": summary.cross_scale_clean_pairs,
+                "cross_scale_floor": summary.cross_scale_floor,
+                "cross_scale_floor_breached": summary.cross_scale_floor_breached,
+            },
+            indent=2,
+        )
+    )
+    return summary.exit_code()
+
+
 def explorer_smoke_main(argv: list[str] | None = None) -> int:
     """Implements `make uat-explorer-smoke`."""
     from tests.uat.phases.explorer_smoke import run_explorer_smoke
@@ -223,4 +284,6 @@ if __name__ == "__main__":
         sys.exit(package_main(sys.argv[2:]))
     if len(sys.argv) > 1 and sys.argv[1] == "explorer-smoke":
         sys.exit(explorer_smoke_main(sys.argv[2:]))
+    if len(sys.argv) > 1 and sys.argv[1] == "report":
+        sys.exit(report_main(sys.argv[2:]))
     sys.exit(cell_main())

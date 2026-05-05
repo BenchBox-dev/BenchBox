@@ -250,7 +250,7 @@ work:
 - id: w8
   summary: "make uat-report: TSV roll-up + optional cross-scale coverage assertion"
   needs: [w7]
-  status: pending
+  status: done
   notes: |
     Outputs:
       - `matrix_summary.tsv` with columns: platform, benchmark, scale,
