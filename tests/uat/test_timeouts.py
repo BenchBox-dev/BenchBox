@@ -53,9 +53,9 @@ def test_iter_argv_for_log_quotes_spaces():
     assert out == "echo 'hello world'"
 
 
-def test_env_with_path_only_drops_pythonpath(monkeypatch):
+def test_env_without_pythonpath_drops_pythonpath(monkeypatch):
     monkeypatch.setenv("PYTHONPATH", "/some/path")
     monkeypatch.setenv("OTHER", "x")
-    env = timeouts.env_with_path_only_pythonpath()
+    env = timeouts.env_without_pythonpath()
     assert "PYTHONPATH" not in env
     assert env["OTHER"] == "x"

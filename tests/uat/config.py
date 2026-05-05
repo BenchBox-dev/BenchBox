@@ -87,6 +87,22 @@ def _validate_phases(phases: list[str]) -> tuple[str, ...]:
     return tuple(out)
 
 
+def _require_positive_int(raw: dict[str, Any], key: str, *, default: int) -> int:
+    """Coerce raw[key] to int. Reject floats and non-numeric strings."""
+    value = raw.get(key, default)
+    if isinstance(value, bool):
+        raise ConfigError(f"`execute.{key}` must be an int, got bool")
+    if isinstance(value, int):
+        coerced = value
+    elif isinstance(value, str) and value.lstrip("-").isdigit():
+        coerced = int(value)
+    else:
+        raise ConfigError(f"`execute.{key}` must be an int, got {type(value).__name__}={value!r}")
+    if coerced <= 0:
+        raise ConfigError(f"`execute.{key}` must be > 0")
+    return coerced
+
+
 def _validate_execute(raw: dict[str, Any]) -> ExecuteConfig:
     if raw is None:
         raw = {}
@@ -97,12 +113,8 @@ def _validate_execute(raw: dict[str, Any]) -> ExecuteConfig:
             "`execute.parallel_platforms: true` is forbidden — UAT W3 line 222: "
             "concurrent platform runs contaminate timings"
         )
-    timeout = int(raw.get("per_cell_timeout_s", 600))
-    if timeout <= 0:
-        raise ConfigError("`execute.per_cell_timeout_s` must be > 0")
-    early_after = int(raw.get("early_stop_after_s", 180))
-    if early_after <= 0:
-        raise ConfigError("`execute.early_stop_after_s` must be > 0")
+    timeout = _require_positive_int(raw, "per_cell_timeout_s", default=600)
+    early_after = _require_positive_int(raw, "early_stop_after_s", default=180)
     return ExecuteConfig(
         per_cell_timeout_s=timeout,
         early_stop_after_s=early_after,

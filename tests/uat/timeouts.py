@@ -104,8 +104,8 @@ def _kill_process_group(pid: int) -> None:
         return
 
 
-def env_with_path_only_pythonpath(extra: Mapping[str, str] | None = None) -> dict[str, str]:
-    """Build a child env that inherits PATH but drops PYTHONPATH-style leakage.
+def env_without_pythonpath(extra: Mapping[str, str] | None = None) -> dict[str, str]:
+    """Build a child env that inherits the parent's env but drops PYTHONPATH.
 
     Convenience for tests that subprocess `uv run` without inheriting the
     parent's PYTHONPATH. Used by `tests/uat/runner.py` callers.

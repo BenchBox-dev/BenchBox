@@ -81,9 +81,6 @@ def run_execute(
             if cell.scale in pruned_rungs:
                 pruned.append(cell)
                 continue
-            if cell.scale not in next_rungs:
-                # Already observed (loop logic guard) — skip silently.
-                continue
             cell_result = runner(
                 cell.platform,
                 cell.benchmark,
