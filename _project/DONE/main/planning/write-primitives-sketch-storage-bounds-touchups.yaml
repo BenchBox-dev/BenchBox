@@ -2,7 +2,8 @@ id: write-primitives-sketch-storage-bounds-touchups
 title: "Write Primitives sketch: tighten/widen sweep variant storage bounds after PR #184 lands"
 worktree: main
 priority: Low
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-05-04"
 category: "Verification"
 
 description: |
@@ -63,34 +64,34 @@ context_sections:
     Address opportunistically.
 
 work:
-  - id: w1
-    summary: "Run lgmm10 / lgmm8 / lgk10 / lgk14 ops at SF=0.01 on the installed extension and capture observed bytes"
-    status: pending
-    notes: |
-      Theta lgk10/lgk14 only if the datasketch_theta extension drift
-      is resolved; otherwise skip those and re-flag via the existing
-      blind-spot.
+- id: w1
+  summary: "Run lgmm10 / lgmm8 / lgk10 / lgk14 ops at SF=0.01 on the installed extension and capture observed bytes"
+  status: done
+  notes: |
+    Theta lgk10/lgk14 only if the datasketch_theta extension drift
+    is resolved; otherwise skip those and re-flag via the existing
+    blind-spot.
 
-  - id: w2
-    summary: "Retune each variant's storage_size bounds to bracket the observation"
-    needs: [w1]
-    status: pending
+- id: w2
+  summary: "Retune each variant's storage_size bounds to bracket the observation"
+  needs: [w1]
+  status: done
 
-  - id: w3
-    summary: "Update inline yaml comments with the observed value"
-    needs: [w2]
-    status: pending
+- id: w3
+  summary: "Update inline yaml comments with the observed value"
+  needs: [w2]
+  status: done
 
 scope_limit:
   only_modify:
-    - benchbox/core/write_primitives/catalog/operations.yaml
-    - CHANGELOG.md
+  - benchbox/core/write_primitives/catalog/operations.yaml
+  - CHANGELOG.md
   do_not_modify:
-    - benchbox/core/write_primitives/benchmark.py
-    - benchbox/core/write_primitives/dataframe_operations.py
+  - benchbox/core/write_primitives/benchmark.py
+  - benchbox/core/write_primitives/dataframe_operations.py
   rationale: |
     Bound-retune is a yaml-only change.
 
 deps:
   needs:
-    - write-primitives-sketch-parameter-sweeps
+  - write-primitives-sketch-parameter-sweeps
