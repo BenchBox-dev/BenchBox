@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lockedAt": "2026-05-05T22:40:51.170Z",
+  "lockedAt": "2026-05-05T23:53:27.723Z",
   "skills": {
     "blog": {
       "source": {
@@ -402,13 +402,13 @@
         "type": "local",
         "name": "personal",
         "path": "/Users/joe/.skill-sync/skills/SHARED/review-protocol",
-        "fetchedAt": "2026-05-05T22:40:51.112Z"
+        "fetchedAt": "2026-05-05T23:53:27.617Z"
       },
       "installMode": "mirror",
       "files": {
         "SKILL.md": {
-          "sha256": "b15a09e061869af2b688c1a4957d0c9f5fae0467f4a144d6abd1a56213f6cc68",
-          "size": 1942
+          "sha256": "1b0af94ea354cba2499b3d16e4f186ddd9e4e6abed30fd4bafe222992873599b",
+          "size": 2056
         },
         "skill.yaml": {
           "sha256": "efe5d79366ee8ff39450f8e68b47c2fcd021f547585d1546a35e3e3f66078545",
