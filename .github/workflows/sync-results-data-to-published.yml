@@ -40,10 +40,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout develop
+      - name: Checkout the triggering commit
+        # Pin to ${{ github.sha }} (not `ref: develop`) so each run mirrors
+        # the exact commit that triggered it. With concurrency.cancel-in-progress
+        # set to false, an older queued run that picked up `develop`'s
+        # current tip would mirror newer corpus content while still naming
+        # the branch / PR with the older GITHUB_SHA, producing misattributed
+        # or duplicate mirror PRs.
         uses: actions/checkout@v4
         with:
-          ref: develop
+          ref: ${{ github.sha }}
           fetch-depth: 0  # full history so we can switch branches and diff
 
       - name: Configure git identity

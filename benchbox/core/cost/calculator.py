@@ -230,12 +230,16 @@ class CostCalculator:
             "pyspark",
             # DataFrame platforms
             "datafusion",
+            "datafusion-df",
             "polars",
             "polars-df",
             "pandas-df",
             "cudf-df",
             "modin-df",
             "dask-df",
+            "pyspark-df",
+            "lakesail",
+            "lakesail-df",
         }
 
     def is_local_platform(self, platform: str) -> bool:

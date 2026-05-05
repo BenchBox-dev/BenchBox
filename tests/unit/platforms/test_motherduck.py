@@ -230,6 +230,60 @@ class TestMotherDuckFromConfig:
         assert adapter.memory_limit == "8GB"
 
 
+class TestMotherDuckConfigBuilder:
+    """w19 regression: the credential wizard saves a `database` field, but the
+    default registry builder did not call CredentialManager, so runtime always
+    fell back to the adapter's internal default (``benchbox``). Routing
+    MotherDuck through ``_build_motherduck_config`` (registered in
+    benchbox/platforms/__init__.py) pulls the wizard-saved database into
+    runtime config so adapters land on the configured database."""
+
+    def test_config_builder_pulls_database_from_credential_manager(self, monkeypatch):
+        from benchbox.platforms.motherduck import _build_motherduck_config
+
+        # Patch CredentialManager to return a wizard-saved database value.
+        class _FakeCredentialManager:
+            def get_platform_credentials(self, key: str):
+                assert key == "motherduck"
+                return {"database": "wizard_saved_db", "token_env_var": "MOTHERDUCK_TOKEN"}
+
+        monkeypatch.setattr(
+            "benchbox.security.credentials.CredentialManager",
+            lambda: _FakeCredentialManager(),
+        )
+
+        config = _build_motherduck_config(
+            "motherduck",
+            options={},
+            overrides={},
+            info=None,
+        )
+
+        assert config.options["database"] == "wizard_saved_db"
+        assert config.options["token_env_var"] == "MOTHERDUCK_TOKEN"
+
+    def test_explicit_cli_database_overrides_credential_value(self, monkeypatch):
+        from benchbox.platforms.motherduck import _build_motherduck_config
+
+        class _FakeCredentialManager:
+            def get_platform_credentials(self, key: str):
+                return {"database": "saved_db"}
+
+        monkeypatch.setattr(
+            "benchbox.security.credentials.CredentialManager",
+            lambda: _FakeCredentialManager(),
+        )
+
+        config = _build_motherduck_config(
+            "motherduck",
+            options={},
+            overrides={"_explicit_platform_options": {"database": "cli_db"}},
+            info=None,
+        )
+
+        assert config.options["database"] == "cli_db"
+
+
 class TestMotherDuckCreateConnection:
     """Test create_connection with a mocked duckdb.connect."""
 

@@ -94,10 +94,24 @@ export function latencyScaleTicks(scale: LatencyBarScale): number[] {
     return [0, 0.25, 0.5, 0.75, 1].map((fraction) => fraction * scale.domainMax);
   }
 
-  const ticks = LATENCY_LOG_TICKS_MS.filter(
+  // Always include both endpoint ticks so the right edge of the bar chart
+  // has a labelled terminal value. Without this, ranges like 0.2-2 ms or
+  // 100k-50M ms would be plotted against an unlabelled endpoint and the
+  // axis could be misread. Canonical powers of ten remain for interior
+  // labelling; dedupe collapses any duplicates at the endpoints.
+  const interior = LATENCY_LOG_TICKS_MS.filter(
     (ms) => ms >= scale.domainMin * 0.99 && ms <= scale.domainMax * 1.01,
   );
-  return ticks.length >= 2 ? ticks : [scale.min, scale.max];
+  const combined = [scale.domainMin, ...interior, scale.domainMax];
+  const seen = new Set<number>();
+  const ticks: number[] = [];
+  for (const value of combined) {
+    if (!seen.has(value)) {
+      seen.add(value);
+      ticks.push(value);
+    }
+  }
+  return ticks;
 }
 
 // ---------------------------------------------------------------------------

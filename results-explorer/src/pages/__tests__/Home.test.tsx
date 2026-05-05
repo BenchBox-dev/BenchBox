@@ -12,7 +12,7 @@ import {
   EXPLORER_PERFORMANCE_MEASURES,
   clearExplorerPerformanceEntriesForTests,
 } from "@/lib/performanceMarks";
-import { Home } from "@/pages/Home";
+import { Home, toggleFacetValue } from "@/pages/Home";
 
 /**
  * ResultRow fixtures - shape mirrors `bench.results` (SELECT * FROM bench.results).
@@ -585,5 +585,28 @@ describe("Home", () => {
     expect(cohortLink.getAttribute("href")).toContain("sf=0.1");
     expect(cohortLink.getAttribute("href")).toContain("phase=power");
     expect(cohortLink.getAttribute("href")).toContain("tuning=auto");
+  });
+});
+
+describe("toggleFacetValue (w13)", () => {
+  it("removes a value when it is already selected, leaving siblings intact", () => {
+    // Pre-w13 the dropdown handler did `[value]` (single-element replacement),
+    // collapsing ?bm=tpch,clickbench to just one entry on any subsequent click.
+    expect(toggleFacetValue(["tpch", "clickbench"], "tpch")).toEqual(["clickbench"]);
+    expect(toggleFacetValue(["tpch", "clickbench"], "clickbench")).toEqual(["tpch"]);
+  });
+
+  it("adds a value when it is not already selected", () => {
+    expect(toggleFacetValue(["tpch"], "clickbench")).toEqual(["tpch", "clickbench"]);
+  });
+
+  it("returns an empty list when toggling the only selected value", () => {
+    expect(toggleFacetValue(["tpch"], "tpch")).toEqual([]);
+  });
+
+  it("does not mutate the input list", () => {
+    const input = ["tpch", "clickbench"];
+    toggleFacetValue(input, "tpch");
+    expect(input).toEqual(["tpch", "clickbench"]);
   });
 });
