@@ -1490,6 +1490,102 @@ blind-spots-report:
 # Alias: 'sweep' as the verb users will reach for; report is the v1 sweep view.
 blind-spots-sweep: blind-spots-report
 
+# ----------------------------------------------------------------------
+# UAT framework (tests/uat/) — see _project/specs/uat-framework.md.
+# Operator-only; not exposed as `benchbox` CLI subcommands. UAT is a
+# project-developer concern, benchbox is a project-user concern.
+# ----------------------------------------------------------------------
+.PHONY: uat-cell uat-execute uat-validate uat-package uat-explorer-smoke uat-report uat-sweep uat-stress
+
+# make uat-cell PLATFORM=duckdb BENCHMARK=tpch SCALE=0.01
+uat-cell:
+	@if [ -z "$(PLATFORM)" ] || [ -z "$(BENCHMARK)" ] || [ -z "$(SCALE)" ]; then \
+		echo "Usage: make uat-cell PLATFORM=<name> BENCHMARK=<name> SCALE=<float>" >&2; \
+		exit 2; \
+	fi
+	@uv run --no-sync -- python -m tests.uat._cli \
+		--platform "$(PLATFORM)" \
+		--benchmark "$(BENCHMARK)" \
+		--scale "$(SCALE)" \
+		$(if $(PHASES),--phases "$(PHASES)",) \
+		$(if $(COMPRESSION),--compression "$(COMPRESSION)",) \
+		$(if $(TIMEOUT_S),--timeout-s "$(TIMEOUT_S)",) \
+		$(if $(LOG_DIR),--log-dir "$(LOG_DIR)",)
+
+# make uat-validate RESULTS_DIR=<dir> OUTPUT_TSV=<path> [FLOOR=0.80]
+uat-validate:
+	@if [ -z "$(RESULTS_DIR)" ] || [ -z "$(OUTPUT_TSV)" ]; then \
+		echo "Usage: make uat-validate RESULTS_DIR=<dir> OUTPUT_TSV=<path> [FLOOR=0.80]" >&2; \
+		exit 2; \
+	fi
+	@uv run --no-sync -- python -m tests.uat._cli validate \
+		--results-dir "$(RESULTS_DIR)" \
+		--output-tsv "$(OUTPUT_TSV)" \
+		$(if $(FLOOR),--floor "$(FLOOR)",)
+
+# make uat-report CELLS_JSONL=<path> OUTPUT_TSV=<path> [RUNGS=0.01,0.1,1.0] [CROSS_SCALE_FLOOR=N]
+uat-report:
+	@if [ -z "$(CELLS_JSONL)" ] || [ -z "$(OUTPUT_TSV)" ]; then \
+		echo "Usage: make uat-report CELLS_JSONL=<path> OUTPUT_TSV=<path> [RUNGS=...] [CROSS_SCALE_FLOOR=N]" >&2; \
+		exit 2; \
+	fi
+	@uv run --no-sync -- python -m tests.uat._cli report \
+		--cells-jsonl "$(CELLS_JSONL)" \
+		--output-tsv "$(OUTPUT_TSV)" \
+		$(if $(RUNGS),--rungs "$(RUNGS)",) \
+		$(if $(CROSS_SCALE_FLOOR),--cross-scale-floor "$(CROSS_SCALE_FLOOR)",)
+
+# make uat-explorer-smoke BUNDLES_DIR=<path> OUTPUT_DIR=<path> LOG_DIR=<path> [BROWSERS=chromium]
+uat-explorer-smoke:
+	@if [ -z "$(BUNDLES_DIR)" ] || [ -z "$(OUTPUT_DIR)" ] || [ -z "$(LOG_DIR)" ]; then \
+		echo "Usage: make uat-explorer-smoke BUNDLES_DIR=<path> OUTPUT_DIR=<path> LOG_DIR=<path> [BROWSERS=chromium]" >&2; \
+		exit 2; \
+	fi
+	@uv run --no-sync -- python -m tests.uat._cli explorer-smoke \
+		--bundles-dir "$(BUNDLES_DIR)" \
+		--output-dir "$(OUTPUT_DIR)" \
+		--log-dir "$(LOG_DIR)" \
+		$(if $(BROWSERS),--browsers "$(BROWSERS)",)
+
+# make uat-package CONFIG=<path> SUBMISSIONS_DIR=<path> RESULTS="r1.json r2.json ..."
+uat-package:
+	@if [ -z "$(CONFIG)" ] || [ -z "$(SUBMISSIONS_DIR)" ] || [ -z "$(RESULTS)" ]; then \
+		echo "Usage: make uat-package CONFIG=<path> SUBMISSIONS_DIR=<path> RESULTS=\"r1.json r2.json ...\"" >&2; \
+		exit 2; \
+	fi
+	@uv run --no-sync -- python -m tests.uat._cli package \
+		--config "$(CONFIG)" \
+		--submissions-dir "$(SUBMISSIONS_DIR)" \
+		$(foreach r,$(RESULTS),--result "$(r)")
+
+# make uat-sweep CONFIG=tests/uat/configs/<name>.yaml [DRY_RUN=1]
+uat-sweep:
+	@if [ -z "$(CONFIG)" ]; then \
+		echo "Usage: make uat-sweep CONFIG=<path> [DRY_RUN=1]" >&2; \
+		exit 2; \
+	fi
+	@uv run --no-sync -- python -m tests.uat._cli sweep --config "$(CONFIG)"
+
+# make uat-stress [PLATFORM=] [BENCHMARK=] [SCALE=] [CONFIG=]
+# Canned stress preset; feature parity with scripts/local_stress_test.sh.
+uat-stress:
+	@uv run --no-sync -- python -m tests.uat._cli stress \
+		$(if $(CONFIG),--config "$(CONFIG)",) \
+		$(if $(PLATFORM),--platform "$(PLATFORM)",) \
+		$(if $(BENCHMARK),--benchmark "$(BENCHMARK)",) \
+		$(if $(SCALE),--scale "$(SCALE)",)
+
+# make uat-execute CONFIG=tests/uat/configs/uat.yaml
+uat-execute:
+	@if [ -z "$(CONFIG)" ]; then \
+		echo "Usage: make uat-execute CONFIG=<path>" >&2; \
+		exit 2; \
+	fi
+	@uv run --no-sync -- python -m tests.uat._cli execute \
+		--config "$(CONFIG)" \
+		$(if $(DATABASES_ROOT),--databases-root "$(DATABASES_ROOT)",) \
+		$(if $(NO_CLEANUP),--no-cleanup,)
+
 # Help
 help:
 	@echo "BenchBox Makefile"
