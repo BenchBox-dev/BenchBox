@@ -55,6 +55,42 @@ def cell_main(argv: list[str] | None = None) -> int:
     return 0 if result.status == "passed" else 1
 
 
+def package_main(argv: list[str] | None = None) -> int:
+    """Implements `make uat-package CONFIG=<path> RESULTS=glob...`."""
+    from tests.uat.config import load_config
+    from tests.uat.phases.package import run_package
+
+    parser = argparse.ArgumentParser(prog="uat-package")
+    parser.add_argument("--config", required=True)
+    parser.add_argument("--submissions-dir", required=True)
+    parser.add_argument(
+        "--result",
+        action="append",
+        required=True,
+        help="Result JSON path; repeat for multiple",
+    )
+    args = parser.parse_args(argv)
+
+    config = load_config(args.config)
+    result = run_package(
+        config,
+        result_paths=[Path(p) for p in args.result],
+        submissions_dir=Path(args.submissions_dir),
+    )
+    print(
+        json.dumps(
+            {
+                "terminal_state": result.terminal_state,
+                "submissions_dir": str(result.submissions_dir),
+                "success": result.success_count,
+                "failure": result.failure_count,
+            },
+            indent=2,
+        )
+    )
+    return result.exit_code()
+
+
 def validate_main(argv: list[str] | None = None) -> int:
     """Implements `make uat-validate RESULTS_DIR=<dir>`."""
     from tests.uat.phases.validate import run_validate
@@ -150,4 +186,6 @@ if __name__ == "__main__":
         sys.exit(execute_main(sys.argv[2:]))
     if len(sys.argv) > 1 and sys.argv[1] == "validate":
         sys.exit(validate_main(sys.argv[2:]))
+    if len(sys.argv) > 1 and sys.argv[1] == "package":
+        sys.exit(package_main(sys.argv[2:]))
     sys.exit(cell_main())

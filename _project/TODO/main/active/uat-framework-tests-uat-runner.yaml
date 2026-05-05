@@ -219,7 +219,7 @@ work:
 - id: w6
   summary: "make uat-package: read submit_terminal_state from YAML"
   needs: [w5]
-  status: pending
+  status: done
   notes: |
     YAML field `submit_terminal_state` uses the four-word vocabulary
     established by `uat-template-success-metric-terminal-state-and-gating`:
