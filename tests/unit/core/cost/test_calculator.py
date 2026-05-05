@@ -201,7 +201,7 @@ class TestCostCalculator:
         assert normalized_cost.normalized_cost_usd == 0
         assert normalized_cost.cost_usd is None
 
-    def test_dataframe_variant_platforms_are_local(self):
+    def test_dataframe_variant_local_platforms_have_not_applicable_cost(self):
         """w14 regression: every registered DataFrame variant whose primary
         execution is on the developer's machine must be classified as local
         so cost normalization yields ``not_applicable_local`` rather than
@@ -209,14 +209,19 @@ class TestCostCalculator:
         were missing from the allowlist, polluting cost facets and the
         empty-state logic that depends on ``cost_status``."""
         calculator = CostCalculator()
+        phase_cost = calculator.calculate_phase_cost("power_test", [QueryCost(0.0, "USD")])
         for platform_id in [
             "datafusion",
             "datafusion-df",
             "polars",
             "polars-df",
+            "pandas",
             "pandas-df",
+            "cudf",
             "cudf-df",
+            "modin",
             "modin-df",
+            "dask",
             "dask-df",
             "pyspark",
             "pyspark-df",
@@ -228,6 +233,10 @@ class TestCostCalculator:
             assert calculator.is_local_platform(platform_id), (
                 f"{platform_id!r} should be classified as a local platform"
             )
+            benchmark_cost = calculator.calculate_benchmark_cost([phase_cost], {"platform": platform_id})
+            normalized_cost, warnings = calculator.calculate_normalized_benchmark_cost(platform_id, benchmark_cost, {})
+            assert warnings == []
+            assert normalized_cost.cost_status == "not_applicable_local"
 
     def test_cloud_platforms_are_not_local(self):
         """w14 sanity check: known cloud platforms remain non-local so cost
