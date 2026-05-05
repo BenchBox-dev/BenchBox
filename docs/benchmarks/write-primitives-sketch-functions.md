@@ -274,11 +274,19 @@ future option if drift detection needs to be tighter.
 
 ## Try it locally on clickhouse-local
 
-ClickHouse Local (`clickhouse local`, the embeddable single-binary build
-that ships with the standard Homebrew / DEB / RPM ClickHouse package)
-runs the headline ClickHouse sketch overrides without any cloud
-credentials. Install via `brew install clickhouse` (or your distro
-equivalent) and run:
+BenchBox's `clickhouse-local` platform uses embedded ClickHouse through
+chDB, so it runs the headline ClickHouse sketch overrides without any
+cloud credentials or external ClickHouse server. Install BenchBox with the
+`clickhouse-local` extra (or add `chdb` to an existing BenchBox dev
+environment) and run:
+
+```bash
+uv add benchbox --extra clickhouse-local
+# Existing BenchBox development checkout:
+uv add chdb
+```
+
+Then run:
 
 ```bash
 uv run -- benchbox run --platform clickhouse-local --benchmark write_primitives \
