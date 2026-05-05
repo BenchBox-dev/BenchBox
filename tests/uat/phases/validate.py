@@ -51,7 +51,7 @@ def run_validate(
     floor: float = 0.80,
     extra_args: tuple[str, ...] = (),
     rollup_script: Path | None = None,
-    runner=subprocess.run,
+    runner=None,
 ) -> ValidateResult:
     """Execute the validate phase against results_dir, writing the rollup to output_tsv.
 
@@ -62,6 +62,8 @@ def run_validate(
     Raises `ValidatePhaseError` only when the subprocess fails AND no TSV
     was produced — in that case there is nothing to parse.
     """
+    if runner is None:
+        runner = subprocess.run
     script = rollup_script or ROLLUP_SCRIPT
     if not script.exists():
         raise FileNotFoundError(f"validator rollup helper not found at {script}")

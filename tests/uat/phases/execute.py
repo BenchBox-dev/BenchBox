@@ -42,13 +42,17 @@ def run_execute(
     log_dir: Path | None = None,
     databases_root: Path | None = None,
     cleanup_enabled: bool = True,
-    runner=run_cell,  # injectable for tests
+    runner=None,
 ) -> ExecuteOutcome:
     """Walk the matrix sequentially with ladder pruning and reuse-aware cleanup.
 
     Parameters mirror the spec's W4 execute phase. `runner` is injectable
     so the fast tests can drive the loop without spawning subprocesses.
+    Resolves the module-level `run_cell` lazily so monkeypatching
+    `tests.uat.phases.execute.run_cell` from a test takes effect.
     """
+    if runner is None:
+        runner = run_cell
     assert config.execute.parallel_platforms is False, "parallel_platforms must remain False — UAT W3 line 222"
 
     cells = enumerate_cells(config.raw)
