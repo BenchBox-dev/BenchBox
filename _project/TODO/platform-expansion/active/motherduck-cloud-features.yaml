@@ -1,7 +1,7 @@
 id: motherduck-cloud-features
 title: "MotherDuck Cloud Feature Completion - Credential Wizard, Cloud Upload, Cache Control"
 worktree: platform-expansion
-priority: High
+priority: Medium
 status: Blocked
 category: Platform Expansion
 description: |

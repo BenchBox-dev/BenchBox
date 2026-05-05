@@ -1,7 +1,7 @@
 id: dev-loop-step-6-queue-decision-gate
 title: "Dev-loop simplification — Step 6: queue implementation gate — DEFERRED until Step 5 justifies"
 worktree: main
-priority: Medium-High
+priority: Medium
 status: Blocked
 category: Core Functionality
 

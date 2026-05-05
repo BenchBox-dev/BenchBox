@@ -1,7 +1,7 @@
 id: single-repo-migration-phase-8-first-post-migration-release
 title: "Single-repo migration phase 8: cut the first release after deletion and docs cleanup"
 worktree: main
-priority: Medium
+priority: Medium-High
 status: Not Started
 category: Release Tooling
 

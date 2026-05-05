@@ -1,7 +1,7 @@
 id: write-primitives-sketch-cloud-verification
 title: "Write Primitives sketch: cloud verification of Snowflake / BigQuery / Databricks / Redshift platform_overrides"
 worktree: main
-priority: Medium
+priority: Low
 status: "Blocked"
 category: "Verification"
 
