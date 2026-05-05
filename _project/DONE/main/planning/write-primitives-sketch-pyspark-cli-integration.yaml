@@ -2,7 +2,8 @@ id: write-primitives-sketch-pyspark-cli-integration
 title: "Write Primitives sketch: wire PySpark sketch factories into the benchbox CLI"
 worktree: main
 priority: Medium
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-05-04"
 category: "Core Functionality"
 
 description: |
@@ -89,73 +90,81 @@ context_sections:
     type errors during w3.
 
 work:
-  - id: w1
-    summary: "Add sketch_df_hll_persist_merge and sketch_df_topk_persist_merge ops to operations.yaml"
-    status: pending
-    notes: |
-      Two new entries with the AGGREGATE_PERSIST/MERGE op shape. The
-      DataFrame ops live in operations.yaml alongside SQL ops; a
-      `dispatch: aggregate_state` (or similar) marker distinguishes
-      them. Bonds, source paths, and group_cols are catalog inputs
-      that the dispatch passes to the factory helpers.
+- id: w1
+  summary: "Add sketch_df_hll_persist_merge and sketch_df_topk_persist_merge ops to operations.yaml"
+  status: done
+  notes: |
+    Two new entries with the AGGREGATE_PERSIST/MERGE op shape. The
+    DataFrame ops live in operations.yaml alongside SQL ops; a
+    `dispatch: aggregate_state` (or similar) marker distinguishes
+    them. Bonds, source paths, and group_cols are catalog inputs
+    that the dispatch passes to the factory helpers.
 
-  - id: w2
-    summary: "Add aggregate-state dispatch fork in DataFrame workload runner"
-    needs: [w1]
-    status: pending
-    notes: |
-      `benchbox/core/write_primitives/benchmark.py` has the
-      DataFrame workload runner; today every op routes through
-      embedded DuckDB SQL (`_execute_dataframe_sql_parity_workload`).
-      Add an early branch: if the catalog entry is shaped as
-      AGGREGATE_PERSIST/MERGE, instantiate the appropriate factory
-      (HLL or top-K), call
-      `manager.execute_aggregate_persist(...)` then
-      `manager.execute_aggregate_merge(...)`, and roll the two
-      DataFrameWriteResults into the operation envelope.
+- id: w2
+  summary: "Add aggregate-state dispatch fork in DataFrame workload runner"
+  needs: [w1]
+  status: done
+  notes: |
+    `benchbox/core/write_primitives/benchmark.py` has the
+    DataFrame workload runner; today every op routes through
+    embedded DuckDB SQL (`_execute_dataframe_sql_parity_workload`).
+    Add an early branch: if the catalog entry is shaped as
+    AGGREGATE_PERSIST/MERGE, instantiate the appropriate factory
+    (HLL or top-K), call
+    `manager.execute_aggregate_persist(...)` then
+    `manager.execute_aggregate_merge(...)`, and roll the two
+    DataFrameWriteResults into the operation envelope.
 
-  - id: w3
-    summary: "Run the verification command against a real Spark 3.5+ session"
-    needs: [w2]
-    status: pending
-    notes: |
-      First real-Spark integration of these helpers. Expect at least
-      one type-shape bug to surface — debug, fix, document. If the
-      top-K nested expression
-      `F.size(F.approx_top_k_estimate(F.approx_top_k_combine(col)))`
-      doesn't resolve cleanly inside `state.agg(...)`, restructure
-      the merge_extract to do agg-then-select rather than nesting
-      everything.
+- id: w3
+  summary: "Run the verification command against a real Spark 3.5+ session"
+  needs: [w2]
+  status: done
+  notes: |
+    First real-Spark integration of these helpers. Expect at least
+    one type-shape bug to surface — debug, fix, document. If the
+    top-K nested expression
+    `F.size(F.approx_top_k_estimate(F.approx_top_k_combine(col)))`
+    doesn't resolve cleanly inside `state.agg(...)`, restructure
+    the merge_extract to do agg-then-select rather than nesting
+    everything.
 
-  - id: w4
-    summary: "Update docs and mark blind-spot resolved"
-    needs: [w3]
-    status: pending
-    notes: |
-      Remove "CLI integration gap" subsection from
-      docs/benchmarks/write-primitives-sketch-functions.md; add the
-      verified invocation example. Set blind-spot file's frontmatter
-      `status:` to `resolved` and link this TODO from
-      `todo_id:`.
+- id: w4
+  summary: "Update docs and mark blind-spot resolved"
+  needs: [w3]
+  status: done
+  notes: |
+    Remove "CLI integration gap" subsection from
+    docs/benchmarks/write-primitives-sketch-functions.md; add the
+    verified invocation example. Set blind-spot file's frontmatter
+    `status:` to `resolved` and link this TODO from
+    `todo_id:`.
 
-  - id: w5
-    summary: "Add changelog entry"
-    needs: [w4]
-    status: pending
+- id: w5
+  summary: "Add changelog entry"
+  needs: [w4]
+  status: done
 
 scope_limit:
   only_modify:
-    - benchbox/core/write_primitives/catalog/operations.yaml
-    - benchbox/core/write_primitives/benchmark.py
-    - tests/integration/core/write_primitives/
-    - docs/benchmarks/write-primitives-sketch-functions.md
-    - _project/blind-spots/2026-05-04-011321-pyspark-sketch-todo-scope-vs-verification-mismatch.md
-    - CHANGELOG.md
+  - benchbox/core/write_primitives/catalog/operations.yaml
+  - benchbox/core/write_primitives/catalog/loader.py
+  - benchbox/core/write_primitives/benchmark.py
+  - tests/integration/core/write_primitives/
+  - tests/unit/core/write_primitives/
+  - docs/benchmarks/write-primitives-sketch-functions.md
+  - _project/blind-spots/2026-05-04-011321-pyspark-sketch-todo-scope-vs-verification-mismatch.md
+  - _project/blind-spots/2026-05-05-003901-pyspark-cli-integration-scope-excludes-loader.md
+  - CHANGELOG.md
   do_not_modify:
-    - benchbox/core/write_primitives/dataframe_operations.py
+  - benchbox/core/write_primitives/dataframe_operations.py
   rationale: |
-    Factory helpers are stable and tested; this TODO wires them
-    in, doesn't redesign them.
+    Factory helpers in `dataframe_operations.py` are stable and tested;
+    this TODO wires them in without redesign. Loader is in scope because
+    the new AGGREGATE_PERSIST/MERGE op shape requires a catalog model
+    extension (matching the `architecture-fixes` precedent that added
+    `validation_query.platform_overrides`); the prior scope without
+    `loader.py` was the contradiction recorded in
+    `_project/blind-spots/2026-05-05-003901-pyspark-cli-integration-scope-excludes-loader.md`.
 
 deps:
   needs: []

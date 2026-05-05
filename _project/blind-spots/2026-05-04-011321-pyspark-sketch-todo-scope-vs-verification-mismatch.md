@@ -1,7 +1,7 @@
 ---
 id: 2026-05-04-011321-pyspark-sketch-todo-scope-vs-verification-mismatch
 date: 2026-05-04
-status: merged-to-todo
+status: actioned
 finding_kind: scope-creep
 review_context: "/code review w2 prep / write-primitives-sketch-pyspark-dataframe-surface"
 related_paths:
@@ -14,11 +14,22 @@ suggested_sweep: "decide whether the pyspark-dataframe-surface TODO is a 'primit
 todo_id: write-primitives-sketch-pyspark-cli-integration
 ---
 
-> **Update 2026-05-04**: the concrete CLI-wireup gap is now tracked in
-> `_project/TODO/main/planning/write-primitives-sketch-pyspark-cli-integration.yaml`.
-> The process learning ("watch for scope vs verification contradictions
-> when authoring TODOs") stays as a blind-spot for future-author hint;
-> the actionable closure is the new TODO.
+> **Update 2026-05-04 (resolved 2026-05-05)**: the concrete CLI-wireup
+> gap was tracked in
+> `_project/TODO/main/planning/write-primitives-sketch-pyspark-cli-integration.yaml`
+> and the wire-up has now landed. Catalog ops `sketch_df_hll_persist_merge`
+> and `sketch_df_topk_persist_merge` carry an `aggregate_state` block, and
+> the dispatch fork in `WritePrimitivesBenchmark._execute_dataframe_sql_parity_workload`
+> routes them through `manager.execute_aggregate_persist` /
+> `manager.execute_aggregate_merge` instead of the DuckDB parity path.
+> The verification command
+> `uv run -- benchbox run --platform pyspark --benchmark write_primitives --scale 0.01 --queries sketch_df_hll_persist_merge`
+> now passes live on PySpark 4.1.1 (aggregate_value=14852, RSE ~1% vs
+> true=15000, inside the [14250, 15750] bound). The process learning —
+> "watch for scope-versus-verification contradictions when authoring TODOs"
+> — stays recorded for future authors. A second-instance recurrence of
+> this class on the cli-integration TODO itself is captured in
+> `_project/blind-spots/2026-05-05-003901-pyspark-cli-integration-scope-excludes-loader.md`.
 
 
 # pyspark-dataframe-surface TODO: scope_limit vs verification command contradict

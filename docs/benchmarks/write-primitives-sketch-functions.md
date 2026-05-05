@@ -429,12 +429,24 @@ the function symbol — distributions that backport the function to a
 3.5.x build will be rejected by the version check. If you hit that case,
 bypass the guard or open a TODO to add a backport-detection branch.
 
-The current factory tests are MagicMock-based and verify call patterns
-without booting a real Spark session. Until the CLI integration follow-up
-runs the persist+merge cycle against Spark 3.5+ at least once, treat
-type-shape concerns (e.g. whether `F.hll_sketch_estimate` accepts the
-`Column` produced by `F.hll_union_agg` directly inside an `agg(...)`)
-as unverified.
+The factory unit tests are MagicMock-based and verify call patterns. The
+real-Spark CLI integration is wired through the catalog ops
+`sketch_df_hll_persist_merge` and `sketch_df_topk_persist_merge` — both
+declare an `aggregate_state` block that the dispatch fork in
+`WritePrimitivesBenchmark._execute_dataframe_sql_parity_workload` routes
+through `manager.execute_aggregate_persist` /
+`manager.execute_aggregate_merge` on the active platform's
+`DataFrameWriteOperationsManager` instead of through the DuckDB parity
+path. HLL is verified live on PySpark 4.1.1 at SF=0.01:
+`aggregate_value=14852` (true distinct l_orderkeys = 15000, 0.99% RSE,
+inside the `[14250, 15750]` bound). Top-K skips cleanly on the same
+runtime because the PySpark 4.1.1 client wheel does not expose
+`F.approx_top_k_accumulate` / `F.approx_top_k_combine` /
+`F.approx_top_k_estimate` in its Python `functions` namespace —
+`pyspark_supports_approx_top_k(spark)` returns `False` and the dispatch
+fork records a structured `SKIPPED` result. To exercise top-K live, run
+on a Spark distribution that surfaces `approx_top_k_accumulate` in the
+Python API.
 
 KLL is intentionally **not** implemented at the DataFrame layer because
 Spark's KLL surface is SQL-UDAF-only today; using `percentile_approx`
