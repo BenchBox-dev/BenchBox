@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Verified
+
+- **write_primitives sketch (sweep variants)** — live SF=0.01 measurement
+  of KLL `k=100` and `k=1000` sweep variants on DuckDB 1.3.2 +
+  datasketches extension `2e38607`. Observed merged sketch sizes:
+  `kll_k100` 2508 bytes (within `[500, 5000]`), `kll_k1000` 21220 bytes
+  (within `[5000, 40000]`). Replaces the prior "synthetic test" comments
+  with real datasketches build numbers. Top-K (`lgmm8`/`lgmm10`) and
+  Theta (`lgk10`/`lgk14`) sweep bounds remain spec-derived because
+  `datasketch_frequent_items` and `datasketch_theta` are not exported
+  by the current DuckDB community datasketches build — drift tracked in
+  `_project/blind-spots/2026-05-02-155524-duckdb-datasketches-extension-drift.md`.
+  Comments updated to make the spec-vs-measured distinction explicit.
+
 ### New
 
 - **write_primitives sketch** — DuckDB-only parameter-sweep variants
