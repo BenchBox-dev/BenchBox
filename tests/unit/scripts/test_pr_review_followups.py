@@ -277,6 +277,34 @@ def test_run_executor_for_comment_uses_config_override_for_approval_policy() -> 
     assert result.disposition == "no-current-action"  # RecordingRunner produces no diff
 
 
+def test_run_executor_for_comment_treats_clean_local_commit_as_fixed() -> None:
+    pending = pr_review_followups.PendingComment(pr=_pr(), comment=_comment(51), replies=())
+    runner = RecordingRunner(
+        scripted={
+            ("git", "rev-parse", "HEAD"): [
+                subprocess.CompletedProcess(["git", "rev-parse", "HEAD"], 0, "before-sha\n", ""),
+                subprocess.CompletedProcess(["git", "rev-parse", "HEAD"], 0, "after-sha\n", ""),
+            ],
+            ("git", "status", "--porcelain"): [
+                subprocess.CompletedProcess(["git", "status", "--porcelain"], 0, "", ""),
+                subprocess.CompletedProcess(["git", "status", "--porcelain"], 0, "", ""),
+            ],
+        }
+    )
+
+    result = pr_review_followups.run_executor_for_comment(
+        runner,
+        pending,
+        repo="joeharris76/BenchBox",
+        base="develop",
+        executor_model=None,
+        executor_sandbox="workspace-write",
+        executor_approval="never",
+    )
+
+    assert result.disposition == "fixed"
+
+
 def test_commit_message_for_result_includes_pr_and_comment_id() -> None:
     pending = pr_review_followups.PendingComment(
         pr=_pr(), comment=_comment(101, body="[P1] Tighten the merge guard"), replies=()

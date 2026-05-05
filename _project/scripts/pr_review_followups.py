@@ -469,14 +469,17 @@ def print_pending_table(pending: Sequence[PendingComment]) -> None:
         print(f"#{item.pr.number:<5}  {item.comment.id:>12}  {path:<52}  {first_body_line(item.comment.body)}")
 
 
-def git_status_snapshot(runner: CommandRunner) -> str:
-    """Snapshot of working-tree state used as a disposition baseline.
+def git_state_snapshot(runner: CommandRunner) -> str:
+    """Snapshot of local Git state used as a disposition baseline.
 
     `git diff` only sees unstaged tracked-file changes. The executor may stage
-    edits (`git add`) or create new untracked files; both must count as "fixed".
-    `git status --porcelain` covers all three: modified, staged, and untracked.
+    edits (`git add`), create new untracked files, or leave a clean local commit;
+    all of those must count as "fixed". `git status --porcelain` covers modified,
+    staged, and untracked files. `git rev-parse HEAD` covers clean commits.
     """
-    return checked(runner, ["git", "status", "--porcelain"]).stdout
+    head = checked(runner, ["git", "rev-parse", "HEAD"]).stdout.strip()
+    status = checked(runner, ["git", "status", "--porcelain"]).stdout
+    return f"HEAD {head}\n{status}"
 
 
 def git_changed_paths(runner: CommandRunner) -> list[str]:
@@ -601,7 +604,7 @@ def run_executor_for_comment(
     executor_sandbox: str,
     executor_approval: str,
 ) -> ActionResult:
-    before = git_status_snapshot(runner)
+    before = git_state_snapshot(runner)
     prompt = build_executor_prompt(item, repo=repo, base=base)
     # codex-cli >= 0.20 dropped `--ask-for-approval`. The config-override
     # syntax (`-c approval_policy=<mode>`) works across the supported version
@@ -629,7 +632,7 @@ def run_executor_for_comment(
     if result.returncode != 0:
         raise CommandError(cmd, result)
 
-    after = git_status_snapshot(runner)
+    after = git_state_snapshot(runner)
     disposition = "fixed" if after != before else "no-current-action"
     summary = result.stdout.strip() or result.stderr.strip() or f"Disposition: {disposition}"
     return ActionResult(pending=item, disposition=disposition, summary=summary)
