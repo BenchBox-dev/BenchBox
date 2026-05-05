@@ -31,18 +31,29 @@ def _result(label: str, passed: bool, detail: str) -> bool:
     return passed
 
 
-def repro_1_duckdb_all_keyword() -> bool:
-    _section("Tier B #1: DuckDB GROUP/ORDER BY ALL quoted under identify=True")
-    sql = "SELECT col1, col2, SUM(col3) FROM tbl GROUP BY ALL"
-    out = sqlglot.transpile(sql, read="duckdb", write="duckdb", identify=True)[0]
-    print(f"  input : {sql}")
-    print(f"  output: {out}")
+def _check_duckdb_all_keyword(label: str, sql: str, *, read: str) -> bool:
+    out = sqlglot.transpile(sql, read=read, write="duckdb", identify=True)[0]
+    print(f"  input ({read}->duckdb): {sql}")
+    print(f"  output             : {out}")
     quoted = '"ALL"' in out or "`ALL`" in out
     return _result(
-        "GROUP BY ALL preserved as bare keyword (no identifier quoting)",
+        f"{label} preserved as bare keyword (no identifier quoting)",
         passed=not quoted,
-        detail=f"detected double-quoted ALL in clause: {quoted}",
+        detail=f"detected quoted ALL in clause: {quoted}",
     )
+
+
+def repro_1_duckdb_all_keyword() -> bool:
+    _section("Tier B #1: DuckDB GROUP/ORDER BY ALL quoted under identify=True")
+    group_sql = "SELECT col1, col2, SUM(col3) FROM tbl GROUP BY ALL"
+    order_sql = "SELECT col1, col2 FROM tbl ORDER BY ALL"
+    results = [
+        _check_duckdb_all_keyword("GROUP BY ALL (duckdb->duckdb)", group_sql, read="duckdb"),
+        _check_duckdb_all_keyword("ORDER BY ALL (duckdb->duckdb)", order_sql, read="duckdb"),
+        _check_duckdb_all_keyword("GROUP BY ALL (postgres->duckdb)", group_sql, read="postgres"),
+        _check_duckdb_all_keyword("ORDER BY ALL (postgres->duckdb)", order_sql, read="postgres"),
+    ]
+    return all(results)
 
 
 def repro_2_sqlite_interval_arithmetic() -> bool:
