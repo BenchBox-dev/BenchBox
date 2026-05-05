@@ -1,186 +1,126 @@
-# BenchBox - Agent And Contributor Guide
+# BenchBox Agent Guide
 
-Consistent tooling, safe defaults, minimal surprises.
+Consistent tooling, safe defaults, minimal surprises. Research first, make scoped changes, verify before return.
 
-## Workflow
-- Research before coding: read files, run tests, understand first
-- Run test suite after multi-file edits; review every find-replace in context
-- Stop on user interrupt/redirect
-- Review-shaped actions (review, audit, research, compare, to-spec, security
-  review, L2 blind-spot audit) are read-only plus local capture per the synced
-  `SHARED/review-protocol` skill. Captures may write designated local files and
-  must be surfaced with `Recorded: <path>`, but they do not authorize commit,
-  push, PR creation, or auto-merge.
+## Core Rules
 
-## Tooling
-Use `rg`; read files in ≤250-line chunks. Always `uv run --` for Python tools. `make` wrappers OK. Run `benchbox --help` after dev install.
-Common: `uv run -- python -m pytest {test}`, `pytest -m fast -q`, `ruff format .`, `ruff check .`, `ruff check --fix .`, `ty check` (all via `uv run`).
+- Use `rg`; read files in focused chunks.
+- Python tooling is `uv` only: use `uv run -- ...`, `uv add`, `uv sync`, `uv lock`. Do not use bare `python`, `pytest`, `ruff`, `pip`, conda, poetry, manual venvs, or `requirements.txt`.
+- `make` wrappers are fine when present. Common commands still run through uv when Python is direct: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format .`, `uv run -- ty check`.
+- Do not use `git add -A`; stage explicit paths only.
+- Do not run live cloud tests or destructive git/filesystem commands without explicit approval.
+- No credentials in repo. Use env vars or gitignored `.env`; redact secrets in logs.
+- Stop on user interrupt or redirect. Do not revert user changes unless explicitly asked.
 
 ## Code Style
-Python 3.10+, 4 spaces, 120 cols. Ruff only. Type hints on public APIs.
 
-## Package Management
-`uv` exclusively - no pip/pip-tools/poetry/conda, no `requirements.txt`, no manual pyproject.toml edits, no manual venvs.
-Commands: `uv add pkg`, `uv add --dev pkg`, `uv add benchbox --extra cloud --extra clickhouse`, `uv sync --group dev`, `uv lock`, `uv tool install tool_name`, `uv tree`, `uv pip list`, `uv export`.
-Avoid: bare `python`/`pytest`/`ruff`; `git add -A`; `-o "addopts="` with pytest; running TPC-DS SF<1 with stock dsdgen (it crashes; BenchBox bundles patched binaries - see `patch-and-redistribute-tpcds-dsdgen-subscale-support`).
+Python 3.10+, 4 spaces, 120 columns, Ruff only, type hints on public APIs. Prefer existing local patterns and helpers over new abstractions. Standardize where it reduces real duplication; avoid generic frameworks for one-off cases.
 
 ## Tests
-Markers: fast, unit, integration, tpch, tpcds, platform_smoke, docker_integration, live_integration. Coverage ≥80%.
+
+Markers: `fast`, `unit`, `integration`, `tpch`, `tpcds`, `ssb`, `platform_smoke`, `docker_integration`, `live_integration`, `slow`, `resource_heavy`, `stress`.
+
 - Smoke: `uv run -- python -m pytest -m fast -q`
 - Standards: `uv run -- python -m pytest -m "tpch or tpcds" --tb=short`
-- Docker: `make test-docker-<platform>` (clickhouse, trino, presto, postgresql, starrocks, doris, databend, influxdb)
-- Cloud: `make test-live-<platform>` (databricks, snowflake, bigquery, redshift, athena) - approval required
-- Coverage: `make coverage-fast` (fast only) or `make coverage-all` (full suite). Avoid `live_*` without approval.
+- Coverage: `make coverage-fast` or `make coverage-all`
+- Docker: `make test-docker-<platform>`
+- Cloud: `make test-live-<platform>` only with approval
 
-## Sandbox & Security
-FS: workspace-write. Network: restricted. Pre-approved: `rg`, `uv run -- python -m pytest`.
-Needs approval: network, installs, writes outside workspace, live cloud tests.
-No credentials in repo; use env vars or `.env` (gitignored); redact secrets in logs.
+`tests/conftest.py` excludes slow/stress/live/resource-heavy unless requested. `pytest -n auto` uses `~/.benchbox/test.lock`; concurrent runs fail fast.
 
-## CLI Modes & Phases
-- Non-interactive: `--non-interactive` (or `BENCHBOX_NON_INTERACTIVE=true`) with `--platform --benchmark --scale --phases`
-- Dry-run: `benchbox run --dry-run <DIR> --platform <plat> --benchmark <bm> --scale <sf> [--phases ...]`
-- Phases: generate (data), load (tables), power|throughput|maintenance (queries). Default: generate+load+execute. Always propagate `--phases`.
-- `--seed <int>` for deterministic runs. Scale ≥1 must be whole integers; default smoke: 0.01.
+## BenchBox Runtime
+
+CLI supports non-interactive mode with `--non-interactive` or `BENCHBOX_NON_INTERACTIVE=true`. Dry-run: `benchbox run --dry-run <DIR> --platform <plat> --benchmark <bm> --scale <sf> [--phases ...]`.
+
+Phases: `generate`, `load`, `power`, `throughput`, `maintenance`. Defaults are generate+load+execute; always propagate `--phases`. Use `--seed <int>` for deterministic runs. Scale >=1 must be whole integer; default smoke is 0.01.
+
+Outputs go under `benchmark_runs/`; manifests enable reuse. Compression defaults to zstd and may fall back to none. Quick restart state is `~/.benchbox/last_run.yaml`.
 
 ## DataFrame Support
-20/22 benchmarks support DataFrame execution: `benchbox run --platform polars-df --benchmark <id>`.
 
-**Platforms**: polars-df (expression, production), pandas-df (pandas, production), pyspark-df (expression, needs Spark), datafusion-df (expression, production), modin-df (pandas, needs Ray/Dask), cudf-df (pandas, needs CUDA), dask-df (pandas, production), databricks-df (expression, cloud), lakesail-df (expression, cloud).
+Production DataFrame platforms include `polars-df`, `pandas-df`, `datafusion-df`, and `dask-df`; others may need Spark/Ray/CUDA/cloud credentials. Most SQL benchmarks have matching `dataframe_queries/` implementations. Expression-family platforms use lazy context; pandas-family uses eager frames. Validate against DuckDB SQL at SF=0.01.
 
-**Benchmarks**: tpch (22), tpcds (99), ssb (13), clickbench (43), nyctaxi (25), flightdata (20), tsbs_devops (18), h2odb (10), amplab (8), coffeeshop (11), joinorder (113), tpch_skew (22), tpchavoc (220), datavault (22), tpcdi (38), tpcds_obt (17), write_primitives (12), read_primitives (136), metadata_primitives (62), transaction_primitives (12). Not supported: ai_primitives, vector_search.
+Examples:
 
-**Options**: polars-df: streaming, rechunk, n_rows. pandas-df: dtype_backend (numpy|numpy_nullable|pyarrow). datafusion-df: none.
-**Install**: Polars is core; Pandas: `--extra pandas`; all: `--extra dataframe-all`.
-**Architecture**: `dataframe_queries/` beside SQL `queries.py`; expression-family uses lazy ctx, pandas-family uses eager; validated against DuckDB SQL at SF=0.01.
-
-### Advanced DataFrame Usage
-- Query subset: `benchbox run --platform polars-df --benchmark tpch --scale 0.01 --queries Q1,Q6,Q14`
-- Streaming: `benchbox run --platform polars-df --benchmark tpcds --scale 1 --platform-option streaming=true`
-
-## Data, Reporting, Logging, Timing
-- TPC binaries: `_binaries/tpc-{h,ds}/<os-arch>/`; avoid compiling in CI.
-- Output: `benchmark_runs/`; manifests enable reuse; normalize cloud `--output` paths. Compression default: zstd (fall back to none).
-- Validation toggles: preflight, postgen-manifest, postload.
-- CLI summaries: query breakdowns, top failures, recommendations. JSON artifacts to `benchmark_runs/results/` with execution ID + timestamp.
-- Logging: respect `--quiet`; use `-v/-vv` for diagnostics; don't change third-party logger levels globally.
-- Elapsed time: `benchbox.utils.clock.mono_time()` / `elapsed_seconds()`. Wall-clock only for event/audit timestamps and OS metadata.
-- Canonical key: `execution_time_seconds`; compat boundary also accepts `execution_time_ms`.
-- Audit: `timing_audit.py --report`, `timing_policy_check.py --strict`. Allowlist: `_project/config/timing_wall_clock_allowlist.json`.
-- Quick restart: `~/.benchbox/last_run.yaml` (database type, phases, scale, tuning mode).
-
-## Commits & PRs
-Conventional Commits (feat:, fix:, docs:, test:). PRs link issues, include tests + docs. CI: ruff + typecheck + tests via `make test-ci`.
-Single repo (`origin` → `joeharris76/BenchBox`); two long-lived branches: `develop` (dev work) and `main` (release-only). Dev PRs target `develop`, squash-merge. Releases use a 2-command flow: `make release-cut VERSION=X.Y.Z` (cuts `vX.Y.Z` from develop, bumps version, generates changelog, curates dev-only paths, opens PR vs main) → `make release-finalize VERSION=X.Y.Z` (squash-merges, tags `main`, pushes the tag → `release.yml` publishes to PyPI). `develop` is intentionally not modified post-release. Full runbook: `docs/operations/release-guide.md`.
-
-**`develop` is PR-gated** (no direct push). Required CI reports through the `ci-required-result` umbrella. The active `develop` ruleset already has strict-base off; do not treat routine dev work as a branch-protection deployment. Linear history; squash-only; 0 reviewer approvals required (self-merge is fine).
-
-Routine `develop` PRs run the lightweight required gate through `.github/workflows/pr.yml`. The shared path ruleset is `.github/path-filters.yml`: content-only PRs run content validation and skip Python fast tests; code, infra, workflow, tooling, and unknown paths run the post-Step-3 lint/type + Ubuntu 3.12 fast-test gate. Broad non-required validation (OS/Python compatibility, security, integration smoke/table-format, package install, parity, and PySpark) runs through `.github/workflows/nightly.yml` on schedule or `workflow_dispatch`, and remains available on `main`/release paths. `main` PRs and tag releases keep release-grade validation.
-
-**One-shot flow**: from a feature branch run `make pr-preflight && make pr-open`. Preflight uses the same `path-filters.yml` classifier as CI: content-only branches run the cheap content guard and skip only the local Python fast-test lane, while code/infra/unknown branches run the full local lint + fast-test gate. `pr-open` pushes, opens the PR vs `develop`, and enables `gh pr merge --auto --squash` so the PR lands the moment CI goes green. Don't poll. Expensive pre-push hooks are opt-in: set `BENCHBOX_PREPUSH=1` for pushes where you want the local timing fast lane and the path-aware fast-test lane to run; otherwise use `make pr-preflight` as the explicit local gate before pushing. `pr-open` is **idempotent** — rerunning is safe; it reuses an existing open PR for the current branch and (re)enables auto-merge either way. Before pushing it warns on textual conflicts against every other open PR head (`git merge-tree`, ~1s, no CI, warn-only). A backstop workflow (`.github/workflows/auto-merge-on-open.yml`) enables auto-merge on any non-draft PR opened against develop, so PRs opened outside `make pr-open` still auto-land. After a PR lands, `.github/workflows/develop-post-merge.yml` runs the lightweight lint + fast-test mirror on the actual `develop` tip and opens a revert PR if that tip goes red.
-
-**If develop goes red**: the post-merge workflow attempts to revert the offending squash SHA. If the revert applies, it opens an `auto-revert/<sha>` PR labeled `incident:develop-red`, links the failed run and originating PR, and requests review from the original PR author when possible. If the revert conflicts, it opens an issue labeled `incident:develop-red-revert-conflict` with the failing SHA, run URL, originating PR, and attempted branch. Agents do not need to monitor CI proactively after auto-merge; the revert PR or conflict issue is the alert. To repair, claim a fresh pool worktree with `make worktree-claim BRANCH=fix/<original-issue>`, fix the root cause, run the normal preflight, and resubmit with `make pr-open`. For inspection, `make dev-loop-metrics` downloads recent `metrics` artifacts and reports PR-to-merge P50/P95, post-merge red rate, conflict rate, and total runner minutes. The GitHub-side admin state this depends on (ruleset required-checks, default workflow permissions, incident labels) is documented in `docs/operations/repo-admin-settings.md`.
-
-**Worktrees for parallel branches**:
-- Keep `~/Developer/BenchBox/` on `develop` permanently.
-- New write sessions use the retained pool: `make worktree-claim BRANCH=fix/foo` atomically claims a free `BenchBox.pool-NN`, resets it to current `origin/develop`, checks out `fix/foo`, runs `uv sync --group dev`, and prints `WORKTREE_PATH=...`.
-- `cd` into that path, work, run `make pr-open`, and after the PR merges run `make worktree-release` inside the pool worktree to return it to detached `origin/develop`.
-- `make worktree-pool-status` shows each slot's state (free / claimed / stale / dirty / unknown / missing), venv health (ok / stale / missing), and disk usage. After a busy session, `make worktree-pool-sweep-stale` auto-releases slots whose PRs have merged and whose trees are clean (idempotent). Reach for `make worktree-pool-reset POOL=NN` only as a last-resort manual escape hatch when you intentionally want to discard or detach that slot.
-- `make worktree-add BRANCH=fix/foo` remains as a deprecated one-release compatibility path for legacy non-pool worktrees.
-- `make pr-fanout` walks every worktree (skipping the main clone) and runs `make pr-open` with bounded parallelism (`PR_FANOUT_JOBS ?= 4`) so retained worktrees can be published without local hook serialization.
-- The operating model is pool worktrees + auto-merge, with `.github/workflows/develop-post-merge.yml` as the develop-tip safety net.
-- `make pr-refresh` remains a manual escape hatch when a branch genuinely needs `origin/develop` merged before `make pr-open`.
-- `make worktree-prune` is for legacy non-pool worktrees; pool worktrees are retained and released with `make worktree-release`.
-
-**Concurrent-PR conventions** (light, not enforced by tools):
-- **Drafts are intentional.** Open as draft for spikes, RFCs, or parked work — auto-merge is suppressed. Marking ready (`gh pr ready <n>`) flips it on via the backstop workflow.
-- **`.gitignore` ∩ tracked files is CI-blocked** (`.github/workflows/gitignore-lint.yml`). New ignore rules that match tracked files on the PR head must untrack them in the same PR; rules that match files tracked on the base branch require an explicit `# benchbox-ignore-lint: allow-next-line tracked` waiver immediately before the pattern. Use that only for isolated untracking PRs, because it can force open branches to refresh.
-
-**In Claude Code**: the project-local `/pr` slash command (`.claude/commands/pr.md`) is the canonical wrapper — it commits, preflights, pushes, opens, and enables auto-merge in one shot. Prefer it over the user-global `/commit-push-pr` plugin; that one targets `main` by default and doesn't enable auto-merge.
-
-## Planning & TODOs
-Layout: `_project/TODO/{worktree}/{phase}/{item}.yaml`; completed → `_project/DONE/`. Stable `id` = filename slug.
-Flat `work[]` with `needs` edges (not nested tasks.phases). Inter-item deps: `deps.needs: [slug-ids]`. Deferred work in separate `deferred[]`.
-CLI: `uv run --project _project/scripts -- python _project/scripts/todo_cli.py list|show|stats|ready|next|done|check-graph|validate|reindex|cleanup`.
-- `ready`: deps-satisfied by priority. `next <slug>`: ready/blocked/done/deferred within item.
-- `done <slug> <work-id>`: marks complete, reports unblocked. `check-graph`: no cycles/dangling refs.
-Indexes: `_project/{TODO|DONE}/_indexes/` (gitignored — auto-regenerated by `todo_cli.py` on first read; `make todo-reindex` to rebuild explicitly). Template: `TODO_ENTRY_TEMPLATE.yaml`. Schema: `TODO_SCHEMA.yaml`.
-Guardrails: must_preserve, approach, anti_patterns, verification, scope_limit.
-Scripts: `generate_indexes.py`, `validate_todo.py` (needs `--project _project/scripts`), `migrate_todo_format.py` in `_project/scripts/`.
-After changes: `make todo-reindex` (or just let `todo_cli.py` regen on next read). See `~/.claude/skills/todo/SKILL.md`.
-
-## Skills & Workflow
-Workflows: benchmark-test, quick-quality-check, tpc-compliance-check, compare-implementations, binary-wrapper-check, dialect-translation-test, live-platform-test, architecture-review, benchmark-plan-and-execute, project-todo-sync.
-Auto-detect runner, honor non-interactive, output human + JSON. Plans: one step in_progress. Preambles: short, grouped. Patches: surgical.
-
-## Recipes
 ```bash
-benchbox run --platform duckdb --benchmark tpch --scale 0.01 --phases power --non-interactive     # TPC-H smoke
-benchbox run --benchmark tpcds --scale 0.1 --phases generate --output ./tpcds_sf01 --non-interactive  # data only
-benchbox run --platform duckdb --benchmark tpch --scale 0.1 --dry-run ./preview --phases power --seed 3
-benchbox run --platform polars-df --benchmark tpch --scale 0.01 --non-interactive                  # DataFrame Polars
-benchbox run --platform pandas-df --benchmark tpch --scale 0.01 --non-interactive                  # DataFrame Pandas
-benchbox run --platform polars-df --benchmark nyctaxi --scale 0.01 --non-interactive               # NYC Taxi
-benchbox run --platform polars-df --benchmark clickbench --scale 0.01 --non-interactive            # ClickBench
-# SSB comparison: run DuckDB + polars-df at same scale, then benchbox compare <f1> <f2>
+benchbox run --platform polars-df --benchmark tpch --scale 0.01 --queries Q1,Q6
+benchbox run --platform pandas-df --benchmark tpch --scale 0.01 --non-interactive
 ```
 
-## Structure
-`benchbox/` (core+CLI), `tests/`, `examples/`, `docs/`, `_project/` (working files, experiments; `_trash/` for discards), configs (pyproject.toml, pytest.ini, Makefile), outputs in `benchmark_runs/`.
+## Timing And Validation
 
-## Timing Policy
-Benchmark timings use `mono_time()` / `elapsed_seconds()` from `benchbox.utils.clock`. Wall-clock is allowed only for event/audit timestamps and OS metadata - never for measured durations. Any wall-clock site measuring elapsed time is a policy violation.
-Canonical result key: `execution_time_seconds`; legacy `execution_time_ms` is accepted at compat boundaries only.
-Audit: `uv run _project/scripts/timing_audit.py --report` lists every wall-clock site with rationale; `timing_policy_check.py --strict` fails on any unallowlisted call. Allowlist lives at `_project/config/timing_wall_clock_allowlist.json` and requires a reason per entry.
-Deep dive: `docs/development/run-lifecycle-map.md`.
+Measured durations must use `benchbox.utils.clock.mono_time()` / `elapsed_seconds()`. Wall-clock is allowed only for event/audit timestamps and OS metadata. Canonical result key is `execution_time_seconds`; `execution_time_ms` is compatibility-only.
 
-## Result Validation
-Every phase that produces data feeds the validation pipeline. Validation modes: `exact` (default for power/throughput), `loose` (numeric tolerance), `range` (min/max bounds), `full` (exact + schema + row counts + checksums), `disabled` (opt-out, CI-blocked).
-Toggles: `--validation <mode>` at the CLI, or `--preflight`/`--postgen-manifest`/`--postload` for per-stage controls.
-Cross-platform validation (when enabled) replays the same query set across DuckDB and the target platform, comparing row-by-row under the chosen tolerance mode. Failures report diff samples, not summary counts.
-Deep dive: `docs/development/result-integrity-validation.md`.
+Audits:
+
+```bash
+uv run -- python _project/scripts/timing_audit.py --report
+uv run -- python _project/scripts/timing_policy_check.py --strict
+```
+
+Validation modes: `exact`, `loose`, `range`, `full`, `disabled`. Use CLI `--validation <mode>` or stage toggles (`--preflight`, `--postgen-manifest`, `--postload`). Cross-platform validation compares row-by-row and reports diff samples.
 
 ## Adapter Authoring
-To add a new platform: subclass `PlatformAdapter` (`benchbox/platforms/base/adapter.py`), implement the abstract hooks (connection, execute, load), register via `@register_platform`, and drop config in `benchbox/platforms/<name>/`. Keep SDK imports lazy so optional dependencies don't break base installs.
-Refactor status: the base class is being split into cohesive modules (connection / execution / data_loading / result_capture / dialect_translation / tuning). See `docs/development/adapter-refactor-map.md` for the target module layout before introducing new adapter responsibilities.
-**DDL transforms**: every CREATE TABLE rewrite an adapter performs must be registered in `benchbox/sql_compat/rules/ddl_optimize/<platform>_ddl_rewrites.py` under `Phase.DDL_OPTIMIZE`. Adapters inherit `BaseDdlOptimizer` (`benchbox/platforms/base/ddl_optimizer.py`) for automatic rule dispatch. `compat_lint --check-ddl-drift` enforces this at CI time. Full pattern and checklist: `benchbox/sql_compat/README.md`.
-Deep dive: `docs/development/adding-new-platforms.md` (SQL), `docs/development/adding-dataframe-platform.md` (DataFrame), `docs/development/platform-development.rst`.
 
-## Dependency Upper Bounds
-**Policy**: cap only the highest-risk deps - those with history of breaking minor/major releases, or whose API is deeply integrated into BenchBox internals. Unbounded is the default for everything else.
-**Currently capped** (see `pyproject.toml` comments for rationale): `sqlglot<31`, `click<9`, `pydantic<3`, `pyarrow<24`, `duckdb<2`. These five drive translation, CLI, validation, columnar IO, and the SQL runner respectively.
-**When to add a bound**: a dep ships a breaking change in a non-major release, OR BenchBox integrates deeply enough that a major bump would require non-trivial migration.
-**When to bump**: only after explicitly validating on the new major - never reactively when CI breaks (that's the signal we wanted). Run the full fast suite + standards suite on the new major before bumping.
-**Review cadence**: see `_project/TODO/main/planning/review-dependency-upper-bounds-quarterly.yaml`. Open issue links in pyproject comments when available.
-**Release gate**: `.github/workflows/release.yml` runs `scripts/check_dependency_bounds.py --fail-on=cap-reached` before build. This blocks only on a genuine bounds violation (locked major ≥ cap major); ceiling-minus-one (e.g. `sqlglot 30.x` under `<31`) is surfaced in the markdown artifact but not blocking, because current caps intentionally sit at `current_major + 1`. Same script serves the quarterly review - single source of truth.
-**Bump procedure**: (1) validate the new major on fast + standards suites; (2) edit `pyproject.toml` cap and rationale comment; (3) refresh `uv.lock`; (4) if bumping because the release gate has fired, link the failing run in the commit message.
-Audit with `uv tree` / `uv pip list`. Deep dives: `docs/development/dependency-compatibility.md` (version caps on kept deps), `docs/development/dependency-inventory.md` (per-dep import sites, owner module, and elimination candidates).
+Add SQL platforms by subclassing `PlatformAdapter`, implementing connection/execution/load hooks, registering with `@register_platform`, and keeping SDK imports lazy. Check `docs/development/adapter-refactor-map.md` before adding base responsibilities.
 
-## Test Markers Cheat Sheet
-| Marker | Meaning | Typical runtime |
-|--------|---------|-----------------|
-| `fast` | Isolated unit; no network, no docker, no data gen | < 1s each |
-| `unit` | Unit-level, may touch disk/cache | < 5s each |
-| `integration` | Multi-module, local-only | seconds |
-| `tpch` / `tpcds` / `ssb` | Standards compliance at tiny scale | seconds |
-| `platform_smoke` | Per-platform connectivity + trivial query | seconds |
-| `docker_integration` | Requires local container (clickhouse/trino/…) | tens of seconds |
-| `live_integration` | Hits real cloud account - **approval required** | variable |
-| `slow` / `resource_heavy` / `stress` | Excluded from fast/CI profiles | minutes |
-Short form works for agents: `uv run -- python -m pytest -m fast -q`. `tests/conftest.py` enforces the slow/stress/live_integration/resource_heavy exclusion when those markers aren't in the `-m` expression. Full taxonomy: `tests/README.md`.
+Every adapter CREATE TABLE rewrite must be registered in `benchbox/sql_compat/rules/ddl_optimize/<platform>_ddl_rewrites.py` under `Phase.DDL_OPTIMIZE`; adapters inherit `BaseDdlOptimizer`. `compat_lint --check-ddl-drift` enforces this.
 
-Parallel-run safety: `pytest -n auto` acquires an inter-process lock at `~/.benchbox/test.lock`; concurrent runs fail fast. Details: `tests/README.md` → "Parallel Run Mutual Exclusion".
+## Dependency Bounds
+
+Default is unbounded. Current high-risk caps: `sqlglot<31`, `click<9`, `pydantic<3`, `pyarrow<24`, `duckdb<2`. Add caps only for known breaking release history or deep internal coupling. Bump only after validating the new major on fast + standards suites, then update `pyproject.toml` rationale and `uv.lock`.
+
+## Git, PRs, Worktrees
+
+Repo: `origin` -> `joeharris76/BenchBox`. Long-lived branches: `develop` for dev, `main` for release. Dev PRs target `develop`, squash-merge, linear history. `develop` is PR-gated; do not direct-push routine work.
+
+Standard one-shot flow from a feature branch:
+
+```bash
+make pr-preflight
+make pr-open
+```
+
+`pr-open` is idempotent: pushes, opens/reuses a PR to `develop`, and enables squash auto-merge when CI passes. Do not poll; post-merge safety opens a revert PR or incident issue if `develop` goes red.
+
+Use retained pool worktrees for parallel work:
+
+```bash
+make worktree-claim BRANCH=fix/foo
+cd <WORKTREE_PATH>
+make pr-preflight && make pr-open
+make worktree-release
+```
+
+Inspect with `make worktree-pool-status`; sweep with `make worktree-pool-sweep-stale`. Use `make worktree-pool-reset POOL=NN` only when intentionally discarding a slot. Claude Code should prefer project `/pr` over global `/commit-push-pr`.
+
+Release flow is `make release-cut VERSION=X.Y.Z` then `make release-finalize VERSION=X.Y.Z`; see `docs/operations/release-guide.md`.
+
+## TODOs And Planning
+
+TODOs live in `_project/TODO/{worktree}/{phase}/{item}.yaml`; completed items move to `_project/DONE/`. Stable `id` is filename slug. Use flat `work[]` with `needs` edges; inter-item deps go in `deps.needs`; deferred work goes in `deferred[]`.
+
+CLI:
+
+```bash
+uv run --project _project/scripts -- python _project/scripts/todo_cli.py list|show|stats|ready|next|done|check-graph|validate|reindex|cleanup
+```
+
+Indexes under `_project/{TODO|DONE}/_indexes/` are generated. Guardrails: `must_preserve`, `approach`, `anti_patterns`, `verification`, `scope_limit`.
+
+## Skills And Workflows
+
+High-level wrappers remain stable: `code`, `test`, `todo`, `blog`, `docs`, `benchbox-workflow`, `skill-sync`, `tidy-perms`. Preserve action names and triggers. Review-shaped actions are read-only except local capture; write-shaped actions require research, verification, explicit-path commit, and push when authorized.
+
+BenchBox workflow actions: `test`, `quality`, `compliance`, `dialect`, `binary`, `compare`, `live`, `architecture`, `plan`.
 
 ## Further Reading
-| Topic | Deep-dive doc |
-|-------|---------------|
-| Run lifecycle | `docs/development/run-lifecycle-map.md` |
-| Result validation | `docs/development/result-integrity-validation.md` |
-| Adding SQL platforms | `docs/development/adding-new-platforms.md` |
-| Adding DataFrame platforms | `docs/development/adding-dataframe-platform.md` |
-| Adapter refactor map | `docs/development/adapter-refactor-map.md` |
-| DDL transform governance | `benchbox/sql_compat/README.md` |
-| Dependency compatibility | `docs/development/dependency-compatibility.md` |
-| Dependency inventory & ownership | `docs/development/dependency-inventory.md` |
-| Parallel test lock | `tests/README.md` |
-| Read primitives | `docs/development/read-primitives-catalog.md` |
+
+- Run lifecycle: `docs/development/run-lifecycle-map.md`
+- Result validation: `docs/development/result-integrity-validation.md`
+- SQL platforms: `docs/development/adding-new-platforms.md`
+- DataFrame platforms: `docs/development/adding-dataframe-platform.md`
+- Adapter refactor: `docs/development/adapter-refactor-map.md`
+- SQL compatibility: `benchbox/sql_compat/README.md`
+- Dependency compatibility: `docs/development/dependency-compatibility.md`
+- Test taxonomy and lock: `tests/README.md`
