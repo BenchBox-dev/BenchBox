@@ -70,7 +70,7 @@ jobs:
           # (`A...B`) walks from the merge-base, which doesn't exist for
           # unrelated histories and produces a misleading 1-path result.
           # Two-tree compare is independent of history topology.
-          mapfile -t DIFFED < <(git diff --name-only origin/published-results origin/develop -- \
+          mapfile -t DIFFED < <(git diff --name-only origin/published-results "${GITHUB_SHA}" -- \
             'results-data/bundles' 'results-data/corpus-inventory.json' \
             'results-data/CORPUS_NOTES.md' 'results-data/SEED_CORPUS_SPEC.md' \
             'results-data/README.md' 'results-data/validate_corpus.py' \
@@ -103,10 +103,11 @@ jobs:
           # Start from current published-results
           git switch --force-create "${MIRROR_BRANCH}" origin/published-results
 
-          # Apply develop's content for each mirrored path. For directory
+          # Apply the triggering commit's content for each mirrored path. For directory
           # paths, wipe the existing tree first so develop-side deletions
           # within the directory propagate (otherwise `git checkout` only
-          # writes paths present on develop and leaves stragglers behind).
+          # writes paths present on the source commit and leaves stragglers behind).
+          SOURCE_REF="${GITHUB_SHA}"
           DIRECTORY_PATHS=(
             'results-data/bundles'
           )
@@ -121,22 +122,22 @@ jobs:
           )
 
           for path in "${DIRECTORY_PATHS[@]}"; do
-            if git cat-file -e "origin/develop:${path}" 2>/dev/null; then
+            if git cat-file -e "${SOURCE_REF}:${path}" 2>/dev/null; then
               # Wipe the directory's existing tree so file-level deletions
-              # on develop propagate to the mirror.
+              # on the source commit propagate to the mirror.
               git rm -rf --quiet "${path}" 2>/dev/null || true
-              git checkout origin/develop -- "${path}"
+              git checkout "${SOURCE_REF}" -- "${path}"
             else
-              # Whole directory removed on develop — mirror the removal.
+              # Whole directory removed on the source commit — mirror the removal.
               git rm -rf --quiet "${path}" 2>/dev/null || true
             fi
           done
 
           for path in "${FILE_PATHS[@]}"; do
-            if git cat-file -e "origin/develop:${path}" 2>/dev/null; then
-              git checkout origin/develop -- "${path}"
+            if git cat-file -e "${SOURCE_REF}:${path}" 2>/dev/null; then
+              git checkout "${SOURCE_REF}" -- "${path}"
             else
-              # File removed on develop — mirror the removal.
+              # File removed on the source commit — mirror the removal.
               git rm -f --quiet "${path}" 2>/dev/null || true
             fi
           done
