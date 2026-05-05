@@ -89,6 +89,24 @@ def test_run_validate_surfaces_nonzero_subprocess_via_exit_code(tmp_path: Path):
     assert out.clean_count == 2
 
 
+def test_parse_validator_status_by_path_round_trip(tmp_path: Path):
+    tsv = tmp_path / "rollup.tsv"
+    _write_tsv(tsv, ["clean", "warning_only", "error"])
+    status_by_path = validate.parse_validator_status_by_path(tsv)
+    # _write_tsv writes /tmp/rN.json result_path values.
+    keys = {str(p) for p in status_by_path}
+    assert "/tmp/r0.json" in keys
+    assert status_by_path[Path("/tmp/r0.json")] == "clean"
+    assert status_by_path[Path("/tmp/r1.json")] == "warning_only"
+    assert status_by_path[Path("/tmp/r2.json")] == "error"
+
+
+def test_parse_validator_status_by_path_handles_missing_columns(tmp_path: Path):
+    tsv = tmp_path / "rollup.tsv"
+    tsv.write_text("foo\tbar\n", encoding="utf-8")
+    assert validate.parse_validator_status_by_path(tsv) == {}
+
+
 def test_run_validate_raises_when_subprocess_fails_and_no_tsv(tmp_path: Path):
     """No TSV → ValidatePhaseError, never CalledProcessError."""
     missing_tsv = tmp_path / "rollup.tsv"

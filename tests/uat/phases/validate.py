@@ -142,6 +142,33 @@ def parse_rollup(rollup_tsv: Path, *, floor: float = 0.80) -> ValidateResult:
     )
 
 
+def parse_validator_status_by_path(rollup_tsv: Path) -> dict[Path, str]:
+    """Extract result_path → validator_status from a rollup TSV.
+
+    Used by the report phase so cross_scale_clean_pair_count can apply
+    the validator-clean dimension. Missing or short rows are skipped.
+    """
+    out: dict[Path, str] = {}
+    with rollup_tsv.open("r", encoding="utf-8") as fh:
+        header = fh.readline().rstrip("\n").split("\t")
+        try:
+            status_idx = header.index("validator_status")
+            path_idx = header.index("result_path")
+        except ValueError:
+            return out
+        for line in fh:
+            if line.startswith("#") or not line.strip():
+                continue
+            fields = line.rstrip("\n").split("\t")
+            if len(fields) <= max(status_idx, path_idx):
+                continue
+            result_path = fields[path_idx].strip()
+            if not result_path:
+                continue
+            out[Path(result_path)] = fields[status_idx]
+    return out
+
+
 def standalone_argv(results_dir: Path, output_tsv: Path) -> list[str]:
     """Help text helper for `make uat-validate`."""
     return [
