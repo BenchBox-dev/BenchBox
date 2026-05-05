@@ -177,7 +177,7 @@ work:
 - id: w4
   summary: "make uat-execute CONFIG=uat.yaml: scale-ladder + early-stop + reuse-aware cleanup"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Implements the matrix-execution mechanics the 2026-05-02 W3
     hand-rolled:

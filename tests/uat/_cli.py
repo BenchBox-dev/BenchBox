@@ -55,5 +55,64 @@ def cell_main(argv: list[str] | None = None) -> int:
     return 0 if result.status == "passed" else 1
 
 
+def execute_main(argv: list[str] | None = None) -> int:
+    """Implements `make uat-execute CONFIG=path/to/uat.yaml`."""
+    from tests.uat.config import load_config
+    from tests.uat.phases.execute import default_log_dir, run_execute
+    from tests.uat.phases.preflight import run_preflight
+
+    parser = argparse.ArgumentParser(prog="uat-execute")
+    parser.add_argument("--config", required=True)
+    parser.add_argument(
+        "--databases-root",
+        default=None,
+        help="Optional override for ~/Developer/benchmark_runs/databases",
+    )
+    parser.add_argument(
+        "--no-cleanup",
+        action="store_true",
+        help="Disable reuse-aware database cleanup",
+    )
+    args = parser.parse_args(argv)
+
+    config = load_config(args.config)
+    if "preflight" in config.phases:
+        preflight = run_preflight(
+            free_space_path=(config.raw.get("preflight") or {}).get("free_space_path", "~/Developer/benchmark_runs"),
+            free_space_min_gib=(config.raw.get("preflight") or {}).get("free_space_min_gib", 5.0),
+            docker_required=(config.raw.get("preflight") or {}).get("docker_required", False),
+        )
+        for warning in preflight.warnings:
+            print(f"[preflight warn] {warning}", file=sys.stderr)
+        if preflight.aborted:
+            print(f"[preflight] ABORT: {preflight.abort_reason}", file=sys.stderr)
+            return 2
+
+    databases_root = (
+        Path(args.databases_root) if args.databases_root else Path.home() / "Developer" / "benchmark_runs" / "databases"
+    )
+    log_dir = default_log_dir(config)
+    outcome = run_execute(
+        config,
+        log_dir=log_dir,
+        databases_root=databases_root,
+        cleanup_enabled=not args.no_cleanup,
+    )
+
+    summary = {
+        "name": config.name,
+        "log_dir": str(log_dir),
+        "passed": sum(1 for r in outcome.results if r.status == "passed"),
+        "failed": sum(1 for r in outcome.results if r.status == "failed"),
+        "timed_out": sum(1 for r in outcome.results if r.status == "timed-out"),
+        "pruned": len(outcome.pruned),
+        "skipped_unreachable": len(outcome.skipped_unreachable),
+    }
+    print(json.dumps(summary, indent=2))
+    return 0 if summary["failed"] == 0 and summary["timed_out"] == 0 else 1
+
+
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "execute":
+        sys.exit(execute_main(sys.argv[2:]))
     sys.exit(cell_main())

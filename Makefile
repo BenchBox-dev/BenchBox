@@ -1495,7 +1495,7 @@ blind-spots-sweep: blind-spots-report
 # Operator-only; not exposed as `benchbox` CLI subcommands. UAT is a
 # project-developer concern, benchbox is a project-user concern.
 # ----------------------------------------------------------------------
-.PHONY: uat-cell
+.PHONY: uat-cell uat-execute
 
 # make uat-cell PLATFORM=duckdb BENCHMARK=tpch SCALE=0.01
 uat-cell:
@@ -1511,6 +1511,17 @@ uat-cell:
 		$(if $(COMPRESSION),--compression "$(COMPRESSION)",) \
 		$(if $(TIMEOUT_S),--timeout-s "$(TIMEOUT_S)",) \
 		$(if $(LOG_DIR),--log-dir "$(LOG_DIR)",)
+
+# make uat-execute CONFIG=tests/uat/configs/uat.yaml
+uat-execute:
+	@if [ -z "$(CONFIG)" ]; then \
+		echo "Usage: make uat-execute CONFIG=<path>" >&2; \
+		exit 2; \
+	fi
+	@uv run --no-sync -- python -m tests.uat._cli execute \
+		--config "$(CONFIG)" \
+		$(if $(DATABASES_ROOT),--databases-root "$(DATABASES_ROOT)",) \
+		$(if $(NO_CLEANUP),--no-cleanup,)
 
 # Help
 help:
