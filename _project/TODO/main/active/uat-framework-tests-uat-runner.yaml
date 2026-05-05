@@ -269,7 +269,7 @@ work:
 - id: w9
   summary: "make uat-sweep CONFIG=...; make uat-stress (canned preset)"
   needs: [w8]
-  status: pending
+  status: done
   notes: |
     `make uat-sweep CONFIG=path/uat.yaml` chains preflight ->
     enumerate -> execute -> validate -> package -> explorer-smoke ->

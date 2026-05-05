@@ -1,0 +1,190 @@
+"""UAT sweep orchestrator: walks the YAML `phases:` list in order.
+
+`run_sweep` is the entry point for `make uat-sweep CONFIG=...`. It
+respects `dry_run:` (used by W10's structural-parity replay test).
+
+Sequential platform execution discipline (UAT W3 line 222 in
+_project/handoffs/results-explorer-uat-retrospective-20260502.md):
+phases run in serial; the execute phase iterates platforms in serial
+internally; no `parallel=True` knob anywhere.
+"""
+
+from __future__ import annotations
+
+import datetime as _dt
+import json
+import os
+from dataclasses import dataclass
+from pathlib import Path
+
+from tests.uat.config import UATConfig, apply_stress_overrides, load_config
+from tests.uat.phases import execute as exec_phase, preflight as preflight_phase, report as report_phase
+
+
+@dataclass(frozen=True)
+class SweepResult:
+    name: str
+    log_dir: Path
+    aborted_phase: str | None
+    abort_reason: str | None
+    phase_exit_codes: dict[str, int]
+
+    def exit_code(self) -> int:
+        if self.aborted_phase is not None:
+            return 2
+        return max((c for c in self.phase_exit_codes.values()), default=0)
+
+
+def run_sweep(
+    config: UATConfig,
+    *,
+    log_dir_override: Path | None = None,
+    databases_root: Path | None = None,
+) -> SweepResult:
+    """Orchestrate the YAML's `phases:` list. Returns SweepResult."""
+    now = _dt.datetime.now()
+    log_dir = log_dir_override or exec_phase.default_log_dir(config, now=now)
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    if databases_root is None:
+        databases_root = (
+            Path(os.environ.get("BENCHBOX_OUTPUT_DIR", str(Path.home() / "Developer" / "benchmark_runs"))) / "databases"
+        )
+
+    phase_exit_codes: dict[str, int] = {}
+    aborted_phase: str | None = None
+    abort_reason: str | None = None
+
+    cells_jsonl = log_dir / "cells.jsonl"
+    execute_outcome = None
+
+    for phase in config.phases:
+        if config.dry_run:
+            phase_exit_codes[phase] = 0
+            continue
+        if phase == "preflight":
+            preflight_cfg = config.raw.get("preflight") or {}
+            result = preflight_phase.run_preflight(
+                free_space_path=preflight_cfg.get("free_space_path", "~/Developer/benchmark_runs"),
+                free_space_min_gib=float(preflight_cfg.get("free_space_min_gib", 5.0)),
+                docker_required=bool(preflight_cfg.get("docker_required", False)),
+                noisy_neighbor_warn_load=float(preflight_cfg.get("noisy_neighbor_warn_load", 8.0)),
+            )
+            phase_exit_codes[phase] = 2 if result.aborted else 0
+            if result.aborted:
+                aborted_phase = phase
+                abort_reason = result.abort_reason
+                break
+        elif phase == "enumerate":
+            phase_exit_codes[phase] = 0  # enumerate's effect is realised by execute.
+        elif phase == "execute":
+            execute_outcome = exec_phase.run_execute(
+                config,
+                log_dir=log_dir,
+                databases_root=databases_root,
+            )
+            with cells_jsonl.open("w", encoding="utf-8") as fh:
+                for cell in execute_outcome.results:
+                    fh.write(
+                        json.dumps(
+                            {
+                                "platform": cell.platform,
+                                "benchmark": cell.benchmark,
+                                "scale": cell.scale,
+                                "status": cell.status,
+                                "exit_code": cell.exit_code,
+                                "elapsed_s": cell.elapsed_s,
+                                "log_path": str(cell.log_path),
+                                "result_path": (str(cell.result_path) if cell.result_path else None),
+                            }
+                        )
+                        + "\n"
+                    )
+            phase_exit_codes[phase] = 0 if all(r.status == "passed" for r in execute_outcome.results) else 1
+        elif phase == "validate":
+            from tests.uat.phases.validate import run_validate
+
+            validate_cfg = config.raw.get("validate") or {}
+            results_dir = log_dir
+            output_tsv = log_dir / "validator_rollup.tsv"
+            try:
+                vr = run_validate(
+                    results_dir,
+                    output_tsv=output_tsv,
+                    floor=float(validate_cfg.get("validator_clean_rate_floor", 0.80)),
+                )
+                phase_exit_codes[phase] = vr.exit_code()
+            except FileNotFoundError as exc:
+                phase_exit_codes[phase] = 2
+                aborted_phase = phase
+                abort_reason = str(exc)
+                break
+        elif phase == "package":
+            from tests.uat.phases.package import run_package
+
+            if execute_outcome is None:
+                phase_exit_codes[phase] = 2
+                aborted_phase = phase
+                abort_reason = "package phase requires execute phase to have run"
+                break
+            result_paths = [r.result_path for r in execute_outcome.results if r.result_path]
+            submissions_dir = Path(
+                config.output.submissions_dir_template.replace("{date}", now.strftime("%Y%m%d")).replace(
+                    "{name}", config.name
+                )
+            ).expanduser()
+            pr = run_package(
+                config,
+                result_paths=result_paths,
+                submissions_dir=submissions_dir,
+            )
+            phase_exit_codes[phase] = pr.exit_code()
+        elif phase == "explorer_smoke":
+            from tests.uat.phases.explorer_smoke import run_explorer_smoke
+
+            es_cfg = config.raw.get("explorer_smoke") or {}
+            result = run_explorer_smoke(
+                bundles_dir=log_dir / "bundles",
+                output_dir=log_dir / "explorer_data",
+                log_dir=log_dir,
+                playwright_browsers=tuple(es_cfg.get("playwright_browsers", ["chromium"])),
+            )
+            phase_exit_codes[phase] = result.exit_code()
+        elif phase == "report":
+            report_cfg = config.raw.get("report") or {}
+            tsv_path = log_dir / report_cfg.get("matrix_summary_tsv", "matrix_summary.tsv")
+            cells = execute_outcome.results if execute_outcome else []
+            scales_cfg = config.raw.get("scales") or {}
+            rungs = scales_cfg.get("rungs")
+            summary = report_phase.write_report(
+                cells,
+                output_path=tsv_path,
+                rungs=[float(r) for r in rungs] if rungs else None,
+                cross_scale_floor=report_cfg.get("cross_scale_coverage_min_pairs"),
+            )
+            phase_exit_codes[phase] = summary.exit_code()
+
+    return SweepResult(
+        name=config.name,
+        log_dir=log_dir,
+        aborted_phase=aborted_phase,
+        abort_reason=abort_reason,
+        phase_exit_codes=phase_exit_codes,
+    )
+
+
+def run_sweep_from_path(
+    config_path: Path,
+    *,
+    stress_overrides: dict[str, str | float | None] | None = None,
+) -> SweepResult:
+    """Convenience wrapper for `make uat-sweep` and `make uat-stress`."""
+    config = load_config(config_path)
+    if stress_overrides:
+        config = apply_stress_overrides(
+            config,
+            platform=stress_overrides.get("platform"),
+            benchmark=stress_overrides.get("benchmark"),
+            scale=stress_overrides.get("scale"),
+        )
+    return run_sweep(config)

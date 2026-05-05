@@ -1495,7 +1495,7 @@ blind-spots-sweep: blind-spots-report
 # Operator-only; not exposed as `benchbox` CLI subcommands. UAT is a
 # project-developer concern, benchbox is a project-user concern.
 # ----------------------------------------------------------------------
-.PHONY: uat-cell uat-execute uat-validate uat-package uat-explorer-smoke uat-report
+.PHONY: uat-cell uat-execute uat-validate uat-package uat-explorer-smoke uat-report uat-sweep uat-stress
 
 # make uat-cell PLATFORM=duckdb BENCHMARK=tpch SCALE=0.01
 uat-cell:
@@ -1557,6 +1557,23 @@ uat-package:
 		--config "$(CONFIG)" \
 		--submissions-dir "$(SUBMISSIONS_DIR)" \
 		$(foreach r,$(RESULTS),--result "$(r)")
+
+# make uat-sweep CONFIG=tests/uat/configs/<name>.yaml [DRY_RUN=1]
+uat-sweep:
+	@if [ -z "$(CONFIG)" ]; then \
+		echo "Usage: make uat-sweep CONFIG=<path> [DRY_RUN=1]" >&2; \
+		exit 2; \
+	fi
+	@uv run --no-sync -- python -m tests.uat._cli sweep --config "$(CONFIG)"
+
+# make uat-stress [PLATFORM=] [BENCHMARK=] [SCALE=] [CONFIG=]
+# Canned stress preset; feature parity with scripts/local_stress_test.sh.
+uat-stress:
+	@uv run --no-sync -- python -m tests.uat._cli stress \
+		$(if $(CONFIG),--config "$(CONFIG)",) \
+		$(if $(PLATFORM),--platform "$(PLATFORM)",) \
+		$(if $(BENCHMARK),--benchmark "$(BENCHMARK)",) \
+		$(if $(SCALE),--scale "$(SCALE)",)
 
 # make uat-execute CONFIG=tests/uat/configs/uat.yaml
 uat-execute:

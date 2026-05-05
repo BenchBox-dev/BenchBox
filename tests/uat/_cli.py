@@ -55,6 +55,65 @@ def cell_main(argv: list[str] | None = None) -> int:
     return 0 if result.status == "passed" else 1
 
 
+def sweep_main(argv: list[str] | None = None) -> int:
+    """Implements `make uat-sweep CONFIG=<path>`."""
+    from tests.uat.orchestrator import run_sweep_from_path
+
+    parser = argparse.ArgumentParser(prog="uat-sweep")
+    parser.add_argument("--config", required=True)
+    args = parser.parse_args(argv)
+
+    result = run_sweep_from_path(Path(args.config))
+    print(
+        json.dumps(
+            {
+                "name": result.name,
+                "log_dir": str(result.log_dir),
+                "aborted_phase": result.aborted_phase,
+                "abort_reason": result.abort_reason,
+                "phase_exit_codes": result.phase_exit_codes,
+            },
+            indent=2,
+        )
+    )
+    return result.exit_code()
+
+
+def stress_main(argv: list[str] | None = None) -> int:
+    """Implements `make uat-stress [PLATFORM=] [BENCHMARK=] [SCALE=]`."""
+    from tests.uat.orchestrator import run_sweep_from_path
+
+    parser = argparse.ArgumentParser(prog="uat-stress")
+    parser.add_argument("--config", default=None, help="Defaults to tests/uat/configs/stress-default.yaml")
+    parser.add_argument("--platform", default=None)
+    parser.add_argument("--benchmark", default=None)
+    parser.add_argument("--scale", type=float, default=None)
+    args = parser.parse_args(argv)
+
+    if args.config is None:
+        config_path = Path(__file__).resolve().parent / "configs" / "stress-default.yaml"
+    else:
+        config_path = Path(args.config)
+    overrides: dict[str, str | float | None] = {
+        "platform": args.platform,
+        "benchmark": args.benchmark,
+        "scale": args.scale,
+    }
+    result = run_sweep_from_path(config_path, stress_overrides=overrides)
+    print(
+        json.dumps(
+            {
+                "name": result.name,
+                "log_dir": str(result.log_dir),
+                "aborted_phase": result.aborted_phase,
+                "phase_exit_codes": result.phase_exit_codes,
+            },
+            indent=2,
+        )
+    )
+    return result.exit_code()
+
+
 def report_main(argv: list[str] | None = None) -> int:
     """Implements `make uat-report`. Reads cells from a JSON-lines stream."""
     import json as _json
@@ -286,4 +345,8 @@ if __name__ == "__main__":
         sys.exit(explorer_smoke_main(sys.argv[2:]))
     if len(sys.argv) > 1 and sys.argv[1] == "report":
         sys.exit(report_main(sys.argv[2:]))
+    if len(sys.argv) > 1 and sys.argv[1] == "sweep":
+        sys.exit(sweep_main(sys.argv[2:]))
+    if len(sys.argv) > 1 and sys.argv[1] == "stress":
+        sys.exit(stress_main(sys.argv[2:]))
     sys.exit(cell_main())
