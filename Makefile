@@ -1490,6 +1490,28 @@ blind-spots-report:
 # Alias: 'sweep' as the verb users will reach for; report is the v1 sweep view.
 blind-spots-sweep: blind-spots-report
 
+# ----------------------------------------------------------------------
+# UAT framework (tests/uat/) — see _project/specs/uat-framework.md.
+# Operator-only; not exposed as `benchbox` CLI subcommands. UAT is a
+# project-developer concern, benchbox is a project-user concern.
+# ----------------------------------------------------------------------
+.PHONY: uat-cell
+
+# make uat-cell PLATFORM=duckdb BENCHMARK=tpch SCALE=0.01
+uat-cell:
+	@if [ -z "$(PLATFORM)" ] || [ -z "$(BENCHMARK)" ] || [ -z "$(SCALE)" ]; then \
+		echo "Usage: make uat-cell PLATFORM=<name> BENCHMARK=<name> SCALE=<float>" >&2; \
+		exit 2; \
+	fi
+	@uv run --no-sync -- python -m tests.uat._cli \
+		--platform "$(PLATFORM)" \
+		--benchmark "$(BENCHMARK)" \
+		--scale "$(SCALE)" \
+		$(if $(PHASES),--phases "$(PHASES)",) \
+		$(if $(COMPRESSION),--compression "$(COMPRESSION)",) \
+		$(if $(TIMEOUT_S),--timeout-s "$(TIMEOUT_S)",) \
+		$(if $(LOG_DIR),--log-dir "$(LOG_DIR)",)
+
 # Help
 help:
 	@echo "BenchBox Makefile"

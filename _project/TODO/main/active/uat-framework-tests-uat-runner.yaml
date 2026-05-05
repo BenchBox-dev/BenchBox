@@ -158,7 +158,7 @@ work:
 - id: w3
   summary: "tests/uat/runner.py + make uat-cell PLATFORM=X BENCHMARK=Y SCALE=Z"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Single-cell execution. `subprocess.run` invokes `benchbox run`
     with timeout. Captures stdout+stderr to a per-run log file under
