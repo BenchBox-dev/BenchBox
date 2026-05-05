@@ -3600,6 +3600,7 @@ operations:
       redshift: null
       sqlite: null
       starrocks: null
+      trino: null
 
   - id: sketch_cpc_insert_per_partition
     category: sketch
@@ -3634,6 +3635,7 @@ operations:
       redshift: null
       sqlite: null
       starrocks: null
+      trino: null
 
   - id: sketch_cpc_query_union_merge
     category: sketch
@@ -3683,6 +3685,7 @@ operations:
       redshift: null
       sqlite: null
       starrocks: null
+      trino: null
 
   - id: sketch_cpc_drop_persistent_table
     category: sketch
@@ -3713,6 +3716,7 @@ operations:
       redshift: null
       sqlite: null
       starrocks: null
+      trino: null
 
   # ----------------------------------------------------------------------
   # REQ family (DuckDB-only): relative-error quantile sketch (vs KLL's
@@ -3751,6 +3755,7 @@ operations:
       redshift: null
       sqlite: null
       starrocks: null
+      trino: null
 
   - id: sketch_req_insert_per_partition
     category: sketch
@@ -3785,6 +3790,7 @@ operations:
       redshift: null
       sqlite: null
       starrocks: null
+      trino: null
 
   - id: sketch_req_query_quantile_merge
     category: sketch
@@ -3832,6 +3838,7 @@ operations:
       redshift: null
       sqlite: null
       starrocks: null
+      trino: null
 
   - id: sketch_req_drop_persistent_table
     category: sketch
@@ -3862,6 +3869,7 @@ operations:
       redshift: null
       sqlite: null
       starrocks: null
+      trino: null
   # ----------------------------------------------------------------------
   # Sketch parameter-sweep variants (DuckDB-only).
   # Each variant pins the sketch parameter explicitly so users can
