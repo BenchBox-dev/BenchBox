@@ -19,7 +19,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
-from tests.uat.cleanup import CellKey, can_prune, prune_database_dir
+from tests.uat.cleanup import SOURCE_REUSE_GRAPH, CellKey, can_prune, prune_database_dir
 from tests.uat.config import UATConfig
 from tests.uat.ladder import LadderRung, plan_ladder
 from tests.uat.matrix import platform_is_reachable
@@ -60,9 +60,18 @@ def run_execute(
     for key in by_pb:
         by_pb[key].sort(key=lambda c: c.scale)
 
+    # Reorder by_pb so that for each platform, sources from
+    # SOURCE_REUSE_GRAPH come before their consumers. Without this,
+    # `include: [read_primitives, tpch]` (or a future registry change
+    # that moves consumer-categories ahead of sources) would attempt to
+    # run a consumer before the source has loaded its DB.
+    by_pb = _reorder_for_topology(by_pb)
+
     results: list[CellResult] = []
     pruned: list[Cell] = []
     skipped_unreachable: list[Cell] = []
+    completed_pairs: set[tuple[str, str]] = set()
+    already_pruned: set[tuple[str, str, float]] = set()
 
     for (platform, benchmark), pb_cells in by_pb.items():
         if config.execute.skip_unreachable and not platform_is_reachable(platform):
@@ -99,30 +108,23 @@ def run_execute(
                 )
             )
 
+        completed_pairs.add((platform, benchmark))
+
         if cleanup_enabled and databases_root is not None:
-            # Per-platform/benchmark mid-sweep cleanup: only prune when
-            # all consumers of this source/scale are completed within
-            # this platform.
-            pending_after_pb = _pending_cells_after(by_pb, platform, benchmark)
-            completed_for_platform = [
-                CellKey(r.platform, r.benchmark, r.scale) for r in results if r.platform == platform
-            ]
-            for scale in {c.scale for c in pb_cells}:
-                decision = can_prune(
-                    benchmark,
-                    platform=platform,
-                    scale=scale,
-                    pending_cells=[CellKey(c.platform, c.benchmark, c.scale) for c in pending_after_pb],
-                    completed_cells=completed_for_platform,
-                )
-                if decision.safe_to_prune:
-                    prune_database_dir(
-                        databases_root,
-                        platform=platform,
-                        benchmark=benchmark,
-                        scale=scale,
-                        dry_run=config.dry_run,
-                    )
+            # Re-check pruneability for EVERY benchmark we have already
+            # completed on this platform, not just the one that just
+            # finished. The source DB (e.g. tpch) becomes prunable only
+            # when its last consumer (read_primitives, write_primitives,
+            # …) finishes, which is by definition a later iteration.
+            _maybe_prune_completed(
+                platform=platform,
+                by_pb=by_pb,
+                results=results,
+                completed_pairs=completed_pairs,
+                already_pruned=already_pruned,
+                databases_root=databases_root,
+                dry_run=config.dry_run,
+            )
 
     return ExecuteOutcome(
         results=tuple(results),
@@ -131,21 +133,103 @@ def run_execute(
     )
 
 
-def _pending_cells_after(
+def _reorder_for_topology(
     by_pb: dict[tuple[str, str], list[Cell]],
-    current_platform: str,
-    current_benchmark: str,
-) -> list[Cell]:
-    """Return cells in by_pb that haven't been processed yet (same/later platform/benchmark order)."""
-    out: list[Cell] = []
-    seen = False
+) -> dict[tuple[str, str], list[Cell]]:
+    """Reorder by_pb so for each platform, sources precede their consumers.
+
+    Reuse graph from `cleanup.SOURCE_REUSE_GRAPH` (e.g. tpch is a source
+    for read_primitives etc.). The topological sort is stable: benchmarks
+    not constrained by the graph keep their original relative order.
+    """
+    consumer_to_sources: dict[str, list[str]] = {}
+    for source, consumers in SOURCE_REUSE_GRAPH.items():
+        for c in consumers:
+            if c == source:
+                continue
+            consumer_to_sources.setdefault(c, []).append(source)
+
+    # Bucket pairs by platform, preserving original order within each.
+    by_platform: dict[str, list[tuple[str, list[Cell]]]] = {}
     for (platform, benchmark), pb_cells in by_pb.items():
-        if (platform, benchmark) == (current_platform, current_benchmark):
-            seen = True
-            continue
-        if seen:
-            out.extend(pb_cells)
+        by_platform.setdefault(platform, []).append((benchmark, pb_cells))
+
+    out: dict[tuple[str, str], list[Cell]] = {}
+    for platform, pairs in by_platform.items():
+        bench_to_cells = dict(pairs)
+        bench_order = [b for b, _ in pairs]
+        sorted_benches = _topological_sort(bench_order, consumer_to_sources)
+        for bench in sorted_benches:
+            out[(platform, bench)] = bench_to_cells[bench]
     return out
+
+
+def _topological_sort(
+    benchmarks: list[str],
+    consumer_to_sources: dict[str, list[str]],
+) -> list[str]:
+    """Stable topological sort: sources precede consumers, otherwise input order."""
+    bench_set = set(benchmarks)
+    visited: set[str] = set()
+    out: list[str] = []
+
+    def visit(b: str) -> None:
+        if b in visited:
+            return
+        visited.add(b)
+        for src in consumer_to_sources.get(b, ()):
+            if src in bench_set:
+                visit(src)
+        out.append(b)
+
+    for b in benchmarks:
+        visit(b)
+    return out
+
+
+def _maybe_prune_completed(
+    *,
+    platform: str,
+    by_pb: dict[tuple[str, str], list[Cell]],
+    results: list[CellResult],
+    completed_pairs: set[tuple[str, str]],
+    already_pruned: set[tuple[str, str, float]],
+    databases_root: Path,
+    dry_run: bool,
+) -> None:
+    """For each (platform, benchmark) already completed, prune any scale whose consumers are all done."""
+    pending_keys = [
+        CellKey(c.platform, c.benchmark, c.scale)
+        for (p, b), pb in by_pb.items()
+        if (p, b) not in completed_pairs
+        for c in pb
+    ]
+    completed_keys_this_platform = [
+        CellKey(r.platform, r.benchmark, r.scale) for r in results if r.platform == platform
+    ]
+    benches_done_on_platform = [b for (p, b) in completed_pairs if p == platform]
+    for prev_bench in benches_done_on_platform:
+        scales_for_prev = {c.scale for c in by_pb.get((platform, prev_bench), [])}
+        for scale in scales_for_prev:
+            key = (platform, prev_bench, scale)
+            if key in already_pruned:
+                continue
+            decision = can_prune(
+                prev_bench,
+                platform=platform,
+                scale=scale,
+                pending_cells=pending_keys,
+                completed_cells=completed_keys_this_platform,
+            )
+            if decision.safe_to_prune:
+                prune_database_dir(
+                    databases_root,
+                    platform=platform,
+                    benchmark=prev_bench,
+                    scale=scale,
+                    dry_run=dry_run,
+                )
+                already_pruned.add(key)
 
 
 def default_log_dir(config: UATConfig, now: _dt.datetime | None = None) -> Path:
