@@ -174,20 +174,26 @@ def _topological_sort(
 ) -> list[str]:
     """Stable topological sort: sources precede consumers, otherwise input order."""
     bench_set = set(benchmarks)
-    visited: set[str] = set()
+    pending = set(benchmarks)
+    dependents: dict[str, list[str]] = defaultdict(list)
+    indegree = dict.fromkeys(benchmarks, 0)
     out: list[str] = []
-
-    def visit(b: str) -> None:
-        if b in visited:
-            return
-        visited.add(b)
-        for src in consumer_to_sources.get(b, ()):
+    for consumer in benchmarks:
+        for src in consumer_to_sources.get(consumer, ()):
             if src in bench_set:
-                visit(src)
-        out.append(b)
+                dependents[src].append(consumer)
+                indegree[consumer] += 1
 
-    for b in benchmarks:
-        visit(b)
+    while pending:
+        ready = next((b for b in benchmarks if b in pending and indegree[b] == 0), None)
+        if ready is None:
+            # SOURCE_REUSE_GRAPH is expected to be acyclic, but preserve
+            # deterministic progress if a future edit introduces a cycle.
+            ready = next(b for b in benchmarks if b in pending)
+        pending.remove(ready)
+        out.append(ready)
+        for dependent in dependents.get(ready, ()):
+            indegree[dependent] -= 1
     return out
 
 

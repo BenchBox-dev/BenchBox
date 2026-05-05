@@ -183,6 +183,35 @@ def test_topological_sort_stable_when_no_constraint():
     assert out == ["clickbench", "ssb", "h2odb"]
 
 
+def test_topological_sort_keeps_available_unrelated_benchmark_before_source():
+    """Stable order should move sources only as far left as dependency constraints require."""
+    consumer_to_sources = {
+        "read_primitives": ["tpch"],
+        "write_primitives": ["tpch"],
+        "transaction_primitives": ["tpch"],
+        "ai_primitives": ["tpch"],
+    }
+    out = exec_phase._topological_sort(
+        [
+            "read_primitives",
+            "clickbench",
+            "tpch",
+            "write_primitives",
+            "transaction_primitives",
+            "ai_primitives",
+        ],
+        consumer_to_sources,
+    )
+    assert out == [
+        "clickbench",
+        "tpch",
+        "read_primitives",
+        "write_primitives",
+        "transaction_primitives",
+        "ai_primitives",
+    ]
+
+
 def test_execute_reorders_consumer_before_source(tmp_path):
     """Even if include lists read_primitives first, tpch must run first."""
     matrix.reset_reachability_cache()

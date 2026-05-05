@@ -123,3 +123,23 @@ def test_run_validate_raises_when_subprocess_fails_and_no_tsv(tmp_path: Path):
             output_tsv=missing_tsv,
             runner=fake_runner,
         )
+
+
+def test_run_validate_ignores_stale_tsv_when_subprocess_fails(tmp_path: Path):
+    """A previous rollup must not make a failed validator look parseable."""
+    stale_tsv = tmp_path / "rollup.tsv"
+    _write_tsv(stale_tsv, ["clean"])
+
+    def fake_runner(argv, check):
+        class Completed:
+            returncode = 5
+
+        return Completed()
+
+    with pytest.raises(validate.ValidatePhaseError, match="exited 5"):
+        validate.run_validate(
+            tmp_path / "results",
+            output_tsv=stale_tsv,
+            runner=fake_runner,
+        )
+    assert not stale_tsv.exists()

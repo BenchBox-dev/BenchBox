@@ -68,6 +68,8 @@ def run_validate(
     if not script.exists():
         raise FileNotFoundError(f"validator rollup helper not found at {script}")
     output_tsv.parent.mkdir(parents=True, exist_ok=True)
+    if output_tsv.exists():
+        output_tsv.unlink()
     argv = [
         sys.executable,
         str(script),

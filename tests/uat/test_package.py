@@ -136,3 +136,25 @@ def test_package_local_stage_does_not_warn(tmp_path: Path):
         warn=warnings.append,
     )
     assert warnings == []
+
+
+def test_package_cloud_uploaded_does_not_warn(tmp_path: Path):
+    cfg = validate_config(
+        {
+            "name": "x",
+            "package": {
+                "submit_terminal_state": "cloud-uploaded",
+                "service": "https://results.example.com",
+            },
+        }
+    )
+    runner = _fake_runner_factory([0])
+    warnings: list[str] = []
+    package.run_package(
+        cfg,
+        result_paths=[tmp_path / "r.json"],
+        submissions_dir=tmp_path / "subs",
+        runner=runner,
+        warn=warnings.append,
+    )
+    assert warnings == []
