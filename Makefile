@@ -1495,7 +1495,7 @@ blind-spots-sweep: blind-spots-report
 # Operator-only; not exposed as `benchbox` CLI subcommands. UAT is a
 # project-developer concern, benchbox is a project-user concern.
 # ----------------------------------------------------------------------
-.PHONY: uat-cell uat-execute uat-validate uat-package
+.PHONY: uat-cell uat-execute uat-validate uat-package uat-explorer-smoke
 
 # make uat-cell PLATFORM=duckdb BENCHMARK=tpch SCALE=0.01
 uat-cell:
@@ -1522,6 +1522,18 @@ uat-validate:
 		--results-dir "$(RESULTS_DIR)" \
 		--output-tsv "$(OUTPUT_TSV)" \
 		$(if $(FLOOR),--floor "$(FLOOR)",)
+
+# make uat-explorer-smoke BUNDLES_DIR=<path> OUTPUT_DIR=<path> LOG_DIR=<path> [BROWSERS=chromium]
+uat-explorer-smoke:
+	@if [ -z "$(BUNDLES_DIR)" ] || [ -z "$(OUTPUT_DIR)" ] || [ -z "$(LOG_DIR)" ]; then \
+		echo "Usage: make uat-explorer-smoke BUNDLES_DIR=<path> OUTPUT_DIR=<path> LOG_DIR=<path> [BROWSERS=chromium]" >&2; \
+		exit 2; \
+	fi
+	@uv run --no-sync -- python -m tests.uat._cli explorer-smoke \
+		--bundles-dir "$(BUNDLES_DIR)" \
+		--output-dir "$(OUTPUT_DIR)" \
+		--log-dir "$(LOG_DIR)" \
+		$(if $(BROWSERS),--browsers "$(BROWSERS)",)
 
 # make uat-package CONFIG=<path> SUBMISSIONS_DIR=<path> RESULTS="r1.json r2.json ..."
 uat-package:

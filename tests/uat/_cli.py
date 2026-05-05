@@ -55,6 +55,39 @@ def cell_main(argv: list[str] | None = None) -> int:
     return 0 if result.status == "passed" else 1
 
 
+def explorer_smoke_main(argv: list[str] | None = None) -> int:
+    """Implements `make uat-explorer-smoke`."""
+    from tests.uat.phases.explorer_smoke import run_explorer_smoke
+
+    parser = argparse.ArgumentParser(prog="uat-explorer-smoke")
+    parser.add_argument("--bundles-dir", required=True)
+    parser.add_argument("--output-dir", required=True)
+    parser.add_argument("--log-dir", required=True)
+    parser.add_argument("--browsers", default="chromium")
+    args = parser.parse_args(argv)
+
+    result = run_explorer_smoke(
+        bundles_dir=Path(args.bundles_dir),
+        output_dir=Path(args.output_dir),
+        log_dir=Path(args.log_dir),
+        playwright_browsers=tuple(args.browsers.split(",")),
+    )
+    print(
+        json.dumps(
+            {
+                "skipped": result.skipped,
+                "skip_reason": result.skip_reason,
+                "build_returncode": result.build_returncode,
+                "smoke_returncode": result.smoke_returncode,
+                "build_log": str(result.build_log) if result.build_log else None,
+                "smoke_log": str(result.smoke_log) if result.smoke_log else None,
+            },
+            indent=2,
+        )
+    )
+    return result.exit_code()
+
+
 def package_main(argv: list[str] | None = None) -> int:
     """Implements `make uat-package CONFIG=<path> RESULTS=glob...`."""
     from tests.uat.config import load_config
@@ -188,4 +221,6 @@ if __name__ == "__main__":
         sys.exit(validate_main(sys.argv[2:]))
     if len(sys.argv) > 1 and sys.argv[1] == "package":
         sys.exit(package_main(sys.argv[2:]))
+    if len(sys.argv) > 1 and sys.argv[1] == "explorer-smoke":
+        sys.exit(explorer_smoke_main(sys.argv[2:]))
     sys.exit(cell_main())

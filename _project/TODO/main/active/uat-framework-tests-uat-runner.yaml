@@ -237,7 +237,7 @@ work:
 - id: w7
   summary: "make uat-explorer-smoke: build + Playwright"
   needs: [w6]
-  status: pending
+  status: done
   notes: |
     Reuses `benchbox explorer build` and `results-explorer/scripts/
     serve-browser-tests.mjs` exactly as the 2026-05-02 W6 did. UATs
