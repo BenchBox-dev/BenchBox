@@ -203,7 +203,7 @@ work:
 - id: w5
   summary: "make uat-validate: invoke scripts/uat_validator_rollup.py per cell"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     INTEGRATION work, not reimplementation. The
     `scripts/uat_validator_rollup.py` helper from

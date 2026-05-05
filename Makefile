@@ -1495,7 +1495,7 @@ blind-spots-sweep: blind-spots-report
 # Operator-only; not exposed as `benchbox` CLI subcommands. UAT is a
 # project-developer concern, benchbox is a project-user concern.
 # ----------------------------------------------------------------------
-.PHONY: uat-cell uat-execute
+.PHONY: uat-cell uat-execute uat-validate
 
 # make uat-cell PLATFORM=duckdb BENCHMARK=tpch SCALE=0.01
 uat-cell:
@@ -1511,6 +1511,17 @@ uat-cell:
 		$(if $(COMPRESSION),--compression "$(COMPRESSION)",) \
 		$(if $(TIMEOUT_S),--timeout-s "$(TIMEOUT_S)",) \
 		$(if $(LOG_DIR),--log-dir "$(LOG_DIR)",)
+
+# make uat-validate RESULTS_DIR=<dir> OUTPUT_TSV=<path> [FLOOR=0.80]
+uat-validate:
+	@if [ -z "$(RESULTS_DIR)" ] || [ -z "$(OUTPUT_TSV)" ]; then \
+		echo "Usage: make uat-validate RESULTS_DIR=<dir> OUTPUT_TSV=<path> [FLOOR=0.80]" >&2; \
+		exit 2; \
+	fi
+	@uv run --no-sync -- python -m tests.uat._cli validate \
+		--results-dir "$(RESULTS_DIR)" \
+		--output-tsv "$(OUTPUT_TSV)" \
+		$(if $(FLOOR),--floor "$(FLOOR)",)
 
 # make uat-execute CONFIG=tests/uat/configs/uat.yaml
 uat-execute:

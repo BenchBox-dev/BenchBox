@@ -55,6 +55,39 @@ def cell_main(argv: list[str] | None = None) -> int:
     return 0 if result.status == "passed" else 1
 
 
+def validate_main(argv: list[str] | None = None) -> int:
+    """Implements `make uat-validate RESULTS_DIR=<dir>`."""
+    from tests.uat.phases.validate import run_validate
+
+    parser = argparse.ArgumentParser(prog="uat-validate")
+    parser.add_argument("--results-dir", required=True)
+    parser.add_argument("--output-tsv", required=True)
+    parser.add_argument("--floor", type=float, default=0.80)
+    args = parser.parse_args(argv)
+
+    result = run_validate(
+        Path(args.results_dir),
+        output_tsv=Path(args.output_tsv),
+        floor=args.floor,
+    )
+    print(
+        json.dumps(
+            {
+                "rollup_tsv": str(result.rollup_tsv_path),
+                "clean": result.clean_count,
+                "warning_only": result.warning_count,
+                "error": result.error_count,
+                "refused_by_cli": result.refused_count,
+                "clean_rate": round(result.clean_rate, 4),
+                "floor": result.floor,
+                "floor_breached": result.floor_breached,
+            },
+            indent=2,
+        )
+    )
+    return result.exit_code()
+
+
 def execute_main(argv: list[str] | None = None) -> int:
     """Implements `make uat-execute CONFIG=path/to/uat.yaml`."""
     from tests.uat.config import load_config
@@ -115,4 +148,6 @@ def execute_main(argv: list[str] | None = None) -> int:
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "execute":
         sys.exit(execute_main(sys.argv[2:]))
+    if len(sys.argv) > 1 and sys.argv[1] == "validate":
+        sys.exit(validate_main(sys.argv[2:]))
     sys.exit(cell_main())
