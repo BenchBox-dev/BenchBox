@@ -334,19 +334,46 @@ def execute_main(argv: list[str] | None = None) -> int:
     return 0 if summary["failed"] == 0 and summary["timed_out"] == 0 else 1
 
 
+SUBCOMMANDS = {
+    "cell": cell_main,
+    "execute": execute_main,
+    "validate": validate_main,
+    "package": package_main,
+    "explorer-smoke": explorer_smoke_main,
+    "report": report_main,
+    "sweep": sweep_main,
+    "stress": stress_main,
+}
+
+
+def _help_text() -> str:
+    cmds = ", ".join(sorted(SUBCOMMANDS))
+    return (
+        f"usage: python -m tests.uat._cli <subcommand> [options]\n"
+        f"  subcommands: {cmds}\n"
+        "  with no subcommand, --platform/--benchmark/--scale invoke the "
+        "single-cell runner."
+    )
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Dispatch to the right subcommand. Bare flags route to cell_main for `make uat-cell`."""
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if not argv:
+        return cell_main([])
+    head = argv[0]
+    if head in SUBCOMMANDS:
+        return SUBCOMMANDS[head](argv[1:])
+    if head in {"-h", "--help"}:
+        print(_help_text())
+        return 0
+    if head.startswith("-"):
+        # Backward compat: `python -m tests.uat._cli --platform=... --benchmark=... --scale=...`
+        return cell_main(argv)
+    print(f"unknown subcommand: {head!r}", file=sys.stderr)
+    print(_help_text(), file=sys.stderr)
+    return 2
+
+
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "execute":
-        sys.exit(execute_main(sys.argv[2:]))
-    if len(sys.argv) > 1 and sys.argv[1] == "validate":
-        sys.exit(validate_main(sys.argv[2:]))
-    if len(sys.argv) > 1 and sys.argv[1] == "package":
-        sys.exit(package_main(sys.argv[2:]))
-    if len(sys.argv) > 1 and sys.argv[1] == "explorer-smoke":
-        sys.exit(explorer_smoke_main(sys.argv[2:]))
-    if len(sys.argv) > 1 and sys.argv[1] == "report":
-        sys.exit(report_main(sys.argv[2:]))
-    if len(sys.argv) > 1 and sys.argv[1] == "sweep":
-        sys.exit(sweep_main(sys.argv[2:]))
-    if len(sys.argv) > 1 and sys.argv[1] == "stress":
-        sys.exit(stress_main(sys.argv[2:]))
-    sys.exit(cell_main())
+    sys.exit(main())
