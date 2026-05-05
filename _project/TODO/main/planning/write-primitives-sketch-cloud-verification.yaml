@@ -107,8 +107,9 @@ context_sections:
       - theta_sketch_agg / theta_union_agg / theta_sketch_estimate —
         verify these are first-class (DataSketches Spark integration
         ships in Databricks Runtime by default).
-      - kll_sketch_agg / kll_sketch_estimate_quantile — Databricks-
-        specific function names that diverge from open-source Spark's
+      - kll_sketch_agg_double / kll_merge_agg_double /
+        kll_sketch_get_quantile_double — Databricks-specific typed
+        function names that diverge from open-source Spark's
         percentile_approx; confirm the override is correct.
       - approx_top_k_accumulate / _combine / _estimate — Spark 4.1+
         (Databricks Runtime bumps Spark version on its own cadence;

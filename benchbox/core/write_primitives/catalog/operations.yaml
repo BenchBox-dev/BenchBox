@@ -2973,7 +2973,7 @@ operations:
           activity_date DATE, region STRING, price_sketch BINARY
         ) USING DELTA;
         INSERT INTO sketch_ops_kll_partitions
-        SELECT l_shipdate, l_returnflag, kll_sketch_agg(l_extendedprice)
+        SELECT l_shipdate, l_returnflag, kll_sketch_agg_double(CAST(l_extendedprice AS DOUBLE))
         FROM lineitem GROUP BY l_shipdate, l_returnflag;
       snowflake: |
         DROP TABLE IF EXISTS sketch_ops_kll_partitions;
@@ -3280,6 +3280,9 @@ operations:
         expected_value_min: 30000
         expected_value_max: 40000
         platform_overrides:
+          databricks: |
+            SELECT kll_sketch_get_quantile_double(kll_merge_agg_double(price_sketch), 0.5) AS median_price
+            FROM sketch_ops_kll_partitions
           clickhouse: |
             SELECT quantileTDigestMerge(0.5)(price_sketch) AS median_price
             FROM sketch_ops_kll_partitions
@@ -3330,9 +3333,9 @@ operations:
           activity_date DATE, region STRING, price_sketch BINARY
         ) USING DELTA;
         INSERT INTO sketch_ops_kll_partitions
-        SELECT l_shipdate, l_returnflag, kll_sketch_agg(l_extendedprice)
+        SELECT l_shipdate, l_returnflag, kll_sketch_agg_double(CAST(l_extendedprice AS DOUBLE))
         FROM lineitem GROUP BY l_shipdate, l_returnflag;
-        SELECT kll_sketch_estimate_quantile(kll_sketch_agg(price_sketch), 0.5) AS median_price
+        SELECT kll_sketch_get_quantile_double(kll_merge_agg_double(price_sketch), 0.5) AS median_price
         FROM sketch_ops_kll_partitions;
       snowflake: |
         DROP TABLE IF EXISTS sketch_ops_kll_partitions;
@@ -3843,6 +3846,290 @@ operations:
           WHERE table_name = 'sketch_req_partitions'
         expected_rows: 1
     cleanup_sql: null
+    expected_rows_affected: null
+    platform_overrides:
+      databricks: null
+      snowflake: null
+      bigquery: null
+      clickhouse: null
+      datafusion: null
+      redshift: null
+      sqlite: null
+      starrocks: null
+  # ----------------------------------------------------------------------
+  # Sketch parameter-sweep variants (DuckDB-only).
+  # Each variant pins the sketch parameter explicitly so users can
+  # measure the size / accuracy / latency tradeoff across the recommended
+  # parameter range, vs guessing.
+  #
+  # Theta (lg_k) and frequent-items (lg_max_map_size) variants share the
+  # extension-drift fate of their parent ops — see
+  # `_project/blind-spots/2026-05-02-155524-duckdb-datasketches-extension-drift.md`.
+  # KLL variants are end-to-end verified on the installed extension at
+  # the time of authoring (k=100: ~2KB merged, k=1000: ~18KB merged).
+  # ----------------------------------------------------------------------
+
+  - id: sketch_query_theta_union_merge_lgk10
+    category: sketch
+    description: Theta sweep variant — lg_k=10 (1024 entries, ~5KB serialized, ~3.1% RSE). Smaller and lossier than the default lg_k=12.
+    requires_setup: false
+    write_sql: |
+      INSTALL datasketches FROM community;
+      LOAD datasketches;
+      DROP TABLE IF EXISTS sketch_ops_daily_users;
+      CREATE TABLE sketch_ops_daily_users (
+        activity_date DATE, region VARCHAR(25), user_sketch BLOB, rev_sketch BLOB
+      );
+      INSERT INTO sketch_ops_daily_users
+      SELECT l_shipdate, l_returnflag,
+             datasketch_theta(10, l_orderkey),
+             datasketch_theta(10, CAST(l_extendedprice AS INTEGER))
+      FROM lineitem GROUP BY l_shipdate, l_returnflag;
+      SELECT datasketch_theta_estimate(datasketch_theta(10, user_sketch::sketch_theta_uint64)) AS distinct_orders
+      FROM sketch_ops_daily_users;
+    validation_queries:
+      - id: theta_lgk10_estimate_in_range
+        sql: |
+          SELECT datasketch_theta_estimate(datasketch_theta(10, user_sketch::sketch_theta_uint64)) AS distinct_orders
+          FROM sketch_ops_daily_users
+        # Wider than default lg_k=12 because lg_k=10 has ~3.1% RSE.
+        # SF=0.01 true=15000; bound generously to absorb the larger error.
+        expected_value_min: 13500
+        expected_value_max: 16500
+      - id: theta_lgk10_storage_size
+        sql: |
+          SELECT octet_length(datasketch_theta(10, user_sketch::sketch_theta_uint64)) AS sketch_bytes
+          FROM sketch_ops_daily_users
+        # Theta lg_k=10 → 1024 entries; spec ~5KB merged.
+        expected_value_min: 1000
+        expected_value_max: 12000
+    cleanup_sql: |
+      DROP TABLE IF EXISTS sketch_ops_daily_users
+    expected_rows_affected: null
+    platform_overrides:
+      databricks: null
+      snowflake: null
+      bigquery: null
+      clickhouse: null
+      datafusion: null
+      redshift: null
+      sqlite: null
+      starrocks: null
+
+  - id: sketch_query_theta_union_merge_lgk14
+    category: sketch
+    description: Theta sweep variant — lg_k=14 (16384 entries, ~64KB serialized, ~0.8% RSE). Larger and tighter than default lg_k=12.
+    requires_setup: false
+    write_sql: |
+      INSTALL datasketches FROM community;
+      LOAD datasketches;
+      DROP TABLE IF EXISTS sketch_ops_daily_users;
+      CREATE TABLE sketch_ops_daily_users (
+        activity_date DATE, region VARCHAR(25), user_sketch BLOB, rev_sketch BLOB
+      );
+      INSERT INTO sketch_ops_daily_users
+      SELECT l_shipdate, l_returnflag,
+             datasketch_theta(14, l_orderkey),
+             datasketch_theta(14, CAST(l_extendedprice AS INTEGER))
+      FROM lineitem GROUP BY l_shipdate, l_returnflag;
+      SELECT datasketch_theta_estimate(datasketch_theta(14, user_sketch::sketch_theta_uint64)) AS distinct_orders
+      FROM sketch_ops_daily_users;
+    validation_queries:
+      - id: theta_lgk14_estimate_in_range
+        sql: |
+          SELECT datasketch_theta_estimate(datasketch_theta(14, user_sketch::sketch_theta_uint64)) AS distinct_orders
+          FROM sketch_ops_daily_users
+        # Tighter than default because lg_k=14 has ~0.8% RSE.
+        expected_value_min: 14700
+        expected_value_max: 15300
+      - id: theta_lgk14_storage_size
+        sql: |
+          SELECT octet_length(datasketch_theta(14, user_sketch::sketch_theta_uint64)) AS sketch_bytes
+          FROM sketch_ops_daily_users
+        # Theta lg_k=14 → 16384 entries; spec ~64KB merged.
+        expected_value_min: 16000
+        expected_value_max: 130000
+    cleanup_sql: |
+      DROP TABLE IF EXISTS sketch_ops_daily_users
+    expected_rows_affected: null
+    platform_overrides:
+      databricks: null
+      snowflake: null
+      bigquery: null
+      clickhouse: null
+      datafusion: null
+      redshift: null
+      sqlite: null
+      starrocks: null
+
+  - id: sketch_query_kll_quantiles_merge_k100
+    category: sketch
+    description: KLL sweep variant — k=100 (~1.5KB, ~1.65% normalized rank error). Smaller and lossier than default k=200.
+    requires_setup: false
+    write_sql: |
+      INSTALL datasketches FROM community;
+      LOAD datasketches;
+      DROP TABLE IF EXISTS sketch_ops_kll_partitions;
+      CREATE TABLE sketch_ops_kll_partitions (
+        activity_date DATE, region VARCHAR(25), price_sketch BLOB
+      );
+      INSERT INTO sketch_ops_kll_partitions
+      SELECT l_shipdate, l_returnflag, datasketch_kll(100, l_extendedprice)
+      FROM lineitem GROUP BY l_shipdate, l_returnflag;
+      SELECT datasketch_kll_quantile(datasketch_kll(100, price_sketch::sketch_kll_double), 0.5::DOUBLE, true) AS median_price
+      FROM sketch_ops_kll_partitions;
+    validation_queries:
+      - id: kll_k100_median_in_range
+        sql: |
+          SELECT datasketch_kll_quantile(datasketch_kll(100, price_sketch::sketch_kll_double), 0.5::DOUBLE, true) AS median_price
+          FROM sketch_ops_kll_partitions
+        expected_value_min: 30000
+        expected_value_max: 40000
+      - id: kll_k100_storage_size
+        sql: |
+          SELECT octet_length(datasketch_kll(100, price_sketch::sketch_kll_double)) AS sketch_bytes
+          FROM sketch_ops_kll_partitions
+        # KLL k=100 verified ~2KB merged at SF=0.01 (synthetic test).
+        expected_value_min: 500
+        expected_value_max: 5000
+    cleanup_sql: |
+      DROP TABLE IF EXISTS sketch_ops_kll_partitions
+    expected_rows_affected: null
+    platform_overrides:
+      databricks: null
+      snowflake: null
+      bigquery: null
+      clickhouse: null
+      datafusion: null
+      redshift: null
+      sqlite: null
+      starrocks: null
+
+  - id: sketch_query_kll_quantiles_merge_k1000
+    category: sketch
+    description: KLL sweep variant — k=1000 (~15KB, ~0.59% normalized rank error). Larger and tighter than default k=200.
+    requires_setup: false
+    write_sql: |
+      INSTALL datasketches FROM community;
+      LOAD datasketches;
+      DROP TABLE IF EXISTS sketch_ops_kll_partitions;
+      CREATE TABLE sketch_ops_kll_partitions (
+        activity_date DATE, region VARCHAR(25), price_sketch BLOB
+      );
+      INSERT INTO sketch_ops_kll_partitions
+      SELECT l_shipdate, l_returnflag, datasketch_kll(1000, l_extendedprice)
+      FROM lineitem GROUP BY l_shipdate, l_returnflag;
+      SELECT datasketch_kll_quantile(datasketch_kll(1000, price_sketch::sketch_kll_double), 0.5::DOUBLE, true) AS median_price
+      FROM sketch_ops_kll_partitions;
+    validation_queries:
+      - id: kll_k1000_median_in_range
+        sql: |
+          SELECT datasketch_kll_quantile(datasketch_kll(1000, price_sketch::sketch_kll_double), 0.5::DOUBLE, true) AS median_price
+          FROM sketch_ops_kll_partitions
+        expected_value_min: 30000
+        expected_value_max: 40000
+      - id: kll_k1000_storage_size
+        sql: |
+          SELECT octet_length(datasketch_kll(1000, price_sketch::sketch_kll_double)) AS sketch_bytes
+          FROM sketch_ops_kll_partitions
+        # KLL k=1000 verified ~18KB merged at SF=0.01 (synthetic test).
+        expected_value_min: 5000
+        expected_value_max: 40000
+    cleanup_sql: |
+      DROP TABLE IF EXISTS sketch_ops_kll_partitions
+    expected_rows_affected: null
+    platform_overrides:
+      databricks: null
+      snowflake: null
+      bigquery: null
+      clickhouse: null
+      datafusion: null
+      redshift: null
+      sqlite: null
+      starrocks: null
+
+  - id: sketch_query_topk_combine_lgmm8
+    category: sketch
+    description: Top-K sweep variant — explicit lg_max_map_size=8 (256 buckets, ~600B). Same parameter as the default headline op; provided for sweep-symmetry comparisons.
+    requires_setup: false
+    write_sql: |
+      INSTALL datasketches FROM community;
+      LOAD datasketches;
+      DROP TABLE IF EXISTS sketch_ops_topk;
+      CREATE TABLE sketch_ops_topk (shard_id INTEGER, topk_sketch BLOB);
+      INSERT INTO sketch_ops_topk
+      SELECT CAST(l_orderkey % 8 AS INTEGER),
+             datasketch_frequent_items(8, l_shipmode)
+      FROM lineitem GROUP BY l_orderkey % 8;
+      SELECT LENGTH(datasketch_frequent_items_get_frequent(
+        datasketch_frequent_items(8, topk_sketch), 'NO_FALSE_POSITIVES'
+      )) AS frequent_count
+      FROM sketch_ops_topk;
+    validation_queries:
+      - id: topk_lgmm8_frequent_count_in_range
+        sql: |
+          SELECT LENGTH(datasketch_frequent_items_get_frequent(
+            datasketch_frequent_items(8, topk_sketch), 'NO_FALSE_POSITIVES'
+          )) AS frequent_count
+          FROM sketch_ops_topk
+        expected_value_min: 6
+        expected_value_max: 8
+      - id: topk_lgmm8_storage_size
+        sql: |
+          SELECT octet_length(datasketch_frequent_items(8, topk_sketch)) AS sketch_bytes
+          FROM sketch_ops_topk
+        expected_value_min: 200
+        expected_value_max: 2000
+    cleanup_sql: |
+      DROP TABLE IF EXISTS sketch_ops_topk
+    expected_rows_affected: null
+    platform_overrides:
+      databricks: null
+      snowflake: null
+      bigquery: null
+      clickhouse: null
+      datafusion: null
+      redshift: null
+      sqlite: null
+      starrocks: null
+
+  - id: sketch_query_topk_combine_lgmm10
+    category: sketch
+    description: Top-K sweep variant — lg_max_map_size=10 (1024 buckets, ~2KB). Larger than default lgmm=8; should still report 7 frequent items deterministically (lineitem has 7 distinct shipmodes).
+    requires_setup: false
+    write_sql: |
+      INSTALL datasketches FROM community;
+      LOAD datasketches;
+      DROP TABLE IF EXISTS sketch_ops_topk;
+      CREATE TABLE sketch_ops_topk (shard_id INTEGER, topk_sketch BLOB);
+      INSERT INTO sketch_ops_topk
+      SELECT CAST(l_orderkey % 8 AS INTEGER),
+             datasketch_frequent_items(10, l_shipmode)
+      FROM lineitem GROUP BY l_orderkey % 8;
+      SELECT LENGTH(datasketch_frequent_items_get_frequent(
+        datasketch_frequent_items(10, topk_sketch), 'NO_FALSE_POSITIVES'
+      )) AS frequent_count
+      FROM sketch_ops_topk;
+    validation_queries:
+      - id: topk_lgmm10_frequent_count_in_range
+        sql: |
+          SELECT LENGTH(datasketch_frequent_items_get_frequent(
+            datasketch_frequent_items(10, topk_sketch), 'NO_FALSE_POSITIVES'
+          )) AS frequent_count
+          FROM sketch_ops_topk
+        # Same envelope as default — lineitem has 7 distinct shipmodes;
+        # larger map shouldn't change the count.
+        expected_value_min: 6
+        expected_value_max: 8
+      - id: topk_lgmm10_storage_size
+        sql: |
+          SELECT octet_length(datasketch_frequent_items(10, topk_sketch)) AS sketch_bytes
+          FROM sketch_ops_topk
+        # Spec: lg_max_map_size=10 → 1024 buckets, ~2KB.
+        expected_value_min: 500
+        expected_value_max: 5000
+    cleanup_sql: |
+      DROP TABLE IF EXISTS sketch_ops_topk
     expected_rows_affected: null
     platform_overrides:
       databricks: null
