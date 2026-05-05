@@ -1,4 +1,4 @@
-You are actioning one stale Codex web-agent inline PR review comment for BenchBox.
+You are actioning one stale bot/agent inline PR review comment for BenchBox.
 
 Source:
 - Repository: {repo}
@@ -20,7 +20,7 @@ Required workflow:
 5. If no fix is currently required, leave files unchanged and explain the evidence.
 6. Do not commit, push, open a PR, or reply on GitHub. The outer Make routine handles those steps.
 
-Carry-over patterns from the completed Codex follow-up TODOs:
+Carry-over patterns from the completed PR-review follow-up TODOs:
 - A stale GitHub thread is not enough evidence. Verify current behavior before fixing or dismissing.
 - Some comments are already fixed by later merges; close those with concrete current-file evidence, not code churn.
 - Historical DONE-item verification commands should stay executable when the comment identifies a real command defect.
@@ -30,17 +30,17 @@ Carry-over patterns from the completed Codex follow-up TODOs:
 - Prefer focused tests over broad rewrites.
 
 Useful local references:
-- `_project/DONE/main/active/codex-pr-review-followups-week-2026-05-01.yaml`
-- `_project/TODO/main/active/codex-pr-review-followups-week-2026-05-03.yaml`
-- `_project/audits/codex-weekly-sweep-template.md`
-- `_project/audits/codex-thread-rescan-week-2026-05-01.md`
+- `_project/DONE/main/active/codex-pr-review-followups-week-2026-05-01.yaml` (historical filename; the routine is now `pr-review-followups`)
+- `_project/DONE/main/active/codex-pr-review-followups-week-2026-05-03.yaml` (historical filename; same)
+- `_project/audits/pr-review-sweep-template.md`
+- `_project/audits/codex-thread-rescan-week-2026-05-01.md` (historical rescan audit)
 
 Diff hunk from the original PR comment:
 ```diff
 {comment_diff_hunk}
 ```
 
-Codex web-agent comment body:
+Reviewer comment body:
 ```markdown
 {comment_body}
 ```

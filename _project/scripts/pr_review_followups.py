@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
-"""Action stale Codex web-agent review comments left on merged PRs.
+"""Action stale bot/agent review comments left on merged PRs.
 
 The script is intentionally an orchestrator, not a static fixer. It gathers
-candidate inline review comments, skips comments that already carry the
-BenchBox action marker reply, asks local `codex exec` to assess and fix each
-remaining finding against the current tree, replies to the source comment, and
-then optionally submits one batched PR through the existing Make workflow.
+candidate inline review comments from configured authors, skips comments that
+already carry the BenchBox action marker reply, asks the local executor (the
+`codex` CLI) to assess and fix each remaining finding against the current
+tree, replies to the source comment, and then optionally submits one batched
+PR through the existing Make workflow. The reviewer set is configurable via
+`--author`; the executor is currently codex but is isolated behind the
+`--executor-*` flags so it can be swapped without touching the orchestration.
 """
 
 from __future__ import annotations
@@ -23,14 +26,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Sequence
 
-DEFAULT_CODEX_AUTHORS = ("chatgpt-codex-connector[bot]", "chatgpt-codex-connector")
-ACTION_MARKER = "benchbox-codex-review-followup-actioned"
+DEFAULT_REVIEW_AUTHORS = ("chatgpt-codex-connector[bot]", "chatgpt-codex-connector")
+ACTION_MARKER = "benchbox-pr-review-followup-actioned"
 ACTION_MARKER_REGEX = re.compile(rf"(?m)^<!--\s*{re.escape(ACTION_MARKER)}\b")
-DEFAULT_COMMIT_MESSAGE = "fix: address stale Codex PR review follow-ups"
-PER_COMMENT_COMMIT_PREFIX = "fix(codex-followup)"
+DEFAULT_COMMIT_MESSAGE = "fix: address stale PR review follow-ups"
+PER_COMMENT_COMMIT_PREFIX = "fix(pr-followup)"
 MAX_REPLY_SUMMARY_CHARS = 8000
-PROMPT_TEMPLATE_PATH = Path(__file__).resolve().parent / "prompts" / "codex_pr_review_followup.md"
-MIN_CODEX_VERSION = (0, 20, 0)
+PROMPT_TEMPLATE_PATH = Path(__file__).resolve().parent / "prompts" / "pr_review_followup.md"
+MIN_EXECUTOR_VERSION = (0, 20, 0)
 PER_COMMENT_COMMIT_SUBJECT_REGEX = re.compile(
     rf"^{re.escape(PER_COMMENT_COMMIT_PREFIX)}: PR #(\d+) comment (\d+) "
 )
@@ -457,7 +460,7 @@ def first_body_line(body: str) -> str:
 
 def print_pending_table(pending: Sequence[PendingComment]) -> None:
     if not pending:
-        print("No pending Codex PR review comments found.")
+        print("No pending PR review comments found.")
         return
     print(f"{'PR':>6}  {'Comment':>12}  {'Path':<52}  Finding")
     print(f"{'-' * 6}  {'-' * 12}  {'-' * 52}  {'-' * 40}")
@@ -469,8 +472,8 @@ def print_pending_table(pending: Sequence[PendingComment]) -> None:
 def git_status_snapshot(runner: CommandRunner) -> str:
     """Snapshot of working-tree state used as a disposition baseline.
 
-    `git diff` only sees unstaged tracked-file changes. Codex may stage edits
-    (`git add`) or create new untracked files; both must count as "fixed".
+    `git diff` only sees unstaged tracked-file changes. The executor may stage
+    edits (`git add`) or create new untracked files; both must count as "fixed".
     `git status --porcelain` covers all three: modified, staged, and untracked.
     """
     return checked(runner, ["git", "status", "--porcelain"]).stdout
@@ -527,7 +530,7 @@ def load_prompt_template(path: Path = PROMPT_TEMPLATE_PATH) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def build_codex_prompt(
+def build_executor_prompt(
     item: PendingComment,
     *,
     repo: str,
@@ -556,20 +559,21 @@ def build_codex_prompt(
     return rendered.strip()
 
 
-def check_codex_version(
-    runner: CommandRunner, *, minimum: tuple[int, int, int] = MIN_CODEX_VERSION
+def check_executor_version(
+    runner: CommandRunner, *, minimum: tuple[int, int, int] = MIN_EXECUTOR_VERSION
 ) -> tuple[int, int, int]:
-    """Probe `codex --version` and assert it parses to >= minimum.
+    """Probe the executor's `--version` and assert it parses to >= minimum.
 
-    Surfaces a clear remediation when the binary is missing or too old, so the
-    routine fails fast instead of mid-loop with an opaque flag-not-recognized
-    error from a stale codex CLI.
+    The executor is currently the codex CLI; the function name stays generic so
+    a future executor swap doesn't require a rename. Surfaces a clear
+    remediation when the binary is missing or too old, so the routine fails
+    fast instead of mid-loop with an opaque flag-not-recognized error.
     """
     try:
         result = runner.run(["codex", "--version"])
     except FileNotFoundError as exc:
         raise RuntimeError(
-            "codex CLI not found on PATH. Install codex-cli "
+            "Executor binary `codex` not found on PATH. Install codex-cli "
             f">= {'.'.join(str(p) for p in minimum)} (https://github.com/openai/codex)."
         ) from exc
     if result.returncode != 0:
@@ -577,28 +581,28 @@ def check_codex_version(
     text = (result.stdout or result.stderr or "").strip()
     match = re.search(r"(\d+)\.(\d+)\.(\d+)", text)
     if not match:
-        raise RuntimeError(f"Could not parse codex CLI version from output: {text!r}")
+        raise RuntimeError(f"Could not parse executor version from output: {text!r}")
     parsed = (int(match.group(1)), int(match.group(2)), int(match.group(3)))
     if parsed < minimum:
         raise RuntimeError(
-            f"codex CLI {'.'.join(str(p) for p in parsed)} is below the required "
-            f">= {'.'.join(str(p) for p in minimum)}. Upgrade codex-cli."
+            f"Executor codex-cli {'.'.join(str(p) for p in parsed)} is below the required "
+            f">= {'.'.join(str(p) for p in minimum)}. Upgrade the executor."
         )
     return parsed
 
 
-def run_codex_for_comment(
+def run_executor_for_comment(
     runner: CommandRunner,
     item: PendingComment,
     *,
     repo: str,
     base: str,
-    codex_model: str | None,
-    codex_sandbox: str,
-    codex_approval: str,
+    executor_model: str | None,
+    executor_sandbox: str,
+    executor_approval: str,
 ) -> ActionResult:
     before = git_status_snapshot(runner)
-    prompt = build_codex_prompt(item, repo=repo, base=base)
+    prompt = build_executor_prompt(item, repo=repo, base=base)
     # codex-cli >= 0.20 dropped `--ask-for-approval`. The config-override
     # syntax (`-c approval_policy=<mode>`) works across the supported version
     # range and is forward-stable.
@@ -608,12 +612,12 @@ def run_codex_for_comment(
         "--cd",
         str(runner.cwd),
         "--sandbox",
-        codex_sandbox,
+        executor_sandbox,
         "-c",
-        f"approval_policy={codex_approval}",
+        f"approval_policy={executor_approval}",
     ]
-    if codex_model:
-        cmd.extend(["--model", codex_model])
+    if executor_model:
+        cmd.extend(["--model", executor_model])
     cmd.append("-")
 
     print(f"\n==> PR #{item.pr.number} comment {item.comment.id}: {item.comment.html_url}", flush=True)
@@ -638,7 +642,7 @@ def commit_message_for_result(result: ActionResult) -> str:
     headline = first_body_line(comment.body)
     subject = f"{PER_COMMENT_COMMIT_PREFIX}: PR #{pr.number} comment {comment.id} — {headline}"
     # Keep commit subjects under the conventional ~100-char soft cap; truncate
-    # the codex headline before composing rather than after, so the trailer
+    # the comment headline before composing rather than after, so the trailer
     # stays intact.
     if len(subject) > 100:
         keep = 100 - (len(subject) - len(headline)) - 1
@@ -679,12 +683,12 @@ def _porcelain_paths_with_worktree_mods(porcelain: str) -> set[str]:
 def commit_changes_for_result(
     runner: CommandRunner, result: ActionResult
 ) -> bool:
-    """Stage + commit codex-produced changes for one comment.
+    """Stage + commit executor-produced changes for one comment.
 
     Returns True when a commit was created. Called *before* the GitHub reply
-    is posted so a crash between codex and reply leaves no phantom-actioned
-    state on GitHub: either the commit landed (next run sees no change), or
-    nothing happened (next run reprocesses the comment cleanly).
+    is posted so a crash between the executor run and the reply leaves no
+    phantom-actioned state on GitHub: either the commit landed (next run sees
+    no change), or nothing happened (next run reprocesses the comment cleanly).
 
     A pre-commit hook that auto-formats the staged paths (e.g. `ruff-format`)
     aborts the first commit with the marker `files were modified by this hook`
@@ -731,7 +735,7 @@ def build_reply_body(result: ActionResult, *, branch: str) -> str:
     return textwrap.dedent(
         f"""
         <!-- {ACTION_MARKER}: pr={pr.number} comment_id={comment.id} branch={branch} -->
-        Follow-up sweep actioned this Codex review comment.
+        Follow-up sweep actioned this PR review comment.
 
         Disposition: {result.disposition}
         Branch: `{branch}`
@@ -858,7 +862,7 @@ def finalize_changes(
 
     Per-comment commits are produced inside `run_action_loop` *before* the
     GitHub reply is posted. This finalizer's job is just to (a) sweep up any
-    leftover unstaged paths into a fallback batch commit (codex output that
+    leftover unstaged paths into a fallback batch commit (executor output that
     was somehow missed by `commit_changes_for_result`), (b) run preflight,
     (c) open the PR.
     """
@@ -899,7 +903,7 @@ def run_action_loop(args: argparse.Namespace, runner: CommandRunner) -> int:
         if not args.dry_run:
             branch = current_branch(runner)
             ensure_action_branch(branch, no_submit=args.no_submit)
-            check_codex_version(runner)
+            check_executor_version(runner)
         ensure_clean_start(
             runner,
             allow_dirty=args.allow_dirty or args.dry_run or resume,
@@ -935,17 +939,17 @@ def run_action_loop(args: argparse.Namespace, runner: CommandRunner) -> int:
 
     results: list[ActionResult] = []
     for item in pending:
-        result = run_codex_for_comment(
+        result = run_executor_for_comment(
             runner,
             item,
             repo=repo,
             base=args.base,
-            codex_model=args.codex_model,
-            codex_sandbox=args.codex_sandbox,
-            codex_approval=args.codex_approval,
+            executor_model=args.executor_model,
+            executor_sandbox=args.executor_sandbox,
+            executor_approval=args.executor_approval,
         )
-        # Order matters: commit BEFORE replying. A crash between codex and
-        # the reply leaves nothing on GitHub; a crash between commit and
+        # Order matters: commit BEFORE replying. A crash between the executor
+        # and the reply leaves nothing on GitHub; a crash between commit and
         # reply leaves a benign uncommented commit. Reply-before-commit
         # would create phantom-actioned threads that future sweeps would
         # silently skip even though no fix landed.
@@ -954,7 +958,7 @@ def run_action_loop(args: argparse.Namespace, runner: CommandRunner) -> int:
         if not args.no_reply:
             reply_to_comment(runner, repo=repo, result=result, branch=branch)
 
-    print(f"\nActioned {len(results)} Codex review comment(s).")
+    print(f"\nActioned {len(results)} PR review comment(s).")
     finalize_changes(
         runner,
         base_ref=f"origin/{args.base}",
@@ -969,13 +973,13 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
     for command in ("list", "run"):
         sub = subparsers.add_parser(command)
-        sub.add_argument("--repo", default=os.environ.get("CODEX_REVIEW_REPO"))
-        sub.add_argument("--base", default=os.environ.get("CODEX_REVIEW_BASE", "develop"))
-        sub.add_argument("--limit-prs", type=int, default=int(os.environ.get("CODEX_REVIEW_PR_LIMIT", "1000")))
-        sub.add_argument("--max-comments", type=int, default=int(os.environ.get("CODEX_REVIEW_MAX_COMMENTS", "0")))
-        sub.add_argument("--since", default=os.environ.get("CODEX_REVIEW_SINCE"))
-        sub.add_argument("--until", default=os.environ.get("CODEX_REVIEW_UNTIL"))
-        sub.add_argument("--author", action="append", default=list(DEFAULT_CODEX_AUTHORS))
+        sub.add_argument("--repo", default=os.environ.get("PR_REVIEW_REPO"))
+        sub.add_argument("--base", default=os.environ.get("PR_REVIEW_BASE", "develop"))
+        sub.add_argument("--limit-prs", type=int, default=int(os.environ.get("PR_REVIEW_PR_LIMIT", "1000")))
+        sub.add_argument("--max-comments", type=int, default=int(os.environ.get("PR_REVIEW_MAX_COMMENTS", "0")))
+        sub.add_argument("--since", default=os.environ.get("PR_REVIEW_SINCE"))
+        sub.add_argument("--until", default=os.environ.get("PR_REVIEW_UNTIL"))
+        sub.add_argument("--author", action="append", default=list(DEFAULT_REVIEW_AUTHORS))
     run_parser = subparsers.choices["run"]
     run_parser.add_argument("--dry-run", action="store_true")
     run_parser.add_argument("--allow-dirty", action="store_true")
@@ -991,12 +995,21 @@ def build_parser() -> argparse.ArgumentParser:
             "accepted. Use this after a crashed sweep to re-drive the routine."
         ),
     )
-    run_parser.add_argument("--codex-model", default=os.environ.get("CODEX_REVIEW_MODEL"))
     run_parser.add_argument(
-        "--codex-sandbox",
-        default=os.environ.get("CODEX_REVIEW_CODEX_SANDBOX", "workspace-write"),
+        "--executor-model",
+        default=os.environ.get("PR_REVIEW_EXECUTOR_MODEL"),
+        help="Optional model name passed through to the executor (`codex --model`).",
     )
-    run_parser.add_argument("--codex-approval", default=os.environ.get("CODEX_REVIEW_CODEX_APPROVAL", "never"))
+    run_parser.add_argument(
+        "--executor-sandbox",
+        default=os.environ.get("PR_REVIEW_EXECUTOR_SANDBOX", "workspace-write"),
+        help="Sandbox profile passed through to the executor (`codex --sandbox`).",
+    )
+    run_parser.add_argument(
+        "--executor-approval",
+        default=os.environ.get("PR_REVIEW_EXECUTOR_APPROVAL", "never"),
+        help="Approval policy passed through to the executor (`-c approval_policy=...`).",
+    )
     run_parser.add_argument("--commit-message", default=DEFAULT_COMMIT_MESSAGE)
     return parser
 

@@ -2,11 +2,11 @@
 # This makefile provides commands for building, testing and development
 
 PR_FANOUT_JOBS ?= 4
-CODEX_REVIEW_BASE ?= develop
-CODEX_REVIEW_PR_LIMIT ?= 1000
-CODEX_REVIEW_MAX_COMMENTS ?= 0
-CODEX_REVIEW_CODEX_SANDBOX ?= workspace-write
-CODEX_REVIEW_CODEX_APPROVAL ?= never
+PR_REVIEW_BASE ?= develop
+PR_REVIEW_PR_LIMIT ?= 1000
+PR_REVIEW_MAX_COMMENTS ?= 0
+PR_REVIEW_EXECUTOR_SANDBOX ?= workspace-write
+PR_REVIEW_EXECUTOR_APPROVAL ?= never
 POOL_SIZE ?= 10
 WORKTREE_POOL_PARENT ?= ..
 DEV_LOOP_METRICS_DAYS ?= 30
@@ -32,7 +32,7 @@ POOL_CLAIM_MARKER_STALE_SECONDS ?= 600
 # truth instead of repeating the four-deep nested expansion.
 POOL_REPO_CMD = basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"
 
-.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-status codex-pr-review-followups codex-pr-review-followups-list dev-loop-metrics worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-add worktree-list worktree-prune todo-reindex
+.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-status pr-review-followups pr-review-followups-list dev-loop-metrics worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-add worktree-list worktree-prune todo-reindex
 
 # Primary test commands using pytest marker system
 test: test-fast
@@ -762,7 +762,7 @@ release-finalize:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-fanout pr-refresh pr-conflict-scan pr-status codex-pr-review-followups codex-pr-review-followups-list dev-loop-metrics worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-release-locked worktree-pool-reset worktree-pool-reset-locked worktree-pool-sweep-stale worktree-pool-sweep-stale-locked worktree-pool-disk-clean worktree-add worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
+.PHONY: pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-release-locked worktree-pool-reset worktree-pool-reset-locked worktree-pool-sweep-stale worktree-pool-sweep-stale-locked worktree-pool-disk-clean worktree-add worktree-list worktree-prune todo-reindex blind-spots-list blind-spots-report blind-spots-sweep
 
 # Mirror the CI gate locally before pushing. Catches ~all CI failures
 # without the network roundtrip. Delegates to ci-lint so the local
@@ -899,52 +899,56 @@ pr-status:
 	@gh pr list --base develop --state open --limit 20 --json number,title,headRefName,statusCheckRollup,autoMergeRequest \
 		--template '{{range .}}#{{.number}} {{.title}} ({{.headRefName}}){{"\n"}}  auto-merge: {{if .autoMergeRequest}}ON{{else}}OFF{{end}}{{"\n"}}  checks: {{range .statusCheckRollup}}{{.name}}={{.conclusion}} {{end}}{{"\n\n"}}{{end}}'
 
-# Discover candidate Codex web-agent comments on merged PRs without making changes.
-codex-pr-review-followups-list:
-	@uv run --project _project/scripts -- python _project/scripts/codex_pr_review_followups.py list \
-		--base "$(CODEX_REVIEW_BASE)" \
-		--limit-prs "$(CODEX_REVIEW_PR_LIMIT)" \
-		--max-comments "$(CODEX_REVIEW_MAX_COMMENTS)" \
-		$(if $(CODEX_REVIEW_REPO),--repo "$(CODEX_REVIEW_REPO)") \
-		$(if $(CODEX_REVIEW_SINCE),--since "$(CODEX_REVIEW_SINCE)") \
-		$(if $(CODEX_REVIEW_UNTIL),--until "$(CODEX_REVIEW_UNTIL)")
+# Discover candidate bot/agent review comments on merged PRs without making changes.
+# Default --author filter is the chatgpt-codex-connector bot; override with --author
+# (or by editing DEFAULT_REVIEW_AUTHORS in the script) to add other reviewers.
+pr-review-followups-list:
+	@uv run --project _project/scripts -- python _project/scripts/pr_review_followups.py list \
+		--base "$(PR_REVIEW_BASE)" \
+		--limit-prs "$(PR_REVIEW_PR_LIMIT)" \
+		--max-comments "$(PR_REVIEW_MAX_COMMENTS)" \
+		$(if $(PR_REVIEW_REPO),--repo "$(PR_REVIEW_REPO)") \
+		$(if $(PR_REVIEW_SINCE),--since "$(PR_REVIEW_SINCE)") \
+		$(if $(PR_REVIEW_UNTIL),--until "$(PR_REVIEW_UNTIL)")
 
-# One-comment-at-a-time Codex follow-up loop for merged PR review findings.
-# Each actioned comment lands as its own commit *before* the GitHub marker
-# reply is posted, so a mid-sweep crash never leaves a phantom-actioned
-# thread on GitHub. After the loop, the routine runs pr-preflight and
-# opens one PR through the normal pr-open workflow.
+# One-comment-at-a-time follow-up loop for merged PR review findings from any
+# configured reviewer (default: chatgpt-codex-connector). The local executor is
+# the codex CLI but is isolated behind --executor-* flags. Each actioned
+# comment lands as its own commit *before* the GitHub marker reply is posted,
+# so a mid-sweep crash never leaves a phantom-actioned thread on GitHub. After
+# the loop, the routine runs pr-preflight and opens one PR through the normal
+# pr-open workflow.
 #
 # Useful overrides:
-#   CODEX_REVIEW_MAX_COMMENTS=N   cap an iteration batch
-#   CODEX_REVIEW_SINCE=YYYY-MM-DD scope by merged-at date
-#   CODEX_REVIEW_MODEL=<model>    choose the nested codex exec model
-#   CODEX_REVIEW_REPLY=0          skip GitHub replies. Only the literals
-#                                 0|false|no disable; anything else
-#                                 (including "1" or "true") is treated as
-#                                 the default, so the reply is posted.
-#   CODEX_REVIEW_SUBMIT=0         skip final pr-open. Same accepted values
-#                                 as CODEX_REVIEW_REPLY above.
-#   CODEX_REVIEW_RESUME=1         re-drive the routine on a branch that
-#                                 already carries per-comment commits from a
-#                                 prior crashed sweep. Implies --allow-dirty
-#                                 and skips comments already committed
-#                                 locally. Only the literals 1|true|yes
-#                                 enable it.
-codex-pr-review-followups:
-	@uv run --project _project/scripts -- python _project/scripts/codex_pr_review_followups.py run \
-		--base "$(CODEX_REVIEW_BASE)" \
-		--limit-prs "$(CODEX_REVIEW_PR_LIMIT)" \
-		--max-comments "$(CODEX_REVIEW_MAX_COMMENTS)" \
-		--codex-sandbox "$(CODEX_REVIEW_CODEX_SANDBOX)" \
-		--codex-approval "$(CODEX_REVIEW_CODEX_APPROVAL)" \
-		$(if $(CODEX_REVIEW_REPO),--repo "$(CODEX_REVIEW_REPO)") \
-		$(if $(CODEX_REVIEW_SINCE),--since "$(CODEX_REVIEW_SINCE)") \
-		$(if $(CODEX_REVIEW_UNTIL),--until "$(CODEX_REVIEW_UNTIL)") \
-		$(if $(CODEX_REVIEW_MODEL),--codex-model "$(CODEX_REVIEW_MODEL)") \
-		$(if $(filter 0 false no,$(CODEX_REVIEW_REPLY)),--no-reply) \
-		$(if $(filter 0 false no,$(CODEX_REVIEW_SUBMIT)),--no-submit) \
-		$(if $(filter 1 true yes,$(CODEX_REVIEW_RESUME)),--resume)
+#   PR_REVIEW_MAX_COMMENTS=N         cap an iteration batch
+#   PR_REVIEW_SINCE=YYYY-MM-DD       scope by merged-at date
+#   PR_REVIEW_EXECUTOR_MODEL=<name>  choose the executor model
+#   PR_REVIEW_REPLY=0                skip GitHub replies. Only the literals
+#                                    0|false|no disable; anything else
+#                                    (including "1" or "true") is treated as
+#                                    the default, so the reply is posted.
+#   PR_REVIEW_SUBMIT=0               skip final pr-open. Same accepted values
+#                                    as PR_REVIEW_REPLY above.
+#   PR_REVIEW_RESUME=1               re-drive the routine on a branch that
+#                                    already carries per-comment commits from
+#                                    a prior crashed sweep. Implies
+#                                    --allow-dirty and skips comments already
+#                                    committed locally. Only the literals
+#                                    1|true|yes enable it.
+pr-review-followups:
+	@uv run --project _project/scripts -- python _project/scripts/pr_review_followups.py run \
+		--base "$(PR_REVIEW_BASE)" \
+		--limit-prs "$(PR_REVIEW_PR_LIMIT)" \
+		--max-comments "$(PR_REVIEW_MAX_COMMENTS)" \
+		--executor-sandbox "$(PR_REVIEW_EXECUTOR_SANDBOX)" \
+		--executor-approval "$(PR_REVIEW_EXECUTOR_APPROVAL)" \
+		$(if $(PR_REVIEW_REPO),--repo "$(PR_REVIEW_REPO)") \
+		$(if $(PR_REVIEW_SINCE),--since "$(PR_REVIEW_SINCE)") \
+		$(if $(PR_REVIEW_UNTIL),--until "$(PR_REVIEW_UNTIL)") \
+		$(if $(PR_REVIEW_EXECUTOR_MODEL),--executor-model "$(PR_REVIEW_EXECUTOR_MODEL)") \
+		$(if $(filter 0 false no,$(PR_REVIEW_REPLY)),--no-reply) \
+		$(if $(filter 0 false no,$(PR_REVIEW_SUBMIT)),--no-submit) \
+		$(if $(filter 1 true yes,$(PR_REVIEW_RESUME)),--resume)
 
 dev-loop-metrics:
 	@set -e; \
@@ -1691,8 +1695,8 @@ help:
 	@echo "  make pr-fanout       Run pr-open across worktrees with bounded parallelism (PR_FANOUT_JOBS=$(PR_FANOUT_JOBS))"
 	@echo "  make pr-refresh      Merge origin/develop into current branch, push, and re-enable auto-merge"
 	@echo "  make pr-status       List your open PRs vs develop with CI + auto-merge state"
-	@echo "  make codex-pr-review-followups-list  List un-actioned Codex comments on merged PRs"
-	@echo "  make codex-pr-review-followups       Action each comment, reply with marker, submit PR"
+	@echo "  make pr-review-followups-list        List un-actioned bot/agent review comments on merged PRs"
+	@echo "  make pr-review-followups             Action each comment, reply with marker, submit PR"
 	@echo "  make dev-loop-metrics  Summarize recent develop post-merge metrics (DEV_LOOP_METRICS_DAYS=$(DEV_LOOP_METRICS_DAYS))"
 	@echo "Worktree-pool lifecycle (preferred for new write sessions):"
 	@echo "  make worktree-pool-init           Bootstrap retained pool worktrees (POOL_SIZE=$(POOL_SIZE))"
