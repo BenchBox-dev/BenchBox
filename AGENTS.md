@@ -6,6 +6,11 @@ Consistent tooling, safe defaults, minimal surprises.
 - Research before coding: read files, run tests, understand first
 - Run test suite after multi-file edits; review every find-replace in context
 - Stop on user interrupt/redirect
+- Review-shaped actions (review, audit, research, compare, to-spec, security
+  review, L2 blind-spot audit) are read-only plus local capture per the synced
+  `SHARED/review-protocol` skill. Captures may write designated local files and
+  must be surfaced with `Recorded: <path>`, but they do not authorize commit,
+  push, PR creation, or auto-merge.
 
 ## Tooling
 Use `rg`; read files in ≤250-line chunks. Always `uv run --` for Python tools. `make` wrappers OK. Run `benchbox --help` after dev install.

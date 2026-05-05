@@ -18,6 +18,7 @@ skills:
   - SHARED/context-guide
   - SHARED/debug-framework
   - SHARED/slicing-framework
+  - SHARED/review-protocol
   - skill-sync
   - tidy-perms
 targets:

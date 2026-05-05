@@ -11,7 +11,7 @@ description: Record a blind-spot audit finding to _project/blind-spots/ (file-fi
 
 ## Your task
 
-Follow `~/.claude/skills/SHARED/review-protocol.md` exactly. Apply §2
+Follow the synced `SHARED/review-protocol` skill exactly. Apply §2
 (defect gate) **before** anything else. If the gate triggers, refuse
 to file and offer the user the TODO / inline-fix / escalation menu
 described in SHARED §2. If the gate passes:
@@ -41,6 +41,6 @@ described in SHARED §2. If the gate passes:
 
 ## Notes
 
-Behavior is governed by `~/.claude/skills/SHARED/review-protocol.md`.
+Behavior is governed by `SHARED/review-protocol`.
 Storage is governed by `_project/blind-spots/README.md`. Don't restate
 either here.
