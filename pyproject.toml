@@ -28,7 +28,9 @@ dependencies = [
     "textcharts>=0.1.0",
     # sqlglot ships majors ~quarterly with dialect-translation breakage; cap to next major to catch
     # regressions in CI rather than silently in `uv sync`. Bump after validating on the new major.
-    "sqlglot>=20.0.0,<31.0.0",
+    # Floor is v25.6.0 — first release containing PR #3756, which preserves DuckDB
+    # GROUP/ORDER BY ALL as bare keywords under identify=True (was a BenchBox post-fixup).
+    "sqlglot>=25.6.0,<31.0.0",
     # CLI essentials
     # click: capped <9 - historically click majors rename decorators/context APIs.
     "click>=8.0.0,<9.0.0",

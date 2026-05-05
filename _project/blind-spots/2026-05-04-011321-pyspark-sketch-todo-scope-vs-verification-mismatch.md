@@ -1,17 +1,25 @@
 ---
 id: 2026-05-04-011321-pyspark-sketch-todo-scope-vs-verification-mismatch
 date: 2026-05-04
-status: open
+status: merged-to-todo
 finding_kind: scope-creep
 review_context: "/code review w2 prep / write-primitives-sketch-pyspark-dataframe-surface"
 related_paths:
   - _project/TODO/main/planning/write-primitives-sketch-pyspark-dataframe-surface.yaml
+  - _project/TODO/main/planning/write-primitives-sketch-pyspark-cli-integration.yaml
   - benchbox/core/write_primitives/benchmark.py
   - benchbox/core/write_primitives/catalog/operations.yaml
   - benchbox/core/write_primitives/dataframe_operations.py
 suggested_sweep: "decide whether the pyspark-dataframe-surface TODO is a 'primitives layer only' deliverable (current scope_limit) or includes the benchbox CLI wire-up (current verification commands); update one or the other so they agree"
-todo_id: write-primitives-sketch-pyspark-dataframe-surface
+todo_id: write-primitives-sketch-pyspark-cli-integration
 ---
+
+> **Update 2026-05-04**: the concrete CLI-wireup gap is now tracked in
+> `_project/TODO/main/planning/write-primitives-sketch-pyspark-cli-integration.yaml`.
+> The process learning ("watch for scope vs verification contradictions
+> when authoring TODOs") stays as a blind-spot for future-author hint;
+> the actionable closure is the new TODO.
+
 
 # pyspark-dataframe-surface TODO: scope_limit vs verification command contradict
 

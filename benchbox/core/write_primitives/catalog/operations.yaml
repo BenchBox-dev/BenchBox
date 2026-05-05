@@ -3114,29 +3114,47 @@ operations:
             FROM sketch_ops_daily_users
       # Storage-size validation: octet_length() of the merged sketch state
       # certifies the persisted bytes haven't regressed to zero or grown
-      # unbounded. Bounds tuned per engine because uniq's HLL++ encoding
-      # produces meaningfully different sizes than DataSketches Theta.
-      # Skipped on platforms whose merged-sketch byte length isn't
-      # interesting / accessible via the same shape.
-      - id: theta_storage_size
+      # unbounded. Split into two engine-specific validations so each engine
+      # gets bounds tight enough to flag material regressions (a wide
+      # cross-engine envelope would let DuckDB grow 5x silently before
+      # alarming). Each variant skips all non-target engines via explicit
+      # null overrides.
+      - id: theta_storage_size_duckdb
         sql: |
           SELECT octet_length(datasketch_theta(user_sketch)) AS sketch_bytes
           FROM sketch_ops_daily_users
-        # Bounds span both engines' observed merged-state sizes:
-        #   DuckDB DataSketches Theta lg_k=12 → ~16KB
-        #   ClickHouse uniq HLL++ default precision → ~60KB (verified chDB)
-        # Wide enough to absorb encoding drift on either family, tight
-        # enough to flag a sketch becoming a no-op (size 0) or growing
-        # unboundedly. Per-engine tightening can land in a follow-up.
+        # DuckDB DataSketches Theta lg_k=12 → ~16KB merged at SF=0.01.
+        # Bounds tight enough to flag a 2x growth (e.g. accidental lg_k=14
+        # bump) while tolerating modest encoding-format drift.
         expected_value_min: 4000
+        expected_value_max: 32000
+        platform_overrides:
+          clickhouse: null
+          databricks: null
+          snowflake: null
+          bigquery: null
+          redshift: null
+          datafusion: null
+          sqlite: null
+          starrocks: null
+      - id: theta_storage_size_clickhouse
+        # Default sql is ClickHouse-only; every non-clickhouse engine is
+        # explicitly skipped below so the default body is never executed
+        # off-target. ClickHouse AggregateFunction columns aren't a
+        # length() input directly; toString() serializes the merged state
+        # to its bytes-of-string representation, which is correlated with
+        # but not identical to the on-disk binary state size — stable
+        # enough for regression detection across runs.
+        sql: |
+          SELECT length(toString(uniqMergeState(user_sketch))) AS sketch_bytes
+          FROM sketch_ops_daily_users
+        # ClickHouse uniq HLL++ default precision → ~60KB (verified chDB).
+        # Bounds tight enough that a regression to <16KB or growth past
+        # 100KB alarms; wide enough to absorb encoding drift.
+        expected_value_min: 16000
         expected_value_max: 100000
         platform_overrides:
-          # ClickHouse AggregateFunction columns aren't a length() input;
-          # toString() serializes the merged state to its bytes-of-string
-          # representation which is what we want to measure.
-          clickhouse: |
-            SELECT length(toString(uniqMergeState(user_sketch))) AS sketch_bytes
-            FROM sketch_ops_daily_users
+          duckdb: null
           databricks: null
           snowflake: null
           bigquery: null
@@ -3268,23 +3286,36 @@ operations:
           clickhouse: |
             SELECT quantileTDigestMerge(0.5)(price_sketch) AS median_price
             FROM sketch_ops_kll_partitions
-      - id: kll_storage_size
+      # See theta_storage_size_duckdb above for why the storage-size check
+      # is split into per-engine variants — same rationale here.
+      - id: kll_storage_size_duckdb
         sql: |
           SELECT octet_length(datasketch_kll(200, price_sketch::sketch_kll_double)) AS sketch_bytes
           FROM sketch_ops_kll_partitions
-        # DuckDB DataSketches KLL k=200 merged state observed ~3KB at
-        # SF=0.01. Bounds intentionally wide enough to absorb encoding
-        # drift but tight enough to catch a no-op regression.
+        # DuckDB DataSketches KLL k=200 → ~3KB merged at SF=0.01.
+        # Tight bounds to flag any 2x growth without false-failing on
+        # within-family encoding drift.
         expected_value_min: 1000
+        expected_value_max: 6000
+        platform_overrides:
+          clickhouse: null
+          databricks: null
+          snowflake: null
+          bigquery: null
+          redshift: null
+          datafusion: null
+          sqlite: null
+          starrocks: null
+      - id: kll_storage_size_clickhouse
+        sql: |
+          SELECT length(toString(quantileTDigestMergeState(0.5)(price_sketch))) AS sketch_bytes
+          FROM sketch_ops_kll_partitions
+        # ClickHouse quantileTDigest at compression=100 → ~3.8KB merged
+        # (verified chDB, SF=0.01). Bounds tight to its observed range.
+        expected_value_min: 1500
         expected_value_max: 8000
         platform_overrides:
-          # ClickHouse quantileTDigest merged state observed ~3.8KB in
-          # spike (chDB, SF=0.01); compression=100 produces similar bytes
-          # to KLL k=200, fitting inside the DuckDB bounds. Use toString()
-          # because length() doesn't accept an AggregateFunction directly.
-          clickhouse: |
-            SELECT length(toString(quantileTDigestMergeState(0.5)(price_sketch))) AS sketch_bytes
-            FROM sketch_ops_kll_partitions
+          duckdb: null
           databricks: null
           snowflake: null
           bigquery: null
@@ -3386,22 +3417,36 @@ operations:
           clickhouse: |
             SELECT length(topKMerge(8)(topk_sketch)) AS frequent_count
             FROM sketch_ops_topk
-      - id: topk_storage_size
+      # See theta_storage_size_duckdb above for why the storage-size check
+      # is split into per-engine variants.
+      - id: topk_storage_size_duckdb
         sql: |
           SELECT octet_length(datasketch_frequent_items(8, topk_sketch)) AS sketch_bytes
           FROM sketch_ops_topk
         # DuckDB DataSketches frequent-items lg_max_map_size=8 (256 buckets)
-        # merged state observed ~600 bytes at SF=0.01.
-        expected_value_min: 200
-        expected_value_max: 2000
+        # → ~600B merged at SF=0.01.
+        expected_value_min: 300
+        expected_value_max: 1200
         platform_overrides:
-          # ClickHouse topK(8) merged state observed ~294 bytes in spike
-          # (chDB, SF=0.01); much smaller than DataSketches frequent-items
-          # but fits inside the DuckDB bounds. Use toString() because
-          # length() doesn't accept an AggregateFunction directly.
-          clickhouse: |
-            SELECT length(toString(topKMergeState(8)(topk_sketch))) AS sketch_bytes
-            FROM sketch_ops_topk
+          clickhouse: null
+          databricks: null
+          snowflake: null
+          bigquery: null
+          redshift: null
+          datafusion: null
+          sqlite: null
+          starrocks: null
+      - id: topk_storage_size_clickhouse
+        sql: |
+          SELECT length(toString(topKMergeState(8)(topk_sketch))) AS sketch_bytes
+          FROM sketch_ops_topk
+        # ClickHouse topK(8) merged state → ~294B at SF=0.01 (verified chDB).
+        # Tighter than the DataSketches frequent-items size; still loose
+        # enough to absorb encoding drift.
+        expected_value_min: 150
+        expected_value_max: 800
+        platform_overrides:
+          duckdb: null
           databricks: null
           snowflake: null
           bigquery: null

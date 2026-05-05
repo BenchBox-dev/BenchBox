@@ -152,10 +152,7 @@ def _resolve_validation_sql(val_query: Any, platform_key: str | None) -> tuple[s
     not "failed"). Mirrors `_get_effective_write_sql` for the operation-level
     overrides.
     """
-    # `getattr` with a default is intentional defensive coding — test fixtures
-    # mock val_query as MagicMock without the new field, and production callers
-    # always have the dataclass-default empty dict.
-    overrides = getattr(val_query, "platform_overrides", None) or {}
+    overrides = val_query.platform_overrides or {}
     if not platform_key or platform_key not in overrides:
         return val_query.sql, None
     override = overrides[platform_key]

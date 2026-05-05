@@ -40,6 +40,7 @@ def _make_val_query(
         expected_rows=expected_rows,
         expected_rows_min=expected_rows_min,
         expected_rows_max=expected_rows_max,
+        platform_overrides={},
     )
 
 

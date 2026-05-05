@@ -20,6 +20,24 @@ inline review threads has accumulated on merged PRs). Each sweep produces:
 3. Optional cross-links from in-window blind-spots filed under
    `_project/blind-spots/YYYY-MM-DD-*` to the TODO
 
+For routine single-pass cleanup, prefer the automated Make routine before
+creating another manual inventory:
+
+```bash
+# Preview the candidate queue.
+make codex-pr-review-followups-list CODEX_REVIEW_SINCE=YYYY-MM-DD CODEX_REVIEW_UNTIL=YYYY-MM-DD
+
+# In a feature worktree, action each queued comment, reply with the
+# BenchBox action marker, run preflight, and open the batched PR.
+make codex-pr-review-followups CODEX_REVIEW_SINCE=YYYY-MM-DD CODEX_REVIEW_UNTIL=YYYY-MM-DD
+```
+
+The routine uses the same judgment rules below: it verifies current behavior
+before editing, treats stale-but-fixed threads as no-current-action, preserves
+historical DONE verification commands when they are still executable
+documentation, and skips future reprocessing only after it has posted a reply
+containing the `benchbox-codex-review-followup-actioned` marker.
+
 ## Required scope axes
 
 The frame "unresolved Codex review threads from PRs #N–#M" is good at

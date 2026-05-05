@@ -945,6 +945,9 @@ class DataFrameWriteOperationsManager:
 
         start_time = time.time()
         target_path = Path(target_path)
+        # Track whether we created the directory ourselves so a failed persist
+        # doesn't leak an empty directory onto disk for the caller to clean up.
+        target_existed_before = target_path.exists()
         try:
             state_df = state_builder()
             target_path.mkdir(parents=True, exist_ok=True)
@@ -963,6 +966,12 @@ class DataFrameWriteOperationsManager:
             )
         except Exception as e:
             self.logger.error(f"AGGREGATE_PERSIST failed: {e}")
+            if not target_existed_before and target_path.exists():
+                try:
+                    if not any(target_path.iterdir()):
+                        target_path.rmdir()
+                except OSError:
+                    pass
             return DataFrameWriteResult.failure(
                 WriteOperationType.AGGREGATE_PERSIST,
                 str(e),
@@ -1105,6 +1114,12 @@ def pyspark_supports_approx_top_k(spark_session: Any) -> bool:
     BenchBox's PySpark adapter targets Spark 3.5+, so callers must guard
     top-K aggregate-state ops on the runtime version. Returns False on
     older Spark versions or when the function symbol is not available.
+
+    Note: this is a conservative version-then-attribute check. If a
+    distribution backports `approx_top_k_accumulate` to a 3.5.x build,
+    the `< (4, 1)` gate rejects it spuriously — callers in that
+    environment should bypass this guard or file a TODO to add the
+    backport-detection branch.
 
     Args:
         spark_session: A SparkSession.
