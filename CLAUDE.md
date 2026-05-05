@@ -2,7 +2,7 @@
 
 → **See AGENTS.md for full guidance.** Claude Code-specific shortcuts only.
 
-**Critical rules**: Always `uv run` (never bare `python`/`pytest`/`ruff`/`ty`). Never `git add -A`. Dev PRs target `develop`, never `main` (`main` is release-only and `develop` is PR-gated — no direct push to either). **All agent edits and commits happen in a worktree off `develop`. If a session begins in the main clone (`/Users/joe/Developer/BenchBox`), creating a worktree is the FIRST action (see "Session start" below). Never `git checkout`/`switch`/`branch -m` in the main clone without explicit user approval — that clone stays on `develop`.** TPC-DS SF<1 requires the patched dsdgen bundled with BenchBox (stock dsdgen crashes at SF<1; see `patch-and-redistribute-tpcds-dsdgen-subscale-support`). No `-o "addopts="` with pytest.
+**Critical rules**: Always `uv run` (never bare `python`/`pytest`/`ruff`/`ty`). Never `git add -A`. Dev PRs target `develop`, never `main` (`main` is release-only and `develop` is PR-gated — no direct push to either). **All agent edits and commits happen in a worktree off `develop`. If a session begins in the main clone (`/Users/joe/Developer/BenchBox`), creating a worktree is the FIRST action (see "Session start" below). Never `git checkout`/`switch`/`branch -m` in the main clone without explicit user approval — that clone stays on `develop`.** **Never open a PR or enable auto-merge as a side-effect of a review, audit, or research action — see `~/.claude/skills/SHARED/review-protocol.md` §1. Landing changes requires explicit user authorization in a separate turn; this fires before any "auto-commit" or "file-first capture" mandate elsewhere.** TPC-DS SF<1 requires the patched dsdgen bundled with BenchBox (stock dsdgen crashes at SF<1; see `patch-and-redistribute-tpcds-dsdgen-subscale-support`). No `-o "addopts="` with pytest.
 
 ## Session start
 
@@ -191,30 +191,25 @@ during the single-repo migration).
   (`_project/`, `_blog/`, agent configs, etc.) live only on develop by
   design. Full runbook: `docs/operations/release-guide.md`.
 
-## Review workflow — blind-spot capture (mandatory)
+## Review workflow — blind-spot capture
 
-When you produce a **Blind-Spot Audit (L2)** during any review (ultrareview,
-`/review`, ad-hoc code review, research, planning), you MUST:
+Behavior is governed by `~/.claude/skills/SHARED/review-protocol.md`. When
+that protocol authorizes a blind-spot capture, BenchBox bindings are:
 
-1. **Write the finding to disk first** at
-   `_project/blind-spots/YYYY-MM-DD-HHMMSS-<slug>.md`, using the frontmatter
-   schema and body shape in `_project/blind-spots/README.md`.
-2. **Then** quote the finding in your chat reply, prefixed with one line:
-   `Recorded: _project/blind-spots/<file>.md`.
+- Path: `_project/blind-spots/YYYY-MM-DD-HHMMSS-<slug>.md`
+- Schema: see `_project/blind-spots/README.md` (storage spec)
+- Validate: `uv run --project _project/scripts -- python _project/scripts/validate_blind_spot.py _project/blind-spots/<file>.md`
+- Sweep: `make blind-spots-{list,report,sweep}` — promotion to TODO is a sweep-step decision
+- Chat marker: prefix the body quote with `Recorded: _project/blind-spots/<file>.md`
 
-Do not skip the file write because the finding "feels minor" — sweep-time
-triage is where dismissals belong, not write-time. Findings printed only in
-chat get lost; file-first capture is what makes the L2 audit habit pay off.
-If a review response contains an L2 audit without a `Recorded:` pointer for
-each finding, treat the response as protocol drift and record the missing
-finding before continuing.
+Per SHARED §4, the capture is local-only: do not commit beyond the
+capture file, do not push, do not run `make pr-open`. The user
+authorizes any PR in a separate turn. Apply the SHARED §2 defect gate
+before recording — defects belong in the severity table and TODOs, not
+in the blind-spots directory.
 
-Sweep / triage findings with `make blind-spots-{list,report,sweep}`. Promotion
-to a TODO is a sweep-step decision, not a write-step decision. See
-`_project/blind-spots/README.md` for the full protocol.
-
-The `/blind-spot` slash command (`.claude/commands/blind-spot.md`) wraps the
-file-first capture flow when you want to record one explicitly outside a review.
+The `/blind-spot` slash command (`.claude/commands/blind-spot.md`) is the
+explicit-recording entrypoint and follows the same protocol.
 
 ## Commands
 

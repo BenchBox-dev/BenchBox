@@ -1,36 +1,18 @@
 # Blind-Spot Findings
 
-Centralized capture for **blind-spot audit (L2)** findings produced during
-reviews — observations that *may* warrant action but haven't been triaged yet.
+Storage for **blind-spot audit (L2)** findings: framework gaps, post-fix
+pattern notes, and dormant assumptions. One file per finding, sweepable
+later without PR merge collisions.
 
-This directory exists because audit findings printed only in chat get lost.
-Persisting each finding as its own file makes the backlog sweepable later
-without creating PR merge collisions.
+## Behavior is governed elsewhere
 
----
-
-## What goes here
-
-A finding belongs in this directory when it surfaces:
-
-- A **gap in a review framework** that was used (axis missing, dimension
-  the rubric can't capture).
-- A **bug class** behind a reported instance (the symptom was fixed, but
-  the underlying pattern probably exists elsewhere).
-- A **scope-creep flag** — work that wasn't requested but might be load-bearing.
-- An **assumption worth testing later** — something that was true at audit
-  time but might decay.
-- Anything else that came out of a Blind-Spot Audit (L2) section in a review.
-
-### What does NOT go here
-
-- Concrete actionable bugs with a clear owner → make a TODO.
-- Architectural decisions → `_project/decisions/` (ADRs).
-- Full reviews / audits → `_project/audits/`.
-- Random ideas / brainstorming → `_project/notes/`.
-
-If unsure, write the finding here. The sweep step is where dismissals happen,
-not the write step.
+The rules for **when** to write a finding here, **what** counts as a
+blind spot vs a defect, and **what** capture authorizes (and does not
+authorize) live in `~/.claude/skills/SHARED/review-protocol.md`. This
+README documents only **storage**: frontmatter schema, file naming,
+validation, and sweep workflow. Defects (anything that materially
+affects correctness, performance, or security) go to TODOs, not here —
+see SHARED §2.
 
 ---
 
@@ -110,13 +92,12 @@ the top-level title plus the three required `##` sections below.
 
 ## How findings get written
 
-Project `CLAUDE.md` binds Claude Code's L2 audits to this directory:
-when an L2 audit is generated during any review, the audit is **written to
-disk first**, then quoted in the chat response. The chat output becomes a
-view of the persisted file, not a separate ephemeral artifact.
-
-Humans (and other agents) can also invoke the `/blind-spot` slash command
-to record one explicitly.
+Behavior governed by `~/.claude/skills/SHARED/review-protocol.md` §4.
+When that protocol authorizes a capture, the file is written here on
+the local branch and surfaced in chat with a `Recorded: <path>` line.
+The capture is local-only — it does not authorize a commit beyond the
+file, a push, or a PR. Use the `/blind-spot` slash command for explicit
+recording.
 
 ---
 
