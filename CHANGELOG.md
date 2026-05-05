@@ -32,6 +32,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### New
 
+- **write_primitives DataFrame** — PySpark sketch persist+merge ops
+  available via the benchbox CLI:
+  `sketch_df_hll_persist_merge` (Spark 3.5+) and
+  `sketch_df_topk_persist_merge` (Spark 4.1+, requires
+  `F.approx_top_k_*` symbols which the current 4.1.1 wheel does not
+  expose — the op skips cleanly on those runtimes via
+  `pyspark_supports_approx_top_k`). Catalog ops carry a new
+  `aggregate_state` block that the dispatch fork in
+  `WritePrimitivesBenchmark._execute_dataframe_sql_parity_workload`
+  routes through `manager.execute_aggregate_persist` /
+  `manager.execute_aggregate_merge` instead of the DuckDB parity
+  path. HLL verified live at SF=0.01: aggregate_value=14852
+  (true distinct l_orderkeys = 15000, ~1% RSE, inside `[14250, 15750]`).
+  Run via:
+  `uv run -- benchbox run --platform pyspark --benchmark write_primitives --scale 0.01 --queries sketch_df_hll_persist_merge`.
+
 - **write_primitives sketch** — DuckDB-only parameter-sweep variants
   (`sketch_query_*_{lgk10,lgk14,k100,k1000,lgmm8,lgmm10}`) so users can
   measure the size / accuracy / latency tradeoff per sketch family

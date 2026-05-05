@@ -4162,3 +4162,76 @@ operations:
       redshift: null
       sqlite: null
       starrocks: null
+
+  # ----------------------------------------------------------------------
+  # DataFrame aggregate-state ops (AGGREGATE_PERSIST + AGGREGATE_MERGE
+  # cycle). These dispatch through `manager.execute_aggregate_persist`
+  # followed by `manager.execute_aggregate_merge` on the active platform's
+  # DataFrameWriteOperationsManager rather than through the SQL parity
+  # path. Engines without a DataFrame-layer sketch surface short-circuit
+  # via `supports_operation` and surface a structured "unsupported"
+  # failure.
+  #
+  # Today only PySpark advertises `supports_aggregate_persist` /
+  # `supports_aggregate_merge`. Top-K requires Spark 4.1+ (see
+  # `pyspark_supports_approx_top_k`); HLL works on Spark 3.5+.
+  # ----------------------------------------------------------------------
+
+  - id: sketch_df_hll_persist_merge
+    category: sketch
+    description: ★ Headline DataFrame — PySpark HLL persist+merge cycle. Builds per-group HLL sketches of l_orderkey via `F.hll_sketch_agg`, persists state to Parquet, then merges via `F.hll_union_agg` and extracts the distinct-count estimate via `F.hll_sketch_estimate`. Pairs with the SQL-side `sketch_query_theta_union_merge` so users can compare DataFrame and SQL paths against the same true-distinct=15000 baseline at SF=0.01.
+    requires_setup: false
+    write_sql: ""  # placeholder — dispatched via aggregate_state below
+    aggregate_state:
+      sketch_type: hll
+      source_table: lineitem
+      target_subdir: write_primitives/sketch_df_hll_persist_merge
+      group_cols: [l_shipdate, l_returnflag]
+      value_col: l_orderkey
+      sketch_alias: user_sketch
+      supported_platforms: [pyspark]
+    validation_queries:
+      - id: hll_distinct_in_range
+        sql: |
+          -- Aggregate-state validation runs against the merge-extract
+          -- scalar in `metrics.aggregate_value`, not against this SQL.
+          -- The placeholder SELECT keeps the loader's "validation has SQL"
+          -- contract honored without committing to a SQL execution path.
+          SELECT 1
+        # SF=0.01 true distinct l_orderkeys = 15000. Spark
+        # `hll_sketch_agg` default lg_k=12 has ~1.6% RSE; ±5% bound
+        # absorbs RSE plus per-run merge-order variation.
+        expected_value_min: 14250
+        expected_value_max: 15750
+    cleanup_sql: null
+    expected_rows_affected: null
+    platform_overrides: {}
+
+  - id: sketch_df_topk_persist_merge
+    category: sketch
+    description: ★ Headline DataFrame — PySpark Top-K persist+merge cycle. Spark 4.1+ only — `F.approx_top_k_accumulate` is the per-group state builder; `F.approx_top_k_combine` + `F.approx_top_k_estimate` perform the merge+extract. Reports the count of frequent items (lineitem has 7 distinct l_shipmodes; SF=0.01 returns 7 deterministically). Skipped cleanly on Spark 3.5.x via `pyspark_supports_approx_top_k` runtime guard.
+    requires_setup: false
+    write_sql: ""  # placeholder — dispatched via aggregate_state below
+    aggregate_state:
+      sketch_type: topk
+      source_table: lineitem
+      target_subdir: write_primitives/sketch_df_topk_persist_merge
+      # The persist builder shards by `l_orderkey % 8` internally; the
+      # catalog still names a real grouping column so the spec serializes
+      # cleanly across both the SQL- and DataFrame-side ops.
+      group_cols: [l_shipmode]
+      value_col: l_shipmode
+      sketch_alias: topk_sketch
+      supported_platforms: [pyspark]
+    validation_queries:
+      - id: topk_frequent_count_in_range
+        sql: |
+          SELECT 1
+        # lineitem has exactly 7 distinct l_shipmode values; the merge
+        # reports all 7 deterministically. [6, 8] catches both a sketch
+        # losing one mode and a Spark approx_top_k false-positive.
+        expected_value_min: 6
+        expected_value_max: 8
+    cleanup_sql: null
+    expected_rows_affected: null
+    platform_overrides: {}

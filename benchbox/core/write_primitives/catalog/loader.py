@@ -48,6 +48,31 @@ class ValidationQuery:
 
 
 @dataclass(frozen=True)
+class AggregateStateSpec:
+    """Catalog spec for an AGGREGATE_PERSIST/MERGE DataFrame op.
+
+    SQL ops carry their work in `write_sql`; aggregate-state DataFrame
+    ops instead declare a small spec the runtime uses to instantiate
+    the appropriate factory builder + merge-extract pair from
+    `dataframe_operations.py`. The benchmark dispatch fork inspects the
+    op for an `aggregate_state` block, calls the correct factory, then
+    runs `manager.execute_aggregate_persist` followed by
+    `manager.execute_aggregate_merge` and rolls the two
+    `DataFrameWriteResult`s into the operation envelope.
+    """
+
+    sketch_type: str  # "hll" | "topk"
+    source_table: str  # e.g. "lineitem"
+    target_subdir: str  # relative path under the run output dir
+    group_cols: list[str] = field(default_factory=list)
+    value_col: str = ""
+    sketch_alias: str = "sketch"
+    # Platforms this op supports. Other platforms surface a structured
+    # "unsupported" failure via DataFrameWriteOperationsManager.
+    supported_platforms: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class WriteOperation:
     """Representation of a single write operation entry."""
 
@@ -61,6 +86,12 @@ class WriteOperation:
     file_dependencies: list[str] = field(default_factory=list)
     platform_overrides: dict[str, str] = field(default_factory=dict)
     requires_setup: bool = True  # Whether operation requires staging tables to be set up
+    # Optional aggregate-state spec. When present, this op is dispatched
+    # through `manager.execute_aggregate_persist` + `execute_aggregate_merge`
+    # rather than the SQL parity path; `write_sql` may be a placeholder
+    # string but is preserved so existing tooling that introspects ops
+    # by SQL body keeps working.
+    aggregate_state: AggregateStateSpec | None = None
 
 
 @dataclass(frozen=True)
@@ -221,6 +252,64 @@ def _parse_optional_scalars(operation_id: str, entry: dict) -> tuple[str | None,
     return cleanup_sql, expected_rows_affected
 
 
+def _parse_aggregate_state(operation_id: str, raw: object) -> AggregateStateSpec | None:
+    """Parse the optional `aggregate_state` block on a catalog op.
+
+    Aggregate-state ops dispatch through the DataFrame manager's
+    `execute_aggregate_persist` / `execute_aggregate_merge` paths
+    instead of the SQL parity runner. Returning None means "this op is
+    a normal SQL op."
+    """
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise WritePrimitivesCatalogError(f"Catalog entry '{operation_id}' aggregate_state must be a mapping")
+    sketch_type = raw.get("sketch_type")
+    if sketch_type not in ("hll", "topk"):
+        raise WritePrimitivesCatalogError(
+            f"Catalog entry '{operation_id}' aggregate_state.sketch_type must be 'hll' or 'topk'"
+        )
+    source_table = raw.get("source_table")
+    if not isinstance(source_table, str) or not source_table.strip():
+        raise WritePrimitivesCatalogError(
+            f"Catalog entry '{operation_id}' aggregate_state.source_table must be a non-empty string"
+        )
+    target_subdir = raw.get("target_subdir")
+    if not isinstance(target_subdir, str) or not target_subdir.strip():
+        raise WritePrimitivesCatalogError(
+            f"Catalog entry '{operation_id}' aggregate_state.target_subdir must be a non-empty string"
+        )
+    raw_group_cols = raw.get("group_cols", [])
+    if not isinstance(raw_group_cols, list) or not all(isinstance(col, str) and col.strip() for col in raw_group_cols):
+        raise WritePrimitivesCatalogError(
+            f"Catalog entry '{operation_id}' aggregate_state.group_cols must be a list of non-empty strings"
+        )
+    value_col = raw.get("value_col")
+    if not isinstance(value_col, str) or not value_col.strip():
+        raise WritePrimitivesCatalogError(
+            f"Catalog entry '{operation_id}' aggregate_state.value_col must be a non-empty string"
+        )
+    sketch_alias = raw.get("sketch_alias", "sketch")
+    if not isinstance(sketch_alias, str) or not sketch_alias.strip():
+        raise WritePrimitivesCatalogError(
+            f"Catalog entry '{operation_id}' aggregate_state.sketch_alias must be a non-empty string"
+        )
+    raw_supported = raw.get("supported_platforms", [])
+    if not isinstance(raw_supported, list) or not all(isinstance(p, str) and p.strip() for p in raw_supported):
+        raise WritePrimitivesCatalogError(
+            f"Catalog entry '{operation_id}' aggregate_state.supported_platforms must be a list of non-empty strings"
+        )
+    return AggregateStateSpec(
+        sketch_type=sketch_type,
+        source_table=source_table.strip(),
+        target_subdir=target_subdir.strip(),
+        group_cols=[col.strip() for col in raw_group_cols],
+        value_col=value_col.strip(),
+        sketch_alias=sketch_alias.strip(),
+        supported_platforms=[p.strip() for p in raw_supported],
+    )
+
+
 def _parse_operation_entry(index: int, entry: object, existing_ids: set[str]) -> WriteOperation:
     if not isinstance(entry, dict):
         raise WritePrimitivesCatalogError(f"Catalog entry at index {index} must be a mapping")
@@ -243,9 +332,22 @@ def _parse_operation_entry(index: int, entry: object, existing_ids: set[str]) ->
         raise WritePrimitivesCatalogError(f"Catalog entry '{operation_id}' must include a description")
     description = description.strip()
 
+    aggregate_state = _parse_aggregate_state(operation_id, entry.get("aggregate_state"))
+
     write_sql = entry.get("write_sql")
-    if not isinstance(write_sql, str) or not write_sql.strip():
-        raise WritePrimitivesCatalogError(f"Catalog entry '{operation_id}' must include non-empty write_sql")
+    if aggregate_state is None:
+        if not isinstance(write_sql, str) or not write_sql.strip():
+            raise WritePrimitivesCatalogError(f"Catalog entry '{operation_id}' must include non-empty write_sql")
+    else:
+        # Aggregate-state ops route through the DataFrame manager rather than
+        # SQL execution; tolerate a placeholder write_sql for tooling that
+        # introspects the catalog by SQL body.
+        if write_sql is None:
+            write_sql = ""
+        if not isinstance(write_sql, str):
+            raise WritePrimitivesCatalogError(
+                f"Catalog entry '{operation_id}' write_sql must be a string when aggregate_state is set"
+            )
 
     cleanup_sql, expected_rows_affected = _parse_optional_scalars(operation_id, entry)
 
@@ -272,6 +374,7 @@ def _parse_operation_entry(index: int, entry: object, existing_ids: set[str]) ->
         file_dependencies=file_dependencies,
         platform_overrides=platform_overrides,
         requires_setup=requires_setup,
+        aggregate_state=aggregate_state,
     )
 
 
@@ -308,6 +411,7 @@ __all__ = [
     "WriteOperationsCatalog",
     "WriteOperation",
     "ValidationQuery",
+    "AggregateStateSpec",
     "WritePrimitivesCatalogError",
     "load_write_primitives_catalog",
 ]
