@@ -14,6 +14,7 @@ import argparse
 import datetime as dt
 import json
 import os
+import re
 import subprocess
 import sys
 import textwrap
@@ -23,8 +24,12 @@ from typing import Any, Sequence
 
 DEFAULT_CODEX_AUTHORS = ("chatgpt-codex-connector[bot]", "chatgpt-codex-connector")
 ACTION_MARKER = "benchbox-codex-review-followup-actioned"
+ACTION_MARKER_REGEX = re.compile(rf"(?m)^<!--\s*{re.escape(ACTION_MARKER)}\b")
 DEFAULT_COMMIT_MESSAGE = "fix: address stale Codex PR review follow-ups"
-MAX_REPLY_SUMMARY_CHARS = 1800
+PER_COMMENT_COMMIT_PREFIX = "fix(codex-followup)"
+MAX_REPLY_SUMMARY_CHARS = 8000
+PROMPT_TEMPLATE_PATH = Path(__file__).resolve().parent / "prompts" / "codex_pr_review_followup.md"
+MIN_CODEX_VERSION = (0, 20, 0)
 
 
 @dataclass(frozen=True)
@@ -224,6 +229,12 @@ def review_comment_from_api(item: dict[str, Any]) -> ReviewComment:
 
 
 def fetch_pr_review_comments(runner: CommandRunner, *, repo: str, pr_number: int) -> list[ReviewComment]:
+    """REST fallback: fetch review comments for a single PR.
+
+    Used when the GraphQL batch path is not viable (e.g. tests injecting a
+    minimal recording runner). Production runs go through
+    `fetch_review_comments_batched`.
+    """
     rows = gh_json_lines(
         runner,
         [
@@ -238,14 +249,138 @@ def fetch_pr_review_comments(runner: CommandRunner, *, repo: str, pr_number: int
     return [review_comment_from_api(row) for row in rows]
 
 
+REVIEW_COMMENTS_GRAPHQL_QUERY = """
+query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 50, after: $cursor) {
+        pageInfo { hasNextPage endCursor }
+        nodes {
+          comments(first: 100) {
+            nodes {
+              databaseId
+              body
+              path
+              url
+              createdAt
+              diffHunk
+              line
+              originalLine
+              originalCommit { oid }
+              commit { oid }
+              replyTo { databaseId }
+              author { login }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+""".strip()
+
+
+def _graphql_comment_to_api_shape(node: dict[str, Any]) -> dict[str, Any]:
+    author = node.get("author") or {}
+    reply_to = node.get("replyTo") or {}
+    original_commit = node.get("originalCommit") or {}
+    commit = node.get("commit") or {}
+    return {
+        "id": node.get("databaseId"),
+        "body": node.get("body") or "",
+        "path": node.get("path") or "",
+        "html_url": node.get("url") or "",
+        "user": {"login": author.get("login") or ""},
+        "created_at": node.get("createdAt") or "",
+        "diff_hunk": node.get("diffHunk") or "",
+        "in_reply_to_id": reply_to.get("databaseId"),
+        "original_commit_id": original_commit.get("oid"),
+        "commit_id": commit.get("oid"),
+        "line": node.get("line"),
+        "original_line": node.get("originalLine"),
+    }
+
+
+def fetch_review_comments_via_graphql(
+    runner: CommandRunner, *, repo: str, pr_number: int
+) -> list[ReviewComment] | None:
+    """Fetch one PR's review comments via a single GraphQL request (paginated).
+
+    Returns None if the GraphQL endpoint is unavailable in this environment
+    (the caller falls back to the REST path). Each merged PR still costs one
+    GraphQL roundtrip, but each roundtrip pulls every thread + comment for
+    that PR — replacing the prior per-page REST chain.
+    """
+    owner, _, name = repo.partition("/")
+    if not owner or not name:
+        return None
+
+    cursor: str | None = None
+    rows: list[dict[str, Any]] = []
+    while True:
+        args = [
+            "gh",
+            "api",
+            "graphql",
+            "-f",
+            f"query={REVIEW_COMMENTS_GRAPHQL_QUERY}",
+            "-F",
+            f"owner={owner}",
+            "-F",
+            f"name={name}",
+            "-F",
+            f"number={pr_number}",
+        ]
+        if cursor is not None:
+            args.extend(["-F", f"cursor={cursor}"])
+        result = runner.run(args)
+        if result.returncode != 0:
+            return None
+        try:
+            payload = json.loads(result.stdout) if result.stdout.strip() else {}
+        except json.JSONDecodeError:
+            return None
+        pr = (((payload.get("data") or {}).get("repository") or {}).get("pullRequest") or {})
+        threads = (pr.get("reviewThreads") or {})
+        for thread in threads.get("nodes") or []:
+            for node in (thread.get("comments") or {}).get("nodes") or []:
+                if node.get("databaseId") is None:
+                    continue
+                rows.append(_graphql_comment_to_api_shape(node))
+        page_info = threads.get("pageInfo") or {}
+        if not page_info.get("hasNextPage"):
+            break
+        cursor = page_info.get("endCursor")
+        if not cursor:
+            break
+    return [review_comment_from_api(row) for row in rows]
+
+
+def load_pr_review_comments(
+    runner: CommandRunner, *, repo: str, pr_number: int
+) -> list[ReviewComment]:
+    """Prefer GraphQL; fall back to REST on any failure for resilience."""
+    via_graphql = fetch_review_comments_via_graphql(runner, repo=repo, pr_number=pr_number)
+    if via_graphql is not None:
+        return via_graphql
+    return fetch_pr_review_comments(runner, repo=repo, pr_number=pr_number)
+
+
 def has_action_marker(replies: Sequence[ReviewComment]) -> bool:
-    return any(ACTION_MARKER in reply.body for reply in replies)
+    """Match the marker only inside an HTML comment at start-of-line.
+
+    Substring matching let any reply that quoted the marker string (e.g. in a
+    meta-discussion) silently kill future sweeps for the thread.
+    """
+    return any(ACTION_MARKER_REGEX.search(reply.body) for reply in replies)
 
 
 def comment_precedes_merge(comment: ReviewComment, pr: PullRequest) -> bool:
     comment_time = parse_github_time(comment.created_at)
     merged_time = parse_github_time(pr.merged_at)
-    if comment_time is None or merged_time is None:
+    if merged_time is None:
+        raise ValueError(f"PR #{pr.number} is missing mergedAt; should be filtered upstream")
+    if comment_time is None:
         return False
     return comment_time < merged_time
 
@@ -296,7 +431,7 @@ def discover_pending_comments(
         until=until,
     )
     for pr in pull_requests:
-        comments = fetch_pr_review_comments(runner, repo=repo, pr_number=pr.number)
+        comments = load_pr_review_comments(runner, repo=repo, pr_number=pr.number)
         pending.extend(pending_comments_for_pr(pr, comments, author_logins=author_logins))
     return pending
 
@@ -320,8 +455,14 @@ def print_pending_table(pending: Sequence[PendingComment]) -> None:
         print(f"#{item.pr.number:<5}  {item.comment.id:>12}  {path:<52}  {first_body_line(item.comment.body)}")
 
 
-def git_diff(runner: CommandRunner) -> str:
-    return checked(runner, ["git", "diff", "--binary"]).stdout
+def git_status_snapshot(runner: CommandRunner) -> str:
+    """Snapshot of working-tree state used as a disposition baseline.
+
+    `git diff` only sees unstaged tracked-file changes. Codex may stage edits
+    (`git add`) or create new untracked files; both must count as "fixed".
+    `git status --porcelain` covers all three: modified, staged, and untracked.
+    """
+    return checked(runner, ["git", "status", "--porcelain"]).stdout
 
 
 def git_changed_paths(runner: CommandRunner) -> list[str]:
@@ -352,64 +493,68 @@ def truncate_summary(text: str, limit: int = MAX_REPLY_SUMMARY_CHARS) -> str:
     return normalized[: limit - 15].rstrip() + "\n[truncated]"
 
 
-def build_codex_prompt(item: PendingComment, *, repo: str, base: str) -> str:
+def load_prompt_template(path: Path = PROMPT_TEMPLATE_PATH) -> str:
+    return path.read_text(encoding="utf-8")
+
+
+def build_codex_prompt(
+    item: PendingComment,
+    *,
+    repo: str,
+    base: str,
+    template: str | None = None,
+) -> str:
     comment = item.comment
     pr = item.pr
-    return textwrap.dedent(
-        f"""
-        You are actioning one stale Codex web-agent inline PR review comment for BenchBox.
+    rendered = (template or load_prompt_template()).format(
+        repo=repo,
+        base=base,
+        pr_number=pr.number,
+        pr_title=pr.title,
+        pr_url=pr.url,
+        pr_merged_at=pr.merged_at,
+        comment_html_url=comment.html_url,
+        comment_id=comment.id,
+        comment_path=comment.path,
+        comment_line=comment.line,
+        comment_original_line=comment.original_line,
+        comment_commit_id=comment.commit_id,
+        comment_original_commit_id=comment.original_commit_id,
+        comment_diff_hunk=comment.diff_hunk,
+        comment_body=comment.body,
+    )
+    return rendered.strip()
 
-        Source:
-        - Repository: {repo}
-        - Base branch: {base}
-        - Merged PR: #{pr.number} {pr.title}
-        - PR URL: {pr.url}
-        - PR merged at: {pr.merged_at}
-        - Review comment: {comment.html_url}
-        - Comment id: {comment.id}
-        - Path: {comment.path}
-        - Line: current={comment.line}, original={comment.original_line}
-        - Commit: current={comment.commit_id}, original={comment.original_commit_id}
 
-        Required workflow:
-        1. Inspect the current repository state before editing. Do not assume the old PR diff still reflects the tree.
-        2. Decide whether the finding still requires action on the current branch.
-        3. If a fix is still required, make the smallest coherent fix and add/update focused regression coverage.
-        4. Run the narrowest relevant verification command. Use `uv run --` for Python tooling.
-        5. If no fix is currently required, leave files unchanged and explain the evidence.
-        6. Do not commit, push, open a PR, or reply on GitHub. The outer Make routine handles those steps.
+def check_codex_version(
+    runner: CommandRunner, *, minimum: tuple[int, int, int] = MIN_CODEX_VERSION
+) -> tuple[int, int, int]:
+    """Probe `codex --version` and assert it parses to >= minimum.
 
-        Carry-over patterns from the completed Codex follow-up TODOs:
-        - A stale GitHub thread is not enough evidence. Verify current behavior before fixing or dismissing.
-        - Some comments are already fixed by later merges; close those with concrete current-file evidence, not code churn.
-        - Historical DONE-item verification commands should stay executable when the comment identifies a real command defect.
-        - Comments on obsolete DONE verification commands can be closed as no-current-action only when the command is not reused
-          and the current sweep/template captures the protocol hygiene lesson.
-        - Cross-check related blind-spots and weakened tests when the finding is about regression coverage.
-        - Prefer focused tests over broad rewrites.
-
-        Useful local references:
-        - `_project/DONE/main/active/codex-pr-review-followups-week-2026-05-01.yaml`
-        - `_project/TODO/main/active/codex-pr-review-followups-week-2026-05-03.yaml`
-        - `_project/audits/codex-weekly-sweep-template.md`
-        - `_project/audits/codex-thread-rescan-week-2026-05-01.md`
-
-        Diff hunk from the original PR comment:
-        ```diff
-        {comment.diff_hunk}
-        ```
-
-        Codex web-agent comment body:
-        ```markdown
-        {comment.body}
-        ```
-
-        Final response format:
-        - `Disposition: fixed` or `Disposition: no-current-action`
-        - `Evidence:` one short paragraph with files/tests checked
-        - `Verification:` command(s) run, or why verification was not applicable
-        """
-    ).strip()
+    Surfaces a clear remediation when the binary is missing or too old, so the
+    routine fails fast instead of mid-loop with an opaque flag-not-recognized
+    error from a stale codex CLI.
+    """
+    try:
+        result = runner.run(["codex", "--version"])
+    except FileNotFoundError as exc:
+        raise RuntimeError(
+            "codex CLI not found on PATH. Install codex-cli "
+            f">= {'.'.join(str(p) for p in minimum)} (https://github.com/openai/codex)."
+        ) from exc
+    if result.returncode != 0:
+        raise CommandError(["codex", "--version"], result)
+    text = (result.stdout or result.stderr or "").strip()
+    match = re.search(r"(\d+)\.(\d+)\.(\d+)", text)
+    if not match:
+        raise RuntimeError(f"Could not parse codex CLI version from output: {text!r}")
+    parsed = (int(match.group(1)), int(match.group(2)), int(match.group(3)))
+    if parsed < minimum:
+        raise RuntimeError(
+            f"codex CLI {'.'.join(str(p) for p in parsed)} is below the required "
+            f">= {'.'.join(str(p) for p in minimum)}. Upgrade codex-cli."
+        )
+    return parsed
 
 
 def run_codex_for_comment(
@@ -422,8 +567,11 @@ def run_codex_for_comment(
     codex_sandbox: str,
     codex_approval: str,
 ) -> ActionResult:
-    before = git_diff(runner)
+    before = git_status_snapshot(runner)
     prompt = build_codex_prompt(item, repo=repo, base=base)
+    # codex-cli >= 0.20 dropped `--ask-for-approval`. The config-override
+    # syntax (`-c approval_policy=<mode>`) works across the supported version
+    # range and is forward-stable.
     cmd = [
         "codex",
         "exec",
@@ -431,8 +579,8 @@ def run_codex_for_comment(
         str(runner.cwd),
         "--sandbox",
         codex_sandbox,
-        "--ask-for-approval",
-        codex_approval,
+        "-c",
+        f"approval_policy={codex_approval}",
     ]
     if codex_model:
         cmd.extend(["--model", codex_model])
@@ -447,10 +595,59 @@ def run_codex_for_comment(
     if result.returncode != 0:
         raise CommandError(cmd, result)
 
-    after = git_diff(runner)
+    after = git_status_snapshot(runner)
     disposition = "fixed" if after != before else "no-current-action"
     summary = result.stdout.strip() or result.stderr.strip() or f"Disposition: {disposition}"
     return ActionResult(pending=item, disposition=disposition, summary=summary)
+
+
+def commit_message_for_result(result: ActionResult) -> str:
+    """One commit per actioned comment, with PR# + comment id for traceability."""
+    pr = result.pending.pr
+    comment = result.pending.comment
+    headline = first_body_line(comment.body)
+    subject = f"{PER_COMMENT_COMMIT_PREFIX}: PR #{pr.number} comment {comment.id} — {headline}"
+    # Keep commit subjects under the conventional ~100-char soft cap; truncate
+    # the codex headline before composing rather than after, so the trailer
+    # stays intact.
+    if len(subject) > 100:
+        keep = 100 - (len(subject) - len(headline)) - 1
+        subject = (
+            f"{PER_COMMENT_COMMIT_PREFIX}: PR #{pr.number} comment {comment.id} — "
+            f"{headline[: max(keep, 1)]}…"
+        )
+    body = (
+        f"Disposition: {result.disposition}\n"
+        f"Source: {comment.html_url}\n"
+        f"Path: {comment.path}\n"
+    )
+    return f"{subject}\n\n{body}"
+
+
+def commit_changes_for_result(
+    runner: CommandRunner, result: ActionResult
+) -> bool:
+    """Stage + commit codex-produced changes for one comment.
+
+    Returns True when a commit was created. Called *before* the GitHub reply
+    is posted so a crash between codex and reply leaves no phantom-actioned
+    state on GitHub: either the commit landed (next run sees no change), or
+    nothing happened (next run reprocesses the comment cleanly).
+    """
+    if result.disposition != "fixed":
+        return False
+    paths = git_changed_paths(runner)
+    if not paths:
+        return False
+    print("==> Staging changed paths for this comment")
+    for path in paths:
+        print(f"  {path}")
+    stage_paths(runner, paths)
+    staged_paths = checked(runner, ["git", "diff", "--cached", "--name-only"]).stdout.splitlines()
+    if not staged_paths:
+        return False
+    checked(runner, ["git", "commit", "-m", commit_message_for_result(result)])
+    return True
 
 
 def build_reply_body(result: ActionResult, *, branch: str) -> str:
@@ -519,31 +716,38 @@ def stage_paths(runner: CommandRunner, paths: Sequence[str]) -> None:
     checked(runner, ["git", "add", "--", *paths])
 
 
-def submit_changes(
+def finalize_changes(
     runner: CommandRunner,
     *,
     base_ref: str,
     commit_message: str,
     no_submit: bool,
 ) -> None:
+    """Run preflight + open the PR over the per-comment commits already on HEAD.
+
+    Per-comment commits are produced inside `run_action_loop` *before* the
+    GitHub reply is posted. This finalizer's job is just to (a) sweep up any
+    leftover unstaged paths into a fallback batch commit (codex output that
+    was somehow missed by `commit_changes_for_result`), (b) run preflight,
+    (c) open the PR.
+    """
     paths = git_changed_paths(runner)
-    commits_before = local_commit_count(runner, base_ref)
-    if not paths and commits_before == 0:
+    commits = local_commit_count(runner, base_ref)
+    if not paths and commits == 0:
         print("No file changes or local commits were produced; skipping PR submission.")
         return
 
     if paths:
-        print("\n==> Staging changed paths")
+        print("\n==> Sweeping leftover changed paths into fallback commit")
         for path in paths:
             print(f"  {path}")
         stage_paths(runner, paths)
+        staged = checked(runner, ["git", "diff", "--cached", "--name-only"]).stdout.splitlines()
+        if staged:
+            checked(runner, ["git", "commit", "-m", commit_message])
 
     print("\n==> Running pr-preflight")
     checked(runner, ["make", "pr-preflight"])
-
-    staged_paths = checked(runner, ["git", "diff", "--cached", "--name-only"]).stdout.splitlines()
-    if staged_paths:
-        checked(runner, ["git", "commit", "-m", commit_message])
 
     if no_submit:
         print("Skipping PR submission because --no-submit was set.")
@@ -563,6 +767,7 @@ def run_action_loop(args: argparse.Namespace, runner: CommandRunner) -> int:
         if not args.dry_run:
             branch = current_branch(runner)
             ensure_action_branch(branch, no_submit=args.no_submit)
+            check_codex_version(runner)
         ensure_clean_start(runner, allow_dirty=args.allow_dirty or args.dry_run, base_ref=f"origin/{args.base}")
     pending = discover_pending_comments(
         runner,
@@ -591,12 +796,18 @@ def run_action_loop(args: argparse.Namespace, runner: CommandRunner) -> int:
             codex_sandbox=args.codex_sandbox,
             codex_approval=args.codex_approval,
         )
+        # Order matters: commit BEFORE replying. A crash between codex and
+        # the reply leaves nothing on GitHub; a crash between commit and
+        # reply leaves a benign uncommented commit. Reply-before-commit
+        # would create phantom-actioned threads that future sweeps would
+        # silently skip even though no fix landed.
+        commit_changes_for_result(runner, result)
         results.append(result)
         if not args.no_reply:
             reply_to_comment(runner, repo=repo, result=result, branch=branch)
 
     print(f"\nActioned {len(results)} Codex review comment(s).")
-    submit_changes(
+    finalize_changes(
         runner,
         base_ref=f"origin/{args.base}",
         commit_message=args.commit_message,
