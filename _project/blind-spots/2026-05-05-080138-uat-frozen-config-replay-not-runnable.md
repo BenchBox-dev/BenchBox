@@ -9,7 +9,7 @@ related_paths:
   - tests/uat/test_replay_2026_05_02.py
   - tests/uat/test_frozen_configs.py
 suggested_sweep: "any 'frozen historical record' pattern in the repo — audit whether the freeze guarantees runnability at thaw time, or only readability."
-todo_id: null
+todo_id: uat-framework-review-followups
 ---
 
 # Frozen-config policy proves the file hasn't changed; not that it can still drive a sweep
