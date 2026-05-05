@@ -2,7 +2,8 @@ id: uat-framework-tests-uat-runner
 title: "UAT framework: consolidate stress + sweep machinery into tests/uat/"
 worktree: main
 priority: "Medium"
-status: "In Progress"
+status: "Completed"
+completed_date: "2026-05-05"
 category: "Testing and Quality Assurance"
 
 deps:
@@ -304,7 +305,7 @@ work:
 - id: w11
   summary: "Documentation + scripts/local_stress_test.sh decision"
   needs: [w10]
-  status: pending
+  status: done
   notes: |
     Output:
       - `docs/operations/uat-framework.md` -- operator guide
