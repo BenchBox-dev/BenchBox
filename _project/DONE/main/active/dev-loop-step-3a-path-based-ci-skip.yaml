@@ -193,10 +193,13 @@ work:
               - run: |
                   set -euo pipefail
                   if [ "${{ needs.ci-paths.outputs.needs-code-ci }}" = "false" ]; then
-                    test "${{ needs.content-guard.result }}" = "success" ||
-                      test "${{ needs.content-guard.result }}" = "skipped"
+                    if ! { test "${{ needs.content-guard.result }}" = "success" ||
+                           test "${{ needs.content-guard.result }}" = "skipped"; }; then
+                      echo "content-guard=${{ needs.content-guard.result }}"
+                      exit 1
+                    fi
                     echo "Content-only PR — skipped Python code CI."
-                    exit $?
+                    exit 0
                   fi
                   if [ "${{ needs.code-lint.result }}" = "success" ] && \
                      [ "${{ needs.code-test.result }}" = "success" ]; then
