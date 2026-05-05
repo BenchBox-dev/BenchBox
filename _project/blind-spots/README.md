@@ -8,11 +8,9 @@ later without PR merge collisions.
 
 The rules for **when** to write a finding here, **what** counts as a
 blind spot vs a defect, and **what** capture authorizes (and does not
-authorize) live in `~/.claude/skills/SHARED/review-protocol.md`. This
+authorize) live in the synced `SHARED/review-protocol` skill. This
 README documents only **storage**: frontmatter schema, file naming,
-validation, and sweep workflow. Defects (anything that materially
-affects correctness, performance, or security) go to TODOs, not here —
-see SHARED §2.
+validation, and sweep workflow.
 
 ---
 
@@ -90,14 +88,11 @@ the top-level title plus the three required `##` sections below.
 
 ---
 
-## How findings get written
+## Recording bindings
 
-Behavior governed by `~/.claude/skills/SHARED/review-protocol.md` §4.
-When that protocol authorizes a capture, the file is written here on
-the local branch and surfaced in chat with a `Recorded: <path>` line.
-The capture is local-only — it does not authorize a commit beyond the
-file, a push, or a PR. Use the `/blind-spot` slash command for explicit
-recording.
+Behavior is governed by `SHARED/review-protocol`. This directory stores
+the file shape used by the `/blind-spot` slash command and any other
+agent capture flow that the shared protocol authorizes.
 
 ---
 

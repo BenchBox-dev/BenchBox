@@ -2,7 +2,7 @@
 
 → **See AGENTS.md for full guidance.** Claude Code-specific shortcuts only.
 
-**Critical rules**: Always `uv run` (never bare `python`/`pytest`/`ruff`/`ty`). Never `git add -A`. Dev PRs target `develop`, never `main` (`main` is release-only and `develop` is PR-gated — no direct push to either). **All agent edits and commits happen in a worktree off `develop`. If a session begins in the main clone (`/Users/joe/Developer/BenchBox`), creating a worktree is the FIRST action (see "Session start" below). Never `git checkout`/`switch`/`branch -m` in the main clone without explicit user approval — that clone stays on `develop`.** **Never open a PR or enable auto-merge as a side-effect of a review, audit, or research action — see `~/.claude/skills/SHARED/review-protocol.md` §1. Landing changes requires explicit user authorization in a separate turn; this fires before any "auto-commit" or "file-first capture" mandate elsewhere.** TPC-DS SF<1 requires the patched dsdgen bundled with BenchBox (stock dsdgen crashes at SF<1; see `patch-and-redistribute-tpcds-dsdgen-subscale-support`). No `-o "addopts="` with pytest.
+**Critical rules**: Always `uv run` (never bare `python`/`pytest`/`ruff`/`ty`). Never `git add -A`. Dev PRs target `develop`, never `main` (`main` is release-only and `develop` is PR-gated — no direct push to either). **All agent edits and commits happen in a worktree off `develop`. If a session begins in the main clone (`/Users/joe/Developer/BenchBox`), creating a worktree is the FIRST action (see "Session start" below). Never `git checkout`/`switch`/`branch -m` in the main clone without explicit user approval — that clone stays on `develop`.** **Never open a PR or enable auto-merge as a side-effect of a review, audit, or research action — see the synced `SHARED/review-protocol` skill §1. Landing changes requires explicit user authorization in a separate turn; this fires before any "auto-commit" or "file-first capture" mandate elsewhere.** TPC-DS SF<1 requires the patched dsdgen bundled with BenchBox (stock dsdgen crashes at SF<1; see `patch-and-redistribute-tpcds-dsdgen-subscale-support`). No `-o "addopts="` with pytest.
 
 ## Session start
 
@@ -193,8 +193,8 @@ during the single-repo migration).
 
 ## Review workflow — blind-spot capture
 
-Behavior is governed by `~/.claude/skills/SHARED/review-protocol.md`. When
-that protocol authorizes a blind-spot capture, BenchBox bindings are:
+Behavior is governed by the synced `SHARED/review-protocol` skill. When that
+protocol authorizes a blind-spot capture, BenchBox bindings are:
 
 - Path: `_project/blind-spots/YYYY-MM-DD-HHMMSS-<slug>.md`
 - Schema: see `_project/blind-spots/README.md` (storage spec)
@@ -202,8 +202,8 @@ that protocol authorizes a blind-spot capture, BenchBox bindings are:
 - Sweep: `make blind-spots-{list,report,sweep}` — promotion to TODO is a sweep-step decision
 - Chat marker: prefix the body quote with `Recorded: _project/blind-spots/<file>.md`
 
-Per SHARED §4, the capture is local-only: do not commit beyond the
-capture file, do not push, do not run `make pr-open`. The user
+Per SHARED §4, the capture is local-only: do not commit any file,
+including the capture file, do not push, do not run `make pr-open`. The user
 authorizes any PR in a separate turn. Apply the SHARED §2 defect gate
 before recording — defects belong in the severity table and TODOs, not
 in the blind-spots directory.
