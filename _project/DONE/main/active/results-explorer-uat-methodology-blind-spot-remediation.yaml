@@ -136,8 +136,7 @@ verification:
   command: "test -f _project/specs/uat-methodology-blind-spot-remediation.md"
   expected_output: "file exists"
 - description: "All three blind-spot files have status `merged-to-todo` (or `dismissed` for explicitly rejected ones)."
-  command: "uv run --project _project/scripts -- python _project/scripts/sweep_blind_spots.py list --status open | grep -E
-    '081920|081921|081922' || echo 'all triaged'"
+  command: "uv run --project _project/scripts -- python _project/scripts/sweep_blind_spots.py list --status open | grep -E '081920|081921|081922' || echo 'all triaged'"
   expected_output: "all triaged"
 - description: "Implementation TODOs exist for each accepted remediation."
   command: "ls _project/TODO/main/planning/uat-template-*.yaml 2>/dev/null"
