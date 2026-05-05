@@ -1264,7 +1264,8 @@ worktree-pool-check:
 			violations="$$violations  - $$pool: missing ($$wt is not a git worktree)\n"; \
 			missing_count=$$((missing_count + 1)); \
 		elif [ -f "$$wt/.benchbox/claim_in_progress" ]; then \
-			marker_mtime_epoch=$$(stat -f %m "$$wt/.benchbox/claim_in_progress" 2>/dev/null || stat -c %Y "$$wt/.benchbox/claim_in_progress" 2>/dev/null || echo 0); \
+			marker_mtime_epoch=$$(stat -c %Y "$$wt/.benchbox/claim_in_progress" 2>/dev/null || stat -f %m "$$wt/.benchbox/claim_in_progress" 2>/dev/null || echo 0); \
+			case "$$marker_mtime_epoch" in ''|*[!0-9]*) marker_mtime_epoch=0 ;; esac; \
 			marker_age_seconds=$$((now_epoch - marker_mtime_epoch)); \
 			marker_age=$$(date -u -r "$$wt/.benchbox/claim_in_progress" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo "?"); \
 			if [ "$$marker_age_seconds" -ge "$(POOL_CLAIM_MARKER_STALE_SECONDS)" ]; then \
