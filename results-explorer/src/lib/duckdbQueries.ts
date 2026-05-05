@@ -159,6 +159,7 @@ export interface CohortMetadataRow {
   phase: string;
   cohort_label: string;
   cohort_href: string;
+  /** Count of ranking-eligible rows with non-null primary metrics. */
   platform_count: number;
   primary_metric: string;
   primary_order: "asc" | "desc";
@@ -647,7 +648,7 @@ async function loadMetaLeaderboardData(): Promise<MetaLeaderboard | null> {
         " FROM bench.meta_leaderboard" +
         " ORDER BY avg_rank NULLS LAST, platform_id",
     ),
-    // Filter to leaderboard-eligible cohorts (≥2 platforms) to match the
+    // Filter to leaderboard-eligible cohorts (≥2 rankable platforms) to match the
     // pipeline's `_build_meta_leaderboard` selection. Single-platform cohorts
     // carry no ranks and would only bloat the pivot - excluding them here
     // keeps the round-trip small on large corpora.

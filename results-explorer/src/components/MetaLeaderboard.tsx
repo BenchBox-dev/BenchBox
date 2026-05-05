@@ -242,7 +242,7 @@ export function MetaLeaderboard({
                     key={cohort.key}
                     scope="col"
                     class="table-th whitespace-nowrap"
-                    title={`${humanizeBenchmark(cohort.benchmark)} SF${cohort.scale_factor} ${cohort.phase} - ${cohort.platform_count} platforms`}
+                    title={`${humanizeBenchmark(cohort.benchmark)} SF${cohort.scale_factor} ${cohort.phase} - ${cohort.platform_count} ranked platforms`}
                   >
                     <a
                       href={cohortHref(cohort)}

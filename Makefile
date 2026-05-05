@@ -652,12 +652,10 @@ compat-docs-check:
 
 # Verify fixtures match the current Python implementation without overwriting.
 # Fails if any fixture is out of date (drift detected).
-# comparison_artifact.json is excluded from the diff - it requires real result bundles to generate
-# and is verified by the comparisonArtifact.parity.test.tsx suite instead.
 parity-check:
 	@tmpdir=$$(mktemp -d) && \
-	uv run python tests/parity/generate_visualization_fixtures.py --out $$tmpdir && \
-	diff -r --exclude='.gitkeep' --exclude='comparison_artifact.json' tests/parity/fixtures $$tmpdir && \
+	uv run -- python tests/parity/generate_visualization_fixtures.py --out $$tmpdir && \
+	diff -r --exclude='.gitkeep' tests/parity/fixtures $$tmpdir && \
 	echo "parity-check: fixtures match Python source" && \
 	rm -rf $$tmpdir || \
 	(echo "parity-check FAILED: fixtures are out of date - run 'make parity-fixtures' to regenerate" && rm -rf $$tmpdir && exit 1)

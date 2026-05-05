@@ -12,7 +12,7 @@ from pathlib import Path
 import duckdb
 import pytest
 
-from benchbox.core.explorer_pipeline.pipeline import ExplorerPipeline
+from benchbox.core.explorer_pipeline.pipeline import SUBMISSION_MANIFEST_SUFFIX, ExplorerPipeline
 from tests.unit.core.explorer_pipeline.conftest import MINIMAL_BUNDLE
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
@@ -658,6 +658,36 @@ def tie_db_path(tmp_path_factory: pytest.TempPathFactory) -> Path:
     return output_dir / "results.duckdb"
 
 
+@pytest.fixture(scope="module")
+def eligibility_db_path(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Three-platform fixture where the numerically best row is not ranking-eligible."""
+    import copy
+    import json
+
+    bundles = []
+    for platform, power_score in (("duckdb", 5000.0), ("community", 10000.0), ("sqlite", 1000.0)):
+        bundle = copy.deepcopy(MINIMAL_BUNDLE)
+        bundle["run"]["id"] = f"run-{platform}"
+        bundle["platform"]["name"] = platform
+        bundle["summary"]["tpc_metrics"]["power_at_size"] = power_score
+        bundles.append((platform, bundle))
+
+    base = tmp_path_factory.mktemp("eligibility_pipeline_output")
+    data_dir = base / "data"
+    bundles_dir = data_dir / "bundles"
+    bundles_dir.mkdir(parents=True)
+    for platform, bundle in bundles:
+        (bundles_dir / f"{platform}.json").write_text(json.dumps(bundle), encoding="utf-8")
+    (bundles_dir / f"community{SUBMISSION_MANIFEST_SUFFIX}").write_text(
+        json.dumps({"bundle_file": "community.json"}),
+        encoding="utf-8",
+    )
+
+    output_dir = base / "out"
+    ExplorerPipeline().run(data_dir, output_dir, bundle_url_prefix="/results/data/bundles")
+    return output_dir / "results.duckdb"
+
+
 class TestCohortVariantPreservation:
     def test_cohort_metadata_keeps_all_variants(self, variant_db_path: Path) -> None:
         with _connect(variant_db_path) as con:
@@ -718,6 +748,45 @@ class TestBenchmarkRankingTieHandling:
             ).fetchall()
 
         assert rows == [("duckdb", 1), ("sqlite", 1), ("polars", 3)]
+
+
+class TestBenchmarkRankingEligibility:
+    def test_benchmark_rankings_exclude_ineligible_rows_from_rank_math(self, eligibility_db_path: Path) -> None:
+        with _connect(eligibility_db_path) as con:
+            rows = con.execute(
+                "SELECT platform, is_ranking_eligible, power_score, rank, total_in_cohort, speedup_vs_best"
+                " FROM benchmark_rankings WHERE benchmark = 'tpch'"
+                " ORDER BY rank NULLS LAST, platform"
+            ).fetchall()
+
+        assert rows == [
+            ("duckdb", True, 5000.0, 1, 2, 1.0),
+            ("sqlite", True, 1000.0, 2, 2, 0.2),
+            ("community", False, 10000.0, None, 2, None),
+        ]
+
+    def test_cohort_metadata_uses_ranked_count_but_preserves_ineligible_variant(
+        self,
+        eligibility_db_path: Path,
+    ) -> None:
+        with _connect(eligibility_db_path) as con:
+            rows = con.execute(
+                "SELECT platform, rank, platform_count, metric_value, speedup_vs_best"
+                " FROM cohort_metadata WHERE benchmark = 'tpch'"
+                " ORDER BY rank NULLS LAST, platform"
+            ).fetchall()
+
+        assert rows == [
+            ("duckdb", 1, 2, 5000.0, 1.0),
+            ("sqlite", 2, 2, 1000.0, 0.2),
+            ("community", None, 2, 10000.0, None),
+        ]
+
+    def test_meta_leaderboard_omits_platforms_with_no_ranked_cohorts(self, eligibility_db_path: Path) -> None:
+        with _connect(eligibility_db_path) as con:
+            rows = con.execute("SELECT platform_id, avg_rank, n_cohorts FROM meta_leaderboard").fetchall()
+
+        assert rows == [("duckdb", 1.0, 1), ("sqlite", 2.0, 1)]
 
 
 # ---------------------------------------------------------------------------

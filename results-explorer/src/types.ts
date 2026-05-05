@@ -181,6 +181,7 @@ export interface MetaCohort {
   phase: string;
   label: string;
   href: string;
+  /** Count of ranking-eligible platforms with non-null primary metrics. */
   platform_count: number;
   primary_metric: string;
   primary_order: "asc" | "desc";

@@ -224,6 +224,8 @@ CREATE TABLE IF NOT EXISTS benchmark_rankings (
     primary_metric     VARCHAR  NOT NULL,
     primary_order      VARCHAR  NOT NULL,
     rank               INTEGER,
+    -- Number of ranking-eligible rows with non-null primary metrics.
+    -- Visible but unranked rows keep rank=NULL and do not increment this total.
     total_in_cohort    INTEGER  NOT NULL,
     percentile_p50     DOUBLE,
     percentile_p90     DOUBLE,
@@ -303,6 +305,9 @@ CREATE TABLE IF NOT EXISTS cohort_metadata (
     phase          VARCHAR  NOT NULL,
     cohort_label   VARCHAR  NOT NULL,
     cohort_href    VARCHAR  NOT NULL,
+    -- Number of ranking-eligible rows with non-null primary metrics in this
+    -- cohort. The table can still preserve additional visible rows with
+    -- rank=NULL, so this may be lower than COUNT(*) per cohort_key.
     platform_count INTEGER  NOT NULL,
     primary_metric VARCHAR  NOT NULL,
     primary_order  VARCHAR  NOT NULL,
