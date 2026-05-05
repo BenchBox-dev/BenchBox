@@ -2,7 +2,7 @@ id: uat-framework-tests-uat-runner
 title: "UAT framework: consolidate stress + sweep machinery into tests/uat/"
 worktree: main
 priority: "Medium"
-status: "Not Started"
+status: "In Progress"
 category: "Testing and Quality Assurance"
 
 deps:
@@ -89,7 +89,7 @@ description: |
 work:
 - id: w1
   summary: "Spec the framework: tests/uat/ layout, YAML schema, phase contract, Make-target naming"
-  status: pending
+  status: done
   notes: |
     Output: `_project/specs/uat-framework.md`. This is a HARD
     user-approval gate; no Python lands until the spec is reviewed
@@ -346,13 +346,19 @@ verification:
   expected_output: "no diff"
 
 must_preserve:
-- "scripts/local_stress_test.sh continues to work as today's stress entrypoint until W11 explicitly migrates it -- because muscle memory is widespread and breaking this surface mid-framework-build invalidates the no-disruption promise"
-- "benchbox user-facing CLI surface unchanged -- because UAT is dev tooling, not user surface; no benchbox uat subcommand, no new top-level commands"
-- "scripts/validate_submission.py contract and exit codes unchanged -- because the validator is the source of truth; the framework wraps via uat_validator_rollup.py only"
-- "scripts/uat_validator_rollup.py public CLI unchanged once it lands -- because that helper is owned by uat-template-validator-clean-rate-runner; the framework is a consumer"
+- "scripts/local_stress_test.sh continues to work as today's stress entrypoint until W11 explicitly migrates it -- because
+  muscle memory is widespread and breaking this surface mid-framework-build invalidates the no-disruption promise"
+- "benchbox user-facing CLI surface unchanged -- because UAT is dev tooling, not user surface; no benchbox uat subcommand,
+  no new top-level commands"
+- "scripts/validate_submission.py contract and exit codes unchanged -- because the validator is the source of truth; the framework
+  wraps via uat_validator_rollup.py only"
+- "scripts/uat_validator_rollup.py public CLI unchanged once it lands -- because that helper is owned by uat-template-validator-clean-rate-runner;
+  the framework is a consumer"
 - "_project/TODO_SCHEMA.yaml and _project/TODO_ENTRY_TEMPLATE.yaml unchanged -- because schema/template work is owned by uat-template-success-metric-terminal-state-and-gating"
-- "results-data/ and origin/published-results corpus untouched -- because the framework dispatches submission, it does not curate corpus content"
-- "Sequential platform execution discipline -- because UAT W3 line 222 explicitly forbids parallel platforms (timing contamination); code comments must reference this"
+- "results-data/ and origin/published-results corpus untouched -- because the framework dispatches submission, it does not
+  curate corpus content"
+- "Sequential platform execution discipline -- because UAT W3 line 222 explicitly forbids parallel platforms (timing contamination);
+  code comments must reference this"
 
 approach: |
   Spec-first. W1 is a HARD user-approval gate: no Python lands until
@@ -385,16 +391,27 @@ approach: |
   `~/Developer/benchmark_runs/uat_<date>/` (off-tree, as today).
 
 anti_patterns:
-- "DO NOT add a `benchbox uat` CLI subcommand -- because UAT is dev tooling, not user surface, and the package shipped on PyPI shouldn't carry sweep machinery -- expose via `make uat-*` targets only."
-- "DO NOT reimplement validator wrapping -- because uat-template-validator-clean-rate-runner ships scripts/uat_validator_rollup.py for exactly this purpose -- the framework's validate phase invokes that helper as a subprocess."
-- "DO NOT bundle methodology / TODO-template scope into this framework -- because Findings 1/2/3 have their own TODOs and a merged spec -- this TODO is about machinery drift only."
-- "DO NOT modify benchbox/ source -- because the framework consumes benchbox as a library only, and platform/runner code is user-CLI territory -- import and subprocess only."
-- "DO NOT remove scripts/local_stress_test.sh in this TODO -- because muscle memory is widespread and the W1 spec must explicitly authorise any deprecation cycle -- leave or thin-delegate; never delete in this TODO."
-- "DO NOT run platforms in parallel under uat-execute -- because concurrent runs contaminate timings and corrupt the corpus (UAT W3 line 222) -- preserve the sequential discipline; document the anti-pattern in code comments referencing the source line."
-- "DO NOT default cross_scale_coverage_min_pairs to enabled -- because the methodology spec scoped Finding 1 as convention-only and tooling teeth are opt-in -- the YAML field defaults off; sweep authors enable explicitly."
-- "DO NOT skip the W1 spec gate -- because this TODO has 11 work units and an approved spec is the only reliable user-review point at this scale -- no Python lands until the spec is approved by the user."
-- "DO NOT include UAT machinery in _project/scripts/ -- because the user has explicitly directed UAT to live in tests/ to avoid the mostly-untracked _project/ tree -- tests/uat/ is the only acceptable home."
-- "DO NOT proceed past W4 if scripts/uat_validator_rollup.py has not landed -- because that helper is the source of truth for validation and reimplementing it would orphan the validator-clean-rate TODO -- surface the dep blocker to the user instead."
+- "DO NOT add a `benchbox uat` CLI subcommand -- because UAT is dev tooling, not user surface, and the package shipped on
+  PyPI shouldn't carry sweep machinery -- expose via `make uat-*` targets only."
+- "DO NOT reimplement validator wrapping -- because uat-template-validator-clean-rate-runner ships scripts/uat_validator_rollup.py
+  for exactly this purpose -- the framework's validate phase invokes that helper as a subprocess."
+- "DO NOT bundle methodology / TODO-template scope into this framework -- because Findings 1/2/3 have their own TODOs and
+  a merged spec -- this TODO is about machinery drift only."
+- "DO NOT modify benchbox/ source -- because the framework consumes benchbox as a library only, and platform/runner code is
+  user-CLI territory -- import and subprocess only."
+- "DO NOT remove scripts/local_stress_test.sh in this TODO -- because muscle memory is widespread and the W1 spec must explicitly
+  authorise any deprecation cycle -- leave or thin-delegate; never delete in this TODO."
+- "DO NOT run platforms in parallel under uat-execute -- because concurrent runs contaminate timings and corrupt the corpus
+  (UAT W3 line 222) -- preserve the sequential discipline; document the anti-pattern in code comments referencing the source
+  line."
+- "DO NOT default cross_scale_coverage_min_pairs to enabled -- because the methodology spec scoped Finding 1 as convention-only
+  and tooling teeth are opt-in -- the YAML field defaults off; sweep authors enable explicitly."
+- "DO NOT skip the W1 spec gate -- because this TODO has 11 work units and an approved spec is the only reliable user-review
+  point at this scale -- no Python lands until the spec is approved by the user."
+- "DO NOT include UAT machinery in _project/scripts/ -- because the user has explicitly directed UAT to live in tests/ to
+  avoid the mostly-untracked _project/ tree -- tests/uat/ is the only acceptable home."
+- "DO NOT proceed past W4 if scripts/uat_validator_rollup.py has not landed -- because that helper is the source of truth
+  for validation and reimplementing it would orphan the validator-clean-rate TODO -- surface the dep blocker to the user instead."
 
 scope_limit:
   only_modify:
@@ -426,28 +443,41 @@ scope_limit:
   - "tests/unit/"
 
 success_metrics:
-- "Single Python framework at tests/uat/ replaces the ad-hoc UAT-driver pattern; the next sweep author writes a YAML config under tests/uat/configs/ rather than a procedural TODO."
-- "make uat-stress provides feature parity with scripts/local_stress_test.sh for stress-test use cases (same PLATFORM/BENCHMARK/SCALE inputs produce the same result paths)."
-- "make uat-sweep against tests/uat/configs/uat-2026-05-02.yaml produces structurally-parallel output to the historical 2026-05-02 retrospective (same columns, equivalent row count within ladder-pruning tolerance)."
-- "scripts/local_stress_test.sh remains usable as today's stress entrypoint for the duration of this TODO; migration to make uat-stress is opt-in for users."
+- "Single Python framework at tests/uat/ replaces the ad-hoc UAT-driver pattern; the next sweep author writes a YAML config
+  under tests/uat/configs/ rather than a procedural TODO."
+- "make uat-stress provides feature parity with scripts/local_stress_test.sh for stress-test use cases (same PLATFORM/BENCHMARK/SCALE
+  inputs produce the same result paths)."
+- "make uat-sweep against tests/uat/configs/uat-2026-05-02.yaml produces structurally-parallel output to the historical 2026-05-02
+  retrospective (same columns, equivalent row count within ladder-pruning tolerance)."
+- "scripts/local_stress_test.sh remains usable as today's stress entrypoint for the duration of this TODO; migration to make
+  uat-stress is opt-in for users."
 - "Spec at _project/specs/uat-framework.md is user-approved before any Python in tests/uat/ lands."
 - "Each work unit lands in its own PR with fast-test coverage; no monolithic delivery."
-- "Validator-clean rate, terminal-state vocab, and (opt-in) cross-scale coverage assertion are first-class framework features sourced from the existing uat-template-* TODOs (no duplication)."
-- "Submission terminal state: local-stage (no upstream action; framework runs locally; published-results PRs are a separate downstream concern owned by results-explorer-uat-corpus-integrate-validated-bundles for the historical 2026-05-02 corpus)."
+- "Validator-clean rate, terminal-state vocab, and (opt-in) cross-scale coverage assertion are first-class framework features
+  sourced from the existing uat-template-* TODOs (no duplication)."
+- "Submission terminal state: local-stage (no upstream action; framework runs locally; published-results PRs are a separate
+  downstream concern owned by results-explorer-uat-corpus-integrate-validated-bundles for the historical 2026-05-02 corpus)."
 
 deferred:
 - summary: "Retiring scripts/local_stress_test.sh entirely"
-  reason: "Out of scope -- W11 documents the migration path but does not delete the script. A separate deprecation TODO files only after make uat-stress proves adoption across two-plus subsequent UAT uses."
+  reason: "Out of scope -- W11 documents the migration path but does not delete the script. A separate deprecation TODO files
+    only after make uat-stress proves adoption across two-plus subsequent UAT uses."
 - summary: "Cloud-platform UAT support (Snowflake / BigQuery / Redshift / Athena / Databricks / ClickHouse Cloud)"
-  reason: "Scope of a separate `uat-framework-cloud-platforms` TODO if/when the explorer's cloud-facet surface is ready to be tested under load. Local-only is sufficient for the first iteration; matches the 2026-05-02 sweep scope."
+  reason: "Scope of a separate `uat-framework-cloud-platforms` TODO if/when the explorer's cloud-facet surface is ready to
+    be tested under load. Local-only is sufficient for the first iteration; matches the 2026-05-02 sweep scope."
 - summary: "Throughput-phase support"
-  reason: "The 2026-05-02 sweep ran load,power only and the spec does not require throughput. Adding throughput multiplies wall-clock cost; deferred until the local UAT proves valuable."
+  reason: "The 2026-05-02 sweep ran load,power only and the spec does not require throughput. Adding throughput multiplies
+    wall-clock cost; deferred until the local UAT proves valuable."
 - summary: "Tooling enforcement of `gating: true` open_questions in todo_cli.py"
-  reason: "Owned by a future TODO if the convention proves insufficient. This framework respects the convention via YAML schema, not by enforcing TODO authoring conventions."
+  reason: "Owned by a future TODO if the convention proves insufficient. This framework respects the convention via YAML schema,
+    not by enforcing TODO authoring conventions."
 - summary: "Pytest-style invocation of UAT phases"
-  reason: "tests/uat/ is a Python package, not a pytest test directory. The framework runs as a script with side effects; pytest is a poor fit for orchestration. The fast tests added in W2/W3/W4 ARE pytest, but they cover unit-level logic (port maps, ladder pruning) not full phase invocation."
+  reason: "tests/uat/ is a Python package, not a pytest test directory. The framework runs as a script with side effects;
+    pytest is a poor fit for orchestration. The fast tests added in W2/W3/W4 ARE pytest, but they cover unit-level logic (port
+    maps, ladder pruning) not full phase invocation."
 - summary: "Reformat scripts/local_stress_test.sh to import from tests/uat/matrix.py"
-  reason: "Drift-reducing but invasive; defaults to W11 deferral. Sweep author may opt into this with explicit user approval, but this TODO does not require it."
+  reason: "Drift-reducing but invasive; defaults to W11 deferral. Sweep author may opt into this with explicit user approval,
+    but this TODO does not require it."
 - summary: "Migration of older bash entrypoints (other scripts/*.sh stress / smoke wrappers)"
   reason: "Out of scope. This TODO addresses the local_stress_test.sh / UAT-driver drift only."
 
@@ -528,9 +558,17 @@ context_sections:
     review.
 
 open_questions:
-- "tests/uat/ vs tests/uat_runner/ for the package directory name -- prefer tests/uat/ for brevity; flag if existing tests/ naming has a precedent the spec should align with."
-- "Should the W1 spec require independent reviewer beyond the user, given finding 084354 (self-bias risk in stress-tests)? Default: user reviews and the spec includes adversarial framing per the finding to mitigate; promote to multi-reviewer review only if the spec proves contentious."
-- "Should make uat-stress eventually replace scripts/local_stress_test.sh, or coexist indefinitely? Default: coexist; W11 documents the choice and a separate deprecation TODO files only after make uat-stress proves adoption."
-- "tests/uat/configs/uat-2026-05-02.yaml -- frozen replay (immutable historical record) or starting template (editable)? Default: frozen replay; new sweep configs cloned from it. Confirm before W10."
-- "submit_terminal_state default for stress preset: should make uat-stress have NO package phase (so terminal-state is undefined) or emit local-stage by default? Default: stress preset omits the package phase entirely so terminal-state is irrelevant for stress runs."
-- "Should W2's matrix.py port the eval-based registry-loader pattern (current bash) or use direct Python imports (cleaner)? Default: direct imports; the bash script's eval pattern was a workaround for shell limits and Python has no equivalent constraint."
+- "tests/uat/ vs tests/uat_runner/ for the package directory name -- prefer tests/uat/ for brevity; flag if existing tests/
+  naming has a precedent the spec should align with."
+- "Should the W1 spec require independent reviewer beyond the user, given finding 084354 (self-bias risk in stress-tests)?
+  Default: user reviews and the spec includes adversarial framing per the finding to mitigate; promote to multi-reviewer review
+  only if the spec proves contentious."
+- "Should make uat-stress eventually replace scripts/local_stress_test.sh, or coexist indefinitely? Default: coexist; W11
+  documents the choice and a separate deprecation TODO files only after make uat-stress proves adoption."
+- "tests/uat/configs/uat-2026-05-02.yaml -- frozen replay (immutable historical record) or starting template (editable)? Default:
+  frozen replay; new sweep configs cloned from it. Confirm before W10."
+- "submit_terminal_state default for stress preset: should make uat-stress have NO package phase (so terminal-state is undefined)
+  or emit local-stage by default? Default: stress preset omits the package phase entirely so terminal-state is irrelevant
+  for stress runs."
+- "Should W2's matrix.py port the eval-based registry-loader pattern (current bash) or use direct Python imports (cleaner)?
+  Default: direct imports; the bash script's eval pattern was a workaround for shell limits and Python has no equivalent constraint."
