@@ -3148,7 +3148,8 @@ operations:
         sql: |
           SELECT length(toString(uniqMergeState(user_sketch))) AS sketch_bytes
           FROM sketch_ops_daily_users
-        # ClickHouse uniq HLL++ default precision → ~60KB (verified chDB).
+        # ClickHouse uniq HLL++ default precision → 60003 bytes
+        # (verified clickhouse-local 25.4.2, SF=0.01, 2026-05-04).
         # Bounds tight enough that a regression to <16KB or growth past
         # 100KB alarms; wide enough to absorb encoding drift.
         expected_value_min: 16000
@@ -3310,8 +3311,9 @@ operations:
         sql: |
           SELECT length(toString(quantileTDigestMergeState(0.5)(price_sketch))) AS sketch_bytes
           FROM sketch_ops_kll_partitions
-        # ClickHouse quantileTDigest at compression=100 → ~3.8KB merged
-        # (verified chDB, SF=0.01). Bounds tight to its observed range.
+        # ClickHouse quantileTDigest at compression=100 → 4314 bytes merged
+        # (verified clickhouse-local 25.4.2, SF=0.01, 2026-05-04).
+        # Bounds tight to its observed range.
         expected_value_min: 1500
         expected_value_max: 8000
         platform_overrides:
@@ -3440,7 +3442,8 @@ operations:
         sql: |
           SELECT length(toString(topKMergeState(8)(topk_sketch))) AS sketch_bytes
           FROM sketch_ops_topk
-        # ClickHouse topK(8) merged state → ~294B at SF=0.01 (verified chDB).
+        # ClickHouse topK(8) merged state → 317 bytes at SF=0.01
+        # (verified clickhouse-local 25.4.2, 2026-05-04).
         # Tighter than the DataSketches frequent-items size; still loose
         # enough to absorb encoding drift.
         expected_value_min: 150
