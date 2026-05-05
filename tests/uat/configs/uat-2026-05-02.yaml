@@ -1,0 +1,63 @@
+# FROZEN — do not edit. Clone to a new file for new sweeps.
+#
+# Replay of the 2026-05-02 results-explorer multi-scale corpus sweep.
+# Source: _project/handoffs/results-explorer-uat-retrospective-20260502.md.
+# This file is an immutable historical record. The W10 structural-parity
+# test runs `make uat-sweep CONFIG=... DRY_RUN=1` against this YAML and
+# asserts the resulting matrix_summary.tsv has the same column shape and
+# row count (within ladder-pruning tolerance) as the 2026-05-02 retrospective.
+
+name: "uat-2026-05-02"
+description: "Frozen replay of the 2026-05-02 results-explorer multi-scale corpus sweep"
+
+phases:
+  - preflight
+  - enumerate
+  - execute
+  - validate
+  - package
+  - explorer_smoke
+  - report
+
+dry_run: false
+
+platforms:
+  groups: ["sql", "dataframe"]
+
+benchmarks:
+  groups: ["all"]
+
+scales:
+  rungs: [0.01, 0.1, 1.0]
+
+execute:
+  per_cell_timeout_s: 600
+  early_stop_after_s: 180
+  early_stop_on_failure: true
+  phases_arg: "load,power"
+  skip_unreachable: true
+
+preflight:
+  free_space_min_gib: 5
+  free_space_path: "~/Developer/benchmark_runs"
+
+cleanup:
+  preserve_datagen: true
+  prune_databases: true
+
+validate:
+  validator_clean_rate_floor: 0.80
+
+package:
+  submit_terminal_state: "local-stage"
+
+explorer_smoke:
+  playwright_browsers: ["chromium"]
+
+report:
+  matrix_summary_tsv: "matrix_summary.tsv"
+  cross_scale_coverage_min_pairs: null
+
+output:
+  logs_dir_template: "~/Developer/benchmark_runs/logs/uat_20260502_replay"
+  submissions_dir_template: "~/Developer/benchmark_runs/submissions/{name}_replay"

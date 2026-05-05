@@ -284,7 +284,7 @@ work:
 - id: w10
   summary: "tests/uat/configs/uat-2026-05-02.yaml replay + structural-parity assertion"
   needs: [w9]
-  status: pending
+  status: done
   notes: |
     Encode the 2026-05-02 sweep parameters as a FROZEN replay config
     (immutable historical record; per W1 spec policy decision, new
