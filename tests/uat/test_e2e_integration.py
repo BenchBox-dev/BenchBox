@@ -144,15 +144,18 @@ def test_e2e_validator_status_reaches_cross_scale_check(tmp_path: Path, monkeypa
     runner = _runner_factory(invocations)
     monkeypatch.setattr("tests.uat.phases.execute.run_cell", runner)
 
-    rollup_tsv = tmp_path / "validator_rollup.tsv"
+    validated_paths: list[Path] = []
 
     def fake_validate_runner(argv, check):
+        result_path = Path(argv[2])
+        output_tsv = Path(argv[argv.index("--output") + 1])
+        validated_paths.append(result_path)
+        scale = float(result_path.stem.rsplit("_", 1)[-1])
+        status = "clean" if scale == 0.01 else "error"
         rows = ["platform\tbenchmark\tscale\tresult_path\tvalidator_status\terror_count\twarning_count\tfirst_error"]
-        for plat, bench, scale in invocations:
-            result_path = f"/tmp/{plat}_{bench}_{scale}.json"
-            status = "clean" if scale == 0.01 else "error"
-            rows.append(f"{plat}\t{bench}\t{scale}\t{result_path}\t{status}\t0\t0\t")
-        rollup_tsv.write_text("\n".join(rows) + "\n", encoding="utf-8")
+        plat, bench, scale_text = result_path.stem.split("_", 2)
+        rows.append(f"{plat}\t{bench}\t{scale_text}\t{result_path}\t{status}\t0\t0\t")
+        output_tsv.write_text("\n".join(rows) + "\n", encoding="utf-8")
 
         class Completed:
             returncode = 0
@@ -172,3 +175,4 @@ def test_e2e_validator_status_reaches_cross_scale_check(tmp_path: Path, monkeypa
 
     assert result.phase_exit_codes["validate"] == 1
     assert result.phase_exit_codes["report"] == 1
+    assert validated_paths == [Path(f"/tmp/{plat}_{bench}_{scale}.json") for plat, bench, scale in invocations]

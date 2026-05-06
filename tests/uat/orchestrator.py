@@ -121,11 +121,16 @@ def run_sweep(
             from tests.uat.phases.validate import ValidatePhaseError, run_validate
 
             validate_cfg = config.raw.get("validate") or {}
-            results_dir = log_dir
+            if execute_outcome is None:
+                phase_exit_codes[phase] = 2
+                aborted_phase = phase
+                abort_reason = "validate phase requires execute phase to have run"
+                break
+            result_paths = [r.result_path for r in execute_outcome.results if r.result_path]
             output_tsv = log_dir / "validator_rollup.tsv"
             try:
                 vr = run_validate(
-                    results_dir,
+                    result_paths,
                     output_tsv=output_tsv,
                     floor=float(validate_cfg.get("validator_clean_rate_floor", 0.80)),
                 )
