@@ -157,11 +157,59 @@ def test_execute_skips_unreachable_platform(tmp_path):
     assert len(outcome.skipped_unreachable) == 1
 
 
+def test_execute_passes_config_extra_args_to_runner(tmp_path):
+    matrix.reset_reachability_cache()
+    cfg = validate_config(
+        {
+            "name": "fake",
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "execute": {"extra_args": ["--tuning", "tuned"]},
+        }
+    )
+    seen: dict[str, tuple[str, ...] | Path] = {}
+
+    def recording_runner(platform, benchmark, scale, **kwargs):
+        seen["extra_args"] = tuple(kwargs["extra_args"])
+        seen["benchmark_runs_dir"] = kwargs["benchmark_runs_dir"]
+        return CellResult(
+            platform=platform,
+            benchmark=benchmark,
+            scale=scale,
+            status="passed",
+            exit_code=0,
+            elapsed_s=1.0,
+            log_path=Path("/tmp/x.log"),
+            result_path=None,
+        )
+
+    exec_phase.run_execute(
+        cfg,
+        log_dir=tmp_path,
+        databases_root=tmp_path / "databases",
+        runner=recording_runner,
+    )
+    assert seen["extra_args"] == ("--tuning", "tuned")
+    assert seen["benchmark_runs_dir"] == Path("~/Developer/benchmark_runs").expanduser()
+
+
 def test_default_log_dir_substitutes_date_and_name():
     cfg = validate_config({"name": "uat-2026-05-02"})
     out = exec_phase.default_log_dir(cfg, now=_dt.datetime(2026, 5, 5))
     assert "20260505" in str(out)
     assert "uat-2026-05-02" not in str(out)  # default template uses {date} only
+
+
+def test_default_benchmark_runs_dir_substitutes_date_and_name(tmp_path):
+    cfg = validate_config(
+        {
+            "name": "uat-smoke",
+            "output": {"benchmark_runs_dir_template": str(tmp_path / "{name}" / "{date}")},
+        }
+    )
+    out = exec_phase.default_benchmark_runs_dir(cfg, now=_dt.datetime(2026, 5, 5))
+    assert out == tmp_path / "uat-smoke" / "20260505"
 
 
 def test_topological_sort_moves_source_before_consumer():

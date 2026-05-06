@@ -10,6 +10,7 @@ from unittest.mock import patch
 import pytest
 
 from tests.uat import runner
+from tests.uat.timeouts import TimeoutResult
 
 pytestmark = pytest.mark.fast
 
@@ -56,6 +57,58 @@ def test_run_cell_writes_log_and_returns_result(tmp_path: Path):
     assert result.log_path.exists()
     log_text = result.log_path.read_text()
     assert "benchmark_runs/results/" in log_text
+
+
+def test_run_cell_sets_benchbox_output_dir_for_subprocess(tmp_path: Path):
+    fake_argv = [sys.executable, "-c", "print('unused')"]
+    captured = {}
+
+    def fake_run_with_timeout(argv, timeout_s, *, stdout=None, stderr=None, env=None, cwd=None):
+        captured["env"] = env
+        return TimeoutResult(exit_code=0, timed_out=False, elapsed_s=0.1)
+
+    with (
+        patch.object(runner, "benchbox_run_argv", return_value=fake_argv),
+        patch.object(runner, "run_with_timeout", side_effect=fake_run_with_timeout),
+    ):
+        result = runner.run_cell(
+            "duckdb",
+            "tpch",
+            0.01,
+            timeout_s=10,
+            log_dir=tmp_path,
+            benchmark_runs_dir=tmp_path / "shared-runs",
+            now=_dt.datetime(2026, 5, 5, 12, 0, 0),
+        )
+
+    assert result.status == "passed"
+    assert captured["env"]["BENCHBOX_OUTPUT_DIR"] == str(tmp_path / "shared-runs")
+    assert "BENCHBOX_OUTPUT_DIR=" in result.log_path.read_text()
+
+
+def test_run_cell_defaults_benchbox_output_dir_to_shared(monkeypatch, tmp_path: Path):
+    monkeypatch.delenv("BENCHBOX_OUTPUT_DIR", raising=False)
+    fake_argv = [sys.executable, "-c", "print('unused')"]
+    captured = {}
+
+    def fake_run_with_timeout(argv, timeout_s, *, stdout=None, stderr=None, env=None, cwd=None):
+        captured["env"] = env
+        return TimeoutResult(exit_code=0, timed_out=False, elapsed_s=0.1)
+
+    with (
+        patch.object(runner, "benchbox_run_argv", return_value=fake_argv),
+        patch.object(runner, "run_with_timeout", side_effect=fake_run_with_timeout),
+    ):
+        runner.run_cell(
+            "duckdb",
+            "tpch",
+            0.01,
+            timeout_s=10,
+            log_dir=tmp_path,
+            now=_dt.datetime(2026, 5, 5, 12, 0, 0),
+        )
+
+    assert captured["env"]["BENCHBOX_OUTPUT_DIR"] == str(Path.home() / "Developer" / "benchmark_runs")
 
 
 def test_run_cell_marks_failure(tmp_path: Path):

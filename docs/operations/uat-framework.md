@@ -26,8 +26,8 @@ developer guide for hacking on the framework itself is
 
 ## Output artefacts
 
-By default everything lands under `~/Developer/benchmark_runs/`
-(override via `BENCHBOX_OUTPUT_DIR`):
+By default every BenchBox runtime artefact lands under the shared
+`~/Developer/benchmark_runs/` root:
 
 ```
 ~/Developer/benchmark_runs/
@@ -38,8 +38,12 @@ By default everything lands under `~/Developer/benchmark_runs/`
 └── submissions/<name>/            # local-stage / draft-pr bundles
 ```
 
-The `output.logs_dir_template` and `output.submissions_dir_template`
-YAML fields override these paths.
+The UAT runner passes this root to every `benchbox run` subprocess as
+`BENCHBOX_OUTPUT_DIR`, so datagen, loaded databases, and result JSONs
+stay outside the worktree even when the sweep is launched from a pool
+worktree. Override the root with `output.benchmark_runs_dir_template`;
+override only logs or staged submissions with `output.logs_dir_template`
+and `output.submissions_dir_template`.
 
 ## Submission terminal states
 

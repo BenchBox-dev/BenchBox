@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T00:46:37.797708+00:00",
+  "bundle_file": "h2odb_sf001_duckdb_sql_20260505_194911_c1a8853f.json",
+  "bundle_hash": "b515fdf111c23d92b255a3a875f5b2f2ea375c1e3166bee8bd89c6b10502f59c",
+  "companion_hashes": {},
+  "benchmark": "H2O Database",
+  "platform": "DuckDB",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

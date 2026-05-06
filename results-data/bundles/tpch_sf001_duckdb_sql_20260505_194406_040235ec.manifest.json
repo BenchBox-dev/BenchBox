@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T00:47:39.768704+00:00",
+  "bundle_file": "tpch_sf001_duckdb_sql_20260505_194406_040235ec.json",
+  "bundle_hash": "71302900f5cad1ee9c5317263a0ae8ebb577a45369f0f587b9d9058867cc1bfb",
+  "companion_hashes": {},
+  "benchmark": "TPC-H",
+  "platform": "DuckDB",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

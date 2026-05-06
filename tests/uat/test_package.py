@@ -35,6 +35,7 @@ def test_package_local_stage_invokes_output_mode(tmp_path: Path):
     )
     assert result.terminal_state == "local-stage"
     assert result.success_count == 1
+    assert result.invocations[0][:2] == ("benchbox", "submit")
     assert "--output" in result.invocations[0]
 
 

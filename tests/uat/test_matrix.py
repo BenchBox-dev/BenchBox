@@ -243,6 +243,11 @@ def test_benchbox_run_argv_includes_platform_extras():
     assert "port=19030" in argv
 
 
+def test_benchbox_run_argv_appends_extra_args():
+    argv = matrix.benchbox_run_argv("duckdb", "tpch", 0.01, extra_args=["--tuning", "tuned"])
+    assert argv[-2:] == ["--tuning", "tuned"]
+
+
 def test_benchbox_run_argv_velox_iterations_one():
     argv = matrix.benchbox_run_argv("velox", "tpch", 0.01)
     # CLI flags before --platform-option per the bash ordering.

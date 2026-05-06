@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T00:46:33.875673+00:00",
+  "bundle_file": "flightdata_sf01_duckdb_sql_20260505_201107_93c8c67a.json",
+  "bundle_hash": "805f05715448c4ab60f246ec0e09f59c4c7975c6a037a3cbfe60b2a932bec297",
+  "companion_hashes": {},
+  "benchmark": "Flight Data OLAP",
+  "platform": "DuckDB",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

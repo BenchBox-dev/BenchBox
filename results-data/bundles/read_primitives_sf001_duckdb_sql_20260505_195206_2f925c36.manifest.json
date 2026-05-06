@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T00:47:00.766085+00:00",
+  "bundle_file": "read_primitives_sf001_duckdb_sql_20260505_195206_2f925c36.json",
+  "bundle_hash": "83df14aefcecc666fa4db79dba62199f3db35a5c02103cc48118945259f969bc",
+  "companion_hashes": {},
+  "benchmark": "Read Primitives",
+  "platform": "DuckDB",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

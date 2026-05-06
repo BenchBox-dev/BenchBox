@@ -1,7 +1,91 @@
 {
   "schema_version": "2.2",
-  "generated_at": "2026-05-03T12:55:22.715296+00:00",
+  "generated_at": "2026-05-06T01:34:55.468539+00:00",
   "bundles": [
+    {
+      "file": "ai_primitives_sf001_clickhouse_local_sql_20260505_203904_5cabc96e.json",
+      "benchmark": "ai_primitives",
+      "benchmark_name": "AI/ML Primitives",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 0.01,
+      "timestamp": "2026-05-05T20:39:04.440484",
+      "query_count": 0,
+      "trust_label": "community-submission",
+      "bundle_sha256": "0003f2e8de845e1054cbed82ee694fa94863b8ebb2a38fd0dd4fe99e0728eb56"
+    },
+    {
+      "file": "ai_primitives_sf01_clickhouse_local_sql_20260505_203907_c5c8e351.json",
+      "benchmark": "ai_primitives",
+      "benchmark_name": "AI/ML Primitives",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 0.1,
+      "timestamp": "2026-05-05T20:39:07.135013",
+      "query_count": 0,
+      "trust_label": "community-submission",
+      "bundle_sha256": "cbf763025e658276fa21fee86aa3b6c6bcff50accec5b117da7c79c5ab67a398"
+    },
+    {
+      "file": "ai_primitives_sf1_clickhouse_local_sql_20260505_203910_7d1d6452.json",
+      "benchmark": "ai_primitives",
+      "benchmark_name": "AI/ML Primitives",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 1.0,
+      "timestamp": "2026-05-05T20:39:10.063280",
+      "query_count": 0,
+      "trust_label": "community-submission",
+      "bundle_sha256": "5fc9e5d92a109e830efd9a3147410235a2ceeae6f23e02fdc8983a37e9985400"
+    },
+    {
+      "file": "ai_primitives_sf001_duckdb_sql_20260505_195237_6a61da4c.json",
+      "benchmark": "ai_primitives",
+      "benchmark_name": "AI/ML Primitives",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.01,
+      "timestamp": "2026-05-05T19:52:37.792326",
+      "query_count": 0,
+      "trust_label": "community-submission",
+      "bundle_sha256": "71aa1ed47621fcba05f1fbc19c7a2f70ff96a77b7b05dc5de2a6388ecbe9279e"
+    },
+    {
+      "file": "amplab_sf001_clickhouse_local_sql_20260505_203653_53b43aa6.json",
+      "benchmark": "amplab",
+      "benchmark_name": "AMPLab Big Data",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 0.01,
+      "timestamp": "2026-05-05T20:36:53.652329",
+      "query_count": 24,
+      "trust_label": "community-submission",
+      "bundle_sha256": "d0560738f6602d4b7f2e5e6955dfc47a899e8f00255d0e8add1f3699e509f997"
+    },
+    {
+      "file": "amplab_sf01_clickhouse_local_sql_20260505_203655_ba55b5ed.json",
+      "benchmark": "amplab",
+      "benchmark_name": "AMPLab Big Data",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 0.1,
+      "timestamp": "2026-05-05T20:36:55.807842",
+      "query_count": 24,
+      "trust_label": "community-submission",
+      "bundle_sha256": "61c120a0595a2083a1f621ea727ba2c5537d4a4c027182c4a60c5403db2d0207"
+    },
+    {
+      "file": "amplab_sf1_clickhouse_local_sql_20260505_203700_ceb5fba7.json",
+      "benchmark": "amplab",
+      "benchmark_name": "AMPLab Big Data",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 1.0,
+      "timestamp": "2026-05-05T20:37:00.828393",
+      "query_count": 24,
+      "trust_label": "community-submission",
+      "bundle_sha256": "1c3c87c41a0dde0d7d0547ee899f1cd0c829f32d4d900ff7b38b0e226852300a"
+    },
     {
       "file": "amplab_sf001_datafusion_sql_20260502_182815_88aab2ac.json",
       "benchmark": "amplab",
@@ -27,6 +111,18 @@
       "bundle_sha256": "8f6a203116445ac18f59f559b2e3175e6488b8a754d929a80f614b83522162dd"
     },
     {
+      "file": "amplab_sf001_datafusion_sql_20260505_202641_ba032765.json",
+      "benchmark": "amplab",
+      "benchmark_name": "AMPLab Big Data",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 0.01,
+      "timestamp": "2026-05-05T20:26:41.367303",
+      "query_count": 24,
+      "trust_label": "community-submission",
+      "bundle_sha256": "d4177089c1d7f89c4108b3ba52caaba5d282dbe066395f7581d1492ef1aa7b5d"
+    },
+    {
       "file": "amplab_sf01_datafusion_df_20260502_223335_8ed41c67.json",
       "benchmark": "amplab",
       "benchmark_name": "AMPLab",
@@ -39,6 +135,18 @@
       "bundle_sha256": "7866e5fd26effb51b501eff38e46947c531dbb64a289318c404d3bdc30fe6606"
     },
     {
+      "file": "amplab_sf01_datafusion_sql_20260505_202643_93bf75ab.json",
+      "benchmark": "amplab",
+      "benchmark_name": "AMPLab Big Data",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 0.1,
+      "timestamp": "2026-05-05T20:26:43.380391",
+      "query_count": 24,
+      "trust_label": "community-submission",
+      "bundle_sha256": "880719a97116b1487970f1dd508541d5318c7d5958886a912f9322f5c8afb21c"
+    },
+    {
       "file": "amplab_sf1_datafusion_df_20260502_223336_92b1324f.json",
       "benchmark": "amplab",
       "benchmark_name": "AMPLab",
@@ -49,6 +157,54 @@
       "query_count": 0,
       "trust_label": "community-submission",
       "bundle_sha256": "08ddf2ddb0f127c45bb277108ed918bf8b718c636b1d03204fee063c9cb225cb"
+    },
+    {
+      "file": "amplab_sf1_datafusion_sql_20260505_202647_8721b098.json",
+      "benchmark": "amplab",
+      "benchmark_name": "AMPLab Big Data",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 1.0,
+      "timestamp": "2026-05-05T20:26:47.956659",
+      "query_count": 24,
+      "trust_label": "community-submission",
+      "bundle_sha256": "3de217ecded26ec2c4d0a7137fdd24779a08bc48b8305c3009791b32601882ff"
+    },
+    {
+      "file": "amplab_sf001_duckdb_sql_20260505_195133_aee4e9cc.json",
+      "benchmark": "amplab",
+      "benchmark_name": "AMPLab Big Data",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.01,
+      "timestamp": "2026-05-05T19:51:33.396513",
+      "query_count": 24,
+      "trust_label": "community-submission",
+      "bundle_sha256": "9af633ba14c8e50a5afc3867c158a050a4f8ed41ef8a1ad1dc96a1e1d52676ce"
+    },
+    {
+      "file": "amplab_sf01_duckdb_sql_20260505_195137_6d9a2a8a.json",
+      "benchmark": "amplab",
+      "benchmark_name": "AMPLab Big Data",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.1,
+      "timestamp": "2026-05-05T19:51:37.578338",
+      "query_count": 24,
+      "trust_label": "community-submission",
+      "bundle_sha256": "7798a83bd5cb6ceee187094fd4f8a7d2241424c093c1df4981ea17fd099765a7"
+    },
+    {
+      "file": "amplab_sf1_duckdb_sql_20260505_195202_f00b12ea.json",
+      "benchmark": "amplab",
+      "benchmark_name": "AMPLab Big Data",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 1.0,
+      "timestamp": "2026-05-05T19:52:02.427840",
+      "query_count": 24,
+      "trust_label": "community-submission",
+      "bundle_sha256": "6c8fea98d44a8108efd49a49ed2de05445de50a1b900975b6573c1ab1e3bab9a"
     },
     {
       "file": "amplab_sf001_polars_df_20260502_211246_1df590de.json",
@@ -195,6 +351,18 @@
       "bundle_sha256": "96530ca97865eb5186a28cf55f0fa57a6ce969f8fc558d131ba35c96f5f3aec5"
     },
     {
+      "file": "clickbench_sf1_clickhouse_local_sql_20260505_203637_10bcd7ec.json",
+      "benchmark": "clickbench",
+      "benchmark_name": "ClickBench",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 1.0,
+      "timestamp": "2026-05-05T20:36:37.228021",
+      "query_count": 129,
+      "trust_label": "community-submission",
+      "bundle_sha256": "fbbeaf4dcb7fcbdb3a021f49135158cd9f18e848e49740d73a90c28e5f7ec2d0"
+    },
+    {
       "file": "clickbench_sf1_datafusion_sql_20260502_182747_b51a3184.json",
       "benchmark": "clickbench",
       "benchmark_name": "ClickBench",
@@ -217,6 +385,30 @@
       "query_count": 129,
       "trust_label": "community-submission",
       "bundle_sha256": "8a337c0f24407b9c6b29a2ac16a046563c74cb24cbf6671d57547b9e1e9bcba9"
+    },
+    {
+      "file": "clickbench_sf1_datafusion_sql_20260505_202622_16a77636.json",
+      "benchmark": "clickbench",
+      "benchmark_name": "ClickBench",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 1.0,
+      "timestamp": "2026-05-05T20:26:22.876641",
+      "query_count": 129,
+      "trust_label": "community-submission",
+      "bundle_sha256": "7c16f9c1ec27359c32d89f7c6f9f43d8ee34622df4711577ffa05e09ab17704e"
+    },
+    {
+      "file": "clickbench_sf1_duckdb_sql_20260505_194908_b0d3d371.json",
+      "benchmark": "clickbench",
+      "benchmark_name": "ClickBench",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 1.0,
+      "timestamp": "2026-05-05T19:49:08.629203",
+      "query_count": 129,
+      "trust_label": "community-submission",
+      "bundle_sha256": "b1bc621342d3b2d899bd5cf3f4e858f4756d96e02cc496280987e29e3650190f"
     },
     {
       "file": "clickbench_sf1_polars_df_20260502_211211_9f5a3ffd.json",
@@ -267,6 +459,42 @@
       "bundle_sha256": "3f7d9283d03a5448b58e4e04f13d42a6101ec311da3cba975c6f3caaf45d5e4a"
     },
     {
+      "file": "coffeeshop_sf001_clickhouse_local_sql_20260505_203923_337b9500.json",
+      "benchmark": "coffeeshop",
+      "benchmark_name": "CoffeeShop",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 0.01,
+      "timestamp": "2026-05-05T20:39:23.401468",
+      "query_count": 33,
+      "trust_label": "community-submission",
+      "bundle_sha256": "6452fb172ef79cfb0c77df70248bbdc0d02c7d337a0bd351075949a2b7deab3c"
+    },
+    {
+      "file": "coffeeshop_sf01_clickhouse_local_sql_20260505_203926_5ca5cc7b.json",
+      "benchmark": "coffeeshop",
+      "benchmark_name": "CoffeeShop",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 0.1,
+      "timestamp": "2026-05-05T20:39:26.813183",
+      "query_count": 33,
+      "trust_label": "community-submission",
+      "bundle_sha256": "3ebbec4149509b449643ff624bfe85d6eb74299423ad3f16262a58d96535d9fe"
+    },
+    {
+      "file": "coffeeshop_sf1_clickhouse_local_sql_20260505_203937_f8995a77.json",
+      "benchmark": "coffeeshop",
+      "benchmark_name": "CoffeeShop",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 1.0,
+      "timestamp": "2026-05-05T20:39:37.035236",
+      "query_count": 33,
+      "trust_label": "community-submission",
+      "bundle_sha256": "977a7df72424e22577dc14caaba816ea79b29fcbef169d6ecb2ad146a812114d"
+    },
+    {
       "file": "coffeeshop_sf001_datafusion_sql_20260502_182803_8caf558a.json",
       "benchmark": "coffeeshop",
       "benchmark_name": "CoffeeShop",
@@ -291,6 +519,18 @@
       "bundle_sha256": "395058682af9fd82bab80f84461d906e44fff183872f8731ee585a862f58a50d"
     },
     {
+      "file": "coffeeshop_sf001_datafusion_sql_20260505_202708_21fb5ae1.json",
+      "benchmark": "coffeeshop",
+      "benchmark_name": "CoffeeShop",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 0.01,
+      "timestamp": "2026-05-05T20:27:08.174284",
+      "query_count": 33,
+      "trust_label": "community-submission",
+      "bundle_sha256": "6bf8e2d50c9735e473db65e6c57dab0b2fec164c3941cc8ed2edc83b826d966a"
+    },
+    {
       "file": "coffeeshop_sf01_datafusion_df_20260502_223321_08fec735.json",
       "benchmark": "coffeeshop",
       "benchmark_name": "CoffeeShop",
@@ -303,6 +543,18 @@
       "bundle_sha256": "2e8a1099c104f72dcfe292fbc734d9b11bab3551f7c08030adce7c9192b32bfb"
     },
     {
+      "file": "coffeeshop_sf01_datafusion_sql_20260505_202710_d087c2f1.json",
+      "benchmark": "coffeeshop",
+      "benchmark_name": "CoffeeShop",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 0.1,
+      "timestamp": "2026-05-05T20:27:10.685035",
+      "query_count": 33,
+      "trust_label": "community-submission",
+      "bundle_sha256": "62bf70e61856522301457a8835f09a27e394ee40fde3c077f28de8b75395ed67"
+    },
+    {
       "file": "coffeeshop_sf1_datafusion_df_20260502_223323_0eb2e311.json",
       "benchmark": "coffeeshop",
       "benchmark_name": "CoffeeShop",
@@ -313,6 +565,54 @@
       "query_count": 0,
       "trust_label": "community-submission",
       "bundle_sha256": "a0cdbb436e1840cfbb4d474862fe02d91fd9c08560aa8230a478151e0d7615d0"
+    },
+    {
+      "file": "coffeeshop_sf1_datafusion_sql_20260505_202720_843f9380.json",
+      "benchmark": "coffeeshop",
+      "benchmark_name": "CoffeeShop",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 1.0,
+      "timestamp": "2026-05-05T20:27:20.141811",
+      "query_count": 33,
+      "trust_label": "community-submission",
+      "bundle_sha256": "18b67346702fdd16ffa3c0e71976a51c8afb1e00dbc6c2af8fc0c887b655c595"
+    },
+    {
+      "file": "coffeeshop_sf001_duckdb_sql_20260505_195303_d21a7135.json",
+      "benchmark": "coffeeshop",
+      "benchmark_name": "CoffeeShop",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.01,
+      "timestamp": "2026-05-05T19:53:03.868429",
+      "query_count": 33,
+      "trust_label": "community-submission",
+      "bundle_sha256": "dfc7f3ede74b768dc6d2a3d4d621579bc4d1552f402f0320cf46496d8bdc8ffa"
+    },
+    {
+      "file": "coffeeshop_sf01_duckdb_sql_20260505_195311_b64361e0.json",
+      "benchmark": "coffeeshop",
+      "benchmark_name": "CoffeeShop",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.1,
+      "timestamp": "2026-05-05T19:53:11.130454",
+      "query_count": 33,
+      "trust_label": "community-submission",
+      "bundle_sha256": "b9b74d966b2a176eaffaa3b5454f3424a21c36e05bcbeb5fcd3347ade6a42c1f"
+    },
+    {
+      "file": "coffeeshop_sf1_duckdb_sql_20260505_195358_af98b993.json",
+      "benchmark": "coffeeshop",
+      "benchmark_name": "CoffeeShop",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 1.0,
+      "timestamp": "2026-05-05T19:53:58.587673",
+      "query_count": 33,
+      "trust_label": "community-submission",
+      "bundle_sha256": "6c3c306b082fb435da5c2d4b876482707e56ae64e2def2b87d594351c65e67b0"
     },
     {
       "file": "coffeeshop_sf001_polars_df_20260502_211230_fe693d45.json",
@@ -471,6 +771,18 @@
       "bundle_sha256": "c7077f5c5632478b921654368cec4d103e0ee5632e34c14c9f3e51b75667c9e7"
     },
     {
+      "file": "datavault_sf001_duckdb_sql_20260505_202118_6c55c3f8.json",
+      "benchmark": "datavault",
+      "benchmark_name": "Data Vault",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.01,
+      "timestamp": "2026-05-05T20:21:18.597392",
+      "query_count": 66,
+      "trust_label": "community-submission",
+      "bundle_sha256": "ba87b6550e3f851b098f24dce8fdc8502e68f047cb30a4d932b8a940872b4f6a"
+    },
+    {
       "file": "datavault_sf01_duckdb_sql_20260502_182249_6f443c67.json",
       "benchmark": "datavault",
       "benchmark_name": "Data Vault",
@@ -483,6 +795,18 @@
       "bundle_sha256": "55e982fc411540da8cb3e8626971bc685a387bfb0da3daedc62be83862295344"
     },
     {
+      "file": "datavault_sf01_duckdb_sql_20260505_202133_e00a34c0.json",
+      "benchmark": "datavault",
+      "benchmark_name": "Data Vault",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.1,
+      "timestamp": "2026-05-05T20:21:33.309548",
+      "query_count": 66,
+      "trust_label": "community-submission",
+      "bundle_sha256": "789050aa55d634bb200b10a1dd5a219edecdc7be0c55add930be4cb7fa2d1c0d"
+    },
+    {
       "file": "datavault_sf1_duckdb_sql_20260502_182429_6560cfef.json",
       "benchmark": "datavault",
       "benchmark_name": "Data Vault",
@@ -493,6 +817,18 @@
       "query_count": 66,
       "trust_label": "community-submission",
       "bundle_sha256": "0e1bd1bb055c1a7ac309b6e77edd7ae03fd2a5e8b56df43e9de6589e7262aa08"
+    },
+    {
+      "file": "datavault_sf1_duckdb_sql_20260505_202356_c7865471.json",
+      "benchmark": "datavault",
+      "benchmark_name": "Data Vault",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 1.0,
+      "timestamp": "2026-05-05T20:23:56.503241",
+      "query_count": 66,
+      "trust_label": "community-submission",
+      "bundle_sha256": "285b22c80c08a777c1e2dca4dc6d18972ee420022c7e128fe6fad0e00c9d70cc"
     },
     {
       "file": "datavault_sf001_pyspark_df_20260502_215849_95a24d45.json",
@@ -555,6 +891,30 @@
       "bundle_sha256": "c7219ff821d3d8b915e7f0ab62b296bba7e5db86fee7de24251b4768a4df0f4c"
     },
     {
+      "file": "flightdata_sf001_duckdb_sql_20260505_200924_5451891e.json",
+      "benchmark": "flightdata",
+      "benchmark_name": "Flight Data OLAP",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.01,
+      "timestamp": "2026-05-05T20:09:24.394200",
+      "query_count": 60,
+      "trust_label": "community-submission",
+      "bundle_sha256": "8f46086d77b28f5780ea3ee21812f985639d4569c0cf140bda37d1cf2b796303"
+    },
+    {
+      "file": "flightdata_sf01_duckdb_sql_20260505_201107_93c8c67a.json",
+      "benchmark": "flightdata",
+      "benchmark_name": "Flight Data OLAP",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.1,
+      "timestamp": "2026-05-05T20:11:07.215183",
+      "query_count": 60,
+      "trust_label": "community-submission",
+      "bundle_sha256": "805f05715448c4ab60f246ec0e09f59c4c7975c6a037a3cbfe60b2a932bec297"
+    },
+    {
       "file": "flightdata_sf001_polars_df_20260502_211311_d255f81b.json",
       "benchmark": "flightdata",
       "benchmark_name": "Flight Data",
@@ -603,6 +963,42 @@
       "bundle_sha256": "5afbea0e9b0fca6db583ca099184e2c3af2a43aa6abdac566897db0e3a4d525e"
     },
     {
+      "file": "h2odb_sf001_clickhouse_local_sql_20260505_203639_3bda9be4.json",
+      "benchmark": "h2odb",
+      "benchmark_name": "H2O Database",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 0.01,
+      "timestamp": "2026-05-05T20:36:39.246060",
+      "query_count": 30,
+      "trust_label": "community-submission",
+      "bundle_sha256": "e5195562a2e7f68f49fe68bef112af4cf525901186671c94bfad02699a60d3bc"
+    },
+    {
+      "file": "h2odb_sf01_clickhouse_local_sql_20260505_203641_db01762e.json",
+      "benchmark": "h2odb",
+      "benchmark_name": "H2O Database",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 0.1,
+      "timestamp": "2026-05-05T20:36:41.753698",
+      "query_count": 30,
+      "trust_label": "community-submission",
+      "bundle_sha256": "2394410c0d7fa221727178fab54d6d260859a132f8e1a87e04a767a8fbbb7158"
+    },
+    {
+      "file": "h2odb_sf1_clickhouse_local_sql_20260505_203651_f359c574.json",
+      "benchmark": "h2odb",
+      "benchmark_name": "H2O Database",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 1.0,
+      "timestamp": "2026-05-05T20:36:50.962169",
+      "query_count": 30,
+      "trust_label": "community-submission",
+      "bundle_sha256": "0fb6fb11028a1be0365bbf174238da967a07b01b96575b4d06857d7b71a0f4bc"
+    },
+    {
       "file": "h2odb_sf001_datafusion_sql_20260502_182748_cd8a576b.json",
       "benchmark": "h2odb",
       "benchmark_name": "H2O Database",
@@ -627,6 +1023,18 @@
       "bundle_sha256": "d505979d5f15a87c9e653b4e2dec67347791e7d64b550e5b968d44da43b0187c"
     },
     {
+      "file": "h2odb_sf001_datafusion_sql_20260505_202624_2db63a1d.json",
+      "benchmark": "h2odb",
+      "benchmark_name": "H2O Database",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 0.01,
+      "timestamp": "2026-05-05T20:26:24.547198",
+      "query_count": 30,
+      "trust_label": "community-submission",
+      "bundle_sha256": "ac3d6337210fc611f883c6b55bcf7610b4437f803cbbd9b4beece8f24b157513"
+    },
+    {
       "file": "h2odb_sf01_datafusion_df_20260502_223314_b024941c.json",
       "benchmark": "h2odb",
       "benchmark_name": "H2ODB",
@@ -639,6 +1047,18 @@
       "bundle_sha256": "3f542b04a3c7e9aaed0c58fe7e7a3b41cbfb1ee14c6117b293555eec7658726d"
     },
     {
+      "file": "h2odb_sf01_datafusion_sql_20260505_202626_4b98c5e0.json",
+      "benchmark": "h2odb",
+      "benchmark_name": "H2O Database",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 0.1,
+      "timestamp": "2026-05-05T20:26:26.888881",
+      "query_count": 30,
+      "trust_label": "community-submission",
+      "bundle_sha256": "9042ed9c75c50478dddabcf5a202d25769a290d2333065f34174108700613ea9"
+    },
+    {
       "file": "h2odb_sf1_datafusion_df_20260502_223315_db3ffa2a.json",
       "benchmark": "h2odb",
       "benchmark_name": "H2ODB",
@@ -649,6 +1069,54 @@
       "query_count": 0,
       "trust_label": "community-submission",
       "bundle_sha256": "a43773735504f8553d3e6e56a565113e40dafa93bf6f123ef8296abee3815699"
+    },
+    {
+      "file": "h2odb_sf1_datafusion_sql_20260505_202639_e274d151.json",
+      "benchmark": "h2odb",
+      "benchmark_name": "H2O Database",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 1.0,
+      "timestamp": "2026-05-05T20:26:39.609079",
+      "query_count": 30,
+      "trust_label": "community-submission",
+      "bundle_sha256": "b66e75483dfd41f8d8f5a5d2bc387b0376564036ccae1ef5fe878f1a8cbb743e"
+    },
+    {
+      "file": "h2odb_sf001_duckdb_sql_20260505_194911_c1a8853f.json",
+      "benchmark": "h2odb",
+      "benchmark_name": "H2O Database",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.01,
+      "timestamp": "2026-05-05T19:49:11.641096",
+      "query_count": 30,
+      "trust_label": "community-submission",
+      "bundle_sha256": "b515fdf111c23d92b255a3a875f5b2f2ea375c1e3166bee8bd89c6b10502f59c"
+    },
+    {
+      "file": "h2odb_sf01_duckdb_sql_20260505_194926_a281ede2.json",
+      "benchmark": "h2odb",
+      "benchmark_name": "H2O Database",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.1,
+      "timestamp": "2026-05-05T19:49:26.535298",
+      "query_count": 30,
+      "trust_label": "community-submission",
+      "bundle_sha256": "7132174087256cef71653cc150a0c7a5bc6d9d40a5aaeaa1e620c0e1edecc9ad"
+    },
+    {
+      "file": "h2odb_sf1_duckdb_sql_20260505_195131_cb85ff30.json",
+      "benchmark": "h2odb",
+      "benchmark_name": "H2O Database",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 1.0,
+      "timestamp": "2026-05-05T19:51:31.413383",
+      "query_count": 30,
+      "trust_label": "community-submission",
+      "bundle_sha256": "ff96f9eb8807a88622f05aff65f9c7e365a73cdb29a33144a6bb47b7dc832e95"
     },
     {
       "file": "h2odb_sf001_polars_df_20260502_211213_b684dd1e.json",
@@ -795,6 +1263,30 @@
       "bundle_sha256": "3edea7e51efa2f54b9ea0dd24671ea224d93a9d6a77db913794bd7b120b13c9c"
     },
     {
+      "file": "joinorder_sf1_clickhouse_local_sql_20260505_203919_70acdc69.json",
+      "benchmark": "joinorder",
+      "benchmark_name": "JoinOrderBenchmark",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 1.0,
+      "timestamp": "2026-05-05T20:39:19.831409",
+      "query_count": 39,
+      "trust_label": "community-submission",
+      "bundle_sha256": "b0e209db709cabe55dd2994a4267cbc3e9b3b65c438095455dd02589ce9589a9"
+    },
+    {
+      "file": "joinorder_sf1_duckdb_sql_20260505_195300_be289a53.json",
+      "benchmark": "joinorder",
+      "benchmark_name": "JoinOrderBenchmark",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 1.0,
+      "timestamp": "2026-05-05T19:53:00.790367",
+      "query_count": 39,
+      "trust_label": "community-submission",
+      "bundle_sha256": "f87c454292494e6fe2ee3904995ba758ec9421b54ce705097a82cd3311936ecc"
+    },
+    {
       "file": "metadata_primitives_sf1_datafusion_sql_20260502_182730_9bf19029.json",
       "benchmark": "metadata_primitives",
       "benchmark_name": "Metadata Primitives",
@@ -805,6 +1297,18 @@
       "query_count": 153,
       "trust_label": "community-submission",
       "bundle_sha256": "7fb6efbbd7d9cfeedf21a1592a0015c2073b1b8f74ec152807a5cabaacc7b25a"
+    },
+    {
+      "file": "metadata_primitives_sf1_duckdb_sql_20260505_195232_e78cf91e.json",
+      "benchmark": "metadata_primitives",
+      "benchmark_name": "Metadata Primitives",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 1.0,
+      "timestamp": "2026-05-05T19:52:32.866588",
+      "query_count": 177,
+      "trust_label": "community-submission",
+      "bundle_sha256": "406c805597c6472e02dd999394f5216066539147922e58c3dd52e58b21bcef71"
     },
     {
       "file": "metadata_primitives_sf1_polars_df_20260502_211203_5a803e74.json",
@@ -865,6 +1369,30 @@
       "query_count": 0,
       "trust_label": "community-submission",
       "bundle_sha256": "a517111be8b7e25eb1946e64a5c091d20b0662cda21143cfb0b5bbb8ede48818"
+    },
+    {
+      "file": "nyctaxi_sf001_duckdb_sql_20260505_195804_c08bdfbb.json",
+      "benchmark": "nyctaxi",
+      "benchmark_name": "NYC Taxi OLAP",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.01,
+      "timestamp": "2026-05-05T19:58:04.155839",
+      "query_count": 75,
+      "trust_label": "community-submission",
+      "bundle_sha256": "32e3e7162e42990494814f2e1b2167e4065c113681ad784d523c642d0b6d5db2"
+    },
+    {
+      "file": "nyctaxi_sf01_duckdb_sql_20260505_195916_61155d40.json",
+      "benchmark": "nyctaxi",
+      "benchmark_name": "NYC Taxi OLAP",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.1,
+      "timestamp": "2026-05-05T19:59:16.258015",
+      "query_count": 75,
+      "trust_label": "community-submission",
+      "bundle_sha256": "95575cd06a800fdb50ef5a85df150bd366641123ce060662bbfdbc6c83a78973"
     },
     {
       "file": "nyctaxi_sf001_polars_df_20260502_211302_0e34be37.json",
@@ -939,6 +1467,30 @@
       "bundle_sha256": "9c750ab8230aa1559b32370e26acc0149982bdbc05d4d9ce1576d0d55a82ae6d"
     },
     {
+      "file": "read_primitives_sf001_clickhouse_local_sql_20260505_203708_600f0101.json",
+      "benchmark": "read_primitives",
+      "benchmark_name": "Read Primitives",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 0.01,
+      "timestamp": "2026-05-05T20:37:08.753802",
+      "query_count": 447,
+      "trust_label": "community-submission",
+      "bundle_sha256": "8f9625e2075f32aeaff4be21a49a334dd108b449b0556ada92e6a9be217f6f3f"
+    },
+    {
+      "file": "read_primitives_sf01_clickhouse_local_sql_20260505_203839_662a6efa.json",
+      "benchmark": "read_primitives",
+      "benchmark_name": "Read Primitives",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 0.1,
+      "timestamp": "2026-05-05T20:38:39.727493",
+      "query_count": 447,
+      "trust_label": "community-submission",
+      "bundle_sha256": "2c8e2790c811a76747599995ed539b6d7fecc923fe308857bc36747eda391051"
+    },
+    {
       "file": "read_primitives_sf001_datafusion_sql_20260502_182650_763aa432.json",
       "benchmark": "read_primitives",
       "benchmark_name": "Read Primitives",
@@ -963,6 +1515,18 @@
       "bundle_sha256": "cde15cf07923dca17fb3396483d27c67c3b204aff7e82804a9bcef7df662c02f"
     },
     {
+      "file": "read_primitives_sf001_datafusion_sql_20260505_202651_3d68fa87.json",
+      "benchmark": "read_primitives",
+      "benchmark_name": "Read Primitives",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 0.01,
+      "timestamp": "2026-05-05T20:26:51.145963",
+      "query_count": 414,
+      "trust_label": "community-submission",
+      "bundle_sha256": "0bdadb8d7cf6ba21a4871443832dc9fe78782c3641507b82ec7c9237b092f40b"
+    },
+    {
       "file": "read_primitives_sf01_datafusion_sql_20260502_182654_e6da3ba3.json",
       "benchmark": "read_primitives",
       "benchmark_name": "Read Primitives",
@@ -985,6 +1549,42 @@
       "query_count": 438,
       "trust_label": "community-submission",
       "bundle_sha256": "11d7b6553d4b4ca20b1a8593d134a946e4c46d2de5cac17ca52158bbe24f475c"
+    },
+    {
+      "file": "read_primitives_sf01_datafusion_sql_20260505_202656_5b1ea0e5.json",
+      "benchmark": "read_primitives",
+      "benchmark_name": "Read Primitives",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 0.1,
+      "timestamp": "2026-05-05T20:26:56.196091",
+      "query_count": 414,
+      "trust_label": "community-submission",
+      "bundle_sha256": "381043b38c48f113484117b445430f49c000b4d8bb33e77ec2a1a58ca15503cf"
+    },
+    {
+      "file": "read_primitives_sf001_duckdb_sql_20260505_195206_2f925c36.json",
+      "benchmark": "read_primitives",
+      "benchmark_name": "Read Primitives",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.01,
+      "timestamp": "2026-05-05T19:52:06.887001",
+      "query_count": 459,
+      "trust_label": "community-submission",
+      "bundle_sha256": "83df14aefcecc666fa4db79dba62199f3db35a5c02103cc48118945259f969bc"
+    },
+    {
+      "file": "read_primitives_sf01_duckdb_sql_20260505_195223_b4dd060a.json",
+      "benchmark": "read_primitives",
+      "benchmark_name": "Read Primitives",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.1,
+      "timestamp": "2026-05-05T19:52:23.796502",
+      "query_count": 459,
+      "trust_label": "community-submission",
+      "bundle_sha256": "e46e1fd607513cd978aa03b0b99799e7e3fdb56aeb9c4db8184aca16104b2f51"
     },
     {
       "file": "read_primitives_sf001_polars_df_20260502_210839_881199ef.json",
@@ -1047,6 +1647,42 @@
       "bundle_sha256": "d89c3f3b8f4a5d8accab666e5a5a9ec8b468aaa3d0db693e4118e3b044885dc8"
     },
     {
+      "file": "ssb_sf001_clickhouse_local_sql_20260505_203621_d5ac1ff2.json",
+      "benchmark": "ssb",
+      "benchmark_name": "Star Schema",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 0.01,
+      "timestamp": "2026-05-05T20:36:21.591288",
+      "query_count": 39,
+      "trust_label": "community-submission",
+      "bundle_sha256": "577843c1f76b99be65220980ee79f1572146479c56ac850e27c3c11ef160dc1b"
+    },
+    {
+      "file": "ssb_sf01_clickhouse_local_sql_20260505_203623_551d054e.json",
+      "benchmark": "ssb",
+      "benchmark_name": "Star Schema",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 0.1,
+      "timestamp": "2026-05-05T20:36:23.977855",
+      "query_count": 39,
+      "trust_label": "community-submission",
+      "bundle_sha256": "f2f3f07a6f52b875cb2dae3d98cc863815809771e3060d148a7c7f8513d89508"
+    },
+    {
+      "file": "ssb_sf1_clickhouse_local_sql_20260505_203630_4a6ac6be.json",
+      "benchmark": "ssb",
+      "benchmark_name": "Star Schema",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 1.0,
+      "timestamp": "2026-05-05T20:36:30.801042",
+      "query_count": 39,
+      "trust_label": "community-submission",
+      "bundle_sha256": "c377ec9006a4984093b439000c70e4c71add3b69713e9566bd341092d47fc2af"
+    },
+    {
       "file": "ssb_sf001_datafusion_sql_20260502_182810_b4e11117.json",
       "benchmark": "ssb",
       "benchmark_name": "Star Schema",
@@ -1071,6 +1707,18 @@
       "bundle_sha256": "40f04b1b46225e11475eaa96b120fd0513d41d5d3f003aa815fbd4e98b9ca587"
     },
     {
+      "file": "ssb_sf001_datafusion_sql_20260505_202609_6a67c248.json",
+      "benchmark": "ssb",
+      "benchmark_name": "Star Schema",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 0.01,
+      "timestamp": "2026-05-05T20:26:09.207335",
+      "query_count": 39,
+      "trust_label": "community-submission",
+      "bundle_sha256": "5c67b0276a584171758ce73f4ccf7f0bb686f5b1420635722ca0080265847357"
+    },
+    {
       "file": "ssb_sf01_datafusion_df_20260502_223328_8c02d649.json",
       "benchmark": "ssb",
       "benchmark_name": "SSB",
@@ -1083,6 +1731,18 @@
       "bundle_sha256": "8aec3bc619997411439454dddeb7a3eb54bc2511865d5b33dbe5402542d4aa8f"
     },
     {
+      "file": "ssb_sf01_datafusion_sql_20260505_202611_1dd69589.json",
+      "benchmark": "ssb",
+      "benchmark_name": "Star Schema",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 0.1,
+      "timestamp": "2026-05-05T20:26:11.366043",
+      "query_count": 39,
+      "trust_label": "community-submission",
+      "bundle_sha256": "588180df6ca279c464216175aa6dddb8fffa9826cb01e96d0dbc60946d16b08d"
+    },
+    {
       "file": "ssb_sf1_datafusion_df_20260502_223330_2b2f5243.json",
       "benchmark": "ssb",
       "benchmark_name": "SSB",
@@ -1093,6 +1753,54 @@
       "query_count": 0,
       "trust_label": "community-submission",
       "bundle_sha256": "848b45829f79ac9c467bd7bbb71284d024e18ccee5933c1993ec19ffb1bc8e77"
+    },
+    {
+      "file": "ssb_sf1_datafusion_sql_20260505_202615_96cb76b9.json",
+      "benchmark": "ssb",
+      "benchmark_name": "Star Schema",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 1.0,
+      "timestamp": "2026-05-05T20:26:15.884697",
+      "query_count": 39,
+      "trust_label": "community-submission",
+      "bundle_sha256": "8e708fff56f6f6baad98212b51898ba89fc103d76e66931a75d319c46465fcaa"
+    },
+    {
+      "file": "ssb_sf001_duckdb_sql_20260505_194805_7c37d3bb.json",
+      "benchmark": "ssb",
+      "benchmark_name": "Star Schema",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.01,
+      "timestamp": "2026-05-05T19:48:05.226488",
+      "query_count": 39,
+      "trust_label": "community-submission",
+      "bundle_sha256": "ffe141aab19d450af8e3dae7c168cc900970dff7ca68dca24470c2388dff5b6b"
+    },
+    {
+      "file": "ssb_sf01_duckdb_sql_20260505_194809_6296e2c7.json",
+      "benchmark": "ssb",
+      "benchmark_name": "Star Schema",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.1,
+      "timestamp": "2026-05-05T19:48:09.907075",
+      "query_count": 39,
+      "trust_label": "community-submission",
+      "bundle_sha256": "cb61a9f1f87cee4003e27852598b5c76004971612f4f9d3e8b3594977a98288e"
+    },
+    {
+      "file": "ssb_sf1_duckdb_sql_20260505_194837_8da189cf.json",
+      "benchmark": "ssb",
+      "benchmark_name": "Star Schema",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 1.0,
+      "timestamp": "2026-05-05T19:48:37.550300",
+      "query_count": 39,
+      "trust_label": "community-submission",
+      "bundle_sha256": "196f97fd85fa1f074ced1d017cdad1fbda7d20ca7341bb67ffceb88ee0f48c41"
     },
     {
       "file": "ssb_sf001_polars_df_20260502_211239_4e92eecf.json",
@@ -1347,6 +2055,42 @@
       "bundle_sha256": "e30dbe28e59a05e6c667edaa7885bfd28dcb1beb739887122f1c947e106ec4a8"
     },
     {
+      "file": "tpcdi_sf001_duckdb_sql_20260505_194656_42b1fe6f.json",
+      "benchmark": "tpcdi",
+      "benchmark_name": "TPC-DI",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.01,
+      "timestamp": "2026-05-05T19:46:56.708604",
+      "query_count": 114,
+      "trust_label": "community-submission",
+      "bundle_sha256": "9b53f8917fd442b2153d7e106acd0ceea8d4e4c33c3f1c8666b3f01067f2eacb"
+    },
+    {
+      "file": "tpcdi_sf01_duckdb_sql_20260505_194723_825c57ae.json",
+      "benchmark": "tpcdi",
+      "benchmark_name": "TPC-DI",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.1,
+      "timestamp": "2026-05-05T19:47:23.698630",
+      "query_count": 114,
+      "trust_label": "community-submission",
+      "bundle_sha256": "3c0917b44e8e553237d4242d96f70cdaf4a7c97e38640df93911434700ecd0b0"
+    },
+    {
+      "file": "tpcdi_sf1_duckdb_sql_20260505_194803_2cbfe3de.json",
+      "benchmark": "tpcdi",
+      "benchmark_name": "TPC-DI",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 1.0,
+      "timestamp": "2026-05-05T19:48:03.078328",
+      "query_count": 114,
+      "trust_label": "community-submission",
+      "bundle_sha256": "668038d297497c4e5853ebb0a38430d1908e4e9fb460bffbb5d98840d45ca75b"
+    },
+    {
       "file": "tpcdi_sf001_sqlite_sql_20260502_191350_29a9ff72.json",
       "benchmark": "tpcdi",
       "benchmark_name": "TPC-DI",
@@ -1455,6 +2199,18 @@
       "bundle_sha256": "e499bd138ced9f8441c91659c255b90964db8ea3380c8aed46b98b0ce94d9d98"
     },
     {
+      "file": "tpcds_obt_sf1_duckdb_sql_20260505_194647_b9ac2e21.json",
+      "benchmark": "tpcds_obt",
+      "benchmark_name": "TPC-DS One Big Table",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 1.0,
+      "timestamp": "2026-05-05T19:46:47.755524",
+      "query_count": 267,
+      "trust_label": "community-submission",
+      "bundle_sha256": "505558b356f6255cc17561ccaa98faa28ff07845be469a6b358c88b5681da50e"
+    },
+    {
       "file": "tpcds_obt_sf1_polars_df_20260502_211324_60c565bf.json",
       "benchmark": "tpcds_obt",
       "benchmark_name": "TPC-DS-OBT",
@@ -1477,6 +2233,42 @@
       "query_count": 9,
       "trust_label": "community-submission",
       "bundle_sha256": "6d43af39e8e679b1206e31a100b81b8b27a0d48be41b7e1592dea372dabe8b41"
+    },
+    {
+      "file": "tpch_sf001_clickhouse_local_sql_20260505_202840_41b8599a.json",
+      "benchmark": "tpch",
+      "benchmark_name": "TPC-H",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 0.01,
+      "timestamp": "2026-05-05T20:28:40.073074",
+      "query_count": 66,
+      "trust_label": "community-submission",
+      "bundle_sha256": "7429cc157fa0d52218b8fa13349f4defcd8baf38e64dbe9778c3b85d275ff5be"
+    },
+    {
+      "file": "tpch_sf01_clickhouse_local_sql_20260505_202845_84d3cb01.json",
+      "benchmark": "tpch",
+      "benchmark_name": "TPC-H",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 0.1,
+      "timestamp": "2026-05-05T20:28:45.889522",
+      "query_count": 66,
+      "trust_label": "community-submission",
+      "bundle_sha256": "5c2bfa3fb1eb7671b98ee47ef8cd37f8b9da2da2dc60af50a957dbd356d9e713"
+    },
+    {
+      "file": "tpch_sf1_clickhouse_local_sql_20260505_202911_87557349.json",
+      "benchmark": "tpch",
+      "benchmark_name": "TPC-H",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 1.0,
+      "timestamp": "2026-05-05T20:29:11.734403",
+      "query_count": 66,
+      "trust_label": "community-submission",
+      "bundle_sha256": "cd377532b7081aa3ae1beed88919a71dd181c9b826e4780b527d68f0d774632b"
     },
     {
       "file": "tpch_sf001_datafusion_20260403_093731_c235e698.json",
@@ -1515,6 +2307,18 @@
       "bundle_sha256": "a7a749ddae61c356790d57b824c080764ceb3a9093c5e4109992b40123fbe0c6"
     },
     {
+      "file": "tpch_sf001_datafusion_sql_20260505_202456_b59e544c.json",
+      "benchmark": "tpch",
+      "benchmark_name": "TPC-H",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 0.01,
+      "timestamp": "2026-05-05T20:24:56.997961",
+      "query_count": 66,
+      "trust_label": "community-submission",
+      "bundle_sha256": "e7b46fe41b4db0a5b8eef769e01bd2909a2821269ef16ba7c0687836cc60c266"
+    },
+    {
       "file": "tpch_sf01_datafusion_sql_20260404_191814_890f931e.json",
       "benchmark": "tpch",
       "benchmark_name": "TPC-H",
@@ -1551,6 +2355,18 @@
       "bundle_sha256": "4e3a4fc430b2ee637815f54c2e45a25209fbf20970ce8086aa53788683342e2f"
     },
     {
+      "file": "tpch_sf01_datafusion_sql_20260505_202501_17df7bf5.json",
+      "benchmark": "tpch",
+      "benchmark_name": "TPC-H",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 0.1,
+      "timestamp": "2026-05-05T20:25:01.395385",
+      "query_count": 66,
+      "trust_label": "community-submission",
+      "bundle_sha256": "4f532d1aa7e2bfa00056472ebd5115059b7cd0eebccd2fee7f0c66c22230b911"
+    },
+    {
       "file": "tpch_sf1_datafusion_sql_20260502_182446_cec107c3.json",
       "benchmark": "tpch",
       "benchmark_name": "TPC-H",
@@ -1575,6 +2391,18 @@
       "bundle_sha256": "e5f64283745393780f9d25afafae324d8f1c670b209f9abb96e2f361cd7bcf01"
     },
     {
+      "file": "tpch_sf1_datafusion_sql_20260505_202511_b23e3ad1.json",
+      "benchmark": "tpch",
+      "benchmark_name": "TPC-H",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 1.0,
+      "timestamp": "2026-05-05T20:25:11.126369",
+      "query_count": 66,
+      "trust_label": "community-submission",
+      "bundle_sha256": "b11596f7cff2aa8888431d9d5e26607dedaa9a821368802c0eaf5c22091e38ae"
+    },
+    {
       "file": "tpch_sf001_duckdb_20260403_093653_9c0925d1.json",
       "benchmark": "tpch",
       "benchmark_name": "TPC-H",
@@ -1587,6 +2415,18 @@
       "bundle_sha256": "eb18208c6cba5da0e3a90b4e07865ec11a4885ed98b581c473cf21a3176ddfb0"
     },
     {
+      "file": "tpch_sf001_duckdb_sql_20260505_194406_040235ec.json",
+      "benchmark": "tpch",
+      "benchmark_name": "TPC-H",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.01,
+      "timestamp": "2026-05-05T19:44:06.679638",
+      "query_count": 66,
+      "trust_label": "community-submission",
+      "bundle_sha256": "71302900f5cad1ee9c5317263a0ae8ebb577a45369f0f587b9d9058867cc1bfb"
+    },
+    {
       "file": "tpch_sf01_duckdb_sql_20260404_191803_a4f37225.json",
       "benchmark": "tpch",
       "benchmark_name": "TPC-H",
@@ -1597,6 +2437,30 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "bundle_sha256": "e38957af3951d4904899c7c3a665887a0302700b05b8902b52a445a050310472"
+    },
+    {
+      "file": "tpch_sf01_duckdb_sql_20260505_194410_53587417.json",
+      "benchmark": "tpch",
+      "benchmark_name": "TPC-H",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.1,
+      "timestamp": "2026-05-05T19:44:10.479387",
+      "query_count": 66,
+      "trust_label": "community-submission",
+      "bundle_sha256": "097d70fc081c1bc9d82d7c09c1db544eeb9409989c46371ebb8f77755d2796b0"
+    },
+    {
+      "file": "tpch_sf1_duckdb_sql_20260505_194416_3e6269a3.json",
+      "benchmark": "tpch",
+      "benchmark_name": "TPC-H",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 1.0,
+      "timestamp": "2026-05-05T19:44:16.348623",
+      "query_count": 66,
+      "trust_label": "community-submission",
+      "bundle_sha256": "4e247113fbb518cf2b5a8fd2be150d47ef3d096e5337b659409baa13399c86c3"
     },
     {
       "file": "tpch_sf001_polars_20260403_093741_e744512d.json",
@@ -1743,6 +2607,42 @@
       "bundle_sha256": "ebcde4885b64223a7ee1dea064d490f6a9078b16a4e452d7f3413424178df489"
     },
     {
+      "file": "tpch_skew_sf001_clickhouse_local_sql_20260505_203958_07a81e73.json",
+      "benchmark": "tpch_skew",
+      "benchmark_name": "TPC-H Skew Benchmark (moderate)",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 0.01,
+      "timestamp": "2026-05-05T20:39:58.222836",
+      "query_count": 66,
+      "trust_label": "community-submission",
+      "bundle_sha256": "04964063f7f34acc29b1cacee6111daae9c3ec57a7e1625f3528de0f3652822c"
+    },
+    {
+      "file": "tpch_skew_sf01_clickhouse_local_sql_20260505_204002_571cac0e.json",
+      "benchmark": "tpch_skew",
+      "benchmark_name": "TPC-H Skew Benchmark (moderate)",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 0.1,
+      "timestamp": "2026-05-05T20:40:02.890138",
+      "query_count": 66,
+      "trust_label": "community-submission",
+      "bundle_sha256": "be8ed7e09abb2b4909885123e96873fba5a187d834bf3ab784ae05af65da1245"
+    },
+    {
+      "file": "tpch_skew_sf1_clickhouse_local_sql_20260505_204026_62ec2f02.json",
+      "benchmark": "tpch_skew",
+      "benchmark_name": "TPC-H Skew Benchmark (moderate)",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 1.0,
+      "timestamp": "2026-05-05T20:40:26.281188",
+      "query_count": 66,
+      "trust_label": "community-submission",
+      "bundle_sha256": "751eaeff2a94745aaafea39011fee3e54e700255a77710c994fea9903ddbd7d1"
+    },
+    {
       "file": "tpch_skew_sf001_datafusion_sql_20260502_183759_e3de6446.json",
       "benchmark": "tpch_skew",
       "benchmark_name": "TPC-H Skew Benchmark (moderate)",
@@ -1765,6 +2665,18 @@
       "query_count": 0,
       "trust_label": "community-submission",
       "bundle_sha256": "f50e004c842a6d40baf8814e5c31cae5106ccf0c7d00023691526815c7a00eb3"
+    },
+    {
+      "file": "tpch_skew_sf001_datafusion_sql_20260505_202733_113e0670.json",
+      "benchmark": "tpch_skew",
+      "benchmark_name": "TPC-H Skew Benchmark (moderate)",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 0.01,
+      "timestamp": "2026-05-05T20:27:33.996530",
+      "query_count": 66,
+      "trust_label": "community-submission",
+      "bundle_sha256": "5a345be33528e9019eacdb98e788d8136e97057d489e0e21b906f20f74fdf9a1"
     },
     {
       "file": "tpch_skew_sf01_datafusion_sql_20260502_183802_eb69285f.json",
@@ -1791,6 +2703,18 @@
       "bundle_sha256": "6c4ed525a41464effb22749d575ae683f92208cf367bd3c5b572c6ebc3d5fa72"
     },
     {
+      "file": "tpch_skew_sf01_datafusion_sql_20260505_202737_bd0cf545.json",
+      "benchmark": "tpch_skew",
+      "benchmark_name": "TPC-H Skew Benchmark (moderate)",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 0.1,
+      "timestamp": "2026-05-05T20:27:37.391956",
+      "query_count": 66,
+      "trust_label": "community-submission",
+      "bundle_sha256": "9f9f7eb81e8bba69839da91d91baaacb4dc1616f86c1978c730c7b828bfa9c34"
+    },
+    {
       "file": "tpch_skew_sf1_datafusion_sql_20260502_183813_4aab199c.json",
       "benchmark": "tpch_skew",
       "benchmark_name": "TPC-H Skew Benchmark (moderate)",
@@ -1815,6 +2739,18 @@
       "bundle_sha256": "d2e131e5e75a8e818ffc515cf6c32274803e73ddd8edf7741151621330a32d4c"
     },
     {
+      "file": "tpch_skew_sf1_datafusion_sql_20260505_202749_a580c2ef.json",
+      "benchmark": "tpch_skew",
+      "benchmark_name": "TPC-H Skew Benchmark (moderate)",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 1.0,
+      "timestamp": "2026-05-05T20:27:49.493815",
+      "query_count": 66,
+      "trust_label": "community-submission",
+      "bundle_sha256": "2b3790b986c4559b0e4a1917c6c0e51128b043d1f5502e4b964feba704e3b08e"
+    },
+    {
       "file": "tpch_skew_sf001_duckdb_sql_20260502_182132_91fbee24.json",
       "benchmark": "tpch_skew",
       "benchmark_name": "TPC-H Skew Benchmark (moderate)",
@@ -1825,6 +2761,18 @@
       "query_count": 66,
       "trust_label": "community-submission",
       "bundle_sha256": "8aac3f671bed694e27e0611b4edc3b81798f89b9f0904a5712ae9e2b7803eae1"
+    },
+    {
+      "file": "tpch_skew_sf001_duckdb_sql_20260505_195424_fbad0be6.json",
+      "benchmark": "tpch_skew",
+      "benchmark_name": "TPC-H Skew Benchmark (moderate)",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.01,
+      "timestamp": "2026-05-05T19:54:24.917792",
+      "query_count": 66,
+      "trust_label": "community-submission",
+      "bundle_sha256": "d0b57673f1f3f21067977027876c43547f1e9254c8e874f804ad111f7faa6858"
     },
     {
       "file": "tpch_skew_sf01_duckdb_sql_20260502_182144_1e30fc13.json",
@@ -1839,6 +2787,18 @@
       "bundle_sha256": "7d55ffe462848a89c62da20457427b8d5a40ea1b76e8d2c19ff5f2372b4bf76d"
     },
     {
+      "file": "tpch_skew_sf01_duckdb_sql_20260505_195436_7170d776.json",
+      "benchmark": "tpch_skew",
+      "benchmark_name": "TPC-H Skew Benchmark (moderate)",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.1,
+      "timestamp": "2026-05-05T19:54:36.047979",
+      "query_count": 66,
+      "trust_label": "community-submission",
+      "bundle_sha256": "2194fc0f26432c2424bdcaf922854f94a256b635c864e2f115a303ed15648ce3"
+    },
+    {
       "file": "tpch_skew_sf1_duckdb_sql_20260502_182232_b0a3346f.json",
       "benchmark": "tpch_skew",
       "benchmark_name": "TPC-H Skew Benchmark (moderate)",
@@ -1849,6 +2809,18 @@
       "query_count": 66,
       "trust_label": "community-submission",
       "bundle_sha256": "e435f5bdccb64bd9930e7a8ec31ccd3b846aa2572216ca7b4549d5234f28c4a8"
+    },
+    {
+      "file": "tpch_skew_sf1_duckdb_sql_20260505_195557_4e041801.json",
+      "benchmark": "tpch_skew",
+      "benchmark_name": "TPC-H Skew Benchmark (moderate)",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 1.0,
+      "timestamp": "2026-05-05T19:55:57.495729",
+      "query_count": 66,
+      "trust_label": "community-submission",
+      "bundle_sha256": "1a23da650f8e8c901b9312fdad31fd70e511d829f42e9a25ecc05a693760a200"
     },
     {
       "file": "tpch_skew_sf001_polars_df_20260502_211424_e25cb06f.json",
@@ -2127,6 +3099,42 @@
       "bundle_sha256": "da0f3ebaa99a711761e80cb7a33575904c9f9ecf92c2407fdd78e10c90b099c6"
     },
     {
+      "file": "tsbs_devops_sf001_duckdb_sql_20260505_195607_c16ba4cc.json",
+      "benchmark": "tsbs_devops",
+      "benchmark_name": "TSBS DevOps",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.01,
+      "timestamp": "2026-05-05T19:56:07.471714",
+      "query_count": 54,
+      "trust_label": "community-submission",
+      "bundle_sha256": "073998c87d5f9c3c1ff1a41fca3dc8c6d6d7cac40e7b253a264b4d9f7e825ae2"
+    },
+    {
+      "file": "tsbs_devops_sf01_duckdb_sql_20260505_195616_74c642b6.json",
+      "benchmark": "tsbs_devops",
+      "benchmark_name": "TSBS DevOps",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.1,
+      "timestamp": "2026-05-05T19:56:16.918660",
+      "query_count": 54,
+      "trust_label": "community-submission",
+      "bundle_sha256": "d6b366f77a45ce10274f82bd473536a6c87e8aa61cdcd928cea9a879454253bc"
+    },
+    {
+      "file": "tsbs_devops_sf1_duckdb_sql_20260505_195718_f6eda1af.json",
+      "benchmark": "tsbs_devops",
+      "benchmark_name": "TSBS DevOps",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 1.0,
+      "timestamp": "2026-05-05T19:57:18.748525",
+      "query_count": 54,
+      "trust_label": "community-submission",
+      "bundle_sha256": "7aeeda16fbfd815c1cb9b082accb40b711a5aaf0fb53336420c214be806fe013"
+    },
+    {
       "file": "tsbs_devops_sf001_polars_df_20260502_211255_aaef4b29.json",
       "benchmark": "tsbs_devops",
       "benchmark_name": "TSBS DevOps",
@@ -2233,6 +3241,42 @@
       "query_count": 54,
       "trust_label": "community-submission",
       "bundle_sha256": "fd3faf44e6864ef72626b6584e16bcd64743361cd7a80d594250f27a81d3387d"
+    },
+    {
+      "file": "vector_search_sf001_duckdb_sql_20260505_202359_c6e8f1dc.json",
+      "benchmark": "vector_search",
+      "benchmark_name": "Vector Search",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.01,
+      "timestamp": "2026-05-05T20:23:59.728218",
+      "query_count": 18,
+      "trust_label": "community-submission",
+      "bundle_sha256": "4644cdc087c0174a00a47726283354bd649c1566fd307f08f4f7dc5c7179d80c"
+    },
+    {
+      "file": "vector_search_sf01_duckdb_sql_20260505_202406_e04da13c.json",
+      "benchmark": "vector_search",
+      "benchmark_name": "Vector Search",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.1,
+      "timestamp": "2026-05-05T20:24:06.204205",
+      "query_count": 18,
+      "trust_label": "community-submission",
+      "bundle_sha256": "0107be16db9def5f56f93cc4b755d92e1351da18fa1716814d615d2be306c895"
+    },
+    {
+      "file": "vector_search_sf1_duckdb_sql_20260505_202453_03450195.json",
+      "benchmark": "vector_search",
+      "benchmark_name": "Vector Search",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 1.0,
+      "timestamp": "2026-05-05T20:24:53.232805",
+      "query_count": 18,
+      "trust_label": "community-submission",
+      "bundle_sha256": "a86771be215f84d646d23050aed638f4ff59245860f1225ccd53d3cf3bf7e6b8"
     },
     {
       "file": "write_primitives_sf001_datafusion_sql_20260502_182720_947d7512.json",
@@ -2404,48 +3448,72 @@
     }
   ],
   "cohorts": {
+    "ai_primitives@sf0.01": [
+      "ClickHouse Local",
+      "DuckDB"
+    ],
+    "ai_primitives@sf0.1": [
+      "ClickHouse Local"
+    ],
+    "ai_primitives@sf1.0": [
+      "ClickHouse Local"
+    ],
     "amplab@sf0.01": [
+      "ClickHouse Local",
       "DataFusion",
+      "DuckDB",
       "Polars",
       "PySpark",
       "SQLite",
       "Spark"
     ],
     "amplab@sf0.1": [
+      "ClickHouse Local",
       "DataFusion",
+      "DuckDB",
       "Polars",
       "PySpark",
       "SQLite",
       "Spark"
     ],
     "amplab@sf1.0": [
+      "ClickHouse Local",
       "DataFusion",
+      "DuckDB",
       "Polars",
       "PySpark",
       "SQLite",
       "Spark"
     ],
     "clickbench@sf1.0": [
+      "ClickHouse Local",
       "DataFusion",
+      "DuckDB",
       "Polars",
       "PySpark",
       "SQLite",
       "Spark"
     ],
     "coffeeshop@sf0.01": [
+      "ClickHouse Local",
       "DataFusion",
+      "DuckDB",
       "Polars",
       "SQLite",
       "Spark"
     ],
     "coffeeshop@sf0.1": [
+      "ClickHouse Local",
       "DataFusion",
+      "DuckDB",
       "Polars",
       "SQLite",
       "Spark"
     ],
     "coffeeshop@sf1.0": [
+      "ClickHouse Local",
       "DataFusion",
+      "DuckDB",
       "Polars",
       "SQLite",
       "Spark"
@@ -2467,47 +3535,62 @@
     ],
     "flightdata@sf0.01": [
       "DataFusion",
+      "DuckDB",
       "Polars",
       "PySpark"
     ],
     "flightdata@sf0.1": [
       "DataFusion",
+      "DuckDB",
       "Polars",
       "PySpark"
     ],
     "h2odb@sf0.01": [
+      "ClickHouse Local",
       "DataFusion",
+      "DuckDB",
       "Polars",
       "PySpark",
       "SQLite",
       "Spark"
     ],
     "h2odb@sf0.1": [
+      "ClickHouse Local",
       "DataFusion",
+      "DuckDB",
       "Polars",
       "PySpark",
       "SQLite",
       "Spark"
     ],
     "h2odb@sf1.0": [
+      "ClickHouse Local",
       "DataFusion",
+      "DuckDB",
       "Polars",
       "PySpark",
       "SQLite",
       "Spark"
     ],
+    "joinorder@sf1.0": [
+      "ClickHouse Local",
+      "DuckDB"
+    ],
     "metadata_primitives@sf1.0": [
       "DataFusion",
+      "DuckDB",
       "Polars",
       "PySpark"
     ],
     "nyctaxi@sf0.01": [
       "DataFusion",
+      "DuckDB",
       "Polars",
       "PySpark"
     ],
     "nyctaxi@sf0.1": [
       "DataFusion",
+      "DuckDB",
       "Polars",
       "PySpark"
     ],
@@ -2517,32 +3600,42 @@
       "PySpark"
     ],
     "read_primitives@sf0.01": [
+      "ClickHouse Local",
       "DataFusion",
+      "DuckDB",
       "Polars",
       "PySpark",
       "SQLite"
     ],
     "read_primitives@sf0.1": [
+      "ClickHouse Local",
       "DataFusion",
+      "DuckDB",
       "Polars",
       "PySpark"
     ],
     "ssb@sf0.01": [
+      "ClickHouse Local",
       "DataFusion",
+      "DuckDB",
       "Polars",
       "PySpark",
       "SQLite",
       "Spark"
     ],
     "ssb@sf0.1": [
+      "ClickHouse Local",
       "DataFusion",
+      "DuckDB",
       "Polars",
       "PySpark",
       "SQLite",
       "Spark"
     ],
     "ssb@sf1.0": [
+      "ClickHouse Local",
       "DataFusion",
+      "DuckDB",
       "Polars",
       "PySpark",
       "SQLite",
@@ -2560,16 +3653,19 @@
     ],
     "tpcdi@sf0.01": [
       "DataFusion",
+      "DuckDB",
       "SQLite",
       "Spark"
     ],
     "tpcdi@sf0.1": [
       "DataFusion",
+      "DuckDB",
       "SQLite",
       "Spark"
     ],
     "tpcdi@sf1.0": [
       "DataFusion",
+      "DuckDB",
       "SQLite",
       "Spark"
     ],
@@ -2580,6 +3676,7 @@
       "PySpark"
     ],
     "tpch@sf0.01": [
+      "ClickHouse Local",
       "DataFusion",
       "DuckDB",
       "Polars",
@@ -2588,6 +3685,7 @@
       "Spark"
     ],
     "tpch@sf0.1": [
+      "ClickHouse Local",
       "DataFusion",
       "DuckDB",
       "Polars",
@@ -2595,12 +3693,15 @@
       "Spark"
     ],
     "tpch@sf1.0": [
+      "ClickHouse Local",
       "DataFusion",
+      "DuckDB",
       "Polars",
       "PySpark",
       "Spark"
     ],
     "tpch_skew@sf0.01": [
+      "ClickHouse Local",
       "DataFusion",
       "DuckDB",
       "Polars",
@@ -2609,6 +3710,7 @@
       "Spark"
     ],
     "tpch_skew@sf0.1": [
+      "ClickHouse Local",
       "DataFusion",
       "DuckDB",
       "Polars",
@@ -2616,6 +3718,7 @@
       "Spark"
     ],
     "tpch_skew@sf1.0": [
+      "ClickHouse Local",
       "DataFusion",
       "DuckDB",
       "Polars",
@@ -2636,21 +3739,33 @@
     ],
     "tsbs_devops@sf0.01": [
       "DataFusion",
+      "DuckDB",
       "Polars",
       "PySpark",
       "SQLite"
     ],
     "tsbs_devops@sf0.1": [
       "DataFusion",
+      "DuckDB",
       "Polars",
       "PySpark",
       "SQLite"
     ],
     "tsbs_devops@sf1.0": [
       "DataFusion",
+      "DuckDB",
       "Polars",
       "PySpark",
       "SQLite"
+    ],
+    "vector_search@sf0.01": [
+      "DuckDB"
+    ],
+    "vector_search@sf0.1": [
+      "DuckDB"
+    ],
+    "vector_search@sf1.0": [
+      "DuckDB"
     ],
     "write_primitives@sf0.01": [
       "DataFusion",
@@ -2671,37 +3786,41 @@
     ]
   },
   "summary": {
-    "total_bundles": 200,
+    "total_bundles": 287,
     "by_benchmark": {
-      "amplab": 16,
-      "clickbench": 6,
-      "coffeeshop": 13,
-      "datavault": 9,
-      "flightdata": 6,
-      "h2odb": 16,
-      "metadata_primitives": 3,
-      "nyctaxi": 9,
-      "read_primitives": 9,
-      "ssb": 16,
+      "ai_primitives": 4,
+      "amplab": 25,
+      "clickbench": 9,
+      "coffeeshop": 22,
+      "datavault": 12,
+      "flightdata": 8,
+      "h2odb": 25,
+      "joinorder": 2,
+      "metadata_primitives": 4,
+      "nyctaxi": 11,
+      "read_primitives": 15,
+      "ssb": 25,
       "star_schema": 6,
-      "tpcdi": 9,
-      "tpcds_obt": 5,
-      "tpch": 22,
-      "tpch_skew": 19,
+      "tpcdi": 12,
+      "tpcds_obt": 6,
+      "tpch": 31,
+      "tpch_skew": 28,
       "tpchavoc": 10,
-      "tsbs_devops": 12,
+      "tsbs_devops": 15,
+      "vector_search": 3,
       "write_primitives": 14
     },
     "by_platform": {
-      "DataFusion": 65,
-      "DuckDB": 13,
+      "ClickHouse Local": 25,
+      "DataFusion": 86,
+      "DuckDB": 54,
       "Polars": 38,
       "PySpark": 34,
       "SQLite": 26,
       "Spark": 24
     },
     "by_trust_label": {
-      "community-submission": 188,
+      "community-submission": 275,
       "maintainer-run": 12
     }
   }

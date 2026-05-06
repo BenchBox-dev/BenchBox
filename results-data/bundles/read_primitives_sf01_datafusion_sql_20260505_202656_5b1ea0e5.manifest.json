@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T00:47:03.310682+00:00",
+  "bundle_file": "read_primitives_sf01_datafusion_sql_20260505_202656_5b1ea0e5.json",
+  "bundle_hash": "381043b38c48f113484117b445430f49c000b4d8bb33e77ec2a1a58ca15503cf",
+  "companion_hashes": {},
+  "benchmark": "Read Primitives",
+  "platform": "DataFusion",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

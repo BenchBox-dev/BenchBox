@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T00:46:16.363562+00:00",
+  "bundle_file": "coffeeshop_sf01_clickhouse_local_sql_20260505_203926_5ca5cc7b.json",
+  "bundle_hash": "3ebbec4149509b449643ff624bfe85d6eb74299423ad3f16262a58d96535d9fe",
+  "companion_hashes": {},
+  "benchmark": "CoffeeShop",
+  "platform": "ClickHouse Local",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

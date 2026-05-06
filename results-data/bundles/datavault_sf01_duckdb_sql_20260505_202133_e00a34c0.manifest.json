@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T00:46:28.771300+00:00",
+  "bundle_file": "datavault_sf01_duckdb_sql_20260505_202133_e00a34c0.json",
+  "bundle_hash": "789050aa55d634bb200b10a1dd5a219edecdc7be0c55add930be4cb7fa2d1c0d",
+  "companion_hashes": {},
+  "benchmark": "Data Vault",
+  "platform": "DuckDB",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

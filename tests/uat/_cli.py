@@ -281,7 +281,7 @@ def validate_main(argv: list[str] | None = None) -> int:
 def execute_main(argv: list[str] | None = None) -> int:
     """Implements `make uat-execute CONFIG=path/to/uat.yaml`."""
     from tests.uat.config import load_config
-    from tests.uat.phases.execute import default_log_dir, run_execute
+    from tests.uat.phases.execute import default_benchmark_runs_dir, default_log_dir, run_execute
     from tests.uat.phases.preflight import run_preflight
 
     parser = argparse.ArgumentParser(prog="uat-execute")
@@ -299,9 +299,10 @@ def execute_main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     config = load_config(args.config)
+    benchmark_runs_dir = default_benchmark_runs_dir(config)
     if "preflight" in config.phases:
         preflight = run_preflight(
-            free_space_path=(config.raw.get("preflight") or {}).get("free_space_path", "~/Developer/benchmark_runs"),
+            free_space_path=(config.raw.get("preflight") or {}).get("free_space_path", str(benchmark_runs_dir)),
             free_space_min_gib=(config.raw.get("preflight") or {}).get("free_space_min_gib", 5.0),
             docker_required=(config.raw.get("preflight") or {}).get("docker_required", False),
         )
@@ -311,13 +312,12 @@ def execute_main(argv: list[str] | None = None) -> int:
             print(f"[preflight] ABORT: {preflight.abort_reason}", file=sys.stderr)
             return 2
 
-    databases_root = (
-        Path(args.databases_root) if args.databases_root else Path.home() / "Developer" / "benchmark_runs" / "databases"
-    )
+    databases_root = Path(args.databases_root).expanduser() if args.databases_root else benchmark_runs_dir / "databases"
     log_dir = default_log_dir(config)
     outcome = run_execute(
         config,
         log_dir=log_dir,
+        benchmark_runs_dir=benchmark_runs_dir,
         databases_root=databases_root,
         cleanup_enabled=not args.no_cleanup,
     )
