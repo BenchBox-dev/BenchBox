@@ -10,6 +10,26 @@ For the **one-shot** approximate-aggregate path (HLL distinct, T-Digest /
 KLL single quantile, top-K), see
 [read_primitives approximate-aggregate functions](read-primitives-approximate-functions.md).
 
+## DuckDB community-extension status (2026-05-06)
+
+Four ops below are currently **blocked on upstream extension stability**:
+
+- `sketch_insert_theta_per_partition`
+- `sketch_insert_topk_per_shard`
+- `sketch_query_theta_union_merge`
+- `sketch_query_topk_combine`
+
+Extension version `2e38607` of the duckdb-community-extensions
+`datasketches` build dropped the `theta` and `frequent_items` families
+between PR #114 morning and the audit later that day. CPC, REQ, KLL,
+and HLL families still load. The four ops above remain in
+`benchbox/core/write_primitives/catalog/operations.yaml` per
+`scope_limit` on the source TODO; CI's
+`extension-smoke.yml` workflow goes red whenever a planned-on family
+is missing from a fresh install. See
+[ADR: DuckDB datasketches vendoring vs HLL fallback](../development/adr/adr-duckdb-datasketches-vendoring.md)
+for the long-term path.
+
 ## Operation lifecycle
 
 Each sketch op is fully self-contained — CREATE the persistent table,
