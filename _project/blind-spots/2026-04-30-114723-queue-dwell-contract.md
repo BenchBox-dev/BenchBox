@@ -1,7 +1,7 @@
 ---
 id: 2026-04-30-114723-queue-dwell-contract
 date: 2026-04-30
-status: open
+status: actionable
 finding_kind: assumption
 review_context: "L2 merge-loop audit / dev-loop simplification planning (2026-04-30)"
 related_paths:
@@ -38,3 +38,4 @@ Agents can walk away after auto-merge only because the current dwell time is sho
   5 still `Blocked` (no published P50/P95 dwell numbers yet). Agent
   walk-away contract in CLAUDE.md still holds. Carry forward the
   next-steps; revisit when Step 5 publishes measurements.
+- 2026-05-06: actionable — 2026-05-06 sweep: make dev-loop-metrics still present; Step 5 Blocked, no published P50/P95 dwell numbers — agent walk-away contract in CLAUDE.md still load-bearing

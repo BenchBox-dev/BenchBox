@@ -1,7 +1,7 @@
 ---
 id: 2026-04-30-114722-queue-single-point-failure
 date: 2026-04-30
-status: open
+status: actionable
 finding_kind: scope-creep
 review_context: "L2 merge-loop audit / dev-loop simplification planning (2026-04-30)"
 related_paths:
@@ -38,3 +38,4 @@ Replacing decentralized auto-merge with a queue can make one local process or wo
   `Blocked`; no failure-mode-analysis artifact authored. Carry forward
   the next-steps. Do not promote to a steward TODO until Step 5 returns
   BUILD QUEUE.
+- 2026-05-06: actionable — 2026-05-06 sweep: decentralized auto-merge live (auto-merge-on-open.yml + develop-post-merge.yml present); dev-loop-step-6-queue-decision-gate still Blocked on Step 5 — failure-mode-analysis remains the gate before any steward TODO

@@ -1,7 +1,7 @@
 ---
 id: 2026-04-30-114721-global-test-lock-cpu-protection
 date: 2026-04-30
-status: open
+status: actionable
 finding_kind: assumption
 review_context: "L2 merge-loop audit / dev-loop simplification planning (2026-04-30)"
 related_paths:
@@ -39,3 +39,4 @@ Removing the global lock by default can shift pain from blocked pushes to CPU sa
   remains opt-in. `dev-loop-step-5-measurement-window` is still `Blocked`,
   so no concurrent-xdist measurement has been collected. Carry forward the
   two next-steps; do not flip the default until measurement lands.
+- 2026-05-06: actionable — 2026-05-06 sweep: tests/conftest.py:_get_test_lock_path still defaults to $HOME/.benchbox/test.lock; dev-loop-step-5-measurement-window still Blocked, no concurrent-xdist measurement collected — keep default global lock until Step 5 lands

@@ -40,7 +40,7 @@ Every finding file must start with YAML frontmatter matching this shape:
 ---
 id: 2026-04-29-143205-react-key-collision-class   # = filename stem
 date: 2026-04-29                                  # ISO date
-status: open                                      # open | actioned | dismissed | merged-to-todo
+status: open                                      # open | actionable | actioned | dismissed | merged-to-todo
 finding_kind: bug-class                           # framework-gap | bug-class | missed-axis | scope-creep | assumption | other
 review_context: "ultrareview B4 / chore/dashboard-keys"
 related_paths:
@@ -55,7 +55,7 @@ todo_id: null                                     # populated when promoted via 
 |---|---|---|
 | `id` | yes | Must equal filename without `.md` |
 | `date` | yes | ISO `YYYY-MM-DD` |
-| `status` | yes | One of: `open`, `actioned`, `dismissed`, `merged-to-todo` |
+| `status` | yes | One of: `open`, `actionable`, `actioned`, `dismissed`, `merged-to-todo` |
 | `finding_kind` | yes | One of: `framework-gap`, `bug-class`, `missed-axis`, `scope-creep`, `assumption`, `other` |
 | `review_context` | yes | Free-form: which review / branch / PR / agent surfaced this |
 | `related_paths` | optional | Repo-relative paths the finding touches; list of strings or `null` |
@@ -101,8 +101,8 @@ and any other agent capture flow that the shared protocol authorizes.
 Sweep on demand:
 
 ```bash
-make blind-spots-list                # all open findings (one row each)
-make blind-spots-report              # counts by status + kind, oldest open first
+make blind-spots-list                # open findings only (one row each)
+make blind-spots-report              # counts by status + kind, oldest active first (open + actionable)
 make blind-spots-sweep               # alias for blind-spots-report
 ```
 
@@ -113,6 +113,7 @@ uv run --project _project/scripts -- python _project/scripts/sweep_blind_spots.p
 uv run --project _project/scripts -- python _project/scripts/sweep_blind_spots.py show <id>
 uv run --project _project/scripts -- python _project/scripts/sweep_blind_spots.py triage <id> --action dismiss  --reason "..."
 uv run --project _project/scripts -- python _project/scripts/sweep_blind_spots.py triage <id> --action actioned [--reason "..."]
+uv run --project _project/scripts -- python _project/scripts/sweep_blind_spots.py triage <id> --action actionable --reason "..."
 uv run --project _project/scripts -- python _project/scripts/sweep_blind_spots.py triage <id> --action promote  --todo-id <todo-slug>
 ```
 
@@ -123,6 +124,15 @@ appends a one-line entry under `## Triage log` in the body):
   warrant action.
 - **`actioned`** — sets `status: actioned`. Use when a fix landed without
   needing a separate TODO (e.g., handled inline during the same review).
+- **`actionable`** — sets `status: actionable`. Use when a sweep
+  re-verifies the finding against current code, confirms it is still
+  load-bearing, but the work is not yet ready for TODO promotion (e.g.,
+  blocked on prerequisite measurement). Requires `--reason "..."`; the
+  reason becomes the triage-log entry that names the verifying review,
+  so a future sweep can tell `actionable` ("re-checked today, still
+  real") apart from `open` ("recorded once, never re-checked"). Default
+  `list` filter remains `open`-only — `actionable` items surface via
+  `--status actionable`.
 - **`promote`** — sets `status: merged-to-todo` and fills `todo_id`.
   Authoring the TODO file itself is **your** job — use
   `_project/TODO_ENTRY_TEMPLATE.yaml` and place it under

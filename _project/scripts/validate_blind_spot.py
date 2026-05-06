@@ -21,7 +21,7 @@ from pathlib import Path
 
 import yaml
 
-ALLOWED_STATUS = {"open", "actioned", "dismissed", "merged-to-todo"}
+ALLOWED_STATUS = {"open", "actionable", "actioned", "dismissed", "merged-to-todo"}
 ALLOWED_KIND = {
     "framework-gap",
     "bug-class",

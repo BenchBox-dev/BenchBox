@@ -251,3 +251,104 @@ def test_triage_rejects_promote_reason_combo(tmp_path: Path) -> None:
 
     assert result == 2
     assert "status: open" in path.read_text(encoding="utf-8")
+
+
+def test_validator_accepts_actionable_status(tmp_path: Path) -> None:
+    stem = "2026-04-29-120010-actionable-status"
+    path = tmp_path / f"{stem}.md"
+    path.write_text(_finding_text(stem, status="actionable"), encoding="utf-8")
+
+    assert validate_blind_spot.validate_file(path) == []
+
+
+def test_triage_actionable_requires_reason(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    bs_dir = tmp_path / "_project" / "blind-spots"
+    stem = "2026-04-29-120011-actionable-needs-reason"
+    path = _write_finding(bs_dir, stem)
+    args = SimpleNamespace(id=stem, action="actionable", reason=None, todo_id=None)
+
+    result = sweep_blind_spots.cmd_triage(bs_dir, args)
+
+    assert result == 2
+    assert "--reason is required" in capsys.readouterr().err
+    assert "status: open" in path.read_text(encoding="utf-8")
+
+
+def test_triage_actionable_rejects_blank_reason(tmp_path: Path) -> None:
+    bs_dir = tmp_path / "_project" / "blind-spots"
+    stem = "2026-04-29-120012-actionable-blank-reason"
+    path = _write_finding(bs_dir, stem)
+    args = SimpleNamespace(id=stem, action="actionable", reason="   ", todo_id=None)
+
+    result = sweep_blind_spots.cmd_triage(bs_dir, args)
+
+    assert result == 2
+    assert "status: open" in path.read_text(encoding="utf-8")
+
+
+def test_triage_actionable_stamps_status_and_logs_reason(tmp_path: Path) -> None:
+    bs_dir = tmp_path / "_project" / "blind-spots"
+    stem = "2026-04-29-120013-actionable-happy-path"
+    path = _write_finding(bs_dir, stem)
+    args = SimpleNamespace(
+        id=stem,
+        action="actionable",
+        reason="2026-05-06 sweep: still load-bearing; blocked on prerequisite",
+        todo_id=None,
+    )
+
+    result = sweep_blind_spots.cmd_triage(bs_dir, args)
+
+    assert result == 0
+    text = path.read_text(encoding="utf-8")
+    assert "status: actionable" in text
+    assert "## Triage log" in text
+    assert "actionable — 2026-05-06 sweep" in text
+
+
+def test_default_list_filter_excludes_actionable(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    bs_dir = tmp_path / "_project" / "blind-spots"
+    _write_finding(bs_dir, "2026-04-29-120014-still-open")
+    _write_finding(bs_dir, "2026-04-29-120015-now-actionable", status="actionable")
+
+    result = sweep_blind_spots.cmd_list(bs_dir, SimpleNamespace(status="open", kind=None))
+
+    assert result == 0
+    out = capsys.readouterr().out
+    assert "2026-04-29-120014-still-open" in out
+    assert "2026-04-29-120015-now-actionable" not in out
+    assert "1 finding(s)." in out
+
+
+def test_actionable_status_filter_surfaces_only_actionable(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    bs_dir = tmp_path / "_project" / "blind-spots"
+    _write_finding(bs_dir, "2026-04-29-120016-still-open")
+    _write_finding(bs_dir, "2026-04-29-120017-now-actionable", status="actionable")
+
+    result = sweep_blind_spots.cmd_list(bs_dir, SimpleNamespace(status="actionable", kind=None))
+
+    assert result == 0
+    out = capsys.readouterr().out
+    assert "2026-04-29-120017-now-actionable" in out
+    assert "2026-04-29-120016-still-open" not in out
+    assert "1 finding(s)." in out
+
+
+def test_report_oldest_section_surfaces_actionable_alongside_open(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    bs_dir = tmp_path / "_project" / "blind-spots"
+    _write_finding(bs_dir, "2026-04-29-120020-stale-open")
+    _write_finding(bs_dir, "2026-04-30-120021-confirmed-actionable", date="2026-04-30", status="actionable")
+    _write_finding(bs_dir, "2026-04-29-120022-already-dismissed", status="dismissed")
+
+    result = sweep_blind_spots.cmd_report(bs_dir, SimpleNamespace(top=10))
+
+    assert result == 0
+    out = capsys.readouterr().out
+    assert "Oldest active (2 of 2)" in out
+    assert "[open]" in out
+    assert "[actionable]" in out
+    assert "2026-04-29-120020-stale-open" in out
+    assert "2026-04-30-120021-confirmed-actionable" in out
+    assert "2026-04-29-120022-already-dismissed" not in out

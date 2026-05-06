@@ -1,7 +1,7 @@
 ---
 id: 2026-04-30-114724-post-merge-safety-tension
 date: 2026-04-30
-status: open
+status: actionable
 finding_kind: framework-gap
 review_context: "L2 merge-loop audit / dev-loop simplification planning (2026-04-30)"
 related_paths:
@@ -38,3 +38,4 @@ If the post-merge workflow is the real protection layer, adding a queue may dupl
 - 2026-05-05: actionable (sweep). State unchanged: post-merge revert
   workflow shipped; Step 5 still `Blocked`. Architectural rule remains
   load-bearing by inertia, not enforcement. Carry forward.
+- 2026-05-06: actionable — 2026-05-06 sweep: develop-post-merge.yml safety-net workflow still shipped; Step 5 Blocked — 'no queue without pre-merge ordering evidence' rule remains load-bearing by inertia
