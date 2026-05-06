@@ -366,6 +366,13 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         if sql_override is not None:
             return sql_override, None
 
+        if getattr(operation, "aggregate_state", None) is not None:
+            platform_label = platform_key or "SQL"
+            return None, (
+                f"Operation '{operation.id}' is DataFrame aggregate-state only and is unsupported on "
+                f"platform '{platform_label}'."
+            )
+
         effective_sql = operation.write_sql
 
         if platform_key and operation.platform_overrides and platform_key in operation.platform_overrides:
@@ -832,6 +839,24 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             staging_heading="Write Primitives Staging Tables",
             get_staging_tables_sql=get_all_staging_tables_sql,
         )
+
+    def get_query(self, query_id: Union[int, str], **kwargs: Any) -> str:
+        """Get SQL for a SQL-runnable write operation."""
+        operation = self.operations_manager.get_operation(str(query_id))
+        if operation.aggregate_state is not None:
+            raise ValueError(f"Operation '{operation.id}' is DataFrame aggregate-state only and is not exposed as SQL")
+        return operation.write_sql
+
+    def get_queries(self, dialect: Optional[str] = None) -> dict[str, str]:
+        """Get SQL-runnable write operations, excluding DataFrame-only aggregate-state ops."""
+        _ = dialect
+        operations = self.operations_manager.get_all_operations()
+        return {op_id: op.write_sql for op_id, op in operations.items() if op.aggregate_state is None}
+
+    def get_queries_by_category(self, category: str) -> dict[str, str]:
+        """Get SQL-runnable write operations for a category."""
+        operations = self.operations_manager.get_operations_by_category(category)
+        return {op_id: op.write_sql for op_id, op in operations.items() if op.aggregate_state is None}
 
     def execute_operation(
         self,
@@ -1404,7 +1429,8 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         cache_dir.mkdir(parents=True, exist_ok=True)
 
         # Find the TBL fixture for the table at the active scale factor.
-        # benchbox/datagen writes them to `<run_root>/datagen/tpch_<sf-label>/<table>.tbl[.N].zst`.
+        # benchbox/datagen writes them to `<run_root>/datagen/tpch_<sf-label>/<table>.tbl`
+        # with optional numeric shards and compression suffixes.
         # We probe upward from output_dir to locate that fixture root.
         from benchbox.utils.scale_factor import format_scale_factor
 
@@ -1415,16 +1441,8 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             output_dir / "datagen" / scale_label,
             Path.cwd() / "benchmark_runs" / "datagen" / scale_label,
         ]
-        tbl_glob = next(
-            (
-                pattern
-                for root in candidate_roots
-                if root.exists()
-                for pattern in [str(root / f"{source_table}.tbl*.zst"), str(root / f"{source_table}.tbl")]
-            ),
-            None,
-        )
-        if tbl_glob is None:
+        tbl_files = self._find_aggregate_tbl_sources(source_table, candidate_roots)
+        if not tbl_files:
             raise RuntimeError(
                 f"Could not locate {source_table}.tbl fixture for scale {scale} "
                 f"under any of {[str(r) for r in candidate_roots]}"
@@ -1435,20 +1453,43 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         # single-file and directory paths.
         import duckdb
 
+        from benchbox.platforms.base.data_loading import escape_sql_string_literal
+
         column_specs = self._tbl_column_specs(source_table)
         column_list = ", ".join(f"'{name}': '{type_}'" for name, type_ in column_specs)
+        escaped_paths = [escape_sql_string_literal(str(path)) for path in tbl_files]
+        path_list = "[" + ", ".join(f"'{path}'" for path in escaped_paths) + "]"
         target_file = cache_dir / "data.parquet"
         conn = duckdb.connect()
         try:
             conn.execute(
-                f"COPY (SELECT * FROM read_csv('{tbl_glob}', delim='|', "
-                f"columns={{{column_list}}}, header=false, compression='zstd')) "
+                f"COPY (SELECT * FROM read_csv({path_list}, delim='|', "
+                f"columns={{{column_list}}}, header=false)) "
                 f"TO '{target_file}' (FORMAT PARQUET, COMPRESSION ZSTD)"
             )
         finally:
             conn.close()
 
         return cache_dir
+
+    @staticmethod
+    def _find_aggregate_tbl_sources(source_table: str, candidate_roots: list[Path]) -> list[Path]:
+        """Find actual TPC fixture files for aggregate-state parquet conversion."""
+        patterns = (
+            f"{source_table}.tbl",
+            f"{source_table}.tbl.[0-9]*",
+            f"{source_table}.tbl.gz",
+            f"{source_table}.tbl.[0-9]*.gz",
+            f"{source_table}.tbl.zst",
+            f"{source_table}.tbl.[0-9]*.zst",
+        )
+        for root in candidate_roots:
+            if not root.exists():
+                continue
+            files = sorted({path for pattern in patterns for path in root.glob(pattern) if path.is_file()})
+            if files:
+                return files
+        return []
 
     @staticmethod
     def _tbl_column_specs(source_table: str) -> list[tuple[str, str]]:

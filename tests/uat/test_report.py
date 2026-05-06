@@ -102,3 +102,23 @@ def test_cross_scale_validator_status_blocks_clean_pair():
         validator_status_by_path={Path("/tmp/r1.json"): "clean", Path("/tmp/r2.json"): "error"},
     )
     assert n == 0
+
+
+def test_cross_scale_validator_status_normalizes_lookup_paths(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    result_root = tmp_path / "benchmark_runs" / "results"
+    cells = [
+        _cell("duckdb", "tpch", 0.01, status="passed", result=result_root / "r1.json"),
+        _cell("duckdb", "tpch", 0.1, status="passed", result=result_root / "r2.json"),
+    ]
+
+    n = report.cross_scale_clean_pair_count(
+        cells,
+        rungs=[0.01, 0.1],
+        validator_status_by_path={
+            Path("benchmark_runs/results/r1.json").resolve(): "clean",
+            Path("benchmark_runs/results/r2.json").resolve(): "error",
+        },
+    )
+
+    assert n == 0

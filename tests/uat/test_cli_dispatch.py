@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from tests.uat import _cli
@@ -77,3 +79,37 @@ def test_subcommands_table_covers_all_make_targets():
         "stress",
     }
     assert set(_cli.SUBCOMMANDS) == expected
+
+
+def test_sweep_main_forwards_dry_run_override(monkeypatch, capsys):
+    calls: list[tuple[Path, bool | None]] = []
+
+    class StubResult:
+        name = "stub"
+        log_dir = Path("logs")
+        aborted_phase = None
+        abort_reason = None
+        phase_exit_codes = {"execute": 0}
+
+        def exit_code(self):
+            return 0
+
+    def fake_run_sweep_from_path(config_path, *, dry_run_override=None, stress_overrides=None):
+        assert stress_overrides is None
+        calls.append((config_path, dry_run_override))
+        return StubResult()
+
+    monkeypatch.setattr("tests.uat.orchestrator.run_sweep_from_path", fake_run_sweep_from_path)
+    rc = _cli.sweep_main(["--config", "tests/uat/configs/uat-2026-05-02.yaml", "--dry-run"])
+
+    assert rc == 0
+    assert calls == [(Path("tests/uat/configs/uat-2026-05-02.yaml"), True)]
+    assert '"phase_exit_codes"' in capsys.readouterr().out
+
+
+def test_make_uat_sweep_forwards_dry_run_variable():
+    makefile = Path("Makefile").read_text(encoding="utf-8")
+    target = makefile.split("uat-sweep:", maxsplit=1)[1].split("# make uat-stress", maxsplit=1)[0]
+
+    assert "[DRY_RUN=1]" in target
+    assert "$(if $(DRY_RUN),--dry-run,)" in target

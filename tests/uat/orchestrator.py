@@ -14,7 +14,7 @@ from __future__ import annotations
 import datetime as _dt
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from tests.uat.config import UATConfig, apply_stress_overrides, load_config
@@ -88,7 +88,7 @@ def run_sweep(
             try:
                 exec_phase.enumerate_cells(config.raw)
                 phase_exit_codes[phase] = 0
-            except (ValueError, KeyError) as exc:
+            except (ValueError, KeyError, TypeError) as exc:
                 phase_exit_codes[phase] = 2
                 aborted_phase = phase
                 abort_reason = str(exc)
@@ -121,11 +121,16 @@ def run_sweep(
             from tests.uat.phases.validate import ValidatePhaseError, run_validate
 
             validate_cfg = config.raw.get("validate") or {}
-            results_dir = log_dir
+            if execute_outcome is None:
+                phase_exit_codes[phase] = 2
+                aborted_phase = phase
+                abort_reason = "validate phase requires execute phase to have run"
+                break
+            result_paths = [r.result_path for r in execute_outcome.results if r.result_path]
             output_tsv = log_dir / "validator_rollup.tsv"
             try:
                 vr = run_validate(
-                    results_dir,
+                    result_paths,
                     output_tsv=output_tsv,
                     floor=float(validate_cfg.get("validator_clean_rate_floor", 0.80)),
                 )
@@ -204,6 +209,7 @@ def run_sweep_from_path(
     config_path: Path,
     *,
     stress_overrides: dict[str, str | float | None] | None = None,
+    dry_run_override: bool | None = None,
 ) -> SweepResult:
     """Convenience wrapper for `make uat-sweep` and `make uat-stress`."""
     config = load_config(config_path)
@@ -214,4 +220,8 @@ def run_sweep_from_path(
             benchmark=stress_overrides.get("benchmark"),
             scale=stress_overrides.get("scale"),
         )
+    if dry_run_override is not None:
+        raw = dict(config.raw)
+        raw["dry_run"] = dry_run_override
+        config = replace(config, dry_run=dry_run_override, raw=raw)
     return run_sweep(config)

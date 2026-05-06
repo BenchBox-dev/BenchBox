@@ -14,9 +14,11 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Sequence
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 ROLLUP_SCRIPT = REPO_ROOT / "scripts" / "uat_validator_rollup.py"
+TSV_HEADER = "platform\tbenchmark\tscale\tresult_path\tvalidator_status\terror_count\twarning_count\tfirst_error"
 
 
 @dataclass(frozen=True)
@@ -45,7 +47,7 @@ class ValidatePhaseError(RuntimeError):
 
 
 def run_validate(
-    results_dir: Path,
+    results_dir: Path | Sequence[Path],
     *,
     output_tsv: Path,
     floor: float = 0.80,
@@ -70,6 +72,15 @@ def run_validate(
     output_tsv.parent.mkdir(parents=True, exist_ok=True)
     if output_tsv.exists():
         output_tsv.unlink()
+    if not isinstance(results_dir, Path):
+        return _run_validate_paths(
+            tuple(results_dir),
+            output_tsv=output_tsv,
+            floor=floor,
+            extra_args=extra_args,
+            rollup_script=script,
+            runner=runner,
+        )
     argv = [
         sys.executable,
         str(script),
@@ -97,6 +108,62 @@ def run_validate(
         floor_breached=parsed.floor_breached,
         script_returncode=rc,
     )
+
+
+def _run_validate_paths(
+    result_paths: tuple[Path, ...],
+    *,
+    output_tsv: Path,
+    floor: float,
+    extra_args: tuple[str, ...],
+    rollup_script: Path,
+    runner,
+) -> ValidateResult:
+    """Run the rollup helper against exact execute result paths and merge its TSV rows."""
+    rows: list[str] = []
+    max_rc = 0
+    for idx, result_path in enumerate(result_paths):
+        tmp_tsv = output_tsv.with_name(f".{output_tsv.name}.{idx}.tmp")
+        if tmp_tsv.exists():
+            tmp_tsv.unlink()
+        argv = [
+            sys.executable,
+            str(rollup_script),
+            str(result_path),
+            "--output",
+            str(tmp_tsv),
+            *extra_args,
+        ]
+        completed = runner(argv, check=False)
+        rc = getattr(completed, "returncode", 0)
+        max_rc = max(max_rc, rc)
+        if rc != 0 and not tmp_tsv.exists():
+            raise ValidatePhaseError(f"validator subprocess exited {rc} without producing {tmp_tsv}")
+        rows.extend(_rollup_body_rows(tmp_tsv))
+        tmp_tsv.unlink(missing_ok=True)
+
+    output_tsv.write_text(TSV_HEADER + "\n" + "\n".join(rows) + ("\n" if rows else ""), encoding="utf-8")
+    parsed = parse_rollup(output_tsv, floor=floor)
+    if max_rc == 0:
+        return parsed
+    return ValidateResult(
+        rollup_tsv_path=parsed.rollup_tsv_path,
+        clean_count=parsed.clean_count,
+        warning_count=parsed.warning_count,
+        error_count=parsed.error_count,
+        refused_count=parsed.refused_count,
+        total=parsed.total,
+        clean_rate=parsed.clean_rate,
+        floor=parsed.floor,
+        floor_breached=parsed.floor_breached,
+        script_returncode=max_rc,
+    )
+
+
+def _rollup_body_rows(rollup_tsv: Path) -> list[str]:
+    with rollup_tsv.open("r", encoding="utf-8") as fh:
+        lines = [line.rstrip("\n") for line in fh]
+    return [line for line in lines[1:] if line and not line.startswith("#")]
 
 
 def parse_rollup(rollup_tsv: Path, *, floor: float = 0.80) -> ValidateResult:
@@ -169,7 +236,7 @@ def parse_validator_status_by_path(rollup_tsv: Path) -> dict[Path, str]:
             result_path = fields[path_idx].strip()
             if not result_path:
                 continue
-            out[Path(result_path)] = fields[status_idx]
+            out[Path(result_path).resolve()] = fields[status_idx]
     return out
 
 

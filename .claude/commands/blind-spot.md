@@ -11,10 +11,10 @@ description: Record a blind-spot audit finding to _project/blind-spots/ (file-fi
 
 ## Your task
 
-Follow the synced `SHARED/review-protocol` skill exactly. Apply §2
+Follow `docs/development/review-protocol.md` exactly. Apply Section 2
 (defect gate) **before** anything else. If the gate triggers, refuse
 to file and offer the user the TODO / inline-fix / escalation menu
-described in SHARED §2. If the gate passes:
+described in the review protocol. If the gate passes:
 
 1. **Pick the slug.** Derive a 3–6 word kebab-case slug capturing the
    *class*, not the *instance*. Example: "react keys collide on
@@ -37,10 +37,11 @@ described in SHARED §2. If the gate passes:
 
 5. **Report** with `Recorded: _project/blind-spots/<filename>.md` and
    a quote of the body. **Stop there** — do not commit, do not push,
-   do not run `make pr-open`. Per SHARED §4, the disk-write is local-only.
+   do not run `make pr-open`. Per review protocol Section 4, the
+   disk-write is local-only.
 
 ## Notes
 
-Behavior is governed by `SHARED/review-protocol`.
+Behavior is governed by `docs/development/review-protocol.md`.
 Storage is governed by `_project/blind-spots/README.md`. Don't restate
 either here.

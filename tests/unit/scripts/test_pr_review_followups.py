@@ -277,6 +277,34 @@ def test_run_executor_for_comment_uses_config_override_for_approval_policy() -> 
     assert result.disposition == "no-current-action"  # RecordingRunner produces no diff
 
 
+def test_run_executor_for_comment_treats_clean_local_commit_as_fixed() -> None:
+    pending = pr_review_followups.PendingComment(pr=_pr(), comment=_comment(51), replies=())
+    runner = RecordingRunner(
+        scripted={
+            ("git", "rev-parse", "HEAD"): [
+                subprocess.CompletedProcess(["git", "rev-parse", "HEAD"], 0, "before-sha\n", ""),
+                subprocess.CompletedProcess(["git", "rev-parse", "HEAD"], 0, "after-sha\n", ""),
+            ],
+            ("git", "status", "--porcelain"): [
+                subprocess.CompletedProcess(["git", "status", "--porcelain"], 0, "", ""),
+                subprocess.CompletedProcess(["git", "status", "--porcelain"], 0, "", ""),
+            ],
+        }
+    )
+
+    result = pr_review_followups.run_executor_for_comment(
+        runner,
+        pending,
+        repo="joeharris76/BenchBox",
+        base="develop",
+        executor_model=None,
+        executor_sandbox="workspace-write",
+        executor_approval="never",
+    )
+
+    assert result.disposition == "fixed"
+
+
 def test_commit_message_for_result_includes_pr_and_comment_id() -> None:
     pending = pr_review_followups.PendingComment(
         pr=_pr(), comment=_comment(101, body="[P1] Tighten the merge guard"), replies=()
@@ -734,6 +762,98 @@ def test_resume_skips_comments_already_committed_locally(monkeypatch, tmp_path) 
         "comment 12345 was already committed locally and must be skipped; "
         "only the unrelated comment 88888 should reach run_executor_for_comment"
     )
+
+
+def test_resume_finalizes_when_all_pending_comments_are_already_committed(monkeypatch, tmp_path) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    subprocess.run(["git", "init", "-q", str(repo_root)], check=True)
+    subprocess.run(["git", "-C", str(repo_root), "config", "user.email", "test@example.com"], check=True)
+    subprocess.run(["git", "-C", str(repo_root), "config", "user.name", "Test"], check=True)
+    subprocess.run(["git", "-C", str(repo_root), "config", "commit.gpgsign", "false"], check=True)
+    (repo_root / "README").write_text("ok\n")
+    subprocess.run(["git", "-C", str(repo_root), "add", "README"], check=True)
+    subprocess.run(["git", "-C", str(repo_root), "commit", "-q", "-m", "init"], check=True)
+    subprocess.run(["git", "-C", str(repo_root), "branch", "-M", "develop"], check=True)
+    head = subprocess.run(
+        ["git", "-C", str(repo_root), "rev-parse", "HEAD"], check=True, capture_output=True, text=True
+    ).stdout.strip()
+    subprocess.run(["git", "-C", str(repo_root), "update-ref", "refs/remotes/origin/develop", head], check=True)
+    subprocess.run(["git", "-C", str(repo_root), "checkout", "-q", "-b", "fix/pr-review-resume"], check=True)
+    (repo_root / "fix.txt").write_text("prior fix\n")
+    subprocess.run(["git", "-C", str(repo_root), "add", "fix.txt"], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo_root),
+            "commit",
+            "-q",
+            "-m",
+            "fix(pr-followup): PR #999 comment 12345 — recovered fix",
+        ],
+        check=True,
+    )
+
+    already_pr = pr_review_followups.PullRequest(
+        number=999, title="prior", merged_at="2026-05-01T00:00:00Z", url="https://example/999"
+    )
+    already_comment = pr_review_followups.ReviewComment(
+        id=12345,
+        body="[P1] already done",
+        path="fix.txt",
+        html_url="https://example/999#12345",
+        user_login="chatgpt-codex-connector[bot]",
+        created_at="2026-04-30T00:00:00Z",
+    )
+    pending_already = pr_review_followups.PendingComment(pr=already_pr, comment=already_comment, replies=())
+
+    executor_calls: list[int] = []
+    finalize_calls: list[dict[str, object]] = []
+
+    monkeypatch.setattr(pr_review_followups, "resolve_repo", lambda runner, repo: "joeharris76/BenchBox")
+    monkeypatch.setattr(
+        pr_review_followups,
+        "discover_pending_comments",
+        lambda runner, **_: [pending_already],
+    )
+    monkeypatch.setattr(pr_review_followups, "check_executor_version", lambda runner: (0, 128, 0))
+    monkeypatch.setattr(
+        pr_review_followups,
+        "run_executor_for_comment",
+        lambda runner, item, **_: executor_calls.append(item.comment.id),
+    )
+    monkeypatch.setattr(pr_review_followups, "reply_to_comment", lambda runner, **_: None)
+    monkeypatch.setattr(
+        pr_review_followups,
+        "finalize_changes",
+        lambda runner, **kwargs: finalize_calls.append(kwargs),
+    )
+
+    runner = pr_review_followups.CommandRunner(repo_root)
+    args = pr_review_followups.build_parser().parse_args(
+        [
+            "run",
+            "--repo",
+            "joeharris76/BenchBox",
+            "--base",
+            "develop",
+            "--no-submit",
+            "--resume",
+        ]
+    )
+
+    rc = pr_review_followups.run_action_loop(args, runner)
+
+    assert rc == 0
+    assert executor_calls == []
+    assert finalize_calls == [
+        {
+            "base_ref": "origin/develop",
+            "commit_message": args.commit_message,
+            "no_submit": True,
+        }
+    ]
 
 
 def test_discover_locally_committed_pairs_matches_per_comment_subjects(tmp_path) -> None:

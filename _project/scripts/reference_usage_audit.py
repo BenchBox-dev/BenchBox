@@ -107,10 +107,10 @@ def _message_content_hits(
     hits: list[Hit] = []
     timestamp = str(record.get("timestamp", ""))
     for item in _message_items(record):
-        content = item.get("content")
+        item_type = str(item.get("type", "text"))
+        content = item.get("content") if item_type == "tool_result" else item.get("text", item.get("content"))
         if not isinstance(content, str):
             continue
-        item_type = str(item.get("type", "text"))
         category = "tool_result_content" if item_type == "tool_result" else "message_content"
         for reference in references:
             if _matches_reference(content, reference):

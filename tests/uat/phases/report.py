@@ -47,6 +47,12 @@ def render_row(
     )
 
 
+def _validator_status_for_path(validator_status_by_path: dict[Path, str], result_path: Path | None) -> str:
+    if result_path is None:
+        return ""
+    return validator_status_by_path.get(result_path, "") or validator_status_by_path.get(result_path.resolve(), "")
+
+
 def cross_scale_clean_pair_count(
     cells: Iterable[CellResult],
     rungs: list[float],
@@ -71,7 +77,7 @@ def cross_scale_clean_pair_count(
             if cell.status != "passed":
                 ok = False
                 break
-            v = validator_status_by_path.get(cell.result_path, "") if cell.result_path else ""
+            v = _validator_status_for_path(validator_status_by_path, cell.result_path)
             if v and v not in ("clean", "warning_only"):
                 ok = False
                 break
@@ -100,8 +106,8 @@ def write_report(
         fh.write(REPORT_HEADER + "\n")
         for cell in rows:
             v = (
-                validator_status_by_path.get(cell.result_path, "")
-                if (validator_status_by_path and cell.result_path)
+                _validator_status_for_path(validator_status_by_path, cell.result_path)
+                if validator_status_by_path
                 else ""
             )
             fh.write(render_row(cell, validator_status=v) + "\n")

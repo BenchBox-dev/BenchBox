@@ -61,9 +61,10 @@ def sweep_main(argv: list[str] | None = None) -> int:
 
     parser = argparse.ArgumentParser(prog="uat-sweep")
     parser.add_argument("--config", required=True)
+    parser.add_argument("--dry-run", action="store_true", help="Override the YAML config and skip workload phases")
     args = parser.parse_args(argv)
 
-    result = run_sweep_from_path(Path(args.config))
+    result = run_sweep_from_path(Path(args.config), dry_run_override=True if args.dry_run else None)
     print(
         json.dumps(
             {

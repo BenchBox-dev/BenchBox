@@ -131,3 +131,17 @@ def test_loader_real_catalog_still_loads() -> None:
             if op.id and not op.id.startswith("sketch_"):
                 assert v.expected_value_min is None
                 assert v.expected_value_max is None
+
+
+def test_duckdb_only_cpc_and_req_operations_skip_trino() -> None:
+    catalog = load_write_primitives_catalog()
+
+    duckdb_only_ops = [
+        operation
+        for operation in catalog.operations.values()
+        if operation.id.startswith(("sketch_cpc_", "sketch_req_"))
+    ]
+
+    assert duckdb_only_ops
+    assert all("trino" in operation.platform_overrides for operation in duckdb_only_ops)
+    assert all(operation.platform_overrides["trino"] is None for operation in duckdb_only_ops)

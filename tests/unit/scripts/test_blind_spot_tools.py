@@ -30,6 +30,16 @@ validate_blind_spot = _load_script("validate_blind_spot")
 sweep_blind_spots = _load_script("sweep_blind_spots")
 
 
+def test_blind_spot_command_uses_repo_tracked_protocol() -> None:
+    command_text = (REPO_ROOT / ".claude" / "commands" / "blind-spot.md").read_text(encoding="utf-8")
+
+    assert "docs/development/review-protocol.md" in command_text
+    assert "_project/blind-spots/README.md" in command_text
+    assert "~/" not in command_text
+    assert ".claude/skills" not in command_text
+    assert (REPO_ROOT / "docs" / "development" / "review-protocol.md").is_file()
+
+
 def _finding_text(
     stem: str,
     *,
