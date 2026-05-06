@@ -88,7 +88,7 @@ def run_sweep(
             try:
                 exec_phase.enumerate_cells(config.raw)
                 phase_exit_codes[phase] = 0
-            except (ValueError, KeyError) as exc:
+            except (ValueError, KeyError, TypeError) as exc:
                 phase_exit_codes[phase] = 2
                 aborted_phase = phase
                 abort_reason = str(exc)
