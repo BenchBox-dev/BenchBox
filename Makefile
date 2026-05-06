@@ -1158,7 +1158,8 @@ worktree-release-locked:
 	git reset --hard origin/develop; \
 	git branch -D "$$branch"; \
 	git remote prune origin; \
-	echo "Released $$branch; worktree is detached at origin/develop."
+	rm -rf "$$top/.venv"; \
+	echo "Released $$branch; worktree is detached at origin/develop (.venv cleared; next claim will re-sync)."
 
 ## worktree-pool-status: report pool slot state + venv health + disk usage.
 ##
@@ -1182,7 +1183,8 @@ worktree-release-locked:
 ## Venv health:
 ##   ok           — .venv/pyvenv.cfg exists and is at least as new as uv.lock + pyproject.toml
 ##   stale        — .venv exists but uv.lock or pyproject.toml is newer (next claim will re-sync)
-##   missing      — .venv absent (claim will recreate)
+##   missing      — .venv absent (claim will recreate; expected for free
+##                  slots, since release/sweep clears `.venv/`)
 ##
 ## PR-state lookup is batched: a single `gh pr list --state all` runs up
 ## front and an associative awk lookup per slot replaces N per-slot
@@ -1357,6 +1359,9 @@ worktree-pool-reset-locked:
 ## or where the gh API lookup failed (state=unknown). Run after a busy day
 ## to recover slots that died between work and `make worktree-release`.
 ##
+## Also drops `.venv/` from each released slot to free disk on inactive
+## pool worktrees; the next `worktree-claim` re-syncs from `~/.cache/uv/`.
+##
 ## Acquires the pool lock for the duration of the sweep so concurrent
 ## claims/releases cannot race with the per-slot reset operations.
 worktree-pool-sweep-stale:
@@ -1401,6 +1406,7 @@ worktree-pool-sweep-stale-locked:
 		git -C "$$wt" reset --hard origin/develop >/dev/null; \
 		git -C "$$wt" branch -D "$$current" >/dev/null 2>&1 || true; \
 		git -C "$$wt" remote prune origin >/dev/null 2>&1 || true; \
+		rm -rf "$$wt/.venv"; \
 		swept=$$((swept + 1)); \
 	done; \
 	echo "Swept $$swept pool slot(s)."
