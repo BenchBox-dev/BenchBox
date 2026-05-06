@@ -1,19 +1,19 @@
 {
   "version": 1,
-  "lockedAt": "2026-05-06T11:51:41.812Z",
+  "lockedAt": "2026-05-06T12:21:59.436Z",
   "skills": {
     "blog": {
       "source": {
         "type": "local",
         "name": "personal",
         "path": "/Users/joe/.skill-sync/skills/blog",
-        "fetchedAt": "2026-05-06T11:46:32.513Z"
+        "fetchedAt": "2026-05-06T12:21:59.334Z"
       },
       "installMode": "mirror",
       "files": {
         "references/critique.md": {
-          "sha256": "4e26d0841c179c02a4117037756d27d2308f473fde4d133cbb6d849a023e8e9c",
-          "size": 1164
+          "sha256": "d78d4622a4c33afc7e505fdb2dcdc8b633585049d91b04c6dfa23f2e3770e0e1",
+          "size": 2013
         },
         "SKILL.md": {
           "sha256": "26382c08807bfb516034f883689fde5a91c6974089138e366f95dbd6f164a073",
@@ -30,7 +30,7 @@
         "type": "local",
         "name": "personal",
         "path": "/Users/joe/.skill-sync/skills/code",
-        "fetchedAt": "2026-05-06T11:51:41.740Z"
+        "fetchedAt": "2026-05-06T12:21:59.340Z"
       },
       "installMode": "mirror",
       "files": {
@@ -55,8 +55,8 @@
           "size": 721
         },
         "SKILL.md": {
-          "sha256": "46b46ad2c46625c6c2e7bf155d0589eb0f5470a4411a7742435a606b7625660f",
-          "size": 4063
+          "sha256": "ad2a41fd0fe98d43391ba72807aca3c7512fef983b5109053a4b51d4863b81c7",
+          "size": 4591
         },
         "skill.yaml": {
           "sha256": "d828f5f4c7075ad76083914ad5b3525bb3ab16d59ba0c293cb8d1f2759cf75bf",
@@ -111,7 +111,7 @@
         "type": "local",
         "name": "personal",
         "path": "/Users/joe/.skill-sync/skills/todo",
-        "fetchedAt": "2026-05-06T11:46:32.523Z"
+        "fetchedAt": "2026-05-06T12:21:59.344Z"
       },
       "installMode": "mirror",
       "files": {
@@ -128,8 +128,8 @@
           "size": 1464
         },
         "SKILL.md": {
-          "sha256": "45da543671b21c2c5a2f5a2cafa6f641e9c7ef4979bb4e6b4cd4a4efc3374636",
-          "size": 4238
+          "sha256": "defe714d13399892709e9a85d0de6500a696ea69dd5608f0b978d3ec1e0b1614",
+          "size": 4618
         },
         "skill.yaml": {
           "sha256": "02fb9215abb958fbb853438905ee2fab5eaf49c9cc820033edb23c992313fe20",
