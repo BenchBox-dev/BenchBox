@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T00:48:13.897960+00:00",
+  "bundle_file": "tsbs_devops_sf01_duckdb_sql_20260505_195616_74c642b6.json",
+  "bundle_hash": "d6b366f77a45ce10274f82bd473536a6c87e8aa61cdcd928cea9a879454253bc",
+  "companion_hashes": {},
+  "benchmark": "TSBS DevOps",
+  "platform": "DuckDB",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

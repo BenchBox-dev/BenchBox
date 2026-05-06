@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import shutil
 import subprocess
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -80,14 +79,21 @@ def run_explorer_smoke(
 
     build_log = log_dir / "explorer_build.log"
     smoke_log = log_dir / "playwright_smoke.log"
+    if bundles_dir.name == "bundles":
+        data_dir = bundles_dir.parent
+    else:
+        data_dir = log_dir / "explorer_input"
+        data_dir.mkdir(parents=True, exist_ok=True)
+        linked_bundles = data_dir / "bundles"
+        if linked_bundles.exists() or linked_bundles.is_symlink():
+            linked_bundles.unlink()
+        linked_bundles.symlink_to(bundles_dir, target_is_directory=True)
     build_argv = [
-        sys.executable,
-        "-m",
-        "benchbox.cli",
+        "benchbox",
         "explorer",
         "build",
-        "--bundles-dir",
-        str(bundles_dir),
+        "--data-dir",
+        str(data_dir),
         "--output",
         str(output_dir),
         *build_extra_args,

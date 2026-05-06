@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T00:45:57.062557+00:00",
+  "bundle_file": "amplab_sf001_clickhouse_local_sql_20260505_203653_53b43aa6.json",
+  "bundle_hash": "d0560738f6602d4b7f2e5e6955dfc47a899e8f00255d0e8add1f3699e509f997",
+  "companion_hashes": {},
+  "benchmark": "AMPLab Big Data",
+  "platform": "ClickHouse Local",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

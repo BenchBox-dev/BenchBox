@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import datetime as _dt
 import json
-import os
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -44,12 +43,11 @@ def run_sweep(
     """Orchestrate the YAML's `phases:` list. Returns SweepResult."""
     now = _dt.datetime.now()
     log_dir = log_dir_override or exec_phase.default_log_dir(config, now=now)
+    benchmark_runs_dir = exec_phase.default_benchmark_runs_dir(config, now=now)
     log_dir.mkdir(parents=True, exist_ok=True)
 
     if databases_root is None:
-        databases_root = (
-            Path(os.environ.get("BENCHBOX_OUTPUT_DIR", str(Path.home() / "Developer" / "benchmark_runs"))) / "databases"
-        )
+        databases_root = benchmark_runs_dir / "databases"
 
     phase_exit_codes: dict[str, int] = {}
     aborted_phase: str | None = None
@@ -58,6 +56,7 @@ def run_sweep(
     cells_jsonl = log_dir / "cells.jsonl"
     execute_outcome = None
     validator_rollup_tsv: Path | None = None
+    submissions_dir: Path | None = None
 
     for phase in config.phases:
         if config.dry_run and phase != "enumerate":
@@ -71,7 +70,7 @@ def run_sweep(
         if phase == "preflight":
             preflight_cfg = config.raw.get("preflight") or {}
             result = preflight_phase.run_preflight(
-                free_space_path=preflight_cfg.get("free_space_path", "~/Developer/benchmark_runs"),
+                free_space_path=preflight_cfg.get("free_space_path", str(benchmark_runs_dir)),
                 free_space_min_gib=float(preflight_cfg.get("free_space_min_gib", 5.0)),
                 docker_required=bool(preflight_cfg.get("docker_required", False)),
                 noisy_neighbor_warn_load=float(preflight_cfg.get("noisy_neighbor_warn_load", 8.0)),
@@ -97,6 +96,7 @@ def run_sweep(
             execute_outcome = exec_phase.run_execute(
                 config,
                 log_dir=log_dir,
+                benchmark_runs_dir=benchmark_runs_dir,
                 databases_root=databases_root,
             )
             with cells_jsonl.open("w", encoding="utf-8") as fh:
@@ -165,8 +165,9 @@ def run_sweep(
             from tests.uat.phases.explorer_smoke import run_explorer_smoke
 
             es_cfg = config.raw.get("explorer_smoke") or {}
+            bundles_dir = submissions_dir if submissions_dir is not None else log_dir / "bundles"
             result = run_explorer_smoke(
-                bundles_dir=log_dir / "bundles",
+                bundles_dir=bundles_dir,
                 output_dir=log_dir / "explorer_data",
                 log_dir=log_dir,
                 playwright_browsers=tuple(es_cfg.get("playwright_browsers", ["chromium"])),

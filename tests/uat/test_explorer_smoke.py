@@ -44,6 +44,8 @@ def test_runs_build_then_smoke(tmp_path: Path):
     assert result.exit_code() == 0
     assert len(invocations) == 2
     # Build first, smoke second.
+    assert invocations[0][:3] == ["benchbox", "explorer", "build"]
+    assert "--data-dir" in invocations[0]
     assert "explorer" in invocations[0]
     assert "node" in invocations[1][0]
 

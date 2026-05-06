@@ -44,12 +44,14 @@ class ExecuteConfig:
     early_stop_on_failure: bool = True
     phases_arg: str = "load,power"
     compression: str | None = None
+    extra_args: tuple[str, ...] = ()
     skip_unreachable: bool = True
     parallel_platforms: bool = False  # reserved; must remain False
 
 
 @dataclass(frozen=True)
 class OutputConfig:
+    benchmark_runs_dir_template: str = "~/Developer/benchmark_runs"
     logs_dir_template: str = "~/Developer/benchmark_runs/logs/uat_{date}"
     submissions_dir_template: str = "~/Developer/benchmark_runs/submissions/{name}"
 
@@ -115,12 +117,20 @@ def _validate_execute(raw: dict[str, Any]) -> ExecuteConfig:
         )
     timeout = _require_positive_int(raw, "per_cell_timeout_s", default=600)
     early_after = _require_positive_int(raw, "early_stop_after_s", default=180)
+    extra_args_raw = raw.get("extra_args", ())
+    if extra_args_raw is None:
+        extra_args = ()
+    elif isinstance(extra_args_raw, (list, tuple)) and all(isinstance(entry, str) for entry in extra_args_raw):
+        extra_args = tuple(extra_args_raw)
+    else:
+        raise ConfigError("`execute.extra_args` must be a list of strings")
     return ExecuteConfig(
         per_cell_timeout_s=timeout,
         early_stop_after_s=early_after,
         early_stop_on_failure=bool(raw.get("early_stop_on_failure", True)),
         phases_arg=str(raw.get("phases_arg", "load,power")),
         compression=raw.get("compression"),
+        extra_args=extra_args,
         skip_unreachable=bool(raw.get("skip_unreachable", True)),
         parallel_platforms=False,
     )
@@ -132,6 +142,12 @@ def _validate_output(raw: dict[str, Any]) -> OutputConfig:
     if not isinstance(raw, dict):
         raise ConfigError("`output:` must be a mapping")
     return OutputConfig(
+        benchmark_runs_dir_template=str(
+            raw.get(
+                "benchmark_runs_dir_template",
+                "~/Developer/benchmark_runs",
+            )
+        ),
         logs_dir_template=str(
             raw.get(
                 "logs_dir_template",

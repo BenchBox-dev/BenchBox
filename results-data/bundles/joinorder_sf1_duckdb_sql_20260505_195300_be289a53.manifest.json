@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T00:46:49.321387+00:00",
+  "bundle_file": "joinorder_sf1_duckdb_sql_20260505_195300_be289a53.json",
+  "bundle_hash": "f87c454292494e6fe2ee3904995ba758ec9421b54ce705097a82cd3311936ecc",
+  "companion_hashes": {},
+  "benchmark": "JoinOrderBenchmark",
+  "platform": "DuckDB",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

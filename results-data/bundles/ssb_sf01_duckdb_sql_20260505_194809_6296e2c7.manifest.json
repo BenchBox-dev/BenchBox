@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T00:47:12.196523+00:00",
+  "bundle_file": "ssb_sf01_duckdb_sql_20260505_194809_6296e2c7.json",
+  "bundle_hash": "cb61a9f1f87cee4003e27852598b5c76004971612f4f9d3e8b3594977a98288e",
+  "companion_hashes": {},
+  "benchmark": "Star Schema",
+  "platform": "DuckDB",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

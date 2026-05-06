@@ -40,6 +40,7 @@ def run_execute(
     config: UATConfig,
     *,
     log_dir: Path | None = None,
+    benchmark_runs_dir: Path | None = None,
     databases_root: Path | None = None,
     cleanup_enabled: bool = True,
     runner=None,
@@ -54,6 +55,9 @@ def run_execute(
     if runner is None:
         runner = run_cell
     assert config.execute.parallel_platforms is False, "parallel_platforms must remain False — UAT W3 line 222"
+    benchmark_runs_dir = (
+        Path(benchmark_runs_dir).expanduser() if benchmark_runs_dir is not None else default_benchmark_runs_dir(config)
+    )
 
     cells = enumerate_cells(config.raw)
     by_pb: dict[tuple[str, str], list[Cell]] = defaultdict(list)
@@ -101,7 +105,9 @@ def run_execute(
                 timeout_s=config.execute.per_cell_timeout_s,
                 phases=config.execute.phases_arg,
                 compression=config.execute.compression,
+                extra_args=config.execute.extra_args,
                 log_dir=log_dir,
+                benchmark_runs_dir=benchmark_runs_dir,
             )
             results.append(cell_result)
             observed.append(
@@ -246,5 +252,13 @@ def default_log_dir(config: UATConfig, now: _dt.datetime | None = None) -> Path:
     """Resolve the YAML log_dir_template against {date} and {name}."""
     now = now or _dt.datetime.now()
     template = config.output.logs_dir_template
+    rendered = template.replace("{date}", now.strftime("%Y%m%d")).replace("{name}", config.name)
+    return Path(rendered).expanduser()
+
+
+def default_benchmark_runs_dir(config: UATConfig, now: _dt.datetime | None = None) -> Path:
+    """Resolve the YAML benchmark_runs root against {date} and {name}."""
+    now = now or _dt.datetime.now()
+    template = config.output.benchmark_runs_dir_template
     rendered = template.replace("{date}", now.strftime("%Y%m%d")).replace("{name}", config.name)
     return Path(rendered).expanduser()

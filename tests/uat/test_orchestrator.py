@@ -9,6 +9,7 @@ import pytest
 
 from tests.uat import orchestrator
 from tests.uat.config import validate_config
+from tests.uat.runner import CellResult
 
 pytestmark = pytest.mark.fast
 
@@ -107,3 +108,85 @@ def test_dry_run_passes_with_valid_enumerate(tmp_path: Path):
     result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path)
     assert result.aborted_phase is None
     assert all(c == 0 for c in result.phase_exit_codes.values())
+
+
+def test_explorer_smoke_uses_package_submissions_dir(tmp_path: Path):
+    cfg = validate_config(
+        {
+            "name": "smoke",
+            "phases": ["execute", "package", "explorer_smoke"],
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "package": {"submit_terminal_state": "local-stage"},
+            "output": {"submissions_dir_template": str(tmp_path / "submissions" / "{name}")},
+        }
+    )
+    cell = CellResult(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.01,
+        status="passed",
+        exit_code=0,
+        elapsed_s=1.0,
+        log_path=tmp_path / "cell.log",
+        result_path=tmp_path / "result.json",
+    )
+    execute_outcome = type("ExecuteOutcome", (), {"results": (cell,)})()
+    captured: dict[str, Path] = {}
+
+    def fake_package(config, *, result_paths, submissions_dir):
+        captured["package_dir"] = submissions_dir
+        return type("PackageResult", (), {"exit_code": lambda self: 0})()
+
+    def fake_explorer_smoke(**kwargs):
+        captured["bundles_dir"] = kwargs["bundles_dir"]
+        return type("ExplorerResult", (), {"exit_code": lambda self: 0})()
+
+    with (
+        patch.object(orchestrator.exec_phase, "run_execute", return_value=execute_outcome),
+        patch("tests.uat.phases.package.run_package", side_effect=fake_package),
+        patch("tests.uat.phases.explorer_smoke.run_explorer_smoke", side_effect=fake_explorer_smoke),
+    ):
+        result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
+
+    assert result.aborted_phase is None
+    assert captured["bundles_dir"] == captured["package_dir"]
+    assert captured["bundles_dir"] == tmp_path / "submissions" / "smoke"
+
+
+def test_orchestrator_uses_output_root_for_preflight_execute_and_cleanup(tmp_path: Path):
+    root = tmp_path / "shared-runs"
+    cfg = validate_config(
+        {
+            "name": "smoke",
+            "phases": ["preflight", "execute"],
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "output": {"benchmark_runs_dir_template": str(root)},
+        }
+    )
+    fake_preflight = type("Preflight", (), {"aborted": False, "abort_reason": None, "warnings": ()})()
+    fake_execute = type("ExecuteOutcome", (), {"results": (), "pruned": (), "skipped_unreachable": ()})()
+    captured: dict[str, Path | str] = {}
+
+    def fake_run_preflight(**kwargs):
+        captured["free_space_path"] = kwargs["free_space_path"]
+        return fake_preflight
+
+    def fake_run_execute(config, **kwargs):
+        captured["benchmark_runs_dir"] = kwargs["benchmark_runs_dir"]
+        captured["databases_root"] = kwargs["databases_root"]
+        return fake_execute
+
+    with (
+        patch.object(orchestrator.preflight_phase, "run_preflight", side_effect=fake_run_preflight),
+        patch.object(orchestrator.exec_phase, "run_execute", side_effect=fake_run_execute),
+    ):
+        result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
+
+    assert result.aborted_phase is None
+    assert captured["free_space_path"] == str(root)
+    assert captured["benchmark_runs_dir"] == root
+    assert captured["databases_root"] == root / "databases"

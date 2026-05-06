@@ -75,9 +75,7 @@ def _build_submit_argv(
 ) -> list[str]:
     """Build the `benchbox submit ...` argv for a single result file."""
     base = [
-        sys.executable,
-        "-m",
-        "benchbox.cli",
+        "benchbox",
         "submit",
         str(result_path),
     ]

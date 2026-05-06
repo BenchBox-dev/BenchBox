@@ -69,6 +69,7 @@ def run_cell(
     phases: str = "load,power",
     compression: str | None = None,
     log_dir: Path | str | None = None,
+    benchmark_runs_dir: Path | str | None = None,
     extra_args=(),
     now: _dt.datetime | None = None,
 ) -> CellResult:
@@ -91,12 +92,19 @@ def run_cell(
 
     with log_path.open("w", encoding="utf-8") as log_fh:
         log_fh.write(f"# {' '.join(argv)}\n")
+        runs_dir = (
+            _default_benchmark_runs_dir() if benchmark_runs_dir is None else Path(benchmark_runs_dir).expanduser()
+        )
+        env = os.environ.copy()
+        env["BENCHBOX_OUTPUT_DIR"] = str(runs_dir)
+        log_fh.write(f"# BENCHBOX_OUTPUT_DIR={runs_dir}\n")
         log_fh.flush()
         timeout_result = run_with_timeout(
             argv,
             timeout_s=timeout_s,
             stdout=log_fh,
             stderr=log_fh,
+            env=env,
         )
 
     log_text = log_path.read_text(encoding="utf-8", errors="replace")
@@ -131,3 +139,12 @@ def _default_log_dir(now: _dt.datetime) -> Path:
         )
     )
     return runs_root / "logs" / f"uat_{now.strftime('%Y%m%d')}"
+
+
+def _default_benchmark_runs_dir() -> Path:
+    return Path(
+        os.environ.get(
+            "BENCHBOX_OUTPUT_DIR",
+            str(Path.home() / "Developer" / "benchmark_runs"),
+        )
+    ).expanduser()

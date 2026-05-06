@@ -27,6 +27,7 @@ def test_validate_config_minimal():
     assert "execute" in cfg.phases or cfg.phases  # default phases applied
     assert cfg.execute.per_cell_timeout_s == 600
     assert cfg.execute.parallel_platforms is False
+    assert cfg.output.benchmark_runs_dir_template == "~/Developer/benchmark_runs"
 
 
 def test_validate_config_rejects_parallel_platforms():
@@ -57,6 +58,22 @@ def test_validate_config_rejects_float_timeout():
 def test_validate_config_accepts_string_int_timeout():
     cfg = config.validate_config({"name": "smoke", "execute": {"per_cell_timeout_s": "120"}})
     assert cfg.execute.per_cell_timeout_s == 120
+
+
+def test_validate_config_accepts_execute_extra_args():
+    cfg = config.validate_config({"name": "smoke", "execute": {"extra_args": ["--tuning", "tuned"]}})
+    assert cfg.execute.extra_args == ("--tuning", "tuned")
+
+
+def test_validate_config_accepts_benchmark_runs_dir_template(tmp_path: Path):
+    root = tmp_path / "runs" / "{name}" / "{date}"
+    cfg = config.validate_config({"name": "smoke", "output": {"benchmark_runs_dir_template": str(root)}})
+    assert cfg.output.benchmark_runs_dir_template == str(root)
+
+
+def test_validate_config_rejects_non_string_execute_extra_args():
+    with pytest.raises(config.ConfigError, match="extra_args"):
+        config.validate_config({"name": "smoke", "execute": {"extra_args": ["--tuning", 1]}})
 
 
 def test_validate_config_rejects_bool_timeout():

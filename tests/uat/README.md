@@ -73,6 +73,15 @@ line of defence. Do not delete either guard. Origin of the rule:
 UAT W3 line 222 in
 `_project/handoffs/results-explorer-uat-retrospective-20260502.md`.
 
+## Runtime output root
+
+UAT sweeps default to the shared `~/Developer/benchmark_runs` root,
+not the current worktree. `output.benchmark_runs_dir_template` is
+resolved once per sweep and passed to every `benchbox run` subprocess
+as `BENCHBOX_OUTPUT_DIR`; preflight and reuse-aware database cleanup
+derive their default roots from the same value. Keep these paths
+aligned whenever adding a phase that reads or writes run artefacts.
+
 ## Frozen-config hashes
 
 When you add a new FROZEN config:
