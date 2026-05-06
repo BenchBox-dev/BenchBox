@@ -16,8 +16,10 @@ explicit user approval — that clone stays on `develop`.**
 audit, or research action — see `~/.claude/skills/SHARED/review-protocol/SKILL.md` §1.
 Landing changes requires explicit user authorization in a separate turn;
 this fires before any "auto-commit" or "file-first capture" mandate
-elsewhere.** TPC-DS SF<1 requires the patched dsdgen bundled with
-BenchBox. No `-o "addopts="` with pytest.
+elsewhere.** Conversely, write work on a worktree ends at `make pr-open`,
+not at `git push` — `make pr-open` is in the pre-approved set.
+TPC-DS SF<1 requires the patched dsdgen bundled with BenchBox.
+No `-o "addopts="` with pytest.
 
 ## Session start
 

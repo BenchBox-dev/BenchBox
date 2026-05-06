@@ -5,7 +5,7 @@ Subcommands::
 
     list [--status STATUS] [--kind KIND]    Show matching findings (default: open).
     show <id>                               Print one finding (frontmatter + body).
-    report                                  Counts by status + kind, oldest open first.
+    report                                  Counts by status + kind, oldest active first.
     triage <id> --action ACTION [...]       Stamp frontmatter to record triage outcome.
         --action dismiss [--reason "..."]
         --action actioned [--reason "..."]
