@@ -7,8 +7,9 @@ Subcommands::
     show <id>                               Print one finding (frontmatter + body).
     report                                  Counts by status + kind, oldest open first.
     triage <id> --action ACTION [...]       Stamp frontmatter to record triage outcome.
-        --action dismiss --reason "..."
+        --action dismiss [--reason "..."]
         --action actioned [--reason "..."]
+        --action actionable --reason "..."
         --action promote --todo-id <slug>
 
 Triage edits only the frontmatter and appends one line under a
@@ -27,12 +28,14 @@ from pathlib import Path
 
 import yaml
 
-ALLOWED_STATUS = {"open", "actioned", "dismissed", "merged-to-todo"}
+ALLOWED_STATUS = {"open", "actionable", "actioned", "dismissed", "merged-to-todo"}
 ACTION_TO_STATUS = {
     "dismiss": "dismissed",
     "actioned": "actioned",
+    "actionable": "actionable",
     "promote": "merged-to-todo",
 }
+REQUIRES_REASON = {"actionable"}
 FINDING_ID_RE = re.compile(r"^\d{4}-\d{2}-\d{2}-\d{6}-[a-z0-9]+(?:-[a-z0-9]+)*$")
 FRONTMATTER_RE = re.compile(r"\A---\n(.*?)\n---(?:\n|\Z)", re.DOTALL)
 TRIAGE_LOG_HEADING_RE = re.compile(r"(?m)^## Triage log\s*$")
@@ -179,14 +182,14 @@ def cmd_report(bs_dir: Path, args: argparse.Namespace) -> int:
 
     by_status: dict[str, int] = {}
     by_kind: dict[str, int] = {}
-    open_findings: list[tuple[str, dict, str]] = []
+    active_findings: list[tuple[str, dict, str]] = []
     for path, data, body in findings:
         st = str(data.get("status", "?"))
         kn = str(data.get("finding_kind", "?"))
         by_status[st] = by_status.get(st, 0) + 1
         by_kind[kn] = by_kind.get(kn, 0) + 1
-        if st == "open":
-            open_findings.append((fmt_date(data.get("date", "")), data, body))
+        if st in {"open", "actionable"}:
+            active_findings.append((fmt_date(data.get("date", "")), data, body))
 
     print(f"Total findings: {len(findings)}\n")
 
@@ -200,15 +203,16 @@ def cmd_report(bs_dir: Path, args: argparse.Namespace) -> int:
         print(f"  {kn:<16} {by_kind[kn]:>4}")
     print()
 
-    if open_findings:
-        open_findings.sort(key=lambda t: t[0])
-        print(f"Oldest open ({min(args.top, len(open_findings))} of {len(open_findings)}):")
-        for d, data, body in open_findings[: args.top]:
-            print(f"  {d}  {data.get('id', '?')}  — {extract_title(body)}")
+    if active_findings:
+        active_findings.sort(key=lambda t: t[0])
+        print(f"Oldest active ({min(args.top, len(active_findings))} of {len(active_findings)}):")
+        for d, data, body in active_findings[: args.top]:
+            st = str(data.get("status", "?"))
+            print(f"  {d}  [{st}]  {data.get('id', '?')}  — {extract_title(body)}")
     else:
-        print("No open findings.")
+        print("No active findings.")
 
-    print("\nTriage with: sweep_blind_spots.py triage <id> --action {dismiss|actioned|promote} [...]")
+    print("\nTriage with: sweep_blind_spots.py triage <id> --action {dismiss|actioned|actionable|promote} [...]")
     return 0
 
 
@@ -279,6 +283,9 @@ def cmd_triage(bs_dir: Path, args: argparse.Namespace) -> int:
     else:
         if args.todo_id:
             print("error: --todo-id is only valid with --action promote", file=sys.stderr)
+            return 2
+        if args.action in REQUIRES_REASON and not (args.reason and args.reason.strip()):
+            print(f"error: --reason is required for --action {args.action}", file=sys.stderr)
             return 2
         todo_id = None
         reason = args.reason or ""
