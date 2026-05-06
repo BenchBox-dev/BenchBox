@@ -129,7 +129,7 @@ work:
 
 verification:
 - description: "Each new branch heading is present in the reference"
-  command: "grep -cE '^### (Matrix/audit-doc|Mixed tooling\\+data|Repo-shape ADR|Multi-W spec|Defect follow-up|Verification-only)
+  command: "make skill-sync >/dev/null && grep -cE '^### (Matrix/audit-doc|Mixed tooling\\+data|Repo-shape ADR|Multi-W spec|Defect follow-up|Verification-only)
     branch' .claude/skills/code/references/five-axis-review.md"
   expected_output: ">= 6"
 - description: "Reference still passes basic lint"

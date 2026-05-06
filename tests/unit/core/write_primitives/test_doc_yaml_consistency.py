@@ -39,6 +39,9 @@ class _Claim:
 
 # Pinned doc claims and their target validation_query bound. Add an entry
 # here when a new sketch family lands a "verified <tool>" prose claim.
+# This deliberately avoids structured annotations in the docs: the regexes
+# bind only the compact empirical clause, so surrounding prose can stay natural
+# while storage-size numbers still fail loudly when removed or re-stamped.
 CLAIMS: list[_Claim] = [
     _Claim(
         op_id="sketch_query_theta_union_merge",

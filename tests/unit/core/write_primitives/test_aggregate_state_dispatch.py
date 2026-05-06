@@ -183,7 +183,7 @@ def test_dispatch_persist_failure_returns_failed_envelope(
     # rows_returned stays at 0 on persist failure -- dispatch never reaches merge.
     assert result["rows_returned"] == 0
     assert manager.last_merge_path is None, "merge should not run after persist failure"
-    assert "error" in result and result["error"]
+    assert result["error"] == "AGGREGATE_PERSIST failed: mock persist boom"
 
 
 def test_dispatch_merge_failure_returns_failed_envelope_with_persist_rows(
@@ -209,17 +209,9 @@ def test_dispatch_merge_failure_returns_failed_envelope_with_persist_rows(
     result = wp_benchmark._execute_aggregate_state_op(op.id, adapter=adapter_with_spark)
 
     assert result["status"] == "FAILED", result
-    # KNOWN: dispatch's `merge.error` access raises AttributeError on the
-    # DataFrameWriteResult dataclass (which exposes `error_message`, not
-    # `error`); the outer try/except then wraps the failure with "raised:".
-    # The dispatch reached the merge call before failing, so the merge
-    # path was exercised -- that's the differentiation we lock in here.
-    # See test_dispatch_persist_failure_returns_failed_envelope: that path
-    # never invokes the merge, while this one does. When the dispatch's
-    # `merge.error` typo is fixed (out of scope for this TODO), update the
-    # assertion to expect rows_returned == 99 and a structured merge error.
+    assert result["rows_returned"] == 99
     assert manager.last_merge_path is not None, "dispatch should reach merge before failing"
-    assert "error" in result and result["error"]
+    assert result["error"] == "AGGREGATE_MERGE failed: mock merge boom"
 
 
 def test_dispatch_bound_violation_returns_failed_envelope_with_diagnostic(

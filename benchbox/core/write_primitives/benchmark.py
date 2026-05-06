@@ -1351,7 +1351,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                     "status": "FAILED",
                     "execution_time_seconds": elapsed_seconds(t0),
                     "rows_returned": 0,
-                    "error": f"AGGREGATE_PERSIST failed: {persist.error}",
+                    "error": f"AGGREGATE_PERSIST failed: {persist.error_message or 'unknown error'}",
                 }
             merge = manager.execute_aggregate_merge(target_path, merge_extract)
             elapsed = elapsed_seconds(t0)
@@ -1361,7 +1361,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                     "status": "FAILED",
                     "execution_time_seconds": elapsed,
                     "rows_returned": int(persist.rows_affected),
-                    "error": f"AGGREGATE_MERGE failed: {merge.error}",
+                    "error": f"AGGREGATE_MERGE failed: {merge.error_message or 'unknown error'}",
                 }
 
             # Validate the extracted scalar against bounds in the first

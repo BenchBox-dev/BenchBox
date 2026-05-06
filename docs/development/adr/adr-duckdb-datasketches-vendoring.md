@@ -25,8 +25,8 @@ pipeline upstream is owned by duckdb-community-extensions, not BenchBox.
 
 `scripts/duckdb_datasketches_smoke.py` and the `extension-smoke.yml`
 CI workflow now probe one representative function per family on every
-relevant PR plus a daily cron, so future drift is caught at PR or
-within 24h rather than at benchmark time.
+relevant primitive/script/workflow/dependency PR plus a daily cron, so
+future drift is caught at PR or within 24h rather than at benchmark time.
 
 ## Options Considered
 

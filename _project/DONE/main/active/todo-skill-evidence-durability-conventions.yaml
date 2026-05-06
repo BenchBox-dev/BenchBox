@@ -126,7 +126,7 @@ verification:
   command: "test -f _project/verification-logs/README.md"
   expected_output: "exit 0"
 - description: "/todo review rubric carries a freshness axis"
-  command: "grep -E 'freshness' .claude/skills/todo/SKILL.md"
+  command: "make skill-sync >/dev/null && grep -E 'freshness' .claude/skills/todo/SKILL.md"
   expected_output: "matches >= 1"
 
 must_preserve:

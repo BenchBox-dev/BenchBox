@@ -10,7 +10,9 @@ Source: `grep -n "verified" benchbox/core/write_primitives/catalog/operations.ya
 Author runtime: BenchBox develop @ 2fd761edd, DuckDB 1.3.2, datasketches
 extension 2e38607 (matches TODO 4's smoke). ClickHouse-local was not
 present on this sweep host, so ClickHouse-keyed observations are
-inherited from the original 2026-05-04 measurements.
+inherited from the original 2026-05-04 measurements; the smoke script
+now runs ClickHouse probes when `clickhouse-local` is available via
+PATH or `CLICKHOUSE_LOCAL_BIN`.
 
 | # | Op (yaml line)                                  | Tool / version stamped       | Comment claim         | YAML bound (sketch_bytes) | Re-measured? | Verdict |
 |---|-------------------------------------------------|------------------------------|-----------------------|---------------------------|--------------|---------|
@@ -37,5 +39,6 @@ inherited from the original 2026-05-04 measurements.
 ## Re-stamp candidates
 
 None on this sweep. w4 is a no-op for the 2026-05-06 sweep. The next
-sweep should run `scripts/sketch_storage_smoke.sh` (shipped by w2) and
-update this table, re-stamping any row whose observation drifted.
+sweep should run `scripts/sketch_storage_smoke.sh` (shipped by w2) with
+`clickhouse-local` available when refreshing ClickHouse rows, then
+update this table and re-stamp any row whose observation drifted.

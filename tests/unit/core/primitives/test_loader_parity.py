@@ -136,3 +136,15 @@ def test_write_primitives_loader_delegates_to_shared_parser() -> None:
         "write_primitives loader must delegate to the shared parser; "
         "if a divergent helper reappears here the parity contract is broken"
     )
+
+
+def test_write_primitives_backcompat_helper_shims_stay_callable() -> None:
+    """Backcompat helper exports should fail loudly if deleted or rebound incorrectly."""
+    from benchbox.core.write_primitives.catalog import loader as write_loader
+
+    assert write_loader._parse_expected_value_bounds(
+        "op1", "v1", {"expected_value_min": "1", "expected_value_max": "2"}
+    ) == (1.0, 2.0)
+    assert write_loader._parse_validation_platform_overrides(
+        "op1", "v1", {"platform_overrides": {" duckdb ": "SELECT 1", "redshift": None}}
+    ) == {"duckdb": "SELECT 1", "redshift": None}
