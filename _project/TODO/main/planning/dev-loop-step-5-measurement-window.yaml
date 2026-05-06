@@ -28,6 +28,12 @@ deps:
     - dev-loop-step-3a-path-based-ci-skip
     - dev-loop-step-4-post-merge-safety-net
 
+blockers:
+  - date: "2026-04-30"
+    work: [w2, w3, w4, w5]
+    reason: "Calendar-gated: the 30-day measurement window started at 2026-04-30T21:33:45Z (Step 4 PR #81 merge timestamp, the later of the two prerequisite merges). Aggregation, threshold evaluation, and decision-record work cannot begin until the window closes — early aggregation would bias the result with a contaminated baseline."
+    unblock: "Window closes 2026-05-30. Run `make dev-loop-metrics DEV_LOOP_METRICS_DAYS=30 DEV_LOOP_METRICS_LIMIT=500` on or after that date to start w2."
+
 work:
   - id: w1
     summary: "Wait for 30 calendar days after Step 3a and Step 4 have both merged before starting w2"
