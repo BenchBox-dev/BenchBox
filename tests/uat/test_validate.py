@@ -95,10 +95,24 @@ def test_parse_validator_status_by_path_round_trip(tmp_path: Path):
     status_by_path = validate.parse_validator_status_by_path(tsv)
     # _write_tsv writes /tmp/rN.json result_path values.
     keys = {str(p) for p in status_by_path}
-    assert "/tmp/r0.json" in keys
-    assert status_by_path[Path("/tmp/r0.json")] == "clean"
-    assert status_by_path[Path("/tmp/r1.json")] == "warning_only"
-    assert status_by_path[Path("/tmp/r2.json")] == "error"
+    assert str(Path("/tmp/r0.json").resolve()) in keys
+    assert status_by_path[Path("/tmp/r0.json").resolve()] == "clean"
+    assert status_by_path[Path("/tmp/r1.json").resolve()] == "warning_only"
+    assert status_by_path[Path("/tmp/r2.json").resolve()] == "error"
+
+
+def test_parse_validator_status_by_path_normalizes_relative_paths(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    tsv = tmp_path / "rollup.tsv"
+    tsv.write_text(
+        "platform\tbenchmark\tscale\tresult_path\tvalidator_status\terror_count\twarning_count\tfirst_error\n"
+        "duckdb\ttpch\t0.01\tbenchmark_runs/results/r0.json\terror\t0\t0\t\n",
+        encoding="utf-8",
+    )
+
+    status_by_path = validate.parse_validator_status_by_path(tsv)
+
+    assert status_by_path == {(tmp_path / "benchmark_runs" / "results" / "r0.json").resolve(): "error"}
 
 
 def test_parse_validator_status_by_path_handles_missing_columns(tmp_path: Path):

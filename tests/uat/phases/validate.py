@@ -236,7 +236,7 @@ def parse_validator_status_by_path(rollup_tsv: Path) -> dict[Path, str]:
             result_path = fields[path_idx].strip()
             if not result_path:
                 continue
-            out[Path(result_path)] = fields[status_idx]
+            out[Path(result_path).resolve()] = fields[status_idx]
     return out
 
 
