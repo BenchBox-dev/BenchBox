@@ -1,7 +1,7 @@
 ---
 id: 2026-05-03-130000-stress-script-uat-driver-drift
 date: 2026-05-03
-status: open
+status: actioned
 finding_kind: framework-gap
 review_context: "code review of scripts/local_stress_test.sh against the 2026-05-02 UAT retrospective"
 related_paths:
@@ -59,3 +59,7 @@ them encourages each sweep to invent its own composition.
 - [ ] Expose the framework via `make uat-*` targets — keep the user CLI surface (`benchbox`) unchanged.
 - [ ] Encode the 2026-05-02 sweep parameters as a frozen replay config (`tests/uat/configs/uat-2026-05-02.yaml`) and assert structural parity with the historical retrospective.
 - [ ] Document the migration path for `scripts/local_stress_test.sh` (leave alone, thin-delegate, or retire) without forcing a deprecation cycle in the framework's first delivery.
+
+## Triage log
+
+- 2026-05-05: actioned — UAT Python framework shipped under tests/uat/ (orchestrator/runner/matrix/ladder/cleanup/configs/phases) via PR #205; recommended migration delivered

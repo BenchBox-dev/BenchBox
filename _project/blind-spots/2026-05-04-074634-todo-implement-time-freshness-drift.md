@@ -1,7 +1,7 @@
 ---
 id: 2026-05-04-074634-todo-implement-time-freshness-drift
 date: 2026-05-04
-status: open
+status: merged-to-todo
 finding_kind: framework-gap
 review_context: "/todo review retire-sqlglot-duckdb-all-workaround"
 related_paths:
@@ -9,7 +9,7 @@ related_paths:
   - _project/sqlglot-upstream/repros/repro_all.py
   - .claude/skills/todo/SKILL.md
 suggested_sweep: "consider adding a 'verify research findings still hold' step at the start of any TODO whose safety hinges on an upstream third-party state — check across the planning/ backlog for similar shape (upstream-fix retirements, dependency-floor bumps, deprecated-warning sweeps)"
-todo_id: null
+todo_id: todo-skill-evidence-durability-conventions
 ---
 
 # TODO review rubric does not score implement-time freshness drift
@@ -63,3 +63,11 @@ against the *current* dependency snapshot before any code is touched.
 - [ ] Sweep planning/ for sibling TODOs that retire workarounds once an
       upstream fix lands; if 2+ exist, the schema-level convention above pays
       for itself.
+
+## Triage log
+
+- 2026-05-05: actionable (sweep). Partially advanced: the in-scope nudge for
+  `retire-sqlglot-duckdb-all-workaround` landed (TODO now in DONE/).
+  Schema-level `freshness_check` field and TODO-skill rubric updates have
+  not shipped. Carry forward steps 1 and 3.
+- 2026-05-05: promoted to TODO `todo-skill-evidence-durability-conventions`

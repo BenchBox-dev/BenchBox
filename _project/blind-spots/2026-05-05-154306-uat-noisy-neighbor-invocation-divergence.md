@@ -1,7 +1,7 @@
 ---
 id: 2026-05-05-154306-uat-noisy-neighbor-invocation-divergence
 date: 2026-05-05
-status: open
+status: merged-to-todo
 finding_kind: framework-gap
 review_context: "principal-engineer review of UAT framework PR #205 (post-merge simplification audit)"
 related_paths:
@@ -42,3 +42,11 @@ behaviour divergence — the kind that erodes trust in framework guarantees.
 - [ ] Audit other phases for the same pattern. Candidate: `cleanup_enabled`
       (Python kwarg from `_cli.py:321`) vs the unread `cleanup.prune_databases`
       YAML field (see sibling blind-spot `uat-orphan-yaml-fields`).
+
+## Triage log
+
+- 2026-05-05: actionable (sweep). Confirmed: `tests/uat/_cli.py` still does not pass
+  `noisy_neighbor_warn_load`; only `tests/uat/orchestrator.py:77` honours
+  the field. Tracked under `uat-framework-review-followups`. Carry forward
+  all three next-steps.
+- 2026-05-05: promoted to TODO `uat-framework-review-followups`

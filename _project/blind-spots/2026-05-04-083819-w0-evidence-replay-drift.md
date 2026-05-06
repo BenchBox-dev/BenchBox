@@ -1,14 +1,14 @@
 ---
 id: 2026-05-04-083819-w0-evidence-replay-drift
 date: 2026-05-04
-status: open
+status: merged-to-todo
 finding_kind: framework-gap
 review_context: "/code review W0 / chore/retire-sqlglot-duckdb-all-workaround"
 related_paths:
   - _project/sqlglot-upstream/repros/repro_all.py
   - _project/TODO/main/active/retire-sqlglot-duckdb-all-workaround.yaml
 suggested_sweep: "Consider whether re-validation gates that use unpinned `uv run --with <pkg>` should always commit a transcript or pin file alongside the status flip, so a reviewer landing the PR days later can replay the same evidence."
-todo_id: null
+todo_id: todo-skill-evidence-durability-conventions
 ---
 
 # W0 evidence-replay drift
@@ -51,3 +51,12 @@ because it scores the *change*, not the *evidence the change relied on*.
 
 This is a `framework-gap` against the five-axis review rubric for verification-only
 commits, not a `bug-class`. It does not block this PR.
+
+## Triage log
+
+- 2026-05-05: actionable (sweep). Sibling of
+  `2026-05-04-074634-todo-implement-time-freshness-drift`.
+  `_project/verification-logs/` does not exist; verification-only commits
+  still rely on free-text commit messages. Carry forward the convention +
+  framework-axis next-steps.
+- 2026-05-05: promoted to TODO `todo-skill-evidence-durability-conventions`

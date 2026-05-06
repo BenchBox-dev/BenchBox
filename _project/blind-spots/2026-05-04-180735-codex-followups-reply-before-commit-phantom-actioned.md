@@ -1,7 +1,7 @@
 ---
 id: 2026-05-04-180735-codex-followups-reply-before-commit-phantom-actioned
 date: 2026-05-04
-status: open
+status: actioned
 finding_kind: bug-class
 review_context: "/code review of PR #194 (codex-pr-review-followups routine) on chore/codex-pr-review-followups"
 related_paths:
@@ -30,3 +30,7 @@ Other orchestrators in the repo that post-then-mutate (or vice versa) should be 
 - [ ] If a single batched commit is preferred for PR ergonomics, persist a local sidecar (`_project/iterate/codex-followups/<run-id>/state.json`) that records reply-posted-but-uncommitted comments, so a resume run can detect them and either retry the commit or post a corrective reply.
 - [ ] Add a smoke test that simulates an exception thrown between `reply_to_comment` and `submit_changes` and asserts the system can be re-driven to a consistent state.
 - [ ] Sweep other repo orchestrators (`make pr-fanout`, dev-loop post-merge revert workflow, etc.) for the same "external write before local commit" pattern.
+
+## Triage log
+
+- 2026-05-05: actioned — Reorder shipped: pr_review_followups.py:951-959 calls commit_changes_for_result BEFORE reply_to_comment with explicit phantom-actioned comment guard

@@ -34,3 +34,7 @@ Agents can walk away after auto-merge only because the current dwell time is sho
   surfaces dwell-time symptoms that justify Step 6 (queue); at that
   point the dwell-target acceptance criteria below must be folded
   into the queue spec before any implementation TODO ships.
+- 2026-05-05: actionable (sweep). `make dev-loop-metrics` exists; Step
+  5 still `Blocked` (no published P50/P95 dwell numbers yet). Agent
+  walk-away contract in CLAUDE.md still holds. Carry forward the
+  next-steps; revisit when Step 5 publishes measurements.

@@ -34,3 +34,8 @@ Removing the global lock by default can shift pain from blocked pushes to CPU sa
   rule "keep default global" is preserved by inertia rather than
   evidence — the survey/measurement work item below is still owed.
   Re-evaluate when dev-loop-step-5-measurement-window completes.
+- 2026-05-05: actionable (sweep). `tests/conftest.py:_get_test_lock_path`
+  still defaults to `$HOME/.benchbox/test.lock` and `BENCHBOX_TEST_LOCK_DIR`
+  remains opt-in. `dev-loop-step-5-measurement-window` is still `Blocked`,
+  so no concurrent-xdist measurement has been collected. Carry forward the
+  two next-steps; do not flip the default until measurement lands.

@@ -1,7 +1,7 @@
 ---
 id: 2026-05-04-140839-repro-harness-call-shape-coverage-gap
 date: 2026-05-04
-status: open
+status: merged-to-todo
 finding_kind: bug-class
 review_context: "/code review during retire-sqlglot-duckdb-all-workaround / chore/retire-sqlglot-duckdb-all-workaround"
 related_paths:
@@ -9,7 +9,7 @@ related_paths:
   - benchbox/utils/dialect_utils.py
   - _project/sqlglot-upstream/README.md
 suggested_sweep: "Audit every repro in repros/repro_all.py against the actual call shape used in benchbox/utils/dialect_utils.py and benchbox/platforms/base/dialect_translation.py. For each, confirm the read/write dialect pair the harness exercises matches the pair production code uses; widen any narrow probes."
-todo_id: null
+todo_id: sqlglot-repro-harness-wrapper-call-shape
 ---
 
 # Repro harness call-shape coverage gap
@@ -71,3 +71,13 @@ dialect — but it is a live trap for anyone writing a "retire the workaround" T
 This is a `bug-class` finding (not specific to item #1) but it does not block the
 current PR — that PR captures the immediate consequence (workaround stays, docs
 clarified, floor bumped). The class itself wants a separate sweep.
+
+## Triage log
+
+- 2026-05-05: actionable (sweep).
+  `_project/sqlglot-upstream/repros/repro_all.py:repro_1_duckdb_all_keyword`
+  still single-dialect (`read="duckdb"`/`write="duckdb"`); no
+  cross-dialect probe (`read="postgres"`/`write="duckdb"`) added. README
+  guidance about wrapper call-shape not added. Carry forward all three
+  next-steps.
+- 2026-05-05: promoted to TODO `sqlglot-repro-harness-wrapper-call-shape`

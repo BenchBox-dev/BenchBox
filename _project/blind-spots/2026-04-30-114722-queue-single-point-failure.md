@@ -34,3 +34,7 @@ Replacing decentralized auto-merge with a queue can make one local process or wo
   BUILD QUEUE, this finding's failure-mode-analysis requirement is
   the gate that must clear before any steward implementation TODO
   unblocks.
+- 2026-05-05: actionable (sweep). State unchanged: Step 5/6 still
+  `Blocked`; no failure-mode-analysis artifact authored. Carry forward
+  the next-steps. Do not promote to a steward TODO until Step 5 returns
+  BUILD QUEUE.

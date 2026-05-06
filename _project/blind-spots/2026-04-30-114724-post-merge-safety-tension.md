@@ -35,3 +35,6 @@ If the post-merge workflow is the real protection layer, adding a queue may dupl
   problem" rule is currently being respected by the planning DAG rather
   than by enforcement; revisit after Step 5 publishes the go/no-go
   decision record.
+- 2026-05-05: actionable (sweep). State unchanged: post-merge revert
+  workflow shipped; Step 5 still `Blocked`. Architectural rule remains
+  load-bearing by inertia, not enforcement. Carry forward.

@@ -1,7 +1,7 @@
 ---
 id: 2026-05-04-180736-codex-followups-no-external-cli-version-contract
 date: 2026-05-04
-status: open
+status: actioned
 finding_kind: framework-gap
 review_context: "/code review of PR #194 (codex-pr-review-followups routine) on chore/codex-pr-review-followups"
 related_paths:
@@ -37,3 +37,7 @@ The PR also shipped without an end-to-end integration test — the test file exe
 - [ ] Add an integration smoke test that invokes the routine with a fake `codex` shim on `PATH` (a 5-line bash script that echoes a fixed disposition) so the end-to-end argv assembly is exercised in CI.
 - [ ] Adopt a repo-wide convention: any script that shells out to a non-bundled CLI declares its supported version range in a module-level constant + a probe function, and the test suite asserts the probe runs.
 - [ ] Sweep `_project/scripts/` and `scripts/` for similar shell-outs (`subprocess.run([...])` with a non-stdlib binary) and audit each for a version contract.
+
+## Triage log
+
+- 2026-05-05: actioned — check_executor_version() probe added; --ask-for-approval replaced with -c approval_policy= config-override syntax

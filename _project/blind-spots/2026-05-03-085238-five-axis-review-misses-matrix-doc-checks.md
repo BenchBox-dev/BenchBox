@@ -1,14 +1,14 @@
 ---
 id: 2026-05-03-085238-five-axis-review-misses-matrix-doc-checks
 date: 2026-05-03
-status: open
+status: merged-to-todo
 finding_kind: framework-gap
 review_context: "/code review of W1+W2 commit dbfbdcf04 (results-explorer-uat-corpus-integrate-validated-bundles), branch feat/results-explorer-uat-corpus-validated-bundle"
 related_paths:
   - _project/handoffs/results-explorer-uat-corpus-integration-20260503.md
   - .claude/skills/code/references/five-axis-review.md
 suggested_sweep: "Add a 'matrix/audit doc' branch to the /code review checklist that mandates regenerate-from-source diffing and an alternatives-considered section."
-todo_id: null
+todo_id: extend-five-axis-review-rubric
 ---
 
 # Five-axis review skips matrix arithmetic and alternatives in audit docs
@@ -49,3 +49,11 @@ review rubric is code-centric.
 - [ ] Add a "matrix/audit doc" branch to `.claude/skills/code/references/five-axis-review.md` (or the project review checklist) that requires regenerate-from-source diffing of every numeric claim before sign-off.
 - [ ] Add an "Alternatives considered" requirement to the audit-doc template/protocol when the audit's recommendation depends on a policy gate (corpus validator depth, contract-validator strictness, etc.).
 - [ ] Sweep `_project/handoffs/` for any prior audit doc whose tables were never regenerate-diffed; spot-check representative ones.
+
+## Triage log
+
+- 2026-05-05: actionable (sweep). `.claude/skills/code/references/five-axis-review.md`
+  (62 lines) still has no matrix/audit-doc branch and no
+  regenerate-from-source clause; no audit-doc template that requires
+  "Alternatives considered". Carry forward all three next-steps.
+- 2026-05-05: promoted to TODO `extend-five-axis-review-rubric`
