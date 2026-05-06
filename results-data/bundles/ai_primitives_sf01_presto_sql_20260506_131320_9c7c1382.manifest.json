@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:07:37.467926+00:00",
+  "bundle_file": "ai_primitives_sf01_presto_sql_20260506_131320_9c7c1382.json",
+  "bundle_hash": "e414f9b97a79037c7e2ef565e1b0a5022a29bafa208ce97c5477a1f6cb391545",
+  "companion_hashes": {},
+  "benchmark": "AI/ML Primitives",
+  "platform": "Presto",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

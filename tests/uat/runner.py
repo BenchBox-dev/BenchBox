@@ -81,20 +81,18 @@ def run_cell(
     log_dir = Path(log_dir) if log_dir is not None else _default_log_dir(now)
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = _default_log_path(log_dir, platform, benchmark, scale, now)
+    runs_dir = _default_benchmark_runs_dir() if benchmark_runs_dir is None else Path(benchmark_runs_dir).expanduser()
     argv = benchbox_run_argv(
         platform,
         benchmark,
         scale,
         phases=phases,
         compression=compression,
-        extra_args=extra_args,
+        extra_args=("--output", str(runs_dir / "datagen"), *extra_args),
     )
 
     with log_path.open("w", encoding="utf-8") as log_fh:
         log_fh.write(f"# {' '.join(argv)}\n")
-        runs_dir = (
-            _default_benchmark_runs_dir() if benchmark_runs_dir is None else Path(benchmark_runs_dir).expanduser()
-        )
         env = os.environ.copy()
         env["BENCHBOX_OUTPUT_DIR"] = str(runs_dir)
         log_fh.write(f"# BENCHBOX_OUTPUT_DIR={runs_dir}\n")

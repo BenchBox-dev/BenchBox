@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:13:51.440601+00:00",
+  "bundle_file": "tsbs_devops_sf1_pandas_df_20260506_094936_d0262571.json",
+  "bundle_hash": "0d735ff17a1eae9803bbfe87dbcd6be621a5b6a1835585fb8990e235e97022ec",
+  "companion_hashes": {},
+  "benchmark": "TSBS DevOps",
+  "platform": "Pandas",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

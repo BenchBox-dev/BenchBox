@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:12:44.288901+00:00",
+  "bundle_file": "tpch_sf1_pyspark_df_20260506_095809_e5a99e2e.json",
+  "bundle_hash": "a0f1bf5015e0cf5e662fdc2ff5af5232014a1959f2ef9a3e4435de04811dd648",
+  "companion_hashes": {},
+  "benchmark": "TPC-H",
+  "platform": "PySpark",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

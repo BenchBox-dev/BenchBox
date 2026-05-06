@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:13:40.604238+00:00",
+  "bundle_file": "tsbs_devops_sf01_clickhouse_local_sql_20260506_081229_d53c2d66.json",
+  "bundle_hash": "d5d6048f9d5a4a2ada5f6a2b7f4dbc5f6d887c822c5a26447c35ee39a00e75a6",
+  "companion_hashes": {},
+  "benchmark": "TSBS DevOps",
+  "platform": "ClickHouse Local",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

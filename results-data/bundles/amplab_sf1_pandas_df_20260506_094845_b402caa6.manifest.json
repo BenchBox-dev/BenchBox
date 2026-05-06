@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:08:07.373281+00:00",
+  "bundle_file": "amplab_sf1_pandas_df_20260506_094845_b402caa6.json",
+  "bundle_hash": "e203cce273a27328f825cba317cc437acd8349386752660121a4eab9b43b7245",
+  "companion_hashes": {},
+  "benchmark": "AMPLab",
+  "platform": "Pandas",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

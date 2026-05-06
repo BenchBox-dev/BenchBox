@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:08:08.572814+00:00",
+  "bundle_file": "amplab_sf1_polars_df_20260506_094144_93355711.json",
+  "bundle_hash": "9be1189af2fafc4bc8a061e76b44c467a8e87a65bd5857e1b5e093ac7c008933",
+  "companion_hashes": {},
+  "benchmark": "AMPLab",
+  "platform": "Polars",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

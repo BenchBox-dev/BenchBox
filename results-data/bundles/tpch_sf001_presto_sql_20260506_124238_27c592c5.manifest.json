@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:12:23.840748+00:00",
+  "bundle_file": "tpch_sf001_presto_sql_20260506_124238_27c592c5.json",
+  "bundle_hash": "a695b88c3eaff74e3756935efbbedd6d83e6839bdbb88d64a199e61e267d0570",
+  "companion_hashes": {},
+  "benchmark": "TPC-H",
+  "platform": "Presto",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:08:13.384200+00:00",
+  "bundle_file": "amplab_sf1_starrocks_sql_20260506_112529_dcf664b6.json",
+  "bundle_hash": "1f36b1ecbad081e916058f8ad49c8d56c9f005e00741463df71b3ab30a60a566",
+  "companion_hashes": {},
+  "benchmark": "AMPLab Big Data",
+  "platform": "StarRocks",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

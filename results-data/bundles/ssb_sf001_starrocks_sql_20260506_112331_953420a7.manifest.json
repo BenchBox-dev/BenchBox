@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:11:11.871554+00:00",
+  "bundle_file": "ssb_sf001_starrocks_sql_20260506_112331_953420a7.json",
+  "bundle_hash": "74bbfef46a3fe8e2c3e33490cf5bba747fd50479b37fcc3883090e3ea2c1d273",
+  "companion_hashes": {},
+  "benchmark": "Star Schema",
+  "platform": "StarRocks",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

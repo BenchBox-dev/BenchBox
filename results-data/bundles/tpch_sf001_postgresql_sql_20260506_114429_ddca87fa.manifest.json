@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:12:22.631961+00:00",
+  "bundle_file": "tpch_sf001_postgresql_sql_20260506_114429_ddca87fa.json",
+  "bundle_hash": "1efee510d52e063a21849367b723f35c5018f38d51ab2077492b492a8c7a6aaf",
+  "companion_hashes": {},
+  "benchmark": "TPC-H",
+  "platform": "PostgreSQL",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

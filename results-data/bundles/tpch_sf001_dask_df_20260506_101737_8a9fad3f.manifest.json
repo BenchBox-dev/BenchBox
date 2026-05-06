@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:12:16.653975+00:00",
+  "bundle_file": "tpch_sf001_dask_df_20260506_101737_8a9fad3f.json",
+  "bundle_hash": "563e98e18d32ebc0cd93555f495c3fd502d5e2d80845725d9fde946ed1740b51",
+  "companion_hashes": {},
+  "benchmark": "TPC-H",
+  "platform": "Dask",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

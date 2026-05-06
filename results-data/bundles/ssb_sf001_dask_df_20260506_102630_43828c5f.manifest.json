@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:11:00.978378+00:00",
+  "bundle_file": "ssb_sf001_dask_df_20260506_102630_43828c5f.json",
+  "bundle_hash": "9290a6470e433e9fa2b3f1126572137fa5eff506fd6fcc67e592b32d190031a4",
+  "companion_hashes": {},
+  "benchmark": "SSB",
+  "platform": "Dask",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}
