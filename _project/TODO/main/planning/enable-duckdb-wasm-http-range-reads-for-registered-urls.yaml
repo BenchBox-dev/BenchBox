@@ -52,6 +52,12 @@ deps:
   needs:
     - implement-results-explorer-browser-functional-tests
 
+blockers:
+  - date: "2026-05-01"
+    work: [w2, w3]
+    reason: "Upstream duckdb-wasm has not shipped a stable 1.33.x release with the per-URL range-read fix. As of 2026-05-01 npm publishes only 1.32.0 stable plus dev pre-releases (1.33.1-dev45 / dev53), and upstream issue duckdb/duckdb-wasm#1984 remains open. Pinning to a dev pre-release violates the TODO's `approach` constraint, and no public-config workaround exists on 1.32.0."
+    unblock: "Upstream ships a stable @duckdb/duckdb-wasm 1.33.x (or later) build that issues 206 Partial Content responses against URLs registered with `HTTP, directIO=true`."
+
 work:
   - id: w1
     summary: "Re-audit duckdb-wasm runtime flags and the HTTP file-reader code path for the current version"

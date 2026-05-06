@@ -264,6 +264,12 @@ deps:
   needs:
     - write-primitives-architecture-fixes
 
+blockers:
+  - date: "2026-05-02"
+    work: [w1, w2, w3, w4]
+    reason: "No live cloud credentials available locally for Snowflake / BigQuery / Databricks / Redshift. Each work unit requires running the supported sketch-op set against a real cloud engine (small warehouse / job / cluster) to verify function-signature drift and re-tune expected_value tolerance bounds per engine. The architectural prerequisite (`write-primitives-architecture-fixes`) has landed, so this is purely a credential gate."
+    unblock: "Provision creds for at least one of Snowflake / BigQuery / Databricks / Redshift. Each engine's verification is its own work unit / PR — partial unblock per engine is supported and preferred."
+
 metadata:
   owners:
     - joeharris76

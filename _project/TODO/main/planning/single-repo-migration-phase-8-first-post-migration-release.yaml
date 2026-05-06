@@ -7,6 +7,7 @@ category: Release Tooling
 
 deps:
   needs:
+  - single-repo-migration-phase-4-test-release-with-new-flow
   - single-repo-migration-phase-6-delete-obsolete-tooling
   - single-repo-migration-phase-7-docs-cleanup
 
