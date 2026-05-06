@@ -1,14 +1,14 @@
 ---
 id: 2026-05-05-003357-empirical-verification-numbers-decoupled-from-yaml-bounds
 date: 2026-05-05
-status: open
+status: merged-to-todo
 finding_kind: framework-gap
 review_context: "/code review of write-primitives-sketch-clickhouse-local-smoke (TODO completion)"
 related_paths:
   - benchbox/core/write_primitives/catalog/operations.yaml
   - docs/benchmarks/write-primitives-sketch-functions.md
 suggested_sweep: "audit other 'verified <tool> at SF=X' style comments in catalog yaml + matching docs prose; check whether any pair of (yaml-bound, doc-claim) can drift independently with no test"
-todo_id: null
+todo_id: catalog-empirical-claim-durability
 ---
 
 # Five-Axis Review Misses Durability of Empirical Verification Numbers
@@ -65,3 +65,11 @@ unverified numbers, eroding the value of the whole methodology.
   the yaml bound for the same metric.
 - [ ] Add "durability of empirical claims" as an axis or sub-axis to
   the review framework for verification-type changes.
+
+## Triage log
+
+- 2026-05-05: actionable (sweep). `scripts/sketch_storage_smoke.sh` (or equivalent
+  make target) does not exist; no doc-yaml consistency test;
+  review-framework durability axis not added. Catalog `verified <tool>`
+  comments still hand-stamped. Carry forward all four next-steps.
+- 2026-05-05: promoted to TODO `catalog-empirical-claim-durability`

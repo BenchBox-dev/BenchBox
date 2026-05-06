@@ -1,7 +1,7 @@
 ---
 id: 2026-05-05-090216-defect-followup-artifact-freshness
 date: 2026-05-05
-status: open
+status: merged-to-todo
 finding_kind: framework-gap
 review_context: "code review of fix/uat-framework-pr205-followups"
 related_paths:
@@ -10,7 +10,7 @@ related_paths:
   - tests/uat/test_validate.py
   - tests/uat/test_phases.py
 suggested_sweep: "For follow-up PR reviews, add a stale-artifact freshness check for phase outputs that are reused across reruns."
-todo_id: null
+todo_id: extend-five-axis-review-rubric
 ---
 
 # Defect Follow-Up Reviews Need Artifact Freshness Checks
@@ -24,3 +24,10 @@ Follow-up fixes often focus on the named symptom and its regression test. That c
 ## Suggested next steps
 - [ ] Add an artifact-freshness prompt to the review checklist for orchestration and phase-output code.
 - [ ] Sweep phase wrappers that parse output files after subprocess calls for stale-file reuse.
+
+## Triage log
+
+- 2026-05-05: actionable (sweep). Review checklist not yet extended; phase wrappers in
+  `tests/uat/phases/` not yet swept for stale-file reuse. Carry forward
+  both next-steps.
+- 2026-05-05: promoted to TODO `extend-five-axis-review-rubric`

@@ -1,14 +1,14 @@
 ---
 id: 2026-05-02-155524-duckdb-datasketches-extension-drift
 date: 2026-05-02
-status: open
+status: merged-to-todo
 finding_kind: assumption
 review_context: "TODO write-primitives-sketch-clickhouse-and-storage-metrics implementation attempt"
 related_paths:
   - benchbox/core/write_primitives/catalog/operations.yaml
   - pyproject.toml
 suggested_sweep: "Pin or vendor a known-good datasketches community-extension build (e.g. ship the .duckdb_extension binary in _binaries/), or replace `datasketch_theta` / `datasketch_frequent_items` references with exported HLL-family substitutes. Add a CI smoke that enumerates required families (`theta`, `frequent_items`, `cpc`, `req`, `kll`, `hll`) so future community-extension rebuilds fail fast when any planned sketch family appears or disappears."
-todo_id: null
+todo_id: duckdb-datasketches-family-ci-smoke
 ---
 
 # DuckDB datasketches Community Extension Dropped theta + frequent-items Families
@@ -83,3 +83,14 @@ changes BenchBox's behavior without any version bump or PR.
 - [ ] Until resolved, treat any sketch-TODO verification step that
       requires DuckDB execution of theta or topk ops as a known-fail;
       do not block PRs on that specific check.
+
+## Triage log
+
+- 2026-05-05: actionable (sweep). Catalog still references
+  `datasketch_theta`/`datasketch_frequent_items`
+  (`benchbox/core/write_primitives/catalog/operations.yaml`). No CI smoke
+  enumerates required sketch families; no `_binaries/datasketches/`
+  vendoring; no upstream issue tracked here. PR #182 added CPC + REQ
+  families but did not address the theta/frequent-items drift exposure.
+  Carry forward all four next-steps.
+- 2026-05-05: promoted to TODO `duckdb-datasketches-family-ci-smoke`

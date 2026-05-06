@@ -1,0 +1,144 @@
+id: extend-five-axis-review-rubric
+title: "Extend the five-axis code review rubric with five missing branches"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Tooling and Workflow
+
+description: |
+  Five blind-spot findings between 2026-05-03 and 2026-05-05 each flagged a
+  class of review the current five-axis rubric (Correctness, Readability,
+  Architecture, Security, Performance) does not catch:
+
+  - Matrix/audit docs whose deliverable is tables of numbers
+    (`2026-05-03-085238`).
+  - Mixed tooling+data PRs where reversibility differs by component
+    (`2026-05-03-090105`).
+  - Repo-shape ADRs (branch-shape, CI moves, cross-branch vendoring) that
+    need a day-1 executability dry-run (`2026-05-03-092657`).
+  - Multi-work-unit specs whose vertical slicing is unreachable in
+    practice (`2026-05-04-120000`).
+  - Defect-follow-up reviews that miss stale artifact reuse in
+    orchestration code (`2026-05-05-090216`).
+
+  The fix is concentrated: extend
+  `.claude/skills/code/references/five-axis-review.md` with five branches,
+  each gated by the kind of change under review. The rubric stays
+  five-axis-shaped; the branches add review-targeted prompts.
+
+closes_blind_spots:
+  - 2026-05-03-085238-five-axis-review-misses-matrix-doc-checks
+  - 2026-05-03-090105-mixed-tooling-data-pr-review-gap
+  - 2026-05-03-092657-repo-shape-adr-day-one-executability
+  - 2026-05-04-120000-spec-review-implementation-reachability-gap
+  - 2026-05-05-090216-defect-followup-artifact-freshness
+
+work:
+  - id: w1
+    summary: "Add 'matrix/audit doc' branch with regenerate-from-source + alternatives-considered prompts"
+    status: pending
+    notes: |
+      Trigger: deliverable is a markdown doc whose payload is tables of
+      numbers (audit/curation/inventory docs). Prompts:
+        1. For every numeric claim, regenerate from source and diff.
+        2. If the doc's recommendation depends on a policy gate, require
+           an "Alternatives considered" section quantifying the
+           alternative paths.
+
+  - id: w2
+    summary: "Add 'mixed tooling+data PR' branch with per-component reversibility analysis"
+    status: pending
+    notes: |
+      Trigger: PR diff bundles tooling artifacts (CI configs, pre-commit,
+      lint configs) AND data artifacts (JSON, fixtures, result bundles).
+      Prompts:
+        1. Reversibility/blast-radius assessed PER component, not
+           aggregate.
+        2. If the tooling change is a band-aid for a data-side issue,
+           require a follow-up TODO id capturing the upstream fix.
+
+  - id: w3
+    summary: "Add 'repo-shape ADR' branch with day-1 executability dry-run"
+    status: pending
+    notes: |
+      Trigger: ADR proposes a branch-shape change, CI workflow move,
+      cross-branch vendoring, or any operational repo state change.
+      Prompts:
+        1. Enumerate consumers of the affected branch (CI, contributor
+           flows, automation, downstream branches).
+        2. For each consumer, confirm it works against the proposed end
+           state using only the ADR's stated allowlist/exclusions.
+
+  - id: w4
+    summary: "Add 'multi-W spec implementation reachability' sub-axis (LOC-per-W flag)"
+    status: pending
+    notes: |
+      Trigger: spec proposes a multi-work-unit decomposition (W1..Wn).
+      Prompts:
+        1. Estimate LOC per W from the spec's module/responsibility
+           breakdown.
+        2. Flag any W estimated >300 LOC pre-approval; require split or
+           rationale before sign-off rather than mid-implementation.
+
+  - id: w5
+    summary: "Add 'defect follow-up artifact freshness' branch for orchestration code"
+    status: pending
+    notes: |
+      Trigger: PR is a follow-up fix for orchestration / phase-output
+      code that writes artifacts later parsed by another phase or retry.
+      Prompts:
+        1. For each phase that parses output files, confirm the file was
+           produced by the current invocation (not an earlier
+           failed/aborted run).
+        2. Sweep the diff for stale-file reuse patterns (`os.path.exists`
+           + skip rather than re-emit).
+
+  - id: w6
+    summary: "Sweep skill bindings for cross-cutting impact"
+    needs: [w1, w2, w3, w4, w5]
+    status: pending
+    notes: |
+      After the five branches are added, scan `.claude/skills/code/SKILL.md`
+      and the BenchBox `CLAUDE.md` review-protocol bindings for any
+      phrasing that conflicts with the new branches (e.g., language that
+      limits reviews to "code diffs only"). Update where needed.
+
+verification:
+  - description: "All five new branches present in the reference"
+    command: "grep -cE 'matrix/audit|mixed tooling.+data|repo-shape ADR|implementation reachability|artifact freshness' .claude/skills/code/references/five-axis-review.md"
+    expected_output: ">= 5"
+  - description: "Reference still passes basic lint"
+    command: "make lint"
+    expected_output: "exit 0"
+
+must_preserve:
+  - "The five top-level axes (Correctness, Readability & Simplicity, Architecture, Security, Performance) remain the primary frame; new content is review-shape-specific branches, not new top-level axes."
+  - "Severity classification table (Critical/Required/Nit/Consider) is unchanged."
+  - "Existing 'What's Done Well' rule and change-sizing guidance remain."
+
+anti_patterns:
+  - "DO NOT add a sixth top-level axis -- the rubric's five-axis shape is the brand. Add branches gated on the kind of change under review."
+  - "DO NOT introduce review steps that require running the project's full test suite for every review. Branches must be cheap textual checks, not gates that block reviewer flow."
+  - "DO NOT couple the new branches to BenchBox-specific paths. The reference is shared across projects via skill-sync; keep prompts framework-shaped."
+
+scope_limit:
+  only_modify:
+    - ".claude/skills/code/references/five-axis-review.md"
+    - ".claude/skills/code/SKILL.md"
+
+metadata:
+  tags:
+    - review-framework
+    - skills
+    - blind-spot-followup
+  estimated_effort: "Medium"
+  created_date: "2026-05-05"
+
+impact:
+  technical_debt: |
+    Five recurring review failure modes (matrix-doc arithmetic drift,
+    mixed-PR review collapse, repo-shape ADR day-1 breakage, unreachable
+    multi-W slicing, stale-artifact reuse in defect follow-ups) all
+    surface during PR review today via reviewer attention rather than the
+    rubric. Codifying them prevents the same gap from recurring on every
+    future review of the same shape.

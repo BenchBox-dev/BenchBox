@@ -1,14 +1,14 @@
 ---
 id: 2026-05-04-120000-spec-review-implementation-reachability-gap
 date: 2026-05-04
-status: open
+status: merged-to-todo
 finding_kind: framework-gap
 review_context: "/code review of W1 spec _project/specs/uat-framework.md on branch feat/uat-framework-w1-spec"
 related_paths:
   - _project/specs/uat-framework.md
   - _project/TODO/main/active/uat-framework-tests-uat-runner.yaml
 suggested_sweep: "add an implementation-reachability axis to multi-W spec reviews; flag any W estimated >300 LOC pre-approval"
-todo_id: null
+todo_id: extend-five-axis-review-rubric
 ---
 
 # Spec reviews don't rate whether 11-W vertical slices are actually deliverable
@@ -46,3 +46,11 @@ framework work. Any spec that proposes a multi-work-unit decomposition
 - [ ] Add an "implementation reachability" check to multi-work-unit spec reviews: estimate LOC per W from the spec's module/responsibility breakdown, flag any W estimated >300 LOC pre-approval, ask the spec author to split before sign-off rather than mid-implementation.
 - [ ] Consider whether the L2 audit prompt for multi-W specs should include LOC distribution as a default question (alongside the existing axes).
 - [ ] If the UAT framework W4 hits >500 LOC during implementation, treat that as confirming evidence for this finding and promote to a TODO that revises the spec-review framework.
+
+## Triage log
+
+- 2026-05-05: actionable (sweep). five-axis-review.md still rates only the five
+  generic axes; no implementation-reachability sub-axis or LOC-per-W flag.
+  UAT framework PR #205 shipped without confirming or refuting this gap.
+  Carry forward all three next-steps.
+- 2026-05-05: promoted to TODO `extend-five-axis-review-rubric`

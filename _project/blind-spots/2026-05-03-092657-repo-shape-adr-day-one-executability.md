@@ -1,14 +1,14 @@
 ---
 id: 2026-05-03-092657-repo-shape-adr-day-one-executability
 date: 2026-05-03
-status: open
+status: merged-to-todo
 finding_kind: framework-gap
 review_context: "/code review of W1 ADR commit 2cd65cb1c (published-results-slim-down-and-corpus-mirror), branch feat/published-results-slim-and-corpus-mirror"
 related_paths:
   - docs/development/adr/adr-published-results-slim-corpus-branch.md
   - .claude/skills/code/references/five-axis-review.md
 suggested_sweep: "Add a 'post-change dry-run' step to the review checklist for repo-shape ADRs (branch-shape changes, CI config moves, vendoring across branches)."
-todo_id: null
+todo_id: extend-five-axis-review-rubric
 ---
 
 # Five-axis review skips day-1 executability for repo-shape ADRs
@@ -48,3 +48,10 @@ narrative-soundness check.
 - [ ] Add a "post-change dry-run" subsection to `.claude/skills/code/references/five-axis-review.md` (or the project review checklist) that fires for ADRs whose deliverable is a branch-shape change, CI config move, or cross-branch vendoring.
 - [ ] The dry-run step should require the reviewer to enumerate consumers of the affected branch (CI workflows, contributor flows, automation, downstream branches) and confirm each one works against the proposed end state.
 - [ ] Sweep `docs/development/adr/` for prior repo-shape ADRs and spot-check whether their proposed end states would have passed a dry-run at write time.
+
+## Triage log
+
+- 2026-05-05: actionable (sweep). five-axis-review.md still has no repo-shape ADR /
+  day-1 executability branch. No prior-ADR sweep performed. Carry forward
+  all three next-steps.
+- 2026-05-05: promoted to TODO `extend-five-axis-review-rubric`

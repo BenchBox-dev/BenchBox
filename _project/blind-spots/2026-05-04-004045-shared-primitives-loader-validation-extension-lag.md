@@ -1,7 +1,7 @@
 ---
 id: 2026-05-04-004045-shared-primitives-loader-validation-extension-lag
 date: 2026-05-04
-status: open
+status: merged-to-todo
 finding_kind: framework-gap
 review_context: "/code review W1 / feat/write-primitives-architecture-fixes"
 related_paths:
@@ -9,7 +9,7 @@ related_paths:
   - benchbox/core/write_primitives/catalog/loader.py
   - benchbox/core/transaction_primitives/catalog/loader.py
 suggested_sweep: "audit which validation_query fields the shared primitives loader passes through vs which write_primitives' local loader supports; close the gap or document the divergence"
-todo_id: null
+todo_id: shared-primitives-loader-validation-parity
 ---
 
 # Shared primitives catalog loader lags write_primitives validation extensions
@@ -52,3 +52,14 @@ of issue this finding marks.
 - [ ] Either way, add a CI grep / test that fails when one loader gains a
       validation_query field the other does not, so the gap stops widening
       silently.
+
+## Triage log
+
+- 2026-05-05: actionable (sweep). Confirmed:
+  `benchbox/core/primitives/catalog/loader.py:_parse_validation_queries`
+  (lines 464–500) still forwards only 7 fields
+  (id/sql/expected_rows/min/max/values/check_expression). Still missing
+  `expected_value_min`, `expected_value_max`, and validation-level
+  `platform_overrides`. Operation-level `platform_overrides` IS present.
+  Asymmetry persists. Carry forward all three next-steps.
+- 2026-05-05: promoted to TODO `shared-primitives-loader-validation-parity`

@@ -1,7 +1,7 @@
 ---
 id: 2026-05-05-010706-pyspark-aggregate-state-dispatch-no-unit-test
 date: 2026-05-05
-status: open
+status: merged-to-todo
 finding_kind: missed-axis
 review_context: "/code review of pyspark-cli-integration W2 (aggregate-state dispatch fork)"
 related_paths:
@@ -9,7 +9,7 @@ related_paths:
   - tests/unit/core/write_primitives/test_pyspark_sketch_factories.py
   - tests/unit/core/write_primitives/test_aggregate_state_catalog.py
 suggested_sweep: "audit other live-Spark-only integration paths in BenchBox to see whether unit tests with stubbed managers would catch dispatch-layer regressions earlier"
-todo_id: null
+todo_id: pyspark-aggregate-state-dispatch-unit-tests
 ---
 
 # Aggregate-state dispatch fork has no stubbed-manager unit test
@@ -72,3 +72,13 @@ caught before the next CLI run.
 - [ ] Consider whether the live-Spark CLI command should be wired into
   a nightly CI lane so dispatch-layer regressions surface within a day
   of merge, not at the next ad-hoc run.
+
+## Triage log
+
+- 2026-05-05: actionable (sweep). Confirmed: `tests/unit/core/write_primitives/` has
+  no test exercising
+  `WritePrimitivesBenchmark._execute_aggregate_state_op` dispatch fork
+  (grep returns zero hits). Catalog/factory/manager unit tests exist but
+  the dispatch layer is still only exercised by live-Spark CLI runs. Carry
+  forward all three next-steps.
+- 2026-05-05: promoted to TODO `pyspark-aggregate-state-dispatch-unit-tests`

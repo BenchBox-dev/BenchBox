@@ -1,7 +1,7 @@
 ---
 id: 2026-05-05-080138-uat-frozen-config-replay-not-runnable
 date: 2026-05-05
-status: open
+status: merged-to-todo
 finding_kind: assumption
 review_context: "/code review of PR #205 (UAT framework W2-W11)"
 related_paths:
@@ -51,3 +51,11 @@ the current code" — get conflated under the same "frozen" label.
       not behavior-stable. If a registry change retires a platform
       cited in a frozen config, file an issue rather than silently
       regenerating the hash.
+
+## Triage log
+
+- 2026-05-05: actionable (sweep). Tracked under `uat-framework-review-followups`
+  (planning, Not Started); the followup TODO's W7 (frozen-ceremony
+  retirement) is the planned resolution path. Carry forward both
+  next-steps until W7 lands.
+- 2026-05-05: promoted to TODO `uat-framework-review-followups`

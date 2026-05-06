@@ -1,7 +1,7 @@
 ---
 id: 2026-05-03-090105-mixed-tooling-data-pr-review-gap
 date: 2026-05-03
-status: open
+status: merged-to-todo
 finding_kind: framework-gap
 review_context: "/code review of W3 commit eb9dcdfd9 (results-explorer-uat-corpus-integrate-validated-bundles), branch feat/results-explorer-uat-corpus-validated-bundle"
 related_paths:
@@ -9,7 +9,7 @@ related_paths:
   - .claude/skills/code/references/five-axis-review.md
   - _project/handoffs/results-explorer-uat-corpus-integration-20260503.md
 suggested_sweep: "Add a 'mixed tooling+data PR' branch to the review checklist that requires per-component reversibility/blast-radius analysis and a named upstream/downstream alternative."
-todo_id: null
+todo_id: extend-five-axis-review-rubric
 ---
 
 # Five-axis review collapses tooling+data PRs into a single review surface
@@ -53,3 +53,11 @@ artefacts with very different blast radii, the review owes the reader
 - [ ] Extend `.claude/skills/code/references/five-axis-review.md` (or the project review checklist) with a "mixed tooling+data PR" branch that requires per-component reversibility analysis and an "upstream/downstream alternative considered" line.
 - [ ] When such a PR is reviewed and the upstream alternative is deferred, require a follow-up TODO id in the review output so the band-aid doesn't outlive its rationale.
 - [ ] File the upstream byte-stable bundle emission TODO that this finding refers to (currently outstanding).
+
+## Triage log
+
+- 2026-05-05: actionable (sweep). five-axis-review.md still has no mixed tooling+data
+  branch; no per-component reversibility/blast-radius prompt; no
+  upstream/downstream alternative requirement. Carry forward all three
+  next-steps.
+- 2026-05-05: promoted to TODO `extend-five-axis-review-rubric`

@@ -1,7 +1,7 @@
 ---
 id: 2026-05-05-080138-uat-bash-parity-structural-only
 date: 2026-05-05
-status: open
+status: merged-to-todo
 finding_kind: assumption
 review_context: "/code review of PR #205 (UAT framework W2-W11)"
 related_paths:
@@ -54,3 +54,10 @@ same observable outcome (exit code, log content, timing)?
 - [ ] When porting future bash scripts, write structural and behavioral
       parity tests as separate suites; do not let the structural one
       satisfy the audit.
+
+## Triage log
+
+- 2026-05-05: actionable (sweep). Tracked under `uat-framework-review-followups`
+  (planning, Not Started). No behavioral-parity smoke for
+  `tcp_probe`/`run_with_timeout` yet. Carry forward all three next-steps.
+- 2026-05-05: promoted to TODO `uat-framework-review-followups`

@@ -1,7 +1,7 @@
 ---
 id: 2026-05-04-113747-blog-critique-currency-and-partisan-reader-axes
 date: 2026-05-04
-status: open
+status: merged-to-todo
 finding_kind: framework-gap
 review_context: "/blog critique of _blog/building-benchbox/outlines/12-sketch-functions-databricks-response.md"
 related_paths:
@@ -10,7 +10,7 @@ related_paths:
   - .claude/skills/blog/references/critique.md
   - _blog/building-benchbox/outlines/12-sketch-functions-databricks-response.md
 suggested_sweep: "Audit the /blog critique rubric before the next vendor-response post (currently planned: vector indexes follow-up). Consider adding two checks to references/critique.md: (1) a Currency check — does the underlying technical claim still hold as of today, and is the publication window for time-sensitive vendor responses still open; (2) a Partisan-Reader check — would a reader from the source vendor's team find any framing dismissive (boring half / hidden claim / second-tier), and can the same substance survive without those framings."
-todo_id: null
+todo_id: extend-blog-critique-vendor-response-axes
 ---
 
 # /blog critique rubric misses currency and partisan-reader axes for vendor-response posts
@@ -106,3 +106,13 @@ warrants the file.)
 These were addressed inline in the revised outline; this file captures
 the *framework* gap so the rubric improves before the next
 vendor-response post.
+
+## Triage log
+
+- 2026-05-05: actionable (sweep). `.claude/skills/blog/references/critique.md` Risk
+  axis now mentions "stale, partisan" generically, but no explicit
+  Currency check (verify "blocked TODOs" / "not yet shipped" claims
+  against git log + `_project/TODO`/`_project/DONE`) and no
+  Partisan-Reader check. Vendor-response shelf-life axis absent. Carry
+  forward all three next-steps.
+- 2026-05-05: promoted to TODO `extend-blog-critique-vendor-response-axes`

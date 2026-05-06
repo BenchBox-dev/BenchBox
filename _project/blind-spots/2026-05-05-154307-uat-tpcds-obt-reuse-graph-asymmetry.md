@@ -1,7 +1,7 @@
 ---
 id: 2026-05-05-154307-uat-tpcds-obt-reuse-graph-asymmetry
 date: 2026-05-05
-status: open
+status: merged-to-todo
 finding_kind: assumption
 review_context: "principal-engineer review of UAT framework PR #205 (post-merge simplification audit)"
 related_paths:
@@ -73,3 +73,12 @@ would miss the relationship.
 - [ ] If the reuse is NOT real, remove `tpcds_obt` from
       `SOURCE_REUSE_GRAPH["tpcds"]` and document the cleanup behaviour
       change.
+
+## Triage log
+
+- 2026-05-05: actionable (sweep). Confirmed: `benchbox/core/tpcds_obt/benchmark.py`
+  still has no `get_data_source_benchmark()` override;
+  `tests/uat/cleanup.py:SOURCE_REUSE_GRAPH` still hand-maintained. Tracked
+  under `uat-framework-review-followups`. Carry forward all four
+  next-steps.
+- 2026-05-05: promoted to TODO `uat-framework-review-followups`

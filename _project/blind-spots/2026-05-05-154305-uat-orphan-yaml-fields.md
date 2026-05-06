@@ -1,7 +1,7 @@
 ---
 id: 2026-05-05-154305-uat-orphan-yaml-fields
 date: 2026-05-05
-status: open
+status: merged-to-todo
 finding_kind: framework-gap
 review_context: "principal-engineer review of UAT framework PR #205 (post-merge simplification audit)"
 related_paths:
@@ -48,3 +48,11 @@ misleading picture of what was actually controlled by the YAML.
 - [ ] Add a `tests/uat/test_config.py` regression: every field present in
       `stress-default.yaml` MUST have a reader under `tests/uat/` or
       `benchbox/`. Mechanical grep test, fast-marked.
+
+## Triage log
+
+- 2026-05-05: actionable (sweep). Confirmed: zero readers in `tests/uat/` or
+  `benchbox/` for `cleanup.preserve_datagen`, `cleanup.prune_databases`,
+  `package.pr_target_branch`. Tracked under
+  `uat-framework-review-followups`. Carry forward all three next-steps.
+- 2026-05-05: promoted to TODO `uat-framework-review-followups`

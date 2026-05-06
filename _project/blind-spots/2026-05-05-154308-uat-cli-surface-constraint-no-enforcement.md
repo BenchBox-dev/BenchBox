@@ -1,7 +1,7 @@
 ---
 id: 2026-05-05-154308-uat-cli-surface-constraint-no-enforcement
 date: 2026-05-05
-status: open
+status: merged-to-todo
 finding_kind: framework-gap
 review_context: "principal-engineer review of UAT framework PR #205 (post-merge simplification audit)"
 related_paths:
@@ -53,3 +53,11 @@ ongoing.
       ongoing enforcement is technical debt.
 - [ ] Audit other "verification block in the parent TODO" claims — same
       pattern likely recurs.
+
+## Triage log
+
+- 2026-05-05: actionable (sweep). Confirmed: no
+  `tests/uat/test_no_cli_surface_drift.py`; spec language in
+  `_project/specs/uat-framework.md:371-373` unchanged. Tracked under
+  `uat-framework-review-followups`. Carry forward all three next-steps.
+- 2026-05-05: promoted to TODO `uat-framework-review-followups`

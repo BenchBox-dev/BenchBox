@@ -1,7 +1,7 @@
 ---
 id: 2026-05-05-003901-pyspark-cli-integration-scope-excludes-loader
 date: 2026-05-05
-status: open
+status: actioned
 finding_kind: scope-creep
 review_context: "/todo implement write-primitives-sketch-pyspark-cli-integration W1 (catalog entries for AGGREGATE_PERSIST/MERGE)"
 related_paths:
@@ -85,3 +85,7 @@ recurred one revision later.
   `_execute_dataframe_sql_parity_workload` (W2), real Spark 3.5+
   integration test (W3 — PySpark 4.1.1 is installed locally),
   doc + blind-spot + CHANGELOG (W4–W5).
+
+## Triage log
+
+- 2026-05-05: actioned — TODO write-primitives-sketch-pyspark-cli-integration completed (now in DONE/) with scope_limit.only_modify expanded to include catalog/loader.py; aggregate_state op shape landed as first-class loader extension
