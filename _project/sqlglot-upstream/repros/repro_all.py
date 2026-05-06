@@ -31,16 +31,9 @@ def _result(label: str, passed: bool, detail: str) -> bool:
     return passed
 
 
-def _check_all_keyword_pair(label: str, sql: str, *, read: str, write: str = "duckdb") -> bool:
-    """Run one transpile and report whether ALL stayed unquoted.
-
-    Caller passes ``read`` and ``write`` as literals so a grep over this
-    file reads the call shape directly -- a wrapper-call-shape probe must
-    match the production read/write pair, and the
-    `cross-dialect probe` doc in the README is keyed off that grep.
-    """
-    out = sqlglot.transpile(sql, read=read, write=write, identify=True)[0]
-    print(f"  input ({read}->{write}): {sql}")
+def _check_duckdb_all_keyword(label: str, sql: str, *, read: str) -> bool:
+    out = sqlglot.transpile(sql, read=read, write="duckdb", identify=True)[0]
+    print(f"  input ({read}->duckdb): {sql}")
     print(f"  output             : {out}")
     quoted = '"ALL"' in out or "`ALL`" in out
     return _result(
@@ -54,38 +47,13 @@ def repro_1_duckdb_all_keyword() -> bool:
     _section("Tier B #1: DuckDB GROUP/ORDER BY ALL quoted under identify=True")
     group_sql = "SELECT col1, col2, SUM(col3) FROM tbl GROUP BY ALL"
     order_sql = "SELECT col1, col2 FROM tbl ORDER BY ALL"
-
-    # Direct-dialect probe: dialect_utils.translate_sql_query when the input
-    # benchmark already speaks DuckDB.
-    direct_pass = all(
-        [
-            _check_all_keyword_pair("GROUP BY ALL (duckdb->duckdb)", group_sql, read="duckdb", write="duckdb"),
-            _check_all_keyword_pair("ORDER BY ALL (duckdb->duckdb)", order_sql, read="duckdb", write="duckdb"),
-        ]
-    )
-
-    # Wrapper / cross-dialect probe: BenchBox's actual call shape at
-    # `dialect_utils.translate_sql_query` is read="postgres" (after netezza-
-    # postgres normalization), write="duckdb". Single-dialect PASS is not a
-    # valid retirement gate for `_restore_group_order_by_all_keyword`; this
-    # cross-dialect pair is.
-    wrapper_pass = all(
-        [
-            _check_all_keyword_pair(
-                "GROUP BY ALL wrapper (postgres->duckdb)", group_sql, read="postgres", write="duckdb"
-            ),
-            _check_all_keyword_pair(
-                "ORDER BY ALL wrapper (postgres->duckdb)", order_sql, read="postgres", write="duckdb"
-            ),
-        ]
-    )
-
-    if direct_pass and not wrapper_pass:
-        print(
-            "  SUMMARY: read=postgres,write=duckdb (wrapper) FAIL while read=duckdb,write=duckdb PASS — "
-            "_restore_group_order_by_all_keyword still load-bearing."
-        )
-    return direct_pass and wrapper_pass
+    results = [
+        _check_duckdb_all_keyword("GROUP BY ALL (duckdb->duckdb)", group_sql, read="duckdb"),
+        _check_duckdb_all_keyword("ORDER BY ALL (duckdb->duckdb)", order_sql, read="duckdb"),
+        _check_duckdb_all_keyword("GROUP BY ALL (postgres->duckdb)", group_sql, read="postgres"),
+        _check_duckdb_all_keyword("ORDER BY ALL (postgres->duckdb)", order_sql, read="postgres"),
+    ]
+    return all(results)
 
 
 def repro_2_sqlite_interval_arithmetic() -> bool:

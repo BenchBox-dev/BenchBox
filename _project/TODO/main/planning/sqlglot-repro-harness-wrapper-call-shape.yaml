@@ -1,0 +1,121 @@
+id: sqlglot-repro-harness-wrapper-call-shape
+title: "Extend SQLGlot repro harness to cover wrapper call shapes (cross-dialect probes)"
+worktree: main
+priority: Medium
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  Blind-spot `2026-05-04-140839` flagged that
+  `_project/sqlglot-upstream/repros/repro_all.py:repro_1_duckdb_all_keyword`
+  exercises only `read="duckdb"`/`write="duckdb"` and reported PASS on
+  `sqlglot==30.6.0`. That conclusion drove a TODO to retire
+  `_restore_group_order_by_all_keyword` in
+  `benchbox/utils/dialect_utils.py`.
+
+  The retirement was wrong. BenchBox's actual call shape at
+  `dialect_utils.translate_sql_query` is `read="postgres"` (after
+  netezza-postgres normalization) / `write="duckdb"`. On the same sqlglot
+  version that pair still emits `ORDER BY "ALL"`, which DuckDB rejects.
+  The post-fixup is still load-bearing.
+
+  The fix is twofold: (1) extend repro_1 to probe both call shapes
+  independently, (2) document a wrapper-call-shape convention in the
+  README so any future post-fixup retirement TODO is gated by the right
+  probe.
+
+closes_blind_spots:
+  - 2026-05-04-140839-repro-harness-call-shape-coverage-gap
+
+work:
+  - id: w1
+    summary: "Extend `repro_1_duckdb_all_keyword` with cross-dialect probe"
+    status: pending
+    notes: |
+      Inside the repro, run two transpiles and print PASS/FAIL for each
+      independently:
+        - read="duckdb",   write="duckdb",  identify=True
+        - read="postgres", write="duckdb",  identify=True
+      Return PASS only if BOTH probes pass. The cross-dialect probe will
+      FAIL today on `sqlglot==30.6.0` -- that is the correct result and
+      the test is what would have caught the false retirement evidence
+      in 2026-05-04.
+
+  - id: w2
+    summary: "Document the wrapper-call-shape convention in README"
+    needs: [w1]
+    status: pending
+    notes: |
+      Add to `_project/sqlglot-upstream/README.md` "Run the harness"
+      section: "Any new repro for an item that lives in
+      `dialect_utils.translate_sql_query` MUST exercise both
+      `read=<target>, write=<target>` and `read='postgres',
+      write=<target>` -- the wrapper invokes SQLGlot across dialects,
+      and a single-dialect probe is not a valid retirement gate."
+
+  - id: w3
+    summary: "Audit the remaining repros for wrapper-call-shape coverage"
+    needs: [w1]
+    status: pending
+    notes: |
+      For each existing `repro_*` (currently 2, 3, 5, 6), confirm the
+      read/write pair the harness exercises matches the pair production
+      code uses at the post-fixup's call site. Widen any narrow probe;
+      document the audit verdict per item in the README.
+
+  - id: w4
+    summary: "Add a review-protocol prophylactic check"
+    needs: [w2]
+    status: pending
+    notes: |
+      Update `.claude/skills/code/SKILL.md` (or the BenchBox CLAUDE.md
+      review-protocol bindings) so that a /code review of any TODO
+      claiming to retire a `dialect_utils.translate_sql_query`
+      post-fixup based on a harness PASS must grep the helper's call
+      site and confirm the harness probe matches the wrapper's `read=`
+      argument at that call.
+
+verification:
+  - description: "repro_1 exercises both call shapes"
+    command: "grep -E 'read=\"postgres\".*write=\"duckdb\"' _project/sqlglot-upstream/repros/repro_all.py"
+    expected_output: "matches >= 1"
+  - description: "Cross-dialect probe explicitly reports the workaround as still needed on sqlglot==30.6.0"
+    command: "uv run --with 'sqlglot==30.6.0' -- python _project/sqlglot-upstream/repros/repro_all.py 2>&1 | grep -E 'postgres.*duckdb.*FAIL|wrapper.*FAIL'"
+    expected_output: "matches >= 1"
+  - description: "Harness binary still parses (exits with 0 or 1, not crash)"
+    command: "uv run --with sqlglot -- python _project/sqlglot-upstream/repros/repro_all.py; echo exit=$?"
+    expected_output: "exit=0 or exit=1 (never >= 2)"
+  - description: "README documents the wrapper-call-shape convention"
+    command: "grep -E 'wrapper.call.shape|wrapper-call-shape|cross-dialect' _project/sqlglot-upstream/README.md"
+    expected_output: "matches >= 1"
+
+must_preserve:
+  - "Existing repro_2 / repro_3 / repro_5 / repro_6 still run and report PASS/FAIL accurately for their respective call shapes."
+  - "The PASS/FAIL summary at the bottom of `repro_all.py` continues to print one line per repro item."
+  - "`benchbox/utils/dialect_utils.py:_restore_group_order_by_all_keyword` is NOT retired by this TODO -- the cross-dialect probe will confirm it still has a job."
+
+anti_patterns:
+  - "DO NOT delete the single-dialect probe -- both probes are valuable, and the comparison is the diagnostic. Add the cross-dialect probe alongside, don't replace."
+  - "DO NOT widen this TODO into a full sqlglot upstream-test rewrite. The scope is the wrapper-call-shape coverage gap; broader harness redesign is out of scope."
+
+scope_limit:
+  only_modify:
+    - "_project/sqlglot-upstream/repros/repro_all.py"
+    - "_project/sqlglot-upstream/README.md"
+    - ".claude/skills/code/SKILL.md"
+
+metadata:
+  tags:
+    - sqlglot
+    - dialect-utils
+    - blind-spot-followup
+  estimated_effort: "Small"
+  created_date: "2026-05-05"
+
+impact:
+  technical_debt: |
+    The same false-retirement pattern can recur for any future post-
+    fixup whose retirement TODO is gated by a single-dialect repro.
+    Locking the harness into wrapper-call-shape coverage makes those
+    retirement decisions safe by construction rather than by reviewer
+    attention.

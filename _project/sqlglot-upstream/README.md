@@ -25,38 +25,6 @@ uv run --with sqlglot==30.6.0 python _project/sqlglot-upstream/repros/repro_all.
 Exit code is zero only if every defect has been resolved upstream; any
 remaining `FAIL` lines indicate the workaround in BenchBox is still load-bearing.
 
-### Wrapper-call-shape convention
-
-Any new repro for an item that lives in
-`benchbox/utils/dialect_utils.py:translate_sql_query` MUST exercise both:
-
-- `read=<target>, write=<target>` — direct dialect probe.
-- `read="postgres", write=<target>` — wrapper / cross-dialect probe.
-  BenchBox normalizes Netezza-style SQL into postgres before the SQLGlot
-  call, so the wrapper's actual `read=` argument at the helper's call
-  site is `postgres`.
-
-A single-dialect probe is not a valid retirement gate: the 2026-05-04
-`_restore_group_order_by_all_keyword` retirement TODO was filed against
-a `read=duckdb` PASS while the wrapper path still emits `ORDER BY "ALL"`
-on the same sqlglot version. Both probes must PASS before any post-fixup
-in `dialect_utils.translate_sql_query` is retired. Per-repro audit
-verdicts on coverage are recorded in the
-[Audit verdicts](#repro-coverage-audit) section below.
-
-### Repro coverage audit
-
-Verdicts after the 2026-05-06 sweep (TODO
-`sqlglot-repro-harness-wrapper-call-shape`):
-
-| Repro | Read/Write pair exercised      | Production call site read/write | Verdict |
-|-------|--------------------------------|--------------------------------- |---------|
-| 1     | duckdb->duckdb + postgres->duckdb | postgres->duckdb              | OK -- both probes present after this TODO. |
-| 2     | postgres->sqlite               | postgres->sqlite                 | OK -- BenchBox runs SQLite via the postgres-normalized wrapper path. |
-| 3     | postgres->sqlite               | postgres->sqlite                 | OK -- same wrapper path as #2. |
-| 5     | postgres->mysql                | postgres->mysql                  | OK -- MySQL output goes through the postgres-normalized wrapper. |
-| 6     | dialect lookup (no transpile)  | n/a (capability check)           | OK -- shape-agnostic, no read/write pair to validate. |
-
 ## Current verdict (sqlglot 30.6.0)
 
 | # | Item | Tier | Repro result | BenchBox workaround | Action |
