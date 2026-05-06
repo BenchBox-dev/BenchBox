@@ -1,5 +1,8 @@
 # Review Protocol
 
+> Canonical, unabridged form. The synced `SHARED/review-protocol` skill is
+> the compressed agent-loaded mirror — keep both in lockstep when editing.
+
 The contract for review-shaped actions: code reviews, audits, research,
 compare, to-spec, security reviews, and any L2 blind-spot audit performed
 within them. Wrappers (skills, slash commands, AGENTS.md, CLAUDE.md, and
