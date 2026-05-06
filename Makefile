@@ -1714,7 +1714,7 @@ help:
 	@echo ""
 	@echo "Blind-Spot Findings (see _project/blind-spots/README.md):"
 	@echo "  make blind-spots-list   List open findings (one row each)"
-	@echo "  make blind-spots-report Counts by status + kind, oldest open first"
+	@echo "  make blind-spots-report Counts by status + kind, oldest active first"
 	@echo "  make blind-spots-sweep  Alias for blind-spots-report"
 	@echo ""
 	@echo "Release Workflow (2-command flow; see docs/operations/release-guide.md):"
