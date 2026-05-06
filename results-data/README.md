@@ -42,10 +42,8 @@ sidecar absent → `maintainer-run`. See `scripts/generate_corpus_inventory.py`.
 
 The current corpus mixes both labels: 12 maintainer-run bundles from the
 original seed-corpus runs and 188 community-submission bundles from the
-2026-05-02 UAT sweep. The curation reasoning (which bundles were
-included or excluded under the cohort-depth gate, the per-cohort
-audit matrix) is recorded on `develop` at
-[`_project/handoffs/results-explorer-uat-corpus-integration-20260503.md`](https://github.com/joeharris76/BenchBox/blob/develop/_project/handoffs/results-explorer-uat-corpus-integration-20260503.md).
+2026-05-02 UAT sweep (curated and integrated per
+`_project/handoffs/results-explorer-uat-corpus-integration-20260503.md`).
 
 ## Seed Corpus
 
@@ -60,7 +58,7 @@ and write_primitives across SF 0.01 / 0.1 / 1.0 where platforms reached the
 
 For the up-to-date per-cohort breakdown, see
 `results-data/corpus-inventory.json` (regenerate via
-`uv run --no-project --python 3.11 -- python scripts/generate_corpus_inventory.py --write`).
+`uv run -- python scripts/generate_corpus_inventory.py --write`).
 `results-data/SEED_CORPUS_SPEC.md` documents the seed-lane workflow target
 matrix and the validator gate.
 

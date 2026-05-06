@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T00:46:06.062621+00:00",
+  "bundle_file": "amplab_sf1_datafusion_sql_20260505_202647_8721b098.json",
+  "bundle_hash": "3de217ecded26ec2c4d0a7137fdd24779a08bc48b8305c3009791b32601882ff",
+  "companion_hashes": {},
+  "benchmark": "AMPLab Big Data",
+  "platform": "DataFusion",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

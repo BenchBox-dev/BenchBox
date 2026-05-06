@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T00:46:11.194400+00:00",
+  "bundle_file": "clickbench_sf1_duckdb_sql_20260505_194908_b0d3d371.json",
+  "bundle_hash": "b1bc621342d3b2d899bd5cf3f4e858f4756d96e02cc496280987e29e3650190f",
+  "companion_hashes": {},
+  "benchmark": "ClickBench",
+  "platform": "DuckDB",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

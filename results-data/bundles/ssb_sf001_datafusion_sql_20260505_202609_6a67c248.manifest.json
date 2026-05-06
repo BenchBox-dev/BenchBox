@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T00:47:07.126159+00:00",
+  "bundle_file": "ssb_sf001_datafusion_sql_20260505_202609_6a67c248.json",
+  "bundle_hash": "5c67b0276a584171758ce73f4ccf7f0bb686f5b1420635722ca0080265847357",
+  "companion_hashes": {},
+  "benchmark": "Star Schema",
+  "platform": "DataFusion",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

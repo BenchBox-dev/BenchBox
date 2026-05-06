@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T00:46:03.517864+00:00",
+  "bundle_file": "amplab_sf01_duckdb_sql_20260505_195137_6d9a2a8a.json",
+  "bundle_hash": "7798a83bd5cb6ceee187094fd4f8a7d2241424c093c1df4981ea17fd099765a7",
+  "companion_hashes": {},
+  "benchmark": "AMPLab Big Data",
+  "platform": "DuckDB",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}
