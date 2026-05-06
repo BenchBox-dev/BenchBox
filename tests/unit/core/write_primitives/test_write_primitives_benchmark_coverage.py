@@ -372,6 +372,44 @@ class TestGetEffectiveWriteSql:
 
 
 # ---------------------------------------------------------------------------
+# Aggregate-state source conversion
+# ---------------------------------------------------------------------------
+
+
+class TestAggregateStateSourceConversion:
+    def test_find_aggregate_tbl_sources_requires_actual_matches(self, tmp_path):
+        stale_root = tmp_path / "stale_root"
+        stale_root.mkdir()
+        good_root = tmp_path / "good_root"
+        good_root.mkdir()
+        shard_2 = good_root / "lineitem.tbl.2"
+        shard_1 = good_root / "lineitem.tbl.1"
+        shard_2.write_text("2|", encoding="utf-8")
+        shard_1.write_text("1|", encoding="utf-8")
+
+        files = WritePrimitivesBenchmark._find_aggregate_tbl_sources("lineitem", [stale_root, good_root])
+
+        assert files == [shard_1, shard_2]
+
+    def test_resolve_aggregate_source_path_uses_actual_gzip_match_and_duckdb_infers_compression(self, wp, tmp_path):
+        wp.scale_factor = 0.01
+        datagen_root = tmp_path.parent / "datagen" / "tpch_sf001"
+        datagen_root.mkdir(parents=True)
+        gz_file = datagen_root / "lineitem.tbl.1.gz"
+        gz_file.write_bytes(b"not read by mocked duckdb")
+        conn = MagicMock()
+
+        with patch("duckdb.connect", return_value=conn):
+            result = wp._resolve_aggregate_source_path("lineitem", adapter=None, output_dir=tmp_path, spark=None)
+
+        assert result == tmp_path / "_aggregate_state_sources" / "lineitem"
+        sql = conn.execute.call_args.args[0]
+        assert "read_csv([" in sql
+        assert "lineitem.tbl.1.gz" in sql
+        assert "compression='zstd'" not in sql
+
+
+# ---------------------------------------------------------------------------
 # _get_population_sql special cases
 # ---------------------------------------------------------------------------
 
