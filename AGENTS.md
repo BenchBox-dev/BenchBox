@@ -15,6 +15,29 @@ surface that solves the problem, verify, then commit only authorized files.
 through `uv run -- ...`. Do not use destructive git/filesystem commands or live
 cloud tests without explicit approval.
 
+## Output Discipline
+
+Broad commands are final gates. Long output is an artifact, not chat.
+
+- Path lists before content; targeted hunks before whole files.
+- Commands likely to emit >100 lines (preflight, full suites, Docker pulls,
+  large diffs, `gh pr view --json body,files`): redirect to `/tmp/<slug>.log`;
+  report command, status, counts, failure tail.
+- Verification ladder: TODO `verification:` → targeted tests → fast suite
+  (once pre-commit) → `make pr-preflight` (once pre-`pr-open`).
+- PR triage uses compact `gh pr list --json` first; inspect failed-job JSON
+  before logs. Do not poll — pending is a valid terminal state.
+- Force-push: `--force-with-lease`, feature/pool branches only.
+
+## Long-Running UAT
+
+See `docs/operations/uat-framework.md`. For UAT, stress, Docker matrices, or
+runs >10min: announce command, max runtime, log path, and stop condition
+before launch. Use `BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs`; logs
+under that root, never under a worktree. Sequential platforms; one Docker
+stack at a time (`up → run → down → prune`). Below disk safety threshold,
+stop new workload.
+
 ## Code Style
 
 Python 3.10+, 4 spaces, 120 columns, Ruff only, type hints on public APIs.
