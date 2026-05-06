@@ -1,19 +1,19 @@
 {
   "version": 1,
-  "lockedAt": "2026-05-06T12:27:34.245Z",
+  "lockedAt": "2026-05-06T14:06:30.003Z",
   "skills": {
     "blog": {
       "source": {
         "type": "local",
         "name": "personal",
         "path": "/Users/joe/.skill-sync/skills/blog",
-        "fetchedAt": "2026-05-06T12:21:59.334Z"
+        "fetchedAt": "2026-05-06T14:03:35.384Z"
       },
       "installMode": "mirror",
       "files": {
         "references/critique.md": {
-          "sha256": "d78d4622a4c33afc7e505fdb2dcdc8b633585049d91b04c6dfa23f2e3770e0e1",
-          "size": 2013
+          "sha256": "95ae54273bca1e1a2d99d812b529b5f0955411ecb4d51bc8c0000de99768501c",
+          "size": 2117
         },
         "SKILL.md": {
           "sha256": "26382c08807bfb516034f883689fde5a91c6974089138e366f95dbd6f164a073",
@@ -30,7 +30,7 @@
         "type": "local",
         "name": "personal",
         "path": "/Users/joe/.skill-sync/skills/code",
-        "fetchedAt": "2026-05-06T12:27:34.176Z"
+        "fetchedAt": "2026-05-06T14:06:15.520Z"
       },
       "installMode": "mirror",
       "files": {
@@ -39,8 +39,8 @@
           "size": 770
         },
         "references/five-axis-review.md": {
-          "sha256": "ad9773c5bf9c6492973fda34b43f5c47810c13dbe9eb135efa8f1ea71fa55602",
-          "size": 4195
+          "sha256": "d6a42dbc556544cf8b292c6ba23ccbef72911d1cdb6a74e76c543626d161b6f4",
+          "size": 4215
         },
         "references/handoff.md": {
           "sha256": "37ecdbe8e88662d8bda26b8b87412081750ba1e23fb804a68e0803fe7cf7e8c2",
@@ -55,8 +55,8 @@
           "size": 721
         },
         "SKILL.md": {
-          "sha256": "ad2a41fd0fe98d43391ba72807aca3c7512fef983b5109053a4b51d4863b81c7",
-          "size": 4591
+          "sha256": "3afbbf73eb184be7caf5874c4f9cf48a6367e7e0cad5b73860b3d193e2dc2066",
+          "size": 4594
         },
         "skill.yaml": {
           "sha256": "d828f5f4c7075ad76083914ad5b3525bb3ab16d59ba0c293cb8d1f2759cf75bf",

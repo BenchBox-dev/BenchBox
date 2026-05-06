@@ -8,6 +8,8 @@ on:
       - 'benchbox/core/write_primitives/**'
       - 'benchbox/core/read_primitives/**'
       - 'scripts/duckdb_datasketches_smoke.py'
+      - 'pyproject.toml'
+      - 'uv.lock'
       - '.github/workflows/extension-smoke.yml'
   schedule:
     # Daily at 06:00 UTC catches upstream community-extensions rebuilds

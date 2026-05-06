@@ -64,10 +64,10 @@ work:
 
 verification:
 - description: "All three new checks appear in the critique reference"
-  command: "grep -cE 'Currency|Partisan-Reader|Shelf-life' .claude/skills/blog/references/critique.md"
+  command: "make skill-sync >/dev/null && grep -cE 'Currency|Partisan-Reader|Shelf-life' .claude/skills/blog/references/critique.md"
   expected_output: ">= 3"
 - description: "Existing rubric rows unchanged"
-  command: "grep -cE '^\\| (Thesis|Audience|Evidence|Structure|Voice|Utility|Risk) \\|' .claude/skills/blog/references/critique.md"
+  command: "make skill-sync >/dev/null && grep -cE '^\\| (Thesis|Audience|Evidence|Structure|Voice|Utility|Risk) \\|' .claude/skills/blog/references/critique.md"
   expected_output: ">= 7"
 
 must_preserve:
