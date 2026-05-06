@@ -63,8 +63,17 @@ def rank_platforms(summary: BenchmarkSummary) -> RankedCohort:
     rankable_values = [
         value for value in (metric_value(row) for row in sorted_rows if row.is_ranking_eligible) if value is not None
     ]
-    best_value = (max(rankable_values) if higher_is_better else min(rankable_values)) if rankable_values else None
-    slowest_value = (min(rankable_values) if higher_is_better else max(rankable_values)) if rankable_values else None
+    positive_rankable_values = [value for value in rankable_values if value > 0]
+    best_value = (
+        (max(positive_rankable_values) if higher_is_better else min(positive_rankable_values))
+        if positive_rankable_values
+        else None
+    )
+    slowest_value = (
+        (min(positive_rankable_values) if higher_is_better else max(positive_rankable_values))
+        if positive_rankable_values
+        else None
+    )
 
     ranked_rows: list[RankedPlatform] = []
     current_rank = 1
