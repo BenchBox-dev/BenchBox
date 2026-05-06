@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T00:45:55.784977+00:00",
+  "bundle_file": "ai_primitives_sf1_clickhouse_local_sql_20260505_203910_7d1d6452.json",
+  "bundle_hash": "5fc9e5d92a109e830efd9a3147410235a2ceeae6f23e02fdc8983a37e9985400",
+  "companion_hashes": {},
+  "benchmark": "AI/ML Primitives",
+  "platform": "ClickHouse Local",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

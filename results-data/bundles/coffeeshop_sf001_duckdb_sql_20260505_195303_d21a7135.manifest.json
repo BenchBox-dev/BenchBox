@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T00:46:15.076767+00:00",
+  "bundle_file": "coffeeshop_sf001_duckdb_sql_20260505_195303_d21a7135.json",
+  "bundle_hash": "dfc7f3ede74b768dc6d2a3d4d621579bc4d1552f402f0320cf46496d8bdc8ffa",
+  "companion_hashes": {},
+  "benchmark": "CoffeeShop",
+  "platform": "DuckDB",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

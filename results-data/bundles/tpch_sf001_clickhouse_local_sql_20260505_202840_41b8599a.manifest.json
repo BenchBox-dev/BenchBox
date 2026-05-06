@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T00:47:36.956532+00:00",
+  "bundle_file": "tpch_sf001_clickhouse_local_sql_20260505_202840_41b8599a.json",
+  "bundle_hash": "7429cc157fa0d52218b8fa13349f4defcd8baf38e64dbe9778c3b85d275ff5be",
+  "companion_hashes": {},
+  "benchmark": "TPC-H",
+  "platform": "ClickHouse Local",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

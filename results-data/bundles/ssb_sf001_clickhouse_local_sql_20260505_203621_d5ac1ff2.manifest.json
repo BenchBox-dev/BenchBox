@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T00:47:05.844951+00:00",
+  "bundle_file": "ssb_sf001_clickhouse_local_sql_20260505_203621_d5ac1ff2.json",
+  "bundle_hash": "577843c1f76b99be65220980ee79f1572146479c56ac850e27c3c11ef160dc1b",
+  "companion_hashes": {},
+  "benchmark": "Star Schema",
+  "platform": "ClickHouse Local",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}
