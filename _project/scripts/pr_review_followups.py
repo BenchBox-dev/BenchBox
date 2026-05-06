@@ -937,7 +937,15 @@ def run_action_loop(args: argparse.Namespace, runner: CommandRunner) -> int:
         pending = pending[: args.max_comments]
 
     print_pending_table(pending)
-    if args.command == "list" or args.dry_run or not pending:
+    if args.command == "list" or args.dry_run:
+        return 0
+    if not pending:
+        finalize_changes(
+            runner,
+            base_ref=f"origin/{args.base}",
+            commit_message=args.commit_message,
+            no_submit=args.no_submit,
+        )
         return 0
 
     results: list[ActionResult] = []
