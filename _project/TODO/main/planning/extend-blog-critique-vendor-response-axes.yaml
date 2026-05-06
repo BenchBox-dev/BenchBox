@@ -29,17 +29,18 @@ closes_blind_spots:
 
 work:
   - id: w1
-    summary: "Add explicit Currency check to the Technical/Risk lane"
+    summary: "Add explicit Currency check to the Risk lane"
     status: pending
     notes: |
-      Add a checklist item to `.claude/skills/blog/references/critique.md`:
+      Add a checklist item under the existing Risk row of
+      `.claude/skills/blog/references/critique.md`:
       "If the outline cites blocked TODOs, honest deferrals, or 'not yet
       shipped' caveats, verify them against `git log` and the current
       state of `_project/TODO/` and `_project/DONE/`. Flag any item
       that's actually shipped since the outline was written."
 
   - id: w2
-    summary: "Add Partisan-Reader check to the Style/Voice lane"
+    summary: "Add Partisan-Reader check to the Voice lane"
     status: pending
     notes: |
       Add a checklist item: "For posts that respond to a vendor or

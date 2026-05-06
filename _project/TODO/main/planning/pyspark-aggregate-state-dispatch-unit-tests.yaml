@@ -82,25 +82,26 @@ work:
       function short-circuits to the cached path without re-running the
       conversion.
 
-  - id: w6
-    summary: "(Stretch) Wire the live-Spark CLI command into a nightly CI lane"
-    needs: [w2, w3, w4]
-    status: pending
-    notes: |
-      Optional. Decision criterion: how often does a dispatch regression
-      actually slip past the new unit tests? If the first month surfaces
-      a real regression that the unit tests missed, build a nightly job
-      that runs `benchbox run --platform pyspark --queries sketch_df_*`
-      against a real Spark and reports failure on the next morning. If
-      unit tests catch everything, skip this work unit.
-
 verification:
-  - description: "All new dispatch tests run and pass"
+  - description: "Dispatch test file exits 0"
     command: "uv run -- python -m pytest tests/unit/core/write_primitives/test_aggregate_state_dispatch.py -v"
-    expected_output: "exit 0; >= 6 passing tests"
+    expected_output: "exit 0"
+  - description: "Dispatch test file has at least 6 passing tests"
+    command: "uv run -- python -m pytest tests/unit/core/write_primitives/test_aggregate_state_dispatch.py --collect-only -q | grep -cE '::test_'"
+    expected_output: ">= 6"
   - description: "Existing fast unit tests still pass"
     command: "uv run -- python -m pytest tests/unit/core/write_primitives/ -m 'fast' -q"
     expected_output: "exit 0"
+
+deferred:
+  - summary: "Wire the live-Spark CLI command into a nightly CI lane"
+    reason: |
+      Stretch goal pending evidence the unit tests miss a real
+      regression. Decision criterion: if the first month after w2-w4
+      land surfaces a dispatch regression that the new unit tests did
+      not catch, file a follow-up TODO to run `benchbox run --platform
+      pyspark --queries sketch_df_*` against a real Spark in a nightly
+      job. Otherwise the unit-test coverage is sufficient.
 
 must_preserve:
   - "The live-Spark CLI command `benchbox run --platform pyspark --benchmark write_primitives --queries sketch_df_hll_persist_merge` continues to work end-to-end on a host with PySpark installed."

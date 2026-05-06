@@ -37,7 +37,10 @@ work:
       write time | current tool version | bound | observed bytes today
       (if measurable). Any row where current observation is outside the
       bound or where the tool version has moved is a sweep finding --
-      record in this TODO's notes.
+      record the table as a checked-in handoff at
+      `_project/handoffs/catalog-verified-comment-sweep-2026-05-05.md`
+      (or current date) so a reviewer can diff the next sweep against
+      it.
 
   - id: w2
     summary: "Write `scripts/sketch_storage_smoke.sh` (or `make` target) that prints observed bytes"
@@ -85,8 +88,10 @@ work:
       observed numbers in catalog comments or docs, require a checked-in
       smoke (or make target) that re-produces the observation, and a
       consistency test that fails when doc claims drift outside catalog
-      bounds." Coordinate with the `extend-five-axis-review-rubric` TODO
-      to avoid duplication.
+      bounds." This sub-axis is explicitly delegated to this TODO by
+      `extend-five-axis-review-rubric` (see its `deferred:` block) so
+      there is no double-edit risk. The `deps.needs` link below ensures
+      the parent TODO's six branches land first.
 
 verification:
   - description: "Smoke script exists"
@@ -95,9 +100,9 @@ verification:
   - description: "Doc-yaml consistency test exists and passes"
     command: "uv run -- python -m pytest tests/unit/core/write_primitives/test_doc_yaml_consistency.py -v"
     expected_output: "exit 0"
-  - description: "Sweep table captured in this TODO's notes"
-    command: "grep -E 'sweep table|w1 sweep findings' _project/DONE/main/*/catalog-empirical-claim-durability.yaml _project/TODO/main/*/catalog-empirical-claim-durability.yaml 2>/dev/null"
-    expected_output: "matches >= 1 (after w1 lands)"
+  - description: "Sweep handoff document exists"
+    command: "ls _project/handoffs/catalog-verified-comment-sweep-*.md 2>/dev/null"
+    expected_output: ">= 1 file (after w1 lands)"
 
 must_preserve:
   - "Existing `expected_value_min/max` bounds in `operations.yaml` are not loosened to make a stale comment pass -- if the smoke shows drift, the bound moves WITH a new dated comment line, not silently."

@@ -1,12 +1,12 @@
 id: extend-five-axis-review-rubric
-title: "Extend the five-axis code review rubric with five missing branches"
+title: "Extend the five-axis code review rubric with six missing branches"
 worktree: main
 priority: Medium-High
 status: Not Started
 category: Tooling and Workflow
 
 description: |
-  Five blind-spot findings between 2026-05-03 and 2026-05-05 each flagged a
+  Six blind-spot findings between 2026-05-03 and 2026-05-05 each flagged a
   class of review the current five-axis rubric (Correctness, Readability,
   Architecture, Security, Performance) does not catch:
 
@@ -20,9 +20,11 @@ description: |
     practice (`2026-05-04-120000`).
   - Defect-follow-up reviews that miss stale artifact reuse in
     orchestration code (`2026-05-05-090216`).
+  - Verification-only commits that cite transient evidence in commit
+    messages with no committed artifact (`2026-05-04-083819`).
 
   The fix is concentrated: extend
-  `.claude/skills/code/references/five-axis-review.md` with five branches,
+  `.claude/skills/code/references/five-axis-review.md` with six branches,
   each gated by the kind of change under review. The rubric stays
   five-axis-shaped; the branches add review-targeted prompts.
 
@@ -30,6 +32,7 @@ closes_blind_spots:
   - 2026-05-03-085238-five-axis-review-misses-matrix-doc-checks
   - 2026-05-03-090105-mixed-tooling-data-pr-review-gap
   - 2026-05-03-092657-repo-shape-adr-day-one-executability
+  - 2026-05-04-083819-w0-evidence-replay-drift
   - 2026-05-04-120000-spec-review-implementation-reachability-gap
   - 2026-05-05-090216-defect-followup-artifact-freshness
 
@@ -44,6 +47,7 @@ work:
         2. If the doc's recommendation depends on a policy gate, require
            an "Alternatives considered" section quantifying the
            alternative paths.
+      Add as `### Matrix/audit-doc branch` in five-axis-review.md.
 
   - id: w2
     summary: "Add 'mixed tooling+data PR' branch with per-component reversibility analysis"
@@ -56,6 +60,7 @@ work:
            aggregate.
         2. If the tooling change is a band-aid for a data-side issue,
            require a follow-up TODO id capturing the upstream fix.
+      Add as `### Mixed tooling+data branch`.
 
   - id: w3
     summary: "Add 'repo-shape ADR' branch with day-1 executability dry-run"
@@ -68,6 +73,7 @@ work:
            flows, automation, downstream branches).
         2. For each consumer, confirm it works against the proposed end
            state using only the ADR's stated allowlist/exclusions.
+      Add as `### Repo-shape ADR branch`.
 
   - id: w4
     summary: "Add 'multi-W spec implementation reachability' sub-axis (LOC-per-W flag)"
@@ -79,6 +85,7 @@ work:
            breakdown.
         2. Flag any W estimated >300 LOC pre-approval; require split or
            rationale before sign-off rather than mid-implementation.
+      Add as `### Multi-W spec implementation-reachability branch`.
 
   - id: w5
     summary: "Add 'defect follow-up artifact freshness' branch for orchestration code"
@@ -92,24 +99,67 @@ work:
            failed/aborted run).
         2. Sweep the diff for stale-file reuse patterns (`os.path.exists`
            + skip rather than re-emit).
+      Add as `### Defect follow-up artifact-freshness branch`.
 
   - id: w6
-    summary: "Sweep skill bindings for cross-cutting impact"
-    needs: [w1, w2, w3, w4, w5]
+    summary: "Add 'verification-only commit / evidence durability' branch"
     status: pending
     notes: |
-      After the five branches are added, scan `.claude/skills/code/SKILL.md`
-      and the BenchBox `CLAUDE.md` review-protocol bindings for any
-      phrasing that conflicts with the new branches (e.g., language that
-      limits reviews to "code diffs only"). Update where needed.
+      Trigger: PR's deliverable is verification-only (no functional code
+      change), or a commit message asserts evidence ("re-validated X
+      against version Y") without a committed artifact. Prompts:
+        1. Require a committed transcript or pin file that a reviewer
+           landing the PR days later can replay.
+        2. Reject "trust me, I ran it" evidence -- the
+           `_project/verification-logs/` convention from
+           `todo-skill-evidence-durability-conventions` is the binding.
+      Add as `### Verification-only / evidence-durability branch`.
+
+  - id: w7
+    summary: "Sweep skill bindings for cross-cutting impact"
+    needs: [w1, w2, w3, w4, w5, w6]
+    status: pending
+    notes: |
+      Grep `.claude/skills/code/SKILL.md` and the BenchBox `CLAUDE.md`
+      review-protocol bindings for these specific phrases that conflict
+      with the new branches: `code diffs only`, `narrative review`,
+      `single-axis`, `code-centric review`. Rephrase any matches so the
+      review wrapper acknowledges the new branches.
 
 verification:
-  - description: "All five new branches present in the reference"
-    command: "grep -cE 'matrix/audit|mixed tooling.+data|repo-shape ADR|implementation reachability|artifact freshness' .claude/skills/code/references/five-axis-review.md"
-    expected_output: ">= 5"
+  - description: "Each new branch heading is present in the reference"
+    command: "grep -cE '^### (Matrix/audit-doc|Mixed tooling\\+data|Repo-shape ADR|Multi-W spec|Defect follow-up|Verification-only) branch' .claude/skills/code/references/five-axis-review.md"
+    expected_output: ">= 6"
   - description: "Reference still passes basic lint"
     command: "make lint"
     expected_output: "exit 0"
+
+deferred:
+  - summary: "Add 'durability of empirical claims' sub-axis to five-axis-review.md"
+    reason: |
+      Owned by `catalog-empirical-claim-durability:w5`; that TODO already
+      depends on this one, and consolidating the work there avoids a
+      double-edit of the same file. Cross-reference is recorded in both.
+
+  - summary: "Sweep `_project/handoffs/` for prior audit docs whose tables were never regenerate-diffed"
+    reason: |
+      Recommended by blind-spot `2026-05-03-085238` but distinct from the
+      rubric extension this TODO ships. File a separate small TODO once
+      the matrix/audit-doc branch is in place; doing both in this TODO
+      would expand scope past "rubric edits only."
+
+  - summary: "Sweep `docs/development/adr/` for prior repo-shape ADRs against the day-1 dry-run"
+    reason: |
+      Recommended by blind-spot `2026-05-03-092657`. Same rationale as
+      above: the rubric extension is the right deliverable for this TODO;
+      retroactive ADR audits are a separable work item.
+
+  - summary: "Sweep `tests/uat/phases/` wrappers for stale-file reuse patterns"
+    reason: |
+      Recommended by blind-spot `2026-05-05-090216`. The new branch
+      makes the pattern catchable on future PRs; the prior-art sweep
+      belongs to `uat-framework-review-followups` which already owns the
+      phase-wrappers area.
 
 must_preserve:
   - "The five top-level axes (Correctness, Readability & Simplicity, Architecture, Security, Performance) remain the primary frame; new content is review-shape-specific branches, not new top-level axes."
@@ -136,9 +186,10 @@ metadata:
 
 impact:
   technical_debt: |
-    Five recurring review failure modes (matrix-doc arithmetic drift,
+    Six recurring review failure modes (matrix-doc arithmetic drift,
     mixed-PR review collapse, repo-shape ADR day-1 breakage, unreachable
-    multi-W slicing, stale-artifact reuse in defect follow-ups) all
-    surface during PR review today via reviewer attention rather than the
+    multi-W slicing, stale-artifact reuse in defect follow-ups,
+    verification-only commits without committed evidence) all surface
+    during PR review today via reviewer attention rather than the
     rubric. Codifying them prevents the same gap from recurring on every
     future review of the same shape.
