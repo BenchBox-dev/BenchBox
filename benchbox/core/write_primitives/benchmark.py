@@ -366,6 +366,13 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         if sql_override is not None:
             return sql_override, None
 
+        if getattr(operation, "aggregate_state", None) is not None:
+            platform_label = platform_key or "SQL"
+            return None, (
+                f"Operation '{operation.id}' is DataFrame aggregate-state only and is unsupported on "
+                f"platform '{platform_label}'."
+            )
+
         effective_sql = operation.write_sql
 
         if platform_key and operation.platform_overrides and platform_key in operation.platform_overrides:
@@ -832,6 +839,24 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             staging_heading="Write Primitives Staging Tables",
             get_staging_tables_sql=get_all_staging_tables_sql,
         )
+
+    def get_query(self, query_id: Union[int, str], **kwargs: Any) -> str:
+        """Get SQL for a SQL-runnable write operation."""
+        operation = self.operations_manager.get_operation(str(query_id))
+        if operation.aggregate_state is not None:
+            raise ValueError(f"Operation '{operation.id}' is DataFrame aggregate-state only and is not exposed as SQL")
+        return operation.write_sql
+
+    def get_queries(self, dialect: Optional[str] = None) -> dict[str, str]:
+        """Get SQL-runnable write operations, excluding DataFrame-only aggregate-state ops."""
+        _ = dialect
+        operations = self.operations_manager.get_all_operations()
+        return {op_id: op.write_sql for op_id, op in operations.items() if op.aggregate_state is None}
+
+    def get_queries_by_category(self, category: str) -> dict[str, str]:
+        """Get SQL-runnable write operations for a category."""
+        operations = self.operations_manager.get_operations_by_category(category)
+        return {op_id: op.write_sql for op_id, op in operations.items() if op.aggregate_state is None}
 
     def execute_operation(
         self,
