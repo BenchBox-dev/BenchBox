@@ -467,7 +467,18 @@ def _parse_validation_queries(
     error_class: type[RuntimeError],
     build_validation_query: Any,
 ) -> list[Any]:
-    """Parse validation queries from an operation entry."""
+    """Parse validation queries from an operation entry.
+
+    Loader contract: the kwargs forwarded to ``build_validation_query`` must
+    stay in lockstep with the write_primitives-local equivalent at
+    ``benchbox/core/write_primitives/catalog/loader.py``. New callers receive
+    `expected_value_min`, `expected_value_max`, and validation-level
+    `platform_overrides`; existing dataclasses without those fields ignore
+    the extras via ``_filter_supported_kwargs``. The cross-loader parity
+    test at ``tests/unit/core/primitives/test_loader_parity.py`` enforces
+    field-set equality; see TODO
+    `shared-primitives-loader-validation-parity` for rationale.
+    """
     raw_validations = entry.get("validation_queries", [])
     if not isinstance(raw_validations, list):
         raise error_class(f"Catalog entry '{operation_id}' validation_queries must be a list")
@@ -485,19 +496,119 @@ def _parse_validation_queries(
         if not isinstance(val_sql, str) or not val_sql.strip():
             raise error_class(f"Validation query '{val_id}' in operation '{operation_id}' missing 'sql'")
 
+        expected_value_min, expected_value_max = _parse_expected_value_bounds(
+            operation_id, val_id, val_entry, error_class
+        )
+        platform_overrides = _parse_validation_platform_overrides(operation_id, val_id, val_entry, error_class)
+
+        all_kwargs = {
+            "id": val_id.strip(),
+            "sql": val_sql,
+            "expected_rows": val_entry.get("expected_rows"),
+            "expected_rows_min": val_entry.get("expected_rows_min"),
+            "expected_rows_max": val_entry.get("expected_rows_max"),
+            "expected_values": val_entry.get("expected_values"),
+            "check_expression": val_entry.get("check_expression"),
+            "expected_value_min": expected_value_min,
+            "expected_value_max": expected_value_max,
+            "platform_overrides": platform_overrides,
+        }
         validation_queries.append(
-            build_validation_query(
-                id=val_id.strip(),
-                sql=val_sql,
-                expected_rows=val_entry.get("expected_rows"),
-                expected_rows_min=val_entry.get("expected_rows_min"),
-                expected_rows_max=val_entry.get("expected_rows_max"),
-                expected_values=val_entry.get("expected_values"),
-                check_expression=val_entry.get("check_expression"),
-            )
+            build_validation_query(**_filter_supported_kwargs(build_validation_query, all_kwargs))
         )
 
     return validation_queries
+
+
+def _parse_validation_platform_overrides(
+    operation_id: str,
+    val_id: str,
+    val_entry: dict[str, Any],
+    error_class: type[RuntimeError],
+) -> dict[str, str | None]:
+    """Parse and validate per-platform validation SQL overrides.
+
+    Each value must be either a non-empty string (replacement SQL) or
+    ``None`` (explicit skip). Empty strings and other types are rejected at
+    load time so a typo cannot silently disable validation.
+    """
+    raw = val_entry.get("platform_overrides")
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise error_class(
+            f"Validation query '{val_id}' in operation '{operation_id}' platform_overrides must be a mapping"
+        )
+    overrides: dict[str, str | None] = {}
+    for platform_key, override in raw.items():
+        if not isinstance(platform_key, str) or not platform_key.strip():
+            raise error_class(
+                f"Validation query '{val_id}' in operation '{operation_id}' "
+                "platform_overrides keys must be non-empty platform names"
+            )
+        if override is None:
+            overrides[platform_key.strip()] = None
+            continue
+        if not isinstance(override, str) or not override.strip():
+            raise error_class(
+                f"Validation query '{val_id}' in operation '{operation_id}' "
+                f"platform_overrides['{platform_key}'] must be a non-empty string or null"
+            )
+        overrides[platform_key.strip()] = override
+    return overrides
+
+
+def _parse_expected_value_bounds(
+    operation_id: str,
+    val_id: str,
+    val_entry: dict[str, Any],
+    error_class: type[RuntimeError],
+) -> tuple[float | None, float | None]:
+    """Parse and validate ``expected_value_min``/``max`` for tolerance-based scalar checks."""
+    raw_min = val_entry.get("expected_value_min")
+    raw_max = val_entry.get("expected_value_max")
+    if raw_min is None and raw_max is None:
+        return None, None
+    if raw_min is None or raw_max is None:
+        raise error_class(
+            f"Validation query '{val_id}' in operation '{operation_id}' must set both "
+            "expected_value_min and expected_value_max together"
+        )
+    try:
+        bound_min = float(raw_min)
+        bound_max = float(raw_max)
+    except (TypeError, ValueError) as exc:
+        raise error_class(
+            f"Validation query '{val_id}' in operation '{operation_id}' expected_value_min/max must be numeric"
+        ) from exc
+    if bound_min > bound_max:
+        raise error_class(
+            f"Validation query '{val_id}' in operation '{operation_id}' expected_value_min "
+            f"({bound_min}) must be <= expected_value_max ({bound_max})"
+        )
+    if any(val_entry.get(k) is not None for k in ("expected_rows", "expected_rows_min", "expected_rows_max")):
+        raise error_class(
+            f"Validation query '{val_id}' in operation '{operation_id}' cannot combine "
+            "expected_value_min/max with expected_rows fields — they describe different "
+            "validation kinds"
+        )
+    if val_entry.get("expected_values") is not None:
+        raise error_class(
+            f"Validation query '{val_id}' in operation '{operation_id}' cannot combine "
+            "expected_value_min/max with expected_values"
+        )
+    return bound_min, bound_max
+
+
+def _filter_supported_kwargs(callable_: Any, kwargs: dict[str, Any]) -> dict[str, Any]:
+    """Drop kwargs the target callable does not accept; preserves backwards compat."""
+    try:
+        params = signature(callable_).parameters
+    except (TypeError, ValueError):
+        return kwargs
+    if any(p.kind == Parameter.VAR_KEYWORD for p in params.values()):
+        return kwargs
+    return {k: v for k, v in kwargs.items() if k in params}
 
 
 def _parse_variants(

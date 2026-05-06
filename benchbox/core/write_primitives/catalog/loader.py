@@ -13,6 +13,12 @@ from typing import Any
 
 import yaml
 
+from benchbox.core.primitives.catalog.loader import (
+    _parse_expected_value_bounds as _shared_parse_expected_value_bounds,
+    _parse_validation_platform_overrides as _shared_parse_validation_platform_overrides,
+    _parse_validation_queries as shared_parse_validation_queries,
+)
+
 CATALOG_FILENAME = "operations.yaml"
 
 
@@ -122,39 +128,19 @@ def _load_catalog_payload() -> dict:
 
 
 def _parse_validation_queries(operation_id: str, raw_validations: object) -> list[ValidationQuery]:
-    if not isinstance(raw_validations, list):
-        raise WritePrimitivesCatalogError(f"Catalog entry '{operation_id}' validation_queries must be a list")
-    queries: list[ValidationQuery] = []
-    for val_idx, val_entry in enumerate(raw_validations):
-        if not isinstance(val_entry, dict):
-            raise WritePrimitivesCatalogError(
-                f"Validation query {val_idx} in operation '{operation_id}' must be a mapping"
-            )
-        val_id = val_entry.get("id")
-        if not isinstance(val_id, str) or not val_id.strip():
-            raise WritePrimitivesCatalogError(f"Validation query {val_idx} in operation '{operation_id}' missing 'id'")
-        val_sql = val_entry.get("sql")
-        if not isinstance(val_sql, str) or not val_sql.strip():
-            raise WritePrimitivesCatalogError(
-                f"Validation query '{val_id}' in operation '{operation_id}' missing 'sql'"
-            )
-        expected_value_min, expected_value_max = _parse_expected_value_bounds(operation_id, val_id, val_entry)
-        platform_overrides = _parse_validation_platform_overrides(operation_id, val_id, val_entry)
-        queries.append(
-            ValidationQuery(
-                id=val_id.strip(),
-                sql=val_sql,
-                expected_rows=val_entry.get("expected_rows"),
-                expected_rows_min=val_entry.get("expected_rows_min"),
-                expected_rows_max=val_entry.get("expected_rows_max"),
-                expected_values=val_entry.get("expected_values"),
-                check_expression=val_entry.get("check_expression"),
-                expected_value_min=expected_value_min,
-                expected_value_max=expected_value_max,
-                platform_overrides=platform_overrides,
-            )
-        )
-    return queries
+    """Delegate to the shared loader so the field-forwarding contract stays unified.
+
+    See ``benchbox.core.primitives.catalog.loader._parse_validation_queries``
+    for the contract. The cross-loader parity test at
+    ``tests/unit/core/primitives/test_loader_parity.py`` enforces that this
+    wrapper and the shared one expose identical kwargs.
+    """
+    return shared_parse_validation_queries(
+        {"validation_queries": raw_validations},
+        operation_id,
+        WritePrimitivesCatalogError,
+        ValidationQuery,
+    )
 
 
 def _parse_validation_platform_overrides(
@@ -162,37 +148,8 @@ def _parse_validation_platform_overrides(
     val_id: str,
     val_entry: dict,
 ) -> dict[str, str | None]:
-    """Parse and validate per-platform validation SQL overrides.
-
-    Each value must be either a non-empty string (replacement SQL for that
-    platform) or `null` (explicit skip with a logged reason at runtime).
-    Empty strings and other types are rejected at load time so a typo cannot
-    silently disable validation.
-    """
-    raw = val_entry.get("platform_overrides")
-    if raw is None:
-        return {}
-    if not isinstance(raw, dict):
-        raise WritePrimitivesCatalogError(
-            f"Validation query '{val_id}' in operation '{operation_id}' platform_overrides must be a mapping"
-        )
-    overrides: dict[str, str | None] = {}
-    for platform_key, override in raw.items():
-        if not isinstance(platform_key, str) or not platform_key.strip():
-            raise WritePrimitivesCatalogError(
-                f"Validation query '{val_id}' in operation '{operation_id}' "
-                "platform_overrides keys must be non-empty platform names"
-            )
-        if override is None:
-            overrides[platform_key.strip()] = None
-            continue
-        if not isinstance(override, str) or not override.strip():
-            raise WritePrimitivesCatalogError(
-                f"Validation query '{val_id}' in operation '{operation_id}' "
-                f"platform_overrides['{platform_key}'] must be a non-empty string or null"
-            )
-        overrides[platform_key.strip()] = override
-    return overrides
+    """Backwards-compatible re-export bound to ``WritePrimitivesCatalogError``."""
+    return _shared_parse_validation_platform_overrides(operation_id, val_id, val_entry, WritePrimitivesCatalogError)
 
 
 def _parse_expected_value_bounds(
@@ -200,40 +157,8 @@ def _parse_expected_value_bounds(
     val_id: str,
     val_entry: dict,
 ) -> tuple[float | None, float | None]:
-    """Parse and validate expected_value_min/max for tolerance-based scalar checks."""
-    raw_min = val_entry.get("expected_value_min")
-    raw_max = val_entry.get("expected_value_max")
-    if raw_min is None and raw_max is None:
-        return None, None
-    if raw_min is None or raw_max is None:
-        raise WritePrimitivesCatalogError(
-            f"Validation query '{val_id}' in operation '{operation_id}' must set both "
-            "expected_value_min and expected_value_max together"
-        )
-    try:
-        bound_min = float(raw_min)
-        bound_max = float(raw_max)
-    except (TypeError, ValueError) as exc:
-        raise WritePrimitivesCatalogError(
-            f"Validation query '{val_id}' in operation '{operation_id}' expected_value_min/max must be numeric"
-        ) from exc
-    if bound_min > bound_max:
-        raise WritePrimitivesCatalogError(
-            f"Validation query '{val_id}' in operation '{operation_id}' expected_value_min "
-            f"({bound_min}) must be <= expected_value_max ({bound_max})"
-        )
-    if any(val_entry.get(k) is not None for k in ("expected_rows", "expected_rows_min", "expected_rows_max")):
-        raise WritePrimitivesCatalogError(
-            f"Validation query '{val_id}' in operation '{operation_id}' cannot combine "
-            "expected_value_min/max with expected_rows fields — they describe different "
-            "validation kinds"
-        )
-    if val_entry.get("expected_values") is not None:
-        raise WritePrimitivesCatalogError(
-            f"Validation query '{val_id}' in operation '{operation_id}' cannot combine "
-            "expected_value_min/max with expected_values"
-        )
-    return bound_min, bound_max
+    """Backwards-compatible re-export bound to ``WritePrimitivesCatalogError``."""
+    return _shared_parse_expected_value_bounds(operation_id, val_id, val_entry, WritePrimitivesCatalogError)
 
 
 def _parse_optional_scalars(operation_id: str, entry: dict) -> tuple[str | None, int | None]:
