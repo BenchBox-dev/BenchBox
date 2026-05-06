@@ -21,7 +21,14 @@ class TransactionPrimitivesCatalogError(RuntimeError):
 
 @dataclass(frozen=True)
 class ValidationQuery:
-    """Representation of a validation query for a write operation."""
+    """Representation of a validation query for a write operation.
+
+    Field-set parity with ``write_primitives.catalog.loader.ValidationQuery``
+    is enforced by ``tests/unit/core/primitives/test_loader_parity.py``;
+    no current transaction_primitives operation uses the tolerance bounds
+    or per-platform overrides, but the dataclass accepts them so the
+    shared loader's forwarding contract is uniform across consumers.
+    """
 
     id: str
     sql: str
@@ -30,6 +37,9 @@ class ValidationQuery:
     expected_rows_max: int | None = None
     expected_values: dict[str, Any] | None = None
     check_expression: str | None = None
+    expected_value_min: float | None = None
+    expected_value_max: float | None = None
+    platform_overrides: dict[str, str | None] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
