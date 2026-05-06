@@ -1566,7 +1566,8 @@ uat-sweep:
 		echo "Usage: make uat-sweep CONFIG=<path> [DRY_RUN=1]" >&2; \
 		exit 2; \
 	fi
-	@uv run --no-sync -- python -m tests.uat._cli sweep --config "$(CONFIG)"
+	@uv run --no-sync -- python -m tests.uat._cli sweep --config "$(CONFIG)" \
+		$(if $(DRY_RUN),--dry-run,)
 
 # make uat-stress [PLATFORM=] [BENCHMARK=] [SCALE=] [CONFIG=]
 # Canned stress preset; feature parity with scripts/local_stress_test.sh.

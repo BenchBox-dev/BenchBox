@@ -14,7 +14,7 @@ from __future__ import annotations
 import datetime as _dt
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from tests.uat.config import UATConfig, apply_stress_overrides, load_config
@@ -209,6 +209,7 @@ def run_sweep_from_path(
     config_path: Path,
     *,
     stress_overrides: dict[str, str | float | None] | None = None,
+    dry_run_override: bool | None = None,
 ) -> SweepResult:
     """Convenience wrapper for `make uat-sweep` and `make uat-stress`."""
     config = load_config(config_path)
@@ -219,4 +220,8 @@ def run_sweep_from_path(
             benchmark=stress_overrides.get("benchmark"),
             scale=stress_overrides.get("scale"),
         )
+    if dry_run_override is not None:
+        raw = dict(config.raw)
+        raw["dry_run"] = dry_run_override
+        config = replace(config, dry_run=dry_run_override, raw=raw)
     return run_sweep(config)
