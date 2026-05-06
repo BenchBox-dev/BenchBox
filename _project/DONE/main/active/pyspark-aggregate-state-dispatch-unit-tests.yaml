@@ -1,0 +1,140 @@
+id: pyspark-aggregate-state-dispatch-unit-tests
+title: "Add unit tests for the PySpark aggregate-state dispatch fork"
+worktree: main
+priority: Medium
+status: Completed
+completed_date: "2026-05-06"
+category: Testing and Quality Assurance
+
+description: |
+  Blind-spot `2026-05-05-010706` documented that
+  `WritePrimitivesBenchmark._execute_aggregate_state_op`
+  (`benchbox/core/write_primitives/benchmark.py`) is exercised today only
+  by the live-Spark CLI command `benchbox run --platform pyspark
+  --benchmark write_primitives --queries sketch_df_*`. Unit tests exist
+  for the catalog loader, the PySpark factories with a MagicMock spark
+  session, and the `DataFrameWriteOperationsManager` methods -- but
+  nothing for the dispatch fork itself: ops partitioning into
+  "aggregate-state vs SQL parity" branches, `_resolve_platform_name`,
+  `_extract_spark_session`, the per-op result envelope, SKIPPED-on-
+  unsupported-platform / SKIPPED-on-Spark-version paths, validation-bound
+  checks on `aggregate_value`, and state-dir cleanup between iterations.
+
+  Result: dispatch-only regressions stay green in unit tests and surface
+  only on the next ad-hoc CLI run.
+
+  Sweep verification (2026-05-05): zero hits for
+  `_execute_aggregate_state_op` in `tests/`.
+
+closes_blind_spots:
+- 2026-05-05-010706-pyspark-aggregate-state-dispatch-no-unit-test
+
+work:
+- id: w1
+  summary: "Build a `MockDataFrameWriteOperationsManager` helper"
+  status: done
+  notes: |
+    Add `tests/unit/core/write_primitives/_mock_manager.py` that
+    returns configurable `DataFrameWriteResult` objects from
+    `execute_aggregate_persist` / `execute_aggregate_merge`. Allow
+    callers to inject success / error / metrics / aggregate_value.
+    Keep it MagicMock-light so it documents the contract.
+
+- id: w2
+  summary: "Cover the success path: bound-passing aggregate_value"
+  needs: [w1]
+  status: done
+  notes: |
+    Test `_execute_aggregate_state_op` with a mock manager that
+    returns a SUCCESS result whose `aggregate_value` is inside the
+    validation bound. Assert: result envelope has SUCCESS status, the
+    right metric fields, no spurious validation errors.
+
+- id: w3
+  summary: "Cover failure paths: persist failure, merge failure, bound violation"
+  needs: [w2]
+  status: done
+  notes: |
+    Three tests, one per failure mode. Persist FAIL: manager raises /
+    returns failure on `execute_aggregate_persist`. Merge FAIL: same
+    on `execute_aggregate_merge`. Bound violation: SUCCESS result
+    whose `aggregate_value` is outside the bound. Assert: each
+    produces a distinct, diagnostic error message in the result
+    envelope.
+
+- id: w4
+  summary: "Cover the SKIP paths: unsupported platform, Spark version guard"
+  needs: [w2]
+  status: done
+  notes: |
+    Test SKIPPED-on-unsupported-platform: dispatch sees a platform
+    that doesn't expose aggregate-state factories. Test SKIPPED-on-
+    Spark-version: dispatch sees Spark 3.4.x where `F.approx_top_k_*`
+    is missing. Assert: SKIPPED status with a reason string that names
+    the missing capability.
+
+- id: w5
+  summary: "Cover `_resolve_aggregate_source_path` cache-hit"
+  needs: [w1]
+  status: done
+  notes: |
+    Today the conversion branch is the only path covered. Add a test
+    where a pre-existing Parquet directory is present and assert the
+    function short-circuits to the cached path without re-running the
+    conversion.
+
+verification:
+- description: "Dispatch test file exits 0"
+  command: "uv run -- python -m pytest tests/unit/core/write_primitives/test_aggregate_state_dispatch.py -v"
+  expected_output: "exit 0"
+- description: "Dispatch test file has at least 6 passing tests"
+  command: "uv run -- python -m pytest tests/unit/core/write_primitives/test_aggregate_state_dispatch.py --collect-only -q
+    | grep -cE '::test_'"
+  expected_output: ">= 6"
+- description: "Existing fast unit tests still pass"
+  command: "uv run -- python -m pytest tests/unit/core/write_primitives/ -m 'fast' -q"
+  expected_output: "exit 0"
+
+deferred:
+- summary: "Wire the live-Spark CLI command into a nightly CI lane"
+  reason: |
+    Stretch goal pending evidence the unit tests miss a real
+    regression. Decision criterion: if the first month after w2-w4
+    land surfaces a dispatch regression that the new unit tests did
+    not catch, file a follow-up TODO to run `benchbox run --platform
+    pyspark --queries sketch_df_*` against a real Spark in a nightly
+    job. Otherwise the unit-test coverage is sufficient.
+
+must_preserve:
+- "The live-Spark CLI command `benchbox run --platform pyspark --benchmark write_primitives --queries sketch_df_hll_persist_merge`
+  continues to work end-to-end on a host with PySpark installed."
+- "Existing unit tests in `test_pyspark_sketch_factories.py`, `test_dataframe_aggregate_state_ops.py`, `test_aggregate_state_catalog.py`
+  remain unchanged."
+- "MagicMock objects in existing tests are not promoted to the new mock manager helper (the existing tests have a different
+  scope)."
+
+anti_patterns:
+- "DO NOT make the new tests depend on a real PySpark install -- the whole point is to exercise dispatch without spinning
+  up a JVM. The mock manager is the seam."
+- "DO NOT leak the mock manager into integration tests -- it is a unit-level testing helper, not a substitute for the real
+  manager in larger flows."
+
+scope_limit:
+  only_modify:
+  - "tests/unit/core/write_primitives/"
+
+metadata:
+  tags:
+  - pyspark
+  - testing
+  - blind-spot-followup
+  estimated_effort: "Medium"
+  created_date: "2026-05-05"
+
+impact:
+  technical_debt: |
+    The dispatch fork is the highest-risk regression surface in
+    `WritePrimitivesBenchmark` because PySpark API churn (factory
+    symbols moving wheel-to-wheel, version-gated guards) hits dispatch
+    first and unit tests least. Closing the coverage gap means the next
+    API change surfaces in CI, not on the next ad-hoc CLI run.
