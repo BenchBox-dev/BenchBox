@@ -49,8 +49,27 @@ description: |
     future maintainers can sweep them when upstream catches up.
 
 work:
+  - id: w0
+    summary: "Re-validate cited evidence (chdb SIGABRT still reproduces, chdb version still pinned)"
+    status: pending
+    notes: |
+      Evidence-durability gate per
+      _project/verification-logs/README.md. Before w1, confirm:
+        - `uv pip show chdb` matches the version pinned at TODO write
+          time (or the SIGABRT still reproduces against whatever is
+          pinned now).
+        - The `TODO(chdb-tuple-dataframe)` marker still exists in
+          benchbox/platforms/clickhouse/client.py:_arrow_to_dataframe
+          (i.e., upstream fix hasn't already landed in our pin).
+      Capture stdout under
+      _project/verification-logs/track-upstream-platform-workarounds/w0.log
+      and commit. If the SIGABRT no longer reproduces, the rest of
+      this TODO collapses to "remove the workaround" instead of "file
+      upstream."
+
   - id: w1
     summary: "File chdb DataFrame/Tuple SIGABRT upstream and link the issue"
+    needs: [w0]
     status: pending
     notes: |
       Repro: `groupArray(tuple(Int32, Int32, Decimal, Decimal))` query
