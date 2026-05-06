@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lockedAt": "2026-05-06T12:21:59.436Z",
+  "lockedAt": "2026-05-06T12:27:34.245Z",
   "skills": {
     "blog": {
       "source": {
@@ -30,7 +30,7 @@
         "type": "local",
         "name": "personal",
         "path": "/Users/joe/.skill-sync/skills/code",
-        "fetchedAt": "2026-05-06T12:21:59.340Z"
+        "fetchedAt": "2026-05-06T12:27:34.176Z"
       },
       "installMode": "mirror",
       "files": {
@@ -39,8 +39,8 @@
           "size": 770
         },
         "references/five-axis-review.md": {
-          "sha256": "13150ef9461ab4fa8e22cfba2d5f15b9447fa031b1af9defe19138f70416a8a2",
-          "size": 3873
+          "sha256": "ad9773c5bf9c6492973fda34b43f5c47810c13dbe9eb135efa8f1ea71fa55602",
+          "size": 4195
         },
         "references/handoff.md": {
           "sha256": "37ecdbe8e88662d8bda26b8b87412081750ba1e23fb804a68e0803fe7cf7e8c2",
