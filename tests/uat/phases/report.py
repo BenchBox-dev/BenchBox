@@ -16,7 +16,9 @@ from typing import Iterable
 
 from tests.uat.runner import CellResult
 
-REPORT_HEADER = "platform\tbenchmark\tscale\tstatus\telapsed_s\tlog_path\tresult_path\tvalidator_status"
+REPORT_HEADER = (
+    "platform\tbenchmark\tscale\tstatus\telapsed_s\tlog_path\tresult_path\tsubmit_terminal_state\tvalidator_status"
+)
 
 
 @dataclass(frozen=True)
@@ -39,11 +41,11 @@ def render_row(
     *,
     validator_status: str = "",
 ) -> str:
-    """Render one row matching the historical column order."""
+    """Render one row matching the current matrix-summary column order."""
     return (
         f"{cell.platform}\t{cell.benchmark}\t{cell.scale}\t"
         f"{cell.status}\t{cell.elapsed_s:.2f}\t"
-        f"{cell.log_path}\t{cell.result_path or ''}\t{validator_status}"
+        f"{cell.log_path}\t{cell.result_path or ''}\t{cell.submit_terminal_state}\t{validator_status}"
     )
 
 

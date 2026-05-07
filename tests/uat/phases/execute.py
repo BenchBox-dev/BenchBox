@@ -20,7 +20,7 @@ from __future__ import annotations
 import datetime as _dt
 from collections import defaultdict
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from tests.uat import docker_assets
@@ -30,7 +30,7 @@ from tests.uat.ladder import LadderRung, plan_ladder
 from tests.uat.matrix import platform_is_reachable, reset_reachability_cache
 from tests.uat.phases.enumerate import Cell, enumerate_cells
 from tests.uat.phases.preflight import free_space_gib as default_free_space_reader
-from tests.uat.runner import CellResult, run_cell
+from tests.uat.runner import CellResult, classify_for_submit, run_cell, submit_state_is_cell_failure
 
 
 @dataclass(frozen=True)
@@ -462,6 +462,7 @@ def _run_platform_benchmark(
             log_dir=log_dir,
             benchmark_runs_dir=benchmark_runs_dir,
         )
+        cell_result = _apply_submit_classification(cell_result)
         results.append(cell_result)
         observed.append(
             LadderRung(
@@ -488,6 +489,21 @@ def _run_platform_benchmark(
             databases_root=databases_root,
             dry_run=config.dry_run,
         )
+
+
+def _apply_submit_classification(cell_result: CellResult) -> CellResult:
+    """Mirror submit refusals for any runner that returned a result JSON."""
+    if cell_result.status != "passed" or cell_result.result_path is None or not cell_result.result_path.exists():
+        return cell_result
+    submit_state = classify_for_submit(cell_result.result_path)
+    if submit_state.value == cell_result.submit_terminal_state and not submit_state_is_cell_failure(submit_state):
+        return cell_result
+    return replace(
+        cell_result,
+        status="failed" if submit_state_is_cell_failure(submit_state) else cell_result.status,
+        exit_code=(cell_result.exit_code or 1) if submit_state_is_cell_failure(submit_state) else cell_result.exit_code,
+        submit_terminal_state=submit_state.value,
+    )
 
 
 def _reorder_for_topology(

@@ -1,0 +1,226 @@
+id: results-explorer-uat-defect-submit-partial-success-refusals
+title: "Surface query-level failures as failed UAT cells before the package phase"
+worktree: main
+priority: High
+status: Completed
+completed_date: "2026-05-07"
+category: Testing and Quality Assurance
+
+description: |
+  In the 2026-05-05 tuned UAT sweep, 27 of 114 result JSONs from
+  "passed" cells were refused by `benchbox submit --output` during the
+  package phase. Most refusals were for query-level failures hidden
+  inside otherwise-successful runs, with a smaller share for
+  unofficial TPC-DS compliance classes (`unofficial_subscale`,
+  `unofficial_nonstandard`).
+
+  Affected benchmarks/platforms in the dominant refusals:
+    - DataVault
+    - FlightData / DataFusion
+    - JoinOrder / DataFusion
+    - metadata, read, write, transaction primitives
+    - TPC-DI
+    - TPC-DS OBT
+    - TPCHavoc
+    - TSBS / DataFusion
+
+  Source: `_project/handoffs/results-explorer-uat-tuned-followup-20260505.md`
+  ("Submission And Validation" + "Defect Classification →
+  Submission-contract"). Follow-up to PR #235.
+
+  Today the UAT cell-level outcome is "passed" if the run produced a
+  result JSON, even when individual queries inside the run failed. The
+  package phase is the first place these are caught — too late for the
+  validator-clean rate to mean what it claims, and too late for an
+  operator to triage during the sweep.
+
+  This TODO makes the UAT execute phase classify a cell as failed
+  whenever its result JSON contains query-level errors (or any other
+  condition `benchbox submit` would refuse), so the sweep terminal
+  state matches the submittable-bundle reality.
+
+  Out of scope: TPC-DS compliance-class refusals are deliberate and
+  correct — those cells should not be force-promoted; they remain as
+  "passed but unofficial" in the matrix and are excluded from
+  submission packaging by design.
+
+deps:
+  needs: []
+
+work:
+- id: w0
+  summary: "Replay current `benchbox submit --output` against the 2026-05-05 corpus and capture the refusal split"
+  status: done
+  notes: |
+    Evidence-durability gate per `_project/verification-logs/README.md`.
+    The whole TODO turns on the "27 of 114 refused" figure; pin it now
+    so the implementer (and the w5 sanity check) can compare against a
+    captured baseline:
+
+      LOGS=~/Developer/benchmark_runs/logs/uat_tuned_followup_20260505_pool02_rerun
+      RESULT_LIST=$(mktemp)
+      awk -F'\t' 'NR>1 && $4=="passed" && $6 {print $6}' \
+        "$LOGS/coverage_cells.tsv" > "$RESULT_LIST"
+      echo "passed-result-paths $(wc -l < "$RESULT_LIST")"
+      while IFS= read -r source_path; do
+        result_path="$source_path"
+        if [ ! -f "$result_path" ]; then
+          result_path="$HOME/Developer/benchmark_runs/results/$(basename "$source_path")"
+        fi
+        out_dir=$(mktemp -d)
+        if uv run -- benchbox submit "$result_path" --output "$out_dir" --dry-run \
+            > "$out_dir/submit.log" 2>&1; then
+          echo submittable
+        else
+          reason=$(grep -E 'Submission refused:' "$out_dir/submit.log" \
+            | sed -E 's/.*Submission refused: //; s/\x1b\[[0-9;]*m//g' \
+            | head -1)
+          echo "refused:${reason:-unknown}"
+        fi
+        rm -rf "$out_dir"
+      done < "$RESULT_LIST" | sort | uniq -c
+      rm -f "$RESULT_LIST"
+
+    Expected (handoff anchor): 114 passed-result paths; 87 submittable;
+    27 refused split between unofficial compliance and non-clean/query-level
+    failures; validator-clean rate 95.4% on the staged subset. Capture stdout under
+    `_project/verification-logs/results-explorer-uat-defect-submit-partial-success-refusals/w0.log`
+    and commit. If the refusal count has drifted (submit.py rules
+    changed since 2026-05-05), update the description's count and the
+    w5 expected split before proceeding.
+
+- id: w1
+  summary: "Catalogue every condition `benchbox submit --output` refuses today"
+  needs: [w0]
+  status: done
+  notes: |
+    Read `benchbox/cli/commands/submit.py` end-to-end. List the explicit
+    refusal predicates (compliance class, query-level failure markers,
+    missing manifest fields, etc.) and the result-JSON fields each
+    consults. Output: short table in this TODO (or a captured log)
+    keyed by predicate → result-JSON path. This is the contract the
+    execute phase must replicate to detect-early.
+
+    Implemented contract:
+    - missing file / absent result path → `missing_manifest`.
+    - `load_result_file()` `UnsupportedSchemaError` / `ResultLoadError` →
+      `schema_violation`.
+    - `benchmark.compliance_class in {unofficial_nonstandard,
+      unofficial_subscale}` → `unofficial` (cell remains passed, package can
+      skip it).
+    - `result_failed_query_count(result) > 0` / `result_non_clean_reason()` →
+      `query_failure` for failed-query counts, otherwise `schema_violation`
+      for non-clean validation statuses.
+
+- id: w2
+  summary: "Add `submit_terminal_state` classifier in `tests/uat/runner.py` (or new module) that mirrors the submit refusals"
+  needs: [w1]
+  status: done
+  notes: |
+    Function: `classify_for_submit(result_json) -> SubmitTerminalState`
+    where `SubmitTerminalState ∈ {submittable, unofficial,
+    query_failure, schema_violation, missing_manifest}`. Call after
+    every cell's runner exit. The classifier reuses the predicates
+    catalogued in w1; do NOT branch off `submit.py`'s implementation —
+    delegate where possible (import the public predicate functions),
+    mirror only what cannot be imported. Refusing to package an
+    unsubmittable cell is a feature, not a regression — operators see
+    it during execute, not at the package boundary.
+
+- id: w3
+  summary: "Update execute phase: cells whose `submit_terminal_state` is `query_failure` or `schema_violation` are reported
+    FAILED, not PASSED"
+  needs: [w2]
+  status: done
+  notes: |
+    `tests/uat/phases/execute.py` per-cell terminal-state computation
+    consumes `classify_for_submit` and downgrades the cell. Cells with
+    `unofficial` stay PASSED but are tagged so the package phase still
+    excludes them with a clear reason. Update the per-platform/per-
+    benchmark coverage TSV columns accordingly. Update existing
+    package-phase refusal logging to reference the upstream classify
+    result rather than re-deriving.
+
+- id: w4
+  summary: "Regression test: synthetic result JSON with a query failure → execute phase reports FAILED, package phase agrees"
+  needs: [w3]
+  status: done
+  notes: |
+    Fast-marked. Two fixture JSONs: (a) clean → submittable + PASSED,
+    (b) clean shape but one query has `error: ...` → query_failure +
+    FAILED. Assert both runner output and package-phase refusal list
+    agree. Prevents regression of the "passed but refused" gap.
+
+- id: w5
+  summary: "Replay 2026-05-05 passed-result paths through the new classifier and compare the refusal split"
+  needs: [w4]
+  status: done
+  notes: |
+    Sanity check that the implementation matches the observed defect.
+    Re-read the 114 `status=passed` result JSON paths from
+    `~/Developer/benchmark_runs/logs/uat_tuned_followup_20260505_pool02_rerun/coverage_cells.tsv`,
+    resolving pool-local paths to same-name files under
+    `~/Developer/benchmark_runs/results/` when needed. Assert: 87
+    submittable + 27 non-submittable = 114, and the 27 split into
+    `unofficial` versus `query_failure`/`schema_violation` according to
+    the classifier. Only the non-clean (`query_failure` ∪
+    `schema_violation`) subset should flip from PASSED to FAILED;
+    `unofficial` remains PASSED but tagged. Capture the exact split into
+    the verification log under `_project/verification-logs/<this-id>/`.
+
+must_preserve:
+- "`benchbox submit --output` remains the source of truth for refusals — UAT mirrors it, does not override it."
+- "Direction of dependency: `tests/uat/runner.py` may IMPORT public predicates from `benchbox.cli.commands.submit`, but never
+  the reverse. The CLI must not depend on the UAT framework."
+- "`unofficial` compliance-class cells continue to PASS at the cell level (they ran successfully; they are simply not submittable)."
+- "validator-clean-rate floor enforcement; tightening the cell-level pass criterion does not weaken the validator gate."
+
+anti_patterns:
+- "DO NOT branch off submit.py's refusal logic — duplicating predicates means the next refusal-rule change diverges UAT from
+  submit. Import where possible; document each mirror as 'mirror of submit.py:<line>'."
+- "DO NOT mark `unofficial` cells as FAILED — they ran, they just are not submittable. Conflating these obscures real query-level
+  failures."
+- "DO NOT add a config flag to opt out of the new classifier — opting out re-creates the gap; if a future contract change
+  is needed, it lives in the classifier itself."
+
+verification:
+- description: "Classifier is importable and has the expected vocabulary"
+  command: "uv run -- python -c 'from tests.uat.runner import classify_for_submit, SubmitTerminalState; print(SubmitTerminalState.__members__.keys())'"
+  expected_output: "submittable, unofficial, query_failure, schema_violation, missing_manifest"
+- description: "Synthetic-failure fixture produces FAILED at the execute phase"
+  command: "uv run -- python -m pytest tests/uat/test_runner.py -m fast -k classify_for_submit -q"
+  expected_output: "all green"
+- description: "Replay against 2026-05-05 passed-result paths matches handoff numbers"
+  command: "uv run -- python -m tests.uat._cli replay-classify --coverage-cells ~/Developer/benchmark_runs/logs/uat_tuned_followup_20260505_pool02_rerun/coverage_cells.tsv
+    --results-root ~/Developer/benchmark_runs/results"
+  expected_output: "114 passed-result paths; 87 submittable; 27 non-submittable split by classifier"
+- description: "Cell-level coverage TSV exposes `submit_terminal_state` column"
+  command: "head -1 ~/Developer/benchmark_runs/logs/<latest-sweep>/coverage_cells.tsv"
+  expected_output: "header includes submit_terminal_state"
+
+scope_limit:
+  only_modify:
+  - "tests/uat/runner.py"
+  - "tests/uat/phases/execute.py"
+  - "tests/uat/phases/package.py"
+  - "tests/uat/_cli.py"
+  - "tests/uat/test_runner.py"
+  - "tests/uat/test_phases.py"
+  do_not_modify:
+  - "benchbox/cli/commands/submit.py"
+  - "benchbox/core/results/schema.py"
+
+metadata:
+  tags:
+  - uat-framework
+  - results-explorer
+  - submission
+  - cell-classification
+  - validator
+  estimated_effort: "Medium (~3-5 days, 5 work units)"
+  created_date: "2026-05-06"
+  source: |
+    Handoff `_project/handoffs/results-explorer-uat-tuned-followup-20260505.md`,
+    Follow-Up TODO Candidate #4. 27 of 114 result JSONs were refused by
+    `benchbox submit --output` in the 2026-05-05 sweep, mostly for
+    query-level failures hidden inside "passed" cells.
