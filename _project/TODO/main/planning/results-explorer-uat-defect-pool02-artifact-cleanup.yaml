@@ -59,7 +59,7 @@ work:
 - id: w1
   summary: "Verify pool-02 result JSONs are still mirrored to the shared root before removal"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     Repeat the post-copy diff from the handoff:
       diff <(ls /Users/joe/Developer/BenchBox.pool-02/benchmark_runs/results) \
