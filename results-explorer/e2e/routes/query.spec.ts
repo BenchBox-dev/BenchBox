@@ -13,10 +13,15 @@ test.describe("Query workbench", () => {
     await waitForDataLoaded(page, /matching result bundle/);
 
     const main = page.getByRole("main");
-    // Column-toggle pills include one per column in the attached schema.
-    for (const column of ["benchmark", "platform", "trust_label"]) {
-      await expect(main.getByText(column, { exact: true }).first()).toBeVisible();
+    // The default table leads with public column labels rather than raw schema names.
+    for (const column of ["Benchmark", "Platform", "Trust tier"]) {
+      await expect(main.getByRole("columnheader", { name: new RegExp(`^${column}`) })).toBeVisible();
     }
+
+    // Schema-driven column configuration remains available, but subordinate.
+    await page.locator("summary", { hasText: "Configure visible columns" }).click();
+    await expect(main.getByRole("checkbox", { name: "Trust tier" })).toBeChecked();
+    await expect(main.getByText("trust_label", { exact: true }).first()).toBeVisible();
   });
 
   test("@smoke filters environment facet fixture rows", async ({ page }) => {
@@ -30,12 +35,12 @@ test.describe("Query workbench", () => {
     await expect(facetCheckbox(page, "Deployment", "cloud")).toBeVisible();
     await expect(facetCheckbox(page, "Deployment", "local")).toHaveCount(1);
     await expect(page.getByRole("checkbox", { name: /^Deployment:\s+local\b/ })).toHaveCount(1);
-    await expect(facetCheckbox(page, "Cloud provider", "aws")).toBeVisible();
+    await expect(facetCheckbox(page, "Cloud provider", "AWS")).toBeVisible();
     await expect(facetCheckbox(page, "Cloud region", "us-east-1")).toBeVisible();
     await expect(facetCheckbox(page, "Instance / warehouse", "m6i.large")).toBeVisible();
 
     await facetCheckbox(page, "Deployment", "cloud").check();
-    await facetCheckbox(page, "Cloud provider", "aws").check();
+    await facetCheckbox(page, "Cloud provider", "AWS").check();
     await facetCheckbox(page, "Cloud region", "us-east-1").check();
     await facetCheckbox(page, "Instance / warehouse", "m6i.large").check();
 
@@ -49,7 +54,7 @@ test.describe("Query workbench", () => {
 
     await facetCheckbox(page, "Instance / warehouse", "m6i.large").uncheck();
     await facetCheckbox(page, "Cloud region", "us-east-1").uncheck();
-    await facetCheckbox(page, "Cloud provider", "aws").uncheck();
+    await facetCheckbox(page, "Cloud provider", "AWS").uncheck();
     await facetCheckbox(page, "Deployment", "cloud").uncheck();
 
     await expectQueryParam(page, "deployment", null);
@@ -57,7 +62,7 @@ test.describe("Query workbench", () => {
 
     await facetCheckbox(page, "Deployment", "local").check();
     await facetCheckbox(page, "Instance / warehouse", "container-cpu-10").check();
-    await facetCheckbox(page, "Storage", "duckdb_native").check();
+    await facetCheckbox(page, "Storage", "duckdb native").check();
 
     await expectQueryParam(page, "deployment", "local");
     await expectQueryParam(page, "shape", "container-cpu-10");
@@ -86,7 +91,7 @@ test.describe("Query workbench", () => {
     // "Visible Columns" bar don't steal the locator.
     const header = page
       .locator("thead th")
-      .filter({ hasText: /^benchmark/ })
+      .filter({ hasText: /^Benchmark/ })
       .first();
     await header.click();
     await expect(header).toContainText("↑");
@@ -117,10 +122,11 @@ test.describe("Query workbench", () => {
 
     // `trust_label` is in the default visible set; untoggle it and the
     // matching columnheader must disappear.
-    const trustCheckbox = page.locator("label", { hasText: "trust_label" }).getByRole("checkbox");
+    await page.locator("summary", { hasText: "Configure visible columns" }).click();
+    const trustCheckbox = page.getByRole("checkbox", { name: "Trust tier" });
     await expect(trustCheckbox).toBeChecked();
     await trustCheckbox.uncheck();
-    await expect(page.getByRole("columnheader", { name: /^trust_label\s*/ })).toHaveCount(0);
+    await expect(page.getByRole("columnheader", { name: /^Trust tier\s*/ })).toHaveCount(0);
   });
 
   test("loading a starter query populates the SQL textarea", async ({ page }) => {

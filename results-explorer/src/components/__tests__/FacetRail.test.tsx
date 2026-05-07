@@ -139,6 +139,10 @@ describe("FacetDrawer", () => {
     fireEvent.keyDown(document, { key: "Tab" });
     expect(screen.getByRole("button", { name: "Done" })).toHaveFocus();
 
+    expect(within(dialog).getByRole("button", { name: "Reset filters" })).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Apply filters" }));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+
     fireEvent.click(screen.getByRole("button", { name: "Close filters" }));
     expect(onOpenChange).toHaveBeenCalledWith(false);
 

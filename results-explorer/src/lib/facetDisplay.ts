@@ -60,5 +60,5 @@ function normalizeLookup(value: string): string {
 }
 
 function readableToken(value: string): string {
-  return value.split("_").join(" ");
+  return value.replace(/[_-]+/g, " ");
 }
