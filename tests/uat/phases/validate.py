@@ -121,7 +121,7 @@ def _run_validate_paths(
 ) -> ValidateResult:
     """Run the rollup helper against exact execute result paths and merge its TSV rows."""
     rows: list[str] = []
-    max_rc = 0
+    script_returncode = 0
     for idx, result_path in enumerate(result_paths):
         tmp_tsv = output_tsv.with_name(f".{output_tsv.name}.{idx}.tmp")
         if tmp_tsv.exists():
@@ -136,7 +136,8 @@ def _run_validate_paths(
         ]
         completed = runner(argv, check=False)
         rc = getattr(completed, "returncode", 0)
-        max_rc = max(max_rc, rc)
+        if script_returncode == 0 and rc != 0:
+            script_returncode = rc
         if rc != 0 and not tmp_tsv.exists():
             raise ValidatePhaseError(f"validator subprocess exited {rc} without producing {tmp_tsv}")
         rows.extend(_rollup_body_rows(tmp_tsv))
@@ -144,7 +145,7 @@ def _run_validate_paths(
 
     output_tsv.write_text(TSV_HEADER + "\n" + "\n".join(rows) + ("\n" if rows else ""), encoding="utf-8")
     parsed = parse_rollup(output_tsv, floor=floor)
-    if max_rc == 0:
+    if script_returncode == 0:
         return parsed
     return ValidateResult(
         rollup_tsv_path=parsed.rollup_tsv_path,
@@ -156,7 +157,7 @@ def _run_validate_paths(
         clean_rate=parsed.clean_rate,
         floor=parsed.floor,
         floor_breached=parsed.floor_breached,
-        script_returncode=max_rc,
+        script_returncode=script_returncode,
     )
 
 
