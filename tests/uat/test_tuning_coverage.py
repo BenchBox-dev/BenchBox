@@ -67,6 +67,18 @@ def test_static_matrix_drift_flags_new_current_rows_missing_from_matrix():
     assert static_matrix_drift(recorded, current) == ["new current row missing from matrix for duckdb/newbench"]
 
 
+def test_static_regressions_reports_current_rows_missing_from_checked_in_matrix():
+    recorded = [
+        TuningCoverageRow("duckdb", "tpch", TUNED_TEMPLATE, DECISION_DONE, "benchmark-specific tuned template exists")
+    ]
+    current = [
+        *recorded,
+        TuningCoverageRow("duckdb", "newbench", BASIC_CONSTRAINTS, DECISION_WAIVED, "needs checked-in triage"),
+    ]
+
+    assert static_regressions(recorded, current) == ["missing checked-in matrix row for duckdb/newbench"]
+
+
 def test_runtime_log_parser_matches_matrix_rows(tmp_path: Path):
     log_path = tmp_path / "duckdb_tpch_0.01_20260505_010203.log"
     log_path.write_text("Tuning: auto-discovered template at examples/tunings/duckdb/tpch_tuned.yaml\n")
