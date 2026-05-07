@@ -117,16 +117,16 @@ export function FacetDrawer({
     <div class="space-y-3" aria-label="Mobile result facets">
       <button
         type="button"
-        class="flex w-full items-center justify-between gap-3 rounded-md border border-gray-300 bg-white px-3 py-2 text-left text-sm shadow-sm"
+        class="flex w-full items-center justify-between gap-3 rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-2 text-left text-sm shadow-sm"
         aria-expanded={open}
         data-result-count={resultCount}
         onClick={() => onOpenChange(!open)}
       >
         <span class="min-w-0">
-          <span class="font-medium text-gray-900">Filters</span>
+          <span class="font-medium text-[var(--bb-data-fg-primary)]">Filters</span>
           {activeChips.length > 0 && <ActiveChipPreview activeChips={activeChips} />}
         </span>
-        <span class="shrink-0 text-xs text-gray-500">{resultCount.toLocaleString()} results</span>
+        <span class="shrink-0 text-xs text-[var(--bb-data-fg-muted)]">{resultCount.toLocaleString()} results</span>
       </button>
       {activeChips.length > 0 && (
         <ActiveChipStrip activeChips={activeChips} onReset={onReset} compact />
@@ -136,7 +136,7 @@ export function FacetDrawer({
           <button
             type="button"
             aria-label="Close filters"
-            class="fixed inset-0 z-40 bg-gray-900/40 sm:hidden"
+            class="fixed inset-0 z-40 bg-[var(--bb-bg-primary)]/40 sm:hidden"
             onClick={() => onOpenChange(false)}
           />
           <div
@@ -145,13 +145,13 @@ export function FacetDrawer({
             aria-modal="true"
             aria-label="Filter results"
             tabIndex={-1}
-            class="fixed inset-0 z-50 overflow-y-auto bg-white p-3 shadow-2xl outline-none sm:static sm:rounded-lg sm:border sm:border-gray-200 sm:shadow-lg"
+            class="fixed inset-0 z-50 overflow-y-auto bg-[var(--bb-surface-data)] p-3 shadow-2xl outline-none sm:static sm:rounded-lg sm:border sm:border-[var(--bb-data-border)] sm:shadow-lg"
           >
-            <div class="mb-3 flex items-center justify-between gap-3 border-b border-gray-200 pb-3 sm:hidden">
-              <h2 class="text-sm font-semibold text-gray-900">Filters</h2>
+            <div class="mb-3 flex items-center justify-between gap-3 border-b border-[var(--bb-data-border)] pb-3 sm:hidden">
+              <h2 class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">Filters</h2>
               <button
                 type="button"
-                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700"
+                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1.5 text-sm font-medium text-[var(--bb-data-fg-primary)]"
                 onClick={() => onOpenChange(false)}
               >
                 Done
@@ -177,7 +177,7 @@ function ActiveChipPreview({ activeChips }: { activeChips: ActiveFacetChip[] }) 
       {activeChips.map((chip) => (
         <span
           key={chip.key}
-          class="max-w-32 truncate rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-700"
+          class="max-w-32 truncate rounded-full bg-[var(--bb-tone-info-bg)] px-2 py-0.5 text-[11px] font-medium text-[var(--bb-tone-info-fg)]"
         >
           {chip.label}
         </span>
@@ -196,13 +196,13 @@ function FacetSummary({
   onReset: () => void;
 }) {
   return (
-    <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+    <section class="rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-4 shadow-sm">
       <div class="flex items-start justify-between gap-3">
         <div>
-          <h2 class="text-sm font-semibold text-gray-900">Filters</h2>
-          <p class="mt-1 text-xs text-gray-500">{resultCount.toLocaleString()} matching results</p>
+          <h2 class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">Filters</h2>
+          <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">{resultCount.toLocaleString()} matching results</p>
         </div>
-        <button type="button" class="text-xs font-medium text-brand-700 hover:text-brand-900" onClick={onReset}>
+        <button type="button" class="text-xs font-medium text-[var(--bb-accent-hover)] hover:underline" onClick={onReset}>
           Reset
         </button>
       </div>
@@ -226,7 +226,7 @@ function ActiveChipStrip({
         <button
           key={chip.key}
           type="button"
-          class="rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700 hover:bg-brand-100"
+          class="rounded-full bg-[var(--bb-tone-info-bg)] px-3 py-1 text-xs font-medium text-[var(--bb-tone-info-fg)] hover:bg-[var(--bb-tone-neutral-bg)]"
           onClick={chip.onClear ?? onReset}
         >
           {chip.value === undefined
@@ -260,11 +260,11 @@ function FacetGroupSection({
   }, [group.options, search]);
 
   return (
-    <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+    <section class="rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-4 shadow-sm">
       <div class="mb-3 flex items-center justify-between gap-2">
-        <h3 class="text-sm font-semibold text-gray-900">{group.label}</h3>
+        <h3 class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">{group.label}</h3>
         {group.selected.length > 0 && (
-          <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
+          <span class="rounded-full bg-[var(--bb-surface-app)] px-2 py-0.5 text-xs text-[var(--bb-data-fg-muted)]">
             {group.selected.length}
           </span>
         )}
@@ -274,7 +274,7 @@ function FacetGroupSection({
           <span class="sr-only">Search {group.label}</span>
           <input
             type="search"
-            class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+            class="w-full rounded-md border border-[var(--bb-data-border-strong)] px-3 py-1.5 text-sm"
             placeholder={`Search ${group.label.toLowerCase()}`}
             value={search}
             onInput={(event) => setSearch((event.currentTarget as HTMLInputElement).value)}
@@ -282,13 +282,13 @@ function FacetGroupSection({
         </label>
       )}
       {options.length === 0 ? (
-        <p class="text-sm text-gray-400">{group.emptyLabel ?? "No facet values"}</p>
+        <p class="text-sm text-[var(--bb-data-fg-subtle)]">{group.emptyLabel ?? "No facet values"}</p>
       ) : (
         <div class="space-y-2">
           {options.map((option) => {
             const checked = group.selected.includes(option.value);
             return (
-              <label key={option.value} class="flex items-center justify-between gap-2 text-sm text-gray-600">
+              <label key={option.value} class="flex items-center justify-between gap-2 text-sm text-[var(--bb-data-fg-muted)]">
                 <span class="inline-flex min-w-0 items-center gap-2">
                   <input
                     type="checkbox"
@@ -300,7 +300,7 @@ function FacetGroupSection({
                   <span class="truncate">{option.displayLabel}</span>
                 </span>
                 {option.count !== undefined && (
-                  <span class="shrink-0 text-xs text-gray-400">{option.count.toLocaleString()}</span>
+                  <span class="shrink-0 text-xs text-[var(--bb-data-fg-subtle)]">{option.count.toLocaleString()}</span>
                 )}
               </label>
             );

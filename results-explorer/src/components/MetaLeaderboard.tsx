@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { route } from "preact-router";
 import type { MetaCohort, MetaLeaderboard as MetaLeaderboardData, MetaPlatform, MetaRank } from "@/types";
 import { colorForCell, lightnessForCell } from "@/lib/chartMath";
-import { fmtGeomean, fmtScore, humanizeBenchmark } from "@/utils";
+import { fmtGeomean, fmtScore } from "@/utils";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import {
