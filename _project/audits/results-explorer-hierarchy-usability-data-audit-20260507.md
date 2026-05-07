@@ -4,7 +4,10 @@
 
 Verdict: the Results Explorer is functionally renderable in the fixture-backed audit run, but it is not yet product-ready for visual hierarchy, usability, or data-presentation quality. The strongest risks are not route crashes; they are interpretation risks: users can mistake focus state for selected data, miss hidden mobile navigation/actions, read clipped tables/charts incorrectly, and compare metrics without enough visible unit, direction, and comparability context.
 
-No new TODO YAMLs were created. The concrete remediation actions found here are covered by the existing PR #244 TODO set, especially `results-explorer-retheme-leaderboard-semantics`, `results-explorer-retheme-responsive-accessibility`, `results-explorer-retheme-browse-pages`, `results-explorer-retheme-result-and-compare`, and `results-explorer-retheme-query-workbench`. The only gap is evidence depth, which this audit supplies.
+This PR now includes evidence-bound remediation TODOs that reference this audit,
+PR #246, the exact screenshot filenames, and the finding IDs. The earlier PR
+#244 TODO set still describes the broad retheme work; the new PR #246 TODOs add
+the missing screenshot-specific implementation and closeout criteria.
 
 Positive evidence: every controlled route capture completed with zero console logs in the screenshot manifest, and the valid mixed-scale Compare route correctly suppresses winner claims with a visible warning.
 
@@ -239,26 +242,38 @@ Additional focused captures:
 | 16 | DQ-7 | Medium | `/results/star_schema/`, 1280px | `benchmark-star-schema-1280.png`: SSB label and many `0 ms` cells | Naming and zero timing semantics are ambiguous | Label SSB/Star Schema equivalence and sub-ms formatting |
 | 17 | DQ-8 | Low | Mixed-scale Compare, 1280px | `compare-mixed-scale-valid-1280.png`: good suppression; diff table still visible | Guardrails should stay attached to derived values | Repeat suppression context near tables/charts |
 
-## Mapping to Existing PR #244 TODOs
+## Mapping to Existing PR #244 TODOs and PR #246 Remediation TODOs
 
-| Finding | Existing TODO coverage | Coverage notes |
-|---|---|---|
-| VH-1 | `results-explorer-retheme-leaderboard-semantics` w1; `results-explorer-retheme-responsive-accessibility` w5 | Directly covers removing misleading initial focus ring and separating focus from active/selected states. |
-| VH-2 | `results-explorer-retheme-leaderboard-semantics` w3; `results-explorer-retheme-theme-system-foundation` w4 | Covers analytical control redesign and shared controls. No new TODO needed. |
-| VH-3 | `results-explorer-retheme-result-and-compare` w1, w2 | Directly covers Result Detail first-viewport hierarchy and receipt placement. |
-| VH-4 | `results-explorer-retheme-result-and-compare` w1, w4, w5, w6 | Covers Compare decision hierarchy, comparability receipt, baseline control, chart choice, and diff table retheme. |
-| VH-5 | `results-explorer-retheme-query-workbench` w1, w4, w6 | Covers public workflow definition, Visible Columns placement, and advanced SQL hierarchy. |
-| U-1 | `results-explorer-retheme-responsive-accessibility` w2 | Directly covers mobile nav discoverability and active route visibility. |
-| U-2 | `results-explorer-retheme-responsive-accessibility` w3, w4; `results-explorer-retheme-browse-pages` w5; `results-explorer-retheme-query-workbench` w5 | Covers table overflow, chart overflow, mobile browse behavior, and query table scroll affordance. |
-| U-3 | `results-explorer-retheme-browse-pages` w6 | Directly covers compare-selection behavior and selected-result bar. |
-| U-4 | `results-explorer-retheme-query-workbench` w3, w7; `results-explorer-retheme-responsive-accessibility` w5 | Covers mobile filters, drawer/focus behavior, and keyboard paths. |
-| DQ-1 | `results-explorer-retheme-leaderboard-semantics` w2, w5 | Directly covers metric/unit/direction labels and speedup legend semantics. |
-| DQ-2 | `results-explorer-retheme-leaderboard-semantics` w4, w5; `results-explorer-retheme-theme-system-foundation` w3 | Covers separation of quantitative heat from trust/validation metadata and state tokens. |
-| DQ-3 | `results-explorer-retheme-result-and-compare` w5, w7; `results-explorer-retheme-responsive-accessibility` w4 | Covers chart layout, overflow, labels, and regression checks. |
-| DQ-4 | `results-explorer-retheme-result-and-compare` w5 | Directly covers Compare chart whitespace, domain, margins, labels, and default chart choice. |
-| DQ-5 | `results-explorer-retheme-browse-pages` w4; `results-explorer-retheme-responsive-accessibility` w4 | Covers Platform table/trend grouping and sparse chart/overflow behavior. |
-| DQ-6 | `results-explorer-retheme-query-workbench` w5 | Covers consistent formatting, units, dates, row actions, and scroll affordances for query tables. |
-| DQ-7 | `results-explorer-retheme-browse-pages` w3, w7; `results-explorer-retheme-leaderboard-semantics` w2 | Covers matrix semantics, missing/failed timing display, and visible metric labels. Add the SSB/Star Schema naming note during browse-page implementation; no separate TODO needed. |
-| DQ-8 | `results-explorer-retheme-result-and-compare` w4, w6; `results-explorer-retheme-release-gate` w4 | Covers mismatch suppression, Query-Level Diff retheme, and interaction QA for Compare. |
+| Finding | Existing PR #244 TODO coverage | New PR #246 evidence TODO coverage | Coverage notes |
+|---|---|---|---|
+| VH-1 | `results-explorer-retheme-leaderboard-semantics` w1; `results-explorer-retheme-responsive-accessibility` w5 | `results-explorer-pr246-home-leaderboard-evidence-remediation`; `results-explorer-pr246-responsive-navigation-overflow-remediation` | Directly covers removing misleading initial focus ring and separating focus from active/selected states with screenshot acceptance criteria. |
+| VH-2 | `results-explorer-retheme-leaderboard-semantics` w3; `results-explorer-retheme-theme-system-foundation` w4 | `results-explorer-pr246-home-leaderboard-evidence-remediation` | Covers analytical control redesign and shared controls, now tied to `home-390.png` and `home-1280.png`. |
+| VH-3 | `results-explorer-retheme-result-and-compare` w1, w2 | `results-explorer-pr246-result-compare-evidence-remediation` | Directly covers Result Detail first-viewport hierarchy and receipt placement with detail screenshots. |
+| VH-4 | `results-explorer-retheme-result-and-compare` w1, w4, w5, w6 | `results-explorer-pr246-result-compare-evidence-remediation` | Covers Compare decision hierarchy, comparability receipt, baseline control, chart choice, and diff table retheme. |
+| VH-5 | `results-explorer-retheme-query-workbench` w1, w4, w6 | `results-explorer-pr246-query-workbench-evidence-remediation` | Covers public workflow definition, Visible Columns placement, and advanced SQL hierarchy. |
+| U-1 | `results-explorer-retheme-responsive-accessibility` w2 | `results-explorer-pr246-responsive-navigation-overflow-remediation` | Directly covers mobile nav discoverability and active route visibility. |
+| U-2 | `results-explorer-retheme-responsive-accessibility` w3, w4; `results-explorer-retheme-browse-pages` w5; `results-explorer-retheme-query-workbench` w5 | `results-explorer-pr246-responsive-navigation-overflow-remediation` | Covers table overflow, chart overflow, mobile browse behavior, and query table scroll affordance. |
+| U-3 | `results-explorer-retheme-browse-pages` w6 | `results-explorer-pr246-browse-platform-evidence-remediation` | Directly covers compare-selection behavior and selected-result bar. |
+| U-4 | `results-explorer-retheme-query-workbench` w3, w7; `results-explorer-retheme-responsive-accessibility` w5 | `results-explorer-pr246-query-workbench-evidence-remediation`; `results-explorer-pr246-responsive-navigation-overflow-remediation` | Covers mobile filters, drawer/focus behavior, and keyboard paths. |
+| DQ-1 | `results-explorer-retheme-leaderboard-semantics` w2, w5 | `results-explorer-pr246-home-leaderboard-evidence-remediation` | Directly covers metric/unit/direction labels and speedup legend semantics. |
+| DQ-2 | `results-explorer-retheme-leaderboard-semantics` w4, w5; `results-explorer-retheme-theme-system-foundation` w3 | `results-explorer-pr246-home-leaderboard-evidence-remediation`; `results-explorer-pr246-browse-platform-evidence-remediation` | Covers separation of quantitative heat from trust/validation metadata and state tokens. |
+| DQ-3 | `results-explorer-retheme-result-and-compare` w5, w7; `results-explorer-retheme-responsive-accessibility` w4 | `results-explorer-pr246-result-compare-evidence-remediation`; `results-explorer-pr246-responsive-navigation-overflow-remediation` | Covers chart layout, overflow, labels, and regression checks. |
+| DQ-4 | `results-explorer-retheme-result-and-compare` w5 | `results-explorer-pr246-result-compare-evidence-remediation` | Directly covers Compare chart whitespace, domain, margins, labels, and default chart choice. |
+| DQ-5 | `results-explorer-retheme-browse-pages` w4; `results-explorer-retheme-responsive-accessibility` w4 | `results-explorer-pr246-browse-platform-evidence-remediation` | Covers Platform table/trend grouping and sparse chart/overflow behavior. |
+| DQ-6 | `results-explorer-retheme-query-workbench` w5 | `results-explorer-pr246-query-workbench-evidence-remediation` | Covers consistent formatting, units, dates, row actions, and scroll affordances for query tables. |
+| DQ-7 | `results-explorer-retheme-browse-pages` w3, w7; `results-explorer-retheme-leaderboard-semantics` w2 | `results-explorer-pr246-browse-platform-evidence-remediation` | Covers matrix semantics, missing/failed timing display, SSB/Star Schema naming, sub-ms formatting, and visible metric labels. |
+| DQ-8 | `results-explorer-retheme-result-and-compare` w4, w6; `results-explorer-retheme-release-gate` w4 | `results-explorer-pr246-result-compare-evidence-remediation`; `results-explorer-pr246-final-evidence-gate` | Covers mismatch suppression, Query-Level Diff retheme, and interaction QA for Compare. |
 
-Gap assessment: no additional TODO YAML is required from this audit. The existing TODO set already contains concrete work items for every observed issue. This audit should be linked from PR #244 as supplemental evidence for visual hierarchy, usability, and data-presentation quality.
+PR #246 TODO set:
+
+- `results-explorer-pr246-home-leaderboard-evidence-remediation`
+- `results-explorer-pr246-responsive-navigation-overflow-remediation`
+- `results-explorer-pr246-result-compare-evidence-remediation`
+- `results-explorer-pr246-browse-platform-evidence-remediation`
+- `results-explorer-pr246-query-workbench-evidence-remediation`
+- `results-explorer-pr246-final-evidence-gate`
+
+Gap assessment: every PR #246 finding now has both broad PR #244 retheme
+coverage and a screenshot-specific PR #246 remediation TODO. The final evidence
+gate must not be completed until every screenshot in the PR #246 evidence set is
+considered during closeout.
