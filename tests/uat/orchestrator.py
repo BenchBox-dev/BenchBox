@@ -73,6 +73,8 @@ def run_sweep(
                 free_space_min_gib=config.preflight.free_space_min_gib,
                 docker_required=config.preflight.docker_required or config.cleanup.docker_manage_platforms,
                 noisy_neighbor_warn_load=config.preflight.noisy_neighbor_warn_load,
+                local_platforms_check=config.preflight.local_platforms_check,
+                requested_platforms=preflight_phase.requested_platforms_from_raw(config.raw),
             )
             phase_exit_codes[phase] = 2 if result.aborted else 0
             if result.aborted:

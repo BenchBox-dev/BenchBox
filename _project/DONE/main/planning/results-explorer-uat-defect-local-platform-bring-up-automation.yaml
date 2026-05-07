@@ -2,7 +2,8 @@ id: results-explorer-uat-defect-local-platform-bring-up-automation
 title: "Author runbook + bring-up automation for Lakesail and the 15 TCP-backed local platforms"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-05-07"
 category: Platform Expansion
 
 description: |
@@ -71,7 +72,7 @@ work:
 - id: w1
   summary: "Inventory each platform's current readiness contract: what process/container, what port, what env"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     For each of the 16 platforms, capture:
       - default port the BenchBox connector expects
@@ -81,10 +82,14 @@ work:
     Output: `docs/operations/local-platform-provisioning.tsv` keyed
     by platform with the columns above. Land as a checked-in artifact.
 
+    Completed with a 17-line TSV (header + 16 platforms) covering endpoint,
+    process/container, compose file/service, healthcheck, decision,
+    bring-up command, and notes.
+
 - id: w2
   summary: "Distinguish 'document only' from 'automate' per platform"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Some platforms are heavy enough or licensed enough that automated
     bring-up isn't warranted (e.g., Singlestore, large vendor images).
@@ -92,10 +97,14 @@ work:
     `automate` (a target that brings it up). Output: `decision`
     column on the TSV from w1.
 
+    Automated: cedardb, clickhouse-server, databend, doris, influxdb,
+    postgresql, presto, questdb, singlestore, starrocks, trino, velox.
+    Document-only: lakesail, pg-duckdb, pg-mooncake, timescaledb.
+
 - id: w3
   summary: "For 'automate' platforms, add a `make uat-bring-up PLATFORM=<name>` target that starts and healthchecks"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Generic Make target that dispatches per-platform:
       make uat-bring-up PLATFORM=postgresql  # docker compose up + wait
@@ -108,7 +117,7 @@ work:
 - id: w4
   summary: "Optional `preflight.local_platforms_check: true` config field that runs reachability per requested platform"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     When set, the preflight phase pings each platform in
     `platforms.include` and aborts the sweep with a clear error if any
@@ -117,10 +126,13 @@ work:
     attempt before the abort. Default: `false` (preserves current
     "skip unreachable" behaviour).
 
+    Wired through `tests/uat/config.py`, orchestrator, and standalone
+    `tests.uat._cli execute` so the field is reachable from YAML.
+
 - id: w5
   summary: "Write the operator runbook in `docs/operations/uat-local-provisioning.md`"
   needs: [w2, w3]
-  status: pending
+  status: done
   notes: |
     Per-platform sections (16 entries) covering the document-only
     bring-up steps, ports, and any quirks (e.g., Doris JDK requirement,
@@ -164,6 +176,9 @@ scope_limit:
   - "Makefile"
   - "tests/uat/phases/preflight.py"
   - "tests/uat/test_preflight.py"
+  - "tests/uat/config.py"
+  - "tests/uat/orchestrator.py"
+  - "tests/uat/_cli.py"
   - "docs/operations/uat-local-provisioning.md"
   - "docs/operations/local-platform-provisioning.tsv"
   - "scripts/uat-bring-up/"
