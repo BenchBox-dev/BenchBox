@@ -9,6 +9,7 @@ import { ErrorMessage } from "@/components/ErrorMessage";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 import { TuningBadge } from "@/components/TuningBadge";
+import { StatusBadge } from "@/components/StatusBadge";
 import { MethodologyDisclosure } from "@/components/MethodologyDisclosure";
 import { RunReceipt, planDownloadUrl } from "@/components/RunReceipt";
 import { ChartPanel } from "@/components/ChartPanel";
@@ -266,7 +267,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
       <div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
         <div class="space-y-6">
           <section class="card">
-            <h2 class="mb-4 text-base font-semibold text-gray-900">Environment</h2>
+            <h2 class="mb-4 text-base font-semibold text-[var(--bb-data-fg-primary)]">Environment</h2>
             {environmentRows.length > 0 ? (
               <dl class="space-y-2 text-sm">
                 {environmentRows.map((row) => (
@@ -274,36 +275,36 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
                 ))}
               </dl>
             ) : (
-              <p class="text-sm text-gray-500">Environment metadata was not recorded for this run.</p>
+              <p class="text-sm text-[var(--bb-data-fg-muted)]">Environment metadata was not recorded for this run.</p>
             )}
           </section>
 
           {showTuningSection && (
             <section class="card">
-              <h2 class="mb-3 text-base font-semibold text-gray-900">Tuning Config</h2>
+              <h2 class="mb-3 text-base font-semibold text-[var(--bb-data-fg-primary)]">Tuning Config</h2>
               <div class="space-y-2 text-sm">
                 {detail.tuning_mode ? (
                   <div class="flex items-center gap-2">
-                    <span class="text-gray-500">Mode:</span>
+                    <span class="text-[var(--bb-data-fg-muted)]">Mode:</span>
                     <TuningBadge tuningMode={detail.tuning_mode} />
                   </div>
                 ) : (
-                  <p class="text-gray-500">Tuning mode not recorded.</p>
+                  <p class="text-[var(--bb-data-fg-muted)]">Tuning mode not recorded.</p>
                 )}
                 {tuningUrl ? (
                   <div>
                     <button
-                      class="mt-1 text-xs text-brand-600 hover:text-brand-800 underline cursor-pointer bg-transparent border-0 p-0"
+                      class="mt-1 cursor-pointer border-0 bg-transparent p-0 text-xs text-[var(--bb-accent-hover)] underline hover:text-[var(--bb-accent)]"
                       onClick={handleTuningExpand}
                     >
                       {tuningExpanded ? "Hide config ↑" : "Show config ↓"}
                     </button>
                     {tuningExpanded && (
                       <div class="mt-2">
-                        {tuningLoading && <p class="text-xs text-gray-400">Loading...</p>}
-                        {tuningError && <p class="text-xs text-red-500">{tuningError}</p>}
+                        {tuningLoading && <p class="text-xs text-[var(--bb-data-fg-subtle)]">Loading...</p>}
+                        {tuningError && <p role="alert" class="text-xs text-[var(--bb-tone-danger-fg)]">{tuningError}</p>}
                         {tuningData && (
-                          <pre class="overflow-x-auto rounded bg-gray-50 p-2 text-xs text-gray-700">
+                          <pre class="overflow-x-auto rounded panel-muted p-2 text-xs text-[var(--bb-data-fg-primary)]">
                             {JSON.stringify(tuningData, null, 2)}
                           </pre>
                         )}
@@ -311,7 +312,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
                     )}
                   </div>
                 ) : (
-                  <p class="text-xs text-gray-400">No tuning config recorded.</p>
+                  <p class="text-xs text-[var(--bb-data-fg-subtle)]">No tuning config recorded.</p>
                 )}
               </div>
             </section>
@@ -333,12 +334,13 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
           <RunReceipt detail={detail} />
 
           <section class="card">
-            <h2 class="mb-4 text-base font-semibold text-gray-900">
+            <h2 class="mb-4 text-base font-semibold text-[var(--bb-data-fg-primary)]">
               Query Timings ({detail.display_timings.length})
             </h2>
             <div class="overflow-x-auto">
-              <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
+              <div class="mb-2 flex justify-end"><span class="bb-scroll-affordance">← scroll →</span></div>
+              <table class="min-w-full divide-y divide-[var(--bb-data-border)]">
+                <thead class="bg-[var(--bb-surface-data-muted)]">
                   <tr>
                     <th class="p-0" scope="col">
                       <button
@@ -369,7 +371,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
                     </th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-100 bg-white">
+                <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
                   {sortedMedians.map((q) => (
                     <MedianRow key={q.query_id} timing={q} />
                   ))}
@@ -378,12 +380,13 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
             </div>
             {detail.queries.length > 0 && (
               <details class="mt-4">
-                <summary class="cursor-pointer text-sm text-gray-500 hover:text-gray-700 select-none">
+                <summary class="cursor-pointer select-none text-sm text-[var(--bb-data-fg-muted)] hover:text-[var(--bb-data-fg-primary)]">
                   Individual samples ({detail.queries.length})
                 </summary>
                 <div class="mt-3 overflow-x-auto">
-                  <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
+                  <div class="mb-2 flex justify-end"><span class="bb-scroll-affordance">← scroll →</span></div>
+                  <table class="min-w-full divide-y divide-[var(--bb-data-border)]">
+                    <thead class="bg-[var(--bb-surface-data-muted)]">
                       <tr>
                         <th
                           class="table-th cursor-pointer select-none"
@@ -414,7 +417,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
                         </th>
                       </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-100 bg-white">
+                    <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
                       {sortedRawQueries.map((q, i) => (
                         <QueryRow key={`${q.query_id}-${i}`} query={q} />
                       ))}
@@ -454,15 +457,15 @@ function formatDisplayToken(value: string) {
 function EnvironmentRow({ label, value }: { label: string; value: string }) {
   return (
     <div class="flex justify-between gap-2">
-      <dt class="text-gray-500">{label}</dt>
-      <dd class="font-medium text-gray-900 text-right">{value}</dd>
+      <dt class="text-[var(--bb-data-fg-muted)]">{label}</dt>
+      <dd class="text-right font-medium text-[var(--bb-data-fg-primary)]">{value}</dd>
     </div>
   );
 }
 
 function MedianRow({ timing }: { timing: QueryDisplayTiming }) {
   return (
-    <tr class="hover:bg-gray-50">
+    <tr class="hover:bg-[var(--bb-surface-data-muted)]">
       <td class="table-td font-mono font-medium">{timing.query_id}</td>
       <td class="table-td font-mono">
         {timing.display_ms !== null ? timing.display_ms.toFixed(1) : "-"}
@@ -473,19 +476,14 @@ function MedianRow({ timing }: { timing: QueryDisplayTiming }) {
 }
 
 function QueryRow({ query }: { query: QueryTiming }) {
-  const statusClass =
-    query.status === "pass"
-      ? "badge-green"
-      : query.status === "fail"
-        ? "badge-red"
-        : "badge-gray";
+  const tone = query.status === "pass" ? "success" : query.status === "fail" ? "danger" : "neutral";
 
   return (
-    <tr class="hover:bg-gray-50">
+    <tr class="hover:bg-[var(--bb-surface-data-muted)]">
       <td class="table-td font-mono font-medium">{query.query_id}</td>
       <td class="table-td font-mono">{query.duration_ms.toFixed(1)}</td>
       <td class="table-td">
-        <span class={`badge ${statusClass}`}>{query.status}</span>
+        <StatusBadge role="validation" tone={tone}>{query.status}</StatusBadge>
       </td>
     </tr>
   );

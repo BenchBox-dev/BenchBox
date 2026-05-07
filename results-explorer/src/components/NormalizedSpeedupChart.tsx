@@ -86,6 +86,7 @@ export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props)
   return (
     <div ref={containerRef} class="w-full overflow-x-auto">
       <svg
+        class="bb-chart-svg"
         width="100%"
         height={totalHeight}
         viewBox={`0 0 ${drawWidth} ${totalHeight}`}
@@ -181,7 +182,7 @@ export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props)
       </svg>
 
       {/* Legend */}
-      <div class="mt-2 flex flex-wrap gap-3 text-xs text-gray-500">
+      <div class="mt-2 flex flex-wrap gap-3 text-xs text-[var(--bb-data-fg-muted)]">
         <span>Baseline: <strong>{results[baselineIdx]?.platform}</strong></span>
         {nonBaselineResults.map((r, i) => {
           const colorIdx = i < baselineIdx ? i : i + 1;

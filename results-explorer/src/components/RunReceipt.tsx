@@ -2,6 +2,7 @@ import type { ComponentChildren } from "preact";
 import type { DetailResult } from "@/types";
 import { humanizeBenchmark } from "@/utils";
 import { costModelSummary, costScopeSummary, normalizedCostLabel } from "@/lib/costDisplay";
+import { StatusBadge } from "@/components/StatusBadge";
 
 interface RunReceiptProps {
   detail: DetailResult;
@@ -91,13 +92,13 @@ export function RunReceipt({
   ];
 
   return (
-    <section id="run-receipt" aria-label="Run receipt" class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+    <section id="run-receipt" aria-label="Run receipt" class="panel-elevated p-4">
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 class="text-base font-semibold text-gray-900">Run Receipt</h2>
-          <p class="mt-1 text-xs text-gray-500">Reproducibility, platform, and integrity metadata for this result.</p>
+          <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)]">Run Receipt</h2>
+          <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">Reproducibility, platform, and integrity metadata for this result.</p>
         </div>
-        <span class="badge badge-gray">{detail.result_id.slice(0, 8)}</span>
+        <StatusBadge role="generic" tone="neutral">{detail.result_id.slice(0, 8)}</StatusBadge>
       </div>
       <div class="grid gap-4 lg:grid-cols-2">
         {sections.map((section) => (
@@ -110,15 +111,15 @@ export function RunReceipt({
 
 function ReceiptSection({ title, rows }: { title: string; rows: ReceiptRow[] }) {
   return (
-    <section aria-labelledby={`run-receipt-${slug(title)}`} class="border-t border-gray-100 pt-3">
-      <h3 id={`run-receipt-${slug(title)}`} class="mb-2 text-xs font-semibold uppercase text-gray-500">
+    <section aria-labelledby={`run-receipt-${slug(title)}`} class="border-t border-[var(--bb-data-border)] pt-3">
+      <h3 id={`run-receipt-${slug(title)}`} class="mb-2 text-xs font-semibold uppercase text-[var(--bb-data-fg-subtle)]">
         {title}
       </h3>
       <dl class="grid grid-cols-[minmax(7rem,0.8fr)_minmax(0,1.2fr)] gap-x-3 gap-y-2 text-sm">
         {rows.map((row) => (
           <div key={row.label} class="contents">
-            <dt class="text-xs text-gray-500">{row.label}</dt>
-            <dd class="min-w-0 break-words text-xs font-medium text-gray-900">{row.value}</dd>
+            <dt class="text-xs text-[var(--bb-data-fg-muted)]">{row.label}</dt>
+            <dd class="min-w-0 break-words text-xs font-medium text-[var(--bb-data-fg-primary)]">{row.value}</dd>
           </div>
         ))}
       </dl>

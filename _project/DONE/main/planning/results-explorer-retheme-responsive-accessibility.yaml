@@ -58,11 +58,9 @@ work:
     Outcome: introduced the `.bb-scroll-affordance` utility in
     `index.css` (visible only at <mobile breakpoint) so dense tables
     can render an "← scroll →" cue without breaking desktop scan.
-    Rolling out the affordance to every table is descoped — the
-    utility is in place; downstream wiring on a per-table basis is
-    follow-up work tracked by the release-gate TODO. Pre-existing
-    sticky-first-column semantics (MetaLeaderboard, QueryHeatmap)
-    remain.
+    Follow-up wiring now covers Query result/SQL tables, Result Detail
+    timing/sample tables, and QueryDiffTable. Pre-existing sticky-first-
+    column semantics (MetaLeaderboard, QueryHeatmap) remain.
 
 - id: w4
   summary: "Harden chart sizing and SVG overflow"
@@ -71,12 +69,10 @@ work:
   notes: |
     Outcome: introduced the `.bb-chart-svg` utility in `index.css`
     (`max-width: 100%; height: auto`) so chart components can opt
-    into container-bound width. Wiring it into every chart is
-    descoped; the utility is available, and the existing
-    `useElementSize` hook already drives most charts to container
-    width. The audit-flagged Compare/ResultDetail overflows are
-    expected to reproduce only in extreme widths and are listed for
-    the release-gate sweep.
+    into container-bound width. Follow-up wiring now applies the
+    utility to chart SVG components used by Result Detail and Compare;
+    the existing `useElementSize` hook continues to drive chart layout
+    to container width.
 
 - id: w5
   summary: "Normalize focus-visible, selected, active, hover, and disabled states"

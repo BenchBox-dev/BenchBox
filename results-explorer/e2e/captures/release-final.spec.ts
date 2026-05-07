@@ -15,6 +15,7 @@ import { mkdirSync, appendFileSync, writeFileSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { test } from "@playwright/test";
+import { waitForDataLoaded, waitForShell } from "../support/fixtures";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../../..");
@@ -28,15 +29,31 @@ const OUT = path.join(
 );
 const LOG = path.join(OUT, `console-network-${TODAY}.log`);
 
-const ROUTES: Array<{ slug: string; url: string }> = [
-  { slug: "home", url: "/results/" },
-  { slug: "benchmark-tpch-sf001", url: "/results/tpch/?sf=0.01&phase=standard" },
-  { slug: "benchmark-star-schema-sf01", url: "/results/star_schema/?sf=0.1&phase=power" },
-  { slug: "platform-duckdb", url: "/results/p/duckdb/" },
-  { slug: "platform-polars", url: "/results/p/polars/" },
-  { slug: "compare-empty", url: "/results/compare" },
-  { slug: "query", url: "/results/query" },
-  { slug: "not-found", url: "/results/clickbench/" },
+const ROUTES: Array<{ slug: string; url: string; readyText: RegExp }> = [
+  { slug: "home", url: "/results/", readyText: /Cross-Benchmark Leaderboard/ },
+  { slug: "benchmark-tpch-sf001", url: "/results/tpch/?sf=0.01&phase=standard", readyText: /TPC-H Results/ },
+  {
+    slug: "benchmark-star-schema-sf01",
+    url: "/results/star_schema/?sf=0.1&phase=power",
+    readyText: /SSB Results/,
+  },
+  { slug: "platform-duckdb", url: "/results/p/duckdb/", readyText: /DuckDB Results/ },
+  { slug: "platform-datafusion", url: "/results/p/datafusion/", readyText: /DataFusion Results/ },
+  { slug: "platform-polars", url: "/results/p/polars/", readyText: /Polars Results/ },
+  {
+    slug: "result-detail-tpch-duckdb",
+    url: "/results/r/tpch-duckdb-sf0.01-20260403-010ee756",
+    readyText: /Query Timings/,
+  },
+  { slug: "compare-same-cohort", url: "/results/compare?ids=ba6a8c83,5e6c5eba", readyText: /TPC-H Comparison/ },
+  {
+    slug: "compare-mismatch-benchmark",
+    url: "/results/compare?ids=ba6a8c83,0f0add9f",
+    readyText: /Mixed Benchmark Comparison/,
+  },
+  { slug: "compare-empty", url: "/results/compare", readyText: /Cannot compare/ },
+  { slug: "query", url: "/results/query", readyText: /matching result bundle/ },
+  { slug: "not-found", url: "/results/clickbench/", readyText: /No published results yet/ },
 ];
 const WIDTHS = [390, 768, 1280, 1600];
 
@@ -48,7 +65,7 @@ test.describe("@retheme-capture release-final", () => {
     mkdirSync(OUT, { recursive: true });
     writeFileSync(LOG, `# Release-gate cold-load log ${TODAY}\n`);
 
-    for (const { slug, url } of ROUTES) {
+    for (const { slug, url, readyText } of ROUTES) {
       for (const width of WIDTHS) {
         const context = await browser.newContext({ viewport: { width, height: 900 } });
         const page = await context.newPage();
@@ -71,8 +88,9 @@ test.describe("@retheme-capture release-final", () => {
 
         try {
           await page.goto(url, { waitUntil: "domcontentloaded" });
+          await waitForShell(page);
+          await waitForDataLoaded(page, readyText);
           await page.waitForLoadState("load", { timeout: 10_000 }).catch(() => {});
-          await page.waitForTimeout(1000);
           await page.screenshot({
             path: path.join(OUT, `${slug}-${width}.png`),
             fullPage: true,

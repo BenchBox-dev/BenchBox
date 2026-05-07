@@ -33,7 +33,7 @@ export function PowerBar({ summary }: Props) {
     .sort((a, b) => (b.power_score ?? 0) - (a.power_score ?? 0));
 
   if (rows.length === 0) {
-    return <p class="text-sm text-gray-400 italic">Power@Size scores not available for these results.</p>;
+    return <p class="text-sm italic text-[var(--bb-data-fg-subtle)]">Power@Size scores not available for these results.</p>;
   }
 
   const maxScore = Math.max(...rows.map((r) => r.power_score!));
@@ -42,7 +42,7 @@ export function PowerBar({ summary }: Props) {
 
   return (
     <div ref={containerRef} class="w-full overflow-x-auto">
-      <svg width={w} height={totalH} role="img" aria-label="TPC Power@Size comparison - higher is better">
+      <svg class="bb-chart-svg" width={w} height={totalH} role="img" aria-label="TPC Power@Size comparison - higher is better">
         {rows.map((row, ri) => {
           const barW = (row.power_score! / maxScore) * plotW;
           const y = PADDING_TOP + ri * ROW_H;

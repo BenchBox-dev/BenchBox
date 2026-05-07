@@ -38,8 +38,8 @@ export function MethodologyDisclosure({ detail }: Props) {
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
       >
-        <h2 class="text-base font-semibold text-gray-900">How this was measured</h2>
-        <span class="text-sm text-gray-400">{expanded ? "↑ Hide" : "↓ Show"}</span>
+        <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)]">How this was measured</h2>
+        <span class="text-sm text-[var(--bb-data-fg-subtle)]">{expanded ? "↑ Hide" : "↓ Show"}</span>
       </button>
 
       {expanded && (
@@ -51,12 +51,12 @@ export function MethodologyDisclosure({ detail }: Props) {
           <DisclosureRow label="Execution mode" value={modeLabel(detail.execution_mode)} />
           <DisclosureRow label="Test type" value={testTypeLabel(detail.test_type)} />
           <div class="flex gap-3">
-            <dt class="w-36 flex-shrink-0 text-gray-500">Tuning state</dt>
+            <dt class="w-36 flex-shrink-0 text-[var(--bb-data-fg-muted)]">Tuning state</dt>
             <dd>
               {detail.tuning_mode ? (
                 <TuningBadge tuningMode={detail.tuning_mode} />
               ) : (
-                <span class="text-gray-700">Not recorded</span>
+                <span class="text-[var(--bb-data-fg-primary)]">Not recorded</span>
               )}
             </dd>
           </div>
@@ -78,8 +78,8 @@ export function MethodologyDisclosure({ detail }: Props) {
 function DisclosureRow({ label, value }: { label: string; value: string }) {
   return (
     <div class="flex gap-3">
-      <dt class="w-36 flex-shrink-0 text-gray-500">{label}</dt>
-      <dd class="text-gray-700">{value}</dd>
+      <dt class="w-36 flex-shrink-0 text-[var(--bb-data-fg-muted)]">{label}</dt>
+      <dd class="text-[var(--bb-data-fg-primary)]">{value}</dd>
     </div>
   );
 }

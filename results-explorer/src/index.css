@@ -103,7 +103,11 @@
     }
 
     a {
-        @apply text-brand-700 hover:text-brand-900;
+        color: var(--bb-accent-hover);
+    }
+
+    a:hover {
+        color: var(--bb-accent);
     }
 
     *:focus-visible {
@@ -164,8 +168,9 @@
     }
 
     .btn-primary {
-        @apply btn text-white;
+        @apply btn;
         background-color: var(--bb-accent-hover);
+        color: var(--bb-fg-primary);
     }
     .btn-primary:hover {
         background-color: var(--bb-accent);
@@ -193,8 +198,9 @@
     }
 
     .btn-danger {
-        @apply btn text-white;
+        @apply btn;
         background-color: var(--bb-status-danger);
+        color: var(--bb-fg-primary);
     }
     .btn-danger:hover {
         background-color: var(--bb-status-danger-hover);
@@ -320,7 +326,7 @@
         font-size: var(--bb-text-xs);
         color: var(--bb-data-fg-subtle);
     }
-    @media (max-width: calc(var(--bb-bp-mobile) - 1px)) {
+    @media (max-width: 47.999rem) {
         .bb-scroll-affordance {
             display: inline-flex;
             align-items: center;

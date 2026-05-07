@@ -2,6 +2,7 @@ import type { ComponentChildren } from "preact";
 import type { CompareDecisionSummary } from "@/lib/compareSummary";
 import { formatRatio } from "@/lib/compareSummary";
 import { fmtGeomean, fmtMs, fmtScore } from "@/utils";
+import { StatusBadge } from "@/components/StatusBadge";
 
 interface CompareSummaryProps {
   summary: CompareDecisionSummary;
@@ -17,57 +18,57 @@ export function CompareSummary({ summary }: CompareSummaryProps) {
     <section aria-labelledby="compare-decision-summary-title" class="card mb-8">
       <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 id="compare-decision-summary-title" class="text-base font-semibold text-gray-900">
+          <h2 id="compare-decision-summary-title" class="text-base font-semibold text-[var(--bb-data-fg-primary)]">
             Decision Summary
           </h2>
-          <p class="mt-1 text-sm font-medium text-gray-800">{summary.headline}</p>
+          <p class="mt-1 text-sm font-medium text-[var(--bb-data-fg-primary)]">{summary.headline}</p>
         </div>
-        <span class={`badge ${summary.claimSuppressed ? "badge-yellow" : "badge-green"}`}>
+        <StatusBadge role="computed" tone={summary.claimSuppressed ? "warning" : "info"}>
           {summary.claimSuppressed ? "Claims suppressed" : "Computed from selected runs"}
-        </span>
+        </StatusBadge>
       </div>
 
       <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <SummaryCard label="Winner">
           {summary.claimSuppressed ? (
-            <p class="text-sm text-gray-500">Not claimed</p>
+            <p class="text-sm text-[var(--bb-data-fg-muted)]">Not claimed</p>
           ) : summary.winner ? (
             <>
-              <p class="text-sm font-semibold text-gray-900">{summary.winner.platform}</p>
-              <p class="mt-1 font-mono text-xs text-gray-500">
+              <p class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">{summary.winner.platform}</p>
+              <p class="mt-1 font-mono text-xs text-[var(--bb-data-fg-muted)]">
                 {formatPrimaryValue(summary.winner.value, summary.primaryMetric)}
               </p>
             </>
           ) : (
-            <p class="text-sm text-gray-500">Primary metric unavailable</p>
+            <p class="text-sm text-[var(--bb-data-fg-muted)]">Primary metric unavailable</p>
           )}
         </SummaryCard>
 
         <SummaryCard label={summary.primaryMetricLabel}>
           {summary.comparisonRatio !== null ? (
             <>
-              <p class="font-mono text-sm font-semibold text-gray-900">
+              <p class="font-mono text-sm font-semibold text-[var(--bb-data-fg-primary)]">
                 {formatRatio(summary.comparisonRatio)}
               </p>
-              <p class="mt-1 text-xs text-gray-500">{summary.comparisonLabel}</p>
+              <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">{summary.comparisonLabel}</p>
             </>
           ) : (
-            <p class="text-sm text-gray-500">No comparable primary values</p>
+            <p class="text-sm text-[var(--bb-data-fg-muted)]">No comparable primary values</p>
           )}
         </SummaryCard>
 
         <SummaryCard label="Query wins">
           {summary.claimSuppressed ? (
             <>
-              <p class="text-sm text-gray-500">Winner claim suppressed</p>
-              <p class="mt-1 text-xs text-gray-500">Use the query diff table for raw evidence.</p>
+              <p class="text-sm text-[var(--bb-data-fg-muted)]">Winner claim suppressed</p>
+              <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">Use the query diff table for raw evidence.</p>
             </>
           ) : (
             <>
-              <p class="font-mono text-sm font-semibold text-gray-900">
+              <p class="font-mono text-sm font-semibold text-[var(--bb-data-fg-primary)]">
                 {summary.queryRecord.wins}/{summary.queryRecord.comparableQueries} fastest
               </p>
-              <p class="mt-1 text-xs text-gray-500">
+              <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">
                 {summary.queryRecord.losses} slower, {summary.queryRecord.ties} tied,{" "}
                 {summary.queryRecord.missing} missing
               </p>
@@ -80,19 +81,19 @@ export function CompareSummary({ summary }: CompareSummaryProps) {
           winnerPercentiles?.p50 !== undefined &&
           winnerPercentiles.p90 !== null &&
           winnerPercentiles.p99 !== null ? (
-            <p class="font-mono text-xs text-gray-700">
+            <p class="font-mono text-xs text-[var(--bb-data-fg-primary)]">
               p50 {fmtMs(winnerPercentiles.p50)} · p90 {fmtMs(winnerPercentiles.p90)} · p99{" "}
               {fmtMs(winnerPercentiles.p99)}
             </p>
           ) : (
-            <p class="text-sm text-gray-500">Percentiles unavailable</p>
+            <p class="text-sm text-[var(--bb-data-fg-muted)]">Percentiles unavailable</p>
           )}
         </SummaryCard>
       </div>
 
       {summary.cost && (
-        <div class="mt-3 rounded-md border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-600">
-          <span class="font-semibold text-gray-700">Cost/performance:</span>{" "}
+        <div class="mt-3 rounded-md border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-3 py-2 text-xs text-[var(--bb-data-fg-muted)]">
+          <span class="font-semibold text-[var(--bb-data-fg-primary)]">Cost/performance:</span>{" "}
           {formatCostSummary(summary.cost)}
         </div>
       )}
@@ -108,8 +109,8 @@ function SummaryCard({
   children: ComponentChildren;
 }) {
   return (
-    <div class="rounded-md border border-gray-100 bg-gray-50 px-3 py-2">
-      <h3 class="mb-1 text-xs font-semibold uppercase text-gray-500">{label}</h3>
+    <div class="rounded-md border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-3 py-2">
+      <h3 class="mb-1 text-xs font-semibold uppercase text-[var(--bb-data-fg-subtle)]">{label}</h3>
       {children}
     </div>
   );

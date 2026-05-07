@@ -58,7 +58,7 @@ export function CDFChart({ summary }: Props) {
 
   return (
     <div ref={containerRef} class="w-full overflow-x-auto">
-      <svg width={w} height={totalH} role="img" aria-label="Cumulative distribution of per-query latency">
+      <svg class="bb-chart-svg" width={w} height={totalH} role="img" aria-label="Cumulative distribution of per-query latency">
         {/* Y-axis grid lines + labels */}
         {Y_TICKS_PCT.map((pct) => {
           const y = yFor(pct);

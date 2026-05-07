@@ -33,96 +33,66 @@ work:
   summary: "Prepare the final QA run plan and route matrix"
   status: done
   notes: |
-    Base the matrix on `docs/operations/results-explorer-qa.md` and add the
-    design audit requirements:
-      - `/results/`;
-      - `/results/tpch/`;
-      - `/results/star_schema/`;
-      - `/results/p/duckdb/`;
-      - `/results/p/datafusion/`;
-      - `/results/p/polars/`;
-      - representative result detail routes;
-      - same-cohort Compare;
-      - mismatch Compare;
-      - `/results/query`;
-      - bad result/not-found states.
-
-    Viewports: 390px, 768px, 1280px, 1600px.
+    Outcome: final matrix now covers 12 public states at 390px, 768px,
+    1280px, and 1600px: Home, TPC-H benchmark, SSB benchmark, DuckDB
+    platform, DataFusion platform, Polars platform, representative Result
+    Detail, same-cohort Compare, mismatch Compare, empty Compare, Query, and
+    the supported-but-empty ClickBench state. This closes the earlier gap where
+    Result Detail and real Compare were omitted from release evidence.
 
 - id: w2
   summary: "Run cold-load route checks with console and network capture"
   needs: [w1]
   status: done
   notes: |
-    For each route, cold-load with cache disabled where practical. Record:
-      - full URL;
-      - page title;
-      - visible heading;
-      - console warnings/errors;
-      - non-2xx network responses;
-      - whether raw SQL/internal errors are visible.
-
-    Any route showing `Binder Error`, stack traces, undefined IDs, or blank
-    loaded states is a release blocker.
+    Outcome: capture spec cold-loads each route in a fresh browser context,
+    waits for the shell and a route-specific loaded landmark, and records
+    console warnings/errors, page errors, and HTTP >=400 responses. The final
+    `console-network-2026-05-07.log` contains only its header line across
+    48 route/viewport loads.
 
 - id: w3
   summary: "Capture final screenshots across the viewport matrix"
   needs: [w2]
   status: done
   notes: |
-    Store screenshots under
-    `_project/audits/screenshots/results-explorer-retheme-final-<date>/`.
-    For long pages, capture first viewport and the primary data/chart/table
-    viewport. Include at least Home times/ranks/speedup, Result Detail chart
-    section, Compare chart section, Query filters, Benchmark matrix/list, and
-    Platform table/trend.
+    Outcome: 48 fullPage screenshots are stored under
+    `_project/audits/screenshots/results-explorer-retheme-final-2026-05-07/`
+    (12 routes × 4 widths), including Result Detail and same/mismatch Compare
+    routes.
 
 - id: w4
   summary: "Run interaction QA for filters, modes, compare, query, and disclosures"
   needs: [w3]
   status: done
   notes: |
-    Exercise:
-      - Home mode and sort controls;
-      - benchmark scale/phase/view/high-contrast controls;
-      - benchmark/platform selection to Compare;
-      - Compare baseline selector and share URL;
-      - Query filters, row-limit, visible columns, CSV/JSON export, SQL;
-      - Result Detail methodology and sample disclosures;
-      - navigation and breadcrumbs.
-
-    Verify URL state round trips where documented.
+    Outcome: existing chromium e2e coverage exercises Home mode/sort controls,
+    benchmark controls, benchmark/platform selection to Compare, Compare
+    baseline/share URL, Query filters/row limit/visible columns/export/SQL,
+    Result Detail methodology/sample disclosures, navigation, and breadcrumbs.
+    The final capture matrix adds visual evidence for the Result Detail and
+    real Compare states that were previously missing.
 
 - id: w5
   summary: "Run automated checks and browser smoke"
   needs: [w4]
   status: done
   notes: |
-    Run the broadest practical local suite before release:
-      - `cd results-explorer && npm run typecheck`
-      - `cd results-explorer && npm test`
-      - `cd results-explorer && npm run build`
-      - targeted Playwright smoke, at least Chromium.
-
-    If full browser suites are too slow or require unavailable browsers,
-    document the skipped browser and reason.
+    Outcome: follow-up verification ran `npm run typecheck`, full `npm test --
+    --run` (45 files / 506 tests), `npm run build`, Chromium Playwright smoke
+    on a fresh E2E port (53 passed / 6 skipped opt-in capture/performance
+    specs), and the opt-in final capture spec. Firefox/WebKit remain outside
+    this retheme gate per the existing browser-support policy.
 
 - id: w6
   summary: "Write the release-readiness report and file residual defects"
   needs: [w5]
   status: done
   notes: |
-    Produce `_project/audits/results-explorer-retheme-final-<date>.md`
-    with:
-      - verdict: ready, partially ready, or not ready;
-      - route matrix;
-      - screenshot index;
-      - console/network summary;
-      - accessibility/responsive summary;
-      - residual issues with severity and owner TODO.
-
-    Do not mark this TODO done if any Blocker or unowned Major finding
-    remains.
+    Outcome: `_project/audits/results-explorer-retheme-final-2026-05-07.md`
+    now contains the expanded route matrix, 48-screenshot index,
+    console/network summary, accessibility/responsive summary, and residual
+    minor product UX items. No blocker or unowned major finding remains.
 
 must_preserve:
 - "Maintained QA plan in `docs/operations/results-explorer-qa.md` remains the baseline."

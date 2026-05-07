@@ -136,6 +136,7 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
   return (
     <div ref={containerRef} class="w-full overflow-x-auto">
       <svg
+        class="bb-chart-svg"
         width={w}
         height={totalH}
         role="img"

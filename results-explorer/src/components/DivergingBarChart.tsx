@@ -82,12 +82,13 @@ export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
 
   return (
     <div ref={containerRef} class="w-full overflow-x-auto">
-      <p class="mb-2 text-xs text-gray-500">
+      <p class="mb-2 text-xs text-[var(--bb-data-fg-muted)]">
         {faster} quer{faster === 1 ? "y" : "ies"} faster, {slower} quer{slower === 1 ? "y" : "ies"} slower
         {rawEntries.length > 0 && ` · median delta: ${medianDelta >= 0 ? "+" : ""}${medianDelta.toFixed(1)}%`}
         {" · sorted by magnitude"}
       </p>
       <svg
+        class="bb-chart-svg"
         width="100%"
         height={totalHeight}
         viewBox={`0 0 ${drawWidth} ${totalHeight}`}
@@ -170,7 +171,7 @@ export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
       </svg>
 
       {/* Legend */}
-      <div class="mt-2 flex flex-wrap gap-3 text-xs text-gray-500">
+      <div class="mt-2 flex flex-wrap gap-3 text-xs text-[var(--bb-data-fg-muted)]">
         <span>Baseline: <strong>{results[baselineIdx]?.platform}</strong></span>
         <span class="ml-2">
             <span class="inline-block h-2 w-3 rounded-sm mr-1" style={{ backgroundColor: FASTER_FILL }} />faster (negative %)

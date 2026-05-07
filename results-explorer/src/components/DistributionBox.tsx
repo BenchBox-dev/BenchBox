@@ -62,7 +62,7 @@ export function DistributionBox({ summary }: Props) {
 
   return (
     <div ref={containerRef} class="w-full overflow-x-auto">
-      <svg width={w} height={totalH} role="img" aria-label="Distribution box plots of per-query latency">
+      <svg class="bb-chart-svg" width={w} height={totalH} role="img" aria-label="Distribution box plots of per-query latency">
         {rows.map((row, ri) => {
           const y = PADDING_TOP + ri * ROW_H;
           const midY = y + ROW_H * 0.5;
@@ -138,7 +138,7 @@ export function DistributionBox({ summary }: Props) {
           })}
         </g>
       </svg>
-      <p class="text-[10px] text-gray-400 mt-1">
+      <p class="mt-1 text-[10px] text-[var(--bb-data-fg-subtle)]">
         Box: Q1-Q3 · Line: median · Whiskers: min/max of per-query display latencies
       </p>
     </div>

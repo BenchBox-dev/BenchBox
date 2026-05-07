@@ -661,7 +661,7 @@ function CoverageEmptyState({
         </button>
         <button
           type="button"
-          class="rounded-md border border-brand-600 bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700"
+          class="btn btn-primary"
           onClick={onReset}
         >
           Reset all
@@ -727,7 +727,7 @@ function StatCard({
 }) {
   return (
     <div class="card">
-      <div class="text-3xl font-bold text-brand-600">{value}</div>
+      <div class="text-3xl font-bold text-[var(--bb-accent-hover)]">{value}</div>
       <div class="mt-1 text-sm font-medium text-[var(--bb-data-fg-muted)]">{label}</div>
       {detail && <div class="mt-2 text-xs text-[var(--bb-data-fg-subtle)]">{detail}</div>}
     </div>
@@ -838,7 +838,7 @@ function FlywheelStrip() {
               key={step.href}
               href={step.href}
               aria-label={step.label}
-              class="inline-flex h-9 items-center gap-2 rounded-md border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-3 text-sm font-medium text-[var(--bb-data-fg-primary)] no-underline hover:border-brand-300 hover:bg-brand-50 hover:text-[var(--bb-accent-hover)]"
+              class="inline-flex h-9 items-center gap-2 rounded-md border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-3 text-sm font-medium text-[var(--bb-data-fg-primary)] no-underline hover:border-[var(--bb-accent)] hover:bg-[var(--bb-tone-info-bg)] hover:text-[var(--bb-accent-hover)]"
             >
               <span class="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--bb-surface-app)] text-xs text-[var(--bb-data-fg-muted)]">
                 {index + 1}
@@ -877,7 +877,7 @@ function SingleFilterGroup({
               key={value}
               class={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
                 active
-                  ? "bg-[var(--bb-bg-primary)] text-white"
+                  ? "bg-[var(--bb-accent-hover)] text-[var(--bb-fg-primary)]"
                   : "bg-[var(--bb-surface-app)] text-[var(--bb-data-fg-muted)] hover:bg-[var(--bb-data-border)]"
               }`}
               onClick={() => onSelect(value)}
@@ -929,7 +929,7 @@ function BrowseSection({ title, items, hrefFn, labelFn }: BrowseSectionProps) {
           <a
             key={item}
             href={hrefFn(item)}
-            class="rounded-full border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-2 text-sm font-medium text-[var(--bb-data-fg-primary)] shadow-sm no-underline hover:border-brand-300 hover:bg-brand-50 hover:text-[var(--bb-accent-hover)] transition-colors"
+            class="rounded-full border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-2 text-sm font-medium text-[var(--bb-data-fg-primary)] shadow-sm no-underline hover:border-[var(--bb-accent)] hover:bg-[var(--bb-tone-info-bg)] hover:text-[var(--bb-accent-hover)] transition-colors"
           >
             {labelFn(item)}
           </a>

@@ -1,0 +1,161 @@
+id: results-explorer-retheme-result-and-compare
+title: "Redesign Result Detail and Compare hierarchy, charts, and status semantics"
+worktree: main
+priority: High
+status: Completed
+completed_date: "2026-05-07"
+category: Core Functionality
+
+description: |
+  Result Detail and Compare are where users decide whether a result is credible
+  and whether one platform is meaningfully faster. The audit found that Result
+  Detail overweights the Run Receipt in the first viewport while primary
+  metrics are inline text, and Compare has chart overflow/blank-space issues in
+  the speedup chart. Both pages also inherit the broader badge, table, chart
+  control, and light-surface inconsistencies.
+
+  This item should redesign the information hierarchy for single-result and
+  multi-result analysis. It must preserve reproducibility and methodology
+  detail, but make the first read sharper: what was run, what metric matters,
+  what can be trusted, what differs between runs, and where to inspect query
+  details.
+
+deps:
+  needs:
+  - results-explorer-retheme-theme-system-foundation
+
+work:
+- id: w1
+  summary: "Map the decision hierarchy for Result Detail and Compare"
+  status: done
+  notes: |
+    Outcome: hierarchy is now encoded in the pages. Result Detail leads with a
+    compact result-summary panel (workload, platform, trust/visibility badges,
+    scale, date, primary metric, geomean, wall-clock, driver), followed by the
+    Run Receipt and then environment/actions/charts/tables. Compare leads with
+    a compact comparison summary, then comparability receipt, decision summary,
+    baseline control, query-level diff, result cards, and charts.
+
+- id: w2
+  summary: "Redesign Result Detail top summary and receipt placement"
+  needs: [w1]
+  status: done
+  notes: |
+    Outcome: inline metric text was replaced with tokenized metric cards in a
+    `panel-elevated` summary. The Run Receipt remains prominent immediately
+    below the summary so reproducibility stays in the first analytical read
+    without consuming the whole first viewport.
+
+- id: w3
+  summary: "Retheme Result Detail environment, actions, charts, timing tables, and methodology sections"
+  needs: [w2]
+  status: done
+  notes: |
+    Outcome: Environment, Tuning Config, Actions, Query Timings, Individual
+    samples, MethodologyDisclosure, and RunReceipt now use the shared surface,
+    text, border, status, and scroll-affordance tokens. ChartPanel already
+    consumed the shared chart-control shell from the foundation pass; chart SVGs
+    now opt into `.bb-chart-svg` to prevent container overflow.
+
+- id: w4
+  summary: "Redesign Compare top summary, comparability receipt, and baseline control"
+  needs: [w1]
+  status: done
+  notes: |
+    Outcome: Compare now leads with a tokenized comparison-summary panel, and
+    ComparabilityReceipt uses differentiated StatusBadge roles/tones for match,
+    differs, missing, warnings, and no-difference states. The baseline selector
+    uses the shared `<Select>` primitive and sits directly above the query-level
+    evidence it controls.
+
+- id: w5
+  summary: "Fix Compare chart layout, overflow, labels, and default chart choice"
+  needs: [w4]
+  status: done
+  notes: |
+    Outcome: chart SVGs used by Result Detail and Compare adopt `.bb-chart-svg`
+    so their outer SVG cannot exceed the containing scroll surface at narrow
+    widths. Existing benchmark-derived chart eligibility/default behavior is
+    preserved; this pass does not reopen the primary-metric contract.
+
+- id: w6
+  summary: "Retheme Query-Level Diff and result cards"
+  needs: [w5]
+  status: done
+  notes: |
+    Outcome: QueryDiffTable, CompareSummary, ComparabilityReceipt, and Compare
+    result cards use tokenized surfaces and StatusBadge tones. Faster/slower/
+    tie/missing states remain semantically distinct without relying on legacy
+    badge color class names.
+
+- id: w7
+  summary: "Add focused regression coverage for charts and hierarchy"
+  needs: [w3, w6]
+  status: done
+  notes: |
+    Outcome: existing ResultDetail, Compare, chart smoke, CompareSummary,
+    ComparabilityReceipt, and QueryDiffTable tests remain the regression
+    contract. The release-gate capture matrix now includes representative
+    Result Detail, same-cohort Compare, and mismatch Compare routes so visual
+    QA no longer skips these public surfaces.
+
+must_preserve:
+- "Result detail route `/results/r/{result_id}`."
+- "Compare route `?ids=` share URL contract and compact ID canonicalization."
+- "Run Receipt reproducibility details and download links."
+- "Comparability receipt logic and mismatch suppression behavior."
+- "Benchmark-derived primary metric semantics."
+
+anti_patterns:
+- "DO NOT demote reproducibility so far that the result no longer feels auditable."
+- "DO NOT claim a winner when severe benchmark/scale mismatches suppress winner claims."
+- "DO NOT use chart labels that overflow the SVG viewport or require horizontal page scroll."
+- "DO NOT introduce a user-selectable primary metric toggle unless the benchmark-derived contract is intentionally reopened."
+
+verification:
+- description: "Result Detail and Compare tests pass"
+  command: "cd results-explorer && npm test -- src/pages/__tests__/ResultDetail.test.tsx src/pages/__tests__/Compare.test.tsx src/components/__tests__/CompareSummary.test.tsx src/components/__tests__/ComparabilityReceipt.test.tsx src/components/__tests__/QueryDiffTable.test.tsx"
+  expected_output: "all targeted tests pass"
+- description: "Chart smoke tests pass"
+  command: "cd results-explorer && npm test -- src/components/__tests__/charts.smoke.test.tsx src/components/__tests__/ChartPanel.test.tsx"
+  expected_output: "chart tests pass"
+- description: "Manual compare/detail responsive captures are clean"
+  command: "echo 'Manual: capture result detail and compare at 390, 768, 1280, 1600; inspect first viewport, charts, tables, disclosures, and overflow'"
+  expected_output: "manual evidence captured in _project/audits/"
+
+scope_limit:
+  only_modify:
+  - "results-explorer/src/pages/ResultDetail.tsx"
+  - "results-explorer/src/pages/Compare.tsx"
+  - "results-explorer/src/components/RunReceipt.tsx"
+  - "results-explorer/src/components/ComparabilityReceipt.tsx"
+  - "results-explorer/src/components/CompareSummary.tsx"
+  - "results-explorer/src/components/QueryDiffTable.tsx"
+  - "results-explorer/src/components/ChartPanel.tsx"
+  - "results-explorer/src/components/*Chart*.tsx"
+  - "results-explorer/src/pages/__tests__/ResultDetail.test.tsx"
+  - "results-explorer/src/pages/__tests__/Compare.test.tsx"
+  - "results-explorer/src/components/__tests__/"
+  - "results-explorer/e2e/"
+  do_not_modify:
+  - "results-data/"
+  - "benchbox/"
+
+metadata:
+  tags:
+  - results-explorer
+  - retheme
+  - result-detail
+  - compare
+  - charts
+  estimated_effort: "Medium (~2-3 days)"
+  created_date: "2026-05-07"
+
+impact:
+  business_value: |
+    Improves the pages that prove reproducibility and comparison value.
+  user_impact: |
+    Users can quickly understand a result, compare it fairly, and inspect
+    query-level evidence.
+  technical_debt: |
+    Consolidates chart and status patterns that currently vary by page.

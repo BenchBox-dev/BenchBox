@@ -527,7 +527,7 @@ export function Query(_: RoutableProps) {
                       type="button"
                       class={`px-3 py-1.5 text-sm ${
                         rowLimitMode === mode
-                          ? "bg-[var(--bb-accent-hover)] text-white"
+                          ? "bg-[var(--bb-accent-hover)] text-[var(--bb-fg-primary)]"
                           : "bg-[var(--bb-surface-data)] text-[var(--bb-data-fg-muted)] hover:bg-[var(--bb-surface-data-muted)]"
                       }`}
                       aria-pressed={rowLimitMode === mode}
@@ -576,6 +576,7 @@ export function Query(_: RoutableProps) {
                     Showing {visibleRows.length.toLocaleString()} of {rows.length.toLocaleString()} returned rows
                   </span>
                   <span>Query limit: {rowLimitMode === "all" ? "all" : DEFAULT_ROW_LIMIT.toLocaleString()}</span>
+                  <span class="bb-scroll-affordance">← scroll →</span>
                 </div>
                 <table class="min-w-full divide-y divide-[var(--bb-data-border)]">
                   <thead class="bg-[var(--bb-surface-data-muted)]">
@@ -642,8 +643,9 @@ export function Query(_: RoutableProps) {
               </div>
               {sqlRows.length > 0 && (
                 <div class="overflow-x-auto rounded-lg border border-[var(--bb-data-border)]">
-                  <div class="border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
-                    Showing {visibleSqlRows.length.toLocaleString()} of {sqlRows.length.toLocaleString()} SQL rows
+                  <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
+                    <span>Showing {visibleSqlRows.length.toLocaleString()} of {sqlRows.length.toLocaleString()} SQL rows</span>
+                    <span class="bb-scroll-affordance">← scroll →</span>
                   </div>
                   <table class="min-w-full divide-y divide-[var(--bb-data-border)]">
                     <thead class="bg-[var(--bb-surface-data-muted)]">

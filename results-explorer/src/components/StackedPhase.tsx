@@ -52,7 +52,7 @@ export function StackedPhase({ summary }: Props) {
 
   if (rows.length === 0) {
     return (
-      <p class="text-sm text-gray-400 italic">
+      <p class="text-sm italic text-[var(--bb-data-fg-subtle)]">
         Phase duration data is not available for these results. Re-run the pipeline with a bundle
         that includes a phases block.
       </p>
@@ -84,6 +84,7 @@ export function StackedPhase({ summary }: Props) {
   return (
     <div ref={containerRef} class="w-full overflow-x-auto">
       <svg
+        class="bb-chart-svg"
         width={w}
         height={totalH}
         role="img"
@@ -162,7 +163,7 @@ export function StackedPhase({ summary }: Props) {
       </svg>
 
       {/* Legend */}
-      <div class="flex flex-wrap gap-3 text-xs text-gray-600 mt-1.5">
+      <div class="mt-1.5 flex flex-wrap gap-3 text-xs text-[var(--bb-data-fg-muted)]">
         {allPhases.map((phase) => (
           <span key={phase} class="flex items-center gap-1">
             <span

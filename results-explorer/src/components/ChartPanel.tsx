@@ -434,6 +434,7 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
   return (
     <div ref={containerRef} class="w-full overflow-x-auto">
       <svg
+        class="bb-chart-svg"
         width={width}
         height={totalHeight}
         role="img"
