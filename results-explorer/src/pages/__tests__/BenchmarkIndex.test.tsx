@@ -374,6 +374,28 @@ describe("BenchmarkIndex", () => {
     expect(screen.getAllByText("loose").length).toBeGreaterThan(0);
   });
 
+  it("shows persistent compare guidance before any rows are selected", async () => {
+    render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => expect(screen.getByTestId("benchmark-compare-guidance")).toBeTruthy());
+
+    const guidance = screen.getByTestId("benchmark-compare-guidance");
+    expect(guidance.textContent).toContain("Select two or more platforms");
+    const disabledAction = screen.getByRole("button", { name: "Select 2 comparable results" }) as HTMLButtonElement;
+    expect(disabledAction.disabled).toBe(true);
+  });
+
+  it("labels the Star Schema Benchmark and SSB equivalence explicitly", async () => {
+    const ssbRows = RESULT_ROWS.map((row) => ({ ...row, benchmark: "star_schema" }));
+    const ssbRankings = RANKING_ROWS.map((row) => ({ ...row, benchmark: "star_schema" }));
+    const ssbCells = CELL_ROWS.map((row) => ({ ...row, benchmark: "star_schema" }));
+    vi.mocked(queryRows).mockImplementation(defaultImpl(ssbRows, ssbRankings, ssbCells));
+
+    render(<BenchmarkIndex benchmark="star_schema" />);
+    await waitFor(() => expect(screen.getByText("SSB Results")).toBeTruthy());
+
+    expect(screen.getByTestId("benchmark-context-note").textContent).toContain("Star Schema Benchmark (SSB)");
+  });
+
   it("compare tray shows selected metadata and links with short IDs", async () => {
     (window as Window & { __benchboxCompareSelectionTest?: boolean }).__benchboxCompareSelectionTest = true;
     render(<BenchmarkIndex benchmark="tpch" />);
@@ -441,8 +463,18 @@ describe("BenchmarkIndex", () => {
 
     // List view shows a table with Geomean column but no query columns
     await waitFor(() => expect(screen.getByRole("button", { name: /Geomean/ })).toBeTruthy());
+    expect(new URL(window.location.href).searchParams.get("view")).toBe("list");
     expect(screen.queryByRole("button", { name: /^Q1/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /^Q2/ })).toBeNull();
+  });
+
+  it("restores benchmark view mode from the URL", async () => {
+    window.history.replaceState(null, "", "/results/tpch/?view=list");
+
+    render(<BenchmarkIndex benchmark="tpch" />);
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /Geomean/ })).toBeTruthy());
+    expect(screen.queryByRole("button", { name: /^Q1/ })).toBeNull();
   });
 
   it("list view sorts rows from table headers", async () => {

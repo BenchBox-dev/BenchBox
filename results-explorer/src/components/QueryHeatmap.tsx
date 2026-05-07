@@ -23,7 +23,7 @@ import { useMemo, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import type { BenchmarkSummary, PlatformRow, SortDirection, SortState } from "@/types";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
-import { fmtMs, fmtScore, fmtGeomean, complianceLabel } from "@/utils";
+import { fmtMs as formatDurationMs, fmtScore, fmtGeomean, complianceLabel } from "@/utils";
 import { queryDisplayLabel, sortQueryIds } from "@/lib/queryLabels";
 
 // ---------------------------------------------------------------------------
@@ -51,6 +51,11 @@ interface QueryHeatmapProps {
 }
 
 const MOBILE_OUTLIER_LIMIT = 3;
+
+function fmtQueryMs(ms: number): string {
+  if (ms >= 0 && ms < 1) return "<1 ms";
+  return formatDurationMs(ms);
+}
 
 export function QueryHeatmap({
   summary,
@@ -228,6 +233,10 @@ export function QueryHeatmap({
   const suppressHeat = sorted.length < 2;
 
   const primaryLabel = primaryMetric === "power_score" ? "Power Score" : "Geomean";
+  const primaryDirectionLabel = primaryMetric === "power_score" ? "higher is better" : "lower is faster";
+  const heatmapMeaning = suppressHeat
+    ? "Heat color is suppressed because this cohort has fewer than two comparable platforms."
+    : "Heat color compares each query column with the fastest published timing; darker cells are slower.";
   // Show secondary geomean column when the artifact carries a secondary metric,
   // rather than hardcoding the power_score assumption.
   const showGeomeanCol = ranking?.secondary_metric === "display_geomean_ms";
@@ -242,6 +251,19 @@ export function QueryHeatmap({
         class="sr-only"
       >
         {announcement}
+      </div>
+
+      <div
+        class="mb-3 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-3 py-2 text-xs text-[var(--bb-data-fg-muted)]"
+        data-testid="query-heatmap-legend"
+      >
+        <div class="font-semibold text-[var(--bb-data-fg-primary)]">
+          {primaryLabel}: {primaryDirectionLabel}
+        </div>
+        <div class="mt-1">
+          Per-query timings use milliseconds and lower is faster. {heatmapMeaning} <strong>&lt;1 ms</strong> means a
+          zero-or-sub-millisecond timing below display precision; <strong>No run</strong> means missing data.
+        </div>
       </div>
 
       <div
@@ -324,7 +346,7 @@ export function QueryHeatmap({
                           <div class="text-xs text-[var(--bb-data-fg-muted)]">{outlier.ratioLabel}</div>
                         </div>
                         <div class="font-mono text-xs font-semibold text-[var(--bb-data-fg-primary)]">
-                          {fmtMs(outlier.ms)}
+                          {fmtQueryMs(outlier.ms)}
                         </div>
                       </div>
                     ))}
@@ -509,9 +531,9 @@ export function QueryHeatmap({
                       ms !== null
                         ? ratio !== null
                           ? ratio <= 1.005
-                            ? `${fmtMs(ms)}, fastest in column`
-                            : `${fmtMs(ms)}, ${ratio.toFixed(1)}× fastest in column`
-                          : fmtMs(ms)
+                            ? `${fmtQueryMs(ms)}, fastest in column`
+                            : `${fmtQueryMs(ms)}, ${ratio.toFixed(1)}× fastest in column`
+                          : fmtQueryMs(ms)
                         : `No published query run for ${row.platform} ${qid}`;
 
                     const isFocused = focusPos.row === rowIdx && focusPos.col === colIdx;
@@ -539,7 +561,7 @@ export function QueryHeatmap({
                         onKeyDown={(e) => handleCellKey(e as KeyboardEvent, rowIdx, colIdx)}
                         onFocus={() => setAnnouncement(`${queryDisplayLabel(qid)}: ${ariaLabel}`)}
                       >
-                        {ms !== null ? fmtMs(ms) : "No run"}
+                        {ms !== null ? fmtQueryMs(ms) : "No run"}
                       </td>
                     );
                   })}

@@ -167,6 +167,30 @@ describe("QueryHeatmap rendering", () => {
     expect(slowest?.getAttribute("aria-label")).toBe("100 ms, 10.0× fastest in column");
   });
 
+  it("shows the metric/heatmap legend and formats zero/sub-millisecond timings", () => {
+    const summary = makeSummary({
+      platforms: [
+        {
+          ...makeSummary().platforms[0]!,
+          timings: { Q1: 0, Q2: 20 },
+        },
+        {
+          ...makeSummary().platforms[1]!,
+          timings: { Q1: 4, Q2: 200 },
+        },
+      ],
+    });
+    const { container } = render(<QueryHeatmap summary={summary} />);
+
+    const legend = screen.getByTestId("query-heatmap-legend");
+    expect(legend.textContent).toContain("Power Score: higher is better");
+    expect(legend.textContent).toContain("<1 ms");
+
+    const subMs = container.querySelector<HTMLElement>('[data-cell="0-0"]');
+    expect(subMs?.textContent).toBe("<1 ms");
+    expect(subMs?.getAttribute("aria-label")).toBe("<1 ms, fastest in column");
+  });
+
   it("activates reduced-color class when high contrast is requested", () => {
     const { container } = render(<QueryHeatmap summary={makeSummary()} highContrast />);
     expect(container.firstElementChild?.className).toContain("heatmap-reduced-color");

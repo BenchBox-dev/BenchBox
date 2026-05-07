@@ -8,6 +8,7 @@ import { humanizeBenchmark, isKnownBenchmark, fmtScore, fmtGeomean, errMsg, comp
 import { facetsToWhereClause, useFacetState, type FacetKey, type FacetState } from "@/lib/facetModel";
 import { hasActiveFacets, matchesFacetRow, singleFacetValue } from "@/lib/facetMatching";
 import { buildCompareUrl, compareIdForRow, displayCompareId } from "@/lib/resultLinks";
+import { stringSerde, useUrlState } from "@/lib/useUrlState";
 import { BenchmarkMatrixSkeleton } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { Breadcrumb } from "@/components/Breadcrumb";
@@ -26,6 +27,10 @@ interface BenchmarkIndexProps extends RoutableProps {
 
 type ViewMode = "matrix" | "ranks" | "list";
 type BenchmarkListSortKey = "platform" | "scale_factor" | "run_date" | "power_score" | "display_geomean_ms" | "query_count";
+const VIEW_MODES = new Set<ViewMode>(["matrix", "ranks", "list"]);
+function coerceViewMode(value: string): ViewMode {
+  return VIEW_MODES.has(value as ViewMode) ? (value as ViewMode) : "matrix";
+}
 const TABLE_RENDER_LIMIT = 200;
 const TABLE_RENDER_INCREMENT = 200;
 const BENCHMARK_RESULT_FACET_KEYS: FacetKey[] = [
@@ -64,6 +69,29 @@ const TRUST_LABEL_ABBREV: Record<string, string> = {
 
 function trustAbbrev(label: string): string {
   return TRUST_LABEL_ABBREV[label] ?? label.split("-")[0] ?? label;
+}
+
+function benchmarkContextNote(benchmark: string): string | null {
+  if (benchmark === "star_schema" || benchmark === "ssb") {
+    return "Star Schema Benchmark (SSB): the route keeps the canonical star_schema slug while the published benchmark label uses SSB.";
+  }
+  return null;
+}
+
+function benchmarkCompareGuidanceMessage(
+  selectedCount: number,
+  title: string,
+  scaleFactor: string,
+  phase: string,
+): string {
+  const cohort = `${title} SF ${scaleFactor} ${phase}`;
+  if (selectedCount === 0) {
+    return `Select two or more platforms from the same ${cohort} cohort to compare. Benchmark, scale, phase, metric, and unit stay fixed on this page.`;
+  }
+  if (selectedCount === 1) {
+    return `1 result selected in ${cohort}. Select one more result from this cohort to enable Compare.`;
+  }
+  return `${selectedCount} results selected in ${cohort}. The sticky tray opens Compare with the same benchmark, scale, and phase contract.`;
 }
 
 export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
@@ -110,8 +138,15 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   const setTuningFilter = (value: string) => setFacet("tuning_mode", value === "all" ? [] : [value]);
   const setTrustFilter = (value: Set<string> | null) => setFacet("trust_tier", value ? [...value].sort() : []);
 
-  // View: matrix (default), ranks, or list
-  const [viewMode, setViewMode] = useState<ViewMode>("matrix");
+  // View: matrix (default), ranks, or list. URL-synced so matrix/list/ranks
+  // screenshots and shared links preserve the same browse state.
+  const [viewModeRaw, setViewModeRaw] = useUrlState<string>("view", "matrix", stringSerde);
+  const viewMode = coerceViewMode(viewModeRaw);
+  const setViewMode = (value: ViewMode) => setViewModeRaw(value);
+
+  useEffect(() => {
+    if (viewModeRaw !== viewMode) setViewModeRaw(viewMode);
+  }, [setViewModeRaw, viewMode, viewModeRaw]);
 
   // High contrast / reduced-color mode for the heatmap (explicit user toggle).
   // Also activates automatically via CSS prefers-contrast: more media query.
@@ -321,6 +356,8 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     selectedIds.size >= 2
       ? buildCompareUrl([...selectedIds])
       : null;
+  const contextNote = benchmarkContextNote(benchmark);
+  const compareGuidance = benchmarkCompareGuidanceMessage(selectedIds.size, title, effectiveSf, effectivePhase);
 
   return (
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -467,6 +504,40 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
           )}
         </div>
       </div>
+
+      {contextNote && (
+        <div
+          class="mb-4 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]"
+          data-testid="benchmark-context-note"
+        >
+          {contextNote}
+        </div>
+      )}
+
+      <section
+        class="mb-4 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 shadow-sm"
+        data-testid="benchmark-compare-guidance"
+        aria-label="Benchmark compare guidance"
+      >
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">Compare selected results</h2>
+            <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">{compareGuidance}</p>
+          </div>
+          {compareUrl ? (
+            <span
+              class="shrink-0 rounded-md border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-3 py-1.5 text-sm font-medium text-[var(--bb-data-fg-muted)]"
+              aria-live="polite"
+            >
+              Use sticky tray to compare
+            </span>
+          ) : (
+            <button type="button" class="btn btn-secondary shrink-0 text-sm" disabled>
+              {selectedIds.size === 1 ? "Select 1 more result" : "Select 2 comparable results"}
+            </button>
+          )}
+        </div>
+      </section>
 
       {/* Matrix view */}
       {viewMode === "matrix" && (
