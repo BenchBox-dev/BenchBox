@@ -278,6 +278,41 @@ def validate_main(argv: list[str] | None = None) -> int:
     return result.exit_code()
 
 
+def verify_tuning_matrix_main(argv: list[str] | None = None) -> int:
+    """Verify checked-in tuned-template coverage against observed UAT logs."""
+    from benchbox.core.tuning.coverage import (
+        parse_runtime_tuning_logs,
+        read_tuning_coverage_tsv,
+        runtime_mismatches,
+    )
+    from tests.uat.matrix import PLATFORM_GROUPS, load_benchmarks, resolve_benchmarks
+
+    parser = argparse.ArgumentParser(prog="verify-tuning-matrix")
+    parser.add_argument("--logs", required=True, help="Directory containing per-cell UAT command logs")
+    parser.add_argument(
+        "--matrix",
+        default=str(Path(__file__).resolve().parent / "data" / "tuning_coverage.tsv"),
+        help="Checked-in tuning coverage TSV",
+    )
+    args = parser.parse_args(argv)
+
+    benchmarks = load_benchmarks()
+    observations = parse_runtime_tuning_logs(
+        Path(args.logs).expanduser(),
+        platforms=PLATFORM_GROUPS["all"],
+        benchmarks=resolve_benchmarks(groups=["all"], benchmarks=benchmarks),
+    )
+    matrix_rows = read_tuning_coverage_tsv(Path(args.matrix))
+    mismatches = runtime_mismatches(matrix_rows, observations)
+    if mismatches:
+        print("Tuning matrix mismatches:", file=sys.stderr)
+        for mismatch in mismatches:
+            print(f"  - {mismatch}", file=sys.stderr)
+        return 1
+    print(json.dumps({"observations": len(observations), "mismatches": 0}, indent=2))
+    return 0
+
+
 def execute_main(argv: list[str] | None = None) -> int:
     """Implements `make uat-execute CONFIG=path/to/uat.yaml`."""
     from tests.uat.config import load_config
@@ -352,6 +387,7 @@ SUBCOMMANDS = {
     "report": report_main,
     "sweep": sweep_main,
     "stress": stress_main,
+    "verify-tuning-matrix": verify_tuning_matrix_main,
 }
 
 

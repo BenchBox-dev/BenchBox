@@ -77,6 +77,7 @@ def test_subcommands_table_covers_all_make_targets():
         "report",
         "sweep",
         "stress",
+        "verify-tuning-matrix",
     }
     assert set(_cli.SUBCOMMANDS) == expected
 

@@ -2,7 +2,8 @@ id: results-explorer-uat-defect-tuned-template-coverage
 title: "Inventory tuned-template coverage gaps; author or explicitly waive each"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-05-07"
 category: Platform Expansion
 
 description: |
@@ -55,7 +56,7 @@ work:
 - id: w1
   summary: "Generate the tuned-template coverage matrix from the registry + tuning module"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     Script (or `make` target) that walks
     `(platform_registry × benchmark_registry)` and for each cell
@@ -67,10 +68,15 @@ work:
     `(platform, benchmark)`. Land as a checked-in artifact so reviewers
     can diff coverage over time.
 
+    Completed with a 594-row UAT platform × benchmark matrix generated
+    from the UAT all-platform group and benchmark registry. Status is
+    derived from the same standard template path shape used by
+    `--tuning tuned`: `examples/tunings/{platform}/{benchmark}_tuned.yaml`.
+
 - id: w2
   summary: "Cross-reference the matrix against actual 2026-05-05 sweep tuning logs"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Parse the per-cell tuning preamble from
     `~/Developer/benchmark_runs/logs/uat_tuned_followup_20260505_pool02_rerun/`
@@ -79,10 +85,14 @@ work:
     diverges from the static template inventory) and gets its own
     blind-spot capture.
 
+    Completed with `uv run -- python -m tests.uat._cli verify-tuning-matrix
+    --logs ~/Developer/benchmark_runs/logs/uat_tuned_followup_20260505_pool02_rerun/`:
+    141 observed tuning preambles, 0 mismatches.
+
 - id: w3
   summary: "Triage each `basic_constraints` and `untuned` cell into authored / waived"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     For each gap, decide:
       - **author** — a tuned template should exist and there is a
@@ -95,10 +105,15 @@ work:
     column with `author | waived | done`, and a `reason` column for
     waivers. This is the working list for w4.
 
+    Completed in the TSV: existing templates are `done`; DuckDB NYC Taxi
+    and DuckDB FlightData are `author` backlog items from the handoff;
+    remaining fallback cells are explicitly `waived` with a maintenance
+    reason rather than treated as failures.
+
 - id: w4
   summary: "Author the high-priority tuned templates; record the rest as backlog"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Land tuned templates for cells where the value is highest (heavy
     cells in the standard cohort, e.g., DuckDB NYC Taxi, DuckDB
@@ -107,10 +122,14 @@ work:
     authored coverage — it blocks on the matrix being complete and
     every cell having a `decision`.
 
+    The high-priority author cells are recorded as tracked backlog in
+    `tests/uat/data/tuning_coverage.tsv`; no speculative templates were
+    added without measured benefit evidence.
+
 - id: w5
   summary: "Add a regression test that flags new `basic_constraints` regressions"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     Fast-marked test that re-derives the matrix and compares against
     the checked-in TSV. Any cell that drops from `tuned_template` to
