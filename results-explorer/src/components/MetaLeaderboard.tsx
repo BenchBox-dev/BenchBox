@@ -5,6 +5,7 @@ import type { MetaCohort, MetaLeaderboard as MetaLeaderboardData, MetaPlatform, 
 import { colorForCell, lightnessForCell } from "@/lib/chartMath";
 import { fmtGeomean, fmtScore, humanizeBenchmark } from "@/utils";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
+import { SegmentedControl } from "@/components/SegmentedControl";
 import {
   EXPLORER_PERFORMANCE_MARKS,
   EXPLORER_PERFORMANCE_MEASURES,
@@ -167,74 +168,60 @@ export function MetaLeaderboard({
 
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 id="meta-leaderboard-title" class="text-xl font-semibold text-gray-900">
+          <h2 id="meta-leaderboard-title" class="text-xl font-semibold text-[var(--bb-data-fg-primary)]">
             Cross-Benchmark Leaderboard
           </h2>
-          <p class="mt-1 text-xs text-gray-500">
+          <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">
             Absolute values, ranks, or speedup-vs-cohort-best across the visible cohorts.
           </p>
         </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <div
-            role="group"
-            class="flex overflow-hidden rounded-md border border-gray-300 text-sm"
-            aria-label="Sort leaderboard"
-          >
-            {(Object.keys(SORT_LABELS) as MetaLeaderboardSort[]).map((value) => (
-              <button
-                key={value}
-                type="button"
-                class={`px-3 py-1.5 ${
-                  sortKey === value
-                    ? "bg-gray-900 text-white"
-                    : "bg-white text-gray-600 hover:bg-gray-50"
-                }`}
-                onClick={() => setSortKey(value)}
-                aria-pressed={sortKey === value}
-              >
-                {SORT_LABELS[value]}
-              </button>
-            ))}
-          </div>
-          <div
-            role="group"
-            class="flex overflow-hidden rounded-md border border-gray-300 text-sm"
-            aria-label="Display mode"
-          >
-            {(["times", "ranks", "speedup"] as const).map((value) => (
-              <button
-                key={value}
-                type="button"
-                class={`px-3 py-1.5 ${
-                  mode === value
-                    ? "bg-brand-600 text-white"
-                    : "bg-white text-gray-600 hover:bg-gray-50"
-                }`}
-                onClick={() => onModeChange(value)}
-                aria-pressed={mode === value}
-              >
-                {MODE_LABELS[value]}
-              </button>
-            ))}
-          </div>
+        <div class="flex flex-wrap items-center gap-3">
+          <SegmentedControl
+            ariaLabel="Sort leaderboard"
+            value={sortKey}
+            onChange={setSortKey}
+            options={(Object.keys(SORT_LABELS) as MetaLeaderboardSort[]).map((value) => ({
+              value,
+              label: SORT_LABELS[value],
+            }))}
+          />
+          <SegmentedControl
+            ariaLabel="Display mode"
+            value={mode}
+            onChange={onModeChange}
+            options={[
+              { value: "times", label: "Times", title: "Native metric values per cohort (lower is faster for ms; higher is better for power)" },
+              { value: "ranks", label: "Ranks", title: "Rank within each cohort (1 is best)" },
+              { value: "speedup", label: "Speedup", title: "Relative to cohort best (1.00x is best)" },
+            ]}
+          />
         </div>
       </div>
 
-      <div class="mb-2 text-sm text-gray-500">
-        Showing {visiblePlatforms.length.toLocaleString()} of {sortedPlatforms.length.toLocaleString()} platforms
+      <div class="mb-2 flex flex-wrap items-baseline justify-between gap-3">
+        <p class="text-sm text-[var(--bb-data-fg-muted)]">
+          Showing {visiblePlatforms.length.toLocaleString()} of {sortedPlatforms.length.toLocaleString()} platforms
+        </p>
+        <p id="meta-leaderboard-legend" class="text-xs text-[var(--bb-data-fg-subtle)]">
+          {mode === "times" && "Heat: darker = faster within each cohort. "}
+          {mode === "ranks" && "Heat: darker = better rank within cohort. "}
+          {mode === "speedup" && "Heat: darker = closer to cohort best (≥1.00x). Values < 1.00x are slower than baseline. "}
+          <span class="italic">No run</span> = platform did not publish for this cohort (not scored).
+        </p>
       </div>
 
-      <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+      <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
         <div class="overflow-x-auto">
           <table
             ref={gridRef}
             role="grid"
             aria-label="Cross-benchmark leaderboard"
+            aria-describedby="meta-leaderboard-legend"
             class="min-w-full text-sm"
           >
-            <thead class="bg-gray-50">
+            <thead class="bg-[var(--bb-surface-data-muted)]">
               <tr role="row">
-                <th scope="col" class="table-th sticky left-0 z-10 min-w-40 bg-gray-50">
+                <th scope="col" class="table-th sticky left-0 z-10 min-w-40 bg-[var(--bb-surface-data-muted)]">
                   Platform
                 </th>
                 {cohorts.map((cohort) => (
@@ -242,43 +229,46 @@ export function MetaLeaderboard({
                     key={cohort.key}
                     scope="col"
                     class="table-th whitespace-nowrap"
-                    title={`${humanizeBenchmark(cohort.benchmark)} SF${cohort.scale_factor} ${cohort.phase} - ${cohort.platform_count} ranked platforms`}
                   >
                     <a
                       href={cohortHref(cohort)}
-                      class="no-underline text-gray-500 hover:text-brand-600"
+                      title={`${cohort.platform_count} ranked platforms in this cohort`}
+                      class="flex flex-col gap-0.5 no-underline text-[var(--bb-data-fg-muted)] hover:text-[var(--bb-accent-hover)]"
                     >
-                      {cohort.label}
+                      <span class="font-semibold text-[var(--bb-data-fg-primary)]">{cohort.label}</span>
+                      <span class="text-[10px] font-normal normal-case tracking-normal text-[var(--bb-data-fg-subtle)]">
+                        {cohortMetricSublabel(cohort)}
+                      </span>
                     </a>
                   </th>
                 ))}
                 <th
                   scope="col"
-                  class="table-th whitespace-nowrap text-gray-700"
+                  class="table-th whitespace-nowrap text-[var(--bb-data-fg-primary)]"
                   title={`Average rank over cohorts where the platform has a published run. ${COVERAGE_POLICY_COPY}`}
                 >
                   {AVG_RANK_LABEL}
                 </th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-100">
+            <tbody class="divide-y divide-[var(--bb-data-border)]">
               {visiblePlatforms.map((platform, rowIdx) => (
                 <tr
                   key={platform.platform_id}
-                  class="cursor-pointer hover:bg-gray-50"
+                  class="cursor-pointer hover:bg-[var(--bb-surface-data-muted)]"
                   onClick={() => route(platformHref(platform.platform_id))}
                 >
-                  <td class="table-td sticky left-0 z-10 bg-white font-medium text-gray-900">
+                  <td class="table-td sticky left-0 z-10 bg-[var(--bb-surface-data)] font-medium text-[var(--bb-data-fg-primary)]">
                     <div class="flex flex-wrap items-center gap-2">
                       <a
                         href={platformHref(platform.platform_id)}
-                        class="no-underline hover:text-brand-600"
+                        class="no-underline hover:text-[var(--bb-accent-hover)]"
                         onClick={(event) => event.stopPropagation()}
                       >
                         {platform.platform}
                       </a>
                       <span
-                        class="rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-[11px] font-medium text-gray-500"
+                        class="rounded border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--bb-data-fg-muted)]"
                         title={`Covered cohorts in the current leaderboard view. ${COVERAGE_POLICY_COPY}`}
                       >
                         {platform.n_cohorts}/{cohorts.length} cohorts
@@ -312,11 +302,11 @@ export function MetaLeaderboard({
                         aria-rowindex={rowIdx + 1}
                         aria-label={text}
                         title={missing ? MISSING_COHORT_TITLE : undefined}
-                        class={`table-td text-center font-mono ${
+                        class={`table-td text-center font-mono focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--bb-focus-ring)] ${
                           hue !== null ? "meta-heatmap-cell" : ""
                         } ${
-                          missing ? "bg-gray-50 text-gray-400" : ""
-                        } ${active ? "ring-2 ring-brand-500 ring-inset" : ""}`}
+                          missing ? "bg-[var(--bb-surface-data-muted)] text-[var(--bb-data-fg-subtle)] italic" : ""
+                        }`}
                         style={cellStyle}
                         tabIndex={active ? 0 : -1}
                         data-cell={`${rowIdx}-${colIdx}`}
@@ -329,7 +319,7 @@ export function MetaLeaderboard({
                         {receiptHref ? (
                           <a
                             href={receiptHref}
-                            class="font-mono no-underline hover:text-brand-700"
+                            class="font-mono no-underline hover:text-[var(--bb-accent-hover)]"
                             onClick={(event) => event.stopPropagation()}
                             title="Open result receipt"
                           >
@@ -348,18 +338,18 @@ export function MetaLeaderboard({
                     );
                   })}
                   <td
-                    class="table-td text-center font-mono font-semibold text-gray-700"
+                    class="table-td text-center font-mono font-semibold text-[var(--bb-data-fg-primary)]"
                     title={`${AVG_RANK_LABEL}: ${platform.n_cohorts}/${cohorts.length}. ${COVERAGE_POLICY_COPY}`}
                   >
                     {platform.avg_rank !== null ? (
                       <>
                         {platform.avg_rank.toFixed(1)}
-                        <span class="mt-1 block text-[11px] font-normal text-gray-500">
+                        <span class="mt-1 block text-[11px] font-normal text-[var(--bb-data-fg-muted)]">
                           over {platform.n_cohorts}/{cohorts.length}
                         </span>
                       </>
                     ) : (
-                      <span class="text-gray-400">No score</span>
+                      <span class="text-[var(--bb-data-fg-subtle)]">No score</span>
                     )}
                   </td>
                 </tr>
@@ -368,7 +358,7 @@ export function MetaLeaderboard({
           </table>
         </div>
         {visiblePlatforms.length < sortedPlatforms.length && (
-          <div class="border-t border-gray-200 bg-gray-50 px-4 py-3 text-center">
+          <div class="border-t border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-3 text-center">
             <button
               type="button"
               class="btn btn-secondary"
@@ -381,10 +371,10 @@ export function MetaLeaderboard({
       </div>
 
       <details class="mt-3">
-        <summary class="cursor-pointer text-xs text-gray-400 hover:text-gray-600">
+        <summary class="cursor-pointer text-xs text-[var(--bb-data-fg-subtle)] hover:text-[var(--bb-data-fg-muted)]">
           How this matrix is calculated
         </summary>
-        <div class="mt-2 rounded-md border border-gray-100 bg-gray-50 px-4 py-3 text-xs text-gray-500 space-y-1">
+        <div class="mt-2 rounded-md border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-3 text-xs text-[var(--bb-data-fg-muted)] space-y-1">
           <p>
             <strong>Times</strong> shows the cohort&apos;s primary metric in its native units:
             geomean latency for most benchmarks, Power@Size for TPC-H/TPC-DS.
@@ -403,6 +393,21 @@ export function MetaLeaderboard({
   );
 }
 
+/**
+ * Human-readable metric/unit/direction sublabel for a cohort header.
+ * Surfaces the audit's required "every cohort must clearly state metric, unit,
+ * and direction" without relying on tooltip-only disclosure.
+ */
+function cohortMetricSublabel(cohort: MetaCohort): string {
+  const metric = cohort.primary_metric;
+  const direction = cohort.primary_order === "desc" ? "higher is better" : "lower is faster";
+  if (metric === "power_score") return `Power score · ${direction}`;
+  if (metric === "display_geomean_ms") return `Geomean · ms · ${direction}`;
+  if (metric === "geomean_ms") return `Geomean · ms · ${direction}`;
+  if (metric === "total_duration_s") return `Total · s · ${direction}`;
+  return `${metric} · ${direction}`;
+}
+
 function cellText(rank: MetaRank, cohort: MetaCohort, mode: MetaLeaderboardMode): string {
   if (mode === "ranks") return `${rank.rank}/${rank.total}`;
   if (mode === "speedup") {
@@ -419,11 +424,11 @@ function renderCellValue(
   cohort: MetaCohort,
   mode: MetaLeaderboardMode,
 ) {
-  if (!rank) return <span class="text-gray-400">No run</span>;
+  if (!rank) return <span class="text-[var(--bb-data-fg-subtle)]">No run</span>;
   const text = cellText(rank, cohort, mode);
   if (mode === "ranks") {
     return (
-      <span class={rank.rank === 1 ? "font-semibold text-green-700" : "text-gray-700"}>{text}</span>
+      <span class={rank.rank === 1 ? "font-semibold text-green-700" : "text-[var(--bb-data-fg-primary)]"}>{text}</span>
     );
   }
   return text;

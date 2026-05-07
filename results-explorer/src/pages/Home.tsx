@@ -423,10 +423,10 @@ export function Home(_: RoutableProps) {
         </section>
 
         <section class="mb-12">
-          <h2 class="mb-4 text-xl font-semibold text-gray-900">Recent Results</h2>
-          <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-            <table class="min-w-full divide-y divide-gray-200">
-              <thead class="bg-gray-50">
+          <h2 class="mb-4 text-xl font-semibold text-[var(--bb-data-fg-primary)]">Recent Results</h2>
+          <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
+            <table class="min-w-full divide-y divide-[var(--bb-data-border)]">
+              <thead class="bg-[var(--bb-surface-data-muted)]">
                 <tr>
                   <th class="table-th">Benchmark</th>
                   <th class="table-th">Platform</th>
@@ -450,7 +450,7 @@ export function Home(_: RoutableProps) {
                   <th class="table-th" />
                 </tr>
               </thead>
-              <tbody class="divide-y divide-gray-100 bg-white">
+              <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
                 {recent.map((result) => (
                   <RecentRow key={result.result_id} entry={result} showCost={showRecentCost} />
                 ))}
@@ -514,7 +514,7 @@ function HomeLoadingSkeleton() {
 function SkeletonSelect({ label }: { label: string }) {
   return (
     <div>
-      <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</div>
+      <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--bb-data-fg-muted)]">{label}</div>
       <SkeletonBlock className="h-9 w-full bb-skeleton-dark" />
     </div>
   );
@@ -613,13 +613,13 @@ function CoverageEmptyState({
   return (
     <section
       aria-labelledby="coverage-empty-title"
-      class="mb-12 rounded-lg border border-dashed border-gray-300 bg-white p-8 text-gray-600"
+      class="mb-12 rounded-lg border border-dashed border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] p-8 text-[var(--bb-data-fg-muted)]"
     >
       <div class="mx-auto max-w-3xl text-center">
-        <h2 id="coverage-empty-title" class="text-lg font-semibold text-gray-900">
+        <h2 id="coverage-empty-title" class="text-lg font-semibold text-[var(--bb-data-fg-primary)]">
           No leaderboard cells match the current filters
         </h2>
-        <p class="mt-2 text-sm text-gray-500">
+        <p class="mt-2 text-sm text-[var(--bb-data-fg-muted)]">
           The current facet combination removed every published cohort cell.
         </p>
       </div>
@@ -630,14 +630,14 @@ function CoverageEmptyState({
           class="mx-auto mt-5 grid max-w-3xl gap-2 sm:grid-cols-2 lg:grid-cols-3"
         >
           {activeFacets.map((facet) => (
-            <div key={facet.key} class="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-left">
-              <dt class="text-[11px] font-semibold uppercase tracking-wide text-gray-400">{facet.label}</dt>
-              <dd class="mt-1 text-sm font-medium text-gray-700">{facet.value}</dd>
+            <div key={facet.key} class="rounded-md border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-3 py-2 text-left">
+              <dt class="text-[11px] font-semibold uppercase tracking-wide text-[var(--bb-data-fg-subtle)]">{facet.label}</dt>
+              <dd class="mt-1 text-sm font-medium text-[var(--bb-data-fg-primary)]">{facet.value}</dd>
             </div>
           ))}
         </dl>
       ) : (
-        <p class="mt-5 text-center text-sm text-gray-500">
+        <p class="mt-5 text-center text-sm text-[var(--bb-data-fg-muted)]">
           No active facets are applied; the public corpus has no leaderboard cohorts for this view.
         </p>
       )}
@@ -645,7 +645,7 @@ function CoverageEmptyState({
       <div class="mt-5 flex flex-wrap justify-center gap-2">
         <button
           type="button"
-          class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+          class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-2 text-sm font-medium text-[var(--bb-data-fg-primary)] hover:bg-[var(--bb-surface-data-muted)] disabled:cursor-not-allowed disabled:opacity-50"
           onClick={onClearScale}
           disabled={!canClearScale}
         >
@@ -653,7 +653,7 @@ function CoverageEmptyState({
         </button>
         <button
           type="button"
-          class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+          class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-2 text-sm font-medium text-[var(--bb-data-fg-primary)] hover:bg-[var(--bb-surface-data-muted)] disabled:cursor-not-allowed disabled:opacity-50"
           onClick={onClearPlatform}
           disabled={!canClearPlatform}
         >
@@ -728,8 +728,8 @@ function StatCard({
   return (
     <div class="card">
       <div class="text-3xl font-bold text-brand-600">{value}</div>
-      <div class="mt-1 text-sm font-medium text-gray-500">{label}</div>
-      {detail && <div class="mt-2 text-xs text-gray-400">{detail}</div>}
+      <div class="mt-1 text-sm font-medium text-[var(--bb-data-fg-muted)]">{label}</div>
+      {detail && <div class="mt-2 text-xs text-[var(--bb-data-fg-subtle)]">{detail}</div>}
     </div>
   );
 }
@@ -754,9 +754,9 @@ function MultiSelectFilter({
 
   return (
     <label class="block">
-      <span class="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</span>
+      <span class="mb-2 block text-xs font-semibold uppercase tracking-wide text-[var(--bb-data-fg-muted)]">{label}</span>
       <select
-        class="h-9 w-full rounded-md border border-[var(--bb-border-default)] bg-white px-3 text-sm font-medium text-gray-900"
+        class="h-9 w-full rounded-md border border-[var(--bb-border-default)] bg-[var(--bb-surface-data)] px-3 text-sm font-medium text-[var(--bb-data-fg-primary)]"
         value={value}
         onChange={(event) => onSelect((event.currentTarget as HTMLSelectElement).value)}
       >
@@ -792,9 +792,9 @@ function SelectFilter({
   if (options.length === 0) return null;
   return (
     <label class="block">
-      <span class="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</span>
+      <span class="mb-2 block text-xs font-semibold uppercase tracking-wide text-[var(--bb-data-fg-muted)]">{label}</span>
       <select
-        class="h-9 w-full rounded-md border border-[var(--bb-border-default)] bg-white px-3 text-sm font-medium text-gray-900"
+        class="h-9 w-full rounded-md border border-[var(--bb-border-default)] bg-[var(--bb-surface-data)] px-3 text-sm font-medium text-[var(--bb-data-fg-primary)]"
         value={current}
         onChange={(event) => onSelect((event.currentTarget as HTMLSelectElement).value)}
       >
@@ -811,9 +811,9 @@ function SelectFilter({
 function CoverageSummary() {
   return (
     <div>
-      <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Deployment / cost</div>
+      <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--bb-data-fg-muted)]">Deployment / cost</div>
       <div class="flex flex-wrap gap-2">
-        <span class="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-500">
+        <span class="rounded-full bg-[var(--bb-surface-app)] px-3 py-1.5 text-xs font-medium text-[var(--bb-data-fg-muted)]">
           All public coverage
         </span>
       </div>
@@ -829,18 +829,18 @@ const FLYWHEEL_STEPS = [
 
 function FlywheelStrip() {
   return (
-    <section class="mb-12 border-y border-gray-200 py-3">
+    <section class="mb-12 border-y border-[var(--bb-data-border)] py-3">
       <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p class="text-sm font-semibold text-gray-700">Run -&gt; Compare -&gt; Submit</p>
+        <p class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">Run -&gt; Compare -&gt; Submit</p>
         <nav aria-label="Result contribution workflow" class="flex flex-wrap gap-2">
           {FLYWHEEL_STEPS.map((step, index) => (
             <a
               key={step.href}
               href={step.href}
               aria-label={step.label}
-              class="inline-flex h-9 items-center gap-2 rounded-md border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 no-underline hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
+              class="inline-flex h-9 items-center gap-2 rounded-md border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-3 text-sm font-medium text-[var(--bb-data-fg-primary)] no-underline hover:border-brand-300 hover:bg-brand-50 hover:text-[var(--bb-accent-hover)]"
             >
-              <span class="flex h-5 w-5 items-center justify-center rounded-full bg-gray-100 text-xs text-gray-500">
+              <span class="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--bb-surface-app)] text-xs text-[var(--bb-data-fg-muted)]">
                 {index + 1}
               </span>
               {step.label}
@@ -868,7 +868,7 @@ function SingleFilterGroup({
   if (options.length === 0) return null;
   return (
     <div>
-      <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</div>
+      <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--bb-data-fg-muted)]">{label}</div>
       <div class="flex flex-wrap gap-2">
         {options.map((value) => {
           const active = current === value;
@@ -877,8 +877,8 @@ function SingleFilterGroup({
               key={value}
               class={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
                 active
-                  ? "bg-gray-900 text-white"
-                  : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                  ? "bg-[var(--bb-bg-primary)] text-white"
+                  : "bg-[var(--bb-surface-app)] text-[var(--bb-data-fg-muted)] hover:bg-[var(--bb-data-border)]"
               }`}
               onClick={() => onSelect(value)}
               aria-pressed={active}
@@ -894,16 +894,16 @@ function SingleFilterGroup({
 
 function RecentRow({ entry, showCost }: { entry: ResultRow; showCost: boolean }) {
   return (
-    <tr class="hover:bg-gray-50">
+    <tr class="hover:bg-[var(--bb-surface-data-muted)]">
       <td class="table-td font-medium">{humanizeBenchmark(entry.benchmark)}</td>
       <td class="table-td">
         <span class="badge badge-blue">{entry.platform}</span>
       </td>
       <td class="table-td">SF {entry.scale_factor}</td>
-      <td class="table-td text-gray-500">{entry.run_date}</td>
+      <td class="table-td text-[var(--bb-data-fg-muted)]">{entry.run_date}</td>
       <td class="table-td font-mono">{fmtScore(entry.power_score)}</td>
       <td class="table-td font-mono">{fmtGeomean(entry.geomean_ms)}</td>
-      {showCost && <td class="table-td font-mono text-gray-500">{normalizedCostLabel(entry)}</td>}
+      {showCost && <td class="table-td font-mono text-[var(--bb-data-fg-muted)]">{normalizedCostLabel(entry)}</td>}
       <td class="table-td text-right">
         <a href={`/results/r/${entry.result_id}`} class="text-xs font-medium no-underline">
           View →
@@ -923,13 +923,13 @@ interface BrowseSectionProps {
 function BrowseSection({ title, items, hrefFn, labelFn }: BrowseSectionProps) {
   return (
     <section>
-      <h2 class="mb-3 text-xl font-semibold text-gray-900">{title}</h2>
+      <h2 class="mb-3 text-xl font-semibold text-[var(--bb-data-fg-primary)]">{title}</h2>
       <div class="flex flex-wrap gap-2">
         {items.map((item) => (
           <a
             key={item}
             href={hrefFn(item)}
-            class="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm no-underline hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 transition-colors"
+            class="rounded-full border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-2 text-sm font-medium text-[var(--bb-data-fg-primary)] shadow-sm no-underline hover:border-brand-300 hover:bg-brand-50 hover:text-[var(--bb-accent-hover)] transition-colors"
           >
             {labelFn(item)}
           </a>

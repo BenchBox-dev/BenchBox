@@ -1,0 +1,171 @@
+id: results-explorer-retheme-leaderboard-semantics
+title: "Retheme the home leaderboard around metric clarity and comparison semantics"
+worktree: main
+priority: High
+status: Completed
+completed_date: "2026-05-07"
+category: Core Functionality
+
+description: |
+  The Home page is the strongest expression of the intended BenchBox brand, but
+  the cross-benchmark leaderboard still has data-presentation and accessibility
+  issues. The audit observed an active-looking blue ring on a `No run` cell at
+  first render, mixed units in the same mode (`1 ms` for SSB next to TPC-H power
+  score values such as `11,636.653`), visually competing heatmap colors, blue
+  links, green trust badges, green validation badges, and weak explanations of
+  missing runs, coverage, ranking, and speedup semantics.
+
+  This item should make the leaderboard feel like a rigorous benchmark product:
+  every cohort must clearly state metric, unit, and direction; missing data must
+  be distinct from slow data; trust and validation must be visible without
+  overpowering quantitative comparison; and keyboard focus must be intentional.
+
+deps:
+  needs:
+  - results-explorer-retheme-theme-system-foundation
+
+work:
+- id: w1
+  summary: "Remove the misleading initial focus/selection ring from leaderboard cells"
+  status: done
+  notes: |
+    In `MetaLeaderboard.tsx`, distinguish roving-grid internal focus position
+    from visible keyboard focus. The first cell should not show a blue ring
+    until the user actually keyboard-focuses the grid or selects a cell.
+    Prefer `focus-visible` styling over always applying `ring-2` from
+    `focusPos`.
+
+- id: w2
+  summary: "Add metric, unit, and direction labels to each cohort header"
+  needs: [w1]
+  status: done
+  notes: |
+    Update cohort headers so visible text or compact sublabels communicate:
+      - benchmark label;
+      - scale factor;
+      - phase;
+      - metric family (`Geomean latency`, `Power score`, etc.);
+      - unit (`ms`, score, ratio);
+      - direction (`lower is faster` or `higher is better`).
+
+    Do not rely on title tooltips. Tooltips are additive only.
+
+- id: w3
+  summary: "Redesign mode and sort controls so they read as analytical controls, not generic tabs"
+  needs: [w2]
+  status: done
+  notes: |
+    Replace the two adjacent segmented groups with shared primitives from the
+    theme-system TODO. Labels should explain the mode:
+      - `Times` -> native metric values;
+      - `Ranks` -> rank within each cohort;
+      - `Speedup` -> relative to cohort best.
+
+    Consider grouping sort and mode under a compact toolbar with labels so
+    `Avg rank over covered cohorts` does not dominate mobile.
+
+- id: w4
+  summary: "Separate quantitative heat from trust and validation metadata"
+  needs: [w3]
+  status: done
+  notes: |
+    Define a cell layout where the value remains the primary read, heatmap
+    shade is secondary, and trust/validation metadata is either compact,
+    de-emphasized, or exposed in a consistent metadata row. The trust badge
+    and validation badge should not both look like the same green success
+    chip.
+
+- id: w5
+  summary: "Define accessible color and legend behavior for heatmap and speedup modes"
+  needs: [w4]
+  status: done
+  notes: |
+    Add a compact legend that names:
+      - best/slowest or stronger/weaker shade semantics;
+      - missing run treatment;
+      - validation/trust glyph or badge meaning;
+      - whether speedup values below `1.00x` are worse.
+
+    Reuse the existing reduced-color/high-contrast logic and verify it still
+    works after the visual changes.
+
+- id: w6
+  summary: "Clarify ranking and coverage labels"
+  needs: [w5]
+  status: done
+  notes: |
+    The `Avg rank over covered cohorts` column should make clear that missing
+    cohorts are not scored. The `1/4 cohorts` coverage chip should remain
+    visible but not compete with the platform name. Add copy or a legend
+    explaining `No run` vs not eligible vs filtered out.
+
+- id: w7
+  summary: "Verify desktop and mobile leaderboard behavior"
+  needs: [w6]
+  status: done
+  notes: |
+    Check 390px, 768px, 1280px, and 1600px. At mobile widths, either add a
+    clear horizontal-scroll affordance or introduce compact platform cards
+    that preserve cohort comparison. Keyboard traversal must remain possible
+    without invisible focus or focus/selection ambiguity.
+
+must_preserve:
+- "Existing leaderboard URL mode contract (`?mode=ranks`, `?mode=speedup`) unless explicitly migrated."
+- "Clickable cohort headers and result receipt links."
+- "Coverage policy: missing cohorts are not scored; coverage is shown separately."
+- "High-contrast/reduced-color path for heatmap cells."
+
+anti_patterns:
+- "DO NOT hide metric direction in title attributes only."
+- "DO NOT use the same green pill style for trust, validation, computed, and ranking states."
+- "DO NOT make missing runs look like slow runs or zero values."
+- "DO NOT remove keyboard grid navigation while fixing focus styling."
+
+verification:
+- description: "MetaLeaderboard unit and accessibility tests pass"
+  command: "cd results-explorer && npm test -- src/components/__tests__/MetaLeaderboard.test.tsx src/components/__tests__/MetaLeaderboard.a11y.test.tsx"
+  expected_output: "all MetaLeaderboard tests pass"
+- description: "Home page browser smoke covers all three modes"
+  command: "cd results-explorer && npm run test:e2e:fixtures && npm run build && npx playwright test --project=chromium --grep
+    home"
+  expected_output: "home smoke passes for times, ranks, and speedup"
+- description: "Manual visual QA across requested viewports"
+  command: "echo 'Manual: capture /results/ at 390, 768, 1280, 1600 in times/ranks/speedup and verify focus, units, heatmap,
+    missing runs, badges, and coverage labels'"
+  expected_output: "manual evidence captured in _project/audits/"
+
+scope_limit:
+  only_modify:
+  - "results-explorer/src/components/MetaLeaderboard.tsx"
+  - "results-explorer/src/components/TrustBadge.tsx"
+  - "results-explorer/src/components/TuningBadge.tsx"
+  - "results-explorer/src/pages/Home.tsx"
+  - "results-explorer/src/lib/chartMath.ts"
+  - "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
+  - "results-explorer/src/components/__tests__/MetaLeaderboard.a11y.test.tsx"
+  - "results-explorer/src/pages/__tests__/Home.test.tsx"
+  - "results-explorer/e2e/routes/home.spec.ts"
+  do_not_modify:
+  - "results-data/"
+  - "benchbox/"
+
+metadata:
+  tags:
+  - results-explorer
+  - retheme
+  - leaderboard
+  - heatmap
+  - accessibility
+  estimated_effort: "Medium (~2 days)"
+  created_date: "2026-05-07"
+
+impact:
+  business_value: |
+    Makes the landing leaderboard credible as the public face of BenchBox
+    results.
+  user_impact: |
+    Users can understand what each value means, what is missing, and whether a
+    platform is actually better.
+  technical_debt: |
+    Clarifies the semantic contract between ranking data, visual encoding, and
+    accessibility behavior.

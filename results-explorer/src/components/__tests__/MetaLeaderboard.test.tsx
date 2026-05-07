@@ -114,7 +114,7 @@ describe("MetaLeaderboard", () => {
     const onModeChange = vi.fn();
     render(<MetaLeaderboard data={DATA} mode="times" onModeChange={onModeChange} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Speedup" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Speedup" }));
     expect(onModeChange).toHaveBeenCalledWith("speedup");
   });
 
@@ -212,15 +212,15 @@ describe("MetaLeaderboard", () => {
     const rowOrder = () =>
       Array.from(container.querySelectorAll("tbody tr")).map((row) => row.textContent ?? "");
 
-    expect(screen.getByRole("button", { name: "Avg rank over covered cohorts" }).getAttribute("aria-pressed")).toBe("true");
-    expect(screen.getByRole("button", { name: "Best cohort" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Recent" })).toBeTruthy();
-    expect(screen.getByRole("columnheader", { name: "Avg rank over covered cohorts" })).toBeTruthy();
+    expect(screen.getByRole("radio", { name: "Avg rank over covered cohorts" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("radio", { name: "Best cohort" })).toBeTruthy();
+    expect(screen.getByRole("radio", { name: "Recent" })).toBeTruthy();
+    expect(screen.getByRole("columnheader", { name: /Avg rank over covered cohorts/ })).toBeTruthy();
     expect(rowOrder()[0]).toContain("Polars");
 
-    fireEvent.click(screen.getByRole("button", { name: "Coverage" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Coverage" }));
 
-    expect(screen.getByRole("button", { name: "Coverage" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("radio", { name: "Coverage" }).getAttribute("aria-checked")).toBe("true");
     expect(screen.getByText("2/2 cohorts")).toBeTruthy();
     expect(screen.getByText("over 2/2")).toBeTruthy();
     expect(rowOrder()[0]).toContain("DuckDB");
@@ -323,7 +323,9 @@ describe("MetaLeaderboard", () => {
       ],
     };
     render(<MetaLeaderboard data={dataWithNa} mode="ranks" onModeChange={vi.fn()} />);
-    expect(screen.getByText("No run")).toBeTruthy();
+    // "No run" appears both in a missing-cell and in the legend caption; assert
+    // both surfaces are present rather than relying on a single-match query.
+    expect(screen.getAllByText("No run").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("0/1 cohorts")).toBeTruthy();
     expect(screen.getByText("No score")).toBeTruthy();
     const missingCell = screen.getByRole("gridcell", {
