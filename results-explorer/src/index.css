@@ -300,6 +300,34 @@
         min-height: var(--bb-skeleton-row-height);
     }
 
+    /* SVG charts must not exceed their container at narrow viewports.
+       Chart components own the inner layout (axes, ticks, value labels);
+       this rule only constrains the outer box to prevent horizontal
+       overflow at 390px / 768px. Cells that legitimately need horizontal
+       scrolling (heatmaps, sparkline tables) wrap themselves in
+       `.overflow-x-auto`. */
+    .bb-chart-svg {
+        max-width: 100%;
+        height: auto;
+    }
+
+    /* Compact "←/→ scroll" cue for dense tables that overflow at narrow
+       widths. Pair with `overflow-x-auto` on the parent so the table
+       still scrolls; this label only signals scrollability so users
+       don't think they are seeing a clipped view. */
+    .bb-scroll-affordance {
+        display: none;
+        font-size: var(--bb-text-xs);
+        color: var(--bb-data-fg-subtle);
+    }
+    @media (max-width: calc(var(--bb-bp-mobile) - 1px)) {
+        .bb-scroll-affordance {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+    }
+
     /* Heatmap cells use a single-hue sequential palette by default.
      Components still emit --cell-hue for chart-math parity, while
      --cell-lightness drives a color-blind-safer light-to-dark scale. */
