@@ -1,0 +1,169 @@
+id: results-explorer-uat-defect-tuned-template-coverage
+title: "Inventory tuned-template coverage gaps; author or explicitly waive each"
+worktree: main
+priority: Medium
+status: Not Started
+category: Platform Expansion
+
+description: |
+  In the 2026-05-05 tuned UAT sweep every attempted command log started
+  with `--tuning tuned`, and every successful result JSON has
+  `execution.tuning_mode == "tuned"`. However several runs reported a
+  fallback in their tuning log:
+
+      Tuning: using basic constraints (no optimized template available)
+
+  Examples in the handoff: DuckDB NYC Taxi, DuckDB FlightData. These
+  are still tuned-mode runs, but they are not benchmark-specific
+  tuned-template runs — the tuning layer fell back to platform-level
+  basic constraints because no `(platform, benchmark)` template
+  exists.
+
+  Source: `_project/handoffs/results-explorer-uat-tuned-followup-20260505.md`
+  ("Tuning Verification"). Follow-up to PR #235.
+
+  This TODO produces a complete `(platform, benchmark)` coverage matrix
+  showing which cells have a tuned template, which fall back to basic
+  constraints, and which fall back further (no tuning at all). Each
+  gap is then either authored or explicitly waived with a recorded
+  reason — so the next UAT sweep can claim "tuned" with confidence
+  about what tuned actually means per cell.
+
+deps:
+  needs: []
+
+work:
+  - id: w0
+    summary: "Capture the current 'basic constraints' fallback set from the 2026-05-05 sweep logs"
+    status: pending
+    notes: |
+      Evidence-durability gate per `_project/verification-logs/README.md`.
+      The TODO calls out DuckDB NYC Taxi and FlightData as examples;
+      pin the actual fallback list now:
+
+        LOGS=~/Developer/benchmark_runs/logs/uat_tuned_followup_20260505_pool02_rerun
+        grep -rn 'basic constraints (no optimized template available)' "$LOGS" \
+          | sed -E 's/.*\/([^/]+)\.log:.*/\1/' \
+          | sort -u
+
+      Capture stdout under
+      `_project/verification-logs/results-explorer-uat-defect-tuned-template-coverage/w0.log`
+      and commit. The captured set becomes the input to w3's triage — if
+      the static matrix in w1 omits a cell that observably fell back at
+      runtime, w2's mismatch check will fire.
+
+  - id: w1
+    summary: "Generate the tuned-template coverage matrix from the registry + tuning module"
+    needs: [w0]
+    status: pending
+    notes: |
+      Script (or `make` target) that walks
+      `(platform_registry × benchmark_registry)` and for each cell
+      reports one of:
+        - `tuned_template`           — a benchmark-specific template exists
+        - `basic_constraints`        — only platform-level constraints
+        - `untuned`                  — no tuning input at all
+      Output: `tests/uat/data/tuning_coverage.tsv` keyed by
+      `(platform, benchmark)`. Land as a checked-in artifact so reviewers
+      can diff coverage over time.
+
+  - id: w2
+    summary: "Cross-reference the matrix against actual 2026-05-05 sweep tuning logs"
+    needs: [w1]
+    status: pending
+    notes: |
+      Parse the per-cell tuning preamble from
+      `~/Developer/benchmark_runs/logs/uat_tuned_followup_20260505_pool02_rerun/`
+      and assert each cell's classification matches w1's static derivation.
+      Any mismatch is itself a defect (the runtime tuning behaviour
+      diverges from the static template inventory) and gets its own
+      blind-spot capture.
+
+  - id: w3
+    summary: "Triage each `basic_constraints` and `untuned` cell into authored / waived"
+    needs: [w2]
+    status: pending
+    notes: |
+      For each gap, decide:
+        - **author** — a tuned template should exist and there is a
+          natural one to write (e.g., ClickHouse-Local TPC-H bears
+          straightforward constraints)
+        - **waive** — tuned template is not meaningful for this cell
+          (e.g., a pure ingestion benchmark, or a platform that doesn't
+          accept user-provided constraints) — waiver records the reason
+      Output: `tests/uat/data/tuning_coverage.tsv` gains a `decision`
+      column with `author | waived | done`, and a `reason` column for
+      waivers. This is the working list for w4.
+
+  - id: w4
+    summary: "Author the high-priority tuned templates; record the rest as backlog"
+    needs: [w3]
+    status: pending
+    notes: |
+      Land tuned templates for cells where the value is highest (heavy
+      cells in the standard cohort, e.g., DuckDB NYC Taxi, DuckDB
+      FlightData per the handoff). The remainder stays in the matrix
+      as a tracked backlog; this TODO does NOT block on hitting 100%
+      authored coverage — it blocks on the matrix being complete and
+      every cell having a `decision`.
+
+  - id: w5
+    summary: "Add a regression test that flags new `basic_constraints` regressions"
+    needs: [w4]
+    status: pending
+    notes: |
+      Fast-marked test that re-derives the matrix and compares against
+      the checked-in TSV. Any cell that drops from `tuned_template` to
+      `basic_constraints` or `untuned` fails the test (the inverse
+      direction — improvements — is allowed). Prevents silent
+      regression when a new platform or benchmark lands without a
+      tuned template.
+
+must_preserve:
+  - "`execution.tuning_mode == \"tuned\"` semantics — a cell with `basic_constraints` is still legitimately tuned, just not benchmark-specific."
+  - "Existing tuning module surface (`benchbox.core.tuning` if present, or wherever templates are loaded today)."
+  - "TPC-H / TPC-DS official-mode templates — those are governed by compliance and not in scope for waiver decisions."
+
+anti_patterns:
+  - "DO NOT make `basic_constraints` itself an error condition — many cells have no tuned template by design, and treating fallback as failure makes operators less informed, not more."
+  - "DO NOT author tuned templates speculatively without evidence they help — a template that is identical to basic constraints just adds maintenance overhead without runtime benefit."
+  - "DO NOT introduce a new top-level config flag to gate tuned-template authoring — registration belongs in the tuning module, not in YAML config."
+
+verification:
+  - description: "Coverage matrix is checked in"
+    command: "test -f tests/uat/data/tuning_coverage.tsv && echo OK"
+    expected_output: "OK"
+  - description: "Every `(platform, benchmark)` row has a `decision`"
+    command: "uv run -- python -c 'import csv; rows=list(csv.DictReader(open(\"tests/uat/data/tuning_coverage.tsv\"), delimiter=\"\\t\")); assert all(r[\"decision\"] in (\"author\",\"waived\",\"done\") for r in rows), [r for r in rows if r[\"decision\"] not in (\"author\",\"waived\",\"done\")]; print(\"OK\")'"
+    expected_output: "OK"
+  - description: "Regression test flags drops in template coverage"
+    command: "uv run -- python -m pytest tests/uat/test_tuning_coverage.py -m fast -q"
+    expected_output: "all green"
+  - description: "Static matrix and 2026-05-05 sweep observations agree"
+    command: "uv run -- python -m tests.uat._cli verify-tuning-matrix --logs ~/Developer/benchmark_runs/logs/uat_tuned_followup_20260505_pool02_rerun/"
+    expected_output: "no mismatches"
+
+scope_limit:
+  only_modify:
+    - "tests/uat/data/tuning_coverage.tsv"
+    - "tests/uat/test_tuning_coverage.py"
+    - "tests/uat/_cli.py"
+    - "benchbox/core/tuning/"
+  do_not_modify:
+    - "benchbox/core/tpch/"
+    - "benchbox/core/tpcds/"
+
+metadata:
+  tags:
+    - uat-framework
+    - results-explorer
+    - tuning
+    - coverage
+    - templates
+  estimated_effort: "Medium (~1 week, 5 work units)"
+  created_date: "2026-05-06"
+  source: |
+    Handoff `_project/handoffs/results-explorer-uat-tuned-followup-20260505.md`,
+    Follow-Up TODO Candidate #5. Several 2026-05-05 sweep cells reported
+    "Tuning: using basic constraints (no optimized template available)"
+    despite running in `--tuning tuned` mode.
