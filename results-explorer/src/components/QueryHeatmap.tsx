@@ -218,7 +218,7 @@ export function QueryHeatmap({
 
   if (platforms.length === 0) {
     return (
-      <div class="rounded-lg border border-dashed border-gray-300 bg-white p-10 text-center text-gray-400">
+      <div class="rounded-lg border border-dashed border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] p-10 text-center text-[var(--bb-data-fg-subtle)]">
         No results available for this configuration.
       </div>
     );
@@ -258,8 +258,8 @@ export function QueryHeatmap({
               key={row.result_id}
               data-testid={`query-heatmap-mobile-card-${row.result_id}`}
               role="listitem"
-              class={`rounded-lg border border-gray-200 bg-white p-3 shadow-sm ${
-                isSelected ? "border-brand-300 bg-blue-50" : ""
+              class={`rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-3 shadow-sm ${
+                isSelected ? "border-[var(--bb-accent-hover)] bg-[var(--bb-tone-info-bg)]" : ""
               }`}
             >
               <div class="flex items-start gap-3">
@@ -269,18 +269,18 @@ export function QueryHeatmap({
                     checked={isSelected}
                     onChange={() => toggleRow(row)}
                     aria-label={`Select ${row.platform} for comparison`}
-                    class="mt-1 h-4 w-4 shrink-0 rounded border-gray-300 focus:ring-2 focus:ring-brand-500"
+                    class="mt-1 h-4 w-4 shrink-0 rounded border-[var(--bb-data-border-strong)]"
                   />
                 )}
                 <div class="min-w-0 flex-1">
                   <div class="flex flex-wrap items-center gap-1.5">
-                    <h2 class="text-sm font-semibold text-gray-900">{row.platform}</h2>
+                    <h2 class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">{row.platform}</h2>
                     {!row.is_ranking_eligible && (
-                      <span class="text-xs text-gray-400">{complianceLabel(row.compliance_class)}</span>
+                      <span class="text-xs text-[var(--bb-data-fg-subtle)]">{complianceLabel(row.compliance_class)}</span>
                     )}
                   </div>
                   {row.platform_version && (
-                    <div class="mt-0.5 text-xs text-gray-400">{row.platform_version}</div>
+                    <div class="mt-0.5 text-xs text-[var(--bb-data-fg-subtle)]">{row.platform_version}</div>
                   )}
                   <a
                     href={`/results/r/${row.result_id}#run-receipt`}
@@ -290,8 +290,8 @@ export function QueryHeatmap({
                   </a>
                 </div>
                 <dl class="shrink-0 text-right">
-                  <dt class="text-[0.65rem] font-semibold uppercase text-gray-400">{primaryLabel}</dt>
-                  <dd class="font-mono text-sm font-semibold text-gray-900">
+                  <dt class="text-[0.65rem] font-semibold uppercase text-[var(--bb-data-fg-subtle)]">{primaryLabel}</dt>
+                  <dd class="font-mono text-sm font-semibold text-[var(--bb-data-fg-primary)]">
                     {fmtPrimary(getPrimaryValue(row))}
                   </dd>
                 </dl>
@@ -301,36 +301,36 @@ export function QueryHeatmap({
                 <TrustBadge trustLabel={row.trust_label} compact />
                 <ValidationBadge validationStatus={row.validation_status} showMissing />
                 {showGeomeanCol && (
-                  <span class="rounded-full bg-gray-100 px-2 py-0.5 font-mono text-xs text-gray-600">
+                  <span class="rounded-full bg-[var(--bb-surface-app)] px-2 py-0.5 font-mono text-xs text-[var(--bb-data-fg-muted)]">
                     Geomean {fmtGeomean(row.display_geomean_ms)}
                   </span>
                 )}
               </div>
 
-              <div class="mt-3 border-t border-gray-100 pt-3">
-                <div class="text-[0.65rem] font-semibold uppercase text-gray-400">Query outliers</div>
+              <div class="mt-3 border-t border-[var(--bb-data-border)] pt-3">
+                <div class="text-[0.65rem] font-semibold uppercase text-[var(--bb-data-fg-subtle)]">Query outliers</div>
                 {outliers.length > 0 ? (
                   <div class="mt-2 grid gap-2" role="list" aria-label={`${row.platform} query outliers`}>
                     {outliers.map((outlier) => (
                       <div
                         key={outlier.queryId}
                         role="listitem"
-                        class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-md bg-gray-50 px-2 py-1.5"
+                        class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-md bg-[var(--bb-surface-data-muted)] px-2 py-1.5"
                       >
                         <div class="min-w-0">
-                          <div class="truncate font-mono text-xs font-semibold text-gray-800">
+                          <div class="truncate font-mono text-xs font-semibold text-[var(--bb-data-fg-primary)]">
                             {queryDisplayLabel(outlier.queryId)}
                           </div>
-                          <div class="text-xs text-gray-500">{outlier.ratioLabel}</div>
+                          <div class="text-xs text-[var(--bb-data-fg-muted)]">{outlier.ratioLabel}</div>
                         </div>
-                        <div class="font-mono text-xs font-semibold text-gray-900">
+                        <div class="font-mono text-xs font-semibold text-[var(--bb-data-fg-primary)]">
                           {fmtMs(outlier.ms)}
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p class="mt-2 rounded-md bg-gray-50 px-2 py-1.5 text-xs text-gray-500">
+                  <p class="mt-2 rounded-md bg-[var(--bb-surface-data-muted)] px-2 py-1.5 text-xs text-[var(--bb-data-fg-muted)]">
                     No query timings published.
                   </p>
                 )}
@@ -341,17 +341,17 @@ export function QueryHeatmap({
       </div>
 
       <div class="hidden md:block">
-        <div class="mb-2 flex items-center justify-between gap-3 text-xs text-gray-500">
+        <div class="mb-2 flex items-center justify-between gap-3 text-xs text-[var(--bb-data-fg-muted)]">
           <span
             data-testid="query-heatmap-scroll-hint"
-            class="inline-flex items-center rounded-full border border-gray-200 bg-white px-2.5 py-1 font-medium shadow-sm"
+            class="inline-flex items-center rounded-full border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-2.5 py-1 font-medium shadow-sm"
           >
             Query columns →
           </span>
           <span>{sortedQueryIds.length.toLocaleString()} queries</span>
         </div>
         <div
-          class="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm"
+          class="overflow-x-auto rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm"
           data-testid="query-heatmap-scroll-container"
         >
         <table
@@ -360,13 +360,13 @@ export function QueryHeatmap({
           aria-label={`${summary.benchmark} SF${summary.scale_factor} ${summary.phase} results`}
           class="min-w-max text-sm"
         >
-          <thead class="bg-gray-50">
+          <thead class="bg-[var(--bb-surface-data-muted)]">
             <tr role="row">
               {hasSelection && <th role="columnheader" scope="col" aria-label="Select for comparison" class="table-th w-12 min-w-12 px-2" />}
               <th
                 role="columnheader"
                 scope="col"
-                class="sticky left-0 z-10 w-44 min-w-44 bg-gray-50 p-0"
+                class="sticky left-0 z-10 w-44 min-w-44 bg-[var(--bb-surface-data-muted)] p-0"
                 aria-sort={ariaSort("platform")}
               >
                 <button
@@ -378,7 +378,7 @@ export function QueryHeatmap({
                   {sortAnnouncement("platform")}
                 </button>
               </th>
-              <th role="columnheader" scope="col" class="table-th sticky left-44 z-10 w-36 min-w-36 whitespace-nowrap bg-gray-50">
+              <th role="columnheader" scope="col" class="table-th sticky left-44 z-10 w-36 min-w-36 whitespace-nowrap bg-[var(--bb-surface-data-muted)]">
                 Trust
               </th>
               <th
@@ -407,7 +407,7 @@ export function QueryHeatmap({
                 >
                   <button
                     type="button"
-                    class="table-th block w-full cursor-pointer select-none border-0 bg-transparent text-left text-gray-400"
+                    class="table-th block w-full cursor-pointer select-none border-0 bg-transparent text-left text-[var(--bb-data-fg-subtle)]"
                     onClick={() => toggleSort("geomean")}
                   >
                     Geomean{sortArrow("geomean")}
@@ -436,7 +436,7 @@ export function QueryHeatmap({
               ))}
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-100">
+          <tbody class="divide-y divide-[var(--bb-data-border)]">
             {sorted.map((row, rowIdx) => {
               const isSelected = selectedIds?.has(rowKey(row)) ?? false;
               return (
@@ -444,7 +444,7 @@ export function QueryHeatmap({
                   key={row.result_id}
                   role="row"
                   data-testid={row.result_id}
-                  class={`hover:bg-gray-50 ${isSelected ? "bg-blue-50" : ""}`}
+                  class={`hover:bg-[var(--bb-surface-data-muted)] ${isSelected ? "bg-[var(--bb-tone-info-bg)]" : ""}`}
                 >
                   {hasSelection && (
                     <td role="gridcell" class="table-td w-12 min-w-12 px-2">
@@ -453,24 +453,24 @@ export function QueryHeatmap({
                         checked={isSelected}
                         onChange={() => toggleRow(row)}
                         aria-label={`Select ${row.platform} for comparison`}
-                        class="h-4 w-4 rounded border-gray-300 focus:ring-2 focus:ring-brand-500"
+                        class="h-4 w-4 rounded border-[var(--bb-data-border-strong)]"
                       />
                     </td>
                   )}
                   <td
                     role="gridcell"
                     class={`table-td sticky left-0 z-10 w-44 min-w-44 ${
-                      isSelected ? "bg-blue-50" : "bg-white"
+                      isSelected ? "bg-[var(--bb-tone-info-bg)]" : "bg-[var(--bb-surface-data)]"
                     }`}
                   >
                     <div class="flex flex-wrap items-center gap-1.5">
-                      <span class="font-medium text-gray-900">{row.platform}</span>
+                      <span class="font-medium text-[var(--bb-data-fg-primary)]">{row.platform}</span>
                       {!row.is_ranking_eligible && (
-                        <span class="text-xs text-gray-400">{complianceLabel(row.compliance_class)}</span>
+                        <span class="text-xs text-[var(--bb-data-fg-subtle)]">{complianceLabel(row.compliance_class)}</span>
                       )}
                     </div>
                     {row.platform_version && (
-                      <div class="mt-0.5 text-xs text-gray-400">{row.platform_version}</div>
+                      <div class="mt-0.5 text-xs text-[var(--bb-data-fg-subtle)]">{row.platform_version}</div>
                     )}
                     <a
                       href={`/results/r/${row.result_id}#run-receipt`}
@@ -482,7 +482,7 @@ export function QueryHeatmap({
                   <td
                     role="gridcell"
                     class={`table-td sticky left-44 z-10 w-36 min-w-36 whitespace-nowrap ${
-                      isSelected ? "bg-blue-50" : "bg-white"
+                      isSelected ? "bg-[var(--bb-tone-info-bg)]" : "bg-[var(--bb-surface-data)]"
                     }`}
                   >
                     <div class="flex flex-wrap gap-1">
@@ -494,7 +494,7 @@ export function QueryHeatmap({
                     {fmtPrimary(getPrimaryValue(row))}
                   </td>
                   {showGeomeanCol && (
-                    <td role="gridcell" class="table-td w-32 min-w-32 whitespace-nowrap font-mono text-gray-500">
+                    <td role="gridcell" class="table-td w-32 min-w-32 whitespace-nowrap font-mono text-[var(--bb-data-fg-muted)]">
                       {fmtGeomean(row.display_geomean_ms)}
                     </td>
                   )}
@@ -530,8 +530,8 @@ export function QueryHeatmap({
                         role="gridcell"
                         data-cell={`${rowIdx}-${colIdx}`}
                         tabIndex={isFocused ? 0 : -1}
-                        class={`table-td min-w-[7rem] whitespace-nowrap text-right font-mono focus:outline focus:outline-2 focus:outline-brand-500 ${
-                          hue !== null ? "heatmap-cell" : ms === null ? "bg-gray-50 text-gray-400" : ""
+                        class={`table-td min-w-[7rem] whitespace-nowrap text-right font-mono ${
+                          hue !== null ? "heatmap-cell" : ms === null ? "bg-[var(--bb-surface-data-muted)] text-[var(--bb-data-fg-subtle)]" : ""
                         }`}
                         style={cellStyle}
                         aria-label={ariaLabel}

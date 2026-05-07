@@ -75,7 +75,7 @@ test.describe("Index sortable headers", () => {
     await waitForShell(page);
     await waitForDataLoaded(page, /TPC-H Results/);
 
-    await page.getByRole("button", { name: "List" }).click();
+    await page.getByRole("radio", { name: "List" }).click();
     const table = page.locator("table").first();
     const rows = table.locator("tbody tr[data-testid]");
     await expect.poll(() => rows.count()).toBeGreaterThanOrEqual(3);

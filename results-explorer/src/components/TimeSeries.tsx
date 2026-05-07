@@ -95,7 +95,7 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
 
   if (allSeries.length === 0) {
     return (
-      <p class="text-sm text-gray-400 italic">
+      <p class="text-sm text-[var(--bb-data-fg-subtle)] italic">
         Not enough historical data for a trend chart (need ≥2 runs per platform).
       </p>
     );
@@ -223,7 +223,7 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
 
       {/* Legend */}
       {allSeries.length > 1 && (
-        <div class="flex flex-wrap gap-4 text-xs text-gray-600 mt-1">
+        <div class="flex flex-wrap gap-4 text-xs text-[var(--bb-data-fg-muted)] mt-1">
           {allSeries.map((s) => (
             <span key={s.platformId} class="flex items-center gap-1.5">
               <span class="inline-block w-5 border-t-2" style={{ borderColor: s.color }} />

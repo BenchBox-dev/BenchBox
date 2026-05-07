@@ -48,13 +48,13 @@ export function RankTable({ summary }: Props) {
       >
         <thead>
           <tr>
-            <th class="text-left px-2 py-1.5 border-b border-gray-200 text-gray-500 font-normal sticky left-0 bg-white min-w-[4rem]">
+            <th class="text-left px-2 py-1.5 border-b border-[var(--bb-data-border)] text-[var(--bb-data-fg-muted)] font-normal sticky left-0 bg-[var(--bb-surface-data)] min-w-[4rem]">
               Query
             </th>
             {platforms.map((p, i) => (
               <th
                 key={p.result_id}
-                class="px-2 py-1.5 border-b border-gray-200 text-gray-700 font-semibold whitespace-nowrap text-center"
+                class="px-2 py-1.5 border-b border-[var(--bb-data-border)] text-[var(--bb-data-fg-primary)] font-semibold whitespace-nowrap text-center"
               >
                 <span
                   class="inline-block w-2 h-2 rounded-full mr-1 align-middle"
@@ -67,8 +67,8 @@ export function RankTable({ summary }: Props) {
         </thead>
         <tbody>
           {sortedQueryIds.map((qid) => (
-            <tr key={qid} class="hover:bg-gray-50">
-              <td class="px-2 py-1 border-b border-gray-100 text-gray-600 font-mono sticky left-0 bg-white">
+            <tr key={qid} class="hover:bg-[var(--bb-surface-data-muted)]">
+              <td class="px-2 py-1 border-b border-[var(--bb-data-border)] text-[var(--bb-data-fg-muted)] font-mono sticky left-0 bg-[var(--bb-surface-data)]">
                 {queryDisplayLabel(qid)}
               </td>
               {platforms.map((_, i) => {
@@ -76,12 +76,12 @@ export function RankTable({ summary }: Props) {
                 return (
                   <td
                     key={i}
-                    class={`px-2 py-1 border-b border-gray-100 text-center font-mono ${
+                    class={`px-2 py-1 border-b border-[var(--bb-data-border)] text-center font-mono ${
                       r === 1
-                        ? "font-bold text-emerald-700 bg-emerald-50"
+                        ? "font-bold text-[var(--bb-tone-success-fg)] bg-[var(--bb-tone-success-bg)]"
                         : r === null
-                          ? "text-gray-300"
-                          : "text-gray-600"
+                          ? "text-[var(--bb-data-fg-subtle)]"
+                          : "text-[var(--bb-data-fg-muted)]"
                     }`}
                   >
                     {r === null ? "-" : ordinal(r)}
@@ -92,13 +92,13 @@ export function RankTable({ summary }: Props) {
           ))}
         </tbody>
         <tfoot>
-          <tr class="bg-gray-50 border-t border-gray-200">
-            <td class="px-2 py-1.5 text-gray-500 sticky left-0 bg-gray-50">1st wins</td>
+          <tr class="bg-[var(--bb-surface-data-muted)] border-t border-[var(--bb-data-border)]">
+            <td class="px-2 py-1.5 text-[var(--bb-data-fg-muted)] sticky left-0 bg-[var(--bb-surface-data-muted)]">1st wins</td>
             {winCounts.map((w, i) => (
               <td
                 key={i}
                 class={`px-2 py-1.5 text-center font-semibold ${
-                  w === maxWins && maxWins > 0 ? "text-emerald-700" : "text-gray-700"
+                  w === maxWins && maxWins > 0 ? "text-[var(--bb-tone-success-fg)]" : "text-[var(--bb-data-fg-primary)]"
                 }`}
               >
                 {w}

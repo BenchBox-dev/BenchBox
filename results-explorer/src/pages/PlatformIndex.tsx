@@ -197,17 +197,17 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
       <Breadcrumb crumbs={[{ label: "Results", href: "/results/" }, { label: platformDisplayName }]} />
 
       <div class="mt-6 mb-8 flex items-center justify-between">
-        <h1 class="text-3xl font-bold text-gray-900">{platformDisplayName} Results</h1>
+        <h1 class="text-3xl font-bold text-[var(--bb-data-fg-primary)]">{platformDisplayName} Results</h1>
 
         <div class="flex items-center gap-4">
           {tuningModes.length > 1 && (
             <div class="flex items-center gap-2">
-              <label class="text-sm font-medium text-gray-700" for="tuning-filter">
+              <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="tuning-filter">
                 Tuning:
               </label>
               <select
                 id="tuning-filter"
-                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1.5 text-sm shadow-sm"
                 value={tuningFilter}
                 onChange={(e) => setTuningFilter((e.target as HTMLSelectElement).value)}
               >
@@ -229,21 +229,21 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
       </div>
 
       {platformResults.length === 0 ? (
-        <p class="text-gray-500">
+        <p class="text-[var(--bb-data-fg-muted)]">
           {allPlatformResults.length > 0 && hasActivePlatformResultFacets(facets)
             ? `No results match the selected filters for platform: ${platformDisplayName}.`
             : `No results found for platform: ${platformDisplayName}.`}
         </p>
       ) : (
-        <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-white px-4 py-3 text-sm text-gray-500">
+        <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
             <span>
               Showing {visiblePlatformResults.length.toLocaleString()} of {platformResults.length.toLocaleString()} results
             </span>
             {selected.size > 0 && <span>{selected.size.toLocaleString()} selected for compare</span>}
           </div>
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
+          <table class="min-w-full divide-y divide-[var(--bb-data-border)]">
+            <thead class="bg-[var(--bb-surface-data-muted)]">
               <tr>
                 <th class="table-th w-8">
                   <span class="sr-only">Compare</span>
@@ -307,7 +307,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                 <th class="table-th" />
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-100 bg-white">
+            <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
               {visiblePlatformResults.map((r) => (
                 <PlatformRow
                   key={r.result_id}
@@ -319,7 +319,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
             </tbody>
           </table>
           {visiblePlatformResults.length < platformResults.length && (
-            <div class="border-t border-gray-200 bg-gray-50 px-4 py-3 text-center">
+            <div class="border-t border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-3 text-center">
               <button
                 type="button"
                 class="btn btn-secondary"
@@ -332,13 +332,13 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
         </div>
       )}
 
-      {selected.size === 1 && <p class="mt-3 text-sm text-gray-500">Select at least one more result to compare.</p>}
+      {selected.size === 1 && <p class="mt-3 text-sm text-[var(--bb-data-fg-muted)]">Select at least one more result to compare.</p>}
 
       {compareUrl && (
-        <div class="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 bg-white px-4 py-3 shadow-lg">
+        <div class="fixed bottom-0 left-0 right-0 z-50 border-t border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 shadow-lg">
           <div class="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div class="min-w-0 flex-1">
-              <div class="text-sm text-gray-700">
+              <div class="text-sm text-[var(--bb-data-fg-primary)]">
                 <strong>{selected.size}</strong> results selected for compare
               </div>
               <div
@@ -353,15 +353,15 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                       key={row.result_id}
                       data-testid={`compare-tray-row-${row.result_id}`}
                       role="listitem"
-                      class="flex max-w-full flex-wrap items-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-600"
+                      class="flex max-w-full flex-wrap items-center gap-1.5 rounded-md border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-2 py-1 text-xs text-[var(--bb-data-fg-muted)]"
                     >
-                      <span class="font-medium text-gray-900">{row.platform}</span>
+                      <span class="font-medium text-[var(--bb-data-fg-primary)]">{row.platform}</span>
                       <span>{humanizeBenchmark(row.benchmark)}</span>
                       <span>SF {row.scale_factor}</span>
                       <span>{row.phase}</span>
                       <span>{row.run_date}</span>
                       <TrustBadge trustLabel={row.trust_label} compact />
-                      <span class="font-mono text-gray-500">ID {displayCompareId(id)}</span>
+                      <span class="font-mono text-[var(--bb-data-fg-muted)]">ID {displayCompareId(id)}</span>
                     </div>
                   );
                 })}
@@ -370,7 +370,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
             <div class="flex shrink-0 items-center gap-3">
               <button
                 type="button"
-                class="text-sm text-gray-500 hover:text-gray-700"
+                class="text-sm text-[var(--bb-data-fg-muted)] hover:text-[var(--bb-data-fg-primary)]"
                 onClick={() => setSelected(new Set())}
               >
                 Clear
@@ -385,16 +385,16 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
 
       {platformResultsRaw.length >= 2 && (
         <section class="card mt-8" aria-label="Performance trends by comparable cohort">
-          <h2 class="mb-2 text-base font-semibold text-gray-900">Performance Trends by Cohort</h2>
+          <h2 class="mb-2 text-base font-semibold text-[var(--bb-data-fg-primary)]">Performance Trends by Cohort</h2>
           {trendCohorts.length === 0 ? (
-            <p class="text-sm text-gray-400 italic">
+            <p class="text-sm text-[var(--bb-data-fg-subtle)] italic">
               Trends require at least two runs within the same benchmark, scale, phase, and primary metric.
             </p>
           ) : (
             <div class="space-y-6">
               {trendCohorts.map((cohort) => (
                 <section key={cohort.key} data-testid={`trend-cohort-${cohort.key}`} class="space-y-2">
-                  <h3 class="text-sm font-medium text-gray-700">{cohort.label}</h3>
+                  <h3 class="text-sm font-medium text-[var(--bb-data-fg-primary)]">{cohort.label}</h3>
                   <TimeSeries entries={cohort.entries} primaryMetric={cohort.primaryMetric} />
                 </section>
               ))}
@@ -456,19 +456,19 @@ interface PlatformRowProps {
 
 function PlatformRow({ entry, checked, onToggle }: PlatformRowProps) {
   return (
-    <tr class="hover:bg-gray-50" data-testid={entry.result_id}>
+    <tr class="hover:bg-[var(--bb-surface-data-muted)]" data-testid={entry.result_id}>
       <td class="table-td">
         <input
           type="checkbox"
           checked={checked}
           onChange={onToggle}
-          class="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+          class="h-4 w-4 rounded border-[var(--bb-data-border-strong)]"
           aria-label={`Select ${entry.result_id} for comparison`}
         />
       </td>
       <td class="table-td font-medium">{humanizeBenchmark(entry.benchmark)}</td>
       <td class="table-td">SF {entry.scale_factor}</td>
-      <td class="table-td text-gray-500">{entry.run_date}</td>
+      <td class="table-td text-[var(--bb-data-fg-muted)]">{entry.run_date}</td>
       <td class="table-td font-mono">{fmtScore(entry.power_score)}</td>
       <td class="table-td font-mono">{fmtGeomean(entry.geomean_ms)}</td>
       <td class="table-td">
