@@ -41,6 +41,41 @@ let initError: Error | null = null;
 
 type DuckDBConnection = Awaited<ReturnType<duckdb.AsyncDuckDB["connect"]>>;
 
+// Required column contract for the canonical `bench.results` table.
+//
+// Scope: this is the *cost + identity + environment-facet subset* whose
+// disappearance triggered the 2026-05-07 retheme audit binder error
+// (specifically `normalized_cost_usd`, `cost_status`, `cost_model_*`,
+// `pricing_region`, `cloud_*`). It is intentionally a subset of the full
+// builder schema, not a mirror of every column read by deep queries — the
+// goal is to convert the cost-contract drift mode into an actionable
+// init-time error, not to lock down the entire builder schema. Other
+// columns (e.g. `display_geomean_ms`, `trust_label`) ARE read by deep
+// queries; their absence would still surface as a deeper binder error.
+// Extending this list is fine if a future regression motivates it.
+//
+// Builder source: `benchbox/core/explorer_pipeline/duckdb_builder.py`.
+const BENCH_RESULTS_REQUIRED_COLUMNS = [
+  "result_id",
+  "benchmark",
+  "scale_factor",
+  "platform",
+  "platform_id",
+  "cost_usd",
+  "normalized_cost_usd",
+  "cost_model_version",
+  "cost_model_source",
+  "cost_scope",
+  "cost_status",
+  "billing_unit",
+  "pricing_region",
+  "deployment_class",
+  "cloud_provider",
+  "cloud_region",
+  "instance_or_warehouse",
+  "storage_format",
+] as const;
+
 // Required scans must be queryable AND non-empty for the snapshot to be
 // considered ready. Optional scans must be queryable (so we know the table
 // is attached and the schema exists), but an empty result is acceptable —
@@ -106,6 +141,32 @@ export async function _waitForSnapshotRowsForTest(
   conn: DuckDBConnection,
 ): Promise<void> {
   return waitForSnapshotRows(conn);
+}
+
+// Exported for unit-test coverage of the bench.results column guard.
+export async function _verifyBenchResultsColumnsForTest(
+  conn: DuckDBConnection,
+): Promise<void> {
+  return verifyBenchResultsColumns(conn);
+}
+
+export const _BENCH_RESULTS_REQUIRED_COLUMNS_FOR_TEST = BENCH_RESULTS_REQUIRED_COLUMNS;
+
+async function verifyBenchResultsColumns(conn: DuckDBConnection): Promise<void> {
+  const result = await conn.query(
+    "SELECT column_name FROM information_schema.columns" +
+      " WHERE table_catalog = 'bench' AND table_name = 'results'",
+  );
+  const present = new Set<string>(
+    result.toArray().map((row) => String(row.toJSON().column_name ?? "")),
+  );
+  const missing = BENCH_RESULTS_REQUIRED_COLUMNS.filter((column) => !present.has(column));
+  if (missing.length === 0) return;
+  throw new Error(
+    `DuckDB snapshot 'bench.results' is missing required columns: ${missing.join(", ")}.` +
+      " Regenerate the snapshot via 'benchbox explorer build' or check the deployed" +
+      " results.duckdb file. See _project/analysis/results-explorer-cost-schema-compatibility-2026-05-07.md.",
+  );
 }
 
 async function waitForSnapshotRows(conn: DuckDBConnection): Promise<void> {
@@ -192,6 +253,9 @@ export async function getDb(): Promise<duckdb.AsyncDuckDB> {
       // Run the same projection PlatformIndex uses so a cold HTTP-backed
       // snapshot is query-ready before the cached DB instance is exposed.
       await waitForSnapshotRows(conn);
+      // Convert "Binder Error in deep page query" into "DuckDB snapshot is
+      // missing column X" at init time. See `BENCH_RESULTS_REQUIRED_COLUMNS`.
+      await verifyBenchResultsColumns(conn);
     } finally {
       await conn.close();
     }
