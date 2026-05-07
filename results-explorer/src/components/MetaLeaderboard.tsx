@@ -230,7 +230,12 @@ export function MetaLeaderboard({
       </div>
 
       <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
-        <div class="overflow-x-auto">
+        <div class="flex justify-end">
+          <span class="bb-scroll-affordance m-2" data-testid="meta-leaderboard-scroll-hint">
+            Scroll table for more cohorts →
+          </span>
+        </div>
+        <div class="overflow-x-auto" data-testid="meta-leaderboard-scroll-container">
           <table
             ref={gridRef}
             role="grid"

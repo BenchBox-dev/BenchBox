@@ -48,6 +48,7 @@ function Header() {
               ≥640px (sm) the row collapses back to single-line. */}
           <nav
             aria-label="Results Explorer"
+            data-testid="results-explorer-nav"
             class="flex min-h-12 flex-wrap items-center gap-x-5 gap-y-1 py-1 text-sm sm:flex-nowrap sm:overflow-x-auto"
           >
             <ExplorerNavLink href="/results/" active={currentPath === "/results" || currentPath === "/results/"}>

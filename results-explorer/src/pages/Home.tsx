@@ -425,37 +425,44 @@ export function Home(_: RoutableProps) {
         <section class="mb-12">
           <h2 class="mb-4 text-xl font-semibold text-[var(--bb-data-fg-primary)]">Recent Results</h2>
           <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
-            <table class="min-w-full divide-y divide-[var(--bb-data-border)]">
-              <thead class="bg-[var(--bb-surface-data-muted)]">
-                <tr>
-                  <th class="table-th">Benchmark</th>
-                  <th class="table-th">Platform</th>
-                  <th class="table-th">Scale</th>
-                  <th class="table-th">Date</th>
-                  <th class="table-th">Power Score</th>
-                  <th
-                    class="table-th"
-                    title="Geometric mean of per-query execution times (measurement runs only). Lower is faster."
-                  >
-                    Geomean (ms)
-                  </th>
-                  {showRecentCost && (
+            <div class="flex justify-end">
+              <span class="bb-scroll-affordance m-2" data-testid="recent-results-scroll-hint">
+                Scroll table for row actions →
+              </span>
+            </div>
+            <div class="overflow-x-auto" data-testid="recent-results-scroll-container">
+              <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">
+                <thead class="bg-[var(--bb-surface-data-muted)]">
+                  <tr>
+                    <th class="table-th">Benchmark</th>
+                    <th class="table-th">Platform</th>
+                    <th class="table-th">Scale</th>
+                    <th class="table-th">Date</th>
+                    <th class="table-th">Power Score</th>
                     <th
                       class="table-th"
-                      title="BenchBox normalized USD from emitted normalized_cost metadata. Local and unavailable rows are not comparable cloud cost."
+                      title="Geometric mean of per-query execution times (measurement runs only). Lower is faster."
                     >
-                      Normalized cost
+                      Geomean (ms)
                     </th>
-                  )}
-                  <th class="table-th" />
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
-                {recent.map((result) => (
-                  <RecentRow key={result.result_id} entry={result} showCost={showRecentCost} />
-                ))}
-              </tbody>
-            </table>
+                    {showRecentCost && (
+                      <th
+                        class="table-th"
+                        title="BenchBox normalized USD from emitted normalized_cost metadata. Local and unavailable rows are not comparable cloud cost."
+                      >
+                        Normalized cost
+                      </th>
+                    )}
+                    <th class="table-th sticky right-0 z-10 bg-[var(--bb-surface-data-muted)]" />
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
+                  {recent.map((result) => (
+                    <RecentRow key={result.result_id} entry={result} showCost={showRecentCost} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
 
@@ -904,7 +911,7 @@ function RecentRow({ entry, showCost }: { entry: ResultRow; showCost: boolean })
       <td class="table-td font-mono">{fmtScore(entry.power_score)}</td>
       <td class="table-td font-mono">{fmtGeomean(entry.geomean_ms)}</td>
       {showCost && <td class="table-td font-mono text-[var(--bb-data-fg-muted)]">{normalizedCostLabel(entry)}</td>}
-      <td class="table-td text-right">
+      <td class="table-td sticky right-0 z-10 bg-[var(--bb-surface-data)] text-right">
         <a href={`/results/r/${entry.result_id}`} class="text-xs font-medium no-underline">
           View →
         </a>

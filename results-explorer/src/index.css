@@ -312,7 +312,10 @@
        overflow at 390px / 768px. Cells that legitimately need horizontal
        scrolling (heatmaps, sparkline tables) wrap themselves in
        `.overflow-x-auto`. */
-    .bb-chart-svg {
+    .bb-chart-svg,
+    .card svg[role="img"],
+    .panel svg[role="img"],
+    [data-chart-container] svg {
         max-width: 100%;
         height: auto;
     }

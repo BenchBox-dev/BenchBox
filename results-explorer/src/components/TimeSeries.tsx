@@ -48,8 +48,8 @@ interface Series {
 }
 
 export function TimeSeries({ entries, primaryMetric }: Props) {
-  const [containerRef, { width: containerWidth }] = useElementSize();
-  const w = Math.max(containerWidth, 400);
+  const [containerRef, { width: containerWidth }] = useElementSize(320);
+  const w = Math.max(containerWidth, 320);
 
   const metric = primaryMetric ?? "display_geomean_ms";
   const higherIsBetter = metric === "power_score";

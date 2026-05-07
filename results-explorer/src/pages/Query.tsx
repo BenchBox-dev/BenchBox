@@ -572,9 +572,9 @@ export function Query(_: RoutableProps) {
                     Showing {visibleRows.length.toLocaleString()} of {rows.length.toLocaleString()} returned rows
                   </span>
                   <span>Query limit: {rowLimitMode === "all" ? "all" : DEFAULT_ROW_LIMIT.toLocaleString()}</span>
-                  <span class="bb-scroll-affordance">← scroll →</span>
+                  <span class="bb-scroll-affordance" data-testid="query-results-scroll-hint">← scroll →</span>
                 </div>
-                <table class="min-w-full divide-y divide-[var(--bb-data-border)]">
+                <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">
                   <thead class="bg-[var(--bb-surface-data-muted)]">
                     <tr>
                       {visibleColumns.map((column) => (
@@ -587,7 +587,7 @@ export function Query(_: RoutableProps) {
                           {sort.column === column ? (sort.direction === "asc" ? " ↑" : " ↓") : ""}
                         </th>
                       ))}
-                      <th class="table-th" />
+                      <th class="table-th sticky right-0 z-10 bg-[var(--bb-surface-data-muted)]" />
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
@@ -598,7 +598,7 @@ export function Query(_: RoutableProps) {
                             {formatQueryCell(column, row[column])}
                           </td>
                         ))}
-                        <td class="table-td text-right">
+                        <td class="table-td sticky right-0 z-10 bg-[var(--bb-surface-data)] text-right">
                           <a href={`/results/r/${row.result_id}`} class="text-xs font-medium no-underline">
                             View →
                           </a>
@@ -648,9 +648,9 @@ export function Query(_: RoutableProps) {
                 <div class="overflow-x-auto rounded-lg border border-[var(--bb-data-border)]">
                   <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
                     <span>Showing {visibleSqlRows.length.toLocaleString()} of {sqlRows.length.toLocaleString()} SQL rows</span>
-                    <span class="bb-scroll-affordance">← scroll →</span>
+                    <span class="bb-scroll-affordance" data-testid="query-sql-scroll-hint">← scroll →</span>
                   </div>
-                  <table class="min-w-full divide-y divide-[var(--bb-data-border)]">
+                  <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">
                     <thead class="bg-[var(--bb-surface-data-muted)]">
                       <tr>
                         {sqlColumns.map((column) => (
