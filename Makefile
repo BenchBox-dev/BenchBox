@@ -1583,22 +1583,16 @@ uat-package:
 		--submissions-dir "$(SUBMISSIONS_DIR)" \
 		$(foreach r,$(RESULTS),--result "$(r)")
 
-UAT_BRING_UP_KNOWN_PLATFORMS := cedardb clickhouse-server databend doris influxdb lakesail pg-duckdb pg-mooncake postgresql presto questdb singlestore starrocks timescaledb trino velox
-ifneq ($(strip $(PLATFORM)),)
-ifeq ($(filter $(PLATFORM),$(UAT_BRING_UP_KNOWN_PLATFORMS)),)
-$(error unknown platform '$(PLATFORM)'; supported: $(UAT_BRING_UP_KNOWN_PLATFORMS))
-endif
-endif
-
-# make uat-bring-up PLATFORM=<name> [TIMEOUT_S=300] [DRY_RUN=1]
+# make uat-bring-up PLATFORM=<name> [TIMEOUT_S=300] [DRY_RUN=1] [BENCHMARK_RUNS_DIR=~/Developer/benchmark_runs]
 uat-bring-up:
 	@if [ -z "$(PLATFORM)" ]; then \
-		echo "Usage: make uat-bring-up PLATFORM=<name> [TIMEOUT_S=300] [DRY_RUN=1]" >&2; \
+		echo "Usage: make uat-bring-up PLATFORM=<name> [TIMEOUT_S=300] [DRY_RUN=1] [BENCHMARK_RUNS_DIR=~/Developer/benchmark_runs]" >&2; \
 		exit 2; \
 	fi
 	@uv run --no-sync -- python scripts/uat-bring-up/uat_bring_up.py \
 		--platform "$(PLATFORM)" \
 		$(if $(TIMEOUT_S),--timeout-s "$(TIMEOUT_S)",) \
+		$(if $(BENCHMARK_RUNS_DIR),--benchmark-runs-dir "$(BENCHMARK_RUNS_DIR)",) \
 		$(if $(DRY_RUN),--dry-run,)
 
 # make uat-sweep CONFIG=tests/uat/configs/<name>.yaml [DRY_RUN=1]

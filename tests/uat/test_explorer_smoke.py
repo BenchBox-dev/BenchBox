@@ -33,18 +33,23 @@ def test_explorer_smoke_uses_data_dir_flag():
 def test_runs_build_then_playwright_smoke(tmp_path: Path):
     invocations: list[list[str]] = []
     cwd_by_invocation: list[Path | None] = []
+    output_dir = tmp_path / "out"
 
     def fake_runner(argv, stdout=None, stderr=None, check=False, cwd=None, env=None):
         invocations.append(argv)
         cwd_by_invocation.append(cwd)
+        if argv[:3] == ["benchbox", "explorer", "build"]:
+            output_dir.mkdir(parents=True)
+            (output_dir / "results.duckdb").write_text("fixture", encoding="utf-8")
         return Mock(returncode=0, args=argv)
 
     with patch.object(explorer_smoke, "has_node", return_value=True):
         result = explorer_smoke.run_explorer_smoke(
             bundles_dir=tmp_path / "b",
-            output_dir=tmp_path / "out",
+            output_dir=output_dir,
             log_dir=tmp_path / "logs",
             playwright_browsers=("chromium",),
+            playwright_fixture_dir=tmp_path / "fixture-data",
             runner=fake_runner,
         )
     assert result.skipped is False
@@ -59,6 +64,7 @@ def test_runs_build_then_playwright_smoke(tmp_path: Path):
     assert "--project" in invocations[3]
     assert "chromium" in invocations[3]
     assert all(cwd == explorer_smoke.EXPLORER_DIR for cwd in cwd_by_invocation[1:])
+    assert (tmp_path / "fixture-data" / "results.duckdb").read_text(encoding="utf-8") == "fixture"
 
 
 def test_short_circuits_on_build_failure(tmp_path: Path):

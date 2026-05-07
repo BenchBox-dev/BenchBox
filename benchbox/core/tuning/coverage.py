@@ -166,16 +166,20 @@ def static_regressions(
     recorded_rows: Iterable[TuningCoverageRow],
     current_rows: Iterable[TuningCoverageRow],
 ) -> list[str]:
-    """Return rows whose current status is worse than the checked-in matrix."""
+    """Return checked-in matrix drift that would hide coverage regressions."""
+    recorded_by_key = {row.key: row for row in recorded_rows}
     current_by_key = {row.key: row for row in current_rows}
     regressions: list[str] = []
-    for recorded in recorded_rows:
+    for recorded in recorded_by_key.values():
         current = current_by_key.get(recorded.key)
         if current is None:
             regressions.append(f"missing current row for {recorded.platform}/{recorded.benchmark}")
             continue
         if STATUS_RANK[current.status] < STATUS_RANK[recorded.status]:
             regressions.append(f"{recorded.platform}/{recorded.benchmark}: {recorded.status} -> {current.status}")
+    for current in current_by_key.values():
+        if current.key not in recorded_by_key:
+            regressions.append(f"new current row missing from matrix for {current.platform}/{current.benchmark}")
     return regressions
 
 

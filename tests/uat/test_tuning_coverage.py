@@ -10,8 +10,10 @@ from benchbox.core.tuning.coverage import (
     BASIC_CONSTRAINTS,
     DECISION_AUTHOR,
     DECISION_DONE,
+    DECISION_WAIVED,
     TUNED_TEMPLATE,
     VALID_DECISIONS,
+    TuningCoverageRow,
     build_tuning_coverage_rows,
     parse_runtime_tuning_logs,
     read_tuning_coverage_tsv,
@@ -38,6 +40,30 @@ def test_checked_in_tuning_coverage_has_no_static_regressions():
     recorded = read_tuning_coverage_tsv(MATRIX_PATH)
     current = build_tuning_coverage_rows(_uat_platforms(), _uat_benchmarks())
     assert static_regressions(recorded, current) == []
+
+
+def test_static_regressions_flags_new_current_rows_missing_from_matrix():
+    recorded = [
+        TuningCoverageRow(
+            platform="duckdb",
+            benchmark="tpch",
+            status=TUNED_TEMPLATE,
+            decision=DECISION_DONE,
+            reason="template exists",
+        )
+    ]
+    current = [
+        *recorded,
+        TuningCoverageRow(
+            platform="duckdb",
+            benchmark="newbench",
+            status=BASIC_CONSTRAINTS,
+            decision=DECISION_WAIVED,
+            reason="new coverage gap",
+        ),
+    ]
+
+    assert static_regressions(recorded, current) == ["new current row missing from matrix for duckdb/newbench"]
 
 
 def test_runtime_log_parser_matches_matrix_rows(tmp_path: Path):

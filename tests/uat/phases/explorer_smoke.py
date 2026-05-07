@@ -73,6 +73,7 @@ def run_explorer_smoke(
     log_dir: Path,
     build_extra_args: tuple[str, ...] = (),
     playwright_browsers: tuple[str, ...] = ("chromium",),
+    playwright_fixture_dir: Path | None = None,
     runner=subprocess.run,
 ) -> ExplorerSmokeResult:
     """Build the explorer and run a browser smoke against the bundles in bundles_dir.
@@ -111,6 +112,10 @@ def run_explorer_smoke(
             skip_reason=None,
         )
 
+    _stage_playwright_fixture_dir(
+        source_dir=output_dir,
+        fixture_dir=playwright_fixture_dir or _default_playwright_fixture_dir(),
+    )
     smoke_returncode = _run_browser_smoke(
         smoke_log=smoke_log,
         data_dir=output_dir,
@@ -137,6 +142,38 @@ def _prepare_data_dir(*, bundles_dir: Path, log_dir: Path) -> Path:
         linked_bundles.unlink()
     linked_bundles.symlink_to(bundles_dir, target_is_directory=True)
     return data_dir
+
+
+def _default_playwright_fixture_dir() -> Path:
+    """Return the fixture mount used by results-explorer/playwright.config.ts."""
+    return EXPLORER_DIR / "test-fixtures" / ".generated" / "data"
+
+
+def _stage_playwright_fixture_dir(*, source_dir: Path, fixture_dir: Path) -> None:
+    """Point Playwright's fixture mount at the UAT-built Explorer data.
+
+    The Playwright config launches `serve-browser-tests.mjs`, whose default
+    `/results/data/` mount is `test-fixtures/.generated/data`. UAT builds a
+    fresh data directory per run, so stage that directory into the generated
+    fixture mount before invoking Playwright directly.
+    """
+    source = source_dir.expanduser().resolve()
+    fixture = fixture_dir.expanduser()
+    if fixture.exists() or fixture.is_symlink():
+        try:
+            if fixture.resolve() == source:
+                return
+        except OSError:
+            pass
+        if fixture.is_symlink() or fixture.is_file():
+            fixture.unlink()
+        else:
+            shutil.rmtree(fixture)
+    fixture.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        fixture.symlink_to(source, target_is_directory=True)
+    except OSError:
+        shutil.copytree(source, fixture)
 
 
 def _run_browser_smoke(

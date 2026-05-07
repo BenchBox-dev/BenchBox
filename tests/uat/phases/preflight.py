@@ -103,6 +103,7 @@ def run_preflight(
     noisy_neighbor_warn_load: float = 8.0,
     local_platforms_check: bool = False,
     requested_platforms: Iterable[str] = (),
+    benchmark_runs_dir: str | Path | None = None,
     bring_up_runner: BringUpRunner | None = None,
     reachability_checker: ReachabilityChecker | None = None,
 ) -> PreflightResult:
@@ -138,7 +139,8 @@ def run_preflight(
     if local_platforms_check and not aborted:
         checked, attempted, local_abort, local_warnings = _check_local_platforms(
             requested_platforms,
-            bring_up_runner=bring_up_runner or _run_make_bring_up,
+            bring_up_runner=bring_up_runner
+            or (lambda platform: _run_make_bring_up(platform, benchmark_runs_dir=benchmark_runs_dir)),
             reachability_checker=reachability_checker or platform_is_reachable,
         )
         warnings.extend(local_warnings)
@@ -200,9 +202,12 @@ def _check_local_platforms(
     return checked, tuple(attempted), None, tuple(warnings)
 
 
-def _run_make_bring_up(platform: str) -> int:
+def _run_make_bring_up(platform: str, *, benchmark_runs_dir: str | Path | None = None) -> int:
+    argv = ["make", "uat-bring-up", f"PLATFORM={platform}"]
+    if benchmark_runs_dir is not None:
+        argv.append(f"BENCHMARK_RUNS_DIR={Path(benchmark_runs_dir).expanduser()}")
     completed = subprocess.run(
-        ["make", "uat-bring-up", f"PLATFORM={platform}"],
+        argv,
         cwd=REPO_ROOT,
         check=False,
     )
