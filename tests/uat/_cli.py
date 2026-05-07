@@ -9,8 +9,10 @@ see _project/specs/uat-framework.md Section 1.4).
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import sys
+from collections import Counter
 from pathlib import Path
 
 
@@ -48,6 +50,7 @@ def cell_main(argv: list[str] | None = None) -> int:
                 "elapsed_s": round(result.elapsed_s, 2),
                 "log_path": str(result.log_path),
                 "result_path": str(result.result_path) if result.result_path else None,
+                "submit_terminal_state": result.submit_terminal_state,
             },
             indent=2,
         )
@@ -149,6 +152,7 @@ def report_main(argv: list[str] | None = None) -> int:
                     elapsed_s=float(payload.get("elapsed_s", 0.0)),
                     log_path=Path(payload.get("log_path", "")),
                     result_path=(Path(payload["result_path"]) if payload.get("result_path") else None),
+                    submit_terminal_state=payload.get("submit_terminal_state", "submittable"),
                 )
             )
     rungs = [float(s) for s in args.rungs.split(",")] if args.rungs else None
@@ -207,6 +211,44 @@ def explorer_smoke_main(argv: list[str] | None = None) -> int:
         )
     )
     return result.exit_code()
+
+
+def replay_classify_main(argv: list[str] | None = None) -> int:
+    """Replay a coverage TSV's passed result paths through the submit classifier."""
+    from tests.uat.runner import SubmitTerminalState, classify_for_submit
+
+    parser = argparse.ArgumentParser(prog="uat-replay-classify")
+    parser.add_argument("--coverage-cells", required=True)
+    parser.add_argument("--results-root", required=True)
+    args = parser.parse_args(argv)
+
+    coverage_cells = Path(args.coverage_cells).expanduser()
+    results_root = Path(args.results_root).expanduser()
+    counts: Counter[str] = Counter()
+    total = 0
+    with coverage_cells.open(newline="", encoding="utf-8") as fh:
+        reader = csv.DictReader(fh, delimiter="\t")
+        for row in reader:
+            if row.get("status") != "passed" or not row.get("result_path"):
+                continue
+            total += 1
+            result_path = Path(row["result_path"])
+            if not result_path.exists():
+                result_path = results_root / result_path.name
+            counts[classify_for_submit(result_path).value] += 1
+
+    submittable = counts[SubmitTerminalState.submittable.value]
+    non_submittable = total - submittable
+    split = ", ".join(
+        f"{state.value}={counts[state.value]}"
+        for state in SubmitTerminalState
+        if state is not SubmitTerminalState.submittable
+    )
+    print(
+        f"{total} passed-result paths; {submittable} submittable; "
+        f"{non_submittable} non-submittable split by classifier: {split}"
+    )
+    return 0
 
 
 def package_main(argv: list[str] | None = None) -> int:
@@ -373,6 +415,8 @@ def main(argv: list[str] | None = None) -> int:
     head = argv[0]
     if head in SUBCOMMANDS:
         return SUBCOMMANDS[head](argv[1:])
+    if head == "replay-classify":
+        return replay_classify_main(argv[1:])
     if head in {"-h", "--help"}:
         print(_help_text())
         return 0

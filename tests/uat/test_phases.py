@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as _dt
+import json
 from pathlib import Path
 from unittest.mock import patch
 
@@ -10,10 +11,39 @@ import pytest
 
 from tests.uat import docker_assets, matrix
 from tests.uat.config import validate_config
-from tests.uat.phases import enumerate as enum_phase, execute as exec_phase, preflight as preflight_phase
+from tests.uat.phases import (
+    enumerate as enum_phase,
+    execute as exec_phase,
+    package as package_phase,
+    preflight as preflight_phase,
+)
 from tests.uat.runner import CellResult
 
 pytestmark = pytest.mark.fast
+
+
+def _write_submit_result(path: Path, *, failed: int = 0) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "version": "2.1",
+        "run": {
+            "id": "uat-test",
+            "timestamp": "2026-01-01T00:00:00",
+            "total_duration_ms": 1,
+            "query_time_ms": 1,
+            "iterations": 1,
+            "streams": 1,
+        },
+        "benchmark": {"id": "tpch", "name": "TPC-H", "scale_factor": 0.01, "test_type": "power"},
+        "platform": {"name": "DuckDB"},
+        "summary": {
+            "queries": {"total": 1, "passed": 0 if failed else 1, "failed": failed},
+            "validation": {"status": "failed" if failed else "passed"},
+        },
+        "queries": [{"id": "Q1", "status": "ERROR" if failed else "SUCCESS", "execution_time_ms": 1}],
+        "phases": {},
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -420,6 +450,67 @@ def test_execute_passes_config_extra_args_to_runner(tmp_path):
     )
     assert seen["extra_args"] == ("--tuning", "tuned")
     assert seen["benchmark_runs_dir"] == Path("~/Developer/benchmark_runs").expanduser()
+
+
+def test_execute_downgrades_passed_cell_with_query_failure_result(tmp_path):
+    matrix.reset_reachability_cache()
+    result_path = tmp_path / "benchmark_runs" / "results" / "failed-query.json"
+    _write_submit_result(result_path, failed=1)
+    cfg = validate_config(
+        {
+            "name": "fake",
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+        }
+    )
+
+    def fake_runner(platform, benchmark, scale, **kwargs):
+        return CellResult(
+            platform=platform,
+            benchmark=benchmark,
+            scale=scale,
+            status="passed",
+            exit_code=0,
+            elapsed_s=1.0,
+            log_path=tmp_path / "cell.log",
+            result_path=result_path,
+        )
+
+    outcome = exec_phase.run_execute(
+        cfg,
+        log_dir=tmp_path,
+        databases_root=tmp_path / "databases",
+        runner=fake_runner,
+    )
+
+    assert outcome.results[0].status == "failed"
+    assert outcome.results[0].submit_terminal_state == "query_failure"
+
+
+def test_package_classifier_agrees_with_query_failure_refusal(tmp_path):
+    result_path = tmp_path / "benchmark_runs" / "results" / "failed-query.json"
+    _write_submit_result(result_path, failed=1)
+    cfg = validate_config({"name": "fake", "package": {"submit_terminal_state": "local-stage"}})
+    warnings: list[str] = []
+    calls: list[tuple[str, ...]] = []
+
+    def fake_runner(argv, check=False):
+        calls.append(tuple(argv))
+        return type("Completed", (), {"returncode": 0})()
+
+    result = package_phase.run_package(
+        cfg,
+        result_paths=[result_path],
+        submissions_dir=tmp_path / "subs",
+        runner=fake_runner,
+        warn=warnings.append,
+        classify_results=True,
+    )
+
+    assert result.failure_count == 1
+    assert calls == []
+    assert "query_failure" in warnings[0]
 
 
 def test_default_log_dir_substitutes_date_and_name():

@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from tests.uat.config import VALID_TERMINAL_STATES, UATConfig
+from tests.uat.runner import SubmitTerminalState, classify_for_submit
 
 # Terminal states whose PR-opening flow is not yet implemented; the
 # dispatcher emits the same argv as `local-stage` and warns the operator
@@ -94,6 +95,7 @@ def run_package(
     submissions_dir: Path,
     runner=subprocess.run,
     warn=None,
+    classify_results: bool = True,
 ) -> PackageResult:
     """Dispatch submission per `submit_terminal_state`.
 
@@ -121,6 +123,17 @@ def run_package(
     success = 0
     failure = 0
     for result_path in result_paths:
+        if classify_results and result_path.exists():
+            submit_state = classify_for_submit(result_path)
+            if submit_state is SubmitTerminalState.unofficial:
+                warn(f"[package] skipping unofficial result {result_path}: submit_terminal_state=unofficial")
+                continue
+            if submit_state is not SubmitTerminalState.submittable:
+                warn(
+                    f"[package] refusing unsubmittable result {result_path}: submit_terminal_state={submit_state.value}"
+                )
+                failure += 1
+                continue
         argv = _build_submit_argv(
             state,
             result_path=result_path,

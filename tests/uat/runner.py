@@ -13,11 +13,15 @@ must iterate sequentially.
 from __future__ import annotations
 
 import datetime as _dt
+import json
 import os
 import re
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 
+from benchbox.core.results.loader import ResultLoadError, UnsupportedSchemaError, load_result_file
+from benchbox.core.results.status import result_failed_query_count, result_non_clean_reason
 from tests.uat.matrix import benchbox_run_argv
 from tests.uat.timeouts import TimeoutResult, run_with_timeout
 
@@ -26,6 +30,17 @@ from tests.uat.timeouts import TimeoutResult, run_with_timeout
 # narrower than `[^\s]+` so a comma- or semicolon-separated log line
 # does not collapse two paths into a single match.
 RESULT_PATH_RE = re.compile(r"(?:/[^\s,;]+/)?benchmark_runs/results/[^\s,;]+\.json")
+UNOFFICIAL_COMPLIANCE_CLASSES = frozenset({"unofficial_nonstandard", "unofficial_subscale"})
+
+
+class SubmitTerminalState(str, Enum):
+    """UAT mirror of the `benchbox submit --output` refusal vocabulary."""
+
+    submittable = "submittable"
+    unofficial = "unofficial"
+    query_failure = "query_failure"
+    schema_violation = "schema_violation"
+    missing_manifest = "missing_manifest"
 
 
 @dataclass(frozen=True)
@@ -40,6 +55,7 @@ class CellResult:
     elapsed_s: float
     log_path: Path
     result_path: Path | None
+    submit_terminal_state: str = SubmitTerminalState.submittable.value
 
 
 def extract_result_path(log_text: str) -> str | None:
@@ -53,6 +69,46 @@ def extract_result_path(log_text: str) -> str | None:
     if not matches:
         return None
     return matches[-1]
+
+
+def classify_for_submit(result_json: Path | str | None) -> SubmitTerminalState:
+    """Classify a result JSON using the same refusal predicates as `benchbox submit`.
+
+    Mirrors `benchbox/cli/commands/submit.py`: load failures are schema
+    problems, unofficial TPC-DS compliance classes remain successful but
+    non-submittable, and non-clean results are refused before packaging.
+    """
+    if result_json is None:
+        return SubmitTerminalState.missing_manifest
+    path = Path(result_json).expanduser()
+    if not path.exists():
+        return SubmitTerminalState.missing_manifest
+    try:
+        result, _raw = load_result_file(path)
+    except FileNotFoundError:
+        return SubmitTerminalState.missing_manifest
+    except (json.JSONDecodeError, OSError, ResultLoadError, UnsupportedSchemaError):
+        return SubmitTerminalState.schema_violation
+
+    if getattr(result, "compliance_class", None) in UNOFFICIAL_COMPLIANCE_CLASSES:
+        return SubmitTerminalState.unofficial
+
+    non_clean_reason = result_non_clean_reason(result)
+    if non_clean_reason:
+        if result_failed_query_count(result):
+            return SubmitTerminalState.query_failure
+        return SubmitTerminalState.schema_violation
+    return SubmitTerminalState.submittable
+
+
+def submit_state_is_cell_failure(state: SubmitTerminalState | str) -> bool:
+    """Return True for submit states that should downgrade a passed cell to FAILED."""
+    normalized = state.value if isinstance(state, SubmitTerminalState) else str(state)
+    return normalized in {
+        SubmitTerminalState.query_failure.value,
+        SubmitTerminalState.schema_violation.value,
+        SubmitTerminalState.missing_manifest.value,
+    }
 
 
 def _default_log_path(log_dir: Path, platform: str, benchmark: str, scale: float, now: _dt.datetime) -> Path:
@@ -107,18 +163,35 @@ def run_cell(
 
     log_text = log_path.read_text(encoding="utf-8", errors="replace")
     result_path_str = extract_result_path(log_text) if timeout_result.exit_code == 0 else None
-    result_path = Path(result_path_str) if result_path_str else None
+    result_path = _resolve_result_path(result_path_str, runs_dir) if result_path_str else None
     status = _classify(timeout_result)
+    submit_state = (
+        classify_for_submit(result_path) if timeout_result.exit_code == 0 else SubmitTerminalState.missing_manifest
+    )
+    exit_code = timeout_result.exit_code
+    if status == "passed" and submit_state_is_cell_failure(submit_state):
+        status = "failed"
+        exit_code = exit_code or 1
     return CellResult(
         platform=platform,
         benchmark=benchmark,
         scale=scale,
         status=status,
-        exit_code=timeout_result.exit_code,
+        exit_code=exit_code,
         elapsed_s=timeout_result.elapsed_s,
         log_path=log_path,
         result_path=result_path,
+        submit_terminal_state=submit_state.value,
     )
+
+
+def _resolve_result_path(result_path_str: str, runs_dir: Path) -> Path:
+    path = Path(result_path_str).expanduser()
+    if path.is_absolute() or path.exists():
+        return path
+    if len(path.parts) >= 2 and path.parts[0] == "benchmark_runs":
+        return runs_dir.parent / path
+    return runs_dir / path
 
 
 def _classify(timeout_result: TimeoutResult) -> str:
