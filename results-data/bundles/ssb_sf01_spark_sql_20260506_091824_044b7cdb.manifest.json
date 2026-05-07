@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:11:20.300441+00:00",
+  "bundle_file": "ssb_sf01_spark_sql_20260506_091824_044b7cdb.json",
+  "bundle_hash": "9364ae41d8790feae956595c032e233e05d9312d32204af2c1f78cc60e316c4b",
+  "companion_hashes": {},
+  "benchmark": "Star Schema",
+  "platform": "Spark",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

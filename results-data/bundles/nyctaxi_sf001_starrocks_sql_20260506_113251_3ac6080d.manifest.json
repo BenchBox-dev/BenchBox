@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:10:28.685482+00:00",
+  "bundle_file": "nyctaxi_sf001_starrocks_sql_20260506_113251_3ac6080d.json",
+  "bundle_hash": "c0cc08a75d92324826e70042c797896c716c1455e6c4d2def3c8af6302dcb837",
+  "companion_hashes": {},
+  "benchmark": "NYC Taxi OLAP",
+  "platform": "StarRocks",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

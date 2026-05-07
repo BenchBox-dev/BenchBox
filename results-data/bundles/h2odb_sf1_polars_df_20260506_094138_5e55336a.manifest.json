@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:09:52.845324+00:00",
+  "bundle_file": "h2odb_sf1_polars_df_20260506_094138_5e55336a.json",
+  "bundle_hash": "c876469e03c363423e8d850f10e6a814c628a17bed07b9730695734ade4b1d66",
+  "companion_hashes": {},
+  "benchmark": "H2ODB",
+  "platform": "Polars",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

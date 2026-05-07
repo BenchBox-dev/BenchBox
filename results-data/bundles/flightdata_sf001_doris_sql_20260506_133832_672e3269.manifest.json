@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:09:15.688571+00:00",
+  "bundle_file": "flightdata_sf001_doris_sql_20260506_133832_672e3269.json",
+  "bundle_hash": "f1fdecb90f830b1af8d0e14662a23709a4738e2293d55f4f38288e496c8df296",
+  "companion_hashes": {},
+  "benchmark": "Flight Data OLAP",
+  "platform": "Apache Doris",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

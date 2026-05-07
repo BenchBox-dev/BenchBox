@@ -1,0 +1,256 @@
+{
+  "version": "2.1",
+  "run": {
+    "id": "e128050e",
+    "timestamp": "2026-05-06T13:13:14.081137",
+    "total_duration_ms": 1375,
+    "query_time_ms": 0,
+    "iterations": 1,
+    "streams": 1
+  },
+  "benchmark": {
+    "id": "ai_primitives",
+    "name": "AI/ML Primitives",
+    "scale_factor": 0.01,
+    "test_type": "power"
+  },
+  "platform": {
+    "name": "Presto",
+    "version": "0.296-8661b73",
+    "client_version": "0.8.4",
+    "config": {
+      "execution_mode": "sql",
+      "connection_mode": "remote",
+      "dialect": "presto",
+      "host": "localhost",
+      "port": 8080,
+      "catalog": "memory",
+      "schema": "schema_440cc58b8341",
+      "http_scheme": "http",
+      "table_format": "memory",
+      "result_cache_disabled": true,
+      "client_source": "BenchBox",
+      "node_count": 1,
+      "available_catalogs": [
+        "jmx",
+        "memory",
+        "system"
+      ],
+      "driver_package": "presto-python-client",
+      "driver_version_resolved": "0.8.4",
+      "driver_version_actual": "0.8.4",
+      "driver_runtime_strategy": "current-process",
+      "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-10/.venv/bin/python3"
+    },
+    "deployment": {
+      "deployment_type": "self_hosted",
+      "connection_mode": "remote",
+      "endpoint_class": "localhost_port",
+      "metadata_source": "inferred",
+      "collection_status": "partial"
+    },
+    "cloud": {
+      "source": "unavailable",
+      "collection_status": "unavailable"
+    },
+    "compute": {
+      "node_count": 1,
+      "source": "requested",
+      "collection_status": "partial"
+    },
+    "storage": {
+      "table_format": "memory",
+      "source": "requested",
+      "collection_status": "partial"
+    },
+    "raw_config": {
+      "schema": "schema_440cc58b8341",
+      "catalog": "memory",
+      "password": "<redacted>",
+      "http_scheme": "http",
+      "table_format": "memory",
+      "result_cache_disabled": true,
+      "client_source": "BenchBox",
+      "node_count": 1,
+      "available_catalogs": [
+        "jmx",
+        "memory",
+        "system"
+      ]
+    },
+    "raw_metadata": {
+      "dialect": "presto"
+    },
+    "driver_actual_version": "0.8.4",
+    "driver_package": "presto-python-client",
+    "driver_resolved_version": "0.8.4",
+    "driver_runtime_strategy": "current-process"
+  },
+  "config": {
+    "compression": {
+      "type": "zstd",
+      "level": null
+    },
+    "phases": [
+      "load",
+      "power"
+    ],
+    "platform_options": {
+      "table_format": "memory",
+      "force_recreate": false,
+      "show_query_plans": false,
+      "force_upload": false
+    },
+    "platform_option_sources": {
+      "table_format": "saved_config",
+      "force_recreate": "saved_config",
+      "show_query_plans": "saved_config",
+      "force_upload": "saved_config"
+    },
+    "mode": "sql"
+  },
+  "summary": {
+    "queries": {
+      "total": 0,
+      "passed": 0,
+      "failed": 0
+    },
+    "timing": {
+      "total_ms": 0,
+      "avg_ms": 0,
+      "min_ms": 0,
+      "max_ms": 0
+    },
+    "validation": "passed"
+  },
+  "phases": {
+    "data_generation": {
+      "status": "SUCCESS",
+      "duration_ms": 0
+    },
+    "schema_creation": {
+      "status": "SUCCESS",
+      "duration_ms": 0
+    },
+    "data_loading": {
+      "status": "SUCCESS",
+      "duration_ms": 0
+    },
+    "validation": {
+      "status": "PASSED",
+      "duration_ms": 65
+    },
+    "power_test": {
+      "status": "FAILED",
+      "duration_ms": 0
+    },
+    "throughput_test": {
+      "status": "NOT_RUN"
+    }
+  },
+  "queries": [],
+  "cost": {
+    "total_usd": 0,
+    "model": "estimated"
+  },
+  "normalized_cost": {
+    "normalized_cost_usd": "0",
+    "cost_usd": null,
+    "cost_model_version": "2025.11",
+    "cost_model_source": "benchbox.core.cost.pricing",
+    "cost_scope": "compute_only",
+    "cost_status": "not_applicable_local",
+    "billing_unit": "not_applicable",
+    "pricing_region": "not_applicable",
+    "deployment": {
+      "cloud_provider": null,
+      "cloud_region": null,
+      "instance_type": null,
+      "warehouse_size": null,
+      "node_count": null,
+      "cluster_size": null,
+      "storage_format": null,
+      "storage_tier": null
+    }
+  },
+  "execution": {
+    "entry_point": "cli",
+    "timestamp": "2026-05-06T13:13:10.402779",
+    "phases": [
+      "load",
+      "power"
+    ],
+    "compression": {
+      "type": "zstd"
+    },
+    "mode": "sql",
+    "driver_package": "presto-python-client",
+    "driver_version_resolved": "0.8.4",
+    "driver_version_actual": "0.8.4",
+    "driver_runtime_strategy": "current-process",
+    "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-10/.venv/bin/python3",
+    "non_interactive": true,
+    "tuning_mode": "tuned"
+  },
+  "environment": {
+    "os": "Darwin",
+    "arch": "arm64",
+    "python": "3.12.11",
+    "client_host": {
+      "os": "Darwin",
+      "arch": "arm64",
+      "python": "3.12.11",
+      "machine_id": "machine_45d1a3ef31a1728d"
+    },
+    "platform_runtime": {
+      "runtime_type": "docker_container",
+      "collection_status": "available",
+      "source": "observed",
+      "engine_host": "host_3d073a60484e"
+    },
+    "container": {
+      "collection_status": "available",
+      "source": "observed",
+      "docker_engine_version": "29.4.0",
+      "image": "prestodb/presto:0.297",
+      "container_id": "container_ad5367c36826",
+      "container_name": "container_d73f4a5758e9",
+      "requested_platform": "linux",
+      "port_mappings": {
+        "8080/tcp": [
+          {
+            "HostIp": "[REDACTED]",
+            "HostPort": "18081"
+          },
+          {
+            "HostIp": "::",
+            "HostPort": "18081"
+          }
+        ]
+      },
+      "bind_mounts": [
+        {
+          "source": "path_7d64b6aa21f0",
+          "destination": "path_9469ac3bf15a",
+          "mode": "ro",
+          "rw": false
+        }
+      ],
+      "volumes": [
+        {
+          "source": "path_3df553327092",
+          "destination": "path_0e952cd84760",
+          "mode": "",
+          "rw": true
+        }
+      ],
+      "state": "running"
+    },
+    "machine_id": "machine_45d1a3ef31a1728d"
+  },
+  "export": {
+    "timestamp": "2026-05-06T13:13:14.095299",
+    "tool": "benchbox-exporter",
+    "anonymized": true
+  }
+}

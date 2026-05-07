@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:12:27.426516+00:00",
+  "bundle_file": "tpch_sf001_spark_sql_20260506_091251_b1ac2a2c.json",
+  "bundle_hash": "e1e5933ea2fd16df036144cda801522dcdb9f3a740387f32f718db2d96730434",
+  "companion_hashes": {},
+  "benchmark": "TPC-H",
+  "platform": "Spark",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

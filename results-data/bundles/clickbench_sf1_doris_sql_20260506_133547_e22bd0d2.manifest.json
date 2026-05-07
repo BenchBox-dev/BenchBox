@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:08:17.000555+00:00",
+  "bundle_file": "clickbench_sf1_doris_sql_20260506_133547_e22bd0d2.json",
+  "bundle_hash": "3ef486848f6ea9a3a6bb6133dacbdb5df6f4a09d1e0296b7b171c7e67edf28ca",
+  "companion_hashes": {},
+  "benchmark": "ClickBench",
+  "platform": "Apache Doris",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

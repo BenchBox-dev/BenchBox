@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:08:45.744737+00:00",
+  "bundle_file": "coffeeshop_sf1_dask_df_20260506_103931_838fea41.json",
+  "bundle_hash": "c6e41ca60c96f062841c3bbc2ab3f6d410b5106de834b9a5658bd8d8f9982c93",
+  "companion_hashes": {},
+  "benchmark": "CoffeeShop",
+  "platform": "Dask",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

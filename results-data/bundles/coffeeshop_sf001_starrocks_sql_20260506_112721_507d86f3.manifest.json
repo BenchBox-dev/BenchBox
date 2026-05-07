@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:08:36.127579+00:00",
+  "bundle_file": "coffeeshop_sf001_starrocks_sql_20260506_112721_507d86f3.json",
+  "bundle_hash": "e65f355cccce768ef412a143c28040a96a65ea024c93366334a20748ce3b1c30",
+  "companion_hashes": {},
+  "benchmark": "CoffeeShop",
+  "platform": "StarRocks",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

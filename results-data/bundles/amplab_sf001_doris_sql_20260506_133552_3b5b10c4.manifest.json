@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:07:45.807106+00:00",
+  "bundle_file": "amplab_sf001_doris_sql_20260506_133552_3b5b10c4.json",
+  "bundle_hash": "24fe9dc21bf2a44dd2b5d4614e760d509aeb9d666c9416e3f6a56503255cb9c5",
+  "companion_hashes": {},
+  "benchmark": "AMPLab Big Data",
+  "platform": "Apache Doris",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

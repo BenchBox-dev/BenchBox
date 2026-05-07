@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:08:30.140255+00:00",
+  "bundle_file": "coffeeshop_sf001_pandas_df_20260506_094904_09b3a379.json",
+  "bundle_hash": "77d33bb86f350c45829357b18faba2f79da9ac8f52b43d4622800ee63c0f8f76",
+  "companion_hashes": {},
+  "benchmark": "CoffeeShop",
+  "platform": "Pandas",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

@@ -1,0 +1,270 @@
+{
+  "version": "2.1",
+  "run": {
+    "id": "56daf325",
+    "timestamp": "2026-05-06T09:49:38.479930",
+    "total_duration_ms": 73,
+    "query_time_ms": 0,
+    "iterations": 1,
+    "streams": 1
+  },
+  "benchmark": {
+    "id": "nyctaxi",
+    "name": "NYC Taxi",
+    "scale_factor": 0.01,
+    "test_type": "power"
+  },
+  "platform": {
+    "name": "Pandas",
+    "version": "2.3.3",
+    "client_version": "unknown",
+    "config": {
+      "execution_mode": "dataframe",
+      "family": "pandas",
+      "dtype_backend": "numpy_nullable",
+      "working_dir": "/Users/joe/Developer/benchmark_runs/datagen/nyctaxi_sf001",
+      "copy_on_write": false,
+      "copy_on_write_active": false,
+      "driver_runtime_strategy": "current-process"
+    },
+    "deployment": {
+      "deployment_type": "dataframe",
+      "endpoint_class": "embedded_process",
+      "metadata_source": "inferred",
+      "collection_status": "partial"
+    },
+    "cloud": {
+      "source": "unavailable",
+      "collection_status": "unavailable"
+    },
+    "compute": {
+      "source": "unavailable",
+      "collection_status": "unavailable"
+    },
+    "storage": {
+      "source": "unavailable",
+      "collection_status": "unavailable"
+    },
+    "raw_config": {
+      "dtype_backend": "numpy_nullable",
+      "working_dir": "/Users/joe/Developer/benchmark_runs/datagen/nyctaxi_sf001",
+      "copy_on_write": false,
+      "copy_on_write_active": false,
+      "options": {
+        "driver_auto_install": false,
+        "verbose_level": 0,
+        "verbose_enabled": false,
+        "very_verbose": false,
+        "quiet": false,
+        "verbose": false,
+        "force_recreate": false,
+        "show_query_plans": false,
+        "tuning_enabled": true,
+        "force_upload": false,
+        "capture_plans": false,
+        "strict_plan_capture": false,
+        "execution_mode": "dataframe",
+        "unified_tuning_configuration": {
+          "primary_keys": {
+            "enabled": true,
+            "enforce_uniqueness": true,
+            "nullable": false
+          },
+          "foreign_keys": {
+            "enabled": true,
+            "enforce_referential_integrity": true,
+            "on_delete_action": "RESTRICT",
+            "on_update_action": "RESTRICT"
+          },
+          "unique_constraints": {
+            "enabled": true,
+            "ignore_nulls": false
+          },
+          "check_constraints": {
+            "enabled": true,
+            "enforce_on_insert": true,
+            "enforce_on_update": true
+          },
+          "platform_optimizations": {
+            "z_ordering_enabled": false,
+            "liquid_clustering_enabled": false,
+            "databricks_clustering_strategy": "z_order",
+            "sorted_ingestion_mode": "off",
+            "sorted_ingestion_method": "auto",
+            "auto_optimize_enabled": false,
+            "auto_compact_enabled": false,
+            "bloom_filters_enabled": false,
+            "materialized_views_enabled": false
+          }
+        },
+        "df_tuning_config": {
+          "memory": {
+            "chunk_size": 500000,
+            "spill_to_disk": false,
+            "rechunk_after_filter": true
+          },
+          "execution": {
+            "streaming_mode": false,
+            "lazy_evaluation": true
+          },
+          "data_types": {
+            "dtype_backend": "pyarrow",
+            "enable_string_cache": false,
+            "auto_categorize_strings": false,
+            "categorical_threshold": 0.5
+          },
+          "io": {
+            "memory_pool": "default",
+            "memory_map": true,
+            "pre_buffer": true
+          },
+          "gpu": {
+            "enabled": false,
+            "device_id": 0,
+            "spill_to_host": "endpoint_56077d355632",
+            "pool_type": "default"
+          },
+          "write": {
+            "compression": "zstd"
+          },
+          "metadata": {
+            "version": "1.0",
+            "format": "dataframe_tuning",
+            "platform": "pandas",
+            "description": "Auto-generated defaults for pandas",
+            "generated_by": "benchbox-smart-defaults"
+          }
+        }
+      },
+      "driver_auto_install": false,
+      "driver_auto_install_used": false,
+      "execution_mode": "dataframe",
+      "benchmark": "nyctaxi",
+      "scale_factor": 0.01,
+      "tuning_config": "UnifiedTuningConfiguration(primary_keys=PrimaryKeyConfiguration(enabled=True, enforce_uniqueness=True, nullable=False), foreign_keys=ForeignKeyConfiguration(enabled=True, enforce_referential_integrity=True, on_delete_action='RESTRICT', on_update_action='RESTRICT'), unique_constraints=UniqueConstraintConfiguration(enabled=True, ignore_nulls=False), check_constraints=CheckConstraintConfiguration(enabled=True, enforce_on_insert=True, enforce_on_update=True), platform_optimizations=PlatformOptimizationConfiguration(z_ordering_enabled=False, z_ordering_columns=[], liquid_clustering_enabled=False, liquid_clustering_columns=[], databricks_clustering_strategy='z_order', sorted_ingestion_mode='off', sorted_ingestion_method='auto', auto_optimize_enabled=False, auto_compact_enabled=False, bloom_filters_enabled=False, bloom_filter_columns=[], materialized_views_enabled=False), table_tunings={})",
+      "memory_limit": "12GB",
+      "thread_limit": 8
+    },
+    "raw_metadata": {
+      "driver_runtime_strategy": "current-process"
+    },
+    "driver_runtime_strategy": "current-process"
+  },
+  "config": {
+    "compression": {
+      "type": "zstd",
+      "level": null
+    },
+    "phases": [
+      "load",
+      "power"
+    ],
+    "mode": "dataframe"
+  },
+  "summary": {
+    "queries": {
+      "total": 0,
+      "passed": 0,
+      "failed": 0
+    },
+    "timing": {
+      "total_ms": 0,
+      "avg_ms": 0,
+      "min_ms": 0,
+      "max_ms": 0
+    },
+    "data": {
+      "rows_loaded": 84857,
+      "load_time_ms": 72.8
+    },
+    "validation": "passed"
+  },
+  "phases": {
+    "data_generation": {
+      "status": "NOT_RUN"
+    },
+    "schema_creation": {
+      "status": "NOT_RUN"
+    },
+    "data_loading": {
+      "status": "SUCCESS",
+      "duration_ms": 72
+    },
+    "validation": {
+      "status": "NOT_RUN"
+    },
+    "power_test": {
+      "status": "COMPLETED"
+    },
+    "throughput_test": {
+      "status": "NOT_RUN"
+    }
+  },
+  "queries": [],
+  "tables": {
+    "taxi_zones": {
+      "rows": 265,
+      "load_ms": 1
+    },
+    "trips": {
+      "rows": 84592,
+      "load_ms": 71
+    }
+  },
+  "cost": {
+    "total_usd": 0,
+    "model": "estimated"
+  },
+  "normalized_cost": {
+    "normalized_cost_usd": "0",
+    "cost_usd": null,
+    "cost_model_version": "2025.11",
+    "cost_model_source": "benchbox.core.cost.pricing",
+    "cost_scope": "compute_only",
+    "cost_status": "not_applicable_local",
+    "billing_unit": "not_applicable",
+    "pricing_region": "not_applicable",
+    "deployment": {
+      "cloud_provider": null,
+      "cloud_region": null,
+      "instance_type": null,
+      "warehouse_size": null,
+      "node_count": null,
+      "cluster_size": null,
+      "storage_format": null,
+      "storage_tier": null
+    }
+  },
+  "execution": {
+    "entry_point": "cli",
+    "timestamp": "2026-05-06T09:49:38.476870",
+    "phases": [
+      "load",
+      "power"
+    ],
+    "compression": {
+      "type": "zstd"
+    },
+    "mode": "sql",
+    "driver_runtime_strategy": "current-process",
+    "non_interactive": true,
+    "tuning_mode": "tuned"
+  },
+  "environment": {
+    "platform_runtime": {
+      "runtime_type": "dataframe_process",
+      "collection_status": "partial",
+      "source": "inferred",
+      "engine_host": "host_9d0940c513de"
+    },
+    "machine_id": "machine_45d1a3ef31a1728d",
+    "client_host": {
+      "machine_id": "machine_45d1a3ef31a1728d"
+    }
+  },
+  "export": {
+    "timestamp": "2026-05-06T09:49:38.569101",
+    "tool": "benchbox-exporter",
+    "anonymized": true
+  }
+}

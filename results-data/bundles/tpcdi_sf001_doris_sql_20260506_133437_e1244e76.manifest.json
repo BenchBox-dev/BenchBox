@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:11:38.447490+00:00",
+  "bundle_file": "tpcdi_sf001_doris_sql_20260506_133437_e1244e76.json",
+  "bundle_hash": "5ede11b209f7aaa22b56dc7ca8a79eef0b59bfe63f239718eb9219815dc16918",
+  "companion_hashes": {},
+  "benchmark": "TPC-DI",
+  "platform": "Apache Doris",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

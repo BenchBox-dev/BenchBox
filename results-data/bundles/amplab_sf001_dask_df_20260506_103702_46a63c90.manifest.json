@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:07:43.425639+00:00",
+  "bundle_file": "amplab_sf001_dask_df_20260506_103702_46a63c90.json",
+  "bundle_hash": "7a95a8a17f3b6fef9eb61813500ba09cc519577ff4c2b04cf6ad6fc30bb5fc6f",
+  "companion_hashes": {},
+  "benchmark": "AMPLab",
+  "platform": "Dask",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

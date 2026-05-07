@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:11:05.807337+00:00",
+  "bundle_file": "ssb_sf001_polars_df_20260506_094110_59e73c93.json",
+  "bundle_hash": "a8bbd6f1446e60b5c660ecc3f816e43e9551e5938df42c3724b63fdc09b89b1b",
+  "companion_hashes": {},
+  "benchmark": "SSB",
+  "platform": "Polars",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:12:53.886310+00:00",
+  "bundle_file": "tpch_skew_sf001_polars_df_20260506_094216_6ea93c54.json",
+  "bundle_hash": "ca46ea155cb1f2f7f8945edd6f8a8c02cdff4ce0a2723f1a8c2c9034eaf9c963",
+  "companion_hashes": {},
+  "benchmark": "TPC-H Skew",
+  "platform": "Polars",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

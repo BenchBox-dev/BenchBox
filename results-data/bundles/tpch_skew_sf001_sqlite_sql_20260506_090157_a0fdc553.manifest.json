@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:12:58.709899+00:00",
+  "bundle_file": "tpch_skew_sf001_sqlite_sql_20260506_090157_a0fdc553.json",
+  "bundle_hash": "c1b83a9b17a76175741d5243c4e69d0660165d6f3695f2f381a450667b27cca5",
+  "companion_hashes": {},
+  "benchmark": "TPC-H Skew Benchmark (moderate)",
+  "platform": "SQLite",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

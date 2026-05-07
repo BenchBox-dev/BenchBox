@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:12:57.501548+00:00",
+  "bundle_file": "tpch_skew_sf001_spark_sql_20260506_093634_b31bc35f.json",
+  "bundle_hash": "bfacef45f5e712a8f54e3d0936e363b71f4d9b58c3ab11126305f47ae82adf5c",
+  "companion_hashes": {},
+  "benchmark": "TPC-H Skew Benchmark (moderate)",
+  "platform": "Spark",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

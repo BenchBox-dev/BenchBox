@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:12:38.268079+00:00",
+  "bundle_file": "tpch_sf01_starrocks_sql_20260506_110857_067043ba.json",
+  "bundle_hash": "ed7d8b700fa24db1e7807a9ad5b4eb7273cc3088ec64479c2069f62fa8650ae0",
+  "companion_hashes": {},
+  "benchmark": "TPC-H",
+  "platform": "StarRocks",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}
