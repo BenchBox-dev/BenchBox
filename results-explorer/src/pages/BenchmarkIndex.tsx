@@ -16,6 +16,7 @@ import { TuningBadge, tuningLabel } from "@/components/TuningBadge";
 import { QueryHeatmap } from "@/components/QueryHeatmap";
 import { RankTable } from "@/components/RankTable";
 import { ChartPanel } from "@/components/ChartPanel";
+import { SegmentedControl } from "@/components/SegmentedControl";
 import { NotFound } from "@/pages/NotFound";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
@@ -243,8 +244,8 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
       return (
         <div class="mx-auto max-w-7xl px-4 py-24 text-center sm:px-6 lg:px-8">
           <Breadcrumb crumbs={[{ label: "Results", href: "/results/" }, { label: humanizeBenchmark(benchmark) }]} />
-          <h1 class="mt-6 text-3xl font-bold text-gray-900">{humanizeBenchmark(benchmark)}</h1>
-          <p class="mt-4 text-lg text-gray-600">
+          <h1 class="mt-6 text-3xl font-bold text-[var(--bb-data-fg-primary)]">{humanizeBenchmark(benchmark)}</h1>
+          <p class="mt-4 text-lg text-[var(--bb-data-fg-muted)]">
             No published results match the selected filters for {humanizeBenchmark(benchmark)}.
           </p>
           <a href={`/results/${benchmark}/`} class="mt-6 inline-block btn btn-primary no-underline">
@@ -256,11 +257,11 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     return (
       <div class="mx-auto max-w-7xl px-4 py-24 text-center sm:px-6 lg:px-8">
         <Breadcrumb crumbs={[{ label: "Results", href: "/results/" }, { label: humanizeBenchmark(benchmark) }]} />
-        <h1 class="mt-6 text-3xl font-bold text-gray-900">{humanizeBenchmark(benchmark)}</h1>
-        <p class="mt-4 text-lg text-gray-600">
+        <h1 class="mt-6 text-3xl font-bold text-[var(--bb-data-fg-primary)]">{humanizeBenchmark(benchmark)}</h1>
+        <p class="mt-4 text-lg text-[var(--bb-data-fg-muted)]">
           No published results yet for {humanizeBenchmark(benchmark)}.
         </p>
-        <p class="mt-2 text-sm text-gray-500">
+        <p class="mt-2 text-sm text-[var(--bb-data-fg-muted)]">
           The benchmark is supported by BenchBox but no runs have been ingested into the public corpus.
         </p>
         <a href="/results/" class="mt-6 inline-block btn btn-primary no-underline">
@@ -331,18 +332,18 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
       />
 
       <div class="mt-6 mb-6 flex flex-wrap items-center justify-between gap-4">
-        <h1 class="text-3xl font-bold text-gray-900">{title} Results</h1>
+        <h1 class="text-3xl font-bold text-[var(--bb-data-fg-primary)]">{title} Results</h1>
 
         <div class="flex flex-wrap items-center gap-3">
           {/* Scale factor filter */}
           {scaleFactors.length > 1 && (
             <div class="flex items-center gap-2">
-              <label class="text-sm font-medium text-gray-700" for="scale-filter">
+              <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="scale-filter">
                 Scale:
               </label>
               <select
                 id="scale-filter"
-                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1.5 text-sm shadow-sm"
                 value={effectiveSf}
                 onChange={(e) => setScaleFilter((e.target as HTMLSelectElement).value)}
               >
@@ -358,12 +359,12 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
           {/* Phase filter */}
           {phases.length > 1 && (
             <div class="flex items-center gap-2">
-              <label class="text-sm font-medium text-gray-700" for="phase-filter">
+              <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="phase-filter">
                 Phase:
               </label>
               <select
                 id="phase-filter"
-                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1.5 text-sm shadow-sm"
                 value={effectivePhase}
                 onChange={(e) => setPhaseFilter((e.target as HTMLSelectElement).value)}
               >
@@ -379,12 +380,12 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
           {/* Tuning filter */}
           {tuningModes.length > 1 && (
             <div class="flex items-center gap-2">
-              <label class="text-sm font-medium text-gray-700" for="tuning-filter">
+              <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="tuning-filter">
                 Tuning:
               </label>
               <select
                 id="tuning-filter"
-                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1.5 text-sm shadow-sm"
                 value={tuningFilter}
                 onChange={(e) => setTuningFilter((e.target as HTMLSelectElement).value)}
               >
@@ -401,7 +402,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
           {/* Trust filter chips - default "all tiers shown"; shown only when >1 tier present */}
           {trustLabels.length > 1 && (
             <div class="flex items-center gap-2">
-              <span class="text-sm font-medium text-gray-700">Trust:</span>
+              <span class="text-sm font-medium text-[var(--bb-data-fg-primary)]">Trust:</span>
               <div class="flex flex-wrap gap-1">
                 {trustLabels.map((tier) => {
                   const active = trustFilter === null || trustFilter.has(tier);
@@ -410,8 +411,8 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
                       key={tier}
                       class={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
                         active
-                          ? "bg-gray-700 text-white"
-                          : "bg-gray-100 text-gray-400 hover:bg-gray-200"
+                          ? "bg-[var(--bb-bg-elevated)] text-[var(--bb-fg-primary)]"
+                          : "bg-[var(--bb-surface-app)] text-[var(--bb-data-fg-subtle)] hover:bg-[var(--bb-data-border)]"
                       }`}
                       aria-pressed={active}
                       onClick={() => {
@@ -438,37 +439,24 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
           )}
 
           {/* View toggle */}
-          <div class="flex overflow-hidden rounded-md border border-gray-300 text-sm">
-            <button
-              class={`px-3 py-1.5 ${viewMode === "matrix" ? "bg-brand-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}
-              onClick={() => setViewMode("matrix")}
-              aria-pressed={viewMode === "matrix"}
-            >
-              Matrix
-            </button>
-            <button
-              class={`px-3 py-1.5 ${viewMode === "ranks" ? "bg-brand-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}
-              onClick={() => setViewMode("ranks")}
-              aria-pressed={viewMode === "ranks"}
-            >
-              Ranks
-            </button>
-            <button
-              class={`px-3 py-1.5 ${viewMode === "list" ? "bg-brand-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}
-              onClick={() => setViewMode("list")}
-              aria-pressed={viewMode === "list"}
-            >
-              List
-            </button>
-          </div>
+          <SegmentedControl
+            ariaLabel="Benchmark view"
+            value={viewMode}
+            onChange={(value) => setViewMode(value)}
+            options={[
+              { value: "matrix", label: "Matrix" },
+              { value: "ranks", label: "Ranks" },
+              { value: "list", label: "List" },
+            ]}
+          />
 
           {/* High contrast toggle - only meaningful in matrix (heatmap) view */}
           {viewMode === "matrix" && (
             <button
               class={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
                 highContrast
-                  ? "border-gray-700 bg-gray-700 text-white"
-                  : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
+                  ? "border-[var(--bb-bg-elevated)] bg-[var(--bb-bg-elevated)] text-[var(--bb-fg-primary)]"
+                  : "border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] text-[var(--bb-data-fg-muted)] hover:bg-[var(--bb-surface-data-muted)]"
               }`}
               onClick={() => setHighContrast((v) => !v)}
               aria-pressed={highContrast}
@@ -490,7 +478,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
           ) : summaryLoading ? (
             <BenchmarkMatrixSkeleton message="Loading matrix..." />
           ) : !filteredSummary ? (
-            <div class="rounded-lg border border-dashed border-gray-300 bg-white p-10 text-center text-gray-400">
+            <div class="rounded-lg border border-dashed border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] p-10 text-center text-[var(--bb-data-fg-subtle)]">
               <p class="font-medium">
                 No benchmark data available for {humanizeBenchmark(benchmark)} SF{effectiveSf} phase {effectivePhase}.
               </p>
@@ -516,7 +504,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
           ) : summaryLoading ? (
             <BenchmarkMatrixSkeleton message="Loading ranks..." />
           ) : !filteredSummary ? (
-            <div class="rounded-lg border border-dashed border-gray-300 bg-white p-10 text-center text-gray-400">
+            <div class="rounded-lg border border-dashed border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] p-10 text-center text-[var(--bb-data-fg-subtle)]">
               <p class="font-medium">
                 No benchmark data available for {humanizeBenchmark(benchmark)} SF{effectiveSf} phase {effectivePhase}.
               </p>
@@ -548,10 +536,10 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
 
       {/* Sticky Compare bar */}
       {compareUrl && (
-        <div class="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 bg-white px-4 py-3 shadow-lg">
+        <div class="fixed bottom-0 left-0 right-0 z-50 border-t border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 shadow-lg">
           <div class="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div class="min-w-0 flex-1">
-              <div class="text-sm text-gray-700">
+              <div class="text-sm text-[var(--bb-data-fg-primary)]">
                 <strong>{selectedIds.size}</strong> platforms selected for compare
               </div>
               <div
@@ -569,15 +557,15 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
                       key={id}
                       data-testid={`compare-tray-row-${id}`}
                       role="listitem"
-                      class="flex max-w-full flex-wrap items-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-600"
+                      class="flex max-w-full flex-wrap items-center gap-1.5 rounded-md border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-2 py-1 text-xs text-[var(--bb-data-fg-muted)]"
                     >
-                      <span class="font-medium text-gray-900">{row.platform}</span>
+                      <span class="font-medium text-[var(--bb-data-fg-primary)]">{row.platform}</span>
                       <span>{humanizeBenchmark(cohortBenchmark)}</span>
                       <span>SF {cohortScale}</span>
                       <span>{cohortPhase}</span>
                       <span>{row.run_date}</span>
                       <TrustBadge trustLabel={row.trust_label} compact />
-                      <span class="font-mono text-gray-500">ID {displayCompareId(id)}</span>
+                      <span class="font-mono text-[var(--bb-data-fg-muted)]">ID {displayCompareId(id)}</span>
                     </div>
                   );
                 })}
@@ -586,7 +574,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
             <div class="flex shrink-0 items-center gap-3">
               <button
                 type="button"
-                class="text-sm text-gray-500 hover:text-gray-700"
+                class="text-sm text-[var(--bb-data-fg-muted)] hover:text-[var(--bb-data-fg-primary)]"
                 onClick={() => setSelectedIds(new Set())}
               >
                 Clear
@@ -681,19 +669,19 @@ function ListTable({
 
   if (filtered.length === 0) {
     return (
-      <p class="text-gray-500">
+      <p class="text-[var(--bb-data-fg-muted)]">
         No results found for SF {scaleFactor}.
       </p>
     );
   }
 
   return (
-    <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-      <div class="border-b border-gray-200 bg-white px-4 py-3 text-sm text-gray-500">
+    <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
+      <div class="border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
         Showing {visibleRows.length.toLocaleString()} of {filtered.length.toLocaleString()} results for SF {scaleFactor}
       </div>
-      <table class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
+      <table class="min-w-full divide-y divide-[var(--bb-data-border)]">
+        <thead class="bg-[var(--bb-surface-data-muted)]">
           <tr>
             <ListSortHeader
               label="Platform"
@@ -754,14 +742,14 @@ function ListTable({
             <th class="table-th" />
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-100 bg-white">
+        <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
           {visibleRows.map((r) => (
             <BenchmarkRow key={r.result_id} entry={r} />
           ))}
         </tbody>
       </table>
       {visibleRows.length < filtered.length && (
-        <div class="border-t border-gray-200 bg-gray-50 px-4 py-3 text-center">
+        <div class="border-t border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-3 text-center">
           <button
             type="button"
             class="btn btn-secondary"
@@ -777,23 +765,23 @@ function ListTable({
 
 function BenchmarkRow({ entry }: { entry: ResultRow }) {
   return (
-    <tr class="hover:bg-gray-50" data-testid={entry.result_id}>
+    <tr class="hover:bg-[var(--bb-surface-data-muted)]" data-testid={entry.result_id}>
       <td class="table-td">
         <a href={`/results/p/${entry.platform_id}/`} class="font-medium no-underline">
           {entry.platform}
         </a>
         {entry.compliance_class && entry.compliance_class !== "official" && (
-          <span class="ml-2 text-xs text-gray-400">{complianceLabel(entry.compliance_class)}</span>
+          <span class="ml-2 text-xs text-[var(--bb-data-fg-subtle)]">{complianceLabel(entry.compliance_class)}</span>
         )}
         {entry.driver_version && (
-          <span class="ml-2 text-xs text-gray-400">v{entry.driver_version}</span>
+          <span class="ml-2 text-xs text-[var(--bb-data-fg-subtle)]">v{entry.driver_version}</span>
         )}
       </td>
       <td class="table-td">SF {entry.scale_factor}</td>
-      <td class="table-td text-gray-500">{entry.run_date}</td>
+      <td class="table-td text-[var(--bb-data-fg-muted)]">{entry.run_date}</td>
       <td class="table-td font-mono">{fmtScore(entry.power_score)}</td>
       <td class="table-td font-mono">{fmtGeomean(entry.display_geomean_ms ?? entry.geomean_ms)}</td>
-      <td class="table-td text-gray-500">{entry.query_count}</td>
+      <td class="table-td text-[var(--bb-data-fg-muted)]">{entry.query_count}</td>
       <td class="table-td">
         <div class="flex flex-wrap gap-1">
           <TrustBadge trustLabel={entry.trust_label} compact />

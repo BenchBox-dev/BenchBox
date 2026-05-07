@@ -42,7 +42,7 @@ interface SparkProps {
 }
 
 function SparkBar({ value, max, color, higherIsBetter = false }: SparkProps) {
-  if (value === null || max <= 0) return <span class="text-gray-300">-</span>;
+  if (value === null || max <= 0) return <span class="text-[var(--bb-data-fg-subtle)]">-</span>;
   // For higher-is-better (power_score): best = full bar, worst → MIN_FRAC.
   // For lower-is-better (latency):     best = full bar, worst → MIN_FRAC.
   // Either way, best=1.0 and worst=MIN_FRAC so relative spread is visible.
@@ -84,21 +84,21 @@ export function SparklineTable({ summary }: Props) {
         aria-label="Compact performance metrics overview"
       >
         <thead>
-          <tr class="border-b border-gray-200">
-            <th class="text-left px-2 py-1.5 text-gray-500 font-normal min-w-[10rem]">Platform</th>
-            <th class="text-right px-2 py-1.5 text-gray-500 font-normal whitespace-nowrap" colSpan={2}>
+          <tr class="border-b border-[var(--bb-data-border)]">
+            <th class="text-left px-2 py-1.5 text-[var(--bb-data-fg-muted)] font-normal min-w-[10rem]">Platform</th>
+            <th class="text-right px-2 py-1.5 text-[var(--bb-data-fg-muted)] font-normal whitespace-nowrap" colSpan={2}>
               Geomean
             </th>
             {showPower && (
-              <th class="text-right px-2 py-1.5 text-gray-500 font-normal whitespace-nowrap" colSpan={2}>
+              <th class="text-right px-2 py-1.5 text-[var(--bb-data-fg-muted)] font-normal whitespace-nowrap" colSpan={2}>
                 Power@Size
               </th>
             )}
             {showP99 && (
-              <th class="text-right px-2 py-1.5 text-gray-500 font-normal">P99</th>
+              <th class="text-right px-2 py-1.5 text-[var(--bb-data-fg-muted)] font-normal">P99</th>
             )}
             {showCost && (
-              <th class="text-right px-2 py-1.5 text-gray-500 font-normal" title={costModelDisclosure(platforms)}>
+              <th class="text-right px-2 py-1.5 text-[var(--bb-data-fg-muted)] font-normal" title={costModelDisclosure(platforms)}>
                 Normalized cost
               </th>
             )}
@@ -108,8 +108,8 @@ export function SparklineTable({ summary }: Props) {
           {platforms.map((p, i) => {
             const color = paletteColor(i);
             return (
-              <tr key={p.result_id} class="border-b border-gray-100 hover:bg-gray-50">
-                <td class="px-2 py-1.5 font-medium text-gray-700">
+              <tr key={p.result_id} class="border-b border-[var(--bb-data-border)] hover:bg-[var(--bb-surface-data-muted)]">
+                <td class="px-2 py-1.5 font-medium text-[var(--bb-data-fg-primary)]">
                   <span
                     class="inline-block w-2 h-2 rounded-full mr-1.5 align-middle"
                     style={{ backgroundColor: color }}
@@ -120,7 +120,7 @@ export function SparklineTable({ summary }: Props) {
                 <td class="px-1 py-1.5">
                   <SparkBar value={p.display_geomean_ms} max={maxGeomean} color={color} />
                 </td>
-                <td class="px-2 py-1.5 text-right font-mono text-gray-700">
+                <td class="px-2 py-1.5 text-right font-mono text-[var(--bb-data-fg-primary)]">
                   {fmtMs(p.display_geomean_ms)}
                 </td>
                 {/* Power score spark + value */}
@@ -134,20 +134,20 @@ export function SparklineTable({ summary }: Props) {
                         higherIsBetter
                       />
                     </td>
-                    <td class="px-2 py-1.5 text-right font-mono text-gray-700">
+                    <td class="px-2 py-1.5 text-right font-mono text-[var(--bb-data-fg-primary)]">
                       {fmtScore(p.power_score)}
                     </td>
                   </>
                 )}
                 {/* P99 */}
                 {showP99 && (
-                  <td class="px-2 py-1.5 text-right font-mono text-gray-500">
+                  <td class="px-2 py-1.5 text-right font-mono text-[var(--bb-data-fg-muted)]">
                     {fmtMs(p.percentile_stats?.p99 ?? null)}
                   </td>
                 )}
                 {/* Cost */}
                 {showCost && (
-                  <td class="px-2 py-1.5 text-right font-mono text-gray-500">
+                  <td class="px-2 py-1.5 text-right font-mono text-[var(--bb-data-fg-muted)]">
                     {normalizedCostValue(p) !== null ? `$${normalizedCostValue(p)!.toFixed(2)}` : costStatusLabel(p)}
                   </td>
                 )}
