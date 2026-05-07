@@ -87,6 +87,22 @@ def test_validate_config_accepts_managed_docker_cleanup_contract():
     assert cfg.cleanup.docker_start_timeout_s == 42
 
 
+@pytest.mark.parametrize(
+    ("field", "cleanup"),
+    [
+        ("preserve_datagen", {"preserve_datagen": "false"}),
+        ("prune_databases", {"prune_databases": "false"}),
+        (
+            "docker_manage_platforms",
+            {"docker_manage_platforms": "false", "docker_platform_switch": "volumes"},
+        ),
+    ],
+)
+def test_validate_config_rejects_quoted_cleanup_booleans(field: str, cleanup: dict[str, object]):
+    with pytest.raises(config.ConfigError, match=rf"cleanup\.{field}` must be a bool"):
+        config.validate_config({"name": "smoke", "cleanup": cleanup})
+
+
 def test_validate_config_rejects_invalid_docker_cleanup_mode():
     with pytest.raises(config.ConfigError, match="docker_platform_switch"):
         config.validate_config({"name": "smoke", "cleanup": {"docker_platform_switch": "everything"}})
