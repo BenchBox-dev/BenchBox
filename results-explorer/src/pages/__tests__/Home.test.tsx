@@ -427,6 +427,20 @@ describe("Home", () => {
     });
   });
 
+  it("restores and updates Home leaderboard mode through the URL", async () => {
+    window.history.replaceState(null, "", "/results/?mode=speedup");
+
+    render(<Home />);
+    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+
+    expect(screen.getByRole("radio", { name: "Speedup" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByText("0.50x")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("radio", { name: "Ranks" }));
+
+    await waitFor(() => expect(new URL(window.location.href).searchParams.get("mode")).toBe("ranks"));
+  });
+
   it("renders a compact run-compare-submit workflow near the leaderboard", async () => {
     render(<Home />);
     await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());

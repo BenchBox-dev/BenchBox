@@ -144,10 +144,10 @@ describe("TrustBadge", () => {
 });
 
 describe("ValidationBadge", () => {
-  it("renders exact validation with success tone", () => {
+  it("renders exact validation with info tone distinct from trust success", () => {
     const { container } = render(<ValidationBadge validationStatus="exact" />);
     const badge = container.querySelector(".badge");
-    expect(badge?.getAttribute("data-tone")).toBe("success");
+    expect(badge?.getAttribute("data-tone")).toBe("info");
     expect(badge?.textContent).toBe("exact");
     expect(badge?.getAttribute("title")).toContain("Validation status: exact");
   });

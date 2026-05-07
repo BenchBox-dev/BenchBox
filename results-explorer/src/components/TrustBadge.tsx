@@ -93,7 +93,7 @@ function validationTone(status: string): StatusTone {
   if (status.includes("fail")) return "danger";
   if (status.includes("disabled") || status.includes("partial")) return "warning";
   if (status === "exact" || status === "full" || status === "passed" || status === "pass") {
-    return "success";
+    return "info";
   }
   if (status === "loose" || status === "range") return "warning";
   return "neutral";

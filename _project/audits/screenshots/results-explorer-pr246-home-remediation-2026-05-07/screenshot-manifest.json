@@ -1,0 +1,77 @@
+{
+  "captured_at": "2026-05-07T15:08:54.292Z",
+  "routes": [
+    {
+      "filename": "home-390.png",
+      "url": "/results/",
+      "width": 390,
+      "mode": "times"
+    },
+    {
+      "filename": "home-768.png",
+      "url": "/results/",
+      "width": 768,
+      "mode": "times"
+    },
+    {
+      "filename": "home-1280.png",
+      "url": "/results/",
+      "width": 1280,
+      "mode": "times"
+    },
+    {
+      "filename": "home-1600.png",
+      "url": "/results/",
+      "width": 1600,
+      "mode": "times"
+    },
+    {
+      "filename": "home-ranks-390.png",
+      "url": "/results/?mode=ranks",
+      "width": 390,
+      "mode": "ranks"
+    },
+    {
+      "filename": "home-ranks-768.png",
+      "url": "/results/?mode=ranks",
+      "width": 768,
+      "mode": "ranks"
+    },
+    {
+      "filename": "home-ranks-1280.png",
+      "url": "/results/?mode=ranks",
+      "width": 1280,
+      "mode": "ranks"
+    },
+    {
+      "filename": "home-ranks-1600.png",
+      "url": "/results/?mode=ranks",
+      "width": 1600,
+      "mode": "ranks"
+    },
+    {
+      "filename": "home-speedup-mobile-390.png",
+      "url": "/results/?mode=speedup",
+      "width": 390,
+      "mode": "speedup"
+    },
+    {
+      "filename": "home-speedup-768.png",
+      "url": "/results/?mode=speedup",
+      "width": 768,
+      "mode": "speedup"
+    },
+    {
+      "filename": "home-speedup-1280.png",
+      "url": "/results/?mode=speedup",
+      "width": 1280,
+      "mode": "speedup"
+    },
+    {
+      "filename": "home-speedup-1600.png",
+      "url": "/results/?mode=speedup",
+      "width": 1600,
+      "mode": "speedup"
+    }
+  ]
+}
