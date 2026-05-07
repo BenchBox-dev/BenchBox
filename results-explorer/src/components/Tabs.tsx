@@ -1,4 +1,5 @@
 import type { ComponentChildren } from "preact";
+import { useRef } from "preact/hooks";
 
 export interface TabItem<T extends string> {
   value: T;
@@ -25,6 +26,15 @@ export function Tabs<T extends string>({
   controls,
   class: extraClass = "",
 }: TabsProps<T>) {
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  const selectAndFocus = (index: number) => {
+    const item = items[index];
+    if (!item || item.disabled) return;
+    tabRefs.current[index]?.focus();
+    onChange(item.value);
+  };
+
   const moveFocus = (direction: 1 | -1, fromIndex: number) => {
     const enabled = items
       .map((item, index) => ({ item, index }))
@@ -33,7 +43,7 @@ export function Tabs<T extends string>({
     const currentEnabledIdx = enabled.findIndex(({ index }) => index === fromIndex);
     const nextEnabledIdx =
       (currentEnabledIdx + direction + enabled.length) % enabled.length;
-    onChange(enabled[nextEnabledIdx]!.item.value);
+    selectAndFocus(enabled[nextEnabledIdx]!.index);
   };
 
   const onKeyDown = (event: KeyboardEvent, currentIndex: number) => {
@@ -51,13 +61,13 @@ export function Tabs<T extends string>({
       case "Home": {
         event.preventDefault();
         const first = items.findIndex((item) => !item.disabled);
-        if (first >= 0) onChange(items[first]!.value);
+        if (first >= 0) selectAndFocus(first);
         break;
       }
       case "End": {
         event.preventDefault();
-        const enabled = items.filter((item) => !item.disabled);
-        if (enabled.length > 0) onChange(enabled[enabled.length - 1]!.value);
+        const last = items.reduce((lastIndex, item, index) => (item.disabled ? lastIndex : index), -1);
+        if (last >= 0) selectAndFocus(last);
         break;
       }
       default:
@@ -83,6 +93,9 @@ export function Tabs<T extends string>({
             aria-disabled={item.disabled || undefined}
             disabled={item.disabled}
             tabIndex={selected ? 0 : -1}
+            ref={(node) => {
+              tabRefs.current[index] = node;
+            }}
             onClick={() => !item.disabled && onChange(item.value)}
             onKeyDown={(event) => onKeyDown(event as KeyboardEvent, index)}
             class={`whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
