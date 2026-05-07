@@ -62,6 +62,18 @@ def test_stress_default_yaml_loads():
     assert "explorer_smoke" not in cfg.phases
 
 
+def test_stress_docker_managed_yaml_loads():
+    p = Path(__file__).resolve().parent / "configs" / "stress-docker-managed.yaml"
+    assert p.exists()
+    from tests.uat.config import load_config
+
+    cfg = load_config(p)
+    assert cfg.name == "stress-docker-managed"
+    assert cfg.cleanup.docker_manage_platforms is True
+    assert cfg.cleanup.docker_platform_switch == "volumes"
+    assert cfg.preflight.docker_required is True
+
+
 def test_dry_run_still_runs_enumerate(tmp_path: Path):
     """dry_run should NOT short-circuit enumerate; a malformed config must fail at PR time."""
     cfg = validate_config(
@@ -132,7 +144,7 @@ def test_explorer_smoke_uses_package_submissions_dir(tmp_path: Path):
         log_path=tmp_path / "cell.log",
         result_path=tmp_path / "result.json",
     )
-    execute_outcome = type("ExecuteOutcome", (), {"results": (cell,)})()
+    execute_outcome = type("ExecuteOutcome", (), {"results": (cell,), "aborted": False, "abort_reason": None})()
     captured: dict[str, Path] = {}
 
     def fake_package(config, *, result_paths, submissions_dir):
@@ -168,7 +180,11 @@ def test_orchestrator_uses_output_root_for_preflight_execute_and_cleanup(tmp_pat
         }
     )
     fake_preflight = type("Preflight", (), {"aborted": False, "abort_reason": None, "warnings": ()})()
-    fake_execute = type("ExecuteOutcome", (), {"results": (), "pruned": (), "skipped_unreachable": ()})()
+    fake_execute = type(
+        "ExecuteOutcome",
+        (),
+        {"results": (), "pruned": (), "skipped_unreachable": (), "aborted": False, "abort_reason": None},
+    )()
     captured: dict[str, Path | str] = {}
 
     def fake_run_preflight(**kwargs):
@@ -178,6 +194,8 @@ def test_orchestrator_uses_output_root_for_preflight_execute_and_cleanup(tmp_pat
     def fake_run_execute(config, **kwargs):
         captured["benchmark_runs_dir"] = kwargs["benchmark_runs_dir"]
         captured["databases_root"] = kwargs["databases_root"]
+        captured["cleanup_enabled"] = kwargs["cleanup_enabled"]
+        captured["free_space_checks_enabled"] = kwargs["free_space_checks_enabled"]
         return fake_execute
 
     with (
@@ -190,3 +208,5 @@ def test_orchestrator_uses_output_root_for_preflight_execute_and_cleanup(tmp_pat
     assert captured["free_space_path"] == str(root)
     assert captured["benchmark_runs_dir"] == root
     assert captured["databases_root"] == root / "databases"
+    assert captured["cleanup_enabled"] is True
+    assert captured["free_space_checks_enabled"] is True

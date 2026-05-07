@@ -28,6 +28,9 @@ def test_validate_config_minimal():
     assert cfg.execute.per_cell_timeout_s == 600
     assert cfg.execute.parallel_platforms is False
     assert cfg.output.benchmark_runs_dir_template == "~/Developer/benchmark_runs"
+    assert cfg.preflight.free_space_min_gib == 5.0
+    assert cfg.cleanup.docker_manage_platforms is False
+    assert cfg.cleanup.docker_platform_switch == "off"
 
 
 def test_validate_config_rejects_parallel_platforms():
@@ -63,6 +66,49 @@ def test_validate_config_accepts_string_int_timeout():
 def test_validate_config_accepts_execute_extra_args():
     cfg = config.validate_config({"name": "smoke", "execute": {"extra_args": ["--tuning", "tuned"]}})
     assert cfg.execute.extra_args == ("--tuning", "tuned")
+
+
+def test_validate_config_accepts_managed_docker_cleanup_contract():
+    cfg = config.validate_config(
+        {
+            "name": "smoke",
+            "cleanup": {
+                "docker_manage_platforms": True,
+                "docker_platform_switch": "volumes",
+                "docker_project_prefix": "benchbox-uat-test",
+                "docker_start_timeout_s": 42,
+                "docker_fixed_container_name_policy": "fail",
+            },
+        }
+    )
+    assert cfg.cleanup.docker_manage_platforms is True
+    assert cfg.cleanup.docker_platform_switch == "volumes"
+    assert cfg.cleanup.docker_project_prefix == "benchbox-uat-test"
+    assert cfg.cleanup.docker_start_timeout_s == 42
+
+
+def test_validate_config_rejects_invalid_docker_cleanup_mode():
+    with pytest.raises(config.ConfigError, match="docker_platform_switch"):
+        config.validate_config({"name": "smoke", "cleanup": {"docker_platform_switch": "everything"}})
+
+
+def test_validate_config_rejects_docker_cleanup_noop_without_managed_lifecycle():
+    with pytest.raises(config.ConfigError, match="docker_manage_platforms"):
+        config.validate_config({"name": "smoke", "cleanup": {"docker_platform_switch": "volumes"}})
+
+
+def test_validate_config_rejects_invalid_fixed_container_name_policy():
+    with pytest.raises(config.ConfigError, match="docker_fixed_container_name_policy"):
+        config.validate_config(
+            {
+                "name": "smoke",
+                "cleanup": {
+                    "docker_manage_platforms": True,
+                    "docker_platform_switch": "volumes",
+                    "docker_fixed_container_name_policy": "shrug",
+                },
+            }
+        )
 
 
 def test_validate_config_accepts_benchmark_runs_dir_template(tmp_path: Path):

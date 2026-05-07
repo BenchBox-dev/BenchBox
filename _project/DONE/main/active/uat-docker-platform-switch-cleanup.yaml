@@ -2,7 +2,8 @@ id: uat-docker-platform-switch-cleanup
 title: "UAT: clear Docker assets at platform-switch boundaries"
 worktree: main
 priority: "High"
-status: "Not Started"
+status: Completed
+completed_date: "2026-05-06"
 category: "Testing and Quality Assurance"
 
 deps:
@@ -38,7 +39,7 @@ work:
 - id: w1
   summary: "Audit current UAT execution, Docker platform mapping, and ownership boundaries"
   needs: []
-  status: pending
+  status: done
   notes: |
     Read the implementation paths before editing:
       - `tests/uat/phases/execute.py` for the sequential platform loop and current database cleanup hook.
@@ -78,7 +79,7 @@ work:
 - id: w2
   summary: "Define the Docker cleanup contract and config schema before adding behavior"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Add a concrete config contract under `cleanup:` and document its defaults. The contract must distinguish four questions:
       1. Should UAT manage Docker stacks for Docker-backed platforms, or only probe externally managed stacks?
@@ -109,7 +110,7 @@ work:
 - id: w3
   summary: "Implement a Docker asset helper with safe, inspectable command generation"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Add a focused helper module, preferably `tests/uat/docker_assets.py`, rather than embedding subprocess command construction in `execute.py`.
     The helper should expose small, testable pieces:
@@ -131,7 +132,7 @@ work:
 - id: w4
   summary: "Wire UAT-owned Docker startup and teardown into the execute platform boundary"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Integrate at `tests/uat/phases/execute.py::run_execute`, not in `runner.py` and not in any platform adapter.
     Required control flow:
@@ -151,7 +152,7 @@ work:
 - id: w5
   summary: "Add mid-sweep free-space checks around Docker teardown and platform transitions"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     The UAT spec says `preflight.free_space_min_gib` is a sweep-abort guardrail watched mid-sweep, but current code only checks at preflight.
     Add the minimal free-space check needed for this work:
@@ -164,7 +165,7 @@ work:
 - id: w6
   summary: "Add fast unit coverage for Docker helper, config readers, and execute-boundary behavior"
   needs: [w3, w4, w5]
-  status: pending
+  status: done
   notes: |
     Add tests under `tests/uat/` without requiring a live Docker daemon:
       - Mapping completeness: every platform in `matrix.PLATFORM_GROUPS["docker"]` has a `DockerPlatformSpec`, and no non-Docker platforms accidentally map.
@@ -182,7 +183,7 @@ work:
 - id: w7
   summary: "Update operator/developer docs and example configs"
   needs: [w6]
-  status: pending
+  status: done
   notes: |
     Update documentation where UAT operators actually look:
       - `docs/operations/uat-framework.md`: add a Docker storage section explaining platform-switch cleanup, safe defaults, the no-op prevention rule, and how to opt out.
@@ -202,7 +203,7 @@ work:
 - id: w8
   summary: "Run local verification and optional live Docker smoke with explicit approval"
   needs: [w7]
-  status: pending
+  status: done
   notes: |
     Required non-live verification:
       - Run focused UAT tests for new helper/config/execute behavior.
@@ -218,13 +219,16 @@ work:
 
 deferred:
 - summary: "Automatic global Docker image/build-cache pruning"
-  reason: "Too destructive for UAT automation. Keep `docker system prune` / `docker builder prune` as explicit user-approved recovery commands outside this item."
+  reason: "Too destructive for UAT automation. Keep `docker system prune` / `docker builder prune` as explicit user-approved
+    recovery commands outside this item."
 - summary: "Cleanup of externally managed Docker stacks"
-  reason: "Deleting volumes from stacks UAT did not start can destroy developer data. This item uses UAT-owned stack lifecycle; any external-cleanup mode needs a separate explicit approval and design."
+  reason: "Deleting volumes from stacks UAT did not start can destroy developer data. This item uses UAT-owned stack lifecycle;
+    any external-cleanup mode needs a separate explicit approval and design."
 - summary: "Cloud-platform lifecycle cleanup"
   reason: "Cloud UAT is deferred elsewhere; this item is only for local Docker-backed platforms."
 - summary: "Moving Docker lifecycle management into platform adapters"
-  reason: "Adapters should connect to a platform, not own local infrastructure lifecycle; UAT is the developer harness that knows the sweep boundary."
+  reason: "Adapters should connect to a platform, not own local infrastructure lifecycle; UAT is the developer harness that
+    knows the sweep boundary."
 
 verification:
 - description: "Focused tests for Docker asset cleanup and UAT execute integration pass."
@@ -240,27 +244,36 @@ verification:
   command: "uv run -- ty check"
   expected_output: "type check passes or any pre-existing unrelated failures are documented"
 - description: "TODO schema and graph remain valid after updating the item."
-  command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate _project/TODO/main/planning/uat-docker-platform-switch-cleanup.yaml && uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph"
+  command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate _project/TODO/main/planning/uat-docker-platform-switch-cleanup.yaml
+    && uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph"
   expected_output: "TODO item validates and graph has no dangling references or cycles"
 - description: "Optional approved live smoke proves UAT-owned Docker volumes are removed at platform switch."
   command: "make uat-execute CONFIG=<temporary-docker-uat-config>"
-  expected_output: "Docker platform A is torn down with UAT-owned volumes removed before platform B starts; unrelated Docker stacks remain untouched"
+  expected_output: "Docker platform A is torn down with UAT-owned volumes removed before platform B starts; unrelated Docker
+    stacks remain untouched"
 
 must_preserve:
 - "Sequential platform execution remains mandatory; do not add parallel platform execution or async Docker lifecycle behavior."
-- "Existing TPC-H/TPC-DS source-consumer database reuse remains intact; Docker teardown happens at platform boundaries, not per cell."
-- "Generated datagen under `~/Developer/benchmark_runs/datagen/` remains preserved unless a separate explicit cleanup policy is approved."
+- "Existing TPC-H/TPC-DS source-consumer database reuse remains intact; Docker teardown happens at platform boundaries, not
+  per cell."
+- "Generated datagen under `~/Developer/benchmark_runs/datagen/` remains preserved unless a separate explicit cleanup policy
+  is approved."
 - "Non-Docker and DataFrame platform UAT behavior stays unchanged except for shared free-space guardrails."
-- "Benchmark cell elapsed time remains the `benchbox run` subprocess duration; Docker startup/teardown is UAT overhead, not query timing."
+- "Benchmark cell elapsed time remains the `benchbox run` subprocess duration; Docker startup/teardown is UAT overhead, not
+  query timing."
 - "Docker cleanup targets only UAT-owned compose projects by default; user-managed developer stacks are not stopped or pruned."
-- "Externally managed Docker stacks keep current probe/skip behavior unless a separate explicitly approved external cleanup mode is designed."
+- "Externally managed Docker stacks keep current probe/skip behavior unless a separate explicitly approved external cleanup
+  mode is designed."
 
 anti_patterns:
-- "DO NOT use `docker system prune`, `docker volume prune`, `docker image prune`, or `docker builder prune` from automated UAT."
+- "DO NOT use `docker system prune`, `docker volume prune`, `docker image prune`, or `docker builder prune` from automated
+  UAT."
 - "DO NOT run `docker compose down -v` without an explicit UAT-owned `-p <project>` name in automated cleanup."
-- "DO NOT allow `docker_platform_switch: volumes` or `images` while `docker_manage_platforms: false`; that is a no-op or unsafe external deletion."
+- "DO NOT allow `docker_platform_switch: volumes` or `images` while `docker_manage_platforms: false`; that is a no-op or unsafe
+  external deletion."
 - "DO NOT add new YAML fields that are not read by both `uat-sweep` and `uat-execute` paths."
-- "DO NOT assume compose project names isolate platforms whose compose files declare fixed `container_name`; audit and handle those explicitly."
+- "DO NOT assume compose project names isolate platforms whose compose files declare fixed `container_name`; audit and handle
+  those explicitly."
 - "DO NOT put Docker lifecycle commands in platform adapters or `benchbox run`; this is UAT harness behavior."
 - "DO NOT tear Docker down after each cell; that breaks same-platform reuse and increases timing noise."
 - "DO NOT silently swallow cleanup failures; surface them in logs and phase outcomes while still attempting best-effort teardown."
@@ -303,10 +316,16 @@ approach: |
   before any live Docker smoke.
 
 notes:
-- "Origin: code review of the UAT process requested by the operator to prevent out-of-space issues on a storage-constrained device."
-- "Review follow-up addressed: clarify that cleanup must not be a no-op under externally managed Docker, and audit fixed `container_name` compose files before relying on project-name isolation."
-- "Existing related concern: `_project/TODO/main/planning/uat-framework-review-followups.yaml` tracks typed UAT config/orphan YAML cleanup; coordinate with it but do not create another orphan field."
-- "The 2026-05-02 and 2026-05-05 UAT handoffs show disk pressure was already a blocking operational risk. This item addresses Docker-owned storage that current `benchmark_runs/databases` pruning cannot see."
+- "Origin: code review of the UAT process requested by the operator to prevent out-of-space issues on a storage-constrained
+  device."
+- "Review follow-up addressed: clarify that cleanup must not be a no-op under externally managed Docker, and audit fixed `container_name`
+  compose files before relying on project-name isolation."
+- "Existing related concern: `_project/TODO/main/planning/uat-framework-review-followups.yaml` tracks typed UAT config/orphan
+  YAML cleanup; coordinate with it but do not create another orphan field."
+- "The 2026-05-02 and 2026-05-05 UAT handoffs show disk pressure was already a blocking operational risk. This item addresses
+  Docker-owned storage that current `benchmark_runs/databases` pruning cannot see."
+- "Implementation completed with non-live tests only; optional live Docker smoke was not run because it creates/removes Docker
+  volumes and requires explicit approval."
 
 metadata:
   tags: [uat, docker, cleanup, disk-budget, storage]

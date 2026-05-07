@@ -68,12 +68,11 @@ def run_sweep(
             phase_exit_codes[phase] = 0
             continue
         if phase == "preflight":
-            preflight_cfg = config.raw.get("preflight") or {}
             result = preflight_phase.run_preflight(
-                free_space_path=preflight_cfg.get("free_space_path", str(benchmark_runs_dir)),
-                free_space_min_gib=float(preflight_cfg.get("free_space_min_gib", 5.0)),
-                docker_required=bool(preflight_cfg.get("docker_required", False)),
-                noisy_neighbor_warn_load=float(preflight_cfg.get("noisy_neighbor_warn_load", 8.0)),
+                free_space_path=config.preflight.free_space_path or str(benchmark_runs_dir),
+                free_space_min_gib=config.preflight.free_space_min_gib,
+                docker_required=config.preflight.docker_required or config.cleanup.docker_manage_platforms,
+                noisy_neighbor_warn_load=config.preflight.noisy_neighbor_warn_load,
             )
             phase_exit_codes[phase] = 2 if result.aborted else 0
             if result.aborted:
@@ -98,6 +97,8 @@ def run_sweep(
                 log_dir=log_dir,
                 benchmark_runs_dir=benchmark_runs_dir,
                 databases_root=databases_root,
+                cleanup_enabled=config.cleanup.prune_databases,
+                free_space_checks_enabled="preflight" in config.phases,
             )
             with cells_jsonl.open("w", encoding="utf-8") as fh:
                 for cell in execute_outcome.results:
@@ -116,6 +117,11 @@ def run_sweep(
                         )
                         + "\n"
                     )
+            if execute_outcome.aborted:
+                phase_exit_codes[phase] = 2
+                aborted_phase = phase
+                abort_reason = execute_outcome.abort_reason
+                break
             phase_exit_codes[phase] = 0 if all(r.status == "passed" for r in execute_outcome.results) else 1
         elif phase == "validate":
             from tests.uat.phases.validate import ValidatePhaseError, run_validate
@@ -174,8 +180,6 @@ def run_sweep(
             )
             phase_exit_codes[phase] = result.exit_code()
         elif phase == "report":
-            from tests.uat.phases.validate import parse_validator_status_by_path
-
             report_cfg = config.raw.get("report") or {}
             tsv_path = log_dir / report_cfg.get("matrix_summary_tsv", "matrix_summary.tsv")
             cells = execute_outcome.results if execute_outcome else []
@@ -185,9 +189,7 @@ def run_sweep(
             # validate phase ran earlier in this sweep. Without this,
             # cross_scale_clean_pair_count silently degrades to a
             # passed-only check.
-            validator_status_by_path: dict[Path, str] | None = None
-            if validator_rollup_tsv is not None and validator_rollup_tsv.exists():
-                validator_status_by_path = parse_validator_status_by_path(validator_rollup_tsv)
+            validator_status_by_path = _validator_status_by_path(validator_rollup_tsv)
             summary = report_phase.write_report(
                 cells,
                 output_path=tsv_path,
@@ -204,6 +206,14 @@ def run_sweep(
         abort_reason=abort_reason,
         phase_exit_codes=phase_exit_codes,
     )
+
+
+def _validator_status_by_path(validator_rollup_tsv: Path | None) -> dict[Path, str] | None:
+    if validator_rollup_tsv is None or not validator_rollup_tsv.exists():
+        return None
+    from tests.uat.phases.validate import parse_validator_status_by_path
+
+    return parse_validator_status_by_path(validator_rollup_tsv)
 
 
 def run_sweep_from_path(

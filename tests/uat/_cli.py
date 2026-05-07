@@ -302,9 +302,10 @@ def execute_main(argv: list[str] | None = None) -> int:
     benchmark_runs_dir = default_benchmark_runs_dir(config)
     if "preflight" in config.phases:
         preflight = run_preflight(
-            free_space_path=(config.raw.get("preflight") or {}).get("free_space_path", str(benchmark_runs_dir)),
-            free_space_min_gib=(config.raw.get("preflight") or {}).get("free_space_min_gib", 5.0),
-            docker_required=(config.raw.get("preflight") or {}).get("docker_required", False),
+            free_space_path=config.preflight.free_space_path or str(benchmark_runs_dir),
+            free_space_min_gib=config.preflight.free_space_min_gib,
+            docker_required=config.preflight.docker_required or config.cleanup.docker_manage_platforms,
+            noisy_neighbor_warn_load=config.preflight.noisy_neighbor_warn_load,
         )
         for warning in preflight.warnings:
             print(f"[preflight warn] {warning}", file=sys.stderr)
@@ -319,7 +320,8 @@ def execute_main(argv: list[str] | None = None) -> int:
         log_dir=log_dir,
         benchmark_runs_dir=benchmark_runs_dir,
         databases_root=databases_root,
-        cleanup_enabled=not args.no_cleanup,
+        cleanup_enabled=not args.no_cleanup and config.cleanup.prune_databases,
+        free_space_checks_enabled="preflight" in config.phases,
     )
 
     summary = {
@@ -330,8 +332,14 @@ def execute_main(argv: list[str] | None = None) -> int:
         "timed_out": sum(1 for r in outcome.results if r.status == "timed-out"),
         "pruned": len(outcome.pruned),
         "skipped_unreachable": len(outcome.skipped_unreachable),
+        "docker_events": len(outcome.docker_events),
+        "aborted": outcome.aborted,
+        "abort_reason": outcome.abort_reason,
     }
     print(json.dumps(summary, indent=2))
+    if outcome.aborted:
+        print(f"[execute] ABORT: {outcome.abort_reason}", file=sys.stderr)
+        return 2
     return 0 if summary["failed"] == 0 and summary["timed_out"] == 0 else 1
 
 

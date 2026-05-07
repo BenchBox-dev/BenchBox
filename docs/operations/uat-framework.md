@@ -45,6 +45,57 @@ worktree. Override the root with `output.benchmark_runs_dir_template`;
 override only logs or staged submissions with `output.logs_dir_template`
 and `output.submissions_dir_template`.
 
+## Docker storage cleanup
+
+Loaded databases under `benchmark_runs/databases/` are pruned at safe
+reuse boundaries, but Docker containers, networks, and named volumes live
+outside that tree. For storage-constrained Docker sweeps, use UAT-owned
+Docker lifecycle management instead of manually pruning the Docker daemon:
+
+```yaml
+cleanup:
+  preserve_datagen: true
+  prune_databases: true
+  docker_manage_platforms: true
+  docker_platform_switch: "volumes"   # down -v --remove-orphans at platform switch
+  docker_project_prefix: "benchbox-uat"
+  docker_start_timeout_s: 300
+  docker_fixed_container_name_policy: "fail"
+```
+
+With `docker_manage_platforms: true`, the execute phase starts a
+project-scoped compose stack before each Docker-backed platform, runs all
+cells for that platform, then tears down that same UAT-owned project in a
+`finally` block before moving on. The generated commands are targeted:
+`docker compose -p <benchbox-uat-...> -f <compose-file> down -v
+--remove-orphans`. UAT never runs `docker system prune`, `docker volume
+prune`, or unqualified `docker compose down` automatically.
+
+The default remains externally managed Docker:
+
+```yaml
+cleanup:
+  docker_manage_platforms: false
+  docker_platform_switch: "off"
+```
+
+In that mode UAT only probes local TCP ports and skips unreachable
+Docker-backed platforms when `execute.skip_unreachable: true`; it reports
+Docker cleanup as disabled. Config validation rejects non-`off` Docker
+cleanup when `docker_manage_platforms` is false so the storage-saving
+setting cannot silently become a no-op.
+
+Use `tests/uat/configs/stress-docker-managed.yaml` as the starting point
+for storage-constrained smoke sweeps. It intentionally starts with the
+`docker-fast` group because the PostgreSQL-extension compose files still
+declare fixed `container_name` values and are rejected for UAT-managed
+startup until those files gain safe project-scoped names or overrides.
+Inspect a UAT-owned stack with:
+
+```bash
+docker compose -p <benchbox-uat-project> ps
+```
+
 ## Submission terminal states
 
 The package phase reads `package.submit_terminal_state` from YAML;
@@ -101,6 +152,11 @@ around this.
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | Preflight aborts on disk | `<5 GiB free at ~/Developer/benchmark_runs` | free space, or override `preflight.free_space_min_gib` |
-| Skipped-unreachable platforms | local Docker / TCP services not running | `docker compose up` for the relevant services, or set `execute.skip_unreachable: false` to surface as failures |
+| Mid-sweep execute aborts on disk | free space fell below `preflight.free_space_min_gib` after a platform | inspect `uat_lifecycle.log`; increase space or reduce the matrix before resuming |
+| Skipped-unreachable platforms | local Docker / TCP services not running and Docker is externally managed | `docker compose up` for the relevant services, or set `execute.skip_unreachable: false` to surface as failures |
+| Docker daemon unavailable in managed mode | `cleanup.docker_manage_platforms: true` requires `docker ps` and `docker compose` | start Docker Desktop/daemon; preflight treats Docker as required in managed mode |
+| Compose stack startup timeout | image pull/build or healthcheck exceeded `cleanup.docker_start_timeout_s` | inspect the compose logs and raise the timeout only after confirming the service is healthy |
+| Cleanup command failed | UAT-owned `docker compose down ...` returned non-zero | inspect `uat_lifecycle.log`, then run the logged command manually if safe |
+| Fixed `container_name` collision | a compose file declares a global container name already in use | stop the conflicting developer stack or keep that platform external-only until the compose file is fixed |
 | Validator clean rate breaches floor | bundle quality regression | run `make uat-validate` standalone, inspect rollup TSV |
 | Make target missing | new release not synced | `make worktree-pool-status` to check pool freshness |
