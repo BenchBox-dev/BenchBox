@@ -206,6 +206,18 @@ describe("Panel / DataCard", () => {
     expect(screen.getByText("One per question")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Export" })).toBeTruthy();
   });
+
+  it("DataCard applies class to the body when rendered without a Panel", () => {
+    const { container } = render(
+      <DataCard withPanel={false} class="grid-area-main">
+        body
+      </DataCard>,
+    );
+    const root = container.firstElementChild!;
+    expect(root.className).toContain("flex flex-col gap-4");
+    expect(root.className).toContain("grid-area-main");
+    expect(container.querySelector("[data-surface]")).toBeNull();
+  });
 });
 
 describe("DataTable", () => {
