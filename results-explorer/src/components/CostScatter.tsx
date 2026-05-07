@@ -66,7 +66,7 @@ export function CostScatter({ summary }: Props) {
 
   if (pts.length === 0) {
     return (
-      <div class="space-y-1 text-sm text-gray-400 italic">
+      <div class="space-y-1 text-sm italic text-[var(--bb-data-fg-subtle)]">
         <p>No normalized cost data available for this cohort.</p>
         <p class="text-xs">{normalizedCostEmptyReason(summary.platforms)}</p>
       </div>
@@ -109,6 +109,7 @@ export function CostScatter({ summary }: Props) {
   return (
     <div ref={containerRef} class="w-full overflow-x-auto">
       <svg
+        class="bb-chart-svg"
         width={w}
         height={totalH}
         role="img"
@@ -235,8 +236,8 @@ export function CostScatter({ summary }: Props) {
           {metricLabel}
         </text>
       </svg>
-      <p class="mt-1 text-xs text-gray-400">
-        {modelDisclosure}. Only rows with <code class="rounded bg-gray-100 px-1">cost_status=normalized</code> are
+      <p class="mt-1 text-xs text-[var(--bb-data-fg-subtle)]">
+        {modelDisclosure}. Only rows with <code class="rounded bg-[var(--bb-surface-data-muted)] px-1">cost_status=normalized</code> are
         plotted; local and unavailable cost rows are omitted.
       </p>
     </div>

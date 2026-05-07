@@ -34,7 +34,7 @@ function Header() {
             <GlobalNavLink href="https://github.com/joeharris76/BenchBox">GitHub</GlobalNavLink>
             <a
               href="https://benchbox.dev/docs/usage/installation.html"
-              class="rounded-md bg-[var(--bb-accent)] px-3 py-1.5 text-sm font-semibold text-[var(--bb-fg-inverse)] no-underline hover:bg-[var(--bb-accent-hover)] hover:text-white"
+              class="rounded-md bg-[var(--bb-accent)] px-3 py-1.5 text-sm font-semibold text-[var(--bb-fg-inverse)] no-underline hover:bg-[var(--bb-accent-hover)] hover:text-[var(--bb-fg-primary)]"
             >
               Run benchmark
             </a>

@@ -153,7 +153,7 @@ test.describe("Query workbench", () => {
     await page.getByRole("button", { name: /^Run SQL$/ }).click();
 
     const advancedSection = page.locator("details", { hasText: "Advanced SQL" });
-    const errorEl = advancedSection.locator("[role='alert'], .tone-danger, [data-tone='danger']").first();
+    const errorEl = advancedSection.getByRole("alert");
     await expect(errorEl).toBeVisible();
     await expect(errorEl).toContainText(/read[- ]only|not allowed|cannot/i);
   });

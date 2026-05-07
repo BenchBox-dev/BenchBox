@@ -46,6 +46,7 @@ export function QueryTimingChart({ bars, unit = "ms", height = 220 }: QueryTimin
   return (
     <div ref={containerRef} class="overflow-x-auto">
       <svg
+        class="bb-chart-svg"
         width="100%"
         height={height}
         viewBox={`0 0 ${viewWidth} ${height}`}
@@ -157,6 +158,7 @@ export function GroupedQueryChart({ groups, unit = "ms", height = 260 }: Grouped
   return (
     <div ref={containerRef} class="overflow-x-auto">
       <svg
+        class="bb-chart-svg"
         width="100%"
         height={height}
         viewBox={`0 0 ${viewWidth} ${height}`}

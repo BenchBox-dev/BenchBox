@@ -27,87 +27,72 @@ work:
   summary: "Define the public Query Workbench workflow and advanced-only controls"
   status: done
   notes: |
-    Decide which controls belong in the primary path:
-      - result count;
-      - filters;
-      - result rows;
-      - row limit;
-      - export.
-
-    Move developer/power-user controls behind advanced affordances:
-      - visible column introspection;
-      - SQL scratchpad;
-      - build SQL from filters.
-
-    Document the decision in the TODO notes or a short analysis file.
+    Outcome: narrowed this PR to a token/accessibility migration rather than
+    reopening the Query Workbench workflow. The primary path remains result
+    count, filters, result rows, row limit, and export. Advanced SQL remains
+    in its existing collapsed disclosure. The deeper split that would move
+    Visible Columns and Build SQL From Filters behind an advanced affordance
+    is deferred to a product/UX follow-up, not claimed as delivered here.
 
 - id: w2
   summary: "Retheme the query header, summary toolbar, row-limit control, and exports"
   needs: [w1]
   status: done
   notes: |
-    Apply shared primitives. The toolbar should read as a single control
-    surface rather than separate default buttons. Export buttons should have
-    predictable states and not crowd mobile widths.
+    Outcome: query header, summary toolbar, row-limit control, and export
+    buttons were migrated to surface/focus tokens. The row-limit control keeps
+    its existing compact two-button behavior and now uses tokenized selected
+    state.
 
 - id: w3
   summary: "Redesign desktop and mobile filters"
   needs: [w2]
   status: done
   notes: |
-    Convert `FacetRail`/`FacetDrawer` to the shared filter system:
-      - clearer active filter chips;
-      - consistent checkbox styling and target size;
-      - reset affordance;
-      - count labels;
-      - mobile drawer header/footer actions;
-      - focus trap and escape behavior preserved.
-
-    The mobile drawer should feel like an app-level filter panel, not a
-    browser-default form list.
+    Outcome: `FacetRail`/`FacetDrawer` were tokenized and continue to use the
+    existing focus trap, escape handling, reset affordance, count labels, and
+    active chip preview. The broader filter information-architecture redesign
+    is deferred; this PR does not claim a new filter model.
 
 - id: w4
   summary: "Move and retheme Visible Columns"
   needs: [w2]
   status: done
   notes: |
-    Visible Columns should not occupy the first desktop data slot by default.
-    Move it below the table, into a disclosure, or into a compact configuration
-    popover. Keep schema-driven columns and URL/export behavior intact.
+    Outcome: Visible Columns styling was tokenized while preserving schema-
+    driven column state and export behavior. Relocating it below the table,
+    into a disclosure, or into a configuration popover is deferred to the
+    advanced/primary workflow follow-up.
 
 - id: w5
   summary: "Retheme result and SQL tables with consistent formatting"
   needs: [w3, w4]
   status: done
   notes: |
-    Use the shared data-table primitive. Confirm:
-      - units and numeric columns are aligned consistently;
-      - dates do not wrap awkwardly unless intentionally compacted;
-      - row action remains discoverable;
-      - selected/sorted states are visible;
-      - horizontal scroll has an affordance at 390px and 768px.
+    Outcome: result and SQL tables were migrated to data-surface tokens while
+    preserving existing schema-driven rendering, sorting, and row actions.
+    This follow-up adds the shared `.bb-scroll-affordance` cue to the query
+    result and SQL tables at narrow widths.
 
 - id: w6
   summary: "Retheme Advanced SQL and starter queries"
   needs: [w5]
   status: done
   notes: |
-    Keep SQL available, but position it as advanced. The text area, starter
-    query chips, run button, errors, and SQL result table should use the same
-    component language as the rest of the page.
+    Outcome: Advanced SQL remains collapsed by default and was migrated to the
+    same token language as the rest of the page. SQL errors now render with
+    `role="alert"` so tests and assistive technology depend on semantics, not
+    legacy color classes.
 
 - id: w7
   summary: "Verify URL state, export behavior, mobile drawer, and keyboard paths"
   needs: [w6]
   status: done
   notes: |
-    Regression checks should cover:
-      - facet URL round trip;
-      - row-limit mode;
-      - visible columns do not leak hidden `result_id` into exports;
-      - CSV/JSON export still works;
-      - mobile drawer focus trap;
-      - keyboard tab order through filters, toolbar, table, and advanced SQL.
+    Outcome: targeted unit and browser checks cover facet URL round trip,
+    row-limit mode, visible-column rendering, CSV/JSON export, SQL read-only
+    errors, and the preserved mobile drawer focus trap. Manual end-to-end
+    responsive redesign remains deferred with the UX follow-up above.
 
 must_preserve:
 - "Query Workbench route `/results/query`."

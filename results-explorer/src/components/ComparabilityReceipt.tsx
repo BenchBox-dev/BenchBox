@@ -1,6 +1,7 @@
 import type { DetailResult, Environment } from "@/types";
 import { humanizeBenchmark } from "@/utils";
 import { costModelSummary, costScopeSummary, normalizedCostLabel } from "@/lib/costDisplay";
+import { StatusBadge, type StatusTone } from "@/components/StatusBadge";
 
 interface ComparabilityReceiptProps {
   results: DetailResult[];
@@ -22,17 +23,17 @@ export function ComparabilityReceipt({ results }: ComparabilityReceiptProps) {
   const warningCount = fields.filter((field) => field.status === "diff").length;
 
   return (
-    <section aria-label="Comparability receipt" class="mb-8 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+    <section aria-label="Comparability receipt" class="panel-elevated mb-8 p-4">
       <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 class="text-base font-semibold text-gray-900">Comparability Receipt</h2>
-          <p class="mt-1 text-xs text-gray-500">
+          <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)]">Comparability Receipt</h2>
+          <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">
             Workload, version, validation, and environment checks for the selected result set.
           </p>
         </div>
-        <span class={`badge ${warningCount > 0 ? "badge-yellow" : "badge-green"}`}>
+        <StatusBadge role="comparison" tone={warningCount > 0 ? "warning" : "success"}>
           {warningCount > 0 ? `${warningCount} warnings` : "No differences"}
-        </span>
+        </StatusBadge>
       </div>
 
       <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -67,13 +68,13 @@ export function buildComparabilityFields(results: DetailResult[]): Comparability
 
 function ComparabilityFieldRow({ field }: { field: ComparabilityField }) {
   return (
-    <div class="rounded-md border border-gray-100 bg-gray-50 px-3 py-2">
+    <div class="rounded-md border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-3 py-2">
       <div class="mb-1 flex items-center justify-between gap-2">
-        <h3 class="text-xs font-semibold uppercase text-gray-500">{field.label}</h3>
-        <span class={`badge ${statusClass(field.status)}`}>{statusLabel(field.status)}</span>
+        <h3 class="text-xs font-semibold uppercase text-[var(--bb-data-fg-subtle)]">{field.label}</h3>
+        <StatusBadge role="comparison" tone={statusTone(field.status)}>{statusLabel(field.status)}</StatusBadge>
       </div>
-      <p class="break-words text-xs font-medium text-gray-900">{field.summary}</p>
-      {field.detail && <p class="mt-1 break-words text-xs text-gray-500">{field.detail}</p>}
+      <p class="break-words text-xs font-medium text-[var(--bb-data-fg-primary)]">{field.summary}</p>
+      {field.detail && <p class="mt-1 break-words text-xs text-[var(--bb-data-fg-muted)]">{field.detail}</p>}
     </div>
   );
 }
@@ -179,8 +180,8 @@ function statusLabel(status: ComparabilityStatus) {
   return "Not recorded";
 }
 
-function statusClass(status: ComparabilityStatus) {
-  if (status === "match") return "badge-green";
-  if (status === "diff") return "badge-yellow";
-  return "badge-gray";
+function statusTone(status: ComparabilityStatus): StatusTone {
+  if (status === "match") return "success";
+  if (status === "diff") return "warning";
+  return "neutral";
 }

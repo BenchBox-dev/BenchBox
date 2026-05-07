@@ -69,7 +69,7 @@ export function PercentileLadder({ rows }: Props) {
 
   return (
     <div ref={containerRef} class="w-full overflow-x-auto">
-      <svg width={drawWidth} height={totalHeight} role="img" aria-label="Percentile latency ladder chart">
+      <svg class="bb-chart-svg" width={drawWidth} height={totalHeight} role="img" aria-label="Percentile latency ladder chart">
         {/* Legend */}
         <g transform="translate(0, 4)">
           {PERCENTILE_LABELS.map((label, li) => {

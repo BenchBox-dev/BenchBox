@@ -17,6 +17,8 @@ import { vsSlowestRatio } from "@/lib/chartMath";
 import { buildCompareDecisionSummary } from "@/lib/compareSummary";
 import { paletteColor } from "@/lib/chartTheme";
 import { ChartPanel } from "@/components/ChartPanel";
+import { Select } from "@/components/Select";
+import { StatusBadge } from "@/components/StatusBadge";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 type PrimaryMetric = "power_score" | "display_geomean_ms";
@@ -225,47 +227,46 @@ export function Compare(_: RoutableProps) {
         }
       />
 
-      <div class="mt-6 mb-8 flex items-center justify-between">
-        <div>
-          <h1 class="text-3xl font-bold text-gray-900">{benchmarkLabel} Comparison</h1>
-          <p class="mt-1 text-sm text-gray-500">
-            Scale factor: {scaleFactorLabel} - {rowCount} platforms
-          </p>
-          {/* Trust tier diversity note - informational, not a warning */}
-          {(() => {
-            const tiers = [...new Set(rowData.map((r) => r.trustLabel))];
-            return tiers.length > 1 ? (
-              <p class="mt-1 text-xs text-gray-400">Comparing across trust tiers: {tiers.join(", ")}</p>
-            ) : null;
-          })()}
+      <section class="mt-6 mb-8 panel-elevated p-5" aria-label="Comparison summary">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wide text-[var(--bb-data-fg-subtle)]">Compare</p>
+            <h1 class="mt-1 text-3xl font-bold text-[var(--bb-data-fg-primary)]">{benchmarkLabel} Comparison</h1>
+            <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">
+              Scale factor: {scaleFactorLabel} - {rowCount} platforms
+            </p>
+            {/* Trust tier diversity note - informational, not a warning */}
+            {(() => {
+              const tiers = [...new Set(rowData.map((r) => r.trustLabel))];
+              return tiers.length > 1 ? (
+                <p class="mt-1 text-xs text-[var(--bb-data-fg-subtle)]">Comparing across trust tiers: {tiers.join(", ")}</p>
+              ) : null;
+            })()}
+          </div>
+          <button class="btn btn-secondary" onClick={handleShare}>
+            {copied ? "Copied!" : "Share URL"}
+          </button>
         </div>
-        <button class="btn btn-secondary" onClick={handleShare}>
-          {copied ? "Copied!" : "Share URL"}
-        </button>
-      </div>
+      </section>
 
       <CompareGuardrailSummary warningCount={comparabilityWarningCount} severeMismatchReason={severeMismatchReason} />
       <CompareSummary summary={decisionSummary} />
       {results.length > 1 && (
-        <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-gray-200 bg-white px-3 py-2 shadow-sm">
+        <div class="panel mb-4 flex flex-wrap items-center justify-between gap-3 px-3 py-2 shadow-sm">
           <div>
-            <label class="text-sm font-medium text-gray-700" for="compare-baseline">
+            <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="compare-baseline">
               Baseline
             </label>
-            <p class="text-xs text-gray-500">Ratios and deltas compare every candidate against this run.</p>
+            <p class="text-xs text-[var(--bb-data-fg-muted)]">Ratios and deltas compare every candidate against this run.</p>
           </div>
-          <select
+          <Select
             id="compare-baseline"
-            class="rounded border border-gray-300 bg-white px-2 py-1 text-sm text-gray-700 focus:outline-none"
+            ariaLabel="Baseline"
             value={String(normalizedBaselineIndex)}
-            onChange={(event) => setBaselineIndex(Number((event.target as HTMLSelectElement).value))}
-          >
-            {results.map((result, index) => (
-              <option key={result.result_id} value={String(index)}>
-                {result.platform}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => setBaselineIndex(Number(value))}
+            options={results.map((result, index) => ({ value: String(index), label: result.platform }))}
+            size="sm"
+          />
         </div>
       )}
 
@@ -304,20 +305,20 @@ export function Compare(_: RoutableProps) {
               style={{ borderTopColor: color, borderTopWidth: "3px" }}
             >
               <div class="mb-2 flex items-center justify-between">
-                <span class="font-semibold text-gray-900">{r.label}</span>
+                <span class="font-semibold text-[var(--bb-data-fg-primary)]">{r.label}</span>
                 <div class="flex flex-wrap gap-1">
                   <TrustBadge trustLabel={r.trustLabel} compact />
                   {r.tuningMode && <TuningBadge tuningMode={r.tuningMode} />}
-                  {isFastest && <span class="badge badge-green">fastest</span>}
+                  {isFastest && <StatusBadge role="ranking" tone="success">fastest</StatusBadge>}
                 </div>
               </div>
-              <p class="text-xs text-gray-500 mb-3">
+              <p class="mb-3 text-xs text-[var(--bb-data-fg-muted)]">
                 {r.runDate.slice(0, 10)}
                 {r.driverVersion && !r.label.includes(`v${r.driverVersion}`) && ` · v${r.driverVersion}`}
               </p>
               <dl class="space-y-1 text-sm">
                 <div class="flex justify-between">
-                  <dt class="text-gray-500">
+                  <dt class="text-[var(--bb-data-fg-muted)]">
                     {primaryMetric === "power_score" ? "Power score" : "Geomean query time"}
                   </dt>
                   <dd class="font-mono font-medium">
@@ -330,38 +331,38 @@ export function Compare(_: RoutableProps) {
                 </div>
                 {primaryMetric === "power_score" && (
                   <div class="flex justify-between">
-                    <dt class="text-gray-500 text-xs">Geomean</dt>
-                    <dd class="font-mono text-gray-500 text-xs">{fmtGeomean(r.displayGeomeanMs)}</dd>
+                    <dt class="text-xs text-[var(--bb-data-fg-muted)]">Geomean</dt>
+                    <dd class="font-mono text-xs text-[var(--bb-data-fg-muted)]">{fmtGeomean(r.displayGeomeanMs)}</dd>
                   </div>
                 )}
                 {r.totalDurationS !== null && (
                   <div class="flex justify-between">
-                    <dt class="text-gray-500">Wall-clock total</dt>
-                    <dd class="font-mono text-gray-600">{r.totalDurationS.toFixed(2)} s</dd>
+                    <dt class="text-[var(--bb-data-fg-muted)]">Wall-clock total</dt>
+                    <dd class="font-mono text-[var(--bb-data-fg-primary)]">{r.totalDurationS.toFixed(2)}s</dd>
                   </div>
                 )}
                 {showPrimaryClaims && speedup !== null && (
                   <div class="flex justify-between">
-                    <dt class="text-gray-500">{vsLabel}</dt>
+                    <dt class="text-[var(--bb-data-fg-muted)]">{vsLabel}</dt>
                     <dd class="font-mono">{speedup.toFixed(2)}x</dd>
                   </div>
                 )}
                 {r.executionMode && (
                   <div class="flex justify-between">
-                    <dt class="text-gray-500">Mode</dt>
-                    <dd class="text-gray-700">{modeLabel(r.executionMode)}</dd>
+                    <dt class="text-[var(--bb-data-fg-muted)]">Mode</dt>
+                    <dd class="text-[var(--bb-data-fg-primary)]">{modeLabel(r.executionMode)}</dd>
                   </div>
                 )}
                 {r.testType && (
                   <div class="flex justify-between">
-                    <dt class="text-gray-500">Test type</dt>
-                    <dd class="text-gray-700">{testTypeLabel(r.testType)}</dd>
+                    <dt class="text-[var(--bb-data-fg-muted)]">Test type</dt>
+                    <dd class="text-[var(--bb-data-fg-primary)]">{testTypeLabel(r.testType)}</dd>
                   </div>
                 )}
               </dl>
               <a
                 href={`/results/r/${r.resultId}`}
-                class="mt-3 block text-xs no-underline text-gray-400 hover:text-gray-600"
+                class="mt-3 block text-xs no-underline text-[var(--bb-data-fg-muted)] hover:text-[var(--bb-accent-hover)]"
               >
                 View detail →
               </a>
@@ -370,7 +371,7 @@ export function Compare(_: RoutableProps) {
         })}
       </div>
 
-      <p class="mb-6 text-xs text-gray-400">
+      <p class="mb-6 text-xs text-[var(--bb-data-fg-subtle)]">
         <strong>Geomean query time</strong> - geometric mean of per-query execution times (measurement runs only). More
         comparable than wall-clock total when query counts differ. Lower is faster.
       </p>

@@ -1,5 +1,6 @@
 import type { DetailResult } from "@/types";
 import { fmtMs } from "@/utils";
+import { StatusBadge, type StatusTone } from "@/components/StatusBadge";
 
 export type QueryDiffStatus = "faster" | "slower" | "tie" | "missing";
 
@@ -30,15 +31,15 @@ export function QueryDiffTable({ results, baselineIndex = 0, suppressionReason =
     <section class="card mb-8" aria-labelledby="query-diff-title">
       <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 id="query-diff-title" class="text-base font-semibold text-gray-900">
+          <h2 id="query-diff-title" class="text-base font-semibold text-[var(--bb-data-fg-primary)]">
             Query-Level Diff
           </h2>
-          <p class="mt-1 text-xs text-gray-500">
-            Baseline: <span class="font-medium text-gray-700">{baseline.platform}</span>. Negative deltas mean the
+          <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">
+            Baseline: <span class="font-medium text-[var(--bb-data-fg-primary)]">{baseline.platform}</span>. Negative deltas mean the
             candidate is faster than baseline.
           </p>
         </div>
-        <span class="badge badge-gray">{rows.length} comparisons</span>
+        <StatusBadge role="comparison" tone="neutral">{rows.length} comparisons</StatusBadge>
       </div>
 
       {suppressionReason && (
@@ -48,8 +49,9 @@ export function QueryDiffTable({ results, baselineIndex = 0, suppressionReason =
       )}
 
       <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200 text-sm">
-          <thead class="bg-gray-50">
+        <div class="mb-2 flex justify-end"><span class="bb-scroll-affordance">← scroll →</span></div>
+        <table class="min-w-full divide-y divide-[var(--bb-data-border)] text-sm">
+          <thead class="bg-[var(--bb-surface-data-muted)]">
             <tr>
               <th class="table-th">Query</th>
               <th class="table-th">Candidate</th>
@@ -60,9 +62,9 @@ export function QueryDiffTable({ results, baselineIndex = 0, suppressionReason =
               <th class="table-th">Status</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-100 bg-white">
+          <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
             {rows.map((row) => (
-              <tr key={`${row.queryId}-${row.candidateResultId}`} class="hover:bg-gray-50">
+              <tr key={`${row.queryId}-${row.candidateResultId}`} class="hover:bg-[var(--bb-surface-data-muted)]">
                 <td class="table-td font-mono font-medium">{row.queryId}</td>
                 <td class="table-td">{row.candidatePlatform}</td>
                 <td class="table-td font-mono">{formatMsCell(row.baselineMs)}</td>
@@ -70,7 +72,7 @@ export function QueryDiffTable({ results, baselineIndex = 0, suppressionReason =
                 <td class="table-td font-mono">{row.ratio !== null ? `${row.ratio.toFixed(2)}x` : "-"}</td>
                 <td class="table-td font-mono">{formatDelta(row.deltaMs)}</td>
                 <td class="table-td">
-                  <span class={`badge ${statusClass(row.status)}`}>{statusLabel(row.status)}</span>
+                  <StatusBadge role="comparison" tone={statusTone(row.status)}>{statusLabel(row.status)}</StatusBadge>
                 </td>
               </tr>
             ))}
@@ -124,7 +126,7 @@ function diffStatus(deltaMs: number | null): QueryDiffStatus {
 }
 
 function formatMsCell(ms: number | null) {
-  return ms !== null ? fmtMs(ms) : <span class="text-gray-400">-</span>;
+  return ms !== null ? fmtMs(ms) : <span class="text-[var(--bb-data-fg-subtle)]">-</span>;
 }
 
 function formatDelta(deltaMs: number | null) {
@@ -140,9 +142,9 @@ function statusLabel(status: QueryDiffStatus) {
   return "Missing";
 }
 
-function statusClass(status: QueryDiffStatus) {
-  if (status === "faster") return "badge-green";
-  if (status === "slower") return "badge-yellow";
-  if (status === "tie") return "badge-gray";
-  return "badge-red";
+function statusTone(status: QueryDiffStatus): StatusTone {
+  if (status === "faster") return "success";
+  if (status === "slower") return "warning";
+  if (status === "tie") return "neutral";
+  return "danger";
 }

@@ -64,11 +64,12 @@ export function QueryHistogram({ summary }: Props) {
     return (
       <div key={panelIdx} class="mb-2">
         {panels.length > 1 && (
-          <p class="text-[10px] text-gray-400 mb-0.5 ml-[44px]">
+          <p class="mb-0.5 ml-[44px] text-[10px] text-[var(--bb-data-fg-subtle)]">
             Queries {panelIdx * MAX_PER_PANEL + 1}-{Math.min((panelIdx + 1) * MAX_PER_PANEL, sortedQueryIds.length)}
           </p>
         )}
         <svg
+          class="bb-chart-svg"
           width="100%"
           height={PADDING_TOP + CHART_H + LABEL_H}
           viewBox={`0 0 ${w} ${PADDING_TOP + CHART_H + LABEL_H}`}
@@ -165,7 +166,7 @@ export function QueryHistogram({ summary }: Props) {
     <div ref={containerRef} class="w-full">
       {panels.map((slice, pi) => renderPanel(slice, pi))}
       {platforms.length > 1 && (
-        <div class="flex flex-wrap gap-3 text-xs text-gray-600 mt-1">
+        <div class="mt-1 flex flex-wrap gap-3 text-xs text-[var(--bb-data-fg-muted)]">
           {platforms.map((p, i) => (
             <span key={p.result_id} class="flex items-center gap-1">
               <span class="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: paletteColor(i) }} />
