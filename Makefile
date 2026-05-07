@@ -1326,6 +1326,15 @@ worktree-pool-check:
 	fi; \
 	printf 'Pool invariant check OK: %d slot(s), no aborted markers.\n' "$(POOL_SIZE)"
 
+## worktree-pool-reset POOL=NN [FORCE=1]: hard-reset a stuck pool slot to
+## origin/develop. Without FORCE=1, refuses if the slot has uncommitted
+## tracked changes. With FORCE=1, prompts for "RESET" then discards
+## tracked changes AND scrubs untracked + ignored content (including
+## `.venv/`, `benchmark_runs/`, build outputs) so the slot is reclaimed
+## clean. The `.benchbox/` cache directory is preserved across reset.
+## Use as an escape hatch when worktree-pool-sweep-stale won't release a
+## slot (e.g., dirty working tree, no merged PR), or to reclaim disk
+## from orphan benchmark output left by previous claims.
 worktree-pool-reset:
 	@test -n "$(POOL)" || { echo "Usage: make worktree-pool-reset POOL=NN"; exit 1; }
 	@case "$(POOL)" in [0-9][0-9]) ;; *) echo "POOL must be two digits, e.g. POOL=03"; exit 1 ;; esac
@@ -1355,7 +1364,7 @@ worktree-pool-reset-locked:
 	git -C "$$wt" fetch origin develop --quiet; \
 	git -C "$$wt" checkout --detach origin/develop; \
 	git -C "$$wt" reset --hard origin/develop; \
-	if [ "$(FORCE)" = "1" ]; then git -C "$$wt" clean -fd -e .benchbox >/dev/null; fi; \
+	if [ "$(FORCE)" = "1" ]; then git -C "$$wt" clean -fdx -e .benchbox >/dev/null; fi; \
 	if [ "$(FORCE)" = "1" ] && [ -n "$$branch" ]; then \
 		case "$$branch" in develop|main) ;; *) git branch -D "$$branch" >/dev/null 2>&1 || true ;; esac; \
 	fi; \
