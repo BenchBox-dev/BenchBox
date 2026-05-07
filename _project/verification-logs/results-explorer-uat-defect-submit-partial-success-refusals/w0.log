@@ -1,0 +1,26 @@
+$ LOGS=~/Developer/benchmark_runs/logs/uat_tuned_followup_20260505_pool02_rerun
+$ awk -F'\t' 'NR>1 && $4=="passed" && $6 {print $6}' "$LOGS/coverage_cells.tsv" > "$RESULT_LIST"
+$ echo "passed-result-paths $(wc -l < "$RESULT_LIST")"
+passed-result-paths      114
+$ while ... benchbox submit --dry-run ... | sort | uniq -c
+   2 refused:compliance_class=unofficial_nonstandard
+   5 refused:compliance_class=unofficial_subscale
+   1 refused:result is not a clean pass (13 failed queries)
+   1 refused:result is not a clean pass (15 failed queries)
+   2 refused:result is not a clean pass (18 failed queries)
+   1 refused:result is not a clean pass (20 failed queries)
+   2 refused:result is not a clean pass (23 failed queries)
+   1 refused:result is not a clean pass (24 failed queries)
+   1 refused:result is not a clean pass (27 failed queries)
+   1 refused:result is not a clean pass (294 failed queries)
+   1 refused:result is not a clean pass (30 failed queries)
+   1 refused:result is not a clean pass (372 failed queries)
+   1 refused:result is not a clean pass (44 failed queries)
+   1 refused:result is not a clean pass (48 failed queries)
+   1 refused:result is not a clean pass (6 failed queries)
+   1 refused:result is not a clean pass (69 failed queries)
+   1 refused:result is not a clean pass (72 failed queries)
+   1 refused:result is not a clean pass (78 failed queries)
+   1 refused:result is not a clean pass (84 failed queries)
+   1 refused:result is not a clean pass (87 failed queries)
+  87 submittable
