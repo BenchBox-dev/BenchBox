@@ -1,0 +1,78 @@
+"""Fast regression checks for the checked-in tuned-template coverage matrix."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from benchbox.core.tuning.coverage import (
+    BASIC_CONSTRAINTS,
+    DECISION_AUTHOR,
+    DECISION_DONE,
+    TUNED_TEMPLATE,
+    VALID_DECISIONS,
+    build_tuning_coverage_rows,
+    parse_runtime_tuning_logs,
+    read_tuning_coverage_tsv,
+    runtime_mismatches,
+    static_regressions,
+)
+from tests.uat.matrix import PLATFORM_GROUPS, load_benchmarks, resolve_benchmarks
+
+pytestmark = pytest.mark.fast
+
+MATRIX_PATH = Path(__file__).resolve().parent / "data" / "tuning_coverage.tsv"
+
+
+def test_tuning_coverage_matrix_is_checked_in_and_has_decisions():
+    rows = read_tuning_coverage_tsv(MATRIX_PATH)
+    assert rows
+    assert all(row.decision in VALID_DECISIONS for row in rows)
+    assert all(row.reason for row in rows)
+    assert any(row.status == TUNED_TEMPLATE and row.decision == DECISION_DONE for row in rows)
+    assert any(row.status == BASIC_CONSTRAINTS and row.decision == DECISION_AUTHOR for row in rows)
+
+
+def test_checked_in_tuning_coverage_has_no_static_regressions():
+    recorded = read_tuning_coverage_tsv(MATRIX_PATH)
+    current = build_tuning_coverage_rows(_uat_platforms(), _uat_benchmarks())
+    assert static_regressions(recorded, current) == []
+
+
+def test_runtime_log_parser_matches_matrix_rows(tmp_path: Path):
+    log_path = tmp_path / "duckdb_tpch_0.01_20260505_010203.log"
+    log_path.write_text("Tuning: auto-discovered template at examples/tunings/duckdb/tpch_tuned.yaml\n")
+
+    rows = [
+        row for row in read_tuning_coverage_tsv(MATRIX_PATH) if row.platform == "duckdb" and row.benchmark == "tpch"
+    ]
+    observations = parse_runtime_tuning_logs(tmp_path, platforms=_uat_platforms(), benchmarks=_uat_benchmarks())
+
+    assert len(observations) == 1
+    assert observations[0].status == TUNED_TEMPLATE
+    assert runtime_mismatches(rows, observations) == []
+
+
+def test_runtime_log_mismatch_reports_context(tmp_path: Path):
+    log_path = tmp_path / "duckdb_tpch_0.01_20260505_010203.log"
+    log_path.write_text("Tuning: using basic constraints (no optimized template available)\n")
+    rows = [
+        row for row in read_tuning_coverage_tsv(MATRIX_PATH) if row.platform == "duckdb" and row.benchmark == "tpch"
+    ]
+
+    observations = parse_runtime_tuning_logs(tmp_path, platforms=_uat_platforms(), benchmarks=_uat_benchmarks())
+    mismatches = runtime_mismatches(rows, observations)
+
+    assert len(mismatches) == 1
+    assert "duckdb/tpch" in mismatches[0]
+    assert str(log_path) in mismatches[0]
+
+
+def _uat_platforms() -> list[str]:
+    return list(PLATFORM_GROUPS["all"])
+
+
+def _uat_benchmarks() -> list[str]:
+    benchmarks = load_benchmarks()
+    return resolve_benchmarks(groups=["all"], benchmarks=benchmarks)
