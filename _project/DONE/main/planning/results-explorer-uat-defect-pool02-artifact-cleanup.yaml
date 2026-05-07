@@ -2,7 +2,8 @@ id: results-explorer-uat-defect-pool02-artifact-cleanup
 title: "Reclaim 29.6 GiB of pool-02 datagen + databases left by the 2026-05-05 sweep"
 worktree: main
 priority: Medium
-status: Blocked
+status: Completed
+completed_date: "2026-05-07"
 category: Operations
 
 description: |
@@ -21,9 +22,9 @@ description: |
   Source: `_project/handoffs/results-explorer-uat-tuned-followup-20260505.md`
   ("Runtime Path Audit" + "Consolidation performed"). Follow-up to PR #235.
 
-  **Status: Blocked on explicit user approval.** This is a destructive
-  filesystem operation. The handoff explicitly notes the deletion was not
-  done because it requires authorization.
+  **Status: Completed after explicit user approval.** This was a destructive
+  filesystem operation, limited to the pool-02 `datagen` and `databases`
+  trees. The `results` tree was preserved.
 
   The propagation defect itself was fixed in PR #235 (UAT execute now
   passes a non-worktree root as `BENCHBOX_OUTPUT_DIR`), so future sweeps
@@ -56,6 +57,10 @@ work:
     `disk-budget-resume-plan/w1` inventory already harvested everything
     it needs, this w0 confirms it BEFORE deletion is requested.
 
+    Captured current footprint before approval: datagen 3.1 MiB,
+    databases 36 KiB, results 24 KiB. The original 29.6 GiB had already
+    been mostly reclaimed before this PR reached the destructive step.
+
 - id: w1
   summary: "Verify pool-02 result JSONs are still mirrored to the shared root before removal"
   needs: [w0]
@@ -67,10 +72,14 @@ work:
     Expected: every pool-02 result JSON has a same-name counterpart in
     the shared root. If anything is missing, copy it BEFORE w2.
 
+    Mirror check found 6 pool-local JSONs not yet present in the shared
+    root; copied those 6 files to `~/Developer/benchmark_runs/results/`
+    and re-ran the diff to a clean result before deletion.
+
 - id: w2
   summary: "After explicit user approval, remove the pool-02 datagen and databases trees"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Hard prerequisite: `results-explorer-uat-defect-disk-budget-resume-plan/w1`
     (per-platform/benchmark/scale disk inventory) must have completed.
@@ -87,14 +96,23 @@ work:
     Do NOT rm `benchmark_runs/results` — those JSONs are the run record
     and stay until the corpus integration is closed out.
 
+    User approval was received in chat (`Approve`) on 2026-05-07. Removed
+    only `/Users/joe/Developer/BenchBox.pool-02/benchmark_runs/datagen`
+    and `/Users/joe/Developer/BenchBox.pool-02/benchmark_runs/databases`.
+
 - id: w3
   summary: "Confirm pool-02 free disk recovered and the worktree is reusable"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     `df -h /Users/joe/Developer/BenchBox.pool-02` and
     `make worktree-pool-status` should show pool-02 healthy.
     Update the handoff with the final reclaimed-bytes figure.
+
+    Final verification: both target trees are gone, pool-02 results remain
+    present, and the shared results root contains 2634 entries. Reclaimed
+    from the approved deletion itself was ~3.1 MiB + 36 KiB because the
+    previously cited 29.6 GiB footprint had already been reduced.
 
 must_preserve:
 - "Pool-02 result JSONs under `benchmark_runs/results/` until corpus integration is closed."
@@ -138,7 +156,7 @@ metadata:
   - destructive
   estimated_effort: "Trivial (~30 min after approval)"
   created_date: "2026-05-06"
-  blocking_reason: "Awaiting explicit user approval for destructive filesystem operation."
+  blocking_reason: "Resolved 2026-05-07 by explicit user approval in chat."
   source: |
     Handoff `_project/handoffs/results-explorer-uat-tuned-followup-20260505.md`,
     Follow-Up TODO Candidate #2. 29.6 GiB pool-local artifacts left by the
