@@ -18,6 +18,7 @@ const BASE_SCHEMA_COLUMNS = [
   { name: "scale_factor", type: "DOUBLE" },
   { name: "run_date", type: "VARCHAR" },
   { name: "power_score", type: "DOUBLE" },
+  { name: "total_duration_s", type: "DOUBLE" },
   { name: "geomean_ms", type: "DOUBLE" },
   { name: "trust_label", type: "VARCHAR" },
   { name: "tuning_mode", type: "VARCHAR" },
@@ -42,6 +43,7 @@ const BASE_ROWS = [
     scale_factor: 0.1,
     run_date: "2026-04-17T12:00:00Z",
     power_score: null,
+    total_duration_s: 65.25,
     geomean_ms: 10,
     trust_label: "maintainer-run",
     cost_status: "not_applicable_local",
@@ -56,6 +58,7 @@ const BASE_ROWS = [
     scale_factor: 0.1,
     run_date: "2026-04-16T12:00:00Z",
     power_score: null,
+    total_duration_s: 72,
     geomean_ms: 20,
     trust_label: "community-submission",
     cost_status: "normalized",
@@ -222,8 +225,26 @@ describe("Query", () => {
     const resultsTable = screen.getAllByRole("table")[0]!;
 
     expect(screen.getAllByText("SQLite").length).toBeGreaterThan(0);
-    expect(within(resultsTable).getAllByText("clickbench").length).toBeGreaterThan(0);
-    expect(within(resultsTable).getByText("maintainer-run")).toBeTruthy();
+    expect(within(resultsTable).getAllByText("ClickBench").length).toBeGreaterThan(0);
+    expect(within(resultsTable).getByText("maintainer run")).toBeTruthy();
+  });
+
+  it("uses public table labels and formatted values in the default result table", async () => {
+    render(<Query />);
+    await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
+    const resultsTable = screen.getAllByRole("table")[0]!;
+
+    expect(within(resultsTable).getByRole("columnheader", { name: /^Benchmark/ })).toBeTruthy();
+    expect(within(resultsTable).getByRole("columnheader", { name: /^Scale/ })).toBeTruthy();
+    expect(within(resultsTable).getByRole("columnheader", { name: /^Run date/ })).toBeTruthy();
+    expect(within(resultsTable).getByRole("columnheader", { name: /^Geomean latency/ })).toBeTruthy();
+    expect(within(resultsTable).getAllByText("SF 0.1").length).toBeGreaterThan(0);
+    expect(within(resultsTable).getAllByText("2026-04-17").length).toBeGreaterThan(0);
+    expect(within(resultsTable).getByText("10 ms")).toBeTruthy();
+
+    fireEvent.click(screen.getByText("Configure visible columns"));
+    fireEvent.click(screen.getByLabelText("Total duration"));
+    await waitFor(() => expect(within(resultsTable).getByText("65.25 s")).toBeTruthy());
   });
 
   it("orders mobile query controls so results appear before deep filters", async () => {
@@ -244,6 +265,8 @@ describe("Query", () => {
     expect(appearsBefore(resultsPanel, advancedSql)).toBe(true);
     expect(appearsBefore(resultsPanel, visibleColumns)).toBe(true);
     expect(appearsBefore(resultsPanel, desktopFilters)).toBe(true);
+    expect(visibleColumns.tagName).toBe("DETAILS");
+    expect(visibleColumns.textContent).toContain("Configure visible columns");
     expect(mobileDrawer.className).toContain("lg:hidden");
     expect(desktopFilters.className).toContain("hidden");
   });
@@ -260,7 +283,9 @@ describe("Query", () => {
 
     const dialog = screen.getByRole("dialog", { name: "Filter results" });
     expect(within(dialog).getByText("Benchmark")).toBeTruthy();
-    expect(within(dialog).getByLabelText(/^Benchmark: clickbench/)).toBeTruthy();
+    expect(within(dialog).getByLabelText(/^Benchmark: ClickBench/)).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: "Apply filters" })).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: "Reset filters" })).toBeTruthy();
     expect(within(dialog).getAllByText("Has cost").length).toBeGreaterThan(0);
   });
 
@@ -278,7 +303,7 @@ describe("Query", () => {
   it("updates the select SQL when facet filters change and sort toggles", async () => {
     render(<Query />);
     await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
-    await waitFor(() => expect(screen.getByText("Platform")).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByText("Platform").length).toBeGreaterThan(0));
     const resultsTable = screen.getAllByRole("table")[0]!;
 
     fireEvent.click(screen.getByLabelText(/DuckDB/i));
@@ -287,7 +312,7 @@ describe("Query", () => {
       expect(selectCalls.at(-1)?.[0]).toContain("platform IN (?)");
     });
 
-    fireEvent.click(within(resultsTable).getAllByText(/^benchmark(?:\s[↑↓])?$/)[0]!);
+    fireEvent.click(within(resultsTable).getAllByText(/^Benchmark(?:\s[↑↓])?$/)[0]!);
     await waitFor(() => {
       const selectCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) => isDefaultResultSelect(sql));
       expect(selectCalls.at(-1)?.[0]).toContain("ORDER BY benchmark ASC");
@@ -301,14 +326,15 @@ describe("Query", () => {
     const initialFacetCallCount = facetCountCalls().length;
     const resultsTable = screen.getAllByRole("table")[0]!;
 
-    fireEvent.click(within(resultsTable).getAllByText(/^benchmark(?:\s[↑↓])?$/)[0]!);
+    fireEvent.click(within(resultsTable).getAllByText(/^Benchmark(?:\s[↑↓])?$/)[0]!);
     await waitFor(() => {
       const selectCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) => isDefaultResultSelect(sql));
       expect(selectCalls.at(-1)?.[0]).toContain("ORDER BY benchmark ASC");
     });
     expect(facetCountCalls()).toHaveLength(initialFacetCallCount);
 
-    fireEvent.click(screen.getByLabelText(/^geomean_ms$/));
+    fireEvent.click(screen.getByText("Configure visible columns"));
+    fireEvent.click(screen.getByLabelText(/^Geomean latency/));
     await waitFor(() => {
       const selectCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) => isDefaultResultSelect(sql));
       expect(selectCalls.at(-1)?.[0]).not.toContain("geomean_ms");
@@ -370,12 +396,13 @@ describe("Query", () => {
   it("applies normalized cost and deployment facets to the generated query", async () => {
     render(<Query />);
     await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
-    await waitFor(() => expect(screen.getByText("Cost status")).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByText("Cost status").length).toBeGreaterThan(0));
 
-    const costStatus = screen.getByText("Cost status").closest("section")!;
-    const deployment = screen.getByText("Deployment").closest("section")!;
-    const cloudProvider = screen.getByText("Cloud provider").closest("section")!;
-    const shape = screen.getByText("Instance / warehouse").closest("section")!;
+    const desktopFilters = screen.getByTestId("query-desktop-filters");
+    const costStatus = within(desktopFilters).getByRole("heading", { name: "Cost status" }).closest("section")!;
+    const deployment = within(desktopFilters).getByRole("heading", { name: "Deployment" }).closest("section")!;
+    const cloudProvider = within(desktopFilters).getByRole("heading", { name: "Cloud provider" }).closest("section")!;
+    const shape = within(desktopFilters).getByRole("heading", { name: "Instance / warehouse" }).closest("section")!;
     fireEvent.click(within(costStatus).getByLabelText(/^Cost status: normalized/i));
     fireEvent.click(within(deployment).getByLabelText(/^Deployment: cloud/i));
     fireEvent.click(within(cloudProvider).getByLabelText(/^Cloud provider: aws/i));
@@ -478,7 +505,7 @@ describe("Query", () => {
     render(<Query />);
     await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
 
-    fireEvent.click(screen.getByRole("button", { name: "Download CSV" }));
+    fireEvent.click(screen.getByRole("button", { name: "Download CSV (visible columns)" }));
     await waitFor(() => expect(vi.mocked(getDb)).toHaveBeenCalled());
     await waitFor(() => expect(capturedBlob).not.toBeNull());
     expect(capturedBlob).toBeTruthy();
@@ -522,7 +549,7 @@ describe("Query", () => {
     render(<Query />);
     await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
 
-    fireEvent.click(screen.getByRole("button", { name: "Download JSON" }));
+    fireEvent.click(screen.getByRole("button", { name: "Download JSON (visible columns)" }));
     await waitFor(() => expect(capturedBlob).not.toBeNull());
     const jsonText = await capturedBlob!.text();
     const parsed = JSON.parse(jsonText);

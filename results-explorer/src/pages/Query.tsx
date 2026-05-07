@@ -21,6 +21,7 @@ import { toDateWindowFacet, toggleFacetValue } from "@/lib/facetMatching";
 import { STARTER_QUERY_CATEGORIES, starterQueriesByCategory, type StarterQueryCategory } from "@/lib/starterQueries";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { memoizedSnapshotQueryRows } from "@/lib/duckdbQueries";
+import { formatQueryCell, formatQueryColumnLabel, formatQueryFacetValue } from "@/lib/queryLabels";
 import {
   EXPLORER_PERFORMANCE_MARKS,
   EXPLORER_PERFORMANCE_MEASURES,
@@ -255,7 +256,7 @@ export function Query(_: RoutableProps) {
   const facetGroups: FacetGroup[] = [
     makeFacetGroup("benchmark", "Benchmark", facetCounts.benchmark ?? [], benchmarks),
     makeFacetGroup("platform", "Platform", facetCounts.platform ?? [], platforms),
-    makeFacetGroup("scale_factor", "Scale", facetCounts.scale_factor ?? [], scaleFactors, (value) => `SF ${value}`),
+    makeFacetGroup("scale_factor", "Scale", facetCounts.scale_factor ?? [], scaleFactors),
     makeFacetGroup("tuning_mode", "Tuning", facetCounts.tuning_mode ?? [], tuningModes),
     makeFacetGroup("trust_tier", "Trust", facetCounts.trust_label ?? [], trustTiers),
     makeFacetGroup("validation_status", "Validation", facetCounts.validation_status ?? [], validationStatuses),
@@ -289,7 +290,7 @@ export function Query(_: RoutableProps) {
   const activeFilterChips: ActiveFacetChip[] = [
     ...makeActiveChips("benchmark", "Benchmark", benchmarks, setBenchmarks),
     ...makeActiveChips("platform", "Platform", platforms, setPlatforms),
-    ...makeActiveChips("scale_factor", "Scale", scaleFactors, setScaleFactors, (value) => `SF ${value}`),
+    ...makeActiveChips("scale_factor", "Scale", scaleFactors, setScaleFactors),
     ...makeActiveChips("tuning_mode", "Tuning", tuningModes, setTuningModes),
     ...makeActiveChips("trust_tier", "Trust", trustTiers, setTrustTiers),
     ...makeActiveChips("validation_status", "Validation", validationStatuses, setValidationStatuses),
@@ -298,12 +299,7 @@ export function Query(_: RoutableProps) {
     ...makeActiveChips("deployment_class", "Deployment", deploymentClasses, setDeploymentClasses),
     ...makeActiveChips("cloud_provider", "Cloud provider", cloudProviders, setCloudProviders),
     ...makeActiveChips("cloud_region", "Cloud region", cloudRegions, setCloudRegions),
-    ...makeActiveChips(
-      "instance_or_warehouse",
-      "Instance / warehouse",
-      instanceOrWarehouses,
-      setInstanceOrWarehouses,
-    ),
+    ...makeActiveChips("instance_or_warehouse", "Instance / warehouse", instanceOrWarehouses, setInstanceOrWarehouses),
     ...makeActiveChips("storage_format", "Storage", storageFormats, setStorageFormats),
     ...(hasCost === "all"
       ? []
@@ -538,16 +534,16 @@ export function Query(_: RoutableProps) {
                   ))}
                 </div>
               </div>
-              <button class="btn btn-secondary" onClick={buildSqlFromFilters}>
-                Build SQL From Filters
-              </button>
               <button class="btn btn-secondary" onClick={downloadCsv}>
-                Download CSV
+                Download CSV (visible columns)
               </button>
               <button class="btn btn-secondary" onClick={downloadJson}>
-                Download JSON
+                Download JSON (visible columns)
               </button>
             </div>
+            <p class="w-full text-xs text-[var(--bb-data-fg-muted)]">
+              Exports include the currently visible columns only; row View links keep hidden result IDs available.
+            </p>
             {downloadError && <div class="w-full text-sm text-[var(--bb-tone-danger-fg)]">{downloadError}</div>}
           </div>
 
@@ -582,8 +578,12 @@ export function Query(_: RoutableProps) {
                   <thead class="bg-[var(--bb-surface-data-muted)]">
                     <tr>
                       {visibleColumns.map((column) => (
-                        <th key={column} class="table-th cursor-pointer select-none" onClick={() => toggleSort(column)}>
-                          {column}
+                        <th
+                          key={column}
+                          class="table-th cursor-pointer select-none"
+                          onClick={() => toggleSort(column)}
+                        >
+                          {formatQueryColumnLabel(column)}
                           {sort.column === column ? (sort.direction === "asc" ? " ↑" : " ↓") : ""}
                         </th>
                       ))}
@@ -595,7 +595,7 @@ export function Query(_: RoutableProps) {
                       <tr key={String(row.result_id)} class="hover:bg-[var(--bb-surface-data-muted)]">
                         {visibleColumns.map((column) => (
                           <td key={column} class="table-td">
-                            {formatCell(row[column])}
+                            {formatQueryCell(column, row[column])}
                           </td>
                         ))}
                         <td class="table-td text-right">
@@ -625,6 +625,9 @@ export function Query(_: RoutableProps) {
           <details class="order-4 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-4 shadow-sm">
             <summary class="cursor-pointer text-sm font-medium text-[var(--bb-data-fg-primary)]">Advanced SQL</summary>
             <div class="mt-4 space-y-4">
+              <button class="btn btn-secondary" onClick={buildSqlFromFilters}>
+                Build SQL From Filters
+              </button>
               <StarterQueries onSelect={loadStarterQuery} />
               <textarea
                 class="min-h-40 w-full rounded-lg border border-[var(--bb-data-border-strong)] p-3 font-mono text-sm"
@@ -700,13 +703,16 @@ export function Query(_: RoutableProps) {
                 <label
                   key={column}
                   class="inline-flex items-center gap-2 rounded-full bg-[var(--bb-surface-app)] px-3 py-1 text-xs text-[var(--bb-data-fg-muted)]"
+                  title={column}
                 >
                   <input
                     type="checkbox"
+                    aria-label={formatQueryColumnLabel(column)}
                     checked={visibleColumns.includes(column)}
                     onChange={() => toggleColumn(column)}
                   />
-                  {column}
+                  <span>{formatQueryColumnLabel(column)}</span>
+                  <code class="rounded bg-[var(--bb-surface-app)] px-1 font-mono text-[10px] text-[var(--bb-data-fg-subtle)]">{column}</code>
                 </label>
               ))}
             </div>
@@ -735,7 +741,7 @@ function makeFacetGroup(
   label: string,
   buckets: FacetBucket[],
   selected: string[],
-  formatLabel: (value: string) => string = (value) => value,
+  formatLabel: (value: string) => string = (value) => formatQueryFacetValue(key, value),
 ): FacetGroup {
   return {
     key,
@@ -754,7 +760,7 @@ function makeActiveChips(
   label: string,
   selected: string[],
   setSelected: (next: string[]) => void,
-  formatLabel: (value: string) => string = (value) => value,
+  formatLabel: (value: string) => string = (value) => formatQueryFacetValue(keyPrefix, value),
 ): ActiveFacetChip[] {
   return selected.map((value) => ({
     key: `${keyPrefix}:${value}`,

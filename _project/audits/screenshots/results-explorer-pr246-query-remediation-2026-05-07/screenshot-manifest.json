@@ -1,0 +1,35 @@
+{
+  "captured_at": "2026-05-07T22:02:29.695Z",
+  "routes": [
+    {
+      "filename": "query-390.png",
+      "url": "/results/query",
+      "width": 390,
+      "openMobileFilters": false
+    },
+    {
+      "filename": "query-768.png",
+      "url": "/results/query",
+      "width": 768,
+      "openMobileFilters": false
+    },
+    {
+      "filename": "query-1280.png",
+      "url": "/results/query",
+      "width": 1280,
+      "openMobileFilters": false
+    },
+    {
+      "filename": "query-1600.png",
+      "url": "/results/query",
+      "width": 1600,
+      "openMobileFilters": false
+    },
+    {
+      "filename": "query-mobile-filter-drawer-390.png",
+      "url": "/results/query",
+      "width": 390,
+      "openMobileFilters": true
+    }
+  ]
+}
