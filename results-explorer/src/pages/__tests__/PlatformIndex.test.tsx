@@ -104,6 +104,17 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(getRowOrder(container)).toEqual(["r-tpch-fast", "r-ssb-mid", "r-tpch-slow", "r-null-geo"]);
   });
 
+  it("shows persistent compare guidance and cohort labels before selection", async () => {
+    render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    const guidance = screen.getByTestId("platform-compare-guidance");
+    expect(guidance.textContent).toContain("Select two or more DuckDB results");
+    expect((screen.getByRole("button", { name: "Select 2 comparable results" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTestId("platform-table-scroll-hint").textContent).toContain("Scroll table");
+    expect(screen.getAllByText(/geomean latency, ms \(lower is faster\)/).length).toBeGreaterThan(0);
+  });
+
   it("clicking the Geomean header twice flips ascending → descending (nulls still last)", async () => {
     const { container } = render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
@@ -224,6 +235,15 @@ describe("PlatformIndex - sortable table headers", () => {
         primary_metric: "power_score",
       }),
       makeRow({
+        result_id: "r-tpch-c",
+        benchmark: "tpch",
+        scale_factor: 0.01,
+        phase: "power",
+        run_date: "2026-04-03",
+        power_score: 1300,
+        primary_metric: "power_score",
+      }),
+      makeRow({
         result_id: "r-ssb-a",
         benchmark: "star_schema",
         scale_factor: 0.1,
@@ -241,6 +261,15 @@ describe("PlatformIndex - sortable table headers", () => {
         display_geomean_ms: 18,
         primary_metric: "display_geomean_ms",
       }),
+      makeRow({
+        result_id: "r-ssb-c",
+        benchmark: "star_schema",
+        scale_factor: 0.1,
+        phase: "power",
+        run_date: "2026-04-03",
+        display_geomean_ms: 17,
+        primary_metric: "display_geomean_ms",
+      }),
     ]);
 
     const { container } = render(<PlatformIndex platform="duckdb" />);
@@ -251,9 +280,11 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(container.querySelectorAll("svg[aria-label$='trend over time']")).toHaveLength(2);
     expect(tpch.querySelector('[data-result-id="r-tpch-a"]')).toBeTruthy();
     expect(tpch.querySelector('[data-result-id="r-tpch-b"]')).toBeTruthy();
+    expect(tpch.querySelector('[data-result-id="r-tpch-c"]')).toBeTruthy();
     expect(tpch.querySelector('[data-result-id="r-ssb-a"]')).toBeNull();
     expect(ssb.querySelector('[data-result-id="r-ssb-a"]')).toBeTruthy();
     expect(ssb.querySelector('[data-result-id="r-ssb-b"]')).toBeTruthy();
+    expect(ssb.querySelector('[data-result-id="r-ssb-c"]')).toBeTruthy();
     expect(ssb.querySelector('[data-result-id="r-tpch-a"]')).toBeNull();
   });
 
@@ -282,6 +313,7 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(tpchRow.textContent).toContain("2026-04-03");
     expect(tpchRow.textContent).toContain("ID aaaabbbb");
     expect(ssbRow.textContent).toContain("SSB");
+    expect(screen.getByTestId("platform-compare-guidance").textContent).toContain("differ by benchmark");
 
     const compareLink = screen.getByRole("link", { name: /Compare 2 selected/ }) as HTMLAnchorElement;
     expect(compareLink.getAttribute("href")).toBe("/results/compare?ids=aaaabbbb,ccccdddd");
@@ -335,6 +367,16 @@ describe("PlatformIndex - sortable table headers", () => {
         primary_metric: "display_geomean_ms",
       }),
       makeRow({
+        result_id: "r-tpch-c",
+        benchmark: "tpch",
+        scale_factor: 0.1,
+        run_date: "2026-04-03",
+        geomean_ms: 11,
+        display_geomean_ms: 11,
+        phase: "power",
+        primary_metric: "display_geomean_ms",
+      }),
+      makeRow({
         result_id: "r-ssb-a",
         benchmark: "star_schema",
         scale_factor: 0.1,
@@ -354,6 +396,16 @@ describe("PlatformIndex - sortable table headers", () => {
         phase: "power",
         primary_metric: "display_geomean_ms",
       }),
+      makeRow({
+        result_id: "r-ssb-c",
+        benchmark: "star_schema",
+        scale_factor: 0.1,
+        run_date: "2026-04-03",
+        geomean_ms: 21,
+        display_geomean_ms: 21,
+        phase: "power",
+        primary_metric: "display_geomean_ms",
+      }),
     ]);
 
     render(<PlatformIndex platform="duckdb" />);
@@ -362,11 +414,28 @@ describe("PlatformIndex - sortable table headers", () => {
     const tpchTrend = screen.getByTestId("trend-cohort-tpch-sf0.1-power-display_geomean_ms");
     const ssbTrend = screen.getByTestId("trend-cohort-star_schema-sf0.1-power-display_geomean_ms");
     expect(screen.getAllByRole("img", { name: "Geomean ms trend over time" })).toHaveLength(2);
-    expect(screen.getByText("TPC-H · SF 0.1 · power")).toBeTruthy();
-    expect(screen.getByText("SSB · SF 0.1 · power")).toBeTruthy();
+    expect(screen.getByText(/TPC-H · SF 0\.1 · power · geomean latency/)).toBeTruthy();
+    expect(screen.getByText(/SSB · SF 0\.1 · power · geomean latency/)).toBeTruthy();
     expect(tpchTrend.querySelector('[data-result-id="r-tpch-a"]')).toBeTruthy();
+    expect(tpchTrend.querySelector('[data-result-id="r-tpch-c"]')).toBeTruthy();
     expect(tpchTrend.querySelector('[data-result-id="r-ssb-a"]')).toBeNull();
     expect(ssbTrend.querySelector('[data-result-id="r-ssb-a"]')).toBeTruthy();
+    expect(ssbTrend.querySelector('[data-result-id="r-ssb-c"]')).toBeTruthy();
     expect(ssbTrend.querySelector('[data-result-id="r-tpch-a"]')).toBeNull();
+  });
+
+  it("replaces one- and two-observation trends with sparse-data states", async () => {
+    vi.mocked(getPlatformIndexRows).mockResolvedValue([
+      makeRow({ result_id: "r-tpch-a", benchmark: "tpch", run_date: "2026-04-01", geomean_ms: 10 }),
+      makeRow({ result_id: "r-tpch-b", benchmark: "tpch", run_date: "2026-04-02", geomean_ms: 12 }),
+    ]);
+
+    render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    expect(screen.queryByRole("img", { name: "Geomean ms trend over time" })).toBeNull();
+    const sparse = screen.getByTestId("trend-sparse-tpch-sf0.1-power-display_geomean_ms");
+    expect(sparse.textContent).toContain("Limited observations: 2 published runs");
+    expect(sparse.textContent).toContain("geomean latency, ms (lower is faster)");
   });
 });

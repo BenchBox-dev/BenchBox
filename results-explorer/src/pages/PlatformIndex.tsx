@@ -23,6 +23,7 @@ type PlatformSortKey = "benchmark" | "scale_factor" | "run_date" | "power_score"
 type TrendMetric = "power_score" | "display_geomean_ms";
 const TABLE_RENDER_LIMIT = 200;
 const TABLE_RENDER_INCREMENT = 200;
+const MIN_TREND_OBSERVATIONS = 3;
 const PLATFORM_RESULT_FACET_KEYS: FacetKey[] = [
   "benchmark",
   "scale_factor",
@@ -44,7 +45,51 @@ interface TrendCohort {
   key: string;
   label: string;
   primaryMetric: TrendMetric;
+  metricDescription: string;
+  observationCount: number;
   entries: PlatformIndexRowRow[];
+}
+
+function trendMetricDescription(metric: TrendMetric): string {
+  return metric === "power_score" ? "power score (higher is better)" : "geomean latency, ms (lower is faster)";
+}
+
+function primaryMetricContract(metric: string): string {
+  return trendMetricDescription(normalizeTrendMetric(metric));
+}
+
+function selectedCohortDifferences(rows: PlatformIndexRowRow[]): string[] {
+  if (rows.length < 2) return [];
+  const first = rows[0]!;
+  const differs = (field: keyof PlatformIndexRowRow) => rows.some((row) => row[field] !== first[field]);
+  const differences: string[] = [];
+  if (differs("benchmark")) differences.push("benchmark");
+  if (differs("scale_factor")) differences.push("scale factor");
+  if (differs("phase")) differences.push("phase");
+  if (differs("primary_metric")) differences.push("primary metric");
+  return differences;
+}
+
+function platformCompareGuidanceMessage(
+  selectedRows: PlatformIndexRowRow[],
+  selectedCount: number,
+  platformName: string,
+): string {
+  if (selectedCount === 0) {
+    return `Select two or more ${platformName} results from the same benchmark, scale, phase, and primary metric for a decision-grade comparison.`;
+  }
+  if (selectedCount === 1) {
+    const row = selectedRows[0];
+    const cohort = row ? `${humanizeBenchmark(row.benchmark)} SF ${row.scale_factor} ${row.phase}` : "this cohort";
+    return `1 result selected in ${cohort}. Select one more result from the same comparable cohort.`;
+  }
+  const differences = selectedCohortDifferences(selectedRows);
+  if (differences.length > 0) {
+    return `${selectedCount} results selected, but they differ by ${differences.join(", ")}. Compare will keep the receipts visible and may suppress winner claims for mixed cohorts.`;
+  }
+  const first = selectedRows[0];
+  const cohort = first ? `${humanizeBenchmark(first.benchmark)} SF ${first.scale_factor} ${first.phase}` : "one cohort";
+  return `${selectedCount} results selected in ${cohort}. The sticky tray opens Compare with matching cohort context.`;
 }
 
 export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
@@ -120,7 +165,11 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   const platformResultsRaw = allPlatformResults.filter((row) =>
     matchesFacetRow(row, facets, { keys: PLATFORM_RESULT_FACET_KEYS }),
   );
-  const trendCohorts = buildTrendCohorts(platformResultsRaw);
+  const allTrendCohorts = buildTrendCohorts(platformResultsRaw);
+  const trendCohorts = allTrendCohorts.filter((cohort) => cohort.observationCount >= MIN_TREND_OBSERVATIONS);
+  const sparseTrendCohorts = allTrendCohorts.filter(
+    (cohort) => cohort.observationCount > 0 && cohort.observationCount < MIN_TREND_OBSERVATIONS,
+  );
   const rowsByResultId = new Map(allPlatformResults.map((row) => [row.result_id, row]));
   const selectedRows = [...selected]
     .map((resultId) => rowsByResultId.get(resultId))
@@ -130,6 +179,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     return row ? compareIdForRow(row) : resultId;
   });
   const compareUrl = selected.size >= 2 ? buildCompareUrl(selectedCompareIds) : null;
+  const compareGuidance = platformCompareGuidanceMessage(selectedRows, selected.size, platformDisplayName);
 
   const platformResults = [...platformResultsRaw].sort((a, b) => {
     const dir = sort.direction === "asc" ? 1 : -1;
@@ -196,7 +246,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <Breadcrumb crumbs={[{ label: "Results", href: "/results/" }, { label: platformDisplayName }]} />
 
-      <div class="mt-6 mb-8 flex items-center justify-between">
+      <div class="mt-6 mb-6 flex flex-wrap items-center justify-between gap-4">
         <h1 class="text-3xl font-bold text-[var(--bb-data-fg-primary)]">{platformDisplayName} Results</h1>
 
         <div class="flex items-center gap-4">
@@ -220,13 +270,33 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
               </select>
             </div>
           )}
-          {compareUrl && (
-            <a class="btn btn-primary text-sm no-underline" href={compareUrl}>
-              Compare {selected.size} results
-            </a>
-          )}
         </div>
       </div>
+
+      <section
+        class="mb-4 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 shadow-sm"
+        data-testid="platform-compare-guidance"
+        aria-label="Platform compare guidance"
+      >
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">Compare selected results</h2>
+            <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">{compareGuidance}</p>
+          </div>
+          {compareUrl ? (
+            <span
+              class="shrink-0 rounded-md border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-3 py-1.5 text-sm font-medium text-[var(--bb-data-fg-muted)]"
+              aria-live="polite"
+            >
+              Use sticky tray to compare
+            </span>
+          ) : (
+            <button type="button" class="btn btn-secondary shrink-0 text-sm" disabled>
+              {selected.size === 1 ? "Select 1 more result" : "Select 2 comparable results"}
+            </button>
+          )}
+        </div>
+      </section>
 
       {platformResults.length === 0 ? (
         <p class="text-[var(--bb-data-fg-muted)]">
@@ -242,7 +312,12 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
             </span>
             {selected.size > 0 && <span>{selected.size.toLocaleString()} selected for compare</span>}
           </div>
-          <table class="min-w-full divide-y divide-[var(--bb-data-border)]">
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-2 text-xs text-[var(--bb-data-fg-muted)]">
+            <span>Rows are labelled by comparable cohort: benchmark, scale, phase, and primary metric.</span>
+            <span data-testid="platform-table-scroll-hint">Scroll table for source and receipt columns →</span>
+          </div>
+          <div class="overflow-x-auto" data-testid="platform-results-scroll-container">
+          <table class="min-w-max divide-y divide-[var(--bb-data-border)]">
             <thead class="bg-[var(--bb-surface-data-muted)]">
               <tr>
                 <th class="table-th w-8">
@@ -268,6 +343,8 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                     {ariaSortAnnouncement("scale_factor")}
                   </button>
                 </th>
+                <th class="table-th">Phase</th>
+                <th class="table-th">Metric contract</th>
                 <th class="p-0" scope="col" aria-sort={ariaSort("run_date")}>
                   <button
                     type="button"
@@ -318,6 +395,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
               ))}
             </tbody>
           </table>
+          </div>
           {visiblePlatformResults.length < platformResults.length && (
             <div class="border-t border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-3 text-center">
               <button
@@ -383,19 +461,40 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
         </div>
       )}
 
-      {platformResultsRaw.length >= 2 && (
+      {platformResultsRaw.length > 0 && (
         <section class="card mt-8" aria-label="Performance trends by comparable cohort">
           <h2 class="mb-2 text-base font-semibold text-[var(--bb-data-fg-primary)]">Performance Trends by Cohort</h2>
-          {trendCohorts.length === 0 ? (
+          <p class="mb-4 text-sm text-[var(--bb-data-fg-muted)]">
+            Trend cohorts never mix benchmark, scale, phase, or metric. Charts require at least {MIN_TREND_OBSERVATIONS} observations;
+            smaller cohorts stay visible as sparse-data states.
+          </p>
+          {trendCohorts.length === 0 && sparseTrendCohorts.length === 0 ? (
             <p class="text-sm text-[var(--bb-data-fg-subtle)] italic">
-              Trends require at least two runs within the same benchmark, scale, phase, and primary metric.
+              No trendable metric values are available for the selected filters.
             </p>
           ) : (
             <div class="space-y-6">
               {trendCohorts.map((cohort) => (
                 <section key={cohort.key} data-testid={`trend-cohort-${cohort.key}`} class="space-y-2">
                   <h3 class="text-sm font-medium text-[var(--bb-data-fg-primary)]">{cohort.label}</h3>
+                  <p class="text-xs text-[var(--bb-data-fg-muted)]">
+                    {cohort.observationCount} observations · {cohort.metricDescription}
+                  </p>
                   <TimeSeries entries={cohort.entries} primaryMetric={cohort.primaryMetric} />
+                </section>
+              ))}
+              {sparseTrendCohorts.map((cohort) => (
+                <section
+                  key={cohort.key}
+                  data-testid={`trend-sparse-${cohort.key}`}
+                  class="rounded-lg border border-dashed border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-3 py-3"
+                >
+                  <h3 class="text-sm font-medium text-[var(--bb-data-fg-primary)]">{cohort.label}</h3>
+                  <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">
+                    Limited observations: {cohort.observationCount} published {cohort.observationCount === 1 ? "run" : "runs"}
+                    in this comparable cohort. Trend chart hidden until at least {MIN_TREND_OBSERVATIONS} observations exist.
+                  </p>
+                  <p class="mt-1 text-xs text-[var(--bb-data-fg-subtle)]">Metric: {cohort.metricDescription}.</p>
                 </section>
               ))}
             </div>
@@ -417,10 +516,13 @@ function buildTrendCohorts(rows: PlatformIndexRowRow[]): TrendCohort[] {
     const key = `${row.benchmark}-sf${row.scale_factor}-${row.phase}-${primaryMetric}`;
     let cohort = groups.get(key);
     if (!cohort) {
+      const metricDescription = trendMetricDescription(primaryMetric);
       cohort = {
         key,
-        label: `${humanizeBenchmark(row.benchmark)} · SF ${row.scale_factor} · ${row.phase}`,
+        label: `${humanizeBenchmark(row.benchmark)} · SF ${row.scale_factor} · ${row.phase} · ${metricDescription}`,
         primaryMetric,
+        metricDescription,
+        observationCount: 0,
         entries: [],
       };
       groups.set(key, cohort);
@@ -429,14 +531,15 @@ function buildTrendCohorts(rows: PlatformIndexRowRow[]): TrendCohort[] {
   }
 
   return [...groups.values()]
-    .map((cohort) => ({
-      ...cohort,
-      entries: [...cohort.entries].sort((a, b) => a.run_date.localeCompare(b.run_date)),
-    }))
-    .filter(
-      (cohort) =>
-        cohort.entries.filter((entry) => trendValue(entry, cohort.primaryMetric) !== null).length >= 2,
-    )
+    .map((cohort) => {
+      const entries = [...cohort.entries].sort((a, b) => a.run_date.localeCompare(b.run_date));
+      return {
+        ...cohort,
+        entries,
+        observationCount: entries.filter((entry) => trendValue(entry, cohort.primaryMetric) !== null).length,
+      };
+    })
+    .filter((cohort) => cohort.observationCount > 0)
     .sort((a, b) => a.label.localeCompare(b.label));
 }
 
@@ -468,6 +571,10 @@ function PlatformRow({ entry, checked, onToggle }: PlatformRowProps) {
       </td>
       <td class="table-td font-medium">{humanizeBenchmark(entry.benchmark)}</td>
       <td class="table-td">SF {entry.scale_factor}</td>
+      <td class="table-td text-[var(--bb-data-fg-muted)]">{entry.phase}</td>
+      <td class="table-td max-w-[12rem] text-xs text-[var(--bb-data-fg-muted)]">
+        {primaryMetricContract(entry.primary_metric)}
+      </td>
       <td class="table-td text-[var(--bb-data-fg-muted)]">{entry.run_date}</td>
       <td class="table-td font-mono">{fmtScore(entry.power_score)}</td>
       <td class="table-td font-mono">{fmtGeomean(entry.geomean_ms)}</td>

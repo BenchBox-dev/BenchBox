@@ -1,0 +1,113 @@
+{
+  "captured_at": "2026-05-07T15:00:34.308Z",
+  "routes": [
+    {
+      "filename": "benchmark-tpch-390.png",
+      "url": "/results/tpch/?sf=0.01&phase=standard",
+      "width": 390,
+      "highContrast": false
+    },
+    {
+      "filename": "benchmark-tpch-768.png",
+      "url": "/results/tpch/?sf=0.01&phase=standard",
+      "width": 768,
+      "highContrast": false
+    },
+    {
+      "filename": "benchmark-tpch-1280.png",
+      "url": "/results/tpch/?sf=0.01&phase=standard",
+      "width": 1280,
+      "highContrast": false
+    },
+    {
+      "filename": "benchmark-tpch-1600.png",
+      "url": "/results/tpch/?sf=0.01&phase=standard",
+      "width": 1600,
+      "highContrast": false
+    },
+    {
+      "filename": "benchmark-tpch-list-1280.png",
+      "url": "/results/tpch/?sf=0.01&phase=standard&view=list",
+      "width": 1280,
+      "highContrast": false
+    },
+    {
+      "filename": "benchmark-tpch-high-contrast-1280.png",
+      "url": "/results/tpch/?sf=0.01&phase=standard",
+      "width": 1280,
+      "highContrast": true
+    },
+    {
+      "filename": "benchmark-star-schema-390.png",
+      "url": "/results/star_schema/?sf=0.01&phase=standard",
+      "width": 390,
+      "highContrast": false
+    },
+    {
+      "filename": "benchmark-star-schema-768.png",
+      "url": "/results/star_schema/?sf=0.01&phase=standard",
+      "width": 768,
+      "highContrast": false
+    },
+    {
+      "filename": "benchmark-star-schema-1280.png",
+      "url": "/results/star_schema/?sf=0.01&phase=standard",
+      "width": 1280,
+      "highContrast": false
+    },
+    {
+      "filename": "benchmark-star-schema-1600.png",
+      "url": "/results/star_schema/?sf=0.01&phase=standard",
+      "width": 1600,
+      "highContrast": false
+    },
+    {
+      "filename": "platform-duckdb-390.png",
+      "url": "/results/p/duckdb/",
+      "width": 390,
+      "highContrast": false
+    },
+    {
+      "filename": "platform-duckdb-768.png",
+      "url": "/results/p/duckdb/",
+      "width": 768,
+      "highContrast": false
+    },
+    {
+      "filename": "platform-duckdb-1280.png",
+      "url": "/results/p/duckdb/",
+      "width": 1280,
+      "highContrast": false
+    },
+    {
+      "filename": "platform-duckdb-1600.png",
+      "url": "/results/p/duckdb/",
+      "width": 1600,
+      "highContrast": false
+    },
+    {
+      "filename": "platform-datafusion-390.png",
+      "url": "/results/p/datafusion/",
+      "width": 390,
+      "highContrast": false
+    },
+    {
+      "filename": "platform-datafusion-768.png",
+      "url": "/results/p/datafusion/",
+      "width": 768,
+      "highContrast": false
+    },
+    {
+      "filename": "platform-datafusion-1280.png",
+      "url": "/results/p/datafusion/",
+      "width": 1280,
+      "highContrast": false
+    },
+    {
+      "filename": "platform-datafusion-1600.png",
+      "url": "/results/p/datafusion/",
+      "width": 1600,
+      "highContrast": false
+    }
+  ]
+}
