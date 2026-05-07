@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:11:04.606147+00:00",
+  "bundle_file": "ssb_sf001_pandas_df_20260506_094753_f7d46d2d.json",
+  "bundle_hash": "1382ec9e230d6413d732dce4275be32ec9bdf6b8ed28cf0de05ce1a6bfb249b0",
+  "companion_hashes": {},
+  "benchmark": "SSB",
+  "platform": "Pandas",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

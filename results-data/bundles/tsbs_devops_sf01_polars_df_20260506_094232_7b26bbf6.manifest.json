@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:13:44.223905+00:00",
+  "bundle_file": "tsbs_devops_sf01_polars_df_20260506_094232_7b26bbf6.json",
+  "bundle_hash": "d03b3800347b98fef11df9e7580200b909a77058bc09c5f88e1ddec8b9a5e084",
+  "companion_hashes": {},
+  "benchmark": "TSBS DevOps",
+  "platform": "Polars",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

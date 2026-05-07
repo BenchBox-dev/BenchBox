@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:07:50.562832+00:00",
+  "bundle_file": "amplab_sf001_pyspark_df_20260506_100044_a00e1073.json",
+  "bundle_hash": "e6ffd653c33cdac4fd1610dad1049cb921fe87a38096e3571afb0bf78c72f577",
+  "companion_hashes": {},
+  "benchmark": "AMPLab",
+  "platform": "PySpark",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

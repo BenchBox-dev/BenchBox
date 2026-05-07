@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:08:27.724948+00:00",
+  "bundle_file": "coffeeshop_sf001_datafusion_sql_20260506_110149_795d2c88.json",
+  "bundle_hash": "e4415c3cb2cae96e714d40c1fb2e8ab179c689b40e8c2d42bb3784545c008879",
+  "companion_hashes": {},
+  "benchmark": "CoffeeShop",
+  "platform": "DataFusion",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:08:42.138441+00:00",
+  "bundle_file": "coffeeshop_sf01_postgresql_sql_20260506_120002_89451625.json",
+  "bundle_hash": "5bb28b5bf81bf7656aff9732c1af5b93a73b957ed85a37480e08ddcd97c375d3",
+  "companion_hashes": {},
+  "benchmark": "CoffeeShop",
+  "platform": "PostgreSQL",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

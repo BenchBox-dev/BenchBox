@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:07:33.880410+00:00",
+  "bundle_file": "ai_primitives_sf001_sqlite_sql_20260506_084900_ab6a2532.json",
+  "bundle_hash": "6e1cbcf4f63f9f433e15d210006a77e786ef6ebbc9dc7f8d2b919d4a4c74afae",
+  "companion_hashes": {},
+  "benchmark": "AI/ML Primitives",
+  "platform": "SQLite",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:09:46.829517+00:00",
+  "bundle_file": "h2odb_sf01_pyspark_df_20260506_100031_ad59cea5.json",
+  "bundle_hash": "eb365566c8c294956f98729628cd892990abf8cd00bade24d46258ab1126b5a0",
+  "companion_hashes": {},
+  "benchmark": "H2ODB",
+  "platform": "PySpark",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

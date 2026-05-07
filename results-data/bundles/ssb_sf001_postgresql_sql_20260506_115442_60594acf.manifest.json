@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:11:07.011579+00:00",
+  "bundle_file": "ssb_sf001_postgresql_sql_20260506_115442_60594acf.json",
+  "bundle_hash": "f392e4f015603c00900e30b6e86364b19b21a1db279fa5d22337bc8fe66c7bb7",
+  "companion_hashes": {},
+  "benchmark": "Star Schema",
+  "platform": "PostgreSQL",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

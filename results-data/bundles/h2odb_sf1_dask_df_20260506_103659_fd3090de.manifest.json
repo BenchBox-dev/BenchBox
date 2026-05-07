@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:09:50.435362+00:00",
+  "bundle_file": "h2odb_sf1_dask_df_20260506_103659_fd3090de.json",
+  "bundle_hash": "7278bcf5f912c5334c96fc5db25bfbe8b2a47f5aabeac33cf8847d7d697a1888",
+  "companion_hashes": {},
+  "benchmark": "H2ODB",
+  "platform": "Dask",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

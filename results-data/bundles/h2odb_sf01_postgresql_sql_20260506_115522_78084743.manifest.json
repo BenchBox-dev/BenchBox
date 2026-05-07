@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:09:45.624081+00:00",
+  "bundle_file": "h2odb_sf01_postgresql_sql_20260506_115522_78084743.json",
+  "bundle_hash": "d0633418bafbce280966b76492bad439a96ff0ee5fa516e7e0ec5fb4303b6dc9",
+  "companion_hashes": {},
+  "benchmark": "H2O Database",
+  "platform": "PostgreSQL",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

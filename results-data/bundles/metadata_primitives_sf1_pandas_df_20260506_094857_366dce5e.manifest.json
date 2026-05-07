@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:10:10.728892+00:00",
+  "bundle_file": "metadata_primitives_sf1_pandas_df_20260506_094857_366dce5e.json",
+  "bundle_hash": "6f0a8bff6ec9740fd09fd88c53a1a5e5e1df613dff90b04b14560ec21b5535b6",
+  "companion_hashes": {},
+  "benchmark": "Metadata",
+  "platform": "Pandas",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

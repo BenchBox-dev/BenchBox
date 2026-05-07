@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:09:09.707264+00:00",
+  "bundle_file": "datavault_sf1_doris_sql_20260506_134642_21b7dc0b.json",
+  "bundle_hash": "fdfab9976e3a67e35fb0e6434e21e1f8d7d766a4f194dbec97564cf1027635a0",
+  "companion_hashes": {},
+  "benchmark": "Data Vault",
+  "platform": "Apache Doris",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

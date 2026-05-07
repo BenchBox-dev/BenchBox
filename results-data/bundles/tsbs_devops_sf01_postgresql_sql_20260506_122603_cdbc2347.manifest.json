@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:13:45.429015+00:00",
+  "bundle_file": "tsbs_devops_sf01_postgresql_sql_20260506_122603_cdbc2347.json",
+  "bundle_hash": "8f4843e20b3c6bf8c74c009aa4de82699c80235fc50f339aa88aa7526f490337",
+  "companion_hashes": {},
+  "benchmark": "TSBS DevOps",
+  "platform": "PostgreSQL",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:09:26.437777+00:00",
+  "bundle_file": "flightdata_sf01_starrocks_sql_20260506_113753_61c19ae1.json",
+  "bundle_hash": "54a50b18787b9beec97fda76d10560e6376ac406669fa7a2c5e41d3d6e649445",
+  "companion_hashes": {},
+  "benchmark": "Flight Data OLAP",
+  "platform": "StarRocks",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

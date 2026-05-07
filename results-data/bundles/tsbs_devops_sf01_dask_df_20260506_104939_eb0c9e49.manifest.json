@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:13:41.817503+00:00",
+  "bundle_file": "tsbs_devops_sf01_dask_df_20260506_104939_eb0c9e49.json",
+  "bundle_hash": "99425e51048e9e78155cdaf38ede194e560a1ecb757d129697c6cd9aafd40c18",
+  "companion_hashes": {},
+  "benchmark": "TSBS DevOps",
+  "platform": "Dask",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

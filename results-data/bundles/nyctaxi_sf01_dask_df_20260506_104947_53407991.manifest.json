@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:10:29.882641+00:00",
+  "bundle_file": "nyctaxi_sf01_dask_df_20260506_104947_53407991.json",
+  "bundle_hash": "2ae75dfe77c4f3f84e2ae39d1afe0ba666054194541dfe10e5d370553830b457",
+  "companion_hashes": {},
+  "benchmark": "NYC Taxi",
+  "platform": "Dask",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

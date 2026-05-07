@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:09:22.834290+00:00",
+  "bundle_file": "flightdata_sf01_clickhouse_local_sql_20260506_081656_d07ddf40.json",
+  "bundle_hash": "ca932820aae588ec21fef2d4f0ec9439d6e31aa6390af6b1f8c6aa86a9603742",
+  "companion_hashes": {},
+  "benchmark": "Flight Data OLAP",
+  "platform": "ClickHouse Local",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}
