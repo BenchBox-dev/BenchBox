@@ -1,0 +1,45 @@
+# w0 evidence for results-explorer-uat-defect-local-platform-bring-up-automation
+# date: 2026-05-07
+# worktree: /Users/joe/Developer/BenchBox.pool-05
+
+$ LOGS=~/Developer/benchmark_runs/logs/uat_tuned_followup_20260505_pool02_rerun
+$ awk -F"\t" 'NR==1 || $4=="skipped-unreachable" {print}' "$LOGS/coverage_cells.tsv" | wc -l
+     856
+
+$ awk -F"\t" 'NR>1 {print $4}' "$LOGS/coverage_cells.tsv" | sort | uniq -c
+  25 failed
+  72 ladder-pruned
+ 114 passed
+ 435 resource-budget-blocked
+ 855 skipped-unreachable
+   2 timed-out
+
+$ cat "$LOGS/coverage_platform_summary.tsv"
+platform	passed	failed	timed-out	ladder-pruned	skipped-unreachable	resource-budget-blocked	total
+cedardb	0	0	0	0	57	0	57
+clickhouse-local	34	0	0	8	0	15	57
+clickhouse-server	0	0	0	0	57	0	57
+dask-df	0	0	0	0	0	51	51
+databend	0	0	0	0	57	0	57
+datafusion	33	2	0	22	0	0	57
+datafusion-df	0	0	0	0	0	51	51
+doris	0	0	0	0	57	0	57
+duckdb	47	1	2	7	0	0	57
+influxdb	0	0	0	0	57	0	57
+lakesail	0	22	0	35	0	0	57
+modin-df	0	0	0	0	0	51	51
+pandas-df	0	0	0	0	0	51	51
+pg-duckdb	0	0	0	0	57	0	57
+pg-mooncake	0	0	0	0	57	0	57
+polars-df	0	0	0	0	0	51	51
+postgresql	0	0	0	0	57	0	57
+presto	0	0	0	0	57	0	57
+pyspark-df	0	0	0	0	0	51	51
+questdb	0	0	0	0	57	0	57
+singlestore	0	0	0	0	57	0	57
+spark	0	0	0	0	0	57	57
+sqlite	0	0	0	0	0	57	57
+starrocks	0	0	0	0	57	0	57
+timescaledb	0	0	0	0	57	0	57
+trino	0	0	0	0	57	0	57
+velox	0	0	0	0	57	0	57
