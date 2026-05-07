@@ -78,6 +78,28 @@ def test_allowed_patterns_from_todo_maps_skill_scope(tmp_path: Path) -> None:
     ]
 
 
+def test_allowed_patterns_from_todo_treats_skill_directory_without_slash_as_prefix(tmp_path: Path) -> None:
+    todo = tmp_path / "todo.yaml"
+    todo.write_text(
+        """
+        id: example
+        scope_limit:
+          only_modify:
+            - ".claude/skills/code"
+            - ".claude/skills/todo/defaults"
+        """,
+        encoding="utf-8",
+    )
+
+    patterns = skill_sync_lock_audit.allowed_patterns_from_todo(todo)
+
+    assert patterns == ["code/", "todo/defaults/"]
+    assert skill_sync_lock_audit._is_allowed("code/SKILL.md", patterns)
+    assert skill_sync_lock_audit._is_allowed("code/references/five-axis-review.md", patterns)
+    assert skill_sync_lock_audit._is_allowed("todo/defaults/TODO_SCHEMA.yaml", patterns)
+    assert not skill_sync_lock_audit._is_allowed("blog/SKILL.md", patterns)
+
+
 def test_allowed_patterns_gate_changed_lock_paths() -> None:
     assert skill_sync_lock_audit._is_allowed("todo/SKILL.md", ["todo/"])
     assert skill_sync_lock_audit._is_allowed(

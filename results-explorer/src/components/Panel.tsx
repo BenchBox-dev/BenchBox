@@ -68,8 +68,9 @@ export function DataCard({
   class: extraClass = "",
   children,
 }: DataCardProps) {
+  const bodyClass = ["flex flex-col gap-4", !withPanel ? extraClass : ""].filter(Boolean).join(" ");
   const body = (
-    <div class="flex flex-col gap-4">
+    <div class={bodyClass}>
       {(title || description || actions) && (
         <header class="flex flex-wrap items-start justify-between gap-3">
           <div>

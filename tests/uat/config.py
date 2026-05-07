@@ -143,6 +143,13 @@ def _require_nonnegative_float(raw: dict[str, Any], key: str, *, default: float,
     return coerced
 
 
+def _require_bool(raw: dict[str, Any], key: str, *, default: bool, section: str) -> bool:
+    value = raw.get(key, default)
+    if not isinstance(value, bool):
+        raise ConfigError(f"`{section}.{key}` must be a bool, got {type(value).__name__}={value!r}")
+    return value
+
+
 def _validate_execute(raw: dict[str, Any]) -> ExecuteConfig:
     if raw is None:
         raw = {}
@@ -234,10 +241,10 @@ def _validate_cleanup(raw: dict[str, Any] | None) -> CleanupConfig:
     if not isinstance(raw, dict):
         raise ConfigError("`cleanup:` must be a mapping")
 
-    preserve_datagen = bool(raw.get("preserve_datagen", True))
+    preserve_datagen = _require_bool(raw, "preserve_datagen", default=True, section="cleanup")
     if not preserve_datagen:
         raise ConfigError("`cleanup.preserve_datagen: false` is not supported by UAT automation")
-    docker_manage_platforms = bool(raw.get("docker_manage_platforms", False))
+    docker_manage_platforms = _require_bool(raw, "docker_manage_platforms", default=False, section="cleanup")
     docker_platform_switch = str(raw.get("docker_platform_switch", "off"))
     if docker_platform_switch not in VALID_DOCKER_PLATFORM_SWITCH_MODES:
         raise ConfigError(
@@ -262,7 +269,7 @@ def _validate_cleanup(raw: dict[str, Any] | None) -> CleanupConfig:
 
     return CleanupConfig(
         preserve_datagen=preserve_datagen,
-        prune_databases=bool(raw.get("prune_databases", True)),
+        prune_databases=_require_bool(raw, "prune_databases", default=True, section="cleanup"),
         docker_manage_platforms=docker_manage_platforms,
         docker_platform_switch=docker_platform_switch,
         docker_project_prefix=docker_project_prefix,

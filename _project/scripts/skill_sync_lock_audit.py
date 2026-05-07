@@ -101,8 +101,8 @@ def _scope_path_to_skill_pattern(path: str) -> str | None:
     after = normalized.split(marker, 1)[1]
     if not after:
         return None
-    if after.endswith("/"):
-        return after
+    if after.endswith("/") or Path(after).suffix == "":
+        return after.rstrip("/") + "/"
     return after
 
 

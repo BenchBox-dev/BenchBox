@@ -26,10 +26,12 @@ from tests.uat.matrix import benchbox_run_argv
 from tests.uat.timeouts import TimeoutResult, run_with_timeout
 
 # Mirrors scripts/local_stress_test.sh:478 — match either an absolute or
-# relative `benchmark_runs/results/.../*.json` path. The `[^\s,;]+` is
-# narrower than `[^\s]+` so a comma- or semicolon-separated log line
-# does not collapse two paths into a single match.
-RESULT_PATH_RE = re.compile(r"(?:/[^\s,;]+/)?benchmark_runs/results/[^\s,;]+\.json")
+# relative result JSON path under a `results/` directory. The UAT runner
+# may override BENCHBOX_OUTPUT_DIR, so the runs root is not necessarily
+# named `benchmark_runs`. The `[^\s,;]+` is narrower than `[^\s]+` so a
+# comma- or semicolon-separated log line does not collapse two paths into
+# a single match.
+RESULT_PATH_RE = re.compile(r"(?:(?:[A-Za-z]:)?/?[^\s,;]*/)?results/[^\s,;]+\.json")
 UNOFFICIAL_COMPLIANCE_CLASSES = frozenset({"unofficial_nonstandard", "unofficial_subscale"})
 
 
@@ -59,7 +61,7 @@ class CellResult:
 
 
 def extract_result_path(log_text: str) -> str | None:
-    """Return the last `benchmark_runs/results/.../*.json` path mentioned in log_text.
+    """Return the last `results/.../*.json` path mentioned in log_text.
 
     Bash semantics: `grep -oE ... | tail -1`. The Python port matches the
     last occurrence so log re-prints (e.g. summary tables) take precedence

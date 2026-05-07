@@ -129,7 +129,7 @@ describe("Tabs", () => {
     expect(screen.getByText("(7)")).toBeTruthy();
   });
 
-  it("ArrowRight / ArrowLeft / Home / End move selection skipping disabled tabs", () => {
+  it("ArrowRight / ArrowLeft / Home / End move selection and focus skipping disabled tabs", () => {
     const onChange = vi.fn();
     render(
       <Tabs
@@ -144,14 +144,28 @@ describe("Tabs", () => {
       />,
     );
     const a = screen.getByRole("tab", { name: "A" });
-    fireEvent.keyDown(a, { key: "ArrowRight" });
+    const c = screen.getByRole("tab", { name: "C" });
+
+    a.focus();
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowRight" });
     expect(onChange).toHaveBeenLastCalledWith("c");
-    fireEvent.keyDown(a, { key: "ArrowLeft" });
-    expect(onChange).toHaveBeenLastCalledWith("c");
-    fireEvent.keyDown(a, { key: "End" });
-    expect(onChange).toHaveBeenLastCalledWith("c");
-    fireEvent.keyDown(a, { key: "Home" });
+    expect(c).toHaveFocus();
+
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowRight" });
     expect(onChange).toHaveBeenLastCalledWith("a");
+    expect(a).toHaveFocus();
+
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowLeft" });
+    expect(onChange).toHaveBeenLastCalledWith("c");
+    expect(c).toHaveFocus();
+
+    fireEvent.keyDown(document.activeElement!, { key: "Home" });
+    expect(onChange).toHaveBeenLastCalledWith("a");
+    expect(a).toHaveFocus();
+
+    fireEvent.keyDown(document.activeElement!, { key: "End" });
+    expect(onChange).toHaveBeenLastCalledWith("c");
+    expect(c).toHaveFocus();
   });
 
   it("aria-controls links the tablist to a tabpanel id when supplied", () => {
@@ -191,6 +205,18 @@ describe("Panel / DataCard", () => {
     expect(screen.getByRole("heading", { name: "Charts" })).toBeTruthy();
     expect(screen.getByText("One per question")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Export" })).toBeTruthy();
+  });
+
+  it("DataCard applies class to the body when rendered without a Panel", () => {
+    const { container } = render(
+      <DataCard withPanel={false} class="grid-area-main">
+        body
+      </DataCard>,
+    );
+    const root = container.firstElementChild!;
+    expect(root.className).toContain("flex flex-col gap-4");
+    expect(root.className).toContain("grid-area-main");
+    expect(container.querySelector("[data-surface]")).toBeNull();
   });
 });
 

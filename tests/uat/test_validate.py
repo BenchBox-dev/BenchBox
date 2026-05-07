@@ -89,6 +89,32 @@ def test_run_validate_surfaces_nonzero_subprocess_via_exit_code(tmp_path: Path):
     assert out.clean_count == 2
 
 
+def test_run_validate_paths_preserves_negative_subprocess_returncode(tmp_path: Path):
+    """Signal-style negative return codes must not be masked during path aggregation."""
+    result_paths = (tmp_path / "r0.json", tmp_path / "r1.json")
+    output_tsv = tmp_path / "rollup.tsv"
+    returncodes = iter([-9, 0])
+
+    def fake_runner(argv, check):
+        output = Path(argv[argv.index("--output") + 1])
+        _write_tsv(output, ["clean"])
+
+        class Completed:
+            returncode = next(returncodes)
+
+        return Completed()
+
+    out = validate.run_validate(
+        result_paths,
+        output_tsv=output_tsv,
+        runner=fake_runner,
+    )
+
+    assert out.script_returncode == -9
+    assert out.exit_code() == -9
+    assert out.total == 2
+
+
 def test_parse_validator_status_by_path_round_trip(tmp_path: Path):
     tsv = tmp_path / "rollup.tsv"
     _write_tsv(tsv, ["clean", "warning_only", "error"])

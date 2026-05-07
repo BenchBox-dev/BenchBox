@@ -37,8 +37,8 @@ def rank_platforms(summary: BenchmarkSummary) -> RankedCohort:
     """Rank a benchmark summary with standard competition ranking.
 
     Tied rows share the same rank and the next distinct row skips by the tie
-    size. Rows that are not ranking-eligible, or have null primary metrics,
-    sort after rankable rows and receive no rank.
+    size. Rows that are not ranking-eligible, or have null/non-positive primary
+    metrics, sort after rankable rows and receive no rank.
     """
 
     ranking = summary.ranking
@@ -49,31 +49,25 @@ def rank_platforms(summary: BenchmarkSummary) -> RankedCohort:
     def metric_value(row: PlatformRow) -> float | None:
         return row.power_score if primary_metric == "power_score" else row.display_geomean_ms
 
-    def is_rankable(row: PlatformRow) -> bool:
-        return row.is_ranking_eligible and metric_value(row) is not None
+    def is_rankable(row: PlatformRow, value: float | None) -> bool:
+        return row.is_ranking_eligible and value is not None and value > 0
 
     def sort_key(row: PlatformRow) -> tuple[bool, float, str, str]:
         value = metric_value(row)
-        if not is_rankable(row):
+        if not is_rankable(row, value):
             return (True, 0.0, row.platform_id, row.result_id)
         assert value is not None
         return (False, -value if higher_is_better else value, row.platform_id, row.result_id)
 
     sorted_rows = sorted(summary.platforms, key=sort_key)
-    rankable_values = [
-        value for value in (metric_value(row) for row in sorted_rows if row.is_ranking_eligible) if value is not None
-    ]
-    positive_rankable_values = [value for value in rankable_values if value > 0]
-    best_value = (
-        (max(positive_rankable_values) if higher_is_better else min(positive_rankable_values))
-        if positive_rankable_values
-        else None
-    )
-    slowest_value = (
-        (min(positive_rankable_values) if higher_is_better else max(positive_rankable_values))
-        if positive_rankable_values
-        else None
-    )
+    rankable_values: list[float] = []
+    for row in sorted_rows:
+        value = metric_value(row)
+        if is_rankable(row, value):
+            assert value is not None
+            rankable_values.append(value)
+    best_value = (max(rankable_values) if higher_is_better else min(rankable_values)) if rankable_values else None
+    slowest_value = (min(rankable_values) if higher_is_better else max(rankable_values)) if rankable_values else None
 
     ranked_rows: list[RankedPlatform] = []
     current_rank = 1
@@ -81,11 +75,12 @@ def rank_platforms(summary: BenchmarkSummary) -> RankedCohort:
     previous_value: float | None = None
     for row in sorted_rows:
         value = metric_value(row)
-        if not is_rankable(row):
+        if not is_rankable(row, value):
             rank = None
             rank_speedup_vs_best = None
             rank_speedup_vs_slowest = None
         else:
+            assert value is not None
             rankable_index += 1
             if previous_value is not None and value != previous_value:
                 current_rank = rankable_index

@@ -141,6 +141,7 @@ DOCKER_PLATFORMS=( "${FAST_DOCKER[@]}" "${SLOW_DOCKER[@]}" )
 # but each platform gets its own reachability cache entry (keyed by platform).
 get_platform_port() {
   case "$1" in
+    lakesail)           echo "localhost:50051" ;;
     singlestore)        echo "localhost:13306" ;;
     questdb)            echo "localhost:8812" ;;
     presto)             echo "localhost:18081" ;;

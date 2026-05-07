@@ -61,6 +61,11 @@ benchmark_runs/results/duckdb_tpch_20260502.json
     assert out.endswith("FINAL.json")
 
 
+def test_extract_result_path_accepts_custom_runs_root():
+    log = "/tmp/shared-runs/results/duckdb_tpch_custom_root.json\n"
+    assert runner.extract_result_path(log) == "/tmp/shared-runs/results/duckdb_tpch_custom_root.json"
+
+
 def test_extract_result_path_returns_none_when_missing():
     log = "[info] running\n[error] failed before result capture\n"
     assert runner.extract_result_path(log) is None
@@ -95,7 +100,7 @@ def test_run_cell_writes_log_and_returns_result(tmp_path: Path):
 
 
 def test_run_cell_sets_benchbox_output_dir_for_subprocess(tmp_path: Path):
-    result_path = tmp_path / "shared-runs" / "benchmark_runs" / "results" / "duckdb_tpch_env.json"
+    result_path = tmp_path / "shared-runs" / "results" / "duckdb_tpch_env.json"
     _write_result_json(result_path)
     fake_argv = [sys.executable, "-c", "print('unused')"]
     captured = {}
@@ -125,6 +130,7 @@ def test_run_cell_sets_benchbox_output_dir_for_subprocess(tmp_path: Path):
         )
 
     assert result.status == "passed"
+    assert result.result_path == result_path
     assert captured["env"]["BENCHBOX_OUTPUT_DIR"] == str(tmp_path / "shared-runs")
     assert captured["argv"][-2:] == ["--output", str(tmp_path / "shared-runs" / "datagen")]
     assert "BENCHBOX_OUTPUT_DIR=" in result.log_path.read_text()

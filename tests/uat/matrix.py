@@ -22,6 +22,7 @@ from typing import Iterable
 # Platform → "host:port" for TCP reachability probes. Mirrors
 # `get_platform_port` in scripts/local_stress_test.sh:142-161.
 PLATFORM_PORTS: dict[str, str] = {
+    "lakesail": "localhost:50051",
     "singlestore": "localhost:13306",
     "questdb": "localhost:8812",
     "presto": "localhost:18081",

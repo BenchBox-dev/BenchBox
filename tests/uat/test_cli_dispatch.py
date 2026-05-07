@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -114,6 +115,48 @@ def test_make_uat_sweep_forwards_dry_run_variable():
 
     assert "[DRY_RUN=1]" in target
     assert "$(if $(DRY_RUN),--dry-run,)" in target
+
+
+@pytest.mark.parametrize(
+    ("target", "variables", "expected_fragment"),
+    [
+        (
+            "uat-cell",
+            ["PLATFORM=duckdb", "BENCHMARK=tpch", "SCALE=0.01"],
+            '--platform "duckdb"',
+        ),
+        (
+            "uat-stress",
+            ["PLATFORM=duckdb", "BENCHMARK=tpch"],
+            '--platform "duckdb"',
+        ),
+    ],
+)
+def test_make_uat_targets_accept_non_bring_up_platforms(target, variables, expected_fragment):
+    result = subprocess.run(
+        ["make", "--no-print-directory", "-n", target, *variables],
+        cwd=Path.cwd(),
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert expected_fragment in result.stdout
+    assert "unknown platform" not in result.stderr
+
+
+def test_make_uat_bring_up_unknown_platform_still_fails_clearly():
+    result = subprocess.run(
+        ["make", "--no-print-directory", "uat-bring-up", "PLATFORM=does-not-exist"],
+        cwd=Path.cwd(),
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+    assert result.returncode != 0
+    assert "unknown platform" in result.stderr.strip().splitlines()[-1]
 
 
 def test_execute_main_reads_cleanup_config_for_standalone_path(tmp_path, monkeypatch, capsys):
