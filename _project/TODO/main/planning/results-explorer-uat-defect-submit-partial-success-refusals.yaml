@@ -56,15 +56,33 @@ work:
       so the implementer (and the w5 sanity check) can compare against a
       captured baseline:
 
-        CORPUS=~/Developer/benchmark_runs/submissions/uat-tuned-followup-20260505
-        for r in "$CORPUS"/*.json; do
-          uv run -- benchbox submit --output "$r" --dry-run 2>&1 \
-            | tail -1
-        done | sort | uniq -c
+        LOGS=~/Developer/benchmark_runs/logs/uat_tuned_followup_20260505_pool02_rerun
+        RESULT_LIST=$(mktemp)
+        awk -F'\t' 'NR>1 && $4=="passed" && $6 {print $6}' \
+          "$LOGS/coverage_cells.tsv" > "$RESULT_LIST"
+        echo "passed-result-paths $(wc -l < "$RESULT_LIST")"
+        while IFS= read -r source_path; do
+          result_path="$source_path"
+          if [ ! -f "$result_path" ]; then
+            result_path="$HOME/Developer/benchmark_runs/results/$(basename "$source_path")"
+          fi
+          out_dir=$(mktemp -d)
+          if uv run -- benchbox submit "$result_path" --output "$out_dir" --dry-run \
+              > "$out_dir/submit.log" 2>&1; then
+            echo submittable
+          else
+            reason=$(grep -E 'Submission refused:' "$out_dir/submit.log" \
+              | sed -E 's/.*Submission refused: //; s/\x1b\[[0-9;]*m//g' \
+              | head -1)
+            echo "refused:${reason:-unknown}"
+          fi
+          rm -rf "$out_dir"
+        done < "$RESULT_LIST" | sort | uniq -c
+        rm -f "$RESULT_LIST"
 
-      Expected (handoff anchor): 87 staged; 27 refused (mostly
-      query-level failures); validator-clean rate 95.4% on the staged
-      subset. Capture stdout under
+      Expected (handoff anchor): 114 passed-result paths; 87 submittable;
+      27 refused split between unofficial compliance and non-clean/query-level
+      failures; validator-clean rate 95.4% on the staged subset. Capture stdout under
       `_project/verification-logs/results-explorer-uat-defect-submit-partial-success-refusals/w0.log`
       and commit. If the refusal count has drifted (submit.py rules
       changed since 2026-05-05), update the description's count and the
@@ -121,16 +139,21 @@ work:
       agree. Prevents regression of the "passed but refused" gap.
 
   - id: w5
-    summary: "Replay 2026-05-05 corpus through the new classifier; expect 27 cells to flip from PASSED to FAILED"
+    summary: "Replay 2026-05-05 passed-result paths through the new classifier and compare the refusal split"
     needs: [w4]
     status: pending
     notes: |
       Sanity check that the implementation matches the observed defect.
-      Run `classify_for_submit` over the 114 result JSONs from
-      `~/Developer/benchmark_runs/submissions/uat-tuned-followup-20260505/`
-      and assert: 87 submittable + N unofficial + 27 (query_failure ∪
-      schema_violation) = 114. Capture the exact split into the
-      verification log under `_project/verification-logs/<this-id>/`.
+      Re-read the 114 `status=passed` result JSON paths from
+      `~/Developer/benchmark_runs/logs/uat_tuned_followup_20260505_pool02_rerun/coverage_cells.tsv`,
+      resolving pool-local paths to same-name files under
+      `~/Developer/benchmark_runs/results/` when needed. Assert: 87
+      submittable + 27 non-submittable = 114, and the 27 split into
+      `unofficial` versus `query_failure`/`schema_violation` according to
+      the classifier. Only the non-clean (`query_failure` ∪
+      `schema_violation`) subset should flip from PASSED to FAILED;
+      `unofficial` remains PASSED but tagged. Capture the exact split into
+      the verification log under `_project/verification-logs/<this-id>/`.
 
 must_preserve:
   - "`benchbox submit --output` remains the source of truth for refusals — UAT mirrors it, does not override it."
@@ -150,9 +173,9 @@ verification:
   - description: "Synthetic-failure fixture produces FAILED at the execute phase"
     command: "uv run -- python -m pytest tests/uat/test_runner.py -m fast -k classify_for_submit -q"
     expected_output: "all green"
-  - description: "Replay against 2026-05-05 corpus matches handoff numbers"
-    command: "uv run -- python -m tests.uat._cli replay-classify --corpus ~/Developer/benchmark_runs/submissions/uat-tuned-followup-20260505/"
-    expected_output: "27 query_failure or schema_violation; 87 submittable"
+  - description: "Replay against 2026-05-05 passed-result paths matches handoff numbers"
+    command: "uv run -- python -m tests.uat._cli replay-classify --coverage-cells ~/Developer/benchmark_runs/logs/uat_tuned_followup_20260505_pool02_rerun/coverage_cells.tsv --results-root ~/Developer/benchmark_runs/results"
+    expected_output: "114 passed-result paths; 87 submittable; 27 non-submittable split by classifier"
   - description: "Cell-level coverage TSV exposes `submit_terminal_state` column"
     command: "head -1 ~/Developer/benchmark_runs/logs/<latest-sweep>/coverage_cells.tsv"
     expected_output: "header includes submit_terminal_state"

@@ -78,7 +78,7 @@ work:
       first destroys its source. The `deps.needs` edge above gates the
       whole cleanup TODO on that ancestor TODO, but call it out here too
       so a single-work-unit operator sees the constraint inline.
-    notes: |
+
       Operator command (run only after the user authorizes AND
       disk-budget-resume-plan/w1 is done):
         rm -rf /Users/joe/Developer/BenchBox.pool-02/benchmark_runs/datagen
