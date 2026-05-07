@@ -113,6 +113,14 @@ def test_uat_bring_up_velox_passes_benchmark_runs_dir_env(tmp_path: Path, monkey
     assert "UAT bring-up OK" in capsys.readouterr().out
 
 
+def test_preflight_automated_set_matches_script_automated_set():
+    """Preflight and the bring-up script must agree on which platforms are automated."""
+    bring_up = _load_bring_up_module()
+
+    assert bring_up.automated_platforms() == preflight.automated_local_platforms()
+    assert bring_up.automated_platforms() == preflight.AUTOMATED_LOCAL_PLATFORMS
+
+
 def _load_bring_up_module():
     path = Path("scripts/uat-bring-up/uat_bring_up.py").resolve()
     spec = importlib.util.spec_from_file_location("uat_bring_up", path)

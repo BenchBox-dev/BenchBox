@@ -14,23 +14,30 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
+from tests.uat import docker_assets
 from tests.uat.matrix import platform_is_reachable, reset_reachability_cache, resolve_platforms
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-AUTOMATED_LOCAL_PLATFORMS: tuple[str, ...] = (
-    "cedardb",
-    "clickhouse-server",
-    "databend",
-    "doris",
-    "influxdb",
-    "postgresql",
-    "presto",
-    "questdb",
-    "singlestore",
-    "starrocks",
-    "trino",
-    "velox",
-)
+
+
+def automated_local_platforms() -> tuple[str, ...]:
+    """Derive the UAT-managed local platform set from `docker_assets`.
+
+    Single source of truth: a platform is UAT-managed iff its
+    `DockerPlatformSpec.managed_start_allowed` is true and it has no
+    `fixed_container_names`. Mirrors the rule used by
+    `scripts/uat-bring-up/uat_bring_up.py:automated_platforms`.
+    """
+    return tuple(
+        sorted(
+            platform
+            for platform, spec in docker_assets.docker_platform_specs().items()
+            if spec.managed_start_allowed and not spec.fixed_container_names
+        )
+    )
+
+
+AUTOMATED_LOCAL_PLATFORMS: tuple[str, ...] = automated_local_platforms()
 
 BringUpRunner = Callable[[str], int]
 ReachabilityChecker = Callable[[str], bool]
@@ -169,10 +176,11 @@ def _check_local_platforms(
     checked = tuple(dict.fromkeys(requested_platforms))
     attempted: list[str] = []
     warnings: list[str] = []
+    automated = set(automated_local_platforms())
     for platform in checked:
         if reachability_checker(platform):
             continue
-        if platform not in AUTOMATED_LOCAL_PLATFORMS:
+        if platform not in automated:
             return (
                 checked,
                 tuple(attempted),

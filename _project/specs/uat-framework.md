@@ -488,8 +488,15 @@ reports 1,530 candidate cells, 527 real attempted terminal cells,
 exactly:
 
 ```
-platform | benchmark | scale | status | elapsed_s | log_path | result_path | validator_status
+platform | benchmark | scale | status | elapsed_s | log_path | result_path | submit_terminal_state | validator_status
 ```
+
+The `submit_terminal_state` column was inserted in PR #247 between
+`result_path` and `validator_status`; the historical fixture
+(`tests/uat/fixtures/uat-2026-05-02-matrix-summary-header.tsv`)
+was bumped at the same time. External consumers parsing the TSV by
+positional index (`awk '{print $8}'`) must move `validator_status`
+from column 8 to column 9 to stay correct.
 
 Wall-clock match is impossible (dry-run prints intent without
 invoking benchbox); structural parity is the bar.
