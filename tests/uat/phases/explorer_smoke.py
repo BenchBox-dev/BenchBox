@@ -187,6 +187,7 @@ def _run_browser_smoke(
     env["BENCHBOX_DATA_DIR"] = str(data_dir)
     commands = (
         ["npm", "ci"],
+        ["npm", "run", "test:e2e:fixtures"],
         ["npm", "run", "build"],
         playwright_argv(playwright_browsers),
     )

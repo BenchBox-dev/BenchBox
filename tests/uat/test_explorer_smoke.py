@@ -30,7 +30,7 @@ def test_explorer_smoke_uses_data_dir_flag():
     assert legacy_flag not in argv
 
 
-def test_runs_build_then_playwright_smoke(tmp_path: Path):
+def test_runs_builds_fixtures_then_playwright_smoke(tmp_path: Path):
     invocations: list[list[str]] = []
     cwd_by_invocation: list[Path | None] = []
     output_dir = tmp_path / "out"
@@ -54,15 +54,16 @@ def test_runs_build_then_playwright_smoke(tmp_path: Path):
         )
     assert result.skipped is False
     assert result.exit_code() == 0
-    assert len(invocations) == 4
+    assert len(invocations) == 5
     assert invocations[0][:3] == ["benchbox", "explorer", "build"]
     assert "--data-dir" in invocations[0]
     assert invocations[1] == ["npm", "ci"]
-    assert invocations[2] == ["npm", "run", "build"]
-    assert invocations[3][:4] == ["npx", "playwright", "test", "--grep"]
-    assert "@smoke" in invocations[3]
-    assert "--project" in invocations[3]
-    assert "chromium" in invocations[3]
+    assert invocations[2] == ["npm", "run", "test:e2e:fixtures"]
+    assert invocations[3] == ["npm", "run", "build"]
+    assert invocations[4][:4] == ["npx", "playwright", "test", "--grep"]
+    assert "@smoke" in invocations[4]
+    assert "--project" in invocations[4]
+    assert "chromium" in invocations[4]
     assert all(cwd == explorer_smoke.EXPLORER_DIR for cwd in cwd_by_invocation[1:])
     assert (tmp_path / "fixture-data" / "results.duckdb").read_text(encoding="utf-8") == "fixture"
 
