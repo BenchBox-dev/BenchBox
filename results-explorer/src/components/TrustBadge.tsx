@@ -1,49 +1,51 @@
 // ---------------------------------------------------------------------------
-// TrustBadge - renders trust_label as a styled pill badge
+// TrustBadge - renders trust_label as a StatusBadge with role="trust"
 //
-// Color semantics:
-//   maintainer-run     → green  (verified by project maintainers)
-//   community-submission → blue (user-submitted, explicitly disclosed)
-//   ci-verified        → gray   (automated pipeline, no human review)
-//   local-run          → gray   (developer machine, no CI validation)
-//   unknown            → gray   (fallback for unrecognised values)
+// Tone semantics:
+//   maintainer-run       → success  (verified by project maintainers)
+//   community-submission → info     (user-submitted, explicitly disclosed)
+//   ci-verified          → neutral  (automated pipeline, no human review)
+//   local-run            → neutral  (developer machine, no CI validation)
+//   unknown              → neutral  (fallback for unrecognised values)
 //
-// Colors meet WCAG AA contrast (light background + dark text in each tier).
+// Tones meet WCAG AA contrast (light background + dark text in each tier).
 // Do NOT de-emphasise community results - show them prominently with their
 // own color rather than a "cautionary" yellow.
 // ---------------------------------------------------------------------------
 
-const TRUST_CONFIG: Record<string, { label: string; badgeClass: string; title: string }> = {
+import { StatusBadge, type StatusTone } from "./StatusBadge";
+
+const TRUST_CONFIG: Record<string, { label: string; tone: StatusTone; title: string }> = {
   "maintainer-run": {
     label: "Maintainer",
-    badgeClass: "badge-green",
+    tone: "success",
     title: "Run by a BenchBox project maintainer under controlled conditions",
   },
   "community-submission": {
     label: "Community",
-    badgeClass: "badge-blue",
+    tone: "info",
     title: "Submitted by a community member - see result detail for provenance",
   },
   "ci-verified": {
     label: "CI",
-    badgeClass: "badge-gray",
+    tone: "neutral",
     title: "Validated by automated CI pipeline",
   },
   "ci-validated": {
     label: "CI",
-    badgeClass: "badge-gray",
+    tone: "neutral",
     title: "Validated by automated CI pipeline",
   },
   "local-run": {
     label: "Local",
-    badgeClass: "badge-gray",
+    tone: "neutral",
     title: "Run on a developer machine - environment may vary",
   },
 };
 
 const DEFAULT_CONFIG = {
   label: "Unknown",
-  badgeClass: "badge-gray",
+  tone: "neutral" as StatusTone,
   title: "Trust level not recorded",
 };
 
@@ -68,9 +70,9 @@ export function TrustBadge({ trustLabel, compact = false }: TrustBadgeProps) {
   };
   const text = compact ? (config.label.split(" ")[0] ?? config.label) : config.label;
   return (
-    <span class={`badge ${config.badgeClass}`} title={config.title}>
+    <StatusBadge role="trust" tone={config.tone} title={config.title}>
       {text}
-    </span>
+    </StatusBadge>
   );
 }
 
@@ -78,23 +80,23 @@ export function ValidationBadge({ validationStatus, showMissing = false }: Valid
   if (!validationStatus && !showMissing) return null;
   const status = validationStatus?.trim() || "not recorded";
   const lower = status.toLowerCase();
-  const badgeClass = validationBadgeClass(lower);
+  const tone = validationTone(lower);
   const label = validationStatus ? lower : "validation n/a";
   return (
-    <span class={`badge ${badgeClass}`} title={`Validation status: ${status}`}>
+    <StatusBadge role="validation" tone={tone} title={`Validation status: ${status}`}>
       {label}
-    </span>
+    </StatusBadge>
   );
 }
 
-function validationBadgeClass(status: string) {
-  if (status.includes("fail")) return "badge-red";
-  if (status.includes("disabled") || status.includes("partial")) return "badge-yellow";
+function validationTone(status: string): StatusTone {
+  if (status.includes("fail")) return "danger";
+  if (status.includes("disabled") || status.includes("partial")) return "warning";
   if (status === "exact" || status === "full" || status === "passed" || status === "pass") {
-    return "badge-green";
+    return "success";
   }
-  if (status === "loose" || status === "range") return "badge-yellow";
-  return "badge-gray";
+  if (status === "loose" || status === "range") return "warning";
+  return "neutral";
 }
 
 export default TrustBadge;

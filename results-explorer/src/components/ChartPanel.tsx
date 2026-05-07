@@ -141,11 +141,11 @@ export function ChartPanel({
   return (
     <section class="card">
       <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <h2 class="text-base font-semibold text-gray-900">Charts</h2>
+        <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)]">Charts</h2>
         <div class="flex w-full min-w-0 flex-col items-stretch gap-2 sm:w-auto sm:items-end">
           {chartGroups.length > 1 && (
             <div
-              class="grid w-full grid-cols-2 gap-1 rounded-md border border-gray-200 bg-gray-50 p-1 sm:flex sm:w-auto sm:flex-wrap sm:justify-end"
+              class="grid w-full grid-cols-2 gap-1 rounded-md panel-muted p-1 sm:flex sm:w-auto sm:flex-wrap sm:justify-end"
               role="tablist"
               aria-label="Chart question groups"
             >
@@ -161,8 +161,8 @@ export function ChartPanel({
                     aria-label={group.label}
                     class={`min-h-9 min-w-0 rounded px-2 py-1.5 text-center text-xs font-medium transition-colors sm:px-3 ${
                       selected
-                        ? "bg-white text-gray-900 shadow-sm"
-                        : "text-gray-600 hover:bg-white hover:text-gray-900"
+                        ? "bg-[var(--bb-surface-data)] text-[var(--bb-data-fg-primary)] shadow-sm"
+                        : "text-[var(--bb-data-fg-muted)] hover:bg-[var(--bb-surface-data)] hover:text-[var(--bb-data-fg-primary)]"
                     }`}
                     onClick={() => selectGroup(group)}
                     title={group.description}
@@ -175,12 +175,12 @@ export function ChartPanel({
           )}
           {showBaseline && summary && summary.platforms.length > 1 && (
             <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
-              <label class="text-xs text-gray-500" for="chart-panel-baseline">
+              <label class="text-xs text-[var(--bb-data-fg-muted)]" for="chart-panel-baseline">
                 Baseline:
               </label>
               <select
                 id="chart-panel-baseline"
-                class="min-w-0 max-w-full rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:outline-none"
+                class="min-w-0 max-w-full rounded border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-xs text-[var(--bb-data-fg-primary)]"
                 value={String(baselineIdx)}
                 onChange={(event) => setBaselineIdx(Number((event.target as HTMLSelectElement).value))}
               >
@@ -194,27 +194,30 @@ export function ChartPanel({
           )}
           {activeGroupCharts.length > 1 && (
             <div
-              class="grid w-full grid-cols-2 gap-1 rounded-md border border-gray-200 bg-gray-50 p-1 sm:flex sm:w-auto sm:flex-wrap sm:justify-end"
+              class="grid w-full grid-cols-2 gap-1 rounded-md panel-muted p-1 sm:flex sm:w-auto sm:flex-wrap sm:justify-end"
               role="group"
               aria-label={`${activeGroup.label} charts`}
             >
-              {activeGroupCharts.map((chart) => (
-                <button
-                  key={chart.id}
-                  type="button"
-                  class={`min-h-9 min-w-0 rounded px-2 py-1.5 text-center text-xs font-medium transition-colors sm:px-3 ${
-                    activeChart.id === chart.id
-                      ? "bg-brand-600 text-white"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
-                  onClick={() => setActiveId(chart.id)}
-                  aria-pressed={activeChart.id === chart.id}
-                  aria-label={chart.title}
-                  title={chart.description}
-                >
-                  {chartButtonLabel(chart)}
-                </button>
-              ))}
+              {activeGroupCharts.map((chart) => {
+                const selected = activeChart.id === chart.id;
+                return (
+                  <button
+                    key={chart.id}
+                    type="button"
+                    class={`min-h-9 min-w-0 rounded px-2 py-1.5 text-center text-xs font-medium transition-colors sm:px-3 ${
+                      selected
+                        ? "bg-[var(--bb-surface-data)] text-[var(--bb-data-fg-primary)] shadow-sm"
+                        : "text-[var(--bb-data-fg-muted)] hover:bg-[var(--bb-surface-data)] hover:text-[var(--bb-data-fg-primary)]"
+                    }`}
+                    onClick={() => setActiveId(chart.id)}
+                    aria-pressed={selected}
+                    aria-label={chart.title}
+                    title={chart.description}
+                  >
+                    {chartButtonLabel(chart)}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
@@ -317,7 +320,7 @@ function renderChart(
           }
         />
       ) : (
-        <p class="text-sm text-gray-400 italic">
+        <p class="text-sm italic text-[var(--bb-data-fg-subtle)]">
           Not enough historical data for a trend chart.
         </p>
       );
@@ -327,7 +330,7 @@ function renderChart(
           {summary && summary.platforms.length > 1 && (
             <div class="flex flex-wrap gap-4">
               {summary.platforms.map((platform, index) => (
-                <div key={platform.result_id} class="flex items-center gap-1.5 text-sm text-gray-600">
+                <div key={platform.result_id} class="flex items-center gap-1.5 text-sm text-[var(--bb-data-fg-muted)]">
                   <span
                     class="inline-block h-3 w-3 rounded-sm"
                     style={{ backgroundColor: paletteColor(index) }}
@@ -406,7 +409,7 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
 
   if (rows.length === 0) {
     return (
-      <p class="text-sm text-gray-400 italic">
+      <p class="text-sm italic text-[var(--bb-data-fg-subtle)]">
         Geomean query timings are not available for these results.
       </p>
     );
@@ -675,9 +678,9 @@ function SummaryBoxPanel({
 
 function SummaryStat({ label, value, title }: { label: string; value: string; title?: string }) {
   return (
-    <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3" title={title}>
-      <div class="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</div>
-      <div class="mt-1 text-sm font-semibold text-gray-900">{value}</div>
+    <div class="rounded-lg panel-muted px-4 py-3" title={title}>
+      <div class="text-xs font-medium uppercase tracking-wide text-[var(--bb-data-fg-subtle)]">{label}</div>
+      <div class="mt-1 text-sm font-semibold text-[var(--bb-data-fg-primary)]">{value}</div>
     </div>
   );
 }

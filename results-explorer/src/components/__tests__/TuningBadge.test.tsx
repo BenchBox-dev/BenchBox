@@ -14,32 +14,38 @@ import { describe, expect, it } from "vitest";
 import { TuningBadge, tuningLabel } from "@/components/TuningBadge";
 
 describe("TuningBadge", () => {
-  it("tuned renders with green badge class and 'Tuned' label", () => {
+  it("tuned renders with success tone and 'Tuned' label", () => {
     const { container } = render(<TuningBadge tuningMode="tuned" />);
     const badge = container.querySelector(".badge");
-    expect(badge?.className).toContain("badge-green");
+    expect(badge?.getAttribute("data-tone")).toBe("success");
     expect(badge?.textContent).toBe("Tuned");
   });
 
-  it("notuning renders with gray badge class and 'No Tuning' label", () => {
+  it("notuning renders with neutral tone and 'No Tuning' label", () => {
     const { container } = render(<TuningBadge tuningMode="notuning" />);
     const badge = container.querySelector(".badge");
-    expect(badge?.className).toContain("badge-gray");
+    expect(badge?.getAttribute("data-tone")).toBe("neutral");
     expect(badge?.textContent).toBe("No Tuning");
   });
 
-  it("auto renders with blue badge class and 'Auto' label", () => {
+  it("auto renders with info tone and 'Auto' label", () => {
     const { container } = render(<TuningBadge tuningMode="auto" />);
     const badge = container.querySelector(".badge");
-    expect(badge?.className).toContain("badge-blue");
+    expect(badge?.getAttribute("data-tone")).toBe("info");
     expect(badge?.textContent).toBe("Auto");
   });
 
-  it("unknown mode falls back to yellow 'Custom Tuning' badge", () => {
+  it("unknown mode falls back to warning 'Custom Tuning' badge", () => {
     const { container } = render(<TuningBadge tuningMode="bespoke-tweaks" />);
     const badge = container.querySelector(".badge");
-    expect(badge?.className).toContain("badge-yellow");
+    expect(badge?.getAttribute("data-tone")).toBe("warning");
     expect(badge?.textContent).toBe("Custom Tuning");
+  });
+
+  it("emits data-role=computed for downstream targeting", () => {
+    const { container } = render(<TuningBadge tuningMode="tuned" />);
+    const badge = container.querySelector(".badge");
+    expect(badge?.getAttribute("data-role")).toBe("computed");
   });
 
   it("every known mode exposes a title tooltip", () => {

@@ -2,11 +2,12 @@
  * Tests for TrustBadge component.
  *
  * Cases:
- *   (a) Known trust labels render expected text and CSS class
+ *   (a) Known trust labels render expected text and tone
  *   (b) compact=true shows only the first word
  *   (c) Unknown trust labels fall back gracefully (show the raw label)
  *   (d) All known tiers have title attributes (tooltip)
- *   (e) Color semantics: maintainer=green, community=blue, others=gray
+ *   (e) Color semantics: maintainer=success, community=info, others=neutral
+ *   (f) data-role="trust" is set so downstream pages can target trust badges
  */
 
 import { render, screen } from "@testing-library/preact";
@@ -18,36 +19,39 @@ describe("TrustBadge", () => {
   // (a) Known trust labels
   // -----------------------------------------------------------------------
 
-  it("maintainer-run renders with green badge class", () => {
+  it("maintainer-run renders with success tone", () => {
     const { container } = render(<TrustBadge trustLabel="maintainer-run" />);
     const badge = container.querySelector(".badge");
-    expect(badge?.className).toContain("badge-green");
+    expect(badge?.getAttribute("data-tone")).toBe("success");
+    expect(badge?.className).toContain("tone-success");
     expect(badge?.textContent).toBe("Maintainer");
   });
 
-  it("community-submission renders with blue badge class", () => {
+  it("community-submission renders with info tone", () => {
     const { container } = render(<TrustBadge trustLabel="community-submission" />);
     const badge = container.querySelector(".badge");
-    expect(badge?.className).toContain("badge-blue");
+    expect(badge?.getAttribute("data-tone")).toBe("info");
+    expect(badge?.className).toContain("tone-info");
     expect(badge?.textContent).toBe("Community");
   });
 
-  it("ci-verified renders with gray badge class", () => {
+  it("ci-verified renders with neutral tone", () => {
     const { container } = render(<TrustBadge trustLabel="ci-verified" />);
     const badge = container.querySelector(".badge");
-    expect(badge?.className).toContain("badge-gray");
+    expect(badge?.getAttribute("data-tone")).toBe("neutral");
+    expect(badge?.className).toContain("tone-neutral");
   });
 
-  it("ci-validated (legacy label) renders with gray badge class", () => {
+  it("ci-validated (legacy label) renders with neutral tone", () => {
     const { container } = render(<TrustBadge trustLabel="ci-validated" />);
     const badge = container.querySelector(".badge");
-    expect(badge?.className).toContain("badge-gray");
+    expect(badge?.getAttribute("data-tone")).toBe("neutral");
   });
 
-  it("local-run renders with gray badge class", () => {
+  it("local-run renders with neutral tone", () => {
     const { container } = render(<TrustBadge trustLabel="local-run" />);
     const badge = container.querySelector(".badge");
-    expect(badge?.className).toContain("badge-gray");
+    expect(badge?.getAttribute("data-tone")).toBe("neutral");
   });
 
   // -----------------------------------------------------------------------
@@ -56,7 +60,6 @@ describe("TrustBadge", () => {
 
   it("compact=true shows first word only for maintainer-run", () => {
     render(<TrustBadge trustLabel="maintainer-run" compact />);
-    // "Maintainer" → first word is "Maintainer"
     expect(screen.getByText("Maintainer")).toBeTruthy();
   });
 
@@ -74,10 +77,10 @@ describe("TrustBadge", () => {
   // (c) Unknown trust labels fallback gracefully
   // -----------------------------------------------------------------------
 
-  it("unknown label falls back to gray badge with raw label as text", () => {
+  it("unknown label falls back to neutral tone with raw label as text", () => {
     const { container } = render(<TrustBadge trustLabel="some-new-tier" />);
     const badge = container.querySelector(".badge");
-    expect(badge?.className).toContain("badge-gray");
+    expect(badge?.getAttribute("data-tone")).toBe("neutral");
     // Shows the raw label when unknown (not "Unknown" - shows actual value)
     expect(badge?.textContent).toBe("some-new-tier");
   });
@@ -113,30 +116,46 @@ describe("TrustBadge", () => {
   });
 
   // -----------------------------------------------------------------------
-  // (e) Color semantics - community is NOT yellow/amber (not cautionary)
+  // (e) Tone semantics - community is NOT warning/danger
   // -----------------------------------------------------------------------
 
-  it("community-submission does not use yellow or amber badge class", () => {
+  it("community-submission does not use warning or danger tone", () => {
     const { container } = render(<TrustBadge trustLabel="community-submission" />);
     const badge = container.querySelector(".badge");
-    expect(badge?.className).not.toContain("badge-yellow");
-    expect(badge?.className).not.toContain("badge-amber");
+    expect(badge?.className).not.toContain("tone-warning");
+    expect(badge?.className).not.toContain("tone-danger");
   });
 
-  it("maintainer-run does not use gray (not de-emphasised)", () => {
+  it("maintainer-run does not use neutral tone (not de-emphasised)", () => {
     const { container } = render(<TrustBadge trustLabel="maintainer-run" />);
     const badge = container.querySelector(".badge");
-    expect(badge?.className).not.toContain("badge-gray");
+    expect(badge?.className).not.toContain("tone-neutral");
+  });
+
+  // -----------------------------------------------------------------------
+  // (f) data-role
+  // -----------------------------------------------------------------------
+
+  it("emits data-role=trust for downstream targeting", () => {
+    const { container } = render(<TrustBadge trustLabel="maintainer-run" />);
+    const badge = container.querySelector(".badge");
+    expect(badge?.getAttribute("data-role")).toBe("trust");
   });
 });
 
 describe("ValidationBadge", () => {
-  it("renders exact validation with green badge semantics", () => {
+  it("renders exact validation with success tone", () => {
     const { container } = render(<ValidationBadge validationStatus="exact" />);
     const badge = container.querySelector(".badge");
-    expect(badge?.className).toContain("badge-green");
+    expect(badge?.getAttribute("data-tone")).toBe("success");
     expect(badge?.textContent).toBe("exact");
     expect(badge?.getAttribute("title")).toContain("Validation status: exact");
+  });
+
+  it("emits data-role=validation", () => {
+    const { container } = render(<ValidationBadge validationStatus="exact" />);
+    const badge = container.querySelector(".badge");
+    expect(badge?.getAttribute("data-role")).toBe("validation");
   });
 
   it("suppresses missing status unless requested", () => {
