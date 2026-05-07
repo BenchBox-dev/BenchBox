@@ -96,6 +96,26 @@ Inspect a UAT-owned stack with:
 docker compose -p <benchbox-uat-project> ps
 ```
 
+## Explorer smoke (browser)
+
+`make uat-explorer-smoke` invokes Playwright directly against a freshly
+built Explorer app, mirroring the `results-explorer-browser.yml` workflow
+entrypoint. Each invocation runs three steps inside `results-explorer/`
+in order:
+
+1. `npm ci` — clean install of Explorer JS dependencies.
+2. `npm run build` — full Explorer production build.
+3. `npx playwright test --grep @smoke --project <browser>` — the actual
+   smoke run, against the staged data dir.
+
+Steps 1 and 2 are not cached locally, so a single `make uat-explorer-smoke`
+invocation pays the full npm cost every time. The CI workflow caches
+`node_modules/` and the build output; a developer-loop sweep does not. If
+you are iterating on a UAT change unrelated to the Explorer browser smoke,
+prefer running the targeted test (`uv run -- python -m pytest
+tests/uat/test_explorer_smoke.py -m fast`) and reserve
+`make uat-explorer-smoke` for end-to-end validation.
+
 ## Submission terminal states
 
 The package phase reads `package.submit_terminal_state` from YAML;
