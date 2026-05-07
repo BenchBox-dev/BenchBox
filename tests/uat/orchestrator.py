@@ -13,11 +13,16 @@ from __future__ import annotations
 
 import datetime as _dt
 import json
+import sys
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
+from typing import Any
 
 from tests.uat.config import UATConfig, apply_stress_overrides, load_config
 from tests.uat.phases import execute as exec_phase, preflight as preflight_phase, report as report_phase
+from tests.uat.preflight_budget import cell_key
+from tests.uat.runner import CellResult
 
 
 @dataclass(frozen=True)
@@ -34,11 +39,134 @@ class SweepResult:
         return max((c for c in self.phase_exit_codes.values()), default=0)
 
 
-def run_sweep(
+RESUME_MANIFEST_VERSION = 1
+ResumeAttempts = Mapping[str, Mapping[str, Any]]
+CellRunner = Callable[..., CellResult]
+
+
+class DiskFloorAbort(RuntimeError):
+    """Raised when the mid-sweep free-space floor is crossed."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+
+
+def load_resume_attempts(path: Path | str | None) -> dict[str, Mapping[str, Any]]:
+    """Load attempted-cell records from a resume manifest."""
+    if path is None:
+        return {}
+    manifest_path = Path(path).expanduser()
+    with manifest_path.open(encoding="utf-8") as fh:
+        payload = json.load(fh)
+    attempts: dict[str, Mapping[str, Any]] = {}
+    for record in payload.get("attempted", []):
+        key = record.get("cell_key") or cell_key(record["platform"], record["benchmark"], float(record["scale"]))
+        attempts[str(key)] = record
+    return attempts
+
+
+def build_resume_runner(
+    attempts: ResumeAttempts,
+    base_runner: CellRunner,
+    *,
+    log_dir: Path,
+) -> CellRunner:
+    """Return a runner that reuses manifest records instead of rerunning attempted cells."""
+
+    def runner(platform: str, benchmark: str, scale: float, **kwargs) -> CellResult:
+        key = cell_key(platform, benchmark, scale)
+        record = attempts.get(key)
+        if record is None:
+            return base_runner(platform, benchmark, scale, **kwargs)
+        return CellResult(
+            platform=platform,
+            benchmark=benchmark,
+            scale=scale,
+            status=str(record.get("terminal_state", record.get("status", "failed"))),
+            exit_code=int(record.get("exit_code", 0)),
+            elapsed_s=float(record.get("elapsed_s", 0.0)),
+            log_path=_optional_path(record.get("log_path")) or log_dir / "resume-skipped.log",
+            result_path=_optional_path(record.get("result_path")),
+        )
+
+    return runner
+
+
+def _build_disk_floor_runner(
+    base_runner: CellRunner,
+    *,
+    attempted_for_resume: list[CellResult],
+    watch_disk_floor: bool,
+    free_space_path: str | Path,
+    free_space_min_gib: float,
+) -> CellRunner:
+    """Wrap a cell runner with attempted-cell capture and mid-sweep disk checks."""
+
+    def runner(platform: str, benchmark: str, scale: float, **kwargs) -> CellResult:
+        result = base_runner(platform, benchmark, scale, **kwargs)
+        attempted_for_resume.append(result)
+        if watch_disk_floor:
+            free_gib = preflight_phase.free_space_gib(free_space_path)
+            if free_gib < free_space_min_gib:
+                raise DiskFloorAbort(
+                    f"free space {free_gib:.1f} GiB < cutoff {free_space_min_gib:.1f} GiB at {free_space_path}"
+                )
+        return result
+
+    return runner
+
+
+def _optional_path(value: Any) -> Path | None:
+    if not value:
+        return None
+    return Path(str(value)).expanduser()
+
+
+def _write_resume_manifest(
+    *,
+    log_dir: Path,
+    config: UATConfig,
+    aborted_phase: str,
+    abort_reason: str | None,
+    attempted: Iterable[CellResult],
+) -> Path:
+    """Persist a resume manifest for a disk-floor abort."""
+    manifest_path = log_dir / "resume.json"
+    payload = {
+        "version": RESUME_MANIFEST_VERSION,
+        "created_at": _dt.datetime.now(_dt.timezone.utc).isoformat(),
+        "config_name": config.name,
+        "log_dir": str(log_dir),
+        "aborted_phase": aborted_phase,
+        "abort_reason": abort_reason,
+        "attempted": [
+            {
+                "cell_key": cell_key(result.platform, result.benchmark, result.scale),
+                "platform": result.platform,
+                "benchmark": result.benchmark,
+                "scale": result.scale,
+                "terminal_state": result.status,
+                "exit_code": result.exit_code,
+                "elapsed_s": result.elapsed_s,
+                "log_path": str(result.log_path),
+                "result_path": str(result.result_path) if result.result_path else None,
+            }
+            for result in attempted
+        ],
+    }
+    with manifest_path.open("w", encoding="utf-8") as fh:
+        json.dump(payload, fh, indent=2, sort_keys=True)
+        fh.write("\n")
+    return manifest_path
+
+
+def run_sweep(  # noqa: C901
     config: UATConfig,
     *,
     log_dir_override: Path | None = None,
     databases_root: Path | None = None,
+    resume_manifest: Path | None = None,
 ) -> SweepResult:
     """Orchestrate the YAML's `phases:` list. Returns SweepResult."""
     now = _dt.datetime.now()
@@ -52,6 +180,7 @@ def run_sweep(
     phase_exit_codes: dict[str, int] = {}
     aborted_phase: str | None = None
     abort_reason: str | None = None
+    resume_attempts = load_resume_attempts(resume_manifest)
 
     cells_jsonl = log_dir / "cells.jsonl"
     execute_outcome = None
@@ -76,11 +205,24 @@ def run_sweep(
                 local_platforms_check=config.preflight.local_platforms_check,
                 requested_platforms=preflight_phase.requested_platforms_from_raw(config.raw),
                 benchmark_runs_dir=benchmark_runs_dir,
+                disk_budget_config=config,
             )
+            disk_budget_summary = getattr(result, "disk_budget_summary", None)
+            if disk_budget_summary:
+                print(disk_budget_summary, file=sys.stderr)
             phase_exit_codes[phase] = 2 if result.aborted else 0
             if result.aborted:
                 aborted_phase = phase
                 abort_reason = result.abort_reason
+                if "free space" in (result.abort_reason or ""):
+                    attempted = execute_outcome.results if execute_outcome is not None else ()
+                    _write_resume_manifest(
+                        log_dir=log_dir,
+                        config=config,
+                        aborted_phase=phase,
+                        abort_reason=abort_reason,
+                        attempted=attempted,
+                    )
                 break
         elif phase == "enumerate":
             # Materialise the cell list eagerly so a malformed config
@@ -95,14 +237,40 @@ def run_sweep(
                 abort_reason = str(exc)
                 break
         elif phase == "execute":
-            execute_outcome = exec_phase.run_execute(
-                config,
-                log_dir=log_dir,
-                benchmark_runs_dir=benchmark_runs_dir,
-                databases_root=databases_root,
-                cleanup_enabled=config.cleanup.prune_databases,
-                free_space_checks_enabled="preflight" in config.phases,
+            base_runner = (
+                build_resume_runner(resume_attempts, exec_phase.run_cell, log_dir=log_dir)
+                if resume_attempts
+                else exec_phase.run_cell
             )
+            attempted_for_resume: list[CellResult] = []
+            execute_kwargs: dict[str, Any] = {
+                "log_dir": log_dir,
+                "benchmark_runs_dir": benchmark_runs_dir,
+                "databases_root": databases_root,
+                "cleanup_enabled": config.cleanup.prune_databases,
+                "free_space_checks_enabled": "preflight" in config.phases,
+                "runner": _build_disk_floor_runner(
+                    base_runner,
+                    attempted_for_resume=attempted_for_resume,
+                    watch_disk_floor="preflight" in config.phases,
+                    free_space_path=config.preflight.free_space_path or str(benchmark_runs_dir),
+                    free_space_min_gib=config.preflight.free_space_min_gib,
+                ),
+            }
+            try:
+                execute_outcome = exec_phase.run_execute(config, **execute_kwargs)
+            except DiskFloorAbort as exc:
+                phase_exit_codes[phase] = 2
+                aborted_phase = phase
+                abort_reason = exc.reason
+                _write_resume_manifest(
+                    log_dir=log_dir,
+                    config=config,
+                    aborted_phase=phase,
+                    abort_reason=abort_reason,
+                    attempted=attempted_for_resume,
+                )
+                break
             with cells_jsonl.open("w", encoding="utf-8") as fh:
                 for cell in execute_outcome.results:
                     fh.write(
@@ -224,6 +392,7 @@ def run_sweep_from_path(
     *,
     stress_overrides: dict[str, str | float | None] | None = None,
     dry_run_override: bool | None = None,
+    resume_manifest: Path | None = None,
 ) -> SweepResult:
     """Convenience wrapper for `make uat-sweep` and `make uat-stress`."""
     config = load_config(config_path)
@@ -238,4 +407,4 @@ def run_sweep_from_path(
         raw = dict(config.raw)
         raw["dry_run"] = dry_run_override
         config = replace(config, dry_run=dry_run_override, raw=raw)
-    return run_sweep(config)
+    return run_sweep(config, resume_manifest=resume_manifest)

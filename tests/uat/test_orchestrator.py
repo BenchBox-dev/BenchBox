@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from unittest.mock import patch
 
@@ -9,6 +10,7 @@ import pytest
 
 from tests.uat import orchestrator
 from tests.uat.config import validate_config
+from tests.uat.phases import execute as exec_phase
 from tests.uat.runner import CellResult
 
 pytestmark = pytest.mark.fast
@@ -210,3 +212,107 @@ def test_orchestrator_uses_output_root_for_preflight_execute_and_cleanup(tmp_pat
     assert captured["databases_root"] == root / "databases"
     assert captured["cleanup_enabled"] is True
     assert captured["free_space_checks_enabled"] is True
+
+
+def test_resume_manifest_written_on_disk_floor_abort(tmp_path: Path):
+    cfg = validate_config(
+        {
+            "name": "resume-smoke",
+            "phases": ["preflight", "execute"],
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+        }
+    )
+    cell = CellResult(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.01,
+        status="passed",
+        exit_code=0,
+        elapsed_s=1.0,
+        log_path=tmp_path / "cell.log",
+        result_path=tmp_path / "result.json",
+    )
+    fake_preflight = type(
+        "Preflight",
+        (),
+        {"aborted": False, "abort_reason": None, "warnings": (), "disk_budget_summary": None},
+    )()
+
+    with (
+        patch.object(orchestrator.preflight_phase, "run_preflight", return_value=fake_preflight),
+        patch.object(orchestrator.exec_phase, "run_cell", return_value=cell),
+        patch.object(orchestrator.preflight_phase, "free_space_gib", return_value=1.0),
+    ):
+        result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
+
+    assert result.aborted_phase == "execute"
+    manifest = tmp_path / "logs" / "resume.json"
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    assert payload["aborted_phase"] == "execute"
+    assert payload["attempted"][0]["cell_key"] == "duckdb|tpch|0.01"
+
+
+def test_manifest_runner_reuses_attempted_cells_and_runs_complement(tmp_path: Path):
+    manifest = tmp_path / "resume.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "attempted": [
+                    {
+                        "cell_key": "duckdb|tpch|0.01",
+                        "platform": "duckdb",
+                        "benchmark": "tpch",
+                        "scale": 0.01,
+                        "terminal_state": "passed",
+                        "exit_code": 0,
+                        "elapsed_s": 1.0,
+                        "log_path": str(tmp_path / "prior.log"),
+                        "result_path": str(tmp_path / "prior.json"),
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    cfg = validate_config(
+        {
+            "name": "resume-smoke",
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01, 0.1]},
+        }
+    )
+    calls: list[float] = []
+
+    def base_runner(platform, benchmark, scale, **kwargs):
+        calls.append(scale)
+        return CellResult(
+            platform=platform,
+            benchmark=benchmark,
+            scale=scale,
+            status="passed",
+            exit_code=0,
+            elapsed_s=2.0,
+            log_path=tmp_path / f"{scale}.log",
+            result_path=tmp_path / f"{scale}.json",
+        )
+
+    runner = orchestrator.build_resume_runner(
+        orchestrator.load_resume_attempts(manifest),
+        base_runner,
+        log_dir=tmp_path,
+    )
+
+    outcome = exec_phase.run_execute(
+        cfg,
+        log_dir=tmp_path,
+        databases_root=tmp_path / "databases",
+        runner=runner,
+    )
+
+    assert calls == [0.1]
+    assert [result.scale for result in outcome.results] == [0.01, 0.1]
+    assert outcome.results[0].result_path == tmp_path / "prior.json"

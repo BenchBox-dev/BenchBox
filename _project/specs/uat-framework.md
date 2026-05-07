@@ -265,6 +265,24 @@ preflight:
                                  # 1-min load average above this prints
                                  # a warning but does not abort.
 
+# Disk-budget estimate --------------------------------------------------
+# `tests/uat/data/disk_budget_table.tsv` is an advisory, checked-in
+# inventory keyed by (platform, benchmark, scale_factor). Preflight
+# prints `Disk budget estimate: ... GiB` before workload execution.
+# The estimate never gates execution; unknown cells are surfaced as a
+# count and `preflight.free_space_min_gib` remains the hard cutoff.
+
+# Resume manifest -------------------------------------------------------
+# On a free-space-floor abort, the orchestrator writes
+# `<log-dir>/resume.json` with:
+#   version: 1
+#   config_name, log_dir, aborted_phase, abort_reason
+#   attempted[]: cell_key, platform, benchmark, scale,
+#                terminal_state, exit_code, elapsed_s,
+#                log_path, result_path
+# `--resume <manifest>` on sweep/execute reuses attempted records and
+# runs the remaining cells without invalidating datagen reuse.
+
 # Validate phase --------------------------------------------------------
 validate:
   validator_clean_rate_floor: 0.80   # optional, float, default 0.80.
@@ -354,6 +372,7 @@ Sweep authors opt in explicitly.
 | `make uat-explorer-smoke` | `RESULTS_DIR=` | Standalone explorer build + Playwright. (W7) |
 | `make uat-report` | `LOGS_DIR=` | Standalone TSV roll-up. (W8) |
 | `make uat-sweep` | `CONFIG=` (and optional `DRY_RUN=1`) | Full sweep: walks `phases:` list. (W9) |
+| `python -m tests.uat._cli preflight` | `--config <path>` | Advisory disk-budget estimate plus current preflight status. |
 | `make uat-stress` | `PLATFORM=`, `BENCHMARK=`, `SCALE=` (all optional) | Canned preset; feature parity with `scripts/local_stress_test.sh` for stress-test use. (W9) |
 
 **Invocation contract.**
