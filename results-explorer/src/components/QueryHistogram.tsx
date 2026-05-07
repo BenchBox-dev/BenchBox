@@ -31,8 +31,8 @@ function fmtMs(ms: number): string {
 }
 
 export function QueryHistogram({ summary }: Props) {
-  const [containerRef, { width: containerWidth }] = useElementSize();
-  const w = Math.max(containerWidth, 400);
+  const [containerRef, { width: containerWidth }] = useElementSize(300);
+  const w = Math.max(containerWidth, 300);
 
   const { platforms, query_ids } = summary;
   if (platforms.length === 0 || query_ids.length === 0) return null;
@@ -69,8 +69,9 @@ export function QueryHistogram({ summary }: Props) {
           </p>
         )}
         <svg
-          width={w}
+          width="100%"
           height={PADDING_TOP + CHART_H + LABEL_H}
+          viewBox={`0 0 ${w} ${PADDING_TOP + CHART_H + LABEL_H}`}
           role="img"
           aria-label={`Query latency histogram${panels.length > 1 ? ` (panel ${panelIdx + 1})` : ""}`}
         >

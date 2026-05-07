@@ -3,11 +3,11 @@ import type { RoutableProps } from "preact-router";
 import type { DetailResult, QueryDisplayTiming, QueryTiming, SortState } from "@/types";
 import type { ChartContext } from "@/lib/chartRegistry";
 import { getDetailResult, getPrimaryMetricForBenchmark } from "@/lib/duckdbQueries";
-import { humanizeBenchmark, errMsg, fmtGeomean } from "@/utils";
+import { humanizeBenchmark, errMsg, fmtGeomean, fmtScore } from "@/utils";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { Breadcrumb } from "@/components/Breadcrumb";
-import { TrustBadge } from "@/components/TrustBadge";
+import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 import { TuningBadge } from "@/components/TuningBadge";
 import { MethodologyDisclosure } from "@/components/MethodologyDisclosure";
 import { RunReceipt, planDownloadUrl } from "@/components/RunReceipt";
@@ -194,6 +194,8 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
 
   const showTuningSection = detail.tuning_mode !== null || detail.has_tuning;
   const plansUrl = planDownloadUrl(detail);
+  const primaryMetricDirection = primaryMetric === "power_score" ? "higher is better" : "lower is better";
+  const primaryMetricName = primaryMetric === "power_score" ? "Power score" : "Geomean query time";
 
   return (
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -205,51 +207,61 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
         ]}
       />
 
-      <section aria-label="Result summary" class="mt-6 mb-8">
-        <div class="flex flex-wrap items-center gap-3 mb-3">
-          <h1 class="text-3xl font-bold text-gray-900">
-            {benchmarkLabel} - {detail.platform}
-          </h1>
-          <TrustBadge trustLabel={detail.trust_label} />
-          {detail.tuning_mode && <TuningBadge tuningMode={detail.tuning_mode} />}
-          {detail.visibility === "public-curated" && (
-            <span class="badge badge-green">curated</span>
-          )}
+      <section aria-label="Result summary" class="mt-6 mb-8 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div class="min-w-0">
+            <div class="mb-3 flex flex-wrap items-center gap-3">
+              <h1 class="text-3xl font-bold text-gray-900">
+                {benchmarkLabel} - {detail.platform}
+              </h1>
+              <TrustBadge trustLabel={detail.trust_label} />
+              <ValidationBadge validationStatus={detail.validation_status} showMissing />
+              {detail.tuning_mode && <TuningBadge tuningMode={detail.tuning_mode} />}
+              {detail.visibility === "public-curated" && <span class="badge badge-green">curated</span>}
+            </div>
+            <p class="text-sm text-gray-600">
+              {benchmarkLabel} · SF {detail.scale_factor} · {detail.test_type ?? "standard"} · run{" "}
+              {detail.run_date.slice(0, 10)}
+            </p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <a href={`/results/compare?ids=${detail.result_id}`} class="btn btn-primary">
+              Compare this result
+            </a>
+            <a href={detail.bundle_download_url} class="btn btn-secondary" download>
+              Download bundle
+            </a>
+            {detail.has_plans && plansUrl && (
+              <a href={plansUrl} class="btn btn-secondary" download>
+                Download plans
+              </a>
+            )}
+          </div>
         </div>
-        <div class="flex flex-wrap gap-6 text-sm text-gray-600">
-          <span>
-            <span class="font-medium">Scale:</span> SF {detail.scale_factor}
-          </span>
-          <span>
-            <span class="font-medium">Date:</span> {detail.run_date.slice(0, 10)}
-          </span>
-          {detail.power_score !== null && (
-            <span>
-              <span class="font-medium">Power score:</span>{" "}
-              <span class="font-mono">{detail.power_score.toLocaleString()}</span>
-            </span>
-          )}
-          <span
-            title="Geometric mean of per-query execution times (measurement runs only). Lower is faster."
-          >
-            <span class="font-medium">Geomean query time:</span>{" "}
-            <span class="font-mono">{fmtGeomean(detail.geomean_ms)}</span>
-          </span>
-          <span>
-            <span class="font-medium">Total wall-clock:</span>{" "}
-            {detail.total_duration_s.toFixed(2)}s
-          </span>
-          {detail.driver_version && (
-            <span>
-              <span class="font-medium">Driver:</span> v{detail.driver_version}
-            </span>
-          )}
+
+        <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <ResultMetricCard
+            label={`Primary metric · ${primaryMetricDirection}`}
+            value={formatPrimaryMetric(detail, primaryMetric)}
+            helper={primaryMetricName}
+          />
+          <ResultMetricCard
+            label="Scale / phase"
+            value={`SF ${detail.scale_factor}`}
+            helper={detail.test_type ?? "standard"}
+          />
+          <ResultMetricCard
+            label="Trust / validation"
+            value={formatDisplayToken(detail.trust_label)}
+            helper={formatDisplayToken(detail.validation_status ?? "validation not recorded")}
+          />
+          <ResultMetricCard
+            label="Wall-clock total"
+            value={`${detail.total_duration_s.toFixed(2)} s`}
+            helper="Run duration"
+          />
         </div>
       </section>
-
-      <div class="mb-8">
-        <RunReceipt detail={detail} />
-      </div>
 
       <div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
         <div class="space-y-6">
@@ -305,35 +317,20 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
             </section>
           )}
 
-          <section class="card">
-            <h2 class="mb-4 text-base font-semibold text-gray-900">Actions</h2>
-            <div class="space-y-3">
-              <a
-                href={`/results/compare?ids=${detail.result_id}`}
-                class="btn btn-secondary w-full"
-              >
-                Compare this result
-              </a>
-              <a href={detail.bundle_download_url} class="btn btn-secondary w-full" download>
-                Download bundle
-              </a>
-            </div>
-            {detail.has_plans && (
-              plansUrl ? (
-                <a href={plansUrl} class="mt-3 inline-block text-xs font-medium no-underline" download>
-                  Download plans
-                </a>
-              ) : (
-                <p class="mt-3 text-xs text-gray-500">Execution plans available.</p>
-              )
-            )}
-          </section>
+          {detail.has_plans && !plansUrl && (
+            <section class="card">
+              <h2 class="mb-2 text-base font-semibold text-gray-900">Execution plans</h2>
+              <p class="text-sm text-gray-500">Execution plans were recorded but are not published for download.</p>
+            </section>
+          )}
         </div>
 
         <div class="lg:col-span-2 space-y-6">
           {(detail.display_timings.length > 0 || detail.queries.length > 0) && (
             <ChartPanel context={chartContext} />
           )}
+
+          <RunReceipt detail={detail} />
 
           <section class="card">
             <h2 class="mb-4 text-base font-semibold text-gray-900">
@@ -433,6 +430,25 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
       </div>
     </div>
   );
+}
+
+function ResultMetricCard({ label, value, helper }: { label: string; value: string; helper: string }) {
+  return (
+    <div class="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+      <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</div>
+      <div class="mt-1 font-mono text-lg font-semibold text-gray-900">{value}</div>
+      <div class="mt-1 text-xs text-gray-500">{helper}</div>
+    </div>
+  );
+}
+
+function formatPrimaryMetric(detail: DetailResult, primaryMetric: PrimaryMetric) {
+  if (primaryMetric === "power_score") return fmtScore(detail.power_score);
+  return fmtGeomean(detail.display_geomean_ms);
+}
+
+function formatDisplayToken(value: string) {
+  return value.replace(/[_-]+/g, " ");
 }
 
 function EnvironmentRow({ label, value }: { label: string; value: string }) {

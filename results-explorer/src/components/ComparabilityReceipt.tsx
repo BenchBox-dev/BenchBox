@@ -8,7 +8,7 @@ interface ComparabilityReceiptProps {
 
 type ComparabilityStatus = "match" | "diff" | "missing";
 
-interface ComparabilityField {
+export interface ComparabilityField {
   label: string;
   status: ComparabilityStatus;
   summary: string;

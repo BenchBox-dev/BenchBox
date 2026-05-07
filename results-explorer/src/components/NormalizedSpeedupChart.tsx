@@ -64,6 +64,24 @@ export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props)
   });
 
   const nonBaselineResults = results.filter((_, i) => i !== baselineIdx);
+  const measuredSpeedups = entries
+    .flatMap((entry) => entry.speedups)
+    .filter((speedup): speedup is number => speedup !== null);
+  const hasMissingSpeedups = entries.some((entry) => entry.speedups.some((speedup) => speedup === null));
+  const allNearEqual =
+    !hasMissingSpeedups &&
+    measuredSpeedups.length > 0 &&
+    measuredSpeedups.every((speedup) => Math.abs(speedup - 1) <= 0.01);
+
+  if (allNearEqual) {
+    return (
+      <SpeedupParityState
+        baseline={results[baselineIdx]?.platform ?? "baseline"}
+        candidates={nonBaselineResults.map((result) => result.platform)}
+        speedupCount={measuredSpeedups.length}
+      />
+    );
+  }
 
   return (
     <div ref={containerRef} class="w-full overflow-x-auto">
@@ -176,12 +194,37 @@ export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props)
           );
         })}
         <span class="ml-2">
-          <span class="inline-block h-2 w-3 rounded-sm mr-1" style={{ backgroundColor: FASTER_FILL }} />faster than baseline
+          <span class="mr-1 inline-block h-2 w-3 rounded-sm" style={{ backgroundColor: FASTER_FILL }} />
+          faster than baseline
         </span>
         <span>
-          <span class="inline-block h-2 w-3 rounded-sm mr-1" style={{ backgroundColor: SLOWER_FILL }} />slower than baseline
+          <span class="mr-1 inline-block h-2 w-3 rounded-sm" style={{ backgroundColor: SLOWER_FILL }} />
+          slower than baseline
         </span>
       </div>
+    </div>
+  );
+}
+
+function SpeedupParityState({
+  baseline,
+  candidates,
+  speedupCount,
+}: {
+  baseline: string;
+  candidates: string[];
+  speedupCount: number;
+}) {
+  return (
+    <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+      <p class="font-semibold text-gray-900">No meaningful per-query speedup difference</p>
+      <p class="mt-1">
+        All {speedupCount.toLocaleString()} compared query speedups are 1.00× versus baseline {baseline}.
+      </p>
+      <p class="mt-2 text-xs text-gray-500">
+        Baseline: <strong>{baseline}</strong>
+        {candidates.length > 0 && <> · Compared with {candidates.join(", ")}</>}
+      </p>
     </div>
   );
 }

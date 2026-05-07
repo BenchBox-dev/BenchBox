@@ -227,6 +227,13 @@ describe("QueryHistogram", () => {
     expect(container.querySelectorAll("rect").length).toBeGreaterThan(0);
   });
 
+  it("uses a mobile-safe responsive width instead of forcing horizontal overflow", () => {
+    const { container } = render(<QueryHistogram summary={makeSummary()} />);
+    const svg = container.querySelector("svg");
+    expect(svg?.getAttribute("width")).toBe("100%");
+    expect(svg?.getAttribute("viewBox")).toMatch(/^0 0 300 /);
+  });
+
   it("auto-splits into multiple panels when query count > 33", () => {
     const query_ids = Array.from({ length: 70 }, (_, i) => `Q${i + 1}`);
     const timings: Record<string, number> = {};

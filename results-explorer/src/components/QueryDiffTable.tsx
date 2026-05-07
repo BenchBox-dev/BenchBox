@@ -17,9 +17,10 @@ export interface QueryDiffRow {
 interface QueryDiffTableProps {
   results: DetailResult[];
   baselineIndex?: number;
+  suppressionReason?: string | null;
 }
 
-export function QueryDiffTable({ results, baselineIndex = 0 }: QueryDiffTableProps) {
+export function QueryDiffTable({ results, baselineIndex = 0, suppressionReason = null }: QueryDiffTableProps) {
   if (results.length < 2) return null;
   const normalizedBaselineIndex = normalizeBaselineIndex(results, baselineIndex);
   const baseline = results[normalizedBaselineIndex]!;
@@ -39,6 +40,12 @@ export function QueryDiffTable({ results, baselineIndex = 0 }: QueryDiffTablePro
         </div>
         <span class="badge badge-gray">{rows.length} comparisons</span>
       </div>
+
+      {suppressionReason && (
+        <div class="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          Winner claims are suppressed because {suppressionReason}; use these query values as raw evidence only.
+        </div>
+      )}
 
       <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200 text-sm">
@@ -79,9 +86,9 @@ export function buildQueryDiffRows(results: DetailResult[], baselineIndex = 0): 
   const normalizedBaselineIndex = normalizeBaselineIndex(results, baselineIndex);
   const baseline = results[normalizedBaselineIndex]!;
   const candidates = results.filter((_, index) => index !== normalizedBaselineIndex);
-  const queryIds = [...new Set(results.flatMap((result) => result.display_timings.map((timing) => timing.query_id)))].sort(
-    (a, b) => a.localeCompare(b, undefined, { numeric: true }),
-  );
+  const queryIds = [
+    ...new Set(results.flatMap((result) => result.display_timings.map((timing) => timing.query_id))),
+  ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
   return queryIds.flatMap((queryId) => {
     const baselineMs = displayMsForQuery(baseline, queryId);

@@ -9,7 +9,7 @@ import { ErrorMessage } from "@/components/ErrorMessage";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { TrustBadge } from "@/components/TrustBadge";
 import { TuningBadge } from "@/components/TuningBadge";
-import { ComparabilityReceipt } from "@/components/ComparabilityReceipt";
+import { ComparabilityReceipt, buildComparabilityFields } from "@/components/ComparabilityReceipt";
 import { CompareSummary } from "@/components/CompareSummary";
 import { QueryDiffTable } from "@/components/QueryDiffTable";
 import { modeLabel, testTypeLabel } from "@/components/MethodologyDisclosure";
@@ -157,6 +157,8 @@ export function Compare(_: RoutableProps) {
   const benchmark = results[0]?.benchmark ?? "";
   const scaleFactor = results[0]?.scale_factor ?? 0;
   const severeMismatchReason = severeCohortMismatchReason(results);
+  const comparabilityFields = buildComparabilityFields(results);
+  const comparabilityWarningCount = comparabilityFields.filter((field) => field.status === "diff").length;
   const mixedBenchmark = new Set(results.map((result) => result.benchmark)).size > 1;
   const benchmarkLabel = mixedBenchmark ? "Mixed Benchmark" : humanizeBenchmark(benchmark);
   const scaleFactorLabel = new Set(results.map((result) => result.scale_factor)).size > 1
@@ -242,7 +244,7 @@ export function Compare(_: RoutableProps) {
         </button>
       </div>
 
-      <ComparabilityReceipt results={results} />
+      <CompareGuardrailSummary warningCount={comparabilityWarningCount} severeMismatchReason={severeMismatchReason} />
       <CompareSummary summary={decisionSummary} />
       {results.length > 1 && (
         <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-gray-200 bg-white px-3 py-2 shadow-sm">
@@ -266,7 +268,18 @@ export function Compare(_: RoutableProps) {
           </select>
         </div>
       )}
-      <QueryDiffTable results={results} baselineIndex={normalizedBaselineIndex} />
+
+      {rowCount > 0 && (
+        <div class="mb-8">
+          <ChartPanel
+            context={{ kind: "compare", results, primaryMetric }}
+            baselineIndex={normalizedBaselineIndex}
+            onBaselineIndexChange={setBaselineIndex}
+            suppressWinnerClaims={severeMismatchReason !== null}
+            suppressionReason={severeMismatchReason ?? undefined}
+          />
+        </div>
+      )}
 
       <div class="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {rowData.map((r, i) => {
@@ -281,7 +294,8 @@ export function Compare(_: RoutableProps) {
             : vsSlowestRatio(primary, slowestPrimary);
           const vsLabel = higherIsBetter ? "vs worst" : "vs slowest";
           const showPrimaryClaims = severeMismatchReason === null;
-          const isFastest = showPrimaryClaims && primary !== null && fastestPrimary !== null && primary === fastestPrimary;
+          const isFastest =
+            showPrimaryClaims && primary !== null && fastestPrimary !== null && primary === fastestPrimary;
 
           return (
             <div
@@ -323,7 +337,7 @@ export function Compare(_: RoutableProps) {
                 {r.totalDurationS !== null && (
                   <div class="flex justify-between">
                     <dt class="text-gray-500">Wall-clock total</dt>
-                    <dd class="font-mono text-gray-600">{r.totalDurationS.toFixed(2)}s</dd>
+                    <dd class="font-mono text-gray-600">{r.totalDurationS.toFixed(2)} s</dd>
                   </div>
                 )}
                 {showPrimaryClaims && speedup !== null && (
@@ -361,18 +375,40 @@ export function Compare(_: RoutableProps) {
         comparable than wall-clock total when query counts differ. Lower is faster.
       </p>
 
-      {rowCount > 0 && (
-        <div class="mb-8">
-          <ChartPanel
-            context={{ kind: "compare", results, primaryMetric }}
-            baselineIndex={normalizedBaselineIndex}
-            onBaselineIndexChange={setBaselineIndex}
-            suppressWinnerClaims={severeMismatchReason !== null}
-            suppressionReason={severeMismatchReason ?? undefined}
-          />
-        </div>
-      )}
+      <QueryDiffTable
+        results={results}
+        baselineIndex={normalizedBaselineIndex}
+        suppressionReason={severeMismatchReason}
+      />
+      <ComparabilityReceipt results={results} />
     </div>
+  );
+}
+
+function CompareGuardrailSummary({
+  warningCount,
+  severeMismatchReason,
+}: {
+  warningCount: number;
+  severeMismatchReason: string | null;
+}) {
+  const hasSevereMismatch = severeMismatchReason !== null;
+  return (
+    <section aria-label="Compare guardrails" class="mb-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 class="text-base font-semibold text-gray-900">Comparability guardrails</h2>
+          <p class="mt-1 text-sm text-gray-600">
+            {hasSevereMismatch
+              ? `Winner claims are suppressed because ${severeMismatchReason}.`
+              : "Selected runs share the same benchmark and scale for winner claims."}
+          </p>
+        </div>
+        <span class={`badge ${hasSevereMismatch || warningCount > 0 ? "badge-yellow" : "badge-green"}`}>
+          {hasSevereMismatch ? "Claims suppressed" : warningCount > 0 ? `${warningCount} warnings` : "Comparable"}
+        </span>
+      </div>
+    </section>
   );
 }
 
