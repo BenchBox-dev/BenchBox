@@ -116,6 +116,35 @@ prefer running the targeted test (`uv run -- python -m pytest
 tests/uat/test_explorer_smoke.py -m fast`) and reserve
 `make uat-explorer-smoke` for end-to-end validation.
 
+## Disk-budget estimate and resume manifests
+
+Preflight now prints an advisory line before workload cells run:
+
+```text
+Disk budget estimate: 12.34 GiB peak (10.50 GiB steady; cells=141; unknown=4)
+```
+
+The estimate comes from `tests/uat/data/disk_budget_table.tsv`, an
+operator-maintained inventory from prior sweeps. It is intentionally
+not a hard gate: unknown cells are reported in the count, and the
+existing `preflight.free_space_min_gib` cutoff is still the only disk
+abort. Treat a large `unknown=` count as a prompt to partition the
+sweep into smaller configs or refresh the table after the next run.
+
+When a sweep aborts on the free-space floor after some cells have run,
+the orchestrator writes `<log-dir>/resume.json`. Resume with:
+
+```bash
+uv run -- python -m tests.uat._cli sweep --config <config.yaml> --resume <log-dir>/resume.json
+# or for execute-only debugging:
+uv run -- python -m tests.uat._cli execute --config <config.yaml> --resume <log-dir>/resume.json
+```
+
+The manifest records attempted cell keys plus terminal state and result
+paths. Resuming reuses those records instead of rerunning the cells and
+continues through the complement. It does not delete datagen or loaded
+DBs, so normal datagen reuse and reuse-aware pruning remain intact.
+
 ## Submission terminal states
 
 The package phase reads `package.submit_terminal_state` from YAML;

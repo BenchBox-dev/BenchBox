@@ -13,6 +13,10 @@ import subprocess
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from tests.uat.config import UATConfig
 
 from tests.uat import docker_assets
 from tests.uat.matrix import platform_is_reachable, reset_reachability_cache, resolve_platforms
@@ -53,6 +57,7 @@ class PreflightResult:
     warnings: tuple[str, ...]
     local_platforms_checked: tuple[str, ...] = ()
     local_platforms_attempted: tuple[str, ...] = ()
+    disk_budget_summary: str | None = None
 
 
 def free_space_gib(path: str | Path) -> float:
@@ -113,6 +118,7 @@ def run_preflight(
     benchmark_runs_dir: str | Path | None = None,
     bring_up_runner: BringUpRunner | None = None,
     reachability_checker: ReachabilityChecker | None = None,
+    disk_budget_config: UATConfig | None = None,
 ) -> PreflightResult:
     """Execute the preflight phase.
 
@@ -131,6 +137,7 @@ def run_preflight(
     abort_reason: str | None = None
     checked: tuple[str, ...] = ()
     attempted: tuple[str, ...] = ()
+    disk_budget_summary = estimate_disk_budget_summary(disk_budget_config) if disk_budget_config is not None else None
 
     if free_gib < free_space_min_gib:
         aborted = True
@@ -164,6 +171,7 @@ def run_preflight(
         warnings=tuple(warnings),
         local_platforms_checked=checked,
         local_platforms_attempted=attempted,
+        disk_budget_summary=disk_budget_summary,
     )
 
 
@@ -228,3 +236,10 @@ def _as_list(value: Iterable | None) -> list:
     if isinstance(value, str):
         return [value]
     return list(value)
+
+
+def estimate_disk_budget_summary(config: UATConfig) -> str:
+    """Return the advisory disk-budget line for a config."""
+    from tests.uat.preflight_budget import estimate_peak_disk, format_disk_budget
+
+    return format_disk_budget(estimate_peak_disk(config))

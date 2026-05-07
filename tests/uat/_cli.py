@@ -65,9 +65,13 @@ def sweep_main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="uat-sweep")
     parser.add_argument("--config", required=True)
     parser.add_argument("--dry-run", action="store_true", help="Override the YAML config and skip workload phases")
+    parser.add_argument("--resume", default=None, help="Path to a prior sweep resume.json manifest")
     args = parser.parse_args(argv)
 
-    result = run_sweep_from_path(Path(args.config), dry_run_override=True if args.dry_run else None)
+    sweep_kwargs = {"dry_run_override": True if args.dry_run else None}
+    if args.resume:
+        sweep_kwargs["resume_manifest"] = Path(args.resume)
+    result = run_sweep_from_path(Path(args.config), **sweep_kwargs)
     print(
         json.dumps(
             {
@@ -116,6 +120,35 @@ def stress_main(argv: list[str] | None = None) -> int:
         )
     )
     return result.exit_code()
+
+
+def preflight_main(argv: list[str] | None = None) -> int:
+    """Print the advisory disk budget and current preflight status for a config."""
+    from tests.uat.config import load_config
+    from tests.uat.phases.execute import default_benchmark_runs_dir
+    from tests.uat.phases.preflight import run_preflight
+
+    parser = argparse.ArgumentParser(prog="uat-preflight")
+    parser.add_argument("--config", required=True)
+    args = parser.parse_args(argv)
+
+    config = load_config(args.config)
+    benchmark_runs_dir = default_benchmark_runs_dir(config)
+    preflight_cfg = config.raw.get("preflight") or {}
+    result = run_preflight(
+        free_space_path=preflight_cfg.get("free_space_path", str(benchmark_runs_dir)),
+        free_space_min_gib=float(preflight_cfg.get("free_space_min_gib", 5.0)),
+        docker_required=bool(preflight_cfg.get("docker_required", False)),
+        noisy_neighbor_warn_load=float(preflight_cfg.get("noisy_neighbor_warn_load", 8.0)),
+        disk_budget_config=config,
+    )
+    if result.disk_budget_summary:
+        print(result.disk_budget_summary)
+    for warning in result.warnings:
+        print(f"[preflight warn] {warning}", file=sys.stderr)
+    if result.aborted:
+        print(f"[preflight] ABORT: {result.abort_reason}", file=sys.stderr)
+    return 0
 
 
 def report_main(argv: list[str] | None = None) -> int:
@@ -373,6 +406,7 @@ def execute_main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Disable reuse-aware database cleanup",
     )
+    parser.add_argument("--resume", default=None, help="Path to a prior execute/sweep resume.json manifest")
     args = parser.parse_args(argv)
 
     config = load_config(args.config)
@@ -386,7 +420,10 @@ def execute_main(argv: list[str] | None = None) -> int:
             local_platforms_check=config.preflight.local_platforms_check,
             requested_platforms=requested_platforms_from_raw(config.raw),
             benchmark_runs_dir=benchmark_runs_dir,
+            disk_budget_config=config,
         )
+        if preflight.disk_budget_summary:
+            print(preflight.disk_budget_summary, file=sys.stderr)
         for warning in preflight.warnings:
             print(f"[preflight warn] {warning}", file=sys.stderr)
         if preflight.aborted:
@@ -395,14 +432,22 @@ def execute_main(argv: list[str] | None = None) -> int:
 
     databases_root = Path(args.databases_root).expanduser() if args.databases_root else benchmark_runs_dir / "databases"
     log_dir = default_log_dir(config)
-    outcome = run_execute(
-        config,
-        log_dir=log_dir,
-        benchmark_runs_dir=benchmark_runs_dir,
-        databases_root=databases_root,
-        cleanup_enabled=not args.no_cleanup and config.cleanup.prune_databases,
-        free_space_checks_enabled="preflight" in config.phases,
-    )
+    runner = None
+    if args.resume:
+        from tests.uat.orchestrator import build_resume_runner, load_resume_attempts
+        from tests.uat.phases.execute import run_cell
+
+        runner = build_resume_runner(load_resume_attempts(Path(args.resume)), run_cell, log_dir=log_dir)
+    execute_kwargs: dict = {
+        "log_dir": log_dir,
+        "benchmark_runs_dir": benchmark_runs_dir,
+        "databases_root": databases_root,
+        "cleanup_enabled": not args.no_cleanup and config.cleanup.prune_databases,
+        "free_space_checks_enabled": "preflight" in config.phases,
+    }
+    if runner is not None:
+        execute_kwargs["runner"] = runner
+    outcome = run_execute(config, **execute_kwargs)
 
     summary = {
         "name": config.name,
@@ -456,6 +501,10 @@ def main(argv: list[str] | None = None) -> int:
         return SUBCOMMANDS[head](argv[1:])
     if head == "replay-classify":
         return replay_classify_main(argv[1:])
+    if head == "preflight":
+        # Not a make target yet, so keep it out of SUBCOMMANDS' make-target
+        # parity test while still exposing the advisory estimator CLI.
+        return preflight_main(argv[1:])
     if head in {"-h", "--help"}:
         print(_help_text())
         return 0
