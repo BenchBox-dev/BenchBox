@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:11:56.349122+00:00",
+  "bundle_file": "tpcds_obt_sf1_pandas_df_20260506_094746_657e8870.json",
+  "bundle_hash": "b8398d4460b62511a7a384426c9f219261d49512b91daed0353814272f987ad2",
+  "companion_hashes": {},
+  "benchmark": "TPC-DS-OBT",
+  "platform": "Pandas",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:13:55.066316+00:00",
+  "bundle_file": "tsbs_devops_sf1_pyspark_df_20260506_101559_ddf6d7c5.json",
+  "bundle_hash": "f3c3b82f0d5f2d30ca869b17d3284362df80c94926fc9a6762fa334e6b00b8cb",
+  "companion_hashes": {},
+  "benchmark": "TSBS DevOps",
+  "platform": "PySpark",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

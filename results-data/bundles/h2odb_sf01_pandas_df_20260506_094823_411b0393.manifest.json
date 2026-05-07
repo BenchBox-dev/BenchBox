@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:09:43.222828+00:00",
+  "bundle_file": "h2odb_sf01_pandas_df_20260506_094823_411b0393.json",
+  "bundle_hash": "280b2bfadebcff438fbffaa32f0de3c510685781bcc3ef92b6cb50a285d1ea01",
+  "companion_hashes": {},
+  "benchmark": "H2ODB",
+  "platform": "Pandas",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

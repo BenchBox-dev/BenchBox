@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:12:55.093741+00:00",
+  "bundle_file": "tpch_skew_sf001_postgresql_sql_20260506_121543_d5f580bc.json",
+  "bundle_hash": "60e71051ab52cd865807a39e9b90ff3af2a247585ffa6034e618d65f86b81b22",
+  "companion_hashes": {},
+  "benchmark": "TPC-H Skew Benchmark (moderate)",
+  "platform": "PostgreSQL",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

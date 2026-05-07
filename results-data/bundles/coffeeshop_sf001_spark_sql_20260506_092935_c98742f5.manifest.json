@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:08:33.743118+00:00",
+  "bundle_file": "coffeeshop_sf001_spark_sql_20260506_092935_c98742f5.json",
+  "bundle_hash": "7021e350d92352bc4e69594373d3be829375aada87506029500c2dcacc2fd10d",
+  "companion_hashes": {},
+  "benchmark": "CoffeeShop",
+  "platform": "Spark",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

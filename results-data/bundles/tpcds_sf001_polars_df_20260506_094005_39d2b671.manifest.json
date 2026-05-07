@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:12:04.734213+00:00",
+  "bundle_file": "tpcds_sf001_polars_df_20260506_094005_39d2b671.json",
+  "bundle_hash": "79eaefd7c443301ed930abc9b12ad23d76e3bdb1b17a908f69a53f57fb1b5898",
+  "companion_hashes": {},
+  "benchmark": "TPC-DS",
+  "platform": "Polars",
+  "scale_factor": 0.01,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

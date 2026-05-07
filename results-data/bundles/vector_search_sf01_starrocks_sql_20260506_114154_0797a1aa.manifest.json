@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:14:03.589077+00:00",
+  "bundle_file": "vector_search_sf01_starrocks_sql_20260506_114154_0797a1aa.json",
+  "bundle_hash": "96f0d95700cc77da191568475bcf2b364b3e5b90706b28c4467f8d59df2d4512",
+  "companion_hashes": {},
+  "benchmark": "Vector Search",
+  "platform": "StarRocks",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

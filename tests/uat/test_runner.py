@@ -65,10 +65,14 @@ def test_run_cell_sets_benchbox_output_dir_for_subprocess(tmp_path: Path):
 
     def fake_run_with_timeout(argv, timeout_s, *, stdout=None, stderr=None, env=None, cwd=None):
         captured["env"] = env
+        captured["argv"] = argv
         return TimeoutResult(exit_code=0, timed_out=False, elapsed_s=0.1)
 
+    def fake_benchbox_run_argv(*args, extra_args=(), **kwargs):
+        return [*fake_argv, *extra_args]
+
     with (
-        patch.object(runner, "benchbox_run_argv", return_value=fake_argv),
+        patch.object(runner, "benchbox_run_argv", side_effect=fake_benchbox_run_argv),
         patch.object(runner, "run_with_timeout", side_effect=fake_run_with_timeout),
     ):
         result = runner.run_cell(
@@ -83,6 +87,7 @@ def test_run_cell_sets_benchbox_output_dir_for_subprocess(tmp_path: Path):
 
     assert result.status == "passed"
     assert captured["env"]["BENCHBOX_OUTPUT_DIR"] == str(tmp_path / "shared-runs")
+    assert captured["argv"][-2:] == ["--output", str(tmp_path / "shared-runs" / "datagen")]
     assert "BENCHBOX_OUTPUT_DIR=" in result.log_path.read_text()
 
 

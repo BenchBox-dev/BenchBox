@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:09:25.234522+00:00",
+  "bundle_file": "flightdata_sf01_polars_df_20260506_094656_46e0d51a.json",
+  "bundle_hash": "80f100951f5dbb9ed443eaf055ac3560ecb7c34b4d03fdfa7437ced096002087",
+  "companion_hashes": {},
+  "benchmark": "Flight Data",
+  "platform": "Polars",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

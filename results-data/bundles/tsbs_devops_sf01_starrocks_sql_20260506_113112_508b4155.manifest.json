@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:13:47.832275+00:00",
+  "bundle_file": "tsbs_devops_sf01_starrocks_sql_20260506_113112_508b4155.json",
+  "bundle_hash": "73c08762aa2dc7d2b7d0f061110bc2cf85f3de39650ab1ccb4b3f694cdf44344",
+  "companion_hashes": {},
+  "benchmark": "TSBS DevOps",
+  "platform": "StarRocks",
+  "scale_factor": 0.1,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

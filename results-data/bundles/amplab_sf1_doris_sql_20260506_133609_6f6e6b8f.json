@@ -1,0 +1,593 @@
+{
+  "version": "2.1",
+  "run": {
+    "id": "6f6e6b8f",
+    "timestamp": "2026-05-06T13:36:09.281454",
+    "total_duration_ms": 11767,
+    "query_time_ms": 1066,
+    "iterations": 3,
+    "streams": 3
+  },
+  "benchmark": {
+    "id": "amplab",
+    "name": "AMPLab Big Data",
+    "scale_factor": 1.0,
+    "test_type": "power"
+  },
+  "platform": {
+    "name": "Apache Doris",
+    "version": "4.0.3-rc03",
+    "client_version": "1.4.6",
+    "config": {
+      "execution_mode": "sql",
+      "host": "localhost",
+      "port": 19031,
+      "dialect": "doris",
+      "database": "database_5589f9c152da",
+      "http_port": 18030,
+      "stream_load_available": true,
+      "table_model": "duplicate",
+      "default_buckets": 10,
+      "stream_load_chunk_size": 10485760,
+      "stream_load_max_filter_ratio": "0",
+      "enable_partitioning": false,
+      "enable_bloom_filter": false,
+      "enable_bitmap_index": false,
+      "mysql_protocol_version": "5.7.99",
+      "version_comment": "doris version doris-4.0.3-rc03-e9096296b8b",
+      "current_database": "benchbox_amplab_sf1",
+      "driver_package": "pymysql",
+      "driver_version_resolved": "1.1.2",
+      "driver_version_actual": "1.1.2",
+      "driver_runtime_strategy": "current-process",
+      "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-10/.venv/bin/python3"
+    },
+    "deployment": {
+      "deployment_type": "self_hosted",
+      "endpoint_class": "localhost_port",
+      "metadata_source": "inferred",
+      "collection_status": "partial"
+    },
+    "cloud": {
+      "source": "unavailable",
+      "collection_status": "unavailable"
+    },
+    "compute": {
+      "source": "unavailable",
+      "collection_status": "unavailable"
+    },
+    "storage": {
+      "source": "unavailable",
+      "collection_status": "unavailable"
+    },
+    "raw_config": {
+      "host": "localhost",
+      "port": 19031,
+      "http_port": 18030,
+      "be_http_port": 18040,
+      "username": "user_34f059c63921",
+      "password": "<redacted>",
+      "database": "database_5589f9c152da",
+      "use_tls": false,
+      "force_recreate": false,
+      "tuning_config": "UnifiedTuningConfiguration(primary_keys=PrimaryKeyConfiguration(enabled=True, enforce_uniqueness=True, nullable=False), foreign_keys=ForeignKeyConfiguration(enabled=True, enforce_referential_integrity=True, on_delete_action='RESTRICT', on_update_action='RESTRICT'), unique_constraints=UniqueConstraintConfiguration(enabled=True, ignore_nulls=False), check_constraints=CheckConstraintConfiguration(enabled=True, enforce_on_insert=True, enforce_on_update=True), platform_optimizations=PlatformOptimizationConfiguration(z_ordering_enabled=False, z_ordering_columns=[], liquid_clustering_enabled=False, liquid_clustering_columns=[], databricks_clustering_strategy='z_order', sorted_ingestion_mode='off', sorted_ingestion_method='auto', auto_optimize_enabled=False, auto_compact_enabled=False, bloom_filters_enabled=False, bloom_filter_columns=[], materialized_views_enabled=False), table_tunings={})",
+      "stream_load_available": true,
+      "table_model": "duplicate",
+      "default_buckets": 10,
+      "stream_load_chunk_size": 10485760,
+      "stream_load_max_filter_ratio": "0",
+      "enable_partitioning": false,
+      "enable_bloom_filter": false,
+      "enable_bitmap_index": false,
+      "mysql_protocol_version": "5.7.99",
+      "version_comment": "doris version doris-4.0.3-rc03-e9096296b8b",
+      "current_database": "benchbox_amplab_sf1"
+    },
+    "raw_metadata": {
+      "dialect": "doris"
+    },
+    "driver_actual_version": "1.1.2",
+    "driver_package": "pymysql",
+    "driver_resolved_version": "1.1.2",
+    "driver_runtime_strategy": "current-process"
+  },
+  "config": {
+    "compression": {
+      "type": "zstd",
+      "level": null
+    },
+    "phases": [
+      "load",
+      "power"
+    ],
+    "platform_options": {
+      "host": "localhost",
+      "port": 19031,
+      "http_port": 18030,
+      "be_http_port": 18040,
+      "username": "user_34f059c63921",
+      "force_recreate": false,
+      "show_query_plans": false,
+      "force_upload": false,
+      "password": "<redacted>"
+    },
+    "platform_option_sources": {
+      "host": "host_d82c4866bd3b",
+      "port": "cli_option",
+      "http_port": "cli_option",
+      "be_http_port": "cli_option",
+      "username": "user_4af2b511cbe3",
+      "force_recreate": "saved_config",
+      "show_query_plans": "saved_config",
+      "force_upload": "saved_config",
+      "password": "<redacted>"
+    },
+    "mode": "sql"
+  },
+  "summary": {
+    "queries": {
+      "total": 24,
+      "passed": 24,
+      "failed": 0
+    },
+    "timing": {
+      "total_ms": 1066,
+      "avg_ms": 44.4,
+      "min_ms": 5,
+      "max_ms": 190,
+      "geometric_mean_ms": 29.6,
+      "stdev_ms": 39.9,
+      "p90_ms": 73,
+      "p95_ms": 81,
+      "p99_ms": 190
+    },
+    "data": {
+      "rows_loaded": 2875000,
+      "load_time_ms": 9924.3
+    },
+    "validation": "passed"
+  },
+  "phases": {
+    "data_generation": {
+      "status": "SUCCESS",
+      "duration_ms": 0
+    },
+    "schema_creation": {
+      "status": "SUCCESS",
+      "duration_ms": 28
+    },
+    "data_loading": {
+      "status": "SUCCESS",
+      "duration_ms": 9924
+    },
+    "validation": {
+      "status": "PASSED",
+      "duration_ms": 65
+    },
+    "power_test": {
+      "status": "COMPLETED",
+      "duration_ms": 1618
+    },
+    "throughput_test": {
+      "status": "NOT_RUN"
+    }
+  },
+  "queries": [
+    {
+      "id": "1",
+      "ms": 13.0,
+      "rows": 1174,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "1a",
+      "ms": 7.0,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "2",
+      "ms": 168.0,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "2a",
+      "ms": 84.0,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "3",
+      "ms": 35.0,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "3a",
+      "ms": 136.0,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "4",
+      "ms": 32.0,
+      "rows": 100,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "5",
+      "ms": 61.0,
+      "rows": 1,
+      "iter": 0,
+      "stream": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "1",
+      "ms": 10.0,
+      "rows": 1174,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "1a",
+      "ms": 6.0,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "2",
+      "ms": 33.0,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "2a",
+      "ms": 64.0,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "3",
+      "ms": 22.0,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "3a",
+      "ms": 190.0,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "4",
+      "ms": 46.0,
+      "rows": 100,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "5",
+      "ms": 81.0,
+      "rows": 1,
+      "iter": 1,
+      "stream": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "1",
+      "ms": 9.0,
+      "rows": 1174,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "1a",
+      "ms": 5.0,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "2",
+      "ms": 32.0,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "2a",
+      "ms": 73.0,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "3",
+      "ms": 18.0,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "3a",
+      "ms": 59.0,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "4",
+      "ms": 31.0,
+      "rows": 100,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "5",
+      "ms": 69.0,
+      "rows": 1,
+      "iter": 2,
+      "stream": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "1",
+      "ms": 8.0,
+      "rows": 1174,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "1a",
+      "ms": 5.0,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "2",
+      "ms": 38.0,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "2a",
+      "ms": 67.0,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "3",
+      "ms": 19.0,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "3a",
+      "ms": 64.0,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "4",
+      "ms": 56.0,
+      "rows": 100,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    },
+    {
+      "id": "5",
+      "ms": 61.0,
+      "rows": 1,
+      "iter": 3,
+      "stream": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS"
+    }
+  ],
+  "tables": {
+    "documents": {
+      "rows": 125000
+    },
+    "rankings": {
+      "rows": 250000
+    },
+    "uservisits": {
+      "rows": 2500000
+    }
+  },
+  "cost": {
+    "model": "estimated"
+  },
+  "normalized_cost": {
+    "normalized_cost_usd": null,
+    "cost_usd": null,
+    "cost_model_version": "2025.11",
+    "cost_model_source": "benchbox.core.cost.pricing",
+    "cost_scope": "compute_only",
+    "cost_status": "unavailable",
+    "billing_unit": "unknown",
+    "pricing_region": "us-east-1",
+    "deployment": {
+      "cloud_provider": "aws",
+      "cloud_region": "us-east-1",
+      "instance_type": null,
+      "warehouse_size": null,
+      "node_count": null,
+      "cluster_size": null,
+      "storage_format": null,
+      "storage_tier": null
+    }
+  },
+  "execution": {
+    "entry_point": "cli",
+    "timestamp": "2026-05-06T13:35:57.349221",
+    "phases": [
+      "load",
+      "power"
+    ],
+    "compression": {
+      "type": "zstd"
+    },
+    "mode": "sql",
+    "driver_package": "pymysql",
+    "driver_version_resolved": "1.1.2",
+    "driver_version_actual": "1.1.2",
+    "driver_runtime_strategy": "current-process",
+    "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-10/.venv/bin/python3",
+    "non_interactive": true,
+    "tuning_mode": "tuned"
+  },
+  "environment": {
+    "os": "Darwin",
+    "arch": "arm64",
+    "python": "3.12.11",
+    "client_host": {
+      "os": "Darwin",
+      "arch": "arm64",
+      "python": "3.12.11",
+      "machine_id": "machine_45d1a3ef31a1728d"
+    },
+    "platform_runtime": {
+      "runtime_type": "docker_container",
+      "collection_status": "available",
+      "source": "observed",
+      "engine_host": "host_93be1695ba28"
+    },
+    "container": {
+      "collection_status": "available",
+      "source": "observed",
+      "docker_engine_version": "29.4.0",
+      "image": "apache/doris:4.0.3-all-slim",
+      "container_id": "container_bbdf457e1fd8",
+      "container_name": "container_771ef735cd3c",
+      "requested_platform": "linux",
+      "port_mappings": {
+        "8030/tcp": [
+          {
+            "HostIp": "[REDACTED]",
+            "HostPort": "18030"
+          },
+          {
+            "HostIp": "::",
+            "HostPort": "18030"
+          }
+        ],
+        "8040/tcp": [
+          {
+            "HostIp": "[REDACTED]",
+            "HostPort": "18040"
+          },
+          {
+            "HostIp": "::",
+            "HostPort": "18040"
+          }
+        ],
+        "9030/tcp": [
+          {
+            "HostIp": "[REDACTED]",
+            "HostPort": "19031"
+          },
+          {
+            "HostIp": "::",
+            "HostPort": "19031"
+          }
+        ]
+      },
+      "volumes": [
+        {
+          "source": "path_6dd7a6b57bd4",
+          "destination": "path_b44c78c1b60f",
+          "mode": "rw",
+          "rw": true
+        },
+        {
+          "source": "path_c6a2b18d621a",
+          "destination": "path_54316c0f8272",
+          "mode": "rw",
+          "rw": true
+        }
+      ],
+      "state": "running"
+    },
+    "machine_id": "machine_45d1a3ef31a1728d"
+  },
+  "export": {
+    "timestamp": "2026-05-06T13:36:09.298948",
+    "tool": "benchbox-exporter",
+    "anonymized": true
+  }
+}

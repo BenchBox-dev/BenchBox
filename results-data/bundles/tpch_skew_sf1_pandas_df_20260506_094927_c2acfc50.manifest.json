@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:13:09.558485+00:00",
+  "bundle_file": "tpch_skew_sf1_pandas_df_20260506_094927_c2acfc50.json",
+  "bundle_hash": "10b143ca9d4a60f056064048d210d24477fd561ac0c4739d7ebfea5fc291ef2a",
+  "companion_hashes": {},
+  "benchmark": "TPC-H Skew",
+  "platform": "Pandas",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}

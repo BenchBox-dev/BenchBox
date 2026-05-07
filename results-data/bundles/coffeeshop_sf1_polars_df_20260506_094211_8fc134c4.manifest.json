@@ -1,0 +1,13 @@
+{
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:08:49.360401+00:00",
+  "bundle_file": "coffeeshop_sf1_polars_df_20260506_094211_8fc134c4.json",
+  "bundle_hash": "8e002de2de9e9d1eec87764530b5828a7fc7064af5468e8251ba4aa884678b77",
+  "companion_hashes": {},
+  "benchmark": "CoffeeShop",
+  "platform": "Polars",
+  "scale_factor": 1.0,
+  "phase": 2,
+  "submission_path": "PR-based",
+  "submitted_by": "Joe Harris"
+}
