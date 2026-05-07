@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -79,6 +80,37 @@ def test_uat_bring_up_unknown_platform_returns_clear_error(capsys):
     captured = capsys.readouterr()
     assert rc == 2
     assert "unknown platform" in captured.err
+
+
+def test_make_platform_filter_does_not_trip_bring_up_validation():
+    completed = subprocess.run(
+        ["make", "-n", "uat-stress", "PLATFORM=duckdb", "CONFIG=tests/uat/configs/stress-default.yaml"],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0
+    assert "unknown platform" not in completed.stderr
+
+
+def test_uat_bring_up_velox_passes_benchmark_runs_dir_env(tmp_path: Path, monkeypatch, capsys):
+    module = _load_bring_up_module()
+    captured: dict[str, dict[str, str]] = {}
+
+    def fake_run_docker_command(argv, **kwargs):
+        captured["env"] = kwargs.get("env") or {}
+        return module.docker_assets.DockerCommandResult(
+            argv=tuple(argv), returncode=0, stdout="", stderr="", dry_run=True
+        )
+
+    monkeypatch.setattr(module.docker_assets, "run_docker_command", fake_run_docker_command)
+
+    rc = module.main(["--platform", "velox", "--benchmark-runs-dir", str(tmp_path), "--dry-run"])
+
+    assert rc == 0
+    assert captured["env"] == {"BENCHBOX_DATA_DIR": str(tmp_path)}
+    assert "UAT bring-up OK" in capsys.readouterr().out
 
 
 def _load_bring_up_module():

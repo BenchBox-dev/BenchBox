@@ -385,6 +385,7 @@ def execute_main(argv: list[str] | None = None) -> int:
             noisy_neighbor_warn_load=config.preflight.noisy_neighbor_warn_load,
             local_platforms_check=config.preflight.local_platforms_check,
             requested_platforms=requested_platforms_from_raw(config.raw),
+            benchmark_runs_dir=benchmark_runs_dir,
         )
         for warning in preflight.warnings:
             print(f"[preflight warn] {warning}", file=sys.stderr)

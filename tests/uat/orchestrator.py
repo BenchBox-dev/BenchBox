@@ -75,6 +75,7 @@ def run_sweep(
                 noisy_neighbor_warn_load=config.preflight.noisy_neighbor_warn_load,
                 local_platforms_check=config.preflight.local_platforms_check,
                 requested_platforms=preflight_phase.requested_platforms_from_raw(config.raw),
+                benchmark_runs_dir=benchmark_runs_dir,
             )
             phase_exit_codes[phase] = 2 if result.aborted else 0
             if result.aborted:

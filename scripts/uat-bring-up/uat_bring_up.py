@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -31,11 +32,26 @@ def known_platforms() -> tuple[str, ...]:
     return tuple(sorted(set(automated_platforms()) | DOCUMENT_ONLY_PLATFORMS))
 
 
+def _benchmark_runs_dir(value: str | None) -> Path:
+    if value:
+        return Path(value).expanduser()
+    default = Path.home() / "Developer" / "benchmark_runs"
+    return Path(os.environ.get("BENCHBOX_OUTPUT_DIR", str(default))).expanduser()
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="uat-bring-up")
     parser.add_argument("--platform", required=True, help="Local UAT platform to start")
     parser.add_argument("--timeout-s", type=int, default=300, help="docker compose --wait timeout")
     parser.add_argument("--project-name", default=None, help="Optional docker compose project name override")
+    parser.add_argument(
+        "--benchmark-runs-dir",
+        default=None,
+        help=(
+            "Benchmark run root to mount into platforms with host-path contracts "
+            "(default: BENCHBOX_OUTPUT_DIR or ~/Developer/benchmark_runs)"
+        ),
+    )
     parser.add_argument(
         "--dry-run", action="store_true", help="Print/run command construction without Docker execution"
     )
@@ -64,11 +80,13 @@ def main(argv: list[str] | None = None) -> int:
 
     project_name = args.project_name or docker_assets.compose_project_name("manual", platform)
     argv_up = docker_assets.compose_up_command(spec, project_name, start_timeout_s=args.timeout_s)
+    benchmark_runs_dir = _benchmark_runs_dir(args.benchmark_runs_dir)
     result = docker_assets.run_docker_command(
         argv_up,
         dry_run=args.dry_run,
         timeout_s=args.timeout_s,
         cwd=docker_assets.REPO_ROOT,
+        env=docker_assets.compose_environment(spec, benchmark_runs_dir=benchmark_runs_dir),
     )
     print(result.command)
     if not result.succeeded:
