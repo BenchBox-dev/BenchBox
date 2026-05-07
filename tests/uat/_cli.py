@@ -339,11 +339,15 @@ def verify_tuning_matrix_main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     benchmarks = load_benchmarks()
+    logs_dir = Path(args.logs).expanduser()
     observations = parse_runtime_tuning_logs(
-        Path(args.logs).expanduser(),
+        logs_dir,
         platforms=PLATFORM_GROUPS["all"],
         benchmarks=resolve_benchmarks(groups=["all"], benchmarks=benchmarks),
     )
+    if not observations:
+        print(f"No tuning observations parsed from UAT logs under {logs_dir}", file=sys.stderr)
+        return 1
     matrix_rows = read_tuning_coverage_tsv(Path(args.matrix))
     mismatches = runtime_mismatches(matrix_rows, observations)
     if mismatches:

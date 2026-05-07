@@ -20,6 +20,7 @@ from benchbox.core.tuning.coverage import (
     runtime_mismatches,
     static_matrix_drift,
 )
+from tests.uat import _cli
 from tests.uat.matrix import PLATFORM_GROUPS, load_benchmarks, resolve_benchmarks
 
 pytestmark = pytest.mark.fast
@@ -93,6 +94,15 @@ def test_runtime_log_mismatch_reports_context(tmp_path: Path):
     assert len(mismatches) == 1
     assert "duckdb/tpch" in mismatches[0]
     assert str(log_path) in mismatches[0]
+
+
+def test_verify_tuning_matrix_rejects_empty_observations(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    rc = _cli.verify_tuning_matrix_main(["--logs", str(tmp_path)])
+
+    captured = capsys.readouterr()
+    assert rc == 1
+    assert "No tuning observations parsed" in captured.err
+    assert str(tmp_path) in captured.err
 
 
 def _uat_platforms() -> list[str]:
