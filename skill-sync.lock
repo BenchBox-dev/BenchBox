@@ -1,13 +1,13 @@
 {
   "version": 1,
-  "lockedAt": "2026-05-06T23:48:58.398Z",
+  "lockedAt": "2026-05-07T00:39:26.575Z",
   "skills": {
     "blog": {
       "source": {
         "type": "local",
         "name": "personal",
         "path": "/Users/joe/.skill-sync/skills/blog",
-        "fetchedAt": "2026-05-06T23:48:58.326Z"
+        "fetchedAt": "2026-05-07T00:39:26.499Z"
       },
       "installMode": "mirror",
       "files": {
@@ -30,7 +30,7 @@
         "type": "local",
         "name": "personal",
         "path": "/Users/joe/.skill-sync/skills/code",
-        "fetchedAt": "2026-05-06T23:48:58.330Z"
+        "fetchedAt": "2026-05-07T00:39:26.505Z"
       },
       "installMode": "mirror",
       "files": {
@@ -69,7 +69,7 @@
         "type": "local",
         "name": "personal",
         "path": "/Users/joe/.skill-sync/skills/test",
-        "fetchedAt": "2026-05-06T23:48:58.332Z"
+        "fetchedAt": "2026-05-07T00:39:26.507Z"
       },
       "installMode": "mirror",
       "files": {
@@ -92,7 +92,7 @@
         "type": "local",
         "name": "personal",
         "path": "/Users/joe/.skill-sync/skills/docs",
-        "fetchedAt": "2026-05-06T23:48:58.334Z"
+        "fetchedAt": "2026-05-07T00:39:26.507Z"
       },
       "installMode": "mirror",
       "files": {
@@ -111,7 +111,7 @@
         "type": "local",
         "name": "personal",
         "path": "/Users/joe/.skill-sync/skills/todo",
-        "fetchedAt": "2026-05-06T23:48:58.336Z"
+        "fetchedAt": "2026-05-07T00:39:26.509Z"
       },
       "installMode": "mirror",
       "files": {
@@ -128,8 +128,8 @@
           "size": 1464
         },
         "SKILL.md": {
-          "sha256": "cea693794e9e94b7842a9da3590a94d95c46f51e418963018bc033987de15b1f",
-          "size": 4847
+          "sha256": "63881f543cb04e1a730b1b9850672ddde8a356bc5a9be8a07121c806c2547308",
+          "size": 4889
         },
         "skill.yaml": {
           "sha256": "02fb9215abb958fbb853438905ee2fab5eaf49c9cc820033edb23c992313fe20",
@@ -142,7 +142,7 @@
         "type": "local",
         "name": "personal",
         "path": "/Users/joe/.skill-sync/skills/benchbox",
-        "fetchedAt": "2026-05-06T23:48:58.337Z"
+        "fetchedAt": "2026-05-07T00:39:26.511Z"
       },
       "installMode": "mirror",
       "files": {
@@ -197,7 +197,7 @@
         "type": "local",
         "name": "personal",
         "path": "/Users/joe/.skill-sync/skills/SHARED/commit-framework",
-        "fetchedAt": "2026-05-06T23:48:58.337Z"
+        "fetchedAt": "2026-05-07T00:39:26.512Z"
       },
       "installMode": "mirror",
       "files": {
@@ -216,7 +216,7 @@
         "type": "local",
         "name": "personal",
         "path": "/Users/joe/.skill-sync/skills/SHARED/verify-framework",
-        "fetchedAt": "2026-05-06T23:48:58.338Z"
+        "fetchedAt": "2026-05-07T00:39:26.513Z"
       },
       "installMode": "mirror",
       "files": {
@@ -235,7 +235,7 @@
         "type": "local",
         "name": "personal",
         "path": "/Users/joe/.skill-sync/skills/SHARED/research-framework",
-        "fetchedAt": "2026-05-06T23:48:58.338Z"
+        "fetchedAt": "2026-05-07T00:39:26.513Z"
       },
       "installMode": "mirror",
       "files": {
@@ -254,7 +254,7 @@
         "type": "local",
         "name": "personal",
         "path": "/Users/joe/.skill-sync/skills/SHARED/compare-framework",
-        "fetchedAt": "2026-05-06T23:48:58.339Z"
+        "fetchedAt": "2026-05-07T00:39:26.514Z"
       },
       "installMode": "mirror",
       "files": {
@@ -273,7 +273,7 @@
         "type": "local",
         "name": "personal",
         "path": "/Users/joe/.skill-sync/skills/SHARED/shrink-framework",
-        "fetchedAt": "2026-05-06T23:48:58.339Z"
+        "fetchedAt": "2026-05-07T00:39:26.515Z"
       },
       "installMode": "mirror",
       "files": {
@@ -292,7 +292,7 @@
         "type": "local",
         "name": "personal",
         "path": "/Users/joe/.skill-sync/skills/tidy-perms",
-        "fetchedAt": "2026-05-06T23:48:58.343Z"
+        "fetchedAt": "2026-05-07T00:39:26.519Z"
       },
       "installMode": "mirror",
       "files": {
@@ -307,7 +307,7 @@
         "type": "local",
         "name": "personal",
         "path": "/Users/joe/.skill-sync/skills/SHARED/context-guide",
-        "fetchedAt": "2026-05-06T23:48:58.340Z"
+        "fetchedAt": "2026-05-07T00:39:26.515Z"
       },
       "installMode": "mirror",
       "files": {
@@ -326,7 +326,7 @@
         "type": "local",
         "name": "personal",
         "path": "/Users/joe/.skill-sync/skills/SHARED/debug-framework",
-        "fetchedAt": "2026-05-06T23:48:58.340Z"
+        "fetchedAt": "2026-05-07T00:39:26.516Z"
       },
       "installMode": "mirror",
       "files": {
@@ -345,7 +345,7 @@
         "type": "local",
         "name": "personal",
         "path": "/Users/joe/.skill-sync/skills/SHARED/slicing-framework",
-        "fetchedAt": "2026-05-06T23:48:58.341Z"
+        "fetchedAt": "2026-05-07T00:39:26.517Z"
       },
       "installMode": "mirror",
       "files": {
@@ -364,7 +364,7 @@
         "type": "local",
         "name": "personal",
         "path": "/Users/joe/.skill-sync/skills/skill-sync",
-        "fetchedAt": "2026-05-06T23:48:58.342Z"
+        "fetchedAt": "2026-05-07T00:39:26.518Z"
       },
       "installMode": "mirror",
       "files": {
@@ -383,7 +383,7 @@
         "type": "local",
         "name": "personal",
         "path": "/Users/joe/.skill-sync/skills/SHARED/plan-deepening-framework",
-        "fetchedAt": "2026-05-06T23:48:58.344Z"
+        "fetchedAt": "2026-05-07T00:39:26.520Z"
       },
       "installMode": "mirror",
       "files": {
@@ -402,7 +402,7 @@
         "type": "local",
         "name": "personal",
         "path": "/Users/joe/.skill-sync/skills/SHARED/review-protocol",
-        "fetchedAt": "2026-05-06T23:48:58.341Z"
+        "fetchedAt": "2026-05-07T00:39:26.517Z"
       },
       "installMode": "mirror",
       "files": {

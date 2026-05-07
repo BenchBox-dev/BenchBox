@@ -22,21 +22,23 @@ Broad commands are final gates. Long output is an artifact, not chat.
 - Path lists before content; targeted hunks before whole files.
 - Commands likely to emit >100 lines (preflight, full suites, Docker pulls,
   large diffs, `gh pr view --json body,files`): redirect to `/tmp/<slug>.log`;
-  report command, status, counts, failure tail.
-- Verification ladder: TODO `verification:` → targeted tests → fast suite
-  (once pre-commit) → `make pr-preflight` (once pre-`pr-open`).
-- PR triage uses compact `gh pr list --json` first; inspect failed-job JSON
-  before logs. Do not poll — pending is a valid terminal state.
+  report command, status, counts, failure tail. UAT logs use the run root below.
+- Verification ladder: read TODO `verification:`; run the narrowest listed or
+  targeted check that proves the change; fast suite once pre-commit;
+  `make pr-preflight` once pre-`pr-open`.
+- PR triage uses compact `gh pr list --json <fields>` first (for example,
+  `number,title,headRefName,baseRefName,state,mergeStateStatus`); inspect
+  failed-job JSON before logs. Do not poll — pending is a valid terminal state.
 - Force-push: `--force-with-lease`, feature/pool branches only.
 
 ## Long-Running UAT
 
 See `docs/operations/uat-framework.md`. For UAT, stress, Docker matrices, or
 runs >10min: announce command, max runtime, log path, and stop condition
-before launch. Use `BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs`; logs
-under that root, never under a worktree. Sequential platforms; one Docker
-stack at a time (`up → run → down → prune`). Below disk safety threshold,
-stop new workload.
+before launch. Use `BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs`; UAT logs
+under that root, never under a worktree or `/tmp`. Sequential platforms; one
+Docker stack at a time (`up → run → down` via project targets; no global prune
+without approval). Below disk safety threshold, stop new workload.
 
 ## Code Style
 
