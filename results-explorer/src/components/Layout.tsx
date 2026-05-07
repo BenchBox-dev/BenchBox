@@ -42,8 +42,14 @@ function Header() {
         </div>
       </div>
       <div class="border-t border-[var(--bb-border-default)] bg-[var(--bb-surface-hero-muted)] text-[var(--bb-fg-primary)]">
-        <div class="mx-auto max-w-7xl overflow-x-auto px-4 sm:px-6 lg:px-8">
-          <nav aria-label="Results Explorer" class="flex min-h-12 items-center gap-5 text-sm">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          {/* Wraps to a second row at the smallest mobile widths so the
+              `Query` item never falls off-canvas (audit 2026-05-07). At
+              ≥640px (sm) the row collapses back to single-line. */}
+          <nav
+            aria-label="Results Explorer"
+            class="flex min-h-12 flex-wrap items-center gap-x-5 gap-y-1 py-1 text-sm sm:flex-nowrap sm:overflow-x-auto"
+          >
             <ExplorerNavLink href="/results/" active={currentPath === "/results" || currentPath === "/results/"}>
               Leaderboards
             </ExplorerNavLink>
