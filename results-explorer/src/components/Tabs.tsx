@@ -27,6 +27,7 @@ export function Tabs<T extends string>({
   class: extraClass = "",
 }: TabsProps<T>) {
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  tabRefs.current.length = items.length;
 
   const selectAndFocus = (index: number) => {
     const item = items[index];
