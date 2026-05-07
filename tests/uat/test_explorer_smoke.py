@@ -23,44 +23,52 @@ def test_skipped_when_node_missing(tmp_path: Path):
     assert result.exit_code() == 0
 
 
-def test_runs_build_then_smoke(tmp_path: Path):
-    invocations: list[list[str]] = []
+def test_explorer_smoke_uses_data_dir_flag():
+    argv = explorer_smoke.build_argv(data_dir=Path("results-data"), output_dir=Path("out"))
+    assert "--data-dir" in argv
+    legacy_flag = "--" + "bundles" + "-dir"
+    assert legacy_flag not in argv
 
-    def fake_runner(argv, stdout=None, stderr=None, check=False):
+
+def test_runs_build_then_playwright_smoke(tmp_path: Path):
+    invocations: list[list[str]] = []
+    cwd_by_invocation: list[Path | None] = []
+
+    def fake_runner(argv, stdout=None, stderr=None, check=False, cwd=None, env=None):
         invocations.append(argv)
+        cwd_by_invocation.append(cwd)
         return Mock(returncode=0, args=argv)
 
-    with (
-        patch.object(explorer_smoke, "has_node", return_value=True),
-        patch.object(explorer_smoke, "playwright_entry_exists", return_value=True),
-    ):
+    with patch.object(explorer_smoke, "has_node", return_value=True):
         result = explorer_smoke.run_explorer_smoke(
             bundles_dir=tmp_path / "b",
             output_dir=tmp_path / "out",
             log_dir=tmp_path / "logs",
+            playwright_browsers=("chromium",),
             runner=fake_runner,
         )
     assert result.skipped is False
     assert result.exit_code() == 0
-    assert len(invocations) == 2
-    # Build first, smoke second.
+    assert len(invocations) == 4
     assert invocations[0][:3] == ["benchbox", "explorer", "build"]
     assert "--data-dir" in invocations[0]
-    assert "explorer" in invocations[0]
-    assert "node" in invocations[1][0]
+    assert invocations[1] == ["npm", "ci"]
+    assert invocations[2] == ["npm", "run", "build"]
+    assert invocations[3][:4] == ["npx", "playwright", "test", "--grep"]
+    assert "@smoke" in invocations[3]
+    assert "--project" in invocations[3]
+    assert "chromium" in invocations[3]
+    assert all(cwd == explorer_smoke.EXPLORER_DIR for cwd in cwd_by_invocation[1:])
 
 
 def test_short_circuits_on_build_failure(tmp_path: Path):
     invocations: list[list[str]] = []
 
-    def fake_runner(argv, stdout=None, stderr=None, check=False):
+    def fake_runner(argv, stdout=None, stderr=None, check=False, cwd=None, env=None):
         invocations.append(argv)
         return Mock(returncode=2, args=argv)
 
-    with (
-        patch.object(explorer_smoke, "has_node", return_value=True),
-        patch.object(explorer_smoke, "playwright_entry_exists", return_value=True),
-    ):
+    with patch.object(explorer_smoke, "has_node", return_value=True):
         result = explorer_smoke.run_explorer_smoke(
             bundles_dir=tmp_path / "b",
             output_dir=tmp_path / "out",
@@ -68,18 +76,26 @@ def test_short_circuits_on_build_failure(tmp_path: Path):
             runner=fake_runner,
         )
     assert result.exit_code() == 2
-    # Smoke should not have run.
     assert len(invocations) == 1
 
 
-def test_skipped_when_playwright_entry_missing(tmp_path: Path, monkeypatch):
-    with (
-        patch.object(explorer_smoke, "has_node", return_value=True),
-        patch.object(explorer_smoke, "playwright_entry_exists", return_value=False),
-    ):
-        result = explorer_smoke.run_explorer_smoke(
+def test_requested_browser_projects_are_not_silently_dropped(tmp_path: Path):
+    invocations: list[list[str]] = []
+
+    def fake_runner(argv, stdout=None, stderr=None, check=False, cwd=None, env=None):
+        invocations.append(argv)
+        return Mock(returncode=0, args=argv)
+
+    with patch.object(explorer_smoke, "has_node", return_value=True):
+        explorer_smoke.run_explorer_smoke(
             bundles_dir=tmp_path / "b",
             output_dir=tmp_path / "out",
             log_dir=tmp_path / "logs",
+            playwright_browsers=("chromium", "firefox"),
+            runner=fake_runner,
         )
-    assert result.skipped is True
+
+    playwright = invocations[-1]
+    assert playwright.count("--project") == 2
+    assert "chromium" in playwright
+    assert "firefox" in playwright

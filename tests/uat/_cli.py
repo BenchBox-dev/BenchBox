@@ -185,14 +185,14 @@ def explorer_smoke_main(argv: list[str] | None = None) -> int:
     from tests.uat.phases.explorer_smoke import run_explorer_smoke
 
     parser = argparse.ArgumentParser(prog="uat-explorer-smoke")
-    parser.add_argument("--bundles-dir", required=True)
+    parser.add_argument("--data-dir", required=True)
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--log-dir", required=True)
     parser.add_argument("--browsers", default="chromium")
     args = parser.parse_args(argv)
 
     result = run_explorer_smoke(
-        bundles_dir=Path(args.bundles_dir),
+        bundles_dir=Path(args.data_dir),
         output_dir=Path(args.output_dir),
         log_dir=Path(args.log_dir),
         playwright_browsers=tuple(args.browsers.split(",")),

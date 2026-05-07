@@ -1,20 +1,21 @@
-"""Explorer-smoke phase: build the explorer + run Playwright.
+"""Explorer-smoke phase: build Explorer data + run Playwright directly.
 
-Mirrors the W6 step of the 2026-05-02 retrospective. Reuses
-`benchbox explorer build` and
-`results-explorer/scripts/serve-browser-tests.mjs` exactly — the
-parent TODO's anti_pattern forbids reimplementing the explorer build.
+Mirrors the Results Explorer browser workflow entrypoint: install the
+Explorer npm dependencies, build the static app, then invoke Playwright
+with explicit projects. The UAT phase owns only the BenchBox data build;
+Playwright remains the single browser-test runner.
 """
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
-PLAYWRIGHT_ENTRY = REPO_ROOT / "results-explorer" / "scripts" / "serve-browser-tests.mjs"
+EXPLORER_DIR = REPO_ROOT / "results-explorer"
 
 
 @dataclass(frozen=True)
@@ -38,8 +39,31 @@ def has_node() -> bool:
     return shutil.which("node") is not None
 
 
-def playwright_entry_exists() -> bool:
-    return PLAYWRIGHT_ENTRY.exists()
+def build_argv(
+    *,
+    data_dir: Path | str = Path("results-data"),
+    output_dir: Path | str = EXPLORER_DIR / "public" / "data",
+    build_extra_args: tuple[str, ...] = (),
+) -> list[str]:
+    """Return the current `benchbox explorer build` argv."""
+    return [
+        "benchbox",
+        "explorer",
+        "build",
+        "--data-dir",
+        str(data_dir),
+        "--output",
+        str(output_dir),
+        *build_extra_args,
+    ]
+
+
+def playwright_argv(playwright_browsers: tuple[str, ...] = ("chromium",)) -> list[str]:
+    """Return the direct Playwright smoke argv for the requested browser projects."""
+    argv = ["npx", "playwright", "test", "--grep", "@smoke"]
+    for browser in playwright_browsers:
+        argv.extend(["--project", browser])
+    return argv
 
 
 def run_explorer_smoke(
@@ -54,8 +78,9 @@ def run_explorer_smoke(
     """Build the explorer and run a browser smoke against the bundles in bundles_dir.
 
     Returns a skipped result if `node` is not on PATH (CI environments
-    without browser tooling installed). The 2026-05-02 sweep ran this
-    locally only; the framework matches that scope.
+    without browser tooling installed). Requested Playwright projects are
+    passed through explicitly; if a project/browser is unavailable, the
+    Playwright command fails loudly.
     """
     log_dir.mkdir(parents=True, exist_ok=True)
     if not has_node():
@@ -67,48 +92,15 @@ def run_explorer_smoke(
             skipped=True,
             skip_reason="node not on PATH",
         )
-    if not playwright_entry_exists():
-        return ExplorerSmokeResult(
-            build_returncode=0,
-            smoke_returncode=0,
-            build_log=None,
-            smoke_log=None,
-            skipped=True,
-            skip_reason=f"playwright entry not found at {PLAYWRIGHT_ENTRY}",
-        )
 
     build_log = log_dir / "explorer_build.log"
     smoke_log = log_dir / "playwright_smoke.log"
-    if bundles_dir.name == "bundles":
-        data_dir = bundles_dir.parent
-    else:
-        data_dir = log_dir / "explorer_input"
-        data_dir.mkdir(parents=True, exist_ok=True)
-        linked_bundles = data_dir / "bundles"
-        if linked_bundles.exists() or linked_bundles.is_symlink():
-            linked_bundles.unlink()
-        linked_bundles.symlink_to(bundles_dir, target_is_directory=True)
-    build_argv = [
-        "benchbox",
-        "explorer",
-        "build",
-        "--data-dir",
-        str(data_dir),
-        "--output",
-        str(output_dir),
-        *build_extra_args,
-    ]
-    smoke_argv = [
-        "node",
-        str(PLAYWRIGHT_ENTRY),
-        "--data-dir",
-        str(output_dir),
-        "--browsers",
-        ",".join(playwright_browsers),
-    ]
+    data_dir = _prepare_data_dir(bundles_dir=bundles_dir, log_dir=log_dir)
+    explorer_build_argv = build_argv(data_dir=data_dir, output_dir=output_dir, build_extra_args=build_extra_args)
 
-    with build_log.open("w") as fh:
-        build = runner(build_argv, stdout=fh, stderr=fh, check=False)
+    with build_log.open("w", encoding="utf-8") as fh:
+        fh.write(f"# {' '.join(explorer_build_argv)}\n")
+        build = runner(explorer_build_argv, stdout=fh, stderr=fh, check=False)
     if getattr(build, "returncode", 0) != 0:
         return ExplorerSmokeResult(
             build_returncode=build.returncode,
@@ -119,13 +111,53 @@ def run_explorer_smoke(
             skip_reason=None,
         )
 
-    with smoke_log.open("w") as fh:
-        smoke = runner(smoke_argv, stdout=fh, stderr=fh, check=False)
+    smoke_returncode = _run_browser_smoke(
+        smoke_log=smoke_log,
+        data_dir=output_dir,
+        playwright_browsers=playwright_browsers,
+        runner=runner,
+    )
     return ExplorerSmokeResult(
         build_returncode=build.returncode,
-        smoke_returncode=smoke.returncode,
+        smoke_returncode=smoke_returncode,
         build_log=build_log,
         smoke_log=smoke_log,
         skipped=False,
         skip_reason=None,
     )
+
+
+def _prepare_data_dir(*, bundles_dir: Path, log_dir: Path) -> Path:
+    if bundles_dir.name == "bundles":
+        return bundles_dir.parent
+    data_dir = log_dir / "explorer_input"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    linked_bundles = data_dir / "bundles"
+    if linked_bundles.exists() or linked_bundles.is_symlink():
+        linked_bundles.unlink()
+    linked_bundles.symlink_to(bundles_dir, target_is_directory=True)
+    return data_dir
+
+
+def _run_browser_smoke(
+    *,
+    smoke_log: Path,
+    data_dir: Path,
+    playwright_browsers: tuple[str, ...],
+    runner,
+) -> int:
+    env = os.environ.copy()
+    env["BENCHBOX_DATA_DIR"] = str(data_dir)
+    commands = (
+        ["npm", "ci"],
+        ["npm", "run", "build"],
+        playwright_argv(playwright_browsers),
+    )
+    with smoke_log.open("w", encoding="utf-8") as fh:
+        for argv in commands:
+            fh.write(f"# (cd {EXPLORER_DIR} && {' '.join(argv)})\n")
+            completed = runner(argv, cwd=EXPLORER_DIR, env=env, stdout=fh, stderr=fh, check=False)
+            returncode = int(getattr(completed, "returncode", 0))
+            if returncode != 0:
+                return returncode
+    return 0

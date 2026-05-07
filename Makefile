@@ -1558,7 +1558,7 @@ uat-explorer-smoke:
 		exit 2; \
 	fi
 	@uv run --no-sync -- python -m tests.uat._cli explorer-smoke \
-		--bundles-dir "$(BUNDLES_DIR)" \
+		--data-dir "$(BUNDLES_DIR)" \
 		--output-dir "$(OUTPUT_DIR)" \
 		--log-dir "$(LOG_DIR)" \
 		$(if $(BROWSERS),--browsers "$(BROWSERS)",)
