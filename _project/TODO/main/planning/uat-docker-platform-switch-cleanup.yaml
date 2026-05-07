@@ -1,0 +1,313 @@
+id: uat-docker-platform-switch-cleanup
+title: "UAT: clear Docker assets at platform-switch boundaries"
+worktree: main
+priority: "High"
+status: "Not Started"
+category: "Testing and Quality Assurance"
+
+deps:
+  needs: []
+
+description: |
+  Storage-constrained UAT sweeps can exhaust disk even after the existing
+  reuse-aware cleanup prunes `~/Developer/benchmark_runs/databases/`: Docker
+  containers, networks, and named volumes live outside the BenchBox output root
+  and are not cleared by the UAT framework today.
+
+  The right integration point is the platform boundary in
+  `tests/uat/phases/execute.py::run_execute`: after the final cell for one
+  platform completes, and before the next platform starts. That keeps
+  same-platform benchmark/database reuse intact while preventing Docker-backed
+  platforms from leaving volume state behind for the rest of a multi-platform
+  sweep.
+
+  Implement targeted, UAT-owned Docker cleanup only. Do not add blanket
+  `docker system prune`, do not delete unrelated developer stacks, and do not
+  move lifecycle management into adapters. The cleanup policy must be expressed
+  in real UAT config fields with readers/tests so it does not repeat the
+  existing orphan-YAML-field problem around `cleanup.*`.
+
+  The implementation must not be a safe-looking no-op. A non-`off` Docker
+  platform-switch cleanup policy is only valid when UAT owns the Docker stack
+  lifecycle for that platform (starts it with a UAT-owned compose project and
+  tears down that same project). If operators choose externally managed Docker
+  services, UAT should keep current skip/probe behavior and must report Docker
+  cleanup as disabled rather than pretending to clear assets it does not own.
+
+work:
+- id: w1
+  summary: "Audit current UAT execution, Docker platform mapping, and ownership boundaries"
+  needs: []
+  status: pending
+  notes: |
+    Read the implementation paths before editing:
+      - `tests/uat/phases/execute.py` for the sequential platform loop and current database cleanup hook.
+      - `tests/uat/cleanup.py` for reuse-aware `benchmark_runs/databases` cleanup semantics.
+      - `tests/uat/matrix.py` for Docker platform groups, TCP probes, CLI flags, uv extras, and platform IDs.
+      - `tests/uat/config.py`, `tests/uat/_cli.py`, and `tests/uat/orchestrator.py` for config readers and divergent invocation paths.
+      - `Makefile` Docker targets and `docs/testing/docker-integration-tests.md` for compose project-name conventions.
+      - `docker/*/docker-compose*.yml` and `docker/*/docker-compose*.yaml` for compose files, declared volumes, container names, healthchecks, and port mappings.
+    Produce the exact mapping from UAT platform ID to compose file(s) and note any special services required.
+    The expected first-pass mapping is:
+      - `clickhouse-server` -> `docker/clickhouse/docker-compose.yml`
+      - `cedardb` -> `docker/cedardb/docker-compose.yml`
+      - `starrocks` -> `docker/starrocks/docker-compose.yml`
+      - `postgresql` -> `docker/postgresql/docker-compose.yml`
+      - `presto` -> `docker/presto/docker-compose.yml`
+      - `trino` -> `docker/trino/docker-compose.yml`
+      - `databend` -> `docker/databend/docker-compose.yml`
+      - `doris` -> `docker/doris/docker-compose.yml`
+      - `influxdb` -> `docker/influxdb/docker-compose.yml`
+      - `pg-duckdb` -> `docker/postgres-extensions/docker-compose.pg-duckdb.yaml`
+      - `pg-mooncake` -> `docker/postgres-extensions/docker-compose.pg-mooncake.yaml`
+      - `timescaledb` -> `docker/postgres-extensions/docker-compose.timescaledb.yaml`
+      - `questdb` -> `docker/questdb/docker-compose.yml`
+      - `singlestore` -> `docker/singlestore/docker-compose.yml`
+      - `velox` -> `docker/velox/docker-compose.yml` with `velox-connect` as the reachable service for host-run UAT.
+    Explicitly decide whether `firebolt` belongs in this mapping. It has a compose file, but is not currently in
+    `matrix.PLATFORM_GROUPS["docker"]` for UAT sweeps.
+
+    Also audit compose files for fixed `container_name` declarations. These weaken the assumption that `docker compose -p
+    <uat-project>` is sufficient isolation, because a user-managed stack with the same container name can collide with a
+    UAT-managed start. Record a per-platform decision:
+      - managed safely as-is because no fixed names or the fixed name is acceptable with documented collision behavior;
+      - managed via a tracked or generated compose override that removes/replaces fixed names;
+      - not eligible for UAT-managed startup until the compose file is changed; or
+      - external-only, which means Docker cleanup stays disabled for that platform.
+
+- id: w2
+  summary: "Define the Docker cleanup contract and config schema before adding behavior"
+  needs: [w1]
+  status: pending
+  notes: |
+    Add a concrete config contract under `cleanup:` and document its defaults. The contract must distinguish four questions:
+      1. Should UAT manage Docker stacks for Docker-backed platforms, or only probe externally managed stacks?
+      2. What teardown depth is allowed at a platform switch for UAT-managed stacks?
+      3. Which destructive operations are forbidden even when cleanup is enabled?
+      4. How does the config avoid a no-op when teardown is requested but UAT does not own the stack?
+
+    Recommended shape:
+      - `cleanup.docker_manage_platforms: false|true` deciding whether UAT may run `docker compose up -d --wait` before a Docker platform.
+          - `false` preserves current externally managed behavior: TCP probes may skip unreachable platforms, and Docker cleanup must be reported as disabled.
+          - `true` is the storage-saving UAT-owned lifecycle mode: start a UAT-owned project before the platform, then tear down that same project at the platform boundary.
+      - `cleanup.docker_platform_switch: "off"|"containers"|"volumes"|"images"`:
+          - `off`: no Docker teardown. Required when `docker_manage_platforms: false` unless a future explicit external-cleanup mode is added.
+          - `containers`: `docker compose down --remove-orphans` for the UAT-owned project only.
+          - `volumes`: `docker compose down -v --remove-orphans` for the UAT-owned project only. This is the recommended storage-saving setting for UAT-managed Docker sweeps.
+          - `images`: `docker compose down -v --remove-orphans --rmi local` for the UAT-owned project only; never remove pulled/base images by default.
+      - `cleanup.docker_project_prefix: "benchbox-uat"` to make ownership visible and avoid colliding with Makefile test stacks.
+      - `cleanup.docker_start_timeout_s` for compose startup wait failures if UAT-managed startup is enabled.
+      - `cleanup.docker_fixed_container_name_policy: "fail"|"override"|"allow"` if w1 finds fixed names that need a first-class decision.
+
+    Validation requirements:
+      - Reject invalid enum values at config-load time.
+      - Reject `docker_manage_platforms: false` combined with `docker_platform_switch` of `containers`, `volumes`, or `images`; otherwise the requested cleanup would silently do nothing.
+      - Reject UAT-managed startup for a platform whose w1 decision says fixed `container_name` makes managed mode unsafe.
+      - Ensure both `make uat-sweep` and `make uat-execute` read the same cleanup policy.
+      - If `uat-framework-review-followups` has already landed typed UAT config dataclasses, extend those dataclasses. If it has not landed, still add real validation/readers/tests for these fields in the current config shape; do not add raw-only fields that are silently ignored.
+
+- id: w3
+  summary: "Implement a Docker asset helper with safe, inspectable command generation"
+  needs: [w2]
+  status: pending
+  notes: |
+    Add a focused helper module, preferably `tests/uat/docker_assets.py`, rather than embedding subprocess command construction in `execute.py`.
+    The helper should expose small, testable pieces:
+      - A `DockerPlatformSpec` dataclass with platform ID, compose file path(s), optional service names, fixed-container-name policy, managed-start eligibility, expected TCP probe label, and notes for special cases like Velox.
+      - `is_docker_platform(platform: str) -> bool` backed by the mapping from w1.
+      - `compose_project_name(config_name, platform, prefix) -> str` that sanitizes names and stays deterministic within a sweep.
+      - `compose_up_command(spec, project_name) -> list[str]` for UAT-managed startup.
+      - `compose_down_command(spec, project_name, cleanup_mode) -> list[str]` for `containers` / `volumes` / `images` modes.
+      - `validate_managed_start_allowed(spec, config) -> None` so fixed `container_name` and external-only decisions fail early with clear text.
+      - A subprocess runner that captures stdout/stderr, timeout, return code, and command string for logging.
+    Safety requirements:
+      - Always include `docker compose -p <uat-owned-project> -f <compose-file> ...` for automated cleanup.
+      - Never generate `docker system prune`, `docker volume prune`, `docker image prune`, or unqualified `docker compose down`.
+      - Never call `down -v` against compose projects that UAT did not start or cannot identify as UAT-owned unless a future explicit user-approved external-cleanup mode is added.
+      - Make dry-run return/log the commands without executing them.
+      - Treat Docker unavailable as an environment/setup outcome, not as a Python traceback.
+      - For fixed `container_name` platforms, either generate/use the approved override from w1 or refuse managed startup before any Docker command is run.
+
+- id: w4
+  summary: "Wire UAT-owned Docker startup and teardown into the execute platform boundary"
+  needs: [w3]
+  status: pending
+  notes: |
+    Integrate at `tests/uat/phases/execute.py::run_execute`, not in `runner.py` and not in any platform adapter.
+    Required control flow:
+      - Group cells by `(platform, benchmark)` as today, preserving the topological reorder for source/consumer reuse.
+      - Detect the start of each new platform.
+      - If the platform is Docker-backed and `cleanup.docker_manage_platforms` is true, validate managed-start eligibility and start its compose stack before reachability probing.
+      - If the platform is Docker-backed and `cleanup.docker_manage_platforms` is false, keep current externally managed skip/probe behavior and record Docker cleanup as disabled, not active.
+      - Run all benchmarks/scales for that platform sequentially as today.
+      - Continue running existing reuse-aware `benchmark_runs/databases` cleanup at safe mid-platform and platform-completion boundaries.
+      - In a `finally` block around the whole platform block, call Docker teardown according to `cleanup.docker_platform_switch` before moving to the next platform, but only for a stack UAT actually started.
+    Teardown must run after passed, failed, timed-out, ladder-pruned, and skipped-unreachable outcomes for the platform when UAT-managed startup occurred.
+    Teardown must also run when the runner raises an exception or a `KeyboardInterrupt`/TERM path unwinds through Python.
+    Do not tear down per cell; that would destroy same-platform reuse and add timing noise.
+    Do not include Docker startup/teardown time inside `CellResult.elapsed_s` because benchmark cell timing should remain scoped to `benchbox run`.
+    If startup fails after creating partial assets, still attempt the configured teardown in `finally`.
+
+- id: w5
+  summary: "Add mid-sweep free-space checks around Docker teardown and platform transitions"
+  needs: [w4]
+  status: pending
+  notes: |
+    The UAT spec says `preflight.free_space_min_gib` is a sweep-abort guardrail watched mid-sweep, but current code only checks at preflight.
+    Add the minimal free-space check needed for this work:
+      - Resolve the same `free_space_path` and threshold used by preflight.
+      - Check before starting a Docker-backed platform, after platform teardown, and before starting the next platform.
+      - If free space is below threshold, abort cleanly before the next cell with a clear reason that includes path, free GiB, threshold GiB, last completed platform, and Docker cleanup status.
+      - Log the before/after free-space values alongside Docker cleanup command results.
+    Keep this check outside query execution timing and avoid sweeping unrelated filesystem paths.
+
+- id: w6
+  summary: "Add fast unit coverage for Docker helper, config readers, and execute-boundary behavior"
+  needs: [w3, w4, w5]
+  status: pending
+  notes: |
+    Add tests under `tests/uat/` without requiring a live Docker daemon:
+      - Mapping completeness: every platform in `matrix.PLATFORM_GROUPS["docker"]` has a `DockerPlatformSpec`, and no non-Docker platforms accidentally map.
+      - Compose command construction: `containers`, `volumes`, and `images` modes produce exactly the expected argv; no command contains `system prune`, `volume prune`, or an unqualified compose project.
+      - Project-name sanitizer: config/platform strings with punctuation produce deterministic safe project names.
+      - Fixed `container_name` handling: platforms with fixed names either use the approved override path or are rejected in managed mode with a clear reason.
+      - Config validation: default values are explicit; invalid `cleanup.docker_platform_switch` raises; non-`off` switch with `docker_manage_platforms: false` raises; both orchestrator and standalone execute paths consume the same cleanup config.
+      - Dry-run: Docker commands are recorded but not executed.
+      - Execute integration: platform A teardown is called before platform B starts for a UAT-managed Docker config; non-Docker platforms do not call Docker helpers.
+      - No-op prevention: the recommended storage-saving config (`docker_manage_platforms: true`, `docker_platform_switch: volumes`) starts and tears down UAT-owned stacks in the mocked execute test.
+      - Failure/interrupt safety: a runner exception still triggers teardown for the current UAT-owned Docker platform.
+      - Skip behavior: existing `skip_unreachable: true` behavior is unchanged when `cleanup.docker_manage_platforms: false` and `docker_platform_switch: off`; when managed mode is true, UAT starts before probing.
+      - Existing database cleanup tests continue to pass, especially source/consumer TPC-H reuse boundaries.
+
+- id: w7
+  summary: "Update operator/developer docs and example configs"
+  needs: [w6]
+  status: pending
+  notes: |
+    Update documentation where UAT operators actually look:
+      - `docs/operations/uat-framework.md`: add a Docker storage section explaining platform-switch cleanup, safe defaults, the no-op prevention rule, and how to opt out.
+      - `tests/uat/README.md`: document the helper module, ownership model, project naming, fixed `container_name` caveats, and why cleanup belongs at the execute platform boundary.
+      - `tests/uat/configs/stress-default.yaml` and editable UAT templates: add explicit Docker cleanup fields if defaults are not self-evident.
+      - If the existing stress-default keeps externally managed Docker behavior, add a second clearly named template or docs snippet for storage-constrained UAT-managed Docker sweeps using `docker_manage_platforms: true` and `docker_platform_switch: volumes`.
+      - Do not edit frozen historical configs in place; clone a corrected template if needed.
+    Include troubleshooting entries:
+      - Docker daemon unavailable.
+      - Compose stack startup timeout.
+      - Cleanup command failed.
+      - Fixed `container_name` collision with an existing developer stack.
+      - Free-space abort after teardown.
+      - How to inspect UAT-owned stacks with `docker compose -p <project> ps`.
+    Make clear that `docker system prune` remains a manual, user-approved recovery step, not something UAT runs automatically.
+
+- id: w8
+  summary: "Run local verification and optional live Docker smoke with explicit approval"
+  needs: [w7]
+  status: pending
+  notes: |
+    Required non-live verification:
+      - Run focused UAT tests for new helper/config/execute behavior.
+      - Run all fast UAT tests.
+      - Run project lint/type checks appropriate for the touched files.
+      - Validate this TODO item and the TODO graph after marking work done.
+      - Confirm generated TODO indexes are not hand-edited and update only through the TODO CLI if this item is marked done.
+    Optional live verification, only after explicit approval because it creates and removes Docker volumes:
+      - Use a temporary UAT config with `platforms.include: ["clickhouse-server", "postgresql"]`, a single cheap benchmark/scale, `cleanup.docker_manage_platforms: true`, and `cleanup.docker_platform_switch: volumes`.
+      - Run through `make uat-execute` or `make uat-sweep` and confirm platform A's UAT-owned Docker project is down with volumes removed before platform B starts.
+      - Confirm no non-UAT Docker project names are stopped or removed.
+      - Capture before/after `docker ps -a`, `docker volume ls`, and `df` evidence in a handoff or notes block.
+
+deferred:
+- summary: "Automatic global Docker image/build-cache pruning"
+  reason: "Too destructive for UAT automation. Keep `docker system prune` / `docker builder prune` as explicit user-approved recovery commands outside this item."
+- summary: "Cleanup of externally managed Docker stacks"
+  reason: "Deleting volumes from stacks UAT did not start can destroy developer data. This item uses UAT-owned stack lifecycle; any external-cleanup mode needs a separate explicit approval and design."
+- summary: "Cloud-platform lifecycle cleanup"
+  reason: "Cloud UAT is deferred elsewhere; this item is only for local Docker-backed platforms."
+- summary: "Moving Docker lifecycle management into platform adapters"
+  reason: "Adapters should connect to a platform, not own local infrastructure lifecycle; UAT is the developer harness that knows the sweep boundary."
+
+verification:
+- description: "Focused tests for Docker asset cleanup and UAT execute integration pass."
+  command: "uv run -- python -m pytest tests/uat -q -m fast -k 'docker or cleanup or execute or config'"
+  expected_output: "selected fast tests pass without requiring a live Docker daemon"
+- description: "All UAT fast tests pass."
+  command: "uv run -- python -m pytest tests/uat -q -m fast"
+  expected_output: "all selected tests pass"
+- description: "Ruff accepts the touched UAT Python files."
+  command: "uv run -- ruff check tests/uat"
+  expected_output: "no lint errors"
+- description: "Project type check remains green if implementation changes typed Python surfaces."
+  command: "uv run -- ty check"
+  expected_output: "type check passes or any pre-existing unrelated failures are documented"
+- description: "TODO schema and graph remain valid after updating the item."
+  command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate _project/TODO/main/planning/uat-docker-platform-switch-cleanup.yaml && uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph"
+  expected_output: "TODO item validates and graph has no dangling references or cycles"
+- description: "Optional approved live smoke proves UAT-owned Docker volumes are removed at platform switch."
+  command: "make uat-execute CONFIG=<temporary-docker-uat-config>"
+  expected_output: "Docker platform A is torn down with UAT-owned volumes removed before platform B starts; unrelated Docker stacks remain untouched"
+
+must_preserve:
+- "Sequential platform execution remains mandatory; do not add parallel platform execution or async Docker lifecycle behavior."
+- "Existing TPC-H/TPC-DS source-consumer database reuse remains intact; Docker teardown happens at platform boundaries, not per cell."
+- "Generated datagen under `~/Developer/benchmark_runs/datagen/` remains preserved unless a separate explicit cleanup policy is approved."
+- "Non-Docker and DataFrame platform UAT behavior stays unchanged except for shared free-space guardrails."
+- "Benchmark cell elapsed time remains the `benchbox run` subprocess duration; Docker startup/teardown is UAT overhead, not query timing."
+- "Docker cleanup targets only UAT-owned compose projects by default; user-managed developer stacks are not stopped or pruned."
+- "Externally managed Docker stacks keep current probe/skip behavior unless a separate explicitly approved external cleanup mode is designed."
+
+anti_patterns:
+- "DO NOT use `docker system prune`, `docker volume prune`, `docker image prune`, or `docker builder prune` from automated UAT."
+- "DO NOT run `docker compose down -v` without an explicit UAT-owned `-p <project>` name in automated cleanup."
+- "DO NOT allow `docker_platform_switch: volumes` or `images` while `docker_manage_platforms: false`; that is a no-op or unsafe external deletion."
+- "DO NOT add new YAML fields that are not read by both `uat-sweep` and `uat-execute` paths."
+- "DO NOT assume compose project names isolate platforms whose compose files declare fixed `container_name`; audit and handle those explicitly."
+- "DO NOT put Docker lifecycle commands in platform adapters or `benchbox run`; this is UAT harness behavior."
+- "DO NOT tear Docker down after each cell; that breaks same-platform reuse and increases timing noise."
+- "DO NOT silently swallow cleanup failures; surface them in logs and phase outcomes while still attempting best-effort teardown."
+
+scope_limit:
+  only_modify:
+  - "tests/uat/docker_assets.py"
+  - "tests/uat/cleanup.py"
+  - "tests/uat/config.py"
+  - "tests/uat/phases/execute.py"
+  - "tests/uat/phases/preflight.py"
+  - "tests/uat/orchestrator.py"
+  - "tests/uat/_cli.py"
+  - "tests/uat/test_*.py"
+  - "tests/uat/configs/*.yaml"
+  - "docs/operations/uat-framework.md"
+  - "tests/uat/README.md"
+  - "_project/specs/uat-framework.md"
+  - "docker/** only if w1 selects a tracked compose-file or override-file fix for fixed `container_name` isolation"
+  do_not_modify:
+  - "benchbox/platforms/** except for tests proving no adapter lifecycle changes are needed"
+  - "results-data/**"
+  - "benchmark_runs/**"
+
+approach: |
+  Treat this as a UAT harness lifecycle problem, not an adapter problem. The
+  execute phase is the only layer that knows when the full set of cells for one
+  platform has finished and the next platform is about to start. That boundary
+  is late enough to preserve same-platform database reuse and early enough to
+  release Docker volumes before the next engine consumes storage.
+
+  Implement the change in two layers: a pure-ish Docker asset module that owns
+  compose mapping and command construction, then a narrow execute-phase hook
+  that calls the helper at platform start/end under a `try/finally`. Keep the
+  cleanup safe and targeted: UAT-owned compose project only, volumes removed
+  only for that project, no global Docker pruning. Prevent no-op configs by
+  rejecting non-`off` teardown unless UAT-managed startup is enabled. Audit
+  fixed `container_name` compose files before assuming compose project names
+  are sufficient isolation. Add explicit config validation and fast tests
+  before any live Docker smoke.
+
+notes:
+- "Origin: code review of the UAT process requested by the operator to prevent out-of-space issues on a storage-constrained device."
+- "Review follow-up addressed: clarify that cleanup must not be a no-op under externally managed Docker, and audit fixed `container_name` compose files before relying on project-name isolation."
+- "Existing related concern: `_project/TODO/main/planning/uat-framework-review-followups.yaml` tracks typed UAT config/orphan YAML cleanup; coordinate with it but do not create another orphan field."
+- "The 2026-05-02 and 2026-05-05 UAT handoffs show disk pressure was already a blocking operational risk. This item addresses Docker-owned storage that current `benchmark_runs/databases` pruning cannot see."
+
+metadata:
+  tags: [uat, docker, cleanup, disk-budget, storage]
+  created_date: "2026-05-06"
