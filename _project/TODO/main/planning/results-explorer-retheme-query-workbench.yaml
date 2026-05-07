@@ -1,0 +1,167 @@
+id: results-explorer-retheme-query-workbench
+title: "Polish Query Workbench into a coherent public explorer surface"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Core Functionality
+
+description: |
+  The Query Workbench is functional, but the retheme audit found that it still
+  looks and behaves like an internal debugging tool. Desktop prioritizes
+  `Visible Columns` above the result table, filters use plain white cards and
+  native checkboxes, the mobile drawer is a default full-screen list, and the
+  advanced SQL surface competes with the primary browse workflow. The page also
+  inherits inconsistent button, table, card, chip, and form styling.
+
+  This item should preserve the power-user capability while making the default
+  experience understandable for public users who want to filter, inspect, and
+  export result bundles.
+
+deps:
+  needs:
+    - results-explorer-retheme-theme-system-foundation
+
+work:
+  - id: w1
+    summary: "Define the public Query Workbench workflow and advanced-only controls"
+    status: pending
+    notes: |
+      Decide which controls belong in the primary path:
+        - result count;
+        - filters;
+        - result rows;
+        - row limit;
+        - export.
+
+      Move developer/power-user controls behind advanced affordances:
+        - visible column introspection;
+        - SQL scratchpad;
+        - build SQL from filters.
+
+      Document the decision in the TODO notes or a short analysis file.
+
+  - id: w2
+    summary: "Retheme the query header, summary toolbar, row-limit control, and exports"
+    needs: [w1]
+    status: pending
+    notes: |
+      Apply shared primitives. The toolbar should read as a single control
+      surface rather than separate default buttons. Export buttons should have
+      predictable states and not crowd mobile widths.
+
+  - id: w3
+    summary: "Redesign desktop and mobile filters"
+    needs: [w2]
+    status: pending
+    notes: |
+      Convert `FacetRail`/`FacetDrawer` to the shared filter system:
+        - clearer active filter chips;
+        - consistent checkbox styling and target size;
+        - reset affordance;
+        - count labels;
+        - mobile drawer header/footer actions;
+        - focus trap and escape behavior preserved.
+
+      The mobile drawer should feel like an app-level filter panel, not a
+      browser-default form list.
+
+  - id: w4
+    summary: "Move and retheme Visible Columns"
+    needs: [w2]
+    status: pending
+    notes: |
+      Visible Columns should not occupy the first desktop data slot by default.
+      Move it below the table, into a disclosure, or into a compact configuration
+      popover. Keep schema-driven columns and URL/export behavior intact.
+
+  - id: w5
+    summary: "Retheme result and SQL tables with consistent formatting"
+    needs: [w3, w4]
+    status: pending
+    notes: |
+      Use the shared data-table primitive. Confirm:
+        - units and numeric columns are aligned consistently;
+        - dates do not wrap awkwardly unless intentionally compacted;
+        - row action remains discoverable;
+        - selected/sorted states are visible;
+        - horizontal scroll has an affordance at 390px and 768px.
+
+  - id: w6
+    summary: "Retheme Advanced SQL and starter queries"
+    needs: [w5]
+    status: pending
+    notes: |
+      Keep SQL available, but position it as advanced. The text area, starter
+      query chips, run button, errors, and SQL result table should use the same
+      component language as the rest of the page.
+
+  - id: w7
+    summary: "Verify URL state, export behavior, mobile drawer, and keyboard paths"
+    needs: [w6]
+    status: pending
+    notes: |
+      Regression checks should cover:
+        - facet URL round trip;
+        - row-limit mode;
+        - visible columns do not leak hidden `result_id` into exports;
+        - CSV/JSON export still works;
+        - mobile drawer focus trap;
+        - keyboard tab order through filters, toolbar, table, and advanced SQL.
+
+must_preserve:
+  - "Query Workbench route `/results/query`."
+  - "Shareable facet URL state."
+  - "Schema-driven visible column list."
+  - "CSV and JSON export output exactly the user-visible selected columns."
+  - "Hidden `result_id` remains available for row View links."
+  - "SQL scratchpad remains read-only against the browser snapshot."
+
+anti_patterns:
+  - "DO NOT turn Query Workbench into a marketing explainer page; it is a tool surface."
+  - "DO NOT make every column visible by default to avoid designing the column controls."
+  - "DO NOT remove SQL/export power features; make them subordinate to the primary workflow."
+  - "DO NOT break mobile drawer focus trapping while retheming the filters."
+
+verification:
+  - description: "Query page unit tests pass"
+    command: "cd results-explorer && npm test -- src/pages/__tests__/Query.test.tsx src/components/__tests__/FacetRail.test.tsx"
+    expected_output: "all targeted tests pass"
+  - description: "Query browser smoke passes"
+    command: "cd results-explorer && npm run test:e2e:fixtures && npm run build && npx playwright test --project=chromium --grep query"
+    expected_output: "query route smoke passes"
+  - description: "Manual Query responsive QA"
+    command: "echo 'Manual: capture /results/query at 390, 768, 1280, 1600; test filters drawer, exports, visible columns, SQL, row action, and table overflow'"
+    expected_output: "manual evidence captured in _project/audits/"
+
+scope_limit:
+  only_modify:
+    - "results-explorer/src/pages/Query.tsx"
+    - "results-explorer/src/components/FacetRail.tsx"
+    - "results-explorer/src/lib/queryFilters.ts"
+    - "results-explorer/src/lib/facetModel.ts"
+    - "results-explorer/src/lib/facetDisplay.ts"
+    - "results-explorer/src/pages/__tests__/Query.test.tsx"
+    - "results-explorer/src/components/__tests__/FacetRail.test.tsx"
+    - "results-explorer/e2e/"
+  do_not_modify:
+    - "results-data/"
+    - "benchbox/"
+
+metadata:
+  tags:
+    - results-explorer
+    - retheme
+    - query-workbench
+    - filters
+    - usability
+  estimated_effort: "Medium (~2 days)"
+  created_date: "2026-05-07"
+
+impact:
+  business_value: |
+    Turns a powerful but internal-feeling workbench into a credible public tool.
+  user_impact: |
+    Users can filter, inspect, and export results without needing to understand
+    the underlying DuckDB schema first.
+  technical_debt: |
+    Consolidates facet and table behavior around reusable components.

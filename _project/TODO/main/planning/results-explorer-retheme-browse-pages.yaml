@@ -1,0 +1,175 @@
+id: results-explorer-retheme-browse-pages
+title: "Retheme benchmark and platform browse pages after route correctness is restored"
+worktree: main
+priority: High
+status: Not Started
+category: Core Functionality
+
+description: |
+  Benchmark and platform pages are central browse flows, but the audit could
+  not fully evaluate them because they currently render cost-schema binder
+  errors. Once route correctness is restored, these pages need a focused
+  retheme and usability pass. Current code shows legacy native selects, mixed
+  segmented controls, static-looking filter clusters, white tables/cards, a
+  bottom compare selection bar, and page-specific table/chart treatments that
+  are not aligned with the intended BenchBox product identity.
+
+  This item covers `/results/:benchmark/` and `/results/p/:platform/`.
+  It should make benchmark matrices, rank/list modes, platform timelines,
+  filters, row selection, compare entry, empty states, and responsive behavior
+  feel like one coherent data-browse system.
+
+deps:
+  needs:
+    - results-explorer-retheme-schema-cost-regression
+    - results-explorer-retheme-theme-system-foundation
+
+work:
+  - id: w1
+    summary: "Re-audit rendered benchmark and platform pages after the schema blocker is fixed"
+    status: pending
+    notes: |
+      Capture 390px, 768px, 1280px, and 1600px screenshots for:
+        - `/results/tpch/?sf=0.01&phase=standard`
+        - `/results/star_schema/?sf=0.1&phase=power`
+        - `/results/p/duckdb/`
+        - `/results/p/polars/`
+
+      Record all controls, tables, charts, empty states, compare-selection
+      flows, and mobile behavior before editing.
+
+  - id: w2
+    summary: "Normalize page headers, breadcrumbs, and primary controls"
+    needs: [w1]
+    status: pending
+    notes: |
+      Apply shared theme primitives to:
+        - breadcrumb treatment;
+        - page title and metadata;
+        - scale/phase/tuning filters;
+        - trust filters;
+        - matrix/ranks/list view toggle;
+        - high-contrast toggle;
+        - compare action.
+
+      The primary page question should be obvious: benchmark page compares
+      platforms within a benchmark cohort; platform page audits one platform
+      across cohorts.
+
+  - id: w3
+    summary: "Retheme BenchmarkIndex matrix, rank, and list views"
+    needs: [w2]
+    status: pending
+    notes: |
+      Use shared table and heatmap primitives. Confirm:
+        - sortable columns have consistent affordances and `aria-sort`;
+        - heatmap cells use the same legend/color semantics as Home;
+        - missing timings and failed queries are visually distinct;
+        - trust/validation badges do not dominate per-query values;
+        - the matrix is scan-friendly at desktop widths.
+
+  - id: w4
+    summary: "Retheme PlatformIndex table, trend sections, and cohort grouping"
+    needs: [w2]
+    status: pending
+    notes: |
+      Ensure the Platform page does not imply mixed benchmark/scale cohorts are
+      one comparable time series. Trend sections should label cohort, scale,
+      phase, and primary metric. The main table should expose benchmark, scale,
+      date, power/geomean, trust, validation, and source/action consistently.
+
+  - id: w5
+    summary: "Design mobile browse behavior for dense matrices and platform tables"
+    needs: [w3, w4]
+    status: pending
+    notes: |
+      At 390px and 768px, decide per surface:
+        - keep horizontal table scroll with visible affordance and sticky first
+          columns; or
+        - switch to compact cards with the same comparison semantics.
+
+      Do not let primary action links or the Compare selection bar fall off
+      screen without an affordance.
+
+  - id: w6
+    summary: "Unify compare-selection behavior and the selected-result bar"
+    needs: [w5]
+    status: pending
+    notes: |
+      Benchmark and platform pages should use the same selection model,
+      selected-count language, compare button state, and incompatibility
+      feedback. Single selection should clearly explain that two or more
+      comparable results are required.
+
+  - id: w7
+    summary: "Polish empty, filtered-empty, and not-found states"
+    needs: [w6]
+    status: pending
+    notes: |
+      Replace blank or generic copy with branded, actionable states:
+        - no results for platform;
+        - no benchmark data for selected scale/phase;
+        - filters exclude all rows;
+        - result set not comparable.
+
+      Raw internal SQL errors should never appear in these states by default.
+
+must_preserve:
+  - "Benchmark page route contract `/results/{benchmark}/?sf=...&phase=...`."
+  - "Platform page route contract `/results/p/{platform_id}/`."
+  - "Existing row-selection to Compare flow with compact IDs when available."
+  - "High-contrast heatmap toggle behavior."
+  - "Sortable table behavior added by pass-2 follow-ups."
+
+anti_patterns:
+  - "DO NOT retheme benchmark and platform pages independently with divergent controls."
+  - "DO NOT chart mixed benchmark/scale cohorts as a single comparable trend."
+  - "DO NOT hide compare selection state behind table scroll."
+  - "DO NOT make mobile users inspect large matrices without a scroll cue or card fallback."
+
+verification:
+  - description: "Benchmark and platform unit tests pass"
+    command: "cd results-explorer && npm test -- src/pages/__tests__/BenchmarkIndex.test.tsx src/pages/__tests__/PlatformIndex.test.tsx src/components/__tests__/QueryHeatmap.test.tsx"
+    expected_output: "all targeted tests pass"
+  - description: "Browser smoke covers benchmark and platform pages"
+    command: "cd results-explorer && npm run test:e2e:fixtures && npm run build && npx playwright test --project=chromium --grep \"benchmark|platform\""
+    expected_output: "browser smoke passes"
+  - description: "Manual responsive captures are clean"
+    command: "echo 'Manual: capture benchmark and platform routes at 390, 768, 1280, 1600 and verify controls, tables, charts, compare bar, empty states, and no raw errors'"
+    expected_output: "manual evidence captured in _project/audits/"
+
+scope_limit:
+  only_modify:
+    - "results-explorer/src/pages/BenchmarkIndex.tsx"
+    - "results-explorer/src/pages/PlatformIndex.tsx"
+    - "results-explorer/src/components/QueryHeatmap.tsx"
+    - "results-explorer/src/components/RankTable.tsx"
+    - "results-explorer/src/components/TimeSeries.tsx"
+    - "results-explorer/src/components/SparklineTable.tsx"
+    - "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
+    - "results-explorer/src/pages/__tests__/PlatformIndex.test.tsx"
+    - "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
+    - "results-explorer/e2e/"
+  do_not_modify:
+    - "results-data/"
+    - "benchbox/"
+
+metadata:
+  tags:
+    - results-explorer
+    - retheme
+    - benchmark-page
+    - platform-page
+    - responsive
+  estimated_effort: "Medium (~2-3 days)"
+  created_date: "2026-05-07"
+
+impact:
+  business_value: |
+    Turns the core browse routes into credible public product surfaces.
+  user_impact: |
+    Users can move from benchmark/platform browsing into comparison without
+    fighting inconsistent controls or dense unresponsive tables.
+  technical_debt: |
+    Consolidates browse-page controls and data-table patterns around shared
+    primitives.
