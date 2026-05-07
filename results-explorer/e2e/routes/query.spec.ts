@@ -153,8 +153,9 @@ test.describe("Query workbench", () => {
     await page.getByRole("button", { name: /^Run SQL$/ }).click();
 
     const advancedSection = page.locator("details", { hasText: "Advanced SQL" });
-    await expect(advancedSection.locator(".text-red-600")).toBeVisible();
-    await expect(advancedSection.locator(".text-red-600")).toContainText(/read[- ]only|not allowed|cannot/i);
+    const errorEl = advancedSection.locator("[role='alert'], .tone-danger, [data-tone='danger']").first();
+    await expect(errorEl).toBeVisible();
+    await expect(errorEl).toContainText(/read[- ]only|not allowed|cannot/i);
   });
 
   test("Download JSON emits a file with the current query rows", async ({ page }) => {
@@ -205,8 +206,11 @@ function facetSection(page: Page, label: string): Locator {
 }
 
 function facetCheckbox(page: Page, sectionLabel: string, optionValue: string): Locator {
+  // Display formatters in `lib/facetDisplay.ts` re-case some option values
+  // (e.g. cloud_provider "aws" → label "AWS"); match case-insensitively so
+  // the test contracts on the underlying option value, not the display label.
   return facetSection(page, sectionLabel).getByRole("checkbox", {
-    name: new RegExp(`^${escapeRegExp(sectionLabel)}:\\s+${escapeRegExp(optionValue)}\\b`),
+    name: new RegExp(`^${escapeRegExp(sectionLabel)}:\\s+${escapeRegExp(optionValue)}\\b`, "i"),
   });
 }
 

@@ -496,9 +496,9 @@ export function Query(_: RoutableProps) {
   return (
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <div class="mb-6">
-        <h1 class="text-3xl font-bold text-gray-900">Results Query Workbench</h1>
-        <p class="mt-2 max-w-3xl text-sm text-gray-600">
-          Query the <code class="rounded bg-gray-100 px-1 font-mono text-xs">results.duckdb</code> snapshot in-browser
+        <h1 class="text-3xl font-bold text-[var(--bb-data-fg-primary)]">Results Query Workbench</h1>
+        <p class="mt-2 max-w-3xl text-sm text-[var(--bb-data-fg-muted)]">
+          Query the <code class="rounded bg-[var(--bb-surface-app)] px-1 font-mono text-xs">results.duckdb</code> snapshot in-browser
           with shareable facet state, schema-driven columns, CSV export, and an optional read-only SQL scratchpad.
         </p>
       </div>
@@ -507,28 +507,28 @@ export function Query(_: RoutableProps) {
         <section class="flex min-w-0 flex-col gap-4 lg:col-start-2">
           <div
             data-testid="query-result-summary"
-            class="order-1 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm lg:order-2"
+            class="order-1 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-4 shadow-sm lg:order-2"
           >
-            <div class="text-sm text-gray-500">
+            <div class="text-sm text-[var(--bb-data-fg-muted)]">
               {rows.length} matching result bundle(s)
               {rowLimitMode === "default" && rows.length >= DEFAULT_ROW_LIMIT && (
-                <span class="ml-2 text-xs text-amber-600">
+                <span class="ml-2 text-xs text-[var(--bb-tone-warning-fg)]">
                   (capped at {DEFAULT_ROW_LIMIT.toLocaleString()} - add more filters to narrow)
                 </span>
               )}
             </div>
             <div class="flex flex-wrap items-center gap-2">
-              <div class="flex items-center gap-2 text-sm text-gray-600">
+              <div class="flex items-center gap-2 text-sm text-[var(--bb-data-fg-muted)]">
                 <span class="font-medium">Rows:</span>
-                <div class="flex overflow-hidden rounded-md border border-gray-300" role="group" aria-label="Result row limit">
+                <div class="flex overflow-hidden rounded-md border border-[var(--bb-data-border-strong)]" role="group" aria-label="Result row limit">
                   {(["default", "all"] as const).map((mode) => (
                     <button
                       key={mode}
                       type="button"
                       class={`px-3 py-1.5 text-sm ${
                         rowLimitMode === mode
-                          ? "bg-brand-600 text-white"
-                          : "bg-white text-gray-600 hover:bg-gray-50"
+                          ? "bg-[var(--bb-accent-hover)] text-white"
+                          : "bg-[var(--bb-surface-data)] text-[var(--bb-data-fg-muted)] hover:bg-[var(--bb-surface-data-muted)]"
                       }`}
                       aria-pressed={rowLimitMode === mode}
                       onClick={() => setRowLimitRaw(mode)}
@@ -548,7 +548,7 @@ export function Query(_: RoutableProps) {
                 Download JSON
               </button>
             </div>
-            {downloadError && <div class="w-full text-sm text-red-600">{downloadError}</div>}
+            {downloadError && <div class="w-full text-sm text-[var(--bb-tone-danger-fg)]">{downloadError}</div>}
           </div>
 
           <div data-testid="query-mobile-filter-drawer" class="order-2 lg:hidden">
@@ -570,15 +570,15 @@ export function Query(_: RoutableProps) {
                 columns={visibleColumns.length || DEFAULT_COLUMNS.length}
               />
             ) : (
-              <div class="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
-                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-white px-4 py-3 text-sm text-gray-500">
+              <div class="overflow-x-auto rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
                   <span>
                     Showing {visibleRows.length.toLocaleString()} of {rows.length.toLocaleString()} returned rows
                   </span>
                   <span>Query limit: {rowLimitMode === "all" ? "all" : DEFAULT_ROW_LIMIT.toLocaleString()}</span>
                 </div>
-                <table class="min-w-full divide-y divide-gray-200">
-                  <thead class="bg-gray-50">
+                <table class="min-w-full divide-y divide-[var(--bb-data-border)]">
+                  <thead class="bg-[var(--bb-surface-data-muted)]">
                     <tr>
                       {visibleColumns.map((column) => (
                         <th key={column} class="table-th cursor-pointer select-none" onClick={() => toggleSort(column)}>
@@ -589,9 +589,9 @@ export function Query(_: RoutableProps) {
                       <th class="table-th" />
                     </tr>
                   </thead>
-                  <tbody class="divide-y divide-gray-100 bg-white">
+                  <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
                     {visibleRows.map((row) => (
-                      <tr key={String(row.result_id)} class="hover:bg-gray-50">
+                      <tr key={String(row.result_id)} class="hover:bg-[var(--bb-surface-data-muted)]">
                         {visibleColumns.map((column) => (
                           <td key={column} class="table-td">
                             {formatCell(row[column])}
@@ -607,7 +607,7 @@ export function Query(_: RoutableProps) {
                   </tbody>
                 </table>
                 {visibleRows.length < rows.length && (
-                  <div class="border-t border-gray-200 bg-gray-50 px-4 py-3 text-center">
+                  <div class="border-t border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-3 text-center">
                     <button
                       type="button"
                       class="btn btn-secondary"
@@ -621,12 +621,12 @@ export function Query(_: RoutableProps) {
             )}
           </div>
 
-          <details class="order-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            <summary class="cursor-pointer text-sm font-medium text-gray-900">Advanced SQL</summary>
+          <details class="order-4 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-4 shadow-sm">
+            <summary class="cursor-pointer text-sm font-medium text-[var(--bb-data-fg-primary)]">Advanced SQL</summary>
             <div class="mt-4 space-y-4">
               <StarterQueries onSelect={loadStarterQuery} />
               <textarea
-                class="min-h-40 w-full rounded-lg border border-gray-300 p-3 font-mono text-sm"
+                class="min-h-40 w-full rounded-lg border border-[var(--bb-data-border-strong)] p-3 font-mono text-sm"
                 value={sqlText}
                 onInput={(event) => setSqlText((event.target as HTMLTextAreaElement).value)}
               />
@@ -634,15 +634,19 @@ export function Query(_: RoutableProps) {
                 <button class="btn btn-secondary" onClick={runSql}>
                   Run SQL
                 </button>
-                {sqlError && <span class="text-sm text-red-600">{sqlError}</span>}
+                {sqlError && (
+                  <span role="alert" class="text-sm text-[var(--bb-tone-danger-fg)]">
+                    {sqlError}
+                  </span>
+                )}
               </div>
               {sqlRows.length > 0 && (
-                <div class="overflow-x-auto rounded-lg border border-gray-200">
-                  <div class="border-b border-gray-200 bg-white px-4 py-3 text-sm text-gray-500">
+                <div class="overflow-x-auto rounded-lg border border-[var(--bb-data-border)]">
+                  <div class="border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
                     Showing {visibleSqlRows.length.toLocaleString()} of {sqlRows.length.toLocaleString()} SQL rows
                   </div>
-                  <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
+                  <table class="min-w-full divide-y divide-[var(--bb-data-border)]">
+                    <thead class="bg-[var(--bb-surface-data-muted)]">
                       <tr>
                         {sqlColumns.map((column) => (
                           <th key={column} class="table-th">
@@ -651,7 +655,7 @@ export function Query(_: RoutableProps) {
                         ))}
                       </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-100 bg-white">
+                    <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
                       {visibleSqlRows.map((row, index) => (
                         <tr key={index}>
                           {sqlColumns.map((column) => (
@@ -664,7 +668,7 @@ export function Query(_: RoutableProps) {
                     </tbody>
                   </table>
                   {visibleSqlRows.length < sqlRows.length && (
-                    <div class="border-t border-gray-200 bg-gray-50 px-4 py-3 text-center">
+                    <div class="border-t border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-3 text-center">
                       <button
                         type="button"
                         class="btn btn-secondary"
@@ -681,19 +685,19 @@ export function Query(_: RoutableProps) {
 
           <div
             data-testid="query-visible-columns"
-            class="order-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm lg:order-1"
+            class="order-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-4 shadow-sm lg:order-1"
           >
             <div>
-              <h2 class="text-base font-semibold text-gray-900">Visible Columns</h2>
-              <p class="text-xs text-gray-500">
-                Driven from DuckDB <code class="rounded bg-gray-100 px-1 font-mono">bench.results</code> introspection.
+              <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)]">Visible Columns</h2>
+              <p class="text-xs text-[var(--bb-data-fg-muted)]">
+                Driven from DuckDB <code class="rounded bg-[var(--bb-surface-app)] px-1 font-mono">bench.results</code> introspection.
               </p>
             </div>
             <div class="flex flex-wrap gap-2">
               {columnNames.map((column) => (
                 <label
                   key={column}
-                  class="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-600"
+                  class="inline-flex items-center gap-2 rounded-full bg-[var(--bb-surface-app)] px-3 py-1 text-xs text-[var(--bb-data-fg-muted)]"
                 >
                   <input
                     type="checkbox"
@@ -853,16 +857,16 @@ function StarterQueries({ onSelect }: { onSelect: (sql: string) => void }) {
     "detail_drilldown",
   ];
   return (
-    <section aria-label="Starter queries" class="rounded-lg border border-gray-200 bg-gray-50 p-3">
-      <h3 class="mb-2 text-sm font-semibold text-gray-900">Starter queries</h3>
-      <p class="mb-3 text-xs text-gray-500">Load a read-only template into the editor below and customise it.</p>
+    <section aria-label="Starter queries" class="rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] p-3">
+      <h3 class="mb-2 text-sm font-semibold text-[var(--bb-data-fg-primary)]">Starter queries</h3>
+      <p class="mb-3 text-xs text-[var(--bb-data-fg-muted)]">Load a read-only template into the editor below and customise it.</p>
       <div class="space-y-3">
         {categoryOrder.map((category) => {
           const items = grouped[category];
           if (items.length === 0) return null;
           return (
             <div key={category}>
-              <div class="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500">
+              <div class="mb-1 text-xs font-medium uppercase tracking-wide text-[var(--bb-data-fg-muted)]">
                 {STARTER_QUERY_CATEGORIES[category]}
               </div>
               <div class="flex flex-wrap gap-2">
@@ -870,7 +874,7 @@ function StarterQueries({ onSelect }: { onSelect: (sql: string) => void }) {
                   <button
                     key={query.id}
                     type="button"
-                    class="rounded-full border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-brand-50 hover:text-brand-700"
+                    class="rounded-full border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1 text-xs font-medium text-[var(--bb-data-fg-primary)] hover:bg-[var(--bb-tone-info-bg)] hover:text-[var(--bb-accent-hover)]"
                     title={query.description}
                     onClick={() => onSelect(query.sql)}
                   >
