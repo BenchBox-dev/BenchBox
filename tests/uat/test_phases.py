@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from tests.uat import matrix
+from tests.uat import docker_assets, matrix
 from tests.uat.config import validate_config
 from tests.uat.phases import enumerate as enum_phase, execute as exec_phase, preflight as preflight_phase
 from tests.uat.runner import CellResult
@@ -155,6 +155,234 @@ def test_execute_skips_unreachable_platform(tmp_path):
         )
     assert len(outcome.results) == 0
     assert len(outcome.skipped_unreachable) == 1
+
+
+def _docker_platform_from_argv(argv: list[str]) -> str:
+    compose_file = argv[argv.index("-f") + 1]
+    if "/clickhouse/" in compose_file:
+        return "clickhouse-server"
+    if "/postgresql/" in compose_file:
+        return "postgresql"
+    if "pg-duckdb" in compose_file:
+        return "pg-duckdb"
+    return compose_file
+
+
+def test_execute_managed_docker_tears_down_platform_before_next_starts(tmp_path):
+    matrix.reset_reachability_cache()
+    cfg = validate_config(
+        {
+            "name": "docker smoke",
+            "platforms": {"include": ["clickhouse-server", "postgresql"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+        }
+    )
+    sequence: list[tuple[str, str, str]] = []
+
+    def fake_docker(argv, **kwargs):
+        action = "up" if "up" in argv else "down"
+        sequence.append(("docker", action, _docker_platform_from_argv(argv)))
+        return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
+
+    def recording_runner(platform, benchmark, scale, **kwargs):
+        sequence.append(("cell", "run", platform))
+        return CellResult(
+            platform=platform,
+            benchmark=benchmark,
+            scale=scale,
+            status="passed",
+            exit_code=0,
+            elapsed_s=1.0,
+            log_path=tmp_path / f"{platform}.log",
+            result_path=None,
+        )
+
+    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=recording_runner,
+            docker_runner=fake_docker,
+            free_space_checks_enabled=True,
+            free_space_reader=lambda _path: 100.0,
+        )
+
+    assert outcome.aborted is False
+    assert sequence == [
+        ("docker", "up", "clickhouse-server"),
+        ("cell", "run", "clickhouse-server"),
+        ("docker", "down", "clickhouse-server"),
+        ("docker", "up", "postgresql"),
+        ("cell", "run", "postgresql"),
+        ("docker", "down", "postgresql"),
+    ]
+    assert any(event.action == "down" and event.status == "ok" for event in outcome.docker_events)
+    down_commands = [event.result.argv for event in outcome.docker_events if event.action == "down" and event.result]
+    assert all("-v" in argv and "--remove-orphans" in argv for argv in down_commands)
+
+
+def test_execute_docker_teardown_failure_aborts_before_next_platform(tmp_path):
+    matrix.reset_reachability_cache()
+    cfg = validate_config(
+        {
+            "name": "docker cleanup failure",
+            "platforms": {"include": ["clickhouse-server", "postgresql"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+        }
+    )
+    commands: list[str] = []
+
+    def fake_docker(argv, **kwargs):
+        action = "up" if "up" in argv else "down"
+        commands.append(f"{action}:{_docker_platform_from_argv(argv)}")
+        if action == "down":
+            return docker_assets.DockerCommandResult(tuple(argv), 1, "", "compose down failed")
+        return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
+
+    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=_stub_runner_factory({0.01: 1.0}, {0.01: True}),
+            docker_runner=fake_docker,
+            free_space_reader=lambda _path: 100.0,
+        )
+
+    assert outcome.aborted is True
+    assert "Docker cleanup failed" in (outcome.abort_reason or "")
+    assert commands == ["up:clickhouse-server", "down:clickhouse-server"]
+
+
+def test_execute_unmanaged_docker_keeps_skip_probe_without_commands(tmp_path):
+    matrix.reset_reachability_cache()
+    cfg = validate_config(
+        {
+            "name": "external",
+            "platforms": {"include": ["postgresql"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "cleanup": {"docker_manage_platforms": False, "docker_platform_switch": "off"},
+        }
+    )
+
+    def fail_docker(argv, **kwargs):  # pragma: no cover - assertion helper
+        raise AssertionError(f"unexpected Docker command: {argv}")
+
+    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=False):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            docker_runner=fail_docker,
+            runner=_stub_runner_factory({}, {}),
+        )
+
+    assert len(outcome.results) == 0
+    assert len(outcome.skipped_unreachable) == 1
+    assert any(event.action == "manage" and event.status == "disabled" for event in outcome.docker_events)
+
+
+def test_execute_runner_exception_still_tears_down_managed_docker(tmp_path):
+    matrix.reset_reachability_cache()
+    cfg = validate_config(
+        {
+            "name": "docker failure",
+            "platforms": {"include": ["clickhouse-server"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+        }
+    )
+    actions: list[str] = []
+
+    def fake_docker(argv, **kwargs):
+        actions.append("up" if "up" in argv else "down")
+        return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
+
+    def raising_runner(platform, benchmark, scale, **kwargs):
+        raise RuntimeError("cell exploded")
+
+    with (
+        patch("tests.uat.phases.execute.platform_is_reachable", return_value=True),
+        pytest.raises(RuntimeError, match="cell exploded"),
+    ):
+        exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=raising_runner,
+            docker_runner=fake_docker,
+            free_space_reader=lambda _path: 100.0,
+        )
+
+    assert actions == ["up", "down"]
+
+
+def test_execute_fixed_container_name_platform_aborts_before_docker_command(tmp_path):
+    cfg = validate_config(
+        {
+            "name": "fixed name",
+            "platforms": {"include": ["pg-duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+        }
+    )
+
+    def fail_docker(argv, **kwargs):  # pragma: no cover - assertion helper
+        raise AssertionError(f"unexpected Docker command: {argv}")
+
+    outcome = exec_phase.run_execute(
+        cfg,
+        log_dir=tmp_path,
+        databases_root=tmp_path / "databases",
+        docker_runner=fail_docker,
+        runner=_stub_runner_factory({}, {}),
+    )
+
+    assert outcome.aborted is True
+    assert "cannot be UAT-managed" in (outcome.abort_reason or "")
+    assert outcome.docker_events == ()
+
+
+def test_execute_free_space_abort_reports_context_after_docker_teardown(tmp_path):
+    matrix.reset_reachability_cache()
+    cfg = validate_config(
+        {
+            "name": "docker disk",
+            "platforms": {"include": ["clickhouse-server"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "preflight": {"free_space_min_gib": 5, "free_space_path": str(tmp_path)},
+            "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+        }
+    )
+    readings = iter([10.0, 1.0])
+
+    def fake_docker(argv, **kwargs):
+        return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
+
+    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=_stub_runner_factory({0.01: 1.0}, {0.01: True}),
+            docker_runner=fake_docker,
+            free_space_checks_enabled=True,
+            free_space_reader=lambda _path: next(readings),
+        )
+
+    assert outcome.aborted is True
+    assert "after Docker teardown" in (outcome.abort_reason or "")
+    assert "last_completed_platform=clickhouse-server" in (outcome.abort_reason or "")
+    assert "docker_cleanup_status=ok" in (outcome.abort_reason or "")
 
 
 def test_execute_passes_config_extra_args_to_runner(tmp_path):

@@ -1,27 +1,27 @@
-# TEMPLATE — editable tuned follow-up UAT sweep config.
+# TEMPLATE — copy and edit for storage-constrained Docker UAT sweeps.
+#
+# Starts UAT-owned Docker compose projects for the docker-fast platform set and
+# tears each project down with volumes at the platform switch. It intentionally
+# avoids PostgreSQL-extension platforms whose compose files currently declare
+# fixed container_name values.
 
-name: "uat-tuned-followup-20260505"
-description: "Tuned multi-scale local UAT sweep for BenchBox submissions"
+name: "stress-docker-managed"
+description: "Storage-constrained Docker stress preset with UAT-owned compose lifecycle"
 
 phases:
   - preflight
   - enumerate
   - execute
-  - validate
-  - package
-  - explorer_smoke
   - report
 
-dry_run: false
-
 platforms:
-  groups: ["sql", "dataframe"]
+  groups: ["docker-fast"]
 
 benchmarks:
-  groups: ["all"]
+  include: ["tpch"]
 
 scales:
-  rungs: [0.01, 0.1, 1.0]
+  rungs: [0.01]
 
 execute:
   per_cell_timeout_s: 600
@@ -30,35 +30,25 @@ execute:
   phases_arg: "load,power"
   skip_unreachable: true
   parallel_platforms: false
-  extra_args: ["--tuning", "tuned"]
 
 preflight:
   free_space_min_gib: 5
   free_space_path: "~/Developer/benchmark_runs"
+  docker_required: true
 
 cleanup:
   preserve_datagen: true
   prune_databases: true
-  docker_manage_platforms: false
-  docker_platform_switch: "off"
+  docker_manage_platforms: true
+  docker_platform_switch: "volumes"
   docker_project_prefix: "benchbox-uat"
   docker_start_timeout_s: 300
   docker_fixed_container_name_policy: "fail"
 
-validate:
-  validator_clean_rate_floor: 0.80
-
-package:
-  submit_terminal_state: "local-stage"
-
-explorer_smoke:
-  playwright_browsers: ["chromium"]
-
 report:
   matrix_summary_tsv: "matrix_summary.tsv"
-  cross_scale_coverage_min_pairs: null
 
 output:
   benchmark_runs_dir_template: "~/Developer/benchmark_runs"
-  logs_dir_template: "~/Developer/benchmark_runs/logs/uat_tuned_followup_20260505_pool02_rerun"
+  logs_dir_template: "~/Developer/benchmark_runs/logs/uat_docker_managed_{date}"
   submissions_dir_template: "~/Developer/benchmark_runs/submissions/{name}"

@@ -113,3 +113,56 @@ def test_make_uat_sweep_forwards_dry_run_variable():
 
     assert "[DRY_RUN=1]" in target
     assert "$(if $(DRY_RUN),--dry-run,)" in target
+
+
+def test_execute_main_reads_cleanup_config_for_standalone_path(tmp_path, monkeypatch, capsys):
+    config_path = tmp_path / "uat.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                'name: "managed-cli"',
+                "phases: [execute]",
+                "platforms:",
+                '  include: ["clickhouse-server"]',
+                "benchmarks:",
+                '  include: ["tpch"]',
+                "scales:",
+                "  rungs: [0.01]",
+                "cleanup:",
+                "  docker_manage_platforms: true",
+                '  docker_platform_switch: "volumes"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+    captured: dict[str, object] = {}
+
+    def fake_run_execute(config, **kwargs):
+        captured["docker_manage_platforms"] = config.cleanup.docker_manage_platforms
+        captured["docker_platform_switch"] = config.cleanup.docker_platform_switch
+        captured["cleanup_enabled"] = kwargs["cleanup_enabled"]
+        captured["free_space_checks_enabled"] = kwargs["free_space_checks_enabled"]
+        return type(
+            "ExecuteOutcome",
+            (),
+            {
+                "results": (),
+                "pruned": (),
+                "skipped_unreachable": (),
+                "docker_events": (),
+                "aborted": False,
+                "abort_reason": None,
+            },
+        )()
+
+    monkeypatch.setattr("tests.uat.phases.execute.run_execute", fake_run_execute)
+    rc = _cli.execute_main(["--config", str(config_path)])
+
+    assert rc == 0
+    assert captured == {
+        "docker_manage_platforms": True,
+        "docker_platform_switch": "volumes",
+        "cleanup_enabled": True,
+        "free_space_checks_enabled": False,
+    }
+    assert '"name": "managed-cli"' in capsys.readouterr().out

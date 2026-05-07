@@ -16,6 +16,7 @@ tests/uat/
 ├── timeouts.py                    # signal-based subprocess timeout
 ├── ladder.py                      # scale-ladder + early-stop
 ├── cleanup.py                     # reuse-aware database pruning
+├── docker_assets.py               # UAT-owned Docker compose mapping/lifecycle helpers
 ├── orchestrator.py                # sweep orchestration (make uat-sweep entry point)
 ├── phases/
 │   ├── preflight.py
@@ -81,6 +82,34 @@ resolved once per sweep and passed to every `benchbox run` subprocess
 as `BENCHBOX_OUTPUT_DIR`; preflight and reuse-aware database cleanup
 derive their default roots from the same value. Keep these paths
 aligned whenever adding a phase that reads or writes run artefacts.
+
+## Docker lifecycle boundary
+
+Docker lifecycle belongs in `phases/execute.py`, not in platform
+adapters and not in `benchbox run`. The execute phase is the only layer
+that knows when all cells for one platform have finished and the next
+platform is about to start, so it can preserve same-platform reuse while
+releasing UAT-owned Docker volumes before the next platform.
+
+`docker_assets.py` owns the platform → compose-file mapping, project-name
+sanitizer, and command builders. Automated commands must always include
+`docker compose -p <uat-owned-project> -f <compose-file>` and must never
+use global prune commands. The current managed-start contract is:
+
+- `cleanup.docker_manage_platforms: false` (default): keep existing
+  external-stack behavior; reachability probes decide whether Docker
+  platforms run or skip, and Docker cleanup is reported as disabled.
+- `cleanup.docker_manage_platforms: true`: start a deterministic
+  `benchbox-uat-...` compose project before probing a Docker platform and
+  tear down only that project in a `finally` block at platform completion.
+- `cleanup.docker_platform_switch: volumes`: the storage-saving mode;
+  generates `down -v --remove-orphans` for the UAT-owned project only.
+
+Compose files with fixed `container_name` values are not project-scoped;
+managed startup rejects those platforms until the compose file is changed
+or a safe override is added. Today that affects `pg-duckdb`,
+`pg-mooncake`, and `timescaledb`. Keep fast tests for this mapping in
+sync with `matrix.PLATFORM_GROUPS["docker"]`.
 
 ## Frozen-config hashes
 

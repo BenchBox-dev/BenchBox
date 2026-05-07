@@ -95,6 +95,7 @@ tests/uat/
 ├── config.py                      # YAML schema validation, dataclass-style config object
 ├── timeouts.py                    # signal-based timeout wrapper (replaces bash perl fallback)
 ├── cleanup.py                     # reuse-aware datagen/databases cleanup
+├── docker_assets.py               # UAT-owned Docker compose lifecycle helpers
 ├── ladder.py                      # scale-ladder + early-stop logic
 ├── phases/
 │   ├── __init__.py
@@ -122,10 +123,11 @@ tests/uat/
 | `config.py` | Load YAML, validate against schema (Section 3), expose typed access | 180 |
 | `timeouts.py` | Signal-based timeout (POSIX `signal.alarm` + `os.killpg`); replaces bash perl wrapper | 80 |
 | `cleanup.py` | Track cell completions; prune `databases/` at safe reuse boundaries; preserve `datagen/` | 150 |
+| `docker_assets.py` | Map Docker-backed UAT platforms to compose files; build safe project-scoped compose commands | 180 |
 | `ladder.py` | Per-(platform, benchmark) rung order; wall-clock and exit-code early-stop; pruning bookkeeping | 100 |
 | `phases/preflight.py` | Disk space (configurable cutoff), docker reachability, host load reading | 80 |
 | `phases/enumerate.py` | Resolve final cell list given config filters and registry truth; honour min/max scale | 100 |
-| `phases/execute.py` | Sequential iteration over (platform, benchmark, rung); invokes runner+ladder+cleanup | 150 |
+| `phases/execute.py` | Sequential iteration over (platform, benchmark, rung); invokes runner+ladder+cleanup; owns Docker platform-boundary lifecycle | 220 |
 | `phases/validate.py` | `subprocess.run(["uv","run","--","python","scripts/uat_validator_rollup.py", ...])`; consume TSV | 60 |
 | `phases/package.py` | Read `submit_terminal_state`; invoke `benchbox submit --output` or `--service`; for `draft-pr`/`merged-to-published-results`, open PR vs `published-results` (auto-merge per state) | 130 |
 | `phases/explorer_smoke.py` | `benchbox explorer build` + `node results-explorer/scripts/serve-browser-tests.mjs` | 60 |
@@ -219,6 +221,27 @@ cleanup:
   preserve_datagen: true         # optional, bool, default true.
   prune_databases: true          # optional, bool, default true. Prune
                                  # at safe reuse boundaries.
+  docker_manage_platforms: false # optional, bool, default false.
+                                 # false = externally managed stacks;
+                                 # UAT only probes/skips. true = UAT
+                                 # starts a project-scoped compose stack
+                                 # before each Docker-backed platform.
+  docker_platform_switch: "off"  # optional, enum: off, containers,
+                                 # volumes, images. Non-off values are
+                                 # valid only when docker_manage_platforms
+                                 # is true. volumes generates targeted
+                                 # `docker compose -p <uat> ... down -v
+                                 # --remove-orphans` at platform switch.
+  docker_project_prefix: "benchbox-uat"
+                                 # optional, str. Prefix for deterministic
+                                 # UAT-owned compose project names.
+  docker_start_timeout_s: 300    # optional, int, default 300. Timeout for
+                                 # compose up/down lifecycle commands.
+  docker_fixed_container_name_policy: "fail"
+                                 # optional, enum: fail, override, allow.
+                                 # Current managed mode rejects compose
+                                 # files with fixed container_name values
+                                 # until a safe override is registered.
 
 # Preflight phase -------------------------------------------------------
 preflight:
@@ -432,7 +455,11 @@ execute:
 cleanup:
   preserve_datagen: true
   prune_databases: true
+  docker_manage_platforms: false
+  docker_platform_switch: "off"
+preflight:
   free_space_min_gib: 5
+  free_space_path: "~/Developer/benchmark_runs"
 validate:
   validator_clean_rate_floor: 0.80
 package:

@@ -32,6 +32,9 @@ VALID_TERMINAL_STATES: tuple[str, ...] = (
     "merged-to-published-results",
 )
 
+VALID_DOCKER_PLATFORM_SWITCH_MODES: tuple[str, ...] = ("off", "containers", "volumes", "images")
+VALID_DOCKER_FIXED_CONTAINER_NAME_POLICIES: tuple[str, ...] = ("fail", "override", "allow")
+
 
 class ConfigError(ValueError):
     """Raised when a UAT YAML config fails schema validation."""
@@ -57,6 +60,25 @@ class OutputConfig:
 
 
 @dataclass(frozen=True)
+class PreflightConfig:
+    free_space_min_gib: float = 5.0
+    free_space_path: str | None = None
+    docker_required: bool = False
+    noisy_neighbor_warn_load: float = 8.0
+
+
+@dataclass(frozen=True)
+class CleanupConfig:
+    preserve_datagen: bool = True
+    prune_databases: bool = True
+    docker_manage_platforms: bool = False
+    docker_platform_switch: str = "off"
+    docker_project_prefix: str = "benchbox-uat"
+    docker_start_timeout_s: int = 300
+    docker_fixed_container_name_policy: str = "fail"
+
+
+@dataclass(frozen=True)
 class UATConfig:
     """Root config object.
 
@@ -71,6 +93,8 @@ class UATConfig:
     dry_run: bool = False
     execute: ExecuteConfig = field(default_factory=ExecuteConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
+    preflight: PreflightConfig = field(default_factory=PreflightConfig)
+    cleanup: CleanupConfig = field(default_factory=CleanupConfig)
     # Raw YAML preserved so W4 can layer additional sections without
     # losing the source data.
     raw: dict[str, Any] = field(default_factory=dict)
@@ -89,19 +113,32 @@ def _validate_phases(phases: list[str]) -> tuple[str, ...]:
     return tuple(out)
 
 
-def _require_positive_int(raw: dict[str, Any], key: str, *, default: int) -> int:
+def _require_positive_int(raw: dict[str, Any], key: str, *, default: int, section: str) -> int:
     """Coerce raw[key] to int. Reject floats and non-numeric strings."""
     value = raw.get(key, default)
     if isinstance(value, bool):
-        raise ConfigError(f"`execute.{key}` must be an int, got bool")
+        raise ConfigError(f"`{section}.{key}` must be an int, got bool")
     if isinstance(value, int):
         coerced = value
     elif isinstance(value, str) and value.lstrip("-").isdigit():
         coerced = int(value)
     else:
-        raise ConfigError(f"`execute.{key}` must be an int, got {type(value).__name__}={value!r}")
+        raise ConfigError(f"`{section}.{key}` must be an int, got {type(value).__name__}={value!r}")
     if coerced <= 0:
-        raise ConfigError(f"`execute.{key}` must be > 0")
+        raise ConfigError(f"`{section}.{key}` must be > 0")
+    return coerced
+
+
+def _require_nonnegative_float(raw: dict[str, Any], key: str, *, default: float, section: str) -> float:
+    value = raw.get(key, default)
+    if isinstance(value, bool):
+        raise ConfigError(f"`{section}.{key}` must be a number, got bool")
+    try:
+        coerced = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ConfigError(f"`{section}.{key}` must be a number, got {type(value).__name__}={value!r}") from exc
+    if coerced < 0:
+        raise ConfigError(f"`{section}.{key}` must be >= 0")
     return coerced
 
 
@@ -115,8 +152,8 @@ def _validate_execute(raw: dict[str, Any]) -> ExecuteConfig:
             "`execute.parallel_platforms: true` is forbidden — UAT W3 line 222: "
             "concurrent platform runs contaminate timings"
         )
-    timeout = _require_positive_int(raw, "per_cell_timeout_s", default=600)
-    early_after = _require_positive_int(raw, "early_stop_after_s", default=180)
+    timeout = _require_positive_int(raw, "per_cell_timeout_s", default=600, section="execute")
+    early_after = _require_positive_int(raw, "early_stop_after_s", default=180, section="execute")
     extra_args_raw = raw.get("extra_args", ())
     if extra_args_raw is None:
         extra_args = ()
@@ -163,6 +200,80 @@ def _validate_output(raw: dict[str, Any]) -> OutputConfig:
     )
 
 
+def _validate_preflight(raw: dict[str, Any] | None) -> PreflightConfig:
+    if raw is None:
+        raw = {}
+    if not isinstance(raw, dict):
+        raise ConfigError("`preflight:` must be a mapping")
+    free_space_path = raw.get("free_space_path")
+    if free_space_path is not None and not isinstance(free_space_path, str):
+        raise ConfigError("`preflight.free_space_path` must be a string")
+    return PreflightConfig(
+        free_space_min_gib=_require_nonnegative_float(
+            raw,
+            "free_space_min_gib",
+            default=5.0,
+            section="preflight",
+        ),
+        free_space_path=free_space_path,
+        docker_required=bool(raw.get("docker_required", False)),
+        noisy_neighbor_warn_load=_require_nonnegative_float(
+            raw,
+            "noisy_neighbor_warn_load",
+            default=8.0,
+            section="preflight",
+        ),
+    )
+
+
+def _validate_cleanup(raw: dict[str, Any] | None) -> CleanupConfig:
+    if raw is None:
+        raw = {}
+    if not isinstance(raw, dict):
+        raise ConfigError("`cleanup:` must be a mapping")
+
+    preserve_datagen = bool(raw.get("preserve_datagen", True))
+    if not preserve_datagen:
+        raise ConfigError("`cleanup.preserve_datagen: false` is not supported by UAT automation")
+    docker_manage_platforms = bool(raw.get("docker_manage_platforms", False))
+    docker_platform_switch = str(raw.get("docker_platform_switch", "off"))
+    if docker_platform_switch not in VALID_DOCKER_PLATFORM_SWITCH_MODES:
+        raise ConfigError(
+            f"Unknown `cleanup.docker_platform_switch` {docker_platform_switch!r}; "
+            f"valid: {sorted(VALID_DOCKER_PLATFORM_SWITCH_MODES)}"
+        )
+    if not docker_manage_platforms and docker_platform_switch != "off":
+        raise ConfigError(
+            "`cleanup.docker_platform_switch` must be 'off' when "
+            "`cleanup.docker_manage_platforms` is false; otherwise cleanup is a no-op or unsafe"
+        )
+
+    docker_project_prefix = str(raw.get("docker_project_prefix", "benchbox-uat")).strip()
+    if not docker_project_prefix:
+        raise ConfigError("`cleanup.docker_project_prefix` must be a non-empty string")
+    docker_fixed_container_name_policy = str(raw.get("docker_fixed_container_name_policy", "fail"))
+    if docker_fixed_container_name_policy not in VALID_DOCKER_FIXED_CONTAINER_NAME_POLICIES:
+        raise ConfigError(
+            "Unknown `cleanup.docker_fixed_container_name_policy` "
+            f"{docker_fixed_container_name_policy!r}; valid: {sorted(VALID_DOCKER_FIXED_CONTAINER_NAME_POLICIES)}"
+        )
+
+    return CleanupConfig(
+        preserve_datagen=preserve_datagen,
+        prune_databases=bool(raw.get("prune_databases", True)),
+        docker_manage_platforms=docker_manage_platforms,
+        docker_platform_switch=docker_platform_switch,
+        docker_project_prefix=docker_project_prefix,
+        docker_start_timeout_s=_require_positive_int(
+            raw,
+            "docker_start_timeout_s",
+            default=300,
+            section="cleanup",
+        ),
+        docker_fixed_container_name_policy=docker_fixed_container_name_policy,
+    )
+
+
 def load_config(path: str | Path) -> UATConfig:
     """Load and validate a UAT YAML config.
 
@@ -190,6 +301,8 @@ def validate_config(raw: dict[str, Any]) -> UATConfig:
     phases = _validate_phases(raw.get("phases") or ["preflight", "enumerate", "execute", "report"])
     execute = _validate_execute(raw.get("execute") or {})
     output = _validate_output(raw.get("output") or {})
+    preflight = _validate_preflight(raw.get("preflight"))
+    cleanup = _validate_cleanup(raw.get("cleanup"))
     return UATConfig(
         name=name,
         description=str(raw.get("description", "")),
@@ -197,6 +310,8 @@ def validate_config(raw: dict[str, Any]) -> UATConfig:
         dry_run=bool(raw.get("dry_run", False)),
         execute=execute,
         output=output,
+        preflight=preflight,
+        cleanup=cleanup,
         raw=raw,
     )
 
