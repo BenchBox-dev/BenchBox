@@ -1,0 +1,72 @@
+# w0 evidence-durability gate: results-explorer-pr246-browse-platform-evidence-remediation
+date_utc=2026-05-07T14:46:51Z
+git_head=b3553beb1
+branch=fix/pr246-browse-platform-evidence
+
+## TODO dependency/status context
+Ready to work (all dependencies satisfied):
+  Medium-High   results-explorer-pr246-browse-platform-evidence-remediation  (1 ready, 8 remaining)
+Blocked:
+  High          results-explorer-pr246-final-evidence-gate  <- needs: results-explorer-pr246-home-leaderboard-evidence-remediation, results-explorer-pr246-responsive-navigation-overflow-remediation, results-explorer-pr246-result-compare-evidence-remediation, results-explorer-pr246-browse-platform-evidence-remediation, results-explorer-pr246-query-workbench-evidence-remediation
+
+## Source artifact findings
+audit artifact: present
+59:- `benchmark-tpch-list-1280.png`
+60:- `benchmark-tpch-high-contrast-1280.png`
+71:- Concrete observed evidence: the first quantitative cell in the leaderboard is outlined with a bright blue ring on initial page load. The ring visually competes with the page title, cohort controls, and platform rows even though no keyboard focus or user selection was performed during capture.
+72:- Why it matters: focus state, selection state, and analytical emphasis carry different meanings in a dense benchmark table. A default blue ring can look like the selected result, active metric, or best value, which weakens both scan order and accessibility semantics.
+91:- Recommended fix: lead with a compact result summary: workload, platform, scale, phase, geomean/power metric, trust, validation, run date, and primary actions. Keep the receipt prominent but lower in the page or partially collapsed.
+126:- Screenshot filename: `home-390.png`, `platform-duckdb-390.png`, `compare-duckdb-aws-390.png`, `query-390.png`
+127:- Concrete observed evidence: Recent Results, Platform table, Compare query diff, and Query result table all require horizontal inspection. In `platform-duckdb-390.png`, the capture surface expands beyond the requested 390px width and table columns/actions are clipped. Compare and Query show only partial right-side columns in the first mobile capture.
+131:### U-3: Compare selection is not discoverable until enough rows are selected
+135:- Screenshot filename: `benchmark-tpch-390.png`, `benchmark-tpch-1280.png`, `platform-duckdb-1280.png`
+136:- Concrete observed evidence: benchmark and platform browse pages expose row checkboxes and receipt links, but the compare affordance is not prominent until selection state changes. The primary action is therefore implicit rather than visible.
+137:- Why it matters: users browsing benchmark/platform pages are likely trying to compare results. If the action only appears after knowing to select rows, discoverability is weak.
+138:- Recommended fix: show a persistent compare tray or disabled compare button with clear text such as "Select 2 comparable results." Use the same selected-count language and incompatibility feedback across benchmark and platform routes.
+157:- Why it matters: benchmark values are not self-explanatory. A power score, latency in ms, rank, and speedup ratio require different interpretation rules.
+158:- Recommended fix: add compact cohort header sublabels for benchmark, scale, phase, metric, unit, and direction. Add a visible legend for heatmap and speedup semantics, including `below 1.00x is worse`.
+164:- Screenshot filename: `home-1280.png`, `benchmark-tpch-1280.png`
+165:- Concrete observed evidence: leaderboard and benchmark matrix cells combine blue links, heatmap fills, green trust badges, green validation badges, and sometimes focus rings in the same cell. The quantitative value does not always remain the dominant read.
+184:- Why it matters: the chart spends space without improving understanding. For equal or near-equal results, it should make "no meaningful difference" obvious rather than forcing users to inspect a sparse plot.
+187:### DQ-5: Platform trend charts are low-information for sparse data and tables mix cohorts
+191:- Screenshot filename: `platform-duckdb-390.png`, `platform-duckdb-1280.png`
+192:- Concrete observed evidence: the trend section has large empty plot regions when only a few points exist. The main platform table mixes SSB, TPC-H, and different scale factors in one scan without enough visual guardrails in the table itself.
+193:- Why it matters: cross-benchmark and cross-scale rows should not read like a single comparable ranking. Sparse trend plots can imply a trajectory where there is only one or two observations.
+194:- Recommended fix: group platform rows by benchmark/scale/phase and label comparability directly. Show trend charts only when there are enough points, or use a compact sparse-data state/sparkline that names the limitation.
+202:- Why it matters: raw schema labels are fine for an internal tool but weaken public interpretation. Units and direction must be visible wherever benchmark values appear.
+205:### DQ-7: Star Schema route labels and zero timings need clearer interpretation
+209:- Screenshot filename: `benchmark-star-schema-1280.png`
+210:- Concrete observed evidence: the route is `/results/star_schema/`, but the title and H1 show `SSB Results`. The matrix contains a single platform row with many `0 ms` query cells and no visible explanation of whether those are rounded timings, missing granularity, or true zero-duration values.
+211:- Why it matters: naming drift and unexplained zeroes create interpretation risk in a benchmark context. Users should understand whether they are looking at SSB as the display name for Star Schema Benchmark, and whether `0 ms` means rounded below display precision.
+212:- Recommended fix: explicitly label Star Schema Benchmark/SSB equivalence and add formatting rules for sub-millisecond or rounded timings, such as `<1 ms`, with a footnote or legend.
+229:| 3 | DQ-2 | Major | `/results/`, `/results/tpch/`, 1280px | `home-1280.png`, `benchmark-tpch-1280.png`: badges, links, heat, and focus compete in cells | Quantitative comparison becomes noisy and badge semantics blur | Redesign cell hierarchy and badge semantics |
+231:| 5 | U-2 | Major | Home, Platform, Compare, Query, 390px | `platform-duckdb-390.png`, `compare-duckdb-aws-390.png`: clipped tables/actions | Users may miss columns and row actions | Add sticky/action columns, scroll affordances, or card fallbacks |
+235:| 9 | DQ-4 | Medium | Compare, 390px/1280px | `compare-duckdb-aws-1280.png`: sparse speedup chart with huge whitespace | Equal-value comparison is harder to read than it should be | Tighten domain or use a clearer two-result default |
+236:| 10 | DQ-5 | Medium | Platform, 390px/1280px | `platform-duckdb-1280.png`: sparse trends and mixed cohorts | Cross-scale/cross-benchmark scans can imply invalid comparison | Group rows by cohort and label sparse trend limitations |
+239:| 13 | U-3 | Medium | Benchmark/Platform, 390px/1280px | `benchmark-tpch-390.png`, `platform-duckdb-1280.png`: compare action implicit | Users must infer checkbox-to-compare behavior | Persistent disabled compare tray with selection guidance |
+242:| 16 | DQ-7 | Medium | `/results/star_schema/`, 1280px | `benchmark-star-schema-1280.png`: SSB label and many `0 ms` cells | Naming and zero timing semantics are ambiguous | Label SSB/Star Schema equivalence and sub-ms formatting |
+256:| U-3 | `results-explorer-retheme-browse-pages` w6 | `results-explorer-pr246-browse-platform-evidence-remediation` | Directly covers compare-selection behavior and selected-result bar. |
+259:| DQ-2 | `results-explorer-retheme-leaderboard-semantics` w4, w5; `results-explorer-retheme-theme-system-foundation` w3 | `results-explorer-pr246-home-leaderboard-evidence-remediation`; `results-explorer-pr246-browse-platform-evidence-remediation` | Covers separation of quantitative heat from trust/validation metadata and state tokens. |
+262:| DQ-5 | `results-explorer-retheme-browse-pages` w4; `results-explorer-retheme-responsive-accessibility` w4 | `results-explorer-pr246-browse-platform-evidence-remediation` | Covers Platform table/trend grouping and sparse chart/overflow behavior. |
+264:| DQ-7 | `results-explorer-retheme-browse-pages` w3, w7; `results-explorer-retheme-leaderboard-semantics` w2 | `results-explorer-pr246-browse-platform-evidence-remediation` | Covers matrix semantics, missing/failed timing display, SSB/Star Schema naming, sub-ms formatting, and visible metric labels. |
+272:- `results-explorer-pr246-browse-platform-evidence-remediation`
+
+## Baseline screenshots referenced by TODO
+present benchmark-tpch-390.png
+present benchmark-tpch-768.png
+present benchmark-tpch-1280.png
+present benchmark-tpch-1600.png
+present benchmark-tpch-list-1280.png
+present benchmark-tpch-high-contrast-1280.png
+present benchmark-star-schema-390.png
+present benchmark-star-schema-768.png
+present benchmark-star-schema-1280.png
+present benchmark-star-schema-1600.png
+present platform-duckdb-390.png
+present platform-duckdb-768.png
+present platform-duckdb-1280.png
+present platform-duckdb-1600.png
+present platform-datafusion-390.png
+present platform-datafusion-768.png
+present platform-datafusion-1280.png
+present platform-datafusion-1600.png
