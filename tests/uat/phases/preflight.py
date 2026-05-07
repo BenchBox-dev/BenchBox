@@ -1,7 +1,8 @@
 """Preflight phase: disk, docker, noisy-neighbor scan.
 
 Mirrors the W1 step of the 2026-05-02 retrospective. Telemetry-first:
-warns liberally, aborts only on `free_space_min_gib`.
+warns liberally, aborts only on `free_space_min_gib` unless an operator
+opts in to local-platform reachability enforcement.
 """
 
 from __future__ import annotations
@@ -9,8 +10,30 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
+
+from tests.uat.matrix import platform_is_reachable, reset_reachability_cache, resolve_platforms
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+AUTOMATED_LOCAL_PLATFORMS: tuple[str, ...] = (
+    "cedardb",
+    "clickhouse-server",
+    "databend",
+    "doris",
+    "influxdb",
+    "postgresql",
+    "presto",
+    "questdb",
+    "singlestore",
+    "starrocks",
+    "trino",
+    "velox",
+)
+
+BringUpRunner = Callable[[str], int]
+ReachabilityChecker = Callable[[str], bool]
 
 
 @dataclass(frozen=True)
@@ -21,6 +44,8 @@ class PreflightResult:
     aborted: bool
     abort_reason: str | None
     warnings: tuple[str, ...]
+    local_platforms_checked: tuple[str, ...] = ()
+    local_platforms_attempted: tuple[str, ...] = ()
 
 
 def free_space_gib(path: str | Path) -> float:
@@ -57,14 +82,38 @@ def host_load_1m() -> float | None:
         return None
 
 
+def requested_platforms_from_raw(raw: dict) -> tuple[str, ...]:
+    """Resolve the platforms requested by a UAT config's raw matrix filters."""
+    platforms_cfg = raw.get("platforms") or {}
+    platform_groups_default = ["sql"] if "include" not in platforms_cfg else []
+    return tuple(
+        resolve_platforms(
+            groups=_as_list(platforms_cfg.get("groups", platform_groups_default)),
+            include=_as_list(platforms_cfg.get("include", [])),
+            exclude=_as_list(platforms_cfg.get("exclude", [])),
+        )
+    )
+
+
 def run_preflight(
     *,
     free_space_path: str | Path = "~/Developer/benchmark_runs",
     free_space_min_gib: float = 5.0,
     docker_required: bool = False,
     noisy_neighbor_warn_load: float = 8.0,
+    local_platforms_check: bool = False,
+    requested_platforms: Iterable[str] = (),
+    bring_up_runner: BringUpRunner | None = None,
+    reachability_checker: ReachabilityChecker | None = None,
 ) -> PreflightResult:
-    """Execute the preflight phase. Aborts only on free-space cutoff."""
+    """Execute the preflight phase.
+
+    By default this preserves historical behaviour: missing local services
+    remain execute-phase `skipped_unreachable` cells. When
+    `local_platforms_check` is true, requested platforms are probed before the
+    sweep starts. Automated platforms get one `make uat-bring-up` attempt;
+    document-only platforms abort with an operator-facing message.
+    """
     free_gib = free_space_gib(free_space_path)
     docker_ok = docker_reachable()
     load_1m = host_load_1m()
@@ -72,6 +121,8 @@ def run_preflight(
     warnings: list[str] = []
     aborted = False
     abort_reason: str | None = None
+    checked: tuple[str, ...] = ()
+    attempted: tuple[str, ...] = ()
 
     if free_gib < free_space_min_gib:
         aborted = True
@@ -84,6 +135,17 @@ def run_preflight(
     if not docker_ok and not docker_required:
         warnings.append("docker not reachable (any docker platforms will skip)")
 
+    if local_platforms_check and not aborted:
+        checked, attempted, local_abort, local_warnings = _check_local_platforms(
+            requested_platforms,
+            bring_up_runner=bring_up_runner or _run_make_bring_up,
+            reachability_checker=reachability_checker or platform_is_reachable,
+        )
+        warnings.extend(local_warnings)
+        if local_abort is not None:
+            aborted = True
+            abort_reason = local_abort
+
     return PreflightResult(
         free_space_gib=free_gib,
         docker_reachable=docker_ok,
@@ -91,4 +153,65 @@ def run_preflight(
         aborted=aborted,
         abort_reason=abort_reason,
         warnings=tuple(warnings),
+        local_platforms_checked=checked,
+        local_platforms_attempted=attempted,
     )
+
+
+def _check_local_platforms(
+    requested_platforms: Iterable[str],
+    *,
+    bring_up_runner: BringUpRunner,
+    reachability_checker: ReachabilityChecker,
+) -> tuple[tuple[str, ...], tuple[str, ...], str | None, tuple[str, ...]]:
+    checked = tuple(dict.fromkeys(requested_platforms))
+    attempted: list[str] = []
+    warnings: list[str] = []
+    for platform in checked:
+        if reachability_checker(platform):
+            continue
+        if platform not in AUTOMATED_LOCAL_PLATFORMS:
+            return (
+                checked,
+                tuple(attempted),
+                f"local platform {platform!r} is unreachable and has no automated UAT bring-up; "
+                "see docs/operations/uat-local-provisioning.md",
+                tuple(warnings),
+            )
+        attempted.append(platform)
+        returncode = bring_up_runner(platform)
+        reset_reachability_cache()
+        if returncode != 0:
+            return (
+                checked,
+                tuple(attempted),
+                f"local platform {platform!r} is unreachable and `make uat-bring-up PLATFORM={platform}` "
+                f"failed with exit {returncode}",
+                tuple(warnings),
+            )
+        if not reachability_checker(platform):
+            return (
+                checked,
+                tuple(attempted),
+                f"local platform {platform!r} remains unreachable after `make uat-bring-up PLATFORM={platform}`",
+                tuple(warnings),
+            )
+        warnings.append(f"local platform {platform!r} was unreachable; `make uat-bring-up` recovered it")
+    return checked, tuple(attempted), None, tuple(warnings)
+
+
+def _run_make_bring_up(platform: str) -> int:
+    completed = subprocess.run(
+        ["make", "uat-bring-up", f"PLATFORM={platform}"],
+        cwd=REPO_ROOT,
+        check=False,
+    )
+    return completed.returncode
+
+
+def _as_list(value: Iterable | None) -> list:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value]
+    return list(value)

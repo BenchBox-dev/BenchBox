@@ -359,7 +359,7 @@ def execute_main(argv: list[str] | None = None) -> int:
     """Implements `make uat-execute CONFIG=path/to/uat.yaml`."""
     from tests.uat.config import load_config
     from tests.uat.phases.execute import default_benchmark_runs_dir, default_log_dir, run_execute
-    from tests.uat.phases.preflight import run_preflight
+    from tests.uat.phases.preflight import requested_platforms_from_raw, run_preflight
 
     parser = argparse.ArgumentParser(prog="uat-execute")
     parser.add_argument("--config", required=True)
@@ -383,6 +383,8 @@ def execute_main(argv: list[str] | None = None) -> int:
             free_space_min_gib=config.preflight.free_space_min_gib,
             docker_required=config.preflight.docker_required or config.cleanup.docker_manage_platforms,
             noisy_neighbor_warn_load=config.preflight.noisy_neighbor_warn_load,
+            local_platforms_check=config.preflight.local_platforms_check,
+            requested_platforms=requested_platforms_from_raw(config.raw),
         )
         for warning in preflight.warnings:
             print(f"[preflight warn] {warning}", file=sys.stderr)

@@ -1511,7 +1511,7 @@ blind-spots-sweep: blind-spots-report
 # Operator-only; not exposed as `benchbox` CLI subcommands. UAT is a
 # project-developer concern, benchbox is a project-user concern.
 # ----------------------------------------------------------------------
-.PHONY: uat-cell uat-execute uat-validate uat-package uat-explorer-smoke uat-report uat-sweep uat-stress
+.PHONY: uat-cell uat-execute uat-validate uat-package uat-explorer-smoke uat-report uat-sweep uat-stress uat-bring-up
 
 # make uat-cell PLATFORM=duckdb BENCHMARK=tpch SCALE=0.01
 uat-cell:
@@ -1573,6 +1573,24 @@ uat-package:
 		--config "$(CONFIG)" \
 		--submissions-dir "$(SUBMISSIONS_DIR)" \
 		$(foreach r,$(RESULTS),--result "$(r)")
+
+UAT_BRING_UP_KNOWN_PLATFORMS := cedardb clickhouse-server databend doris influxdb lakesail pg-duckdb pg-mooncake postgresql presto questdb singlestore starrocks timescaledb trino velox
+ifneq ($(strip $(PLATFORM)),)
+ifeq ($(filter $(PLATFORM),$(UAT_BRING_UP_KNOWN_PLATFORMS)),)
+$(error unknown platform '$(PLATFORM)'; supported: $(UAT_BRING_UP_KNOWN_PLATFORMS))
+endif
+endif
+
+# make uat-bring-up PLATFORM=<name> [TIMEOUT_S=300] [DRY_RUN=1]
+uat-bring-up:
+	@if [ -z "$(PLATFORM)" ]; then \
+		echo "Usage: make uat-bring-up PLATFORM=<name> [TIMEOUT_S=300] [DRY_RUN=1]" >&2; \
+		exit 2; \
+	fi
+	@uv run --no-sync -- python scripts/uat-bring-up/uat_bring_up.py \
+		--platform "$(PLATFORM)" \
+		$(if $(TIMEOUT_S),--timeout-s "$(TIMEOUT_S)",) \
+		$(if $(DRY_RUN),--dry-run,)
 
 # make uat-sweep CONFIG=tests/uat/configs/<name>.yaml [DRY_RUN=1]
 uat-sweep:

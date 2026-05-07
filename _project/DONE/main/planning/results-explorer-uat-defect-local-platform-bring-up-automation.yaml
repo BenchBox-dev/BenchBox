@@ -1,0 +1,201 @@
+id: results-explorer-uat-defect-local-platform-bring-up-automation
+title: "Author runbook + bring-up automation for Lakesail and the 15 TCP-backed local platforms"
+worktree: main
+priority: Medium
+status: Completed
+completed_date: "2026-05-07"
+category: Platform Expansion
+
+description: |
+  The 2026-05-05 tuned UAT sweep marked 855 cells "skipped unreachable"
+  because their target platforms were not provisioned on the local host.
+  This was not a defect in those platforms — they simply require a
+  process or container the UAT host had not started.
+
+  Affected platforms:
+
+    - Lakesail (local Sail / pysail server not provisioned)
+    - 15 TCP-backed SQL platforms: cedardb, clickhouse-server, databend,
+      doris, influxdb, pg-duckdb, pg-mooncake, postgresql, presto,
+      questdb, singlestore, starrocks, timescaledb, trino, velox
+
+  Reachable platforms in the same sweep were `duckdb`, `datafusion`,
+  `lakesail` (incomplete), and `clickhouse-local`.
+
+  Source: `_project/handoffs/results-explorer-uat-tuned-followup-20260505.md`
+  ("Coverage" + "Defect Classification → Environment/provisioning").
+  Follow-up to PR #235. Builds on the inventory landed by
+  `_project/DONE/main/active/results-explorer-uat-defect-local-platform-provisioning.yaml`
+  (closed 2026-05-03) — that TODO catalogued what needs to be running;
+  this one converts the catalogue into a runbook and per-platform
+  bring-up target.
+
+  Today an operator running a multi-platform sweep has to know which
+  platforms need a TCP server up, on which port, and how to start it.
+  That tribal knowledge means most sweeps cover only the embedded
+  subset; cross-platform comparison drifts toward the easy-to-provision
+  edge of the matrix.
+
+  This TODO either documents the provisioning steps in a
+  reproducible runbook, or — where realistic — automates them via the
+  existing Docker / pool tooling so `make uat-sweep` brings up the
+  required platforms before enumeration.
+
+deps:
+  needs:
+  - results-explorer-uat-defect-local-platform-provisioning
+
+work:
+- id: w0
+  summary: "Capture the current unreachable-platform set from the 2026-05-05 sweep coverage TSV"
+  status: done
+  notes: |
+    Evidence-durability gate per `_project/verification-logs/README.md`.
+    The "855 cells skipped unreachable" + 16-platform list is anchored
+    to one sweep; pin the live numbers so the runbook in w5 cites a
+    reproducible source:
+
+      LOGS=~/Developer/benchmark_runs/logs/uat_tuned_followup_20260505_pool02_rerun
+      awk -F'\t' 'NR==1 || $4=="skipped-unreachable" {print}' \
+        "$LOGS/coverage_cells.tsv" | wc -l
+      awk -F'\t' 'NR>1 {print $4}' "$LOGS/coverage_cells.tsv" | sort | uniq -c
+      cat "$LOGS/coverage_platform_summary.tsv"
+
+    Expected (handoff anchor): 856 lines from the first command (header
+    + 855 skipped-unreachable cells), and a full status split matching
+    the handoff. Capture stdout under
+    `_project/verification-logs/results-explorer-uat-defect-local-platform-bring-up-automation/w0.log`
+    and commit. If a platform listed in the description is now reachable
+    (because it was provisioned independently), drop it from the w1
+    inventory before authoring the runbook.
+
+- id: w1
+  summary: "Inventory each platform's current readiness contract: what process/container, what port, what env"
+  needs: [w0]
+  status: done
+  notes: |
+    For each of the 16 platforms, capture:
+      - default port the BenchBox connector expects
+      - launch command (docker compose service name, native binary, etc.)
+      - whether `docker-compose.yml` already defines the service
+      - whether a healthcheck exists
+    Output: `docs/operations/local-platform-provisioning.tsv` keyed
+    by platform with the columns above. Land as a checked-in artifact.
+
+    Completed with a 17-line TSV (header + 16 platforms) covering endpoint,
+    process/container, compose file/service, healthcheck, decision,
+    bring-up command, and notes.
+
+- id: w2
+  summary: "Distinguish 'document only' from 'automate' per platform"
+  needs: [w1]
+  status: done
+  notes: |
+    Some platforms are heavy enough or licensed enough that automated
+    bring-up isn't warranted (e.g., Singlestore, large vendor images).
+    Decision per platform: `document` (runbook step only) vs.
+    `automate` (a target that brings it up). Output: `decision`
+    column on the TSV from w1.
+
+    Automated: cedardb, clickhouse-server, databend, doris, influxdb,
+    postgresql, presto, questdb, singlestore, starrocks, trino, velox.
+    Document-only: lakesail, pg-duckdb, pg-mooncake, timescaledb.
+
+- id: w3
+  summary: "For 'automate' platforms, add a `make uat-bring-up PLATFORM=<name>` target that starts and healthchecks"
+  needs: [w2]
+  status: done
+  notes: |
+    Generic Make target that dispatches per-platform:
+      make uat-bring-up PLATFORM=postgresql  # docker compose up + wait
+      make uat-bring-up PLATFORM=trino       # docker compose up + wait
+    Wraps the service launch + a TCP/health probe with a timeout.
+    Idempotent: re-running on an already-up service is a no-op + OK.
+    Add a fast-marked unit test that asserts the dispatcher returns
+    a sensible error on an unknown platform.
+
+- id: w4
+  summary: "Optional `preflight.local_platforms_check: true` config field that runs reachability per requested platform"
+  needs: [w3]
+  status: done
+  notes: |
+    When set, the preflight phase pings each platform in
+    `platforms.include` and aborts the sweep with a clear error if any
+    requested platform is unreachable AND not in the `automate` set.
+    `automate`-set platforms get a one-shot `make uat-bring-up`
+    attempt before the abort. Default: `false` (preserves current
+    "skip unreachable" behaviour).
+
+    Wired through `tests/uat/config.py`, orchestrator, and standalone
+    `tests.uat._cli execute` so the field is reachable from YAML.
+
+- id: w5
+  summary: "Write the operator runbook in `docs/operations/uat-local-provisioning.md`"
+  needs: [w2, w3]
+  status: done
+  notes: |
+    Per-platform sections (16 entries) covering the document-only
+    bring-up steps, ports, and any quirks (e.g., Doris JDK requirement,
+    Trino catalog config, Lakesail `pysail` install). Cross-link to
+    the new `make uat-bring-up` for automate-set platforms. This is
+    the canonical reference; the platform-readiness TSV from w1 is
+    the index.
+
+must_preserve:
+- "Current `skipped_unreachable` terminal state — the sweep does not become more aggressive about failing when a platform
+  is missing unless `local_platforms_check` is opted in."
+- "BenchBox connector defaults — port and connection logic stays in the connectors, not the UAT framework."
+- "Each platform's existing test suite (tests/integration/test_local_platform_benchmark_matrix.py)."
+
+anti_patterns:
+- "DO NOT start automating a platform without a healthcheck — a `docker compose up` that returns before the server is accepting
+  connections produces flaky sweeps and is worse than 'document only'."
+- "DO NOT couple `make uat-sweep` to bringing up every platform implicitly — bring-up is opt-in via `preflight.local_platforms_check`
+  or explicit `make uat-bring-up`. Implicit bring-up makes 'why is my disk full' a UAT-framework debugging session."
+- "DO NOT consolidate runbook steps into a script that hides the per-platform commands — operators benefit from seeing the
+  literal commands; the script is the convenience, not the truth."
+
+verification:
+- description: "Provisioning TSV is checked in and covers all 16 platforms"
+  command: "wc -l docs/operations/local-platform-provisioning.tsv"
+  expected_output: ">= 17 (header + 16 platforms)"
+- description: "Operator runbook exists and references each platform"
+  command: "for p in lakesail cedardb clickhouse-server databend doris influxdb pg-duckdb pg-mooncake postgresql presto questdb
+    singlestore starrocks timescaledb trino velox; do grep -q \"$p\" docs/operations/uat-local-provisioning.md || echo MISSING
+    $p; done"
+  expected_output: "(no MISSING lines)"
+- description: "`make uat-bring-up PLATFORM=<unknown>` fails with a clear error"
+  command: "make uat-bring-up PLATFORM=does-not-exist 2>&1 | tail -1"
+  expected_output: "non-zero exit; error mentions 'unknown platform'"
+- description: "Optional preflight reachability check works against a known-down port"
+  command: "uv run -- python -m pytest tests/uat/test_preflight.py -m fast -k local_platforms_check -q"
+  expected_output: "all green"
+
+scope_limit:
+  only_modify:
+  - "Makefile"
+  - "tests/uat/phases/preflight.py"
+  - "tests/uat/test_preflight.py"
+  - "tests/uat/config.py"
+  - "tests/uat/orchestrator.py"
+  - "tests/uat/_cli.py"
+  - "docs/operations/uat-local-provisioning.md"
+  - "docs/operations/local-platform-provisioning.tsv"
+  - "scripts/uat-bring-up/"
+  do_not_modify:
+  - "benchbox/core/platform_registry.py"
+  - "benchbox/core/connectors/"
+
+metadata:
+  tags:
+  - uat-framework
+  - results-explorer
+  - platform-provisioning
+  - operations
+  - docker
+  estimated_effort: "Medium (~1-2 weeks, 5 work units)"
+  created_date: "2026-05-06"
+  source: |
+    Handoff `_project/handoffs/results-explorer-uat-tuned-followup-20260505.md`,
+    Follow-Up TODO Candidate #6. 855 cells were "skipped unreachable" in
+    the 2026-05-05 sweep purely due to local provisioning gaps.

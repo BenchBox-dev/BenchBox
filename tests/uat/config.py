@@ -65,6 +65,7 @@ class PreflightConfig:
     free_space_path: str | None = None
     docker_required: bool = False
     noisy_neighbor_warn_load: float = 8.0
+    local_platforms_check: bool = False
 
 
 @dataclass(frozen=True)
@@ -223,6 +224,7 @@ def _validate_preflight(raw: dict[str, Any] | None) -> PreflightConfig:
             default=8.0,
             section="preflight",
         ),
+        local_platforms_check=bool(raw.get("local_platforms_check", False)),
     )
 
 
