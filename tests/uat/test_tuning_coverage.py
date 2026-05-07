@@ -18,7 +18,7 @@ from benchbox.core.tuning.coverage import (
     parse_runtime_tuning_logs,
     read_tuning_coverage_tsv,
     runtime_mismatches,
-    static_regressions,
+    static_matrix_drift,
 )
 from tests.uat.matrix import PLATFORM_GROUPS, load_benchmarks, resolve_benchmarks
 
@@ -36,13 +36,13 @@ def test_tuning_coverage_matrix_is_checked_in_and_has_decisions():
     assert any(row.status == BASIC_CONSTRAINTS and row.decision == DECISION_AUTHOR for row in rows)
 
 
-def test_checked_in_tuning_coverage_has_no_static_regressions():
+def test_checked_in_tuning_coverage_has_no_static_drift():
     recorded = read_tuning_coverage_tsv(MATRIX_PATH)
     current = build_tuning_coverage_rows(_uat_platforms(), _uat_benchmarks())
-    assert static_regressions(recorded, current) == []
+    assert static_matrix_drift(recorded, current) == []
 
 
-def test_static_regressions_flags_new_current_rows_missing_from_matrix():
+def test_static_matrix_drift_flags_new_current_rows_missing_from_matrix():
     recorded = [
         TuningCoverageRow(
             platform="duckdb",
@@ -63,7 +63,7 @@ def test_static_regressions_flags_new_current_rows_missing_from_matrix():
         ),
     ]
 
-    assert static_regressions(recorded, current) == ["new current row missing from matrix for duckdb/newbench"]
+    assert static_matrix_drift(recorded, current) == ["new current row missing from matrix for duckdb/newbench"]
 
 
 def test_runtime_log_parser_matches_matrix_rows(tmp_path: Path):

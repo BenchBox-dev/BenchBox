@@ -162,25 +162,31 @@ def read_tuning_coverage_tsv(path: Path) -> list[TuningCoverageRow]:
     return rows
 
 
-def static_regressions(
+def static_matrix_drift(
     recorded_rows: Iterable[TuningCoverageRow],
     current_rows: Iterable[TuningCoverageRow],
 ) -> list[str]:
-    """Return checked-in matrix drift that would hide coverage regressions."""
+    """Return checked-in matrix drift that would hide coverage regressions.
+
+    Flags three kinds of drift between the checked-in TSV and the
+    currently-derived inventory: (1) recorded keys missing from current,
+    (2) status downgrades vs. the recorded baseline, and (3) newly-derived
+    keys that have not yet been added to the matrix.
+    """
     recorded_by_key = {row.key: row for row in recorded_rows}
     current_by_key = {row.key: row for row in current_rows}
-    regressions: list[str] = []
+    drift: list[str] = []
     for recorded in recorded_by_key.values():
         current = current_by_key.get(recorded.key)
         if current is None:
-            regressions.append(f"missing current row for {recorded.platform}/{recorded.benchmark}")
+            drift.append(f"missing current row for {recorded.platform}/{recorded.benchmark}")
             continue
         if STATUS_RANK[current.status] < STATUS_RANK[recorded.status]:
-            regressions.append(f"{recorded.platform}/{recorded.benchmark}: {recorded.status} -> {current.status}")
+            drift.append(f"{recorded.platform}/{recorded.benchmark}: {recorded.status} -> {current.status}")
     for current in current_by_key.values():
         if current.key not in recorded_by_key:
-            regressions.append(f"new current row missing from matrix for {current.platform}/{current.benchmark}")
-    return regressions
+            drift.append(f"new current row missing from matrix for {current.platform}/{current.benchmark}")
+    return drift
 
 
 def parse_runtime_tuning_logs(
