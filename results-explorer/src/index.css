@@ -4,6 +4,7 @@
 
 @layer base {
     :root {
+        /* Dark global chrome + brand surfaces */
         --bb-bg-primary: #0d1117;
         --bb-bg-panel: #161b22;
         --bb-bg-elevated: #21262d;
@@ -17,8 +18,57 @@
         --bb-status-success: #238636;
         --bb-status-warning: #d29922;
         --bb-status-danger: #f85149;
+        --bb-status-danger-hover: #b91c1c;
         --bb-code-bg: #161b22;
         --bb-code-fg: #f0f6fc;
+
+        /* Light analytical surfaces (dense data panels). See
+           _project/analysis/results-explorer-theme-inventory-2026-05-07.md
+           for the surface-model decision. */
+        --bb-surface-app: #f5f6f8;
+        --bb-surface-data: #ffffff;
+        --bb-surface-data-muted: #f8fafc;
+        --bb-surface-elevated: #ffffff;
+        --bb-surface-hero: #0d1117;
+        --bb-surface-hero-muted: #161b22;
+        --bb-surface-sticky: #f1f5f9;
+        --bb-data-fg-primary: #0f172a;
+        --bb-data-fg-muted: #475569;
+        --bb-data-fg-subtle: #64748b;
+        --bb-data-border: #e2e8f0;
+        --bb-data-border-strong: #cbd5e1;
+        --bb-focus-ring: #2563eb;
+        --bb-focus-ring-on-dark: #93c5fd;
+
+        /* Status tones for StatusBadge / inline state */
+        --bb-tone-info-bg: #dbeafe;
+        --bb-tone-info-fg: #1e3a8a;
+        --bb-tone-success-bg: #dcfce7;
+        --bb-tone-success-fg: #14532d;
+        --bb-tone-warning-bg: #fef3c7;
+        --bb-tone-warning-fg: #78350f;
+        --bb-tone-danger-bg: #fee2e2;
+        --bb-tone-danger-fg: #7f1d1d;
+        --bb-tone-neutral-bg: #e2e8f0;
+        --bb-tone-neutral-fg: #1f2937;
+
+        /* Chart palettes — referenced by chart components for parity with
+           ASCII output. Categorical kept compact and color-blind-aware;
+           sequential and diverging mirror the ASCII heatmap palette. */
+        --bb-chart-cat-1: #2563eb;
+        --bb-chart-cat-2: #0d9488;
+        --bb-chart-cat-3: #b45309;
+        --bb-chart-cat-4: #7c3aed;
+        --bb-chart-cat-5: #be123c;
+        --bb-chart-cat-6: #475569;
+        --bb-chart-success: #15803d;
+        --bb-chart-warning: #b45309;
+        --bb-chart-danger: #b91c1c;
+        --bb-chart-sequential-from: #eff6ff;
+        --bb-chart-sequential-to: #1d4ed8;
+        --bb-chart-diverging-low: #b91c1c;
+        --bb-chart-diverging-mid: #f1f5f9;
+        --bb-chart-diverging-high: #1d4ed8;
         --bb-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
         --bb-font-mono: "SF Mono", Monaco, Inconsolata, "Roboto Mono", "Fira Code", monospace;
         --bb-text-xs: 0.75rem;
@@ -47,61 +97,181 @@
     }
 
     body {
-        @apply bg-gray-50 text-gray-900 min-h-screen;
+        background-color: var(--bb-surface-app);
+        color: var(--bb-data-fg-primary);
+        min-height: 100vh;
     }
 
     a {
-        @apply text-brand-600 hover:text-brand-700;
+        @apply text-brand-700 hover:text-brand-900;
+    }
+
+    *:focus-visible {
+        outline: 2px solid var(--bb-focus-ring);
+        outline-offset: 2px;
+    }
+
+    .surface-hero *:focus-visible,
+    [data-surface="hero"] *:focus-visible {
+        outline-color: var(--bb-focus-ring-on-dark);
     }
 }
 
 @layer components {
+    /* ---- Surfaces ---- */
+
+    .surface-app {
+        background-color: var(--bb-surface-app);
+        color: var(--bb-data-fg-primary);
+    }
+
+    .surface-hero {
+        background-color: var(--bb-surface-hero);
+        color: var(--bb-fg-primary);
+    }
+
+    .surface-hero-muted {
+        background-color: var(--bb-surface-hero-muted);
+        color: var(--bb-fg-primary);
+    }
+
+    .panel {
+        background-color: var(--bb-surface-data);
+        color: var(--bb-data-fg-primary);
+        border: 1px solid var(--bb-data-border);
+        border-radius: 0.5rem;
+    }
+
+    .panel-muted {
+        background-color: var(--bb-surface-data-muted);
+        color: var(--bb-data-fg-primary);
+        border: 1px solid var(--bb-data-border);
+        border-radius: 0.5rem;
+    }
+
+    .panel-elevated {
+        background-color: var(--bb-surface-elevated);
+        color: var(--bb-data-fg-primary);
+        border: 1px solid var(--bb-data-border);
+        border-radius: 0.5rem;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+    }
+
+    /* ---- Buttons ---- */
+
     .btn {
-        @apply inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2;
+        @apply inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors;
     }
 
     .btn-primary {
-        @apply btn bg-brand-600 text-white hover:bg-brand-700;
+        @apply btn text-white;
+        background-color: var(--bb-accent-hover);
+    }
+    .btn-primary:hover {
+        background-color: var(--bb-accent);
+        color: var(--bb-fg-inverse);
     }
 
     .btn-secondary {
-        @apply btn border border-gray-300 bg-white text-gray-700 hover:bg-gray-50;
+        @apply btn;
+        background-color: var(--bb-surface-data);
+        color: var(--bb-data-fg-primary);
+        border: 1px solid var(--bb-data-border-strong);
     }
+    .btn-secondary:hover {
+        background-color: var(--bb-surface-data-muted);
+    }
+
+    .btn-subtle {
+        @apply btn;
+        background-color: transparent;
+        color: var(--bb-data-fg-muted);
+    }
+    .btn-subtle:hover {
+        background-color: var(--bb-surface-data-muted);
+        color: var(--bb-data-fg-primary);
+    }
+
+    .btn-danger {
+        @apply btn text-white;
+        background-color: var(--bb-status-danger);
+    }
+    .btn-danger:hover {
+        background-color: var(--bb-status-danger-hover);
+    }
+
+    /* ---- Badges (legacy aliases, retained for incremental migration) ---- */
 
     .badge {
         @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
     }
 
     .badge-blue {
-        @apply badge bg-blue-100 text-blue-800;
+        background-color: var(--bb-tone-info-bg);
+        color: var(--bb-tone-info-fg);
     }
 
     .badge-green {
-        @apply badge bg-green-100 text-green-800;
+        background-color: var(--bb-tone-success-bg);
+        color: var(--bb-tone-success-fg);
     }
 
     .badge-yellow {
-        @apply badge bg-yellow-100 text-yellow-800;
+        background-color: var(--bb-tone-warning-bg);
+        color: var(--bb-tone-warning-fg);
     }
 
     .badge-red {
-        @apply badge bg-red-100 text-red-800;
+        background-color: var(--bb-tone-danger-bg);
+        color: var(--bb-tone-danger-fg);
     }
 
     .badge-gray {
-        @apply badge bg-gray-100 text-gray-800;
+        background-color: var(--bb-tone-neutral-bg);
+        color: var(--bb-tone-neutral-fg);
     }
 
+    /* ---- Status badge tones (semantic) ---- */
+
+    .tone-info {
+        background-color: var(--bb-tone-info-bg);
+        color: var(--bb-tone-info-fg);
+    }
+
+    .tone-success {
+        background-color: var(--bb-tone-success-bg);
+        color: var(--bb-tone-success-fg);
+    }
+
+    .tone-warning {
+        background-color: var(--bb-tone-warning-bg);
+        color: var(--bb-tone-warning-fg);
+    }
+
+    .tone-danger {
+        background-color: var(--bb-tone-danger-bg);
+        color: var(--bb-tone-danger-fg);
+    }
+
+    .tone-neutral {
+        background-color: var(--bb-tone-neutral-bg);
+        color: var(--bb-tone-neutral-fg);
+    }
+
+    /* ---- Card / table ---- */
+
     .card {
-        @apply rounded-lg border border-gray-200 bg-white p-6 shadow-sm;
+        @apply panel p-6;
     }
 
     .table-th {
-        @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500;
+        @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide;
+        color: var(--bb-data-fg-subtle);
     }
 
     .table-td {
-        @apply px-4 py-3 text-sm text-gray-700;
+        @apply px-4 py-3 text-sm;
+        color: var(--bb-data-fg-primary);
     }
 
     .bb-skeleton {

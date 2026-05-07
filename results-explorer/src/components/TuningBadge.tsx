@@ -1,28 +1,36 @@
 // ---------------------------------------------------------------------------
-// TuningBadge - renders tuning_mode as a styled badge
+// TuningBadge - renders tuning_mode as a StatusBadge with role="computed"
 // ---------------------------------------------------------------------------
 
-export const TUNING_CONFIG: Record<string, { label: string; class: string; title: string }> = {
+import { StatusBadge, type StatusTone } from "./StatusBadge";
+
+interface TuningEntry {
+  label: string;
+  tone: StatusTone;
+  title: string;
+}
+
+export const TUNING_CONFIG: Record<string, TuningEntry> = {
   tuned: {
     label: "Tuned",
-    class: "badge-green",
+    tone: "success",
     title: "Platform-recommended tuning applied",
   },
   notuning: {
     label: "No Tuning",
-    class: "badge-gray",
+    tone: "neutral",
     title: "Platform defaults only - no tuning applied",
   },
   auto: {
     label: "Auto",
-    class: "badge-blue",
+    tone: "info",
     title: "Automatic tuning selected by the platform",
   },
 };
 
-const DEFAULT_CONFIG = {
+const DEFAULT_CONFIG: TuningEntry = {
   label: "Custom Tuning",
-  class: "badge-yellow",
+  tone: "warning",
   title: "Non-standard tuning configuration",
 };
 
@@ -37,8 +45,8 @@ interface TuningBadgeProps {
 export function TuningBadge({ tuningMode }: TuningBadgeProps) {
   const config = TUNING_CONFIG[tuningMode] ?? DEFAULT_CONFIG;
   return (
-    <span class={`badge ${config.class}`} title={config.title}>
+    <StatusBadge role="computed" tone={config.tone} title={config.title}>
       {config.label}
-    </span>
+    </StatusBadge>
   );
 }
