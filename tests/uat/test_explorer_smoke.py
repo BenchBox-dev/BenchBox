@@ -85,6 +85,18 @@ def test_short_circuits_on_build_failure(tmp_path: Path):
     assert len(invocations) == 1
 
 
+def test_default_playwright_fixture_dir_matches_serve_browser_tests_mount():
+    default = explorer_smoke._default_playwright_fixture_dir()
+    assert default == explorer_smoke.EXPLORER_DIR / "test-fixtures" / ".generated" / "data"
+
+    serve_script = explorer_smoke.EXPLORER_DIR / "scripts" / "serve-browser-tests.mjs"
+    serve_text = serve_script.read_text(encoding="utf-8")
+    assert '"test-fixtures", ".generated", "data"' in serve_text, (
+        "serve-browser-tests.mjs default fixture mount diverged from "
+        "_default_playwright_fixture_dir(); update both ends together"
+    )
+
+
 def test_requested_browser_projects_are_not_silently_dropped(tmp_path: Path):
     invocations: list[list[str]] = []
 
