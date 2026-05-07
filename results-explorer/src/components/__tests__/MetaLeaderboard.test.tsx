@@ -212,7 +212,10 @@ describe("MetaLeaderboard", () => {
     const rowOrder = () =>
       Array.from(container.querySelectorAll("tbody tr")).map((row) => row.textContent ?? "");
 
-    expect(screen.getByRole("radio", { name: "Avg rank over covered cohorts" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("group", { name: "Leaderboard display controls" })).toBeTruthy();
+    expect(screen.getByText("Sort")).toBeTruthy();
+    expect(screen.getByText("Mode")).toBeTruthy();
+    expect(screen.getByRole("radio", { name: "Avg rank" }).getAttribute("aria-checked")).toBe("true");
     expect(screen.getByRole("radio", { name: "Best cohort" })).toBeTruthy();
     expect(screen.getByRole("radio", { name: "Recent" })).toBeTruthy();
     expect(screen.getByRole("columnheader", { name: /Avg rank over covered cohorts/ })).toBeTruthy();
@@ -224,6 +227,28 @@ describe("MetaLeaderboard", () => {
     expect(screen.getByText("2/2 cohorts")).toBeTruthy();
     expect(screen.getByText("over 2/2")).toBeTruthy();
     expect(rowOrder()[0]).toContain("DuckDB");
+  });
+
+  it("shows visible cohort phase, metric, unit, and direction labels", () => {
+    render(<MetaLeaderboard data={DATA} mode="times" onModeChange={vi.fn()} />);
+
+    const header = screen.getByRole("columnheader", { name: /ClickBench SF0\.1/ });
+    expect(header.textContent).toContain("power · Geomean · ms · lower is faster");
+  });
+
+  it("does not focus the first leaderboard cell on initial render", () => {
+    render(<MetaLeaderboard data={DATA} mode="times" onModeChange={vi.fn()} />);
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    expect(firstCell.tabIndex).toBe(0);
+    expect(document.activeElement).not.toBe(firstCell);
+  });
+
+  it("speedup mode visibly explains below-1.00x values", () => {
+    render(<MetaLeaderboard data={DATA} mode="speedup" onModeChange={vi.fn()} />);
+
+    expect(screen.getByText(/Values < 1\.00x are slower than baseline/)).toBeTruthy();
+    expect(screen.getByText("0.50x")).toBeTruthy();
   });
 
   it("keeps avg-rank sorting over covered cohorts instead of penalizing missing coverage", () => {

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { route } from "preact-router";
 import type { MetaCohort, MetaLeaderboard as MetaLeaderboardData, MetaPlatform, MetaRank } from "@/types";
 import { colorForCell, lightnessForCell } from "@/lib/chartMath";
-import { fmtGeomean, fmtScore, humanizeBenchmark } from "@/utils";
+import { fmtGeomean, fmtScore } from "@/utils";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import {
@@ -39,10 +39,16 @@ const MODE_LABELS: Record<MetaLeaderboardMode, string> = {
 const AVG_RANK_LABEL = "Avg rank over covered cohorts";
 const COVERAGE_POLICY_COPY = "Missing cohorts are not scored; coverage is shown separately.";
 const SORT_LABELS: Record<MetaLeaderboardSort, string> = {
-  avg_rank: AVG_RANK_LABEL,
+  avg_rank: "Avg rank",
   coverage: "Coverage",
   best_rank: "Best cohort",
   recent_activity: "Recent",
+};
+const SORT_TITLES: Record<MetaLeaderboardSort, string> = {
+  avg_rank: AVG_RANK_LABEL,
+  coverage: "Sort by number of covered cohorts; missing cohorts are not scored.",
+  best_rank: "Sort by each platform's best rank in any visible cohort.",
+  recent_activity: "Sort by the most recent visible run date.",
 };
 const MISSING_COHORT_TITLE = `No published run for this cohort. ${COVERAGE_POLICY_COPY}`;
 const PLATFORM_RENDER_LIMIT = 200;
@@ -175,26 +181,39 @@ export function MetaLeaderboard({
             Absolute values, ranks, or speedup-vs-cohort-best across the visible cohorts.
           </p>
         </div>
-        <div class="flex flex-wrap items-center gap-3">
-          <SegmentedControl
-            ariaLabel="Sort leaderboard"
-            value={sortKey}
-            onChange={setSortKey}
-            options={(Object.keys(SORT_LABELS) as MetaLeaderboardSort[]).map((value) => ({
-              value,
-              label: SORT_LABELS[value],
-            }))}
-          />
-          <SegmentedControl
-            ariaLabel="Display mode"
-            value={mode}
-            onChange={onModeChange}
-            options={[
-              { value: "times", label: "Times", title: "Native metric values per cohort (lower is faster for ms; higher is better for power)" },
-              { value: "ranks", label: "Ranks", title: "Rank within each cohort (1 is best)" },
-              { value: "speedup", label: "Speedup", title: "Relative to cohort best (1.00x is best)" },
-            ]}
-          />
+        <div
+          role="group"
+          class="flex flex-wrap items-center gap-3 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-3 py-2"
+          aria-label="Leaderboard display controls"
+        >
+          <div class="flex items-center gap-2">
+            <span class="text-[11px] font-semibold uppercase tracking-wide text-[var(--bb-data-fg-subtle)]">Sort</span>
+            <SegmentedControl
+              ariaLabel="Sort leaderboard"
+              value={sortKey}
+              onChange={setSortKey}
+              size="sm"
+              options={(Object.keys(SORT_LABELS) as MetaLeaderboardSort[]).map((value) => ({
+                value,
+                label: SORT_LABELS[value],
+                title: SORT_TITLES[value],
+              }))}
+            />
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-[11px] font-semibold uppercase tracking-wide text-[var(--bb-data-fg-subtle)]">Mode</span>
+            <SegmentedControl
+              ariaLabel="Display mode"
+              value={mode}
+              onChange={onModeChange}
+              size="sm"
+              options={[
+                { value: "times", label: "Times", title: "Native metric values per cohort (lower is faster for ms; higher is better for power)" },
+                { value: "ranks", label: "Ranks", title: "Rank within each cohort (1 is best)" },
+                { value: "speedup", label: "Speedup", title: "Relative to cohort best (1.00x is best; below 1.00x is worse)" },
+              ]}
+            />
+          </div>
         </div>
       </div>
 
@@ -401,11 +420,11 @@ export function MetaLeaderboard({
 function cohortMetricSublabel(cohort: MetaCohort): string {
   const metric = cohort.primary_metric;
   const direction = cohort.primary_order === "desc" ? "higher is better" : "lower is faster";
-  if (metric === "power_score") return `Power score · ${direction}`;
-  if (metric === "display_geomean_ms") return `Geomean · ms · ${direction}`;
-  if (metric === "geomean_ms") return `Geomean · ms · ${direction}`;
-  if (metric === "total_duration_s") return `Total · s · ${direction}`;
-  return `${metric} · ${direction}`;
+  if (metric === "power_score") return `${cohort.phase} · Power score · ${direction}`;
+  if (metric === "display_geomean_ms") return `${cohort.phase} · Geomean · ms · ${direction}`;
+  if (metric === "geomean_ms") return `${cohort.phase} · Geomean · ms · ${direction}`;
+  if (metric === "total_duration_s") return `${cohort.phase} · Total · s · ${direction}`;
+  return `${cohort.phase} · ${metric} · ${direction}`;
 }
 
 function cellText(rank: MetaRank, cohort: MetaCohort, mode: MetaLeaderboardMode): string {
