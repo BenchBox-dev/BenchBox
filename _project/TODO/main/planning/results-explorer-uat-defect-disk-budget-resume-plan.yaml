@@ -44,17 +44,16 @@ work:
       Before w1, confirm the handoff figures still reproduce by inspecting
       the captured sweep artifacts:
 
-        wc -l ~/Developer/benchmark_runs/logs/uat_tuned_followup_20260505_pool02_rerun/coverage_cells.tsv
-        awk -F'\t' 'NR>1 {print $NF}' \
-          ~/Developer/benchmark_runs/logs/uat_tuned_followup_20260505_pool02_rerun/coverage_cells.tsv \
-          | sort | uniq -c
+        LOGS=~/Developer/benchmark_runs/logs/uat_tuned_followup_20260505_pool02_rerun
+        wc -l "$LOGS/coverage_cells.tsv"
+        awk -F'\t' 'NR>1 {print $4}' "$LOGS/coverage_cells.tsv" | sort | uniq -c
         du -sh /Users/joe/Developer/BenchBox.pool-02/benchmark_runs/datagen \
                 /Users/joe/Developer/BenchBox.pool-02/benchmark_runs/databases
 
-      Expected (handoff anchor): 1,503 candidate cells; 141 attempted
-      (114 passed, 25 failed, 2 timed out); 435 resource-budget blocked;
-      855 skipped unreachable; 8.6 GiB datagen + 21 GiB databases on
-      pool-02. Capture stdout under
+      Expected (handoff anchor): 1,504 TSV lines (header + 1,503
+      candidate cells); status split: 114 passed, 25 failed, 2 timed-out,
+      72 ladder-pruned, 435 resource-budget-blocked, 855 skipped-unreachable;
+      8.6 GiB datagen + 21 GiB databases on pool-02. Capture stdout under
       `_project/verification-logs/results-explorer-uat-defect-disk-budget-resume-plan/w0.log`
       and commit. If the figures have already drifted (e.g., pool-02
       cleanup ran first), update the description and gate w1 on what
@@ -67,10 +66,12 @@ work:
     notes: |
       Goal: a per-(platform, benchmark, scale) datagen + transient growth
       table that the estimator can consume. Sources:
-        - `~/Developer/benchmark_runs/datagen` and `databases` directories
-          from the 2026-05-05 sweep (8.6 GiB datagen, 21 GiB databases on
-          pool-02 alone — see `pool02-artifact-cleanup` TODO).
-        - Per-cell logs under
+        - `/Users/joe/Developer/BenchBox.pool-02/benchmark_runs/datagen`
+          and `/Users/joe/Developer/BenchBox.pool-02/benchmark_runs/databases`
+          from the 2026-05-05 sweep (handoff anchor: 8.6 GiB datagen,
+          21 GiB databases — see `pool02-artifact-cleanup` TODO).
+        - Shared-root mirrors under `~/Developer/benchmark_runs/` when the
+          pool-local tree has already drifted, plus per-cell logs under
           `~/Developer/benchmark_runs/logs/uat_tuned_followup_20260505_pool02_rerun/`.
       Output: `tests/uat/data/disk_budget_table.tsv` keyed by
       `(platform, benchmark, scale_factor)` with `peak_datagen_gib`,

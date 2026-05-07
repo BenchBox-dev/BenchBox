@@ -55,12 +55,15 @@ work:
       reproducible source:
 
         LOGS=~/Developer/benchmark_runs/logs/uat_tuned_followup_20260505_pool02_rerun
-        awk -F'\t' 'NR==1 || $NF=="skipped_unreachable" {print}' \
+        awk -F'\t' 'NR==1 || $4=="skipped-unreachable" {print}' \
           "$LOGS/coverage_cells.tsv" | wc -l
+        awk -F'\t' 'NR>1 {print $4}' "$LOGS/coverage_cells.tsv" | sort | uniq -c
         cat "$LOGS/coverage_platform_summary.tsv"
 
-      Capture stdout under
-      `_project/verification-logs/results-explorer-uat-defect-local-platform-provisioning/w0.log`
+      Expected (handoff anchor): 856 lines from the first command (header
+      + 855 skipped-unreachable cells), and a full status split matching
+      the handoff. Capture stdout under
+      `_project/verification-logs/results-explorer-uat-defect-local-platform-bring-up-automation/w0.log`
       and commit. If a platform listed in the description is now reachable
       (because it was provisioned independently), drop it from the w1
       inventory before authoring the runbook.
@@ -116,7 +119,7 @@ work:
 
   - id: w5
     summary: "Write the operator runbook in `docs/operations/uat-local-provisioning.md`"
-    needs: [w2]
+    needs: [w2, w3]
     status: pending
     notes: |
       Per-platform sections (16 entries) covering the document-only
