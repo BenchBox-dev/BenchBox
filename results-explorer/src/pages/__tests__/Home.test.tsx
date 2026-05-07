@@ -453,14 +453,14 @@ describe("Home", () => {
     await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
 
     const grid = screen.getByRole("grid", { name: "Cross-benchmark leaderboard" });
-    expect(within(grid).getByRole("link", { name: "ClickBench SF0.1" })).toBeTruthy();
-    expect(within(grid).getByRole("link", { name: "TPC-H SF1" })).toBeTruthy();
+    expect(within(grid).getByRole("link", { name: /^ClickBench SF0.1/ })).toBeTruthy();
+    expect(within(grid).getByRole("link", { name: /^TPC-H SF1/ })).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText("Benchmark"), { target: { value: "clickbench" } });
 
     await waitFor(() => {
-      expect(within(grid).getByRole("link", { name: "ClickBench SF0.1" })).toBeTruthy();
-      expect(within(grid).queryByRole("link", { name: "TPC-H SF1" })).toBeNull();
+      expect(within(grid).getByRole("link", { name: /^ClickBench SF0.1/ })).toBeTruthy();
+      expect(within(grid).queryByRole("link", { name: /^TPC-H SF1/ })).toBeNull();
     });
   });
 
@@ -503,7 +503,7 @@ describe("Home", () => {
     const grid = screen.getByRole("grid", { name: "Cross-benchmark leaderboard" });
     expect(within(grid).getByText("DuckDB")).toBeTruthy();
     expect(within(grid).queryByText("SQLite")).toBeNull();
-    expect(within(grid).queryByRole("link", { name: "TPC-H SF1" })).toBeNull();
+    expect(within(grid).queryByRole("link", { name: /^TPC-H SF1/ })).toBeNull();
 
     const resultCall = vi
       .mocked(queryRows)
@@ -516,7 +516,7 @@ describe("Home", () => {
     expect(String(resultCall?.[0])).toContain("cost_status IN (?)");
     expect(resultCall?.[1]).toEqual(["clickbench", 0.1, "power", "DuckDB", "DuckDB", "cloud", "normalized"]);
 
-    const cohortLink = within(grid).getByRole("link", { name: "ClickBench SF0.1" }) as HTMLAnchorElement;
+    const cohortLink = within(grid).getByRole("link", { name: /^ClickBench SF0.1/ }) as HTMLAnchorElement;
     expect(cohortLink.getAttribute("href")).toContain("sf=0.1");
     expect(cohortLink.getAttribute("href")).toContain("phase=power");
     expect(cohortLink.getAttribute("href")).toContain("platform=DuckDB");
@@ -581,7 +581,7 @@ describe("Home", () => {
     });
     expect(within(grid).getByText("SQLite")).toBeTruthy();
 
-    const cohortLink = within(grid).getByRole("link", { name: "ClickBench SF0.1" }) as HTMLAnchorElement;
+    const cohortLink = within(grid).getByRole("link", { name: /^ClickBench SF0.1/ }) as HTMLAnchorElement;
     expect(cohortLink.getAttribute("href")).toContain("/results/clickbench/");
     expect(cohortLink.getAttribute("href")).toContain("sf=0.1");
     expect(cohortLink.getAttribute("href")).toContain("phase=power");
