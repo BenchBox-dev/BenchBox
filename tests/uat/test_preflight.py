@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.uat import config
+from tests.uat import config, matrix
 from tests.uat.phases import preflight
 
 pytestmark = pytest.mark.fast
@@ -60,6 +60,33 @@ def test_local_platforms_check_aborts_document_only_platform(tmp_path: Path, mon
     )
 
     assert result.aborted is True
+    assert "lakesail" in (result.abort_reason or "")
+    assert "no automated UAT bring-up" in (result.abort_reason or "")
+
+
+def test_local_platforms_check_default_checker_probes_lakesail(tmp_path: Path, monkeypatch):
+    probe_calls: list[tuple[str, int]] = []
+
+    def fake_tcp_probe(host: str, port: int, timeout_s: float = 2.0) -> bool:
+        probe_calls.append((host, port))
+        return False
+
+    matrix.reset_reachability_cache()
+    monkeypatch.setattr(preflight, "free_space_gib", lambda path: 100.0)
+    monkeypatch.setattr(preflight, "docker_reachable", lambda: True)
+    monkeypatch.setattr(preflight, "host_load_1m", lambda: 0.5)
+    monkeypatch.setattr(matrix, "tcp_probe", fake_tcp_probe)
+
+    result = preflight.run_preflight(
+        free_space_path=tmp_path,
+        local_platforms_check=True,
+        requested_platforms=("lakesail",),
+    )
+
+    assert result.aborted is True
+    assert probe_calls == [("localhost", 50051)]
+    assert result.local_platforms_checked == ("lakesail",)
+    assert result.local_platforms_attempted == ()
     assert "lakesail" in (result.abort_reason or "")
     assert "no automated UAT bring-up" in (result.abort_reason or "")
 
