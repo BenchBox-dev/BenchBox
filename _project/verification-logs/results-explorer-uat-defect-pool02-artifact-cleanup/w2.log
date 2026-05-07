@@ -1,0 +1,31 @@
+# w2 evidence for results-explorer-uat-defect-pool02-artifact-cleanup
+# date: 2026-05-07
+# worktree: /Users/joe/Developer/BenchBox.pool-07
+# USER APPROVAL: explicit approval received in chat: "Approve"
+# DESTRUCTIVE SCOPE: only pool-02 benchmark_runs/datagen and benchmark_runs/databases; results preserved.
+
+$ du -sh /Users/joe/Developer/BenchBox.pool-02/benchmark_runs/datagen /Users/joe/Developer/BenchBox.pool-02/benchmark_runs/databases /Users/joe/Developer/BenchBox.pool-02/benchmark_runs/results
+3.1M	/Users/joe/Developer/BenchBox.pool-02/benchmark_runs/datagen
+ 36K	/Users/joe/Developer/BenchBox.pool-02/benchmark_runs/databases
+ 24K	/Users/joe/Developer/BenchBox.pool-02/benchmark_runs/results
+
+$ df -h /Users/joe/Developer/BenchBox.pool-02
+Filesystem      Size    Used   Avail Capacity iused ifree %iused  Mounted on
+/dev/disk3s5   228Gi   173Gi    25Gi    88%    2.3M  267M    1%   /System/Volumes/Data
+
+$ rm -rf /Users/joe/Developer/BenchBox.pool-02/benchmark_runs/datagen
+$ rm -rf /Users/joe/Developer/BenchBox.pool-02/benchmark_runs/databases
+
+$ test ! -d /Users/joe/Developer/BenchBox.pool-02/benchmark_runs/datagen && echo datagen_removed
+datagen_removed
+$ test ! -d /Users/joe/Developer/BenchBox.pool-02/benchmark_runs/databases && echo databases_removed
+databases_removed
+$ test -d /Users/joe/Developer/BenchBox.pool-02/benchmark_runs/results && echo results_preserved
+results_preserved
+
+$ du -sh /Users/joe/Developer/BenchBox.pool-02/benchmark_runs/results
+ 24K	/Users/joe/Developer/BenchBox.pool-02/benchmark_runs/results
+
+$ df -h /Users/joe/Developer/BenchBox.pool-02
+Filesystem      Size    Used   Avail Capacity iused ifree %iused  Mounted on
+/dev/disk3s5   228Gi   173Gi    25Gi    88%    2.3M  267M    1%   /System/Volumes/Data
