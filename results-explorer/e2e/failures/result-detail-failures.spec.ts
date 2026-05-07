@@ -20,10 +20,11 @@ test.describe("ResultDetail failure paths", () => {
 
     // The Home page surfaces the attach failure through the ErrorMessage
     // component, which renders an explicit `<h3>Error</h3>` over a message
-    // paragraph. Asserting on the role + the ErrorMessage wrapper keeps
-    // this tight: a stray "failed" or "could not" elsewhere in the DOM
-    // won't accidentally satisfy the assertion.
-    const errorBox = page.locator("div.bg-red-50").filter({
+    // paragraph and now carries `role="alert"` (post-retheme). Asserting
+    // on role="alert" + the inner heading keeps this tight without
+    // coupling to a Tailwind color literal that the token migration
+    // dropped.
+    const errorBox = page.locator("[role='alert']").filter({
       has: page.getByRole("heading", { name: /^Error$/ }),
     });
     await expect(errorBox).toBeVisible({ timeout: 20_000 });
