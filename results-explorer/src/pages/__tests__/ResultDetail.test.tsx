@@ -8,7 +8,7 @@
  *   (d) QueryTimingChart bar count matches display_timings.length
  */
 
-import { render, screen, fireEvent, waitFor } from "@testing-library/preact";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/preact";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { DetailResult } from "@/types";
 
@@ -146,16 +146,19 @@ describe("ResultDetail - median-first contract", () => {
     expect(screen.getByRole("button", { name: "Query Histogram" })).toBeTruthy();
   });
 
-  it("renders the run receipt before charts and timing tables", async () => {
+  it("renders primary summary and actions before the run receipt", async () => {
     render(<ResultDetail resultId="r1" />);
     await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
 
+    const summary = screen.getByRole("region", { name: "Result summary" });
     const receipt = screen.getByRole("region", { name: "Run receipt" });
     const chartsHeading = screen.getByText("Charts");
-    const timingsHeading = screen.getByRole("heading", { name: "Query Timings (2)" });
 
-    expect(receipt.compareDocumentPosition(chartsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(receipt.compareDocumentPosition(timingsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(summary).toHaveTextContent("Primary metric · higher is better");
+    expect(summary).toHaveTextContent("Power score");
+    expect(within(summary).getByRole("link", { name: "Compare this result" })).toBeTruthy();
+    expect(summary.compareDocumentPosition(receipt) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(chartsHeading.compareDocumentPosition(receipt) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(receipt).toHaveTextContent("Measurement samples");
     expect(receipt).toHaveTextContent("Download bundle");
   });

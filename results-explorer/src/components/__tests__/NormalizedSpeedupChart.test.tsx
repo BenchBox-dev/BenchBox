@@ -81,6 +81,18 @@ describe("NormalizedSpeedupChart", () => {
   // (d) Null timing entries render em-dash
   // -----------------------------------------------------------------------
 
+  it("renders a compact parity state when all query speedups are equal", () => {
+    const equalQueries = [
+      { queryId: "Q1", timings: [{ ms: 100, status: "pass" }, { ms: 100, status: "pass" }] },
+      { queryId: "Q2", timings: [{ ms: 200, status: "pass" }, { ms: 200, status: "pass" }] },
+    ];
+    const { container } = render(<NormalizedSpeedupChart queries={equalQueries} results={RESULTS} baselineIdx={0} />);
+
+    expect(screen.getByText("No meaningful per-query speedup difference")).toBeTruthy();
+    expect(screen.getByText(/2 compared query speedups are 1.00×/)).toBeTruthy();
+    expect(container.querySelector("svg")).toBeNull();
+  });
+
   it("null timing entry renders em-dash placeholder", () => {
     const queriesWithNull = [{ queryId: "Q1", timings: [{ ms: 100, status: "pass" }, null] }];
     render(<NormalizedSpeedupChart queries={queriesWithNull} results={RESULTS} baselineIdx={0} />);

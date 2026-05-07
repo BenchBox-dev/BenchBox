@@ -193,7 +193,7 @@ describe("Compare", () => {
     expect(summary.closest("section")).toHaveTextContent("2/2 fastest");
     expect(summary.compareDocumentPosition(chartsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(summary.compareDocumentPosition(queryDiffHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(queryDiffHeading.compareDocumentPosition(chartsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(chartsHeading.compareDocumentPosition(queryDiffHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("omits summary cost context when normalized costs are absent", async () => {
@@ -477,8 +477,13 @@ describe("Compare", () => {
     });
 
     expect(screen.queryByText(/Cannot compare results from different benchmarks/)).toBeNull();
+    const guardrails = screen.getByRole("region", { name: "Compare guardrails" });
     const receipt = screen.getByRole("region", { name: "Comparability receipt" });
     const summary = screen.getByRole("heading", { name: "Decision Summary" }).closest("section");
+    const queryDiff = screen.getByRole("heading", { name: "Query-Level Diff" }).closest("section");
+    expect(guardrails).toHaveTextContent(
+      "Winner claims are suppressed because benchmarks differ and scale factors differ.",
+    );
     expect(receipt).toHaveTextContent("Benchmark");
     expect(receipt).toHaveTextContent("Scale factor");
     expect(summary).toHaveTextContent("Not directly comparable: benchmarks differ and scale factors differ.");
@@ -486,10 +491,12 @@ describe("Compare", () => {
     expect(summary).not.toHaveTextContent("DuckDB leads by");
     expect(summary).not.toHaveTextContent("fastest");
     expect(screen.queryByText("vs worst")).toBeNull();
-    expect(screen.getByRole("heading", { name: "Query-Level Diff" })).toBeTruthy();
+    expect(queryDiff).toHaveTextContent(
+      "Winner claims are suppressed because benchmarks differ and scale factors differ",
+    );
   });
 
-  it("renders the comparability receipt before charts and query diff evidence", async () => {
+  it("keeps the detailed comparability receipt after decision and chart evidence", async () => {
     render(<Compare />);
     await waitFor(() => {
       expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
@@ -503,8 +510,8 @@ describe("Compare", () => {
     expect(receipt).toHaveTextContent("Query scope");
     expect(receipt).toHaveTextContent("Normalized cost");
     expect(receipt).toHaveTextContent("Cost model");
-    expect(receipt.compareDocumentPosition(chartsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(receipt.compareDocumentPosition(queryDiffHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(chartsHeading.compareDocumentPosition(receipt) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(queryDiffHeading.compareDocumentPosition(receipt) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("shows compare receipt warnings for tuning and environment differences", async () => {

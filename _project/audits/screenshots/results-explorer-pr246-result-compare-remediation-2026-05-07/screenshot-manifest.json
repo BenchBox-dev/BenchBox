@@ -1,0 +1,50 @@
+{
+  "captured_at": "2026-05-07T22:26:39.591Z",
+  "routes": [
+    {
+      "filename": "result-detail-duckdb-390.png",
+      "url": "/results/r/tpch-duckdb-sf0.01-20260403-010ee756",
+      "width": 390
+    },
+    {
+      "filename": "result-detail-duckdb-768.png",
+      "url": "/results/r/tpch-duckdb-sf0.01-20260403-010ee756",
+      "width": 768
+    },
+    {
+      "filename": "result-detail-duckdb-1280.png",
+      "url": "/results/r/tpch-duckdb-sf0.01-20260403-010ee756",
+      "width": 1280
+    },
+    {
+      "filename": "result-detail-duckdb-1600.png",
+      "url": "/results/r/tpch-duckdb-sf0.01-20260403-010ee756",
+      "width": 1600
+    },
+    {
+      "filename": "compare-duckdb-aws-390.png",
+      "url": "/results/compare?ids=tpch-duckdb-sf0.01-20260403-010ee756,tpch-fixture-aws-sql-sf0.01-20260403-e73da6ce",
+      "width": 390
+    },
+    {
+      "filename": "compare-duckdb-aws-768.png",
+      "url": "/results/compare?ids=tpch-duckdb-sf0.01-20260403-010ee756,tpch-fixture-aws-sql-sf0.01-20260403-e73da6ce",
+      "width": 768
+    },
+    {
+      "filename": "compare-duckdb-aws-1280.png",
+      "url": "/results/compare?ids=tpch-duckdb-sf0.01-20260403-010ee756,tpch-fixture-aws-sql-sf0.01-20260403-e73da6ce",
+      "width": 1280
+    },
+    {
+      "filename": "compare-duckdb-aws-1600.png",
+      "url": "/results/compare?ids=tpch-duckdb-sf0.01-20260403-010ee756,tpch-fixture-aws-sql-sf0.01-20260403-e73da6ce",
+      "width": 1600
+    },
+    {
+      "filename": "compare-mixed-scale-valid-1280.png",
+      "url": "/results/compare?ids=tpch-duckdb-sf0.01-20260403-010ee756,0820b170",
+      "width": 1280
+    }
+  ]
+}

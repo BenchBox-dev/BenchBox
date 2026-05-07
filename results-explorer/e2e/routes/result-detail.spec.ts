@@ -16,7 +16,9 @@ test.describe("ResultDetail", () => {
 
     // Trust badge and SF row are rendered synchronously beside the heading.
     const main = page.getByRole("main");
-    await expect(main.getByRole("region", { name: "Result summary" }).getByText(/SF\s*0\.01/)).toBeVisible();
+    await expect(
+      main.getByRole("region", { name: "Result summary" }).getByText("SF 0.01", { exact: true }),
+    ).toBeVisible();
 
     // Query Timings header is the stable landmark for the medians table.
     await expect(main.getByRole("heading", { name: /Query Timings/ })).toBeVisible();

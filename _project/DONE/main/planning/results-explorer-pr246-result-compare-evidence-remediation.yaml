@@ -1,0 +1,231 @@
+id: results-explorer-pr246-result-compare-evidence-remediation
+title: "Address PR #246 Result Detail and Compare hierarchy, chart, and guardrail findings"
+worktree: main
+priority: High
+status: Completed
+completed_date: "2026-05-07"
+category: Core Functionality
+
+description: |
+  PR #246 found that Result Detail and Compare are auditable but not yet sharp
+  enough for decision-making. Result Detail overweights the Run Receipt before
+  the primary metric/action, Compare overweights the Comparability Receipt
+  before the decision/chart read, mobile Result Detail charts clip, and the
+  same-cohort Compare speedup chart wastes large plot space for equal values.
+
+  This TODO turns those screenshots into a concrete implementation plan for
+  single-result interpretation and multi-result comparison. The goal is not to
+  demote reproducibility; it is to make reproducibility, metric interpretation,
+  comparability, baseline choice, and chart evidence work in the right order.
+
+deps:
+  needs:
+  - results-explorer-retheme-theme-system-foundation
+
+context_sections:
+  evidence_source: |
+    PR #246: https://github.com/joeharris76/BenchBox/pull/246
+    Audit artifact:
+    `_project/audits/results-explorer-hierarchy-usability-data-audit-20260507.md`
+  findings: |
+    Covers PR #246 findings VH-3, VH-4, DQ-3, DQ-4, and DQ-8.
+  screenshots: |
+    Baseline screenshots from PR #246:
+    - `result-detail-duckdb-390.png`
+    - `result-detail-duckdb-768.png`
+    - `result-detail-duckdb-1280.png`
+    - `result-detail-duckdb-1600.png`
+    - `compare-duckdb-aws-390.png`
+    - `compare-duckdb-aws-768.png`
+    - `compare-duckdb-aws-1280.png`
+    - `compare-duckdb-aws-1600.png`
+    - `compare-mixed-scale-valid-1280.png`
+  related_existing_todos: |
+    Stay aligned with `results-explorer-retheme-result-and-compare` and
+    `results-explorer-retheme-responsive-accessibility`.
+
+work:
+- id: w1
+  summary: "Map the first-viewport decision hierarchy for Result Detail and Compare"
+  status: done
+  notes: |
+    For Result Detail, define the first read as:
+      - benchmark/workload;
+      - platform;
+      - scale and phase;
+      - primary metric and unit;
+      - trust and validation;
+      - run date;
+      - primary actions such as compare, download, copy/reproduce.
+
+    For Compare, define the first read as:
+      - whether the results are comparable;
+      - winner/suppression state;
+      - baseline;
+      - headline ratio/delta;
+      - query wins/losses/same counts;
+      - chart/table path for details.
+
+- id: w2
+  summary: "Redesign Result Detail top summary and receipt placement"
+  needs: [w1]
+  status: done
+  notes: |
+    Replace inline receipt metrics with a compact summary module or metric
+    cards. Keep Run Receipt visible enough to support auditability, but do
+    not let receipt/environment metadata consume the whole first analytical
+    viewport. Group `Compare this result`, download, and reproducibility
+    actions consistently near the top summary.
+
+    Acceptance evidence:
+    - recaptured 390px and 1280px detail screenshots show primary metrics and
+      at least one primary action before detailed receipt sections dominate;
+    - trust/validation/source labels are visible but subordinate to the
+      primary metric.
+
+- id: w3
+  summary: "Redesign Compare top summary, comparability receipt, and baseline control"
+  needs: [w1]
+  status: done
+  notes: |
+    Compare must lead with a compact comparability status and decision
+    summary. Move baseline controls close to ratio/delta interpretation. Keep
+    warning counts and specific differences visible, but collapse or compact
+    matched receipt details so the first viewport does not read as a receipt
+    inventory before showing the comparison outcome.
+
+- id: w4
+  summary: "Fix Result Detail chart clipping and responsive chart bounds"
+  needs: [w2]
+  status: done
+  notes: |
+    The `result-detail-duckdb-390.png` evidence shows the chart extending past
+    the mobile card. Constrain SVG/chart width to its container, recompute
+    margins at narrow widths, and keep labels legible without horizontal page
+    overflow. Add coverage that would fail if the SVG exceeds the card or if
+    right-side labels are clipped.
+
+- id: w5
+  summary: "Fix Compare speedup chart domain, whitespace, and equal-value state"
+  needs: [w3]
+  status: done
+  notes: |
+    The `compare-duckdb-aws-1280.png` evidence shows equal or near-equal
+    `1.00x` values collapsing into a sparse vertical stack with huge empty
+    plot area. Use a dynamic domain, a clearer two-result default chart, or a
+    compact "no meaningful difference" state. Keep baseline axis/legend text
+    visible and do not rely on color alone.
+
+- id: w6
+  summary: "Keep comparability suppression attached to tables and charts"
+  needs: [w3, w5]
+  status: done
+  notes: |
+    The mixed-scale evidence correctly shows `Scale factor differs` and
+    `Claims suppressed`, but the query diff remains visible below. Repeat or
+    pin suppression context near query-level values and charts whenever severe
+    benchmark/scale/platform mismatches suppress winner claims.
+
+- id: w7
+  summary: "Add focused Result Detail and Compare regression tests"
+  needs: [w2, w3, w4, w5, w6]
+  status: done
+  notes: |
+    Tests should cover:
+      - first-viewport summary labels for detail and compare;
+      - primary metric unit/direction labels;
+      - baseline selector accessible name and state;
+      - comparability warning/suppression labels;
+      - chart container not overflowing at 390px and 768px where feasible;
+      - equal-value compare chart/state with no misleading whitespace.
+
+- id: w8
+  summary: "Recapture Result Detail and Compare PR #246 evidence"
+  needs: [w7]
+  status: done
+  notes: |
+    Capture Result Detail and Compare at 390px, 768px, 1280px, and 1600px,
+    plus the mixed-scale Compare guardrail. Store after evidence under
+    `_project/audits/` and compare directly with the PR #246 filenames listed
+    in this TODO.
+
+must_preserve:
+- "Result Detail route `/results/r/{result_id}`."
+- "Compare route `?ids=` share URL contract and compact ID canonicalization."
+- "Run Receipt reproducibility details, download links, and provenance metadata."
+- "Comparability receipt logic and winner-claim suppression behavior."
+- "Benchmark-derived primary metric semantics."
+
+approach: |
+  First decide the reading order, then adjust components. Avoid changing
+  comparability logic while fixing presentation unless a test proves the logic
+  is wrong. Use shared chart and status primitives where available. Verify with
+  both same-cohort and mixed-scale compare cases from PR #246.
+
+anti_patterns:
+- "DO NOT bury reproducibility so far down the page that a result no longer feels auditable."
+- "DO NOT claim or imply a winner when comparability logic suppresses winner claims."
+- "DO NOT use chart labels that overflow the SVG or require horizontal page scroll."
+- "DO NOT default to a sparse chart when a two-result equal-value state is clearer."
+- "DO NOT introduce a user-selectable primary metric toggle unless the benchmark-derived metric contract is intentionally
+  reopened."
+
+verification:
+- description: "Result Detail and Compare tests pass"
+  command: "cd results-explorer && npm test -- src/pages/__tests__/ResultDetail.test.tsx src/pages/__tests__/Compare.test.tsx
+    src/components/__tests__/CompareSummary.test.tsx src/components/__tests__/ComparabilityReceipt.test.tsx src/components/__tests__/QueryDiffTable.test.tsx"
+  expected_output: "all targeted tests pass"
+- description: "Chart smoke tests pass"
+  command: "cd results-explorer && npm test -- src/components/__tests__/charts.smoke.test.tsx src/components/__tests__/ChartPanel.test.tsx"
+  expected_output: "chart tests pass"
+- description: "Manual PR #246 detail/compare recapture is clean"
+  command: "echo 'Manual: recapture Result Detail and Compare at 390, 768, 1280, 1600 plus mixed-scale Compare and compare
+    against PR #246 screenshots'"
+  expected_output: "manual evidence shows VH-3, VH-4, DQ-3, DQ-4, and DQ-8 resolved or explicitly deferred"
+
+scope_limit:
+  only_modify:
+  - "results-explorer/src/pages/ResultDetail.tsx"
+  - "results-explorer/src/pages/Compare.tsx"
+  - "results-explorer/src/components/RunReceipt.tsx"
+  - "results-explorer/src/components/ComparabilityReceipt.tsx"
+  - "results-explorer/src/components/CompareSummary.tsx"
+  - "results-explorer/src/components/QueryDiffTable.tsx"
+  - "results-explorer/src/components/ChartPanel.tsx"
+  - "results-explorer/src/components/*Chart*.tsx"
+  - "results-explorer/src/pages/__tests__/ResultDetail.test.tsx"
+  - "results-explorer/src/pages/__tests__/Compare.test.tsx"
+  - "results-explorer/src/components/__tests__/"
+  - "results-explorer/e2e/"
+  - "_project/audits/"
+  do_not_modify:
+  - "results-data/"
+  - "benchbox/"
+
+success_metrics:
+- "Result Detail first viewport shows primary metric and primary action before detailed receipt sections dominate."
+- "Compare first viewport shows comparability status, baseline, decision summary, and chart/table path in a clear order."
+- "Result Detail chart does not clip at 390px."
+- "Same-cohort equal-value Compare does not waste most chart area on empty domain."
+- "Mixed-scale Compare keeps suppression context attached to derived values."
+
+metadata:
+  tags:
+  - results-explorer
+  - pr246
+  - result-detail
+  - compare
+  - charts
+  estimated_effort: "Medium (~2-3 days)"
+  created_date: "2026-05-07"
+
+impact:
+  business_value: |
+    Strengthens the pages where users decide whether a result is credible and
+    whether two runs can be compared.
+  user_impact: |
+    Users see the decision, metric, baseline, and comparability guardrails
+    before dense receipt and query details.
+  technical_debt: |
+    Consolidates chart sizing, receipt hierarchy, and comparability-status
+    presentation around testable patterns.
