@@ -1,0 +1,126 @@
+id: audit-report-sha-pinning
+title: "Require structured _project/audits/ reports to record the develop SHA they describe and refuse READY when stale"
+worktree: main
+priority: Medium
+status: Not Started
+category: Quality
+
+description: |
+  PR #277 closed the first suggested step from blind-spot
+  `2026-05-07-211858-release-readiness-against-pre-merge-tree` (the
+  token-scan CI gate). Three suggested steps remain:
+
+  2. Update the release-final capture flow to record the develop SHA the
+     capture was generated from in the audit report, and add a CI job
+     that refuses a "READY" verdict until the SHA matches the merge
+     target's tip.
+  3. Generalize: any structured report under `_project/audits/` should
+     include the develop SHA it describes, and reviewers should refuse
+     to merge a release-readiness PR whose report SHA is older than the
+     merge target.
+  4. Sweep: re-run `_project/audits/results-explorer-retheme-final-2026-05-07.md`
+     with a capture against develop tip after PR #271 lands, so the
+     artifact set reflects the shipped state.
+
+  These three are about *audit report freshness against the merge target*
+  — a class of governance/process gap that is not specific to the
+  retheme. A retheme-only solution (PR #277's token-scan gate) is
+  necessary but not sufficient: any audit-style PR (security review,
+  performance baseline, docs migration) has the same exposure if the
+  report and the merge are not regenerated together.
+
+  The proposed direction:
+
+  - **Schema**: introduce a required `develop_sha:` frontmatter field
+    on structured `_project/audits/*.md` reports. Capture spec emits
+    it via `git rev-parse HEAD`; reviewers see it on every report.
+  - **Gate**: add a make target / CI step that refuses a "READY"
+    verdict when `develop_sha` is older than `merge_base(HEAD,
+    origin/develop)`. Initially a content-guard subcheck for paths
+    matching `_project/audits/**.md`; can graduate to a separate job
+    if scope grows.
+  - **Sweep step (4)**: regenerate the retheme final report against
+    current develop tip in a separate, narrowly scoped PR. Out of scope
+    here unless this TODO promotes step 4 explicitly.
+
+deps:
+  needs:
+  - results-explorer-token-scan-ci-gate
+
+work:
+- id: w1
+  summary: "Define the audit report frontmatter schema (develop_sha + verdict + generated_at)"
+  status: pending
+
+- id: w2
+  summary: "Add validate_audit_report.py under _project/scripts/ enforcing schema + SHA freshness"
+  needs: [w1]
+  status: pending
+
+- id: w3
+  summary: "Wire validation into pr.yml content-guard for paths matching _project/audits/**.md"
+  needs: [w2]
+  status: pending
+
+- id: w4
+  summary: "Backfill develop_sha into the existing structured audit reports under _project/audits/"
+  needs: [w3]
+  status: pending
+
+- id: w5
+  summary: "Regenerate _project/audits/results-explorer-retheme-final-2026-05-07.md against develop tip (blind-spot step 4)"
+  needs: [w4]
+  status: pending
+
+must_preserve:
+- "Existing audit report bodies — schema additions are additive, not rewrites."
+- "Content-guard PR job semantics — the new check is path-scoped to _project/audits/**.md."
+
+anti_patterns:
+- "DO NOT block content-only PRs that don't touch _project/audits/ — the validation is path-aware."
+- "DO NOT enforce SHA freshness on draft / WIP reports — schema validation OK, freshness check should require a verdict==READY frontmatter to fire."
+
+verification:
+- description: "Audit reports without develop_sha are rejected"
+  command: "echo '---\nverdict: READY\n---\n# stub' > /tmp/stub-audit.md && uv run --project _project/scripts -- python _project/scripts/validate_audit_report.py /tmp/stub-audit.md"
+  expected_output: "non-zero exit (missing develop_sha)"
+- description: "Audit reports with stale develop_sha are rejected when verdict==READY"
+  command: "uv run --project _project/scripts -- python _project/scripts/validate_audit_report.py _project/audits/<stale fixture>.md"
+  expected_output: "non-zero exit (SHA older than merge target)"
+- description: "Existing audit reports validate after backfill"
+  command: "for f in _project/audits/*.md; do uv run --project _project/scripts -- python _project/scripts/validate_audit_report.py \"$f\" || exit 1; done"
+  expected_output: "exit 0 across all reports"
+
+scope_limit:
+  only_modify:
+  - "_project/audits/"
+  - "_project/scripts/"
+  - ".github/workflows/pr.yml"
+  - "docs/operations/"
+  do_not_modify:
+  - "results-explorer/src/"
+  - "results-data/"
+  - "benchbox/"
+
+metadata:
+  tags:
+  - quality
+  - ci
+  - audits
+  - blind-spot-residual
+  estimated_effort: "Medium (~2 days)"
+  created_date: "2026-05-08"
+
+impact:
+  business_value: |
+    Closes the remaining surface from the L2 blind-spot
+    2026-05-07-211858-release-readiness-against-pre-merge-tree:
+    audit-style PRs across security, performance, docs, and retheme all
+    lose their structural unreliability when the report describes a
+    different tree than the one shipping.
+  user_impact: |
+    Indirect: audit reports linked from public docs accurately describe
+    the shipped state instead of a pre-merge approximation.
+  technical_debt: |
+    Generalizes a single-class fix (retheme token scan) into a durable
+    audit-report contract that scales to future audit-style PRs.

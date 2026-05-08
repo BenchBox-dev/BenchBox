@@ -1,0 +1,92 @@
+id: explorer-tokens-path-classifier-output
+title: "Expose explorer-paths-needed from path_filter_decision so the explorer-tokens job stops booting on Python-only PRs"
+worktree: main
+priority: Low
+status: Not Started
+category: Quality
+
+description: |
+  PR #277 added the `explorer-tokens` PR-time job in
+  `.github/workflows/pr.yml`. It is gated on
+  `needs.ci-paths.outputs.needs-code-ci == 'true'`, which is true for any
+  code-CI path (`benchbox/**`, `tests/**`, `scripts/**`, …), so the job
+  boots a runner on every Python-only PR before its inner
+  `Detect results-explorer/src changes` step short-circuits the scan.
+
+  Add an `explorer-paths-needed` boolean output to
+  `scripts/path_filter_decision.py` (mirror the existing
+  `content-guard-needed` pattern) and switch the job's `if:` to use it.
+  The inner detection step can then be removed.
+
+  The classifier already has the matching pattern infrastructure;
+  `results-explorer/**` is in `.github/path-filters.yml` `code-ci`. A
+  narrower pattern set (e.g. a new `explorer-tokens` rule key matching
+  `results-explorer/src/**`) is the cleanest fit.
+
+deps: {}
+
+work:
+- id: w1
+  summary: "Add explorer-tokens rule key to .github/path-filters.yml matching results-explorer/src/**"
+  status: pending
+
+- id: w2
+  summary: "Extend path_filter_decision.py to compute explorer_paths and emit explorer-paths-needed"
+  needs: [w1]
+  status: pending
+
+- id: w3
+  summary: "Add unit tests under tests/unit/scripts/test_path_filter_decision.py for the new output"
+  needs: [w2]
+  status: pending
+
+- id: w4
+  summary: "Switch pr.yml explorer-tokens job to gate on explorer-paths-needed and drop the inner git diff detection step"
+  needs: [w3]
+  status: pending
+
+must_preserve:
+- "Existing ci-paths outputs (safe-content-only, needs-code-ci, content-guard-needed) and their semantics."
+- "ci-required-result aggregator behavior — explorer-tokens skipped path still counts as success."
+
+anti_patterns:
+- "DO NOT widen the explorer-tokens scan rule beyond results-explorer/src/** — the gate's purpose is the retheme contract on the public surface, not the e2e/test fixtures."
+
+verification:
+- description: "Classifier returns explorer-paths-needed=true when results-explorer/src changes"
+  command: "uv run -- python -m pytest tests/unit/scripts/test_path_filter_decision.py -k explorer -v"
+  expected_output: "all tests pass"
+- description: "PR-time job no longer boots on a Python-only PR"
+  command: "gh pr view <next python-only PR after merge> --json statusCheckRollup --jq '.statusCheckRollup[] | select(.name==\"explorer-tokens\")'"
+  expected_output: "explorer-tokens skipped (no runner spent)"
+
+scope_limit:
+  only_modify:
+  - "scripts/path_filter_decision.py"
+  - "tests/unit/scripts/test_path_filter_decision.py"
+  - ".github/path-filters.yml"
+  - ".github/workflows/pr.yml"
+  do_not_modify:
+  - "_project/scripts/scan_explorer_tokens.py"
+  - "results-explorer/src/"
+
+metadata:
+  tags:
+  - quality
+  - ci
+  - results-explorer
+  - tokenization
+  estimated_effort: "Small (~half day)"
+  created_date: "2026-05-08"
+
+impact:
+  business_value: |
+    Saves a runner-minute per Python-only PR. Modest individually,
+    additive across the PR queue.
+  user_impact: |
+    None directly. Faster PR feedback when the explorer-tokens job is
+    correctly classified as not-needed.
+  technical_debt: |
+    Brings the explorer-tokens gate in line with the existing
+    path-classifier idiom rather than carrying an inline git-diff
+    detection step that duplicates the classifier's job.

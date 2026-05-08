@@ -403,9 +403,10 @@ clean:
 	find . -name '*.pyo' -delete
 	find . -name '.DS_Store' -delete
 
-# Linting (ruff only)
+# Linting (ruff + explorer token scan)
 lint:
 	uv run ruff check .
+	$(MAKE) lint-explorer-tokens
 
 # Dependency audit - checks that every declared dep has an import site or is allowlisted.
 # Fails if an unused dep is introduced. See _project/scripts/dependency_audit/.
@@ -479,6 +480,7 @@ ci-lint:
 	uv run ruff format --check .
 	uv run ty check
 	$(MAKE) lint-markers
+	$(MAKE) lint-explorer-tokens
 	$(MAKE) skill-sync-check
 	uv run -- python _project/scripts/timing_policy_check.py --strict
 	$(MAKE) compat-docs-check
