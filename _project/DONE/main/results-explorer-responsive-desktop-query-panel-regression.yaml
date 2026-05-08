@@ -3,7 +3,7 @@ title: "Fix or relax responsive.spec.ts query workbench desktop assertion (regre
 worktree: main
 priority: Medium
 status: Completed
-completed: 2026-05-08
+completed_date: "2026-05-08"
 category: Frontend / Test Infrastructure
 
 description: |

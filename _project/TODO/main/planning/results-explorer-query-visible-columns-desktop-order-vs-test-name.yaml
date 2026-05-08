@@ -1,0 +1,141 @@
+id: results-explorer-query-visible-columns-desktop-order-vs-test-name
+title: "Resolve Query workbench desktop ordering vs `responsive.spec.ts` test-name semantic"
+worktree: main
+priority: Low
+status: Not Started
+category: Frontend / Test Infrastructure
+
+description: |
+  PR #276 (`fix(explorer): tighten Query workbench desktop intro to keep
+  results panel above the fold`) closed the failing `responsive.spec.ts`
+  desktop assertion by trimming 12px of vertical space above the grid at
+  lg+ widths only. That fix passes the numeric `expectTopWithin(...,
+  maxY=900)` check (panel.top is now 897), but it leaves two related soft
+  issues that the PR #276 review surfaced and explicitly deferred:
+
+  1) **Layout/test-name semantic mismatch.** The test is titled
+     "query workbench renders summary, active filters, and rows
+     **before deep controls** at desktop", but `query-visible-columns`
+     keeps `lg:order-1` (in
+     `results-explorer/src/pages/Query.tsx:697`), so at desktop the
+     column-toggle UI still renders **above** the summary and rows. The
+     numeric assertion passes but the test name promises ordering the
+     layout does not deliver.
+
+  2) **Brittle 3px desktop budget.** After PR #276, panel.top = 897
+     against `maxY = 900` at desktop. Any future change that adds a
+     border, a font-metrics tick, or a half-line wrap on the intro
+     paragraph at the desktop viewport (1280×900) will retrip the same
+     assertion. Comment landed in PR #277 alongside this TODO; this
+     TODO is the durable answer.
+
+  Resolving (1) structurally also resolves (2): if `query-visible-columns`
+  drops `lg:order-1` (or moves to `lg:order-5` so the right-column flex
+  order at desktop becomes summary → panel → details → visible-columns),
+  panel.top drops from 897 to ≈399, leaving ≈500px of headroom against
+  `maxY=900`.
+
+  Two reasonable resolutions:
+    a) **Restructure the layout to match the test name.** Drop
+       `lg:order-1` from `query-visible-columns` so the section's flex
+       order at desktop is summary → panel → details → visible-columns,
+       matching the test's "rows before deep controls" promise. UX
+       change: the column-toggle UI moves from the top of the right
+       column to the bottom at desktop. Mobile/tablet ordering is
+       already this way (visible-columns at the bottom via `order-5`).
+    b) **Rename the test and document the lg-order intent.** Keep the
+       `lg:order-1` placement (PR #120's design intent of putting
+       column configuration above the table at desktop) and rename the
+       test to something like "renders summary, results panel, and
+       deep controls within the desktop viewport budget" so the title
+       matches what the assertions actually check.
+
+  Resolution (a) is preferable because it removes a documented
+  inconsistency and gives the desktop budget durable headroom; (b) is
+  acceptable if PR #120's design intent is still load-bearing.
+
+deps:
+  needs: []
+
+context_sections:
+  evidence_source: |
+    PR #276 review (in-session with Claude on 2026-05-08) flagged the
+    semantic mismatch and brittleness. The DOM probe captured during
+    that session showed `query-results-panel.top = 909` at all
+    desktop+ widths under `lg:order-1`; with `lg:order-1` removed the
+    panel would land at ≈399 (computed: section start 251 + summary
+    132 + 16 gap = 399).
+  related_pr_history: |
+    PR #120 (a42c65690) introduced `lg:order-1` on
+    `query-visible-columns`, putting the column-toggle UI above the
+    table at desktop only. PR #266/#270/#272 did not touch the lg
+    order. PR #276 (this TODO's parent) tightened intro spacing 12px
+    at lg+ to fit the existing panel into the existing budget.
+  affected_files: |
+    - results-explorer/src/pages/Query.tsx (line 697 — the
+      `lg:order-1` class on `query-visible-columns`)
+    - results-explorer/e2e/responsive.spec.ts:89 (the test name and
+      assertions in question)
+
+work:
+  - id: w1
+    summary: "Decide between layout restructure (a) or test rename (b)"
+    status: pending
+    notes: |
+      Read PR #120's PR description and the visible-columns design
+      rationale. If PR #120's intent (configure-columns-first at
+      desktop) is still load-bearing, choose (b); otherwise (a).
+      Document the chosen rationale in the work-unit notes so the
+      next reviewer sees the decision trail.
+
+  - id: w2
+    summary: "Apply the chosen change"
+    needs: [w1]
+    status: pending
+    notes: |
+      For (a): single-line edit removing `lg:order-1` from
+      `results-explorer/src/pages/Query.tsx:697` (or replacing with
+      `lg:order-5`); also drop the now-vestigial `mb-6 lg:mb-3` from
+      Query.tsx:494 added by PR #276 since the budget no longer
+      requires the lg-only tighten.
+      For (b): rename the test at
+      `results-explorer/e2e/responsive.spec.ts:89` and add a one-line
+      comment near `query-visible-columns` documenting the lg-order
+      intent.
+
+  - id: w3
+    summary: "Re-run responsive grep end-to-end and capture verification"
+    needs: [w2]
+    status: pending
+    notes: |
+      `cd results-explorer && npx playwright test --project=chromium --grep 'responsive|layout|a11y|mobile' --workers=1`.
+      Capture to
+      `_project/verification-logs/results-explorer-query-visible-columns-desktop-order-vs-test-name/responsive-grep.log`.
+      For resolution (a), also include a DOM probe confirming
+      panel.top dropped meaningfully (target: ≤500 at 1280/1440/1600).
+
+verification:
+  - description: "Responsive grep stays green end-to-end"
+    command: "cd results-explorer && npx playwright test --project=chromium --grep 'responsive|layout|a11y|mobile' --workers=1"
+    expected_output: "exit 0; 24+ passed, 0 failed"
+  - description: "If resolution (a): panel.top has ≥100px headroom at desktop"
+    command: "cd results-explorer && npx playwright test --project=chromium e2e/responsive.spec.ts:89 --grep desktop"
+    expected_output: "exit 0 with measurable margin (manual probe ≤800)"
+
+must_preserve:
+  - "Mobile/tablet ordering: results panel above visible-columns (the existing `order-3` < `order-5` invariant)."
+  - "All `data-testid`s on `query-visible-columns`, `query-results-panel`, `query-result-summary`, and `query-mobile-filter-drawer` — downstream tests rely on them."
+  - "`maxY=1200` budgets at mobile/tablet."
+
+anti_patterns:
+  - "DO NOT silently `test.skip` the failing assertion if a future regression retripps the desktop budget."
+  - "DO NOT relax `maxY` at mobile/tablet — only desktop is at issue."
+  - "DO NOT delete the desktop-budget comment in `responsive.spec.ts` added by PR #277 without first resolving this TODO."
+
+scope_limit:
+  only_modify:
+    - "results-explorer/src/pages/Query.tsx (one to two lines around the `query-visible-columns` and intro container if resolving (a); else untouched)"
+    - "results-explorer/e2e/responsive.spec.ts (test title + comment if resolving (b); else untouched)"
+  do_not_touch:
+    - "Other pages or layouts in results-explorer/src/pages/."
+    - "The desktop-budget comment block on `VIEWPORTS` in `responsive.spec.ts` (it documents the budget regardless of which resolution is chosen)."
