@@ -323,16 +323,15 @@
     /* Compact "←/→ scroll" cue for dense tables that overflow at narrow
        widths. Pair with `overflow-x-auto` on the parent so the table
        still scrolls; this label only signals scrollability so users
-       don't think they are seeing a clipped view. */
+       don't think they are seeing a clipped view. Threshold matches
+       --bb-bp-mobile inclusively so 768px tablets (where dense
+       cohort/query tables still overflow horizontally) keep the cue. */
     .bb-scroll-affordance {
         display: none;
         font-size: var(--bb-text-xs);
         color: var(--bb-data-fg-subtle);
     }
-    /* 47.999rem = --bb-bp-mobile (48rem) - 0.001rem.
-       var() and calc() are not supported in @media queries,
-       so this literal must stay in sync with --bb-bp-mobile above. */
-    @media (max-width: 47.999rem) {
+    @media (max-width: 48rem) {
         .bb-scroll-affordance {
             display: inline-flex;
             align-items: center;

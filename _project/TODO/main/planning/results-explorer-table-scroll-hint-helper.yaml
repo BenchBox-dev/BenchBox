@@ -1,0 +1,89 @@
+id: results-explorer-table-scroll-hint-helper
+title: "Extract a shared TableScrollHint helper to converge bb-scroll-affordance copies"
+worktree: main
+priority: Low
+status: Not Started
+category: Frontend / Refactor
+
+description: |
+  PR #270 added the `bb-scroll-affordance` cue across six dense tables
+  (Home recent results, MetaLeaderboard, DataTable, Query results, Query SQL,
+  ResultDetail timings, ResultDetail samples, QueryDiff). PR #270's follow-up
+  (this branch) standardized placement so the hint always sits OUTSIDE the
+  `.overflow-x-auto` container — but the copies still duplicate the same
+  `<div class="mb-2 flex justify-end"><span class="bb-scroll-affordance">…</span></div>`
+  scaffolding in 6+ places.
+
+  Extract a `<TableScrollHint testId="…" label="…" />` helper that owns the
+  layout + class wiring, and refactor every existing call site to use it.
+  Optional: also accept an `onlyWhenOverflowing` prop that gates visibility
+  on `scrollWidth > clientWidth` for parity with the QueryHeatmap pattern at
+  `results-explorer/src/components/QueryHeatmap.tsx`.
+
+deps:
+  needs: []
+
+context_sections:
+  evidence_source: |
+    Post-merge review of PR #270 (fix/pr246-responsive-navigation-overflow)
+    flagged the duplicated scaffolding. The follow-up PR
+    `fix/pr270-followups-affordance-breakpoint` standardized placement but
+    deliberately did NOT introduce a helper — that is what this TODO owns.
+  current_call_sites: |
+    `results-explorer/src/pages/Home.tsx` (recent-results hint)
+    `results-explorer/src/pages/Query.tsx` (results + SQL hints, inside meta bar)
+    `results-explorer/src/pages/ResultDetail.tsx` (timings + samples hints)
+    `results-explorer/src/components/MetaLeaderboard.tsx`
+    `results-explorer/src/components/QueryDiffTable.tsx`
+    `results-explorer/src/components/DataTable.tsx`
+
+work:
+  - id: w1
+    summary: "Add TableScrollHint component with the standardized markup"
+    status: pending
+    notes: |
+      New file `results-explorer/src/components/TableScrollHint.tsx` exporting
+      `<TableScrollHint testId={string} label={string} className?={string} />`.
+      Default label is "← scroll →"; Home/MetaLeaderboard pass the longer
+      "Scroll table for more columns →" / "Scroll table for more cohorts →"
+      copy.
+
+  - id: w2
+    summary: "Refactor existing call sites to use TableScrollHint"
+    needs: [w1]
+    status: pending
+    notes: |
+      Replace inline `<span class="bb-scroll-affordance">` in each call site
+      with `<TableScrollHint />`. Preserve every existing data-testid so
+      Playwright assertions in `responsive.spec.ts` keep working unchanged.
+
+  - id: w3
+    summary: "Optional: gate hint on actual overflow"
+    needs: [w2]
+    status: pending
+    notes: |
+      Add `onlyWhenOverflowing` boolean prop. When true, the helper measures
+      the nearest `[data-scroll-container]` ancestor and only renders when
+      `scrollWidth > clientWidth`. Mirrors QueryHeatmap behavior. Adopt on
+      DataTable first (its callers may have few-column tables that don't
+      actually overflow) before the dense tables.
+
+verification:
+  - description: "Helper exists and is exported"
+    command: "test -f results-explorer/src/components/TableScrollHint.tsx"
+    expected_output: "exit 0"
+  - description: "No remaining inline `bb-scroll-affordance` spans outside the helper"
+    command: "grep -rE 'bb-scroll-affordance' results-explorer/src/ --exclude-dir=__tests__ | grep -v 'TableScrollHint.tsx' | grep -v 'index.css'"
+    expected_output: "no matches"
+  - description: "responsive Playwright grep still passes"
+    command: "cd results-explorer && npx playwright test --project=chromium --grep responsive"
+    expected_output: "exit 0"
+
+must_preserve:
+  - "All existing `data-testid` values for scroll hints — Playwright responsive.spec.ts and capture spec depend on them"
+  - "Hint placement OUTSIDE `.overflow-x-auto` (so the hint stays put when the user scrolls)"
+  - "CSS visibility threshold (`max-width: 48rem`) — the helper renders the same `bb-scroll-affordance` class, no inline display override"
+
+anti_patterns:
+  - "DO NOT inline new `bb-scroll-affordance` spans after the helper exists — every cue should route through the helper"
+  - "DO NOT silently change copy on the longer Home/MetaLeaderboard hints; they intentionally describe what scrolls"
