@@ -43,7 +43,7 @@ export function QueryDiffTable({ results, baselineIndex = 0, suppressionReason =
       </div>
 
       {suppressionReason && (
-        <div class="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+        <div class="mb-4 rounded-md tone-warning border border-[var(--bb-data-border)] px-3 py-2 text-xs">
           Winner claims are suppressed because {suppressionReason}; use these query values as raw evidence only.
         </div>
       )}

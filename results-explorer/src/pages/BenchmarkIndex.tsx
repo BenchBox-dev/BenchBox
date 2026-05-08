@@ -543,7 +543,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
       {viewMode === "matrix" && (
         <>
           {summaryError ? (
-            <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <div class="rounded-lg tone-warning border border-[var(--bb-data-border)] px-4 py-3 text-sm">
               Could not load benchmark matrix: {summaryError}
             </div>
           ) : summaryLoading ? (
@@ -569,7 +569,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
       {viewMode === "ranks" && (
         <>
           {summaryError ? (
-            <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <div class="rounded-lg tone-warning border border-[var(--bb-data-border)] px-4 py-3 text-sm">
               Could not load rank data: {summaryError}
             </div>
           ) : summaryLoading ? (

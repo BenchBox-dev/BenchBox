@@ -77,7 +77,7 @@ export function PercentileLadder({ rows }: Props) {
             return (
               <g key={label} transform={`translate(${LABEL_W + li * 56}, 0)`}>
                 <rect width={14} height={10} y={3} fill={LEGEND_SWATCH_COLOR} opacity={opacity} rx={1} />
-                <text x={18} y={12} class="text-[10px] fill-gray-600 font-mono">
+                <text x={18} y={12} class="text-[10px] fill-[var(--bb-data-fg-muted)] font-mono">
                   {label}
                 </text>
               </g>
@@ -107,7 +107,7 @@ export function PercentileLadder({ rows }: Props) {
                 x={LABEL_W - 6}
                 y={midY + 4}
                 textAnchor="end"
-                class="text-xs fill-gray-700"
+                class="text-xs fill-[var(--bb-data-fg-primary)]"
                 style={{ fontSize: "11px" }}
               >
                 {row.platform.length > 18 ? row.platform.slice(0, 17) + "…" : row.platform}
@@ -136,7 +136,7 @@ export function PercentileLadder({ rows }: Props) {
               <text
                 x={xForMs(row.percentile_stats.p50) + 4}
                 y={midY + 4}
-                class="text-[10px] fill-gray-600 font-mono"
+                class="text-[10px] fill-[var(--bb-data-fg-muted)] font-mono"
                 style={{ fontSize: "10px" }}
               >
                 {row.percentile_stats.p50 >= 1000
@@ -164,7 +164,7 @@ export function PercentileLadder({ rows }: Props) {
                   x={x}
                   y={16}
                   textAnchor="middle"
-                  class="text-[10px] fill-gray-500 font-mono"
+                  class="text-[10px] fill-[var(--bb-data-fg-subtle)] font-mono"
                   style={{ fontSize: "10px" }}
                 >
                   {ms >= 1000 ? `${ms / 1000}s` : `${ms}ms`}

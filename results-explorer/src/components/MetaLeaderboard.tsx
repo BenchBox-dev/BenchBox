@@ -452,7 +452,7 @@ function renderCellValue(
   const text = cellText(rank, cohort, mode);
   if (mode === "ranks") {
     return (
-      <span class={rank.rank === 1 ? "font-semibold text-green-700" : "text-[var(--bb-data-fg-primary)]"}>{text}</span>
+      <span class={rank.rank === 1 ? "font-semibold text-[var(--bb-tone-success-fg)]" : "text-[var(--bb-data-fg-primary)]"}>{text}</span>
     );
   }
   return text;

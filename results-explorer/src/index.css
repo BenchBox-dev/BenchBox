@@ -329,6 +329,9 @@
         font-size: var(--bb-text-xs);
         color: var(--bb-data-fg-subtle);
     }
+    /* 47.999rem = --bb-bp-mobile (48rem) - 0.001rem.
+       var() and calc() are not supported in @media queries,
+       so this literal must stay in sync with --bb-bp-mobile above. */
     @media (max-width: 47.999rem) {
         .bb-scroll-affordance {
             display: inline-flex;
