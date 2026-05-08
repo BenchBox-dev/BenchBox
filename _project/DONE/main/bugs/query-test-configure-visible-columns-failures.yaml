@@ -2,7 +2,7 @@ id: query-test-configure-visible-columns-failures
 title: "Restore Configure visible columns affordance (Query.test.tsx 3 failures on develop tip)"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
 category: Bug Fix
 
 description: |
@@ -39,22 +39,22 @@ deps: {}
 work:
 - id: w1
   summary: "Bisect develop tip back through PRs #266, #268, #269, #270 to find the breaking commit"
-  status: pending
+  status: done
 
 - id: w2
   summary: "Decide whether to restore the affordance label or update the tests"
   needs: [w1]
-  status: pending
+  status: done
 
 - id: w3
   summary: "Apply the chosen fix and confirm Query.test.tsx is green"
   needs: [w2]
-  status: pending
+  status: done
 
 - id: w4
   summary: "Add a regression note in the test file referencing this TODO and the breaking PR"
   needs: [w3]
-  status: pending
+  status: done
 
 must_preserve:
 - "URL state, row-limit, export, and SQL behavior on the Query page."

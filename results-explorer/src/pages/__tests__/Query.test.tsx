@@ -1,3 +1,10 @@
+// Regression contract: the Visible Columns affordance must render as a
+// `<details>` element with a `Configure visible columns` summary. PR #266
+// added the test expectations below but the matching production change
+// in Query.tsx was not merged at the same time, leaving develop with
+// the older `<div>` + `<h2>Visible Columns</h2>` shape and four failing
+// cases. Restoring the `<details>` shape (this file's anchor) closes
+// `query-test-configure-visible-columns-failures`.
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/preact";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

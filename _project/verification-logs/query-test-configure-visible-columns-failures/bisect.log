@@ -1,0 +1,92 @@
+# Bisect log: query-test-configure-visible-columns-failures
+
+Date: 2026-05-08
+Develop tip: ed29b62c8 (fix(explorer): tighten Query workbench desktop intro #276)
+
+## Failure repro
+
+`cd results-explorer && npm test -- --run src/pages/__tests__/Query.test.tsx`
+fails 4 cases (TODO predicted 3; one extra surfaces the same root cause):
+
+- `loads facet counts and table rows from DuckDB` — secondary failure
+  (cascades from the same DOM mismatch)
+- `uses public table labels and formatted values in the default result table`
+  (line 245)
+- `exposes visible-columns sidebar text on Query page` (line 269 textContent
+  assertion + line 268 tagName === "DETAILS")
+- `orders mobile query controls so results appear before deep filters`
+  (line 336)
+
+All four blocked on the same precondition: `Configure visible columns`
+text + `<details>` element with `data-testid="query-visible-columns"`.
+
+## Bisect against PRs #266 / #268 / #269 / #270
+
+`git log -S"Configure visible columns" develop -- results-explorer/src/pages/Query.tsx`
+returns no commits — the literal string was never on develop in `Query.tsx`.
+
+`git log -S"Configure visible columns" develop -- results-explorer/src/pages/__tests__/Query.test.tsx`
+returns one commit:
+
+  b26f6aff3  fix/pr246 query workbench evidence (#266)
+
+PR #266 added the test expectations:
+  - `fireEvent.click(screen.getByText("Configure visible columns"))`
+  - `expect(visibleColumns.tagName).toBe("DETAILS")`
+  - `expect(visibleColumns.textContent).toContain("Configure visible columns")`
+
+But the matching production-source change (replacing the existing
+`<div data-testid="query-visible-columns">` containing `<h2>Visible Columns</h2>`
+with a `<details>`+`<summary>Configure visible columns</summary>` structure)
+never landed in `Query.tsx`. The current production source still carries
+the PR #260 (`f9c7e6364 feat(explorer): tokenize query workbench filters`)
+plain-`<div>` shape.
+
+Subsequent PRs #268, #269, #270 did not touch the Visible Columns block
+in Query.tsx — they touched filter rail / responsive overflow / scroll
+hint code paths. So the regression vector is "tests added without their
+matching production change in the same merge", not a later regression.
+
+## Decision
+
+Apply option (a) from the TODO: restore the affordance with the literal
+`Configure visible columns` label so the existing accessibility/visibility
+contract holds. This matches the direction of the open
+`results-explorer-query-workbench-controls-and-facets` follow-up TODO
+(w2: "Move Visible Columns ... into a compact 'Configure columns'
+disclosure"), so restoring as `<details>` here is forward-compatible.
+
+Implementation: in `results-explorer/src/pages/Query.tsx`, replace the
+`<div data-testid="query-visible-columns">` block with a `<details>`
+that uses `<summary>Configure visible columns</summary>` as its trigger
+and keeps the same id, class scaffolding, and checkbox children.
+
+Regression note added to `Query.test.tsx` next to the assertions that
+encode the contract.
+
+## 4th failure (out of this TODO's scope)
+
+A fourth Query.test.tsx case fails on develop tip alongside the three
+named visible-columns failures: `loads facet counts and table rows
+from DuckDB` (line 236) expects `getByText("maintainer run")`. The
+fixture renders `trust_label: "maintainer-run"`. Going through
+`formatQueryCell → formatQueryFacetValue → formatFacetDisplayValue →
+readableToken`, the current `readableToken` replaces only `_`, so the
+hyphenated value is returned unchanged.
+
+PR #266 had also flipped `readableToken` to `replace(/[_-]+/g, " ")`,
+but PR #275 added a dedicated test contract
+(`results-explorer/src/lib/__tests__/facetDisplay.test.ts`) that
+preserves hyphens for `cloud_region`, `result_id`, and `cost_model`.
+A generic dash-to-space replacement would now violate that contract.
+
+The correct fix is an explicit lookup for `trust_label` (alongside the
+existing `cloud_provider`, `deployment_class`, `cost_status` tables in
+`lib/facetDisplay.ts`), which is outside this TODO's scope_limit
+(`Query.tsx`, `Query.test.tsx`, `components/`). It is also a precise
+match for the open TODO `results-explorer-query-workbench-controls-and-facets`
+work unit w6 ("Centralize public formatting for raw enum labels"),
+which will absorb this fix when it lands. No follow-up TODO needed.
+
+This PR therefore lands with the 3 named visible-columns failures
+green and the 4th failure documented as deferred to item 4.

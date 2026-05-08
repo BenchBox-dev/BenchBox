@@ -692,35 +692,37 @@ export function Query(_: RoutableProps) {
             </div>
           </details>
 
-          <div
+          <details
             data-testid="query-visible-columns"
-            class="order-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-4 shadow-sm lg:order-1"
+            class="order-5 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-4 shadow-sm lg:order-1"
           >
-            <div>
-              <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)]">Visible Columns</h2>
+            <summary class="cursor-pointer text-base font-semibold text-[var(--bb-data-fg-primary)]">
+              Configure visible columns
+            </summary>
+            <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
               <p class="text-xs text-[var(--bb-data-fg-muted)]">
                 Driven from DuckDB <code class="rounded bg-[var(--bb-surface-app)] px-1 font-mono">bench.results</code> introspection.
               </p>
+              <div class="flex flex-wrap gap-2">
+                {columnNames.map((column) => (
+                  <label
+                    key={column}
+                    class="inline-flex items-center gap-2 rounded-full bg-[var(--bb-surface-app)] px-3 py-1 text-xs text-[var(--bb-data-fg-muted)]"
+                    title={column}
+                  >
+                    <input
+                      type="checkbox"
+                      aria-label={formatQueryColumnLabel(column)}
+                      checked={visibleColumns.includes(column)}
+                      onChange={() => toggleColumn(column)}
+                    />
+                    <span>{formatQueryColumnLabel(column)}</span>
+                    <code class="rounded bg-[var(--bb-surface-app)] px-1 font-mono text-[10px] text-[var(--bb-data-fg-subtle)]">{column}</code>
+                  </label>
+                ))}
+              </div>
             </div>
-            <div class="flex flex-wrap gap-2">
-              {columnNames.map((column) => (
-                <label
-                  key={column}
-                  class="inline-flex items-center gap-2 rounded-full bg-[var(--bb-surface-app)] px-3 py-1 text-xs text-[var(--bb-data-fg-muted)]"
-                  title={column}
-                >
-                  <input
-                    type="checkbox"
-                    aria-label={formatQueryColumnLabel(column)}
-                    checked={visibleColumns.includes(column)}
-                    onChange={() => toggleColumn(column)}
-                  />
-                  <span>{formatQueryColumnLabel(column)}</span>
-                  <code class="rounded bg-[var(--bb-surface-app)] px-1 font-mono text-[10px] text-[var(--bb-data-fg-subtle)]">{column}</code>
-                </label>
-              ))}
-            </div>
-          </div>
+          </details>
         </section>
 
         <aside
