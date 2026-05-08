@@ -39,3 +39,4 @@ Agents can walk away after auto-merge only because the current dwell time is sho
   walk-away contract in CLAUDE.md still holds. Carry forward the
   next-steps; revisit when Step 5 publishes measurements.
 - 2026-05-06: actionable — 2026-05-06 sweep: make dev-loop-metrics still present; Step 5 Blocked, no published P50/P95 dwell numbers — agent walk-away contract in CLAUDE.md still load-bearing
+- 2026-05-08: actionable — sweep: `make dev-loop-metrics` still defined (Makefile:959); Step 5 still calendar-blocked through ~2026-05-30; CLAUDE.md walk-away contract (commit→push→PR auth, no polling) intact — carry forward dwell-target acceptance criteria
