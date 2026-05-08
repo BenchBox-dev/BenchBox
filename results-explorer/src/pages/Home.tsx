@@ -9,6 +9,7 @@ import type {
 import type { ResultRow } from "@/lib/duckdbQueries";
 import { getMetaLeaderboardData, listResults } from "@/lib/duckdbQueries";
 import { BENCHMARK_LABELS, humanizeBenchmark, fmtScore, fmtGeomean, errMsg } from "@/utils";
+import { formatBenchmarkLabel } from "@/lib/displayLabels";
 import { MetaLeaderboardSkeleton, SkeletonBlock } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { MetaLeaderboard } from "@/components/MetaLeaderboard";
@@ -341,7 +342,7 @@ export function Home(_: RoutableProps) {
                     value === "all" ? [] : toggleFacetValue(benchmarkFilters, value),
                   )
                 }
-                format={(value) => humanizeBenchmark(value)}
+                format={(value) => formatBenchmarkLabel(value)}
               />
               <MultiSelectFilter
                 label="Scale factor"
@@ -471,7 +472,7 @@ export function Home(_: RoutableProps) {
             title="Browse by Benchmark"
             items={benchmarks}
             hrefFn={(benchmark) => `/results/${benchmark}/`}
-            labelFn={humanizeBenchmark}
+            labelFn={formatBenchmarkLabel}
           />
           <BrowseSection
             title="Browse by Platform"

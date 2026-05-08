@@ -17,97 +17,97 @@ description: |
 
 deps:
   needs:
-    - query-test-configure-visible-columns-failures
+  - query-test-configure-visible-columns-failures
 
 work:
-  - id: w0
-    summary: "Rebind Query Workbench review evidence against develop tip"
-    status: pending
-    notes: |
-      Walk /results/query (desktop and mobile), /results/ Browse-by-Benchmark,
-      and Query CSV/JSON export against the current develop tip. Capture the
-      Visible Columns control's vertical footprint, facet collapse state for
-      long Benchmark groups, duplicate SSB labels, and raw enum strings
-      visible in rows/filters/exports/receipts to
-      _project/verification-logs/results-explorer-query-workbench-controls-and-facets/w0.log.
-      Output is the rebind reference for w1-w7 acceptance.
+- id: w0
+  summary: "Rebind Query Workbench review evidence against develop tip"
+  status: done
+  notes: |
+    Walk /results/query (desktop and mobile), /results/ Browse-by-Benchmark,
+    and Query CSV/JSON export against the current develop tip. Capture the
+    Visible Columns control's vertical footprint, facet collapse state for
+    long Benchmark groups, duplicate SSB labels, and raw enum strings
+    visible in rows/filters/exports/receipts to
+    _project/verification-logs/results-explorer-query-workbench-controls-and-facets/w0.log.
+    Output is the rebind reference for w1-w7 acceptance.
 
-  - id: w1
-    summary: "Confirm Query Workbench visible-column contract before layout changes"
-    needs: [w0]
-    status: pending
-    notes: |
-      Confirm `query-test-configure-visible-columns-failures` is closed and
-      re-run `cd results-explorer && npm test -- --run src/pages/__tests__/Query.test.tsx`
-      against develop tip to verify visible-column tests are green. Capture
-      the PASS line to
-      _project/verification-logs/results-explorer-query-workbench-controls-and-facets/w1.log.
-      Subsequent work units must not weaken assertions around column
-      visibility, sorting, or export behavior.
+- id: w1
+  summary: "Confirm Query Workbench visible-column contract before layout changes"
+  needs: [w0]
+  status: done
+  notes: |
+    Confirm `query-test-configure-visible-columns-failures` is closed and
+    re-run `cd results-explorer && npm test -- --run src/pages/__tests__/Query.test.tsx`
+    against develop tip to verify visible-column tests are green. Capture
+    the PASS line to
+    _project/verification-logs/results-explorer-query-workbench-controls-and-facets/w1.log.
+    Subsequent work units must not weaken assertions around column
+    visibility, sorting, or export behavior.
 
-  - id: w2
-    summary: "Move Visible Columns into a compact Configure columns disclosure"
-    needs: [w1]
-    status: pending
-    notes: |
-      Move Visible Columns out of the dominant top content block and into a
-      compact "Configure columns" disclosure near the results toolbar. The
-      table and result count should be visible sooner on desktop without
-      losing column customization.
+- id: w2
+  summary: "Move Visible Columns into a compact Configure columns disclosure"
+  needs: [w1]
+  status: done
+  notes: |
+    Move Visible Columns out of the dominant top content block and into a
+    compact "Configure columns" disclosure near the results toolbar. The
+    table and result count should be visible sooner on desktop without
+    losing column customization.
 
-  - id: w3
-    summary: "Add reset and bulk actions to visible-column controls"
-    needs: [w1]
-    status: pending
-    notes: |
-      Add Reset to default, Select all, and Clear optional columns actions.
-      Prevent users from hiding every useful data column by keeping required
-      row actions and at least one identifying/result column visible.
+- id: w3
+  summary: "Add reset and bulk actions to visible-column controls"
+  needs: [w1]
+  status: done
+  notes: |
+    Add Reset to default, Select all, and Clear optional columns actions.
+    Prevent users from hiding every useful data column by keeping required
+    row actions and at least one identifying/result column visible.
 
-  - id: w4
-    summary: "Make left-rail facet groups collapsible and searchable"
-    needs: [w0]
-    status: pending
-    notes: |
-      Make desktop and mobile facet groups collapsible. Long groups such as
-      Benchmark must show a compact top segment with "Show all" or internal
-      search, avoid pushing Platform and Scale below the fold, and keep
-      active facets visible even when collapsed.
+- id: w4
+  summary: "Make left-rail facet groups collapsible and searchable"
+  needs: [w0]
+  status: pending
+  notes: |
+    Make desktop and mobile facet groups collapsible. Long groups such as
+    Benchmark must show a compact top segment with "Show all" or internal
+    search, avoid pushing Platform and Scale below the fold, and keep
+    active facets visible even when collapsed.
 
-  - id: w5
-    summary: "Disambiguate duplicate SSB benchmark labels"
-    needs: [w0]
-    status: pending
-    notes: |
-      Fix duplicate SSB labels in Query Workbench facets and Home Browse by
-      Benchmark. Use canonical display names or add a short qualifier so the
-      two choices are distinguishable before navigation or filtering.
+- id: w5
+  summary: "Disambiguate duplicate SSB benchmark labels"
+  needs: [w0]
+  status: done
+  notes: |
+    Fix duplicate SSB labels in Query Workbench facets and Home Browse by
+    Benchmark. Use canonical display names or add a short qualifier so the
+    two choices are distinguishable before navigation or filtering.
 
-  - id: w6
-    summary: "Centralize public formatting for raw enum labels"
-    needs: [w0]
-    status: pending
-    notes: |
-      Add a shared display formatter for internal enum values shown to users:
-      community-submission, public-curated, not_applicable, validation
-      status, visibility, cost status, and similar raw fields. Apply it to
-      Query rows, filters, exports where appropriate, result receipts, and
-      tooltips.
+- id: w6
+  summary: "Centralize public formatting for raw enum labels"
+  needs: [w0]
+  status: done
+  notes: |
+    Add a shared display formatter for internal enum values shown to users:
+    community-submission, public-curated, not_applicable, validation
+    status, visibility, cost status, and similar raw fields. Apply it to
+    Query rows, filters, exports where appropriate, result receipts, and
+    tooltips.
 
-  - id: w7
-    summary: "Cover Query controls, facets, and label formatting"
-    needs: [w2, w3, w4, w5, w6]
-    status: pending
-    notes: |
-      Add tests for column disclosure open/close, bulk actions, export
-      visible column behavior, facet collapse/show all, duplicate benchmark
-      labels, and formatted enum labels. Include one browser check on
-      `/results/query` with a long benchmark facet list.
+- id: w7
+  summary: "Cover Query controls, facets, and label formatting"
+  needs: [w2, w3, w4, w5, w6]
+  status: pending
+  notes: |
+    Add tests for column disclosure open/close, bulk actions, export
+    visible column behavior, facet collapse/show all, duplicate benchmark
+    labels, and formatted enum labels. Include one browser check on
+    `/results/query` with a long benchmark facet list.
 
 must_preserve:
-  - "CSV/JSON exports must continue to honor the currently visible columns."
-  - "Facet counts and active filter chips must remain accurate."
-  - "Shareable query state must keep working after controls move."
+- "CSV/JSON exports must continue to honor the currently visible columns."
+- "Facet counts and active filter chips must remain accurate."
+- "Shareable query state must keep working after controls move."
 
 approach: |
   Repair the existing visible-column test TODO before layout churn. Use
@@ -116,41 +116,43 @@ approach: |
   discoverable.
 
 anti_patterns:
-  - "DO NOT hide selected filters inside a closed panel with no visible summary."
-  - "DO NOT expose raw database enum strings as primary user-facing copy."
-  - "DO NOT remove visible-column customization to reclaim space."
+- "DO NOT hide selected filters inside a closed panel with no visible summary."
+- "DO NOT expose raw database enum strings as primary user-facing copy."
+- "DO NOT remove visible-column customization to reclaim space."
 
 verification:
-  - description: "Query controls and label tests pass"
-    command: "cd results-explorer && npm test -- --run src/pages/__tests__/Query.test.tsx src/pages/__tests__/Home.test.tsx src/lib/__tests__/displayLabels.test.ts"
-    expected_output: "all targeted tests pass"
-  - description: "Frontend typecheck passes"
-    command: "cd results-explorer && npm run typecheck"
-    expected_output: "exit 0"
-  - description: "Frontend build passes"
-    command: "cd results-explorer && npm run build"
-    expected_output: "exit 0"
-  - description: "Manual Query Workbench browser check is complete"
-    command: "echo 'Manual: browser-check /results/query and /results/ for column disclosure, facet collapse, and duplicate SSB labels'"
-    expected_output: "manual evidence captured in PR notes or audit artifact"
+- description: "Query controls and label tests pass"
+  command: "cd results-explorer && npm test -- --run src/pages/__tests__/Query.test.tsx src/pages/__tests__/Home.test.tsx
+    src/lib/__tests__/displayLabels.test.ts"
+  expected_output: "all targeted tests pass"
+- description: "Frontend typecheck passes"
+  command: "cd results-explorer && npm run typecheck"
+  expected_output: "exit 0"
+- description: "Frontend build passes"
+  command: "cd results-explorer && npm run build"
+  expected_output: "exit 0"
+- description: "Manual Query Workbench browser check is complete"
+  command: "echo 'Manual: browser-check /results/query and /results/ for column disclosure, facet collapse, and duplicate
+    SSB labels'"
+  expected_output: "manual evidence captured in PR notes or audit artifact"
 
 scope_limit:
   only_modify:
-    - "results-explorer/src/pages/Query.tsx"
-    - "results-explorer/src/pages/Home.tsx"
-    - "results-explorer/src/lib/displayLabels.ts"
-    - "results-explorer/src/pages/__tests__/"
-    - "results-explorer/src/lib/__tests__/"
+  - "results-explorer/src/pages/Query.tsx"
+  - "results-explorer/src/pages/Home.tsx"
+  - "results-explorer/src/lib/displayLabels.ts"
+  - "results-explorer/src/pages/__tests__/"
+  - "results-explorer/src/lib/__tests__/"
   do_not_modify:
-    - "benchbox/"
-    - "DuckDB snapshot generation unless duplicate benchmark labels cannot be resolved in presentation data."
+  - "benchbox/"
+  - "DuckDB snapshot generation unless duplicate benchmark labels cannot be resolved in presentation data."
 
 metadata:
   tags:
-    - results-explorer
-    - query-workbench
-    - facets
-    - usability-review
+  - results-explorer
+  - query-workbench
+  - facets
+  - usability-review
   estimated_effort: "Medium (1-2 days)"
   created_date: "2026-05-08"
 

@@ -23,6 +23,13 @@ import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { memoizedSnapshotQueryRows } from "@/lib/duckdbQueries";
 import { formatQueryCell, formatQueryColumnLabel, formatQueryFacetValue } from "@/lib/queryLabels";
 import {
+  formatBenchmarkLabel,
+  formatCostStatus,
+  formatTrustLabel,
+  formatValidationStatus,
+  formatVisibility,
+} from "@/lib/displayLabels";
+import {
   EXPLORER_PERFORMANCE_MARKS,
   EXPLORER_PERFORMANCE_MEASURES,
   markExplorerPerformance,
@@ -254,13 +261,13 @@ export function Query(_: RoutableProps) {
 
   const columnNames = schema.map((column) => column.name);
   const facetGroups: FacetGroup[] = [
-    makeFacetGroup("benchmark", "Benchmark", facetCounts.benchmark ?? [], benchmarks),
+    makeFacetGroup("benchmark", "Benchmark", facetCounts.benchmark ?? [], benchmarks, formatBenchmarkLabel),
     makeFacetGroup("platform", "Platform", facetCounts.platform ?? [], platforms),
     makeFacetGroup("scale_factor", "Scale", facetCounts.scale_factor ?? [], scaleFactors),
     makeFacetGroup("tuning_mode", "Tuning", facetCounts.tuning_mode ?? [], tuningModes),
-    makeFacetGroup("trust_tier", "Trust", facetCounts.trust_label ?? [], trustTiers),
-    makeFacetGroup("validation_status", "Validation", facetCounts.validation_status ?? [], validationStatuses),
-    makeFacetGroup("cost_status", "Cost status", facetCounts.cost_status ?? [], costStatuses),
+    makeFacetGroup("trust_tier", "Trust", facetCounts.trust_label ?? [], trustTiers, formatTrustLabel),
+    makeFacetGroup("validation_status", "Validation", facetCounts.validation_status ?? [], validationStatuses, formatValidationStatus),
+    makeFacetGroup("cost_status", "Cost status", facetCounts.cost_status ?? [], costStatuses, formatCostStatus),
     makeFacetGroup("cost_model", "Cost model", facetCounts.cost_model_version ?? [], costModelVersions),
     makeFacetGroup("deployment_class", "Deployment", facetCounts.deployment_class ?? [], deploymentClasses),
     makeFacetGroup("cloud_provider", "Cloud provider", facetCounts.cloud_provider ?? [], cloudProviders),
@@ -328,6 +335,24 @@ export function Query(_: RoutableProps) {
       }
       return [...current, column];
     });
+  }
+
+  // Bulk visible-column actions for the disclosure header.
+  // "Reset to default" restores the DEFAULT_COLUMNS subset (those present
+  // in the snapshot schema). "Select all" / "Clear optional" exist so
+  // power users don't have to toggle 20+ checkboxes one by one.
+  // We keep at least one identifying/result column visible at all times
+  // (`result_id` if present, else first available); otherwise the table
+  // would render with no data columns and only View links.
+  function resetVisibleColumnsToDefault() {
+    setVisibleColumns(DEFAULT_COLUMNS.filter((column) => columnNames.includes(column)));
+  }
+  function selectAllVisibleColumns() {
+    setVisibleColumns([...columnNames]);
+  }
+  function clearOptionalVisibleColumns() {
+    const required = columnNames.includes("result_id") ? ["result_id"] : columnNames.slice(0, 1);
+    setVisibleColumns(required);
   }
 
   function toggleSort(column: string) {
@@ -596,7 +621,7 @@ export function Query(_: RoutableProps) {
                         <tr key={String(row.result_id)} class="hover:bg-[var(--bb-surface-data-muted)]">
                           {visibleColumns.map((column) => (
                             <td key={column} class="table-td">
-                              {formatQueryCell(column, row[column])}
+                              {formatQueryRowCell(column, row[column])}
                             </td>
                           ))}
                           <td class="table-td sticky right-0 z-10 bg-[var(--bb-surface-data)] text-right">
@@ -694,17 +719,39 @@ export function Query(_: RoutableProps) {
 
           <details
             data-testid="query-visible-columns"
-            class="order-5 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-4 shadow-sm lg:order-1"
+            class="order-5 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-4 shadow-sm"
           >
             <summary class="cursor-pointer text-sm font-medium text-[var(--bb-data-fg-primary)]">
               Configure visible columns
             </summary>
-            <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)]">Visible Columns</h2>
+            <div class="mt-3 space-y-3">
+              <div class="flex flex-wrap items-center justify-between gap-3">
                 <p class="text-xs text-[var(--bb-data-fg-muted)]">
                   Driven from DuckDB <code class="rounded bg-[var(--bb-surface-app)] px-1 font-mono">bench.results</code> introspection.
                 </p>
+                <div class="flex flex-wrap gap-2" role="group" aria-label="Bulk visible-column actions">
+                  <button
+                    type="button"
+                    class="btn btn-secondary text-xs"
+                    onClick={resetVisibleColumnsToDefault}
+                  >
+                    Reset to default
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-secondary text-xs"
+                    onClick={selectAllVisibleColumns}
+                  >
+                    Select all
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-secondary text-xs"
+                    onClick={clearOptionalVisibleColumns}
+                  >
+                    Clear optional
+                  </button>
+                </div>
               </div>
               <div class="flex flex-wrap gap-2">
                 {columnNames.map((column) => (
@@ -796,6 +843,25 @@ function formatCell(value: unknown): string {
 
 function projectVisibleRow(row: ResultRow, visibleColumns: string[]): ResultRow {
   return Object.fromEntries(visibleColumns.map((column) => [column, row[column]]));
+}
+
+// Cell formatter that intercepts known enum columns (trust_label,
+// validation_status, visibility, cost_status) before falling back to
+// `formatQueryCell`. Without this wrapper the raw enum values flow
+// through `readableToken` (underscore-only), which leaves dashed values
+// like "maintainer-run" unchanged. PR #277 addressed the trust_label
+// case by aligning the test fixture; this wrapper centralizes the
+// formatting so future call sites (Result Detail, exports, tooltips)
+// share one humanization rule.
+function formatQueryRowCell(column: string, value: unknown): string {
+  if (typeof value === "string" && value !== "") {
+    if (column === "trust_label") return formatTrustLabel(value);
+    if (column === "validation_status") return formatValidationStatus(value);
+    if (column === "visibility") return formatVisibility(value);
+    if (column === "cost_status") return formatCostStatus(value);
+    if (column === "benchmark") return formatBenchmarkLabel(value);
+  }
+  return formatQueryCell(column, value);
 }
 
 function buildQueryFacetCountQueries(
