@@ -1,4 +1,5 @@
 import type { ComponentChildren } from "preact";
+import { getCurrentUrl, useRouter } from "preact-router";
 
 interface LayoutProps {
   children: ComponentChildren;
@@ -15,7 +16,13 @@ export function Layout({ children }: LayoutProps) {
 }
 
 function Header() {
-  const currentPath = typeof window === "undefined" ? "/results/" : window.location.pathname;
+  // Subscribe to preact-router URL changes so client-side `route()` calls
+  // re-render this component. `useRouter()` works from outside the Router
+  // tree by registering a forced-update setter when the consumed context
+  // is the default value.
+  useRouter();
+  const rawUrl = typeof window === "undefined" ? "/results/" : getCurrentUrl();
+  const currentPath = rawUrl.split("?")[0]!.split("#")[0]!;
   const inResults = currentPath === "/" || currentPath === "/results" || currentPath.startsWith("/results/");
 
   return (

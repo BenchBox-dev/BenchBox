@@ -1,5 +1,6 @@
-import { render, screen, within } from "@testing-library/preact";
+import { render, screen, waitFor, within } from "@testing-library/preact";
 import { describe, expect, it } from "vitest";
+import Router, { route } from "preact-router";
 import { Layout } from "@/components/Layout";
 
 function renderAt(path: string) {
@@ -7,6 +8,20 @@ function renderAt(path: string) {
   return render(
     <Layout>
       <div>Page content</div>
+    </Layout>,
+  );
+}
+
+function renderWithRouter(initialPath: string) {
+  window.history.replaceState(null, "", initialPath);
+  return render(
+    <Layout>
+      <Router>
+        <div path="/results/" />
+        <div path="/results/query" />
+        <div path="/results/compare" />
+        <div default />
+      </Router>
     </Layout>,
   );
 }
@@ -50,6 +65,23 @@ describe("Layout", () => {
       expect(within(explorerNav).getByRole("link", { name: label })).toBeTruthy();
     }
     expect(within(explorerNav).getByRole("link", { name: "Query" })).toHaveAttribute("aria-current", "page");
+    expect(within(explorerNav).getByRole("link", { name: "Leaderboards" })).not.toHaveAttribute("aria-current");
+  });
+
+  it("updates the active explorer subnav after a client-side route() call", async () => {
+    // Regression: prior to this fix, Layout read `window.location.pathname`
+    // once at module render time, so navigating from Leaderboards to Query
+    // via preact-router left "Leaderboards" highlighted indefinitely.
+    renderWithRouter("/results/");
+
+    const explorerNav = screen.getByRole("navigation", { name: "Results Explorer" });
+    expect(within(explorerNav).getByRole("link", { name: "Leaderboards" })).toHaveAttribute("aria-current", "page");
+
+    route("/results/query");
+
+    await waitFor(() => {
+      expect(within(explorerNav).getByRole("link", { name: "Query" })).toHaveAttribute("aria-current", "page");
+    });
     expect(within(explorerNav).getByRole("link", { name: "Leaderboards" })).not.toHaveAttribute("aria-current");
   });
 });
