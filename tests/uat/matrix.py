@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from typing import Iterable
 
 # Platform → "host:port" for TCP reachability probes. Mirrors
-# `get_platform_port` in scripts/local_stress_test.sh:142-161.
+# `get_platform_port` in scripts/local_stress_test.sh.
 PLATFORM_PORTS: dict[str, str] = {
     "lakesail": "localhost:50051",
     "singlestore": "localhost:13306",
