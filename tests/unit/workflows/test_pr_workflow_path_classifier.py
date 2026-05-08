@@ -53,8 +53,12 @@ def test_pr_path_classifier_fetches_base_history_for_merge_base() -> None:
 
     # The classifier uses `git diff origin/develop...HEAD`; a depth-1 base fetch
     # on GitHub's synthetic PR merge ref can leave no merge base available.
+    # Three consumers of the full base history today:
+    #   - ci-paths (path classifier)
+    #   - content-guard (recreates path lists for content validators)
+    #   - explorer-tokens (greps the diff for results-explorer/src changes)
     assert '--depth=1 origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"' not in workflow
-    assert workflow.count(base_fetch) == 2
+    assert workflow.count(base_fetch) == 3
 
 
 def test_ci_required_result_preserves_content_guard_failure() -> None:
