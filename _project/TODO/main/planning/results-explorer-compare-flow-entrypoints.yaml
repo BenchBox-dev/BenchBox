@@ -1,0 +1,174 @@
+id: results-explorer-compare-flow-entrypoints
+title: "Repair Results Explorer compare flow entrypoints"
+worktree: main
+priority: Critical
+status: Not Started
+category: Core Functionality
+
+description: |
+  Build a complete in-page compare flow for Results Explorer so users can
+  discover, select, and compare compatible runs without editing URLs. Defects
+  this item addresses were flagged in the 2026-05-08 Results Explorer
+  follow-up review (chat-only artifact, not committed to _project/audits/).
+  w0 rebinds the review evidence against develop tip and captures it to
+  _project/verification-logs/results-explorer-compare-flow-entrypoints/w0.log
+  before any other work unit runs; that log replaces the previous "review row
+  #1/#2/#4/#5/#34/#35/#36" citations as the durable reference.
+
+deps:
+  needs: []
+
+work:
+  - id: w0
+    summary: "Rebind compare-flow review evidence against develop tip"
+    status: pending
+    notes: |
+      Walk /results/compare (empty), /results/r/<id> (single-result compare
+      CTA), /results/query (no compare selection), /results/ (Home leaderboard
+      and Recent Results compare affordances), /results/tpch/ (Benchmark
+      detail row selection), and /results/p/<platform>/ (Platform detail row
+      selection) against the current develop tip. Capture observed defects
+      (URL-editing prompts, dead-end CTAs, missing checkboxes, mixed-cohort
+      acceptance, hidden result_id availability) to
+      _project/verification-logs/results-explorer-compare-flow-entrypoints/w0.log.
+      Output is the rebind reference for w1-w7 acceptance.
+
+  - id: w1
+    summary: "Inventory current compare route contracts and id availability"
+    needs: [w0]
+    status: pending
+    notes: |
+      Inventory Compare, ResultDetail, Query, Home, BenchmarkIndex, and
+      PlatformIndex. Record current compare route contracts, link helpers,
+      selection state, and which transformed row datasets already carry a
+      usable hidden result id. Write the inventory to
+      _project/audits/compare-entrypoint-inventory-2026-05-08.md so w2-w6 can
+      cite it instead of re-deriving.
+
+  - id: w2
+    summary: "Replace the empty Compare URL-editing error with an in-page builder"
+    needs: [w1]
+    status: pending
+    notes: |
+      Replace the empty `/results/compare` state that tells users to add
+      `?ids=id1,id2` with a compare builder. The builder exposes benchmark,
+      platform, scale, phase, and metric-contract filters; renders selectable
+      candidate runs; and disables launch until two compatible ids are
+      selected.
+
+  - id: w3
+    summary: "Support single-result compare starts from Result Detail"
+    needs: [w1]
+    status: pending
+    notes: |
+      Fix ResultDetail "Compare this result" so one selected result opens the
+      compare builder with that run pinned and compatible candidates listed.
+      The page must not redirect to a broken compare state or silently no-op
+      with only one id.
+
+  - id: w4
+    summary: "Add Query Workbench compare selection"
+    needs: [w1]
+    status: pending
+    notes: |
+      Add a checkbox selection column and compare tray to Query Workbench
+      result rows. Preserve hidden result_id values even when the Result ID
+      column is not visible, show selected-run count plus compatibility
+      messages, and launch Compare from the current filtered result set.
+
+  - id: w5
+    summary: "Add Home leaderboard and recent-result compare entrypoints"
+    needs: [w1]
+    status: pending
+    notes: |
+      Add compare affordances to Home leaderboard and Recent Results surfaces.
+      Either provide row checkboxes where ids are present or route to the
+      compare builder with benchmark/platform/scale context prefilled. Remove
+      any link that lands on an empty Compare error.
+
+  - id: w6
+    summary: "Constrain compatible cohort selection on detail pages"
+    needs: [w1]
+    status: pending
+    notes: |
+      On Benchmark and Platform detail pages, enforce same-cohort selection as
+      users select rows. After the first selection, disable incompatible rows
+      with a short reason, keep compatible rows selectable, and replace dead
+      disabled CTA copy with instructions tied to visible checkboxes.
+
+  - id: w7
+    summary: "Cover compare entrypoints with automated and browser checks"
+    needs: [w2, w3, w4, w5, w6]
+    status: pending
+    notes: |
+      Add unit and browser coverage for the empty Compare builder,
+      single-result start, Query Workbench selection, Home selection/routing,
+      Benchmark detail selection, and Platform detail selection. Tests must
+      assert that users are never told to edit the URL to start comparison.
+
+must_preserve:
+  - "Existing `/results/compare?ids=...` deep links must keep working."
+  - "Static export compatibility; no server endpoint or runtime database dependency."
+  - "Comparable cohort rules: benchmark, scale, phase, metric, and unit stay fixed."
+
+approach: |
+  Prefer one shared compare-selection helper or tray over page-specific logic
+  where the data shape already matches. Keep result ids hidden from ordinary
+  table layout unless the user explicitly enables the Result ID column. Treat
+  the empty Compare page as a task-start page, not an error page.
+
+anti_patterns:
+  - "DO NOT require manual URL editing."
+  - "DO NOT allow mixed-cohort compares and then fail after navigation."
+  - "DO NOT duplicate incompatible compare-selection implementations across each page."
+
+verification:
+  - description: "Targeted compare entrypoint tests pass"
+    command: "cd results-explorer && npm test -- --run src/pages/__tests__/Compare.test.tsx src/pages/__tests__/Query.test.tsx src/pages/__tests__/Home.test.tsx src/pages/__tests__/BenchmarkIndex.test.tsx src/pages/__tests__/PlatformIndex.test.tsx"
+    expected_output: "all targeted tests pass"
+  - description: "Frontend typecheck passes"
+    command: "cd results-explorer && npm run typecheck"
+    expected_output: "exit 0"
+  - description: "Frontend build passes"
+    command: "cd results-explorer && npm run build"
+    expected_output: "exit 0"
+  - description: "Manual compare flow browser check is complete"
+    command: "echo 'Manual: browser-check /results/compare, /results/query, /results/, /results/tpch/, /results/p/polars/, and /results/r/<id> for end-to-end selection and launch'"
+    expected_output: "manual evidence captured in PR notes or audit artifact"
+
+scope_limit:
+  only_modify:
+    - "results-explorer/src/pages/Compare.tsx"
+    - "results-explorer/src/pages/ResultDetail.tsx"
+    - "results-explorer/src/pages/Query.tsx"
+    - "results-explorer/src/pages/Home.tsx"
+    - "results-explorer/src/pages/BenchmarkIndex.tsx"
+    - "results-explorer/src/pages/PlatformIndex.tsx"
+    - "results-explorer/src/lib/resultLinks.ts"
+    - "results-explorer/src/pages/__tests__/"
+    - "results-explorer/e2e/"
+    - "_project/audits/compare-entrypoint-inventory-2026-05-08.md"
+  do_not_modify:
+    - "benchmark_runs/"
+    - "benchbox/"
+    - "Generated result snapshot content unless a missing result_id field is proven to be the blocker."
+
+metadata:
+  tags:
+    - results-explorer
+    - compare
+    - p0
+    - usability-review
+  estimated_effort: "Large (2-4 days)"
+  created_date: "2026-05-08"
+
+impact:
+  business_value: |
+    Converts Compare from a dead-end route into the central cross-run
+    investigation workflow promised by the Results Explorer UI.
+  user_impact: |
+    Database engineers can select runs from the pages where they discover them
+    and complete comparison without reading or editing the URL bar.
+  technical_debt: |
+    Consolidates compare selection rules that are currently implied in several
+    pages but not implemented consistently.
