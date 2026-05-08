@@ -1,0 +1,109 @@
+id: results-explorer-responsive-desktop-query-panel-regression
+title: "Fix or relax responsive.spec.ts query workbench desktop assertion (regression on develop)"
+worktree: main
+priority: Medium
+status: Not Started
+category: Frontend / Test Infrastructure
+
+description: |
+  After PR #270 (responsive/navigation overflow remediation) merged into
+  develop, the Playwright assertion at
+  `results-explorer/e2e/responsive.spec.ts:89` ("query workbench renders
+  summary, active filters, and rows before deep controls at desktop")
+  fails on develop with:
+
+      query results panel top should be within 900px
+      Expected: <= 900
+      Received:    909
+
+  The test expects `query-results-panel` top within `viewport.maxY = 900` at
+  the desktop viewport (1280×900). The 9px regression came in with PR #270's
+  Query workbench restructuring (mobile drawer + filter bar reorganization),
+  not with the post-merge follow-up PR #272. PR #272 was only able to
+  validate its own affordance + document-overflow changes by running them in
+  isolation because `responsive.spec.ts` runs serially and this test fails
+  before the affordance loop runs.
+
+  Two reasonable resolutions:
+    1) Trim 9px of vertical space above the results panel on the Query
+       workbench at lg+ widths (e.g. tighten `mt-*` / `gap-*` between the
+       result summary and the panel).
+    2) Relax `viewport.maxY` for desktop from 900 to ~960. The original 900
+       choice equals the viewport height itself, leaving zero margin for
+       layout drift. Tablet uses 1200/900=1.33, mobile uses 1200/900=1.33;
+       desktop's 900/900=1.0 is the only "no margin" pick in the matrix.
+
+  Resolution (1) is preferable because it forces every future PR to keep the
+  result panel above the fold; (2) is acceptable if the post-PR-270 layout
+  is intentional and we only want a guardrail against gross regressions.
+
+deps:
+  needs: []
+
+context_sections:
+  evidence_source: |
+    Verification log committed by PR #272:
+    `_project/verification-logs/results-explorer-pr270-followups/responsive-isolated.log`
+    Failing case: `[chromium] e2e/responsive.spec.ts:89:5 ... at desktop`
+    Reproducible on develop (post-PR-270) with no working-tree changes.
+  test_pattern: |
+    The test runs at viewports {mobile: 390x900, tablet: 768x900, desktop:
+    1280x900, wide: 1600x900} with `maxY` of {1200, 1200, 900, 900}. Tests
+    are serial — when this test fails the rest of the responsive grep does
+    not run, masking other potential regressions.
+  related_pr_history: |
+    PR #270 added the second-row mobile drawer + restructured Query
+    controls. That change is the suspected source of the 9px shift.
+    PR #272 (this branch's parent context) only modifies the affordance
+    breakpoint and hint placement and does not change Query workbench
+    vertical layout.
+
+work:
+  - id: w1
+    summary: "Bisect the 9px regression to a specific PR #270 hunk"
+    status: pending
+    notes: |
+      Locally check out commits between b26f6aff3 (the merge-base) and
+      27fbd73d7 (PR #270 merge) on `results-explorer/src/pages/Query.tsx`.
+      Run the failing assertion at each step and pinpoint the hunk that
+      pushes the panel from ≤900 to 909.
+
+  - id: w2
+    summary: "Decide between layout fix or threshold relaxation"
+    needs: [w1]
+    status: pending
+    notes: |
+      If the 9px shift is incidental (an unintended border/padding from
+      a token swap), tighten the layout. If it is the new mobile drawer
+      trigger that legitimately occupies 9px on desktop, relax desktop
+      maxY to ~960 with a comment explaining the budget. Document the
+      rationale either way.
+
+  - id: w3
+    summary: "Re-run responsive grep end-to-end and confirm tablet affordance + overflow tests run after the fix"
+    needs: [w2]
+    status: pending
+    notes: |
+      The PR #272 verification log only validates the affordance + overflow
+      tests in isolation because the desktop failure stops the serial run
+      early. After fixing this regression, run
+      `npx playwright test --project=chromium --grep "responsive|layout|a11y|mobile"`
+      and capture full output to a verification log.
+
+verification:
+  - description: "responsive grep suite passes end-to-end on develop after fix"
+    command: "cd results-explorer && npx playwright test --project=chromium --grep 'responsive|layout|a11y|mobile'"
+    expected_output: "exit 0; 24+ passed, 0 failed"
+  - description: "Query results panel top stays within desktop viewport"
+    command: "cd results-explorer && npx playwright test --project=chromium e2e/responsive.spec.ts:89 --grep desktop"
+    expected_output: "exit 0"
+
+must_preserve:
+  - "PR #270's contract that mobile drawer + Query controls remain reachable above the fold at every viewport"
+  - "Serial mode for `responsive.spec.ts` if its current invariants depend on it"
+  - "PR #272's affordance + overflow tests continue to pass at 390/768"
+
+anti_patterns:
+  - "DO NOT relax tablet/mobile maxY values — only desktop is at issue"
+  - "DO NOT silently `test.skip` the failing test — that hides the regression and allows further drift"
+  - "DO NOT change the test's selectors or panel data-testid — downstream regression tests rely on them"
