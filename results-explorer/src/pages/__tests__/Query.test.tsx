@@ -217,6 +217,12 @@ beforeEach(() => {
   });
 });
 
+// The "Configure visible columns" assertions in this file encode the
+// expandable Visible Columns affordance on the Query page. PR #266
+// introduced these assertions but did not ship the matching <details>
+// element in Query.tsx, so the three cases below silently failed on
+// develop until restored. See TODO
+// query-test-configure-visible-columns-failures.
 describe("Query", () => {
   it("loads facet counts and table rows from DuckDB", async () => {
     render(<Query />);
@@ -226,7 +232,10 @@ describe("Query", () => {
 
     expect(screen.getAllByText("SQLite").length).toBeGreaterThan(0);
     expect(within(resultsTable).getAllByText("ClickBench").length).toBeGreaterThan(0);
-    expect(within(resultsTable).getByText("maintainer run")).toBeTruthy();
+    // PR #275 tightened readableToken() to preserve hyphens in trust
+    // labels (per PR #266 review). "maintainer-run" no longer humanizes
+    // to "maintainer run".
+    expect(within(resultsTable).getByText("maintainer-run")).toBeTruthy();
   });
 
   it("uses public table labels and formatted values in the default result table", async () => {

@@ -2,7 +2,8 @@ id: results-explorer-retheme-link-hover-direction
 title: "Confirm intended link hover direction (lighter vs darker on light surfaces)"
 worktree: main
 priority: Low
-status: Not Started
+status: Completed
+completed_date: "2026-05-08"
 category: Polish
 
 description: |
@@ -39,17 +40,18 @@ deps: {}
 work:
 - id: w1
   summary: "Decide between option (a) swap accent tokens or (b) introduce dedicated link tokens"
-  status: pending
+  status: done
 
 - id: w2
   summary: "Apply the chosen fix and update any docs that reference --bb-accent in link contexts"
   needs: [w1]
-  status: pending
+  status: done
 
 - id: w3
-  summary: "Spot-check breadcrumbs, methodology disclosures, tuning toggles, and data tables in a real browser at 390/768/1280 widths"
+  summary: "Spot-check breadcrumbs, methodology disclosures, tuning toggles, and data tables in a real browser at 390/768/1280
+    widths"
   needs: [w2]
-  status: pending
+  status: done
 
 must_preserve:
 - "Existing focus-visible ring behavior on links."
@@ -57,11 +59,13 @@ must_preserve:
 
 anti_patterns:
 - "DO NOT reintroduce raw Tailwind `text-blue-*`/`text-brand-*` classes on `<a>` — the rule must stay token-driven."
-- "DO NOT change the rule without testing both light and dark chrome surfaces — the dark chrome relies on the accent token producing legible text."
+- "DO NOT change the rule without testing both light and dark chrome surfaces — the dark chrome relies on the accent token
+  producing legible text."
 
 verification:
 - description: "Targeted unit + e2e suites stay green"
-  command: "cd results-explorer && npm run typecheck && npm test -- --run && npx playwright test --project=chromium --workers=1 --grep-invert @performance"
+  command: "cd results-explorer && npm run typecheck && npm test -- --run && npx playwright test --project=chromium --workers=1
+    --grep-invert @performance"
   expected_output: "no regressions"
 
 scope_limit:
