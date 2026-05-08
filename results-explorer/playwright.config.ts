@@ -69,7 +69,7 @@ export default defineConfig({
   webServer: {
     command: `node scripts/serve-browser-tests.mjs --port ${PORT} --host ${HOST}`,
     url: `${BASE_URL}/results/`,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: !process.env.CI && !process.env.E2E_FIXTURE_DIR,
     timeout: 180_000,
     stdout: "pipe",
     stderr: "pipe",

@@ -91,6 +91,58 @@ describe("SegmentedControl", () => {
     fireEvent.click(screen.getByRole("radio", { name: "Compact" }));
     expect(onChange).not.toHaveBeenCalled();
   });
+
+  it("uses roving focus and radio keyboard navigation while skipping disabled options", () => {
+    const onChange = vi.fn();
+    render(
+      <SegmentedControl
+        ariaLabel="Benchmark view"
+        value="matrix"
+        onChange={onChange}
+        options={[
+          { value: "matrix", label: "Matrix" },
+          { value: "ranks", label: "Ranks", disabled: true },
+          { value: "list", label: "List" },
+        ]}
+      />,
+    );
+    const matrix = screen.getByRole("radio", { name: "Matrix" });
+    const ranks = screen.getByRole("radio", { name: "Ranks" });
+    const list = screen.getByRole("radio", { name: "List" });
+
+    expect(matrix.getAttribute("tabindex")).toBe("0");
+    expect(ranks.getAttribute("tabindex")).toBe("-1");
+    expect(list.getAttribute("tabindex")).toBe("-1");
+
+    matrix.focus();
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowRight" });
+    expect(onChange).toHaveBeenLastCalledWith("list");
+    expect(list).toHaveFocus();
+
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowRight" });
+    expect(onChange).toHaveBeenLastCalledWith("matrix");
+    expect(matrix).toHaveFocus();
+
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowLeft" });
+    expect(onChange).toHaveBeenLastCalledWith("list");
+    expect(list).toHaveFocus();
+
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowUp" });
+    expect(onChange).toHaveBeenLastCalledWith("matrix");
+    expect(matrix).toHaveFocus();
+
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowDown" });
+    expect(onChange).toHaveBeenLastCalledWith("list");
+    expect(list).toHaveFocus();
+
+    fireEvent.keyDown(document.activeElement!, { key: "Home" });
+    expect(onChange).toHaveBeenLastCalledWith("matrix");
+    expect(matrix).toHaveFocus();
+
+    fireEvent.keyDown(document.activeElement!, { key: "End" });
+    expect(onChange).toHaveBeenLastCalledWith("list");
+    expect(list).toHaveFocus();
+  });
 });
 
 describe("Tabs", () => {

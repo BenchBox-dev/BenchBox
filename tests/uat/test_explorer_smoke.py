@@ -33,23 +33,29 @@ def test_explorer_smoke_uses_data_dir_flag():
 def test_runs_builds_fixtures_then_playwright_smoke(tmp_path: Path):
     invocations: list[list[str]] = []
     cwd_by_invocation: list[Path | None] = []
+    env_by_invocation: list[dict[str, str] | None] = []
     output_dir = tmp_path / "out"
+    fixture_dir = tmp_path / "fixture-data"
 
     def fake_runner(argv, stdout=None, stderr=None, check=False, cwd=None, env=None):
         invocations.append(argv)
         cwd_by_invocation.append(cwd)
+        env_by_invocation.append(env)
         if argv[:3] == ["benchbox", "explorer", "build"]:
             output_dir.mkdir(parents=True)
             (output_dir / "results.duckdb").write_text("fixture", encoding="utf-8")
         return Mock(returncode=0, args=argv)
 
-    with patch.object(explorer_smoke, "has_node", return_value=True):
+    with (
+        patch.object(explorer_smoke, "has_node", return_value=True),
+        patch.object(explorer_smoke, "_find_free_local_port", return_value=45678),
+    ):
         result = explorer_smoke.run_explorer_smoke(
             bundles_dir=tmp_path / "b",
             output_dir=output_dir,
             log_dir=tmp_path / "logs",
             playwright_browsers=("chromium",),
-            playwright_fixture_dir=tmp_path / "fixture-data",
+            playwright_fixture_dir=fixture_dir,
             runner=fake_runner,
         )
     assert result.skipped is False
@@ -65,7 +71,10 @@ def test_runs_builds_fixtures_then_playwright_smoke(tmp_path: Path):
     assert "--project" in invocations[4]
     assert "chromium" in invocations[4]
     assert all(cwd == explorer_smoke.EXPLORER_DIR for cwd in cwd_by_invocation[1:])
-    assert (tmp_path / "fixture-data" / "results.duckdb").read_text(encoding="utf-8") == "fixture"
+    assert env_by_invocation[-1] is not None
+    assert env_by_invocation[-1]["E2E_FIXTURE_DIR"] == str(fixture_dir)
+    assert env_by_invocation[-1]["E2E_PORT"] == "45678"
+    assert (fixture_dir / "results.duckdb").read_text(encoding="utf-8") == "fixture"
 
 
 def test_short_circuits_on_build_failure(tmp_path: Path):
@@ -86,16 +95,61 @@ def test_short_circuits_on_build_failure(tmp_path: Path):
     assert len(invocations) == 1
 
 
-def test_default_playwright_fixture_dir_matches_serve_browser_tests_mount():
-    default = explorer_smoke._default_playwright_fixture_dir()
-    assert default == explorer_smoke.EXPLORER_DIR / "test-fixtures" / ".generated" / "data"
+def test_default_playwright_fixture_dir_is_scoped_to_log_dir(tmp_path: Path):
+    first = explorer_smoke._default_playwright_fixture_dir(log_dir=tmp_path / "run-a")
+    second = explorer_smoke._default_playwright_fixture_dir(log_dir=tmp_path / "run-b")
 
+    assert first == tmp_path / "run-a" / "playwright-fixtures" / "data"
+    assert second == tmp_path / "run-b" / "playwright-fixtures" / "data"
+    assert first != second
+    assert explorer_smoke.EXPLORER_DIR not in first.parents
+
+
+def test_serve_browser_tests_accepts_fixture_dir_env_override():
     serve_script = explorer_smoke.EXPLORER_DIR / "scripts" / "serve-browser-tests.mjs"
     serve_text = serve_script.read_text(encoding="utf-8")
-    assert '"test-fixtures", ".generated", "data"' in serve_text, (
-        "serve-browser-tests.mjs default fixture mount diverged from "
-        "_default_playwright_fixture_dir(); update both ends together"
-    )
+    assert "process.env.E2E_FIXTURE_DIR" in serve_text
+    assert '"test-fixtures", ".generated", "data"' in serve_text
+
+
+def test_playwright_config_does_not_reuse_server_for_fixture_dir_override():
+    config = explorer_smoke.EXPLORER_DIR / "playwright.config.ts"
+    config_text = config.read_text(encoding="utf-8")
+    assert "reuseExistingServer: !process.env.CI && !process.env.E2E_FIXTURE_DIR" in config_text
+
+
+def test_default_fixture_dir_is_per_run_and_passed_to_playwright(tmp_path: Path):
+    invocations: list[list[str]] = []
+    env_by_invocation: list[dict[str, str] | None] = []
+    output_dir = tmp_path / "out"
+    log_dir = tmp_path / "logs"
+
+    def fake_runner(argv, stdout=None, stderr=None, check=False, cwd=None, env=None):
+        invocations.append(argv)
+        env_by_invocation.append(env)
+        if argv[:3] == ["benchbox", "explorer", "build"]:
+            output_dir.mkdir(parents=True)
+            (output_dir / "results.duckdb").write_text("fixture", encoding="utf-8")
+        return Mock(returncode=0, args=argv)
+
+    with (
+        patch.object(explorer_smoke, "has_node", return_value=True),
+        patch.object(explorer_smoke, "_find_free_local_port", return_value=45679),
+    ):
+        explorer_smoke.run_explorer_smoke(
+            bundles_dir=tmp_path / "b",
+            output_dir=output_dir,
+            log_dir=log_dir,
+            runner=fake_runner,
+        )
+
+    fixture_dir = log_dir / "playwright-fixtures" / "data"
+    assert fixture_dir != explorer_smoke.EXPLORER_DIR / "test-fixtures" / ".generated" / "data"
+    assert (fixture_dir / "results.duckdb").read_text(encoding="utf-8") == "fixture"
+    assert env_by_invocation[-1] is not None
+    assert env_by_invocation[-1]["E2E_FIXTURE_DIR"] == str(fixture_dir)
+    assert env_by_invocation[-1]["E2E_PORT"] == "45679"
+    assert invocations[-1][:4] == ["npx", "playwright", "test", "--grep"]
 
 
 def test_requested_browser_projects_are_not_silently_dropped(tmp_path: Path):

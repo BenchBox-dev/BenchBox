@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import socket
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -112,13 +113,12 @@ def run_explorer_smoke(
             skip_reason=None,
         )
 
-    _stage_playwright_fixture_dir(
-        source_dir=output_dir,
-        fixture_dir=playwright_fixture_dir or _default_playwright_fixture_dir(),
-    )
+    fixture_dir = playwright_fixture_dir or _default_playwright_fixture_dir(log_dir=log_dir)
+    _stage_playwright_fixture_dir(source_dir=output_dir, fixture_dir=fixture_dir)
     smoke_returncode = _run_browser_smoke(
         smoke_log=smoke_log,
         data_dir=output_dir,
+        fixture_dir=fixture_dir,
         playwright_browsers=playwright_browsers,
         runner=runner,
     )
@@ -144,18 +144,17 @@ def _prepare_data_dir(*, bundles_dir: Path, log_dir: Path) -> Path:
     return data_dir
 
 
-def _default_playwright_fixture_dir() -> Path:
-    """Return the fixture mount used by results-explorer/playwright.config.ts."""
-    return EXPLORER_DIR / "test-fixtures" / ".generated" / "data"
+def _default_playwright_fixture_dir(*, log_dir: Path) -> Path:
+    """Return the per-run fixture mount used by the UAT Playwright smoke."""
+    return log_dir / "playwright-fixtures" / "data"
 
 
 def _stage_playwright_fixture_dir(*, source_dir: Path, fixture_dir: Path) -> None:
     """Point Playwright's fixture mount at the UAT-built Explorer data.
 
-    The Playwright config launches `serve-browser-tests.mjs`, whose default
-    `/results/data/` mount is `test-fixtures/.generated/data`. UAT builds a
-    fresh data directory per run, so stage that directory into the generated
-    fixture mount before invoking Playwright directly.
+    UAT builds a fresh data directory per run, so stage that directory into a
+    per-run fixture mount and pass it to `serve-browser-tests.mjs` via
+    `E2E_FIXTURE_DIR`.
     """
     source = source_dir.expanduser().resolve()
     fixture = fixture_dir.expanduser()
@@ -180,11 +179,14 @@ def _run_browser_smoke(
     *,
     smoke_log: Path,
     data_dir: Path,
+    fixture_dir: Path,
     playwright_browsers: tuple[str, ...],
     runner,
 ) -> int:
     env = os.environ.copy()
     env["BENCHBOX_DATA_DIR"] = str(data_dir)
+    env["E2E_FIXTURE_DIR"] = str(_absolute_path(fixture_dir))
+    env.setdefault("E2E_PORT", str(_find_free_local_port()))
     commands = (
         ["npm", "ci"],
         ["npm", "run", "test:e2e:fixtures"],
@@ -199,3 +201,16 @@ def _run_browser_smoke(
             if returncode != 0:
                 return returncode
     return 0
+
+
+def _absolute_path(path: Path) -> Path:
+    expanded = path.expanduser()
+    if expanded.is_absolute():
+        return expanded
+    return Path.cwd() / expanded
+
+
+def _find_free_local_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])

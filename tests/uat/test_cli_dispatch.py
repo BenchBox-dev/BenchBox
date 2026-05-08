@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -65,6 +66,30 @@ def test_main_help_returns_0(capsys):
     assert rc == 0
     out = capsys.readouterr().out
     assert "subcommands" in out
+
+
+def test_main_preflight_returns_2_when_preflight_aborts(tmp_path, monkeypatch, capsys):
+    config = SimpleNamespace(raw={"preflight": {"free_space_min_gib": 1000.0}})
+
+    def fake_run_preflight(**kwargs):
+        return SimpleNamespace(
+            disk_budget_summary="budget: high water mark 1 GiB",
+            warnings=("disk nearly full",),
+            aborted=True,
+            abort_reason="free space 0.1 GiB < cutoff 1000.0 GiB",
+        )
+
+    monkeypatch.setattr("tests.uat.config.load_config", lambda path: config)
+    monkeypatch.setattr("tests.uat.phases.execute.default_benchmark_runs_dir", lambda cfg: tmp_path / "runs")
+    monkeypatch.setattr("tests.uat.phases.preflight.run_preflight", fake_run_preflight)
+
+    rc = _cli.main(["preflight", "--config", "uat.yaml"])
+
+    captured = capsys.readouterr()
+    assert rc == 2
+    assert "budget: high water mark 1 GiB" in captured.out
+    assert "[preflight warn] disk nearly full" in captured.err
+    assert "[preflight] ABORT: free space 0.1 GiB < cutoff 1000.0 GiB" in captured.err
 
 
 def test_subcommands_table_covers_all_make_targets():

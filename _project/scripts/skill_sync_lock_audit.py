@@ -88,7 +88,31 @@ def diff_skill_files(old: dict[str, Any], new: dict[str, Any]) -> list[SkillFile
     return changes
 
 
-def _scope_path_to_skill_pattern(path: str) -> str | None:
+def _skill_directories_from_locks(*locks: dict[str, Any]) -> set[str]:
+    directories: set[str] = set()
+    for lock in locks:
+        skills = lock.get("skills", {}) or {}
+        for skill_name, skill in skills.items():
+            if not isinstance(skill_name, str):
+                continue
+            skill_prefix = skill_name.strip("/")
+            if not skill_prefix:
+                continue
+            skill_parts = skill_prefix.split("/")
+            for index in range(1, len(skill_parts) + 1):
+                directories.add("/".join(skill_parts[:index]) + "/")
+
+            files = skill.get("files", {}) or {}
+            for rel_file in files:
+                if not isinstance(rel_file, str):
+                    continue
+                full_parts = [*skill_parts, *rel_file.strip("/").split("/")]
+                for index in range(1, len(full_parts)):
+                    directories.add("/".join(full_parts[:index]) + "/")
+    return directories
+
+
+def _scope_path_to_skill_pattern(path: str, *, skill_directories: set[str] | None = None) -> str | None:
     """Map a TODO scope path like ``.claude/skills/code/SKILL.md`` to lock paths.
 
     Returned patterns are simple prefixes. A concrete file path is returned as
@@ -101,12 +125,15 @@ def _scope_path_to_skill_pattern(path: str) -> str | None:
     after = normalized.split(marker, 1)[1]
     if not after:
         return None
-    if after.endswith("/") or Path(after).suffix == "":
+    if after.endswith("/"):
         return after.rstrip("/") + "/"
+    directory_pattern = after.rstrip("/") + "/"
+    if skill_directories is not None and directory_pattern in skill_directories:
+        return directory_pattern
     return after
 
 
-def allowed_patterns_from_todo(todo_path: Path) -> list[str]:
+def allowed_patterns_from_todo(todo_path: Path, *, skill_directories: set[str] | None = None) -> list[str]:
     """Extract allowed skill lock paths from a TODO's scope_limit.only_modify."""
     data = yaml.safe_load(todo_path.read_text(encoding="utf-8")) or {}
     scope = data.get("scope_limit", {}) or {}
@@ -115,7 +142,7 @@ def allowed_patterns_from_todo(todo_path: Path) -> list[str]:
     for raw_path in only_modify:
         if not isinstance(raw_path, str):
             continue
-        pattern = _scope_path_to_skill_pattern(raw_path)
+        pattern = _scope_path_to_skill_pattern(raw_path, skill_directories=skill_directories)
         if pattern is not None:
             patterns.append(pattern)
     return patterns
@@ -158,7 +185,8 @@ def main(argv: list[str] | None = None) -> int:
         print("No skill content hash changes in skill-sync.lock")
         return 0
 
-    patterns = allowed_patterns_from_todo(args.todo) if args.todo else []
+    skill_directories = _skill_directories_from_locks(old_lock, new_lock)
+    patterns = allowed_patterns_from_todo(args.todo, skill_directories=skill_directories) if args.todo else []
     if patterns:
         print("Allowed skill paths from TODO scope:")
         for pattern in patterns:
