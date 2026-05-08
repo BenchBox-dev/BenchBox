@@ -10,7 +10,7 @@
  *   (d) Baseline selector changes which result is treated as baseline in chart section
  */
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/preact";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/preact";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { route } from "preact-router";
 import type { DetailResult } from "@/types";
@@ -31,10 +31,11 @@ vi.mock("@/lib/duckdbQueries", async () => {
     resolveShortId: vi.fn((id: string) => Promise.resolve(id)),
     toShortIds: vi.fn((ids: string[]) => Promise.resolve(ids)),
     getPrimaryMetricForBenchmark: vi.fn().mockResolvedValue("power_score"),
+    listResults: vi.fn().mockResolvedValue([]),
   };
 });
 
-import { getDetailResult, getPrimaryMetricForBenchmark, resolveShortId, toShortIds } from "@/lib/duckdbQueries";
+import { getDetailResult, getPrimaryMetricForBenchmark, listResults, resolveShortId, toShortIds } from "@/lib/duckdbQueries";
 import { Compare } from "@/pages/Compare";
 
 // ---------------------------------------------------------------------------
@@ -128,19 +129,19 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("Compare", () => {
-  it("redirects a single compare ID to its result detail page", async () => {
+  it("opens the compare builder with a single ID pinned (instead of redirecting back to the detail page)", async () => {
     setupUrl(["a556e716"]);
     vi.mocked(resolveShortId).mockResolvedValue("tpch-duckdb-sf0.01-20260403-7fe93365");
+    vi.mocked(getDetailResult).mockResolvedValue(DUCKDB);
 
     render(<Compare />);
 
-    await waitFor(() =>
-      expect(route).toHaveBeenCalledWith(
-        "/results/r/tpch-duckdb-sf0.01-20260403-7fe93365",
-        true,
-      ),
-    );
+    await waitFor(() => expect(screen.getByTestId("compare-builder")).toBeTruthy());
     expect(getDetailResult).toHaveBeenCalledWith("tpch-duckdb-sf0.01-20260403-7fe93365");
+    // The old behavior was a redirect to /results/r/<id>; that round-trip is
+    // gone. The user must end up on a comparison surface, not the detail page
+    // they came from.
+    expect(route).not.toHaveBeenCalledWith(expect.stringMatching(/^\/results\/r\//), true);
   });
 
   it("keeps a single unknown compare ID on the Compare error path", async () => {
@@ -155,15 +156,170 @@ describe("Compare", () => {
     expect(route).not.toHaveBeenCalled();
   });
 
-  it("keeps the empty ids error on the Compare page", async () => {
+  it("renders the in-page compare builder when no ids are provided (no URL editing required)", async () => {
     setupUrl([]);
 
     render(<Compare />);
 
-    await waitFor(() =>
-      expect(screen.getByText(/No result IDs provided/)).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByTestId("compare-builder")).toBeTruthy());
+    expect(screen.getByText(/Pick runs to compare/)).toBeTruthy();
+    expect(screen.queryByText(/Add \?ids=/)).toBeNull();
     expect(route).not.toHaveBeenCalled();
+  });
+
+  it("compare builder enforces same-cohort selection and launches with two compatible runs", async () => {
+    setupUrl([]);
+    // Two compatible (same benchmark/scale/phase) and one incompatible (different benchmark)
+    vi.mocked(listResults).mockResolvedValue([
+      {
+        result_id: "r1",
+        benchmark: "tpch",
+        scale_factor: 0.1,
+        platform: "DuckDB",
+        platform_id: "duckdb",
+        driver_version: null,
+        run_date: "2026-04-17",
+        power_score: 3000,
+        total_duration_s: 60,
+        geomean_ms: 10,
+        display_geomean_ms: 10,
+        query_count: 22,
+        trust_label: "maintainer-run",
+        visibility: "public-curated",
+        platform_version: null,
+        execution_mode: null,
+        tuning_mode: null,
+        tuning_hash: null,
+        test_type: "measurement",
+        validation_status: null,
+        cost_usd: null,
+        compliance_class: null,
+        is_ranking_eligible: true,
+        has_plans: false,
+        plans_published: false,
+        has_tuning: false,
+        bundle_download_url: "",
+        normalized_cost_usd: null,
+        cost_model_version: null,
+        cost_status: null,
+        cost_scope: null,
+        deployment_class: null,
+        cloud_provider: null,
+        cloud_region: null,
+        instance_or_warehouse: null,
+        storage_format: null,
+      } as never,
+      {
+        result_id: "r2",
+        benchmark: "tpch",
+        scale_factor: 0.1,
+        platform: "SQLite",
+        platform_id: "sqlite",
+        driver_version: null,
+        run_date: "2026-04-17",
+        power_score: 300,
+        total_duration_s: 600,
+        geomean_ms: 100,
+        display_geomean_ms: 100,
+        query_count: 22,
+        trust_label: "maintainer-run",
+        visibility: "public-curated",
+        platform_version: null,
+        execution_mode: null,
+        tuning_mode: null,
+        tuning_hash: null,
+        test_type: "measurement",
+        validation_status: null,
+        cost_usd: null,
+        compliance_class: null,
+        is_ranking_eligible: true,
+        has_plans: false,
+        plans_published: false,
+        has_tuning: false,
+        bundle_download_url: "",
+        normalized_cost_usd: null,
+        cost_model_version: null,
+        cost_status: null,
+        cost_scope: null,
+        deployment_class: null,
+        cloud_provider: null,
+        cloud_region: null,
+        instance_or_warehouse: null,
+        storage_format: null,
+      } as never,
+      {
+        result_id: "r3",
+        benchmark: "clickbench",
+        scale_factor: 0.1,
+        platform: "DuckDB",
+        platform_id: "duckdb",
+        driver_version: null,
+        run_date: "2026-04-17",
+        power_score: null,
+        total_duration_s: 60,
+        geomean_ms: 10,
+        display_geomean_ms: 10,
+        query_count: 43,
+        trust_label: "maintainer-run",
+        visibility: "public-curated",
+        platform_version: null,
+        execution_mode: null,
+        tuning_mode: null,
+        tuning_hash: null,
+        test_type: "measurement",
+        validation_status: null,
+        cost_usd: null,
+        compliance_class: null,
+        is_ranking_eligible: true,
+        has_plans: false,
+        plans_published: false,
+        has_tuning: false,
+        bundle_download_url: "",
+        normalized_cost_usd: null,
+        cost_model_version: null,
+        cost_status: null,
+        cost_scope: null,
+        deployment_class: null,
+        cloud_provider: null,
+        cloud_region: null,
+        instance_or_warehouse: null,
+        storage_format: null,
+      } as never,
+    ]);
+
+    const { getByTestId } = render(<Compare />);
+
+    await waitFor(() => expect(getByTestId("compare-builder")).toBeTruthy());
+    await waitFor(() => expect(getByTestId("compare-builder-row-r1")).toBeTruthy());
+
+    // Launch is disabled before any selection
+    const launch = getByTestId("compare-builder-launch") as HTMLButtonElement;
+    expect(launch.disabled).toBe(true);
+
+    // Select first compatible run
+    const r1Checkbox = within(getByTestId("compare-builder-row-r1")).getByRole("checkbox") as HTMLInputElement;
+    r1Checkbox.click();
+
+    // r3 (different benchmark) should now be disabled
+    await waitFor(() => {
+      const r3Checkbox = within(getByTestId("compare-builder-row-r3")).getByRole("checkbox") as HTMLInputElement;
+      expect(r3Checkbox.disabled).toBe(true);
+    });
+
+    // Add second compatible run; launch enables
+    const r2Checkbox = within(getByTestId("compare-builder-row-r2")).getByRole("checkbox") as HTMLInputElement;
+    r2Checkbox.click();
+    await waitFor(() => expect((getByTestId("compare-builder-launch") as HTMLButtonElement).disabled).toBe(false));
+
+    // Click Launch — must navigate to /results/compare?ids=r1,r2 (or r2,r1)
+    (getByTestId("compare-builder-launch") as HTMLButtonElement).click();
+    await waitFor(() => {
+      const calls = vi.mocked(route).mock.calls.map((c) => String(c[0]));
+      const compareCall = calls.find((url) => url.startsWith("/results/compare?ids="));
+      expect(compareCall).toBeTruthy();
+      expect(compareCall).toContain("r1");
+      expect(compareCall).toContain("r2");
+    });
   });
 
   it("shows 'vs worst' speedup of 10.00x in the DuckDB summary card (power_score primary)", async () => {

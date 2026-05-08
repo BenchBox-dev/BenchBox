@@ -578,16 +578,31 @@ export function Query(_: RoutableProps) {
                   <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">
                     <thead class="bg-[var(--bb-surface-data-muted)]">
                       <tr>
-                        {visibleColumns.map((column) => (
-                          <th
-                            key={column}
-                            class="table-th cursor-pointer select-none"
-                            onClick={() => toggleSort(column)}
-                          >
-                            {formatQueryColumnLabel(column)}
-                            {sort.column === column ? (sort.direction === "asc" ? " ↑" : " ↓") : ""}
-                          </th>
-                        ))}
+                        {visibleColumns.map((column) => {
+                          const isActive = sort.column === column;
+                          const arrow = isActive ? (sort.direction === "asc" ? " ↑" : " ↓") : "";
+                          const ariaSort = isActive
+                            ? sort.direction === "asc"
+                              ? "ascending"
+                              : "descending"
+                            : "none";
+                          return (
+                            <th
+                              key={column}
+                              scope="col"
+                              aria-sort={ariaSort}
+                              class="p-0"
+                            >
+                              <button
+                                type="button"
+                                class="table-th block w-full cursor-pointer select-none border-0 bg-transparent text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--bb-accent)]"
+                                onClick={() => toggleSort(column)}
+                              >
+                                {formatQueryColumnLabel(column)}{arrow}
+                              </button>
+                            </th>
+                          );
+                        })}
                         <th class="table-th sticky right-0 z-10 bg-[var(--bb-surface-data-muted)]" />
                       </tr>
                     </thead>
