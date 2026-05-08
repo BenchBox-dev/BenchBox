@@ -1,0 +1,170 @@
+id: results-explorer-table-sticky-density-and-semantics
+title: "Repair Results Explorer table stickiness, density, and semantics"
+worktree: main
+priority: High
+status: Not Started
+category: Frontend UX
+
+description: |
+  Fix broken sticky/frozen table behavior, add missing filters to large
+  tables, and reduce row-height inflation from overloaded cells. Defects
+  this item addresses were flagged in the 2026-05-08 Results Explorer
+  follow-up review (chat-only artifact, not committed to _project/audits/).
+  w0 rebinds the review evidence against develop tip and captures it to
+  _project/verification-logs/results-explorer-table-sticky-density-and-semantics/w0.log
+  before any other work unit runs; that log replaces the previous "review row
+  #8/#10/#11/#24/#31/#33" citations as the durable reference.
+
+deps:
+  needs: []
+
+work:
+  - id: w0
+    summary: "Rebind dense-table review evidence against develop tip"
+    status: pending
+    notes: |
+      Walk QueryHeatmap (Benchmark detail, horizontal and vertical scroll),
+      MetaLeaderboard (Home), PlatformIndex (>= 25 rows), and Query results
+      against the current develop tip with the compare checkbox column both
+      visible and hidden. Capture frozen-column offset drift, header
+      transparency over scrolled cells, overloaded provenance cells, missing
+      Platform-page filters, and Query header semantics/keyboard
+      accessibility to
+      _project/verification-logs/results-explorer-table-sticky-density-and-semantics/w0.log.
+      Output is the rebind reference for w1-w7 acceptance.
+
+  - id: w1
+    summary: "Audit dense scrollable tables and overloaded cells"
+    needs: [w0]
+    status: pending
+    notes: |
+      Audit QueryHeatmap, MetaLeaderboard, PlatformIndex, Query results, and
+      any table with horizontal scroll or frozen columns. Document frozen
+      columns, sticky offsets, header behavior, row heights, and cells that
+      stack platform, version, trust badges, validation badges, and receipt
+      links.
+
+  - id: w2
+    summary: "Fix Benchmark heatmap sticky-left offsets"
+    needs: [w1]
+    status: pending
+    notes: |
+      Fix Benchmark heatmap sticky-left offsets so the optional compare
+      checkbox, platform column, trust/status column, score column, and
+      geomean column stay aligned with horizontally scrolled query cells.
+      Offsets must come from the actual rendered frozen columns rather than
+      hard-coded assumptions.
+
+  - id: w3
+    summary: "Make Benchmark heatmap headers vertically sticky"
+    needs: [w1]
+    status: pending
+    notes: |
+      Make the Benchmark heatmap header row vertically sticky within the
+      scroll container so query numbers stay visible while scrolling down.
+      Set z-index and background layers so frozen column headers and query
+      headers do not overlap or become transparent over cells.
+
+  - id: w4
+    summary: "Compact provenance and trust/status table cells"
+    needs: [w1]
+    status: pending
+    notes: |
+      Replace overloaded primary cells that stack platform name, official
+      status, version, receipt link, trust badge, and validation badge.
+      Keep the frozen region to platform identity plus essential metric, and
+      move receipt and secondary provenance into a compact action, tooltip,
+      or detail cell.
+
+  - id: w5
+    summary: "Add filters to large Platform detail tables"
+    needs: [w0]
+    status: pending
+    notes: |
+      Add visible filters to Platform detail tables with >= 25 rows:
+      benchmark, scale, phase, date range, trust tier, validation status,
+      and metric contract. The count label must update from "Showing 70 of
+      70 results" to the filtered count and provide one-click reset.
+
+  - id: w6
+    summary: "Make Query Workbench sort headers semantic and keyboard accessible"
+    needs: [w0]
+    status: pending
+    notes: |
+      Replace clickable Query table `<th>` headers with keyboard-accessible
+      sort buttons. Add `aria-sort` state, visible focus treatment, and
+      tests asserting ascending/descending sort state changes are announced
+      and reflected in row order.
+
+  - id: w7
+    summary: "Cover sticky, density, filter, and sort behavior"
+    needs: [w2, w3, w4, w5, w6]
+    status: pending
+    notes: |
+      Add tests and browser screenshot checks for horizontal heatmap
+      scroll, vertical header stickiness, compact cell height, platform
+      filtering, and Query sort accessibility. Use at least one fixture
+      with the compare checkbox column visible and one without it.
+
+must_preserve:
+  - "Existing sort behavior and default ordering."
+  - "Receipt/provenance access for every row."
+  - "Readable frozen columns at desktop width."
+
+approach: |
+  Prefer shared table helpers only where existing table structures are
+  already compatible. Use CSS sticky with explicit measured widths or stable
+  CSS variables, and keep layout stable during horizontal scroll. Treat
+  filters as table controls, not separate navigation.
+
+anti_patterns:
+  - "DO NOT hide provenance entirely to gain density."
+  - "DO NOT introduce nested cards or large explanatory text blocks around table controls."
+  - "DO NOT add filters that reset the user to another route."
+
+verification:
+  - description: "Targeted dense table tests pass"
+    command: "cd results-explorer && npm test -- --run src/components/__tests__/QueryHeatmap.test.tsx src/components/__tests__/MetaLeaderboard.test.tsx src/components/__tests__/MetaLeaderboard.a11y.test.tsx src/pages/__tests__/PlatformIndex.test.tsx src/pages/__tests__/Query.test.tsx src/pages/__tests__/Home.test.tsx"
+    expected_output: "all targeted tests pass"
+  - description: "Frontend typecheck passes"
+    command: "cd results-explorer && npm run typecheck"
+    expected_output: "exit 0"
+  - description: "Frontend build passes"
+    command: "cd results-explorer && npm run build"
+    expected_output: "exit 0"
+  - description: "Manual dense table browser check is complete"
+    command: "echo 'Manual: browser-check /results/tpch/, /results/p/polars/, /results/query, and /results/ with horizontal and vertical scrolling'"
+    expected_output: "manual evidence captured in PR notes or audit artifact"
+
+scope_limit:
+  only_modify:
+    - "results-explorer/src/components/QueryHeatmap.tsx"
+    - "results-explorer/src/components/MetaLeaderboard.tsx"
+    - "results-explorer/src/pages/PlatformIndex.tsx"
+    - "results-explorer/src/pages/Query.tsx"
+    - "results-explorer/src/index.css"
+    - "results-explorer/src/components/__tests__/"
+    - "results-explorer/src/pages/__tests__/"
+  do_not_modify:
+    - "benchbox/"
+    - "Generated benchmark data files unless a missing filter field is proven to be absent from the export."
+
+metadata:
+  tags:
+    - results-explorer
+    - tables
+    - density
+    - usability-review
+  estimated_effort: "Large (2-4 days)"
+  created_date: "2026-05-08"
+
+impact:
+  business_value: |
+    Makes dense benchmark and platform tables trustworthy and usable for real
+    result comparison instead of visually drifting during scroll.
+  user_impact: |
+    Users can filter large tables, keep headers aligned, and scan rows without
+    provenance badges inflating every row.
+  technical_debt: |
+    Forces sticky-column and sort-header behavior into tested contracts instead
+    of implicit CSS assumptions.
