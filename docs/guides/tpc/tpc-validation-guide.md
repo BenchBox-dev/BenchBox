@@ -127,7 +127,7 @@ test_results = {
     "scale_factor": 1.0,        # Scale factor used
     "test_start_time": "2023-01-01T10:00:00Z",  # ISO format timestamp
     "test_end_time": "2023-01-01T11:00:00Z",    # ISO format timestamp
-    
+
     # Query execution results
     "query_results": {
         "1": {
@@ -138,20 +138,20 @@ test_results = {
             "error": "..."           # Optional: error message if failed
         }
     },
-    
+
     # Data generation information
     "data_generation": {
         "generation_time": 120.5,   # Time to generate data in seconds
         "generated_tables": ["customer", "orders", "lineitem"]
     },
-    
+
     # Calculated metrics
     "metrics": {
         "avg_query_time": 5.2,
         "total_query_time": 5.2,
         "queries_per_second": 0.19
     },
-    
+
     # Optional: Maintenance operations (for TPC-DS, TPC-DI)
     "maintenance_operations": {
         "insert_operation": {
@@ -161,7 +161,7 @@ test_results = {
             "records_affected": 5000
         }
     },
-    
+
     # Optional: ETL operations (for TPC-DI)
     "etl_operations": {
         "extract_customers": {
@@ -171,19 +171,19 @@ test_results = {
             "records_processed": 150000
         }
     },
-    
+
     # Reproducibility information
     "reproducibility": {
         "seed": 12345,
         "timestamp": "2023-01-01T10:00:00Z",
         "environment": "test_env"
     },
-    
+
     # Test isolation
     "test_isolation": {
         "isolated": True
     },
-    
+
     # Documentation
     "documentation": {
         "test_report": "path/to/test_report.pdf",
@@ -341,7 +341,7 @@ class CustomBusinessRuleValidator(BaseValidator):
     def validate(self, test_results, report):
         # Custom validation logic
         query_results = test_results.get("query_results", {})
-        
+
         if len(query_results) < 5:
             report.add_issue(
                 "ERROR",
@@ -350,7 +350,7 @@ class CustomBusinessRuleValidator(BaseValidator):
                 self.name
             )
             return ValidationResult.FAILED
-        
+
         return ValidationResult.PASSED
 
 # Use custom validator

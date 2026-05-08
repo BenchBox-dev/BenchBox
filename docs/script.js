@@ -7,25 +7,25 @@ copyButtons.forEach(button => {
     button.addEventListener('click', async () => {
         const targetId = button.getAttribute('data-target');
         const codeElement = targetId ? document.getElementById(targetId) : button.closest('.code-block').querySelector('code');
-        
+
         if (!codeElement) return;
-        
+
         const textToCopy = codeElement.textContent.trim();
-        
+
         try {
             await navigator.clipboard.writeText(textToCopy);
-            
+
             // Visual feedback
             const originalText = button.textContent;
             button.textContent = 'Copied!';
             button.classList.add('copied');
-            
+
             // Reset after 2 seconds
             setTimeout(() => {
                 button.textContent = originalText;
                 button.classList.remove('copied');
             }, 2000);
-            
+
         } catch (err) {
             // Fallback for older browsers
             const textArea = document.createElement('textarea');
@@ -36,12 +36,12 @@ copyButtons.forEach(button => {
             document.body.appendChild(textArea);
             textArea.focus();
             textArea.select();
-            
+
             try {
                 document.execCommand('copy');
                 button.textContent = 'Copied!';
                 button.classList.add('copied');
-                
+
                 setTimeout(() => {
                     button.textContent = 'Copy';
                     button.classList.remove('copied');
@@ -49,7 +49,7 @@ copyButtons.forEach(button => {
             } catch (err) {
                 console.error('Failed to copy text: ', err);
             }
-            
+
             document.body.removeChild(textArea);
         }
     });
@@ -59,15 +59,15 @@ copyButtons.forEach(button => {
 navLinks.forEach(link => {
     link.addEventListener('click', (e) => {
         e.preventDefault();
-        
+
         const targetId = link.getAttribute('href');
         const targetElement = document.querySelector(targetId);
-        
+
         if (targetElement) {
             const headerOffset = 80; // Account for fixed header
             const elementPosition = targetElement.getBoundingClientRect().top;
             const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
-            
+
             window.scrollTo({
                 top: offsetPosition,
                 behavior: 'smooth'
@@ -82,13 +82,13 @@ let ticking = false;
 function updateNavBackground() {
     const scrolled = window.scrollY;
     const nav = document.querySelector('.nav');
-    
+
     if (scrolled > 50) {
         nav.style.backgroundColor = 'rgba(13, 17, 23, 0.98)';
     } else {
         nav.style.backgroundColor = 'rgba(13, 17, 23, 0.95)';
     }
-    
+
     ticking = false;
 }
 
@@ -119,7 +119,7 @@ const observer = new IntersectionObserver((entries) => {
 // Observe elements for animation
 document.addEventListener('DOMContentLoaded', () => {
     const animateElements = document.querySelectorAll('.feature-card, .benchmark-card, .install-step');
-    
+
     animateElements.forEach(el => {
         el.style.opacity = '0';
         el.style.transform = 'translateY(20px)';
@@ -132,7 +132,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function createMobileMenu() {
     const nav = document.querySelector('.nav-container');
     const navLinks = document.querySelector('.nav-links');
-    
+
     // Create hamburger button
     const hamburger = document.createElement('button');
     hamburger.className = 'mobile-menu-toggle';
@@ -149,7 +149,7 @@ function createMobileMenu() {
         cursor: pointer;
         padding: 4px;
     `;
-    
+
     // Style hamburger lines
     hamburger.querySelectorAll('span').forEach(span => {
         span.style.cssText = `
@@ -160,16 +160,16 @@ function createMobileMenu() {
             transition: 0.3s;
         `;
     });
-    
+
     // Insert hamburger before nav links
     nav.insertBefore(hamburger, navLinks);
-    
+
     // Toggle mobile menu
     hamburger.addEventListener('click', () => {
         navLinks.classList.toggle('mobile-open');
         hamburger.classList.toggle('active');
     });
-    
+
     // Show hamburger on mobile
     const mediaQuery = window.matchMedia('(max-width: 768px)');
     function handleMediaQuery(e) {
@@ -195,10 +195,10 @@ function createMobileMenu() {
             navLinks.classList.remove('mobile-open');
         }
     }
-    
+
     mediaQuery.addListener(handleMediaQuery);
     handleMediaQuery(mediaQuery);
-    
+
     // Style mobile menu when open
     const style = document.createElement('style');
     style.textContent = `
@@ -207,15 +207,15 @@ function createMobileMenu() {
             opacity: 1 !important;
             pointer-events: auto !important;
         }
-        
+
         .mobile-menu-toggle.active span:nth-child(1) {
             transform: rotate(-45deg) translate(-5px, 5px);
         }
-        
+
         .mobile-menu-toggle.active span:nth-child(2) {
             opacity: 0;
         }
-        
+
         .mobile-menu-toggle.active span:nth-child(3) {
             transform: rotate(45deg) translate(-5px, -5px);
         }
@@ -258,7 +258,7 @@ function showLoadingState(button) {
     const originalText = button.textContent;
     button.textContent = 'Copying...';
     button.disabled = true;
-    
+
     return () => {
         button.textContent = originalText;
         button.disabled = false;
@@ -270,10 +270,10 @@ copyButtons.forEach(button => {
     const originalClickHandler = button.onclick;
     button.addEventListener('click', async (e) => {
         const resetLoading = showLoadingState(button);
-        
+
         // Small delay to show loading state
         await new Promise(resolve => setTimeout(resolve, 100));
-        
+
         resetLoading();
     });
 });

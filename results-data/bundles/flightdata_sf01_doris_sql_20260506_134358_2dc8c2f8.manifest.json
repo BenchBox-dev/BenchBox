@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:09:24.033975+00:00",
-  "bundle_file": "flightdata_sf01_doris_sql_20260506_134358_2dc8c2f8.json",
-  "bundle_hash": "2e0a8cc582fc817ff590f45c656db1e5dd1768fcafbf839cb167f17a6c7739e4",
-  "companion_hashes": {},
   "benchmark": "Flight Data OLAP",
+  "bundle_file": "flightdata_sf01_doris_sql_20260506_134358_2dc8c2f8.json",
+  "bundle_hash": "d781009d69e2fd1a1df022983aedd04784e5256514e049ec7c7311a769af9f11",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "Apache Doris",
   "scale_factor": 0.1,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:09:24.033975+00:00",
   "submitted_by": "Joe Harris"
 }

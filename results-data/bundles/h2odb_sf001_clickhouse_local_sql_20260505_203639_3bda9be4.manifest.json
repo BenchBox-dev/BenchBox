@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T00:46:35.163773+00:00",
-  "bundle_file": "h2odb_sf001_clickhouse_local_sql_20260505_203639_3bda9be4.json",
-  "bundle_hash": "e5195562a2e7f68f49fe68bef112af4cf525901186671c94bfad02699a60d3bc",
-  "companion_hashes": {},
   "benchmark": "H2O Database",
+  "bundle_file": "h2odb_sf001_clickhouse_local_sql_20260505_203639_3bda9be4.json",
+  "bundle_hash": "bc96cebb7164ed169daeac3a31de7789c5dc1425e7110f930bd5dc85ddf2544b",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "ClickHouse Local",
   "scale_factor": 0.01,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T00:46:35.163773+00:00",
   "submitted_by": "Joe Harris"
 }

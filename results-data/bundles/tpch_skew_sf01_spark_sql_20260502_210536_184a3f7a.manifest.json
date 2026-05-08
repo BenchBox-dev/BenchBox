@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-03T02:52:13.099140+00:00",
-  "bundle_file": "tpch_skew_sf01_spark_sql_20260502_210536_184a3f7a.json",
-  "bundle_hash": "52621fb5ae1cf3f4dca09d1108de1843d9e5758f0863ed89a9899b824c57b9b0",
-  "companion_hashes": {},
   "benchmark": "TPC-H Skew Benchmark (moderate)",
+  "bundle_file": "tpch_skew_sf01_spark_sql_20260502_210536_184a3f7a.json",
+  "bundle_hash": "d7e9ed3f1e47423ef31b3cb69e4244992e7fa6e690e96247e048ddd9734f12a4",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "Spark",
   "scale_factor": 0.1,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:52:13.099140+00:00",
   "submitted_by": "BenchBox UAT"
 }

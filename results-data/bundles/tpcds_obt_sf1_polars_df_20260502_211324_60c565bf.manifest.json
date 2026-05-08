@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-03T02:50:57.828142+00:00",
-  "bundle_file": "tpcds_obt_sf1_polars_df_20260502_211324_60c565bf.json",
-  "bundle_hash": "451a68e41566da47f644f77354abe2bd912292c1ec5382a9613ddd0b34f054ea",
-  "companion_hashes": {},
   "benchmark": "TPC-DS-OBT",
+  "bundle_file": "tpcds_obt_sf1_polars_df_20260502_211324_60c565bf.json",
+  "bundle_hash": "9d57d455a1b2b6aa8aa8f88bcafe2b070d5bc9ad94496aaa2432b2670b73b243",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "Polars",
   "scale_factor": 1.0,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:50:57.828142+00:00",
   "submitted_by": "BenchBox UAT"
 }

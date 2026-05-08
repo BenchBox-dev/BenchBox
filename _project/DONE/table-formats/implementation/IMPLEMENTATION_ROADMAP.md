@@ -72,7 +72,7 @@
 - `tests/unit/core/manifest/test_manifest_v2.py`
 - `tests/integration/test_manifest_v2_integration.py`
 
-**Acceptance**: 
+**Acceptance**:
 - v1/v2 manifests load correctly
 - Platform adapters use preferred format
 - All existing tests pass
@@ -91,7 +91,7 @@
 ```python
 class FormatConversionOrchestrator:
     """Orchestrate table format conversion during benchmark runs."""
-    
+
     def convert_benchmark_tables(
         self,
         manifest_path: Path,
@@ -100,7 +100,7 @@ class FormatConversionOrchestrator:
         options: ConversionOptions | None = None
     ) -> dict[str, ConversionResult]:
         """Convert all tables in manifest to target format.
-        
+
         Returns:
             Mapping of table_name → ConversionResult
         """
@@ -112,14 +112,14 @@ class FormatConversionOrchestrator:
         #    - Track results
         # 4. Update manifest with converted paths
         # 5. Write manifest v2
-        
+
     def _get_converter(self, format_name: str) -> FormatConverter:
         """Get converter instance for format."""
         # Use registry pattern (Phase 5)
-        
+
     def _get_schema_for_table(
-        self, 
-        benchmark_name: str, 
+        self,
+        benchmark_name: str,
         table_name: str
     ) -> dict:
         """Load table schema from benchmark definition."""
@@ -135,13 +135,13 @@ def _run_format_conversion(
     conversion_options: ConversionOptions | None
 ) -> dict[str, ConversionResult]:
     """Run format conversion after data generation."""
-    
+
     output_dir = benchmark.output_dir
     manifest_path = output_dir / "_datagen_manifest.json"
-    
+
     if not manifest_path.exists():
         raise RuntimeError("Manifest not found - run data generation first")
-    
+
     orchestrator = FormatConversionOrchestrator()
     return orchestrator.convert_benchmark_tables(
         manifest_path=manifest_path,
@@ -232,18 +232,18 @@ def validate_partition_columns(
 if opts.partition_cols:
     # Validate first
     self.validate_partition_columns(opts.partition_cols, schema)
-    
+
     # Use dataset API for partitioned writes
     import pyarrow.dataset as ds
-    
+
     partitioning = ds.partitioning(
         pa.schema([
-            combined_table.schema.field(c) 
+            combined_table.schema.field(c)
             for c in opts.partition_cols
         ]),
         flavor="hive"
     )
-    
+
     ds.write_dataset(
         combined_table,
         output_dir,
@@ -252,7 +252,7 @@ if opts.partition_cols:
         basename_template="part-{i}.parquet",
         existing_data_behavior="overwrite_or_ignore"
     )
-    
+
     # Update output_files to include all partition files
     output_files = list(output_dir.rglob("*.parquet"))
 else:
@@ -328,25 +328,25 @@ def validate_conversion_compliance(
     fp_tolerance: float = 1e-6
 ) -> ComplianceValidationResult:
     """Comprehensive TPC compliance validation."""
-    
+
     errors = []
     warnings = []
-    
+
     # 1. Row count already validated by validate_row_count()
     row_count_match = True  # Assume passed if we got here
-    
+
     # 2. Sample random rows and compare
     sample_match = _validate_sample_data(
         source_files, converted_file, format_type, sample_size
     )
-    
+
     # 3. Compute aggregate checksums
     agg_match = _validate_aggregates(
         source_files, converted_file, schema, format_type, fp_tolerance
     )
-    
+
     is_compliant = row_count_match and sample_match and agg_match
-    
+
     return ComplianceValidationResult(
         is_compliant=is_compliant,
         row_count_match=row_count_match,
@@ -393,7 +393,7 @@ def _validate_aggregates(...):
 @pytest.mark.integration
 class TestFormatConversionE2E:
     """End-to-end format conversion integration tests."""
-    
+
     def test_tpch_sf001_full_conversion_pipeline(self):
         """Test complete TPC-H SF0.01 → Parquet → Query."""
         # 1. Generate TPC-H SF0.01 data (8 tables)
@@ -403,17 +403,17 @@ class TestFormatConversionE2E:
         # 5. Run TPC-H Q1
         # 6. Compare results with TBL-based run
         # 7. Verify results match
-        
+
     def test_cross_format_results_identical(self):
         """Parquet and Delta produce identical query results."""
         # Generate → convert to both → run query → assert equal
-        
+
     def test_partitioned_conversion_query_speedup(self, benchmark):
         """Partitioning improves selective query performance."""
         # Convert with partition_cols
         # Measure query time with/without partitioning
         # Assert >5x speedup on selective queries
-        
+
     def test_manifest_format_preference_respected(self):
         """Platform adapter loads preferred format."""
         # Convert to multiple formats
@@ -440,13 +440,13 @@ class TestFormatConversionE2E:
 ```python
 class FormatConverterRegistry:
     """Central registry for format converters."""
-    
+
     _converters: dict[str, type[FormatConverter]] = {
         "parquet": ParquetConverter,
         "delta": DeltaConverter,
         "iceberg": IcebergConverter,
     }
-    
+
     @classmethod
     def get(cls, format_name: str) -> FormatConverter:
         """Get converter instance."""
@@ -454,12 +454,12 @@ class FormatConverterRegistry:
         if not converter_class:
             raise ValueError(f"Unknown format: {format_name}")
         return converter_class()
-    
+
     @classmethod
     def register(cls, format_name: str, converter_class: type) -> None:
         """Register custom converter."""
         cls._converters[format_name.lower()] = converter_class
-    
+
     @classmethod
     def list_formats(cls) -> list[str]:
         """List registered formats."""

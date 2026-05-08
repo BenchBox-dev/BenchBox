@@ -1,75 +1,367 @@
 {
-  "version": "2.1",
-  "run": {
-    "id": "16a1516b",
-    "timestamp": "2026-05-02T21:44:42.887215",
-    "total_duration_ms": 65376,
-    "query_time_ms": 44486,
-    "iterations": 3,
-    "streams": 3
-  },
   "benchmark": {
     "id": "clickbench",
     "name": "ClickBench",
     "scale_factor": 1.0,
     "test_type": "power"
   },
+  "config": {
+    "compression": {
+      "level": null,
+      "type": "zstd"
+    },
+    "mode": "dataframe",
+    "phases": [
+      "load",
+      "power"
+    ]
+  },
+  "cost": {
+    "model": "estimated",
+    "total_usd": 0
+  },
+  "environment": {
+    "client_host": {
+      "machine_id": "machine_45d1a3ef31a1728d"
+    },
+    "machine_id": "machine_45d1a3ef31a1728d",
+    "platform_runtime": {
+      "collection_status": "partial",
+      "engine_host": "host_0a57d94f05f4",
+      "runtime_type": "dataframe_process",
+      "source": "inferred"
+    }
+  },
+  "errors": [
+    {
+      "message": "'UnifiedExpr' object has no attribute '_get_object_id'",
+      "phase": "query",
+      "query_id": "21",
+      "type": "'UnifiedExpr' object has no attribute '_get_object_id'"
+    },
+    {
+      "message": "'UnifiedExpr' object has no attribute '_get_object_id'",
+      "phase": "query",
+      "query_id": "21",
+      "type": "'UnifiedExpr' object has no attribute '_get_object_id'"
+    },
+    {
+      "message": "'UnifiedExpr' object has no attribute '_get_object_id'",
+      "phase": "query",
+      "query_id": "21",
+      "type": "'UnifiedExpr' object has no attribute '_get_object_id'"
+    },
+    {
+      "message": "'UnifiedExpr' object has no attribute '_get_object_id'",
+      "phase": "query",
+      "query_id": "21",
+      "type": "'UnifiedExpr' object has no attribute '_get_object_id'"
+    },
+    {
+      "message": "'UnifiedExpr' object has no attribute '_get_object_id'",
+      "phase": "query",
+      "query_id": "22",
+      "type": "'UnifiedExpr' object has no attribute '_get_object_id'"
+    },
+    {
+      "message": "'UnifiedExpr' object has no attribute '_get_object_id'",
+      "phase": "query",
+      "query_id": "22",
+      "type": "'UnifiedExpr' object has no attribute '_get_object_id'"
+    },
+    {
+      "message": "'UnifiedExpr' object has no attribute '_get_object_id'",
+      "phase": "query",
+      "query_id": "22",
+      "type": "'UnifiedExpr' object has no attribute '_get_object_id'"
+    },
+    {
+      "message": "'UnifiedExpr' object has no attribute '_get_object_id'",
+      "phase": "query",
+      "query_id": "22",
+      "type": "'UnifiedExpr' object has no attribute '_get_object_id'"
+    },
+    {
+      "message": "'UnifiedExpr' object has no attribute '_get_object_id'",
+      "phase": "query",
+      "query_id": "23",
+      "type": "'UnifiedExpr' object has no attribute '_get_object_id'"
+    },
+    {
+      "message": "'UnifiedExpr' object has no attribute '_get_object_id'",
+      "phase": "query",
+      "query_id": "23",
+      "type": "'UnifiedExpr' object has no attribute '_get_object_id'"
+    },
+    {
+      "message": "'UnifiedExpr' object has no attribute '_get_object_id'",
+      "phase": "query",
+      "query_id": "23",
+      "type": "'UnifiedExpr' object has no attribute '_get_object_id'"
+    },
+    {
+      "message": "'UnifiedExpr' object has no attribute '_get_object_id'",
+      "phase": "query",
+      "query_id": "23",
+      "type": "'UnifiedExpr' object has no attribute '_get_object_id'"
+    },
+    {
+      "message": "'UnifiedExpr' object has no attribute '_get_object_id'",
+      "phase": "query",
+      "query_id": "24",
+      "type": "'UnifiedExpr' object has no attribute '_get_object_id'"
+    },
+    {
+      "message": "'UnifiedExpr' object has no attribute '_get_object_id'",
+      "phase": "query",
+      "query_id": "24",
+      "type": "'UnifiedExpr' object has no attribute '_get_object_id'"
+    },
+    {
+      "message": "'UnifiedExpr' object has no attribute '_get_object_id'",
+      "phase": "query",
+      "query_id": "24",
+      "type": "'UnifiedExpr' object has no attribute '_get_object_id'"
+    },
+    {
+      "message": "'UnifiedExpr' object has no attribute '_get_object_id'",
+      "phase": "query",
+      "query_id": "24",
+      "type": "'UnifiedExpr' object has no attribute '_get_object_id'"
+    },
+    {
+      "message": "'UnifiedStrExpr' object has no attribute 'replace'",
+      "phase": "query",
+      "query_id": "29",
+      "type": "'UnifiedStrExpr' object has no attribute 'replace'"
+    },
+    {
+      "message": "'UnifiedStrExpr' object has no attribute 'replace'",
+      "phase": "query",
+      "query_id": "29",
+      "type": "'UnifiedStrExpr' object has no attribute 'replace'"
+    },
+    {
+      "message": "'UnifiedStrExpr' object has no attribute 'replace'",
+      "phase": "query",
+      "query_id": "29",
+      "type": "'UnifiedStrExpr' object has no attribute 'replace'"
+    },
+    {
+      "message": "'UnifiedStrExpr' object has no attribute 'replace'",
+      "phase": "query",
+      "query_id": "29",
+      "type": "'UnifiedStrExpr' object has no attribute 'replace'"
+    },
+    {
+      "message": "'UnifiedLazyFrame' object has no attribute 'slice'",
+      "phase": "query",
+      "query_id": "39",
+      "type": "'UnifiedLazyFrame' object has no attribute 'slice'"
+    },
+    {
+      "message": "'UnifiedLazyFrame' object has no attribute 'slice'",
+      "phase": "query",
+      "query_id": "39",
+      "type": "'UnifiedLazyFrame' object has no attribute 'slice'"
+    },
+    {
+      "message": "'UnifiedLazyFrame' object has no attribute 'slice'",
+      "phase": "query",
+      "query_id": "39",
+      "type": "'UnifiedLazyFrame' object has no attribute 'slice'"
+    },
+    {
+      "message": "'UnifiedLazyFrame' object has no attribute 'slice'",
+      "phase": "query",
+      "query_id": "39",
+      "type": "'UnifiedLazyFrame' object has no attribute 'slice'"
+    },
+    {
+      "message": "'UnifiedLazyFrame' object has no attribute 'slice'",
+      "phase": "query",
+      "query_id": "40",
+      "type": "'UnifiedLazyFrame' object has no attribute 'slice'"
+    },
+    {
+      "message": "'UnifiedLazyFrame' object has no attribute 'slice'",
+      "phase": "query",
+      "query_id": "40",
+      "type": "'UnifiedLazyFrame' object has no attribute 'slice'"
+    },
+    {
+      "message": "'UnifiedLazyFrame' object has no attribute 'slice'",
+      "phase": "query",
+      "query_id": "40",
+      "type": "'UnifiedLazyFrame' object has no attribute 'slice'"
+    },
+    {
+      "message": "'UnifiedLazyFrame' object has no attribute 'slice'",
+      "phase": "query",
+      "query_id": "40",
+      "type": "'UnifiedLazyFrame' object has no attribute 'slice'"
+    },
+    {
+      "message": "'UnifiedLazyFrame' object has no attribute 'slice'",
+      "phase": "query",
+      "query_id": "41",
+      "type": "'UnifiedLazyFrame' object has no attribute 'slice'"
+    },
+    {
+      "message": "'UnifiedLazyFrame' object has no attribute 'slice'",
+      "phase": "query",
+      "query_id": "41",
+      "type": "'UnifiedLazyFrame' object has no attribute 'slice'"
+    },
+    {
+      "message": "'UnifiedLazyFrame' object has no attribute 'slice'",
+      "phase": "query",
+      "query_id": "41",
+      "type": "'UnifiedLazyFrame' object has no attribute 'slice'"
+    },
+    {
+      "message": "'UnifiedLazyFrame' object has no attribute 'slice'",
+      "phase": "query",
+      "query_id": "41",
+      "type": "'UnifiedLazyFrame' object has no attribute 'slice'"
+    },
+    {
+      "message": "'UnifiedLazyFrame' object has no attribute 'slice'",
+      "phase": "query",
+      "query_id": "42",
+      "type": "'UnifiedLazyFrame' object has no attribute 'slice'"
+    },
+    {
+      "message": "'UnifiedLazyFrame' object has no attribute 'slice'",
+      "phase": "query",
+      "query_id": "42",
+      "type": "'UnifiedLazyFrame' object has no attribute 'slice'"
+    },
+    {
+      "message": "'UnifiedLazyFrame' object has no attribute 'slice'",
+      "phase": "query",
+      "query_id": "42",
+      "type": "'UnifiedLazyFrame' object has no attribute 'slice'"
+    },
+    {
+      "message": "'UnifiedLazyFrame' object has no attribute 'slice'",
+      "phase": "query",
+      "query_id": "42",
+      "type": "'UnifiedLazyFrame' object has no attribute 'slice'"
+    }
+  ],
+  "execution": {
+    "compression": {
+      "type": "zstd"
+    },
+    "driver_runtime_strategy": "current-process",
+    "entry_point": "cli",
+    "mode": "sql",
+    "non_interactive": true,
+    "phases": [
+      "load",
+      "power"
+    ],
+    "timestamp": "2026-05-02T21:44:42.880861"
+  },
+  "export": {
+    "anonymized": true,
+    "timestamp": "2026-05-02T21:45:48.283659",
+    "tool": "benchbox-exporter"
+  },
+  "normalized_cost": {
+    "billing_unit": "not_applicable",
+    "cost_model_source": "benchbox.core.cost.pricing",
+    "cost_model_version": "2025.11",
+    "cost_scope": "compute_only",
+    "cost_status": "not_applicable_local",
+    "cost_usd": null,
+    "deployment": {
+      "cloud_provider": null,
+      "cloud_region": null,
+      "cluster_size": null,
+      "instance_type": null,
+      "node_count": null,
+      "storage_format": null,
+      "storage_tier": null,
+      "warehouse_size": null
+    },
+    "normalized_cost_usd": "0",
+    "pricing_region": "not_applicable"
+  },
+  "phases": {
+    "data_generation": {
+      "status": "NOT_RUN"
+    },
+    "data_loading": {
+      "duration_ms": 3174,
+      "status": "SUCCESS"
+    },
+    "power_test": {
+      "duration_ms": 62108,
+      "status": "COMPLETED"
+    },
+    "schema_creation": {
+      "status": "NOT_RUN"
+    },
+    "throughput_test": {
+      "status": "NOT_RUN"
+    },
+    "validation": {
+      "status": "NOT_RUN"
+    }
+  },
   "platform": {
-    "name": "PySpark",
-    "version": "4.1.1",
     "client_version": "unknown",
+    "cloud": {
+      "collection_status": "unavailable",
+      "source": "unavailable"
+    },
+    "compute": {
+      "collection_status": "unavailable",
+      "source": "unavailable"
+    },
     "config": {
+      "aqe_enabled": true,
+      "driver_memory": "4g",
+      "driver_runtime_strategy": "current-process",
       "execution_mode": "dataframe",
       "family": "expression",
       "master": "local[*]",
-      "driver_memory": "4g",
       "shuffle_partitions": 10,
-      "aqe_enabled": true,
-      "working_dir": "/Users/joe/Developer/benchmark_runs/datagen/clickbench_sf1",
-      "driver_runtime_strategy": "current-process"
+      "working_dir": "/Users/joe/Developer/benchmark_runs/datagen/clickbench_sf1"
     },
     "deployment": {
+      "collection_status": "partial",
       "deployment_type": "dataframe",
       "endpoint_class": "embedded_process",
-      "metadata_source": "inferred",
-      "collection_status": "partial"
+      "metadata_source": "inferred"
     },
-    "cloud": {
-      "source": "unavailable",
-      "collection_status": "unavailable"
-    },
-    "compute": {
-      "source": "unavailable",
-      "collection_status": "unavailable"
-    },
-    "storage": {
-      "source": "unavailable",
-      "collection_status": "unavailable"
-    },
+    "driver_runtime_strategy": "current-process",
+    "name": "PySpark",
     "raw_config": {
-      "master": "local[*]",
-      "driver_memory": "4g",
-      "shuffle_partitions": 10,
       "aqe_enabled": true,
-      "working_dir": "/Users/joe/Developer/benchmark_runs/datagen/clickbench_sf1",
+      "benchmark": "clickbench",
+      "driver_auto_install": false,
+      "driver_auto_install_used": false,
+      "driver_memory": "4g",
+      "execution_mode": "dataframe",
+      "master": "local[*]",
+      "memory_limit": "12GB",
       "options": {
-        "verbose_level": 0,
-        "verbose_enabled": false,
-        "very_verbose": false,
-        "quiet": false,
-        "verbose": false,
-        "force_recreate": false,
-        "show_query_plans": false,
-        "tuning_enabled": false,
-        "force_upload": false,
         "capture_plans": false,
-        "strict_plan_capture": false,
         "execution_mode": "dataframe",
+        "force_recreate": false,
+        "force_upload": false,
+        "quiet": false,
+        "show_query_plans": false,
+        "strict_plan_capture": false,
+        "tuning_enabled": false,
         "unified_tuning_configuration": {
-          "primary_keys": {
+          "check_constraints": {
             "enabled": false,
-            "enforce_uniqueness": true,
-            "nullable": false
+            "enforce_on_insert": true,
+            "enforce_on_update": true
           },
           "foreign_keys": {
             "enabled": false,
@@ -77,1881 +369,1589 @@
             "on_delete_action": "RESTRICT",
             "on_update_action": "RESTRICT"
           },
+          "platform_optimizations": {
+            "auto_compact_enabled": false,
+            "auto_optimize_enabled": false,
+            "bloom_filters_enabled": false,
+            "databricks_clustering_strategy": "z_order",
+            "liquid_clustering_enabled": false,
+            "materialized_views_enabled": false,
+            "sorted_ingestion_method": "auto",
+            "sorted_ingestion_mode": "off",
+            "z_ordering_enabled": false
+          },
+          "primary_keys": {
+            "enabled": false,
+            "enforce_uniqueness": true,
+            "nullable": false
+          },
           "unique_constraints": {
             "enabled": false,
             "ignore_nulls": false
-          },
-          "check_constraints": {
-            "enabled": false,
-            "enforce_on_insert": true,
-            "enforce_on_update": true
-          },
-          "platform_optimizations": {
-            "z_ordering_enabled": false,
-            "liquid_clustering_enabled": false,
-            "databricks_clustering_strategy": "z_order",
-            "sorted_ingestion_mode": "off",
-            "sorted_ingestion_method": "auto",
-            "auto_optimize_enabled": false,
-            "auto_compact_enabled": false,
-            "bloom_filters_enabled": false,
-            "materialized_views_enabled": false
           }
-        }
+        },
+        "verbose": false,
+        "verbose_enabled": false,
+        "verbose_level": 0,
+        "very_verbose": false
       },
-      "driver_auto_install": false,
-      "driver_auto_install_used": false,
-      "execution_mode": "dataframe",
-      "benchmark": "clickbench",
       "scale_factor": 1.0,
+      "shuffle_partitions": 10,
+      "thread_limit": 8,
       "tuning_config": "UnifiedTuningConfiguration(primary_keys=PrimaryKeyConfiguration(enabled=False, enforce_uniqueness=True, nullable=False), foreign_keys=ForeignKeyConfiguration(enabled=False, enforce_referential_integrity=True, on_delete_action='RESTRICT', on_update_action='RESTRICT'), unique_constraints=UniqueConstraintConfiguration(enabled=False, ignore_nulls=False), check_constraints=CheckConstraintConfiguration(enabled=False, enforce_on_insert=True, enforce_on_update=True), platform_optimizations=PlatformOptimizationConfiguration(z_ordering_enabled=False, z_ordering_columns=[], liquid_clustering_enabled=False, liquid_clustering_columns=[], databricks_clustering_strategy='z_order', sorted_ingestion_mode='off', sorted_ingestion_method='auto', auto_optimize_enabled=False, auto_compact_enabled=False, bloom_filters_enabled=False, bloom_filter_columns=[], materialized_views_enabled=False), table_tunings={})",
-      "memory_limit": "12GB",
-      "thread_limit": 8
+      "working_dir": "/Users/joe/Developer/benchmark_runs/datagen/clickbench_sf1"
     },
     "raw_metadata": {
       "driver_runtime_strategy": "current-process"
     },
-    "driver_runtime_strategy": "current-process"
-  },
-  "config": {
-    "compression": {
-      "type": "zstd",
-      "level": null
+    "storage": {
+      "collection_status": "unavailable",
+      "source": "unavailable"
     },
-    "phases": [
-      "load",
-      "power"
-    ],
-    "mode": "dataframe"
-  },
-  "summary": {
-    "queries": {
-      "total": 129,
-      "passed": 102,
-      "failed": 27
-    },
-    "timing": {
-      "total_ms": 44486,
-      "avg_ms": 436.1,
-      "min_ms": 79,
-      "max_ms": 1436,
-      "geometric_mean_ms": 309.1,
-      "stdev_ms": 365.1,
-      "p90_ms": 1031,
-      "p95_ms": 1216,
-      "p99_ms": 1359
-    },
-    "data": {
-      "rows_loaded": 1000000,
-      "load_time_ms": 3174.1
-    },
-    "validation": "partial"
-  },
-  "phases": {
-    "data_generation": {
-      "status": "NOT_RUN"
-    },
-    "schema_creation": {
-      "status": "NOT_RUN"
-    },
-    "data_loading": {
-      "status": "SUCCESS",
-      "duration_ms": 3174
-    },
-    "validation": {
-      "status": "NOT_RUN"
-    },
-    "power_test": {
-      "status": "COMPLETED",
-      "duration_ms": 62108
-    },
-    "throughput_test": {
-      "status": "NOT_RUN"
-    }
+    "version": "4.1.1"
   },
   "queries": [
     {
       "id": "1",
+      "iter": 0,
       "ms": 585,
       "rows": 1,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "10",
+      "iter": 0,
       "ms": 1200,
       "rows": 10,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "11",
+      "iter": 0,
       "ms": 735,
       "rows": 9,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "12",
+      "iter": 0,
       "ms": 592,
       "rows": 9,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "13",
+      "iter": 0,
       "ms": 255,
       "rows": 10,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "14",
+      "iter": 0,
       "ms": 541,
       "rows": 10,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "15",
+      "iter": 0,
       "ms": 251,
       "rows": 10,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "16",
+      "iter": 0,
       "ms": 866,
       "rows": 10,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "17",
+      "iter": 0,
       "ms": 1063,
       "rows": 10,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "18",
+      "iter": 0,
       "ms": 985,
       "rows": 10,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "19",
+      "iter": 0,
       "ms": 1409,
       "rows": 10,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "2",
+      "iter": 0,
       "ms": 162,
       "rows": 1,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "20",
-      "ms": 126,
       "iter": 0,
-      "stream": 0,
+      "ms": 126,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "21",
-      "ms": 2,
       "iter": 0,
-      "stream": 0,
+      "ms": 2,
       "run_type": "warmup",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 0
     },
     {
       "id": "22",
-      "ms": 1,
       "iter": 0,
-      "stream": 0,
+      "ms": 1,
       "run_type": "warmup",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 0
     },
     {
       "id": "23",
-      "ms": 1,
       "iter": 0,
-      "stream": 0,
+      "ms": 1,
       "run_type": "warmup",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 0
     },
     {
       "id": "24",
-      "ms": 1,
       "iter": 0,
-      "stream": 0,
+      "ms": 1,
       "run_type": "warmup",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 0
     },
     {
       "id": "25",
+      "iter": 0,
       "ms": 211,
       "rows": 10,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "26",
+      "iter": 0,
       "ms": 165,
       "rows": 10,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "27",
+      "iter": 0,
       "ms": 191,
       "rows": 10,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "28",
-      "ms": 473,
       "iter": 0,
-      "stream": 0,
+      "ms": 473,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "29",
-      "ms": 4,
       "iter": 0,
-      "stream": 0,
+      "ms": 4,
       "run_type": "warmup",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 0
     },
     {
       "id": "3",
+      "iter": 0,
       "ms": 131,
       "rows": 1,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "30",
+      "iter": 0,
       "ms": 531,
       "rows": 1,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "31",
+      "iter": 0,
       "ms": 567,
       "rows": 10,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "32",
+      "iter": 0,
       "ms": 501,
       "rows": 10,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "33",
+      "iter": 0,
       "ms": 1059,
       "rows": 10,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "34",
+      "iter": 0,
       "ms": 298,
       "rows": 8,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "35",
+      "iter": 0,
       "ms": 309,
       "rows": 8,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "36",
+      "iter": 0,
       "ms": 1415,
       "rows": 10,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "37",
+      "iter": 0,
       "ms": 266,
       "rows": 8,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "38",
+      "iter": 0,
       "ms": 213,
       "rows": 10,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "39",
-      "ms": 22,
       "iter": 0,
-      "stream": 0,
+      "ms": 22,
       "run_type": "warmup",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 0
     },
     {
       "id": "4",
+      "iter": 0,
       "ms": 97,
       "rows": 1,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "40",
-      "ms": 32,
       "iter": 0,
-      "stream": 0,
+      "ms": 32,
       "run_type": "warmup",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 0
     },
     {
       "id": "41",
-      "ms": 23,
       "iter": 0,
-      "stream": 0,
+      "ms": 23,
       "run_type": "warmup",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 0
     },
     {
       "id": "42",
-      "ms": 18,
       "iter": 0,
-      "stream": 0,
+      "ms": 18,
       "run_type": "warmup",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 0
     },
     {
       "id": "43",
+      "iter": 0,
       "ms": 261,
       "rows": 13,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "5",
+      "iter": 0,
       "ms": 329,
       "rows": 1,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "6",
+      "iter": 0,
       "ms": 140,
       "rows": 1,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "7",
+      "iter": 0,
       "ms": 101,
       "rows": 1,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "8",
+      "iter": 0,
       "ms": 170,
       "rows": 20,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "9",
+      "iter": 0,
       "ms": 1048,
       "rows": 10,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "1",
+      "iter": 1,
       "ms": 99,
       "rows": 1,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "10",
+      "iter": 1,
       "ms": 683,
       "rows": 10,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "11",
+      "iter": 1,
       "ms": 457,
       "rows": 9,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "12",
+      "iter": 1,
       "ms": 483,
       "rows": 9,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "13",
+      "iter": 1,
       "ms": 190,
       "rows": 10,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "14",
+      "iter": 1,
       "ms": 457,
       "rows": 10,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "15",
+      "iter": 1,
       "ms": 203,
       "rows": 10,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "16",
+      "iter": 1,
       "ms": 876,
       "rows": 10,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "17",
+      "iter": 1,
       "ms": 1069,
       "rows": 10,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "18",
+      "iter": 1,
       "ms": 962,
       "rows": 10,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "19",
+      "iter": 1,
       "ms": 1359,
       "rows": 10,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "2",
+      "iter": 1,
       "ms": 126,
       "rows": 1,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "20",
-      "ms": 89,
       "iter": 1,
-      "stream": 1,
+      "ms": 89,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "21",
-      "ms": 1,
       "iter": 1,
-      "stream": 1,
+      "ms": 1,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 1
     },
     {
       "id": "22",
-      "ms": 1,
       "iter": 1,
-      "stream": 1,
+      "ms": 1,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 1
     },
     {
       "id": "23",
-      "ms": 1,
       "iter": 1,
-      "stream": 1,
+      "ms": 1,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 1
     },
     {
       "id": "24",
-      "ms": 1,
       "iter": 1,
-      "stream": 1,
+      "ms": 1,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 1
     },
     {
       "id": "25",
+      "iter": 1,
       "ms": 199,
       "rows": 10,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "26",
+      "iter": 1,
       "ms": 151,
       "rows": 10,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "27",
+      "iter": 1,
       "ms": 195,
       "rows": 10,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "28",
-      "ms": 427,
       "iter": 1,
-      "stream": 1,
+      "ms": 427,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "29",
-      "ms": 4,
       "iter": 1,
-      "stream": 1,
+      "ms": 4,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 1
     },
     {
       "id": "3",
+      "iter": 1,
       "ms": 123,
       "rows": 1,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "30",
+      "iter": 1,
       "ms": 458,
       "rows": 1,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "31",
+      "iter": 1,
       "ms": 529,
       "rows": 10,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "32",
+      "iter": 1,
       "ms": 525,
       "rows": 10,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "33",
+      "iter": 1,
       "ms": 1031,
       "rows": 10,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "34",
+      "iter": 1,
       "ms": 302,
       "rows": 8,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "35",
+      "iter": 1,
       "ms": 294,
       "rows": 8,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "36",
+      "iter": 1,
       "ms": 1255,
       "rows": 10,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "37",
+      "iter": 1,
       "ms": 217,
       "rows": 8,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "38",
+      "iter": 1,
       "ms": 213,
       "rows": 10,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "39",
-      "ms": 21,
       "iter": 1,
-      "stream": 1,
+      "ms": 21,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 1
     },
     {
       "id": "4",
+      "iter": 1,
       "ms": 92,
       "rows": 1,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "40",
-      "ms": 26,
       "iter": 1,
-      "stream": 1,
+      "ms": 26,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 1
     },
     {
       "id": "41",
-      "ms": 20,
       "iter": 1,
-      "stream": 1,
+      "ms": 20,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 1
     },
     {
       "id": "42",
-      "ms": 18,
       "iter": 1,
-      "stream": 1,
+      "ms": 18,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 1
     },
     {
       "id": "43",
+      "iter": 1,
       "ms": 245,
       "rows": 13,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "5",
+      "iter": 1,
       "ms": 332,
       "rows": 1,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "6",
+      "iter": 1,
       "ms": 131,
       "rows": 1,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "7",
+      "iter": 1,
       "ms": 86,
       "rows": 1,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "8",
+      "iter": 1,
       "ms": 150,
       "rows": 20,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "9",
+      "iter": 1,
       "ms": 1017,
       "rows": 10,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "1",
+      "iter": 2,
       "ms": 86,
       "rows": 1,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "10",
+      "iter": 2,
       "ms": 646,
       "rows": 10,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "11",
+      "iter": 2,
       "ms": 455,
       "rows": 9,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "12",
+      "iter": 2,
       "ms": 462,
       "rows": 9,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "13",
+      "iter": 2,
       "ms": 179,
       "rows": 10,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "14",
+      "iter": 2,
       "ms": 438,
       "rows": 10,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "15",
+      "iter": 2,
       "ms": 205,
       "rows": 10,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "16",
+      "iter": 2,
       "ms": 765,
       "rows": 10,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "17",
+      "iter": 2,
       "ms": 1045,
       "rows": 10,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "18",
+      "iter": 2,
       "ms": 935,
       "rows": 10,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "19",
+      "iter": 2,
       "ms": 1343,
       "rows": 10,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "2",
+      "iter": 2,
       "ms": 141,
       "rows": 1,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "20",
-      "ms": 82,
       "iter": 2,
-      "stream": 2,
+      "ms": 82,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "21",
-      "ms": 1,
       "iter": 2,
-      "stream": 2,
+      "ms": 1,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 2
     },
     {
       "id": "22",
-      "ms": 1,
       "iter": 2,
-      "stream": 2,
+      "ms": 1,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 2
     },
     {
       "id": "23",
-      "ms": 1,
       "iter": 2,
-      "stream": 2,
+      "ms": 1,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 2
     },
     {
       "id": "24",
-      "ms": 1,
       "iter": 2,
-      "stream": 2,
+      "ms": 1,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 2
     },
     {
       "id": "25",
+      "iter": 2,
       "ms": 207,
       "rows": 10,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "26",
+      "iter": 2,
       "ms": 152,
       "rows": 10,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "27",
+      "iter": 2,
       "ms": 182,
       "rows": 10,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "28",
-      "ms": 435,
       "iter": 2,
-      "stream": 2,
+      "ms": 435,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "29",
-      "ms": 4,
       "iter": 2,
-      "stream": 2,
+      "ms": 4,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 2
     },
     {
       "id": "3",
+      "iter": 2,
       "ms": 98,
       "rows": 1,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "30",
+      "iter": 2,
       "ms": 456,
       "rows": 1,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "31",
+      "iter": 2,
       "ms": 526,
       "rows": 10,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "32",
+      "iter": 2,
       "ms": 479,
       "rows": 10,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "33",
+      "iter": 2,
       "ms": 1012,
       "rows": 10,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "34",
+      "iter": 2,
       "ms": 301,
       "rows": 8,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "35",
+      "iter": 2,
       "ms": 295,
       "rows": 8,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "36",
+      "iter": 2,
       "ms": 1216,
       "rows": 10,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "37",
+      "iter": 2,
       "ms": 204,
       "rows": 8,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "38",
+      "iter": 2,
       "ms": 204,
       "rows": 10,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "39",
-      "ms": 21,
       "iter": 2,
-      "stream": 2,
+      "ms": 21,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 2
     },
     {
       "id": "4",
+      "iter": 2,
       "ms": 83,
       "rows": 1,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "40",
-      "ms": 27,
       "iter": 2,
-      "stream": 2,
+      "ms": 27,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 2
     },
     {
       "id": "41",
-      "ms": 18,
       "iter": 2,
-      "stream": 2,
+      "ms": 18,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 2
     },
     {
       "id": "42",
-      "ms": 22,
       "iter": 2,
-      "stream": 2,
+      "ms": 22,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 2
     },
     {
       "id": "43",
+      "iter": 2,
       "ms": 221,
       "rows": 13,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "5",
+      "iter": 2,
       "ms": 318,
       "rows": 1,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "6",
+      "iter": 2,
       "ms": 118,
       "rows": 1,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "7",
+      "iter": 2,
       "ms": 84,
       "rows": 1,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "8",
+      "iter": 2,
       "ms": 144,
       "rows": 20,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "9",
+      "iter": 2,
       "ms": 985,
       "rows": 10,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "1",
+      "iter": 3,
       "ms": 85,
       "rows": 1,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "10",
+      "iter": 3,
       "ms": 689,
       "rows": 10,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "11",
+      "iter": 3,
       "ms": 424,
       "rows": 9,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "12",
+      "iter": 3,
       "ms": 469,
       "rows": 9,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "13",
+      "iter": 3,
       "ms": 170,
       "rows": 10,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "14",
+      "iter": 3,
       "ms": 440,
       "rows": 10,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "15",
+      "iter": 3,
       "ms": 190,
       "rows": 10,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "16",
+      "iter": 3,
       "ms": 767,
       "rows": 10,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "17",
+      "iter": 3,
       "ms": 1110,
       "rows": 10,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "18",
+      "iter": 3,
       "ms": 970,
       "rows": 10,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "19",
+      "iter": 3,
       "ms": 1436,
       "rows": 10,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "2",
+      "iter": 3,
       "ms": 126,
       "rows": 1,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "20",
-      "ms": 105,
       "iter": 3,
-      "stream": 3,
+      "ms": 105,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "21",
-      "ms": 1,
       "iter": 3,
-      "stream": 3,
+      "ms": 1,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 3
     },
     {
       "id": "22",
-      "ms": 1,
       "iter": 3,
-      "stream": 3,
+      "ms": 1,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 3
     },
     {
       "id": "23",
-      "ms": 1,
       "iter": 3,
-      "stream": 3,
+      "ms": 1,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 3
     },
     {
       "id": "24",
-      "ms": 1,
       "iter": 3,
-      "stream": 3,
+      "ms": 1,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 3
     },
     {
       "id": "25",
+      "iter": 3,
       "ms": 186,
       "rows": 10,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "26",
+      "iter": 3,
       "ms": 139,
       "rows": 10,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "27",
+      "iter": 3,
       "ms": 190,
       "rows": 10,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "28",
-      "ms": 449,
       "iter": 3,
-      "stream": 3,
+      "ms": 449,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "29",
-      "ms": 3,
       "iter": 3,
-      "stream": 3,
+      "ms": 3,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 3
     },
     {
       "id": "3",
+      "iter": 3,
       "ms": 104,
       "rows": 1,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "30",
+      "iter": 3,
       "ms": 497,
       "rows": 1,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "31",
+      "iter": 3,
       "ms": 544,
       "rows": 10,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "32",
+      "iter": 3,
       "ms": 495,
       "rows": 10,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "33",
+      "iter": 3,
       "ms": 1038,
       "rows": 10,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "34",
+      "iter": 3,
       "ms": 302,
       "rows": 8,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "35",
+      "iter": 3,
       "ms": 325,
       "rows": 8,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "36",
+      "iter": 3,
       "ms": 1253,
       "rows": 10,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "37",
+      "iter": 3,
       "ms": 207,
       "rows": 8,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "38",
+      "iter": 3,
       "ms": 226,
       "rows": 10,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "39",
-      "ms": 18,
       "iter": 3,
-      "stream": 3,
+      "ms": 18,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 3
     },
     {
       "id": "4",
+      "iter": 3,
       "ms": 82,
       "rows": 1,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "40",
-      "ms": 20,
       "iter": 3,
-      "stream": 3,
+      "ms": 20,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 3
     },
     {
       "id": "41",
-      "ms": 22,
       "iter": 3,
-      "stream": 3,
+      "ms": 22,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 3
     },
     {
       "id": "42",
-      "ms": 16,
       "iter": 3,
-      "stream": 3,
+      "ms": 16,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 3
     },
     {
       "id": "43",
+      "iter": 3,
       "ms": 237,
       "rows": 13,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "5",
+      "iter": 3,
       "ms": 326,
       "rows": 1,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "6",
+      "iter": 3,
       "ms": 115,
       "rows": 1,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "7",
+      "iter": 3,
       "ms": 79,
       "rows": 1,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "8",
+      "iter": 3,
       "ms": 157,
       "rows": 20,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "9",
+      "iter": 3,
       "ms": 1027,
       "rows": 10,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     }
   ],
+  "run": {
+    "id": "16a1516b",
+    "iterations": 3,
+    "query_time_ms": 44486,
+    "streams": 3,
+    "timestamp": "2026-05-02T21:44:42.887215",
+    "total_duration_ms": 65376
+  },
+  "summary": {
+    "data": {
+      "load_time_ms": 3174.1,
+      "rows_loaded": 1000000
+    },
+    "queries": {
+      "failed": 27,
+      "passed": 102,
+      "total": 129
+    },
+    "timing": {
+      "avg_ms": 436.1,
+      "geometric_mean_ms": 309.1,
+      "max_ms": 1436,
+      "min_ms": 79,
+      "p90_ms": 1031,
+      "p95_ms": 1216,
+      "p99_ms": 1359,
+      "stdev_ms": 365.1,
+      "total_ms": 44486
+    },
+    "validation": "partial"
+  },
   "tables": {
     "hits": {
-      "rows": 1000000,
-      "load_ms": 3173
+      "load_ms": 3173,
+      "rows": 1000000
     }
   },
-  "cost": {
-    "total_usd": 0,
-    "model": "estimated"
-  },
-  "normalized_cost": {
-    "normalized_cost_usd": "0",
-    "cost_usd": null,
-    "cost_model_version": "2025.11",
-    "cost_model_source": "benchbox.core.cost.pricing",
-    "cost_scope": "compute_only",
-    "cost_status": "not_applicable_local",
-    "billing_unit": "not_applicable",
-    "pricing_region": "not_applicable",
-    "deployment": {
-      "cloud_provider": null,
-      "cloud_region": null,
-      "instance_type": null,
-      "warehouse_size": null,
-      "node_count": null,
-      "cluster_size": null,
-      "storage_format": null,
-      "storage_tier": null
-    }
-  },
-  "execution": {
-    "entry_point": "cli",
-    "timestamp": "2026-05-02T21:44:42.880861",
-    "phases": [
-      "load",
-      "power"
-    ],
-    "compression": {
-      "type": "zstd"
-    },
-    "mode": "sql",
-    "driver_runtime_strategy": "current-process",
-    "non_interactive": true
-  },
-  "environment": {
-    "platform_runtime": {
-      "runtime_type": "dataframe_process",
-      "collection_status": "partial",
-      "source": "inferred",
-      "engine_host": "host_0a57d94f05f4"
-    },
-    "machine_id": "machine_45d1a3ef31a1728d",
-    "client_host": {
-      "machine_id": "machine_45d1a3ef31a1728d"
-    }
-  },
-  "errors": [
-    {
-      "phase": "query",
-      "query_id": "21",
-      "type": "'UnifiedExpr' object has no attribute '_get_object_id'",
-      "message": "'UnifiedExpr' object has no attribute '_get_object_id'"
-    },
-    {
-      "phase": "query",
-      "query_id": "21",
-      "type": "'UnifiedExpr' object has no attribute '_get_object_id'",
-      "message": "'UnifiedExpr' object has no attribute '_get_object_id'"
-    },
-    {
-      "phase": "query",
-      "query_id": "21",
-      "type": "'UnifiedExpr' object has no attribute '_get_object_id'",
-      "message": "'UnifiedExpr' object has no attribute '_get_object_id'"
-    },
-    {
-      "phase": "query",
-      "query_id": "21",
-      "type": "'UnifiedExpr' object has no attribute '_get_object_id'",
-      "message": "'UnifiedExpr' object has no attribute '_get_object_id'"
-    },
-    {
-      "phase": "query",
-      "query_id": "22",
-      "type": "'UnifiedExpr' object has no attribute '_get_object_id'",
-      "message": "'UnifiedExpr' object has no attribute '_get_object_id'"
-    },
-    {
-      "phase": "query",
-      "query_id": "22",
-      "type": "'UnifiedExpr' object has no attribute '_get_object_id'",
-      "message": "'UnifiedExpr' object has no attribute '_get_object_id'"
-    },
-    {
-      "phase": "query",
-      "query_id": "22",
-      "type": "'UnifiedExpr' object has no attribute '_get_object_id'",
-      "message": "'UnifiedExpr' object has no attribute '_get_object_id'"
-    },
-    {
-      "phase": "query",
-      "query_id": "22",
-      "type": "'UnifiedExpr' object has no attribute '_get_object_id'",
-      "message": "'UnifiedExpr' object has no attribute '_get_object_id'"
-    },
-    {
-      "phase": "query",
-      "query_id": "23",
-      "type": "'UnifiedExpr' object has no attribute '_get_object_id'",
-      "message": "'UnifiedExpr' object has no attribute '_get_object_id'"
-    },
-    {
-      "phase": "query",
-      "query_id": "23",
-      "type": "'UnifiedExpr' object has no attribute '_get_object_id'",
-      "message": "'UnifiedExpr' object has no attribute '_get_object_id'"
-    },
-    {
-      "phase": "query",
-      "query_id": "23",
-      "type": "'UnifiedExpr' object has no attribute '_get_object_id'",
-      "message": "'UnifiedExpr' object has no attribute '_get_object_id'"
-    },
-    {
-      "phase": "query",
-      "query_id": "23",
-      "type": "'UnifiedExpr' object has no attribute '_get_object_id'",
-      "message": "'UnifiedExpr' object has no attribute '_get_object_id'"
-    },
-    {
-      "phase": "query",
-      "query_id": "24",
-      "type": "'UnifiedExpr' object has no attribute '_get_object_id'",
-      "message": "'UnifiedExpr' object has no attribute '_get_object_id'"
-    },
-    {
-      "phase": "query",
-      "query_id": "24",
-      "type": "'UnifiedExpr' object has no attribute '_get_object_id'",
-      "message": "'UnifiedExpr' object has no attribute '_get_object_id'"
-    },
-    {
-      "phase": "query",
-      "query_id": "24",
-      "type": "'UnifiedExpr' object has no attribute '_get_object_id'",
-      "message": "'UnifiedExpr' object has no attribute '_get_object_id'"
-    },
-    {
-      "phase": "query",
-      "query_id": "24",
-      "type": "'UnifiedExpr' object has no attribute '_get_object_id'",
-      "message": "'UnifiedExpr' object has no attribute '_get_object_id'"
-    },
-    {
-      "phase": "query",
-      "query_id": "29",
-      "type": "'UnifiedStrExpr' object has no attribute 'replace'",
-      "message": "'UnifiedStrExpr' object has no attribute 'replace'"
-    },
-    {
-      "phase": "query",
-      "query_id": "29",
-      "type": "'UnifiedStrExpr' object has no attribute 'replace'",
-      "message": "'UnifiedStrExpr' object has no attribute 'replace'"
-    },
-    {
-      "phase": "query",
-      "query_id": "29",
-      "type": "'UnifiedStrExpr' object has no attribute 'replace'",
-      "message": "'UnifiedStrExpr' object has no attribute 'replace'"
-    },
-    {
-      "phase": "query",
-      "query_id": "29",
-      "type": "'UnifiedStrExpr' object has no attribute 'replace'",
-      "message": "'UnifiedStrExpr' object has no attribute 'replace'"
-    },
-    {
-      "phase": "query",
-      "query_id": "39",
-      "type": "'UnifiedLazyFrame' object has no attribute 'slice'",
-      "message": "'UnifiedLazyFrame' object has no attribute 'slice'"
-    },
-    {
-      "phase": "query",
-      "query_id": "39",
-      "type": "'UnifiedLazyFrame' object has no attribute 'slice'",
-      "message": "'UnifiedLazyFrame' object has no attribute 'slice'"
-    },
-    {
-      "phase": "query",
-      "query_id": "39",
-      "type": "'UnifiedLazyFrame' object has no attribute 'slice'",
-      "message": "'UnifiedLazyFrame' object has no attribute 'slice'"
-    },
-    {
-      "phase": "query",
-      "query_id": "39",
-      "type": "'UnifiedLazyFrame' object has no attribute 'slice'",
-      "message": "'UnifiedLazyFrame' object has no attribute 'slice'"
-    },
-    {
-      "phase": "query",
-      "query_id": "40",
-      "type": "'UnifiedLazyFrame' object has no attribute 'slice'",
-      "message": "'UnifiedLazyFrame' object has no attribute 'slice'"
-    },
-    {
-      "phase": "query",
-      "query_id": "40",
-      "type": "'UnifiedLazyFrame' object has no attribute 'slice'",
-      "message": "'UnifiedLazyFrame' object has no attribute 'slice'"
-    },
-    {
-      "phase": "query",
-      "query_id": "40",
-      "type": "'UnifiedLazyFrame' object has no attribute 'slice'",
-      "message": "'UnifiedLazyFrame' object has no attribute 'slice'"
-    },
-    {
-      "phase": "query",
-      "query_id": "40",
-      "type": "'UnifiedLazyFrame' object has no attribute 'slice'",
-      "message": "'UnifiedLazyFrame' object has no attribute 'slice'"
-    },
-    {
-      "phase": "query",
-      "query_id": "41",
-      "type": "'UnifiedLazyFrame' object has no attribute 'slice'",
-      "message": "'UnifiedLazyFrame' object has no attribute 'slice'"
-    },
-    {
-      "phase": "query",
-      "query_id": "41",
-      "type": "'UnifiedLazyFrame' object has no attribute 'slice'",
-      "message": "'UnifiedLazyFrame' object has no attribute 'slice'"
-    },
-    {
-      "phase": "query",
-      "query_id": "41",
-      "type": "'UnifiedLazyFrame' object has no attribute 'slice'",
-      "message": "'UnifiedLazyFrame' object has no attribute 'slice'"
-    },
-    {
-      "phase": "query",
-      "query_id": "41",
-      "type": "'UnifiedLazyFrame' object has no attribute 'slice'",
-      "message": "'UnifiedLazyFrame' object has no attribute 'slice'"
-    },
-    {
-      "phase": "query",
-      "query_id": "42",
-      "type": "'UnifiedLazyFrame' object has no attribute 'slice'",
-      "message": "'UnifiedLazyFrame' object has no attribute 'slice'"
-    },
-    {
-      "phase": "query",
-      "query_id": "42",
-      "type": "'UnifiedLazyFrame' object has no attribute 'slice'",
-      "message": "'UnifiedLazyFrame' object has no attribute 'slice'"
-    },
-    {
-      "phase": "query",
-      "query_id": "42",
-      "type": "'UnifiedLazyFrame' object has no attribute 'slice'",
-      "message": "'UnifiedLazyFrame' object has no attribute 'slice'"
-    },
-    {
-      "phase": "query",
-      "query_id": "42",
-      "type": "'UnifiedLazyFrame' object has no attribute 'slice'",
-      "message": "'UnifiedLazyFrame' object has no attribute 'slice'"
-    }
-  ],
-  "export": {
-    "timestamp": "2026-05-02T21:45:48.283659",
-    "tool": "benchbox-exporter",
-    "anonymized": true
-  }
+  "version": "2.1"
 }

@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:11:16.698920+00:00",
-  "bundle_file": "ssb_sf01_polars_df_20260506_094114_66df9f54.json",
-  "bundle_hash": "4d371c2431ff0b94d76a81aa855893a262fa27e40b65b91a3384ec164de56dc1",
-  "companion_hashes": {},
   "benchmark": "SSB",
+  "bundle_file": "ssb_sf01_polars_df_20260506_094114_66df9f54.json",
+  "bundle_hash": "7fc5b3bb10cd1e852e13dd7eee75d1bb608ddebb837edbcda117bbcb7681a561",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "Polars",
   "scale_factor": 0.1,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:11:16.698920+00:00",
   "submitted_by": "Joe Harris"
 }

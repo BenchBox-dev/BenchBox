@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-03T02:49:35.449612+00:00",
-  "bundle_file": "read_primitives_sf001_sqlite_sql_20260502_191534_54aa6b45.json",
-  "bundle_hash": "d89c3f3b8f4a5d8accab666e5a5a9ec8b468aaa3d0db693e4118e3b044885dc8",
-  "companion_hashes": {},
   "benchmark": "Read Primitives",
+  "bundle_file": "read_primitives_sf001_sqlite_sql_20260502_191534_54aa6b45.json",
+  "bundle_hash": "2fda5f09799262e4339177968ad918d1c2379a12eda8ebc11a88be6a1c147495",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "SQLite",
   "scale_factor": 0.01,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:49:35.449612+00:00",
   "submitted_by": "BenchBox UAT"
 }

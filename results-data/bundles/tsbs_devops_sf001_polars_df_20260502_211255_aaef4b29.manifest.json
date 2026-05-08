@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-03T02:53:07.310763+00:00",
-  "bundle_file": "tsbs_devops_sf001_polars_df_20260502_211255_aaef4b29.json",
-  "bundle_hash": "123bcfa81ca2ad828338886007fec4758d242bd322e66710e5b6dc501f8b77bb",
-  "companion_hashes": {},
   "benchmark": "TSBS DevOps",
+  "bundle_file": "tsbs_devops_sf001_polars_df_20260502_211255_aaef4b29.json",
+  "bundle_hash": "313a4b368a7aa2c964bee7d105db750c0abe4d51514b8f0a6351fbe15d4e0349",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "Polars",
   "scale_factor": 0.01,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:53:07.310763+00:00",
   "submitted_by": "BenchBox UAT"
 }

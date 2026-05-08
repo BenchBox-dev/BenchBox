@@ -91,7 +91,7 @@ def make_v2_result_dict(
 def write_v2_result_file(path: Path, **kwargs: Any) -> dict[str, Any]:
     """Create a v2.x result JSON file on disk.  Returns the dict written."""
     data = make_v2_result_dict(**kwargs)
-    path.write_text(json.dumps(data))
+    path.write_text(json.dumps(data), encoding="utf-8")
     return data
 
 

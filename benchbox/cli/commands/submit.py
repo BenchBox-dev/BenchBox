@@ -5,10 +5,10 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
-import shutil
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from types import ModuleType
 
 import click
@@ -27,6 +27,7 @@ from benchbox.cli.submit_service import (
     HostedSubmitUnauthorized,
     submit_hosted_bundle,
 )
+from benchbox.core.results.canonical_json import canonical_json_file_bytes, canonical_json_text
 from benchbox.core.results.loader import (
     ResultLoadError,
     UnsupportedSchemaError,
@@ -119,12 +120,34 @@ def _resolve_submitted_by(explicit: str | None) -> str:
 
 def _compute_file_hash(file_path: Path) -> str:
     """Compute SHA-256 of a single file's contents."""
-    h = hashlib.sha256()
     try:
-        h.update(file_path.read_bytes())
+        return _compute_bytes_hash(file_path.read_bytes())
     except PermissionError:
         raise PermissionError(f"Cannot read file for hashing: {file_path}") from None
-    return h.hexdigest()
+
+
+def _compute_bytes_hash(data: bytes) -> str:
+    """Compute SHA-256 for already-materialized bytes."""
+
+    return hashlib.sha256(data).hexdigest()
+
+
+def _canonical_submission_file_bytes(file_path: Path) -> bytes:
+    """Return canonical JSON bytes for a submit source or companion file."""
+
+    try:
+        return canonical_json_file_bytes(file_path)
+    except PermissionError:
+        raise PermissionError(f"Cannot read file for canonicalization: {file_path}") from None
+    except json.JSONDecodeError as exc:
+        raise click.ClickException(f"Submission file is not valid JSON: {file_path}: {exc}") from exc
+
+
+def _write_canonical_submission_file(source_path: Path, target_path: Path) -> Path:
+    """Write a submit source/companion in canonical JSON form."""
+
+    target_path.write_bytes(_canonical_submission_file_bytes(source_path))
+    return target_path
 
 
 def _build_submission_manifest(
@@ -245,18 +268,15 @@ def _dispatch_service_mode(
     been configured.
 
     Hash contract for the dry-run: the values printed are SHA-256 of the
-    on-disk source files as-is. The Phase 2 PR-package path
-    (--output mode) hashes the same bytes after a `shutil.copy2` into
-    `bundle/`, so the hashes are byte-identical there. If a future
-    iteration of the real-upload path canonicalises (re-serialises) the
-    bundle JSON before sending, this dry-run hash will diverge from the
-    sent hash. In that case, hoist the canonicalisation step ahead of
-    `_compute_file_hash` here so the dry-run reports what the server
-    will actually receive.
+    canonical JSON bytes that the real hosted path uploads. This matches the
+    Phase 2 PR-package path, which writes the same canonical bytes into
+    `bundle/` before building the manifest.
     """
-    bundle_size = source_path.stat().st_size
-    bundle_hash = _compute_file_hash(source_path)
-    companion_hashes = {comp.name: _compute_file_hash(comp) for comp in companions}
+    bundle_bytes = _canonical_submission_file_bytes(source_path)
+    companion_bytes = {comp.name: _canonical_submission_file_bytes(comp) for comp in companions}
+    bundle_size = len(bundle_bytes)
+    bundle_hash = _compute_bytes_hash(bundle_bytes)
+    companion_hashes = {name: _compute_bytes_hash(data) for name, data in companion_bytes.items()}
 
     if dry_run:
         console.print("\n[bold]Dry-run - would upload:[/bold]")
@@ -282,54 +302,65 @@ def _dispatch_service_mode(
         ctx.exit(1)
         return
 
-    manifest = _build_submission_manifest(
-        source_path=source_path,
-        companions=companions,
-        result=result,
-        submitted_by=submitted_by,
-        submission_path="hosted-service",
-    )
+    with TemporaryDirectory(prefix="benchbox-submit-") as tmp_dir:
+        canonical_dir = Path(tmp_dir)
+        upload_source_path = canonical_dir / source_path.name
+        upload_source_path.write_bytes(bundle_bytes)
+        upload_companions: list[Path] = []
+        for comp in companions:
+            upload_companion = canonical_dir / comp.name
+            upload_companion.write_bytes(companion_bytes[comp.name])
+            upload_companions.append(upload_companion)
 
-    console.print("\n[bold]Uploading submission bundle:[/bold]")
-    console.print(f"  Service URL:      {service_url}")
-    console.print(f"  Bundle file:      {source_path.name} ({bundle_size:,} bytes)")
-    console.print(f"  Bundle hash:      {bundle_hash}")
-    console.print(f"  Visibility:       {visibility}")
-
-    try:
-        upload_result = submit_hosted_bundle(
-            service_url=service_url,
-            token=token.token,
-            source_path=source_path,
-            companions=companions,
-            manifest=manifest,
-            bundle_hash=bundle_hash,
-            visibility=visibility,
-            idempotency_key=idempotency_key,
-            wait=wait,
+        manifest = _build_submission_manifest(
+            source_path=upload_source_path,
+            companions=upload_companions,
+            result=result,
+            submitted_by=submitted_by,
+            submission_path="hosted-service",
         )
-    except HostedSubmitUnauthorized:
+        bundle_hash = manifest["bundle_hash"]
+
+        console.print("\n[bold]Uploading submission bundle:[/bold]")
+        console.print(f"  Service URL:      {service_url}")
+        console.print(f"  Bundle file:      {source_path.name} ({bundle_size:,} bytes)")
+        console.print(f"  Bundle hash:      {bundle_hash}")
+        console.print(f"  Visibility:       {visibility}")
+
         try:
-            refreshed_token = refresh_submission_token(service_url)
             upload_result = submit_hosted_bundle(
                 service_url=service_url,
-                token=refreshed_token.token,
-                source_path=source_path,
-                companions=companions,
+                token=token.token,
+                source_path=upload_source_path,
+                companions=upload_companions,
                 manifest=manifest,
                 bundle_hash=bundle_hash,
                 visibility=visibility,
                 idempotency_key=idempotency_key,
                 wait=wait,
             )
-        except (HostedSubmitError, SubmissionAuthError) as exc:
+        except HostedSubmitUnauthorized:
+            try:
+                refreshed_token = refresh_submission_token(service_url)
+                upload_result = submit_hosted_bundle(
+                    service_url=service_url,
+                    token=refreshed_token.token,
+                    source_path=upload_source_path,
+                    companions=upload_companions,
+                    manifest=manifest,
+                    bundle_hash=bundle_hash,
+                    visibility=visibility,
+                    idempotency_key=idempotency_key,
+                    wait=wait,
+                )
+            except (HostedSubmitError, SubmissionAuthError) as exc:
+                console.print(f"\n[red]Hosted submission failed:[/red] {exc}")
+                ctx.exit(1)
+                return
+        except HostedSubmitError as exc:
             console.print(f"\n[red]Hosted submission failed:[/red] {exc}")
             ctx.exit(1)
             return
-    except HostedSubmitError as exc:
-        console.print(f"\n[red]Hosted submission failed:[/red] {exc}")
-        ctx.exit(1)
-        return
 
     try:
         history_path = record_hosted_submission(
@@ -677,22 +708,23 @@ def submit(
 
     bundle_dir.mkdir(parents=True, exist_ok=True)
 
-    shutil.copy2(source_path, bundle_dir / source_path.name)
+    packaged_source_path = _write_canonical_submission_file(source_path, bundle_dir / source_path.name)
+    packaged_companions = []
     for comp in companions:
-        shutil.copy2(comp, bundle_dir / comp.name)
+        packaged_companions.append(_write_canonical_submission_file(comp, bundle_dir / comp.name))
 
     # Per-file hashes are the contract used by scripts/validate_submission.py;
     # using a directory-level hash would not survive copying into
     # results-data/bundles/ where other bundles already live.
     manifest = _build_submission_manifest(
-        source_path=source_path,
-        companions=companions,
+        source_path=packaged_source_path,
+        companions=packaged_companions,
         result=result,
         submitted_by=submitted_by,
         submission_path="PR-based",
     )
 
-    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    manifest_path.write_text(canonical_json_text(manifest), encoding="utf-8")
     contributing_path.write_text(_CONTRIBUTING_TEXT, encoding="utf-8")
 
     _print_submission_summary(

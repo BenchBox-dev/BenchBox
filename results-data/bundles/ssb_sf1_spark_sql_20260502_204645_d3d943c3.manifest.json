@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-03T02:50:16.709319+00:00",
-  "bundle_file": "ssb_sf1_spark_sql_20260502_204645_d3d943c3.json",
-  "bundle_hash": "04b0c126b5613ea6c25b7322b8a8a462ee0bb573a9edd408b8e2732c9b20392c",
-  "companion_hashes": {},
   "benchmark": "Star Schema",
+  "bundle_file": "ssb_sf1_spark_sql_20260502_204645_d3d943c3.json",
+  "bundle_hash": "206566c6ed8ed4a35d24a680daa15f7dc72dc42a604c3a8281261f61b0b09e44",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "Spark",
   "scale_factor": 1.0,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:50:16.709319+00:00",
   "submitted_by": "BenchBox UAT"
 }

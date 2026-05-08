@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:13:33.405173+00:00",
-  "bundle_file": "tsbs_devops_sf001_pandas_df_20260506_094929_d34ba558.json",
-  "bundle_hash": "068630c0d07e3b30402cf86184bbbc1de1c5d2b3b3d7850392e1665f3e877a47",
-  "companion_hashes": {},
   "benchmark": "TSBS DevOps",
+  "bundle_file": "tsbs_devops_sf001_pandas_df_20260506_094929_d34ba558.json",
+  "bundle_hash": "3cdad0929ab7db278ef5841cfa519def85684f70fb7cbeebf35aefc36101b844",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "Pandas",
   "scale_factor": 0.01,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:13:33.405173+00:00",
   "submitted_by": "Joe Harris"
 }

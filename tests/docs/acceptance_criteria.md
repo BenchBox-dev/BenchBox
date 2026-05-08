@@ -184,5 +184,5 @@ This document defines the acceptance criteria for the core features of the Bench
    - MUST provide cookbook-style examples
    - MUST document performance characteristics and tuning
    - MUST explain extension mechanisms
-   
+
 These acceptance criteria will guide the implementation and testing of BenchBox features and serve as a reference for evaluating completeness and quality.

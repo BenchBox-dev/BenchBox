@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:11:32.453537+00:00",
-  "bundle_file": "ssb_sf1_sqlite_sql_20260506_084616_a634320b.json",
-  "bundle_hash": "9c72044e5e734376f418da59dd8cdd553ee539028792f68ea7a95d9816310950",
-  "companion_hashes": {},
   "benchmark": "Star Schema",
+  "bundle_file": "ssb_sf1_sqlite_sql_20260506_084616_a634320b.json",
+  "bundle_hash": "459ed3bb3817fca80bdc8a11d3ede389be4a5e66af47fb953a4fb7ef3f2b9661",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "SQLite",
   "scale_factor": 1.0,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:11:32.453537+00:00",
   "submitted_by": "Joe Harris"
 }

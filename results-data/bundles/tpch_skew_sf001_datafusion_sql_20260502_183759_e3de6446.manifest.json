@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-03T02:51:55.453093+00:00",
-  "bundle_file": "tpch_skew_sf001_datafusion_sql_20260502_183759_e3de6446.json",
-  "bundle_hash": "e0e4306016e30c7ec6dc2300204c824a4fafd813560a3308770a798951f9f433",
-  "companion_hashes": {},
   "benchmark": "TPC-H Skew Benchmark (moderate)",
+  "bundle_file": "tpch_skew_sf001_datafusion_sql_20260502_183759_e3de6446.json",
+  "bundle_hash": "7953f2942845aeb61199d96f3c64abdaf65f5aa397f913d5fbe7fea803e7f0f0",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "DataFusion",
   "scale_factor": 0.01,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:51:55.453093+00:00",
   "submitted_by": "BenchBox UAT"
 }

@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:10:14.310744+00:00",
-  "bundle_file": "metadata_primitives_sf1_pyspark_df_20260506_100507_97282954.json",
-  "bundle_hash": "c7f0577ae6cbc15446b3614ae2c2073b1852065372ce1975c473f228d9ed0976",
-  "companion_hashes": {},
   "benchmark": "Metadata",
+  "bundle_file": "metadata_primitives_sf1_pyspark_df_20260506_100507_97282954.json",
+  "bundle_hash": "392b2bccabeb6cfad9fa171cf6c6dd93ffebe13469ee3ba1430e7d9d559dd592",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "PySpark",
   "scale_factor": 1.0,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:10:14.310744+00:00",
   "submitted_by": "Joe Harris"
 }

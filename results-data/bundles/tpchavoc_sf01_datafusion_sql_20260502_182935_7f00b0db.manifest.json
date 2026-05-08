@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-03T02:52:35.491168+00:00",
-  "bundle_file": "tpchavoc_sf01_datafusion_sql_20260502_182935_7f00b0db.json",
-  "bundle_hash": "04dab22467f1c3ea9f0570543e98977d4534ea9929ab31e033d3519155e8a6db",
-  "companion_hashes": {},
   "benchmark": "TPC-Havoc",
+  "bundle_file": "tpchavoc_sf01_datafusion_sql_20260502_182935_7f00b0db.json",
+  "bundle_hash": "5e79a07d15eff3f13c2622ab41281a3f7231c1871e9051ab97507bd112a38b10",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "DataFusion",
   "scale_factor": 0.1,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:52:35.491168+00:00",
   "submitted_by": "BenchBox UAT"
 }

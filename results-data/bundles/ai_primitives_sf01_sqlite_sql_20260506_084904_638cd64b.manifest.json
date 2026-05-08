@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:07:38.657662+00:00",
-  "bundle_file": "ai_primitives_sf01_sqlite_sql_20260506_084904_638cd64b.json",
-  "bundle_hash": "e9a56d657ba7288fc383f31d2e2813ffe4cd56f59b5f8fcf53d6bc73321ebafe",
-  "companion_hashes": {},
   "benchmark": "AI/ML Primitives",
+  "bundle_file": "ai_primitives_sf01_sqlite_sql_20260506_084904_638cd64b.json",
+  "bundle_hash": "ad8084083c0b6516bdaece5b1eec8a49451ed20bd458234865dd879b6decd246",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "SQLite",
   "scale_factor": 0.1,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:07:38.657662+00:00",
   "submitted_by": "Joe Harris"
 }

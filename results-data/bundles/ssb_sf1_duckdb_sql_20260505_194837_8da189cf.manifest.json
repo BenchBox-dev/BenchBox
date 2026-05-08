@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T00:47:15.993628+00:00",
-  "bundle_file": "ssb_sf1_duckdb_sql_20260505_194837_8da189cf.json",
-  "bundle_hash": "196f97fd85fa1f074ced1d017cdad1fbda7d20ca7341bb67ffceb88ee0f48c41",
-  "companion_hashes": {},
   "benchmark": "Star Schema",
+  "bundle_file": "ssb_sf1_duckdb_sql_20260505_194837_8da189cf.json",
+  "bundle_hash": "43073a0c0ab3215d6f29e55c17a88ddd4d4f95dab2aa3104d81291379f20f71e",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "DuckDB",
   "scale_factor": 1.0,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T00:47:15.993628+00:00",
   "submitted_by": "Joe Harris"
 }

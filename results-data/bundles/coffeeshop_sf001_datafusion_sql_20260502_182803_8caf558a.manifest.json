@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-03T02:47:12.327918+00:00",
-  "bundle_file": "coffeeshop_sf001_datafusion_sql_20260502_182803_8caf558a.json",
-  "bundle_hash": "0e8d27ecbb8409e995c094a1951d6cc070c7653557a52be636208849229cc789",
-  "companion_hashes": {},
   "benchmark": "CoffeeShop",
+  "bundle_file": "coffeeshop_sf001_datafusion_sql_20260502_182803_8caf558a.json",
+  "bundle_hash": "22409a7648966e2507552d8653c75859ab55a0c459d9a174e2ab3df83e7fedc6",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "DataFusion",
   "scale_factor": 0.01,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:47:12.327918+00:00",
   "submitted_by": "BenchBox UAT"
 }

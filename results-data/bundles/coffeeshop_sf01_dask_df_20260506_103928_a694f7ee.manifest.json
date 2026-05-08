@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:08:37.327749+00:00",
-  "bundle_file": "coffeeshop_sf01_dask_df_20260506_103928_a694f7ee.json",
-  "bundle_hash": "a3dbf55a8bd00ac59d5b78c5e7bb4cdc4ffe0af73f3d994c46a25aaf4806ef29",
-  "companion_hashes": {},
   "benchmark": "CoffeeShop",
+  "bundle_file": "coffeeshop_sf01_dask_df_20260506_103928_a694f7ee.json",
+  "bundle_hash": "20f731eb7bf0abcc6b451a28faa2c295eca24c59a6e2b55f5f963cac98cb6038",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "Dask",
   "scale_factor": 0.1,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:08:37.327749+00:00",
   "submitted_by": "Joe Harris"
 }

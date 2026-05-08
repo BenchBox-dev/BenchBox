@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-03T02:49:17.860443+00:00",
-  "bundle_file": "nyctaxi_sf01_pyspark_df_20260502_214726_f8c1d2c5.json",
-  "bundle_hash": "818a7512dec82d146f6022d2ad04ad1862e5c304a3b2c1e9e9d4e903276132c1",
-  "companion_hashes": {},
   "benchmark": "NYC Taxi",
+  "bundle_file": "nyctaxi_sf01_pyspark_df_20260502_214726_f8c1d2c5.json",
+  "bundle_hash": "a68a22017f4d71d6acbd361468540bff2cd44f098f6fc159f83ff218b8f57a64",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "PySpark",
   "scale_factor": 0.1,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:49:17.860443+00:00",
   "submitted_by": "BenchBox UAT"
 }

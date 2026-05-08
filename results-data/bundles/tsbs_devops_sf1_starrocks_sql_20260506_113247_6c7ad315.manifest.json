@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:13:56.317037+00:00",
-  "bundle_file": "tsbs_devops_sf1_starrocks_sql_20260506_113247_6c7ad315.json",
-  "bundle_hash": "ef615d6d176c0eeadf8de3d639adf89192da31eba22af69c82d51f3514c025ba",
-  "companion_hashes": {},
   "benchmark": "TSBS DevOps",
+  "bundle_file": "tsbs_devops_sf1_starrocks_sql_20260506_113247_6c7ad315.json",
+  "bundle_hash": "d6e6ece882eeab164926ea8380b92b1c0f19ec389e20e06bf583c2fe72e606ca",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "StarRocks",
   "scale_factor": 1.0,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:13:56.317037+00:00",
   "submitted_by": "Joe Harris"
 }

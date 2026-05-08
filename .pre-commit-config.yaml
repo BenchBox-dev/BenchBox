@@ -105,7 +105,7 @@ repos:
       - id: codespell
         args:
           - --ignore-words=.codespell-ignore.txt
-          - --skip=*.pyc,_build,*.json,*.lock,*.svg,*.min.js,*.min.css,*.csv
+          - --skip=*.pyc,_build,_binaries/*,benchbox/_binaries/*,*.json,*.lock,*.svg,*.min.js,*.min.css,*.csv
           - --quiet-level=2
         stages: [pre-commit]
         exclude: ^_sources/  # vendored upstream sources; preserve byte-for-byte
@@ -119,17 +119,11 @@ repos:
         stages: [pre-commit]
       - id: end-of-file-fixer
         stages: [pre-commit]
-        # _sources/ + _binaries/EULA: vendored upstream sources, byte-for-byte.
-        # results-data/bundles/*.json: bundle JSONs are hash-pinned by their
-        # per-bundle `<stem>.manifest.json` sidecars (`bundle_hash` SHA-256);
-        # whitespace normalization breaks the validator hash contract. The
-        # pattern is broad (`.*\.json$`) so it also covers the manifest sidecars
-        # themselves, which is harmless — manifests do not carry self-hashes
-        # today, but excluding them is forward-safe.
-        exclude: ^(_sources/|_binaries/.*EULA\.txt|results-data/bundles/.*\.json$)
+        # Vendored upstream artifacts are preserved byte-for-byte.
+        exclude: ^(_sources/|_binaries/|benchbox/_binaries/)
       - id: trailing-whitespace
         stages: [pre-commit]
-        exclude: ^(_sources/|_binaries/.*EULA\.txt|results-data/bundles/.*\.json$)
+        exclude: ^(_sources/|_binaries/|benchbox/_binaries/)
       - id: check-added-large-files
         args: [--maxkb=1000]
         stages: [pre-commit]
