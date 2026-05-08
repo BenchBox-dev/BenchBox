@@ -38,7 +38,10 @@ def _lock(*, code_sha: str = "aaa", todo_sha: str = "bbb", fetched_at: str = "ol
             },
             "todo": {
                 "source": {"fetchedAt": fetched_at},
-                "files": {"SKILL.md": {"sha256": todo_sha, "size": len(todo_sha)}},
+                "files": {
+                    "defaults/TODO_SCHEMA.yaml": {"sha256": "schema", "size": 6},
+                    "SKILL.md": {"sha256": todo_sha, "size": len(todo_sha)},
+                },
             },
         },
     }
@@ -91,13 +94,38 @@ def test_allowed_patterns_from_todo_treats_skill_directory_without_slash_as_pref
         encoding="utf-8",
     )
 
-    patterns = skill_sync_lock_audit.allowed_patterns_from_todo(todo)
+    patterns = skill_sync_lock_audit.allowed_patterns_from_todo(
+        todo,
+        skill_directories=skill_sync_lock_audit._skill_directories_from_locks(_lock()),
+    )
 
     assert patterns == ["code/", "todo/defaults/"]
     assert skill_sync_lock_audit._is_allowed("code/SKILL.md", patterns)
     assert skill_sync_lock_audit._is_allowed("code/references/five-axis-review.md", patterns)
     assert skill_sync_lock_audit._is_allowed("todo/defaults/TODO_SCHEMA.yaml", patterns)
     assert not skill_sync_lock_audit._is_allowed("blog/SKILL.md", patterns)
+
+
+def test_allowed_patterns_from_todo_preserves_extensionless_skill_file(tmp_path: Path) -> None:
+    todo = tmp_path / "todo.yaml"
+    todo.write_text(
+        """
+        id: example
+        scope_limit:
+          only_modify:
+            - ".claude/skills/code/README"
+        """,
+        encoding="utf-8",
+    )
+
+    patterns = skill_sync_lock_audit.allowed_patterns_from_todo(
+        todo,
+        skill_directories=skill_sync_lock_audit._skill_directories_from_locks(_lock()),
+    )
+
+    assert patterns == ["code/README"]
+    assert skill_sync_lock_audit._is_allowed("code/README", patterns)
+    assert not skill_sync_lock_audit._is_allowed("code/README/notes.md", patterns)
 
 
 def test_allowed_patterns_gate_changed_lock_paths() -> None:
