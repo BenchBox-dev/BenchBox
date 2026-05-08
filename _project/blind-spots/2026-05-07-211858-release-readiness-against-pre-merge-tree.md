@@ -1,7 +1,7 @@
 ---
 id: 2026-05-07-211858-release-readiness-against-pre-merge-tree
 date: 2026-05-07
-status: merged-to-todo
+status: actionable
 finding_kind: framework-gap
 review_context: "PR #269 review (results-explorer-retheme-audit-followups) → PR #271 (results-explorer-retheme-postmerge-tokenize)"
 related_paths:
@@ -10,7 +10,7 @@ related_paths:
   - results-explorer/src/pages/ResultDetail.tsx
   - results-explorer/src/pages/Compare.tsx
 suggested_sweep: "before any retheme/release-readiness PR is marked READY, re-run the token scan and the release-final capture against the squash-merged develop tip, not just the PR branch"
-todo_id: results-explorer-token-scan-ci-gate
+todo_id: null
 ---
 
 # Release-readiness reports generated against pre-merge tree silently miss concurrent-PR regressions
@@ -69,6 +69,57 @@ same exposure if the report and the merge are not regenerated together.
       capture against develop tip after PR #271 lands, so the artifact set
       reflects the shipped state.
 
+## Recommended actions
+
+Step #1 is already tracked by TODO
+`_project/TODO/main/planning/results-explorer-token-scan-ci-gate.yaml`
+(adds a CI gate against raw Tailwind palette literals under
+`results-explorer/src`). The remaining gaps need their own work:
+
+1. **Stamp `develop` SHA into release-readiness audits.**
+   Modify the capture flow that emits
+   `_project/audits/results-explorer-retheme-final-<date>.md` (and the
+   sibling `release-final.spec.ts` capture under
+   `results-explorer/e2e/captures/`) to record the `develop` SHA the
+   capture was generated against. Concretely:
+   - Extend the capture spec / its driver to call
+     `git rev-parse origin/develop` at run-start and inject it into the
+     screenshot manifest and audit frontmatter (e.g. a new
+     `develop_sha:` field).
+   - Add a CI job that compares that recorded SHA against the merge
+     target's tip and refuses a "READY" verdict if they diverge.
+   - Wire the gate into the existing `results-explorer/src` path filter
+     so it only runs when the explorer surface changes.
+
+2. **Generalize the SHA stamp to every structured `_project/audits/`
+   report.** The retheme audit is one instance of a class — security
+   reviews, performance baselines, docs migrations, etc. all have the
+   same exposure.
+   - Add a tiny helper script under `_project/scripts/` (e.g.
+     `audit_sha_check.py`) that parses an audit's frontmatter for a
+     `develop_sha:` field and exits non-zero if missing or stale
+     relative to a passed-in target SHA.
+   - Add a `make audit-sha-check FILE=…` target that wraps the script.
+   - Backfill `develop_sha:` into every existing `_project/audits/*.md`
+     via `_project/scripts/audit_sha_backfill.py` (idempotent, derives
+     the SHA from the introducing commit) so the validator can enforce
+     uniformly without grandfathering.
+   - Document the requirement in the closest audit-authoring doc (likely
+     `docs/operations/results-explorer-qa.md` for now, with a note that
+     the contract applies to all `_project/audits/` reports).
+   - Add a CI hook on `_project/audits/**` so any new audit landing
+     without a `develop_sha:` is blocked at PR time.
+
+3. **Re-run the release-final capture against post-#271 develop tip.**
+   PR #271 (`274a4a11e`) closed the literal regression, but the
+   2026-05-07 audit and screenshot set under
+   `_project/audits/screenshots/results-explorer-retheme-final-2026-05-07/`
+   still describe the pre-#271 tree. Regenerate the audit and capture
+   on top of the current `develop` and replace the 2026-05-07 artifact
+   in place via `git mv` (rename to a fresh dated path so `git log
+   --follow` recovers the pre-#271 verdict for post-mortems), stamping
+   the new artifact with `develop_sha:` per #1.
+
 ## Triage log
 
-- 2026-05-08: promoted to TODO `results-explorer-token-scan-ci-gate`
+- 2026-05-08: actionable — Re-verified 2026-05-08: PR #271 (274a4a11e) closed the immediate token regression but next steps #2 (capture/develop-SHA gate), #3 (generalize SHA stamp to all _project/audits/ reports), and #4 (re-run release-final capture against post-#271 develop tip) remain. Next step #1 already tracked by TODO results-explorer-token-scan-ci-gate.

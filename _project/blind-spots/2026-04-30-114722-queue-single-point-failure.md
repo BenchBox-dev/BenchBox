@@ -39,3 +39,4 @@ Replacing decentralized auto-merge with a queue can make one local process or wo
   the next-steps. Do not promote to a steward TODO until Step 5 returns
   BUILD QUEUE.
 - 2026-05-06: actionable — 2026-05-06 sweep: decentralized auto-merge live (auto-merge-on-open.yml + develop-post-merge.yml present); dev-loop-step-6-queue-decision-gate still Blocked on Step 5 — failure-mode-analysis remains the gate before any steward TODO
+- 2026-05-08: actionable — sweep: auto-merge-on-open.yml + develop-post-merge.yml still shipped; dev-loop-step-6-queue-decision-gate still Blocked (waiting on Step 5 measurement window through ~2026-05-30) — failure-mode-analysis pre-condition stands

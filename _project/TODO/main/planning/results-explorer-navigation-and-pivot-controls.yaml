@@ -1,0 +1,144 @@
+id: results-explorer-navigation-and-pivot-controls
+title: "Fix Results Explorer navigation state and sibling pivots"
+worktree: main
+priority: High
+status: Not Started
+category: Frontend UX
+
+description: |
+  Correct stale navigation indicators and add sibling-pivot controls on detail
+  pages so users can switch benchmark/platform context without backing out to
+  an index. Defects this item addresses were flagged in the 2026-05-08
+  Results Explorer follow-up review (chat-only artifact, not committed to
+  _project/audits/). w0 rebinds the review evidence against develop tip and
+  captures it to
+  _project/verification-logs/results-explorer-navigation-and-pivot-controls/w0.log
+  before any other work unit runs; that log replaces the previous "review row
+  #3/#6/#7/#32" citations as the durable reference.
+
+deps:
+  needs: []
+
+work:
+  - id: w0
+    summary: "Rebind navigation and pivot review evidence against develop tip"
+    status: pending
+    notes: |
+      Walk Layout subnav transitions (Leaderboards → Query → Platforms →
+      Compare → benchmark detail → platform detail → result detail), Home
+      leaderboard filter placement, and the absence of benchmark/platform
+      switchers on detail pages against the current develop tip. Capture
+      stale active-tab cases, missing pivots, and filter placement defects to
+      _project/verification-logs/results-explorer-navigation-and-pivot-controls/w0.log.
+      Output is the rebind reference for w1-w5 acceptance.
+
+  - id: w1
+    summary: "Make the Results subnav active state reactive to route changes"
+    needs: [w0]
+    status: pending
+    notes: |
+      Refactor active-tab calculation so it updates after client-side route
+      changes. Verify navigation from Leaderboards to Query, Platforms,
+      Compare, benchmark detail, platform detail, and result detail
+      highlights the route the user is actually on.
+
+  - id: w2
+    summary: "Add a benchmark switcher to Benchmark detail pages"
+    needs: [w0]
+    status: pending
+    notes: |
+      Add a benchmark switcher to the Benchmark detail header near the
+      breadcrumb or title. It must list all available benchmarks, navigate
+      directly to the chosen benchmark detail route, preserve valid
+      scale/view state when possible, and clear invalid query params rather
+      than producing an empty page.
+
+  - id: w3
+    summary: "Add a platform switcher to Platform detail pages"
+    needs: [w0]
+    status: pending
+    notes: |
+      Add a platform switcher to the Platform detail header near the
+      breadcrumb or title. It must list all available platforms, navigate
+      directly to the chosen platform route, and preserve applicable filters
+      once platform-page filtering exists.
+
+  - id: w4
+    summary: "Move Home leaderboard filters above the affected matrix"
+    needs: [w0]
+    status: pending
+    notes: |
+      Move the Home leaderboard cohort controls above or into the same panel
+      as the matrix they affect. Active filter state must be visible before
+      the table so the user does not have to scroll past the matrix to
+      understand how to change benchmark, scale, or platform context.
+
+  - id: w5
+    summary: "Cover nav and sibling pivots with regression tests"
+    needs: [w1, w2, w3, w4]
+    status: pending
+    notes: |
+      Add regression tests for SPA subnav updates, benchmark switcher
+      routing, platform switcher routing, and Home filter placement/state.
+      Include a browser smoke check that active nav does not remain on
+      Leaderboards after opening Query.
+
+must_preserve:
+  - "Existing result URLs and static-export routes."
+  - "Breadcrumb links back to `/results/`."
+  - "Keyboard access to nav and switcher controls."
+
+approach: |
+  Use the router/location source already used by the app instead of reading
+  `window.location` once at module render time. Keep the pivot controls
+  compact and local to the current detail page; do not create new index or
+  landing pages.
+
+anti_patterns:
+  - "DO NOT solve stale nav with full-page reloads."
+  - "DO NOT add sibling links that drop the user into a 404 or empty dataset for valid choices."
+
+verification:
+  - description: "Targeted navigation and pivot tests pass"
+    command: "cd results-explorer && npm test -- --run src/components/__tests__/Layout.test.tsx src/pages/__tests__/BenchmarkIndex.test.tsx src/pages/__tests__/PlatformIndex.test.tsx src/pages/__tests__/Home.test.tsx"
+    expected_output: "all targeted tests pass"
+  - description: "Frontend typecheck passes"
+    command: "cd results-explorer && npm run typecheck"
+    expected_output: "exit 0"
+  - description: "Frontend build passes"
+    command: "cd results-explorer && npm run build"
+    expected_output: "exit 0"
+  - description: "Manual nav browser check is complete"
+    command: "echo 'Manual: browser-check /results/query, /results/tpch/, and /results/p/polars/ for active nav and sibling switching'"
+    expected_output: "manual evidence captured in PR notes or audit artifact"
+
+scope_limit:
+  only_modify:
+    - "results-explorer/src/components/Layout.tsx"
+    - "results-explorer/src/pages/BenchmarkIndex.tsx"
+    - "results-explorer/src/pages/PlatformIndex.tsx"
+    - "results-explorer/src/pages/Home.tsx"
+    - "results-explorer/src/components/__tests__/"
+    - "results-explorer/src/pages/__tests__/"
+  do_not_modify:
+    - "benchbox/"
+    - "Result snapshot generation unless switcher data is missing from exported metadata."
+
+metadata:
+  tags:
+    - results-explorer
+    - navigation
+    - usability-review
+  estimated_effort: "Medium (1-2 days)"
+  created_date: "2026-05-08"
+
+impact:
+  business_value: |
+    Removes false location signals and makes benchmark/platform exploration
+    possible without backtracking.
+  user_impact: |
+    Users can pivot between sibling result views from the page where they notice
+    the need to compare another benchmark or platform.
+  technical_debt: |
+    Replaces one-time location reads with route-aware state and adds regression
+    coverage for SPA navigation.
