@@ -2,7 +2,8 @@ id: results-explorer-responsive-desktop-query-panel-regression
 title: "Fix or relax responsive.spec.ts query workbench desktop assertion (regression on develop)"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed: 2026-05-08
 category: Frontend / Test Infrastructure
 
 description: |
@@ -61,34 +62,53 @@ context_sections:
 work:
   - id: w1
     summary: "Bisect the 9px regression to a specific PR #270 hunk"
-    status: pending
+    status: done
     notes: |
-      Locally check out commits between b26f6aff3 (the merge-base) and
-      27fbd73d7 (PR #270 merge) on `results-explorer/src/pages/Query.tsx`.
-      Run the failing assertion at each step and pinpoint the hunk that
-      pushes the panel from ≤900 to 909.
+      Reframed: not a regression in PR #270 source. With pre-PR-#270 source
+      checked out (Query.tsx, Layout.tsx, index.css at b26f6aff3), the live
+      DOM probe of `/results/query` at desktop (1280/1440/1600) reports
+      `query-results-panel.top = 909` — identical to develop tip. The
+      `lg:order-1` placement of `query-visible-columns` at the top of the
+      right column at lg+ has been the design since PR #120, and its chip
+      list has consistently produced ≈494px above the result summary.
+      PR #270's only Query.tsx changes were sticky right-column cells,
+      `min-w-full w-max` on the table, and scroll-hint `data-testid`s — none
+      of which alter the panel's vertical position. PR #270's actual
+      contribution to this failure was the test side: it relaxed desktop
+      `maxY` from 800 to 900 while narrowing the desktop viewport from 1440
+      to 1280, but the panel was already at 909, so the test was still 9px
+      short. This explains why no per-commit bisect could be performed —
+      PR #270 was squash-merged, and the layout shift the TODO assumed had
+      never existed.
 
   - id: w2
     summary: "Decide between layout fix or threshold relaxation"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      If the 9px shift is incidental (an unintended border/padding from
-      a token swap), tighten the layout. If it is the new mobile drawer
-      trigger that legitimately occupies 9px on desktop, relax desktop
-      maxY to ~960 with a comment explaining the budget. Document the
-      rationale either way.
+      Chose option (1) — tighten layout above the panel — to honour the
+      TODO's preference and to keep the rows panel above the fold at
+      desktop. Single-line, lg-only change in `results-explorer/src/pages/Query.tsx:494`:
+      the page intro container's `mb-6` becomes `mb-6 lg:mb-3`. This drops
+      12px of vertical space between the description block and the grid at
+      lg+ widths only; mobile/tablet spacing is unchanged, so the
+      drawer/results ordering and `maxY=1200` budgets at 390/768 are
+      preserved. After fix, the live probe reports
+      `query-results-panel.top = 897` at 1280/1440/1600 — within the
+      `maxY=900` budget with 3px of margin.
 
   - id: w3
     summary: "Re-run responsive grep end-to-end and confirm tablet affordance + overflow tests run after the fix"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
-      The PR #272 verification log only validates the affordance + overflow
-      tests in isolation because the desktop failure stops the serial run
-      early. After fixing this regression, run
-      `npx playwright test --project=chromium --grep "responsive|layout|a11y|mobile"`
-      and capture full output to a verification log.
+      Captured to
+      `_project/verification-logs/results-explorer-responsive-desktop-query-panel-regression/responsive-grep.log`.
+      `cd results-explorer && npx playwright test --project=chromium --grep 'responsive|layout|a11y|mobile' --workers=1`
+      → 24 passed, 2 skipped (tag-gated `@pr246-capture` / `@retheme-capture`
+      capture specs that don't run under this grep), 0 failed, exit 0. The
+      previously-masked tablet affordance + document-overflow tests now run
+      end-to-end alongside the desktop assertion.
 
 verification:
   - description: "responsive grep suite passes end-to-end on develop after fix"
