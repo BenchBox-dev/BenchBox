@@ -31,29 +31,42 @@ description: |
 
   The proposed direction:
 
-  - **Schema**: introduce a required `develop_sha:` frontmatter field
-    on structured `_project/audits/*.md` reports. Capture spec emits
-    it via `git rev-parse HEAD`; reviewers see it on every report.
-  - **Gate**: add a make target / CI step that refuses a "READY"
-    verdict when `develop_sha` is older than `merge_base(HEAD,
-    origin/develop)`. Initially a content-guard subcheck for paths
-    matching `_project/audits/**.md`; can graduate to a separate job
-    if scope grows.
+  - **Applies-to rule**: `_project/audits/` mixes release-readiness
+    reports with retrospective notes that were never meant to gate
+    merges. The validator only fires on files that declare a top-level
+    `verdict:` frontmatter field (any value). Files without `verdict:`
+    are treated as retrospectives and skipped — they do not need a
+    `develop_sha:` and will not be backfilled. This keeps the schema
+    opt-in via a single positive marker rather than a path or filename
+    convention that would drift.
+  - **Schema (applied to verdict-bearing reports)**: a required
+    `develop_sha:` frontmatter field plus a required
+    `generated_at:` ISO-8601 timestamp. Capture spec emits both via
+    `git rev-parse HEAD` and `date -u +%Y-%m-%dT%H:%M:%SZ`.
+  - **Gate**: a make target / CI step refuses any verdict-bearing
+    report whose `develop_sha:` is not an ancestor of
+    `merge_base(HEAD, origin/develop)` AND whose `verdict:` is `READY`
+    (drafts/WIP verdicts skip the freshness check, schema check still
+    fires). Initially a content-guard subcheck for paths matching
+    `_project/audits/**.md`; can graduate to a separate job if scope
+    grows.
   - **Sweep step (4)**: regenerate the retheme final report against
-    current develop tip in a separate, narrowly scoped PR. Out of scope
-    here unless this TODO promotes step 4 explicitly.
+    current develop tip. Independent of the schema/gate work — can ship
+    in any order — so w5 has no `needs:` and may pick up first.
 
 deps:
   needs:
+  # The token-scan gate is now in DONE — this TODO is on the ready
+  # queue, dependency listed for traceability not blocking.
   - results-explorer-token-scan-ci-gate
 
 work:
 - id: w1
-  summary: "Define the audit report frontmatter schema (develop_sha + verdict + generated_at)"
+  summary: "Document the schema in docs/operations/audit-report-schema.md: applies-to rule (verdict: marker), required fields (develop_sha, generated_at, verdict), validator semantics"
   status: pending
 
 - id: w2
-  summary: "Add validate_audit_report.py under _project/scripts/ enforcing schema + SHA freshness"
+  summary: "Add validate_audit_report.py under _project/scripts/ implementing the schema doc; pytest fixture under tests/fixtures/audits/ for stale-SHA case (commit it as data, not synthesized at runtime)"
   needs: [w1]
   status: pending
 
@@ -63,14 +76,18 @@ work:
   status: pending
 
 - id: w4
-  summary: "Backfill develop_sha into the existing structured audit reports under _project/audits/"
+  summary: "Backfill develop_sha + generated_at into existing verdict-bearing audit reports (skip retrospectives without verdict:)"
   needs: [w3]
   status: pending
 
 - id: w5
   summary: "Regenerate _project/audits/results-explorer-retheme-final-2026-05-07.md against develop tip (blind-spot step 4)"
-  needs: [w4]
   status: pending
+  notes: |
+    Independent of w1-w4. Regenerating the report produces the
+    develop_sha/generated_at frontmatter as a side effect of the
+    capture spec re-run, so this work unit can ship before the schema
+    lands; it just won't pass the gate until w3 is in place.
 
 must_preserve:
 - "Existing audit report bodies — schema additions are additive, not rewrites."
@@ -81,13 +98,19 @@ anti_patterns:
 - "DO NOT enforce SHA freshness on draft / WIP reports — schema validation OK, freshness check should require a verdict==READY frontmatter to fire."
 
 verification:
-- description: "Audit reports without develop_sha are rejected"
-  command: "echo '---\nverdict: READY\n---\n# stub' > /tmp/stub-audit.md && uv run --project _project/scripts -- python _project/scripts/validate_audit_report.py /tmp/stub-audit.md"
-  expected_output: "non-zero exit (missing develop_sha)"
-- description: "Audit reports with stale develop_sha are rejected when verdict==READY"
-  command: "uv run --project _project/scripts -- python _project/scripts/validate_audit_report.py _project/audits/<stale fixture>.md"
+- description: "Verdict-bearing audit reports without develop_sha are rejected"
+  command: "echo $'---\\nverdict: READY\\n---\\n# stub' > /tmp/stub-audit.md && ! uv run --project _project/scripts -- python _project/scripts/validate_audit_report.py /tmp/stub-audit.md"
+  expected_output: "exit 0 (validator rejected; outer ! inverts)"
+- description: "Retrospective notes without verdict: are skipped (no schema enforcement)"
+  command: "echo $'---\\nauthor: x\\n---\\n# notes' > /tmp/note-audit.md && uv run --project _project/scripts -- python _project/scripts/validate_audit_report.py /tmp/note-audit.md"
+  expected_output: "exit 0 (file skipped, not a verdict-bearing report)"
+- description: "Stale-SHA fixture is rejected when verdict==READY"
+  command: "uv run --project _project/scripts -- python _project/scripts/validate_audit_report.py tests/fixtures/audits/stale-sha-ready.md"
   expected_output: "non-zero exit (SHA older than merge target)"
-- description: "Existing audit reports validate after backfill"
+- description: "Stale-SHA fixture is accepted when verdict is not READY (freshness gate skipped, schema still enforced)"
+  command: "uv run --project _project/scripts -- python _project/scripts/validate_audit_report.py tests/fixtures/audits/stale-sha-draft.md"
+  expected_output: "exit 0"
+- description: "All existing audit reports validate after w4 backfill"
   command: "for f in _project/audits/*.md; do uv run --project _project/scripts -- python _project/scripts/validate_audit_report.py \"$f\" || exit 1; done"
   expected_output: "exit 0 across all reports"
 
@@ -97,6 +120,8 @@ scope_limit:
   - "_project/scripts/"
   - ".github/workflows/pr.yml"
   - "docs/operations/"
+  - "tests/fixtures/audits/"
+  - "tests/unit/scripts/"
   do_not_modify:
   - "results-explorer/src/"
   - "results-data/"

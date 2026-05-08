@@ -19,9 +19,15 @@ description: |
   The inner detection step can then be removed.
 
   The classifier already has the matching pattern infrastructure;
-  `results-explorer/**` is in `.github/path-filters.yml` `code-ci`. A
-  narrower pattern set (e.g. a new `explorer-tokens` rule key matching
-  `results-explorer/src/**`) is the cleanest fit.
+  `results-explorer/**` is in `.github/path-filters.yml` `code-ci`. Add
+  a new top-level rule key `explorer-tokens` (sibling of `safe-content`,
+  `content-guard`, `code-ci`) matching exactly `results-explorer/src/**`.
+  The classifier emits `explorer-paths-needed` (boolean) when any
+  changed path matches that key; the PR-time job's `if:` switches from
+  `needs.ci-paths.outputs.needs-code-ci` to
+  `needs.ci-paths.outputs.explorer-paths-needed`. The inner
+  `Detect results-explorer/src changes` step is then redundant and is
+  removed in the same change.
 
 deps: {}
 
@@ -51,14 +57,19 @@ must_preserve:
 
 anti_patterns:
 - "DO NOT widen the explorer-tokens scan rule beyond results-explorer/src/** — the gate's purpose is the retheme contract on the public surface, not the e2e/test fixtures."
+- "DO NOT introduce a github-actions-side path filter (e.g. dorny/paths-filter) to gate the job — diverges from the existing path_filter_decision.py classifier idiom and creates two sources of truth for path classification."
+- "DO NOT keep the inner `Detect results-explorer/src changes` step alongside the new outer `if:` — the whole point of moving the gate to the classifier is to remove the duplicate detection."
 
 verification:
 - description: "Classifier returns explorer-paths-needed=true when results-explorer/src changes"
   command: "uv run -- python -m pytest tests/unit/scripts/test_path_filter_decision.py -k explorer -v"
   expected_output: "all tests pass"
-- description: "PR-time job no longer boots on a Python-only PR"
-  command: "gh pr view <next python-only PR after merge> --json statusCheckRollup --jq '.statusCheckRollup[] | select(.name==\"explorer-tokens\")'"
-  expected_output: "explorer-tokens skipped (no runner spent)"
+- description: "Workflow gate references the new classifier output"
+  command: "grep -q 'outputs.explorer-paths-needed' .github/workflows/pr.yml"
+  expected_output: "exit 0"
+- description: "Inner detection step has been removed"
+  command: "! grep -q 'Detect results-explorer/src changes' .github/workflows/pr.yml"
+  expected_output: "exit 0"
 
 scope_limit:
   only_modify:
