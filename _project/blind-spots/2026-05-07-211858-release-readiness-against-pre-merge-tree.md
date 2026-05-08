@@ -1,7 +1,7 @@
 ---
 id: 2026-05-07-211858-release-readiness-against-pre-merge-tree
 date: 2026-05-07
-status: open
+status: merged-to-todo
 finding_kind: framework-gap
 review_context: "PR #269 review (results-explorer-retheme-audit-followups) → PR #271 (results-explorer-retheme-postmerge-tokenize)"
 related_paths:
@@ -10,7 +10,7 @@ related_paths:
   - results-explorer/src/pages/ResultDetail.tsx
   - results-explorer/src/pages/Compare.tsx
 suggested_sweep: "before any retheme/release-readiness PR is marked READY, re-run the token scan and the release-final capture against the squash-merged develop tip, not just the PR branch"
-todo_id: null
+todo_id: results-explorer-token-scan-ci-gate
 ---
 
 # Release-readiness reports generated against pre-merge tree silently miss concurrent-PR regressions
@@ -68,3 +68,7 @@ same exposure if the report and the merge are not regenerated together.
 - [ ] Sweep: re-run `results-explorer-retheme-final-2026-05-07.md` with a
       capture against develop tip after PR #271 lands, so the artifact set
       reflects the shipped state.
+
+## Triage log
+
+- 2026-05-08: promoted to TODO `results-explorer-token-scan-ci-gate`

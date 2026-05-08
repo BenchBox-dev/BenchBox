@@ -206,9 +206,41 @@ jobs:
           fail_ci_if_error: false  # Don't fail CI if Codecov upload fails (token may not be configured)
           token: ${{ secrets.CODECOV_TOKEN }}
 
+  explorer-tokens:
+    name: explorer-tokens
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.needs-code-ci == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        run: git fetch --no-tags origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
+
+      - name: Detect results-explorer/src changes
+        id: scope
+        shell: bash
+        run: |
+          if git diff --name-only "origin/${{ github.base_ref }}...HEAD" \
+              | grep -qE '^results-explorer/src/'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "No results-explorer/src paths changed; skipping token scan."
+          fi
+
+      - name: Run explorer token scan
+        if: ${{ steps.scope.outputs.run == 'true' }}
+        # Bare python is intentional: the scan is stdlib-only so this gate
+        # does not pay a dependency-sync cost before deciding.
+        run: make lint-explorer-tokens
+
   ci-required-result:
     name: ci-required-result
-    needs: [ci-paths, content-guard, code-lint, code-test]
+    needs: [ci-paths, content-guard, code-lint, code-test, explorer-tokens]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -218,6 +250,7 @@ jobs:
           CONTENT_RESULT: ${{ needs.content-guard.result }}
           LINT_RESULT: ${{ needs.code-lint.result }}
           TEST_RESULT: ${{ needs.code-test.result }}
+          EXPLORER_TOKENS_RESULT: ${{ needs.explorer-tokens.result }}
           CONTENT_GUARD_NEEDED: ${{ needs.ci-paths.outputs.content-guard-needed }}
           NEEDS_CODE_CI: ${{ needs.ci-paths.outputs.needs-code-ci }}
           SAFE_CONTENT_ONLY: ${{ needs.ci-paths.outputs.safe-content-only }}
@@ -238,6 +271,15 @@ jobs:
             echo "Content-only PR; skipped Python code CI."
             echo "safe-content-only=$SAFE_CONTENT_ONLY"
             exit 0
+          fi
+
+          # explorer-tokens is gated on needs-code-ci; when it runs it must
+          # pass. A "skipped" result (no results-explorer/src changes within
+          # the code-CI tier) counts as success here.
+          if [ "$EXPLORER_TOKENS_RESULT" != "success" ] \
+              && [ "$EXPLORER_TOKENS_RESULT" != "skipped" ]; then
+            echo "explorer-tokens=$EXPLORER_TOKENS_RESULT"
+            exit 1
           fi
 
           if [ "$LINT_RESULT" = "success" ] && [ "$TEST_RESULT" = "success" ]; then

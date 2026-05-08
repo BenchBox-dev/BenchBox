@@ -103,11 +103,11 @@
     }
 
     a {
-        color: var(--bb-accent-hover);
+        color: var(--bb-accent);
     }
 
     a:hover {
-        color: var(--bb-accent);
+        color: var(--bb-accent-hover);
     }
 
     *:focus-visible {
