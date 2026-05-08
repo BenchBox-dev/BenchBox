@@ -1,0 +1,229 @@
+id: results-explorer-pr246-responsive-navigation-overflow-remediation
+title: "Address PR #246 mobile navigation, overflow, focus, and reachability findings"
+worktree: main
+priority: High
+status: Completed
+category: Testing and Quality Assurance
+
+description: |
+  PR #246 found that the Results Explorer has cross-route responsive risks:
+  Query disappears from the 390px secondary nav, dense tables clip columns and
+  row actions, and chart/table affordances are inconsistent at mobile and
+  tablet widths. These are not isolated CSS defects; they are route-level
+  responsive contracts that must be specified, implemented, and regression
+  tested.
+
+  This TODO creates the integrated responsive remediation plan for the PR #246
+  evidence. It should be worked alongside page-specific retheme items, but it
+  owns the shared rules for navigation, horizontal scroll affordances, sticky
+  first/action columns, card fallbacks, focus-visible semantics, and target
+  reachability.
+
+deps:
+  needs:
+  - results-explorer-retheme-theme-system-foundation
+
+context_sections:
+  evidence_source: |
+    PR #246: https://github.com/joeharris76/BenchBox/pull/246
+    Audit artifact:
+    `_project/audits/results-explorer-hierarchy-usability-data-audit-20260507.md`
+  findings: |
+    Covers PR #246 findings U-1 and U-2, and provides shared responsive support
+    for VH-1, DQ-3, DQ-4, and U-4.
+  screenshots: |
+    Baseline screenshots from PR #246:
+    - `home-390.png`
+    - `home-768.png`
+    - `benchmark-tpch-390.png`
+    - `benchmark-tpch-768.png`
+    - `benchmark-star-schema-390.png`
+    - `benchmark-star-schema-768.png`
+    - `platform-duckdb-390.png`
+    - `platform-duckdb-768.png`
+    - `platform-datafusion-390.png`
+    - `platform-datafusion-768.png`
+    - `result-detail-duckdb-390.png`
+    - `result-detail-duckdb-768.png`
+    - `compare-duckdb-aws-390.png`
+    - `compare-duckdb-aws-768.png`
+    - `query-390.png`
+    - `query-768.png`
+    - `query-mobile-filter-drawer-390.png`
+  related_existing_todos: |
+    Stay aligned with `results-explorer-retheme-responsive-accessibility`,
+    `results-explorer-retheme-browse-pages`,
+    `results-explorer-retheme-result-and-compare`, and
+    `results-explorer-retheme-query-workbench`.
+
+work:
+- id: w1
+  summary: "Write explicit responsive contracts for every audited route"
+  status: done
+  notes: |
+    For `/results/`, benchmark, platform, result detail, compare, and query,
+    decide the responsive treatment for each major surface:
+      - app/nav shell;
+      - primary actions;
+      - filter bars and drawers;
+      - table/grid surfaces;
+      - chart panels;
+      - row actions and compare actions.
+
+    Each contract must name whether the route uses horizontal scroll with
+    sticky columns, compact cards, stacked controls, a drawer, or responsive
+    chart scaling. Store the decision in code comments only if needed; prefer
+    tests and audit notes as the durable contract.
+
+- id: w2
+  summary: "Make mobile secondary navigation fully discoverable"
+  needs: [w1]
+  status: done
+  notes: |
+    Fix the 390px nav state where `Query` is off-canvas with no strong menu
+    or scroll cue. The active route should remain discoverable on mobile,
+    including when the user is already on `/results/query`. Use a wrapped nav,
+    mobile menu, or visible horizontal-scroll affordance with scroll shadow.
+
+    Verify target sizes are practical for touch and that keyboard focus order
+    through nav items is predictable.
+
+- id: w3
+  summary: "Harden shared table overflow affordances and action reachability"
+  needs: [w1]
+  status: done
+  notes: |
+    Audit and harden:
+      - Home Recent Results and MetaLeaderboard;
+      - Benchmark QueryHeatmap matrix/list;
+      - PlatformIndex table;
+      - Result Detail timing/sample tables;
+      - Compare Query-Level Diff;
+      - Query Workbench result and SQL tables.
+
+    Add scroll shadows, sticky first/action columns, mobile card summaries, or
+    explicit "scroll for more columns" cues. Row actions and compare actions
+    must not fall off the right edge without an affordance.
+
+- id: w4
+  summary: "Harden chart width, labels, and plot-domain behavior across mobile and tablet"
+  needs: [w1]
+  status: done
+  notes: |
+    Fix chart containers so SVGs never exceed their cards at 390px or 768px.
+    Include Result Detail and Compare first because PR #246 captured concrete
+    clipping and sparse plot evidence. Add guardrails for clipped labels,
+    legends overlapping plot content, huge empty plot regions, and delayed
+    ResizeObserver sizing.
+
+- id: w5
+  summary: "Normalize focus-visible, active, selected, hover, disabled, and warning states"
+  needs: [w2, w3]
+  status: done
+  notes: |
+    Define a shared state model that distinguishes:
+      - keyboard focus-visible;
+      - active route/tab/mode;
+      - selected row/result;
+      - analytical highlight;
+      - hover;
+      - disabled or unavailable action;
+      - warning/error/trust/validation state.
+
+    Apply it across nav, segmented controls, filter controls, chart tabs,
+    leaderboard cells, table rows, compare checkboxes, and disclosures.
+
+- id: w6
+  summary: "Add viewport regression checks for responsive contracts"
+  needs: [w2, w3, w4, w5]
+  status: done
+  notes: |
+    Add or extend Playwright checks for 390px, 768px, 1280px, and 1600px:
+      - nav exposes all routes or a visible menu/scroll affordance;
+      - no document body width exceeds viewport except intentional scroll
+        containers;
+      - intentional table scroll containers show affordance;
+      - row actions remain reachable;
+      - chart SVG bounds stay within cards;
+      - focus-visible is not confused with selected/active data state.
+
+- id: w7
+  summary: "Recapture responsive PR #246 evidence after remediation"
+  needs: [w6]
+  status: done
+  notes: |
+    Recapture the mobile and tablet screenshot set named in this TODO. Store
+    the after evidence under `_project/audits/` and compare against the PR
+    #246 baseline. Any remaining off-canvas nav, clipped action, or chart
+    overflow must be fixed or tracked as a release-blocking TODO.
+
+must_preserve:
+- "All public Results Explorer routes and share URLs."
+- "Keyboard access to nav, filter controls, table sort, chart tabs, compare selection, disclosures, and row actions."
+- "Dense desktop data scanning at 1280px and 1600px."
+- "High-contrast/reduced-color behavior for heatmaps and charts."
+- "Existing query/filter URL state contracts."
+
+approach: |
+  Treat responsive behavior as a shared product contract instead of page-local
+  CSS cleanup. Start by enumerating surfaces, then implement the smallest
+  shared primitives and route overrides needed to satisfy the PR #246 evidence.
+  Prefer tests that catch overflow and hidden navigation before relying on
+  manual screenshots alone.
+
+anti_patterns:
+- "DO NOT accept horizontal scrolling without a visible affordance or sticky context."
+- "DO NOT hide route navigation on mobile without an obvious menu, wrap, or scroll cue."
+- "DO NOT use a focus ring to represent selected rows or active chart data."
+- "DO NOT make mobile users reach row actions only by discovering invisible horizontal overflow."
+- "DO NOT fix one route by adding bespoke responsive behavior that contradicts another route."
+
+verification:
+- description: "Responsive and accessibility tests pass"
+  command: "cd results-explorer && npm test -- src/components/__tests__ src/pages/__tests__"
+  expected_output: "all relevant unit and accessibility tests pass"
+- description: "Chromium responsive browser smoke passes"
+  command: "cd results-explorer && npm run test:e2e:fixtures && npm run build && npx playwright test --project=chromium --grep
+    \"responsive|layout|a11y|mobile\""
+  expected_output: "responsive browser smoke passes or skipped grep is documented"
+- description: "Manual mobile/tablet PR #246 evidence recapture is clean"
+  command: "echo 'Manual: recapture audited routes at 390 and 768 and compare against PR #246 mobile/tablet screenshots'"
+  expected_output: "no hidden nav item, clipped row action, or chart/table overflow remains without affordance"
+
+scope_limit:
+  only_modify:
+  - "results-explorer/src/"
+  - "results-explorer/e2e/"
+  - "results-explorer/playwright.config.ts"
+  - "_project/audits/"
+  do_not_modify:
+  - "results-data/"
+  - "benchbox/"
+
+success_metrics:
+- "The Query nav item or an obvious nav menu/scroll affordance is discoverable at 390px."
+- "Every audited route has documented responsive behavior for its primary table and chart surfaces."
+- "No unintentional document-width overflow occurs at 390px or 768px."
+- "Row/detail/compare/query actions remain reachable on mobile."
+- "Chart SVGs remain within their visible containers at mobile and tablet widths."
+
+metadata:
+  tags:
+  - results-explorer
+  - pr246
+  - responsive
+  - accessibility
+  - mobile
+  estimated_effort: "Medium (~2 days)"
+  created_date: "2026-05-07"
+
+impact:
+  business_value: |
+    Reduces launch risk for the public Explorer by making the route matrix work
+    on mobile and tablet, not only desktop.
+  user_impact: |
+    Users can navigate, filter, compare, and inspect rows without hidden actions
+    or clipped data.
+  technical_debt: |
+    Converts responsive behavior from incidental page CSS into testable route
+    contracts.

@@ -223,7 +223,7 @@ export function ChartPanel({
         </div>
       </div>
 
-      <div id="chart-panel-chart" role="tabpanel" aria-label={`${activeGroup.label} chart`}>
+      <div id="chart-panel-chart" role="tabpanel" aria-label={`${activeGroup.label} chart`} data-chart-container>
         {renderChart(activeChart, {
           context,
           summary,

@@ -48,9 +48,11 @@ export function QueryDiffTable({ results, baselineIndex = 0, suppressionReason =
         </div>
       )}
 
-      <div class="overflow-x-auto">
-        <div class="mb-2 flex justify-end"><span class="bb-scroll-affordance">← scroll →</span></div>
-        <table class="min-w-full divide-y divide-[var(--bb-data-border)] text-sm">
+      <div class="overflow-x-auto" data-testid="query-diff-scroll-container">
+        <div class="mb-2 flex justify-end">
+          <span class="bb-scroll-affordance" data-testid="query-diff-scroll-hint">← scroll →</span>
+        </div>
+        <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)] text-sm">
           <thead class="bg-[var(--bb-surface-data-muted)]">
             <tr>
               <th class="table-th">Query</th>

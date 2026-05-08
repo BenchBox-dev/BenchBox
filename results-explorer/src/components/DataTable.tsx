@@ -17,7 +17,14 @@ export function DataTable({ ariaLabel, caption, scrollable = false, class: extra
     </table>
   );
   if (!scrollable) return inner;
-  return <div class="overflow-x-auto">{inner}</div>;
+  return (
+    <div>
+      <div class="flex justify-end">
+        <span class="bb-scroll-affordance mb-2">Scroll table for more columns →</span>
+      </div>
+      <div class="overflow-x-auto">{inner}</div>
+    </div>
+  );
 }
 
 interface TableHeadProps {

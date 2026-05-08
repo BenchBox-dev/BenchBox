@@ -337,9 +337,11 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
             <h2 class="mb-4 text-base font-semibold text-[var(--bb-data-fg-primary)]">
               Query Timings ({detail.display_timings.length})
             </h2>
-            <div class="overflow-x-auto">
-              <div class="mb-2 flex justify-end"><span class="bb-scroll-affordance">← scroll →</span></div>
-              <table class="min-w-full divide-y divide-[var(--bb-data-border)]">
+            <div class="overflow-x-auto" data-testid="detail-timings-scroll-container">
+              <div class="mb-2 flex justify-end">
+                <span class="bb-scroll-affordance" data-testid="detail-timings-scroll-hint">← scroll →</span>
+              </div>
+              <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">
                 <thead class="bg-[var(--bb-surface-data-muted)]">
                   <tr>
                     <th class="p-0" scope="col">
@@ -383,9 +385,11 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
                 <summary class="cursor-pointer select-none text-sm text-[var(--bb-data-fg-muted)] hover:text-[var(--bb-data-fg-primary)]">
                   Individual samples ({detail.queries.length})
                 </summary>
-                <div class="mt-3 overflow-x-auto">
-                  <div class="mb-2 flex justify-end"><span class="bb-scroll-affordance">← scroll →</span></div>
-                  <table class="min-w-full divide-y divide-[var(--bb-data-border)]">
+                <div class="mt-3 overflow-x-auto" data-testid="detail-samples-scroll-container">
+                  <div class="mb-2 flex justify-end">
+                    <span class="bb-scroll-affordance" data-testid="detail-samples-scroll-hint">← scroll →</span>
+                  </div>
+                  <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">
                     <thead class="bg-[var(--bb-surface-data-muted)]">
                       <tr>
                         <th

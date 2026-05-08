@@ -3,16 +3,40 @@ import { waitForDataLoaded, waitForShell } from "./support/fixtures";
 
 const SHORT_DUCKDB = "ba6a8c83";
 const SHORT_DATAFUSION = "5e6c5eba";
+const DETAIL_ID = "tpch-duckdb-sf0.01-20260403-010ee756";
 
 const VIEWPORTS = [
   { name: "mobile", width: 390, height: 900, maxY: 1200 },
-  { name: "desktop", width: 1440, height: 900, maxY: 800 },
+  { name: "tablet", width: 768, height: 900, maxY: 1200 },
+  { name: "desktop", width: 1280, height: 900, maxY: 900 },
+  { name: "wide", width: 1600, height: 900, maxY: 900 },
+] as const;
+
+const AUDITED_ROUTES = [
+  { path: "/results/", ready: /Recent Results/i },
+  { path: "/results/tpch/", ready: /TPC-H Results/i },
+  { path: "/results/p/duckdb/", ready: /DuckDB/i },
+  { path: `/results/r/${DETAIL_ID}`, ready: /Query Timings/i },
+  { path: `/results/compare?ids=${SHORT_DUCKDB},${SHORT_DATAFUSION}`, ready: /TPC-H Comparison/i },
+  { path: "/results/query", ready: /matching result bundle/ },
 ] as const;
 
 test.describe.configure({ mode: "serial" });
 
 test.describe("responsive explorer assertions", () => {
   for (const viewport of VIEWPORTS) {
+    test(`secondary nav exposes every Explorer route at ${viewport.name}`, async ({ page }) => {
+      await setViewport(page, viewport);
+      await page.goto("/results/query");
+      await waitForShell(page);
+
+      const nav = page.getByTestId("results-explorer-nav");
+      for (const label of ["Leaderboards", "Benchmarks", "Platforms", "Compare", "Query"]) {
+        await expect(nav.getByRole("link", { name: label })).toBeVisible();
+      }
+      await expect(nav.getByRole("link", { name: "Query" })).toHaveAttribute("aria-current", "page");
+    });
+
     test(`home keeps headline, cohort summary, and leaderboard rows high in the viewport at ${viewport.name}`, async ({
       page,
     }) => {
@@ -36,7 +60,7 @@ test.describe("responsive explorer assertions", () => {
       await expect(firstRow).toBeVisible({ timeout: 20_000 });
       await expectTopWithin(firstRow, viewport.maxY, "first leaderboard row");
 
-      if (viewport.name === "desktop") {
+      if (viewport.width >= 1280) {
         const rowCount = await leaderboard.locator("tbody tr").count();
         const aboveFold = await rowsAboveFold(leaderboard.locator("tbody tr"), viewport.height);
         // The browser fixture corpus currently has fewer than 8 meta-platforms,
@@ -80,7 +104,7 @@ test.describe("responsive explorer assertions", () => {
       const drawerTrigger = page.locator('[data-testid="query-mobile-filter-drawer"] button[data-result-count]').first();
       await expect(drawerTrigger).toHaveAttribute("data-result-count", /\d+/);
 
-      if (viewport.name === "mobile") {
+      if (viewport.width <= 768) {
         const resultPanelY = await topOf(page.getByTestId("query-results-panel"));
         const visibleColumnsY = await topOf(page.getByTestId("query-visible-columns"));
         expect(resultPanelY).toBeLessThan(visibleColumnsY);
@@ -98,6 +122,37 @@ test.describe("responsive explorer assertions", () => {
       await expect(decisionSummary).toBeVisible();
       await expect(queryEvidence).toBeVisible();
       expect(await topOf(decisionSummary)).toBeLessThan(await topOf(queryEvidence));
+    });
+  }
+
+  for (const viewport of VIEWPORTS.filter((item) => item.width <= 768)) {
+    test(`audited routes avoid document overflow at ${viewport.name}`, async ({ page }) => {
+      await setViewport(page, viewport);
+      for (const route of AUDITED_ROUTES) {
+        await page.goto(route.path);
+        await waitForDataLoaded(page, route.ready);
+        await expectNoDocumentOverflow(page, route.path);
+      }
+    });
+
+    test(`mobile table affordances remain visible at ${viewport.name}`, async ({ page }) => {
+      await setViewport(page, viewport);
+
+      await page.goto("/results/");
+      await waitForDataLoaded(page, /Recent Results/i);
+      await expect(page.getByTestId("recent-results-scroll-hint")).toBeVisible();
+
+      await page.goto(`/results/r/${DETAIL_ID}`);
+      await waitForDataLoaded(page, /Query Timings/i);
+      await expect(page.getByTestId("detail-timings-scroll-hint")).toBeVisible();
+
+      await page.goto(`/results/compare?ids=${SHORT_DUCKDB},${SHORT_DATAFUSION}`);
+      await waitForDataLoaded(page, /TPC-H Comparison/i);
+      await expect(page.getByTestId("query-diff-scroll-hint")).toBeVisible();
+
+      await page.goto("/results/query");
+      await waitForDataLoaded(page, /matching result bundle/);
+      await expect(page.getByTestId("query-results-scroll-hint")).toBeVisible();
     });
   }
 });
@@ -119,6 +174,25 @@ async function topOf(locator: Locator): Promise<number> {
 async function expectTopWithin(locator: Locator, maxY: number, label: string) {
   await expect(locator).toBeVisible({ timeout: 20_000 });
   expect(await topOf(locator), `${label} top should be within ${maxY}px`).toBeLessThanOrEqual(maxY);
+}
+
+async function expectNoDocumentOverflow(page: Page, label: string) {
+  const offenders = await page.evaluate(() => {
+    const viewportWidth = document.documentElement.clientWidth;
+    return Array.from(document.querySelectorAll<HTMLElement>("body *"))
+      .filter((element) => {
+        if (element.closest(".overflow-x-auto") || element.closest("svg[role='img']")) return false;
+        const rect = element.getBoundingClientRect();
+        return rect.right > viewportWidth + 1 || rect.left < -1;
+      })
+      .map((element) => ({
+        tag: element.tagName,
+        text: (element.textContent ?? "").trim().slice(0, 80),
+        className: element.className,
+      }))
+      .slice(0, 5);
+  });
+  expect(offenders, `${label} should not leak content outside intentional scroll containers`).toEqual([]);
 }
 
 async function rowsAboveFold(rows: Locator, viewportHeight: number): Promise<number> {
