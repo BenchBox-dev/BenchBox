@@ -3,9 +3,10 @@
  * Static server used by the Playwright `webServer` block.
  *
  * Serves the built explorer from `dist/` under `/results/` while routing
- * `/results/data/` to the per-run generated fixture directory at
- * `test-fixtures/.generated/data/`. The curated corpus under `public/data/`
- * is never touched - that is the architecture decision recorded in
+ * `/results/data/` to the requested fixture directory. The default remains
+ * `test-fixtures/.generated/data/`; UAT can set E2E_FIXTURE_DIR for a
+ * log-dir-scoped data mount. The curated corpus under `public/data/` is never
+ * touched - that is the architecture decision recorded in
  * `docs/development/browser-test-architecture.md` (Decision 2).
  *
  * The server also sets `Accept-Ranges: bytes` and honors a single `Range`
@@ -32,7 +33,9 @@ const here = fileURLToPath(new URL(".", import.meta.url));
 const projectRoot = resolve(here, "..");
 const distDir = resolve(values["dist-dir"] ?? join(projectRoot, "dist"));
 const fixtureDir = resolve(
-  values["fixture-dir"] ?? join(projectRoot, "test-fixtures", ".generated", "data"),
+  values["fixture-dir"] ??
+    process.env.E2E_FIXTURE_DIR ??
+    join(projectRoot, "test-fixtures", ".generated", "data"),
 );
 
 if (!existsSync(distDir)) {
