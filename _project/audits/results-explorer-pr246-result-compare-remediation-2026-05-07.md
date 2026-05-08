@@ -1,3 +1,6 @@
+---
+develop_sha: 8eae1290703831f4cb640df18a5141929befca91
+---
 # Results Explorer PR #246 Result Detail / Compare Remediation Evidence
 
 Date: 2026-05-07

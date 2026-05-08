@@ -1,3 +1,6 @@
+---
+develop_sha: 9946fe47201814f7be1cb9a3f7089a9abdeabbea
+---
 # Results Explorer Hierarchy, Usability, and Data-Presentation Audit - 2026-05-07
 
 ## Executive Summary

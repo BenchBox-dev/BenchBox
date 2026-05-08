@@ -30,6 +30,39 @@ cd results-explorer
 npm run test:e2e:fixtures
 ```
 
+## Audit develop SHA contract
+
+Every Markdown report under `_project/audits/*.md` must begin with YAML
+frontmatter containing the 40-character `develop_sha:` that the report
+describes:
+
+```yaml
+---
+develop_sha: <git rev-parse origin/develop>
+---
+```
+
+Validate an audit before review with:
+
+```bash
+make audit-sha-check FILE=_project/audits/<report>.md
+```
+
+By default, the validator accepts any stamped SHA reachable from
+`origin/develop`. For top-of-tree release-readiness reviews, callers may set
+`AUDIT_SHA_REQUIRE_CURRENT=<N>` to require the stamp to be within `N` commits
+of the target ref.
+
+Historical backfills are deterministic: for each existing audit, derive the
+stamp from the commit that introduced the file, then use that commit's first
+parent on `develop`. Re-run `_project/scripts/audit_sha_backfill.py` if a
+future sweep needs to reproduce the derivation; it leaves already stamped
+audits unchanged and prints the derivation source per file.
+
+This contract applies to every `_project/audits/` report, not only Results
+Explorer retheme reports. Structured finding lists still keep their existing
+body format after the frontmatter block.
+
 ## Expected Hidden Controls
 
 Some controls are intentionally hidden until the loaded corpus has more
@@ -59,7 +92,7 @@ If a step's "expected" behavior is unclear or seems wrong on its face, mark it `
 
 ## Reporting format
 
-Append one block per finding to a new file at `_project/audits/results-explorer-qa-pass2-findings.md`. **One finding per block, no prose between them.** Use this exact template — I parse it:
+After the required `develop_sha:` frontmatter, append one block per finding to a new file at `_project/audits/results-explorer-qa-pass2-findings.md`. **One finding per block, no prose between them.** Use this exact template — I parse it:
 
 ```yaml
 - id: <STABLE_ID from this plan, e.g. S2.3, U1, F4>

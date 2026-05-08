@@ -1,3 +1,6 @@
+---
+develop_sha: 0182c9556cfa1c2ea4f1168a1648e484bdb46635
+---
 # SQL Compat DDL Drift Audit
 
 **Date:** 2026-04-25

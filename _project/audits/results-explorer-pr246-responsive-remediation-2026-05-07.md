@@ -1,3 +1,6 @@
+---
+develop_sha: c9ceea4851aa9431a29be3c61c24be346a30dd37
+---
 # Results Explorer PR #246 responsive/navigation/overflow remediation
 
 Date: 2026-05-07

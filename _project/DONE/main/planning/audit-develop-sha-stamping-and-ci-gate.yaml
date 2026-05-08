@@ -2,7 +2,8 @@ id: audit-develop-sha-stamping-and-ci-gate
 title: "Stamp develop SHA into release-readiness audits and gate stale audits in CI"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-05-08"
 category: Quality
 
 description: |
@@ -64,7 +65,7 @@ context_sections:
 work:
   - id: w1
     summary: "Define the develop_sha frontmatter contract"
-    status: pending
+    status: done
     notes: |
       Specify in `docs/operations/results-explorer-qa.md` (smallest
       doc-change footprint; broaden later when other audit owners
@@ -85,7 +86,7 @@ work:
   - id: w2
     summary: "Implement audit_sha_check.py validator + Makefile target"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       New file: `_project/scripts/audit_sha_check.py`.
       Behavior:
@@ -103,7 +104,7 @@ work:
   - id: w3
     summary: "Backfill develop_sha into every existing _project/audits/*.md"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       For each `_project/audits/*.md`:
         sha=$(git log --diff-filter=A --reverse --format=%H -- "$f" | head -1)
@@ -128,7 +129,7 @@ work:
   - id: w4
     summary: "Wire the develop SHA into the release-final capture flow"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Modify `results-explorer/e2e/captures/release-final.spec.ts` (and
       any sibling `*-final.spec.ts` drivers) to:
@@ -143,7 +144,7 @@ work:
   - id: w5
     summary: "Add path-aware CI hook on _project/audits/** and capture specs"
     needs: [w3, w4]
-    status: pending
+    status: done
     notes: |
       Reuse the explorer test job's path filter pattern. New CI step:
         - Triggers on PRs touching `_project/audits/**` or
@@ -159,7 +160,7 @@ work:
   - id: w6
     summary: "Document the contract and link from the source blind-spot"
     needs: [w5]
-    status: pending
+    status: done
     notes: |
       Update `docs/operations/results-explorer-qa.md` with:
         - The `develop_sha:` field requirement (uniform — no cutoff).

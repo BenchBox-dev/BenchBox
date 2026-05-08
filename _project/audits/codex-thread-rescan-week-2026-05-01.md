@@ -1,3 +1,6 @@
+---
+develop_sha: f12a9b561973cacaad1d874c78afbd97433bc751
+---
 # Codex Thread Rescan - Week Ending 2026-05-01
 
 Rescan date: 2026-05-01

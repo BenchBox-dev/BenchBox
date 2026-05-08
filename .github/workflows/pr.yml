@@ -238,9 +238,42 @@ jobs:
         # does not pay a dependency-sync cost before deciding.
         run: make lint-explorer-tokens
 
+  audit-sha:
+    name: audit-sha
+    needs: ci-paths
+    if: ${{ contains(needs.ci-paths.outputs.changed-paths, '_project/audits/') || contains(needs.ci-paths.outputs.changed-paths, 'results-explorer/e2e/captures/') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: git fetch --no-tags origin "$BASE_REF:refs/remotes/origin/$BASE_REF"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Validate changed audit develop SHA stamps
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --name-only --diff-filter=ACMRT "origin/${{ github.base_ref }}...HEAD" \
+            | grep -E '^_project/audits/.*\.md$' > /tmp/changed-audits.txt || true
+          if [ ! -s /tmp/changed-audits.txt ]; then
+            echo "No changed audit Markdown files to validate."
+            exit 0
+          fi
+          while IFS= read -r audit_path; do
+            make audit-sha-check FILE="$$audit_path" AUDIT_SHA_TARGET_REF="origin/${{ github.base_ref }}"
+          done < /tmp/changed-audits.txt
+
   ci-required-result:
     name: ci-required-result
-    needs: [ci-paths, content-guard, code-lint, code-test, explorer-tokens]
+    needs: [ci-paths, content-guard, code-lint, code-test, explorer-tokens, audit-sha]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -251,6 +284,7 @@ jobs:
           LINT_RESULT: ${{ needs.code-lint.result }}
           TEST_RESULT: ${{ needs.code-test.result }}
           EXPLORER_TOKENS_RESULT: ${{ needs.explorer-tokens.result }}
+          AUDIT_SHA_RESULT: ${{ needs.audit-sha.result }}
           CONTENT_GUARD_NEEDED: ${{ needs.ci-paths.outputs.content-guard-needed }}
           NEEDS_CODE_CI: ${{ needs.ci-paths.outputs.needs-code-ci }}
           SAFE_CONTENT_ONLY: ${{ needs.ci-paths.outputs.safe-content-only }}
@@ -264,6 +298,12 @@ jobs:
 
           if [ "$CONTENT_GUARD_NEEDED" = "true" ] && [ "$CONTENT_RESULT" != "success" ]; then
             echo "content-guard=$CONTENT_RESULT"
+            exit 1
+          fi
+
+          if [ "$AUDIT_SHA_RESULT" != "success" ] \
+              && [ "$AUDIT_SHA_RESULT" != "skipped" ]; then
+            echo "audit-sha=$AUDIT_SHA_RESULT"
             exit 1
           fi
 

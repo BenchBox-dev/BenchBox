@@ -1,3 +1,6 @@
+---
+develop_sha: ece7018ba80c0ff1359741b82aa08bc1269214a3
+---
 # Results Explorer Retheme — Release-Readiness Report
 
 Date: 2026-05-07

@@ -11,6 +11,7 @@
  * concrete evidence (w2 cold-load checks).
  */
 
+import { execFileSync } from "child_process";
 import { mkdirSync, appendFileSync, writeFileSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -28,6 +29,7 @@ const OUT = path.join(
   `results-explorer-retheme-final-${TODAY}`,
 );
 const LOG = path.join(OUT, `console-network-${TODAY}.log`);
+const MANIFEST = path.join(OUT, `capture-manifest-${TODAY}.json`);
 
 const ROUTES: Array<{ slug: string; url: string; readyText: RegExp }> = [
   { slug: "home", url: "/results/", readyText: /Cross-Benchmark Leaderboard/ },
@@ -57,48 +59,89 @@ const ROUTES: Array<{ slug: string; url: string; readyText: RegExp }> = [
 ];
 const WIDTHS = [390, 768, 1280, 1600];
 
+function resolveDevelopSha(): string {
+  execFileSync("git", ["fetch", "--no-tags", "origin", "develop"], { cwd: REPO_ROOT, stdio: "ignore" });
+  return execFileSync("git", ["rev-parse", "origin/develop"], { cwd: REPO_ROOT, encoding: "utf8" }).trim();
+}
+
+function writeCaptureManifest(developSha: string): void {
+  writeFileSync(
+    MANIFEST,
+    `${JSON.stringify(
+      {
+        capture_date: TODAY,
+        develop_sha: developSha,
+        routes: ROUTES.map(({ slug, url }) => ({ slug, url })),
+        widths: WIDTHS,
+        output_dir: path.relative(REPO_ROOT, OUT),
+        console_network_log: path.relative(REPO_ROOT, LOG),
+      },
+      null,
+      2,
+    )}\n`,
+  );
+}
+
+function logFrontmatterSnippet(developSha: string): void {
+  console.log(
+    [
+      "Release-final audit frontmatter snippet:",
+      "---",
+      `date: ${TODAY}`,
+      `develop_sha: ${developSha}`,
+      "---",
+    ].join("\n"),
+  );
+}
+
 test.describe("@retheme-capture release-final", () => {
   test.skip(process.env.RETHEME_CAPTURE !== "1", "set RETHEME_CAPTURE=1 to refresh");
   test.setTimeout(360_000);
 
   test("captures every QA matrix route at 4 widths with console + network log", async ({ browser }) => {
     mkdirSync(OUT, { recursive: true });
-    writeFileSync(LOG, `# Release-gate cold-load log ${TODAY}\n`);
+    const developSha = resolveDevelopSha();
+    writeFileSync(LOG, `# Release-gate cold-load log ${TODAY}\n# develop_sha: ${developSha}\n`);
+    writeCaptureManifest(developSha);
 
-    for (const { slug, url, readyText } of ROUTES) {
-      for (const width of WIDTHS) {
-        const context = await browser.newContext({ viewport: { width, height: 900 } });
-        const page = await context.newPage();
-        page.on("console", (msg) => {
-          if (msg.type() === "error" || msg.type() === "warning") {
-            appendFileSync(LOG, `[${slug}-${width}] console.${msg.type()}: ${msg.text()}\n`);
-          }
-        });
-        page.on("response", (response) => {
-          if (response.status() >= 400) {
-            appendFileSync(
-              LOG,
-              `[${slug}-${width}] HTTP ${response.status()} ${response.url()}\n`,
-            );
-          }
-        });
-        page.on("pageerror", (err) => {
-          appendFileSync(LOG, `[${slug}-${width}] pageerror: ${err.message}\n`);
-        });
-
-        try {
-          await page.goto(url, { waitUntil: "domcontentloaded" });
-          await waitForShell(page);
-          await waitForDataLoaded(page, readyText);
-          await page.waitForLoadState("load", { timeout: 10_000 }).catch(() => {});
-          await page.screenshot({
-            path: path.join(OUT, `${slug}-${width}.png`),
-            fullPage: true,
+    try {
+      for (const { slug, url, readyText } of ROUTES) {
+        for (const width of WIDTHS) {
+          const context = await browser.newContext({ viewport: { width, height: 900 } });
+          const page = await context.newPage();
+          page.on("console", (msg) => {
+            if (msg.type() === "error" || msg.type() === "warning") {
+              appendFileSync(LOG, `[${slug}-${width}] console.${msg.type()}: ${msg.text()}\n`);
+            }
           });
-        } finally {
-          await context.close();
+          page.on("response", (response) => {
+            if (response.status() >= 400) {
+              appendFileSync(
+                LOG,
+                `[${slug}-${width}] HTTP ${response.status()} ${response.url()}\n`,
+              );
+            }
+          });
+          page.on("pageerror", (err) => {
+            appendFileSync(LOG, `[${slug}-${width}] pageerror: ${err.message}\n`);
+          });
+
+          try {
+            await page.goto(url, { waitUntil: "domcontentloaded" });
+            await waitForShell(page);
+            await waitForDataLoaded(page, readyText);
+            await page.waitForLoadState("load", { timeout: 10_000 }).catch(() => {});
+            await page.screenshot({
+              path: path.join(OUT, `${slug}-${width}.png`),
+              fullPage: true,
+            });
+          } finally {
+            await context.close();
+          }
         }
       }
+    } finally {
+      logFrontmatterSnippet(developSha);
     }
   });
 });
