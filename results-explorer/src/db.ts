@@ -165,7 +165,7 @@ async function verifyBenchResultsColumns(conn: DuckDBConnection): Promise<void> 
   throw new Error(
     `DuckDB snapshot 'bench.results' is missing required columns: ${missing.join(", ")}.` +
       " Regenerate the snapshot via 'benchbox explorer build' or check the deployed" +
-      " results.duckdb file. See _project/analysis/results-explorer-cost-schema-compatibility-2026-05-07.md.",
+      " results.duckdb file.",
   );
 }
 
