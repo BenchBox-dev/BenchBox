@@ -208,19 +208,21 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
         ]}
       />
 
-      <section aria-label="Result summary" class="mt-6 mb-8 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+      <section aria-label="Result summary" class="mt-6 mb-8 panel-elevated p-5">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div class="min-w-0">
             <div class="mb-3 flex flex-wrap items-center gap-3">
-              <h1 class="text-3xl font-bold text-gray-900">
+              <h1 class="text-3xl font-bold text-[var(--bb-data-fg-primary)]">
                 {benchmarkLabel} - {detail.platform}
               </h1>
               <TrustBadge trustLabel={detail.trust_label} />
               <ValidationBadge validationStatus={detail.validation_status} showMissing />
               {detail.tuning_mode && <TuningBadge tuningMode={detail.tuning_mode} />}
-              {detail.visibility === "public-curated" && <span class="badge badge-green">curated</span>}
+              {detail.visibility === "public-curated" && (
+                <StatusBadge role="visibility" tone="success">curated</StatusBadge>
+              )}
             </div>
-            <p class="text-sm text-gray-600">
+            <p class="text-sm text-[var(--bb-data-fg-muted)]">
               {benchmarkLabel} · SF {detail.scale_factor} · {detail.test_type ?? "standard"} · run{" "}
               {detail.run_date.slice(0, 10)}
             </p>
@@ -320,8 +322,8 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
 
           {detail.has_plans && !plansUrl && (
             <section class="card">
-              <h2 class="mb-2 text-base font-semibold text-gray-900">Execution plans</h2>
-              <p class="text-sm text-gray-500">Execution plans were recorded but are not published for download.</p>
+              <h2 class="mb-2 text-base font-semibold text-[var(--bb-data-fg-primary)]">Execution plans</h2>
+              <p class="text-sm text-[var(--bb-data-fg-muted)]">Execution plans were recorded but are not published for download.</p>
             </section>
           )}
         </div>
@@ -441,10 +443,10 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
 
 function ResultMetricCard({ label, value, helper }: { label: string; value: string; helper: string }) {
   return (
-    <div class="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
-      <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</div>
-      <div class="mt-1 font-mono text-lg font-semibold text-gray-900">{value}</div>
-      <div class="mt-1 text-xs text-gray-500">{helper}</div>
+    <div class="rounded-lg panel-muted px-4 py-3">
+      <div class="text-xs font-semibold uppercase tracking-wide text-[var(--bb-data-fg-subtle)]">{label}</div>
+      <div class="mt-1 font-mono text-lg font-semibold text-[var(--bb-data-fg-primary)]">{value}</div>
+      <div class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">{helper}</div>
     </div>
   );
 }

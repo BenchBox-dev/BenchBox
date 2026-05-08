@@ -164,17 +164,17 @@ export function FacetDrawer({
               onToggle={onToggle}
               onReset={onReset}
             />
-            <div class="mt-4 flex gap-2 border-t border-gray-200 pt-3 lg:hidden">
+            <div class="mt-4 flex gap-2 border-t border-[var(--bb-data-border)] pt-3 lg:hidden">
               <button
                 type="button"
-                class="flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700"
+                class="btn btn-secondary flex-1"
                 onClick={onReset}
               >
                 Reset filters
               </button>
               <button
                 type="button"
-                class="flex-1 rounded-md border border-brand-600 bg-brand-600 px-3 py-2 text-sm font-medium text-white"
+                class="btn btn-primary flex-1"
                 onClick={() => onOpenChange(false)}
               >
                 Apply filters

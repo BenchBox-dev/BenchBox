@@ -395,19 +395,22 @@ function CompareGuardrailSummary({
 }) {
   const hasSevereMismatch = severeMismatchReason !== null;
   return (
-    <section aria-label="Compare guardrails" class="mb-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+    <section aria-label="Compare guardrails" class="mb-4 panel-elevated p-4">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 class="text-base font-semibold text-gray-900">Comparability guardrails</h2>
-          <p class="mt-1 text-sm text-gray-600">
+          <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)]">Comparability guardrails</h2>
+          <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">
             {hasSevereMismatch
               ? `Winner claims are suppressed because ${severeMismatchReason}.`
               : "Selected runs share the same benchmark and scale for winner claims."}
           </p>
         </div>
-        <span class={`badge ${hasSevereMismatch || warningCount > 0 ? "badge-yellow" : "badge-green"}`}>
+        <StatusBadge
+          role="comparison"
+          tone={hasSevereMismatch || warningCount > 0 ? "warning" : "success"}
+        >
           {hasSevereMismatch ? "Claims suppressed" : warningCount > 0 ? `${warningCount} warnings` : "Comparable"}
-        </span>
+        </StatusBadge>
       </div>
     </section>
   );

@@ -217,12 +217,12 @@ function SpeedupParityState({
   speedupCount: number;
 }) {
   return (
-    <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
-      <p class="font-semibold text-gray-900">No meaningful per-query speedup difference</p>
-      <p class="mt-1">
+    <div class="rounded-lg panel-muted p-4 text-sm">
+      <p class="font-semibold text-[var(--bb-data-fg-primary)]">No meaningful per-query speedup difference</p>
+      <p class="mt-1 text-[var(--bb-data-fg-muted)]">
         All {speedupCount.toLocaleString()} compared query speedups are 1.00× versus baseline {baseline}.
       </p>
-      <p class="mt-2 text-xs text-gray-500">
+      <p class="mt-2 text-xs text-[var(--bb-data-fg-muted)]">
         Baseline: <strong>{baseline}</strong>
         {candidates.length > 0 && <> · Compared with {candidates.join(", ")}</>}
       </p>
