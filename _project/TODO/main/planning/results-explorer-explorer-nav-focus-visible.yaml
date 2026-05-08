@@ -1,0 +1,98 @@
+id: results-explorer-explorer-nav-focus-visible
+title: "Add focus-visible styling to ExplorerNavLink and other interactive surfaces"
+worktree: main
+priority: Low
+status: Not Started
+category: Frontend / Accessibility
+
+description: |
+  PR #246 audit finding VH-1 ("Home leaderboard shows an active-looking focus
+  ring before user intent") flagged that focus, selection, and analytical
+  highlight states are visually conflated in the Results Explorer. PRs #259/#270
+  remediated the leaderboard ring and the responsive nav respectively, but
+  `ExplorerNavLink` (`results-explorer/src/components/Layout.tsx:97-119`) still
+  has no `focus-visible:` style and relies on the user-agent default outline.
+  The same pattern likely repeats on other Tailwind link/button helpers and
+  on grid cells that emit selection rings.
+
+  This TODO is the follow-on to the PR #246 nav remediation: define a single
+  `focus-visible` token and apply it to the Explorer secondary nav, global nav,
+  table action links (View →), filter pill triggers, and any other surfaces
+  that currently style only `:focus`. Selection state should remain visually
+  distinct from focus.
+
+deps:
+  needs:
+    - results-explorer-pr246-responsive-navigation-overflow-remediation
+
+context_sections:
+  evidence_source: |
+    PR #246 audit:
+    `_project/audits/results-explorer-hierarchy-usability-data-audit-20260507.md`
+    (finding VH-1 and the broader focus/selection conflation discussion).
+    Post-merge review of PR #270 also called this out as out-of-scope-but-
+    deferred.
+  scope_anchor: |
+    `results-explorer/src/components/Layout.tsx:97-119` is the canonical
+    starting point. Audit `Home`, `BenchmarkIndex`, `PlatformIndex`,
+    `Compare`, `Query`, `ResultDetail`, and the shared `DataTable` /
+    `MetaLeaderboard` cells while you are in there.
+
+work:
+  - id: w1
+    summary: "Audit current focus/selection styles across Explorer surfaces"
+    status: pending
+    notes: |
+      Grep for `:focus`, `focus-visible`, and `outline` in
+      `results-explorer/src/`. Note where focus is intentional
+      (modal close buttons, primary CTA), where focus is suppressed
+      (e.g. roving-grid focus on `Home.tsx`), and where the
+      browser default outline is the only feedback.
+
+  - id: w2
+    summary: "Define a focus-visible token + utility class"
+    needs: [w1]
+    status: pending
+    notes: |
+      Add a `--bb-focus-ring` style or `.focus-ring` utility in
+      `results-explorer/src/index.css` that paints a 2px ring with
+      sufficient contrast on both light data surfaces and the dark
+      hero. Selection state must NOT reuse this style.
+
+  - id: w3
+    summary: "Apply focus-visible token to ExplorerNavLink and peers"
+    needs: [w2]
+    status: pending
+    notes: |
+      Update `Layout.tsx` ExplorerNavLink + GlobalNavLink, table
+      action links (`Home.tsx`, `Query.tsx`, `MetaLeaderboard.tsx`),
+      and filter pill triggers. Confirm the leaderboard ring change
+      from PR #259 still uses a *different* visual language (selected
+      vs focused).
+
+  - id: w4
+    summary: "Add a Playwright a11y assertion that nav links expose a focus ring"
+    needs: [w3]
+    status: pending
+    notes: |
+      Tab through the secondary nav at 390/768/1280 and assert each
+      link gets `outline` or computed `box-shadow` matching the new
+      ring on `:focus-visible`. Pair with a test that pointer-only
+      activation does NOT show the ring.
+
+verification:
+  - description: "Every ExplorerNavLink has a non-default focus-visible style"
+    command: "grep -nE 'focus-visible' results-explorer/src/components/Layout.tsx"
+    expected_output: ">= 1 match"
+  - description: "Playwright a11y suite passes"
+    command: "cd results-explorer && npx playwright test --project=chromium --grep '@a11y|focus-visible'"
+    expected_output: "exit 0"
+
+must_preserve:
+  - "PR #259 leaderboard ring fix (VH-1) — focus and selected must stay visually distinct"
+  - "Existing keyboard reachability of every nav link at every viewport"
+  - "Pointer-click activation does not produce a stuck focus ring"
+
+anti_patterns:
+  - "DO NOT replace the user-agent outline with `outline: none` without a same-pass replacement"
+  - "DO NOT reuse the leaderboard selection ring color/style for focus — that is the bug VH-1 already fixed"

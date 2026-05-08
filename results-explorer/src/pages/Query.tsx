@@ -566,7 +566,7 @@ export function Query(_: RoutableProps) {
                 columns={visibleColumns.length || DEFAULT_COLUMNS.length}
               />
             ) : (
-              <div class="overflow-x-auto rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
+              <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
                 <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
                   <span>
                     Showing {visibleRows.length.toLocaleString()} of {rows.length.toLocaleString()} returned rows
@@ -574,39 +574,41 @@ export function Query(_: RoutableProps) {
                   <span>Query limit: {rowLimitMode === "all" ? "all" : DEFAULT_ROW_LIMIT.toLocaleString()}</span>
                   <span class="bb-scroll-affordance" data-testid="query-results-scroll-hint">← scroll →</span>
                 </div>
-                <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">
-                  <thead class="bg-[var(--bb-surface-data-muted)]">
-                    <tr>
-                      {visibleColumns.map((column) => (
-                        <th
-                          key={column}
-                          class="table-th cursor-pointer select-none"
-                          onClick={() => toggleSort(column)}
-                        >
-                          {formatQueryColumnLabel(column)}
-                          {sort.column === column ? (sort.direction === "asc" ? " ↑" : " ↓") : ""}
-                        </th>
-                      ))}
-                      <th class="table-th sticky right-0 z-10 bg-[var(--bb-surface-data-muted)]" />
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
-                    {visibleRows.map((row) => (
-                      <tr key={String(row.result_id)} class="hover:bg-[var(--bb-surface-data-muted)]">
+                <div class="overflow-x-auto">
+                  <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">
+                    <thead class="bg-[var(--bb-surface-data-muted)]">
+                      <tr>
                         {visibleColumns.map((column) => (
-                          <td key={column} class="table-td">
-                            {formatQueryCell(column, row[column])}
-                          </td>
+                          <th
+                            key={column}
+                            class="table-th cursor-pointer select-none"
+                            onClick={() => toggleSort(column)}
+                          >
+                            {formatQueryColumnLabel(column)}
+                            {sort.column === column ? (sort.direction === "asc" ? " ↑" : " ↓") : ""}
+                          </th>
                         ))}
-                        <td class="table-td sticky right-0 z-10 bg-[var(--bb-surface-data)] text-right">
-                          <a href={`/results/r/${row.result_id}`} class="text-xs font-medium no-underline">
-                            View →
-                          </a>
-                        </td>
+                        <th class="table-th sticky right-0 z-10 bg-[var(--bb-surface-data-muted)]" />
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
+                      {visibleRows.map((row) => (
+                        <tr key={String(row.result_id)} class="hover:bg-[var(--bb-surface-data-muted)]">
+                          {visibleColumns.map((column) => (
+                            <td key={column} class="table-td">
+                              {formatQueryCell(column, row[column])}
+                            </td>
+                          ))}
+                          <td class="table-td sticky right-0 z-10 bg-[var(--bb-surface-data)] text-right">
+                            <a href={`/results/r/${row.result_id}`} class="text-xs font-medium no-underline">
+                              View →
+                            </a>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
                 {visibleRows.length < rows.length && (
                   <div class="border-t border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-3 text-center">
                     <button
@@ -645,33 +647,35 @@ export function Query(_: RoutableProps) {
                 )}
               </div>
               {sqlRows.length > 0 && (
-                <div class="overflow-x-auto rounded-lg border border-[var(--bb-data-border)]">
+                <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)]">
                   <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
                     <span>Showing {visibleSqlRows.length.toLocaleString()} of {sqlRows.length.toLocaleString()} SQL rows</span>
                     <span class="bb-scroll-affordance" data-testid="query-sql-scroll-hint">← scroll →</span>
                   </div>
-                  <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">
-                    <thead class="bg-[var(--bb-surface-data-muted)]">
-                      <tr>
-                        {sqlColumns.map((column) => (
-                          <th key={column} class="table-th">
-                            {column}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
-                      {visibleSqlRows.map((row, index) => (
-                        <tr key={index}>
+                  <div class="overflow-x-auto">
+                    <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">
+                      <thead class="bg-[var(--bb-surface-data-muted)]">
+                        <tr>
                           {sqlColumns.map((column) => (
-                            <td key={column} class="table-td">
-                              {formatCell(row[column])}
-                            </td>
+                            <th key={column} class="table-th">
+                              {column}
+                            </th>
                           ))}
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
+                        {visibleSqlRows.map((row, index) => (
+                          <tr key={index}>
+                            {sqlColumns.map((column) => (
+                              <td key={column} class="table-td">
+                                {formatCell(row[column])}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                   {visibleSqlRows.length < sqlRows.length && (
                     <div class="border-t border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-3 text-center">
                       <button
