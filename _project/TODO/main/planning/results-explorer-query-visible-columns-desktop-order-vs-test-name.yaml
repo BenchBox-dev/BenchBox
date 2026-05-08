@@ -15,25 +15,37 @@ description: |
 
   1) **Layout/test-name semantic mismatch.** The test is titled
      "query workbench renders summary, active filters, and rows
-     **before deep controls** at desktop", but `query-visible-columns`
-     keeps `lg:order-1` (in
-     `results-explorer/src/pages/Query.tsx:697`), so at desktop the
-     column-toggle UI still renders **above** the summary and rows. The
-     numeric assertion passes but the test name promises ordering the
-     layout does not deliver.
+     **before deep controls** at desktop", but the `query-visible-columns`
+     element (locate by `data-testid="query-visible-columns"` in
+     `results-explorer/src/pages/Query.tsx`) keeps the `lg:order-1`
+     class, so at desktop the column-toggle UI still renders **above**
+     the summary and rows. The numeric assertion passes but the test
+     name promises ordering the layout does not deliver. This is the
+     durable concern and survives any future visible-columns
+     restructure.
 
-  2) **Brittle 3px desktop budget.** After PR #276, panel.top = 897
-     against `maxY = 900` at desktop. Any future change that adds a
-     border, a font-metrics tick, or a half-line wrap on the intro
-     paragraph at the desktop viewport (1280×900) will retrip the same
-     assertion. Comment landed in PR #277 alongside this TODO; this
-     TODO is the durable answer.
+  2) **Brittle 3px desktop budget (state-dependent).** Immediately
+     after PR #276 landed, panel.top = 897 against `maxY = 900` at
+     desktop — any future change adding a border, a font-metrics tick,
+     or a half-line wrap on the intro paragraph would retrip the
+     assertion. The block comment above `VIEWPORTS` in
+     `results-explorer/e2e/responsive.spec.ts` (added by PR #278
+     alongside this TODO) documents the brittleness. **Important
+     state-dependence:** PR #277 (concurrent, may land before this
+     TODO is actioned) restructures `query-visible-columns` from a
+     div into a default-collapsed `<details>`/`<summary>` affordance,
+     which collapses the visible-columns block from ≈494px to ≈30px
+     by default at lg:order-1. Once PR #277 is in develop, the live
+     panel.top drops to ≈445 and the brittleness rationale evaporates;
+     only the semantic mismatch (1) remains. Re-measure with the live
+     DOM probe before deciding which resolution to pick.
 
-  Resolving (1) structurally also resolves (2): if `query-visible-columns`
-  drops `lg:order-1` (or moves to `lg:order-5` so the right-column flex
-  order at desktop becomes summary → panel → details → visible-columns),
-  panel.top drops from 897 to ≈399, leaving ≈500px of headroom against
-  `maxY=900`.
+  Resolving (1) structurally also resolves (2) regardless of PR #277's
+  merge state: if `query-visible-columns` drops `lg:order-1` (or moves
+  to `lg:order-5` so the right-column flex order at desktop becomes
+  summary → panel → details → visible-columns), panel.top falls into
+  the low hundreds and the desktop budget stops being a recurring
+  concern.
 
   Two reasonable resolutions:
     a) **Restructure the layout to match the test name.** Drop
@@ -72,10 +84,17 @@ context_sections:
     order. PR #276 (this TODO's parent) tightened intro spacing 12px
     at lg+ to fit the existing panel into the existing budget.
   affected_files: |
-    - results-explorer/src/pages/Query.tsx (line 697 — the
-      `lg:order-1` class on `query-visible-columns`)
-    - results-explorer/e2e/responsive.spec.ts:89 (the test name and
-      assertions in question)
+    - results-explorer/src/pages/Query.tsx — locate by
+      `data-testid="query-visible-columns"`; the line carrying the
+      `lg:order-1` class on that element is the structural lever.
+      `data-testid="query-result-summary"` and `data-testid="query-results-panel"`
+      are the sibling testids the test asserts against. Line numbers
+      are intentionally omitted because PR #277's `<details>`/`<summary>`
+      restructure shifts surrounding content.
+    - results-explorer/e2e/responsive.spec.ts — the test
+      "query workbench renders summary, active filters, and rows before
+      deep controls at ${viewport.name}" (currently anchored at line 89
+      on develop tip; locate by the title pattern, not the line).
 
 work:
   - id: w1
@@ -93,15 +112,19 @@ work:
     needs: [w1]
     status: pending
     notes: |
-      For (a): single-line edit removing `lg:order-1` from
-      `results-explorer/src/pages/Query.tsx:697` (or replacing with
-      `lg:order-5`); also drop the now-vestigial `mb-6 lg:mb-3` from
-      Query.tsx:494 added by PR #276 since the budget no longer
-      requires the lg-only tighten.
-      For (b): rename the test at
-      `results-explorer/e2e/responsive.spec.ts:89` and add a one-line
-      comment near `query-visible-columns` documenting the lg-order
-      intent.
+      For (a): single-line edit removing `lg:order-1` from the element
+      with `data-testid="query-visible-columns"` in `Query.tsx` (or
+      replacing with `lg:order-5`); also drop the now-vestigial
+      `mb-6 lg:mb-3` (PR #276) on the page-intro container in the
+      same file since the budget no longer requires the lg-only
+      tighten; and update or remove the `VIEWPORTS` block comment in
+      `responsive.spec.ts` so it reflects the post-fix headroom rather
+      than the historical 3px brittleness.
+      For (b): rename the test "query workbench renders summary,
+      active filters, and rows before deep controls at ..." in
+      `responsive.spec.ts` to match the actual lg-order, and add a
+      one-line comment near `query-visible-columns` in `Query.tsx`
+      documenting the lg-order intent.
 
   - id: w3
     summary: "Re-run responsive grep end-to-end and capture verification"
@@ -130,12 +153,11 @@ must_preserve:
 anti_patterns:
   - "DO NOT silently `test.skip` the failing assertion if a future regression retripps the desktop budget."
   - "DO NOT relax `maxY` at mobile/tablet — only desktop is at issue."
-  - "DO NOT delete the desktop-budget comment in `responsive.spec.ts` added by PR #277 without first resolving this TODO."
+  - "DO NOT delete the desktop-budget comment block on `VIEWPORTS` in `responsive.spec.ts` (added by PR #278) without resolving this TODO; under resolution (a) the comment must be UPDATED to reflect the new headroom, not silently dropped."
 
 scope_limit:
   only_modify:
     - "results-explorer/src/pages/Query.tsx (one to two lines around the `query-visible-columns` and intro container if resolving (a); else untouched)"
-    - "results-explorer/e2e/responsive.spec.ts (test title + comment if resolving (b); else untouched)"
+    - "results-explorer/e2e/responsive.spec.ts (test title + comment if resolving (b); update the `VIEWPORTS` budget comment under (a) to reflect the new headroom)"
   do_not_touch:
     - "Other pages or layouts in results-explorer/src/pages/."
-    - "The desktop-budget comment block on `VIEWPORTS` in `responsive.spec.ts` (it documents the budget regardless of which resolution is chosen)."
