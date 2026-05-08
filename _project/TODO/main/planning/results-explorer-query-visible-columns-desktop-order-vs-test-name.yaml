@@ -5,6 +5,29 @@ priority: Low
 status: Not Started
 category: Frontend / Test Infrastructure
 
+metadata:
+  tags:
+    - explorer
+    - responsive
+    - layout
+    - test-infrastructure
+  estimated_effort: Small
+  created_date: "2026-05-08"
+  source_review: "PR #276 self-review (Claude session, 2026-05-08); refined under /todo review on 2026-05-08"
+
+impact:
+  user_impact: |
+    None under resolution (b). Under resolution (a), the column-toggle
+    UI ("Visible Columns") moves from above the result table to below
+    it at lg+ viewports only. Mobile/tablet ordering is unchanged.
+  maintainer_impact: |
+    Resolves a documented inconsistency between `responsive.spec.ts`'s
+    test name ("rows before deep controls at desktop") and the actual
+    layout, which currently passes the assertion only by virtue of a
+    3-12px slack. Future Query-workbench layout changes become safer:
+    the desktop budget either gets durable headroom (a) or the test
+    title stops promising ordering the layout doesn't deliver (b).
+
 description: |
   PR #276 (`fix(explorer): tighten Query workbench desktop intro to keep
   results panel above the fold`) closed the failing `responsive.spec.ts`
@@ -93,38 +116,94 @@ context_sections:
       restructure shifts surrounding content.
     - results-explorer/e2e/responsive.spec.ts — the test
       "query workbench renders summary, active filters, and rows before
-      deep controls at ${viewport.name}" (currently anchored at line 89
-      on develop tip; locate by the title pattern, not the line).
+      deep controls at ${viewport.name}". Locate by the title pattern
+      (use `--grep "query workbench renders summary"`), not by line
+      number.
 
 work:
+  - id: w0
+    summary: "Re-measure live panel.top against develop tip and capture probe output"
+    status: pending
+    notes: |
+      The cited numbers in `description` (897 post-PR-276,
+      ≈445 post-PR-277, ≈399 under resolution (a)) were measured on
+      2026-05-08 against the then-develop tip. Before w1 makes the
+      decision, re-run a DOM probe at desktop and wide widths to
+      confirm the live numbers and update w1's notes.
+
+      Steps:
+        1. Build the explorer:
+           `cd results-explorer && npm run test:e2e:fixtures && npm run build`
+        2. Drop a temporary probe spec at
+           `results-explorer/e2e/_probe-query-layout.spec.ts` that
+           reads the bounding rects of `query-result-summary`,
+           `query-results-panel`, and `query-visible-columns` at
+           viewports 1280×900 and 1600×900 (the existing
+           `responsive.spec.ts` `setViewport` helper is reusable).
+        3. Run:
+           `cd results-explorer && npx playwright test --project=chromium e2e/_probe-query-layout.spec.ts --workers=1 --reporter=list 2>&1 | tee ../_project/verification-logs/results-explorer-query-visible-columns-desktop-order-vs-test-name/w0.log`
+        4. Update w1's notes with the observed
+           `query-results-panel.top` at 1280 and 1600 widths.
+        5. Delete the probe spec before commit (it is scaffolding,
+           not a regression test).
+
+      The captured `w0.log` is the source of truth; the `description`
+      section is illustrative only.
+
   - id: w1
     summary: "Decide between layout restructure (a) or test rename (b)"
+    needs: [w0]
     status: pending
     notes: |
       Read PR #120's PR description and the visible-columns design
       rationale. If PR #120's intent (configure-columns-first at
       desktop) is still load-bearing, choose (b); otherwise (a).
-      Document the chosen rationale in the work-unit notes so the
-      next reviewer sees the decision trail.
+
+      Fallback if PR #120's description does not articulate intent
+      (terse merge-commit, missing rationale, etc.): default to
+      resolution (a) — the test title is the more recent and more
+      assertive contract — and note the absence in this work-unit's
+      notes so future reviewers see the decision trail.
+
+      Record the chosen resolution as `metadata.chosen_resolution: a|b`
+      on this TODO before starting w2 so w2's checklist is
+      unambiguous.
 
   - id: w2
-    summary: "Apply the chosen change"
+    summary: "Apply the chosen change (one commit per sub-step under resolution (a) so each is independently revertible)"
     needs: [w1]
     status: pending
     notes: |
-      For (a): single-line edit removing `lg:order-1` from the element
-      with `data-testid="query-visible-columns"` in `Query.tsx` (or
-      replacing with `lg:order-5`); also drop the now-vestigial
-      `mb-6 lg:mb-3` (PR #276) on the page-intro container in the
-      same file since the budget no longer requires the lg-only
-      tighten; and update or remove the `VIEWPORTS` block comment in
-      `responsive.spec.ts` so it reflects the post-fix headroom rather
-      than the historical 3px brittleness.
-      For (b): rename the test "query workbench renders summary,
-      active filters, and rows before deep controls at ..." in
-      `responsive.spec.ts` to match the actual lg-order, and add a
-      one-line comment near `query-visible-columns` in `Query.tsx`
-      documenting the lg-order intent.
+      For resolution (a) — three discrete commits, in order:
+
+        w2.a — drop or relax `lg:order-1` on the element with
+               `data-testid="query-visible-columns"` in `Query.tsx`
+               (replace with `lg:order-5` to match its DOM order;
+               keeps mobile/tablet `order-5` intact). Run the
+               responsive grep to confirm panel.top dropped.
+
+        w2.b — revert PR #276's `mb-6 lg:mb-3` page-intro tighten
+               in `Query.tsx` back to bare `mb-6` since the budget
+               is now generous and the lg-only tighten was a
+               targeted patch for the now-resolved 3px headroom.
+
+        w2.c — update the `VIEWPORTS` block comment in
+               `responsive.spec.ts` so it reflects the post-fix
+               headroom rather than the historical 3px brittleness;
+               keep the closed-TODO pointer for traceability.
+
+      For resolution (b) — single commit:
+
+        w2.b' — rename the test
+                "query workbench renders summary, active filters, and
+                rows before deep controls at ${viewport.name}" in
+                `responsive.spec.ts` to a title that matches the
+                actual lg-order (suggested: "query workbench keeps
+                summary, deep controls, and rows within the desktop
+                viewport budget at ${viewport.name}"); add a one-line
+                comment near `query-visible-columns` in `Query.tsx`
+                documenting the lg-order intent and pointing to
+                PR #120.
 
   - id: w3
     summary: "Re-run responsive grep end-to-end and capture verification"
@@ -142,8 +221,8 @@ verification:
     command: "cd results-explorer && npx playwright test --project=chromium --grep 'responsive|layout|a11y|mobile' --workers=1"
     expected_output: "exit 0; 24+ passed, 0 failed"
   - description: "If resolution (a): panel.top has ≥100px headroom at desktop"
-    command: "cd results-explorer && npx playwright test --project=chromium e2e/responsive.spec.ts:89 --grep desktop"
-    expected_output: "exit 0 with measurable margin (manual probe ≤800)"
+    command: "cd results-explorer && npx playwright test --project=chromium e2e/responsive.spec.ts --grep 'query workbench renders summary' --workers=1"
+    expected_output: "exit 0 across mobile/tablet/desktop/wide; w3 DOM probe captured to verification log shows panel.top ≤ 500 at desktop AND wide"
 
 must_preserve:
   - "Mobile/tablet ordering: results panel above visible-columns (the existing `order-3` < `order-5` invariant)."
