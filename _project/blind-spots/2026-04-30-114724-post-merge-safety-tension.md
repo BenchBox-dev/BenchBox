@@ -39,3 +39,4 @@ If the post-merge workflow is the real protection layer, adding a queue may dupl
   workflow shipped; Step 5 still `Blocked`. Architectural rule remains
   load-bearing by inertia, not enforcement. Carry forward.
 - 2026-05-06: actionable — 2026-05-06 sweep: develop-post-merge.yml safety-net workflow still shipped; Step 5 Blocked — 'no queue without pre-merge ordering evidence' rule remains load-bearing by inertia
+- 2026-05-08: actionable — sweep: .github/workflows/develop-post-merge.yml still present; Step 5 calendar-blocked through ~2026-05-30; revert-PR/incident:develop-red flow intact — `no queue without Step 5 pre-merge ordering evidence` rule still load-bearing by inertia

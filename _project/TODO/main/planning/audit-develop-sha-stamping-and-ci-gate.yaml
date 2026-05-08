@@ -1,0 +1,251 @@
+id: audit-develop-sha-stamping-and-ci-gate
+title: "Stamp develop SHA into release-readiness audits and gate stale audits in CI"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Quality
+
+description: |
+  Release-readiness reports under `_project/audits/` describe a tree. If
+  the tree the report describes is not the tree that ships, the verdict
+  is structurally unreliable — even when every individual check passes.
+  PR #269 demonstrated this: a release-readiness report and capture
+  generated against the PR branch were squash-merged onto a develop tip
+  that included PR #268's literal-styled `Result summary` panel and
+  `Compare guardrails` section, and the report still claimed READY.
+  PR #271 (commit `274a4a11e`) closed the immediate token regression
+  manually, but the framework gap remains.
+
+  This TODO adds a durable, audit-agnostic gate so the same class of
+  regression is caught at PR time across every structured audit, not
+  only retheme work:
+
+  1. Every `_project/audits/*.md` audit landing after the cutoff date
+     must include a `develop_sha:` frontmatter field naming the develop
+     SHA the report describes.
+  2. The capture flow that authors release-final reports
+     (`results-explorer/e2e/captures/release-final.spec.ts` and any
+     sibling `*-final.spec.ts` drivers) records the develop SHA at
+     run-start so the human author copies it into the audit
+     frontmatter.
+  3. A small validator (`_project/scripts/audit_sha_check.py`) and a
+     `make audit-sha-check FILE=…` target verify the field is present,
+     resolves to a SHA reachable from `origin/develop`, and is not too
+     far behind the merge target's tip.
+  4. A path-aware CI hook on `_project/audits/**` and
+     `results-explorer/e2e/captures/**` runs the validator on every PR
+     and refuses to merge a release-readiness audit whose recorded SHA
+     is missing or stale relative to the merge target.
+
+  Complements (does not replace)
+  `results-explorer-token-scan-ci-gate.yaml`: that gate prevents the
+  literal-color regression class from shipping; this gate makes every
+  release-readiness audit's tree-claim auditable so future cross-PR
+  races on any surface (security, performance, docs migration) are
+  caught at the audit-author step rather than after merge.
+
+deps:
+  needs:
+    - results-explorer-token-scan-ci-gate
+
+context_sections:
+  "Source blind-spot": |
+    Recorded: _project/blind-spots/2026-05-07-211858-release-readiness-against-pre-merge-tree.md
+    Status: actionable. Re-verified 2026-05-08 (PR #271 landed; framework
+    gap unresolved).
+  "Why this is generalised, not retheme-only": |
+    The blind-spot author called this out explicitly: "any audit-style PR
+    with a structured report (security review, performance baseline, docs
+    migration) has the same exposure." Making the validator and CI hook
+    operate on `_project/audits/**` (rather than only
+    `results-explorer-retheme-final-*`) closes the class, not the
+    instance.
+
+work:
+  - id: w1
+    summary: "Define the develop_sha frontmatter contract"
+    status: pending
+    notes: |
+      Specify in `docs/operations/results-explorer-qa.md` (smallest
+      doc-change footprint; broaden later when other audit owners
+      adopt):
+        - Required field name: `develop_sha:` (full 40-char SHA).
+        - Required on every audit under `_project/audits/*.md` —
+          historical audits are backfilled in w3 so the validator can
+          enforce the requirement uniformly without grandfathering.
+        - Allowed staleness: configurable via CLI flag, default 0 (any
+          ancestor of `origin/develop` is acceptable; reviewers may
+          require `--require-current` for top-of-tree audits).
+        - Backfill rule (consumed by w3): for each existing audit,
+          derive the SHA from the introducing commit via `git log
+          --diff-filter=A --reverse --format=%H -- <audit-file> | head
+          -1`, then use that commit's parent on develop. Document this
+          rule so future agents can re-derive it deterministically.
+
+  - id: w2
+    summary: "Implement audit_sha_check.py validator + Makefile target"
+    needs: [w1]
+    status: pending
+    notes: |
+      New file: `_project/scripts/audit_sha_check.py`.
+      Behavior:
+        - Parse the audit's YAML frontmatter; require `develop_sha:`
+          unconditionally (no date cutoff after backfill in w3 lands).
+        - Run `git merge-base --is-ancestor <develop_sha> origin/develop`
+          and exit non-zero if the SHA is not reachable.
+        - With `--require-current N`, also require that the SHA is
+          within N commits of `origin/develop` tip.
+      Add `make audit-sha-check FILE=<path>` that wraps the script
+      under the existing `audit-*` target convention, and add the
+      target to the pre-approved-commands allowlist in CLAUDE.md so
+      agents can invoke it without prompts.
+
+  - id: w3
+    summary: "Backfill develop_sha into every existing _project/audits/*.md"
+    needs: [w2]
+    status: pending
+    notes: |
+      For each `_project/audits/*.md`:
+        sha=$(git log --diff-filter=A --reverse --format=%H -- "$f" | head -1)
+        # Verify the introducing commit is reachable from origin/develop;
+        # if not (e.g., authored on a feature branch and squashed), fall
+        # back to the squash-merge commit that landed it on develop.
+        # If still unreachable, fall back to `git rev-parse $sha^` (the
+        # parent before the audit was added) and document the deviation
+        # inline as a frontmatter comment.
+      Add a bulk-backfill helper script (`_project/scripts/audit_sha_backfill.py`)
+      so the operation is repeatable and reviewers can audit the
+      derivation per file. The script must:
+        - Not modify audits whose `develop_sha:` is already present.
+        - Print the derivation source per file ("introducing commit",
+          "merge commit", "parent fallback") to stdout so reviewers
+          can spot edge cases.
+        - Be idempotent: running it twice changes nothing.
+      Run the backfill, eyeball the per-file derivation log, and land
+      the backfilled audits in the same PR as the validator so CI
+      starts green on the existing tree.
+
+  - id: w4
+    summary: "Wire the develop SHA into the release-final capture flow"
+    needs: [w2]
+    status: pending
+    notes: |
+      Modify `results-explorer/e2e/captures/release-final.spec.ts` (and
+      any sibling `*-final.spec.ts` drivers) to:
+        - Run `git fetch --no-tags origin develop` and `git rev-parse
+          origin/develop` at spec setup.
+        - Inject the resulting SHA into the screenshot manifest under a
+          new `develop_sha:` key.
+        - Print a copy-paste-ready frontmatter snippet to stdout at
+          spec teardown so the audit author drops it into the report.
+      Out of scope: rewriting the capture spec's screenshot logic.
+
+  - id: w5
+    summary: "Add path-aware CI hook on _project/audits/** and capture specs"
+    needs: [w3, w4]
+    status: pending
+    notes: |
+      Reuse the explorer test job's path filter pattern. New CI step:
+        - Triggers on PRs touching `_project/audits/**` or
+          `results-explorer/e2e/captures/**`.
+        - Runs `make audit-sha-check FILE=<changed-audit>` for every
+          modified audit file (loop over `git diff --name-only`).
+        - Refuses the PR if any audit fails the validator.
+      Job must remain a no-op for PRs that don't touch the path filter.
+      Pre-merge sanity check: with the backfill from w3 landed, run the
+      validator across the entire `_project/audits/` tree from a fresh
+      clone and confirm exit 0 before declaring CI green.
+
+  - id: w6
+    summary: "Document the contract and link from the source blind-spot"
+    needs: [w5]
+    status: pending
+    notes: |
+      Update `docs/operations/results-explorer-qa.md` with:
+        - The `develop_sha:` field requirement (uniform — no cutoff).
+        - The `make audit-sha-check` invocation.
+        - The backfill derivation rule from w1 so future sweeps can
+          repeat it on any newly-orphaned audits.
+        - A note that the contract applies to every report under
+          `_project/audits/`, not only retheme audits.
+      Append a `commits:` reference back to this TODO from the source
+      blind-spot file via a new triage-log entry once the gate ships.
+
+must_preserve:
+  - "Existing pre-commit hooks and the `make lint` umbrella target."
+  - "CI required-result aggregator path-filter behavior."
+  - "Existing _project/audits/*.md content — backfill only adds the `develop_sha:` frontmatter field; body text and other frontmatter fields stay byte-identical."
+  - "Backfill must be idempotent — re-running the helper on already-stamped audits is a no-op."
+
+approach: |
+  Build the validator before touching anything else: w2 makes the
+  contract executable. Then w3 backfills the entire existing tree so
+  CI starts green and the validator can enforce uniformly without a
+  date cutoff. w4 wires the capture flow for new audits, w5 enforces
+  via CI, w6 documents. Keep the validator narrow (no markdown
+  linting, no audit-content checks) so it stays trustworthy as a CI
+  gate. Reuse the existing explorer-job path filter pattern in w5
+  rather than authoring a new workflow from scratch — that pattern
+  is already proven and keeps CI cost flat for non-audit PRs.
+
+anti_patterns:
+  - "DO NOT extend the validator to lint audit content (markdown, headings, sections) — because the validator must stay narrow to remain trustworthy as a CI gate — content-quality checks belong in a separate audit-review TODO."
+  - "DO NOT make the gate run on every CI build — because most PRs do not touch audits — use a path filter on `_project/audits/**` and `results-explorer/e2e/captures/**` so non-audit PRs see no overhead."
+  - "DO NOT backfill develop_sha by hand — because per-file judgment calls about which commit to use will drift over time — drive the backfill from `_project/scripts/audit_sha_backfill.py` so the derivation is auditable and idempotent."
+  - "DO NOT land the validator before the backfill — because CI would fail on the existing tree from day one — sequence is w2 (validator) → w3 (backfill) → w5 (CI gate) in the same PR series, with w3's output landing before w5 enables enforcement."
+
+verification:
+  - description: "Validator fails on an audit missing develop_sha"
+    command: "bash -lc 'set -e; tmp=$(mktemp _project/audits/_gate_test_XXXXX.md); printf -- \"---\\nid: gate-test\\ndate: 2026-05-08\\n---\\n# Stub\\n\" > \"$tmp\"; trap \"rm -f $tmp\" EXIT; ! make audit-sha-check FILE=\"$tmp\"'"
+    expected_output: "non-zero exit (validator caught the missing field)"
+  - description: "Validator passes on an audit with a real develop_sha"
+    command: "bash -lc 'set -e; sha=$(git rev-parse origin/develop); tmp=$(mktemp _project/audits/_gate_test_XXXXX.md); printf -- \"---\\nid: gate-test\\ndate: 2026-05-08\\ndevelop_sha: $sha\\n---\\n# Stub\\n\" > \"$tmp\"; trap \"rm -f $tmp\" EXIT; make audit-sha-check FILE=\"$tmp\"'"
+    expected_output: "exit 0"
+  - description: "CI gate runs only on PRs touching _project/audits/** or captures"
+    command: "echo 'Manual: open a no-op docs PR and confirm audit-sha-check job is skipped via path filter'"
+    expected_output: "Job is reported as skipped on the PR checks tab"
+
+scope_limit:
+  only_modify:
+    - "_project/scripts/"
+    - "Makefile"
+    - ".github/workflows/"
+    - "results-explorer/e2e/captures/"
+    - "docs/operations/"
+    - "CLAUDE.md"
+    - "_project/blind-spots/2026-05-07-211858-release-readiness-against-pre-merge-tree.md"
+    - "_project/audits/"  # backfill-only: w3 adds `develop_sha:` frontmatter to existing audits; body unchanged
+  do_not_modify:
+    - "results-explorer/src/"
+    - "benchbox/"
+    - "results-data/"
+
+success_metrics:
+  - "Every _project/audits/*.md file (including backfilled historical audits) carries a `develop_sha:` field that `audit_sha_check.py` accepts."
+  - "Running `audit_sha_backfill.py` twice produces no changes (idempotent)."
+  - "CI fails on a release-readiness audit whose recorded develop_sha is unreachable from origin/develop or missing entirely."
+  - "release-final.spec.ts emits a copy-paste-ready frontmatter snippet at teardown."
+  - "Source blind-spot `2026-05-07-211858-release-readiness-against-pre-merge-tree` updated with a `commits:` reference once the gate ships."
+
+metadata:
+  tags:
+    - quality
+    - ci
+    - audits
+    - tokenization
+    - retheme
+  estimated_effort: "Medium (~1-2 days)"
+  created_date: "2026-05-08"
+
+impact:
+  business_value: |
+    Closes a class of merge-race regression — audit reports describing a
+    tree that did not ship — that affects every structured release
+    review, not only retheme work.
+  user_impact: |
+    Indirect: protects users from shipping surfaces that contradict
+    their release-readiness verdict (e.g., literal colors after a
+    tokenization claim, perf regressions after a baseline claim).
+  technical_debt: |
+    Replaces a manual reviewer habit ("check the SHA was current") with
+    an enforced PR-time gate so the audit contract is durable.
