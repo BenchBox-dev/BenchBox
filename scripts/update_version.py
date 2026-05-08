@@ -146,7 +146,7 @@ def update_release_marker(path: Path, new_version: str, dry_run: bool = False) -
         print(f"Warning: {path} not found")
         return False
 
-    text = path.read_text()
+    text = path.read_text(encoding="utf-8")
 
     def replacer(match: re.Match) -> str:
         prefix = match.group("prefix")
@@ -168,7 +168,7 @@ def update_release_marker(path: Path, new_version: str, dry_run: bool = False) -
         print(f"[dry-run] Would update release marker in {path}")
         return True
 
-    path.write_text(new_text)
+    path.write_text(new_text, encoding="utf-8")
     print(f"Updated release marker in {path}")
     return True
 

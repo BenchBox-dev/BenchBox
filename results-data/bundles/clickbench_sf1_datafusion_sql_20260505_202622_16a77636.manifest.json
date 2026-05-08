@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T00:46:09.903955+00:00",
-  "bundle_file": "clickbench_sf1_datafusion_sql_20260505_202622_16a77636.json",
-  "bundle_hash": "7c16f9c1ec27359c32d89f7c6f9f43d8ee34622df4711577ffa05e09ab17704e",
-  "companion_hashes": {},
   "benchmark": "ClickBench",
+  "bundle_file": "clickbench_sf1_datafusion_sql_20260505_202622_16a77636.json",
+  "bundle_hash": "33c6486f4bd4c1781d9b77341715c320d932bb0c5945b91e3b69e00bcaf8d679",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "DataFusion",
   "scale_factor": 1.0,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T00:46:09.903955+00:00",
   "submitted_by": "Joe Harris"
 }

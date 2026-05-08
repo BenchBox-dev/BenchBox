@@ -19,22 +19,22 @@ Since BaseBenchmark is an abstract class, we will use three complementary approa
 ```python
 class MockBenchmark(BaseBenchmark):
     """A minimal implementation of BaseBenchmark for testing."""
-    
+
     def __init__(self, scale_factor=1.0, **kwargs):
         super().__init__(scale_factor=scale_factor, **kwargs)
-        
+
     def generate_data(self, tables=None, output_format="memory"):
         """Mock implementation of generate_data."""
         pass
-        
+
     def get_query(self, query_id):
         """Mock implementation returning a test query."""
         return f"SELECT * FROM test_table WHERE id = {query_id}"
-        
+
     def get_all_queries(self):
         """Mock implementation returning test queries."""
         return {i: f"SELECT * FROM test_table WHERE id = {i}" for i in range(1, 5)}
-        
+
     def execute_query(self, query_id, connection, params=None):
         """Mock implementation of execute_query."""
         pass
@@ -226,14 +226,14 @@ def test_feature_expected_behavior():
     """Test that [feature] behaves [expected way] under [conditions]."""
     # Setup
     mock_benchmark = MockBenchmark(scale_factor=1.0, option=value)
-    
+
     # Exercise
     result = mock_benchmark.method_under_test(parameters)
-    
+
     # Verify
     assert result == expected_result
     assert mock_benchmark.state == expected_state
-    
+
     # Cleanup (if needed beyond fixture scope)
     mock_benchmark.cleanup()
 ```

@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:09:21.629757+00:00",
-  "bundle_file": "flightdata_sf001_starrocks_sql_20260506_113354_642d27fa.json",
-  "bundle_hash": "3fab87fdb50e2b51a76ac7dd5e619a5d2cd8fa317c62b40d5ef7756d423cd6f3",
-  "companion_hashes": {},
   "benchmark": "Flight Data OLAP",
+  "bundle_file": "flightdata_sf001_starrocks_sql_20260506_113354_642d27fa.json",
+  "bundle_hash": "cc5abf9e7a804a0a6cbdffffff782c3c52ed94d9b60e39e275c033f096601164",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "StarRocks",
   "scale_factor": 0.01,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:09:21.629757+00:00",
   "submitted_by": "Joe Harris"
 }

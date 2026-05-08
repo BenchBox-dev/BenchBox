@@ -8,7 +8,7 @@ This directory contains the generation script for small embedded DuckDB database
 
 - `basic_test.duckdb` - Simple tables for connection and basic SQL testing
 - `tpch_test.duckdb` - Minimal TPC-H benchmark tables with sample data
-- `tpcds_test.duckdb` - Minimal TPC-DS benchmark tables with sample data  
+- `tpcds_test.duckdb` - Minimal TPC-DS benchmark tables with sample data
 - `ssb_test.duckdb` - Star Schema Benchmark tables with sample data
 - `primitives_test.duckdb` - Tables for testing OLAP operations and window functions
 

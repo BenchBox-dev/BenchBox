@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:09:18.065036+00:00",
-  "bundle_file": "flightdata_sf001_polars_df_20260506_094335_373ec437.json",
-  "bundle_hash": "db9db11a7eecf6674ebfc25b698ae3dc1ee26ea04f3199af6876d55850d3fb54",
-  "companion_hashes": {},
   "benchmark": "Flight Data",
+  "bundle_file": "flightdata_sf001_polars_df_20260506_094335_373ec437.json",
+  "bundle_hash": "f9536a4bd7a600d8592a38cacbaf55e5a505ad1903dbd8bda9443609b3037007",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "Polars",
   "scale_factor": 0.01,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:09:18.065036+00:00",
   "submitted_by": "Joe Harris"
 }

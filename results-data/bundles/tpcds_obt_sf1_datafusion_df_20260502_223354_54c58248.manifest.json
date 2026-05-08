@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-03T02:50:53.126698+00:00",
-  "bundle_file": "tpcds_obt_sf1_datafusion_df_20260502_223354_54c58248.json",
-  "bundle_hash": "83eaafe5ff88fb93854413b67001732df2e3d53a2b43fba3a0696655bad96118",
-  "companion_hashes": {},
   "benchmark": "TPC-DS-OBT",
+  "bundle_file": "tpcds_obt_sf1_datafusion_df_20260502_223354_54c58248.json",
+  "bundle_hash": "f968158780afb2d0d144397c4763cbe37ab6a9d92a8417613f4afdbaaa4a312e",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "DataFusion",
   "scale_factor": 1.0,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:50:53.126698+00:00",
   "submitted_by": "BenchBox UAT"
 }

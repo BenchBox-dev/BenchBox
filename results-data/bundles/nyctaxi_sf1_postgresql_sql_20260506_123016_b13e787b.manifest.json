@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:10:40.721059+00:00",
-  "bundle_file": "nyctaxi_sf1_postgresql_sql_20260506_123016_b13e787b.json",
-  "bundle_hash": "c0845343acc54d512402958282e94c1044c1a55452c01043458ed84e815e37a0",
-  "companion_hashes": {},
   "benchmark": "NYC Taxi OLAP",
+  "bundle_file": "nyctaxi_sf1_postgresql_sql_20260506_123016_b13e787b.json",
+  "bundle_hash": "46f67b39f76428c7da3ad83db5a8c7363fdeb61cdc8a35ad625cec9b609d1b2f",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "PostgreSQL",
   "scale_factor": 1.0,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:10:40.721059+00:00",
   "submitted_by": "Joe Harris"
 }

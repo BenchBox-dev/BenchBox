@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:09:40.824613+00:00",
-  "bundle_file": "h2odb_sf001_starrocks_sql_20260506_112418_b6358447.json",
-  "bundle_hash": "ae7450ca0987aa5e1827d964408887c133faf2fcf147144ce45b377561e9a641",
-  "companion_hashes": {},
   "benchmark": "H2O Database",
+  "bundle_file": "h2odb_sf001_starrocks_sql_20260506_112418_b6358447.json",
+  "bundle_hash": "95f5d1d2f89ff8bee6aec68959962b69627fdc1af3dd968fe157b23d01ad8c57",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "StarRocks",
   "scale_factor": 0.01,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:09:40.824613+00:00",
   "submitted_by": "Joe Harris"
 }

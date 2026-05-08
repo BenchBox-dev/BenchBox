@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:08:00.131005+00:00",
-  "bundle_file": "amplab_sf01_pyspark_df_20260506_100052_73139b54.json",
-  "bundle_hash": "5ee9e3c95818c89a4fb960ab9eb15f7145ff599b11c848a5c82a11cf9e80bd1e",
-  "companion_hashes": {},
   "benchmark": "AMPLab",
+  "bundle_file": "amplab_sf01_pyspark_df_20260506_100052_73139b54.json",
+  "bundle_hash": "2db8528fd961c5cdff5a76caab16694ab6294237ff712d09ca0f380d47301905",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "PySpark",
   "scale_factor": 0.1,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:08:00.131005+00:00",
   "submitted_by": "Joe Harris"
 }

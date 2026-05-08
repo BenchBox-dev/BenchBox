@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:11:09.458872+00:00",
-  "bundle_file": "ssb_sf001_spark_sql_20260506_091807_f9e13bbd.json",
-  "bundle_hash": "4548b24982ec3f98c736174d713d350f0179355d44b61510a5aeddb9a21332c9",
-  "companion_hashes": {},
   "benchmark": "Star Schema",
+  "bundle_file": "ssb_sf001_spark_sql_20260506_091807_f9e13bbd.json",
+  "bundle_hash": "4e07fdc0519e8c0e37739750b0a2acc1d2c6b879c5948ae74b7227fcab2c5648",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "Spark",
   "scale_factor": 0.01,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:11:09.458872+00:00",
   "submitted_by": "Joe Harris"
 }

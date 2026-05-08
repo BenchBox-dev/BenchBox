@@ -254,14 +254,14 @@ class CustomParameterManager(ParameterManager):
     def _generate_query_parameters(self, query_id, rng, scale_factor):
         # Custom parameter generation logic
         params = super()._generate_query_parameters(query_id, rng, scale_factor)
-        
+
         # Add custom parameters
         params.update({
             'custom_param1': rng.randint(1, 100),
             'custom_param2': rng.choice(['A', 'B', 'C']),
             'date_range': f"{rng.randint(1990, 2020)}-{rng.randint(1, 12):02d}-{rng.randint(1, 28):02d}"
         })
-        
+
         return params
 
 # Use custom parameter manager

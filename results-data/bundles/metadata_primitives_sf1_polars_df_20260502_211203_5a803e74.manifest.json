@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-03T02:48:59.158442+00:00",
-  "bundle_file": "metadata_primitives_sf1_polars_df_20260502_211203_5a803e74.json",
-  "bundle_hash": "0592a68bc7dcd4db186078c1eaf337cb1ca1e16ed7dcfb09bce1e513bb9dbf30",
-  "companion_hashes": {},
   "benchmark": "Metadata",
+  "bundle_file": "metadata_primitives_sf1_polars_df_20260502_211203_5a803e74.json",
+  "bundle_hash": "2057518a08e6fdc9733731adb7bd481be2b4a7268a19bb2580afd7a7c1dedb98",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "Polars",
   "scale_factor": 1.0,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:48:59.158442+00:00",
   "submitted_by": "BenchBox UAT"
 }

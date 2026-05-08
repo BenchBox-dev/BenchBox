@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-03T02:49:13.184700+00:00",
-  "bundle_file": "nyctaxi_sf01_datafusion_df_20260502_223345_6b902570.json",
-  "bundle_hash": "ff471f52173a45dfd31d1007af9745e0d3ca4b2b9cdc798365a666cd0e1b6ccf",
-  "companion_hashes": {},
   "benchmark": "NYC Taxi",
+  "bundle_file": "nyctaxi_sf01_datafusion_df_20260502_223345_6b902570.json",
+  "bundle_hash": "4c75ce8d8f96cde7a1b2991f7bcdb5112cca3b6f97a025d1c4ba905197122b36",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "DataFusion",
   "scale_factor": 0.1,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:49:13.184700+00:00",
   "submitted_by": "BenchBox UAT"
 }

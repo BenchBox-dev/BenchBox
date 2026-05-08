@@ -2,8 +2,9 @@ id: results-data-byte-stable-bundle-emission
 title: "Make bundle JSON emission byte-stable so manifest hashes survive normalizers"
 worktree: main
 priority: "Medium"
-status: "Blocked"
+status: "Completed"
 category: "Core Functionality"
+completed_date: "2026-05-08"
 
 description: |
   The bundle emitter (`benchbox/core/results/exporter.py`) writes the primary
@@ -92,7 +93,7 @@ work:
 - id: w4
   summary: "Remove the pre-commit `results-data/bundles/*.json` exclusion"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Once W2 and W3 land, the bundle exclusion in `.pre-commit-config.yaml`
     becomes unnecessary. Remove it from both hooks:
@@ -104,12 +105,11 @@ work:
     Re-run `scripts/validate_submission.py` against `results-data/bundles/`
     after the pre-commit dry-run; it must still report zero errors.
 
-    Blocked after W1-W3 implementation: a read-only scan found 513 existing
-    `results-data/bundles/*.json` primary/companion files without a final
-    newline. Removing this exclusion now would let `end-of-file-fixer` rewrite
-    those grandfathered hash-pinned bytes, violating this TODO's
-    "DO NOT canonicalize already-checked-in bundles" guardrail. Leave W4
-    pending until a separate legacy-bundle grandfather/backfill strategy exists.
+    Completed after explicit 2026-05-08 approval to rewrite existing
+    hash-pinned corpus bytes. Rewrote 525 primary bundle JSON files into the
+    canonical form and updated 513 per-bundle manifest `bundle_hash` values.
+    No `.plans.json` or `.tuning.json` companions were present in this corpus
+    snapshot. Removed the `results-data/bundles/*.json` pre-commit exclusion.
 
 verification:
 - description: "Bundle hash survives a no-op normalization round-trip."
@@ -143,7 +143,7 @@ approach: |
 anti_patterns:
 - "DO NOT just restore the pre-commit exclusion as 'good enough' -- because every future tool that touches bundle bytes will re-trip the hash mismatch -- the durable fix is byte-stable emission."
 - "DO NOT change the manifest's hash function or schema -- because external submitters may already have manifests on disk -- only change the writer side, then keep the same SHA-256 contract."
-- "DO NOT canonicalize already-checked-in bundles in this TODO -- because that would break manifest hashes for currently-shipping bundles -- canonicalization applies to NEW emissions only; old bundles are grandfathered."
+- "DO NOT canonicalize already-checked-in bundles without also updating their per-bundle manifest hashes -- because the manifest SHA-256 contract is byte-exact."
 - "DO NOT canonicalize the primary bundle while leaving `.plans.json` or `.tuning.json` companions vulnerable -- because `companion_hashes` are validated by the same manifest path."
 
 scope_limit:
@@ -153,9 +153,9 @@ scope_limit:
   - "tests/unit/test_results_exporter.py"
   - "tests/unit/cli/commands/test_submit.py"
   - ".pre-commit-config.yaml"
+  - "results-data/bundles/"
   - "_project/TODO/main/planning/results-data-byte-stable-bundle-emission.yaml"
   do_not_modify:
-  - "results-data/bundles/"
   - "results-explorer/"
   - "scripts/validate_submission.py"
 
@@ -163,11 +163,7 @@ success_metrics:
 - "EOF-fixer / trailing-whitespace pre-commit hooks no longer need to skip `results-data/bundles/`."
 - "A new unit test demonstrates that the canonical bundle form survives a no-op whitespace normalization round-trip with hash unchanged."
 - "A new submit-manifest test demonstrates that primary `bundle_hash` and companion hashes survive the same no-op normalization round-trip."
-- "All currently checked-in bundles validate cleanly against `validate_submission.py` after the writer change (existing bundles are grandfathered, not rewritten)."
-
-deferred:
-- summary: "Backfill canonicalization for the existing 200 checked-in bundles"
-  reason: "Rewriting checked-in bundles changes their hashes and breaks the audit trail tying them to specific submission events. Grandfather-only."
+- "All currently checked-in bundles validate cleanly against `validate_submission.py` after the writer change and authorized corpus rewrite."
 
 metadata:
   tags:

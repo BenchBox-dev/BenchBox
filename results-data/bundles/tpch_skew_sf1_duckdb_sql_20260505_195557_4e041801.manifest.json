@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T00:48:00.603741+00:00",
-  "bundle_file": "tpch_skew_sf1_duckdb_sql_20260505_195557_4e041801.json",
-  "bundle_hash": "1a23da650f8e8c901b9312fdad31fd70e511d829f42e9a25ecc05a693760a200",
-  "companion_hashes": {},
   "benchmark": "TPC-H Skew Benchmark (moderate)",
+  "bundle_file": "tpch_skew_sf1_duckdb_sql_20260505_195557_4e041801.json",
+  "bundle_hash": "0d70db21b014751ab0148ffc78e45c8c6d625b46d2b34a4d57f313e6a5c20390",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "DuckDB",
   "scale_factor": 1.0,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T00:48:00.603741+00:00",
   "submitted_by": "Joe Harris"
 }

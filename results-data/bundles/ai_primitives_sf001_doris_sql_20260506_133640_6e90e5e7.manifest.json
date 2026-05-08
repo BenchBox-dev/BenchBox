@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:07:30.306817+00:00",
-  "bundle_file": "ai_primitives_sf001_doris_sql_20260506_133640_6e90e5e7.json",
-  "bundle_hash": "8c8d75dfb7dd6ab81d7bb162b489af0f173a3cf6d6cc40b242018f955b1de784",
-  "companion_hashes": {},
   "benchmark": "AI/ML Primitives",
+  "bundle_file": "ai_primitives_sf001_doris_sql_20260506_133640_6e90e5e7.json",
+  "bundle_hash": "ff049c4d53d212dbc91c61d9d9800985fd3a6dcf8d2d1fdc80d7a10dedc02f81",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "Apache Doris",
   "scale_factor": 0.01,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:07:30.306817+00:00",
   "submitted_by": "Joe Harris"
 }

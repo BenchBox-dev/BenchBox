@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-03T02:51:31.911358+00:00",
-  "bundle_file": "tpch_sf001_pyspark_df_20260502_212950_2dbda97e.json",
-  "bundle_hash": "596ef80ca28a9d8ab855fcdc6128cc862c0b2147fd957857856ca3ceaacb61d8",
-  "companion_hashes": {},
   "benchmark": "TPC-H",
+  "bundle_file": "tpch_sf001_pyspark_df_20260502_212950_2dbda97e.json",
+  "bundle_hash": "3b39ce856a5939bc06db88a4067cf91ced956f8adb97c61532c29653e7117e1f",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "PySpark",
   "scale_factor": 0.01,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:51:31.911358+00:00",
   "submitted_by": "BenchBox UAT"
 }

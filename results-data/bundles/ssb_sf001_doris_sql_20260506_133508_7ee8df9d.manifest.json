@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:11:03.388968+00:00",
-  "bundle_file": "ssb_sf001_doris_sql_20260506_133508_7ee8df9d.json",
-  "bundle_hash": "87a8ad7278e6d369b19eb5bcfc2844dc14fc9c648d24da0304ff46bfbc7badc5",
-  "companion_hashes": {},
   "benchmark": "Star Schema",
+  "bundle_file": "ssb_sf001_doris_sql_20260506_133508_7ee8df9d.json",
+  "bundle_hash": "c760c3a947d8f82c8d3b85448d1978c478e521d0f2b9d5e3d7e7f91406e37e7a",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "Apache Doris",
   "scale_factor": 0.01,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:11:03.388968+00:00",
   "submitted_by": "Joe Harris"
 }
