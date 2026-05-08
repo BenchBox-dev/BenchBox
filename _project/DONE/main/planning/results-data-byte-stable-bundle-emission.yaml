@@ -111,6 +111,11 @@ work:
     No `.plans.json` or `.tuning.json` companions were present in this corpus
     snapshot. Removed the `results-data/bundles/*.json` pre-commit exclusion.
 
+completion_notes:
+- "PR #282 included hook-normalized EOF/trailing-whitespace collateral in `.github/`, `COPYRIGHT.md`, `benchbox/data/coffeeshop/`, `docs/`, `examples/`, `landing/`, and test documentation/fixture files after `uv run -- pre-commit run --all-files` exposed existing drift."
+- "PR #282 included narrow Ruff PLW1514 encoding cleanup in `benchbox/utils/dependency_validation.py`, `scripts/check_example_syntax.py`, `scripts/update_version.py`, `tests/fixtures/result_dict_fixtures.py`, and `tests/unit/platforms/test_compression_support.py`."
+- "Review follow-up: hosted multipart submission manifests now use the same canonical JSON writer as PR-package manifests, with transport-level regression coverage in `tests/unit/cli/test_submit_service.py`."
+
 verification:
 - description: "Bundle hash survives a no-op normalization round-trip."
   command: "uv run -- python -m pytest tests/unit/test_results_exporter.py -k canonical_bundle -v"
@@ -150,11 +155,16 @@ scope_limit:
   only_modify:
   - "benchbox/core/results/"
   - "benchbox/cli/commands/submit.py"
+  - "benchbox/cli/submit_service.py"
   - "tests/unit/test_results_exporter.py"
   - "tests/unit/cli/commands/test_submit.py"
+  - "tests/unit/cli/test_submit_service.py"
   - ".pre-commit-config.yaml"
   - "results-data/bundles/"
   - "_project/TODO/main/planning/results-data-byte-stable-bundle-emission.yaml"
+  - "_project/DONE/main/planning/results-data-byte-stable-bundle-emission.yaml"
+  - "hook-normalized EOF/trailing-whitespace collateral under `.github/`, `COPYRIGHT.md`, `benchbox/data/coffeeshop/`, `docs/`, `examples/`, `landing/`, and test documentation/fixture files"
+  - "Ruff PLW1514 encoding-only cleanup in the small Python read/write sites listed in `completion_notes`"
   do_not_modify:
   - "results-explorer/"
   - "scripts/validate_submission.py"

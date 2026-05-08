@@ -12,6 +12,7 @@ from urllib import error, request
 
 import benchbox
 from benchbox.cli.submit_auth import normalize_service_url
+from benchbox.core.results.canonical_json import canonical_json_text
 
 PUBLIC_RESULTS_BASE_URL = "https://benchbox.dev/results/r"
 _TRANSIENT_STATUS_CODES = {500, 502, 503, 504}
@@ -296,7 +297,7 @@ def _multipart_body(
     _add_form_field(parts, boundary, "visibility", visibility)
     _add_file_field(parts, boundary, "bundle", source_path.name, source_path.read_bytes(), "application/json")
     manifest_name = f"{source_path.stem}.manifest.json"
-    manifest_bytes = (json.dumps(manifest, indent=2) + "\n").encode("utf-8")
+    manifest_bytes = canonical_json_text(manifest).encode("utf-8")
     _add_file_field(parts, boundary, "manifest", manifest_name, manifest_bytes, "application/json")
     for companion in companions:
         _add_file_field(
