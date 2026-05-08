@@ -60,6 +60,20 @@ repos:
         files: ^_project/blind-spots/.*\.md$
         exclude: ^_project/blind-spots/README\.md$
 
+      # Token-scan gate for the Results Explorer retheme. Fails when raw
+      # Tailwind palette literals appear under results-explorer/src outside
+      # an explicit `// allow-explorer-token-literal: <reason>` marker.
+      # Stdlib-only (no uv sync at commit time); runs only when files
+      # under results-explorer/src/ change. See
+      # docs/operations/results-explorer-token-scan.md.
+      - id: explorer-tokens
+        name: results-explorer token-scan
+        entry: python3 _project/scripts/scan_explorer_tokens.py
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+        files: ^results-explorer/src/.*\.(tsx|ts|jsx|js|css|html)$
+
       # Warn-only duplicate-code gate. Manual stage so it doesn't slow
       # every commit (pylint over benchbox/ takes ~60s). Run with
       # `pre-commit run duplicate-code-warn --all-files --hook-stage manual`.
