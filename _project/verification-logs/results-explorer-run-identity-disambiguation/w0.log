@@ -1,0 +1,58 @@
+# PR 3 — `results-explorer-run-identity-disambiguation` w0 audit
+
+Date: 2026-05-08
+Worktree base: feat/explorer-run-identity on develop tip
+                747dfdc8498b... (post-PR #284, post-PR #277).
+Dep: `results-explorer-compare-flow-entrypoints` — partially merged via PR
+     #284 (compare builder + ResultDetail single-result pin landed; the
+     deferred work units in items 1/2/3 do not block this run-identity
+     work).
+
+## Per-work-unit verdicts
+
+w1 "Define a shared RunIdentity formatter and component":
+   Confirmed. No `lib/runIdentity.ts` exists. Will add with `compact`,
+   `table`, `chart`, `selectOption`, and `tooltip` variants plus a
+   cohort-aware `formatRunIdentitiesForCohort` that only adds
+   disambiguating qualifiers when two sources in the cohort share a
+   platform name.
+
+w2 "Apply RunIdentity labels to Rank chart headers":
+   Confirmed. `RankTable.tsx` exists in `components/`. Will apply the
+   `compact` cohort-aware variant to column headers.
+
+w3 "Apply RunIdentity labels to Distribution Box Plot, Percentiles, CDF":
+   Confirmed (deferred). DistributionBox / PercentileLadder / CDFChart
+   each have their own row/series-label assumptions; touching all three
+   in one PR risks regressions. Defer to a follow-up PR.
+
+w4 "Apply RunIdentity labels to overview/sparkline charts":
+   Confirmed (deferred). Same rationale as w3.
+
+w5 "Apply RunIdentity labels and run-aware copy to Compare":
+   Confirmed. `Compare.tsx` baseline select and result cards both
+   currently render the raw `result.platform` string with no
+   disambiguation. Will apply the cohort-aware formatter.
+
+w6 "Disambiguate or aggregate repeated Trend chart series":
+   Confirmed (deferred). TimeSeries.tsx logic for trend series is
+   independent and warrants its own focused diff.
+
+w7 "Cover duplicate label cases across charts and Compare":
+   Partial. New tests for w1 (formatter contract) and w5 (Compare cohort
+   labels). Deferred chart-level coverage moves with the deferred
+   application work units.
+
+## Delivery scope for this PR
+
+In:
+  - w1 (lib/runIdentity.ts + tests)
+  - w2 (RankTable.tsx column headers)
+  - w5 (Compare.tsx baseline select + result cards)
+  - Partial w7 (formatter unit tests + Compare integration test)
+
+Deferred (separate PRs, original TODO stays open):
+  - w3 (Distribution charts)
+  - w4 (Overview/sparkline charts)
+  - w6 (Trend chart series)
+  - Full w7 chart coverage

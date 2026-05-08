@@ -14,6 +14,7 @@ import type { BenchmarkSummary } from "@/types";
 import { paletteColor } from "@/lib/chartTheme";
 import { computeRankTable } from "@/lib/chartMath";
 import { queryDisplayLabel, sortQueryIds } from "@/lib/queryLabels";
+import { formatRunIdentitiesForCohort, type RunIdentitySource } from "@/lib/runIdentity";
 
 interface Props {
   summary: BenchmarkSummary;
@@ -40,6 +41,20 @@ export function RankTable({ summary }: Props) {
   );
   const maxWins = Math.max(...winCounts);
 
+  // Cohort-aware column-header identities. When the same platform name
+  // appears more than once in the rank cohort (e.g., two DataFusion
+  // versions), append the shortest qualifier set that distinguishes
+  // them. Single occurrences keep the bare platform name.
+  const headerIdentitySources: RunIdentitySource[] = platforms.map((p) => ({
+    result_id: p.result_id,
+    platform: p.platform,
+    platform_version: p.platform_version,
+    run_date: p.run_date,
+    trust_label: p.trust_label,
+  }));
+  const headerIdentities = formatRunIdentitiesForCohort(headerIdentitySources, "compact");
+  const headerTooltips = formatRunIdentitiesForCohort(headerIdentitySources, "tooltip");
+
   return (
     <div class="w-full overflow-x-auto">
       <table
@@ -51,18 +66,24 @@ export function RankTable({ summary }: Props) {
             <th class="text-left px-2 py-1.5 border-b border-[var(--bb-data-border)] text-[var(--bb-data-fg-muted)] font-normal sticky left-0 bg-[var(--bb-surface-data)] min-w-[4rem]">
               Query
             </th>
-            {platforms.map((p, i) => (
-              <th
-                key={p.result_id}
-                class="px-2 py-1.5 border-b border-[var(--bb-data-border)] text-[var(--bb-data-fg-primary)] font-semibold whitespace-nowrap text-center"
-              >
-                <span
-                  class="inline-block w-2 h-2 rounded-full mr-1 align-middle"
-                  style={{ backgroundColor: paletteColor(i) }}
-                />
-                {p.platform.length > 16 ? `${p.platform.slice(0, 15)}…` : p.platform}
-              </th>
-            ))}
+            {platforms.map((p, i) => {
+              const identity = headerIdentities[i] ?? p.platform;
+              const tooltip = headerTooltips[i] ?? p.platform;
+              const truncated = identity.length > 16 ? `${identity.slice(0, 15)}…` : identity;
+              return (
+                <th
+                  key={p.result_id}
+                  class="px-2 py-1.5 border-b border-[var(--bb-data-border)] text-[var(--bb-data-fg-primary)] font-semibold whitespace-nowrap text-center"
+                  title={tooltip}
+                >
+                  <span
+                    class="inline-block w-2 h-2 rounded-full mr-1 align-middle"
+                    style={{ backgroundColor: paletteColor(i) }}
+                  />
+                  {truncated}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>
