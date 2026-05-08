@@ -2,7 +2,7 @@ id: results-data-byte-stable-bundle-emission
 title: "Make bundle JSON emission byte-stable so manifest hashes survive normalizers"
 worktree: main
 priority: "Medium"
-status: "Not Started"
+status: "Blocked"
 category: "Core Functionality"
 
 description: |
@@ -37,7 +37,7 @@ description: |
 work:
 - id: w1
   summary: "Survey current bundle, companion, and manifest hash paths; define canonical form"
-  status: pending
+  status: done
   notes: |
     Search with `rg` for `json.dump` / `json.dumps`, `write_text`,
     `bundle_hash`, and `companion_hashes` under:
@@ -52,10 +52,14 @@ work:
     Document the chosen form and rationale in implementation notes or focused
     test names. Do not make code changes in this work unit.
 
+    Implementation note: chosen canonical form is
+    `json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False) + "\n"`,
+    centralized in `benchbox/core/results/canonical_json.py`.
+
 - id: w2
   summary: "Adopt the canonical form for primary and companion JSON emission"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Add or reuse a single canonical serializer in `benchbox/core/results/`.
     Use it for:
@@ -71,7 +75,7 @@ work:
 - id: w3
   summary: "Align submit manifest hashes with canonical primary and companion bytes"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Update `benchbox/cli/commands/submit.py` so `bundle_hash` and every entry
     in `companion_hashes` are computed from the exact canonical bytes that the
@@ -99,6 +103,13 @@ work:
     at least one known-clean primary bundle and its `.manifest.json` sidecar.
     Re-run `scripts/validate_submission.py` against `results-data/bundles/`
     after the pre-commit dry-run; it must still report zero errors.
+
+    Blocked after W1-W3 implementation: a read-only scan found 513 existing
+    `results-data/bundles/*.json` primary/companion files without a final
+    newline. Removing this exclusion now would let `end-of-file-fixer` rewrite
+    those grandfathered hash-pinned bytes, violating this TODO's
+    "DO NOT canonicalize already-checked-in bundles" guardrail. Leave W4
+    pending until a separate legacy-bundle grandfather/backfill strategy exists.
 
 verification:
 - description: "Bundle hash survives a no-op normalization round-trip."

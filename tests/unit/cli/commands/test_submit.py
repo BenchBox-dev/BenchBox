@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib
 import json
 from pathlib import Path
@@ -9,6 +10,8 @@ from types import SimpleNamespace
 
 import pytest
 from click.testing import CliRunner
+
+from benchbox.core.results.canonical_json import canonical_json_bytes
 
 sub = importlib.import_module("benchbox.cli.commands.submit")
 
@@ -66,6 +69,18 @@ def _write_unavailable_cost_total_bundle(path: Path) -> None:
     }
     bundle["cost"] = {"total_usd": 0, "model": "estimated"}
     path.write_text(json.dumps(bundle), encoding="utf-8")
+
+
+def _eof_fixed(data: bytes) -> bytes:
+    return data.rstrip(b"\n") + b"\n"
+
+
+def _sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _canonical_file_bytes(path: Path) -> bytes:
+    return canonical_json_bytes(json.loads(path.read_text(encoding="utf-8")))
 
 
 # ---------------------------------------------------------------------------
@@ -461,6 +476,41 @@ def test_submit_copies_companion_files(monkeypatch: pytest.MonkeyPatch, tmp_path
     assert (out_dir / "bundle" / "tpch_duckdb.tuning.json").exists()
 
 
+def test_submit_canonical_manifest_hashes_primary_and_companions(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    src = tmp_path / "tpch_duckdb.json"
+    src.write_text('{"schema_version":"2.0","z":2,"a":1}', encoding="utf-8")
+    source_raw_hash = _sha256(src.read_bytes())
+
+    plans = tmp_path / "tpch_duckdb.plans.json"
+    plans.write_text('{"z":1,"alpha":{"b":2}}', encoding="utf-8")
+    tuning = tmp_path / "tpch_duckdb.tuning.json"
+    tuning.write_text('{"z":2,"alpha":1}', encoding="utf-8")
+
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
+
+    out_dir = tmp_path / "submission"
+    result = CliRunner().invoke(sub.submit, [str(src), "--output", str(out_dir)])
+
+    assert result.exit_code == 0, result.output
+    packaged_source = out_dir / "bundle" / src.name
+    packaged_plans = out_dir / "bundle" / plans.name
+    packaged_tuning = out_dir / "bundle" / tuning.name
+    manifest = json.loads((out_dir / "tpch_duckdb.manifest.json").read_text(encoding="utf-8"))
+
+    assert packaged_source.read_bytes() == _canonical_file_bytes(src)
+    assert packaged_plans.read_bytes() == _canonical_file_bytes(plans)
+    assert packaged_tuning.read_bytes() == _canonical_file_bytes(tuning)
+    assert _eof_fixed(packaged_source.read_bytes()) == packaged_source.read_bytes()
+    assert _eof_fixed(packaged_plans.read_bytes()) == packaged_plans.read_bytes()
+    assert _eof_fixed(packaged_tuning.read_bytes()) == packaged_tuning.read_bytes()
+    assert manifest["bundle_hash"] == _sha256(packaged_source.read_bytes())
+    assert manifest["bundle_hash"] != source_raw_hash
+    assert manifest["companion_hashes"][plans.name] == _sha256(packaged_plans.read_bytes())
+    assert manifest["companion_hashes"][tuning.name] == _sha256(packaged_tuning.read_bytes())
+
+
 # ---------------------------------------------------------------------------
 # 8. --last with --benchmark/--platform passes filters to find_latest_result
 # ---------------------------------------------------------------------------
@@ -680,6 +730,42 @@ def test_submit_service_real_upload_calls_transport(monkeypatch: pytest.MonkeyPa
     assert history["public_url"] == "https://benchbox.dev/results/r/r1"
     assert history["status"] == "published"
     assert "secret-token" not in json.dumps(history)
+
+
+def test_submit_service_upload_uses_canonical_manifest_hashes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    src = tmp_path / "tpch_duckdb.json"
+    src.write_text('{"schema_version":"2.0","z":2,"a":1}', encoding="utf-8")
+    plans = tmp_path / "tpch_duckdb.plans.json"
+    plans.write_text('{"z":1,"alpha":{"b":2}}', encoding="utf-8")
+    tuning = tmp_path / "tpch_duckdb.tuning.json"
+    tuning.write_text('{"z":2,"alpha":1}', encoding="utf-8")
+
+    captured: dict = {}
+
+    def fake_upload(**kwargs):
+        captured["source_bytes"] = kwargs["source_path"].read_bytes()
+        captured["companion_bytes"] = {comp.name: comp.read_bytes() for comp in kwargs["companions"]}
+        captured["manifest"] = dict(kwargs["manifest"])
+        captured["bundle_hash"] = kwargs["bundle_hash"]
+        return sub.HostedSubmitResult(status="published", idempotency_key="generated-key")
+
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
+    monkeypatch.setattr(sub, "resolve_submission_token", lambda _service_url: SimpleNamespace(token="secret-token"))
+    monkeypatch.setattr(sub, "submit_hosted_bundle", fake_upload)
+    monkeypatch.setattr(sub, "record_hosted_submission", lambda **_kwargs: tmp_path / "history.json")
+
+    result = CliRunner().invoke(sub.submit, [str(src), "--service", "--no-wait"])
+
+    assert result.exit_code == 0, result.output
+    assert captured["source_bytes"] == _canonical_file_bytes(src)
+    assert captured["companion_bytes"][plans.name] == _canonical_file_bytes(plans)
+    assert captured["companion_bytes"][tuning.name] == _canonical_file_bytes(tuning)
+    assert _eof_fixed(captured["source_bytes"]) == captured["source_bytes"]
+    assert _eof_fixed(captured["companion_bytes"][plans.name]) == captured["companion_bytes"][plans.name]
+    assert _eof_fixed(captured["companion_bytes"][tuning.name]) == captured["companion_bytes"][tuning.name]
+    assert captured["manifest"]["bundle_hash"] == captured["bundle_hash"] == _sha256(captured["source_bytes"])
+    assert captured["manifest"]["companion_hashes"][plans.name] == _sha256(captured["companion_bytes"][plans.name])
+    assert captured["manifest"]["companion_hashes"][tuning.name] == _sha256(captured["companion_bytes"][tuning.name])
 
 
 def test_submit_service_real_upload_requires_auth(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

@@ -36,6 +36,7 @@ from benchbox.core.results.anonymization import (
     AnonymizationConfig,
     AnonymizationManager,
 )
+from benchbox.core.results.canonical_json import canonical_json_text
 from benchbox.core.results.models import BenchmarkResults
 from benchbox.core.results.normalizer import get_query_map, normalize_result_dict
 from benchbox.core.results.schema import (
@@ -239,11 +240,7 @@ class ResultExporter:
 
         # Write primary result file
         filepath = self._create_file_path(f"{filename_base}.json")
-        json_content = json.dumps(
-            self._convert_datetimes_to_iso(payload),
-            indent=2,
-            ensure_ascii=False,
-        )
+        json_content = canonical_json_text(self._convert_datetimes_to_iso(payload))
         self._write_file(filepath, json_content)
 
         # Write companion files
@@ -257,16 +254,14 @@ class ResultExporter:
         plans_payload = build_plans_payload(result)
         if plans_payload:
             plans_path = self._create_file_path(f"{filename_base}.plans.json")
-            json_content = json.dumps(plans_payload, indent=2, ensure_ascii=False)
-            self._write_file(plans_path, json_content)
+            self._write_file(plans_path, canonical_json_text(plans_payload))
             self.console.print(f"[dim]Exported plans: {plans_path}[/dim]")
 
         # Tuning companion file
         tuning_payload = build_tuning_payload(result)
         if tuning_payload:
             tuning_path = self._create_file_path(f"{filename_base}.tuning.json")
-            json_content = json.dumps(tuning_payload, indent=2, ensure_ascii=False)
-            self._write_file(tuning_path, json_content)
+            self._write_file(tuning_path, canonical_json_text(tuning_payload))
             self.console.print(f"[dim]Exported tuning: {tuning_path}[/dim]")
 
     def _apply_anonymization(self, payload: dict[str, Any]) -> None:
