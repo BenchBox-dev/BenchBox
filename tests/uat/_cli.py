@@ -148,6 +148,7 @@ def preflight_main(argv: list[str] | None = None) -> int:
         print(f"[preflight warn] {warning}", file=sys.stderr)
     if result.aborted:
         print(f"[preflight] ABORT: {result.abort_reason}", file=sys.stderr)
+        return 2
     return 0
 
 
