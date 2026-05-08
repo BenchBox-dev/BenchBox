@@ -137,7 +137,12 @@ def run_preflight(
     abort_reason: str | None = None
     checked: tuple[str, ...] = ()
     attempted: tuple[str, ...] = ()
-    disk_budget_summary = estimate_disk_budget_summary(disk_budget_config) if disk_budget_config is not None else None
+    disk_budget_summary = None
+    if disk_budget_config is not None:
+        try:
+            disk_budget_summary = estimate_disk_budget_summary(disk_budget_config)
+        except Exception as exc:
+            warnings.append(f"disk budget estimate unavailable: {type(exc).__name__}: {exc}")
 
     if free_gib < free_space_min_gib:
         aborted = True

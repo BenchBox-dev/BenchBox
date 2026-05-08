@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.uat import config, matrix
+from tests.uat import config, matrix, preflight_budget
 from tests.uat.phases import preflight
 
 pytestmark = pytest.mark.fast
@@ -94,6 +94,37 @@ def test_local_platforms_check_default_checker_probes_lakesail(tmp_path: Path, m
 def test_preflight_config_accepts_local_platforms_check():
     cfg = config.validate_config({"name": "smoke", "preflight": {"local_platforms_check": True}})
     assert cfg.preflight.local_platforms_check is True
+
+
+def test_preflight_disk_budget_table_error_is_advisory(tmp_path: Path, monkeypatch):
+    table = tmp_path / "disk_budget.tsv"
+    table.write_text(
+        "platform\tbenchmark\tpeak_datagen_gib\tpeak_database_gib\ttransient_growth_gib\nduckdb\ttpch\t1.0\t2.0\t0.5\n",
+        encoding="utf-8",
+    )
+    cfg = config.validate_config(
+        {
+            "name": "budget-smoke",
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+        }
+    )
+
+    monkeypatch.setattr(preflight, "free_space_gib", lambda path: 100.0)
+    monkeypatch.setattr(preflight, "docker_reachable", lambda: True)
+    monkeypatch.setattr(preflight, "host_load_1m", lambda: 0.5)
+    monkeypatch.setattr(preflight_budget, "DEFAULT_TABLE_PATH", table)
+
+    result = preflight.run_preflight(free_space_path=tmp_path, disk_budget_config=cfg)
+
+    assert result.aborted is False
+    assert result.abort_reason is None
+    assert result.disk_budget_summary is None
+    assert len(result.warnings) == 1
+    assert result.warnings[0].startswith("disk budget estimate unavailable: ValueError: disk budget table ")
+    assert "missing columns" in result.warnings[0]
+    assert "scale_factor" in result.warnings[0]
 
 
 def test_requested_platforms_from_raw_matches_uat_defaults():
