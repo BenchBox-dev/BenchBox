@@ -18,99 +18,99 @@ description: |
 
 deps:
   needs:
-    - results-explorer-compare-flow-entrypoints
+  - results-explorer-compare-flow-entrypoints
 
 work:
-  - id: w0
-    summary: "Rebind run-identity review evidence against develop tip"
-    status: pending
-    notes: |
-      Walk Charts > Rank, Distribution (Box Plot, Percentiles, CDF), Overview
-      (Performance, Power, Summary, Phases, Sparklines), Trend, and Compare
-      (baseline select, result cards, Decision Summary, Query-Level Diff)
-      against the current develop tip using a fixture cohort containing
-      duplicate platforms (e.g., two DataFusion runs differing only by
-      version or hardware). Capture which surfaces show indistinguishable
-      labels to
-      _project/verification-logs/results-explorer-run-identity-disambiguation/w0.log.
-      Output is the rebind reference for w1-w7 acceptance.
+- id: w0
+  summary: "Rebind run-identity review evidence against develop tip"
+  status: done
+  notes: |
+    Walk Charts > Rank, Distribution (Box Plot, Percentiles, CDF), Overview
+    (Performance, Power, Summary, Phases, Sparklines), Trend, and Compare
+    (baseline select, result cards, Decision Summary, Query-Level Diff)
+    against the current develop tip using a fixture cohort containing
+    duplicate platforms (e.g., two DataFusion runs differing only by
+    version or hardware). Capture which surfaces show indistinguishable
+    labels to
+    _project/verification-logs/results-explorer-run-identity-disambiguation/w0.log.
+    Output is the rebind reference for w1-w7 acceptance.
 
-  - id: w1
-    summary: "Define a shared RunIdentity formatter and component"
-    needs: [w0]
-    status: pending
-    notes: |
-      Define compact, table, chart, select-option, and tooltip variants. The
-      identity must include platform name plus enough available qualifiers
-      to distinguish duplicates: driver/platform version, run date, scale,
-      hardware or deployment fingerprint, source tier, and short result id
-      when other qualifiers remain identical.
+- id: w1
+  summary: "Define a shared RunIdentity formatter and component"
+  needs: [w0]
+  status: done
+  notes: |
+    Define compact, table, chart, select-option, and tooltip variants. The
+    identity must include platform name plus enough available qualifiers
+    to distinguish duplicates: driver/platform version, run date, scale,
+    hardware or deployment fingerprint, source tier, and short result id
+    when other qualifiers remain identical.
 
-  - id: w2
-    summary: "Apply RunIdentity labels to Rank chart headers"
-    needs: [w1]
-    status: pending
-    notes: |
-      Apply RunIdentity labels to Charts Rank column headers. Keep column
-      widths compact, provide full identity in a tooltip, and ensure
-      duplicate platform headers no longer render as identical
-      human-readable names.
+- id: w2
+  summary: "Apply RunIdentity labels to Rank chart headers"
+  needs: [w1]
+  status: done
+  notes: |
+    Apply RunIdentity labels to Charts Rank column headers. Keep column
+    widths compact, provide full identity in a tooltip, and ensure
+    duplicate platform headers no longer render as identical
+    human-readable names.
 
-  - id: w3
-    summary: "Apply RunIdentity labels to distribution chart rows"
-    needs: [w1]
-    status: pending
-    notes: |
-      Apply RunIdentity labels to Distribution Box Plot, Percentiles, and
-      CDF rows. Increase or measure the left label gutter so labels do not
-      overlap the plot area, and truncate only with a tooltip that
-      preserves the full identity.
+- id: w3
+  summary: "Apply RunIdentity labels to distribution chart rows"
+  needs: [w1]
+  status: pending
+  notes: |
+    Apply RunIdentity labels to Distribution Box Plot, Percentiles, and
+    CDF rows. Increase or measure the left label gutter so labels do not
+    overlap the plot area, and truncate only with a tooltip that
+    preserves the full identity.
 
-  - id: w4
-    summary: "Apply RunIdentity labels to overview and sparkline charts"
-    needs: [w1]
-    status: pending
-    notes: |
-      Apply RunIdentity labels to Overview Performance, Power, Summary,
-      Phases, and Sparklines. Repeated platform names must either be
-      aggregated intentionally with clear copy or shown as distinct runs
-      with qualifiers.
+- id: w4
+  summary: "Apply RunIdentity labels to overview and sparkline charts"
+  needs: [w1]
+  status: pending
+  notes: |
+    Apply RunIdentity labels to Overview Performance, Power, Summary,
+    Phases, and Sparklines. Repeated platform names must either be
+    aggregated intentionally with clear copy or shown as distinct runs
+    with qualifiers.
 
-  - id: w5
-    summary: "Apply RunIdentity labels and run-aware copy to Compare"
-    needs: [w1]
-    status: pending
-    notes: |
-      Apply RunIdentity to Compare baseline select options, result cards,
-      Decision Summary winner statements, and Query-Level Diff candidate
-      columns. Change copy from "2 platforms" to "2 runs" when selected
-      results have the same platform name. Run after the upstream Compare
-      rebuild (results-explorer-compare-flow-entrypoints) so labels apply
-      to the new builder structure.
+- id: w5
+  summary: "Apply RunIdentity labels and run-aware copy to Compare"
+  needs: [w1]
+  status: done
+  notes: |
+    Apply RunIdentity to Compare baseline select options, result cards,
+    Decision Summary winner statements, and Query-Level Diff candidate
+    columns. Change copy from "2 platforms" to "2 runs" when selected
+    results have the same platform name. Run after the upstream Compare
+    rebuild (results-explorer-compare-flow-entrypoints) so labels apply
+    to the new builder structure.
 
-  - id: w6
-    summary: "Disambiguate or aggregate repeated Trend chart series"
-    needs: [w1]
-    status: pending
-    notes: |
-      Fix Trend chart legends that repeat platform names. Either aggregate
-      repeated runs into one platform series with explicit aggregation copy
-      or display each run with its RunIdentity qualifier.
+- id: w6
+  summary: "Disambiguate or aggregate repeated Trend chart series"
+  needs: [w1]
+  status: pending
+  notes: |
+    Fix Trend chart legends that repeat platform names. Either aggregate
+    repeated runs into one platform series with explicit aggregation copy
+    or display each run with its RunIdentity qualifier.
 
-  - id: w7
-    summary: "Cover duplicate label cases across charts and Compare"
-    needs: [w2, w3, w4, w5, w6]
-    status: pending
-    notes: |
-      Add tests with duplicate platform fixtures for every affected
-      component. Assertions must fail if duplicate visible labels remain in
-      chart headers, chart row labels, compare select options, or decision
-      summary copy.
+- id: w7
+  summary: "Cover duplicate label cases across charts and Compare"
+  needs: [w2, w3, w4, w5, w6]
+  status: pending
+  notes: |
+    Add tests with duplicate platform fixtures for every affected
+    component. Assertions must fail if duplicate visible labels remain in
+    chart headers, chart row labels, compare select options, or decision
+    summary copy.
 
 must_preserve:
-  - "Existing color assignment should remain stable for the same run where possible."
-  - "Small chart labels must stay scannable at standard desktop width."
-  - "Full identity must be available by tooltip, accessible label, or details text."
+- "Existing color assignment should remain stable for the same run where possible."
+- "Small chart labels must stay scannable at standard desktop width."
+- "Full identity must be available by tooltip, accessible label, or details text."
 
 approach: |
   Centralize identity generation before changing individual charts. Use the
@@ -121,53 +121,53 @@ approach: |
   worktrees.
 
 anti_patterns:
-  - "DO NOT append raw UUID-length ids to every label."
-  - "DO NOT leave duplicate labels and rely on color alone."
-  - "DO NOT invent metadata that is not present in the result snapshot."
+- "DO NOT append raw UUID-length ids to every label."
+- "DO NOT leave duplicate labels and rely on color alone."
+- "DO NOT invent metadata that is not present in the result snapshot."
 
 verification:
-  - description: "Run identity and duplicate-label tests pass"
-    command: "cd results-explorer && npm test -- --run src/lib/__tests__/runIdentity.test.ts src/components/__tests__/charts.smoke.test.tsx src/components/__tests__/CompareSummary.test.tsx src/components/__tests__/GroupedQueryChart.test.tsx src/components/__tests__/QueryDiffTable.test.tsx src/components/__tests__/NormalizedSpeedupChart.test.tsx src/pages/__tests__/Compare.test.tsx"
-    expected_output: "all targeted tests pass"
-  - description: "Frontend typecheck passes"
-    command: "cd results-explorer && npm run typecheck"
-    expected_output: "exit 0"
-  - description: "Frontend build passes"
-    command: "cd results-explorer && npm run build"
-    expected_output: "exit 0"
-  - description: "Manual duplicate-run browser check is complete"
-    command: "echo 'Manual: browser-check chart Rank, Distribution, Overview/Sparklines, Trend, and Compare with duplicate DataFusion/Polars fixtures'"
-    expected_output: "manual evidence captured in PR notes or audit artifact"
+- description: "Run identity and duplicate-label tests pass"
+  command: "cd results-explorer && npm test -- --run src/lib/__tests__/runIdentity.test.ts src/components/__tests__/charts.smoke.test.tsx src/components/__tests__/CompareSummary.test.tsx src/components/__tests__/GroupedQueryChart.test.tsx src/components/__tests__/QueryDiffTable.test.tsx src/components/__tests__/NormalizedSpeedupChart.test.tsx src/pages/__tests__/Compare.test.tsx"
+  expected_output: "all targeted tests pass"
+- description: "Frontend typecheck passes"
+  command: "cd results-explorer && npm run typecheck"
+  expected_output: "exit 0"
+- description: "Frontend build passes"
+  command: "cd results-explorer && npm run build"
+  expected_output: "exit 0"
+- description: "Manual duplicate-run browser check is complete"
+  command: "echo 'Manual: browser-check chart Rank, Distribution, Overview/Sparklines, Trend, and Compare with duplicate DataFusion/Polars fixtures'"
+  expected_output: "manual evidence captured in PR notes or audit artifact"
 
 scope_limit:
   only_modify:
-    - "results-explorer/src/lib/runIdentity.ts"
-    - "results-explorer/src/lib/__tests__/"
-    - "results-explorer/src/components/RankTable.tsx"
-    - "results-explorer/src/components/DistributionBox.tsx"
-    - "results-explorer/src/components/PercentileLadder.tsx"
-    - "results-explorer/src/components/CDFChart.tsx"
-    - "results-explorer/src/components/PowerBar.tsx"
-    - "results-explorer/src/components/SparklineTable.tsx"
-    - "results-explorer/src/components/StackedPhase.tsx"
-    - "results-explorer/src/components/QueryTimingChart.tsx"
-    - "results-explorer/src/components/TimeSeries.tsx"
-    - "results-explorer/src/components/NormalizedSpeedupChart.tsx"
-    - "results-explorer/src/components/CompareSummary.tsx"
-    - "results-explorer/src/components/QueryDiffTable.tsx"
-    - "results-explorer/src/components/__tests__/"
-    - "results-explorer/src/pages/Compare.tsx"
-    - "results-explorer/src/pages/__tests__/"
+  - "results-explorer/src/lib/runIdentity.ts"
+  - "results-explorer/src/lib/__tests__/"
+  - "results-explorer/src/components/RankTable.tsx"
+  - "results-explorer/src/components/DistributionBox.tsx"
+  - "results-explorer/src/components/PercentileLadder.tsx"
+  - "results-explorer/src/components/CDFChart.tsx"
+  - "results-explorer/src/components/PowerBar.tsx"
+  - "results-explorer/src/components/SparklineTable.tsx"
+  - "results-explorer/src/components/StackedPhase.tsx"
+  - "results-explorer/src/components/QueryTimingChart.tsx"
+  - "results-explorer/src/components/TimeSeries.tsx"
+  - "results-explorer/src/components/NormalizedSpeedupChart.tsx"
+  - "results-explorer/src/components/CompareSummary.tsx"
+  - "results-explorer/src/components/QueryDiffTable.tsx"
+  - "results-explorer/src/components/__tests__/"
+  - "results-explorer/src/pages/Compare.tsx"
+  - "results-explorer/src/pages/__tests__/"
   do_not_modify:
-    - "benchbox/"
-    - "Generated result data unless required identity fields are missing from the export."
+  - "benchbox/"
+  - "Generated result data unless required identity fields are missing from the export."
 
 metadata:
   tags:
-    - results-explorer
-    - run-identity
-    - charts
-    - usability-review
+  - results-explorer
+  - run-identity
+  - charts
+  - usability-review
   estimated_effort: "Large (2-4 days)"
   created_date: "2026-05-08"
 
