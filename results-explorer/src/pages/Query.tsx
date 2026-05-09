@@ -503,7 +503,7 @@ export function Query(_: RoutableProps) {
         <section class="flex min-w-0 flex-col gap-4 lg:col-start-2">
           <div
             data-testid="query-result-summary"
-            class="order-1 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-4 shadow-sm lg:order-2"
+            class="order-1 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-4 shadow-sm"
           >
             <div class="text-sm text-[var(--bb-data-fg-muted)]">
               {rows.length} matching result bundle(s)
