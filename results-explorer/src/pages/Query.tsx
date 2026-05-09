@@ -709,7 +709,7 @@ export function Query(_: RoutableProps) {
 
           <details
             data-testid="query-visible-columns"
-            class="order-5 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-4 shadow-sm lg:order-1"
+            class="order-5 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-4 shadow-sm"
           >
             <summary class="cursor-pointer text-sm font-medium text-[var(--bb-data-fg-primary)]">
               Configure visible columns
