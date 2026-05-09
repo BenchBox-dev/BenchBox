@@ -85,11 +85,14 @@ description: |
      state-dependence:** PR #277 (concurrent, may land before this
      TODO is actioned) restructures `query-visible-columns` from a
      div into a default-collapsed `<details>`/`<summary>` affordance,
-     which collapses the visible-columns block from ≈494px to ≈30px
+     which collapses the visible-columns block from ≈494px to ≈54px
      by default at lg:order-1. Once PR #277 is in develop, the live
-     panel.top drops to ≈445 and the brittleness rationale evaporates;
+     panel.top drops to ≈457 and the brittleness rationale evaporates;
      only the semantic mismatch (1) remains. Re-measure with the live
-     DOM probe before deciding which resolution to pick.
+     DOM probe before deciding which resolution to pick. (Numbers in
+     this block corrected post-PR-291 against the captured w0.log to
+     match the observed measurement at the time; the original draft
+     estimated 30px / 445 from a smaller probe.)
 
   Resolving (1) structurally also resolves (2) regardless of PR #277's
   merge state: if `query-visible-columns` drops `lg:order-1` (or moves
