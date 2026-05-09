@@ -470,6 +470,7 @@ export function QueryHeatmap({
                     <h2 class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">{row.platform}</h2>
                     {!row.is_ranking_eligible && (
                       <span
+                        role="img"
                         class="text-xs text-[var(--bb-data-fg-subtle)] cursor-help"
                         title={`Compliance: ${complianceLabel(row.compliance_class).replace(/^\(|\)$/g, "")}`}
                         aria-label={`Compliance: ${complianceLabel(row.compliance_class).replace(/^\(|\)$/g, "")}`}
@@ -616,6 +617,7 @@ export function QueryHeatmap({
                       <span class="font-medium text-[var(--bb-data-fg-primary)]">{row.platform}</span>
                       {!row.is_ranking_eligible && (
                         <span
+                          role="img"
                           class="text-xs text-[var(--bb-data-fg-subtle)] cursor-help"
                           title={`Compliance: ${complianceLabel(row.compliance_class).replace(/^\(|\)$/g, "")}`}
                           aria-label={`Compliance: ${complianceLabel(row.compliance_class).replace(/^\(|\)$/g, "")}`}

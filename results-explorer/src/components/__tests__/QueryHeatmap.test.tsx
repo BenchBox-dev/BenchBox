@@ -173,7 +173,7 @@ describe("QueryHeatmap rendering", () => {
     expect(cells[1]?.textContent ?? "").toContain("Receipt");
   });
 
-  it("renders an aria-described compliance marker instead of inline parenthetical text", () => {
+  it("renders a nameable compliance marker instead of inline parenthetical text", () => {
     const noncompliantSummary = makeSummary({
       platforms: [
         {
@@ -187,8 +187,10 @@ describe("QueryHeatmap rendering", () => {
     render(<QueryHeatmap summary={noncompliantSummary} />);
     const marker = screen.getByTestId("heatmap-compliance-marker-platform-noncompliant");
     expect(marker.textContent).toBe("*");
+    expect(marker.getAttribute("role")).toBe("img");
     expect(marker.getAttribute("title")).toContain("subscale");
     expect(marker.getAttribute("aria-label")).toContain("subscale");
+    expect(screen.getAllByRole("img", { name: "Compliance: subscale" })).toHaveLength(2);
     expect(screen.queryByText("(subscale)")).toBeNull();
   });
 
