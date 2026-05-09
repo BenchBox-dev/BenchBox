@@ -15,6 +15,7 @@ export interface FacetGroup {
   selected: string[];
   searchable?: boolean;
   emptyLabel?: string;
+  defaultCollapsed?: boolean;
 }
 
 export interface ActiveFacetChip {
@@ -262,65 +263,104 @@ function FacetGroupSection({
   onToggle: (groupKey: string, value: string) => void;
 }) {
   const [search, setSearch] = useState("");
-  const options = useMemo(() => {
+  const [expanded, setExpanded] = useState(!group.defaultCollapsed);
+  const labelledOptions = useMemo(
+    () =>
+      group.options.map((option) => ({
+        ...option,
+        displayLabel: formatFacetDisplayValue(group.key, option.value, option.label),
+      })),
+    [group.key, group.options],
+  );
+  const filteredOptions = useMemo(() => {
     const needle = search.trim().toLowerCase();
-    const labelled = group.options.map((option) => ({
-      ...option,
-      displayLabel: formatFacetDisplayValue(group.key, option.value, option.label),
-    }));
-    if (needle === "") return labelled;
-    return labelled.filter(
+    if (needle === "") return labelledOptions;
+    return labelledOptions.filter(
       (option) =>
         option.displayLabel.toLowerCase().includes(needle) || option.value.toLowerCase().includes(needle),
     );
-  }, [group.options, search]);
+  }, [labelledOptions, search]);
+  const selectedSummary = useMemo(
+    () => labelledOptions.filter((option) => group.selected.includes(option.value)),
+    [labelledOptions, group.selected],
+  );
+  const panelId = `facet-${group.key}-panel`;
 
   return (
     <section class="rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-4 shadow-sm">
-      <div class="mb-3 flex items-center justify-between gap-2">
-        <h3 class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">{group.label}</h3>
-        {group.selected.length > 0 && (
-          <span class="rounded-full bg-[var(--bb-surface-app)] px-2 py-0.5 text-xs text-[var(--bb-data-fg-muted)]">
-            {group.selected.length}
+      <div class="flex items-center justify-between gap-2">
+        <button
+          type="button"
+          class="flex flex-1 items-center justify-between gap-2 rounded-md text-left"
+          aria-expanded={expanded}
+          aria-controls={panelId}
+          onClick={() => setExpanded((value) => !value)}
+        >
+          <h3 class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">{group.label}</h3>
+          <span class="inline-flex items-center gap-2">
+            {group.selected.length > 0 && (
+              <span class="rounded-full bg-[var(--bb-surface-app)] px-2 py-0.5 text-xs text-[var(--bb-data-fg-muted)]">
+                {group.selected.length}
+              </span>
+            )}
+            <span aria-hidden="true" class="text-xs text-[var(--bb-data-fg-muted)]">
+              {expanded ? "▾" : "▸"}
+            </span>
           </span>
-        )}
+        </button>
       </div>
-      {group.searchable && (
-        <label class="mb-3 block">
-          <span class="sr-only">Search {group.label}</span>
-          <input
-            type="search"
-            class="w-full rounded-md border border-[var(--bb-data-border-strong)] px-3 py-1.5 text-sm"
-            placeholder={`Search ${group.label.toLowerCase()}`}
-            value={search}
-            onInput={(event) => setSearch((event.currentTarget as HTMLInputElement).value)}
-          />
-        </label>
+      {!expanded && selectedSummary.length > 0 && (
+        <div class="mt-2 flex flex-wrap gap-1" data-testid={`facet-${group.key}-selected-summary`}>
+          {selectedSummary.map((option) => (
+            <span
+              key={option.value}
+              class="rounded-full bg-[var(--bb-tone-info-bg)] px-2 py-0.5 text-[11px] text-[var(--bb-tone-info-fg)]"
+            >
+              {option.displayLabel}
+            </span>
+          ))}
+        </div>
       )}
-      {options.length === 0 ? (
-        <p class="text-sm text-[var(--bb-data-fg-subtle)]">{group.emptyLabel ?? "No facet values"}</p>
-      ) : (
-        <div class="space-y-2">
-          {options.map((option) => {
-            const checked = group.selected.includes(option.value);
-            return (
-              <label key={option.value} class="flex items-center justify-between gap-2 text-sm text-[var(--bb-data-fg-muted)]">
-                <span class="inline-flex min-w-0 items-center gap-2">
-                  <input
-                    type="checkbox"
-                    aria-label={formatFacetAccessibleName(group.label, option.displayLabel, option.count)}
-                    checked={checked}
-                    disabled={option.disabled}
-                    onChange={() => onToggle(group.key, option.value)}
-                  />
-                  <span class="truncate">{option.displayLabel}</span>
-                </span>
-                {option.count !== undefined && (
-                  <span class="shrink-0 text-xs text-[var(--bb-data-fg-subtle)]">{option.count.toLocaleString()}</span>
-                )}
-              </label>
-            );
-          })}
+      {expanded && (
+        <div id={panelId} class="mt-3">
+          {group.searchable && (
+            <label class="mb-3 block">
+              <span class="sr-only">Search {group.label}</span>
+              <input
+                type="search"
+                class="w-full rounded-md border border-[var(--bb-data-border-strong)] px-3 py-1.5 text-sm"
+                placeholder={`Search ${group.label.toLowerCase()}`}
+                value={search}
+                onInput={(event) => setSearch((event.currentTarget as HTMLInputElement).value)}
+              />
+            </label>
+          )}
+          {filteredOptions.length === 0 ? (
+            <p class="text-sm text-[var(--bb-data-fg-subtle)]">{group.emptyLabel ?? "No facet values"}</p>
+          ) : (
+            <div class="space-y-2">
+              {filteredOptions.map((option) => {
+                const checked = group.selected.includes(option.value);
+                return (
+                  <label key={option.value} class="flex items-center justify-between gap-2 text-sm text-[var(--bb-data-fg-muted)]">
+                    <span class="inline-flex min-w-0 items-center gap-2">
+                      <input
+                        type="checkbox"
+                        aria-label={formatFacetAccessibleName(group.label, option.displayLabel, option.count)}
+                        checked={checked}
+                        disabled={option.disabled}
+                        onChange={() => onToggle(group.key, option.value)}
+                      />
+                      <span class="truncate">{option.displayLabel}</span>
+                    </span>
+                    {option.count !== undefined && (
+                      <span class="shrink-0 text-xs text-[var(--bb-data-fg-subtle)]">{option.count.toLocaleString()}</span>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </section>

@@ -448,6 +448,10 @@ describe("Query", () => {
     const deployment = within(desktopFilters).getByRole("heading", { name: "Deployment" }).closest("section")!;
     const cloudProvider = within(desktopFilters).getByRole("heading", { name: "Cloud provider" }).closest("section")!;
     const shape = within(desktopFilters).getByRole("heading", { name: "Instance / warehouse" }).closest("section")!;
+    fireEvent.click(within(costStatus).getByRole("button", { name: /^Cost status/ }));
+    fireEvent.click(within(deployment).getByRole("button", { name: /^Deployment/ }));
+    fireEvent.click(within(cloudProvider).getByRole("button", { name: /^Cloud provider/ }));
+    fireEvent.click(within(shape).getByRole("button", { name: /^Instance \/ warehouse/ }));
     fireEvent.click(within(costStatus).getByLabelText(/^Cost status: normalized/i));
     fireEvent.click(within(deployment).getByLabelText(/^Deployment: cloud/i));
     fireEvent.click(within(cloudProvider).getByLabelText(/^Cloud provider: aws/i));
