@@ -122,8 +122,7 @@ anti_patterns:
 
 verification:
 - description: "Query controls and label tests pass"
-  command: "cd results-explorer && npm test -- --run src/pages/__tests__/Query.test.tsx src/pages/__tests__/Home.test.tsx
-    src/lib/__tests__/displayLabels.test.ts"
+  command: "cd results-explorer && npm test -- --run src/pages/__tests__/Query.test.tsx src/pages/__tests__/Home.test.tsx src/lib/__tests__/displayLabels.test.ts"
   expected_output: "all targeted tests pass"
 - description: "Frontend typecheck passes"
   command: "cd results-explorer && npm run typecheck"
@@ -132,8 +131,7 @@ verification:
   command: "cd results-explorer && npm run build"
   expected_output: "exit 0"
 - description: "Manual Query Workbench browser check is complete"
-  command: "echo 'Manual: browser-check /results/query and /results/ for column disclosure, facet collapse, and duplicate
-    SSB labels'"
+  command: "echo 'Manual: browser-check /results/query and /results/ for column disclosure, facet collapse, and duplicate SSB labels'"
   expected_output: "manual evidence captured in PR notes or audit artifact"
 
 scope_limit:
