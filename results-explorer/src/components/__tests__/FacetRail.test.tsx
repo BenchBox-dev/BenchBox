@@ -94,6 +94,117 @@ describe("FacetRail", () => {
   });
 });
 
+describe("FacetRail collapsible groups", () => {
+  const COLLAPSE_GROUPS: FacetGroup[] = [
+    {
+      key: "benchmark",
+      label: "Benchmark",
+      selected: ["tpch"],
+      searchable: true,
+      options: [
+        { value: "tpch", label: "TPC-H", count: 12 },
+        { value: "clickbench", label: "ClickBench", count: 4 },
+        { value: "tpcds", label: "TPC-DS", count: 6 },
+      ],
+    },
+    {
+      key: "trust_tier",
+      label: "Trust",
+      selected: ["official"],
+      defaultCollapsed: true,
+      options: [
+        { value: "official", label: "Official", count: 5 },
+        { value: "community-submission", label: "Community", count: 2 },
+      ],
+    },
+    {
+      key: "deployment_class",
+      label: "Deployment",
+      selected: [],
+      defaultCollapsed: true,
+      options: [
+        { value: "local-laptop", label: "Local laptop", count: 8 },
+        { value: "cloud-instance", label: "Cloud instance", count: 4 },
+      ],
+    },
+  ];
+
+  it("renders default-collapsed groups without their option list and shows selected chips", () => {
+    render(
+      <FacetRail
+        groups={COLLAPSE_GROUPS}
+        resultCount={20}
+        activeChips={[]}
+        onToggle={vi.fn()}
+        onReset={vi.fn()}
+      />,
+    );
+
+    const trustToggle = screen.getByRole("button", { name: /^Trust/ });
+    expect(trustToggle).toHaveAttribute("aria-expanded", "false");
+    const trustSection = trustToggle.closest("section")!;
+    expect(within(trustSection).queryByRole("checkbox")).toBeNull();
+    const selectedSummary = within(trustSection).getByTestId(
+      "facet-trust_tier-selected-summary",
+    );
+    expect(within(selectedSummary).getByText("Official")).toBeTruthy();
+
+    const deploymentToggle = screen.getByRole("button", { name: /^Deployment/ });
+    expect(deploymentToggle).toHaveAttribute("aria-expanded", "false");
+    const deploymentSection = deploymentToggle.closest("section")!;
+    expect(within(deploymentSection).queryByText("Local laptop")).toBeNull();
+
+    const benchmarkToggle = screen.getByRole("button", { name: /^Benchmark/ });
+    expect(benchmarkToggle).toHaveAttribute("aria-expanded", "true");
+    const benchmarkSection = benchmarkToggle.closest("section")!;
+    expect(within(benchmarkSection).getAllByRole("checkbox").length).toBe(3);
+  });
+
+  it("toggles a group expanded and collapsed via its header button", () => {
+    render(
+      <FacetRail
+        groups={COLLAPSE_GROUPS}
+        resultCount={20}
+        activeChips={[]}
+        onToggle={vi.fn()}
+        onReset={vi.fn()}
+      />,
+    );
+
+    const trustToggle = screen.getByRole("button", { name: /^Trust/ });
+    fireEvent.click(trustToggle);
+    expect(trustToggle).toHaveAttribute("aria-expanded", "true");
+    const trustSection = trustToggle.closest("section")!;
+    expect(within(trustSection).getAllByRole("checkbox").length).toBe(2);
+
+    fireEvent.click(trustToggle);
+    expect(trustToggle).toHaveAttribute("aria-expanded", "false");
+    expect(within(trustSection).queryByRole("checkbox")).toBeNull();
+  });
+
+  it("preserves searchable behavior on expanded groups", () => {
+    render(
+      <FacetRail
+        groups={COLLAPSE_GROUPS}
+        resultCount={20}
+        activeChips={[]}
+        onToggle={vi.fn()}
+        onReset={vi.fn()}
+      />,
+    );
+
+    const benchmarkSection = screen
+      .getByRole("button", { name: /^Benchmark/ })
+      .closest("section")!;
+    fireEvent.input(within(benchmarkSection).getByRole("searchbox"), {
+      target: { value: "tpc-d" },
+    });
+    expect(within(benchmarkSection).getByText("TPC-DS")).toBeTruthy();
+    expect(within(benchmarkSection).queryByText("TPC-H")).toBeNull();
+    expect(within(benchmarkSection).queryByText("ClickBench")).toBeNull();
+  });
+});
+
 describe("FacetDrawer", () => {
   it("shows a closed summary and opens the facet dialog", () => {
     const onOpenChange = vi.fn();

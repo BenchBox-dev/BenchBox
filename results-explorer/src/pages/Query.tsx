@@ -261,37 +261,65 @@ export function Query(_: RoutableProps) {
 
   const columnNames = schema.map((column) => column.name);
   const facetGroups: FacetGroup[] = [
-    makeFacetGroup("benchmark", "Benchmark", facetCounts.benchmark ?? [], benchmarks, formatBenchmarkLabel),
-    makeFacetGroup("platform", "Platform", facetCounts.platform ?? [], platforms),
+    makeFacetGroup("benchmark", "Benchmark", facetCounts.benchmark ?? [], benchmarks, {
+      formatLabel: formatBenchmarkLabel,
+      searchable: true,
+    }),
+    makeFacetGroup("platform", "Platform", facetCounts.platform ?? [], platforms, {
+      searchable: true,
+    }),
     makeFacetGroup("scale_factor", "Scale", facetCounts.scale_factor ?? [], scaleFactors),
-    makeFacetGroup("tuning_mode", "Tuning", facetCounts.tuning_mode ?? [], tuningModes),
-    makeFacetGroup("trust_tier", "Trust", facetCounts.trust_label ?? [], trustTiers, formatTrustLabel),
-    makeFacetGroup("validation_status", "Validation", facetCounts.validation_status ?? [], validationStatuses, formatValidationStatus),
-    makeFacetGroup("cost_status", "Cost status", facetCounts.cost_status ?? [], costStatuses, formatCostStatus),
-    makeFacetGroup("cost_model", "Cost model", facetCounts.cost_model_version ?? [], costModelVersions),
-    makeFacetGroup("deployment_class", "Deployment", facetCounts.deployment_class ?? [], deploymentClasses),
-    makeFacetGroup("cloud_provider", "Cloud provider", facetCounts.cloud_provider ?? [], cloudProviders),
-    makeFacetGroup("cloud_region", "Cloud region", facetCounts.cloud_region ?? [], cloudRegions),
+    makeFacetGroup("tuning_mode", "Tuning", facetCounts.tuning_mode ?? [], tuningModes, {
+      defaultCollapsed: true,
+    }),
+    makeFacetGroup("trust_tier", "Trust", facetCounts.trust_label ?? [], trustTiers, {
+      formatLabel: formatTrustLabel,
+      defaultCollapsed: true,
+    }),
+    makeFacetGroup("validation_status", "Validation", facetCounts.validation_status ?? [], validationStatuses, {
+      formatLabel: formatValidationStatus,
+      defaultCollapsed: true,
+    }),
+    makeFacetGroup("cost_status", "Cost status", facetCounts.cost_status ?? [], costStatuses, {
+      formatLabel: formatCostStatus,
+      defaultCollapsed: true,
+    }),
+    makeFacetGroup("cost_model", "Cost model", facetCounts.cost_model_version ?? [], costModelVersions, {
+      defaultCollapsed: true,
+    }),
+    makeFacetGroup("deployment_class", "Deployment", facetCounts.deployment_class ?? [], deploymentClasses, {
+      defaultCollapsed: true,
+    }),
+    makeFacetGroup("cloud_provider", "Cloud provider", facetCounts.cloud_provider ?? [], cloudProviders, {
+      defaultCollapsed: true,
+    }),
+    makeFacetGroup("cloud_region", "Cloud region", facetCounts.cloud_region ?? [], cloudRegions, {
+      searchable: true,
+      defaultCollapsed: true,
+    }),
     makeFacetGroup(
       "instance_or_warehouse",
       "Instance / warehouse",
       facetCounts.instance_or_warehouse ?? [],
       instanceOrWarehouses,
+      { searchable: true, defaultCollapsed: true },
     ),
-    makeFacetGroup("storage_format", "Storage", facetCounts.storage_format ?? [], storageFormats),
+    makeFacetGroup("storage_format", "Storage", facetCounts.storage_format ?? [], storageFormats, {
+      defaultCollapsed: true,
+    }),
     makeFacetGroup(
       "has_cost",
       "Has cost",
       [{ value: "all", count: rows.length }, ...(facetCounts.has_cost ?? [])],
       [hasCost],
-      formatHasCostLabel,
+      { formatLabel: formatHasCostLabel, defaultCollapsed: true },
     ),
     makeFacetGroup(
       "date_window",
       "Date window",
       [{ value: "all", count: rows.length }, ...(facetCounts.date_window ?? [])],
       [dateWindow],
-      formatDateWindowLabel,
+      { formatLabel: formatDateWindowLabel, defaultCollapsed: true },
     ),
   ].filter((group) => group.options.length > 0);
   const activeFilterChips: ActiveFacetChip[] = [
@@ -808,17 +836,27 @@ export function Query(_: RoutableProps) {
   );
 }
 
+interface MakeFacetGroupOptions {
+  formatLabel?: (value: string) => string;
+  searchable?: boolean;
+  defaultCollapsed?: boolean;
+}
+
 function makeFacetGroup(
   key: string,
   label: string,
   buckets: FacetBucket[],
   selected: string[],
-  formatLabel: (value: string) => string = (value) => formatQueryFacetValue(key, value),
+  options: MakeFacetGroupOptions = {},
 ): FacetGroup {
+  const formatLabel =
+    options.formatLabel ?? ((value: string) => formatQueryFacetValue(key, value));
   return {
     key,
     label,
     selected,
+    searchable: options.searchable,
+    defaultCollapsed: options.defaultCollapsed,
     options: buckets.map((bucket) => ({
       value: bucket.value,
       label: formatLabel(bucket.value),

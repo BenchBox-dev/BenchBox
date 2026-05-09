@@ -67,12 +67,22 @@ work:
 - id: w4
   summary: "Make left-rail facet groups collapsible and searchable"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
-    Make desktop and mobile facet groups collapsible. Long groups such as
-    Benchmark must show a compact top segment with "Show all" or internal
-    search, avoid pushing Platform and Scale below the fold, and keep
-    active facets visible even when collapsed.
+    FacetGroupSection grew a per-group expand/collapse toggle (chevron
+    button with aria-expanded/aria-controls) and an optional
+    `defaultCollapsed` flag. Selected option chips render inline when a
+    group is collapsed so active facets stay visible without expanding.
+    Query.tsx now opts the long groups (Benchmark, Platform, Cloud region,
+    Instance/warehouse) into the existing `searchable` affordance and
+    default-collapses every secondary group beyond Benchmark/Platform/
+    Scale so Platform and Scale stay above the fold. FacetDrawer (mobile)
+    inherits the same behavior via FacetRail. Tests added in
+    src/components/__tests__/FacetRail.test.tsx cover default-collapsed
+    rendering, toggle behavior, and search-after-expand. The Query
+    integration test was updated to expand secondary groups before
+    clicking nested checkboxes (no assertion weakened). Verification log:
+    _project/verification-logs/results-explorer-query-workbench-controls-and-facets/w4.log.
 
 - id: w5
   summary: "Disambiguate duplicate SSB benchmark labels"

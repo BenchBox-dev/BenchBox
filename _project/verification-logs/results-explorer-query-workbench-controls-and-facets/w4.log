@@ -1,0 +1,86 @@
+# w4 — Make left-rail facet groups collapsible and searchable
+
+Branch: feat/explorer-query-facets-disclosure
+Develop tip at start: 6c28d2b45 (PR #298 merged)
+
+## Current state on develop tip (rebound 2026-05-09)
+
+Inspected: results-explorer/src/components/FacetRail.tsx,
+results-explorer/src/pages/Query.tsx (lines 263-296),
+results-explorer/src/components/__tests__/FacetRail.test.tsx.
+
+- `FacetRail` renders a left rail of `FacetGroupSection`s. Each group
+  always renders fully expanded — there is no collapse affordance.
+- `FacetGroup` already supports `searchable?: boolean`. The component
+  renders a search input when set; filters options by display label or
+  raw value on input.
+- `FacetGroupSection` does not truncate long option lists; large groups
+  render every option and push later groups (Platform, Scale, Trust,
+  Validation, Cost, Deployment, Cloud, Storage, Has-cost, Date-window)
+  far below the fold.
+- `Query.tsx` builds 14+ facet groups via `makeFacetGroup`. None set
+  `searchable: true`, so the existing search affordance is unused on the
+  Query page even for groups with many options (Benchmark, Platform,
+  Cloud region, Instance/warehouse).
+- The Drawer (mobile) wraps the same `FacetRail`, so any change to
+  collapse behavior applies to both desktop and mobile.
+
+## Defects vs the w0 review
+
+- D1 (collapse): No way to collapse a group. Long groups dominate the
+  rail and force scrolling past Benchmark to reach Platform/Scale.
+- D2 (search): Production never enables `searchable`, even though the
+  capability exists. Long lists have no in-group filter.
+- D3 (active-while-collapsed): Implicit — once D1 is fixed, selected
+  options must remain visible without expanding.
+
+## Planned change for w4
+
+1. Add per-group expanded/collapsed state to `FacetGroupSection`. Add a
+   chevron toggle in the section header. State is local to the
+   component (not persisted across navigation; restoring state per
+   browser session is out of scope for this work unit).
+2. When a group is collapsed:
+   - Hide the search input and the option list.
+   - Render any currently selected options as inline chips so active
+     facets remain visible without expanding.
+   - Empty collapsed groups (no selection) show only the header and a
+     count of the total options available so the user knows expanding
+     it is meaningful.
+3. Add an optional `defaultCollapsed?: boolean` to `FacetGroup`. Apply
+   `defaultCollapsed: true` on Query for groups beyond a stable
+   "primary" prefix (Benchmark, Platform, Scale stay expanded; the rest
+   start collapsed) so Platform and Scale are above the fold.
+4. Apply `searchable: true` to Benchmark, Platform, Cloud region, and
+   Instance/warehouse on Query so long lists have search when expanded.
+5. Add tests asserting:
+   - Toggle button collapses and expands a group.
+   - Selected option chips render in the collapsed header.
+   - Default-collapsed groups render in a collapsed state on initial
+     mount.
+   - Expanded long-list searchable groups continue to filter by search.
+   - Drawer (mobile) inherits the same behavior.
+
+## Manual route walk
+
+Walked /results/query against develop tip in the locally running
+preview (`npm run dev`) prior to changes:
+
+- Default desktop view: Benchmark group expanded with ~16 visible
+  options. Platform header is visible only after scrolling past the
+  Benchmark list. Cloud region group with 8+ entries duplicates the
+  effect lower in the rail.
+- No collapse control on any group.
+- No in-group search anywhere on /results/query, despite the underlying
+  component supporting it.
+- Selected facets render as active chips at the rail summary; that
+  surface is unaffected by the planned change.
+
+## Verification commands (post-implementation)
+
+- `cd results-explorer && npm test -- --run src/components/__tests__/FacetRail.test.tsx src/pages/__tests__/Query.test.tsx`
+- `cd results-explorer && npm run typecheck`
+- `cd results-explorer && npm run build`
+- Browser smoke: `/results/query` — collapse Benchmark, expand Cloud
+  region, type "us-" in Cloud region search, confirm only matching
+  options render. Mobile drawer: same checks via the Filters drawer.
