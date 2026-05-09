@@ -92,10 +92,14 @@ work:
         2. Data-fetch infrastructure (`benchbox/core/data_fetch/`)
            - Per-benchmark `data_manifest.toml` schema (URL, sha256,
              file layout, version, license file)
-           - Cache: ${BENCHBOX_DATA_CACHE:-~/.cache/benchbox/data}/
-             {benchmark}/{version}/
-           - User-supplied opt-out: `--data-path` CLI flag and
-             `BENCHBOX_DATA_PATH_<BENCHMARK>` env var
+           - Reuse BenchBox's existing datagen path convention:
+             `resolve_benchmark_runs_dir()` +
+             `get_datagen_path(benchmark, sf)`
+           - Add manifest-driven SHA256 verification on top of
+             nyctaxi-style `.exists()` presence checks
+           - No new env vars and no new CLI flags; air-gapped users
+             pre-populate the datagen directory and hit the same
+             checksum gate
            - Failure modes documented: ChecksumMismatchError,
              ManifestValidationError, DataFetchError
         3. Dataset versioning in result bundles
@@ -115,16 +119,14 @@ work:
       Module structure (minimum viable, fully tested):
         benchbox/core/data_fetch/__init__.py    # public API: fetch_data()
         benchbox/core/data_fetch/manifest.py    # parse data_manifest.toml
-        benchbox/core/data_fetch/manager.py     # orchestrate fetch/cache/validate
+        benchbox/core/data_fetch/manager.py     # orchestrate path, fetch, validate
         benchbox/core/data_fetch/downloader.py  # HTTP GET + progress + resume + retry
-        benchbox/core/data_fetch/cache.py       # cache location + lock files
         benchbox/core/data_fetch/errors.py      # exception hierarchy
 
       Tests (mocked HTTP):
         tests/unit/core/data_fetch/test_manifest.py
         tests/unit/core/data_fetch/test_manager.py
         tests/unit/core/data_fetch/test_downloader.py
-        tests/unit/core/data_fetch/test_cache.py
 
       Skeleton is benchmark-agnostic; no joinorder-specific code in
       this module. Joinorder wiring happens in the cutover TODO.
@@ -516,6 +518,7 @@ scope_limit:
     - "benchbox/core/data_fetch/ (new module)"
     - "benchbox/core/benchmark_registry.py (add `surface` field + scale validation hook)"
     - "benchbox/core/errors.py (add ScaleFactorNotSupportedError if not present)"
+    - "benchbox/utils/path_utils.py (only if the datagen verification helper extends existing path utilities)"
     - "benchbox/core/joinorder/data_manifest.toml (new)"
     - "tests/unit/core/data_fetch/ (new)"
     - "tests/unit/core/test_scale_factor_validation.py (new)"
@@ -566,11 +569,12 @@ impact:
     Reusable data-fetch infrastructure pays forward: ClickBench,
     Wikipedia pageviews, GitHub Archive, and any future real-data
     benchmark instantiates the same machinery rather than each one
-    solving downloader/manifest/cache from scratch.
+    solving downloader/manifest/verification from scratch.
   user_impact: |
     Users will need to acquire ~1.5 GB of canonical data on first
-    `joinorder` run (silent download by default, with `--data-path`
-    opt-out for air-gapped environments). In exchange they get
+    `joinorder` run (silent download by default into the existing
+    `BENCHBOX_OUTPUT_DIR` / `benchmark_runs/datagen/` tree; air-gapped
+    users pre-populate that directory). In exchange they get
     results that are bit-comparable across all BenchBox users and
     against the academic literature.
   technical_debt: |
@@ -582,7 +586,7 @@ impact:
 success_metrics:
   - "Bit-reproducible Parquet archive built from Harvard Dataverse pg_dump (DOI:10.7910/DVN/2QYZBT) with full provenance manifest"
   - "Reference cardinalities computed for all 113 canonical JOB queries via PostgreSQL oracle, committed to _project/joinorder/reference_cardinalities.json"
-  - "Reusable benchbox/core/data_fetch/ module: parses manifest, downloads with checksum validation, supports user-path opt-out, all tests pass without network access"
+  - "Reusable benchbox/core/data_fetch/ module: parses manifest, downloads with checksum validation into the existing datagen path, verifies pre-populated data, all tests pass without network access"
   - "scale_factor enforcement is registry-driven and reusable: parametrized tests verify joinorder rejects sf!=1 and other benchmarks accept their declared ranges"
   - "DRAFT GitHub Release at tag data/joinorder-imdb-2013-v1 stages the archive and is ready to be promoted by the cutover TODO"
   - "Tiny canonical fixture (~1MB) is checked in and satisfies all 113 query predicates"
@@ -593,6 +597,7 @@ open_questions:
   - "DuckDB Parquet writer's encoding behavior on edge-case Unicode (combining characters, RTL text). Plan: w8 round-trip gate catches this; if it fails, fall back to Polars or pyarrow for the conversion step."
   - "Whether tiny fixture should be deterministic regen vs frozen sha256 in repo. Plan: deterministic regen via the build pipeline (w14), but the resulting Parquets are checked in (so unit tests don't need the full archive)."
   - "Reference cardinality validation against Leis 2015 published numbers — only some queries have published row counts. Plan: w12 cross-checks where available; remaining queries rely on the Postgres-on-canonical oracle alone."
+  - "Nyctaxi currently uses the same datagen directory convention with `.exists()` skip behavior but not this manifest SHA256 gate. Plan: leave nyctaxi unchanged in Step 1 and file follow-up work if the checksum gate should be generalized there."
 
 context_sections:
   "Research Findings": |
@@ -626,12 +631,14 @@ context_sections:
       1. DATA-LICENSE.md per benchmark with IMDb attribution
          verbatim, Boncz-style scope clause, redistribution
          disclaimer, takedown contact
-      2. `--data-path` opt-out for users in stricter jurisdictions
+      2. Air-gapped/pre-populated datagen directory path for users in
+         stricter jurisdictions, using the existing `BENCHBOX_OUTPUT_DIR`
+         convention and the same manifest checksum verification
       3. Same-day takedown SLA: pull Release asset on objection,
-         fall back to user-supplied path
+         fall back to user-populated datagen directory instructions
       4. No click-through (matches field practice; no legal upside)
 
     See conversation history for the full evidence pack and
     sources. If posture conditions cannot be met before w14
     promotion, fall back to Option C: host conversion scripts
-    only, require user-supplied data path.
+    only, require users to pre-populate the standard datagen directory.

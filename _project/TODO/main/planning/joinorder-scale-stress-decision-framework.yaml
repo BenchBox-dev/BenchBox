@@ -14,6 +14,10 @@ description: |
   This item is deliberately a decision framework, not an implementation. It
   should conclude with a recommendation on which scale-up path, if any, is worth
   prototyping after canonical JOB has a reliable dataset contract and oracle.
+  The primary decision record is
+  `_project/decisions/joinorder-scale-stress-decision-<date>.md`; licensing is
+  captured separately in
+  `_project/decisions/joinorder-scale-stress-licensing-<date>.md`.
 
 deps:
   needs:
@@ -121,6 +125,11 @@ work:
       and make any implementation prototype depend on it before coding. The
       decision must identify required changes to runner phases, result bundles,
       platform adapter hooks, CLI phase parsing, and validation/reporting.
+      The decision note must include exactly one machine-checkable line:
+      `Stats phase gate: completed`, `Stats phase gate: smoke-only`, or
+      `Stats phase gate: dependency:joinorder-statistics-phase-measurement`.
+      Use `smoke-only` only when the prototype is explicitly narrowed so it
+      cannot claim publication-quality stats-maintenance conclusions.
 
   - id: w4
     summary: "Compare scale-up implementation options"
@@ -220,12 +229,13 @@ work:
         - Hosting model (GitHub Release / user-supplied path / both)
         - Takedown contact (inherits from canonical unless changed)
 
-      If w7 chooses "no scaled JOB for now": this work unit's
-      output is a one-line note saying "no derived archive planned;
-      licensing review re-opens when scale-stress work resumes." If the recommendation is replicated_imdb, it must
-      also state whether the statistics/analyze phase blocker is satisfied,
-      deferred with a narrower prototype scope, or represented by a new TODO that
-      the prototype must depend on.
+      If w7 chooses "no scaled JOB for now", still use the four headings above;
+      each section may state that no derived archive is planned and licensing
+      review re-opens when scale-stress work resumes. If the recommendation is
+      replicated_imdb, the licensing note must also state whether the
+      statistics/analyze phase blocker is satisfied, deferred with a narrower
+      prototype scope, or represented by a new TODO that the prototype must
+      depend on.
 
 deferred:
   - summary: "Implement any scaled JOB generator"
@@ -241,12 +251,16 @@ must_preserve:
   - "Query validation must use the canonical oracle contract from joinorder-canonical-foundation when applicable."
   - "A scaled JOB-derived prototype must not start until stats/analyze phase requirements are either satisfied or explicitly scoped out in the decision note."
   - "If w7 mutates the prototype TODO file, the prototype TODO must be quiescent (no in-progress work units) at the time of mutation; otherwise concurrent edits create lost-write risk."
+  - "The scale-stress decision record and licensing record use distinct filename prefixes so verification commands cannot read the wrong document."
 
 approach: |
   Treat this as an architecture/design gate. Read canonical JOB behavior, TPC-DS
   compliance labeling, result-bundle metadata, runner phase handling, and
   platform stats/analyze support before recommending implementation. The output
   should be a decision record plus an updated TODO for the chosen prototype.
+  Write the main decision to
+  `_project/decisions/joinorder-scale-stress-decision-<date>.md`; do not use
+  the licensing filename prefix for the main architecture decision.
 
   Cross-TODO write coordination: w7 may update the prototype TODO file
   (`joinorder-replicated-imdb-scale-prototype.yaml`) to copy the chosen
@@ -265,22 +279,25 @@ anti_patterns:
 
 verification:
   - description: "Decision note covers all required sections (programmatic header check)"
-    command: "grep -cE '^## (Benchmark question|Scale semantics|Statistics phase|Scale-up options|Validation gates|Fixed vs parameterized|Recommendation|CI cost|Licensing posture)' _project/decisions/joinorder-scale-stress-*.md | head -1"
+    command: "grep -hEc '^## (Benchmark question|Scale semantics|Statistics phase|Scale-up options|Validation gates|Fixed vs parameterized|Recommendation|CI cost|Licensing posture)' _project/decisions/joinorder-scale-stress-decision-*.md | awk '{ s += $1 } END { print s }'"
     expected_output: ">= 9"
   - description: "Per-engine stats compatibility matrix lists 4+ engines"
-    command: "grep -cE '^\\| (DuckDB|PostgreSQL|ClickHouse|StarRocks|Spark) ' _project/decisions/joinorder-scale-stress-*.md | head -1"
+    command: "grep -hEc '^\\| (DuckDB|PostgreSQL|ClickHouse|StarRocks|Spark) ' _project/decisions/joinorder-scale-stress-decision-*.md | awk '{ s += $1 } END { print s }'"
     expected_output: ">= 4"
   - description: "Workload labels (canonical_imdb, replicated_imdb, etc.) are defined with comparability rules"
-    command: "grep -cE 'canonical_imdb|replicated_imdb|expanded_imdb|parameterized_imdb|synthetic_schema' _project/decisions/joinorder-scale-stress-*.md | awk '{ s += $1 } END { print s }'"
+    command: "grep -hEc 'canonical_imdb|replicated_imdb|expanded_imdb|parameterized_imdb|synthetic_schema' _project/decisions/joinorder-scale-stress-decision-*.md | awk '{ s += $1 } END { print s }'"
     expected_output: ">= 5"
+  - description: "Stats/analyze prototype gate is concrete and machine-checkable"
+    command: "grep -hEc '^Stats phase gate: (completed|smoke-only|dependency:joinorder-statistics-phase-measurement)' _project/decisions/joinorder-scale-stress-decision-*.md | awk '{ s += $1 } END { print s }'"
+    expected_output: "1"
   - description: "Recommendation is explicit and unambiguous (one of 5 named choices, not 'maybe')"
-    command: "grep -cE '^Recommendation: (no scaled JOB|replicated_imdb baseline|expanded_imdb research|parameterized_imdb|staged combination)' _project/decisions/joinorder-scale-stress-*.md | head -1"
+    command: "grep -hEc '^Recommendation: (no scaled JOB|replicated_imdb baseline|expanded_imdb research|parameterized_imdb|staged combination)' _project/decisions/joinorder-scale-stress-decision-*.md | awk '{ s += $1 } END { print s }'"
     expected_output: "1"
   - description: "Validation gates section explicitly rejects non-empty-only checks"
-    command: "grep -cE 'non-empty (checks|results) (are )?insufficient|q-error|cardinalit' _project/decisions/joinorder-scale-stress-*.md | head -1"
+    command: "grep -hEc 'non-empty (checks|results) (are )?insufficient|q-error|cardinalit' _project/decisions/joinorder-scale-stress-decision-*.md | awk '{ s += $1 } END { print s }'"
     expected_output: ">= 2"
   - description: "Licensing posture for derived workloads is recorded with required fields"
-    command: "test -f _project/decisions/joinorder-scale-stress-licensing-*.md 2>/dev/null && grep -cE '^## (Posture|Hosting model|Attribution|Takedown contact)' _project/decisions/joinorder-scale-stress-licensing-*.md"
+    command: "grep -hEc '^## (Posture|Hosting model|Attribution|Takedown contact)' _project/decisions/joinorder-scale-stress-licensing-*.md | awk '{ s += $1 } END { print s }'"
     expected_output: ">= 4"
   - description: "TODO graph remains valid"
     command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph"
@@ -291,7 +308,8 @@ verification:
 
 scope_limit:
   only_modify:
-    - "_project/decisions/joinorder-scale-stress-*.md"
+    - "_project/decisions/joinorder-scale-stress-decision-*.md"
+    - "_project/decisions/joinorder-scale-stress-licensing-*.md"
     - "_project/TODO/main/planning/joinorder-scale-stress-decision-framework.yaml"
     - "_project/TODO/main/planning/joinorder-replicated-imdb-scale-prototype.yaml"
     - "_project/TODO/main/planning/joinorder-statistics-phase-measurement.yaml"
