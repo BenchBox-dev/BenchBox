@@ -164,6 +164,20 @@ uv run --project _project/scripts -- python _project/scripts/todo_cli.py list|sh
 Indexes under `_project/{TODO|DONE}/_indexes/` are generated. Guardrails:
 `must_preserve`, `approach`, `anti_patterns`, `verification`, `scope_limit`.
 
+## Reuse anchors
+
+Search these before designing new BenchBox infrastructure:
+
+| Concept | File |
+|---|---|
+| Per-benchmark data path | `benchbox/utils/path_utils.py:resolve_benchmark_runs_dir`, `benchbox/cli/config.py:get_datagen_path` |
+| External data download + cache | `benchbox/core/nyctaxi/downloader.py` |
+| Verbosity / quiet | `benchbox/utils/verbosity.py` |
+| Compression | `benchbox/utils/compression_mixin.py` |
+| Result bundle publishing | `benchbox/core/publishing/` |
+
+Add anchors as patterns are extracted.
+
 ## Skills & Workflow
 
 High-level wrappers remain stable: `code`, `test`, `todo`, `blog`, `docs`,

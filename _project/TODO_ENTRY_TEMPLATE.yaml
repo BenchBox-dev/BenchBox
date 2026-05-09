@@ -114,6 +114,14 @@ files_affected:
 # IMPLEMENTATION GUARDRAILS (optional - constrain AI agent behavior)
 # ============================================================================
 
+# Existing patterns considered for reuse, one bullet each:
+# "<path>:<concept> — reuse / extend / supersede". Required when this
+# TODO adds a new module, env var, or file-system convention; in those
+# cases /todo review treats absence as a Required finding.
+prior_art:
+  - "<e.g., benchbox/utils/path_utils.py:resolve_benchmark_runs_dir — reuse for per-benchmark data dir>"
+  - "<e.g., benchbox/core/nyctaxi/downloader.py:.exists()-skip — extend with manifest-checksum verification>"
+
 # Existing behaviors that must NOT break. Name specific files, functions,
 # classes, or observable behaviors - not vague "don't break things".
 # Different from success_metrics (project-level outcomes); this is about
