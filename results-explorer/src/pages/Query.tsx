@@ -18,6 +18,7 @@ import {
 import { getTableSchema, type SchemaColumn } from "@/lib/duckdbSchema";
 import { useFacetField } from "@/lib/facetModel";
 import { toDateWindowFacet, toggleFacetValue } from "@/lib/facetMatching";
+import { buildCompareUrl, compareIdForRow } from "@/lib/resultLinks";
 import { STARTER_QUERY_CATEGORIES, starterQueriesByCategory, type StarterQueryCategory } from "@/lib/starterQueries";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { memoizedSnapshotQueryRows } from "@/lib/duckdbQueries";
@@ -95,6 +96,19 @@ export function Query(_: RoutableProps) {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [visibleResultLimit, setVisibleResultLimit] = useState(TABLE_RENDER_LIMIT);
   const [visibleSqlLimit, setVisibleSqlLimit] = useState(TABLE_RENDER_LIMIT);
+  // w4 (compare-flow-entrypoints): select-for-compare state. The first
+  // pick locks the cohort signature; subsequent rows that don't match
+  // render disabled. The Compare tray below the result count surfaces
+  // the active cohort and the launch button.
+  const [compareSelectedIds, setCompareSelectedIds] = useState<Set<string>>(new Set());
+  const toggleCompareSelection = (resultId: string) =>
+    setCompareSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(resultId)) next.delete(resultId);
+      else next.add(resultId);
+      return next;
+    });
+  const clearCompareSelection = () => setCompareSelectedIds(new Set());
   const rowLimitMode = rowLimitRaw === "all" ? "all" : "default";
   const rowLimit = rowLimitMode === "all" ? UNLIMITED_ROW_LIMIT : DEFAULT_ROW_LIMIT;
 
@@ -628,56 +642,160 @@ export function Query(_: RoutableProps) {
                   <span>Query limit: {rowLimitMode === "all" ? "all" : DEFAULT_ROW_LIMIT.toLocaleString()}</span>
                   <span class="bb-scroll-affordance" data-testid="query-results-scroll-hint">← scroll →</span>
                 </div>
-                <div class="overflow-x-auto">
-                  <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">
-                    <thead class="bg-[var(--bb-surface-data-muted)]">
-                      <tr>
-                        {visibleColumns.map((column) => {
-                          const isActive = sort.column === column;
-                          const arrow = isActive ? (sort.direction === "asc" ? " ↑" : " ↓") : "";
-                          const ariaSort = isActive
-                            ? sort.direction === "asc"
-                              ? "ascending"
-                              : "descending"
-                            : "none";
-                          return (
-                            <th
-                              key={column}
-                              scope="col"
-                              aria-sort={ariaSort}
-                              class="p-0"
+                {(() => {
+                  const lockSig = (() => {
+                    const firstId = [...compareSelectedIds][0];
+                    if (firstId === undefined) return null;
+                    const firstRow = rows.find((row) => String(row.result_id) === firstId);
+                    if (!firstRow) return null;
+                    return {
+                      benchmark: String(firstRow.benchmark ?? ""),
+                      scale_factor: firstRow.scale_factor ?? null,
+                      phase: String(firstRow.phase ?? ""),
+                      primary_metric: String(firstRow.primary_metric ?? ""),
+                    };
+                  })();
+                  const lockReason = (row: ResultRow): string | undefined => {
+                    if (lockSig === null) return undefined;
+                    const id = String(row.result_id);
+                    if (compareSelectedIds.has(id)) return undefined;
+                    const mismatches: string[] = [];
+                    if (String(row.benchmark ?? "") !== lockSig.benchmark) mismatches.push("benchmark");
+                    if ((row.scale_factor ?? null) !== lockSig.scale_factor) mismatches.push("scale");
+                    if (String(row.phase ?? "") !== lockSig.phase) mismatches.push("phase");
+                    if (String(row.primary_metric ?? "") !== lockSig.primary_metric)
+                      mismatches.push("primary metric");
+                    if (mismatches.length === 0) return undefined;
+                    return `Locked: first selection is ${formatBenchmarkLabel(lockSig.benchmark)} SF ${lockSig.scale_factor} ${lockSig.phase}. This row differs by ${mismatches.join(", ")}.`;
+                  };
+                  const selectedCompareIds = [...compareSelectedIds]
+                    .map((id) => {
+                      const row = rows.find((r) => String(r.result_id) === id);
+                      return row ? compareIdForRow(row as Parameters<typeof compareIdForRow>[0]) : id;
+                    });
+                  const compareUrl = compareSelectedIds.size >= 2 ? buildCompareUrl(selectedCompareIds) : null;
+                  return (
+                    <>
+                      <div
+                        class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-2 text-sm text-[var(--bb-data-fg-muted)]"
+                        data-testid="query-compare-tray"
+                      >
+                        <span>
+                          {compareSelectedIds.size === 0 ? (
+                            "Select two or more rows to compare. The first pick locks the cohort."
+                          ) : compareSelectedIds.size === 1 ? (
+                            "1 result selected — pick a compatible second row to enable Compare."
+                          ) : (
+                            `${compareSelectedIds.size} results selected.`
+                          )}
+                        </span>
+                        <span class="flex items-center gap-2">
+                          {compareSelectedIds.size > 0 && (
+                            <button
+                              type="button"
+                              class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1 text-xs font-medium hover:bg-[var(--bb-surface-data-muted)]"
+                              onClick={clearCompareSelection}
+                              data-testid="query-compare-clear"
                             >
-                              <button
-                                type="button"
-                                class="table-th block w-full cursor-pointer select-none border-0 bg-transparent text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--bb-accent)]"
-                                onClick={() => toggleSort(column)}
-                              >
-                                {formatQueryColumnLabel(column)}{arrow}
-                              </button>
-                            </th>
-                          );
-                        })}
-                        <th class="table-th sticky right-0 z-10 bg-[var(--bb-surface-data-muted)]" />
-                      </tr>
-                    </thead>
-                    <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
-                      {visibleRows.map((row) => (
-                        <tr key={String(row.result_id)} class="hover:bg-[var(--bb-surface-data-muted)]">
-                          {visibleColumns.map((column) => (
-                            <td key={column} class="table-td">
-                              {formatQueryRowCell(column, row[column])}
-                            </td>
-                          ))}
-                          <td class="table-td sticky right-0 z-10 bg-[var(--bb-surface-data)] text-right">
-                            <a href={`/results/r/${row.result_id}`} class="text-xs font-medium no-underline">
-                              View →
+                              Clear selection
+                            </button>
+                          )}
+                          {compareUrl ? (
+                            <a
+                              href={compareUrl}
+                              class="rounded-md bg-[var(--bb-accent)] px-3 py-1 text-xs font-medium text-white shadow-sm"
+                              data-testid="query-compare-launch"
+                            >
+                              Compare {compareSelectedIds.size} selected →
                             </a>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled
+                              class="rounded-md border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-3 py-1 text-xs font-medium text-[var(--bb-data-fg-subtle)]"
+                              data-testid="query-compare-launch-disabled"
+                            >
+                              Compare (need 2+)
+                            </button>
+                          )}
+                        </span>
+                      </div>
+                      <div class="overflow-x-auto">
+                        <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">
+                          <thead class="bg-[var(--bb-surface-data-muted)]">
+                            <tr>
+                              <th
+                                scope="col"
+                                class="table-th sticky left-0 z-10 w-12 min-w-12 bg-[var(--bb-surface-data-muted)] text-left"
+                              >
+                                <span class="sr-only">Compare</span>
+                              </th>
+                              {visibleColumns.map((column) => {
+                                const isActive = sort.column === column;
+                                const arrow = isActive ? (sort.direction === "asc" ? " ↑" : " ↓") : "";
+                                const ariaSort = isActive
+                                  ? sort.direction === "asc"
+                                    ? "ascending"
+                                    : "descending"
+                                  : "none";
+                                return (
+                                  <th
+                                    key={column}
+                                    scope="col"
+                                    aria-sort={ariaSort}
+                                    class="p-0"
+                                  >
+                                    <button
+                                      type="button"
+                                      class="table-th block w-full cursor-pointer select-none border-0 bg-transparent text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--bb-accent)]"
+                                      onClick={() => toggleSort(column)}
+                                    >
+                                      {formatQueryColumnLabel(column)}{arrow}
+                                    </button>
+                                  </th>
+                                );
+                              })}
+                              <th class="table-th sticky right-0 z-10 bg-[var(--bb-surface-data-muted)]" />
+                            </tr>
+                          </thead>
+                          <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
+                            {visibleRows.map((row) => {
+                              const id = String(row.result_id);
+                              const isSelected = compareSelectedIds.has(id);
+                              const reason = lockReason(row);
+                              return (
+                                <tr key={id} class="hover:bg-[var(--bb-surface-data-muted)]">
+                                  <td class="table-td sticky left-0 z-10 bg-[var(--bb-surface-data)]">
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      disabled={Boolean(reason)}
+                                      title={reason}
+                                      onChange={() => toggleCompareSelection(id)}
+                                      class="h-4 w-4 rounded border-[var(--bb-data-border-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+                                      aria-label={`Select ${id} for comparison`}
+                                      data-testid={`query-compare-checkbox-${id}`}
+                                    />
+                                  </td>
+                                  {visibleColumns.map((column) => (
+                                    <td key={column} class="table-td">
+                                      {formatQueryRowCell(column, row[column])}
+                                    </td>
+                                  ))}
+                                  <td class="table-td sticky right-0 z-10 bg-[var(--bb-surface-data)] text-right">
+                                    <a href={`/results/r/${row.result_id}`} class="text-xs font-medium no-underline">
+                                      View →
+                                    </a>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  );
+                })()}
                 {visibleRows.length < rows.length && (
                   <div class="border-t border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-3 text-center">
                     <button
