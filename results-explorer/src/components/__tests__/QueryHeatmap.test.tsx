@@ -12,7 +12,7 @@
  * No hardcoded expected values remain here - the fixtures are the contract.
  */
 
-import { fireEvent, render, screen } from "@testing-library/preact";
+import { fireEvent, render, screen, within } from "@testing-library/preact";
 import { describe, it, expect } from "vitest";
 import { expectNoAxeViolations } from "@/testing/axe-helper";
 import { QueryHeatmap } from "@/components/QueryHeatmap";
@@ -118,6 +118,37 @@ describe("QueryHeatmap rendering", () => {
     );
     expect(labels).toStrictEqual(["Q1", "Q2", "Q10"]);
     expect(screen.getByRole("button", { name: /^Q10/ })).toBeTruthy();
+  });
+
+  it("applies cumulative sticky-left offsets to the frozen header columns", () => {
+    const { container } = render(<QueryHeatmap summary={makeSummary()} />);
+    const trustHeader = within(container.querySelector("thead")!).getByRole("columnheader", { name: "Trust" });
+    const primaryHeader = container.querySelector("thead")!.querySelector('[aria-sort]:not([aria-sort=""])')!;
+    expect(trustHeader.getAttribute("style")).toContain("left: 11rem");
+    const platformHeader = within(container.querySelector("thead")!).getByRole("columnheader", { name: /^Platform/ });
+    expect(platformHeader.getAttribute("style")).toContain("left: 0rem");
+    expect(platformHeader.className).toContain("sticky");
+    expect(primaryHeader.getAttribute("style")?.includes("left:")).toBe(true);
+  });
+
+  it("shifts sticky offsets right by the checkbox column width when selection is enabled", () => {
+    const { container } = render(
+      <QueryHeatmap summary={makeSummary()} selectedIds={new Set()} onSelectionChange={() => {}} />,
+    );
+    const platformHeader = within(container.querySelector("thead")!).getByRole("columnheader", { name: /^Platform/ });
+    const trustHeader = within(container.querySelector("thead")!).getByRole("columnheader", { name: "Trust" });
+    expect(platformHeader.getAttribute("style")).toContain("left: 3rem");
+    expect(trustHeader.getAttribute("style")).toContain("left: 14rem");
+  });
+
+  it("makes the header row vertically sticky and layers it above body sticky cells", () => {
+    const { container } = render(<QueryHeatmap summary={makeSummary()} />);
+    const headerRow = container.querySelector("thead tr")!;
+    expect(headerRow.className).toContain("sticky");
+    expect(headerRow.className).toContain("top-0");
+    expect(headerRow.className).toMatch(/\bz-(20|30|40)\b/);
+    const platformHeader = within(container.querySelector("thead")!).getByRole("columnheader", { name: /^Platform/ });
+    expect(platformHeader.className).toMatch(/\bz-30\b/);
   });
 
   it("renders compact receipt links and validation status badges", () => {

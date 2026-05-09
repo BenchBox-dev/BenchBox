@@ -47,23 +47,34 @@ work:
   - id: w2
     summary: "Fix Benchmark heatmap sticky-left offsets"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      Fix Benchmark heatmap sticky-left offsets so the optional compare
-      checkbox, platform column, trust/status column, score column, and
-      geomean column stay aligned with horizontally scrolled query cells.
-      Offsets must come from the actual rendered frozen columns rather than
-      hard-coded assumptions.
+      `QueryHeatmap.tsx` grew a `STICKY_COL_REM` width table and a
+      `cumulativeStickyLeft({ hasSelection, showGeomeanCol }, col)` helper
+      that walks the frozen-column prefix and returns the rem offset for
+      a given column. Every sticky column (checkbox, platform, trust,
+      primary score, geomean) now reads its `left` value from this helper
+      via inline `style`. The previous hardcoded `left-44` Tailwind class
+      on Trust desynced when the optional compare-checkbox column was
+      visible; the new offset table accounts for it. Score and Geomean
+      are also sticky now so they stay aligned with horizontally scrolled
+      query cells. Verification log:
+      _project/verification-logs/results-explorer-table-sticky-density-and-semantics/w23.log.
 
   - id: w3
     summary: "Make Benchmark heatmap headers vertically sticky"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      Make the Benchmark heatmap header row vertically sticky within the
-      scroll container so query numbers stay visible while scrolling down.
-      Set z-index and background layers so frozen column headers and query
-      headers do not overlap or become transparent over cells.
+      The header `<tr>` is now `sticky top-0 z-20` with a solid muted
+      background so query column numbers stay visible while scrolling
+      down. Frozen-corner header cells (sticky-top + sticky-left) carry
+      `z-30` so they paint above body sticky cells (`z-10`) and above
+      non-frozen header cells (`z-20`). Tests in
+      `src/components/__tests__/QueryHeatmap.test.tsx` assert the
+      vertically sticky class set and the corner z-index. Verification
+      log:
+      _project/verification-logs/results-explorer-table-sticky-density-and-semantics/w23.log.
 
   - id: w4
     summary: "Compact provenance and trust/status table cells"
