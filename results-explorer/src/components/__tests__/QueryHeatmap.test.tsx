@@ -183,7 +183,13 @@ describe("QueryHeatmap rendering", () => {
     const { container } = render(<QueryHeatmap summary={summary} />);
 
     const legend = screen.getByTestId("query-heatmap-legend");
-    expect(legend.textContent).toContain("Power Score: higher is better");
+    // Per `results-explorer-chart-panel-scope-and-labeling` w4, the legend
+    // heading describes the cell metric (always per-query latency in ms),
+    // not the cohort's primary score column. The primary score column
+    // keeps its own metric/direction copy in the secondary line.
+    expect(legend.textContent).toContain("Per-query latency (ms): lower is better");
+    expect(legend.textContent).toContain("Power Score");
+    expect(legend.textContent).toContain("higher is better");
     expect(legend.textContent).toContain("<1 ms");
 
     const subMs = container.querySelector<HTMLElement>('[data-cell="0-0"]');

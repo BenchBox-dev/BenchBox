@@ -234,6 +234,13 @@ export function QueryHeatmap({
 
   const primaryLabel = primaryMetric === "power_score" ? "Power Score" : "Geomean";
   const primaryDirectionLabel = primaryMetric === "power_score" ? "higher is better" : "lower is faster";
+  // The legend heading describes what the *cells* show, not the cohort's
+  // primary score metric. Heatmap cells are always per-query latency in
+  // milliseconds, regardless of whether the primary score column is
+  // power_score or display_geomean_ms. Earlier copy ("Power Score:
+  // higher is better") contradicted the rendered data on tpch-style
+  // cohorts. The primary score column keeps its own column header
+  // explanation (`primaryLabel`/`primaryDirectionLabel`) below.
   const heatmapMeaning = suppressHeat
     ? "Heat color is suppressed because this cohort has fewer than two comparable platforms."
     : "Heat color compares each query column with the fastest published timing; darker cells are slower.";
@@ -258,11 +265,12 @@ export function QueryHeatmap({
         data-testid="query-heatmap-legend"
       >
         <div class="font-semibold text-[var(--bb-data-fg-primary)]">
-          {primaryLabel}: {primaryDirectionLabel}
+          Per-query latency (ms): lower is better
         </div>
         <div class="mt-1">
-          Per-query timings use milliseconds and lower is faster. {heatmapMeaning} <strong>&lt;1 ms</strong> means a
-          zero-or-sub-millisecond timing below display precision; <strong>No run</strong> means missing data.
+          {heatmapMeaning} <strong>&lt;1 ms</strong> means a zero-or-sub-millisecond timing below display precision;{" "}
+          <strong>No run</strong> means missing data. The primary score column ({primaryLabel}) on the left of each row uses its
+          own metric and direction ({primaryDirectionLabel}).
         </div>
       </div>
 

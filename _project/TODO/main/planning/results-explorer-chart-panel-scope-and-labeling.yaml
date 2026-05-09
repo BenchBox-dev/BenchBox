@@ -17,101 +17,101 @@ description: |
 
 deps:
   needs:
-    - results-explorer-compare-flow-entrypoints
-    - results-explorer-run-identity-disambiguation
+  - results-explorer-compare-flow-entrypoints
+  - results-explorer-run-identity-disambiguation
 
 work:
-  - id: w0
-    summary: "Rebind chart-panel review evidence against develop tip"
-    status: pending
-    notes: |
-      Walk Charts > Overview, Per-query (Heatmap, Histogram), Cost, Trend,
-      Rank, and Compare > Normalized Speedup against the current develop tip
-      using a benchmark detail with cost data and one without. Capture
-      observed defects (chart-panel header height, empty/duplicate Per-query
-      heatmap, Cost-tab behavior with no normalized cost, heatmap legend copy
-      vs rendered cells, contrast/reduced-color visual delta, Compare
-      normalized-speedup row count and dash density) to
-      _project/verification-logs/results-explorer-chart-panel-scope-and-labeling/w0.log.
-      Output is the rebind reference for w1-w7 acceptance.
+- id: w0
+  summary: "Rebind chart-panel review evidence against develop tip"
+  status: done
+  notes: |
+    Walk Charts > Overview, Per-query (Heatmap, Histogram), Cost, Trend,
+    Rank, and Compare > Normalized Speedup against the current develop tip
+    using a benchmark detail with cost data and one without. Capture
+    observed defects (chart-panel header height, empty/duplicate Per-query
+    heatmap, Cost-tab behavior with no normalized cost, heatmap legend copy
+    vs rendered cells, contrast/reduced-color visual delta, Compare
+    normalized-speedup row count and dash density) to
+    _project/verification-logs/results-explorer-chart-panel-scope-and-labeling/w0.log.
+    Output is the rebind reference for w1-w7 acceptance.
 
-  - id: w1
-    summary: "Compact the chart panel header and tab band"
-    needs: [w0]
-    status: pending
-    notes: |
-      Reduce the large empty band above chart subtabs by moving chart title,
-      primary tabs, secondary tabs, and active filters into a compact header
-      region. Preserve usable click targets while removing unused vertical
-      whitespace.
+- id: w1
+  summary: "Compact the chart panel header and tab band"
+  needs: [w0]
+  status: pending
+  notes: |
+    Reduce the large empty band above chart subtabs by moving chart title,
+    primary tabs, secondary tabs, and active filters into a compact header
+    region. Preserve usable click targets while removing unused vertical
+    whitespace.
 
-  - id: w2
-    summary: "Remove or rescope the duplicate Per-query heatmap"
-    needs: [w0]
-    status: pending
-    notes: |
-      On Benchmark detail pages where the matrix is already rendered above the
-      Charts panel, hide Charts > Per-query > Heatmap or replace it with a
-      scoped view that adds information not present in the main matrix. Keep a
-      clear path to Histogram if that subview remains useful.
+- id: w2
+  summary: "Remove or rescope the duplicate Per-query heatmap"
+  needs: [w0]
+  status: pending
+  notes: |
+    On Benchmark detail pages where the matrix is already rendered above the
+    Charts panel, hide Charts > Per-query > Heatmap or replace it with a
+    scoped view that adds information not present in the main matrix. Keep a
+    clear path to Histogram if that subview remains useful.
 
-  - id: w3
-    summary: "Hide or disable Cost tabs when no cost data exists"
-    needs: [w0]
-    status: pending
-    notes: |
-      When no normalized cost data exists for the current cohort, disable or
-      hide the Cost chart tab and show a short unavailable-cost note in a
-      predictable place. Do not let users open a selectable blank panel.
+- id: w3
+  summary: "Hide or disable Cost tabs when no cost data exists"
+  needs: [w0]
+  status: done
+  notes: |
+    When no normalized cost data exists for the current cohort, disable or
+    hide the Cost chart tab and show a short unavailable-cost note in a
+    predictable place. Do not let users open a selectable blank panel.
 
-  - id: w4
-    summary: "Correct heatmap metric copy for latency cells"
-    needs: [w0]
-    status: pending
-    notes: |
-      Change the Benchmark heatmap legend heading from "Power Score: higher is
-      better" when cells are per-query latency values. The visible heading
-      must name the metric actually rendered, for example "Per-query latency
-      (ms): lower is better", while the power-score column keeps its own
-      explanation.
+- id: w4
+  summary: "Correct heatmap metric copy for latency cells"
+  needs: [w0]
+  status: done
+  notes: |
+    Change the Benchmark heatmap legend heading from "Power Score: higher is
+    better" when cells are per-query latency values. The visible heading
+    must name the metric actually rendered, for example "Per-query latency
+    (ms): lower is better", while the power-score column keeps its own
+    explanation.
 
-  - id: w5
-    summary: "Repair or rename high-contrast heatmap mode"
-    needs: [w0]
-    status: pending
-    notes: |
-      Either implement a true high-contrast heatmap palette with stronger
-      luminance separation and accessible text contrast, or rename the control
-      to "Reduced color" if the intended behavior is greyscale. The selected
-      mode must visibly improve contrast or accurately describe the rendered
-      heatmap.
+- id: w5
+  summary: "Repair or rename high-contrast heatmap mode"
+  needs: [w0]
+  status: done
+  notes: |
+    Either implement a true high-contrast heatmap palette with stronger
+    luminance separation and accessible text contrast, or rename the control
+    to "Reduced color" if the intended behavior is greyscale. The selected
+    mode must visibly improve contrast or accurately describe the rendered
+    heatmap.
 
-  - id: w6
-    summary: "Constrain long Compare normalized-speedup charts"
-    needs: [w0]
-    status: pending
-    notes: |
-      Fix Compare normalized speedup/read-primitives charts that render about
-      149 query rows with many dash values. Add a query filter, "show
-      comparable only" default, or per-benchmark grouping so the chart is
-      readable without scrolling through mostly missing rows. Coordinate with
-      the upstream Compare rebuild (results-explorer-compare-flow-entrypoints)
-      and identity labels (results-explorer-run-identity-disambiguation) to
-      avoid stomping their changes.
+- id: w6
+  summary: "Constrain long Compare normalized-speedup charts"
+  needs: [w0]
+  status: pending
+  notes: |
+    Fix Compare normalized speedup/read-primitives charts that render about
+    149 query rows with many dash values. Add a query filter, "show
+    comparable only" default, or per-benchmark grouping so the chart is
+    readable without scrolling through mostly missing rows. Coordinate with
+    the upstream Compare rebuild (results-explorer-compare-flow-entrypoints)
+    and identity labels (results-explorer-run-identity-disambiguation) to
+    avoid stomping their changes.
 
-  - id: w7
-    summary: "Cover chart panel scope, labels, and contrast behavior"
-    needs: [w1, w2, w3, w4, w5, w6]
-    status: pending
-    notes: |
-      Add tests and browser screenshots for chart header height, Per-query tab
-      behavior, absent Cost data, heatmap legend copy, contrast/reduced-color
-      mode, and long Compare chart filtering.
+- id: w7
+  summary: "Cover chart panel scope, labels, and contrast behavior"
+  needs: [w1, w2, w3, w4, w5, w6]
+  status: pending
+  notes: |
+    Add tests and browser screenshots for chart header height, Per-query tab
+    behavior, absent Cost data, heatmap legend copy, contrast/reduced-color
+    mode, and long Compare chart filtering.
 
 must_preserve:
-  - "Existing chart tabs that contain data must remain reachable."
-  - "Benchmark matrix data and chart data must continue to derive from the same cohort."
-  - "Color palettes must keep readable text contrast."
+- "Existing chart tabs that contain data must remain reachable."
+- "Benchmark matrix data and chart data must continue to derive from the same cohort."
+- "Color palettes must keep readable text contrast."
 
 approach: |
   Prefer hiding or disabled states for tabs with no data over rendering blank
@@ -122,45 +122,45 @@ approach: |
   are not edited by three concurrent worktrees.
 
 anti_patterns:
-  - "DO NOT create new pages or a redesigned chart explorer."
-  - "DO NOT keep duplicate matrix views unless the duplicate has a distinct scope."
-  - "DO NOT call greyscale high contrast unless measured contrast actually improves."
+- "DO NOT create new pages or a redesigned chart explorer."
+- "DO NOT keep duplicate matrix views unless the duplicate has a distinct scope."
+- "DO NOT call greyscale high contrast unless measured contrast actually improves."
 
 verification:
-  - description: "Chart panel and heatmap tests pass"
-    command: "cd results-explorer && npm test -- --run src/components/__tests__/ChartPanel.test.tsx src/components/__tests__/QueryHeatmap.test.tsx src/components/__tests__/charts.smoke.test.tsx src/components/__tests__/NormalizedSpeedupChart.test.tsx src/pages/__tests__/Compare.test.tsx"
-    expected_output: "all targeted tests pass"
-  - description: "Frontend typecheck passes"
-    command: "cd results-explorer && npm run typecheck"
-    expected_output: "exit 0"
-  - description: "Frontend build passes"
-    command: "cd results-explorer && npm run build"
-    expected_output: "exit 0"
-  - description: "Manual chart browser check is complete"
-    command: "echo 'Manual: browser-check /results/tpch/ chart Overview, Per-query, Distribution, Cost, Trend, Rank, and Compare normalized speedup'"
-    expected_output: "manual evidence captured in PR notes or audit artifact"
+- description: "Chart panel and heatmap tests pass"
+  command: "cd results-explorer && npm test -- --run src/components/__tests__/ChartPanel.test.tsx src/components/__tests__/QueryHeatmap.test.tsx src/components/__tests__/charts.smoke.test.tsx src/components/__tests__/NormalizedSpeedupChart.test.tsx src/pages/__tests__/Compare.test.tsx"
+  expected_output: "all targeted tests pass"
+- description: "Frontend typecheck passes"
+  command: "cd results-explorer && npm run typecheck"
+  expected_output: "exit 0"
+- description: "Frontend build passes"
+  command: "cd results-explorer && npm run build"
+  expected_output: "exit 0"
+- description: "Manual chart browser check is complete"
+  command: "echo 'Manual: browser-check /results/tpch/ chart Overview, Per-query, Distribution, Cost, Trend, Rank, and Compare normalized speedup'"
+  expected_output: "manual evidence captured in PR notes or audit artifact"
 
 scope_limit:
   only_modify:
-    - "results-explorer/src/components/ChartPanel.tsx"
-    - "results-explorer/src/components/QueryHeatmap.tsx"
-    - "results-explorer/src/components/CostScatter.tsx"
-    - "results-explorer/src/components/NormalizedSpeedupChart.tsx"
-    - "results-explorer/src/components/__tests__/"
-    - "results-explorer/src/pages/BenchmarkIndex.tsx"
-    - "results-explorer/src/pages/Compare.tsx"
-    - "results-explorer/src/pages/__tests__/"
-    - "results-explorer/src/index.css"
+  - "results-explorer/src/components/ChartPanel.tsx"
+  - "results-explorer/src/components/QueryHeatmap.tsx"
+  - "results-explorer/src/components/CostScatter.tsx"
+  - "results-explorer/src/components/NormalizedSpeedupChart.tsx"
+  - "results-explorer/src/components/__tests__/"
+  - "results-explorer/src/pages/BenchmarkIndex.tsx"
+  - "results-explorer/src/pages/Compare.tsx"
+  - "results-explorer/src/pages/__tests__/"
+  - "results-explorer/src/index.css"
   do_not_modify:
-    - "benchbox/"
-    - "Generated result data unless cost availability flags are missing from presentation data."
+  - "benchbox/"
+  - "Generated result data unless cost availability flags are missing from presentation data."
 
 metadata:
   tags:
-    - results-explorer
-    - charts
-    - labels
-    - usability-review
+  - results-explorer
+  - charts
+  - labels
+  - usability-review
   estimated_effort: "Medium (1-2 days)"
   created_date: "2026-05-08"
 

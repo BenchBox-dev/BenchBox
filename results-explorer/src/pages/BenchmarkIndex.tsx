@@ -487,7 +487,11 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
             ]}
           />
 
-          {/* High contrast toggle - only meaningful in matrix (heatmap) view */}
+          {/* Reduced-color (grayscale) toggle - only meaningful in matrix (heatmap) view.
+              Renamed from "High contrast" because the implementation is a
+              greyscale lightness palette, not a true high-contrast palette;
+              calling greyscale "high contrast" mismatched the rendered cells
+              for users who toggled it expecting WCAG-style luminance bumps. */}
           {viewMode === "matrix" && (
             <button
               class={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
@@ -497,9 +501,9 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
               }`}
               onClick={() => setHighContrast((v) => !v)}
               aria-pressed={highContrast}
-              title="Switch heatmap to grayscale for color-vision accessibility"
+              title="Switch the heatmap palette to greyscale for color-vision accessibility"
             >
-              High contrast
+              Reduced color
             </button>
           )}
         </div>
