@@ -303,32 +303,13 @@ export function Home(_: RoutableProps) {
       </section>
 
       <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {filteredMetaLeaderboard && (
-          <MetaLeaderboard
-            data={filteredMetaLeaderboard}
-            mode={mode}
-            onModeChange={(value) => setModeRaw(value)}
-            cohortHref={buildCohortHref}
-            platformHref={buildPlatformHref}
-            resultMetadataById={resultById}
-          />
-        )}
-
-        {filteredMetaLeaderboard && filteredMetaLeaderboard.cohorts.length === 0 && (
-          <CoverageEmptyState
-            activeFacets={activeFacetSummaries}
-            canClearScale={scaleFilters.length > 0}
-            canClearPlatform={facets.platform.length > 0}
-            onClearScale={() => setFacet("scale_factor", [])}
-            onClearPlatform={() => setFacet("platform", [])}
-            onReset={resetFacets}
-          />
-        )}
-
+        {/* Cohort selector renders above the matrix so users can change
+            benchmark/scale/phase context without scrolling past the
+            matrix to find the controls. */}
         {filteredMetaLeaderboard && (
           <section
             aria-label="Leaderboard cohort selector"
-            class="mb-8 rounded-lg border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] p-3"
+            class="mb-6 rounded-lg border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] p-3"
           >
             <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <MultiSelectFilter
@@ -396,6 +377,28 @@ export function Home(_: RoutableProps) {
               </div>
             </details>
           </section>
+        )}
+
+        {filteredMetaLeaderboard && (
+          <MetaLeaderboard
+            data={filteredMetaLeaderboard}
+            mode={mode}
+            onModeChange={(value) => setModeRaw(value)}
+            cohortHref={buildCohortHref}
+            platformHref={buildPlatformHref}
+            resultMetadataById={resultById}
+          />
+        )}
+
+        {filteredMetaLeaderboard && filteredMetaLeaderboard.cohorts.length === 0 && (
+          <CoverageEmptyState
+            activeFacets={activeFacetSummaries}
+            canClearScale={scaleFilters.length > 0}
+            canClearPlatform={facets.platform.length > 0}
+            onClearScale={() => setFacet("scale_factor", [])}
+            onClearPlatform={() => setFacet("platform", [])}
+            onReset={resetFacets}
+          />
         )}
 
         {filteredMetaLeaderboard && <FlywheelStrip />}
