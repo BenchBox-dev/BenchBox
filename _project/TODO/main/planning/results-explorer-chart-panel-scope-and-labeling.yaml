@@ -128,8 +128,7 @@ anti_patterns:
 
 verification:
 - description: "Chart panel and heatmap tests pass"
-  command: "cd results-explorer && npm test -- --run src/components/__tests__/ChartPanel.test.tsx src/components/__tests__/QueryHeatmap.test.tsx
-    src/components/__tests__/charts.smoke.test.tsx src/components/__tests__/NormalizedSpeedupChart.test.tsx src/pages/__tests__/Compare.test.tsx"
+  command: "cd results-explorer && npm test -- --run src/components/__tests__/ChartPanel.test.tsx src/components/__tests__/QueryHeatmap.test.tsx src/components/__tests__/charts.smoke.test.tsx src/components/__tests__/NormalizedSpeedupChart.test.tsx src/pages/__tests__/Compare.test.tsx"
   expected_output: "all targeted tests pass"
 - description: "Frontend typecheck passes"
   command: "cd results-explorer && npm run typecheck"
@@ -138,8 +137,7 @@ verification:
   command: "cd results-explorer && npm run build"
   expected_output: "exit 0"
 - description: "Manual chart browser check is complete"
-  command: "echo 'Manual: browser-check /results/tpch/ chart Overview, Per-query, Distribution, Cost, Trend, Rank, and Compare
-    normalized speedup'"
+  command: "echo 'Manual: browser-check /results/tpch/ chart Overview, Per-query, Distribution, Cost, Trend, Rank, and Compare normalized speedup'"
   expected_output: "manual evidence captured in PR notes or audit artifact"
 
 scope_limit:
