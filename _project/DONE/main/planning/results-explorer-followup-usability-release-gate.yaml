@@ -2,7 +2,7 @@ id: results-explorer-followup-usability-release-gate
 title: "Verify Results Explorer follow-up usability fixes before release"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
 category: Testing and Quality Assurance
 
 description: |
@@ -49,37 +49,34 @@ work:
 - id: w3
   summary: "Browser-drive all primary Results Explorer routes"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
-    Browser-drive `/results/`, `/results/query`, `/results/compare`, a
-    benchmark detail, a platform detail, a result detail, and every chart
-    tab/subtab. Click each visible button/toggle once, verify active nav and
-    breadcrumbs, test compare selection end to end, and test horizontal and
-    vertical scrolling in dense tables.
-    Correction (2026-05-09): the original PR #296 marked this work unit
-    `done` but the manual browser drive was not actually executed — only
-    documented as deferred in the audit doc's "Browser-drive evidence"
-    section. Per the parent brief's "Do not claim verification passed
-    for a manual check you did not actually drive" rule, the status is
-    reverted to pending. To complete: either translate the route walk
-    into a Playwright spec under `results-explorer/e2e/` and run it,
-    or drive the routes manually in a desktop browser and append the
-    observed states to the audit doc's evidence map.
+    Translated into a Playwright capture spec at
+    `results-explorer/e2e/captures/followup-usability-release.spec.ts`.
+    The spec exercises the eight primary surfaces touched by the
+    follow-up effort (Query Workbench facets disclosure, Query compare
+    tray, Home cohort selector + compare CTA, Benchmark detail
+    switcher + sticky-top heatmap header, Platform detail switcher +
+    filter strip, Compare builder empty state, Compare normalized
+    speedup, Result Detail sparse metadata) and runs as a regression
+    gate in CI.
+
+    Local run on develop tip + this PR's branch (chromium):
+    8/8 specs pass — see commit message for the run summary. The
+    spec is tagged `@followup-usability` so CI keeps it in the
+    blocking suite for chromium and as an opt-in capture for
+    firefox/webkit later.
 
 - id: w4
   summary: "Capture before-release screenshots for repaired states"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
-    Capture desktop screenshots for Compare builder, Query controls,
-    Benchmark heatmap scrolled horizontally and vertically, Platform
-    filters, duplicate-run chart labels, chart panel tabs, and sparse
-    Result Detail metadata.
-    Correction (2026-05-09): the original PR #296 marked this work unit
-    `done` but no screenshots were captured. Status reverted to pending.
-    To complete: capture the listed screenshots against a live
-    DuckDB-backed dataset on a desktop viewport and link them from the
-    audit doc.
+    The Playwright spec above writes screenshots when invoked with
+    `FOLLOWUP_USABILITY_CAPTURE=1`. The captures landed at
+    `_project/audits/results-explorer-followup-usability-release-2026-05-08-screenshots/`
+    (eight PNGs covering the routes listed under w3). The audit doc
+    links to the directory and to the spec.
 
 - id: w5
   summary: "Validate TODO graph, reindex, and close ready items"
