@@ -107,28 +107,38 @@ describe("formatRunIdentitiesForCohort", () => {
 
   it("uses short result_id as the last-resort tiebreaker", () => {
     const cohort = [
-      source({ result_id: "1111aaaa11111", platform: "Spark" }),
-      source({ result_id: "2222bbbb22222", platform: "Spark" }),
+      source({ result_id: "tpch-spark-sf0.01-20260403-1111aaaa", platform: "Spark" }),
+      source({ result_id: "tpch-spark-sf0.01-20260403-2222bbbb", platform: "Spark" }),
     ];
     const labels = formatRunIdentitiesForCohort(cohort, "chart");
     expect(new Set(labels).size).toBe(2);
     expect(labels[0]).toContain("1111aaaa");
     expect(labels[1]).toContain("2222bbbb");
+    expect(labels[0]).not.toContain("tpch-spark");
+    expect(labels[1]).not.toContain("tpch-spark");
   });
 
-  it("falls through to the full result_id when 8-char prefixes collide", () => {
-    // Adversarial cohort where natural qualifiers all match and the
-    // short (8-char) result_id slice is also identical. The terminal
-    // full-id qualifier guarantees uniqueness instead of accepting a
-    // duplicate at the safety cap.
+  it("uses the trailing result_id token when 8-char prefixes collide", () => {
+    // BenchBox result_ids usually share their benchmark/platform/date prefix;
+    // the content hash lives at the end and is the compact distinguishing token.
     const cohort = [
-      source({ result_id: "ffffffffaaaa", platform: "Spark" }),
-      source({ result_id: "ffffffffbbbb", platform: "Spark" }),
+      source({ result_id: "tpch-spark-sf0.01-20260403-aaaaaaaa", platform: "Spark" }),
+      source({ result_id: "tpch-spark-sf0.01-20260403-bbbbbbbb", platform: "Spark" }),
     ];
     const labels = formatRunIdentitiesForCohort(cohort, "chart");
     expect(new Set(labels).size).toBe(2);
-    expect(labels[0]).toContain("ffffffffaaaa");
-    expect(labels[1]).toContain("ffffffffbbbb");
+    expect(labels).toEqual(["Spark aaaaaaaa", "Spark bbbbbbbb"]);
+  });
+
+  it("falls through to the full result_id when trailing tokens collide", () => {
+    const cohort = [
+      source({ result_id: "left-shared", platform: "Spark" }),
+      source({ result_id: "right-shared", platform: "Spark" }),
+    ];
+    const labels = formatRunIdentitiesForCohort(cohort, "chart");
+    expect(new Set(labels).size).toBe(2);
+    expect(labels[0]).toContain("left-shared");
+    expect(labels[1]).toContain("right-shared");
   });
 
   it("never produces duplicate visible labels for any cohort", () => {

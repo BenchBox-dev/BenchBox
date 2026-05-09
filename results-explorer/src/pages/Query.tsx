@@ -337,13 +337,19 @@ export function Query(_: RoutableProps) {
     ),
   ].filter((group) => group.options.length > 0);
   const activeFilterChips: ActiveFacetChip[] = [
-    ...makeActiveChips("benchmark", "Benchmark", benchmarks, setBenchmarks),
+    ...makeActiveChips("benchmark", "Benchmark", benchmarks, setBenchmarks, formatBenchmarkLabel),
     ...makeActiveChips("platform", "Platform", platforms, setPlatforms),
     ...makeActiveChips("scale_factor", "Scale", scaleFactors, setScaleFactors),
     ...makeActiveChips("tuning_mode", "Tuning", tuningModes, setTuningModes),
-    ...makeActiveChips("trust_tier", "Trust", trustTiers, setTrustTiers),
-    ...makeActiveChips("validation_status", "Validation", validationStatuses, setValidationStatuses),
-    ...makeActiveChips("cost_status", "Cost status", costStatuses, setCostStatuses),
+    ...makeActiveChips("trust_tier", "Trust", trustTiers, setTrustTiers, formatTrustLabel),
+    ...makeActiveChips(
+      "validation_status",
+      "Validation",
+      validationStatuses,
+      setValidationStatuses,
+      formatValidationStatus,
+    ),
+    ...makeActiveChips("cost_status", "Cost status", costStatuses, setCostStatuses, formatCostStatus),
     ...makeActiveChips("cost_model", "Cost model", costModelVersions, setCostModelVersions),
     ...makeActiveChips("deployment_class", "Deployment", deploymentClasses, setDeploymentClasses),
     ...makeActiveChips("cloud_provider", "Cloud provider", cloudProviders, setCloudProviders),

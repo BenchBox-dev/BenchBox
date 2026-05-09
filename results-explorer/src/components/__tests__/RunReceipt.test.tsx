@@ -110,6 +110,38 @@ describe("RunReceipt", () => {
     expect(within(receipt).getByText("compute only, billing: warehouse_hour, region: us-east-1")).toBeTruthy();
   });
 
+  it("counts placeholder cost summaries as missing receipt metadata", () => {
+    render(
+      <RunReceipt
+        detail={makeDetail({
+          cost_model_version: null,
+          cost_model_source: null,
+          cost_scope: null,
+          billing_unit: null,
+          pricing_region: null,
+        })}
+        shortId="abc12345"
+        isRankingEligible={true}
+      />,
+    );
+
+    const receipt = screen.getByRole("region", { name: "Run receipt" });
+    const cost = within(receipt).getByRole("heading", { name: "Cost" }).closest("section");
+    expect(cost).not.toBeNull();
+    const costSection = within(cost as HTMLElement);
+
+    expect(within(receipt).getByText("2 fields not recorded for this run.")).toBeTruthy();
+    expect(costSection.getByText("2 fields not recorded")).toBeTruthy();
+    expect(costSection.queryByText("Cost model")).toBeNull();
+    expect(costSection.queryByText("Cost scope")).toBeNull();
+    expect(costSection.getByText("unavailable")).toBeTruthy();
+
+    fireEvent.click(within(receipt).getByRole("button", { name: /Show missing metadata/ }));
+    expect(costSection.getByText("Cost model")).toBeTruthy();
+    expect(costSection.getByText("Cost scope")).toBeTruthy();
+    expect(costSection.getAllByText("Not recorded")).toHaveLength(2);
+  });
+
   it("keeps logical query count separate from measurement samples", () => {
     render(<RunReceipt detail={makeDetail()} />);
 

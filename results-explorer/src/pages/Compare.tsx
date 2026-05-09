@@ -38,7 +38,22 @@ interface CompareState {
 
 const EMPTY_RESULTS: DetailResult[] = [];
 
-export function Compare(_: RoutableProps) {
+interface CompareProps extends RoutableProps {
+  url?: string;
+}
+
+function currentCompareUrl(url: string | undefined): string {
+  if (url) return url;
+  if (typeof window === "undefined") return "/results/compare";
+  return `${window.location.pathname}${window.location.search}`;
+}
+
+function searchParamsFromUrl(url: string): URLSearchParams {
+  return new URL(url, "https://benchbox.dev").searchParams;
+}
+
+export function Compare({ url }: CompareProps) {
+  const activeUrl = currentCompareUrl(url);
   const [compareState, setCompareState] = useState<CompareState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,7 +76,13 @@ export function Compare(_: RoutableProps) {
   useEffect(() => {
     let cancelled = false;
 
-    const params = new URLSearchParams(window.location.search);
+    setCompareState(null);
+    setError(null);
+    setLoading(true);
+    setBuilderPinnedId(null);
+    setShowBuilder(false);
+
+    const params = searchParamsFromUrl(activeUrl);
     const idsParam = params.get("ids") ?? "";
     const ids = idsParam
       .split(",")
@@ -132,6 +153,7 @@ export function Compare(_: RoutableProps) {
         const metric = await getPrimaryMetricForBenchmark(details[0]!.benchmark);
         if (cancelled) return;
         setBaselineIndex(0);
+        setShowBuilder(false);
         setCompareState({ results: details, primaryMetric: metric });
         setLoading(false);
       })
@@ -146,7 +168,7 @@ export function Compare(_: RoutableProps) {
       cancelled = true;
       if (copyTimerRef.current !== null) clearTimeout(copyTimerRef.current);
     };
-  }, []);
+  }, [activeUrl]);
 
   // Canonicalize URL to short IDs once data is loaded and URL has long-form IDs.
   useEffect(() => {

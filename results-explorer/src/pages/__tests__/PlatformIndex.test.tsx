@@ -165,6 +165,35 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(screen.queryByTestId("platform-filter-reset")).toBeNull();
   });
 
+  it("disambiguates canonical and legacy SSB benchmark options in the platform filter", async () => {
+    const mixedSsbRows: PlatformIndexRowRow[] = Array.from({ length: 30 }, (_, idx) =>
+      makeRow({
+        result_id: `r-ssb-filter-${idx}`,
+        short_id: `ssbf${String(idx).padStart(4, "0")}`,
+        benchmark: idx < 15 ? "star_schema" : "ssb",
+        run_date: "2026-04-10",
+        geomean_ms: 10 + idx,
+      }),
+    );
+    vi.mocked(getPlatformIndexRows).mockResolvedValue(mixedSsbRows);
+
+    render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    const benchmarkSelect = screen.getByTestId("platform-filter-benchmark") as HTMLSelectElement;
+    const benchmarkOptions = Array.from(benchmarkSelect.options).map((option) => ({
+      value: option.value,
+      label: option.text,
+    }));
+    expect(benchmarkOptions).toEqual([
+      { value: "all", label: "All benchmarks" },
+      { value: "ssb", label: "SSB (legacy slug)" },
+      { value: "star_schema", label: "SSB" },
+    ]);
+    expect(within(benchmarkSelect).getByRole("option", { name: "SSB" })).toHaveValue("star_schema");
+    expect(within(benchmarkSelect).getByRole("option", { name: "SSB (legacy slug)" })).toHaveValue("ssb");
+  });
+
   it("locks the cohort signature after the first compare selection", async () => {
     const cohortRows: PlatformIndexRowRow[] = [
       makeRow({

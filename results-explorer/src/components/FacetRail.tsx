@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useEffect, useId, useMemo, useRef, useState } from "preact/hooks";
 import { formatFacetDisplayValue } from "@/lib/facetDisplay";
 
 export interface FacetOption {
@@ -49,11 +49,13 @@ const FOCUSABLE_DRAWER_SELECTOR = [
 ].join(", ");
 
 export function FacetRail({ groups, resultCount, activeChips = [], onToggle, onReset }: FacetRailProps) {
+  const railId = useId();
+
   return (
     <aside class="space-y-3" aria-label="Result facets">
       <FacetSummary resultCount={resultCount} activeChips={activeChips} onReset={onReset} />
       {groups.map((group) => (
-        <FacetGroupSection key={group.key} group={group} onToggle={onToggle} />
+        <FacetGroupSection key={group.key} group={group} idPrefix={railId} onToggle={onToggle} />
       ))}
     </aside>
   );
@@ -257,9 +259,11 @@ function ActiveChipStrip({
 
 function FacetGroupSection({
   group,
+  idPrefix,
   onToggle,
 }: {
   group: FacetGroup;
+  idPrefix: string;
   onToggle: (groupKey: string, value: string) => void;
 }) {
   const [search, setSearch] = useState("");
@@ -284,7 +288,7 @@ function FacetGroupSection({
     () => labelledOptions.filter((option) => group.selected.includes(option.value)),
     [labelledOptions, group.selected],
   );
-  const panelId = `facet-${group.key}-panel`;
+  const panelId = `${idPrefix}-facet-${group.key}-panel`;
 
   return (
     <section class="rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-4 shadow-sm">

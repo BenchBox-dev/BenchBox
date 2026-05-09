@@ -378,6 +378,8 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     selectedIds.size >= 2
       ? buildCompareUrl([...selectedIds])
       : null;
+  const benchmarkOptions = uniqueBenchmarkOptions();
+  const hasCurrentBenchmarkOption = benchmarkOptions.some((option) => option.value === benchmark);
   const contextNote = benchmarkContextNote(benchmark);
   const compareGuidance = benchmarkCompareGuidanceMessage(selectedIds.size, title, effectiveSf, effectivePhase);
 
@@ -416,12 +418,12 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
                 route(`/results/${next}/${query ? `?${query}` : ""}`);
               }}
             >
-              {uniqueBenchmarkOptions().map((option) => (
+              {benchmarkOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
               ))}
-              {!Object.prototype.hasOwnProperty.call(BENCHMARK_LABELS, benchmark) && (
+              {!hasCurrentBenchmarkOption && (
                 <option value={benchmark}>{title}</option>
               )}
             </select>

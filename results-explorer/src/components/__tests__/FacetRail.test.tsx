@@ -92,6 +92,27 @@ describe("FacetRail", () => {
     fireEvent.click(within(providerSection).getByRole("checkbox", { name: "Cloud provider: GCP (4)" }));
     expect(onToggle).toHaveBeenCalledWith("cloud_provider", "gcp");
   });
+
+  it("generates unique panel ids when duplicate rails render the same groups", () => {
+    render(
+      <>
+        <FacetRail groups={GROUPS} resultCount={16} onToggle={vi.fn()} onReset={vi.fn()} />
+        <FacetRail groups={GROUPS} resultCount={16} onToggle={vi.fn()} onReset={vi.fn()} />
+      </>,
+    );
+
+    const panelIds = Array.from(document.querySelectorAll<HTMLButtonElement>("button[aria-controls]")).map(
+      (button) => button.getAttribute("aria-controls"),
+    );
+    const renderedIds = Array.from(document.querySelectorAll<HTMLElement>("[id]")).map((element) => element.id);
+
+    expect(panelIds).toHaveLength(GROUPS.length * 2);
+    expect(new Set(panelIds).size).toBe(panelIds.length);
+    panelIds.forEach((panelId) => {
+      expect(panelId).toBeTruthy();
+      expect(renderedIds.filter((id) => id === panelId)).toHaveLength(1);
+    });
+  });
 });
 
 describe("FacetRail collapsible groups", () => {

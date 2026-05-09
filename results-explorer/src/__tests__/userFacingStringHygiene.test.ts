@@ -6,14 +6,15 @@
  * `CLAUDE.md`; pointing them at those paths is a leak of internal context
  * dressed up as actionable guidance.
  *
- * The scan looks at string and template literals only — source-code
- * comments are intentionally allowed to reference internal docs because
- * they help maintainers and never reach the runtime.
+ * The scan looks at string literals, template literals, and static JSX text.
+ * Source-code comments are intentionally allowed to reference internal docs
+ * because they help maintainers and never reach the runtime.
  */
 
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import * as ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 const FORBIDDEN_PATTERNS: ReadonlyArray<{ pattern: RegExp; label: string }> = [
@@ -25,48 +26,49 @@ const FORBIDDEN_PATTERNS: ReadonlyArray<{ pattern: RegExp; label: string }> = [
 const here = fileURLToPath(new URL(".", import.meta.url));
 const srcRoot = resolve(here, "..");
 
-// Match double-quoted, single-quoted, and backtick-quoted strings, with
-// support for escape sequences. Intentionally simple: a `${...}` inside a
-// template literal is captured as part of the same backtick literal, which
-// is fine — we only scan the captured text for substrings.
-const STRING_LITERAL_RE = /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`/g;
-
-// Strip block comments first so a `_project/` mention inside `/** ... */`
-// is not visible to the string-literal scan. Line comments are stripped
-// after to avoid affecting URLs like `http://` inside string literals.
-function stripComments(source: string): string {
-  let out = source.replace(/\/\*[\s\S]*?\*\//g, "");
-  // Strip `//` line comments only when they are not inside a string. We
-  // approximate by removing them after extracting strings: in practice the
-  // string-literal regex below does its own quoting, so a residual `//`
-  // outside a string is safe to drop.
-  out = out.replace(/(^|[^:])\/\/[^\n]*/g, "$1");
-  return out;
-}
-
 interface Finding {
   file: string;
-  literal: string;
+  fragment: string;
   pattern: string;
 }
 
-function scanFile(absPath: string): Finding[] {
-  const source = readFileSync(absPath, "utf8");
-  const sourceWithoutComments = stripComments(source);
+function scanSource(file: string, source: string, scriptKind: ts.ScriptKind): Finding[] {
+  const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, scriptKind);
   const findings: Finding[] = [];
-  for (const match of sourceWithoutComments.matchAll(STRING_LITERAL_RE)) {
-    const literal = match[0];
+
+  function scanFragment(fragment: string): void {
     for (const { pattern, label } of FORBIDDEN_PATTERNS) {
-      if (pattern.test(literal)) {
+      if (pattern.test(fragment)) {
         findings.push({
-          file: relative(srcRoot, absPath),
-          literal: literal.length > 200 ? `${literal.slice(0, 200)}…` : literal,
+          file,
+          fragment: fragment.length > 200 ? `${fragment.slice(0, 200)}…` : fragment,
           pattern: label,
         });
       }
     }
   }
+
+  function visit(node: ts.Node): void {
+    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isJsxText(node)) {
+      scanFragment(node.getText(sourceFile));
+    }
+    if (ts.isTemplateExpression(node)) {
+      scanFragment(node.head.getText(sourceFile));
+      for (const span of node.templateSpans) {
+        scanFragment(span.literal.getText(sourceFile));
+      }
+    }
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
   return findings;
+}
+
+function scanFile(absPath: string): Finding[] {
+  const source = readFileSync(absPath, "utf8");
+  const scriptKind = absPath.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
+  return scanSource(relative(srcRoot, absPath), source, scriptKind);
 }
 
 const EXCLUDED_DIR_NAMES = new Set(["__tests__", "test", "testing"]);
@@ -95,10 +97,10 @@ describe("user-facing string hygiene", () => {
     const findings = files.flatMap((file: string) => scanFile(file));
     if (findings.length > 0) {
       const message = findings
-        .map((f) => `  ${f.file}: literal contains "${f.pattern}"\n    ${f.literal}`)
+        .map((f) => `  ${f.file}: source fragment contains "${f.pattern}"\n    ${f.fragment}`)
         .join("\n");
       throw new Error(
-        `Found ${findings.length} runtime string(s) referencing internal repository paths.` +
+        `Found ${findings.length} runtime source fragment(s) referencing internal repository paths.` +
           " Internal docs (_project/, AGENTS.md, CLAUDE.md) are not deployed and must" +
           " never be cited in error messages, JSX text, or console output:\n" +
           message,
@@ -110,12 +112,22 @@ describe("user-facing string hygiene", () => {
     const sample = [
       'throw new Error("see _project/foo.md");',
       "// internal note: _project/bar.md (this is a comment, allowed)",
+      "<p>See AGENTS.md</p>",
+      "{/* JSX maintainer note: CLAUDE.md (this is a comment, allowed) */}",
       'const ok = "regenerate via benchbox explorer build";',
     ].join("\n");
-    const stripped = stripComments(sample);
-    const literals = Array.from(stripped.matchAll(STRING_LITERAL_RE)).map((m) => m[0]);
-    const flagged = literals.filter((lit) => /_project\//.test(lit));
-    expect(flagged).toHaveLength(1);
-    expect(flagged[0]).toContain("_project/foo.md");
+    const findings = scanSource("synthetic.tsx", sample, ts.ScriptKind.TSX);
+    expect(findings).toEqual([
+      {
+        file: "synthetic.tsx",
+        fragment: '"see _project/foo.md"',
+        pattern: "_project/",
+      },
+      {
+        file: "synthetic.tsx",
+        fragment: "See AGENTS.md",
+        pattern: "AGENTS.md",
+      },
+    ]);
   });
 });

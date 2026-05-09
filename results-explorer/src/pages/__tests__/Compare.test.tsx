@@ -35,7 +35,14 @@ vi.mock("@/lib/duckdbQueries", async () => {
   };
 });
 
-import { getDetailResult, getPrimaryMetricForBenchmark, listResults, resolveShortId, toShortIds } from "@/lib/duckdbQueries";
+import {
+  getDetailResult,
+  getPrimaryMetricForBenchmark,
+  listResults,
+  resolveShortId,
+  toShortIds,
+  type ResultRow,
+} from "@/lib/duckdbQueries";
 import { Compare } from "@/pages/Compare";
 
 // ---------------------------------------------------------------------------
@@ -108,6 +115,48 @@ const POSTGRES = makeResult({
     { query_id: "Q2", display_ms: 80, sample_count: 3 },
   ],
 });
+
+function makeResultRow(overrides: Partial<ResultRow> = {}): ResultRow {
+  return {
+    result_id: "r1",
+    benchmark: "tpch",
+    scale_factor: 0.1,
+    platform: "DuckDB",
+    platform_id: "duckdb",
+    driver_version: null,
+    run_date: "2026-04-17",
+    power_score: 3000,
+    total_duration_s: 60,
+    geomean_ms: 10,
+    display_geomean_ms: 10,
+    query_count: 22,
+    trust_label: "maintainer-run",
+    visibility: "public-curated",
+    platform_version: null,
+    execution_mode: null,
+    tuning_mode: null,
+    tuning_hash: null,
+    test_type: "measurement",
+    validation_status: null,
+    cost_usd: null,
+    compliance_class: null,
+    is_ranking_eligible: true,
+    has_plans: false,
+    plans_published: false,
+    has_tuning: false,
+    bundle_download_url: "",
+    normalized_cost_usd: null,
+    cost_model_version: null,
+    cost_status: null,
+    cost_scope: null,
+    deployment_class: null,
+    cloud_provider: null,
+    cloud_region: null,
+    instance_or_warehouse: null,
+    storage_format: null,
+    ...overrides,
+  };
+}
 
 function setupUrl(ids: string[], extraParams: Record<string, string> = {}) {
   const params = new URLSearchParams({ ids: ids.join(","), ...extraParams });
@@ -320,6 +369,40 @@ describe("Compare", () => {
       expect(compareCall).toContain("r1");
       expect(compareCall).toContain("r2");
     });
+  });
+
+  it("loads selected runs after builder navigation changes only the compare query string", async () => {
+    setupUrl([]);
+    vi.mocked(listResults).mockResolvedValue([
+      makeResultRow({ result_id: "r1", platform: "DuckDB", platform_id: "duckdb" }),
+      makeResultRow({
+        result_id: "r2",
+        platform: "SQLite",
+        platform_id: "sqlite",
+        power_score: 300,
+        geomean_ms: 100,
+        display_geomean_ms: 100,
+      }),
+    ]);
+    vi.mocked(toShortIds).mockResolvedValue(["r1", "r2"]);
+
+    const { getByTestId, rerender } = render(<Compare url="/results/compare" />);
+
+    await waitFor(() => expect(getByTestId("compare-builder-row-r1")).toBeTruthy());
+    (within(getByTestId("compare-builder-row-r1")).getByRole("checkbox") as HTMLInputElement).click();
+    (within(getByTestId("compare-builder-row-r2")).getByRole("checkbox") as HTMLInputElement).click();
+
+    await waitFor(() => expect((getByTestId("compare-builder-launch") as HTMLButtonElement).disabled).toBe(false));
+    (getByTestId("compare-builder-launch") as HTMLButtonElement).click();
+    await waitFor(() => expect(route).toHaveBeenCalledWith("/results/compare?ids=r1,r2"));
+
+    window.history.pushState(null, "", "/results/compare?ids=r1,r2");
+    rerender(<Compare url="/results/compare?ids=r1,r2" />);
+
+    await waitFor(() => expect(screen.queryByTestId("compare-builder")).toBeNull());
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Decision Summary" })).toBeTruthy());
+    expect(getDetailResult).toHaveBeenCalledWith("r1");
+    expect(getDetailResult).toHaveBeenCalledWith("r2");
   });
 
   it("shows 'vs worst' speedup of 10.00x in the DuckDB summary card (power_score primary)", async () => {

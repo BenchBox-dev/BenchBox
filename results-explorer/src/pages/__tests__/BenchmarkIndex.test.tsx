@@ -411,6 +411,25 @@ describe("BenchmarkIndex", () => {
     expect(routeMock).toHaveBeenCalledWith("/results/clickbench/?view=ranks");
   });
 
+  it.each([
+    ["ssb", "star_schema"],
+    ["tsbs_devops", "tsbs-devops"],
+  ])("keeps legacy benchmark slug %s selected even when deduped from canonical %s", async (legacySlug, canonicalSlug) => {
+    const legacyRows = RESULT_ROWS.map((row) => ({ ...row, benchmark: legacySlug }));
+    const legacyRankings = RANKING_ROWS.map((row) => ({ ...row, benchmark: legacySlug }));
+    const legacyCells = CELL_ROWS.map((row) => ({ ...row, benchmark: legacySlug }));
+    vi.mocked(queryRows).mockImplementation(defaultImpl(legacyRows, legacyRankings, legacyCells));
+
+    render(<BenchmarkIndex benchmark={legacySlug} />);
+    await waitFor(() => expect(screen.getByTestId("benchmark-switcher")).toBeTruthy());
+
+    const switcher = screen.getByTestId("benchmark-switcher") as HTMLSelectElement;
+    const optionValues = Array.from(switcher.options).map((option) => option.value);
+    expect(switcher.value).toBe(legacySlug);
+    expect(optionValues).toContain(canonicalSlug);
+    expect(optionValues).toContain(legacySlug);
+  });
+
   it("labels the Star Schema Benchmark and SSB equivalence explicitly", async () => {
     const ssbRows = RESULT_ROWS.map((row) => ({ ...row, benchmark: "star_schema" }));
     const ssbRankings = RANKING_ROWS.map((row) => ({ ...row, benchmark: "star_schema" }));

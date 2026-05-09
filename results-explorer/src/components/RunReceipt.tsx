@@ -41,6 +41,11 @@ function rowFromString(
   return recordedRow(label, format(String(raw)));
 }
 
+function rowFromSummary(label: string, value: string): ReceiptRow {
+  if (value === MISSING_PLACEHOLDER) return missingRow(label);
+  return recordedRow(label, value);
+}
+
 export function RunReceipt({
   detail,
   shortId = null,
@@ -108,8 +113,8 @@ export function RunReceipt({
       title: "Cost",
       rows: [
         recordedRow("Normalized cost", normalizedCostLabel(detail)),
-        recordedRow("Cost model", costModelSummary(detail)),
-        recordedRow("Cost scope", costScopeSummary(detail)),
+        rowFromSummary("Cost model", costModelSummary(detail)),
+        rowFromSummary("Cost scope", costScopeSummary(detail)),
       ],
     },
   ];
