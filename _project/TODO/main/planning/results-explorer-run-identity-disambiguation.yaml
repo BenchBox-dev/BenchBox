@@ -127,9 +127,7 @@ anti_patterns:
 
 verification:
 - description: "Run identity and duplicate-label tests pass"
-  command: "cd results-explorer && npm test -- --run src/lib/__tests__/runIdentity.test.ts src/components/__tests__/charts.smoke.test.tsx
-    src/components/__tests__/CompareSummary.test.tsx src/components/__tests__/GroupedQueryChart.test.tsx src/components/__tests__/QueryDiffTable.test.tsx
-    src/components/__tests__/NormalizedSpeedupChart.test.tsx src/pages/__tests__/Compare.test.tsx"
+  command: "cd results-explorer && npm test -- --run src/lib/__tests__/runIdentity.test.ts src/components/__tests__/charts.smoke.test.tsx src/components/__tests__/CompareSummary.test.tsx src/components/__tests__/GroupedQueryChart.test.tsx src/components/__tests__/QueryDiffTable.test.tsx src/components/__tests__/NormalizedSpeedupChart.test.tsx src/pages/__tests__/Compare.test.tsx"
   expected_output: "all targeted tests pass"
 - description: "Frontend typecheck passes"
   command: "cd results-explorer && npm run typecheck"
@@ -138,8 +136,7 @@ verification:
   command: "cd results-explorer && npm run build"
   expected_output: "exit 0"
 - description: "Manual duplicate-run browser check is complete"
-  command: "echo 'Manual: browser-check chart Rank, Distribution, Overview/Sparklines, Trend, and Compare with duplicate DataFusion/Polars
-    fixtures'"
+  command: "echo 'Manual: browser-check chart Rank, Distribution, Overview/Sparklines, Trend, and Compare with duplicate DataFusion/Polars fixtures'"
   expected_output: "manual evidence captured in PR notes or audit artifact"
 
 scope_limit:
