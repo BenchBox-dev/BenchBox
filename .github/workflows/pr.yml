@@ -268,7 +268,7 @@ jobs:
             exit 0
           fi
           while IFS= read -r audit_path; do
-            make audit-sha-check FILE="$$audit_path" AUDIT_SHA_TARGET_REF="origin/${{ github.base_ref }}"
+            make audit-sha-check FILE="$audit_path" AUDIT_SHA_TARGET_REF="origin/${{ github.base_ref }}"
           done < /tmp/changed-audits.txt
 
   ci-required-result:
