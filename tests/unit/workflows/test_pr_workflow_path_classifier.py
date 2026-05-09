@@ -91,10 +91,18 @@ def test_ci_required_result_fails_on_explorer_tokens_failure() -> None:
 
 
 def test_ci_required_result_treats_explorer_tokens_skipped_as_success() -> None:
-    # PRs in the code-CI tier that don't touch results-explorer/src (e.g.
-    # benchbox/, tests/) cause the explorer-tokens job to be skipped. The
-    # aggregator must accept "skipped" as success here — otherwise every
-    # Python-only PR would be blocked.
+    # Defensive: pin the `|| "skipped"` clause in the aggregator's
+    # explorer-tokens check. The (NEEDS_CODE_CI="true",
+    # EXPLORER_TOKENS_RESULT="skipped") combination is not produced by any
+    # real PR shape today: the explorer-tokens job's `if:` is gated on
+    # `needs-code-ci == 'true'`, so when needs-code-ci is true the job runs
+    # (its inner detection step skips the scan when no results-explorer/src
+    # paths changed, but the *job* still concludes "success", not
+    # "skipped"). The only path that yields EXPLORER_TOKENS_RESULT="skipped"
+    # is needs-code-ci="false", but the aggregator early-exits at the
+    # NEEDS_CODE_CI=false branch before reading EXPLORER_TOKENS_RESULT. The
+    # `|| "skipped"` clause is therefore belt-and-braces — this test pins
+    # it so a future cleanup that drops the clause is a deliberate choice.
     result = _run_ci_required_result(
         NEEDS_CODE_CI="true",
         SAFE_CONTENT_ONLY="false",
@@ -127,8 +135,6 @@ def test_ci_required_result_explorer_tokens_in_needs() -> None:
     # `ci-required-result.needs:` list, the aggregator wouldn't observe its
     # status at all (always "" → handled as not-success in the bash logic).
     # Lock the wiring in place.
-    import yaml
-
     workflow_yaml = yaml.safe_load((REPO_ROOT / ".github" / "workflows" / "pr.yml").read_text(encoding="utf-8"))
     needs = workflow_yaml["jobs"]["ci-required-result"]["needs"]
     assert "explorer-tokens" in needs

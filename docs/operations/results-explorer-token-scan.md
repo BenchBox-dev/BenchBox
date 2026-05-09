@@ -43,6 +43,22 @@ A regex match for any combination of:
 Files scanned: `*.tsx`, `*.ts`, `*.jsx`, `*.js`, `*.css`, `*.html` under
 `results-explorer/src/`.
 
+### Known coverage gaps
+
+The regex matches *named-palette* utilities only. The following do **not**
+trip the gate today:
+
+- **Arbitrary-value classes** — `text-[#374151]` (the literal hex
+  equivalent of `text-gray-700`), `bg-[rgb(55,65,81)]`, etc. A
+  contributor reaching for the hex equivalent of a token bypasses the
+  scan. The blind-spot scenario was named-palette literals (PR #271
+  retokenized `text-gray-700`-style classes), so this is acceptable for
+  the current contract; widen the regex to a `text-\[` shape if a
+  future incident shows arbitrary-value bypass in the wild.
+- **Concatenated classnames** — `"text-gray-" + n` or
+  `` `text-${color}-700` `` are not matched (the regex needs a literal
+  contiguous token).
+
 ## Allowlisting an intentional literal
 
 Append an inline marker on the same line as the literal:
@@ -66,13 +82,67 @@ skins, deliberate palette exports for design tooling, and similar.
 
 ## CI wiring
 
-- **PR-time** — `.github/workflows/pr.yml` job `explorer-tokens` runs when
-  `results-explorer/src/` is in the PR diff. It is a required
-  `ci-required-result` input.
+- **PR-time** — `.github/workflows/pr.yml` job `explorer-tokens` is gated
+  in two tiers. The **outer job** runs on any PR where
+  `needs.ci-paths.outputs.needs-code-ci == 'true'` (i.e., any PR in the
+  code-CI tier — Python, infra, explorer, etc.); the runner spins up so
+  the `ci-required-result` aggregator always has a real status to read.
+  The **inner scan step** then `git diff`s against the base ref and only
+  invokes `make lint-explorer-tokens` when at least one path under
+  `results-explorer/src/` changed. The aggregator at
+  `pr.yml`'s `ci-required-result` job treats `success` and `skipped` for
+  this check as passing; `failure` blocks the PR. The
+  `explorer-tokens-path-classifier-output` TODO removes the inner tier
+  by promoting `explorer-paths-needed` into the `ci-paths` classifier
+  output.
 - **Post-merge** — `.github/workflows/develop-post-merge.yml` job
-  `explorer-tokens` re-runs the gate against the merged develop tree so
-  that a squash race that reintroduces literals trips the auto-revert
-  path even when each PR-time scan passed against its own pre-merge tree.
+  `explorer-tokens` runs unconditionally on every push to develop and
+  re-runs the gate against the merged develop tree so that a squash
+  race that reintroduces literals trips the auto-revert path even when
+  each PR-time scan passed against its own pre-merge tree.
+
+## What happens when the post-merge gate trips
+
+The post-merge `explorer-tokens` job feeds three downstream consumers in
+`.github/workflows/develop-post-merge.yml`:
+
+1. **`auto-revert-on-failure`** — `if:` includes
+   `needs.explorer-tokens.result == 'failure'`. When red, it opens an
+   auto-revert PR on the offending squash commit, applies the
+   `incident:develop-red` label, and adds the original PR's author as a
+   reviewer. Conflicts on the revert open a tracking issue with
+   `incident:develop-red-revert-conflict`. **The auto-revert is a PR,
+   not a direct push** — landing the revert still requires explicit
+   merge.
+2. **`metrics`** — the `post_merge_red` shell flag flips true; the
+   `develop_red_detected_at` jq filter selects the earliest
+   `completed_at` across `lint`, `fast-test`, and `explorer-tokens` as
+   the red-detection timestamp.
+3. The dev-loop metrics row is emitted to the `metrics` artifact under
+   `dev-loop-metrics/<sha>.json`.
+
+### When the gate is wrong (false positive)
+
+If the regex flags a legitimate literal at an inopportune moment (e.g.,
+3am hotfix, a docs/comment string that happens to spell a Tailwind
+token), the on-call workflow is:
+
+1. **Close the auto-revert PR** if one was opened — the `incident:develop-red`
+   label makes it discoverable via `gh pr list --label incident:develop-red`.
+2. **Allowlist the line** with `// allow-explorer-token-literal: <reason>`
+   (or the `/* … */` form for CSS), where `<reason>` is concrete enough
+   that a reviewer six months from now can decide whether to remove the
+   marker. Format suggestion: `hotfix-YYYY-MM-DD followup-needed-issue-NNN`.
+3. **File a regex-fix TODO** under `_project/TODO/main/bugs/` describing
+   the false-positive shape, so the allowlist can be removed once the
+   regex is tightened. Use `_project/scripts/scan_explorer_tokens.py` as
+   the single source of truth — adjust `UTILITIES`, `PALETTES`, `STOPS`,
+   or `LITERAL_RE` itself.
+
+The gate is intentionally conservative: matching a literal in a comment
+or string is the documented contract (see
+`tests/unit/scripts/test_scan_explorer_tokens.py::test_literal_re_matches_inside_comments_and_strings_by_design`).
+The allowlist is the operational answer.
 
 ## Extending or removing the gate
 
