@@ -114,11 +114,9 @@ test.describe("responsive explorer assertions", () => {
       const drawerTrigger = page.locator('[data-testid="query-mobile-filter-drawer"] button[data-result-count]').first();
       await expect(drawerTrigger).toHaveAttribute("data-result-count", /\d+/);
 
-      if (viewport.width <= 768) {
-        const resultPanelY = await topOf(page.getByTestId("query-results-panel"));
-        const visibleColumnsY = await topOf(page.getByTestId("query-visible-columns"));
-        expect(resultPanelY).toBeLessThan(visibleColumnsY);
-      }
+      const resultPanelY = await topOf(page.getByTestId("query-results-panel"));
+      const visibleColumnsY = await topOf(page.getByTestId("query-visible-columns"));
+      expect(resultPanelY).toBeLessThan(visibleColumnsY);
     });
 
     test(`compare route keeps decision summary and query evidence reachable at ${viewport.name}`, async ({ page }) => {
