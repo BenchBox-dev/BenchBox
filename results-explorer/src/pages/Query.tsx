@@ -47,6 +47,18 @@ interface FacetBucket {
 
 type ResultRow = Record<string, unknown>;
 
+interface CompareLockSignature {
+  benchmark: string;
+  scaleFactor: unknown;
+  phase: string;
+  primaryMetric: string;
+}
+
+interface CompareSelection {
+  compareId: string;
+  lockSig: CompareLockSignature;
+}
+
 const DEFAULT_COLUMNS = [
   "benchmark",
   "platform",
@@ -56,6 +68,7 @@ const DEFAULT_COLUMNS = [
   "geomean_ms",
   "trust_label",
 ];
+const QUERY_LOCK_COLUMNS = ["result_id", "benchmark", "scale_factor", "power_score", "test_type"] as const;
 const TABLE_RENDER_LIMIT = 200;
 const TABLE_RENDER_INCREMENT = 200;
 
@@ -100,15 +113,22 @@ export function Query(_: RoutableProps) {
   // pick locks the cohort signature; subsequent rows that don't match
   // render disabled. The Compare tray below the result count surfaces
   // the active cohort and the launch button.
-  const [compareSelectedIds, setCompareSelectedIds] = useState<Set<string>>(new Set());
-  const toggleCompareSelection = (resultId: string) =>
-    setCompareSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(resultId)) next.delete(resultId);
-      else next.add(resultId);
+  const [compareSelections, setCompareSelections] = useState<Map<string, CompareSelection>>(new Map());
+  const toggleCompareSelection = (row: ResultRow) =>
+    setCompareSelections((prev) => {
+      const id = String(row.result_id);
+      const next = new Map(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.set(id, {
+          compareId: compareIdForResultRow(row),
+          lockSig: compareLockSignatureForRow(row),
+        });
+      }
       return next;
     });
-  const clearCompareSelection = () => setCompareSelectedIds(new Set());
+  const clearCompareSelection = () => setCompareSelections(new Map());
   const rowLimitMode = rowLimitRaw === "all" ? "all" : "default";
   const rowLimit = rowLimitMode === "all" ? UNLIMITED_ROW_LIMIT : DEFAULT_ROW_LIMIT;
 
@@ -150,9 +170,10 @@ export function Query(_: RoutableProps) {
       validationStatuses,
     ],
   );
+  const columnNames = useMemo(() => schema.map((column) => column.name), [schema]);
   const queryColumns = useMemo(
-    () => (visibleColumns.includes("result_id") ? visibleColumns : ["result_id", ...visibleColumns]),
-    [visibleColumns],
+    () => withRequiredQueryColumns(visibleColumns, columnNames),
+    [columnNames, visibleColumns],
   );
   const activeFilters = useMemo(() => applySchemaFilterSupport(filters, schema), [filters, schema]);
   const facetQueries = useMemo(
@@ -273,7 +294,6 @@ export function Query(_: RoutableProps) {
     );
   }
 
-  const columnNames = schema.map((column) => column.name);
   const facetGroups: FacetGroup[] = [
     makeFacetGroup("benchmark", "Benchmark", facetCounts.benchmark ?? [], benchmarks, {
       formatLabel: formatBenchmarkLabel,
@@ -649,37 +669,26 @@ export function Query(_: RoutableProps) {
                   <span class="bb-scroll-affordance" data-testid="query-results-scroll-hint">← scroll →</span>
                 </div>
                 {(() => {
-                  const lockSig = (() => {
-                    const firstId = [...compareSelectedIds][0];
-                    if (firstId === undefined) return null;
-                    const firstRow = rows.find((row) => String(row.result_id) === firstId);
-                    if (!firstRow) return null;
-                    return {
-                      benchmark: String(firstRow.benchmark ?? ""),
-                      scale_factor: firstRow.scale_factor ?? null,
-                      phase: String(firstRow.phase ?? ""),
-                      primary_metric: String(firstRow.primary_metric ?? ""),
-                    };
-                  })();
+                  const lockSig = [...compareSelections.values()][0]?.lockSig ?? null;
                   const lockReason = (row: ResultRow): string | undefined => {
                     if (lockSig === null) return undefined;
                     const id = String(row.result_id);
-                    if (compareSelectedIds.has(id)) return undefined;
+                    if (compareSelections.has(id)) return undefined;
+                    const rowSig = compareLockSignatureForRow(row);
                     const mismatches: string[] = [];
-                    if (String(row.benchmark ?? "") !== lockSig.benchmark) mismatches.push("benchmark");
-                    if ((row.scale_factor ?? null) !== lockSig.scale_factor) mismatches.push("scale");
-                    if (String(row.phase ?? "") !== lockSig.phase) mismatches.push("phase");
-                    if (String(row.primary_metric ?? "") !== lockSig.primary_metric)
-                      mismatches.push("primary metric");
+                    if (rowSig.benchmark !== lockSig.benchmark) mismatches.push("benchmark");
+                    if (rowSig.scaleFactor !== lockSig.scaleFactor) mismatches.push("scale");
+                    if (rowSig.phase !== lockSig.phase) mismatches.push("phase");
+                    if (rowSig.primaryMetric !== lockSig.primaryMetric) mismatches.push("primary metric");
                     if (mismatches.length === 0) return undefined;
-                    return `Locked: first selection is ${formatBenchmarkLabel(lockSig.benchmark)} SF ${lockSig.scale_factor} ${lockSig.phase}. This row differs by ${mismatches.join(", ")}.`;
+                    return (
+                      `Locked: first selection is ${formatBenchmarkLabel(lockSig.benchmark)} ` +
+                      `SF ${lockSig.scaleFactor} ${lockSig.phase}. ` +
+                      `This row differs by ${mismatches.join(", ")}.`
+                    );
                   };
-                  const selectedCompareIds = [...compareSelectedIds]
-                    .map((id) => {
-                      const row = rows.find((r) => String(r.result_id) === id);
-                      return row ? compareIdForRow(row as Parameters<typeof compareIdForRow>[0]) : id;
-                    });
-                  const compareUrl = compareSelectedIds.size >= 2 ? buildCompareUrl(selectedCompareIds) : null;
+                  const selectedCompareIds = [...compareSelections.values()].map((selection) => selection.compareId);
+                  const compareUrl = compareSelections.size >= 2 ? buildCompareUrl(selectedCompareIds) : null;
                   return (
                     <>
                       <div
@@ -687,16 +696,16 @@ export function Query(_: RoutableProps) {
                         data-testid="query-compare-tray"
                       >
                         <span>
-                          {compareSelectedIds.size === 0 ? (
+                          {compareSelections.size === 0 ? (
                             "Select two or more rows to compare. The first pick locks the cohort."
-                          ) : compareSelectedIds.size === 1 ? (
+                          ) : compareSelections.size === 1 ? (
                             "1 result selected — pick a compatible second row to enable Compare."
                           ) : (
-                            `${compareSelectedIds.size} results selected.`
+                            `${compareSelections.size} results selected.`
                           )}
                         </span>
                         <span class="flex items-center gap-2">
-                          {compareSelectedIds.size > 0 && (
+                          {compareSelections.size > 0 && (
                             <button
                               type="button"
                               class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1 text-xs font-medium hover:bg-[var(--bb-surface-data-muted)]"
@@ -712,7 +721,7 @@ export function Query(_: RoutableProps) {
                               class="rounded-md bg-[var(--bb-accent)] px-3 py-1 text-xs font-medium text-white shadow-sm"
                               data-testid="query-compare-launch"
                             >
-                              Compare {compareSelectedIds.size} selected →
+                              Compare {compareSelections.size} selected →
                             </a>
                           ) : (
                             <button
@@ -767,7 +776,7 @@ export function Query(_: RoutableProps) {
                           <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
                             {visibleRows.map((row) => {
                               const id = String(row.result_id);
-                              const isSelected = compareSelectedIds.has(id);
+                              const isSelected = compareSelections.has(id);
                               const reason = lockReason(row);
                               return (
                                 <tr key={id} class="hover:bg-[var(--bb-surface-data-muted)]">
@@ -777,7 +786,7 @@ export function Query(_: RoutableProps) {
                                       checked={isSelected}
                                       disabled={Boolean(reason)}
                                       title={reason}
-                                      onChange={() => toggleCompareSelection(id)}
+                                      onChange={() => toggleCompareSelection(row)}
                                       class="h-4 w-4 rounded border-[var(--bb-data-border-strong)] disabled:cursor-not-allowed disabled:opacity-50"
                                       aria-label={`Select ${id} for comparison`}
                                       data-testid={`query-compare-checkbox-${id}`}
@@ -1021,6 +1030,35 @@ function formatCell(value: unknown): string {
 
 function projectVisibleRow(row: ResultRow, visibleColumns: string[]): ResultRow {
   return Object.fromEntries(visibleColumns.map((column) => [column, row[column]]));
+}
+
+function withRequiredQueryColumns(visibleColumns: string[], availableColumns: string[]): string[] {
+  const available = new Set(availableColumns);
+  const columns = visibleColumns.includes("result_id") ? [...visibleColumns] : ["result_id", ...visibleColumns];
+  for (const column of QUERY_LOCK_COLUMNS) {
+    if (available.has(column) && !columns.includes(column)) columns.push(column);
+  }
+  return columns;
+}
+
+function compareIdForResultRow(row: ResultRow): string {
+  return compareIdForRow({
+    result_id: String(row.result_id),
+    short_id: typeof row.short_id === "string" ? row.short_id : null,
+  });
+}
+
+function compareLockSignatureForRow(row: ResultRow): CompareLockSignature {
+  return {
+    benchmark: String(row.benchmark ?? ""),
+    scaleFactor: row.scale_factor ?? null,
+    phase: String(row.phase ?? row.test_type ?? "power"),
+    primaryMetric: String(row.primary_metric ?? inferredPrimaryMetric(row)),
+  };
+}
+
+function inferredPrimaryMetric(row: ResultRow): "power_score" | "display_geomean_ms" {
+  return row.power_score === null || row.power_score === undefined ? "display_geomean_ms" : "power_score";
 }
 
 // Cell formatter that intercepts known enum columns (trust_label,

@@ -67,6 +67,16 @@ const BASE_ROWS = [
     instance_or_warehouse: "MEDIUM",
   },
 ];
+const INCOMPATIBLE_FILTERED_ROWS = [
+  {
+    ...BASE_ROWS[1]!,
+    result_id: "r3",
+    benchmark: "tpch",
+    scale_factor: 1,
+    run_date: "2026-04-15T12:00:00Z",
+  },
+];
+let resultRows = BASE_ROWS;
 
 function normalizeSql(sql: string): string {
   return sql.replace(/\s+/g, " ").trim();
@@ -98,6 +108,7 @@ beforeEach(() => {
   vi.mocked(getDb).mockReset();
   clearDuckdbQueryCachesForTests();
   schemaColumns = BASE_SCHEMA_COLUMNS;
+  resultRows = BASE_ROWS;
   window.history.replaceState(null, "", "/results/query");
   vi.stubGlobal(
     "fetch",
@@ -208,12 +219,12 @@ beforeEach(() => {
       throw new Error("read-only connection");
     }
     if (isDefaultResultSelect(sql)) {
-      return BASE_ROWS;
+      return resultRows;
     }
     if (normalized.startsWith("SELECT * FROM bench.results")) {
-      return BASE_ROWS;
+      return resultRows;
     }
-    return BASE_ROWS;
+    return resultRows;
   });
 });
 
@@ -243,6 +254,24 @@ describe("Query", () => {
 
     fireEvent.click(screen.getByTestId("query-compare-clear"));
     expect(screen.getByTestId("query-compare-tray").textContent).toContain("Select two or more rows");
+  });
+
+  it("keeps the compare cohort lock when filters hide the first selected row", async () => {
+    render(<Query />);
+    await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
+
+    fireEvent.click(screen.getByTestId("query-compare-checkbox-r1"));
+    expect(screen.getByTestId("query-compare-tray").textContent).toContain("1 result selected");
+
+    resultRows = INCOMPATIBLE_FILTERED_ROWS;
+    fireEvent.click(screen.getByLabelText(/^Platform: SQLite/));
+
+    await waitFor(() => expect(screen.getByTestId("query-compare-checkbox-r3")).toBeTruthy());
+    expect(screen.queryByTestId("query-compare-checkbox-r1")).toBeNull();
+    const incompatible = screen.getByTestId("query-compare-checkbox-r3") as HTMLInputElement;
+    expect(incompatible.disabled).toBe(true);
+    expect(incompatible.title).toContain("benchmark");
+    expect(screen.getByTestId("query-compare-launch-disabled")).toBeTruthy();
   });
 
   it("loads facet counts and table rows from DuckDB", async () => {
