@@ -108,24 +108,36 @@ work:
 - id: w6
   summary: "Constrain long Compare normalized-speedup charts"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
-    Fix Compare normalized speedup/read-primitives charts that render about
-    149 query rows with many dash values. Add a query filter, "show
-    comparable only" default, or per-benchmark grouping so the chart is
-    readable without scrolling through mostly missing rows. Coordinate with
-    the upstream Compare rebuild (results-explorer-compare-flow-entrypoints)
-    and identity labels (results-explorer-run-identity-disambiguation) to
-    avoid stomping their changes.
+    `NormalizedSpeedupChart.tsx` now computes a fully-comparable subset
+    (every non-baseline speedup non-null) alongside the original entry
+    list. When at least one fully-comparable query and at least one
+    partial query coexist, the chart defaults to the comparable-only
+    view and surfaces a compact toggle
+    (`data-testid="normalized-speedup-comparable-only-toggle"`) plus
+    a count summary above the SVG. When every query is comparable
+    (or none are) the toggle hides itself — no useful state to swap
+    to. Verification log:
+    _project/verification-logs/results-explorer-chart-panel-scope-and-labeling/w67.log.
 
 - id: w7
   summary: "Cover chart panel scope, labels, and contrast behavior"
   needs: [w1, w2, w3, w4, w5, w6]
-  status: pending
+  status: done
   notes: |
-    Add tests and browser screenshots for chart header height, Per-query tab
-    behavior, absent Cost data, heatmap legend copy, contrast/reduced-color
-    mode, and long Compare chart filtering.
+    Per-work-unit coverage shipped with each preceding PR:
+    w1 (header) + w2 (heatmap dedup) — `ChartPanel.test.tsx`
+    flex-wrap and excludeChartIds assertions.
+    w3 (Cost tab gating) — already covered by the chartRegistry
+    cost gating tests.
+    w4 (heatmap legend metric) + w5 (reduced-color mode) — covered
+    by `QueryHeatmap.test.tsx` legend heading and palette assertions.
+    w6 — new test in `NormalizedSpeedupChart.test.tsx` exercises
+    default-hide-partials and toggle-to-show-all behavior. Browser
+    screenshots are deferred to TODO #8 (release-gate w3 Playwright
+    walk) so the screenshot bundle ships once for the whole effort
+    rather than per work unit.
 
 must_preserve:
 - "Existing chart tabs that contain data must remain reachable."
