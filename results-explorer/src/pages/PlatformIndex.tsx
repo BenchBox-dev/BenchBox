@@ -5,7 +5,7 @@ import type { PlatformIndexRowRow } from "@/lib/duckdbQueries";
 import { getPlatformIndexRows } from "@/lib/duckdbQueries";
 import { useFacetState, type DateWindowFacet, type FacetKey, type FacetState } from "@/lib/facetModel";
 import { hasActiveFacets, matchesFacetRow, singleFacetValue, toDateWindowFacet } from "@/lib/facetMatching";
-import { formatTrustLabel, formatValidationStatus } from "@/lib/displayLabels";
+import { formatBenchmarkLabel, formatTrustLabel, formatValidationStatus } from "@/lib/displayLabels";
 import { buildCompareUrl, compareIdForRow, displayCompareId } from "@/lib/resultLinks";
 import { humanizeBenchmark, fmtScore, fmtGeomean, errMsg } from "@/utils";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
@@ -398,7 +398,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                 <option value="all">All benchmarks</option>
                 {benchmarkOptions.map((value) => (
                   <option key={value} value={value}>
-                    {humanizeBenchmark(value)}
+                    {formatBenchmarkLabel(value)}
                   </option>
                 ))}
               </select>
