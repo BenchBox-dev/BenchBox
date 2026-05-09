@@ -1,0 +1,78 @@
+# w3 + w4 + w6 — Run identity on distribution, overview, and trend charts
+
+Branch: feat/explorer-run-identity-charts
+Develop tip at start: 6c28d2b45 + #303 + #304 + #305 (post-merge)
+
+User authorized /skill:code review path instead of /ultrareview for this
+session even though `lib/runIdentity.ts` is consumed.
+
+## Current state on develop tip
+
+`lib/runIdentity.ts` (shipped in #286) exposes
+`formatRunIdentity(source, variant)` and the cohort-aware
+`formatRunIdentitiesForCohort(sources, variant)`. RankTable and the
+Compare result-card headers already use it.
+
+The remaining chart components still pass `platform.platform` through
+unmodified:
+
+- `DistributionBox.tsx:36-77` — row label is `p.platform`, truncated to
+  19 chars. Two DataFusion runs render as identical "DataFusion" rows.
+- `PercentileLadder.tsx` — left labels read directly from `row.platform`.
+- `CDFChart.tsx` — series legends mirror `platform.platform`.
+- `SparklineTable.tsx` — leftmost cell is `platform.platform`.
+- `PowerBar.tsx` — y-axis label is `platform.platform`.
+- `StackedPhase.tsx` — row label is `platform.platform`.
+- `TimeSeries.tsx` — series legend / tooltip identifies a series by
+  `platform`. Repeated platforms with different driver versions render
+  as overlapping series with the same name.
+
+## Defects vs the w0 review
+
+- D1 (w3): Two same-platform runs in Distribution charts render with
+  indistinguishable labels.
+- D2 (w4): Same defect on Overview Performance/Power/Phases/Sparklines.
+- D3 (w6): Trend chart series legends repeat platform names; the
+  series themselves don't carry enough qualifier to tell them apart.
+
+## Planned change
+
+For every chart that currently labels rows or series by
+`platform.platform`:
+
+1. Convert each `PlatformRow` to a `RunIdentitySource` (the fields
+   already line up: `result_id`, `platform`, `platform_version`,
+   `run_date`, `scale_factor`, `deployment_class`,
+   `instance_or_warehouse`, `trust_label`).
+2. Replace the bare `.platform` access with the corresponding entry
+   from `formatRunIdentitiesForCohort(sources, "chart")` (or
+   `"compact"` where the chart needs a tighter label).
+3. Keep tooltip/title text using the same cohort-aware label so the
+   tooltip is also distinguishable.
+
+For Trend (`TimeSeries.tsx`), each series carries multiple historical
+entries grouped by `result_id`/`platform`. The cohort signature is
+the set of distinct series; cohort-aware labels apply at series
+construction time.
+
+A small helper in `lib/runIdentity.ts` is added to convert a
+`PlatformRow`-like object to `RunIdentitySource` so each chart's call
+site stays a single line.
+
+## Manual route walk
+
+- /results/<benchmark>/?phase=power on a fixture cohort containing
+  two DataFusion runs (different driver versions): Distribution Box
+  Plot rows show "DataFusion" twice. Overview > Performance,
+  Power, Phases, Sparklines repeat the platform name. Rank Table
+  (w2 from the same TODO, shipped earlier) already disambiguates.
+- /results/<benchmark>/?view=trend (or any benchmark-detail with
+  historical data): Trend chart legend repeats series names that
+  differ only by driver_version.
+
+## Verification commands
+
+- `cd results-explorer && npm test -- --run src/components/__tests__/DistributionBox.test.tsx src/components/__tests__/PercentileLadder.test.tsx src/components/__tests__/CDFChart.test.tsx src/components/__tests__/SparklineTable.test.tsx src/components/__tests__/StackedPhase.test.tsx src/components/__tests__/TimeSeries.test.tsx src/components/__tests__/PowerBar.test.tsx`
+- `cd results-explorer && npm run typecheck`
+- `cd results-explorer && npm run build`
+- Browser walks deferred to release-gate Playwright (TODO #8 w3).

@@ -17,6 +17,7 @@ import type { BenchmarkSummary } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
 import { paletteColor } from "@/lib/chartTheme";
 import { buildLogLatencyScale, computeBoxStats, logLatencyFraction, logLatencyTicks } from "@/lib/chartMath";
+import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
 
 const LABEL_W = 144;
 const ROW_H = 48;
@@ -32,9 +33,13 @@ export function DistributionBox({ summary }: Props) {
   const [containerRef, { width: containerWidth }] = useElementSize();
   const w = Math.max(containerWidth, 400);
 
+  const cohortLabels = formatRunIdentitiesForCohort(
+    summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
+    "chart",
+  );
   const rows = summary.platforms
     .map((p, i) => ({
-      label: p.platform,
+      label: cohortLabels[i] ?? p.platform,
       color: paletteColor(i),
       stats: computeBoxStats(Object.values(p.timings)),
     }))

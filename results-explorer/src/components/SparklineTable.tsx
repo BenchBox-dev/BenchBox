@@ -11,6 +11,7 @@
 import type { BenchmarkSummary } from "@/types";
 import { paletteColor } from "@/lib/chartTheme";
 import { costModelDisclosure, costStatusLabel, normalizedCostValue } from "@/lib/costDisplay";
+import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
 
 interface Props {
   summary: BenchmarkSummary;
@@ -75,6 +76,10 @@ export function SparklineTable({ summary }: Props) {
 
   const maxGeomean = Math.max(...platforms.map((p) => p.display_geomean_ms ?? 0), 1);
   const maxPower = Math.max(...platforms.map((p) => p.power_score ?? 0), 1);
+  const cohortLabels = formatRunIdentitiesForCohort(
+    platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
+    "table",
+  );
 
   return (
     <div class="w-full overflow-x-auto">
@@ -114,7 +119,7 @@ export function SparklineTable({ summary }: Props) {
                     class="inline-block w-2 h-2 rounded-full mr-1.5 align-middle"
                     style={{ backgroundColor: color }}
                   />
-                  {p.platform}
+                  {cohortLabels[i] ?? p.platform}
                 </td>
                 {/* Geomean spark + value */}
                 <td class="px-1 py-1.5">

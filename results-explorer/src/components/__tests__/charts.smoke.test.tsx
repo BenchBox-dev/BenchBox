@@ -135,6 +135,63 @@ describe("PercentileLadder", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Cohort-aware run identity disambiguation across charts
+// ---------------------------------------------------------------------------
+
+describe("chart run-identity disambiguation", () => {
+  function duplicatePlatformSummary(): BenchmarkSummary {
+    return makeSummary({
+      platforms: [
+        makePlatform({
+          result_id: "r-df-44",
+          platform_id: "datafusion",
+          platform: "DataFusion",
+          platform_version: "44",
+          run_date: "2026-04-01",
+        }),
+        makePlatform({
+          result_id: "r-df-45",
+          platform_id: "datafusion",
+          platform: "DataFusion",
+          platform_version: "45",
+          run_date: "2026-04-15",
+          power_score: 2200,
+          display_geomean_ms: 18,
+          timings: { Q1: 15, Q2: 30, Q3: 45 },
+        }),
+      ],
+    });
+  }
+
+  it("disambiguates duplicate DataFusion rows in DistributionBox", () => {
+    const { container } = render(<DistributionBox summary={duplicatePlatformSummary()} />);
+    const labels = Array.from(container.querySelectorAll("svg text"))
+      .map((el) => el.textContent ?? "")
+      .filter((text) => text.includes("DataFusion"));
+    expect(labels.length).toBe(2);
+    expect(new Set(labels).size).toBe(2);
+  });
+
+  it("disambiguates duplicate DataFusion rows in PowerBar", () => {
+    const { container } = render(<PowerBar summary={duplicatePlatformSummary()} />);
+    const labels = Array.from(container.querySelectorAll("svg text"))
+      .map((el) => el.textContent ?? "")
+      .filter((text) => text.includes("DataFusion"));
+    expect(labels.length).toBe(2);
+    expect(new Set(labels).size).toBe(2);
+  });
+
+  it("disambiguates duplicate DataFusion rows in SparklineTable", () => {
+    const { container } = render(<SparklineTable summary={duplicatePlatformSummary()} />);
+    const cellTexts = Array.from(container.querySelectorAll("tbody td"))
+      .map((td) => td.textContent ?? "")
+      .filter((text) => text.includes("DataFusion"));
+    expect(cellTexts.length).toBe(2);
+    expect(new Set(cellTexts).size).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // CDFChart
 // ---------------------------------------------------------------------------
 
