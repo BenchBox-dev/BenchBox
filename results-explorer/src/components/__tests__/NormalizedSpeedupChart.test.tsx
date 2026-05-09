@@ -8,7 +8,7 @@
  *   (d) Null timing entries render em-dash placeholder
  */
 
-import { render, screen, waitFor } from "@testing-library/preact";
+import { fireEvent, render, screen, waitFor } from "@testing-library/preact";
 import { describe, it, expect, afterEach } from "vitest";
 import { NormalizedSpeedupChart } from "@/components/NormalizedSpeedupChart";
 
@@ -108,6 +108,32 @@ describe("NormalizedSpeedupChart", () => {
   // variant rows for the same queryId could collide on key={queryId}. The
   // composite key `${queryId}-${rowIdx}` keeps reconciliation stable.
   // -----------------------------------------------------------------------
+
+  it("hides queries with missing speedups by default and toggles them back via the comparable-only checkbox", () => {
+    const sparseQueries = [
+      { queryId: "Q1", timings: [{ ms: 100, status: "pass" }, { ms: 50, status: "pass" }] },
+      { queryId: "Q2", timings: [{ ms: 100, status: "pass" }, null] },
+      { queryId: "Q3", timings: [null, { ms: 80, status: "pass" }] },
+    ];
+    const { container } = render(
+      <NormalizedSpeedupChart queries={sparseQueries} results={RESULTS} baselineIdx={0} />,
+    );
+
+    // Default: only the fully-comparable Q1 row renders.
+    const queryLabelsAfterDefault = Array.from(container.querySelectorAll("text"))
+      .map((el) => el.textContent ?? "")
+      .filter((label) => /^Q[123]$/.test(label));
+    expect(queryLabelsAfterDefault).toEqual(["Q1"]);
+    expect(screen.getByText(/2 hidden/)).toBeTruthy();
+
+    // Toggle off the comparable-only filter; Q2 + Q3 should render alongside Q1.
+    const toggle = screen.getByTestId("normalized-speedup-comparable-only-toggle") as HTMLInputElement;
+    fireEvent.change(toggle, { target: { checked: false } });
+    const queryLabelsAfterToggle = Array.from(container.querySelectorAll("text"))
+      .map((el) => el.textContent ?? "")
+      .filter((label) => /^Q[123]$/.test(label));
+    expect(new Set(queryLabelsAfterToggle)).toEqual(new Set(["Q1", "Q2", "Q3"]));
+  });
 
   it("renders both rows when two queries share the same queryId", () => {
     const queriesWithDuplicate = [
