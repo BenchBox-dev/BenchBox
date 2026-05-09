@@ -63,14 +63,19 @@ function describeNaturalQualifiers(source: RunIdentitySource): string[] {
   return out;
 }
 
-// Cohort-aware qualifier list: natural qualifiers, then a short result_id
-// slice for compact disambiguation, then the full result_id as a
-// guaranteed-unique terminal fallback. The full id is only reached if
-// two sources share the same 8-char prefix — an unlikely but possible
-// collision that the previous single-slice tiebreaker would silently
-// retain after the loop's safety cap.
+function shortResultIdToken(resultId: string): string {
+  const parts = resultId.split(/[-_./:]+/).filter(Boolean);
+  if (parts.length > 1) return parts[parts.length - 1]!;
+  return resultId.slice(-8);
+}
+
+// Cohort-aware qualifier list: natural qualifiers, then the trailing
+// result_id token for compact disambiguation, then the full result_id as
+// a guaranteed-unique terminal fallback. BenchBox result_ids end in the
+// content hash segment, so the trailing token distinguishes typical
+// same-platform duplicate runs without appending their shared prefix.
 function describeCohortQualifiers(source: RunIdentitySource): string[] {
-  return [...describeNaturalQualifiers(source), source.result_id.slice(0, 8), source.result_id];
+  return [...describeNaturalQualifiers(source), shortResultIdToken(source.result_id), source.result_id];
 }
 
 function joinForVariant(base: string, qualifiers: string[], variant: RunIdentityVariant): string {
