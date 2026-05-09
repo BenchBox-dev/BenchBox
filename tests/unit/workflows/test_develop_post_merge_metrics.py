@@ -15,10 +15,14 @@ pytestmark = [
 ]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+# Mirrors the live filter in develop-post-merge.yml's metrics step so the
+# fixture stays in sync with the workflow. If the workflow adds another job
+# to the post-merge gate, extend this filter and add a fixture exercising
+# the new job's failure timestamp.
 RED_AT_JQ = r"""
 if $post_merge_red == "true" then
   ([($jobs.jobs // [])[] |
-    select((.name == "lint" or .name == "fast-test") and .conclusion == "failure" and .completed_at != null) |
+    select((.name == "lint" or .name == "fast-test" or .name == "explorer-tokens") and .conclusion == "failure" and .completed_at != null) |
     .completed_at] | min // null)
 else null end
 """
@@ -81,3 +85,67 @@ def test_workflow_metrics_expression_uses_min_not_max() -> None:
 
     assert ".completed_at] | min // null" in workflow
     assert ".completed_at] | max // null" not in workflow
+
+
+def test_explorer_tokens_failure_counted_in_red_at() -> None:
+    # Mirror of test_failed_post_merge_jobs_use_earliest_completion_timestamp
+    # but with an `explorer-tokens` failure as the earliest. Locks in the
+    # blind-spot remediation (token-scan gate) as a tracked post-merge red
+    # signal — not just lint and fast-test.
+    jobs = {
+        "jobs": [
+            {
+                "name": "lint",
+                "conclusion": "failure",
+                "completed_at": "2026-05-01T10:10:00Z",
+            },
+            {
+                "name": "explorer-tokens",
+                "conclusion": "failure",
+                "completed_at": "2026-05-01T10:01:00Z",
+            },
+            {
+                "name": "fast-test",
+                "conclusion": "failure",
+                "completed_at": "2026-05-01T10:05:00Z",
+            },
+        ]
+    }
+
+    assert run_red_at_jq(jobs) == "2026-05-01T10:01:00Z"
+
+
+def test_workflow_metrics_filter_includes_explorer_tokens() -> None:
+    # The jq filter inside develop-post-merge.yml's metrics step decides
+    # which job names are counted as post-merge-red signals. If
+    # `explorer-tokens` is dropped from the filter, the gate would still
+    # flip the `post_merge_red` shell flag but the metrics row would
+    # under-report the red event timestamp.
+    workflow = (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
+    assert '.name == "explorer-tokens"' in workflow
+
+
+def test_post_merge_red_shell_flag_includes_explorer_tokens() -> None:
+    # The shell `post_merge_red` flag is the gate the auto-revert and
+    # metrics rows both branch on. If a future workflow cleanup drops
+    # EXPLORER_TOKENS_RESULT from this expression, the gate would flag
+    # red but no auto-revert PR would open and the metrics row would be
+    # marked green — silently regressing the blind-spot remediation.
+    workflow = (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
+    assert '${EXPLORER_TOKENS_RESULT}" = "failure"' in workflow
+
+
+def test_auto_revert_triggers_on_explorer_tokens_failure() -> None:
+    # The auto-revert-on-failure job's `if:` expression decides which
+    # post-merge red events open a revert PR. Adding `explorer-tokens`
+    # to the trigger was the blind-spot remediation; this test prevents
+    # an inadvertent removal during a future `if:` cleanup.
+    import yaml
+
+    workflow_yaml = yaml.safe_load(
+        (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
+    )
+    auto_revert = workflow_yaml["jobs"]["auto-revert-on-failure"]
+    assert "explorer-tokens" in auto_revert["needs"]
+    # The `if:` is a single string after yaml.safe_load.
+    assert "needs.explorer-tokens.result == 'failure'" in auto_revert["if"]
