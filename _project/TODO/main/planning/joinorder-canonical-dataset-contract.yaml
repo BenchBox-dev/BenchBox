@@ -11,10 +11,11 @@ description: |
   signal from the frozen real IMDB dataset and its cross-table correlations.
 
   This item defines the reusable canonical dataset contract that must exist
-  before any scaled JOB-derived benchmark is credible. It covers the hosted
-  archive format, user-supplied data path, reference validation oracle, encoding
-  and NULL-preservation checks, result-bundle dataset versioning, CI routing, and
-  central scale-factor enforcement.
+  before any scaled JOB-derived benchmark is credible. It covers legal and
+  redistribution constraints, the hosted archive format or user-supplied data
+  path, reference validation oracle, encoding and NULL-preservation checks,
+  result-bundle dataset versioning, CI routing, and central scale-factor
+  enforcement.
 
   This TODO does not implement derived scale-up. It creates the foundation that
   later scale-stress work must depend on.
@@ -34,10 +35,32 @@ context_sections:
     cannot match generated rows because fields such as movie_companies.note and
     cast_info.note are always NULL. Canonical JOB must restore the frozen real
     data contract before any derived benchmark can claim continuity with JOB.
+  "Licensing boundary": |
+    IMDb's current public dataset terms allow local non-commercial use subject to
+    conditions, but hosted redistribution, republishing, alteration, CI caching,
+    and derived archives need an explicit project decision before BenchBox ships
+    any downloadable canonical or scaled IMDb artifact.
 
 work:
+  - id: w0
+    summary: "Resolve the IMDb/JOB data licensing and redistribution gate"
+    status: pending
+    notes: |
+      Write `_project/decisions/joinorder-imdb-data-licensing-<date>.md`
+      before designing the hosted archive. The decision must state:
+        - whether BenchBox may host a canonical Parquet archive;
+        - whether BenchBox may host derived replicated or expanded IMDb archives;
+        - whether CI runners may cache canonical or derived data;
+        - what attribution, terms-acceptance, and non-commercial-use language is
+          required;
+        - the fallback path if hosted redistribution is not approved.
+      Approved fallback shapes include user-supplied `data_path`, a reproducible
+      local conversion script, checksums/manifests, and documentation that points
+      users to their own accepted download path.
+
   - id: w1
     summary: "Choose and document the canonical reference oracle"
+    needs: [w0]
     status: pending
     notes: |
       Decide the validation oracle for canonical JOB. The preferred shape is:
@@ -63,6 +86,9 @@ work:
         - conversion pipeline provenance.
       The format must support hosted download and `--benchmark-option
       data_path=/path/to/job_dataset` for air-gapped users.
+      If w0 does not approve hosted redistribution, specify only the local
+      conversion and user-supplied data-path contract; do not leave "hosted
+      archive" language ambiguous.
 
   - id: w3
     summary: "Add encoding and NULL-preservation gates to the data-build spec"
@@ -92,6 +118,9 @@ work:
       scale mode. The explorer must surface dataset-version mismatches when
       comparing JOB results so a future archive fix does not make old and new
       results ambiguous.
+      Include license/distribution mode in the manifest and result bundle so
+      hosted, user-built, and derived archives cannot be compared as if they were
+      the same artifact.
 
   - id: w5
     summary: "Design central benchmark scale-factor and mode validation"
@@ -135,6 +164,7 @@ deferred:
     reason: "This may be a substantial independent task; w7 decides whether it is in scope."
 
 must_preserve:
+  - "No hosted canonical or derived IMDb archive may ship unless the licensing decision explicitly approves that distribution mode."
   - "Canonical JOB means frozen real IMDB-derived JOB data at SF=1 only; synthetic data must not be mislabeled canonical."
   - "Air-gapped users must have a documented data_path path, not only a hosted-download path."
   - "Predicate-bearing string and note columns must preserve exact values and NULL semantics through conversion."
@@ -149,12 +179,25 @@ approach: |
   than overloading TPC's official/unofficial vocabulary.
 
 anti_patterns:
+  - "DO NOT publish or cache IMDb-derived archives before the licensing decision is written - because non-commercial local use is not the same as redistributing a transformed benchmark dataset - ship scripts/manifests/data_path docs instead when redistribution is not approved."
   - "DO NOT validate canonical JOB with only non-empty query checks - because that would miss wrong answers and predicate-domain corruption - use reference outputs/cardinalities from a chosen reference engine instead."
   - "DO NOT coerce empty strings and NULLs through generic CSV/Parquet defaults - because JOB predicates depend on note and string columns - add explicit round-trip and null-count checks."
   - "DO NOT rely on registry scale_options alone - because current runner paths may bypass it - implement a central validation hook used by CLI and benchmark construction paths."
   - "DO NOT put full canonical JOB in fast tests - because the dataset is gigabyte-scale - use a tiny predicate-satisfying fixture for unit coverage and full data only in UAT/nightly/manual gates."
 
 verification:
+  - description: "Licensing decision exists and declares allowed distribution modes"
+    command: "rg -n \"hosted archive|derived archive|CI cache|user-supplied data_path|distribution mode\" _project/decisions/joinorder-imdb-data-licensing-*.md"
+    expected_output: "decision covers hosting, derived archives, CI caching, and fallback data_path"
+  - description: "Oracle decision names reference engine and stored artifacts"
+    command: "rg -n \"reference engine|PostgreSQL|reference cardinalities|normalized result sets|non-empty\" _project/decisions/joinorder-canonical-dataset-contract-*.md"
+    expected_output: "decision names the oracle and rejects non-empty-only validation"
+  - description: "Manifest contract covers provenance, checksums, nulls, and dataset versioning"
+    command: "rg -n \"dataset_version|manifest hash|source checksum|null counts|conversion pipeline|file format version\" _project/decisions/joinorder-canonical-dataset-contract-*.md"
+    expected_output: "manifest contract includes all required provenance and integrity fields"
+  - description: "Scale-factor enforcement design covers CLI and benchmark construction paths"
+    command: "rg -n \"central validation|scale factor|SF=1|CLI|benchmark construction\" _project/decisions/joinorder-canonical-dataset-contract-*.md"
+    expected_output: "decision covers central SF=1 enforcement"
   - description: "TODO graph remains valid after this planning item is added"
     command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph"
     expected_output: "Graph validation passed"
@@ -164,6 +207,7 @@ verification:
 
 scope_limit:
   only_modify:
+    - "_project/decisions/joinorder-imdb-data-licensing-*.md"
     - "_project/decisions/joinorder-canonical-dataset-contract-*.md"
     - "_project/TODO/main/planning/joinorder-canonical-dataset-contract.yaml"
     - "docs/benchmarks/join-order.md"
@@ -178,6 +222,7 @@ scope_limit:
     - "results-explorer/"
 
 success_metrics:
+  - "A written IMDb/JOB data licensing decision declares whether hosted canonical archives, derived archives, and CI caches are permitted."
   - "A written oracle decision exists and names the reference engine plus exact artifacts to store."
   - "Canonical archive manifest format includes dataset_version, checksums, null counts, provenance, and file format version."
   - "CLI and benchmark construction paths have a central validation design for canonical JOB SF=1 enforcement."

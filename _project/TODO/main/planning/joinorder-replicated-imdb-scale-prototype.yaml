@@ -31,13 +31,22 @@ context_sections:
 
 work:
   - id: w1
-    summary: "Confirm decision-framework approval and prototype scope"
+    summary: "Confirm licensing, stats-phase, and decision-framework prerequisites"
     status: pending
     notes: |
       Do not start implementation unless joinorder-scale-stress-decision-framework
       chooses replicated_imdb as an approved baseline. Copy the chosen prototype
       scope and success criteria from that decision note into this TODO before
       coding.
+
+      Also confirm:
+        - the IMDb/JOB data licensing decision allows the intended local or
+          hosted derived-data workflow;
+        - any required first-class stats/analyze phase TODO is completed or this
+          prototype is explicitly narrowed to a measurement smoke that does not
+          claim stats-maintenance conclusions;
+        - result-bundle labels and manifest fields for replicated_imdb are
+          already specified by the decision framework.
 
   - id: w2
     summary: "Map JOB primary keys, foreign keys, and lookup tables"
@@ -64,6 +73,9 @@ work:
       predicate-bearing values unchanged. Record source dataset_version,
       replica factor, builder version, seed if any, and per-table checksums in
       the derived manifest.
+      If hosted redistribution is not approved, the builder must be documented as
+      a local user-run conversion path and must not produce a BenchBox-hosted
+      derived archive.
 
   - id: w4
     summary: "Validate replicated cardinalities and predicate preservation"
@@ -89,6 +101,9 @@ work:
       and replicated SF=2. Capture load time, stats/analyze time, planning time,
       execution time, plan shape, and cardinality estimates where available.
       This is a measurement smoke, not a leaderboard.
+      If first-class stats/analyze phase accounting is not yet implemented, the
+      report must mark stats/analyze timing as unavailable or manually captured
+      and must not use it as publication-quality evidence.
 
   - id: w6
     summary: "Write the prototype evaluation and decide whether to continue"
@@ -113,6 +128,7 @@ deferred:
 
 must_preserve:
   - "Canonical joinorder remains SF=1 canonical_imdb and literature-comparable only."
+  - "No hosted replicated_imdb archive may ship unless the IMDb/JOB data licensing decision explicitly approves derived archive redistribution."
   - "replicated_imdb result bundles record source canonical dataset_version and derived manifest hash."
   - "Predicate-bearing values must not be suffixed or mutated in the replicated baseline."
   - "Lookup tables must not be duplicated unless the schema contract explicitly requires it."
@@ -124,12 +140,16 @@ approach: |
   query/cardinality scaling before interpreting engine performance.
 
 anti_patterns:
+  - "DO NOT start implementation until licensing and stats/analyze phase prerequisites are resolved - because the prototype otherwise cannot produce shippable or interpretable scale-stress evidence."
   - "DO NOT suffix predicate string values to make rows unique - because JOB predicates depend on exact values - offset IDs instead."
   - "DO NOT duplicate lookup tables by default - because lookup predicates should remain stable and FKs can point to the same lookup rows - keep lookup tables single-copy."
   - "DO NOT publish replicated_imdb results as canonical JOB - because replicated components are an artificial derived scale mode - label result bundles accordingly."
   - "DO NOT run expensive cloud matrices during the prototype - because the first gate is semantic validity and local measurement - defer cloud until w6 approves continuation."
 
 verification:
+  - description: "Prerequisite decisions approve replication scope, distribution mode, and stats/analyze handling"
+    command: "rg -n \"replicated_imdb|derived archive|distribution mode|stats/analyze|recommended prototype\" _project/decisions/joinorder-scale-stress-*.md _project/decisions/joinorder-imdb-data-licensing-*.md"
+    expected_output: "decisions approve or explicitly constrain replicated_imdb before implementation starts"
   - description: "Prototype keeps TODO graph valid"
     command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph"
     expected_output: "Graph validation passed"
@@ -156,6 +176,7 @@ scope_limit:
     - "benchbox/core/tpcds/"
 
 success_metrics:
+  - "Prerequisite decision notes approve replicated_imdb scope, distribution mode, and stats/analyze phase handling before coding begins."
   - "A deterministic replicated_imdb archive builder exists behind an explicit derived scale mode."
   - "Derived manifests record source dataset_version, scale factor, builder version, and per-table checksums."
   - "FK integrity, null-count scaling, predicate frequency scaling, and query cardinality scaling are validated."

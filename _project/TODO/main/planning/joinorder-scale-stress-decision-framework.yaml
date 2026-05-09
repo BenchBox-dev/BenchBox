@@ -32,8 +32,25 @@ context_sections:
     as canonical joinorder and must not claim literature comparability.
 
 work:
+  - id: w0
+    summary: "Collect evidence for optimizer and statistics failures at scale"
+    status: pending
+    notes: |
+      Before choosing a scaled JOB-derived path, collect evidence that the target
+      problem is real and distinct from canonical JOB. Include at least three of:
+        - documented optimizer/cardinality/statistics failures that appear only
+          or primarily at larger data scales;
+        - BenchBox-local observations from prior large-scale runs;
+        - engine documentation describing sampled, stale, partition, or
+          incremental statistics limits;
+        - academic or vendor papers on optimizer search, planning-time, or
+          statistics-maintenance breakdowns at scale.
+      The decision note must separate this evidence from the original JOB paper's
+      fixed-dataset cardinality-estimation problem.
+
   - id: w1
     summary: "Write the benchmark question and non-goals"
+    needs: [w0]
     status: pending
     notes: |
       Produce a short decision note that separates:
@@ -75,6 +92,11 @@ work:
         - incremental or partition stats where supported.
       Measurements should keep load, stats-build, planning, and execution time
       separate. Capture engine-specific stats metadata where available.
+      If a first-class stats/analyze phase is required, create
+      `_project/TODO/main/planning/joinorder-statistics-phase-measurement.yaml`
+      and make any implementation prototype depend on it before coding. The
+      decision must identify required changes to runner phases, result bundles,
+      platform adapter hooks, CLI phase parsing, and validation/reporting.
 
   - id: w4
     summary: "Compare scale-up implementation options"
@@ -133,11 +155,16 @@ work:
         - parameterized_imdb benchmark family,
         - or staged combination.
       The recommendation must name the smallest next prototype and its
-      verification criteria.
+      verification criteria. If the recommendation is replicated_imdb, it must
+      also state whether the statistics/analyze phase blocker is satisfied,
+      deferred with a narrower prototype scope, or represented by a new TODO that
+      the prototype must depend on.
 
 deferred:
   - summary: "Implement any scaled JOB generator"
     reason: "This item is the decision framework. Implementation belongs in a follow-up TODO after w7 chooses a path."
+  - summary: "Implement first-class statistics/analyze phase accounting"
+    reason: "This decision item must decide whether that is required and create a dedicated TODO if so."
   - summary: "Build dashboard/explorer UI for scale-stress metrics"
     reason: "Explorer work depends on final result-bundle fields and benchmark labels."
 
@@ -145,6 +172,7 @@ must_preserve:
   - "Canonical joinorder remains fixed to canonical_imdb SF=1 and is never silently replaced by derived scale modes."
   - "Derived workloads must report their data-generation strategy, dataset version, generator version, seed, and stats protocol."
   - "Query validation must use the canonical oracle contract from joinorder-canonical-dataset-contract when applicable."
+  - "A scaled JOB-derived prototype must not start until stats/analyze phase requirements are either satisfied or explicitly scoped out in the decision note."
 
 approach: |
   Treat this as an architecture/design gate. Read canonical JOB behavior, TPC-DS
@@ -153,15 +181,22 @@ approach: |
   should be a decision record plus an updated TODO for the chosen prototype.
 
 anti_patterns:
+  - "DO NOT proceed on intuition that optimizers fail at scale - because this benchmark must justify a distinct workload identity - collect documented examples or local evidence first."
   - "DO NOT call a scaled derived workload 'JOB' without a qualifier - because users may assume literature comparability - use explicit labels such as replicated_imdb or job_scale_stress."
   - "DO NOT choose offset replication only because it is easiest - because it may hide the statistics/predicate-selectivity problem - evaluate whether it answers the benchmark question."
   - "DO NOT build graph expansion before defining validation gates - because synthetic correlations can look plausible while destroying the JOB signal - define measurement gates first."
   - "DO NOT fold stats-build timing into load or query execution - because the core research question includes statistics maintenance - require separate stats/analyze phase accounting."
 
 verification:
+  - description: "Decision note includes documented optimizer-at-scale evidence"
+    command: "rg -n \"optimizer.*scale|statistics.*scale|stale stats|sampled stats|planning-time|evidence\" _project/decisions/joinorder-scale-stress-*.md"
+    expected_output: "decision note cites documented or local evidence for scale-specific optimizer/statistics failures"
+  - description: "Decision note covers stats/analyze phase dependency"
+    command: "rg -n \"stats/analyze phase|stats-build|runner phases|result bundles|platform adapter|joinorder-statistics-phase-measurement\" _project/decisions/joinorder-scale-stress-*.md"
+    expected_output: "decision states whether first-class stats measurement is required and what TODO or scope handles it"
   - description: "Decision note exists and names the recommended prototype path"
-    command: "ls _project/decisions/joinorder-scale-stress-*.md"
-    expected_output: "at least one decision note"
+    command: "rg -n \"go/no-go|recommended prototype|replicated_imdb|expanded_imdb|parameterized_imdb|no scaled JOB\" _project/decisions/joinorder-scale-stress-*.md"
+    expected_output: "decision note names the selected path and rejected alternatives"
   - description: "TODO graph remains valid"
     command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph"
     expected_output: "Graph validation passed"
@@ -174,6 +209,7 @@ scope_limit:
     - "_project/decisions/joinorder-scale-stress-*.md"
     - "_project/TODO/main/planning/joinorder-scale-stress-decision-framework.yaml"
     - "_project/TODO/main/planning/joinorder-replicated-imdb-scale-prototype.yaml"
+    - "_project/TODO/main/planning/joinorder-statistics-phase-measurement.yaml"
     - "docs/benchmarks/join-order.md"
     - "docs/development/"
   do_not_modify:
@@ -183,9 +219,10 @@ scope_limit:
     - "results-explorer/"
 
 success_metrics:
+  - "The decision note cites documented or local evidence for optimizer/statistics failures that appear at scale."
   - "The benchmark question for scale-stress JOB is written and clearly separated from canonical JOB."
   - "Scale-mode labels and result-bundle metadata are specified."
-  - "Statistics-maintenance phases and required timings are specified."
+  - "Statistics-maintenance phases and required timings are specified, including any follow-up TODO needed for first-class stats/analyze phase accounting."
   - "A go/no-go recommendation selects the smallest next prototype and rejects at least one unsuitable option with rationale."
 
 metadata:
