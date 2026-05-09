@@ -1,0 +1,52 @@
+# w1 — Compact the chart panel header and tab band
+
+Branch: feat/explorer-chart-panel-header
+Develop tip at start: 6c28d2b45 (PR #298 merged)
+
+## Current state on develop tip
+
+Inspected: results-explorer/src/components/ChartPanel.tsx lines 141-224.
+
+The header uses
+`<div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">`
+with the H2 on the left and a right-aligned column that stacks (group
+tablist, optional baseline select, active-group chart subtabs) using
+`flex-col`. On wide screens, the H2 row is short while the right column
+runs tall, leaving an empty band below the title and to the left of the
+subtabs.
+
+## Defects vs the w0 review
+
+- D1 (header): "Empty band above chart subtabs" — the right column
+  stacks vertically (`gap-2 sm:items-end`) while the title row only
+  shows H2. The visual result is a tall right column floating next to a
+  small left H2 with empty space below it.
+
+## Planned change for w1
+
+Restructure the header into a single flex-wrap row so the title, group
+tabs, chart subtabs, and baseline select share a single horizontal
+band when there is room. Drop the right-side stack (`flex-col`) and
+its `sm:items-end` alignment that drove the dead space. Use `ml-auto`
+on the baseline select so it floats right when shown.
+
+- `flex flex-wrap items-center gap-x-4 gap-y-2 mb-3`
+- H2 stays first; tablist (`role="tablist"`) immediately follows.
+- Active-group subtabs (`role="group"`) follow in the same row.
+- Baseline select (when present) gets `ml-auto` to push to the right.
+
+Existing roles, aria-labels, and accessible names are preserved so
+ChartPanel.test.tsx assertions continue to pass without weakening.
+
+## Manual route walk
+
+Walked /results/tpch/?phase=power on develop tip with the local dev
+server. The right-side column visibly stacks with empty space to its
+left below the H2 row. Baseline select on Compare appears mid-stack on
+narrow viewports; on wide viewports it sits below the group tablist.
+
+## Verification commands
+
+- `cd results-explorer && npm test -- --run src/components/__tests__/ChartPanel.test.tsx`
+- `cd results-explorer && npm run typecheck`
+- `cd results-explorer && npm run build`

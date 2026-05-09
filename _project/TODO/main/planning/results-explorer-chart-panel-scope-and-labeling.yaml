@@ -38,22 +38,41 @@ work:
 - id: w1
   summary: "Compact the chart panel header and tab band"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
-    Reduce the large empty band above chart subtabs by moving chart title,
-    primary tabs, secondary tabs, and active filters into a compact header
-    region. Preserve usable click targets while removing unused vertical
-    whitespace.
+    ChartPanel header restructured from a two-column "title left, controls
+    stacked right" layout into a single `flex flex-wrap items-center`
+    band. Title, group tablist, active-group subtabs, and the Compare
+    baseline select share one row and wrap together on narrow screens.
+    The empty band that sat to the right of the H2 (caused by
+    `sm:items-start` against a tall right column) is gone; the baseline
+    select uses `ml-auto` to float right when present. Click targets
+    keep `min-h-9` so accessibility is not regressed. The
+    "responsive segmented chart controls" test was updated to assert
+    `flex flex-wrap` instead of the prior mobile grid (no assertion
+    weakened — the contract is still "controls render with short
+    visible labels at a touch-friendly height"). Verification log:
+    _project/verification-logs/results-explorer-chart-panel-scope-and-labeling/w1.log.
 
 - id: w2
   summary: "Remove or rescope the duplicate Per-query heatmap"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
-    On Benchmark detail pages where the matrix is already rendered above the
-    Charts panel, hide Charts > Per-query > Heatmap or replace it with a
-    scoped view that adds information not present in the main matrix. Keep a
-    clear path to Histogram if that subview remains useful.
+    ChartPanel grew an `excludeChartIds?: readonly string[]` prop. Excluded
+    ids are filtered from the `applicableCharts` result before grouping
+    so they do not appear in the tablist, subtabs, or initial-active
+    selection. BenchmarkIndex now passes
+    `excludeChartIds={["query_heatmap"]}` whenever
+    `viewMode === "matrix"` so the page-level QueryHeatmap above the
+    Charts panel is not duplicated as a Per-query > Heatmap subtab. In
+    ranks/list view modes the chart panel keeps its full set so the
+    heatmap stays accessible. Histogram remains available in the
+    Per-query group either way. Test added in
+    src/components/__tests__/ChartPanel.test.tsx asserts the Heatmap
+    button disappears while the Per-query group is still selectable.
+    Verification log:
+    _project/verification-logs/results-explorer-chart-panel-scope-and-labeling/w2.log.
 
 - id: w3
   summary: "Hide or disable Cost tabs when no cost data exists"

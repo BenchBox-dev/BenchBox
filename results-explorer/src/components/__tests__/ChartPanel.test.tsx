@@ -195,6 +195,28 @@ describe("ChartPanel", () => {
     expect(screen.queryByRole("button", { name: "Sparkline Table" })).toBeNull();
   });
 
+  it("hides charts whose ids are listed in excludeChartIds", () => {
+    render(
+      <ChartPanel
+        context={{
+          kind: "summary",
+          summary: makeSummary(),
+          historical: [
+            makeHistoricalEntry(),
+            makeHistoricalEntry({ result_id: "hist-2", run_date: "2026-04-18T12:00:00Z" }),
+          ],
+        }}
+        excludeChartIds={["query_heatmap"]}
+      />,
+    );
+
+    expect(screen.getByRole("tab", { name: "Per-query" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Query Heatmap" })).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "Per-query" }));
+    expect(screen.queryByRole("button", { name: "Query Heatmap" })).toBeNull();
+    expect(screen.getByRole("tabpanel", { name: "Per-query chart" })).toBeTruthy();
+  });
+
   it("uses responsive segmented chart controls with short visible labels", () => {
     render(
       <ChartPanel
@@ -210,13 +232,13 @@ describe("ChartPanel", () => {
     );
 
     const groupTabs = screen.getByRole("tablist", { name: "Chart question groups" });
-    expect(groupTabs.className).toContain("grid");
-    expect(groupTabs.className).toContain("grid-cols-2");
+    expect(groupTabs.className).toContain("flex");
+    expect(groupTabs.className).toContain("flex-wrap");
     expect(screen.getByRole("tab", { name: "Per-query" }).className).toContain("min-h-9");
 
     const chartControls = screen.getByRole("group", { name: "Overview charts" });
-    expect(chartControls.className).toContain("grid");
-    expect(chartControls.className).toContain("grid-cols-2");
+    expect(chartControls.className).toContain("flex");
+    expect(chartControls.className).toContain("flex-wrap");
 
     const sparkline = screen.getByRole("button", { name: "Sparkline Table" });
     const stacked = screen.getByRole("button", { name: "Stacked Phase Breakdown" });
