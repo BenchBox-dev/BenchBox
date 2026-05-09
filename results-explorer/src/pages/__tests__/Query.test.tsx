@@ -345,6 +345,25 @@ describe("Query", () => {
     expect(within(mobileDrawer).getAllByText("Has cost: Has cost").length).toBeGreaterThan(0);
   });
 
+  it("uses facet display formatters for active URL filter chips", async () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/results/query?benchmark=star_schema,ssb&trust=maintainer-run&cost_status=not_applicable_local",
+    );
+
+    render(<Query />);
+    await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
+
+    const mobileDrawer = screen.getByTestId("query-mobile-filter-drawer");
+    expect(within(mobileDrawer).getAllByText("Benchmark: SSB").length).toBeGreaterThan(0);
+    expect(within(mobileDrawer).getAllByText("Benchmark: SSB (legacy slug)").length).toBeGreaterThan(0);
+    expect(within(mobileDrawer).getAllByText("Trust: maintainer run").length).toBeGreaterThan(0);
+    expect(within(mobileDrawer).getAllByText("Cost status: not applicable (local)").length).toBeGreaterThan(0);
+    expect(within(mobileDrawer).queryByText("Trust: maintainer-run")).toBeNull();
+    expect(within(mobileDrawer).queryByText("Cost status: not applicable local")).toBeNull();
+  });
+
   it("updates the select SQL when facet filters change and sort toggles", async () => {
     render(<Query />);
     await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
