@@ -1,3 +1,6 @@
+---
+develop_sha: 45be4908a77eea5eef1fa72ca2539ad5e11cbe27
+---
 # Results Explorer PR #246 Home Leaderboard Remediation Evidence
 
 Date: 2026-05-07

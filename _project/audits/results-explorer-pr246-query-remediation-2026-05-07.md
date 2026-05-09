@@ -1,3 +1,6 @@
+---
+develop_sha: 1a7a695c651fab91966450320fa236a54f023f21
+---
 # Results Explorer PR #246 Query Workbench Remediation Evidence
 
 Date: 2026-05-07

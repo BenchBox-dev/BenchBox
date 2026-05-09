@@ -74,7 +74,7 @@ command is the explicit-recording entrypoint.
 
 ## Pre-approved Commands
 
-- **Dev/Test**: `make test-*`, `make coverage*`, `make lint`, `make format`, `make typecheck`, `uv run -- python -m pytest *`
+- **Dev/Test**: `make test-*`, `make coverage*`, `make lint`, `make format`, `make typecheck`, `make audit-sha-check FILE=*`, `uv run -- python -m pytest *`
 - **PR/Worktree (read-only)**: `make pr-preflight`, `make pr-preflight-fast-tests`, `make pr-content-guard *`, `make pr-status`, `make dev-loop-metrics`, `make worktree-pool-status`, `make worktree-pool-check`, `make worktree-list`, `git worktree list*`, `gh pr list*`, `gh pr view*`, `gh pr checks*`
 - **PR/Worktree (write — feature/pool worktrees only)**: `make pr-open`, `make pr-fanout`, `make pr-refresh`, `make worktree-claim BRANCH=*`, `make worktree-release`, `make worktree-pool-sweep-stale`, `git push -u origin chore/*`, `git push -u origin fix/*`, `git push -u origin feat/*`, `git push -u origin docs/*`, `gh pr create --fill*`, `gh pr merge --auto --squash*`
 - **Manual/admin escape hatches** (not broad auto-allow): `make worktree-pool-init`, `make worktree-pool-reset POOL=NN`, `make worktree-prune`

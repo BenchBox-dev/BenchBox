@@ -123,3 +123,4 @@ Step #1 is already tracked by TODO
 ## Triage log
 
 - 2026-05-08: actionable — Re-verified 2026-05-08: PR #271 (274a4a11e) closed the immediate token regression but next steps #2 (capture/develop-SHA gate), #3 (generalize SHA stamp to all _project/audits/ reports), and #4 (re-run release-final capture against post-#271 develop tip) remain. Next step #1 already tracked by TODO results-explorer-token-scan-ci-gate.
+- 2026-05-08: actionable — commits: implementation branch `chore/explorer-audit-sha-gate` closes the generalized develop-SHA gate path via TODO `audit-develop-sha-stamping-and-ci-gate`; post-#271 recapture remains tracked separately by TODO `results-explorer-retheme-recapture-against-post-271-develop`.

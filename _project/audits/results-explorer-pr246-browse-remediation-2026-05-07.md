@@ -1,3 +1,6 @@
+---
+develop_sha: 11f3fdec0a78cbcdbbb566744c5598f4f2612406
+---
 # Results Explorer PR #246 Browse/Platform Remediation Evidence
 
 Date: 2026-05-07

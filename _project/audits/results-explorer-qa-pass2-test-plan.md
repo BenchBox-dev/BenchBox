@@ -1,3 +1,6 @@
+---
+develop_sha: 175a98d3bbdb8bcc074583e46a2d5e86ebcacafe
+---
 # Results Explorer — QA Pass-2 Test Plan
 
 **For:** human tester (you)  •  **Output:** structured findings I can ingest verbatim

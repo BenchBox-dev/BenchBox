@@ -34,6 +34,7 @@ def _run_ci_required_result(**env_overrides: str) -> subprocess.CompletedProcess
         "LINT_RESULT": "skipped",
         "TEST_RESULT": "skipped",
         "EXPLORER_TOKENS_RESULT": "skipped",
+        "AUDIT_SHA_RESULT": "skipped",
         "CONTENT_GUARD_NEEDED": "false",
         "NEEDS_CODE_CI": "false",
         "SAFE_CONTENT_ONLY": "true",

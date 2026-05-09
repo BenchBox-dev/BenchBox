@@ -1,3 +1,6 @@
+---
+develop_sha: f20c3856d14542d11ece24e694009e87aef0a419
+---
 # PR-Review Sweep — Template
 
 A reusable checklist for "PR-review follow-ups" TODOs. Built from the
