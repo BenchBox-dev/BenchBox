@@ -47,11 +47,12 @@ work:
       Output: `_project/design/track2-joinorder-stats-as-phase.md`
 
       Sections:
-        1. Current phase model
-           - Survey benchbox/core/benchmark.py and platform-specific
-             benchmark phases. Document each phase, its boundary
-             (what counts as "in" vs "out"), and how its time is
-             measured.
+          1. Current phase model
+             - Survey benchbox/core/runner/runner.py,
+               benchbox/cli/commands/run.py, benchbox/cli/orchestrator.py,
+               benchbox/core/results/, and platform-specific load/analyze
+               hooks. Document each phase, its boundary (what counts as
+               "in" vs "out"), and how its time is measured.
            - Specifically: where does ANALYZE / COMPUTE STATISTICS /
              auto-statistics gathering land today? Likely rolled
              into either load (if the engine auto-analyzes after
