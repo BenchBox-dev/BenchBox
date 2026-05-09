@@ -19,7 +19,7 @@
  * touching this component.
  */
 
-import { useMemo, useRef, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import type { BenchmarkSummary, PlatformRow, SortDirection, SortState } from "@/types";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
@@ -108,6 +108,8 @@ export function QueryHeatmap({
   const sortedQueryIds = useMemo(() => sortQueryIds(query_ids), [query_ids]);
   const hasSelection = onSelectionChange !== undefined;
   const gridRef = useRef<HTMLTableElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const pageStickyHeaderRef = useRef<HTMLDivElement>(null);
 
   // Roving tabindex state: which query cell [rowIdx, colIdx] has tabIndex=0.
   const [focusPos, setFocusPos] = useState({ row: 0, col: 0 });
@@ -136,6 +138,9 @@ export function QueryHeatmap({
   type MatrixSortKey = "platform" | "primary" | "geomean" | `query:${string}`;
   const [sort, setSort] = useState<SortState<MatrixSortKey> | null>(null);
   const activeSort = sort ?? { key: "primary", direction: defaultPrimaryDirection };
+  // Show secondary geomean column when the artifact carries a secondary metric,
+  // rather than hardcoding the power_score assumption.
+  const showGeomeanCol = ranking?.secondary_metric === "display_geomean_ms";
 
   function getPrimaryValue(row: PlatformRow): number | null {
     return primaryMetric === "power_score" ? row.power_score : row.display_geomean_ms;
@@ -181,6 +186,15 @@ export function QueryHeatmap({
     () => [...platforms].sort((a, b) => compareMatrixRows(a, b, activeSort)),
     [activeSort, platforms],
   );
+
+  function syncPageStickyHeaderScroll() {
+    if (!scrollContainerRef.current || !pageStickyHeaderRef.current) return;
+    pageStickyHeaderRef.current.scrollLeft = scrollContainerRef.current.scrollLeft;
+  }
+
+  useEffect(() => {
+    syncPageStickyHeaderScroll();
+  }, [hasSelection, showGeomeanCol, sortedQueryIds.length]);
 
   /** Returns the short_id for a row if available, otherwise falls back to result_id.
    *  The short_id is used for Compare URLs so bookmarks stay compact. */
@@ -285,9 +299,117 @@ export function QueryHeatmap({
   const heatmapMeaning = suppressHeat
     ? "Heat color is suppressed because this cohort has fewer than two comparable platforms."
     : "Heat color compares each query column with the fastest published timing; darker cells are slower.";
-  // Show secondary geomean column when the artifact carries a secondary metric,
-  // rather than hardcoding the power_score assumption.
-  const showGeomeanCol = ranking?.secondary_metric === "display_geomean_ms";
+
+  function renderHeaderSortControl(
+    label: string,
+    key: MatrixSortKey,
+    options: {
+      className?: string;
+      initialDirection?: SortDirection;
+      pageSticky?: boolean;
+      queryLabel?: string;
+    } = {},
+  ) {
+    const className =
+      options.className ?? "table-th block w-full cursor-pointer select-none border-0 bg-transparent text-left";
+    const content = (
+      <>
+        {label}{sortArrow(key)}
+        {options.pageSticky ? null : sortAnnouncement(key)}
+      </>
+    );
+
+    if (options.pageSticky) return <span class={className}>{content}</span>;
+
+    return (
+      <button
+        type="button"
+        class={className}
+        data-query-label={options.queryLabel}
+        onClick={() => toggleSort(key, options.initialDirection)}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  function renderHeaderRow(pageSticky = false) {
+    return (
+      <tr role="row" class="bg-[var(--bb-surface-data-muted)]">
+        {hasSelection && (
+          <th
+            role="columnheader"
+            scope="col"
+            aria-label="Select for comparison"
+            class="table-th sticky z-30 w-12 min-w-12 bg-[var(--bb-surface-data-muted)] px-2"
+            style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "checkbox"))}
+          />
+        )}
+        <th
+          role="columnheader"
+          scope="col"
+          class="sticky z-30 w-44 min-w-44 bg-[var(--bb-surface-data-muted)] p-0"
+          style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "platform"))}
+          aria-sort={ariaSort("platform")}
+        >
+          {renderHeaderSortControl("Platform", "platform", { pageSticky })}
+        </th>
+        <th
+          role="columnheader"
+          scope="col"
+          class="table-th sticky z-30 w-36 min-w-36 whitespace-nowrap bg-[var(--bb-surface-data-muted)]"
+          style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "trust"))}
+        >
+          Trust
+        </th>
+        <th
+          role="columnheader"
+          scope="col"
+          aria-sort={ariaSort("primary")}
+          class="sticky z-30 w-32 min-w-32 whitespace-nowrap bg-[var(--bb-surface-data-muted)] p-0"
+          style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "primary"))}
+          title={primaryLabel}
+        >
+          {renderHeaderSortControl(primaryLabel, "primary", {
+            initialDirection: defaultPrimaryDirection,
+            pageSticky,
+          })}
+        </th>
+        {showGeomeanCol && (
+          <th
+            role="columnheader"
+            scope="col"
+            class="sticky z-30 w-32 min-w-32 whitespace-nowrap bg-[var(--bb-surface-data-muted)] p-0"
+            style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "geomean"))}
+            aria-sort={ariaSort("geomean")}
+            title="Geometric mean of per-query display times"
+          >
+            {renderHeaderSortControl("Geomean", "geomean", {
+              className:
+                "table-th block w-full cursor-pointer select-none border-0 bg-transparent text-left text-[var(--bb-data-fg-subtle)]",
+              pageSticky,
+            })}
+          </th>
+        )}
+        {sortedQueryIds.map((qid) => (
+          <th
+            key={qid}
+            role="columnheader"
+            scope="col"
+            class="min-w-[7rem] whitespace-nowrap p-0 font-mono"
+            aria-sort={ariaSort(`query:${qid}`)}
+          >
+            {renderHeaderSortControl(queryDisplayLabel(qid), `query:${qid}`, {
+              className:
+                "table-th block w-full cursor-pointer select-none border-0 bg-transparent text-left font-mono",
+              pageSticky,
+              queryLabel: pageSticky ? undefined : qid,
+            })}
+          </th>
+        ))}
+      </tr>
+    );
+  }
 
   return (
     <div class={`relative ${highContrast ? "heatmap-reduced-color" : ""}`}>
@@ -422,117 +544,43 @@ export function QueryHeatmap({
           <span>{sortedQueryIds.length.toLocaleString()} queries</span>
         </div>
         <div
+          aria-hidden="true"
+          class="pointer-events-none sticky top-0 z-40 h-0 overflow-visible"
+          data-testid="query-heatmap-page-sticky-header-shell"
+        >
+          <div
+            ref={pageStickyHeaderRef}
+            class="overflow-x-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] shadow-sm"
+            data-testid="query-heatmap-page-sticky-header"
+          >
+            <table role="presentation" class="min-w-max text-sm">
+              <thead class="bg-[var(--bb-surface-data-muted)]">{renderHeaderRow(true)}</thead>
+            </table>
+          </div>
+        </div>
+        <div
+          ref={scrollContainerRef}
           class="overflow-x-auto rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm"
           data-testid="query-heatmap-scroll-container"
+          onScroll={syncPageStickyHeaderScroll}
         >
-        <table
-          ref={gridRef}
-          role="grid"
-          aria-label={`${summary.benchmark} SF${summary.scale_factor} ${summary.phase} results`}
-          class="min-w-max text-sm"
-        >
-          <thead class="bg-[var(--bb-surface-data-muted)]">
-            <tr role="row" class="sticky top-0 z-20 bg-[var(--bb-surface-data-muted)]">
-              {hasSelection && (
-                <th
-                  role="columnheader"
-                  scope="col"
-                  aria-label="Select for comparison"
-                  class="table-th sticky z-30 w-12 min-w-12 bg-[var(--bb-surface-data-muted)] px-2"
-                  style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "checkbox"))}
-                />
-              )}
-              <th
-                role="columnheader"
-                scope="col"
-                class="sticky z-30 w-44 min-w-44 bg-[var(--bb-surface-data-muted)] p-0"
-                style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "platform"))}
-                aria-sort={ariaSort("platform")}
-              >
-                <button
-                  type="button"
-                  class="table-th block w-full cursor-pointer select-none border-0 bg-transparent text-left"
-                  onClick={() => toggleSort("platform")}
-                >
-                  Platform{sortArrow("platform")}
-                  {sortAnnouncement("platform")}
-                </button>
-              </th>
-              <th
-                role="columnheader"
-                scope="col"
-                class="table-th sticky z-30 w-36 min-w-36 whitespace-nowrap bg-[var(--bb-surface-data-muted)]"
-                style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "trust"))}
-              >
-                Trust
-              </th>
-              <th
-                role="columnheader"
-                scope="col"
-                aria-sort={ariaSort("primary")}
-                class="sticky z-30 w-32 min-w-32 whitespace-nowrap bg-[var(--bb-surface-data-muted)] p-0"
-                style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "primary"))}
-                title={primaryLabel}
-              >
-                <button
-                  type="button"
-                  class="table-th block w-full cursor-pointer select-none border-0 bg-transparent text-left"
-                  onClick={() => toggleSort("primary", defaultPrimaryDirection)}
-                >
-                  {primaryLabel}{sortArrow("primary")}
-                  {sortAnnouncement("primary")}
-                </button>
-              </th>
-              {showGeomeanCol && (
-                <th
-                  role="columnheader"
-                  scope="col"
-                  class="sticky z-30 w-32 min-w-32 whitespace-nowrap bg-[var(--bb-surface-data-muted)] p-0"
-                  style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "geomean"))}
-                  aria-sort={ariaSort("geomean")}
-                  title="Geometric mean of per-query display times"
-                >
-                  <button
-                    type="button"
-                    class="table-th block w-full cursor-pointer select-none border-0 bg-transparent text-left text-[var(--bb-data-fg-subtle)]"
-                    onClick={() => toggleSort("geomean")}
+          <table
+            ref={gridRef}
+            role="grid"
+            aria-label={`${summary.benchmark} SF${summary.scale_factor} ${summary.phase} results`}
+            class="min-w-max text-sm"
+          >
+            <thead class="bg-[var(--bb-surface-data-muted)]">{renderHeaderRow()}</thead>
+            <tbody class="divide-y divide-[var(--bb-data-border)]">
+              {sorted.map((row, rowIdx) => {
+                const isSelected = selectedIds?.has(rowKey(row)) ?? false;
+                return (
+                  <tr
+                    key={row.result_id}
+                    role="row"
+                    data-testid={row.result_id}
+                    class={`hover:bg-[var(--bb-surface-data-muted)] ${isSelected ? "bg-[var(--bb-tone-info-bg)]" : ""}`}
                   >
-                    Geomean{sortArrow("geomean")}
-                    {sortAnnouncement("geomean")}
-                  </button>
-                </th>
-              )}
-              {sortedQueryIds.map((qid) => (
-                <th
-                  key={qid}
-                  role="columnheader"
-                  scope="col"
-                  class="min-w-[7rem] whitespace-nowrap p-0 font-mono"
-                  aria-sort={ariaSort(`query:${qid}`)}
-                >
-                  <button
-                    type="button"
-                    class="table-th block w-full cursor-pointer select-none border-0 bg-transparent text-left font-mono"
-                    data-query-label={qid}
-                    onClick={() => toggleSort(`query:${qid}`)}
-                  >
-                    {queryDisplayLabel(qid)}{sortArrow(`query:${qid}`)}
-                    {sortAnnouncement(`query:${qid}`)}
-                  </button>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-[var(--bb-data-border)]">
-            {sorted.map((row, rowIdx) => {
-              const isSelected = selectedIds?.has(rowKey(row)) ?? false;
-              return (
-                <tr
-                  key={row.result_id}
-                  role="row"
-                  data-testid={row.result_id}
-                  class={`hover:bg-[var(--bb-surface-data-muted)] ${isSelected ? "bg-[var(--bb-tone-info-bg)]" : ""}`}
-                >
                   {hasSelection && (
                     <td
                       role="gridcell"
@@ -653,8 +701,8 @@ export function QueryHeatmap({
                 </tr>
               );
             })}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

@@ -84,6 +84,12 @@ function makeSummary(overrides: Partial<BenchmarkSummary> = {}): BenchmarkSummar
   };
 }
 
+function matrixThead(): HTMLElement {
+  const thead = screen.getByTestId("query-heatmap-scroll-container").querySelector("thead");
+  expect(thead).not.toBeNull();
+  return thead as HTMLElement;
+}
+
 // ---------------------------------------------------------------------------
 // (a) Known timings produce stable rendered output
 // ---------------------------------------------------------------------------
@@ -111,9 +117,9 @@ describe("QueryHeatmap rendering", () => {
         },
       ],
     });
-    const { container } = render(<QueryHeatmap summary={summary} />);
+    render(<QueryHeatmap summary={summary} />);
 
-    const labels = Array.from(container.querySelectorAll("thead button[data-query-label]")).map(
+    const labels = Array.from(matrixThead().querySelectorAll("button[data-query-label]")).map(
       (button) => button.getAttribute("data-query-label"),
     );
     expect(labels).toStrictEqual(["Q1", "Q2", "Q10"]);
@@ -121,33 +127,39 @@ describe("QueryHeatmap rendering", () => {
   });
 
   it("applies cumulative sticky-left offsets to the frozen header columns", () => {
-    const { container } = render(<QueryHeatmap summary={makeSummary()} />);
-    const trustHeader = within(container.querySelector("thead")!).getByRole("columnheader", { name: "Trust" });
-    const primaryHeader = container.querySelector("thead")!.querySelector('[aria-sort]:not([aria-sort=""])')!;
+    render(<QueryHeatmap summary={makeSummary()} />);
+    const thead = matrixThead();
+    const trustHeader = within(thead).getByRole("columnheader", { name: "Trust" });
+    const primaryHeader = thead.querySelector('[aria-sort]:not([aria-sort=""])')!;
     expect(trustHeader.getAttribute("style")).toContain("left: 11rem");
-    const platformHeader = within(container.querySelector("thead")!).getByRole("columnheader", { name: /^Platform/ });
+    const platformHeader = within(thead).getByRole("columnheader", { name: /^Platform/ });
     expect(platformHeader.getAttribute("style")).toContain("left: 0rem");
     expect(platformHeader.className).toContain("sticky");
     expect(primaryHeader.getAttribute("style")?.includes("left:")).toBe(true);
   });
 
   it("shifts sticky offsets right by the checkbox column width when selection is enabled", () => {
-    const { container } = render(
-      <QueryHeatmap summary={makeSummary()} selectedIds={new Set()} onSelectionChange={() => {}} />,
-    );
-    const platformHeader = within(container.querySelector("thead")!).getByRole("columnheader", { name: /^Platform/ });
-    const trustHeader = within(container.querySelector("thead")!).getByRole("columnheader", { name: "Trust" });
+    render(<QueryHeatmap summary={makeSummary()} selectedIds={new Set()} onSelectionChange={() => {}} />);
+    const thead = matrixThead();
+    const platformHeader = within(thead).getByRole("columnheader", { name: /^Platform/ });
+    const trustHeader = within(thead).getByRole("columnheader", { name: "Trust" });
     expect(platformHeader.getAttribute("style")).toContain("left: 3rem");
     expect(trustHeader.getAttribute("style")).toContain("left: 14rem");
   });
 
-  it("makes the header row vertically sticky and layers it above body sticky cells", () => {
-    const { container } = render(<QueryHeatmap summary={makeSummary()} />);
-    const headerRow = container.querySelector("thead tr")!;
-    expect(headerRow.className).toContain("sticky");
-    expect(headerRow.className).toContain("top-0");
-    expect(headerRow.className).toMatch(/\bz-(20|30|40)\b/);
-    const platformHeader = within(container.querySelector("thead")!).getByRole("columnheader", { name: /^Platform/ });
+  it("renders the page-sticky header outside the horizontal scroll container", () => {
+    render(<QueryHeatmap summary={makeSummary()} />);
+    const pageStickyShell = screen.getByTestId("query-heatmap-page-sticky-header-shell");
+    const scrollContainer = screen.getByTestId("query-heatmap-scroll-container");
+    const tableHeaderRow = scrollContainer.querySelector("thead tr")!;
+    const platformHeader = within(matrixThead()).getByRole("columnheader", { name: /^Platform/ });
+
+    expect(pageStickyShell.className).toContain("sticky");
+    expect(pageStickyShell.className).toContain("top-0");
+    expect(pageStickyShell.className).toMatch(/\bz-40\b/);
+    expect(pageStickyShell.closest(".overflow-x-auto")).toBeNull();
+    expect(tableHeaderRow.className).not.toContain("top-0");
+    expect(tableHeaderRow.className).not.toMatch(/\bsticky\b/);
     expect(platformHeader.className).toMatch(/\bz-30\b/);
   });
 
@@ -237,11 +249,15 @@ describe("QueryHeatmap rendering", () => {
     const { container } = render(<QueryHeatmap summary={makeSummary()} />);
 
     const scrollContainer = screen.getByTestId("query-heatmap-scroll-container");
+    const pageStickyHeader = screen.getByTestId("query-heatmap-page-sticky-header");
     expect(scrollContainer.className).toContain("overflow-x-auto");
+    scrollContainer.scrollLeft = 96;
+    fireEvent.scroll(scrollContainer);
+    expect(pageStickyHeader.scrollLeft).toBe(96);
     expect(screen.getByTestId("query-heatmap-scroll-hint").textContent).toContain("Query columns");
     expect(screen.getByRole("grid").className).toContain("min-w-max");
 
-    const queryHeaders = Array.from(container.querySelectorAll("thead th"));
+    const queryHeaders = Array.from(matrixThead().querySelectorAll("th"));
     expect(queryHeaders.some((header) => header.className.includes("min-w-[7rem]"))).toBe(true);
     const queryCells = Array.from(container.querySelectorAll("tbody td[data-cell]"));
     expect(queryCells.every((cell) => cell.className.includes("min-w-[7rem]"))).toBe(true);

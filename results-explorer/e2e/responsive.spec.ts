@@ -133,6 +133,45 @@ test.describe("responsive explorer assertions", () => {
     });
   }
 
+  test("benchmark heatmap keeps its header visible during document scroll", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 600 });
+    await page.goto("/results/tpch/?sf=0.01&phase=standard");
+    await waitForDataLoaded(page, /TPC-H Results/i);
+
+    const heatmap = page.getByTestId("query-heatmap-scroll-container").first();
+    await expect(heatmap).toBeVisible();
+    await heatmap.evaluate((container) => {
+      const tbody = container.querySelector("tbody");
+      if (!tbody) throw new Error("missing query heatmap body");
+      const rows = Array.from(tbody.querySelectorAll("tr"));
+      for (let repeat = 0; repeat < 18; repeat += 1) {
+        for (const row of rows) {
+          tbody.appendChild(row.cloneNode(true));
+        }
+      }
+    });
+
+    const pageStickyHeader = page.getByTestId("query-heatmap-page-sticky-header").first();
+    await expect(pageStickyHeader).toBeVisible();
+
+    await heatmap.evaluate((container) => {
+      container.scrollLeft = 160;
+      container.dispatchEvent(new Event("scroll", { bubbles: true }));
+    });
+    await expect.poll(() => pageStickyHeader.evaluate((header) => header.scrollLeft)).toBe(160);
+
+    const scrollY = await heatmap.evaluate((container) => {
+      const rect = container.getBoundingClientRect();
+      return window.scrollY + rect.top + 180;
+    });
+    await page.evaluate((y) => window.scrollTo(0, y), scrollY);
+
+    await expect.poll(async () => (await pageStickyHeader.boundingBox())?.y ?? 999).toBeLessThanOrEqual(1);
+    await expect.poll(async () => (await heatmap.locator("thead tr").first().boundingBox())?.y ?? 999).toBeLessThan(0);
+    await expect(pageStickyHeader.getByText("Platform").first()).toBeVisible();
+    await expect(pageStickyHeader.getByText("Q1").first()).toBeVisible();
+  });
+
   for (const viewport of VIEWPORTS.filter((item) => item.width <= 768)) {
     test(`audited routes avoid document overflow at ${viewport.name}`, async ({ page }) => {
       await setViewport(page, viewport);
