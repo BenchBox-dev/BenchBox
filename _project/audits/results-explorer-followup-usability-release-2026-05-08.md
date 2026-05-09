@@ -3,6 +3,18 @@
 Date: 2026-05-09
 Develop tip at gate run: `61e267cec` (post-PR #295).
 
+**Correction posted 2026-05-09 (after self-audit):** The original
+release-gate PR #296 over-claimed completion of the gate's manual
+work units (w3 browser-drive, w4 screenshots). Those work units were
+documented as deferred in the "Browser-drive evidence" and
+"Browser-drive evidence (w3) and screenshots (w4)" sections below
+but were also marked `status: done` in the YAML, which contradicts
+the brief's "Do not claim verification passed for a manual check you
+did not actually drive" rule. The YAML has been reverted: the
+release-gate TODO is now back under `_project/TODO/main/planning/`,
+w3 and w4 are `status: pending`, and the gate decision below is
+restated as **CONDITIONAL** until the manual evidence lands.
+
 This matrix is the closure record for the 2026-05-08 Results Explorer
 follow-up review (chat-only, never committed to `_project/audits/`).
 Each defect was rebound against develop tip in the implementing TODO's
@@ -138,7 +150,34 @@ After PR #295 merged:
 
 ## Decision
 
-**APPROVED.** No P0 or P1 defects are blocked; every fixed defect has
-an implementing PR, file, and test in the evidence matrix; deferred
-defects retain their original TODO IDs so future audits can re-bind
-against the same matrix structure.
+**CONDITIONAL** (revised 2026-05-09).
+
+Conditions outstanding:
+
+1. Release-gate w3 (Browser-drive primary Results Explorer routes) —
+   not executed; evidence map in this doc lists the routes and
+   expected states. Either run as a Playwright spec under
+   `results-explorer/e2e/` or drive manually and append observed
+   states.
+2. Release-gate w4 (Capture before-release screenshots) — not
+   executed. Capture against a live DuckDB-backed dataset on a
+   desktop viewport.
+3. Seven P1 defects deferred under their original TODOs (compare-flow
+   w4–w6, navigation w2–w4, table-sticky w2–w5, run-identity w3/w4/w6,
+   chart-panel w1/w2/w6, query-workbench w4). The gate's
+   `must_preserve` rule says these are acceptable only if
+   "explicitly blocked"; they are not blocked, they are simply not
+   yet implemented. Either implement before release or get explicit
+   sign-off that they ship in a follow-up wave.
+
+What did land cleanly:
+
+- 15 of 29 matrix defects fixed by PRs #284 / #285 / #286 / #290 / #295.
+- Item 7 (`result-detail-metadata-density`) fully complete and in
+  `_project/DONE/main/planning/`.
+- Automated gate run on `61e267cec`: vitest 545/545, typecheck 0,
+  build clean, `todo_cli check-graph` clean.
+
+The matrix and severity rollup above are accurate; the headline
+verdict was the only thing overstated. Once the three conditions
+above are addressed, this audit can be re-decided as APPROVED.
