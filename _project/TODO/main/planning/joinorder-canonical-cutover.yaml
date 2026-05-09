@@ -273,7 +273,7 @@ work:
             raise NotImplementedError(
               f"DataFrame translation for query {id} not yet "
               f"available. Track-2 TODO: "
-              f"_project/TODO/main/planning/track2-joinorder-dataframe-coverage.md"
+              f"_project/TODO/main/planning/track2-joinorder-dataframe-coverage.yaml"
             )
 
       Seed the follow-up TODO file. NOTE: the Track-2 groundwork
@@ -514,7 +514,7 @@ verification:
     command: "uv run -- python -m pytest tests/unit/core/joinorder/test_canonical_queries.py -q"
     expected_output: "113 passed"
   - description: "DataFrame queries fail loudly for the 100 untranslated"
-    command: "uv run -- python -c 'from benchbox.core.joinorder.dataframe_queries import query_2a; query_2a(None)' 2>&1 | grep -c 'NotImplementedError\\|track2-joinorder-dataframe-coverage'"
+    command: "uv run -- python -c 'from benchbox.core.joinorder.dataframe_queries import query_2a; query_2a(None)' 2>&1 | grep 'NotImplementedError' | grep -c '_project/TODO/main/planning/track2-joinorder-dataframe-coverage.yaml'"
     expected_output: ">= 1"
   - description: "joinorder_synthetic is hidden from the result-publisher's public surface"
     command: "uv run -- python -m pytest tests/unit/core/test_registry_surface_field.py::test_joinorder_synthetic_hidden -q"
