@@ -232,10 +232,13 @@ describe("Query", () => {
 
     expect(screen.getAllByText("SQLite").length).toBeGreaterThan(0);
     expect(within(resultsTable).getAllByText("ClickBench").length).toBeGreaterThan(0);
-    // PR #275 tightened readableToken() to preserve hyphens in trust
-    // labels (per PR #266 review). "maintainer-run" no longer humanizes
-    // to "maintainer run".
-    expect(within(resultsTable).getByText("maintainer-run")).toBeTruthy();
+    // `results-explorer-query-workbench-controls-and-facets` w6 introduces
+    // the centralized `formatTrustLabel` formatter, applied via Query.tsx
+    // `formatQueryRowCell`. With that formatter wired in, the raw
+    // "maintainer-run" trust label renders as "maintainer run" in the
+    // table. PR #277 had aligned this assertion to the unformatted source
+    // because the formatter didn't exist yet; w6 closes that gap.
+    expect(within(resultsTable).getByText("maintainer run")).toBeTruthy();
   });
 
   it("uses public table labels and formatted values in the default result table", async () => {
@@ -278,6 +281,39 @@ describe("Query", () => {
     expect(visibleColumns.textContent).toContain("Configure visible columns");
     expect(mobileDrawer.className).toContain("lg:hidden");
     expect(desktopFilters.className).toContain("hidden");
+  });
+
+  it("provides Reset / Select all / Clear optional bulk actions in the Configure visible columns disclosure", async () => {
+    // Regression contract for w3 of
+    // results-explorer-query-workbench-controls-and-facets: the
+    // disclosure body must offer Reset to default, Select all, and
+    // Clear optional actions so users do not have to toggle 20+
+    // checkboxes one by one.
+    render(<Query />);
+    await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
+
+    const disclosure = screen.getByTestId("query-visible-columns");
+    expect(within(disclosure).getByRole("button", { name: "Reset to default" })).toBeTruthy();
+    expect(within(disclosure).getByRole("button", { name: "Select all" })).toBeTruthy();
+    const clearOptional = within(disclosure).getByRole("button", { name: "Clear optional" });
+
+    // Click "Select all" — every column checkbox in the disclosure
+    // should now be checked.
+    fireEvent.click(within(disclosure).getByRole("button", { name: "Select all" }));
+    await waitFor(() => {
+      const checkboxes = within(disclosure).getAllByRole("checkbox") as HTMLInputElement[];
+      expect(checkboxes.length).toBeGreaterThan(0);
+      expect(checkboxes.every((cb) => cb.checked)).toBe(true);
+    });
+
+    // Click "Clear optional" — at most one column stays checked
+    // (`result_id` if present, else first available); we never let users
+    // hide every useful column.
+    fireEvent.click(clearOptional);
+    await waitFor(() => {
+      const checked = (within(disclosure).getAllByRole("checkbox") as HTMLInputElement[]).filter((cb) => cb.checked);
+      expect(checked.length).toBe(1);
+    });
   });
 
   it("opens full query facets from the mobile drawer trigger", async () => {
