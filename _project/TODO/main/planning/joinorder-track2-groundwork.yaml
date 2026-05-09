@@ -161,8 +161,12 @@ work:
         - Implementation complexity
         - Comparability with existing JOB literature
 
-      Output: recommendation with reasoning, NOT a final decision.
-      Final decision happens when Track 2 is picked up.
+      Output: a SPECIFIC leading candidate (one of A-E) with
+      reasoning tied to the 5 scoring dimensions. NOT a final
+      decision — the lock-in happens when Track 2 is picked up —
+      but the recommendation in this doc must be unambiguous.
+      Multi-option "we'll see" framings are not acceptable
+      output; pick one and defend it.
 
   - id: w4
     summary: "Seed Track-2 TODO: scaling-strategy work"
@@ -325,7 +329,8 @@ impact:
 
 success_metrics:
   - "Phase-model survey doc identifies where stats time lands today across at least 4 supported engines (DuckDB, PostgreSQL, ClickHouse, StarRocks or Spark)"
-  - "Scaling-strategy doc enumerates 5 options with explicit tradeoffs and a recommended leading candidate (with reasoning)"
+  - "Scaling-strategy doc enumerates 5 options A-E with explicit tradeoffs across all 5 dimensions (real-data fidelity, scalability axis, license posture, implementation complexity, JOB-literature comparability)"
+  - "Scaling-strategy doc names ONE specific leading candidate (e.g., 'Option B: sampled-from-real with Y-stratified preservation') with reasoning that ties the recommendation to the scoring across the 5 dimensions — final lock-in still defers to Track-2 kickoff, but the recommendation must be unambiguous in this doc"
   - "Reuse guide is concrete enough that a hypothetical ClickBench TODO can follow it step-by-step without re-deriving patterns"
   - "Track-2 TODO seeds (stats-phase, scaling-strategy) validate cleanly under validate_todo.py"
   - "No Track-1 work blocked or delayed by this TODO"

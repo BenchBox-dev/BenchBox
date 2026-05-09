@@ -46,6 +46,36 @@ description: |
       pipeline.
 
 work:
+  - id: w0
+    summary: "Re-validate the 10/13 empty-query claim against current generator"
+    status: pending
+    notes: |
+      Pins the upstream evidence cited in this TODO's description.
+      The "10/13 embedded queries return zero rows on synthetic data"
+      finding came from an external reviewer probe; before relying on
+      it as motivation, re-run it locally to ensure the underlying
+      defect hasn't been partially patched in the interim.
+
+      Procedure:
+        1. Generate joinorder synthetic data at sf=0.01 via the
+           existing generator (faster than sf=1, same defect signature)
+        2. Load the generated tables into DuckDB
+        3. For each of the 13 currently embedded JOB queries
+           (benchbox/core/joinorder/queries.py), rewrite as
+           SELECT COUNT(*) FROM (<query>) sub
+        4. Execute all 13; record counts
+        5. Assert: at least 8/13 return 0 rows (matches the issue
+           #289 review's 10/13 finding within sampling tolerance)
+
+      Capture stdout to:
+        _project/verification-logs/joinorder-canonical-foundation/w0.log
+
+      A reviewer landing this PR weeks later can replay the log and
+      verify the motivation hasn't shifted (e.g., someone partially
+      fixed the generator without updating this TODO). If the empty-
+      query rate has dropped below 8/13, STOP and re-survey before
+      proceeding — the issue's framing may need adjustment.
+
   - id: w1
     summary: "Write design doc: reusable foundations (scale-factor gate, data-fetch infra, dataset-versioning, registry surface field)"
     status: pending
@@ -123,36 +153,102 @@ work:
           - Existing benchmarks all default to "public"
 
   - id: w4
-    summary: "Build offline conversion pipeline: pg_dump → Postgres restore → Parquet"
+    summary: "Pipeline scaffolding: ephemeral Postgres container + pg_dump download/restore"
     status: pending
     needs: [w1]
     notes: |
-      Script: `_project/scripts/build_joinorder_data.py`
+      Script foundation: `_project/scripts/build_joinorder_data.py`
 
-      Pipeline (run once on Joe's machine, NOT in CI):
-        1. Download Harvard Dataverse pg_dump
-           (doi:10.7910/DVN/2QYZBT); record upstream sha256
-        2. Restore into ephemeral Postgres container (docker run)
-        3. For each of 21 tables: COPY to CSV with
-           FORMAT csv, ENCODING UTF8 (no NFC/NFD normalization)
-        4. CSV → Parquet via DuckDB:
-           COPY ... TO '...parquet' (FORMAT 'parquet',
-           COMPRESSION 'zstd', ROW_GROUP_SIZE 100000)
-        5. Per-table: row count, sha256, schema (column → type)
+      This work unit produces a runnable pipeline skeleton that:
+        1. Downloads the Harvard Dataverse pg_dump
+           (doi:10.7910/DVN/2QYZBT); records upstream sha256 to
+           a build manifest
+        2. Spins up an ephemeral Postgres container via docker
+           (image tag pinned in script)
+        3. Restores the pg_dump into the container
+        4. Validates restore: every expected table is present,
+           row counts within ±1% of Leis 2015 Table 3 reference
+        5. Tears down container on exit
 
-      Provenance embedded in `data_manifest.toml`:
-        - script git SHA, DuckDB version, Postgres version
-        - source DOI, retrieval timestamp, upstream pg_dump sha256
-        - per-table file path, row count, sha256, schema
-        - aggregate sha256 (over all per-file hashes) → dataset_version
+      Output: working pipeline that produces a restored Postgres,
+      validated for completeness, with provenance recorded.
+      Subsequent work units (w5-w7) extract data from this
+      restored state.
 
       Dependencies isolated in `_project/scripts/pyproject.toml`
       (already established pattern in this repo).
 
   - id: w5
-    summary: "Encoding round-trip gate (build-time pipeline assertion)"
+    summary: "Per-table CSV extract from restored Postgres with UTF-8 fidelity"
     status: pending
     needs: [w4]
+    notes: |
+      For each of 21 IMDb tables in the restored Postgres:
+        COPY <table> TO '/tmp/<table>.csv' WITH (
+          FORMAT csv,
+          ENCODING 'UTF8',
+          HEADER true,
+          QUOTE '"',
+          ESCAPE '"',
+          FORCE_QUOTE *
+        )
+
+      No NFC/NFD normalization in the extract step. Verify via
+      sampling: extract a row containing accented characters
+      (e.g., from `name` table) and assert byte-for-byte match
+      against Postgres SELECT output.
+
+      Output: 21 CSV files with provenance (per-file sha256
+      captured for the manifest).
+
+  - id: w6
+    summary: "CSV → Parquet conversion via DuckDB with zstd compression"
+    status: pending
+    needs: [w5]
+    notes: |
+      For each of 21 CSVs, convert to Parquet via DuckDB:
+        COPY (SELECT * FROM read_csv_auto('<file>.csv'))
+          TO '<file>.parquet' (
+            FORMAT 'parquet',
+            COMPRESSION 'zstd',
+            ROW_GROUP_SIZE 100000
+          )
+
+      Schema preservation: `read_csv_auto` infers types; verify
+      against the Postgres source schema (pg_dump metadata).
+      Mismatches must be caught: explicit type casting per table
+      if necessary. Document any forced types in the manifest.
+
+      Output: 21 Parquet files + per-file sha256 captured for the
+      manifest.
+
+  - id: w7
+    summary: "Provenance manifest assembly with full reproducibility metadata"
+    status: pending
+    needs: [w6]
+    notes: |
+      Assemble `data_manifest.toml` with:
+        - script git SHA (from `git rev-parse HEAD` at build time)
+        - DuckDB version (from `duckdb.__version__`)
+        - Postgres image tag (pinned in w4)
+        - source DOI, retrieval timestamp (ISO-8601 UTC),
+          upstream pg_dump sha256
+        - per-table block: file path, row count, sha256, schema
+          (column name → Postgres type)
+        - aggregate sha256 (over all per-file hashes, in
+          deterministic table order) → this becomes the
+          `dataset_version` field
+
+      The manifest is the gate document: any byte-difference in
+      the conversion downstream changes its sha256, which
+      changes dataset_version, which forces explicit version
+      bumps in result bundles. This is the reproducibility
+      contract.
+
+  - id: w8
+    summary: "Encoding round-trip gate (build-time pipeline assertion)"
+    status: pending
+    needs: [w7]
     notes: |
       After Parquet conversion, the pipeline MUST assert encoding
       fidelity. Sample the following classes of rows:
@@ -171,10 +267,10 @@ work:
       the DuckDB writer. Sample size: 100 rows per table from the
       canonical-tricky set above.
 
-  - id: w6
+  - id: w9
     summary: "Predicate-domain validation gate (no-empty-query assertion)"
     status: pending
-    needs: [w4]
+    needs: [w7]
     notes: |
       The defect that makes synthetic JOB worthless is that
       `movie_companies.note` and `cast_info.note` are always NULL,
@@ -195,20 +291,36 @@ work:
       Concrete numbers TBD during w4 from the actual restore; bind
       them then. Pipeline aborts if any column drifts ±5%.
 
-  - id: w7
-    summary: "Compute reference cardinalities for all 113 queries (PostgreSQL oracle)"
+  - id: w10
+    summary: "Import 113 canonical JOB queries from gregrahn into a build-input directory"
     status: pending
-    needs: [w4, w6]
+    needs: [w7]
     notes: |
-      Source queries: gregrahn/join-order-benchmark canonical 113
-      (1a-33c), checked-in to a build-input directory (NOT yet
-      committed to benchbox/core/joinorder/queries.py — that is the
-      cutover TODO's w7).
+      Source: gregrahn/join-order-benchmark canonical 113 queries
+      (1a-33c). Pin the gregrahn commit SHA used (record in build
+      manifest provenance) so the import is reproducible.
 
-      For each query, run against the restored Postgres on the
-      canonical converted data and capture:
+      Output: `_project/joinorder/build-inputs/queries/{1a,...,33c}.sql`
+      One file per query, exact text from upstream (no rewrites).
+
+      NOT committed to benchbox/core/joinorder/queries.py — that
+      is the cutover TODO's responsibility. Build-inputs directory
+      is the staging area used only by the offline pipeline.
+
+      Sanity check: each .sql file is parseable by
+      `sqlglot.parse_one(text, read="postgres")` without error.
+
+  - id: w11
+    summary: "Compute reference cardinalities via PostgreSQL oracle"
+    status: pending
+    needs: [w10, w9]
+    notes: |
+      For each of 113 queries, run against the restored Postgres
+      on canonical converted data and capture:
         - row_count (integer)
-        - first_row_sha256 (sha256 of the canonical-ordered first row)
+        - first_row_sha256 (sha256 of the canonical-ordered first row;
+          query rewritten as `SELECT ... FROM (<query>) ORDER BY 1,2,...`
+          for deterministic ordering)
         - postgres_version
         - query_id (canonical "1a", "33c" etc.)
 
@@ -217,19 +329,34 @@ work:
         {
           "postgres_version": "16.2",
           "dataset_version": "<sha256>",
+          "gregrahn_commit": "<sha>",
           "queries": {
             "1a": {"row_count": ..., "first_row_sha256": "..."},
             ...
           }
         }
 
-      Cross-check at least the queries for which the Leis 2015 paper
-      published row counts; flag mismatches in the build log.
-
-  - id: w8
-    summary: "Package archive tarball with manifest + license + checksums"
+  - id: w12
+    summary: "Cross-check reference cardinalities against Leis 2015 published values"
     status: pending
-    needs: [w4, w5, w6, w7]
+    needs: [w11]
+    notes: |
+      Leis et al. 2015 (https://vldb.org/pvldb/vol9/p204-leis.pdf)
+      publishes row counts for some JOB queries (see paper Table 4
+      and elsewhere in §3-4). Cross-check our computed cardinalities
+      against published values for those queries.
+
+      Output: `_project/joinorder/cardinality-cross-check.md`
+      Lists each query for which Leis 2015 publishes a count;
+      reports our computed count and PASS / DRIFT verdict.
+      Drift > ±2% requires investigation before proceeding (likely
+      indicates a conversion bug from w4 or query parsing issue
+      from w10).
+
+  - id: w13
+    summary: "Package full archive tarball with manifest + license + checksums + cardinalities"
+    status: pending
+    needs: [w7, w8, w9, w12]
     notes: |
       Tarball: `joinorder-imdb-2013-v1.tar.zst`
       Contents:
@@ -242,16 +369,35 @@ work:
       Tarball-level sha256 written separately as
       `joinorder-imdb-2013-v1.tar.zst.sha256`.
 
-      Tiny fixture: re-run pipeline with sample of full canonical
-      (~50 rows per table, predicate-satisfying) → produces tiny
-      Parquet set checked into `tests/fixtures/joinorder_canonical_tiny/`.
-      Same provenance trail (manifest with dataset_version distinct
-      from full canonical).
+  - id: w14
+    summary: "Regenerate tiny canonical fixture (~1MB) and check into repo"
+    status: pending
+    needs: [w13]
+    notes: |
+      Re-run the conversion pipeline with sampling: pick ~50 rows
+      per table from the canonical Parquets, biased to ensure each
+      of the 113 query predicates has ≥1 satisfying row in the tiny
+      sample. Sampling strategy:
+        - For tables with predicate-targeted columns, sample rows
+          where those columns have known query-matching values
+        - For pure FK tables (cast_info, movie_companies, etc.),
+          sample rows that bridge the predicate-satisfying rows
+          via FK relationships
+        - Verify referential integrity after sampling
 
-  - id: w9
+      Output: 21 tiny Parquet files checked into
+      `tests/fixtures/joinorder_canonical_tiny/`, plus a tiny
+      manifest with dataset_version distinct from full canonical
+      (so unit tests can reference both).
+
+      Verification before commit: load tiny fixture into DuckDB,
+      run all 113 queries from w10, assert every query returns
+      ≥1 row.
+
+  - id: w15
     summary: "Stage as DRAFT GitHub Release on tag `data/joinorder-imdb-2013-v1`"
     status: pending
-    needs: [w8]
+    needs: [w13]
     notes: |
       `gh release create data/joinorder-imdb-2013-v1 \
         --draft \
@@ -272,10 +418,10 @@ work:
         - Per-table row counts and sha256s
         - Tarball-level sha256
 
-  - id: w10
+  - id: w16
     summary: "Add `data_manifest.toml` for joinorder pointing at the staged Release URL"
     status: pending
-    needs: [w9]
+    needs: [w15]
     notes: |
       File: `benchbox/core/joinorder/data_manifest.toml`
       Fields populated from w8 manifest output. URL points at the
@@ -328,14 +474,16 @@ approach: |
   that runs once, produces an archive, stages a draft Release.
 
   Sequence the work to minimize rework:
-    1. Design doc first (w1) — anchors all subsequent decisions
-    2. In parallel: data-fetch module (w2), registry+enforcement (w3),
-       and conversion pipeline (w4)
-    3. Pipeline gates (w5, w6) added before reference cardinalities
-       (w7) so we never compute reference values on broken data
-    4. Tarball packaging (w8) and Release staging (w9, w10) come last
+    1. w0 (re-validate cited evidence) — gates the rest
+    2. Design doc first (w1) — anchors all subsequent decisions
+    3. In parallel: data-fetch module (w2), registry+enforcement (w3),
+       and conversion pipeline (w4→w7)
+    4. Pipeline gates (w8, w9) added before reference cardinalities
+       (w10→w12) so we never compute reference values on broken data
+    5. Archive packaging (w13) and tiny fixture regen (w14) precede
+       Release staging (w15, w16)
 
-  For the build pipeline (w4-w8), use Docker-Postgres for
+  For the build pipeline (w4-w14), use Docker-Postgres for
   reproducibility. Document the exact image tag in
   `data_manifest.toml`. The pipeline script must be idempotent and
   re-runnable — if Joe needs to rebuild from a clean source 6 months
@@ -360,8 +508,11 @@ scope_limit:
     - "_project/design/data-fetch-infra-reuse-guide.md (new — design doc consumed by Track-2 groundwork TODO)"
     - "_project/scripts/build_joinorder_data.py (new)"
     - "_project/scripts/pyproject.toml (add deps if needed)"
+    - "_project/joinorder/build-inputs/queries/*.sql (new — 113 queries from gregrahn)"
     - "_project/joinorder/reference_cardinalities.json (new)"
+    - "_project/joinorder/cardinality-cross-check.md (new — Leis 2015 cross-check report)"
     - "_project/joinorder/release-notes.md (new)"
+    - "_project/verification-logs/joinorder-canonical-foundation/w0.log (new — re-validation log)"
     - "benchbox/core/data_fetch/ (new module)"
     - "benchbox/core/benchmark_registry.py (add `surface` field + scale validation hook)"
     - "benchbox/core/errors.py (add ScaleFactorNotSupportedError if not present)"
@@ -438,7 +589,49 @@ success_metrics:
   - "Build pipeline encoding round-trip gate is enforced and would fail on silent NFC/NFD normalization"
 
 open_questions:
-  - "Harvard Dataverse pg_dump may differ from CWI mirror. Plan: cross-check row counts against Leis 2015 Table 3 in w4; if material drift, document the chosen snapshot and rationale in the manifest."
-  - "DuckDB Parquet writer's encoding behavior on edge-case Unicode (combining characters, RTL text). Plan: w5 round-trip gate catches this; if it fails, fall back to Polars or pyarrow for the conversion step."
-  - "Whether tiny fixture should be deterministic regen vs frozen sha256 in repo. Plan: deterministic regen via the build pipeline, but the resulting Parquets are checked in (so unit tests don't need the full archive)."
-  - "Reference cardinality validation against Leis 2015 published numbers — only some queries have published row counts. Plan: w7 cross-checks where available; remaining queries rely on the Postgres-on-canonical oracle alone."
+  - "Harvard Dataverse pg_dump may differ from CWI mirror. Plan: cross-check row counts against Leis 2015 Table 3 in w4 (restore validation); if material drift, document the chosen snapshot and rationale in the manifest."
+  - "DuckDB Parquet writer's encoding behavior on edge-case Unicode (combining characters, RTL text). Plan: w8 round-trip gate catches this; if it fails, fall back to Polars or pyarrow for the conversion step."
+  - "Whether tiny fixture should be deterministic regen vs frozen sha256 in repo. Plan: deterministic regen via the build pipeline (w14), but the resulting Parquets are checked in (so unit tests don't need the full archive)."
+  - "Reference cardinality validation against Leis 2015 published numbers — only some queries have published row counts. Plan: w12 cross-checks where available; remaining queries rely on the Postgres-on-canonical oracle alone."
+
+context_sections:
+  "Research Findings": |
+    License posture (decided in planning, summary):
+
+    Risk read: AMBIGUOUS, LEANING LOW for the planned action (host
+    Parquet conversion as GitHub Release with attribution + checksum
+    manifest + DATA-LICENSE.md + takedown commitment).
+
+    Evidence supporting "leaning low":
+      - Boncz CWI mirror (event.cwi.nl/da/job/readme.txt) has been
+        live since 2016, maintained by JOB co-author through 2025,
+        explicitly acknowledges the gray area
+      - gregrahn/join-order-benchmark: ~9.5 years public, 356 stars,
+        99 forks, no enforcement action
+      - Harvard Dataverse, CedarDB docs, MIT learnedsystems all
+        redistribute IMDb-derived JOB data; no documented IMDb
+        objection in any forum
+      - JOB is derived from a discontinued IMDb data product (2017)
+      - US Feist v. Rural weakens compilation-copyright claim on
+        the parsed/relational form
+
+    Evidence supporting "ambiguous":
+      - IMDb's current ToU literally prohibits "creating any kind
+        of online/offline database" outside personal use
+      - No permissive license, no IMDb consent on record
+      - EU sui generis database right is narrower than US copyright
+
+    Posture conditions for hosting (to be honored in cutover w15 +
+    w14):
+      1. DATA-LICENSE.md per benchmark with IMDb attribution
+         verbatim, Boncz-style scope clause, redistribution
+         disclaimer, takedown contact
+      2. `--data-path` opt-out for users in stricter jurisdictions
+      3. Same-day takedown SLA: pull Release asset on objection,
+         fall back to user-supplied path
+      4. No click-through (matches field practice; no legal upside)
+
+    See conversation history for the full evidence pack and
+    sources. If posture conditions cannot be met before w14
+    promotion, fall back to Option C: host conversion scripts
+    only, require user-supplied data path.
