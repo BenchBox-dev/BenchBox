@@ -1,5 +1,6 @@
 import { useEffect, useState } from "preact/hooks";
 import type { RoutableProps } from "preact-router";
+import { route } from "preact-router";
 import type { PlatformIndexRowRow } from "@/lib/duckdbQueries";
 import { getPlatformIndexRows } from "@/lib/duckdbQueries";
 import { useFacetState, type FacetKey, type FacetState } from "@/lib/facetModel";
@@ -157,6 +158,19 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   // old links constructed from the display name.
   const allPlatformResults = rows.filter((r) => r.platform_id === platform || r.platform === platform);
 
+  // Distinct platform options for the in-page sibling pivot, sorted by
+  // display name. Each row carries (platform_id, platform); we keep the
+  // first display name encountered for each id.
+  const platformOptions = (() => {
+    const byId = new Map<string, string>();
+    for (const row of rows) {
+      if (!byId.has(row.platform_id)) byId.set(row.platform_id, row.platform);
+    }
+    return [...byId.entries()]
+      .map(([platform_id, platform]) => ({ platform_id, platform }))
+      .sort((a, b) => a.platform.localeCompare(b.platform));
+  })();
+
   // Unique non-null tuning modes - only show filter when multiple modes present.
   const tuningModes = [
     ...new Set(allPlatformResults.map((r) => r.tuning_mode).filter((m): m is string => m !== null)),
@@ -249,7 +263,36 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
       <div class="mt-6 mb-6 flex flex-wrap items-center justify-between gap-4">
         <h1 class="text-3xl font-bold text-[var(--bb-data-fg-primary)]">{platformDisplayName} Results</h1>
 
-        <div class="flex items-center gap-4">
+        <div class="flex flex-wrap items-center gap-4">
+          {/* Platform switcher (sibling pivot). Tuning is platform-specific
+              so we do not preserve it across the switch. */}
+          {platformOptions.length > 1 && (
+            <div class="flex items-center gap-2">
+              <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="platform-switcher">
+                Platform:
+              </label>
+              <select
+                id="platform-switcher"
+                data-testid="platform-switcher"
+                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1.5 text-sm shadow-sm"
+                value={platform}
+                onChange={(event) => {
+                  const next = (event.target as HTMLSelectElement).value;
+                  if (next === platform) return;
+                  route(`/results/p/${next}/`);
+                }}
+              >
+                {platformOptions.map((option) => (
+                  <option key={option.platform_id} value={option.platform_id}>
+                    {option.platform}
+                  </option>
+                ))}
+                {!platformOptions.some((option) => option.platform_id === platform) && (
+                  <option value={platform}>{platformDisplayName}</option>
+                )}
+              </select>
+            </div>
+          )}
           {tuningModes.length > 1 && (
             <div class="flex items-center gap-2">
               <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="tuning-filter">

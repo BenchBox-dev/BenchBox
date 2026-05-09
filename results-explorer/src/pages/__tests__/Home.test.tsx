@@ -405,8 +405,8 @@ describe("Home", () => {
     expect(within(activeSummary).getByText("All scales")).toBeTruthy();
     expect(within(activeSummary).getByText("All phases")).toBeTruthy();
     expectDocumentOrder(headline, activeSummary);
-    expectDocumentOrder(activeSummary, leaderboard);
-    expectDocumentOrder(leaderboard, selector);
+    expectDocumentOrder(activeSummary, selector);
+    expectDocumentOrder(selector, leaderboard);
     expectDocumentOrder(leaderboard, workflow);
     expectDocumentOrder(leaderboard, recentHeading);
   });

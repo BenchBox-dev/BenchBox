@@ -1,10 +1,11 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
 import type { RoutableProps } from "preact-router";
+import { route } from "preact-router";
 import type { BenchmarkSummary, PlatformRow, SortDirection, SortState } from "@/types";
 import type { ResultRow } from "@/lib/duckdbQueries";
 import { getBenchmarkSummaryFromDuckDB, listResults } from "@/lib/duckdbQueries";
-import { humanizeBenchmark, isKnownBenchmark, fmtScore, fmtGeomean, errMsg, complianceLabel } from "@/utils";
+import { BENCHMARK_LABELS, humanizeBenchmark, isKnownBenchmark, fmtScore, fmtGeomean, errMsg, complianceLabel } from "@/utils";
 import { facetsToWhereClause, useFacetState, type FacetKey, type FacetState } from "@/lib/facetModel";
 import { hasActiveFacets, matchesFacetRow, singleFacetValue } from "@/lib/facetMatching";
 import { buildCompareUrl, compareIdForRow, displayCompareId } from "@/lib/resultLinks";
@@ -76,6 +77,27 @@ function benchmarkContextNote(benchmark: string): string | null {
     return "Star Schema Benchmark (SSB): the route keeps the canonical star_schema slug while the published benchmark label uses SSB.";
   }
   return null;
+}
+
+/**
+ * Distinct benchmark slugs paired with display labels for the in-page
+ * sibling switcher. Two slugs sometimes share a display label
+ * (`star_schema` and `ssb` both render "SSB"; `tsbs-devops` and
+ * `tsbs_devops` both render "TSBS DevOps") because legacy and
+ * canonical routes coexist. We keep the first slug encountered so the
+ * switcher lists each benchmark family exactly once and the canonical
+ * route wins (BENCHMARK_LABELS is declared with the canonical slug
+ * first).
+ */
+function uniqueBenchmarkOptions(): { value: string; label: string }[] {
+  const seen = new Set<string>();
+  const options: { value: string; label: string }[] = [];
+  for (const [value, label] of Object.entries(BENCHMARK_LABELS)) {
+    if (seen.has(label)) continue;
+    seen.add(label);
+    options.push({ value, label });
+  }
+  return options.sort((a, b) => a.label.localeCompare(b.label));
 }
 
 function benchmarkCompareGuidanceMessage(
@@ -372,6 +394,39 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
         <h1 class="text-3xl font-bold text-[var(--bb-data-fg-primary)]">{title} Results</h1>
 
         <div class="flex flex-wrap items-center gap-3">
+          {/* Benchmark switcher (sibling pivot). View mode is the only piece
+              of UI state that survives the switch; scale, phase, and tuning
+              are benchmark-specific so we drop them rather than risk an
+              empty page on the destination. */}
+          <div class="flex items-center gap-2">
+            <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="benchmark-switcher">
+              Benchmark:
+            </label>
+            <select
+              id="benchmark-switcher"
+              data-testid="benchmark-switcher"
+              class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1.5 text-sm shadow-sm"
+              value={benchmark}
+              onChange={(event) => {
+                const next = (event.target as HTMLSelectElement).value;
+                if (next === benchmark) return;
+                const params = new URLSearchParams();
+                if (viewMode !== "matrix") params.set("view", viewMode);
+                const query = params.toString();
+                route(`/results/${next}/${query ? `?${query}` : ""}`);
+              }}
+            >
+              {uniqueBenchmarkOptions().map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+              {!Object.prototype.hasOwnProperty.call(BENCHMARK_LABELS, benchmark) && (
+                <option value={benchmark}>{title}</option>
+              )}
+            </select>
+          </div>
+
           {/* Scale factor filter */}
           {scaleFactors.length > 1 && (
             <div class="flex items-center gap-2">

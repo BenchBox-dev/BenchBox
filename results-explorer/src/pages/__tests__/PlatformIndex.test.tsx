@@ -6,7 +6,7 @@
  * that default switches direction on repeated clicks of the same key.
  */
 
-import { render, screen, fireEvent, waitFor } from "@testing-library/preact";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/preact";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { PlatformIndexRowRow } from "@/lib/duckdbQueries";
 
@@ -15,6 +15,14 @@ vi.mock("@/lib/duckdbQueries", async () => {
   return {
     ...actual,
     getPlatformIndexRows: vi.fn(),
+  };
+});
+
+vi.mock("preact-router", async () => {
+  const actual = await vi.importActual<typeof import("preact-router")>("preact-router");
+  return {
+    ...actual,
+    route: vi.fn(),
   };
 });
 
@@ -102,6 +110,29 @@ describe("PlatformIndex - sortable table headers", () => {
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
     await waitFor(() => expect(document.title).toBe("DuckDB · BenchBox Results"));
     expect(getRowOrder(container)).toEqual(["r-tpch-fast", "r-ssb-mid", "r-tpch-slow", "r-null-geo"]);
+  });
+
+  it("renders a Platform switcher that routes to a sibling without preserving tuning", async () => {
+    const preactRouter = await import("preact-router");
+    const routeMock = vi.mocked(preactRouter.route);
+    routeMock.mockClear();
+
+    const multiPlatformRows = [
+      ...ROWS,
+      makeRow({ result_id: "r-pg", short_id: "pg00000a", platform_id: "postgres", platform: "Postgres" }),
+    ];
+    vi.mocked(getPlatformIndexRows).mockResolvedValue(multiPlatformRows);
+
+    render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    const switcher = screen.getByTestId("platform-switcher") as HTMLSelectElement;
+    expect(switcher.value).toBe("duckdb");
+    expect(within(switcher).getByRole("option", { name: "Postgres" })).toBeTruthy();
+
+    fireEvent.change(switcher, { target: { value: "postgres" } });
+    expect(routeMock).toHaveBeenCalledTimes(1);
+    expect(routeMock).toHaveBeenCalledWith("/results/p/postgres/");
   });
 
   it("shows persistent compare guidance and cohort labels before selection", async () => {

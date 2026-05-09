@@ -9,7 +9,7 @@
  *   (e) axe-core: no serious/critical violations on a fully-loaded matrix
  */
 
-import { render, screen, fireEvent, waitFor } from "@testing-library/preact";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/preact";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { BenchmarkSummary } from "@/types";
 import { expectNoAxeViolations } from "@/testing/axe-helper";
@@ -21,6 +21,14 @@ import { expectNoAxeViolations } from "@/testing/axe-helper";
 vi.mock("@/db", () => ({
   queryRows: vi.fn(),
 }));
+
+vi.mock("preact-router", async () => {
+  const actual = await vi.importActual<typeof import("preact-router")>("preact-router");
+  return {
+    ...actual,
+    route: vi.fn(),
+  };
+});
 
 vi.mock("@/components/QueryHeatmap", async () => {
   const actual = await vi.importActual<typeof import("@/components/QueryHeatmap")>("@/components/QueryHeatmap");
@@ -382,6 +390,25 @@ describe("BenchmarkIndex", () => {
     expect(guidance.textContent).toContain("Select two or more platforms");
     const disabledAction = screen.getByRole("button", { name: "Select 2 comparable results" }) as HTMLButtonElement;
     expect(disabledAction.disabled).toBe(true);
+  });
+
+  it("renders a Benchmark switcher that routes to a sibling and clears benchmark-specific params", async () => {
+    const preactRouter = await import("preact-router");
+    const routeMock = vi.mocked(preactRouter.route);
+    routeMock.mockClear();
+    window.history.replaceState(null, "", "/results/tpch/?sf=10&phase=power&view=ranks");
+
+    render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => expect(screen.getByText("TPC-H Results")).toBeTruthy());
+
+    const switcher = screen.getByTestId("benchmark-switcher") as HTMLSelectElement;
+    expect(switcher.value).toBe("tpch");
+    expect(within(switcher).getByRole("option", { name: "ClickBench" })).toBeTruthy();
+    expect(within(switcher).getByRole("option", { name: "TPC-H" })).toBeTruthy();
+
+    fireEvent.change(switcher, { target: { value: "clickbench" } });
+    expect(routeMock).toHaveBeenCalledTimes(1);
+    expect(routeMock).toHaveBeenCalledWith("/results/clickbench/?view=ranks");
   });
 
   it("labels the Star Schema Benchmark and SSB equivalence explicitly", async () => {
