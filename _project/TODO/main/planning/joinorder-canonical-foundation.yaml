@@ -1,0 +1,444 @@
+id: joinorder-canonical-foundation
+title: "joinorder canonical IMDb 2013 — Foundation & archive build (Step 1, part 1 of 2)"
+worktree: main
+priority: High
+status: Not Started
+category: Core Functionality
+
+description: |
+  Step 1 of the dual-track JOB strategy responding to GitHub issue #289
+  (https://github.com/joeharris76/BenchBox/issues/289). Splits into two
+  TODOs: this one (foundation + archive build) and
+  `joinorder-canonical-cutover` (code wiring + queries + docs + ship).
+
+  Issue #289 documents that BenchBox's `joinorder` benchmark generates
+  uniformly-random synthetic data, which destroys the cardinality-skew
+  signal JOB was designed to expose (Leis et al. PVLDB 2015). A probe
+  by an external reviewer confirmed 10/13 embedded queries return zero
+  rows on synthetic data because columns like `movie_companies.note`
+  and `cast_info.note` are always NULL, while queries filter on
+  specific note values like `'co-production'`, `'(USA)'`, `'voice'`.
+
+  This TODO produces the artifacts that the cutover TODO consumes:
+    1. Reusable data-fetch / scale-factor / dataset-versioning infrastructure
+       designed for reuse by future real-data benchmarks (ClickBench, etc.).
+    2. A bit-reproducible Parquet archive of the May 2013 IMDb snapshot
+       used by the JOB paper, sourced from Harvard Dataverse pg_dump
+       (doi:10.7910/DVN/2QYZBT), with full provenance and validation.
+    3. Reference cardinalities for all 113 canonical JOB queries,
+       computed via PostgreSQL on the converted data — the oracle for
+       the "do queries actually work" validator.
+    4. A DRAFT GitHub Release staging the archive at tag
+       `data/joinorder-imdb-2013-v1`. Promoted to published only by
+       the cutover TODO, after the code path is verified end-to-end.
+
+  Cutover TODO is gated on this one: the manifest, the archive URL,
+  and the reusable module skeletons are all consumed downstream.
+
+  Decisions locked in (from planning):
+    - Source: Harvard Dataverse pg_dump (institutional stability + DOI).
+    - Hosting: GitHub Releases.
+    - License posture: ship `DATA-LICENSE.md` per benchmark with IMDb
+      attribution + Boncz-style scope clause + takedown commitment.
+      No click-through (matches JOB ecosystem precedent).
+    - Tiny canonical fixture (~1MB): checked into repo for unit tests;
+      regenerated deterministically from full canonical via the build
+      pipeline.
+
+work:
+  - id: w1
+    summary: "Write design doc: reusable foundations (scale-factor gate, data-fetch infra, dataset-versioning, registry surface field)"
+    status: pending
+    notes: |
+      Output: `_project/design/joinorder-step1-foundations.md`
+      Sections:
+        1. Scale-factor enforcement gate
+           - Survey current scale_factor plumbing in benchbox/core/
+             (find the central runner entry point)
+           - Pattern: `validate_scale_factor(benchmark, sf, registry)`
+             raises `ScaleFactorNotSupportedError` when sf not in
+             registry[benchmark].scale_options
+           - Reusable across benchmarks (TPC-DS has scale constraints too)
+        2. Data-fetch infrastructure (`benchbox/core/data_fetch/`)
+           - Per-benchmark `data_manifest.toml` schema (URL, sha256,
+             file layout, version, license file)
+           - Cache: ${BENCHBOX_DATA_CACHE:-~/.cache/benchbox/data}/
+             {benchmark}/{version}/
+           - User-supplied opt-out: `--data-path` CLI flag and
+             `BENCHBOX_DATA_PATH_<BENCHMARK>` env var
+           - Failure modes documented: ChecksumMismatchError,
+             ManifestValidationError, DataFetchError
+        3. Dataset versioning in result bundles
+           - New manifest field `dataset_version` = sha256 of
+             data_manifest.toml; null for purely-generated benchmarks
+           - Surfaced at data layer only — explorer requires zero UI changes
+        4. Registry `surface` field
+           - "public" | "internal" — internal hidden from explorer
+           - joinorder_synthetic uses "internal" (per Joe: must not be
+             visible)
+
+  - id: w2
+    summary: "Build reusable data-fetch module skeleton in benchbox/core/data_fetch/"
+    status: pending
+    needs: [w1]
+    notes: |
+      Module structure (minimum viable, fully tested):
+        benchbox/core/data_fetch/__init__.py    # public API: fetch_data()
+        benchbox/core/data_fetch/manifest.py    # parse data_manifest.toml
+        benchbox/core/data_fetch/manager.py     # orchestrate fetch/cache/validate
+        benchbox/core/data_fetch/downloader.py  # HTTP GET + progress + resume + retry
+        benchbox/core/data_fetch/cache.py       # cache location + lock files
+        benchbox/core/data_fetch/errors.py      # exception hierarchy
+
+      Tests (mocked HTTP):
+        tests/unit/core/data_fetch/test_manifest.py
+        tests/unit/core/data_fetch/test_manager.py
+        tests/unit/core/data_fetch/test_downloader.py
+        tests/unit/core/data_fetch/test_cache.py
+
+      Skeleton is benchmark-agnostic; no joinorder-specific code in
+      this module. Joinorder wiring happens in the cutover TODO.
+
+  - id: w3
+    summary: "Add `surface` field to benchmark registry schema and reusable scale-factor enforcement"
+    status: pending
+    needs: [w1]
+    notes: |
+      Two reusable changes in benchbox/core/benchmark_registry.py:
+        - Add `surface: "public" | "internal"` field; default "public"
+        - Add `validate_scale_factor()` helper used by the runner
+          before generator/load-path
+
+      Also wire the runner to call validate_scale_factor() before any
+      data-generating step. The runner location should be discovered
+      during w1.
+
+      Tests:
+        tests/unit/core/test_scale_factor_validation.py
+          - Parametrized: joinorder is sf=1-only; tpch/tpcds accept
+            their declared ranges; arbitrary sf rejected for joinorder
+        tests/unit/core/test_registry_surface_field.py
+          - "public" benchmarks visible via the result-publisher path
+          - "internal" benchmarks hidden from the same path
+          - Existing benchmarks all default to "public"
+
+  - id: w4
+    summary: "Build offline conversion pipeline: pg_dump → Postgres restore → Parquet"
+    status: pending
+    needs: [w1]
+    notes: |
+      Script: `_project/scripts/build_joinorder_data.py`
+
+      Pipeline (run once on Joe's machine, NOT in CI):
+        1. Download Harvard Dataverse pg_dump
+           (doi:10.7910/DVN/2QYZBT); record upstream sha256
+        2. Restore into ephemeral Postgres container (docker run)
+        3. For each of 21 tables: COPY to CSV with
+           FORMAT csv, ENCODING UTF8 (no NFC/NFD normalization)
+        4. CSV → Parquet via DuckDB:
+           COPY ... TO '...parquet' (FORMAT 'parquet',
+           COMPRESSION 'zstd', ROW_GROUP_SIZE 100000)
+        5. Per-table: row count, sha256, schema (column → type)
+
+      Provenance embedded in `data_manifest.toml`:
+        - script git SHA, DuckDB version, Postgres version
+        - source DOI, retrieval timestamp, upstream pg_dump sha256
+        - per-table file path, row count, sha256, schema
+        - aggregate sha256 (over all per-file hashes) → dataset_version
+
+      Dependencies isolated in `_project/scripts/pyproject.toml`
+      (already established pattern in this repo).
+
+  - id: w5
+    summary: "Encoding round-trip gate (build-time pipeline assertion)"
+    status: pending
+    needs: [w4]
+    notes: |
+      After Parquet conversion, the pipeline MUST assert encoding
+      fidelity. Sample the following classes of rows:
+        - non-ASCII names from `name`, `aka_name` (e.g., accented chars,
+          ideographic chars in actor names)
+        - non-ASCII titles from `title`, `aka_title`
+        - punctuation-heavy notes from `cast_info.note`,
+          `movie_companies.note`
+
+      Round-trip test:
+        Parquet → DuckDB COPY TO csv → COPY back to Postgres TEMP table
+        → assert byte-identical to the original COPY output
+
+      Pipeline aborts (non-zero exit) if any sampled row differs.
+      This catches silent NFC/NFD normalization or encoding drift in
+      the DuckDB writer. Sample size: 100 rows per table from the
+      canonical-tricky set above.
+
+  - id: w6
+    summary: "Predicate-domain validation gate (no-empty-query assertion)"
+    status: pending
+    needs: [w4]
+    notes: |
+      The defect that makes synthetic JOB worthless is that
+      `movie_companies.note` and `cast_info.note` are always NULL,
+      so queries filtering on those values match nothing. The
+      pipeline MUST assert this never happens for canonical data.
+
+      For each of the 113 canonical JOB queries:
+        - Parse the query for predicates on key string columns
+        - Assert there is >= 1 row in the converted data that
+          satisfies that predicate (compute via Postgres)
+        - Aggregate: every query has a non-empty result on canonical data
+
+      Per-column null-fraction assertions against published reference
+      values (Leis 2015, Table 3, and pg_dump-derived counts):
+        - movie_companies.note: NULL fraction roughly 0.6
+        - cast_info.note: NULL fraction roughly 0.85
+        - title.episode_of_id: NULL fraction roughly 0.95
+      Concrete numbers TBD during w4 from the actual restore; bind
+      them then. Pipeline aborts if any column drifts ±5%.
+
+  - id: w7
+    summary: "Compute reference cardinalities for all 113 queries (PostgreSQL oracle)"
+    status: pending
+    needs: [w4, w6]
+    notes: |
+      Source queries: gregrahn/join-order-benchmark canonical 113
+      (1a-33c), checked-in to a build-input directory (NOT yet
+      committed to benchbox/core/joinorder/queries.py — that is the
+      cutover TODO's w7).
+
+      For each query, run against the restored Postgres on the
+      canonical converted data and capture:
+        - row_count (integer)
+        - first_row_sha256 (sha256 of the canonical-ordered first row)
+        - postgres_version
+        - query_id (canonical "1a", "33c" etc.)
+
+      Output: `_project/joinorder/reference_cardinalities.json`
+      (committed to repo). Schema:
+        {
+          "postgres_version": "16.2",
+          "dataset_version": "<sha256>",
+          "queries": {
+            "1a": {"row_count": ..., "first_row_sha256": "..."},
+            ...
+          }
+        }
+
+      Cross-check at least the queries for which the Leis 2015 paper
+      published row counts; flag mismatches in the build log.
+
+  - id: w8
+    summary: "Package archive tarball with manifest + license + checksums"
+    status: pending
+    needs: [w4, w5, w6, w7]
+    notes: |
+      Tarball: `joinorder-imdb-2013-v1.tar.zst`
+      Contents:
+        - 21 *.parquet files
+        - data_manifest.toml (with all provenance fields)
+        - DATA-LICENSE.md (template content, finalized in cutover TODO)
+        - checksums.txt (sha256 per Parquet)
+        - reference_cardinalities.json
+
+      Tarball-level sha256 written separately as
+      `joinorder-imdb-2013-v1.tar.zst.sha256`.
+
+      Tiny fixture: re-run pipeline with sample of full canonical
+      (~50 rows per table, predicate-satisfying) → produces tiny
+      Parquet set checked into `tests/fixtures/joinorder_canonical_tiny/`.
+      Same provenance trail (manifest with dataset_version distinct
+      from full canonical).
+
+  - id: w9
+    summary: "Stage as DRAFT GitHub Release on tag `data/joinorder-imdb-2013-v1`"
+    status: pending
+    needs: [w8]
+    notes: |
+      `gh release create data/joinorder-imdb-2013-v1 \
+        --draft \
+        --title "JoinOrder canonical IMDb 2013 dataset (v1)" \
+        --notes-file _project/joinorder/release-notes.md \
+        joinorder-imdb-2013-v1.tar.zst \
+        joinorder-imdb-2013-v1.tar.zst.sha256`
+
+      Release stays DRAFT until cutover TODO's UAT smoke test
+      verifies the live-download path end-to-end. Promotion to
+      published is done in the cutover TODO's final phase.
+
+      Release notes (`_project/joinorder/release-notes.md`) include:
+        - Provenance (Harvard Dataverse DOI, May 2013 IMDb snapshot)
+        - IMDb attribution string verbatim
+        - Boncz-style scope clause
+        - BenchBox redistribution disclaimer + takedown contact
+        - Per-table row counts and sha256s
+        - Tarball-level sha256
+
+  - id: w10
+    summary: "Add `data_manifest.toml` for joinorder pointing at the staged Release URL"
+    status: pending
+    needs: [w9]
+    notes: |
+      File: `benchbox/core/joinorder/data_manifest.toml`
+      Fields populated from w8 manifest output. URL points at the
+      DRAFT Release asset (which is fetchable via the API even while
+      draft, with a token). The cutover TODO's UAT step verifies
+      the URL resolves end-to-end.
+
+      Add `joinorder-canonical-foundation` checkpoint to commit
+      message body so the cutover TODO can grep for it later.
+
+verification:
+  - description: "Foundation design doc exists with all four sections"
+    command: "test -f _project/design/joinorder-step1-foundations.md && grep -cE '^## (Scale-factor|Data-fetch|Dataset versioning|Registry surface)' _project/design/joinorder-step1-foundations.md"
+    expected_output: ">= 4"
+  - description: "data_fetch module skeleton imports cleanly and tests pass"
+    command: "uv run -- python -c 'from benchbox.core.data_fetch import fetch_data' && uv run -- python -m pytest tests/unit/core/data_fetch/ -q"
+    expected_output: "no import error, all tests pass"
+  - description: "scale_factor validation rejects sf!=1 for joinorder"
+    command: "uv run -- python -m pytest tests/unit/core/test_scale_factor_validation.py::test_joinorder_rejects_non_unit_scale -q"
+    expected_output: "1 passed"
+  - description: "Build pipeline produces archive with all 21 Parquets + manifest + checksums + reference cardinalities"
+    command: "tar -tf joinorder-imdb-2013-v1.tar.zst | sort | grep -cE '\\.parquet$|^data_manifest\\.toml$|^DATA-LICENSE\\.md$|^checksums\\.txt$|^reference_cardinalities\\.json$'"
+    expected_output: ">= 25 (21 parquets + 4 metadata files)"
+  - description: "Encoding round-trip gate is enforced"
+    command: "grep -cE 'def (test_)?encoding_round_trip|encoding[_ ]round[_ ]trip' _project/scripts/build_joinorder_data.py"
+    expected_output: ">= 1"
+  - description: "Reference cardinalities cover all 113 queries"
+    command: "uv run -- python -c 'import json; d = json.load(open(\"_project/joinorder/reference_cardinalities.json\")); print(len(d[\"queries\"]))'"
+    expected_output: "113"
+  - description: "DRAFT GitHub Release exists with archive asset"
+    command: "gh release view data/joinorder-imdb-2013-v1 --json isDraft,assets --jq '{draft: .isDraft, asset_count: (.assets | length)}'"
+    expected_output: "{\"draft\": true, \"asset_count\": 2}"
+  - description: "Tiny fixture is checked in and predicate-satisfying"
+    command: "ls tests/fixtures/joinorder_canonical_tiny/*.parquet | wc -l"
+    expected_output: "21"
+  - description: "data_manifest.toml is wired up for joinorder"
+    command: "test -f benchbox/core/joinorder/data_manifest.toml && grep -cE '^url|^sha256|^version|^dataset_version' benchbox/core/joinorder/data_manifest.toml"
+    expected_output: ">= 4"
+
+must_preserve:
+  - "Existing benchmarks (tpch, tpcds, etc.) continue to accept their declared scale_factor ranges — the new validate_scale_factor() must read each benchmark's scale_options from the registry, not hard-code joinorder"
+  - "Existing benchmark_registry.py entries for non-joinorder benchmarks default to surface=public — no behavior change for them"
+  - "result-publisher continues to publish all current public bundles (no joinorder bundles touched in this TODO; that's the cutover TODO)"
+  - "All current generator-based benchmark code paths in benchbox/core/joinorder/ remain untouched in this TODO — rename happens in the cutover TODO"
+  - "data_fetch module is fully testable without network access — all tests use mocked HTTP"
+
+approach: |
+  This TODO is foundation + offline data prep. Most of the work
+  happens outside the running BenchBox process: a build pipeline
+  that runs once, produces an archive, stages a draft Release.
+
+  Sequence the work to minimize rework:
+    1. Design doc first (w1) — anchors all subsequent decisions
+    2. In parallel: data-fetch module (w2), registry+enforcement (w3),
+       and conversion pipeline (w4)
+    3. Pipeline gates (w5, w6) added before reference cardinalities
+       (w7) so we never compute reference values on broken data
+    4. Tarball packaging (w8) and Release staging (w9, w10) come last
+
+  For the build pipeline (w4-w8), use Docker-Postgres for
+  reproducibility. Document the exact image tag in
+  `data_manifest.toml`. The pipeline script must be idempotent and
+  re-runnable — if Joe needs to rebuild from a clean source 6 months
+  from now, the same script + same upstream pg_dump must produce a
+  byte-identical archive (modulo timestamps in the manifest).
+
+  Reusable infrastructure: design every module in `benchbox/core/data_fetch/`
+  to be benchmark-agnostic. The cutover TODO will instantiate it for
+  joinorder. Future TODOs will instantiate for ClickBench, etc.
+
+anti_patterns:
+  - "DO NOT compute reference cardinalities by re-running the queries on the BenchBox-converted Parquet via DuckDB — because that loses the independent-oracle property — use Postgres on the restored pg_dump as the oracle, then validate that DuckDB on the converted Parquet matches"
+  - "DO NOT skip the encoding round-trip gate — because silent NFC/NFD normalization in the Parquet writer will break predicate matching on accented names without producing any error message — fail loud at build time"
+  - "DO NOT hard-code joinorder-specific logic in benchbox/core/data_fetch/ — because the whole point is reuse for ClickBench / future real-data benchmarks — keep the module benchmark-agnostic; joinorder-specific config goes in benchbox/core/joinorder/data_manifest.toml"
+  - "DO NOT commit the full canonical Parquet archive to git — because it is ~1.5 GB and slows every clone — only the tiny fixture (~1MB) is checked in; the full archive lives only on the GitHub Release"
+  - "DO NOT publish the GitHub Release as non-draft in this TODO — because the live URL is consumed by code that doesn't exist yet — staging stays draft until cutover TODO's UAT smoke test passes"
+  - "DO NOT add joinorder-specific exception classes — because the data_fetch infrastructure is meant for reuse — exceptions live in benchbox/core/data_fetch/errors.py and are benchmark-agnostic"
+
+scope_limit:
+  only_modify:
+    - "_project/design/joinorder-step1-foundations.md (new)"
+    - "_project/design/data-fetch-infra-reuse-guide.md (new — design doc consumed by Track-2 groundwork TODO)"
+    - "_project/scripts/build_joinorder_data.py (new)"
+    - "_project/scripts/pyproject.toml (add deps if needed)"
+    - "_project/joinorder/reference_cardinalities.json (new)"
+    - "_project/joinorder/release-notes.md (new)"
+    - "benchbox/core/data_fetch/ (new module)"
+    - "benchbox/core/benchmark_registry.py (add `surface` field + scale validation hook)"
+    - "benchbox/core/errors.py (add ScaleFactorNotSupportedError if not present)"
+    - "benchbox/core/joinorder/data_manifest.toml (new)"
+    - "tests/unit/core/data_fetch/ (new)"
+    - "tests/unit/core/test_scale_factor_validation.py (new)"
+    - "tests/unit/core/test_registry_surface_field.py (new)"
+    - "tests/fixtures/joinorder_canonical_tiny/ (new — 21 tiny Parquets)"
+  do_not_modify:
+    - "benchbox/core/joinorder/generator.py (rename happens in cutover TODO)"
+    - "benchbox/core/joinorder/benchmark.py (cutover TODO)"
+    - "benchbox/core/joinorder/queries.py (cutover TODO)"
+    - "benchbox/core/joinorder/dataframe_queries.py (cutover TODO)"
+    - "results-data/bundles/ (cutover TODO does the rename)"
+    - "docs/benchmarks/join-order.md (cutover TODO)"
+    - "README.md, CHANGELOG.md (cutover TODO)"
+
+deferred:
+  - summary: "Wire joinorder benchmark to canonical data path"
+    reason: "Cutover TODO (joinorder-canonical-cutover). This TODO produces the artifacts; cutover consumes them."
+  - summary: "Add the 100 missing SQL queries to benchbox/core/joinorder/queries.py"
+    reason: "Cutover TODO. Reference cardinalities for all 113 are computed here, but checked-in to the joinorder package only after the rename to keep the rename atomic."
+  - summary: "Bundle migration (re-tag joinorder_sf1_* → joinorder_synthetic_sf1_*)"
+    reason: "Cutover TODO. Rename only after `joinorder_synthetic` exists in the registry."
+  - summary: "Promote draft GitHub Release to published"
+    reason: "Cutover TODO's final phase, after end-to-end UAT smoke."
+  - summary: "Statistics-as-phase support in the benchmark phase model"
+    reason: "Step 2 (Track 2). This is the foundation for measuring statistics maintenance interplay; deferred to track2 groundwork TODO."
+
+metadata:
+  tags:
+    - joinorder
+    - issue-289
+    - canonical-imdb-2013
+    - data-fetch-infra
+    - reusable-infra
+  estimated_effort: "Large (1-2 weeks for the offline pipeline + design + skeleton)"
+  created_date: "2026-05-09"
+  last_updated: "2026-05-09"
+
+impact:
+  business_value: |
+    Restores `joinorder` as a credible JOB implementation in BenchBox.
+    Issue #289 documents that the current implementation produces
+    misleading results because uniformly-random data destroys the
+    cardinality-skew signal JOB was designed to expose. Anyone
+    publishing "JOB-on-engine-X via BenchBox" today is making claims
+    that don't transfer to literature. This is a benchmark-validity
+    defect, not a feature gap.
+
+    Reusable data-fetch infrastructure pays forward: ClickBench,
+    Wikipedia pageviews, GitHub Archive, and any future real-data
+    benchmark instantiates the same machinery rather than each one
+    solving downloader/manifest/cache from scratch.
+  user_impact: |
+    Users will need to acquire ~1.5 GB of canonical data on first
+    `joinorder` run (silent download by default, with `--data-path`
+    opt-out for air-gapped environments). In exchange they get
+    results that are bit-comparable across all BenchBox users and
+    against the academic literature.
+  technical_debt: |
+    Eliminates the "this is JOB" branding on a workload that isn't
+    JOB. Establishes patterns (data_manifest, dataset_version,
+    DATA-LICENSE.md, scale_factor enforcement) that will repeat for
+    every real-data benchmark.
+
+success_metrics:
+  - "Bit-reproducible Parquet archive built from Harvard Dataverse pg_dump (DOI:10.7910/DVN/2QYZBT) with full provenance manifest"
+  - "Reference cardinalities computed for all 113 canonical JOB queries via PostgreSQL oracle, committed to _project/joinorder/reference_cardinalities.json"
+  - "Reusable benchbox/core/data_fetch/ module: parses manifest, downloads with checksum validation, supports user-path opt-out, all tests pass without network access"
+  - "scale_factor enforcement is registry-driven and reusable: parametrized tests verify joinorder rejects sf!=1 and other benchmarks accept their declared ranges"
+  - "DRAFT GitHub Release at tag data/joinorder-imdb-2013-v1 stages the archive and is ready to be promoted by the cutover TODO"
+  - "Tiny canonical fixture (~1MB) is checked in and satisfies all 113 query predicates"
+  - "Build pipeline encoding round-trip gate is enforced and would fail on silent NFC/NFD normalization"
+
+open_questions:
+  - "Harvard Dataverse pg_dump may differ from CWI mirror. Plan: cross-check row counts against Leis 2015 Table 3 in w4; if material drift, document the chosen snapshot and rationale in the manifest."
+  - "DuckDB Parquet writer's encoding behavior on edge-case Unicode (combining characters, RTL text). Plan: w5 round-trip gate catches this; if it fails, fall back to Polars or pyarrow for the conversion step."
+  - "Whether tiny fixture should be deterministic regen vs frozen sha256 in repo. Plan: deterministic regen via the build pipeline, but the resulting Parquets are checked in (so unit tests don't need the full archive)."
+  - "Reference cardinality validation against Leis 2015 published numbers — only some queries have published row counts. Plan: w7 cross-checks where available; remaining queries rely on the Postgres-on-canonical oracle alone."
