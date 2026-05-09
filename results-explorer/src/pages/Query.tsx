@@ -351,6 +351,7 @@ export function Query(_: RoutableProps) {
     setVisibleColumns([...columnNames]);
   }
   function clearOptionalVisibleColumns() {
+    if (columnNames.length === 0) return;
     const required = columnNames.includes("result_id") ? ["result_id"] : columnNames.slice(0, 1);
     setVisibleColumns(required);
   }
