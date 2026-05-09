@@ -8,13 +8,13 @@ const DETAIL_ID = "tpch-duckdb-sf0.01-20260403-010ee756";
 // Desktop/wide use maxY = viewport.height (900); mobile/tablet use 1200 (1.33x).
 // PR #276 originally tightened the desktop intro spacing to fit
 // `query-results-panel.top` under 900 when `query-visible-columns` rendered
-// above the table at desktop via `lg:order-1`. PRs #277 and #285 dropped
+// above the table at desktop via `lg:order-1`. PRs #277 and #291 dropped
 // `lg:order-1` and reverted the tighten, so the panel now lands at ≈399 at
 // desktop with ≈501px of headroom. The historical TODOs document the full
 // trail: see DONE
 // `results-explorer-responsive-desktop-query-panel-regression` (PR #276) and
 // `results-explorer-query-visible-columns-desktop-order-vs-test-name`
-// (PR #285).
+// (PR #291).
 const VIEWPORTS = [
   { name: "mobile", width: 390, height: 900, maxY: 1200 },
   { name: "tablet", width: 768, height: 900, maxY: 1200 },
