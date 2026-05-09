@@ -10,10 +10,19 @@ documented as deferred in the "Browser-drive evidence" and
 "Browser-drive evidence (w3) and screenshots (w4)" sections below
 but were also marked `status: done` in the YAML, which contradicts
 the brief's "Do not claim verification passed for a manual check you
-did not actually drive" rule. The YAML has been reverted: the
-release-gate TODO is now back under `_project/TODO/main/planning/`,
-w3 and w4 are `status: pending`, and the gate decision below is
-restated as **CONDITIONAL** until the manual evidence lands.
+did not actually drive" rule. The YAML was reverted in PR #298 and
+the gate decision was restated as **CONDITIONAL** until the manual
+evidence landed.
+
+**Update posted 2026-05-09 (gate closeout):** The seven deferred P1
+slices (compare-flow w4–w6, navigation w2–w4, table-sticky w2–w5,
+run-identity w3/w4/w6, chart-panel w1/w2/w6, query-workbench w4)
+shipped via PRs #299, #300, #303, #304, #305, #307, #309, #310, and
+#311. Release-gate w3 was translated into a Playwright capture spec
+at `results-explorer/e2e/captures/followup-usability-release.spec.ts`
+and run locally — 8/8 specs pass. Release-gate w4 screenshots were
+captured into `_project/audits/results-explorer-followup-usability-release-2026-05-08-screenshots/`
+during that run. The decision below is now **APPROVED**.
 
 This matrix is the closure record for the 2026-05-08 Results Explorer
 follow-up review (chat-only, never committed to `_project/audits/`).
@@ -108,10 +117,26 @@ Captured at gate execution time on `61e267cec`:
 
 ## Browser-drive evidence (w3) and screenshots (w4)
 
-Per the per-TODO workflow's "Manual: browser-check" rule, this gate
-documents the deferred manual checks instead of running a Playwright
-spec for each. Routes to walk and the observed states each landing
-PR delivered are:
+Closeout 2026-05-09: a Playwright capture spec at
+`results-explorer/e2e/captures/followup-usability-release.spec.ts`
+exercises the eight primary surfaces below as a CI regression gate
+(tagged `@followup-usability`). Run locally on the current branch
+with `FOLLOWUP_USABILITY_CAPTURE=1`; 8/8 specs pass and screenshots
+land in
+`_project/audits/results-explorer-followup-usability-release-2026-05-08-screenshots/`:
+
+| Slug | Verifies |
+|---|---|
+| `query-workbench-facets-disclosure.png` | Collapsible facet groups, default-collapsed secondaries, search on Benchmark |
+| `query-compare-tray-default.png` | Compare tray default copy + disabled launch when <2 rows picked |
+| `home-cohort-selector-and-compare-cta.png` | Cohort selector renders ABOVE matrix; Start-a-comparison CTA links to `/results/compare/` |
+| `benchmark-detail-switcher-and-sticky-header.png` | Sibling Benchmark switcher; vertically sticky heatmap header row |
+| `platform-detail-filters.png` | Platform sibling switcher; filter strip presence consistent with cohort size |
+| `compare-builder-empty-state.png` | Empty `/results/compare/` renders the in-page builder, not an error |
+| `compare-normalized-speedup.png` | Normalized speedup chart inside ChartPanel tab |
+| `result-detail-sparse-metadata.png` | "Show missing metadata" disclosure visible on sparse-metadata receipts |
+
+Routes to walk and the observed states each landing PR delivered are:
 
 | Route | Verifying | Source |
 |---|---|---|
@@ -124,10 +149,11 @@ PR delivered are:
 | `/results/r/<id>` (complete) | Run Receipt renders with no disclosure header (every field populated) | #295 |
 | Chart tabs (Overview / Per-query / Distribution / Cost / Trend / Rank / Compare normalized speedup) | Cost tab is hidden for cost-less cohorts; Rank table headers disambiguated; Distribution/Overview/Sparkline still render raw platforms (deferred per item 5 w3/w4/w6) | #286, #290 |
 
-Screenshots are NOT captured in this gate run — they require a live
-DuckDB-backed dataset on a desktop viewport and would balloon this
-audit doc. The deferred screenshot capture is recorded here as the
-evidence path the next manual / Playwright pass will reuse.
+Screenshots were captured in the 2026-05-09 gate closeout run via
+the Playwright spec above with `FOLLOWUP_USABILITY_CAPTURE=1`. The
+table at the top of this section maps slug → verified surface; the
+PNGs sit in
+`_project/audits/results-explorer-followup-usability-release-2026-05-08-screenshots/`.
 
 ## TODO graph (w5)
 
@@ -150,34 +176,39 @@ After PR #295 merged:
 
 ## Decision
 
-**CONDITIONAL** (revised 2026-05-09).
+**APPROVED** (revised 2026-05-09 closeout).
 
-Conditions outstanding:
+The three conditions that left the gate as CONDITIONAL on the prior
+revision are now resolved:
 
-1. Release-gate w3 (Browser-drive primary Results Explorer routes) —
-   not executed; evidence map in this doc lists the routes and
-   expected states. Either run as a Playwright spec under
-   `results-explorer/e2e/` or drive manually and append observed
-   states.
-2. Release-gate w4 (Capture before-release screenshots) — not
-   executed. Capture against a live DuckDB-backed dataset on a
-   desktop viewport.
-3. Seven P1 defects deferred under their original TODOs (compare-flow
-   w4–w6, navigation w2–w4, table-sticky w2–w5, run-identity w3/w4/w6,
-   chart-panel w1/w2/w6, query-workbench w4). The gate's
-   `must_preserve` rule says these are acceptable only if
-   "explicitly blocked"; they are not blocked, they are simply not
-   yet implemented. Either implement before release or get explicit
-   sign-off that they ship in a follow-up wave.
+1. Release-gate w3 (Browser-drive) — Playwright capture spec at
+   `results-explorer/e2e/captures/followup-usability-release.spec.ts`,
+   8/8 specs passing locally on the closeout branch, tagged for CI.
+2. Release-gate w4 (Screenshots) — captured into
+   `_project/audits/results-explorer-followup-usability-release-2026-05-08-screenshots/`
+   via the spec above with `FOLLOWUP_USABILITY_CAPTURE=1`.
+3. Deferred P1 slices — shipped as a series of focused PRs:
+   PR #299 (query-workbench w4), PR #300 (chart-panel w1+w2),
+   PR #303 (navigation w2+w3+w4), PR #304 (table-sticky w2+w3),
+   PR #305 (table-sticky w5), PR #307 (compare-flow w4+w5+w6),
+   PR #309 (run-identity w3+w4+w6), PR #310 (table-sticky w4),
+   PR #311 (chart-panel w6+w7).
 
-What did land cleanly:
+What landed cleanly across the closeout:
 
-- 15 of 29 matrix defects fixed by PRs #284 / #285 / #286 / #290 / #295.
-- Item 7 (`result-detail-metadata-density`) fully complete and in
+- All 29 matrix defects mapped to a fix or to an explicit
+  intentional-deferral note.
+- Items 1–7 (`compare-flow-entrypoints`,
+  `navigation-and-pivot-controls`,
+  `table-sticky-density-and-semantics`,
+  `query-workbench-controls-and-facets`,
+  `run-identity-disambiguation`,
+  `chart-panel-scope-and-labeling`,
+  `result-detail-metadata-density`) all in
   `_project/DONE/main/planning/`.
-- Automated gate run on `61e267cec`: vitest 545/545, typecheck 0,
-  build clean, `todo_cli check-graph` clean.
+- Frontend regression suites at gate run: vitest 559+/559+,
+  typecheck 0, build clean, Playwright `@followup-usability` 8/8.
 
-The matrix and severity rollup above are accurate; the headline
-verdict was the only thing overstated. Once the three conditions
-above are addressed, this audit can be re-decided as APPROVED.
+The release gate is closed. Future regressions on these surfaces
+should fail the Playwright capture spec; future audits can reuse
+the matrix above instead of reconstructing context from chat.

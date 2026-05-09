@@ -14,6 +14,7 @@
 import type { ChartHistoricalEntry } from "@/lib/chartRegistry";
 import { useElementSize } from "@/lib/useElementSize";
 import { timeSeriesColor } from "@/lib/chartTheme";
+import { formatRunIdentitiesForCohort, type RunIdentitySource } from "@/lib/runIdentity";
 
 const LABEL_W = 58;
 const AXIS_H = 32;
@@ -73,8 +74,15 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
     byPlatform.set(e.platform_id, arr);
   }
 
+  // Build the per-platform series first, then disambiguate series labels
+  // when two platform_ids share a display name (e.g. two DataFusion
+  // tracks differing only by platform_id). RunIdentity natural qualifiers
+  // (driver_version, deployment, etc.) aren't carried on
+  // ChartHistoricalEntry, so the cohort-aware formatter falls through to
+  // its short result_id tiebreaker — better than two indistinguishable
+  // "DataFusion" entries in the legend.
   let colorIdx = 0;
-  const allSeries: Series[] = [];
+  const seriesDescriptors: { pid: string; firstEntry: ChartHistoricalEntry; points: SeriesPoint[] }[] = [];
   for (const [pid, platformEntries] of byPlatform) {
     const sorted = [...platformEntries].sort((a, b) => a.run_date.localeCompare(b.run_date));
     const points: SeriesPoint[] = sorted
@@ -83,15 +91,25 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
         return val !== null ? { resultId: e.result_id, date: e.run_date, value: val } : null;
       })
       .filter((p): p is SeriesPoint => p !== null);
-    if (points.length >= 2) {
-      allSeries.push({
-        platformId: pid,
-        label: sorted[0]?.platform ?? pid,
-        color: timeSeriesColor(colorIdx++),
-        points,
-      });
+    if (points.length >= 2 && sorted[0]) {
+      seriesDescriptors.push({ pid, firstEntry: sorted[0], points });
     }
   }
+  const cohortLabels = formatRunIdentitiesForCohort(
+    seriesDescriptors.map((descriptor): RunIdentitySource => ({
+      result_id: descriptor.firstEntry.result_id,
+      platform: descriptor.firstEntry.platform,
+      run_date: descriptor.firstEntry.run_date,
+      scale_factor: descriptor.firstEntry.scale_factor,
+    })),
+    "chart",
+  );
+  const allSeries: Series[] = seriesDescriptors.map((descriptor, idx) => ({
+    platformId: descriptor.pid,
+    label: cohortLabels[idx] ?? descriptor.firstEntry.platform,
+    color: timeSeriesColor(colorIdx++),
+    points: descriptor.points,
+  }));
 
   if (allSeries.length === 0) {
     return (

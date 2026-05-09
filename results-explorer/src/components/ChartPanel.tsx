@@ -25,6 +25,7 @@ import { CDFChart } from "@/components/CDFChart";
 import { RankTable } from "@/components/RankTable";
 import { fmtGeomean, fmtScore } from "@/utils";
 import { paletteColor } from "@/lib/chartTheme";
+import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
 import {
   buildLatencyBarScale,
   latencyScaleFraction,
@@ -336,19 +337,25 @@ function renderChart(
     case "comparison_bar":
       return compareGroups.length > 0 ? (
         <div class="space-y-4">
-          {summary && summary.platforms.length > 1 && (
-            <div class="flex flex-wrap gap-4">
-              {summary.platforms.map((platform, index) => (
-                <div key={platform.result_id} class="flex items-center gap-1.5 text-sm text-[var(--bb-data-fg-muted)]">
-                  <span
-                    class="inline-block h-3 w-3 rounded-sm"
-                    style={{ backgroundColor: paletteColor(index) }}
-                  />
-                  {platform.platform}
-                </div>
-              ))}
-            </div>
-          )}
+          {summary && summary.platforms.length > 1 && (() => {
+            const legendLabels = formatRunIdentitiesForCohort(
+              summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
+              "chart",
+            );
+            return (
+              <div class="flex flex-wrap gap-4">
+                {summary.platforms.map((platform, index) => (
+                  <div key={platform.result_id} class="flex items-center gap-1.5 text-sm text-[var(--bb-data-fg-muted)]">
+                    <span
+                      class="inline-block h-3 w-3 rounded-sm"
+                      style={{ backgroundColor: paletteColor(index) }}
+                    />
+                    {legendLabels[index] ?? platform.platform}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
           <GroupedQueryChart groups={compareGroups} />
         </div>
       ) : null;
@@ -371,22 +378,30 @@ function renderChart(
         />
       );
     case "percentile_ladder":
-      return summary ? (
-        <PercentileLadder
-          rows={summary.platforms.flatMap((platform, index) =>
-            platform.percentile_stats !== null
-              ? [
-                  {
-                    result_id: platform.result_id,
-                    platform: platform.platform,
-                    percentile_stats: platform.percentile_stats,
-                    colorIdx: index,
-                  },
-                ]
-              : [],
-          )}
-        />
-      ) : null;
+      if (!summary) return null;
+      {
+        const cohortLabels = formatRunIdentitiesForCohort(
+          summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
+          "chart",
+        );
+        return (
+          <PercentileLadder
+            rows={summary.platforms.flatMap((platform, index) =>
+              platform.percentile_stats !== null
+                ? [
+                    {
+                      result_id: platform.result_id,
+                      platform: platform.platform,
+                      displayLabel: cohortLabels[index] ?? platform.platform,
+                      percentile_stats: platform.percentile_stats,
+                      colorIdx: index,
+                    },
+                  ]
+                : [],
+            )}
+          />
+        );
+      }
     case "normalized_speedup":
       return summary ? (
         <NormalizedSpeedupChart
@@ -411,10 +426,21 @@ function renderChart(
 function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
   const [containerRef, { width: containerWidth }] = useElementSize();
   const width = Math.max(containerWidth, 400);
+  const cohortLabels = formatRunIdentitiesForCohort(
+    summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
+    "chart",
+  );
+  const labelByResultId = new Map(
+    summary.platforms.map((platform, index) => [platform.result_id, cohortLabels[index] ?? platform.platform]),
+  );
   const rows = summary.platforms
     .filter((platform) => platform.display_geomean_ms !== null && platform.display_geomean_ms > 0)
     .sort((a, b) => (a.display_geomean_ms ?? Infinity) - (b.display_geomean_ms ?? Infinity))
-    .map((platform, index) => ({ ...platform, color: paletteColor(index) }));
+    .map((platform, index) => ({
+      ...platform,
+      color: paletteColor(index),
+      displayLabel: labelByResultId.get(platform.result_id) ?? platform.platform,
+    }));
 
   if (rows.length === 0) {
     return (
@@ -475,7 +501,7 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
                 textAnchor="end"
                 style={{ fontSize: "11px", fill: "#374151" }}
               >
-                {row.platform.length > 22 ? `${row.platform.slice(0, 21)}…` : row.platform}
+                {row.displayLabel.length > 22 ? `${row.displayLabel.slice(0, 21)}…` : row.displayLabel}
               </text>
               <rect
                 x={labelWidth}
@@ -486,7 +512,7 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
                 opacity={0.85}
                 rx={2}
               >
-                <title>{`${row.platform}: ${fmtGeomean(row.display_geomean_ms)}`}</title>
+                <title>{`${row.displayLabel}: ${fmtGeomean(row.display_geomean_ms)}`}</title>
               </rect>
               {valueLabelPlacement.placement === "gutter" && (
                 <line

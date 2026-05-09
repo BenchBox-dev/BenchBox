@@ -9,6 +9,7 @@
 // Log2 scale with grid lines at 0.25×, 0.5×, 1×, 2×, 4×.
 // ---------------------------------------------------------------------------
 
+import { useState } from "preact/hooks";
 import { speedupRatio } from "@/lib/chartMath";
 import {
   FASTER_FILL,
@@ -41,6 +42,12 @@ export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props)
   // Use measured width; fall back to 600 if not yet observed (before first paint).
   const drawWidth = Math.max(containerWidth, 300);
 
+  // w6 (chart-panel-scope-and-labeling): default to "comparable only"
+  // so cohorts with hundreds of queries (e.g. read_primitives' ~149)
+  // don't dominate the chart with mostly-missing rows. Toggling
+  // exposes the partials when the user wants the wider context.
+  const [showComparableOnly, setShowComparableOnly] = useState(true);
+
   if (queries.length === 0 || results.length < 2) return null;
 
   const BAR_H = 16;
@@ -49,12 +56,9 @@ export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props)
   const AXIS_H = 24;
   const PADDING = 8;
 
-  const nonBaselineCount = results.length - 1;
-  const rowHeight = BAR_H * nonBaselineCount + BAR_GAP * (nonBaselineCount + 1);
-  const totalHeight = AXIS_H + queries.length * rowHeight + PADDING;
-
-  // Compute speedup entries
-  const entries: SpeedupEntry[] = queries.map(({ queryId, timings }) => {
+  // Compute speedup entries (full set first, then filter for the visible
+  // chart). Counts let the toggle disclose how many rows are hidden.
+  const allEntries: SpeedupEntry[] = queries.map(({ queryId, timings }) => {
     const baselineT = timings[baselineIdx];
     const baselineMs = baselineT && baselineT.ms > 0 ? baselineT.ms : null;
     const speedups = timings
@@ -62,6 +66,17 @@ export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props)
       .map((t) => speedupRatio(baselineMs, t?.ms ?? null));
     return { queryId, speedups };
   });
+  const fullyComparableEntries = allEntries.filter((entry) =>
+    entry.speedups.every((speedup) => speedup !== null),
+  );
+  const entries = showComparableOnly && fullyComparableEntries.length > 0
+    ? fullyComparableEntries
+    : allEntries;
+  const hiddenEntryCount = allEntries.length - entries.length;
+
+  const nonBaselineCount = results.length - 1;
+  const rowHeight = BAR_H * nonBaselineCount + BAR_GAP * (nonBaselineCount + 1);
+  const totalHeight = AXIS_H + entries.length * rowHeight + PADDING;
 
   const nonBaselineResults = results.filter((_, i) => i !== baselineIdx);
   const measuredSpeedups = entries
@@ -85,6 +100,25 @@ export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props)
 
   return (
     <div ref={containerRef} class="w-full overflow-x-auto">
+      {(hiddenEntryCount > 0 || (!showComparableOnly && fullyComparableEntries.length < allEntries.length)) && (
+        <div class="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--bb-data-fg-muted)]">
+          <span>
+            {showComparableOnly
+              ? `Showing ${entries.length} fully comparable queries (${hiddenEntryCount} hidden — at least one run missing data).`
+              : `Showing all ${entries.length} queries; ${allEntries.length - fullyComparableEntries.length} have missing data.`}
+          </span>
+          <label class="inline-flex items-center gap-1.5">
+            <input
+              type="checkbox"
+              checked={showComparableOnly}
+              onChange={(event) => setShowComparableOnly((event.target as HTMLInputElement).checked)}
+              data-testid="normalized-speedup-comparable-only-toggle"
+              class="h-3.5 w-3.5 rounded border-[var(--bb-data-border-strong)]"
+            />
+            <span>Comparable only</span>
+          </label>
+        </div>
+      )}
       <svg
         class="bb-chart-svg"
         width="100%"

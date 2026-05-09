@@ -224,6 +224,27 @@ beforeEach(() => {
 // develop until restored. See TODO
 // query-test-configure-visible-columns-failures.
 describe("Query", () => {
+  it("renders the compare tray and enables launch only after two compatible selections", async () => {
+    render(<Query />);
+    await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
+
+    const tray = screen.getByTestId("query-compare-tray");
+    expect(tray.textContent).toContain("Select two or more rows");
+    expect(screen.getByTestId("query-compare-launch-disabled")).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("query-compare-checkbox-r1"));
+    expect(screen.getByTestId("query-compare-tray").textContent).toContain("1 result selected");
+    expect(screen.getByTestId("query-compare-launch-disabled")).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("query-compare-checkbox-r2"));
+    expect(screen.getByTestId("query-compare-tray").textContent).toContain("2 results selected");
+    const launch = screen.getByTestId("query-compare-launch") as HTMLAnchorElement;
+    expect(launch.href).toContain("/results/compare?ids=");
+
+    fireEvent.click(screen.getByTestId("query-compare-clear"));
+    expect(screen.getByTestId("query-compare-tray").textContent).toContain("Select two or more rows");
+  });
+
   it("loads facet counts and table rows from DuckDB", async () => {
     render(<Query />);
     await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));

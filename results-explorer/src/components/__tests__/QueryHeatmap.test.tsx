@@ -163,6 +163,35 @@ describe("QueryHeatmap rendering", () => {
     expect(platformHeader.className).toMatch(/\bz-30\b/);
   });
 
+  it("renders the Receipt link inside the Trust column to keep the Platform cell identity-only", () => {
+    const { container } = render(<QueryHeatmap summary={makeSummary()} />);
+    const firstRow = container.querySelector("tbody tr");
+    expect(firstRow).not.toBeNull();
+    const cells = firstRow!.querySelectorAll('td[role="gridcell"]');
+    // Platform cell is the first frozen-left gridcell; Trust is the second.
+    expect(cells[0]?.textContent ?? "").not.toContain("Receipt");
+    expect(cells[1]?.textContent ?? "").toContain("Receipt");
+  });
+
+  it("renders an aria-described compliance marker instead of inline parenthetical text", () => {
+    const noncompliantSummary = makeSummary({
+      platforms: [
+        {
+          ...makeSummary().platforms[0]!,
+          result_id: "platform-noncompliant",
+          is_ranking_eligible: false,
+          compliance_class: "unofficial_subscale",
+        },
+      ],
+    });
+    render(<QueryHeatmap summary={noncompliantSummary} />);
+    const marker = screen.getByTestId("heatmap-compliance-marker-platform-noncompliant");
+    expect(marker.textContent).toBe("*");
+    expect(marker.getAttribute("title")).toContain("subscale");
+    expect(marker.getAttribute("aria-label")).toContain("subscale");
+    expect(screen.queryByText("(subscale)")).toBeNull();
+  });
+
   it("renders compact receipt links and validation status badges", () => {
     render(<QueryHeatmap summary={makeSummary()} />);
     const receiptLinks = screen.getAllByRole("link", { name: "Receipt →" }) as HTMLAnchorElement[];

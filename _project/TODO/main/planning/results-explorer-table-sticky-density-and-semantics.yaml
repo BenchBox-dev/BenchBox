@@ -79,13 +79,22 @@ work:
   - id: w4
     summary: "Compact provenance and trust/status table cells"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      Replace overloaded primary cells that stack platform name, official
-      status, version, receipt link, trust badge, and validation badge.
-      Keep the frozen region to platform identity plus essential metric, and
-      move receipt and secondary provenance into a compact action, tooltip,
-      or detail cell.
+      `QueryHeatmap.tsx` Platform cell is now identity-only: the
+      platform name, an optional `*` compliance marker (with `title`
+      and `aria-label` exposing the full label, e.g. "Compliance:
+      subscale"), and the platform_version on a second line. The
+      Receipt → link moved to the Trust column where it sits below
+      the trust + validation badges; the Trust column already
+      represents provenance, so the action is contextually adjacent
+      and the `must_preserve: Receipt/provenance access for every
+      row` rule is honored. The same compaction applies to the mobile
+      cards branch (`md:hidden`) so the small-screen layout stays in
+      sync. Tests in `src/components/__tests__/QueryHeatmap.test.tsx`
+      assert the Receipt link's new home and the compliance marker's
+      tooltip contract. Verification log:
+      _project/verification-logs/results-explorer-table-sticky-density-and-semantics/w4.log.
 
   - id: w5
     summary: "Add filters to large Platform detail tables"

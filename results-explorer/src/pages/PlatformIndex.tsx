@@ -315,6 +315,35 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     });
   }
 
+  // w6 (compare-flow-entrypoints): the cohort signature of the first
+  // selected row locks the rest of the table until the user deselects
+  // back to zero. Compatible siblings stay selectable; incompatible
+  // rows render their checkbox disabled with a reason tooltip.
+  const cohortLockSignature = (() => {
+    const firstSelectedId = [...selected][0];
+    if (firstSelectedId === undefined) return null;
+    const firstRow = allPlatformResults.find((row) => row.result_id === firstSelectedId);
+    if (!firstRow) return null;
+    return {
+      benchmark: firstRow.benchmark,
+      scale_factor: firstRow.scale_factor,
+      phase: firstRow.phase,
+      primary_metric: firstRow.primary_metric,
+    } as const;
+  })();
+  function cohortLockReason(row: PlatformIndexRowRow): string | undefined {
+    if (cohortLockSignature === null) return undefined;
+    if (selected.has(row.result_id)) return undefined;
+    const sig = cohortLockSignature;
+    const mismatches: string[] = [];
+    if (row.benchmark !== sig.benchmark) mismatches.push("benchmark");
+    if (row.scale_factor !== sig.scale_factor) mismatches.push("scale");
+    if (row.phase !== sig.phase) mismatches.push("phase");
+    if (row.primary_metric !== sig.primary_metric) mismatches.push("primary metric");
+    if (mismatches.length === 0) return undefined;
+    return `Locked: first selection is ${humanizeBenchmark(sig.benchmark)} SF ${sig.scale_factor} ${sig.phase}. This row differs by ${mismatches.join(", ")}.`;
+  }
+
   return (
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <Breadcrumb crumbs={[{ label: "Results", href: "/results/" }, { label: platformDisplayName }]} />
@@ -638,6 +667,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                   entry={r}
                   checked={selected.has(r.result_id)}
                   onToggle={() => toggleSelect(r.result_id)}
+                  disabledReason={cohortLockReason(r)}
                 />
               ))}
             </tbody>
@@ -802,9 +832,16 @@ interface PlatformRowProps {
   entry: PlatformIndexRowRow;
   checked: boolean;
   onToggle: () => void;
+  /**
+   * w6 (compare-flow-entrypoints): when a row outside the locked
+   * cohort signature is rendered, the checkbox is disabled with a
+   * tooltip rather than letting the user accumulate a mixed cohort
+   * that Compare would later have to suppress winner claims for.
+   */
+  disabledReason?: string;
 }
 
-function PlatformRow({ entry, checked, onToggle }: PlatformRowProps) {
+function PlatformRow({ entry, checked, onToggle, disabledReason }: PlatformRowProps) {
   return (
     <tr class="hover:bg-[var(--bb-surface-data-muted)]" data-testid={entry.result_id}>
       <td class="table-td">
@@ -812,8 +849,11 @@ function PlatformRow({ entry, checked, onToggle }: PlatformRowProps) {
           type="checkbox"
           checked={checked}
           onChange={onToggle}
-          class="h-4 w-4 rounded border-[var(--bb-data-border-strong)]"
+          disabled={Boolean(disabledReason)}
+          title={disabledReason}
+          class="h-4 w-4 rounded border-[var(--bb-data-border-strong)] disabled:cursor-not-allowed disabled:opacity-50"
           aria-label={`Select ${entry.result_id} for comparison`}
+          data-testid={`platform-compare-checkbox-${entry.result_id}`}
         />
       </td>
       <td class="table-td font-medium">{humanizeBenchmark(entry.benchmark)}</td>
