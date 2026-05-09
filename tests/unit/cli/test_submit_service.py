@@ -14,6 +14,7 @@ from benchbox.cli.submit_service import (
     make_idempotency_key,
     submit_hosted_bundle,
 )
+from benchbox.core.results.canonical_json import canonical_json_text
 
 pytestmark = [
     pytest.mark.unit,
@@ -113,6 +114,38 @@ def test_submit_hosted_bundle_posts_multipart_auth_and_idempotency(tmp_path: Pat
     assert b'name="manifest"; filename="tpch_duckdb.manifest.json"' in req.data
     assert b'name="companions[]"; filename="tpch_duckdb.plans.json"' in req.data
     assert b"secret-token" not in req.data
+
+
+def test_submit_hosted_bundle_writes_canonical_manifest_part(tmp_path: Path) -> None:
+    source, companions = _bundle(tmp_path)
+    manifest = {
+        "submitted_by": "José",
+        "submission_path": "hosted-service",
+        "bundle_hash": "a" * 64,
+        "bundle_file": "tpch_duckdb.json",
+    }
+    opener = FakeOpener(FakeResponse(200, {"status": "already_published", "public_result_id": "r1"}))
+
+    submit_hosted_bundle(
+        service_url="https://api.benchbox.dev/v1",
+        token="secret-token",
+        source_path=source,
+        companions=companions,
+        manifest=manifest,
+        bundle_hash="a" * 64,
+        visibility="public",
+        idempotency_key="fixed-key",
+        wait=True,
+        opener=opener,
+        sleep=lambda _seconds: None,
+    )
+
+    manifest_part = canonical_json_text(manifest).encode("utf-8")
+    req = opener.requests[0]
+    assert b'name="manifest"; filename="tpch_duckdb.manifest.json"' in req.data
+    assert manifest_part in req.data
+    assert b"Jos\\u00e9" not in req.data
+    assert req.data.index(b'"bundle_file"') < req.data.index(b'"submitted_by"')
 
 
 def test_submit_hosted_bundle_retries_upload_and_polls_to_publication(tmp_path: Path) -> None:
