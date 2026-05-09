@@ -90,12 +90,25 @@ work:
   - id: w5
     summary: "Add filters to large Platform detail tables"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
-      Add visible filters to Platform detail tables with >= 25 rows:
-      benchmark, scale, phase, date range, trust tier, validation status,
-      and metric contract. The count label must update from "Showing 70 of
-      70 results" to the filtered count and provide one-click reset.
+      `PlatformIndex.tsx` renders a "Platform result filters" section
+      (`data-testid="platform-detail-filters"`) above the compare-guidance
+      strip whenever `allPlatformResults.length >= 25`. Six selects map
+      to the FacetKeys already plumbed through `useFacetState` /
+      `matchesFacetRow`: benchmark, scale_factor, phase, trust_tier,
+      validation_status, and date_window. Option lists for the first five
+      come from the unfiltered cohort (so the user always sees every
+      available value). Date window uses the canonical four-bucket
+      DateWindowFacet set. A Reset button (only when at least one of the
+      six facets is active) clears them all in one action. The existing
+      "Showing X of Y results" line is unchanged structurally — it
+      already reads from `platformResults` (filtered length), so it
+      flips from "30 of 30" to the filtered count as soon as a select
+      fires. `metric_contract` is intentionally omitted (no single
+      facet for it; a follow-up if/when the corpus needs it).
+      Verification log:
+      _project/verification-logs/results-explorer-table-sticky-density-and-semantics/w5.log.
 
   - id: w6
     summary: "Make Query Workbench sort headers semantic and keyboard accessible"
