@@ -11,6 +11,7 @@
 import type { BenchmarkSummary } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
 import { PHASE_COLORS } from "@/lib/chartTheme";
+import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
 
 // Phase display names (bundle phase name → human-readable)
 const PHASE_LABELS: Record<string, string> = {
@@ -46,6 +47,13 @@ export function StackedPhase({ summary }: Props) {
   const [containerRef, { width: containerWidth }] = useElementSize();
   const w = Math.max(containerWidth, 400);
 
+  const cohortLabels = formatRunIdentitiesForCohort(
+    summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
+    "chart",
+  );
+  const rowLabelByResultId = new Map(
+    summary.platforms.map((platform, index) => [platform.result_id, cohortLabels[index] ?? platform.platform]),
+  );
   const rows = summary.platforms.filter(
     (p) => p.phase_durations && Object.keys(p.phase_durations).length > 0,
   );
@@ -106,7 +114,10 @@ export function StackedPhase({ summary }: Props) {
                 textAnchor="end"
                 style={{ fontSize: "11px", fill: "#374151" }}
               >
-                {row.platform.length > 22 ? `${row.platform.slice(0, 21)}…` : row.platform}
+                {(() => {
+                  const label = rowLabelByResultId.get(row.result_id) ?? row.platform;
+                  return label.length > 22 ? `${label.slice(0, 21)}…` : label;
+                })()}
               </text>
 
               {allPhases.map((phase) => {
