@@ -1,0 +1,82 @@
+# PR 4 — `results-explorer-chart-panel-scope-and-labeling` w0 audit
+
+Date: 2026-05-08
+Worktree base: feat/explorer-chart-panel on develop tip 24b8aaef2 (after
+                PR #284 merged; PR #285 and PR #286 still in review).
+Dep status:
+  - `results-explorer-compare-flow-entrypoints` partial — PR #284 merged.
+  - `results-explorer-run-identity-disambiguation` partial — PR #286 OPEN.
+
+The DAG lists item 6 as needing run-identity, but inspecting item 6's
+work units shows that w1, w3, w4, and w5 do not actually consume the
+runIdentity contract — they touch chart panel layout, cost-tab gating,
+heatmap legend copy, and high-contrast/reduced-color naming. Only w2
+and w6 plausibly interact with run-identity work, and those are
+deferred. Starting against the develop tip is therefore safe.
+
+## Per-work-unit verdicts
+
+w1 "Compact the chart panel header and tab band":
+   Confirmed (deferred). The compaction is a layout-only change in
+   ChartPanel.tsx; touching ~700 lines of layout code in this PR risks
+   regressions in chart rendering surfaces that are otherwise stable.
+   Defer to follow-up PR.
+
+w2 "Remove or rescope the duplicate Per-query heatmap":
+   Confirmed (deferred). The matrix-vs-charts duplication is a
+   BenchmarkIndex composition decision that benefits from a separate
+   focused diff.
+
+w3 "Hide or disable Cost tabs when no cost data exists":
+   Confirmed. `CHART_REGISTRY[cost_scatter].requires` does not include
+   `requiresCostData: true`, so the Cost tab renders for cohorts with
+   no normalized cost rows. The `hasCostData` capability already exists
+   (chartRegistry.ts:436); only the cost_scatter entry needs the gate.
+   Updating the existing ChartPanel test
+   "keeps the cost chart reachable so normalized-cost empty states are
+   visible" to assert the tab is HIDDEN under the new contract.
+
+w4 "Correct heatmap metric copy for latency cells":
+   Confirmed. QueryHeatmap.tsx:235-236 currently labels the legend
+   heading as "{primaryLabel}: {primaryDirectionLabel}" — i.e., "Power
+   Score: higher is better" for tpch — even though the rendered cells
+   are per-query latency. Will replace the heading with
+   "Per-query latency (ms): lower is better" and move the primary
+   score column's direction copy into the secondary description.
+
+w5 "Repair or rename high-contrast heatmap mode":
+   Confirmed. The toggle on `BenchmarkIndex.tsx:502` is labeled
+   "High contrast" but the implementation is grayscale lightness
+   (`heatmap-reduced-color` CSS class). Per TODO option (b), rename
+   the user-visible label to "Reduced color" and update the title
+   tooltip to match.
+
+w6 "Constrain long Compare normalized-speedup charts":
+   Confirmed (deferred). Adding a query filter or "show comparable
+   only" default to the Compare normalized-speedup chart is a
+   self-contained UX add that benefits from a focused diff and
+   end-to-end review.
+
+w7 "Cover chart panel scope, labels, and contrast behavior":
+   Partial. Existing ChartPanel + QueryHeatmap tests are updated to
+   the new contract for w3 and w4. No new test added for w5 because
+   the change is a string label flip that doesn't affect any existing
+   test coverage.
+
+## Delivery scope for this PR
+
+In:
+  - w3 (Cost tab gating via `requiresCostData: true`)
+  - w4 (heatmap legend heading)
+  - w5 (Reduced color rename)
+  - Partial w7 (test contract updates for w3 + w4)
+
+Deferred (separate PRs, original TODO stays open):
+  - w1 (chart panel header compaction)
+  - w2 (per-query heatmap duplicate scope)
+  - w6 (Compare normalized-speedup chart filter)
+  - Full w7 chart-coverage tests
+
+The deferred work units are independently scoped and small enough that
+a future agent can land them without re-doing the w0 audit. The TODO
+file stays in TODO/ until those four units land.
