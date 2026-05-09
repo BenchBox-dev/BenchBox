@@ -8,6 +8,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+import yaml
 
 pytestmark = [
     pytest.mark.unit,
@@ -140,8 +141,6 @@ def test_auto_revert_triggers_on_explorer_tokens_failure() -> None:
     # post-merge red events open a revert PR. Adding `explorer-tokens`
     # to the trigger was the blind-spot remediation; this test prevents
     # an inadvertent removal during a future `if:` cleanup.
-    import yaml
-
     workflow_yaml = yaml.safe_load(
         (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
     )
@@ -149,3 +148,21 @@ def test_auto_revert_triggers_on_explorer_tokens_failure() -> None:
     assert "explorer-tokens" in auto_revert["needs"]
     # The `if:` is a single string after yaml.safe_load.
     assert "needs.explorer-tokens.result == 'failure'" in auto_revert["if"]
+
+
+def test_post_merge_explorer_tokens_job_runs_unconditionally() -> None:
+    # The post-merge `explorer-tokens` job must have no `if:` so it always
+    # runs against the merged develop tree. If a future cleanup added an
+    # `if:` (e.g. mirroring the PR-time path-gated form), the post-merge
+    # re-scan would silently stop firing while the auto-revert wiring would
+    # still reference `needs.explorer-tokens.result == 'failure'` — a state
+    # that could no longer occur. The whole blind-spot remediation
+    # (squash-race regressions tripping auto-revert) depends on this job
+    # running on every push to develop.
+    workflow_yaml = yaml.safe_load(
+        (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
+    )
+    job = workflow_yaml["jobs"]["explorer-tokens"]
+    assert job.get("if") is None, (
+        f"post-merge explorer-tokens job must have no `if:` (always runs); found: {job.get('if')!r}"
+    )

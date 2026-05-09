@@ -84,6 +84,36 @@ def test_literal_re_matches_when_followed_by_dash_word() -> None:
     assert scan.LITERAL_RE.findall('<div class="text-gray-700-typography" />') == ["text-gray-700"]
 
 
+def test_literal_re_reports_every_match_on_a_line() -> None:
+    # Tailwind classes are typically space-joined inside a single string,
+    # so multiple literals can share a line. `findall` must return all of
+    # them so the gate's stderr report points to every offending token,
+    # not just the first. scan_file relies on this so a contributor
+    # debugging "what does the gate want me to fix?" sees the full set.
+    line = '<div class="text-gray-700 bg-blue-500 border-red-300" />'
+    assert scan.LITERAL_RE.findall(line) == [
+        "text-gray-700",
+        "bg-blue-500",
+        "border-red-300",
+    ]
+
+
+def test_scan_file_reports_every_match_on_a_line(tmp_path: Path) -> None:
+    target = tmp_path / "Component.tsx"
+    target.write_text(
+        '<div class="text-gray-700 bg-blue-500 border-red-300" />\n',
+        encoding="utf-8",
+    )
+    hits = scan.scan_file(target)
+    assert len(hits) == 1
+    lineno, line, matches = hits[0]
+    assert lineno == 1
+    assert matches == ["text-gray-700", "bg-blue-500", "border-red-300"]
+    assert "text-gray-700" in line
+    assert "bg-blue-500" in line
+    assert "border-red-300" in line
+
+
 def test_allow_marker_requires_non_empty_reason() -> None:
     assert scan.ALLOW_MARKER_RE.search("// allow-explorer-token-literal: legacy alias")
     assert scan.ALLOW_MARKER_RE.search("/* allow-explorer-token-literal: x */")
