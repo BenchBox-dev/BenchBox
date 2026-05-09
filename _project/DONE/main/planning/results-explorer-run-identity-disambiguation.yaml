@@ -2,7 +2,7 @@ id: results-explorer-run-identity-disambiguation
 title: "Disambiguate duplicate run labels across Results Explorer"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
 category: Frontend UX
 
 description: |
@@ -121,7 +121,7 @@ work:
 - id: w7
   summary: "Cover duplicate label cases across charts and Compare"
   needs: [w2, w3, w4, w5, w6]
-  status: pending
+  status: done
   notes: |
     Add tests with duplicate platform fixtures for every affected
     component. Assertions must fail if duplicate visible labels remain in

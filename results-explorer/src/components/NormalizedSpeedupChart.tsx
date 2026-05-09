@@ -88,7 +88,7 @@ export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props)
     measuredSpeedups.length > 0 &&
     measuredSpeedups.every((speedup) => Math.abs(speedup - 1) <= 0.01);
 
-  if (allNearEqual) {
+  if (allNearEqual && hiddenEntryCount === 0) {
     return (
       <SpeedupParityState
         baseline={results[baselineIdx]?.platform ?? "baseline"}

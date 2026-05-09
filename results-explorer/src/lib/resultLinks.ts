@@ -1,3 +1,5 @@
+export const MAX_COMPARE_SELECTIONS = 4;
+
 export function compareIdForRow(row: { result_id: string; short_id?: string | null }): string {
   return row.short_id || row.result_id;
 }

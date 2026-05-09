@@ -34,7 +34,7 @@
 import { mkdirSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { waitForDataLoaded, waitForShell } from "../support/fixtures";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -47,10 +47,64 @@ const SHOT_DIR = path.join(
 );
 const SHOULD_CAPTURE = process.env.FOLLOWUP_USABILITY_CAPTURE === "1";
 
-async function maybeCapture(page: import("@playwright/test").Page, slug: string): Promise<void> {
+async function maybeCapture(page: Page, slug: string): Promise<void> {
   if (!SHOULD_CAPTURE) return;
   mkdirSync(SHOT_DIR, { recursive: true });
   await page.screenshot({ path: path.join(SHOT_DIR, `${slug}.png`), fullPage: true });
+}
+
+async function countDisabled(locator: Locator): Promise<number> {
+  const count = await locator.count();
+  let disabled = 0;
+  for (let index = 0; index < count; index += 1) {
+    if (await locator.nth(index).isDisabled()) disabled += 1;
+  }
+  return disabled;
+}
+
+async function clickFirstEnabledUnchecked(locator: Locator, startAt = 0): Promise<void> {
+  const count = await locator.count();
+  for (let index = startAt; index < count; index += 1) {
+    const candidate = locator.nth(index);
+    const disabled = await candidate.isDisabled();
+    const checked = await candidate.isChecked();
+    if (!disabled && !checked) {
+      await candidate.click();
+      return;
+    }
+  }
+  throw new Error("No enabled unchecked compare candidate found");
+}
+
+async function launchFirstBuilderComparison(page: Page): Promise<void> {
+  await page.goto("/results/compare/");
+  await waitForShell(page);
+  await waitForDataLoaded(page, /Compare/);
+  await expect(page.getByTestId("compare-builder")).toBeVisible();
+
+  const builderCheckboxes = page.locator('[data-testid^="compare-builder-row-"] input[type="checkbox"]');
+  await expect(builderCheckboxes.first()).toBeVisible();
+  await builderCheckboxes.first().click();
+  await clickFirstEnabledUnchecked(builderCheckboxes, 1);
+  await page.getByTestId("compare-builder-launch").click();
+  await expect(page).toHaveURL(/\/results\/compare\?ids=[^,]+,[^,]+/);
+  await waitForDataLoaded(page, /Comparison/);
+}
+
+async function openFirstSparseResultDetail(page: Page): Promise<void> {
+  await page.goto("/results/");
+  await waitForShell(page);
+  await waitForDataLoaded(page, /Cross-Benchmark Leaderboard/);
+  const hrefs = await page.locator('a[href^="/results/r/"]').evaluateAll((links) =>
+    Array.from(new Set(links.map((link) => link.getAttribute("href")).filter((href): href is string => !!href))),
+  );
+  for (const href of hrefs) {
+    await page.goto(href);
+    await waitForShell(page);
+    await waitForDataLoaded(page, /Query Timings/);
+    if ((await page.getByText(/Show missing/i).count()) > 0) return;
+  }
+  throw new Error("No sparse result-detail page with a Show missing disclosure was found");
 }
 
 test.describe("@followup-usability release-gate route walk", () => {
@@ -84,6 +138,16 @@ test.describe("@followup-usability release-gate route walk", () => {
     await expect(page.getByTestId("query-compare-launch-disabled")).toBeVisible();
 
     await maybeCapture(page, "query-compare-tray-default");
+
+    const checkboxes = page.locator('input[data-testid^="query-compare-checkbox-"]');
+    await expect(checkboxes.first()).toBeVisible();
+    await checkboxes.first().click();
+    await expect(tray).toContainText(/1 result selected/);
+    await clickFirstEnabledUnchecked(checkboxes, 1);
+
+    const launch = page.getByTestId("query-compare-launch");
+    await expect(launch).toBeVisible();
+    await expect(launch).toHaveAttribute("href", /\/results\/compare\?ids=[^,]+,[^,]+/);
   });
 
   test("Home renders the cohort selector above the matrix with a compare entrypoint", async ({ page }) => {
@@ -123,6 +187,12 @@ test.describe("@followup-usability release-gate route walk", () => {
       .first();
     await expect(platformHeader).toHaveCSS("position", "sticky");
 
+    const firstHeatmapRow = page.locator("tbody tr[data-testid]").first();
+    await expect(firstHeatmapRow).toBeVisible();
+    const cells = firstHeatmapRow.locator('td[role="gridcell"]');
+    await expect(cells.nth(1).getByRole("link", { name: /Receipt/ })).toHaveCount(0);
+    await expect(cells.nth(2).getByRole("link", { name: /Receipt/ })).toBeVisible();
+
     await maybeCapture(page, "benchmark-detail-switcher-and-sticky-header");
   });
 
@@ -133,6 +203,14 @@ test.describe("@followup-usability release-gate route walk", () => {
 
     const switcher = page.getByTestId("platform-switcher");
     await expect(switcher).toBeVisible();
+
+    const compareCheckboxes = page.locator('input[data-testid^="platform-compare-checkbox-"]');
+    await expect(compareCheckboxes.first()).toBeVisible();
+    expect(await compareCheckboxes.count()).toBeGreaterThan(1);
+    await compareCheckboxes.first().click();
+    expect(await countDisabled(compareCheckboxes)).toBeGreaterThan(0);
+    await compareCheckboxes.first().click();
+    expect(await countDisabled(compareCheckboxes)).toBe(0);
 
     // The filter strip only renders when allPlatformResults.length >= 25.
     // The committed audit corpus exceeds that threshold; the small browser
@@ -161,29 +239,41 @@ test.describe("@followup-usability release-gate route walk", () => {
     await maybeCapture(page, "compare-builder-empty-state");
   });
 
-  test("Compare normalized-speedup chart defaults to the comparable-only filter when partials exist", async ({ page }) => {
-    // The exact compare URL pair depends on the committed corpus. We use
-    // two known short ids that share a benchmark cohort but differ on
-    // queries, so the chart will render the toggle. If the corpus is
-    // refreshed, the test will fail loudly rather than silently passing.
-    await page.goto("/results/compare?ids=ba6a8c83,5e6c5eba");
-    await waitForShell(page);
-    await waitForDataLoaded(page, /TPC-H Comparison/);
+  test("Compare normalized-speedup chart uses builder-launched IDs and asserts comparable-only control when partials exist", async ({ page }) => {
+    await launchFirstBuilderComparison(page);
 
-    // Click into the Compare > Normalized speedup tab if the page renders
-    // multiple tabs. The chart panel exposes a tab role with that label
-    // (ChartPanel groups). When all queries are comparable the toggle does
-    // not render — that is acceptable. We assert the chart container.
+    const speedupButton = page.getByRole("button", { name: "Normalized Speedup" });
+    if ((await speedupButton.count()) > 0) await speedupButton.click();
+    const baselineOptions = page.locator("#chart-panel-baseline option");
+    if ((await baselineOptions.count()) > 1) {
+      const labels = (await baselineOptions.allTextContents()).map((label) => label.trim());
+      expect(new Set(labels).size).toBe(labels.length);
+    }
     const chartPanel = page.getByRole("tabpanel", { name: /chart/i }).first();
     await expect(chartPanel).toBeVisible();
+
+    const toggle = page.getByTestId("normalized-speedup-comparable-only-toggle");
+    if ((await toggle.count()) > 0) {
+      await expect(toggle).toBeChecked();
+      await expect(page.getByText(/fully comparable queries|hidden|missing data/)).toBeVisible();
+      await toggle.uncheck();
+      await expect(toggle).not.toBeChecked();
+    } else {
+      // Fixture has no partial query coverage for the selected pair; unit tests
+      // own the forced-partial contract while this route walk proves the chart
+      // renders from a real builder-launched comparison without hard-coded ids.
+      if ((await chartPanel.locator("svg").count()) > 0) {
+        await expect(chartPanel.locator("svg").first()).toBeVisible();
+      } else {
+        await expect(page.getByText("No meaningful per-query speedup difference")).toBeVisible();
+      }
+    }
 
     await maybeCapture(page, "compare-normalized-speedup");
   });
 
   test("Result Detail renders without claiming missing receipt fields", async ({ page }) => {
-    await page.goto("/results/r/tpch-duckdb-sf0.01-20260403-010ee756");
-    await waitForShell(page);
-    await waitForDataLoaded(page, /Query Timings/);
+    await openFirstSparseResultDetail(page);
 
     // The disclosure-based "Show missing metadata" toggle was shipped in
     // PR #295 (TODO results-explorer-result-detail-metadata-density) and

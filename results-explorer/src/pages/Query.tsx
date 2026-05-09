@@ -18,7 +18,11 @@ import {
 import { getTableSchema, type SchemaColumn } from "@/lib/duckdbSchema";
 import { useFacetField } from "@/lib/facetModel";
 import { toDateWindowFacet, toggleFacetValue } from "@/lib/facetMatching";
-import { buildCompareUrl, compareIdForRow } from "@/lib/resultLinks";
+import {
+  compareCohortLockReason,
+  compareCohortSignatureForRow,
+} from "@/lib/compareCohort";
+import { buildCompareUrl, compareIdForRow, MAX_COMPARE_SELECTIONS } from "@/lib/resultLinks";
 import { STARTER_QUERY_CATEGORIES, starterQueriesByCategory, type StarterQueryCategory } from "@/lib/starterQueries";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { memoizedSnapshotQueryRows } from "@/lib/duckdbQueries";
@@ -58,6 +62,7 @@ const DEFAULT_COLUMNS = [
 ];
 const TABLE_RENDER_LIMIT = 200;
 const TABLE_RENDER_INCREMENT = 200;
+const COMPARE_METADATA_COLUMNS = ["result_id", "benchmark", "scale_factor", "test_type", "phase", "primary_metric"];
 
 export function Query(_: RoutableProps) {
   useDocumentTitle("Query · BenchBox Results");
@@ -105,7 +110,7 @@ export function Query(_: RoutableProps) {
     setCompareSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(resultId)) next.delete(resultId);
-      else next.add(resultId);
+      else if (next.size < MAX_COMPARE_SELECTIONS) next.add(resultId);
       return next;
     });
   const clearCompareSelection = () => setCompareSelectedIds(new Set());
@@ -150,9 +155,13 @@ export function Query(_: RoutableProps) {
       validationStatuses,
     ],
   );
+  const compareMetadataColumns = useMemo(
+    () => COMPARE_METADATA_COLUMNS.filter((column) => schema.some((item) => item.name === column)),
+    [schema],
+  );
   const queryColumns = useMemo(
-    () => (visibleColumns.includes("result_id") ? visibleColumns : ["result_id", ...visibleColumns]),
-    [visibleColumns],
+    () => [...new Set([...compareMetadataColumns, ...visibleColumns])],
+    [compareMetadataColumns, visibleColumns],
   );
   const activeFilters = useMemo(() => applySchemaFilterSupport(filters, schema), [filters, schema]);
   const facetQueries = useMemo(
@@ -649,34 +658,21 @@ export function Query(_: RoutableProps) {
                   <span class="bb-scroll-affordance" data-testid="query-results-scroll-hint">← scroll →</span>
                 </div>
                 {(() => {
+                  const rowsByResultId = new Map(rows.map((row) => [String(row.result_id), row]));
                   const lockSig = (() => {
                     const firstId = [...compareSelectedIds][0];
                     if (firstId === undefined) return null;
-                    const firstRow = rows.find((row) => String(row.result_id) === firstId);
-                    if (!firstRow) return null;
-                    return {
-                      benchmark: String(firstRow.benchmark ?? ""),
-                      scale_factor: firstRow.scale_factor ?? null,
-                      phase: String(firstRow.phase ?? ""),
-                      primary_metric: String(firstRow.primary_metric ?? ""),
-                    };
+                    const firstRow = rowsByResultId.get(firstId);
+                    return firstRow ? compareCohortSignatureForRow(firstRow) : null;
                   })();
                   const lockReason = (row: ResultRow): string | undefined => {
-                    if (lockSig === null) return undefined;
                     const id = String(row.result_id);
                     if (compareSelectedIds.has(id)) return undefined;
-                    const mismatches: string[] = [];
-                    if (String(row.benchmark ?? "") !== lockSig.benchmark) mismatches.push("benchmark");
-                    if ((row.scale_factor ?? null) !== lockSig.scale_factor) mismatches.push("scale");
-                    if (String(row.phase ?? "") !== lockSig.phase) mismatches.push("phase");
-                    if (String(row.primary_metric ?? "") !== lockSig.primary_metric)
-                      mismatches.push("primary metric");
-                    if (mismatches.length === 0) return undefined;
-                    return `Locked: first selection is ${formatBenchmarkLabel(lockSig.benchmark)} SF ${lockSig.scale_factor} ${lockSig.phase}. This row differs by ${mismatches.join(", ")}.`;
+                    return compareCohortLockReason(row, lockSig);
                   };
                   const selectedCompareIds = [...compareSelectedIds]
                     .map((id) => {
-                      const row = rows.find((r) => String(r.result_id) === id);
+                      const row = rowsByResultId.get(id);
                       return row ? compareIdForRow(row as Parameters<typeof compareIdForRow>[0]) : id;
                     });
                   const compareUrl = compareSelectedIds.size >= 2 ? buildCompareUrl(selectedCompareIds) : null;
@@ -691,6 +687,8 @@ export function Query(_: RoutableProps) {
                             "Select two or more rows to compare. The first pick locks the cohort."
                           ) : compareSelectedIds.size === 1 ? (
                             "1 result selected — pick a compatible second row to enable Compare."
+                          ) : compareSelectedIds.size >= MAX_COMPARE_SELECTIONS ? (
+                            `${compareSelectedIds.size} results selected (maximum).`
                           ) : (
                             `${compareSelectedIds.size} results selected.`
                           )}
@@ -768,7 +766,11 @@ export function Query(_: RoutableProps) {
                             {visibleRows.map((row) => {
                               const id = String(row.result_id);
                               const isSelected = compareSelectedIds.has(id);
-                              const reason = lockReason(row);
+                              const reason =
+                                lockReason(row) ??
+                                (!isSelected && compareSelectedIds.size >= MAX_COMPARE_SELECTIONS
+                                  ? `Up to ${MAX_COMPARE_SELECTIONS} runs can be compared.`
+                                  : undefined);
                               return (
                                 <tr key={id} class="hover:bg-[var(--bb-surface-data-muted)]">
                                   <td class="table-td sticky left-0 z-10 bg-[var(--bb-surface-data)]">

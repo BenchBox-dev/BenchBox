@@ -2,7 +2,7 @@ id: results-explorer-navigation-and-pivot-controls
 title: "Fix Results Explorer navigation state and sibling pivots"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
 category: Frontend UX
 
 description: |
@@ -94,7 +94,7 @@ work:
   - id: w5
     summary: "Cover nav and sibling pivots with regression tests"
     needs: [w1, w2, w3, w4]
-    status: pending
+    status: done
     notes: |
       Add regression tests for SPA subnav updates, benchmark switcher
       routing, platform switcher routing, and Home filter placement/state.

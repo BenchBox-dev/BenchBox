@@ -2,7 +2,7 @@ id: results-explorer-table-sticky-density-and-semantics
 title: "Repair Results Explorer table stickiness, density, and semantics"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
 category: Frontend UX
 
 description: |
@@ -21,7 +21,7 @@ deps:
 work:
   - id: w0
     summary: "Rebind dense-table review evidence against develop tip"
-    status: pending
+    status: done
     notes: |
       Walk QueryHeatmap (Benchmark detail, horizontal and vertical scroll),
       MetaLeaderboard (Home), PlatformIndex (>= 25 rows), and Query results
@@ -36,7 +36,7 @@ work:
   - id: w1
     summary: "Audit dense scrollable tables and overloaded cells"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Audit QueryHeatmap, MetaLeaderboard, PlatformIndex, Query results, and
       any table with horizontal scroll or frozen columns. Document frozen
@@ -122,7 +122,7 @@ work:
   - id: w6
     summary: "Make Query Workbench sort headers semantic and keyboard accessible"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Replace clickable Query table `<th>` headers with keyboard-accessible
       sort buttons. Add `aria-sort` state, visible focus treatment, and
@@ -132,7 +132,7 @@ work:
   - id: w7
     summary: "Cover sticky, density, filter, and sort behavior"
     needs: [w2, w3, w4, w5, w6]
-    status: pending
+    status: done
     notes: |
       Add tests and browser screenshot checks for horizontal heatmap
       scroll, vertical header stickiness, compact cell height, platform

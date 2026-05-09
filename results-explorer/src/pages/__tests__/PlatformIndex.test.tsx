@@ -249,6 +249,32 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(checkboxClickbench.disabled).toBe(false);
   });
 
+  it("caps Platform compare selections at four runs", async () => {
+    const cohortRows: PlatformIndexRowRow[] = Array.from({ length: 5 }, (_, idx) =>
+      makeRow({
+        result_id: `r-compatible-${idx}`,
+        short_id: `compat${idx}`,
+        benchmark: "tpch",
+        scale_factor: 0.1,
+        phase: "power",
+        primary_metric: "display_geomean_ms",
+        run_date: `2026-04-${String(idx + 1).padStart(2, "0")}`,
+        geomean_ms: 10 + idx,
+      }),
+    );
+    vi.mocked(getPlatformIndexRows).mockResolvedValue(cohortRows);
+
+    render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    for (const idx of [0, 1, 2, 3]) {
+      fireEvent.click(screen.getByTestId(`platform-compare-checkbox-r-compatible-${idx}`));
+    }
+    const fifth = screen.getByTestId("platform-compare-checkbox-r-compatible-4") as HTMLInputElement;
+    expect(fifth.disabled).toBe(true);
+    expect(fifth.title).toContain("Up to 4 runs");
+  });
+
   it("hides the platform filter strip when the cohort has fewer than 25 rows", async () => {
     render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());

@@ -2,7 +2,7 @@ id: results-explorer-compare-flow-entrypoints
 title: "Repair Results Explorer compare flow entrypoints"
 worktree: main
 priority: Critical
-status: Not Started
+status: Completed
 category: Core Functionality
 
 description: |
@@ -21,7 +21,7 @@ deps:
 work:
   - id: w0
     summary: "Rebind compare-flow review evidence against develop tip"
-    status: pending
+    status: done
     notes: |
       Walk /results/compare (empty), /results/r/<id> (single-result compare
       CTA), /results/query (no compare selection), /results/ (Home leaderboard
@@ -36,7 +36,7 @@ work:
   - id: w1
     summary: "Inventory current compare route contracts and id availability"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Inventory Compare, ResultDetail, Query, Home, BenchmarkIndex, and
       PlatformIndex. Record current compare route contracts, link helpers,
@@ -48,7 +48,7 @@ work:
   - id: w2
     summary: "Replace the empty Compare URL-editing error with an in-page builder"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Replace the empty `/results/compare` state that tells users to add
       `?ids=id1,id2` with a compare builder. The builder exposes benchmark,
@@ -59,7 +59,7 @@ work:
   - id: w3
     summary: "Support single-result compare starts from Result Detail"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Fix ResultDetail "Compare this result" so one selected result opens the
       compare builder with that run pinned and compatible candidates listed.
@@ -117,7 +117,7 @@ work:
   - id: w7
     summary: "Cover compare entrypoints with automated and browser checks"
     needs: [w2, w3, w4, w5, w6]
-    status: pending
+    status: done
     notes: |
       Add unit and browser coverage for the empty Compare builder,
       single-result start, Query Workbench selection, Home selection/routing,

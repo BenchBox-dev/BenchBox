@@ -6,7 +6,12 @@ import { getPlatformIndexRows } from "@/lib/duckdbQueries";
 import { useFacetState, type DateWindowFacet, type FacetKey, type FacetState } from "@/lib/facetModel";
 import { hasActiveFacets, matchesFacetRow, singleFacetValue, toDateWindowFacet } from "@/lib/facetMatching";
 import { formatBenchmarkLabel, formatTrustLabel, formatValidationStatus } from "@/lib/displayLabels";
-import { buildCompareUrl, compareIdForRow, displayCompareId } from "@/lib/resultLinks";
+import {
+  compareCohortLockReason,
+  compareCohortSignatureForRow,
+  compareCohortSummary,
+} from "@/lib/compareCohort";
+import { buildCompareUrl, compareIdForRow, displayCompareId, MAX_COMPARE_SELECTIONS } from "@/lib/resultLinks";
 import { humanizeBenchmark, fmtScore, fmtGeomean, errMsg } from "@/utils";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
@@ -82,7 +87,7 @@ function platformCompareGuidanceMessage(
   }
   if (selectedCount === 1) {
     const row = selectedRows[0];
-    const cohort = row ? `${humanizeBenchmark(row.benchmark)} SF ${row.scale_factor} ${row.phase}` : "this cohort";
+    const cohort = row ? compareCohortSummary(compareCohortSignatureForRow(row)) : "this cohort";
     return `1 result selected in ${cohort}. Select one more result from the same comparable cohort.`;
   }
   const differences = selectedCohortDifferences(selectedRows);
@@ -90,7 +95,7 @@ function platformCompareGuidanceMessage(
     return `${selectedCount} results selected, but they differ by ${differences.join(", ")}. Compare will keep the receipts visible and may suppress winner claims for mixed cohorts.`;
   }
   const first = selectedRows[0];
-  const cohort = first ? `${humanizeBenchmark(first.benchmark)} SF ${first.scale_factor} ${first.phase}` : "one cohort";
+  const cohort = first ? compareCohortSummary(compareCohortSignatureForRow(first)) : "one cohort";
   return `${selectedCount} results selected in ${cohort}. The sticky tray opens Compare with matching cohort context.`;
 }
 
@@ -308,7 +313,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
       const next = new Set(prev);
       if (next.has(resultId)) {
         next.delete(resultId);
-      } else {
+      } else if (next.size < MAX_COMPARE_SELECTIONS) {
         next.add(resultId);
       }
       return next;
@@ -323,25 +328,11 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     const firstSelectedId = [...selected][0];
     if (firstSelectedId === undefined) return null;
     const firstRow = allPlatformResults.find((row) => row.result_id === firstSelectedId);
-    if (!firstRow) return null;
-    return {
-      benchmark: firstRow.benchmark,
-      scale_factor: firstRow.scale_factor,
-      phase: firstRow.phase,
-      primary_metric: firstRow.primary_metric,
-    } as const;
+    return firstRow ? compareCohortSignatureForRow(firstRow) : null;
   })();
   function cohortLockReason(row: PlatformIndexRowRow): string | undefined {
-    if (cohortLockSignature === null) return undefined;
     if (selected.has(row.result_id)) return undefined;
-    const sig = cohortLockSignature;
-    const mismatches: string[] = [];
-    if (row.benchmark !== sig.benchmark) mismatches.push("benchmark");
-    if (row.scale_factor !== sig.scale_factor) mismatches.push("scale");
-    if (row.phase !== sig.phase) mismatches.push("phase");
-    if (row.primary_metric !== sig.primary_metric) mismatches.push("primary metric");
-    if (mismatches.length === 0) return undefined;
-    return `Locked: first selection is ${humanizeBenchmark(sig.benchmark)} SF ${sig.scale_factor} ${sig.phase}. This row differs by ${mismatches.join(", ")}.`;
+    return compareCohortLockReason(row, cohortLockSignature);
   }
 
   return (
@@ -667,7 +658,12 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                   entry={r}
                   checked={selected.has(r.result_id)}
                   onToggle={() => toggleSelect(r.result_id)}
-                  disabledReason={cohortLockReason(r)}
+                  disabledReason={
+                    cohortLockReason(r) ??
+                    (!selected.has(r.result_id) && selected.size >= MAX_COMPARE_SELECTIONS
+                      ? `Up to ${MAX_COMPARE_SELECTIONS} runs can be compared.`
+                      : undefined)
+                  }
                 />
               ))}
             </tbody>
