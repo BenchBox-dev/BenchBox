@@ -34,6 +34,47 @@ import { colorForCell, lightnessForCell } from "@/lib/chartMath";
 export { colorForCell, lightnessForCell };
 
 // ---------------------------------------------------------------------------
+// Sticky-left offset table
+//
+// Each frozen column maps to a width in rem so the cumulative offset for the
+// next sticky column can be computed exactly without relying on hard-coded
+// Tailwind classes (`left-44` etc.) that desync when an earlier column is
+// hidden — most notably the optional compare-checkbox column.
+// ---------------------------------------------------------------------------
+
+const STICKY_COL_REM = {
+  checkbox: 3, // w-12
+  platform: 11, // w-44
+  trust: 9, // w-36
+  primary: 8, // w-32
+  geomean: 8, // w-32
+} as const;
+
+type StickyColKey = keyof typeof STICKY_COL_REM;
+
+function cumulativeStickyLeft(
+  options: { hasSelection: boolean; showGeomeanCol: boolean },
+  target: StickyColKey,
+): number {
+  let offset = 0;
+  if (target === "checkbox") return offset;
+  if (options.hasSelection) offset += STICKY_COL_REM.checkbox;
+  if (target === "platform") return offset;
+  offset += STICKY_COL_REM.platform;
+  if (target === "trust") return offset;
+  offset += STICKY_COL_REM.trust;
+  if (target === "primary") return offset;
+  offset += STICKY_COL_REM.primary;
+  if (target === "geomean") return offset;
+  if (options.showGeomeanCol) offset += STICKY_COL_REM.geomean;
+  return offset;
+}
+
+function stickyLeftStyle(rem: number): JSX.CSSProperties {
+  return { left: `${rem}rem` };
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -391,12 +432,21 @@ export function QueryHeatmap({
           class="min-w-max text-sm"
         >
           <thead class="bg-[var(--bb-surface-data-muted)]">
-            <tr role="row">
-              {hasSelection && <th role="columnheader" scope="col" aria-label="Select for comparison" class="table-th w-12 min-w-12 px-2" />}
+            <tr role="row" class="sticky top-0 z-20 bg-[var(--bb-surface-data-muted)]">
+              {hasSelection && (
+                <th
+                  role="columnheader"
+                  scope="col"
+                  aria-label="Select for comparison"
+                  class="table-th sticky z-30 w-12 min-w-12 bg-[var(--bb-surface-data-muted)] px-2"
+                  style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "checkbox"))}
+                />
+              )}
               <th
                 role="columnheader"
                 scope="col"
-                class="sticky left-0 z-10 w-44 min-w-44 bg-[var(--bb-surface-data-muted)] p-0"
+                class="sticky z-30 w-44 min-w-44 bg-[var(--bb-surface-data-muted)] p-0"
+                style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "platform"))}
                 aria-sort={ariaSort("platform")}
               >
                 <button
@@ -408,14 +458,20 @@ export function QueryHeatmap({
                   {sortAnnouncement("platform")}
                 </button>
               </th>
-              <th role="columnheader" scope="col" class="table-th sticky left-44 z-10 w-36 min-w-36 whitespace-nowrap bg-[var(--bb-surface-data-muted)]">
+              <th
+                role="columnheader"
+                scope="col"
+                class="table-th sticky z-30 w-36 min-w-36 whitespace-nowrap bg-[var(--bb-surface-data-muted)]"
+                style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "trust"))}
+              >
                 Trust
               </th>
               <th
                 role="columnheader"
                 scope="col"
                 aria-sort={ariaSort("primary")}
-                class="w-32 min-w-32 whitespace-nowrap p-0"
+                class="sticky z-30 w-32 min-w-32 whitespace-nowrap bg-[var(--bb-surface-data-muted)] p-0"
+                style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "primary"))}
                 title={primaryLabel}
               >
                 <button
@@ -431,7 +487,8 @@ export function QueryHeatmap({
                 <th
                   role="columnheader"
                   scope="col"
-                  class="w-32 min-w-32 whitespace-nowrap p-0"
+                  class="sticky z-30 w-32 min-w-32 whitespace-nowrap bg-[var(--bb-surface-data-muted)] p-0"
+                  style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "geomean"))}
                   aria-sort={ariaSort("geomean")}
                   title="Geometric mean of per-query display times"
                 >
@@ -477,7 +534,13 @@ export function QueryHeatmap({
                   class={`hover:bg-[var(--bb-surface-data-muted)] ${isSelected ? "bg-[var(--bb-tone-info-bg)]" : ""}`}
                 >
                   {hasSelection && (
-                    <td role="gridcell" class="table-td w-12 min-w-12 px-2">
+                    <td
+                      role="gridcell"
+                      class={`table-td sticky z-10 w-12 min-w-12 px-2 ${
+                        isSelected ? "bg-[var(--bb-tone-info-bg)]" : "bg-[var(--bb-surface-data)]"
+                      }`}
+                      style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "checkbox"))}
+                    >
                       <input
                         type="checkbox"
                         checked={isSelected}
@@ -489,9 +552,10 @@ export function QueryHeatmap({
                   )}
                   <td
                     role="gridcell"
-                    class={`table-td sticky left-0 z-10 w-44 min-w-44 ${
+                    class={`table-td sticky z-10 w-44 min-w-44 ${
                       isSelected ? "bg-[var(--bb-tone-info-bg)]" : "bg-[var(--bb-surface-data)]"
                     }`}
+                    style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "platform"))}
                   >
                     <div class="flex flex-wrap items-center gap-1.5">
                       <span class="font-medium text-[var(--bb-data-fg-primary)]">{row.platform}</span>
@@ -511,20 +575,33 @@ export function QueryHeatmap({
                   </td>
                   <td
                     role="gridcell"
-                    class={`table-td sticky left-44 z-10 w-36 min-w-36 whitespace-nowrap ${
+                    class={`table-td sticky z-10 w-36 min-w-36 whitespace-nowrap ${
                       isSelected ? "bg-[var(--bb-tone-info-bg)]" : "bg-[var(--bb-surface-data)]"
                     }`}
+                    style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "trust"))}
                   >
                     <div class="flex flex-wrap gap-1">
                       <TrustBadge trustLabel={row.trust_label} compact />
                       <ValidationBadge validationStatus={row.validation_status} showMissing />
                     </div>
                   </td>
-                  <td role="gridcell" class="table-td w-32 min-w-32 whitespace-nowrap font-mono">
+                  <td
+                    role="gridcell"
+                    class={`table-td sticky z-10 w-32 min-w-32 whitespace-nowrap font-mono ${
+                      isSelected ? "bg-[var(--bb-tone-info-bg)]" : "bg-[var(--bb-surface-data)]"
+                    }`}
+                    style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "primary"))}
+                  >
                     {fmtPrimary(getPrimaryValue(row))}
                   </td>
                   {showGeomeanCol && (
-                    <td role="gridcell" class="table-td w-32 min-w-32 whitespace-nowrap font-mono text-[var(--bb-data-fg-muted)]">
+                    <td
+                      role="gridcell"
+                      class={`table-td sticky z-10 w-32 min-w-32 whitespace-nowrap font-mono text-[var(--bb-data-fg-muted)] ${
+                        isSelected ? "bg-[var(--bb-tone-info-bg)]" : "bg-[var(--bb-surface-data)]"
+                      }`}
+                      style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "geomean"))}
+                    >
                       {fmtGeomean(row.display_geomean_ms)}
                     </td>
                   )}

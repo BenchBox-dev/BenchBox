@@ -1,0 +1,93 @@
+# w2 + w3 — Heatmap sticky offsets and vertically sticky header
+
+Branch: feat/explorer-table-sticky-density
+Develop tip at start: 6c28d2b45 (PR #298 merged)
+
+w4 (provenance compaction) and w5 (Platform detail filters) deferred to
+a separate PR to keep the diff reviewable. Per the parent brief: this
+TODO "may split into 2 PRs".
+
+## Current state on develop tip
+
+`results-explorer/src/components/QueryHeatmap.tsx:387-530`. The
+table:
+
+- Checkbox column (visible when `hasSelection`, w-12 = 3rem). NOT
+  sticky — when the user scrolls horizontally, the checkbox slides off
+  with everything else.
+- Platform column: `sticky left-0 z-10 w-44`. Sticky to the left edge
+  of the scroll container.
+- Trust column: `sticky left-44 z-10 w-36`. Hardcoded `left-44`
+  assumes Platform is the first sticky column at offset 0. When
+  `hasSelection` is true, the checkbox at column 1 (3rem wide) is not
+  sticky, so the visual lineup looks correct in the initial scroll
+  position but as soon as the user scrolls horizontally the checkbox
+  slides under the sticky Platform column. Worse, with the checkbox
+  column present, the Trust column's `left-44` is wrong by the
+  checkbox width.
+- Primary (score) column: NOT sticky. The brief calls for it to stay
+  aligned.
+- Geomean column (when shown): NOT sticky. Same.
+- `<thead>`: NOT vertically sticky. The query header row scrolls out
+  of view as soon as the user scrolls down past a tall body.
+
+## Defects vs the w0 review
+
+- D1 (sticky offsets): Hardcoded `left-44` on Trust assumes Platform
+  is the only earlier sticky column. With `hasSelection`, offsets are
+  off by the checkbox width.
+- D2 (sticky coverage): Score and Geomean columns are not sticky, so
+  query cells eventually scroll under the score column when scrolled
+  far enough.
+- D3 (vertical header): Query column headers (`Q1`, `Q2`, …) scroll
+  off the top once the body scrolls down past them.
+- D4 (z-index/transparency): Even if the thead is made sticky, the
+  frozen corner cells (Platform, Trust) need a higher z-index than
+  body sticky cells so they paint above the cells they overlap.
+
+## Planned change for w2
+
+1. Extract column widths into a single `STICKY_COL_REM` constant (in
+   rem) so offset math is centralized: `checkbox: 3, platform: 11,
+   trust: 9, primary: 8, geomean: 8`.
+2. Add a `cumulativeStickyLeft({ hasSelection, showGeomeanCol }, col)`
+   helper that walks the column prefix and returns the rem offset for
+   the requested column, taking into account whether checkbox is
+   present.
+3. Apply `position: sticky; left: <rem>` to each frozen column header
+   and body cell. Use a `style` prop with `left:` so dynamic offsets
+   are not bound to Tailwind static class names.
+4. Add the checkbox column to the sticky set so it stays in view too
+   (offset 0 when present).
+5. Mark Score (primary) and Geomean as sticky with the correct
+   cumulative offset.
+
+## Planned change for w3
+
+1. Apply `position: sticky; top: 0` to the `<thead>` row. Existing
+   `bg-[var(--bb-surface-data-muted)]` keeps the row opaque.
+2. Z-index layering:
+   - Body frozen-left cells: z-10 (existing)
+   - thead non-frozen header cells (query columns): z-20 (new — top
+     sticky only, above body cells)
+   - thead frozen-corner cells (checkbox/platform/trust/primary/
+     geomean): z-30 (new — top+left sticky, above both)
+
+## Manual route walk
+
+- /results/tpch/?phase=power, viewMode=matrix, with hasSelection true
+  (compare-sticky tray opens once any row is selected — for the walk,
+  used the compare URL test fixture). Confirmed the checkbox column
+  slides off, Trust column misaligns by 3rem, query headers scroll
+  away, and Score/Geomean disappear once the user scrolls more than
+  ~5 query columns.
+- Confirmed the same defects when `hasSelection` is false (no compare
+  tray) — Trust still uses `left-44` correctly relative to Platform,
+  but Score/Geomean still slide.
+
+## Verification commands
+
+- `cd results-explorer && npm test -- --run src/components/__tests__/QueryHeatmap.test.tsx src/pages/__tests__/BenchmarkIndex.test.tsx`
+- `cd results-explorer && npm run typecheck`
+- `cd results-explorer && npm run build`
+- Browser walk deferred to release-gate Playwright (TODO #8 w3).
