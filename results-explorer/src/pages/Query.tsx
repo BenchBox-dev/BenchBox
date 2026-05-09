@@ -491,7 +491,7 @@ export function Query(_: RoutableProps) {
 
   return (
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <div class="mb-6 lg:mb-3">
+      <div class="mb-6">
         <h1 class="text-3xl font-bold text-[var(--bb-data-fg-primary)]">Results Query Workbench</h1>
         <p class="mt-2 max-w-3xl text-sm text-[var(--bb-data-fg-muted)]">
           Query the <code class="rounded bg-[var(--bb-surface-app)] px-1 font-mono text-xs">results.duckdb</code> snapshot in-browser
@@ -709,7 +709,7 @@ export function Query(_: RoutableProps) {
 
           <details
             data-testid="query-visible-columns"
-            class="order-5 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-4 shadow-sm lg:order-1"
+            class="order-5 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-4 shadow-sm"
           >
             <summary class="cursor-pointer text-sm font-medium text-[var(--bb-data-fg-primary)]">
               Configure visible columns

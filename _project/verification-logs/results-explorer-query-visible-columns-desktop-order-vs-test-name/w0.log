@@ -1,0 +1,100 @@
+[2m[WebServer] [22m[serve-browser-tests] dist=/Users/joe/Developer/BenchBox.pool-08/results-explorer/dist
+[2m[WebServer] [22m[serve-browser-tests] fixtures=/Users/joe/Developer/BenchBox.pool-08/results-explorer/test-fixtures/.generated/data
+[2m[WebServer] [22m[serve-browser-tests] listening on http://127.0.0.1:4319/results/
+
+Running 2 tests using 1 worker
+
+PROBE@1280 {
+  "header": {
+    "top": 0,
+    "height": 111,
+    "bottom": 111
+  },
+  "main": {
+    "top": 111,
+    "height": 2320
+  },
+  "heading": {
+    "top": 143,
+    "height": 36
+  },
+  "byId": [
+    {
+      "id": "query-result-summary",
+      "top": 309,
+      "left": 344,
+      "height": 132,
+      "width": 904
+    },
+    {
+      "id": "query-results-panel",
+      "top": 457,
+      "left": 344,
+      "height": 537,
+      "width": 904
+    },
+    {
+      "id": "query-mobile-filter-drawer",
+      "top": 0,
+      "left": 0,
+      "height": 0,
+      "width": 0
+    },
+    {
+      "id": "query-visible-columns",
+      "top": 239,
+      "left": 344,
+      "height": 54,
+      "width": 904
+    }
+  ]
+}
+  ✓  1 [chromium] › e2e/_probe-query-layout.spec.ts:7:3 › probe query layout at 1280 (2.3s)
+PROBE@1600 {
+  "header": {
+    "top": 0,
+    "height": 111,
+    "bottom": 111
+  },
+  "main": {
+    "top": 111,
+    "height": 2320
+  },
+  "heading": {
+    "top": 143,
+    "height": 36
+  },
+  "byId": [
+    {
+      "id": "query-result-summary",
+      "top": 309,
+      "left": 504,
+      "height": 132,
+      "width": 904
+    },
+    {
+      "id": "query-results-panel",
+      "top": 457,
+      "left": 504,
+      "height": 537,
+      "width": 904
+    },
+    {
+      "id": "query-mobile-filter-drawer",
+      "top": 0,
+      "left": 0,
+      "height": 0,
+      "width": 0
+    },
+    {
+      "id": "query-visible-columns",
+      "top": 239,
+      "left": 504,
+      "height": 54,
+      "width": 904
+    }
+  ]
+}
+  ✓  2 [chromium] › e2e/_probe-query-layout.spec.ts:7:3 › probe query layout at 1600 (1.0s)
+
+  2 passed (4.5s)
