@@ -162,20 +162,27 @@ test.describe("@followup-usability release-gate route walk", () => {
   });
 
   test("Compare normalized-speedup chart defaults to the comparable-only filter when partials exist", async ({ page }) => {
-    // The exact compare URL pair depends on the committed corpus. We use
-    // two known short ids that share a benchmark cohort but differ on
-    // queries, so the chart will render the toggle. If the corpus is
-    // refreshed, the test will fail loudly rather than silently passing.
-    await page.goto("/results/compare?ids=ba6a8c83,5e6c5eba");
+    // DuckDB plus the generated DataFusion Partial fixture share the
+    // TPC-H cohort but differ on Q22, so the chart must render the
+    // comparable-only toggle. If the corpus is refreshed, this should
+    // fail loudly rather than silently accepting another chart panel.
+    await page.goto("/results/compare?ids=ba6a8c83,a8225285");
     await waitForShell(page);
     await waitForDataLoaded(page, /TPC-H Comparison/);
 
-    // Click into the Compare > Normalized speedup tab if the page renders
-    // multiple tabs. The chart panel exposes a tab role with that label
-    // (ChartPanel groups). When all queries are comparable the toggle does
-    // not render — that is acceptable. We assert the chart container.
-    const chartPanel = page.getByRole("tabpanel", { name: /chart/i }).first();
-    await expect(chartPanel).toBeVisible();
+    const speedupButton = page.getByRole("button", { name: "Normalized Speedup" });
+    await expect(speedupButton).toHaveAttribute("aria-pressed", "true");
+
+    const chartPanel = page.getByRole("tabpanel", { name: "Per-query chart" });
+    await expect(chartPanel.locator('svg[aria-label="Normalized speedup chart"]')).toBeVisible();
+    await expect(chartPanel).toContainText(/fully comparable queries/);
+    await expect(chartPanel).toContainText(/hidden/);
+
+    const comparableOnlyToggle = chartPanel.getByTestId("normalized-speedup-comparable-only-toggle");
+    await expect(comparableOnlyToggle).toBeChecked();
+    await comparableOnlyToggle.uncheck();
+    await expect(comparableOnlyToggle).not.toBeChecked();
+    await expect(chartPanel).toContainText(/Showing all \d+ queries; \d+ have missing data/);
 
     await maybeCapture(page, "compare-normalized-speedup");
   });
