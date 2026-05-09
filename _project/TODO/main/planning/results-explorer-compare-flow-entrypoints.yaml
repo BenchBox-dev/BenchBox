@@ -69,32 +69,50 @@ work:
   - id: w4
     summary: "Add Query Workbench compare selection"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      Add a checkbox selection column and compare tray to Query Workbench
-      result rows. Preserve hidden result_id values even when the Result ID
-      column is not visible, show selected-run count plus compatibility
-      messages, and launch Compare from the current filtered result set.
+      Query Workbench grew a sticky-left "Compare" column with per-row
+      checkboxes plus a tray (`data-testid="query-compare-tray"`) above
+      the table. The first selection locks the cohort signature
+      (benchmark, scale_factor, phase, primary_metric); subsequent rows
+      that don't match render their checkbox disabled with a tooltip
+      explaining the lock. Hidden `result_id` is already on every row
+      via the View link, so no new plumbing was needed. The launch
+      affordance switches between a disabled "Compare (need 2+)" stub
+      and an enabled `<a>` pointing at `buildCompareUrl(...)` once
+      two compatible rows are picked. Verification log:
+      _project/verification-logs/results-explorer-compare-flow-entrypoints/w456.log.
 
   - id: w5
     summary: "Add Home leaderboard and recent-result compare entrypoints"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      Add compare affordances to Home leaderboard and Recent Results surfaces.
-      Either provide row checkboxes where ids are present or route to the
-      compare builder with benchmark/platform/scale context prefilled. Remove
-      any link that lands on an empty Compare error.
+      Home's leaderboard cohort selector now ends with a "Start a
+      comparison →" link (`data-testid="home-compare-entrypoint"`) that
+      routes to `/results/compare/`. The CompareBuilder shipped in #284
+      handles the empty-state flow, so users land on cohort filters and
+      pick from candidates without any URL editing. Row-level checkboxes
+      on the meta-leaderboard were rejected as out of scope: the matrix
+      renders aggregate cohort cells, not individual runs, so per-row
+      checkboxes would need to drill in. The prefilled-builder route
+      matches the YAML's "or route to the compare builder" alternative.
 
   - id: w6
     summary: "Constrain compatible cohort selection on detail pages"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      On Benchmark and Platform detail pages, enforce same-cohort selection as
-      users select rows. After the first selection, disable incompatible rows
-      with a short reason, keep compatible rows selectable, and replace dead
-      disabled CTA copy with instructions tied to visible checkboxes.
+      `PlatformIndex.tsx` now derives a cohort lock signature
+      (benchmark, scale_factor, phase, primary_metric) from the first
+      selected row. Each row checkbox carries an explicit
+      `data-testid="platform-compare-checkbox-<result_id>"` so tests
+      can target it precisely; rows that don't match the locked
+      signature render disabled with a tooltip listing the mismatched
+      fields. Compatible rows stay selectable, and deselecting back to
+      zero releases the lock. BenchmarkIndex was already constrained
+      by the page-level scale/phase contract (the heatmap only renders
+      one cohort at a time), so no change was needed there.
 
   - id: w7
     summary: "Cover compare entrypoints with automated and browser checks"

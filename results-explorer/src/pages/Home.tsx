@@ -376,6 +376,23 @@ export function Home(_: RoutableProps) {
                 />
               </div>
             </details>
+            {/* w5 (compare-flow-entrypoints): Home now exposes a direct
+                entry point into the in-page Compare builder. The builder
+                handles the empty state itself, so no ?ids= prefilling is
+                needed — users land on the cohort filters and pick from
+                the candidate list. */}
+            <div class="mt-3 flex items-center justify-between gap-3 border-t border-[var(--bb-border-default)] pt-3">
+              <p class="text-xs text-[var(--bb-fg-muted)]">
+                Compare two or more runs from the corpus side by side.
+              </p>
+              <a
+                href="/results/compare/"
+                data-testid="home-compare-entrypoint"
+                class="rounded-md border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] px-3 py-1.5 text-sm font-medium text-[var(--bb-fg-primary)] shadow-sm hover:bg-[var(--bb-surface-data-muted)]"
+              >
+                Start a comparison →
+              </a>
+            </div>
           </section>
         )}
 

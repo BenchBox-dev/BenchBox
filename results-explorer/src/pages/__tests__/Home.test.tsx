@@ -441,6 +441,16 @@ describe("Home", () => {
     await waitFor(() => expect(new URL(window.location.href).searchParams.get("mode")).toBe("ranks"));
   });
 
+  it("renders a Compare entrypoint inside the leaderboard cohort selector", async () => {
+    render(<Home />);
+    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+
+    const entrypoint = screen.getByTestId("home-compare-entrypoint");
+    expect(entrypoint).toHaveAttribute("href", "/results/compare/");
+    const selector = screen.getByRole("region", { name: "Leaderboard cohort selector" });
+    expect(selector.contains(entrypoint)).toBe(true);
+  });
+
   it("renders a compact run-compare-submit workflow near the leaderboard", async () => {
     render(<Home />);
     await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());

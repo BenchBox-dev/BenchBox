@@ -165,6 +165,61 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(screen.queryByTestId("platform-filter-reset")).toBeNull();
   });
 
+  it("locks the cohort signature after the first compare selection", async () => {
+    const cohortRows: PlatformIndexRowRow[] = [
+      makeRow({
+        result_id: "r-tpch-a",
+        short_id: "tpcha000",
+        benchmark: "tpch",
+        scale_factor: 0.1,
+        phase: "power",
+        run_date: "2026-04-01",
+        primary_metric: "display_geomean_ms",
+      }),
+      makeRow({
+        result_id: "r-tpch-b",
+        short_id: "tpchb000",
+        benchmark: "tpch",
+        scale_factor: 0.1,
+        phase: "power",
+        run_date: "2026-04-02",
+        primary_metric: "display_geomean_ms",
+      }),
+      makeRow({
+        result_id: "r-clickbench",
+        short_id: "click000",
+        benchmark: "clickbench",
+        scale_factor: 0.1,
+        phase: "power",
+        run_date: "2026-04-03",
+        primary_metric: "display_geomean_ms",
+      }),
+    ];
+    vi.mocked(getPlatformIndexRows).mockResolvedValue(cohortRows);
+
+    render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    const checkboxA = screen.getByTestId("platform-compare-checkbox-r-tpch-a") as HTMLInputElement;
+    const checkboxB = screen.getByTestId("platform-compare-checkbox-r-tpch-b") as HTMLInputElement;
+    const checkboxClickbench = screen.getByTestId(
+      "platform-compare-checkbox-r-clickbench",
+    ) as HTMLInputElement;
+
+    expect(checkboxA.disabled).toBe(false);
+    expect(checkboxB.disabled).toBe(false);
+    expect(checkboxClickbench.disabled).toBe(false);
+
+    fireEvent.click(checkboxA);
+    expect(checkboxA.checked).toBe(true);
+    expect(checkboxB.disabled).toBe(false);
+    expect(checkboxClickbench.disabled).toBe(true);
+    expect(checkboxClickbench.title).toContain("differs by benchmark");
+
+    fireEvent.click(checkboxA);
+    expect(checkboxClickbench.disabled).toBe(false);
+  });
+
   it("hides the platform filter strip when the cohort has fewer than 25 rows", async () => {
     render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
