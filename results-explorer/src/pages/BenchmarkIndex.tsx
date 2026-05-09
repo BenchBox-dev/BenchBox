@@ -605,6 +605,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
               summary: filteredSummary,
               historical: historicalEntries,
             }}
+            excludeChartIds={viewMode === "matrix" ? ["query_heatmap"] : undefined}
           />
         </div>
       )}
