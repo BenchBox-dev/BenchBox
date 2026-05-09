@@ -1,0 +1,76 @@
+# w5 — Add filters to large Platform detail tables
+
+Branch: feat/explorer-platform-filters-density
+Develop tip at start: 6c28d2b45 (PR #298 merged; #304 still open)
+
+w4 (provenance compaction) is deferred to a follow-up PR after #304
+merges, since both touch QueryHeatmap.tsx and a concurrent edit would
+collide on the rebase.
+
+## Current state on develop tip
+
+`results-explorer/src/pages/PlatformIndex.tsx`. The page already
+plumbs facets via `useFacetState()` and applies them via
+`matchesFacetRow(row, facets, { keys: PLATFORM_RESULT_FACET_KEYS })`
+at line 166. PLATFORM_RESULT_FACET_KEYS already lists benchmark,
+scale_factor, phase, trust_tier, validation_status, date_window plus
+others.
+
+Despite the underlying state being available, the only visible filter
+control is the Tuning select (only when >1 tuning mode exists). On a
+DuckDB platform page with 70 results across multiple benchmarks/
+phases/scales, the user cannot narrow by benchmark/scale/phase from
+the UI.
+
+The count strip at line 309-313 reads:
+
+  > Showing 70 of 70 results
+
+There is no reset affordance.
+
+## Defects vs the w0 review
+
+- D1: No filter UI on Platform detail despite filter state being
+  fully wired into the data layer.
+- D2: Static "Showing 70 of 70" count even when no filters could
+  apply — but the count itself is already derived from the filtered
+  array, so once filters render and fire, the count updates without
+  further changes. The defect is purely the absence of UI.
+- D3: No one-click reset.
+
+## Planned change
+
+1. Above the existing compare-guidance section, render a "Filters"
+   strip when `allPlatformResults.length >= 25`. Below 25 rows the
+   strip is omitted to avoid extra chrome on platforms with sparse
+   coverage (the brief explicitly thresholds on >=25).
+2. Six selects: Benchmark, Scale, Phase, Trust, Validation, Date
+   window. Each pulls option values from the actual rendered rows
+   (so the user sees only meaningful choices) except Date window
+   which uses the canonical four-bucket DateWindowFacet set.
+3. A "Reset" button shown only when at least one of those facets is
+   active. Clears the six w5 facets in one action; leaves the existing
+   tuning filter and any compare selection untouched (out of scope).
+4. The existing count strip at line 311 already reads from
+   `platformResults` (filtered length), so once filters fire the
+   "Showing X of Y" updates from "70 of 70" to "filtered of total"
+   automatically. No structural change needed there.
+
+`metric_contract` from the brief is omitted — there is no single
+facet for it; a metric-contract filter would require deriving from
+`primary_metric` plus units. Documented as a follow-up if the corpus
+ever needs it.
+
+## Manual route walk
+
+- /results/p/duckdb/ (70 rows across multiple benchmarks): Tuning
+  select renders; no other filter controls.
+- /results/p/<low-volume>/ (<25 rows): No filter strip needed; matches
+  the <25 threshold.
+
+## Verification commands
+
+- `cd results-explorer && npm test -- --run src/pages/__tests__/PlatformIndex.test.tsx`
+- `cd results-explorer && npm run typecheck`
+- `cd results-explorer && npm run build`
+- Browser walks deferred to release-gate Playwright (TODO #8 w3).

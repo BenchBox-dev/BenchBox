@@ -135,6 +135,42 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(routeMock).toHaveBeenCalledWith("/results/p/postgres/");
   });
 
+  it("renders the platform filter strip when the cohort has >=25 rows and reset clears it", async () => {
+    const denseRows: PlatformIndexRowRow[] = Array.from({ length: 30 }, (_, idx) =>
+      makeRow({
+        result_id: `r-dense-${idx}`,
+        short_id: `dense${String(idx).padStart(4, "0")}`,
+        benchmark: idx < 18 ? "tpch" : "clickbench",
+        scale_factor: idx % 2 === 0 ? 0.1 : 1,
+        run_date: "2026-04-10",
+        geomean_ms: 10 + idx,
+      }),
+    );
+    vi.mocked(getPlatformIndexRows).mockResolvedValue(denseRows);
+
+    render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    const filterStrip = screen.getByTestId("platform-detail-filters");
+    expect(filterStrip).toBeTruthy();
+    expect(screen.getByText("Showing 30 of 30 results")).toBeTruthy();
+
+    fireEvent.change(screen.getByTestId("platform-filter-benchmark"), {
+      target: { value: "clickbench" },
+    });
+    await waitFor(() => expect(screen.getByText("Showing 12 of 12 results")).toBeTruthy());
+
+    fireEvent.click(screen.getByTestId("platform-filter-reset"));
+    await waitFor(() => expect(screen.getByText("Showing 30 of 30 results")).toBeTruthy());
+    expect(screen.queryByTestId("platform-filter-reset")).toBeNull();
+  });
+
+  it("hides the platform filter strip when the cohort has fewer than 25 rows", async () => {
+    render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+    expect(screen.queryByTestId("platform-detail-filters")).toBeNull();
+  });
+
   it("shows persistent compare guidance and cohort labels before selection", async () => {
     render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());

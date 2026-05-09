@@ -3,8 +3,9 @@ import type { RoutableProps } from "preact-router";
 import { route } from "preact-router";
 import type { PlatformIndexRowRow } from "@/lib/duckdbQueries";
 import { getPlatformIndexRows } from "@/lib/duckdbQueries";
-import { useFacetState, type FacetKey, type FacetState } from "@/lib/facetModel";
-import { hasActiveFacets, matchesFacetRow, singleFacetValue } from "@/lib/facetMatching";
+import { useFacetState, type DateWindowFacet, type FacetKey, type FacetState } from "@/lib/facetModel";
+import { hasActiveFacets, matchesFacetRow, singleFacetValue, toDateWindowFacet } from "@/lib/facetMatching";
+import { formatTrustLabel, formatValidationStatus } from "@/lib/displayLabels";
 import { buildCompareUrl, compareIdForRow, displayCompareId } from "@/lib/resultLinks";
 import { humanizeBenchmark, fmtScore, fmtGeomean, errMsg } from "@/utils";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
@@ -101,6 +102,40 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   const { facets, setFacet } = useFacetState();
   const tuningFilter = singleFacetValue(facets.tuning_mode, "all") ?? "all";
   const setTuningFilter = (value: string) => setFacet("tuning_mode", value === "all" ? [] : [value]);
+  // w5 (table-sticky-density-and-semantics): single-select filters for the
+  // Platform detail table. Each maps to a FacetKey already plumbed through
+  // useFacetState/matchesFacetRow so the filtered count strip updates as
+  // soon as the user picks a value.
+  const benchmarkFilter = singleFacetValue(facets.benchmark, "all") ?? "all";
+  const scaleFilter = singleFacetValue(facets.scale_factor, "all") ?? "all";
+  const phaseFilter = singleFacetValue(facets.phase, "all") ?? "all";
+  const trustFilter = singleFacetValue(facets.trust_tier, "all") ?? "all";
+  const validationFilter = singleFacetValue(facets.validation_status, "all") ?? "all";
+  const dateWindowFilter: DateWindowFacet = facets.date_window;
+  // Helper for the five string-array facets that share the "all means
+  // empty array" pattern. date_window has its own DateWindowFacet shape
+  // and uses toDateWindowFacet directly.
+  const setSingleArrayFacet = (
+    key: "benchmark" | "scale_factor" | "phase" | "trust_tier" | "validation_status",
+    value: string,
+  ) => setFacet(key, value === "all" ? [] : [value]);
+  const w5FilterKeys: FacetKey[] = [
+    "benchmark",
+    "scale_factor",
+    "phase",
+    "trust_tier",
+    "validation_status",
+    "date_window",
+  ];
+  const hasW5Filters = hasActiveFacets(facets, w5FilterKeys);
+  const resetW5Filters = () => {
+    setFacet("benchmark", []);
+    setFacet("scale_factor", []);
+    setFacet("phase", []);
+    setFacet("trust_tier", []);
+    setFacet("validation_status", []);
+    setFacet("date_window", "all");
+  };
   // Default: geomean_ms ascending (fastest first), nulls last. The empty-state
   // ordering is observable behaviour — must_preserve in the parent TODO.
   const [sort, setSort] = useState<SortState<PlatformSortKey>>({
@@ -175,6 +210,30 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   const tuningModes = [
     ...new Set(allPlatformResults.map((r) => r.tuning_mode).filter((m): m is string => m !== null)),
   ].sort();
+
+  // w5: derived option lists for the new filter strip. Each list is built
+  // from the unfiltered cohort (allPlatformResults) so the user can always
+  // see every available value, even after narrowing.
+  const benchmarkOptions = [...new Set(allPlatformResults.map((r) => r.benchmark))].sort();
+  const scaleOptions = [
+    ...new Set(allPlatformResults.map((r) => r.scale_factor)),
+  ].sort((a, b) => a - b);
+  const phaseOptions = [...new Set(allPlatformResults.map((r) => r.phase))].sort();
+  const trustOptions = [
+    ...new Set(
+      allPlatformResults
+        .map((r) => r.trust_label)
+        .filter((label): label is string => label !== null && label !== undefined),
+    ),
+  ].sort();
+  const validationOptions = [
+    ...new Set(
+      allPlatformResults
+        .map((r) => r.validation_status)
+        .filter((status): status is string => status !== null && status !== undefined),
+    ),
+  ].sort();
+  const showW5Filters = allPlatformResults.length >= 25;
 
   const platformResultsRaw = allPlatformResults.filter((row) =>
     matchesFacetRow(row, facets, { keys: PLATFORM_RESULT_FACET_KEYS }),
@@ -315,6 +374,151 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
           )}
         </div>
       </div>
+
+      {showW5Filters && (
+        <section
+          class="mb-4 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 shadow-sm"
+          data-testid="platform-detail-filters"
+          aria-label="Platform result filters"
+        >
+          <div class="flex flex-wrap items-end gap-3">
+            <div class="flex flex-col gap-1">
+              <label class="text-xs font-medium text-[var(--bb-data-fg-muted)]" for="platform-filter-benchmark">
+                Benchmark
+              </label>
+              <select
+                id="platform-filter-benchmark"
+                data-testid="platform-filter-benchmark"
+                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-sm shadow-sm"
+                value={benchmarkFilter}
+                onChange={(event) =>
+                  setSingleArrayFacet("benchmark", (event.target as HTMLSelectElement).value)
+                }
+              >
+                <option value="all">All benchmarks</option>
+                {benchmarkOptions.map((value) => (
+                  <option key={value} value={value}>
+                    {humanizeBenchmark(value)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="text-xs font-medium text-[var(--bb-data-fg-muted)]" for="platform-filter-scale">
+                Scale
+              </label>
+              <select
+                id="platform-filter-scale"
+                data-testid="platform-filter-scale"
+                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-sm shadow-sm"
+                value={scaleFilter}
+                onChange={(event) =>
+                  setSingleArrayFacet("scale_factor", (event.target as HTMLSelectElement).value)
+                }
+              >
+                <option value="all">All scales</option>
+                {scaleOptions.map((value) => (
+                  <option key={String(value)} value={String(value)}>
+                    SF {value}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="text-xs font-medium text-[var(--bb-data-fg-muted)]" for="platform-filter-phase">
+                Phase
+              </label>
+              <select
+                id="platform-filter-phase"
+                data-testid="platform-filter-phase"
+                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-sm shadow-sm"
+                value={phaseFilter}
+                onChange={(event) =>
+                  setSingleArrayFacet("phase", (event.target as HTMLSelectElement).value)
+                }
+              >
+                <option value="all">All phases</option>
+                {phaseOptions.map((value) => (
+                  <option key={value} value={value}>
+                    {value.charAt(0).toUpperCase() + value.slice(1)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="text-xs font-medium text-[var(--bb-data-fg-muted)]" for="platform-filter-trust">
+                Trust tier
+              </label>
+              <select
+                id="platform-filter-trust"
+                data-testid="platform-filter-trust"
+                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-sm shadow-sm"
+                value={trustFilter}
+                onChange={(event) =>
+                  setSingleArrayFacet("trust_tier", (event.target as HTMLSelectElement).value)
+                }
+              >
+                <option value="all">All trust tiers</option>
+                {trustOptions.map((value) => (
+                  <option key={value} value={value}>
+                    {formatTrustLabel(value)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="text-xs font-medium text-[var(--bb-data-fg-muted)]" for="platform-filter-validation">
+                Validation
+              </label>
+              <select
+                id="platform-filter-validation"
+                data-testid="platform-filter-validation"
+                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-sm shadow-sm"
+                value={validationFilter}
+                onChange={(event) =>
+                  setSingleArrayFacet("validation_status", (event.target as HTMLSelectElement).value)
+                }
+              >
+                <option value="all">All validation</option>
+                {validationOptions.map((value) => (
+                  <option key={value} value={value}>
+                    {formatValidationStatus(value)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="text-xs font-medium text-[var(--bb-data-fg-muted)]" for="platform-filter-date-window">
+                Date window
+              </label>
+              <select
+                id="platform-filter-date-window"
+                data-testid="platform-filter-date-window"
+                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-sm shadow-sm"
+                value={dateWindowFilter}
+                onChange={(event) =>
+                  setFacet("date_window", toDateWindowFacet((event.target as HTMLSelectElement).value))
+                }
+              >
+                <option value="all">All time</option>
+                <option value="30d">Last 30 days</option>
+                <option value="90d">Last 90 days</option>
+                <option value="365d">Last 365 days</option>
+              </select>
+            </div>
+            {hasW5Filters && (
+              <button
+                type="button"
+                data-testid="platform-filter-reset"
+                class="ml-auto rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1.5 text-sm font-medium text-[var(--bb-data-fg-primary)] shadow-sm hover:bg-[var(--bb-surface-data-muted)]"
+                onClick={resetW5Filters}
+              >
+                Reset filters
+              </button>
+            )}
+          </div>
+        </section>
+      )}
 
       <section
         class="mb-4 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 shadow-sm"
