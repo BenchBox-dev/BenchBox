@@ -85,16 +85,20 @@ skins, deliberate palette exports for design tooling, and similar.
 - **PR-time** — `.github/workflows/pr.yml` job `explorer-tokens` is gated
   in two tiers. The **outer job** runs on any PR where
   `needs.ci-paths.outputs.needs-code-ci == 'true'` (i.e., any PR in the
-  code-CI tier — Python, infra, explorer, etc.); the runner spins up so
-  the `ci-required-result` aggregator always has a real status to read.
-  The **inner scan step** then `git diff`s against the base ref and only
-  invokes `make lint-explorer-tokens` when at least one path under
+  code-CI tier — Python, infra, explorer, etc.). The **inner scan step**
+  then `git diff`s against the base ref and only invokes
+  `make lint-explorer-tokens` when at least one path under
   `results-explorer/src/` changed. The aggregator at
   `pr.yml`'s `ci-required-result` job treats `success` and `skipped` for
-  this check as passing; `failure` blocks the PR. The
-  `explorer-tokens-path-classifier-output` TODO removes the inner tier
-  by promoting `explorer-paths-needed` into the `ci-paths` classifier
-  output.
+  this check as passing; `failure` blocks the PR. The two-tier shape
+  exists because `ci-paths` does not yet emit an `explorer-paths-needed`
+  output, so the cheapest available correctness gate is to spin the
+  outer job on every code-CI PR and have its inner step diff-check the
+  paths. The `explorer-tokens-path-classifier-output` TODO collapses
+  this to a single tier by promoting `explorer-paths-needed` into the
+  `ci-paths` classifier output, after which the outer job can be gated
+  directly on the path predicate and skip cleanly when no
+  `results-explorer/src/` files changed.
 - **Post-merge** — `.github/workflows/develop-post-merge.yml` job
   `explorer-tokens` runs unconditionally on every push to develop and
   re-runs the gate against the merged develop tree so that a squash
@@ -132,12 +136,16 @@ token), the on-call workflow is:
 2. **Allowlist the line** with `// allow-explorer-token-literal: <reason>`
    (or the `/* … */` form for CSS), where `<reason>` is concrete enough
    that a reviewer six months from now can decide whether to remove the
-   marker. Format suggestion: `hotfix-YYYY-MM-DD followup-needed-issue-NNN`.
-3. **File a regex-fix TODO** under `_project/TODO/main/bugs/` describing
-   the false-positive shape, so the allowlist can be removed once the
-   regex is tightened. Use `_project/scripts/scan_explorer_tokens.py` as
-   the single source of truth — adjust `UTILITIES`, `PALETTES`, `STOPS`,
-   or `LITERAL_RE` itself.
+   marker. The marker regex (`ALLOW_MARKER_RE`) only requires a
+   non-empty reason; for hotfix allowlists, the team convention is
+   `hotfix-YYYY-MM-DD followup-needed-issue-NNN` so a sweep can find
+   them later — but the format is not enforced by the gate.
+3. **File a regex-fix TODO** under `_project/TODO/main/planning/`
+   (`category: Bug`) describing the false-positive shape, so the
+   allowlist can be removed once the regex is tightened. Use
+   `_project/scripts/scan_explorer_tokens.py` as the single source of
+   truth — adjust `UTILITIES`, `PALETTES`, `STOPS`, or `LITERAL_RE`
+   itself.
 
 The gate is intentionally conservative: matching a literal in a comment
 or string is the documented contract (see

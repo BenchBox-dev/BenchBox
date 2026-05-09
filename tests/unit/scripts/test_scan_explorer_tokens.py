@@ -84,21 +84,11 @@ def test_literal_re_matches_when_followed_by_dash_word() -> None:
     assert scan.LITERAL_RE.findall('<div class="text-gray-700-typography" />') == ["text-gray-700"]
 
 
-def test_literal_re_reports_every_match_on_a_line() -> None:
-    # Tailwind classes are typically space-joined inside a single string,
-    # so multiple literals can share a line. `findall` must return all of
-    # them so the gate's stderr report points to every offending token,
-    # not just the first. scan_file relies on this so a contributor
-    # debugging "what does the gate want me to fix?" sees the full set.
-    line = '<div class="text-gray-700 bg-blue-500 border-red-300" />'
-    assert scan.LITERAL_RE.findall(line) == [
-        "text-gray-700",
-        "bg-blue-500",
-        "border-red-300",
-    ]
-
-
 def test_scan_file_reports_every_match_on_a_line(tmp_path: Path) -> None:
+    # Tailwind classes are typically space-joined inside a single string,
+    # so multiple literals can share a line. `scan_file` must surface all
+    # of them in one hit tuple so a contributor debugging "what does the
+    # gate want me to fix?" sees the full set, not just the first.
     target = tmp_path / "Component.tsx"
     target.write_text(
         '<div class="text-gray-700 bg-blue-500 border-red-300" />\n',
