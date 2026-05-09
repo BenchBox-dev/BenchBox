@@ -63,10 +63,14 @@ function describeNaturalQualifiers(source: RunIdentitySource): string[] {
   return out;
 }
 
-// Cohort-aware qualifier list: natural qualifiers, then short result_id
-// as a last-resort tiebreaker.
+// Cohort-aware qualifier list: natural qualifiers, then a short result_id
+// slice for compact disambiguation, then the full result_id as a
+// guaranteed-unique terminal fallback. The full id is only reached if
+// two sources share the same 8-char prefix — an unlikely but possible
+// collision that the previous single-slice tiebreaker would silently
+// retain after the loop's safety cap.
 function describeCohortQualifiers(source: RunIdentitySource): string[] {
-  return [...describeNaturalQualifiers(source), source.result_id.slice(0, 8)];
+  return [...describeNaturalQualifiers(source), source.result_id.slice(0, 8), source.result_id];
 }
 
 function joinForVariant(base: string, qualifiers: string[], variant: RunIdentityVariant): string {
@@ -132,11 +136,16 @@ export function formatRunIdentitiesForCohort(
   // the bucket is unique. We track the qualifier-tier count per bucket
   // and apply it uniformly so members of the bucket carry comparable
   // detail. Round counts then translate to slices of each source's
-  // qualifier list.
+  // qualifier list. The cap walks the full qualifier ladder for the
+  // bucket — including the terminal full-result_id fallback — so the
+  // loop always terminates with unique labels (within data
+  // constraints) instead of silently accepting duplicates at a fixed
+  // round count.
   for (const [, indices] of bucketsByLabel) {
     if (indices.length < 2) continue;
+    const maxQualifiers = Math.max(...indices.map((i) => qualifierLists[i]!.length));
     let round = 0;
-    while (round < 6) {
+    while (round <= maxQualifiers) {
       const provisional = indices.map((i) => {
         const used = qualifierLists[i]!.slice(0, round);
         return `${sources[i]!.platform}${used.length > 0 ? " " + used.join(" ") : ""}`;

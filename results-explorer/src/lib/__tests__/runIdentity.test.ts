@@ -116,6 +116,21 @@ describe("formatRunIdentitiesForCohort", () => {
     expect(labels[1]).toContain("2222bbbb");
   });
 
+  it("falls through to the full result_id when 8-char prefixes collide", () => {
+    // Adversarial cohort where natural qualifiers all match and the
+    // short (8-char) result_id slice is also identical. The terminal
+    // full-id qualifier guarantees uniqueness instead of accepting a
+    // duplicate at the safety cap.
+    const cohort = [
+      source({ result_id: "ffffffffaaaa", platform: "Spark" }),
+      source({ result_id: "ffffffffbbbb", platform: "Spark" }),
+    ];
+    const labels = formatRunIdentitiesForCohort(cohort, "chart");
+    expect(new Set(labels).size).toBe(2);
+    expect(labels[0]).toContain("ffffffffaaaa");
+    expect(labels[1]).toContain("ffffffffbbbb");
+  });
+
   it("never produces duplicate visible labels for any cohort", () => {
     const cohort = [
       source({ result_id: "r1", platform: "Spark" }),

@@ -26,6 +26,16 @@ function ordinal(n: number): string {
   return `${n}${suffixes[(v - 20) % 10] ?? suffixes[v] ?? suffixes[0]}`;
 }
 
+export function preserveUniqueAfterTruncation(identities: readonly string[], maxLen: number): string[] {
+  const truncated = identities.map((id) => (id.length > maxLen ? `${id.slice(0, maxLen - 1)}…` : id));
+  const counts = new Map<string, number>();
+  for (const value of truncated) counts.set(value, (counts.get(value) ?? 0) + 1);
+  return identities.map((id, i) => {
+    const candidate = truncated[i]!;
+    return (counts.get(candidate) ?? 0) > 1 ? id : candidate;
+  });
+}
+
 export function RankTable({ summary }: Props) {
   const { platforms, query_ids } = summary;
   if (platforms.length === 0 || query_ids.length === 0) return null;
@@ -44,16 +54,31 @@ export function RankTable({ summary }: Props) {
   // Cohort-aware column-header identities. When the same platform name
   // appears more than once in the rank cohort (e.g., two DataFusion
   // versions), append the shortest qualifier set that distinguishes
-  // them. Single occurrences keep the bare platform name.
+  // them. Single occurrences keep the bare platform name. We pass the
+  // deployment fingerprint fields too so two same-platform/same-version
+  // runs that differ only by deployment can be disambiguated naturally
+  // instead of falling straight to a result_id tiebreaker.
   const headerIdentitySources: RunIdentitySource[] = platforms.map((p) => ({
     result_id: p.result_id,
     platform: p.platform,
     platform_version: p.platform_version,
     run_date: p.run_date,
     trust_label: p.trust_label,
+    deployment_class: p.deployment_class,
+    instance_or_warehouse: p.instance_or_warehouse,
   }));
   const headerIdentities = formatRunIdentitiesForCohort(headerIdentitySources, "compact");
   const headerTooltips = formatRunIdentitiesForCohort(headerIdentitySources, "tooltip");
+  // Visual truncation that preserves cohort uniqueness. The 16-char cap
+  // keeps headers narrow on small viewports, but a naive slice can
+  // re-introduce duplicates by cutting off the qualifier suffix that
+  // distinguished two same-platform runs (e.g., `DataFusion v1.40.0`
+  // vs `DataFusion v1.40.1` both → `DataFusion v1.4…`). Detect those
+  // collisions and keep the full identity for the affected rows so the
+  // disambiguation contract is preserved at the cost of slightly wider
+  // header cells. The tooltip variant remains attached for hover
+  // recovery in either case.
+  const displayedHeaders = preserveUniqueAfterTruncation(headerIdentities, 16);
 
   return (
     <div class="w-full overflow-x-auto">
@@ -67,9 +92,8 @@ export function RankTable({ summary }: Props) {
               Query
             </th>
             {platforms.map((p, i) => {
-              const identity = headerIdentities[i] ?? p.platform;
               const tooltip = headerTooltips[i] ?? p.platform;
-              const truncated = identity.length > 16 ? `${identity.slice(0, 15)}…` : identity;
+              const truncated = displayedHeaders[i] ?? p.platform;
               return (
                 <th
                   key={p.result_id}
