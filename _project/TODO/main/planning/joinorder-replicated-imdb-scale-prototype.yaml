@@ -45,6 +45,11 @@ work:
         - any required first-class stats/analyze phase TODO is completed or this
           prototype is explicitly narrowed to a measurement smoke that does not
           claim stats-maintenance conclusions;
+        - the scale-stress decision note contains exactly one `Stats phase gate:
+          completed`, `Stats phase gate: smoke-only`, or `Stats phase gate:
+          dependency:joinorder-statistics-phase-measurement` line; if the
+          dependency gate is used, add that TODO to this item's `deps.needs`
+          before coding;
         - result-bundle labels and manifest fields for replicated_imdb are
           already specified by the decision framework.
 
@@ -163,11 +168,14 @@ anti_patterns:
 
 verification:
   - description: "Decision-framework approved replicated_imdb explicitly (not 'no scaled JOB' or other path)"
-    command: "grep -cE '^Recommendation: replicated_imdb baseline|^Recommendation: staged combination' _project/decisions/joinorder-scale-stress-*.md | head -1"
+    command: "grep -hEc '^Recommendation: (replicated_imdb baseline|staged combination)' _project/decisions/joinorder-scale-stress-decision-*.md | awk '{ s += $1 } END { print s }'"
     expected_output: "1"
-  - description: "Stats/analyze phase handling is decided (either implemented or explicitly scoped out)"
-    command: "grep -cE 'stats/analyze phase|stats_mode:|stats-build phase' _project/decisions/joinorder-scale-stress-*.md | head -1"
-    expected_output: ">= 1"
+  - description: "Stats/analyze phase handling is decided with a concrete gate"
+    command: "grep -hEc '^Stats phase gate: (completed|smoke-only|dependency:joinorder-statistics-phase-measurement)' _project/decisions/joinorder-scale-stress-decision-*.md | awk '{ s += $1 } END { print s }'"
+    expected_output: "1"
+  - description: "Stats/analyze dependency gate is reflected in prototype dependencies before coding"
+    command: "! grep -hEq '^Stats phase gate: dependency:joinorder-statistics-phase-measurement' _project/decisions/joinorder-scale-stress-decision-*.md || rg -n 'joinorder-statistics-phase-measurement' _project/TODO/main/planning/joinorder-replicated-imdb-scale-prototype.yaml"
+    expected_output: "no output unless dependency gate is selected; otherwise TODO references the dependency"
   - description: "Replicated archive builder produces deterministic output (re-run same input → same sha256)"
     command: "uv run -- python -m pytest tests/unit/core/joinorder_replicated/test_builder_determinism.py -q"
     expected_output: "all tests pass"
@@ -196,6 +204,7 @@ verification:
 scope_limit:
   only_modify:
     - "benchbox/core/joinorder_replicated/"
+    - "benchbox/core/benchmark_registry.py"
     - "benchbox/cli/"
     - "tests/unit/core/joinorder_replicated/"
     - "tests/unit/core/publishing/test_replicated_imdb_bundle_metadata.py"

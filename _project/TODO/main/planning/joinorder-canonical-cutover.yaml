@@ -48,16 +48,19 @@ work:
     notes: |
       File: `benchbox/core/joinorder/benchmark.py`
       Replace generator-based ingestion with:
+        from benchbox.cli import config
         from benchbox.core.data_fetch import fetch_data
-        data_dir = fetch_data("joinorder", registry, override_path=cli.data_path)
+        output_dir = config.get_datagen_path("joinorder", 1.0)
+        data_dir = fetch_data("joinorder", registry, output_dir=output_dir)
         # 21 Parquet files at known paths under data_dir
         for table in TABLES:
           platform.load_parquet(table, data_dir / f"{table}.parquet")
 
-      Add `--data-path` CLI flag (and `BENCHBOX_DATA_PATH_JOINORDER`
-      env var) to the run_benchmark entry points (CLI and MCP). Both
-      bypass the auto-download path and read 21 Parquets from the
-      user-supplied directory.
+      Do not add a new dataset-location flag or benchmark-specific env var.
+      Air-gapped users pre-populate the existing datagen directory
+      (`BENCHBOX_OUTPUT_DIR` / `benchmark_runs/datagen/joinorder_1.0/`);
+      `fetch_data()` verifies the manifest checksum through the same
+      code path used after an auto-download.
 
       Update DataFrame queries (`benchbox/core/joinorder/dataframe_queries.py`)
       to read Parquet directly via `ctx.read_parquet(...)`. The 13
@@ -340,10 +343,13 @@ work:
     notes: |
       Files:
         - README.md: clarify joinorder = canonical IMDb 2013, one-time
-          ~1.2 GB download, sf=1 only, mention `--data-path` opt-out
+          ~1.2 GB download, sf=1 only, and existing
+          `BENCHBOX_OUTPUT_DIR` / `benchmark_runs/datagen/` pre-population
+          convention
         - docs/benchmarks/join-order.md: full rewrite — retract
           "realistic data distributions / preserving join characteristics";
-          new flow; sf=1 explanation; citation; license; --data-path
+          new flow; sf=1 explanation; citation; license; datagen directory
+          pre-population for air-gapped environments
         - benchbox/core/joinorder_synthetic/generator.py docstring:
           retract fidelity claims (already done in w2); link to
           canonical joinorder
@@ -404,7 +410,8 @@ work:
         ### Breaking
         - `joinorder` benchmark now uses canonical IMDb 2013 Parquet
           archive (sf=1 only). First-run downloads ~1.2 GB from
-          GitHub Release. Use `--data-path` for air-gapped environments.
+          GitHub Release into `benchmark_runs/datagen/joinorder_1.0/`;
+          air-gapped users can pre-populate that datagen directory.
           (#289)
         - The previous uniformly-random synthetic generator has been
           renamed to `joinorder_synthetic` and is internal-only
@@ -545,7 +552,7 @@ must_preserve:
   - "Existing joinorder bundle filenames in published-results branch — those are on the published-results branch, NOT touched here; this TODO only re-tags bundles in the develop tree's results-data/bundles/"
   - "DataFrame mode for the 13 already-translated queries — they continue to work on canonical data because they are schema-correct"
   - "Other benchmarks (tpch, tpcds, etc.) — no behavior change; their scale_options remain unchanged"
-  - "MCP run_benchmark API signature — adding --data-path / env var must be additive only"
+  - "MCP run_benchmark API signature — do not add dataset-location flags or benchmark-specific env vars; reuse the existing BENCHBOX_OUTPUT_DIR/datagen convention"
   - "Result-explorer UI — zero changes; the surface: internal field filters at data layer only"
   - "Existing test suite at fast tier — runs in same time bounds (verbosity tests now hit joinorder_synthetic which generates at sf=0.01 just as before)"
 
@@ -600,7 +607,7 @@ scope_limit:
     - "benchbox/core/joinorder_synthetic/ (new module — receives moved files via git mv)"
     - "benchbox/core/benchmark_registry.py (joinorder + joinorder_synthetic entries)"
     - "benchbox/core/publishing/bundle_publisher.py (dataset_version field)"
-    - "benchbox/cli/* and benchbox/mcp/tools/benchmark.py (--data-path flag, help text)"
+    - "benchbox/cli/* and benchbox/mcp/tools/benchmark.py (joinorder sf=1, first-run download, BENCHBOX_OUTPUT_DIR/datagen help text)"
     - "tests/unit/core/joinorder/ (canonical query coverage test)"
     - "tests/unit/core/joinorder_synthetic/ (moved synthetic tests)"
     - "tests/unit/core/test_core_verbosity.py, test_core_quiet.py (3 line changes — synthetic import)"
@@ -658,8 +665,9 @@ impact:
   user_impact: |
     Breaking change for users running `joinorder` at sf!=1: clear
     error pointing at `joinorder_synthetic`. Otherwise transparent —
-    first run downloads ~1.2 GB silently, subsequent runs cached.
-    `--data-path` opt-out for air-gapped environments.
+    first run downloads ~1.2 GB silently into the existing datagen
+    directory, subsequent runs reuse it. Air-gapped users pre-populate
+    `benchmark_runs/datagen/joinorder_1.0/` under `BENCHBOX_OUTPUT_DIR`.
   technical_debt: |
     Eliminates JOB-correctness debt. Establishes patterns
     (DATA-LICENSE per benchmark, dataset_version in result bundles,
