@@ -344,10 +344,17 @@ export function QueryHeatmap({
                   />
                 )}
                 <div class="min-w-0 flex-1">
-                  <div class="flex flex-wrap items-center gap-1.5">
+                  <div class="flex items-center gap-1">
                     <h2 class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">{row.platform}</h2>
                     {!row.is_ranking_eligible && (
-                      <span class="text-xs text-[var(--bb-data-fg-subtle)]">{complianceLabel(row.compliance_class)}</span>
+                      <span
+                        class="text-xs text-[var(--bb-data-fg-subtle)] cursor-help"
+                        title={`Compliance: ${complianceLabel(row.compliance_class).replace(/^\(|\)$/g, "")}`}
+                        aria-label={`Compliance: ${complianceLabel(row.compliance_class).replace(/^\(|\)$/g, "")}`}
+                        data-testid={`heatmap-mobile-compliance-marker-${row.result_id}`}
+                      >
+                        *
+                      </span>
                     )}
                   </div>
                   {row.platform_version && (
@@ -557,21 +564,22 @@ export function QueryHeatmap({
                     }`}
                     style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "platform"))}
                   >
-                    <div class="flex flex-wrap items-center gap-1.5">
+                    <div class="flex items-center gap-1">
                       <span class="font-medium text-[var(--bb-data-fg-primary)]">{row.platform}</span>
                       {!row.is_ranking_eligible && (
-                        <span class="text-xs text-[var(--bb-data-fg-subtle)]">{complianceLabel(row.compliance_class)}</span>
+                        <span
+                          class="text-xs text-[var(--bb-data-fg-subtle)] cursor-help"
+                          title={`Compliance: ${complianceLabel(row.compliance_class).replace(/^\(|\)$/g, "")}`}
+                          aria-label={`Compliance: ${complianceLabel(row.compliance_class).replace(/^\(|\)$/g, "")}`}
+                          data-testid={`heatmap-compliance-marker-${row.result_id}`}
+                        >
+                          *
+                        </span>
                       )}
                     </div>
                     {row.platform_version && (
                       <div class="mt-0.5 text-xs text-[var(--bb-data-fg-subtle)]">{row.platform_version}</div>
                     )}
-                    <a
-                      href={`/results/r/${row.result_id}#run-receipt`}
-                      class="mt-1 inline-block text-xs font-medium no-underline"
-                    >
-                      Receipt →
-                    </a>
                   </td>
                   <td
                     role="gridcell"
@@ -580,9 +588,17 @@ export function QueryHeatmap({
                     }`}
                     style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "trust"))}
                   >
-                    <div class="flex flex-wrap gap-1">
-                      <TrustBadge trustLabel={row.trust_label} compact />
-                      <ValidationBadge validationStatus={row.validation_status} showMissing />
+                    <div class="flex flex-col gap-0.5">
+                      <div class="flex flex-wrap gap-1">
+                        <TrustBadge trustLabel={row.trust_label} compact />
+                        <ValidationBadge validationStatus={row.validation_status} showMissing />
+                      </div>
+                      <a
+                        href={`/results/r/${row.result_id}#run-receipt`}
+                        class="text-xs font-medium no-underline"
+                      >
+                        Receipt →
+                      </a>
                     </div>
                   </td>
                   <td
