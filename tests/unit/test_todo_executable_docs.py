@@ -61,3 +61,15 @@ def test_codex_thread_rescan_audit_does_not_claim_present_blind_spots_are_missin
     assert "are not present in this worktree" not in audit
     for stem in ("103000", "103001", "103002"):
         assert stem in audit
+
+
+def test_joinorder_dataframe_followup_path_uses_seeded_yaml() -> None:
+    path = REPO_ROOT / "_project" / "TODO" / "main" / "planning" / "joinorder-canonical-cutover.yaml"
+    text = path.read_text(encoding="utf-8")
+
+    seeded_path = "_project/TODO/main/planning/track2-joinorder-dataframe-coverage.yaml"
+    stale_path = "_project/TODO/main/planning/track2-joinorder-dataframe-coverage.md"
+
+    assert f'f"{seeded_path}"' in text
+    assert f"grep -c '{seeded_path}'" in text
+    assert stale_path not in text
