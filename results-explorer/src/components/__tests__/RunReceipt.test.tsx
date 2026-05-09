@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/preact";
+import { fireEvent, render, screen, within } from "@testing-library/preact";
 import { describe, expect, it } from "vitest";
 import type { DetailResult } from "@/types";
 import { RunReceipt, planDownloadUrl } from "@/components/RunReceipt";
@@ -79,7 +79,11 @@ describe("RunReceipt", () => {
     expect(within(receipt).getByText("DuckDB")).toBeTruthy();
     expect(within(receipt).getByText("macOS")).toBeTruthy();
     expect(within(receipt).getByText("Trust")).toBeTruthy();
-    expect(within(receipt).getByText("maintainer-run")).toBeTruthy();
+    // `results-explorer-result-detail-metadata-density` w4 wires
+    // RunReceipt onto the shared display-label formatters so the
+    // hyphenated source slug renders as a humanized label here too.
+    expect(within(receipt).getByText("maintainer run")).toBeTruthy();
+    expect(within(receipt).getByText("public (curated)")).toBeTruthy();
     expect(within(receipt).getByText("exact")).toBeTruthy();
     expect(within(receipt).getByText("Eligible")).toBeTruthy();
     expect(within(receipt).getByText("abc12345")).toBeTruthy();
@@ -143,6 +147,78 @@ describe("RunReceipt", () => {
     expect(within(receipt).queryByRole("link", { name: "Download plans" })).toBeNull();
     // The non-link "Plans available" fallback string is shown instead.
     expect(within(receipt).getByText("Plans available")).toBeTruthy();
+  });
+
+  it("hides missing metadata behind the Show missing metadata disclosure (w3)", () => {
+    // Sparse-metadata fixture: trust + visibility recorded, the entire
+    // Platform/Environment surface unrecorded, validation/compliance
+    // missing, no normalized cost. The default view should expose
+    // recorded fields plus per-section "N field(s) not recorded"
+    // counters; clicking the global disclosure reveals the actual
+    // Not-recorded rows so audit users can still see them.
+    render(
+      <RunReceipt
+        detail={makeDetail({
+          platform_version: null,
+          driver_version: null,
+          execution_mode: null,
+          tuning_mode: null,
+          tuning_hash: null,
+          environment: { os: undefined, arch: undefined, cpu_count: undefined, memory_gb: undefined, python: undefined },
+          test_type: null,
+          validation_status: null,
+          compliance_class: null,
+          has_tuning: false,
+        })}
+      />,
+    );
+
+    const receipt = screen.getByRole("region", { name: "Run receipt" });
+    // Recorded fields (Benchmark, Scale, Platform name, Trust, Visibility)
+    // remain visible without expanding the disclosure.
+    expect(within(receipt).getByText("TPC-H")).toBeTruthy();
+    expect(within(receipt).getByText("DuckDB")).toBeTruthy();
+    expect(within(receipt).getByText("maintainer run")).toBeTruthy();
+    expect(within(receipt).getByText("public (curated)")).toBeTruthy();
+
+    // Missing rows are NOT in the default DOM.
+    expect(within(receipt).queryByText("Platform version")).toBeNull();
+    expect(within(receipt).queryByText("Driver version")).toBeNull();
+    expect(within(receipt).queryByText("OS")).toBeNull();
+    expect(within(receipt).queryByText("Validation")).toBeNull();
+    // Per-section counters still surface the missing count so users
+    // know there is more behind the disclosure.
+    expect(within(receipt).getAllByText(/\d+ fields? not recorded/).length).toBeGreaterThan(0);
+
+    // Click the global disclosure — every previously-hidden field
+    // becomes visible.
+    const toggle = within(receipt).getByRole("button", { name: /Show missing metadata/ });
+    fireEvent.click(toggle);
+    expect(within(receipt).getByText("Platform version")).toBeTruthy();
+    expect(within(receipt).getByText("OS")).toBeTruthy();
+    expect(within(receipt).getByText("Validation")).toBeTruthy();
+    expect(within(receipt).getAllByText("Not recorded").length).toBeGreaterThan(0);
+
+    // The button copy flips and the disclosure round-trips.
+    const hideToggle = within(receipt).getByRole("button", { name: /Hide missing metadata/ });
+    fireEvent.click(hideToggle);
+    expect(within(receipt).queryByText("Platform version")).toBeNull();
+  });
+
+  it("does not render the missing-metadata disclosure when every field is recorded (w3)", () => {
+    render(
+      <RunReceipt
+        detail={makeDetail({ plans_published: true })}
+        shortId="abc12345"
+        isRankingEligible={true}
+      />,
+    );
+
+    const receipt = screen.getByRole("region", { name: "Run receipt" });
+    // No "Show missing metadata" toggle, no per-section "N field(s)
+    // not recorded" footer when every row is populated.
+    expect(within(receipt).queryByRole("button", { name: /Show missing metadata/ })).toBeNull();
+    expect(within(receipt).queryByText(/\d+ fields? not recorded/)).toBeNull();
   });
 
   it("derives the plans companion URL only when publication is signaled (w1 regression)", () => {

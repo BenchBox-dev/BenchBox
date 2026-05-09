@@ -12,7 +12,7 @@
  * No hardcoded expected values remain here - the fixtures are the contract.
  */
 
-import { fireEvent, render, screen } from "@testing-library/preact";
+import { fireEvent, render, screen, within } from "@testing-library/preact";
 import { describe, it, expect } from "vitest";
 import { expectNoAxeViolations } from "@/testing/axe-helper";
 import { QueryHeatmap } from "@/components/QueryHeatmap";
@@ -120,6 +120,66 @@ describe("QueryHeatmap rendering", () => {
     expect(screen.getByRole("button", { name: /^Q10/ })).toBeTruthy();
   });
 
+  it("applies cumulative sticky-left offsets to the frozen header columns", () => {
+    const { container } = render(<QueryHeatmap summary={makeSummary()} />);
+    const trustHeader = within(container.querySelector("thead")!).getByRole("columnheader", { name: "Trust" });
+    const primaryHeader = container.querySelector("thead")!.querySelector('[aria-sort]:not([aria-sort=""])')!;
+    expect(trustHeader.getAttribute("style")).toContain("left: 11rem");
+    const platformHeader = within(container.querySelector("thead")!).getByRole("columnheader", { name: /^Platform/ });
+    expect(platformHeader.getAttribute("style")).toContain("left: 0rem");
+    expect(platformHeader.className).toContain("sticky");
+    expect(primaryHeader.getAttribute("style")?.includes("left:")).toBe(true);
+  });
+
+  it("shifts sticky offsets right by the checkbox column width when selection is enabled", () => {
+    const { container } = render(
+      <QueryHeatmap summary={makeSummary()} selectedIds={new Set()} onSelectionChange={() => {}} />,
+    );
+    const platformHeader = within(container.querySelector("thead")!).getByRole("columnheader", { name: /^Platform/ });
+    const trustHeader = within(container.querySelector("thead")!).getByRole("columnheader", { name: "Trust" });
+    expect(platformHeader.getAttribute("style")).toContain("left: 3rem");
+    expect(trustHeader.getAttribute("style")).toContain("left: 14rem");
+  });
+
+  it("makes the header row vertically sticky and layers it above body sticky cells", () => {
+    const { container } = render(<QueryHeatmap summary={makeSummary()} />);
+    const headerRow = container.querySelector("thead tr")!;
+    expect(headerRow.className).toContain("sticky");
+    expect(headerRow.className).toContain("top-0");
+    expect(headerRow.className).toMatch(/\bz-(20|30|40)\b/);
+    const platformHeader = within(container.querySelector("thead")!).getByRole("columnheader", { name: /^Platform/ });
+    expect(platformHeader.className).toMatch(/\bz-30\b/);
+  });
+
+  it("renders the Receipt link inside the Trust column to keep the Platform cell identity-only", () => {
+    const { container } = render(<QueryHeatmap summary={makeSummary()} />);
+    const firstRow = container.querySelector("tbody tr");
+    expect(firstRow).not.toBeNull();
+    const cells = firstRow!.querySelectorAll('td[role="gridcell"]');
+    // Platform cell is the first frozen-left gridcell; Trust is the second.
+    expect(cells[0]?.textContent ?? "").not.toContain("Receipt");
+    expect(cells[1]?.textContent ?? "").toContain("Receipt");
+  });
+
+  it("renders an aria-described compliance marker instead of inline parenthetical text", () => {
+    const noncompliantSummary = makeSummary({
+      platforms: [
+        {
+          ...makeSummary().platforms[0]!,
+          result_id: "platform-noncompliant",
+          is_ranking_eligible: false,
+          compliance_class: "unofficial_subscale",
+        },
+      ],
+    });
+    render(<QueryHeatmap summary={noncompliantSummary} />);
+    const marker = screen.getByTestId("heatmap-compliance-marker-platform-noncompliant");
+    expect(marker.textContent).toBe("*");
+    expect(marker.getAttribute("title")).toContain("subscale");
+    expect(marker.getAttribute("aria-label")).toContain("subscale");
+    expect(screen.queryByText("(subscale)")).toBeNull();
+  });
+
   it("renders compact receipt links and validation status badges", () => {
     render(<QueryHeatmap summary={makeSummary()} />);
     const receiptLinks = screen.getAllByRole("link", { name: "Receipt →" }) as HTMLAnchorElement[];
@@ -183,7 +243,13 @@ describe("QueryHeatmap rendering", () => {
     const { container } = render(<QueryHeatmap summary={summary} />);
 
     const legend = screen.getByTestId("query-heatmap-legend");
-    expect(legend.textContent).toContain("Power Score: higher is better");
+    // Per `results-explorer-chart-panel-scope-and-labeling` w4, the legend
+    // heading describes the cell metric (always per-query latency in ms),
+    // not the cohort's primary score column. The primary score column
+    // keeps its own metric/direction copy in the secondary line.
+    expect(legend.textContent).toContain("Per-query latency (ms): lower is better");
+    expect(legend.textContent).toContain("Power Score");
+    expect(legend.textContent).toContain("higher is better");
     expect(legend.textContent).toContain("<1 ms");
 
     const subMs = container.querySelector<HTMLElement>('[data-cell="0-0"]');

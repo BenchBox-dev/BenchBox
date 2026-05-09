@@ -182,7 +182,12 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     shortTitle: "Cost",
     description: "Scatter plot of normalized cost vs performance with cost-status empty states",
     questionGroup: "cost",
-    requires: { requiresSummary: true },
+    // Adding `requiresCostData` makes the chart unavailable when no platform
+    // in the cohort has normalized_cost_usd. Without this gate the Cost tab
+    // would render an empty selectable panel and force the user to discover
+    // "no cost recorded" by clicking through. The empty state is now
+    // surfaced one level up: the tab itself disappears for cost-less cohorts.
+    requires: { requiresSummary: true, requiresCostData: true },
     cli_equivalent: "cost_scatter",
   },
   {

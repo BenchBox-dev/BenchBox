@@ -34,6 +34,47 @@ import { colorForCell, lightnessForCell } from "@/lib/chartMath";
 export { colorForCell, lightnessForCell };
 
 // ---------------------------------------------------------------------------
+// Sticky-left offset table
+//
+// Each frozen column maps to a width in rem so the cumulative offset for the
+// next sticky column can be computed exactly without relying on hard-coded
+// Tailwind classes (`left-44` etc.) that desync when an earlier column is
+// hidden — most notably the optional compare-checkbox column.
+// ---------------------------------------------------------------------------
+
+const STICKY_COL_REM = {
+  checkbox: 3, // w-12
+  platform: 11, // w-44
+  trust: 9, // w-36
+  primary: 8, // w-32
+  geomean: 8, // w-32
+} as const;
+
+type StickyColKey = keyof typeof STICKY_COL_REM;
+
+function cumulativeStickyLeft(
+  options: { hasSelection: boolean; showGeomeanCol: boolean },
+  target: StickyColKey,
+): number {
+  let offset = 0;
+  if (target === "checkbox") return offset;
+  if (options.hasSelection) offset += STICKY_COL_REM.checkbox;
+  if (target === "platform") return offset;
+  offset += STICKY_COL_REM.platform;
+  if (target === "trust") return offset;
+  offset += STICKY_COL_REM.trust;
+  if (target === "primary") return offset;
+  offset += STICKY_COL_REM.primary;
+  if (target === "geomean") return offset;
+  if (options.showGeomeanCol) offset += STICKY_COL_REM.geomean;
+  return offset;
+}
+
+function stickyLeftStyle(rem: number): JSX.CSSProperties {
+  return { left: `${rem}rem` };
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -234,6 +275,13 @@ export function QueryHeatmap({
 
   const primaryLabel = primaryMetric === "power_score" ? "Power Score" : "Geomean";
   const primaryDirectionLabel = primaryMetric === "power_score" ? "higher is better" : "lower is faster";
+  // The legend heading describes what the *cells* show, not the cohort's
+  // primary score metric. Heatmap cells are always per-query latency in
+  // milliseconds, regardless of whether the primary score column is
+  // power_score or display_geomean_ms. Earlier copy ("Power Score:
+  // higher is better") contradicted the rendered data on tpch-style
+  // cohorts. The primary score column keeps its own column header
+  // explanation (`primaryLabel`/`primaryDirectionLabel`) below.
   const heatmapMeaning = suppressHeat
     ? "Heat color is suppressed because this cohort has fewer than two comparable platforms."
     : "Heat color compares each query column with the fastest published timing; darker cells are slower.";
@@ -258,11 +306,12 @@ export function QueryHeatmap({
         data-testid="query-heatmap-legend"
       >
         <div class="font-semibold text-[var(--bb-data-fg-primary)]">
-          {primaryLabel}: {primaryDirectionLabel}
+          Per-query latency (ms): lower is better
         </div>
         <div class="mt-1">
-          Per-query timings use milliseconds and lower is faster. {heatmapMeaning} <strong>&lt;1 ms</strong> means a
-          zero-or-sub-millisecond timing below display precision; <strong>No run</strong> means missing data.
+          {heatmapMeaning} <strong>&lt;1 ms</strong> means a zero-or-sub-millisecond timing below display precision;{" "}
+          <strong>No run</strong> means missing data. The primary score column ({primaryLabel}) on the left of each row uses its
+          own metric and direction ({primaryDirectionLabel}).
         </div>
       </div>
 
@@ -295,10 +344,17 @@ export function QueryHeatmap({
                   />
                 )}
                 <div class="min-w-0 flex-1">
-                  <div class="flex flex-wrap items-center gap-1.5">
+                  <div class="flex items-center gap-1">
                     <h2 class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">{row.platform}</h2>
                     {!row.is_ranking_eligible && (
-                      <span class="text-xs text-[var(--bb-data-fg-subtle)]">{complianceLabel(row.compliance_class)}</span>
+                      <span
+                        class="text-xs text-[var(--bb-data-fg-subtle)] cursor-help"
+                        title={`Compliance: ${complianceLabel(row.compliance_class).replace(/^\(|\)$/g, "")}`}
+                        aria-label={`Compliance: ${complianceLabel(row.compliance_class).replace(/^\(|\)$/g, "")}`}
+                        data-testid={`heatmap-mobile-compliance-marker-${row.result_id}`}
+                      >
+                        *
+                      </span>
                     )}
                   </div>
                   {row.platform_version && (
@@ -383,12 +439,21 @@ export function QueryHeatmap({
           class="min-w-max text-sm"
         >
           <thead class="bg-[var(--bb-surface-data-muted)]">
-            <tr role="row">
-              {hasSelection && <th role="columnheader" scope="col" aria-label="Select for comparison" class="table-th w-12 min-w-12 px-2" />}
+            <tr role="row" class="sticky top-0 z-20 bg-[var(--bb-surface-data-muted)]">
+              {hasSelection && (
+                <th
+                  role="columnheader"
+                  scope="col"
+                  aria-label="Select for comparison"
+                  class="table-th sticky z-30 w-12 min-w-12 bg-[var(--bb-surface-data-muted)] px-2"
+                  style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "checkbox"))}
+                />
+              )}
               <th
                 role="columnheader"
                 scope="col"
-                class="sticky left-0 z-10 w-44 min-w-44 bg-[var(--bb-surface-data-muted)] p-0"
+                class="sticky z-30 w-44 min-w-44 bg-[var(--bb-surface-data-muted)] p-0"
+                style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "platform"))}
                 aria-sort={ariaSort("platform")}
               >
                 <button
@@ -400,14 +465,20 @@ export function QueryHeatmap({
                   {sortAnnouncement("platform")}
                 </button>
               </th>
-              <th role="columnheader" scope="col" class="table-th sticky left-44 z-10 w-36 min-w-36 whitespace-nowrap bg-[var(--bb-surface-data-muted)]">
+              <th
+                role="columnheader"
+                scope="col"
+                class="table-th sticky z-30 w-36 min-w-36 whitespace-nowrap bg-[var(--bb-surface-data-muted)]"
+                style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "trust"))}
+              >
                 Trust
               </th>
               <th
                 role="columnheader"
                 scope="col"
                 aria-sort={ariaSort("primary")}
-                class="w-32 min-w-32 whitespace-nowrap p-0"
+                class="sticky z-30 w-32 min-w-32 whitespace-nowrap bg-[var(--bb-surface-data-muted)] p-0"
+                style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "primary"))}
                 title={primaryLabel}
               >
                 <button
@@ -423,7 +494,8 @@ export function QueryHeatmap({
                 <th
                   role="columnheader"
                   scope="col"
-                  class="w-32 min-w-32 whitespace-nowrap p-0"
+                  class="sticky z-30 w-32 min-w-32 whitespace-nowrap bg-[var(--bb-surface-data-muted)] p-0"
+                  style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "geomean"))}
                   aria-sort={ariaSort("geomean")}
                   title="Geometric mean of per-query display times"
                 >
@@ -469,7 +541,13 @@ export function QueryHeatmap({
                   class={`hover:bg-[var(--bb-surface-data-muted)] ${isSelected ? "bg-[var(--bb-tone-info-bg)]" : ""}`}
                 >
                   {hasSelection && (
-                    <td role="gridcell" class="table-td w-12 min-w-12 px-2">
+                    <td
+                      role="gridcell"
+                      class={`table-td sticky z-10 w-12 min-w-12 px-2 ${
+                        isSelected ? "bg-[var(--bb-tone-info-bg)]" : "bg-[var(--bb-surface-data)]"
+                      }`}
+                      style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "checkbox"))}
+                    >
                       <input
                         type="checkbox"
                         checked={isSelected}
@@ -481,42 +559,65 @@ export function QueryHeatmap({
                   )}
                   <td
                     role="gridcell"
-                    class={`table-td sticky left-0 z-10 w-44 min-w-44 ${
+                    class={`table-td sticky z-10 w-44 min-w-44 ${
                       isSelected ? "bg-[var(--bb-tone-info-bg)]" : "bg-[var(--bb-surface-data)]"
                     }`}
+                    style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "platform"))}
                   >
-                    <div class="flex flex-wrap items-center gap-1.5">
+                    <div class="flex items-center gap-1">
                       <span class="font-medium text-[var(--bb-data-fg-primary)]">{row.platform}</span>
                       {!row.is_ranking_eligible && (
-                        <span class="text-xs text-[var(--bb-data-fg-subtle)]">{complianceLabel(row.compliance_class)}</span>
+                        <span
+                          class="text-xs text-[var(--bb-data-fg-subtle)] cursor-help"
+                          title={`Compliance: ${complianceLabel(row.compliance_class).replace(/^\(|\)$/g, "")}`}
+                          aria-label={`Compliance: ${complianceLabel(row.compliance_class).replace(/^\(|\)$/g, "")}`}
+                          data-testid={`heatmap-compliance-marker-${row.result_id}`}
+                        >
+                          *
+                        </span>
                       )}
                     </div>
                     {row.platform_version && (
                       <div class="mt-0.5 text-xs text-[var(--bb-data-fg-subtle)]">{row.platform_version}</div>
                     )}
-                    <a
-                      href={`/results/r/${row.result_id}#run-receipt`}
-                      class="mt-1 inline-block text-xs font-medium no-underline"
-                    >
-                      Receipt →
-                    </a>
                   </td>
                   <td
                     role="gridcell"
-                    class={`table-td sticky left-44 z-10 w-36 min-w-36 whitespace-nowrap ${
+                    class={`table-td sticky z-10 w-36 min-w-36 whitespace-nowrap ${
                       isSelected ? "bg-[var(--bb-tone-info-bg)]" : "bg-[var(--bb-surface-data)]"
                     }`}
+                    style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "trust"))}
                   >
-                    <div class="flex flex-wrap gap-1">
-                      <TrustBadge trustLabel={row.trust_label} compact />
-                      <ValidationBadge validationStatus={row.validation_status} showMissing />
+                    <div class="flex flex-col gap-0.5">
+                      <div class="flex flex-wrap gap-1">
+                        <TrustBadge trustLabel={row.trust_label} compact />
+                        <ValidationBadge validationStatus={row.validation_status} showMissing />
+                      </div>
+                      <a
+                        href={`/results/r/${row.result_id}#run-receipt`}
+                        class="text-xs font-medium no-underline"
+                      >
+                        Receipt →
+                      </a>
                     </div>
                   </td>
-                  <td role="gridcell" class="table-td w-32 min-w-32 whitespace-nowrap font-mono">
+                  <td
+                    role="gridcell"
+                    class={`table-td sticky z-10 w-32 min-w-32 whitespace-nowrap font-mono ${
+                      isSelected ? "bg-[var(--bb-tone-info-bg)]" : "bg-[var(--bb-surface-data)]"
+                    }`}
+                    style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "primary"))}
+                  >
                     {fmtPrimary(getPrimaryValue(row))}
                   </td>
                   {showGeomeanCol && (
-                    <td role="gridcell" class="table-td w-32 min-w-32 whitespace-nowrap font-mono text-[var(--bb-data-fg-muted)]">
+                    <td
+                      role="gridcell"
+                      class={`table-td sticky z-10 w-32 min-w-32 whitespace-nowrap font-mono text-[var(--bb-data-fg-muted)] ${
+                        isSelected ? "bg-[var(--bb-tone-info-bg)]" : "bg-[var(--bb-surface-data)]"
+                      }`}
+                      style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "geomean"))}
+                    >
                       {fmtGeomean(row.display_geomean_ms)}
                     </td>
                   )}

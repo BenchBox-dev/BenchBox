@@ -66,6 +66,12 @@ repos:
       # Stdlib-only (no uv sync at commit time); runs only when files
       # under results-explorer/src/ change. See
       # docs/operations/results-explorer-token-scan.md.
+      #
+      # `pass_filenames: false` is intentional: the gate scans the entire
+      # results-explorer/src/ tree, not just changed files, so a literal
+      # added in one PR but never staged again still trips a later commit
+      # that touches a sibling file. Sub-second runtime makes the
+      # whole-tree rescan acceptable at commit time.
       - id: explorer-tokens
         name: results-explorer token-scan
         entry: python3 _project/scripts/scan_explorer_tokens.py

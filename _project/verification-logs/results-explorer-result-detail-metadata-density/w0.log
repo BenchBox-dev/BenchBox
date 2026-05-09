@@ -1,0 +1,82 @@
+# PR — `results-explorer-result-detail-metadata-density` w0 audit
+
+Date: 2026-05-09
+Worktree base: feat/explorer-result-detail-metadata-density on develop tip
+                fd518c709 (post-PR #284, post-PR #285, post-PR #286, post-PR #290).
+
+Dep status: `results-explorer-query-workbench-controls-and-facets`
+            (PR #285) is merged; `lib/displayLabels.ts` and its
+            formatters are available on develop.
+
+## Per-work-unit verdicts
+
+w1 "Audit Result Detail metadata and receipt fields":
+   Confirmed. The audit is the body of this w0 log; verdicts for
+   w2-w5 follow.
+
+w2 "Collapse empty or nearly empty environment summaries":
+   Already-fixed. `ResultDetail.tsx:184-194` builds `environmentRows`
+   by filtering each environment field to a `null` / present pair;
+   lines 273-281 already render either the present rows or a single
+   "Environment metadata was not recorded for this run." placeholder.
+   The "multiple adjacent cards repeating missing values" anti-pattern
+   the TODO targets is not present in the current code. Mark this
+   work unit deferred (no diff needed); document the verdict here so
+   future audits do not re-raise the same observation.
+
+w3 "Group missing receipt fields behind disclosure":
+   Confirmed, with SCOPE DEVIATION. The receipt rendering lives in
+   `components/RunReceipt.tsx`, which the original TODO `scope_limit`
+   does not list. `ResultDetail.tsx:336` simply mounts
+   `<RunReceipt detail={detail} ... />`; the section / row layout that
+   needs grouping behind a disclosure is entirely inside RunReceipt.
+   Per the per-TODO workflow's "Diverged" rule, the YAML's
+   `scope_limit.only_modify` is widened in the same PR to include
+   `results-explorer/src/components/RunReceipt.tsx` and its existing
+   test `results-explorer/src/components/__tests__/RunReceipt.test.tsx`.
+   The `must_preserve` invariants ("Receipt/provenance remains
+   available for audit") are honored — recorded fields stay in the
+   default view; only the missing rows move behind the disclosure.
+
+w4 "Apply shared display labels to Result Detail enums":
+   Confirmed. Two surfaces render raw enum strings today:
+   - `ResultDetail.tsx:459-461` defines a local `formatDisplayToken`
+     that is functionally `formatEnumLabel` from `lib/displayLabels.ts`.
+     It is applied to `trust_label` and `validation_status` for the
+     summary "Trust / validation" metric card. Replace the local
+     helper with the shared `formatTrustLabel` /
+     `formatValidationStatus` so curated labels render
+     ("maintainer run", "not applicable") instead of the underscore /
+     dash form.
+   - `RunReceipt.tsx` renders `detail.trust_label`,
+     `detail.visibility`, `detail.validation_status`, and
+     `detail.cost_status` as raw strings (lines 64-66, 87). Replace
+     with the shared formatters from `lib/displayLabels.ts`.
+
+w5 "Cover complete and sparse Result Detail metadata cases":
+   Confirmed. Tests need to:
+   - assert RunReceipt renders "maintainer run" / "public (curated)"
+     after the formatter swap (existing test fixture has
+     "maintainer-run" / "public-curated");
+   - add a sparse-metadata case that verifies missing receipt rows
+     are NOT visible in the default view but are reachable via the
+     disclosure;
+   - keep the existing complete-metadata case (every section
+     renders).
+
+## Delivery scope for this PR
+
+In:
+  - w0 audit log (this file)
+  - w3 (RunReceipt missing-row grouping behind disclosure)
+  - w4 (replace `formatDisplayToken` with shared formatters in
+    ResultDetail + RunReceipt)
+  - w5 (RunReceipt sparse-vs-complete tests + ResultDetail test fixture
+    updates as needed)
+  - YAML scope_limit widening for w3 (`RunReceipt.tsx` and its test)
+
+Deferred (verdict already-fixed; no diff needed):
+  - w2 (environment summary collapse) — already implemented on develop.
+
+The TODO moves to DONE/ once w3-w5 land; w2's deferral is documented
+here and in the PR body so the closure record is complete.

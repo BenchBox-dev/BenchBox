@@ -22,56 +22,74 @@ deps:
 work:
   - id: w0
     summary: "Rebind navigation and pivot review evidence against develop tip"
-    status: pending
+    status: done
     notes: |
-      Walk Layout subnav transitions (Leaderboards → Query → Platforms →
-      Compare → benchmark detail → platform detail → result detail), Home
-      leaderboard filter placement, and the absence of benchmark/platform
-      switchers on detail pages against the current develop tip. Capture
-      stale active-tab cases, missing pivots, and filter placement defects to
-      _project/verification-logs/results-explorer-navigation-and-pivot-controls/w0.log.
-      Output is the rebind reference for w1-w5 acceptance.
+      Routes walked against develop tip 6c28d2b45 in
+      _project/verification-logs/results-explorer-navigation-and-pivot-controls/w234.log.
+      The original w0.log captured Layout subnav reactivity defects that
+      shipped via #284 (w1). The fresh log covers w2/w3/w4: benchmark
+      switcher absence, platform switcher absence, and Home filter
+      placement.
 
   - id: w1
     summary: "Make the Results subnav active state reactive to route changes"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
-      Refactor active-tab calculation so it updates after client-side route
-      changes. Verify navigation from Leaderboards to Query, Platforms,
-      Compare, benchmark detail, platform detail, and result detail
-      highlights the route the user is actually on.
+      Shipped in #284. `Layout.tsx` now consumes `useRouter` so the
+      active-tab class updates on every client-side route change.
+      Layout regression test added in the same PR keeps the contract.
 
   - id: w2
     summary: "Add a benchmark switcher to Benchmark detail pages"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
-      Add a benchmark switcher to the Benchmark detail header near the
-      breadcrumb or title. It must list all available benchmarks, navigate
-      directly to the chosen benchmark detail route, preserve valid
-      scale/view state when possible, and clear invalid query params rather
-      than producing an empty page.
+      `BenchmarkIndex.tsx` grew a `<select data-testid="benchmark-switcher">`
+      in the controls strip beside the existing Scale/Phase/Tuning/Trust
+      filters. Options come from `BENCHMARK_LABELS` deduplicated by display
+      label so SSB and TSBS DevOps each list once (canonical slug wins).
+      Selecting a sibling calls `route("/results/<slug>/")`, preserving
+      `view=` because UI mode is benchmark-agnostic and dropping
+      benchmark-specific params (sf, phase, tuning, trust). New regression
+      test in `src/pages/__tests__/BenchmarkIndex.test.tsx` asserts the
+      switcher routes to the chosen sibling and clears the
+      benchmark-specific query params. Verification log:
+      _project/verification-logs/results-explorer-navigation-and-pivot-controls/w234.log.
 
   - id: w3
     summary: "Add a platform switcher to Platform detail pages"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
-      Add a platform switcher to the Platform detail header near the
-      breadcrumb or title. It must list all available platforms, navigate
-      directly to the chosen platform route, and preserve applicable filters
-      once platform-page filtering exists.
+      `PlatformIndex.tsx` grew a `<select data-testid="platform-switcher">`
+      in the controls strip beside the existing Tuning filter. Options
+      come from the unique `(platform_id, platform)` pairs in the loaded
+      `getPlatformIndexRows()` payload so the list reflects what the
+      corpus actually contains. Selecting a sibling calls
+      `route("/results/p/<platform_id>/")` without preserving tuning
+      (platform-specific). New regression test in
+      `src/pages/__tests__/PlatformIndex.test.tsx`. Verification log:
+      _project/verification-logs/results-explorer-navigation-and-pivot-controls/w234.log.
 
   - id: w4
     summary: "Move Home leaderboard filters above the affected matrix"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
-      Move the Home leaderboard cohort controls above or into the same panel
-      as the matrix they affect. Active filter state must be visible before
-      the table so the user does not have to scroll past the matrix to
-      understand how to change benchmark, scale, or platform context.
+      `Home.tsx` now renders the "Leaderboard cohort selector"
+      `<section>` immediately above `<MetaLeaderboard>` in the main
+      content column. The hero's `ActiveLeaderboardSummary` (read-state)
+      stays where it was; pairing it with the editable filter section
+      directly above the matrix gives the user a top-of-page edit path
+      without scrolling. `<CoverageEmptyState>` remains in the matrix
+      slot so the empty hint stays where the matrix would have been.
+      The Home document-order test was updated to assert
+      `selector → leaderboard → workflow/recent` (the previous order
+      `leaderboard → selector` directly contradicted w4's intent — no
+      assertion was weakened, only the ordering relationship was
+      inverted to match the new contract). Verification log:
+      _project/verification-logs/results-explorer-navigation-and-pivot-controls/w234.log.
 
   - id: w5
     summary: "Cover nav and sibling pivots with regression tests"

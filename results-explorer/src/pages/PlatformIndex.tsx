@@ -1,9 +1,11 @@
 import { useEffect, useState } from "preact/hooks";
 import type { RoutableProps } from "preact-router";
+import { route } from "preact-router";
 import type { PlatformIndexRowRow } from "@/lib/duckdbQueries";
 import { getPlatformIndexRows } from "@/lib/duckdbQueries";
-import { useFacetState, type FacetKey, type FacetState } from "@/lib/facetModel";
-import { hasActiveFacets, matchesFacetRow, singleFacetValue } from "@/lib/facetMatching";
+import { useFacetState, type DateWindowFacet, type FacetKey, type FacetState } from "@/lib/facetModel";
+import { hasActiveFacets, matchesFacetRow, singleFacetValue, toDateWindowFacet } from "@/lib/facetMatching";
+import { formatTrustLabel, formatValidationStatus } from "@/lib/displayLabels";
 import { buildCompareUrl, compareIdForRow, displayCompareId } from "@/lib/resultLinks";
 import { humanizeBenchmark, fmtScore, fmtGeomean, errMsg } from "@/utils";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
@@ -100,6 +102,40 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   const { facets, setFacet } = useFacetState();
   const tuningFilter = singleFacetValue(facets.tuning_mode, "all") ?? "all";
   const setTuningFilter = (value: string) => setFacet("tuning_mode", value === "all" ? [] : [value]);
+  // w5 (table-sticky-density-and-semantics): single-select filters for the
+  // Platform detail table. Each maps to a FacetKey already plumbed through
+  // useFacetState/matchesFacetRow so the filtered count strip updates as
+  // soon as the user picks a value.
+  const benchmarkFilter = singleFacetValue(facets.benchmark, "all") ?? "all";
+  const scaleFilter = singleFacetValue(facets.scale_factor, "all") ?? "all";
+  const phaseFilter = singleFacetValue(facets.phase, "all") ?? "all";
+  const trustFilter = singleFacetValue(facets.trust_tier, "all") ?? "all";
+  const validationFilter = singleFacetValue(facets.validation_status, "all") ?? "all";
+  const dateWindowFilter: DateWindowFacet = facets.date_window;
+  // Helper for the five string-array facets that share the "all means
+  // empty array" pattern. date_window has its own DateWindowFacet shape
+  // and uses toDateWindowFacet directly.
+  const setSingleArrayFacet = (
+    key: "benchmark" | "scale_factor" | "phase" | "trust_tier" | "validation_status",
+    value: string,
+  ) => setFacet(key, value === "all" ? [] : [value]);
+  const w5FilterKeys: FacetKey[] = [
+    "benchmark",
+    "scale_factor",
+    "phase",
+    "trust_tier",
+    "validation_status",
+    "date_window",
+  ];
+  const hasW5Filters = hasActiveFacets(facets, w5FilterKeys);
+  const resetW5Filters = () => {
+    setFacet("benchmark", []);
+    setFacet("scale_factor", []);
+    setFacet("phase", []);
+    setFacet("trust_tier", []);
+    setFacet("validation_status", []);
+    setFacet("date_window", "all");
+  };
   // Default: geomean_ms ascending (fastest first), nulls last. The empty-state
   // ordering is observable behaviour — must_preserve in the parent TODO.
   const [sort, setSort] = useState<SortState<PlatformSortKey>>({
@@ -157,10 +193,47 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   // old links constructed from the display name.
   const allPlatformResults = rows.filter((r) => r.platform_id === platform || r.platform === platform);
 
+  // Distinct platform options for the in-page sibling pivot, sorted by
+  // display name. Each row carries (platform_id, platform); we keep the
+  // first display name encountered for each id.
+  const platformOptions = (() => {
+    const byId = new Map<string, string>();
+    for (const row of rows) {
+      if (!byId.has(row.platform_id)) byId.set(row.platform_id, row.platform);
+    }
+    return [...byId.entries()]
+      .map(([platform_id, platform]) => ({ platform_id, platform }))
+      .sort((a, b) => a.platform.localeCompare(b.platform));
+  })();
+
   // Unique non-null tuning modes - only show filter when multiple modes present.
   const tuningModes = [
     ...new Set(allPlatformResults.map((r) => r.tuning_mode).filter((m): m is string => m !== null)),
   ].sort();
+
+  // w5: derived option lists for the new filter strip. Each list is built
+  // from the unfiltered cohort (allPlatformResults) so the user can always
+  // see every available value, even after narrowing.
+  const benchmarkOptions = [...new Set(allPlatformResults.map((r) => r.benchmark))].sort();
+  const scaleOptions = [
+    ...new Set(allPlatformResults.map((r) => r.scale_factor)),
+  ].sort((a, b) => a - b);
+  const phaseOptions = [...new Set(allPlatformResults.map((r) => r.phase))].sort();
+  const trustOptions = [
+    ...new Set(
+      allPlatformResults
+        .map((r) => r.trust_label)
+        .filter((label): label is string => label !== null && label !== undefined),
+    ),
+  ].sort();
+  const validationOptions = [
+    ...new Set(
+      allPlatformResults
+        .map((r) => r.validation_status)
+        .filter((status): status is string => status !== null && status !== undefined),
+    ),
+  ].sort();
+  const showW5Filters = allPlatformResults.length >= 25;
 
   const platformResultsRaw = allPlatformResults.filter((row) =>
     matchesFacetRow(row, facets, { keys: PLATFORM_RESULT_FACET_KEYS }),
@@ -242,6 +315,35 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     });
   }
 
+  // w6 (compare-flow-entrypoints): the cohort signature of the first
+  // selected row locks the rest of the table until the user deselects
+  // back to zero. Compatible siblings stay selectable; incompatible
+  // rows render their checkbox disabled with a reason tooltip.
+  const cohortLockSignature = (() => {
+    const firstSelectedId = [...selected][0];
+    if (firstSelectedId === undefined) return null;
+    const firstRow = allPlatformResults.find((row) => row.result_id === firstSelectedId);
+    if (!firstRow) return null;
+    return {
+      benchmark: firstRow.benchmark,
+      scale_factor: firstRow.scale_factor,
+      phase: firstRow.phase,
+      primary_metric: firstRow.primary_metric,
+    } as const;
+  })();
+  function cohortLockReason(row: PlatformIndexRowRow): string | undefined {
+    if (cohortLockSignature === null) return undefined;
+    if (selected.has(row.result_id)) return undefined;
+    const sig = cohortLockSignature;
+    const mismatches: string[] = [];
+    if (row.benchmark !== sig.benchmark) mismatches.push("benchmark");
+    if (row.scale_factor !== sig.scale_factor) mismatches.push("scale");
+    if (row.phase !== sig.phase) mismatches.push("phase");
+    if (row.primary_metric !== sig.primary_metric) mismatches.push("primary metric");
+    if (mismatches.length === 0) return undefined;
+    return `Locked: first selection is ${humanizeBenchmark(sig.benchmark)} SF ${sig.scale_factor} ${sig.phase}. This row differs by ${mismatches.join(", ")}.`;
+  }
+
   return (
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <Breadcrumb crumbs={[{ label: "Results", href: "/results/" }, { label: platformDisplayName }]} />
@@ -249,7 +351,36 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
       <div class="mt-6 mb-6 flex flex-wrap items-center justify-between gap-4">
         <h1 class="text-3xl font-bold text-[var(--bb-data-fg-primary)]">{platformDisplayName} Results</h1>
 
-        <div class="flex items-center gap-4">
+        <div class="flex flex-wrap items-center gap-4">
+          {/* Platform switcher (sibling pivot). Tuning is platform-specific
+              so we do not preserve it across the switch. */}
+          {platformOptions.length > 1 && (
+            <div class="flex items-center gap-2">
+              <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="platform-switcher">
+                Platform:
+              </label>
+              <select
+                id="platform-switcher"
+                data-testid="platform-switcher"
+                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1.5 text-sm shadow-sm"
+                value={platform}
+                onChange={(event) => {
+                  const next = (event.target as HTMLSelectElement).value;
+                  if (next === platform) return;
+                  route(`/results/p/${next}/`);
+                }}
+              >
+                {platformOptions.map((option) => (
+                  <option key={option.platform_id} value={option.platform_id}>
+                    {option.platform}
+                  </option>
+                ))}
+                {!platformOptions.some((option) => option.platform_id === platform) && (
+                  <option value={platform}>{platformDisplayName}</option>
+                )}
+              </select>
+            </div>
+          )}
           {tuningModes.length > 1 && (
             <div class="flex items-center gap-2">
               <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="tuning-filter">
@@ -272,6 +403,151 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
           )}
         </div>
       </div>
+
+      {showW5Filters && (
+        <section
+          class="mb-4 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 shadow-sm"
+          data-testid="platform-detail-filters"
+          aria-label="Platform result filters"
+        >
+          <div class="flex flex-wrap items-end gap-3">
+            <div class="flex flex-col gap-1">
+              <label class="text-xs font-medium text-[var(--bb-data-fg-muted)]" for="platform-filter-benchmark">
+                Benchmark
+              </label>
+              <select
+                id="platform-filter-benchmark"
+                data-testid="platform-filter-benchmark"
+                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-sm shadow-sm"
+                value={benchmarkFilter}
+                onChange={(event) =>
+                  setSingleArrayFacet("benchmark", (event.target as HTMLSelectElement).value)
+                }
+              >
+                <option value="all">All benchmarks</option>
+                {benchmarkOptions.map((value) => (
+                  <option key={value} value={value}>
+                    {humanizeBenchmark(value)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="text-xs font-medium text-[var(--bb-data-fg-muted)]" for="platform-filter-scale">
+                Scale
+              </label>
+              <select
+                id="platform-filter-scale"
+                data-testid="platform-filter-scale"
+                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-sm shadow-sm"
+                value={scaleFilter}
+                onChange={(event) =>
+                  setSingleArrayFacet("scale_factor", (event.target as HTMLSelectElement).value)
+                }
+              >
+                <option value="all">All scales</option>
+                {scaleOptions.map((value) => (
+                  <option key={String(value)} value={String(value)}>
+                    SF {value}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="text-xs font-medium text-[var(--bb-data-fg-muted)]" for="platform-filter-phase">
+                Phase
+              </label>
+              <select
+                id="platform-filter-phase"
+                data-testid="platform-filter-phase"
+                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-sm shadow-sm"
+                value={phaseFilter}
+                onChange={(event) =>
+                  setSingleArrayFacet("phase", (event.target as HTMLSelectElement).value)
+                }
+              >
+                <option value="all">All phases</option>
+                {phaseOptions.map((value) => (
+                  <option key={value} value={value}>
+                    {value.charAt(0).toUpperCase() + value.slice(1)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="text-xs font-medium text-[var(--bb-data-fg-muted)]" for="platform-filter-trust">
+                Trust tier
+              </label>
+              <select
+                id="platform-filter-trust"
+                data-testid="platform-filter-trust"
+                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-sm shadow-sm"
+                value={trustFilter}
+                onChange={(event) =>
+                  setSingleArrayFacet("trust_tier", (event.target as HTMLSelectElement).value)
+                }
+              >
+                <option value="all">All trust tiers</option>
+                {trustOptions.map((value) => (
+                  <option key={value} value={value}>
+                    {formatTrustLabel(value)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="text-xs font-medium text-[var(--bb-data-fg-muted)]" for="platform-filter-validation">
+                Validation
+              </label>
+              <select
+                id="platform-filter-validation"
+                data-testid="platform-filter-validation"
+                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-sm shadow-sm"
+                value={validationFilter}
+                onChange={(event) =>
+                  setSingleArrayFacet("validation_status", (event.target as HTMLSelectElement).value)
+                }
+              >
+                <option value="all">All validation</option>
+                {validationOptions.map((value) => (
+                  <option key={value} value={value}>
+                    {formatValidationStatus(value)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="text-xs font-medium text-[var(--bb-data-fg-muted)]" for="platform-filter-date-window">
+                Date window
+              </label>
+              <select
+                id="platform-filter-date-window"
+                data-testid="platform-filter-date-window"
+                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-sm shadow-sm"
+                value={dateWindowFilter}
+                onChange={(event) =>
+                  setFacet("date_window", toDateWindowFacet((event.target as HTMLSelectElement).value))
+                }
+              >
+                <option value="all">All time</option>
+                <option value="30d">Last 30 days</option>
+                <option value="90d">Last 90 days</option>
+                <option value="365d">Last 365 days</option>
+              </select>
+            </div>
+            {hasW5Filters && (
+              <button
+                type="button"
+                data-testid="platform-filter-reset"
+                class="ml-auto rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1.5 text-sm font-medium text-[var(--bb-data-fg-primary)] shadow-sm hover:bg-[var(--bb-surface-data-muted)]"
+                onClick={resetW5Filters}
+              >
+                Reset filters
+              </button>
+            )}
+          </div>
+        </section>
+      )}
 
       <section
         class="mb-4 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 shadow-sm"
@@ -391,6 +667,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                   entry={r}
                   checked={selected.has(r.result_id)}
                   onToggle={() => toggleSelect(r.result_id)}
+                  disabledReason={cohortLockReason(r)}
                 />
               ))}
             </tbody>
@@ -555,9 +832,16 @@ interface PlatformRowProps {
   entry: PlatformIndexRowRow;
   checked: boolean;
   onToggle: () => void;
+  /**
+   * w6 (compare-flow-entrypoints): when a row outside the locked
+   * cohort signature is rendered, the checkbox is disabled with a
+   * tooltip rather than letting the user accumulate a mixed cohort
+   * that Compare would later have to suppress winner claims for.
+   */
+  disabledReason?: string;
 }
 
-function PlatformRow({ entry, checked, onToggle }: PlatformRowProps) {
+function PlatformRow({ entry, checked, onToggle, disabledReason }: PlatformRowProps) {
   return (
     <tr class="hover:bg-[var(--bb-surface-data-muted)]" data-testid={entry.result_id}>
       <td class="table-td">
@@ -565,8 +849,11 @@ function PlatformRow({ entry, checked, onToggle }: PlatformRowProps) {
           type="checkbox"
           checked={checked}
           onChange={onToggle}
-          class="h-4 w-4 rounded border-[var(--bb-data-border-strong)]"
+          disabled={Boolean(disabledReason)}
+          title={disabledReason}
+          class="h-4 w-4 rounded border-[var(--bb-data-border-strong)] disabled:cursor-not-allowed disabled:opacity-50"
           aria-label={`Select ${entry.result_id} for comparison`}
+          data-testid={`platform-compare-checkbox-${entry.result_id}`}
         />
       </td>
       <td class="table-td font-medium">{humanizeBenchmark(entry.benchmark)}</td>

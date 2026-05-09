@@ -12,6 +12,7 @@ import type { BenchmarkSummary } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
 import { timeSeriesColor } from "@/lib/chartTheme";
 import { buildLogLatencyScale, computeECDFPoints, logLatencyFraction, logLatencyTicks } from "@/lib/chartMath";
+import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
 
 const Y_TICKS_PCT = [0, 25, 50, 75, 100];
 
@@ -29,9 +30,13 @@ export function CDFChart({ summary }: Props) {
   const [containerRef, { width: containerWidth }] = useElementSize();
   const w = Math.max(containerWidth, 400);
 
+  const cohortLabels = formatRunIdentitiesForCohort(
+    summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
+    "chart",
+  );
   const series = summary.platforms
     .map((p, i) => ({
-      label: p.platform,
+      label: cohortLabels[i] ?? p.platform,
       color: timeSeriesColor(i),
       points: computeECDFPoints(Object.values(p.timings)),
     }))

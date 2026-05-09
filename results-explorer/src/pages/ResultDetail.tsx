@@ -14,6 +14,7 @@ import { MethodologyDisclosure } from "@/components/MethodologyDisclosure";
 import { RunReceipt, planDownloadUrl } from "@/components/RunReceipt";
 import { ChartPanel } from "@/components/ChartPanel";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { formatTrustLabel, formatValidationStatus } from "@/lib/displayLabels";
 
 interface ResultDetailProps extends RoutableProps {
   resultId?: string;
@@ -255,8 +256,8 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
           />
           <ResultMetricCard
             label="Trust / validation"
-            value={formatDisplayToken(detail.trust_label)}
-            helper={formatDisplayToken(detail.validation_status ?? "validation not recorded")}
+            value={formatTrustLabel(detail.trust_label)}
+            helper={detail.validation_status ? formatValidationStatus(detail.validation_status) : "validation not recorded"}
           />
           <ResultMetricCard
             label="Wall-clock total"
@@ -454,10 +455,6 @@ function ResultMetricCard({ label, value, helper }: { label: string; value: stri
 function formatPrimaryMetric(detail: DetailResult, primaryMetric: PrimaryMetric) {
   if (primaryMetric === "power_score") return fmtScore(detail.power_score);
   return fmtGeomean(detail.display_geomean_ms);
-}
-
-function formatDisplayToken(value: string) {
-  return value.replace(/[_-]+/g, " ");
 }
 
 function EnvironmentRow({ label, value }: { label: string; value: string }) {

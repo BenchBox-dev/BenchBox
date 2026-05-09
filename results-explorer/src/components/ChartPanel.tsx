@@ -25,6 +25,7 @@ import { CDFChart } from "@/components/CDFChart";
 import { RankTable } from "@/components/RankTable";
 import { fmtGeomean, fmtScore } from "@/utils";
 import { paletteColor } from "@/lib/chartTheme";
+import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
 import {
   buildLatencyBarScale,
   latencyScaleFraction,
@@ -41,6 +42,11 @@ interface ChartPanelProps {
   // page-level decision summary correctly avoided them.
   suppressWinnerClaims?: boolean;
   suppressionReason?: string;
+  // w2 (chart-panel-scope-and-labeling): hosts that already render a
+  // chart at page level (e.g. BenchmarkIndex matrix view rendering
+  // QueryHeatmap above the panel) pass the duplicated chart ids here so
+  // the panel does not expose the same view as a redundant subtab.
+  excludeChartIds?: readonly string[];
 }
 
 interface CompareQueryRow {
@@ -61,8 +67,14 @@ export function ChartPanel({
   onBaselineIndexChange,
   suppressWinnerClaims = false,
   suppressionReason,
+  excludeChartIds,
 }: ChartPanelProps) {
-  const charts = useMemo(() => applicableCharts(context), [context]);
+  const charts = useMemo(() => {
+    const applicable = applicableCharts(context);
+    if (!excludeChartIds || excludeChartIds.length === 0) return applicable;
+    const exclude = new Set(excludeChartIds);
+    return applicable.filter((entry) => !exclude.has(entry.id));
+  }, [context, excludeChartIds]);
   const chartGroups = useMemo(() => groupChartsByQuestion(charts), [charts]);
   const summary = useMemo(() => buildRenderableSummary(context), [context]);
   const historical = useMemo(
@@ -140,87 +152,85 @@ export function ChartPanel({
 
   return (
     <section class="card">
-      <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
         <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)]">Charts</h2>
-        <div class="flex w-full min-w-0 flex-col items-stretch gap-2 sm:w-auto sm:items-end">
-          {chartGroups.length > 1 && (
-            <div
-              class="grid w-full grid-cols-2 gap-1 rounded-md panel-muted p-1 sm:flex sm:w-auto sm:flex-wrap sm:justify-end"
-              role="tablist"
-              aria-label="Chart question groups"
+        {chartGroups.length > 1 && (
+          <div
+            class="flex flex-wrap items-center gap-1 rounded-md panel-muted p-1"
+            role="tablist"
+            aria-label="Chart question groups"
+          >
+            {chartGroups.map((group) => {
+              const selected = group.id === activeGroup.id;
+              return (
+                <button
+                  key={group.id}
+                  role="tab"
+                  type="button"
+                  aria-selected={selected}
+                  aria-controls="chart-panel-chart"
+                  aria-label={group.label}
+                  class={`min-h-9 rounded px-2 py-1 text-xs font-medium transition-colors sm:px-3 ${
+                    selected
+                      ? "bg-[var(--bb-surface-data)] text-[var(--bb-data-fg-primary)] shadow-sm"
+                      : "text-[var(--bb-data-fg-muted)] hover:bg-[var(--bb-surface-data)] hover:text-[var(--bb-data-fg-primary)]"
+                  }`}
+                  onClick={() => selectGroup(group)}
+                  title={group.description}
+                >
+                  {group.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {activeGroupCharts.length > 1 && (
+          <div
+            class="flex flex-wrap items-center gap-1 rounded-md panel-muted p-1"
+            role="group"
+            aria-label={`${activeGroup.label} charts`}
+          >
+            {activeGroupCharts.map((chart) => {
+              const selected = activeChart.id === chart.id;
+              return (
+                <button
+                  key={chart.id}
+                  type="button"
+                  class={`min-h-9 rounded px-2 py-1 text-xs font-medium transition-colors sm:px-3 ${
+                    selected
+                      ? "bg-[var(--bb-surface-data)] text-[var(--bb-data-fg-primary)] shadow-sm"
+                      : "text-[var(--bb-data-fg-muted)] hover:bg-[var(--bb-surface-data)] hover:text-[var(--bb-data-fg-primary)]"
+                  }`}
+                  onClick={() => setActiveId(chart.id)}
+                  aria-pressed={selected}
+                  aria-label={chart.title}
+                  title={chart.description}
+                >
+                  {chartButtonLabel(chart)}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {showBaseline && summary && summary.platforms.length > 1 && (
+          <div class="ml-auto flex items-center gap-2">
+            <label class="text-xs text-[var(--bb-data-fg-muted)]" for="chart-panel-baseline">
+              Baseline:
+            </label>
+            <select
+              id="chart-panel-baseline"
+              class="min-w-0 max-w-full rounded border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-xs text-[var(--bb-data-fg-primary)]"
+              value={String(baselineIdx)}
+              onChange={(event) => setBaselineIdx(Number((event.target as HTMLSelectElement).value))}
             >
-              {chartGroups.map((group) => {
-                const selected = group.id === activeGroup.id;
-                return (
-                  <button
-                    key={group.id}
-                    role="tab"
-                    type="button"
-                    aria-selected={selected}
-                    aria-controls="chart-panel-chart"
-                    aria-label={group.label}
-                    class={`min-h-9 min-w-0 rounded px-2 py-1.5 text-center text-xs font-medium transition-colors sm:px-3 ${
-                      selected
-                        ? "bg-[var(--bb-surface-data)] text-[var(--bb-data-fg-primary)] shadow-sm"
-                        : "text-[var(--bb-data-fg-muted)] hover:bg-[var(--bb-surface-data)] hover:text-[var(--bb-data-fg-primary)]"
-                    }`}
-                    onClick={() => selectGroup(group)}
-                    title={group.description}
-                  >
-                    {group.label}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          {showBaseline && summary && summary.platforms.length > 1 && (
-            <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
-              <label class="text-xs text-[var(--bb-data-fg-muted)]" for="chart-panel-baseline">
-                Baseline:
-              </label>
-              <select
-                id="chart-panel-baseline"
-                class="min-w-0 max-w-full rounded border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-xs text-[var(--bb-data-fg-primary)]"
-                value={String(baselineIdx)}
-                onChange={(event) => setBaselineIdx(Number((event.target as HTMLSelectElement).value))}
-              >
-                {summary.platforms.map((platform, index) => (
-                  <option key={platform.result_id} value={String(index)}>
-                    {platform.platform}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-          {activeGroupCharts.length > 1 && (
-            <div
-              class="grid w-full grid-cols-2 gap-1 rounded-md panel-muted p-1 sm:flex sm:w-auto sm:flex-wrap sm:justify-end"
-              role="group"
-              aria-label={`${activeGroup.label} charts`}
-            >
-              {activeGroupCharts.map((chart) => {
-                const selected = activeChart.id === chart.id;
-                return (
-                  <button
-                    key={chart.id}
-                    type="button"
-                    class={`min-h-9 min-w-0 rounded px-2 py-1.5 text-center text-xs font-medium transition-colors sm:px-3 ${
-                      selected
-                        ? "bg-[var(--bb-surface-data)] text-[var(--bb-data-fg-primary)] shadow-sm"
-                        : "text-[var(--bb-data-fg-muted)] hover:bg-[var(--bb-surface-data)] hover:text-[var(--bb-data-fg-primary)]"
-                    }`}
-                    onClick={() => setActiveId(chart.id)}
-                    aria-pressed={selected}
-                    aria-label={chart.title}
-                    title={chart.description}
-                  >
-                    {chartButtonLabel(chart)}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
+              {summary.platforms.map((platform, index) => (
+                <option key={platform.result_id} value={String(index)}>
+                  {platform.platform}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       <div id="chart-panel-chart" role="tabpanel" aria-label={`${activeGroup.label} chart`} data-chart-container>
@@ -327,19 +337,25 @@ function renderChart(
     case "comparison_bar":
       return compareGroups.length > 0 ? (
         <div class="space-y-4">
-          {summary && summary.platforms.length > 1 && (
-            <div class="flex flex-wrap gap-4">
-              {summary.platforms.map((platform, index) => (
-                <div key={platform.result_id} class="flex items-center gap-1.5 text-sm text-[var(--bb-data-fg-muted)]">
-                  <span
-                    class="inline-block h-3 w-3 rounded-sm"
-                    style={{ backgroundColor: paletteColor(index) }}
-                  />
-                  {platform.platform}
-                </div>
-              ))}
-            </div>
-          )}
+          {summary && summary.platforms.length > 1 && (() => {
+            const legendLabels = formatRunIdentitiesForCohort(
+              summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
+              "chart",
+            );
+            return (
+              <div class="flex flex-wrap gap-4">
+                {summary.platforms.map((platform, index) => (
+                  <div key={platform.result_id} class="flex items-center gap-1.5 text-sm text-[var(--bb-data-fg-muted)]">
+                    <span
+                      class="inline-block h-3 w-3 rounded-sm"
+                      style={{ backgroundColor: paletteColor(index) }}
+                    />
+                    {legendLabels[index] ?? platform.platform}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
           <GroupedQueryChart groups={compareGroups} />
         </div>
       ) : null;
@@ -362,22 +378,30 @@ function renderChart(
         />
       );
     case "percentile_ladder":
-      return summary ? (
-        <PercentileLadder
-          rows={summary.platforms.flatMap((platform, index) =>
-            platform.percentile_stats !== null
-              ? [
-                  {
-                    result_id: platform.result_id,
-                    platform: platform.platform,
-                    percentile_stats: platform.percentile_stats,
-                    colorIdx: index,
-                  },
-                ]
-              : [],
-          )}
-        />
-      ) : null;
+      if (!summary) return null;
+      {
+        const cohortLabels = formatRunIdentitiesForCohort(
+          summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
+          "chart",
+        );
+        return (
+          <PercentileLadder
+            rows={summary.platforms.flatMap((platform, index) =>
+              platform.percentile_stats !== null
+                ? [
+                    {
+                      result_id: platform.result_id,
+                      platform: platform.platform,
+                      displayLabel: cohortLabels[index] ?? platform.platform,
+                      percentile_stats: platform.percentile_stats,
+                      colorIdx: index,
+                    },
+                  ]
+                : [],
+            )}
+          />
+        );
+      }
     case "normalized_speedup":
       return summary ? (
         <NormalizedSpeedupChart
@@ -402,10 +426,21 @@ function renderChart(
 function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
   const [containerRef, { width: containerWidth }] = useElementSize();
   const width = Math.max(containerWidth, 400);
+  const cohortLabels = formatRunIdentitiesForCohort(
+    summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
+    "chart",
+  );
+  const labelByResultId = new Map(
+    summary.platforms.map((platform, index) => [platform.result_id, cohortLabels[index] ?? platform.platform]),
+  );
   const rows = summary.platforms
     .filter((platform) => platform.display_geomean_ms !== null && platform.display_geomean_ms > 0)
     .sort((a, b) => (a.display_geomean_ms ?? Infinity) - (b.display_geomean_ms ?? Infinity))
-    .map((platform, index) => ({ ...platform, color: paletteColor(index) }));
+    .map((platform, index) => ({
+      ...platform,
+      color: paletteColor(index),
+      displayLabel: labelByResultId.get(platform.result_id) ?? platform.platform,
+    }));
 
   if (rows.length === 0) {
     return (
@@ -466,7 +501,7 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
                 textAnchor="end"
                 style={{ fontSize: "11px", fill: "#374151" }}
               >
-                {row.platform.length > 22 ? `${row.platform.slice(0, 21)}…` : row.platform}
+                {row.displayLabel.length > 22 ? `${row.displayLabel.slice(0, 21)}…` : row.displayLabel}
               </text>
               <rect
                 x={labelWidth}
@@ -477,7 +512,7 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
                 opacity={0.85}
                 rx={2}
               >
-                <title>{`${row.platform}: ${fmtGeomean(row.display_geomean_ms)}`}</title>
+                <title>{`${row.displayLabel}: ${fmtGeomean(row.display_geomean_ms)}`}</title>
               </rect>
               {valueLabelPlacement.placement === "gutter" && (
                 <line

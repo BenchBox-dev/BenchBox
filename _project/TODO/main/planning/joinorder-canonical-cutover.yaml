@@ -1,0 +1,681 @@
+id: joinorder-canonical-cutover
+title: "joinorder canonical IMDb 2013 — Code wiring, queries, docs, ship (Step 1, part 2 of 2)"
+worktree: main
+priority: High
+status: Not Started
+category: Core Functionality
+
+description: |
+  Step 1 of the dual-track JOB strategy for issue #289
+  (https://github.com/joeharris76/BenchBox/issues/289). Part 2 of 2.
+  Consumes artifacts from `joinorder-canonical-foundation` and lands
+  the user-visible cutover in a single PR against `develop`.
+
+  This TODO does five things in order:
+    1. Wires `joinorder` to canonical IMDb 2013 Parquet via the
+       reusable data_fetch infrastructure produced by the foundation TODO.
+    2. Renames the existing synthetic generator to `joinorder_synthetic`
+       and registers it with `surface: internal` so it is hidden from
+       the result explorer (per Joe's constraint: must not be visible).
+    3. Adds the 100 missing SQL queries to bring coverage to canonical
+       113. DataFrame mode stays at 13 (Track-2 follow-up TODO seeded).
+    4. Updates documentation, ships DATA-LICENSE.md, migrates existing
+       published bundles, lands CHANGELOG entry.
+    5. Promotes the DRAFT GitHub Release to published, runs UAT smoke
+       on at least 2 platforms, opens PR.
+
+  Decisions locked in (from planning, repeated for context):
+    - Hard rename: `joinorder` invocations targeting the synthetic
+      generator break with a clear error pointing at `joinorder_synthetic`.
+      Beta-appropriate; clean break.
+    - Existing 10 published bundles re-tagged in place
+      (joinorder_sf1_* → joinorder_synthetic_sf1_*); explorer filter
+      hides them via the `surface: internal` registry field. No UI
+      changes.
+    - Auto-download UX: silent first-run with progress bar; license
+      surfaced in DATA-LICENSE.md and `--help`, NOT a click-through.
+    - SQL coverage to all 113; DataFrame stays at 13.
+    - Bundle migration is in-PR (atomic with the surface-field change).
+
+deps:
+  needs:
+    - joinorder-canonical-foundation
+
+work:
+  - id: w1
+    summary: "Wire joinorder benchmark to canonical Parquet ingestion via data_fetch"
+    status: pending
+    notes: |
+      File: `benchbox/core/joinorder/benchmark.py`
+      Replace generator-based ingestion with:
+        from benchbox.core.data_fetch import fetch_data
+        data_dir = fetch_data("joinorder", registry, override_path=cli.data_path)
+        # 21 Parquet files at known paths under data_dir
+        for table in TABLES:
+          platform.load_parquet(table, data_dir / f"{table}.parquet")
+
+      Add `--data-path` CLI flag (and `BENCHBOX_DATA_PATH_JOINORDER`
+      env var) to the run_benchmark entry points (CLI and MCP). Both
+      bypass the auto-download path and read 21 Parquets from the
+      user-supplied directory.
+
+      Update DataFrame queries (`benchbox/core/joinorder/dataframe_queries.py`)
+      to read Parquet directly via `ctx.read_parquet(...)`. The 13
+      existing translations work as-is on canonical data because
+      they were schema-correct; only data source changes.
+
+  - id: w2
+    summary: "git mv synthetic files into new joinorder_synthetic module"
+    status: pending
+    notes: |
+      Use `git mv` to preserve file history:
+        benchbox/core/joinorder/generator.py
+          → benchbox/core/joinorder_synthetic/generator.py
+        benchbox/core/joinorder/queries.py
+          (the 13 currently embedded queries — keep these AS the
+           synthetic surface's query set since canonical 113 lives
+           on joinorder)
+          → benchbox/core/joinorder_synthetic/queries.py
+        benchbox/core/joinorder/dataframe_queries.py
+          (synthetic-shape DataFrame queries — kept for
+           joinorder_synthetic surface)
+          → benchbox/core/joinorder_synthetic/dataframe_queries.py
+
+      Add `benchbox/core/joinorder_synthetic/__init__.py` exporting
+      the same names as the original joinorder module did.
+
+      Commit at this work-unit boundary as a single move-only
+      commit (no content changes); makes the rename auditable in
+      git log.
+
+  - id: w3
+    summary: "Split benchmark.py: canonical stays at original path, synthetic gets its own"
+    status: pending
+    needs: [w2]
+    notes: |
+      The original `benchbox/core/joinorder/benchmark.py` mixes
+      synthetic-generation orchestration with the benchmark phase
+      driver. Split:
+        - Canonical version: stays at benchbox/core/joinorder/benchmark.py
+          (will be wired to data_fetch in w1; here just remove
+           synthetic-generator imports/calls)
+        - Synthetic version: NEW at
+          benchbox/core/joinorder_synthetic/benchmark.py
+          (re-exports synthetic-generation orchestration on the
+           internal-surface module)
+
+      The two share no runtime state. The cutover's w1 (canonical
+      wiring) and this w3 (synthetic split) can be developed in
+      parallel; the conflict surface is only the import header.
+
+  - id: w4
+    summary: "Register joinorder_synthetic + update joinorder registry entry + retract docstrings"
+    status: pending
+    needs: [w3]
+    notes: |
+      Register `joinorder_synthetic` in `benchbox/core/benchmark_registry.py`:
+        "joinorder_synthetic": {
+          "scale_options": [0.01, 0.1, 0.5, 1.0, 2.0, ...],
+          "default_scale": 1.0,
+          "surface": "internal",   # hidden from explorer
+          "data_source": "synthetic",
+        }
+      Update joinorder entry to:
+        "joinorder": {
+          "scale_options": [1.0],
+          "default_scale": 1.0,
+          "surface": "public",
+          "data_source": "canonical",
+          "data_manifest": "benchbox/core/joinorder/data_manifest.toml",
+        }
+
+      Update synthetic generator docstring (now in
+      benchbox/core/joinorder_synthetic/generator.py) to retract
+      fidelity claims:
+        Replace: "creates realistic synthetic data that preserves
+                  the join patterns and selectivity characteristics"
+        With:    "creates synthetic data with uniformly-random
+                  distributions for joinorder schema smoke testing
+                  only. NOT a substitute for canonical JOB — see
+                  benchbox/core/joinorder/ for the canonical
+                  IMDb 2013 implementation."
+
+  - id: w5
+    summary: "Migrate three speed-sensitive tests to use joinorder_synthetic at sf=0.01"
+    status: pending
+    needs: [w4]
+    notes: |
+      Affected tests use `JoinOrderGenerator(scale_factor=0.01)` for
+      log-capture speed (not semantics):
+        tests/unit/core/test_core_verbosity.py:15
+        tests/unit/core/test_core_verbosity.py:26
+        tests/unit/core/test_core_quiet.py:15
+
+      Update each to import from `benchbox.core.joinorder_synthetic`
+      instead of `benchbox.core.joinorder`. No semantic change to
+      the tests; they exercise the verbosity/quiet machinery, not
+      the data.
+
+      Also move generator unit tests:
+        tests/unit/core/joinorder/test_joinorder_generator.py
+          → tests/unit/core/joinorder_synthetic/test_joinorder_generator.py
+        tests/unit/core/joinorder/test_dataframe_queries.py
+          (the synthetic-13-query test)
+          → tests/unit/core/joinorder_synthetic/test_dataframe_queries.py
+
+  - id: w6
+    summary: "Add tiny canonical fixture loader for unit tests"
+    status: pending
+    needs: [w1]
+    notes: |
+      The foundation TODO checked in `tests/fixtures/joinorder_canonical_tiny/`
+      with 21 Parquets. This work unit adds the test helper:
+        tests/conftest.py:
+          @pytest.fixture
+          def joinorder_canonical_tiny(tmp_path):
+            # copy fixture to tmp, return path
+            ...
+
+      Document the fixture's predicate-satisfying property: every
+      embedded canonical query returns >=1 row against this fixture.
+
+  - id: w7
+    summary: "Add unit test: canonical queries return non-zero against tiny fixture"
+    status: pending
+    needs: [w6, w8]
+    notes: |
+      File: `tests/unit/core/joinorder/test_canonical_queries.py`
+
+      For each of 113 canonical JOB queries:
+        - Load tiny fixture into DuckDB
+        - Run query, assert row count >= 1
+        - Cross-check row count against
+          `_project/joinorder/reference_cardinalities.json`'s tiny
+          fixture entries (NB: foundation TODO produced reference
+          cardinalities for full canonical; this test uses a separate
+          tiny-fixture cardinalities file with the same schema —
+          generated by the foundation TODO's tiny-fixture build step
+          (w8b)).
+
+      This is the validator Joe asked for: "ensure all queries
+      actually work."
+
+  - id: w8
+    summary: "Import 113 canonical JOB queries from foundation build-inputs into joinorder/queries.py"
+    status: pending
+    needs: [w1]
+    notes: |
+      Source: foundation TODO produced
+      `_project/joinorder/build-inputs/queries/{1a,...,33c}.sql`
+      (foundation w7a). This work unit consumes those into the
+      runtime module.
+
+      File: `benchbox/core/joinorder/queries.py`
+      Structure: dict keyed by canonical query id (e.g., "1a", "33c");
+      values are SQL strings (Postgres dialect — engine-specific
+      translations happen at runtime via existing dialect infra).
+
+      Test: `tests/unit/core/joinorder/test_query_coverage.py`
+        - Assert 113 queries registered
+        - Assert canonical id format (e.g., regex ^\d+[a-z]$)
+        - Each query is parseable as SQL via sqlglot
+
+  - id: w9
+    summary: "Verify all 113 queries execute against DuckDB on tiny canonical fixture"
+    status: pending
+    needs: [w8, w6]
+    notes: |
+      Smoke test: load tiny canonical fixture (foundation w8b),
+      execute every one of the 113 queries via DuckDB. Assert:
+        - All 113 execute without parse/runtime error
+        - All 113 return ≥1 row (the predicate-domain guarantee)
+
+      DuckDB is the reference engine — if a query fails on DuckDB,
+      that is a blocker for this TODO. PostgreSQL would also work
+      (source dialect) but is not part of the BenchBox runtime
+      surface.
+
+      Test: extends test_canonical_queries.py from w7 with the
+      DuckDB execution sweep.
+
+  - id: w10
+    summary: "Triage non-DuckDB engine query failures; route to per-engine follow-up TODOs"
+    status: pending
+    needs: [w9]
+    notes: |
+      Run the 113-query sweep on each non-DuckDB engine that
+      currently supports joinorder (e.g., starrocks, spark,
+      clickhouse-local, postgres-platform if registered).
+
+      For each engine:
+        - Record per-query PASS/FAIL/SKIP (skip = engine doesn't
+          support a SQL feature; fail = unexpected error)
+        - If failure rate > 0%: file a per-engine follow-up TODO at
+          `_project/TODO/main/planning/joinorder-<engine>-dialect.yaml`
+          (status: Identified, summary: "Per-engine dialect gaps
+           for canonical 113 queries on <engine>"; not blocking
+           the cutover PR)
+
+      THIS TODO does NOT block on full coverage across all engines.
+      DuckDB + at least one other engine passing >=80% is the
+      cutover gate (verified in w17 UAT smoke). Per-engine cleanup
+      lands in follow-up PRs.
+
+  - id: w11
+    summary: "DataFrame mode: explicit NotImplementedError for the 100 untranslated queries; seed Track-2 TODO"
+    status: pending
+    needs: [w1, w8]
+    notes: |
+      File: `benchbox/core/joinorder/dataframe_queries.py`
+
+      For each of the 100 queries not yet DataFrame-translated:
+        def query_<id>(ctx):
+            raise NotImplementedError(
+              f"DataFrame translation for query {id} not yet "
+              f"available. Track-2 TODO: "
+              f"_project/TODO/main/planning/track2-joinorder-dataframe-coverage.md"
+            )
+
+      Seed the follow-up TODO file. NOTE: the Track-2 groundwork
+      TODO seeds two OTHER Track-2 items (stats-phase and scaling-
+      strategy); this dataframe-coverage seed is the cutover's own
+      because the gap is discovered here.
+        _project/TODO/main/planning/track2-joinorder-dataframe-coverage.yaml
+        (status: Identified, priority: Medium, summary only)
+      The seed file is a stub — minimal description, no detailed
+      work units. Whoever picks up Track-2 dataframe coverage will
+      flesh it out at that time.
+
+  - id: w12
+    summary: "Wire dataset_version into result bundle manifests"
+    status: pending
+    needs: [w1]
+    notes: |
+      File: `benchbox/core/publishing/bundle_publisher.py:176-177`
+
+      Add `dataset_version` field to bundle manifest:
+        - For benchmarks with `data_manifest`: sha256 of the
+          data_manifest.toml file
+        - For purely-generated benchmarks (tpch, tpcds): null
+
+      Bundle reader: surface for forensic comparison only — NO
+      explorer UI changes (per Joe's constraint).
+
+      Test: `tests/unit/core/publishing/test_dataset_version_field.py`
+        - joinorder bundles record correct dataset_version
+        - tpch bundles record null dataset_version
+
+  - id: w13
+    summary: "Write DATA-LICENSE.md for joinorder (reusable per-benchmark template)"
+    status: pending
+    needs: [w1]
+    notes: |
+      File: `benchbox/core/joinorder/DATA-LICENSE.md`
+
+      Sections (template shape, reusable for future benchmarks):
+        1. Dataset provenance: Harvard Dataverse DOI:10.7910/DVN/2QYZBT,
+           May 2013 IMDb plain-text "list files" snapshot, parsed via
+           imdbpy into 21-table relational schema, converted to Parquet
+           by BenchBox.
+        2. IMDb attribution string verbatim:
+           "Information courtesy of IMDb (https://www.imdb.com).
+            Used with permission."
+        3. Boncz-style scope clause (research/optimizer use only).
+        4. BenchBox redistribution disclaimer:
+           "BenchBox redistributes a derivative form of this dataset
+            as a convenience for benchmark reproducibility. BenchBox
+            makes no claim of ownership over the underlying IMDb
+            data and will honor takedown requests."
+        5. Takedown contact: <email TBD by Joe before publish>.
+
+      Document the template shape in
+      `_project/design/data-fetch-infra-reuse-guide.md` (foundation TODO
+      created the file; this work unit fills the DATA-LICENSE template
+      section).
+
+  - id: w14
+    summary: "Update documentation: README, docs/benchmarks/join-order.md, MCP/CLI help"
+    status: pending
+    needs: [w4, w13]
+    notes: |
+      Files:
+        - README.md: clarify joinorder = canonical IMDb 2013, one-time
+          ~1.2 GB download, sf=1 only, mention `--data-path` opt-out
+        - docs/benchmarks/join-order.md: full rewrite — retract
+          "realistic data distributions / preserving join characteristics";
+          new flow; sf=1 explanation; citation; license; --data-path
+        - benchbox/core/joinorder_synthetic/generator.py docstring:
+          retract fidelity claims (already done in w2); link to
+          canonical joinorder
+        - benchbox/mcp/tools/benchmark.py:140-174: run_benchmark
+          docstring mentions sf=1 enforcement for joinorder + first-run
+          download
+        - CLI help text in run_benchmark equivalent
+
+  - id: w15
+    summary: "Migrate existing 10 published bundles: rename joinorder_sf1_* → joinorder_synthetic_sf1_*"
+    status: pending
+    needs: [w4, w12]
+    notes: |
+      Script: `_project/scripts/migrate_joinorder_bundles.py`
+
+      Two-phase execution:
+
+      Phase 1 — DRY RUN (mandatory, manual review gate):
+        Run `python _project/scripts/migrate_joinorder_bundles.py
+             --dry-run --output _project/joinorder/migration-plan.md`
+        Output: a markdown report listing each bundle directory
+        rename, each manifest field change, and any anomalies
+        (orphaned files, schema-version conflicts, etc.).
+        REVIEW the plan before proceeding to phase 2.
+
+      Phase 2 — APPLY (single atomic commit):
+        Run `python _project/scripts/migrate_joinorder_bundles.py
+             --apply`
+        For each `results-data/bundles/joinorder_sf1_*`:
+          - `git mv` directory to `joinorder_synthetic_sf1_*`
+          - Update bundle manifest:
+              benchmark_id: joinorder → joinorder_synthetic
+              (preserve all other metadata)
+          - Bump bundle schema version if applicable
+        ALL renames + manifest edits land in a single commit
+        titled `chore(joinorder): re-tag synthetic results bundles
+        (10 bundles)`. Single-commit policy = single-revert if the
+        cutover regresses post-merge.
+
+      Since `joinorder_synthetic` has `surface: internal` (w4),
+      these bundles are filtered out of the explorer view at the
+      result-publisher layer — no explorer UI changes needed.
+
+      Failure handling: if --apply fails partway through, the
+      rule is to `git reset --hard HEAD~1` (the move commit, not
+      destroying earlier work) and re-run --dry-run with the
+      partial state to diagnose. NEVER hand-fix partial state
+      (silent drift risk).
+
+  - id: w16
+    summary: "CHANGELOG entry"
+    status: pending
+    needs: [w14, w15]
+    notes: |
+      File: `CHANGELOG.md`
+
+      Entry shape (under next unreleased version):
+        ### Breaking
+        - `joinorder` benchmark now uses canonical IMDb 2013 Parquet
+          archive (sf=1 only). First-run downloads ~1.2 GB from
+          GitHub Release. Use `--data-path` for air-gapped environments.
+          (#289)
+        - The previous uniformly-random synthetic generator has been
+          renamed to `joinorder_synthetic` and is internal-only
+          (hidden from result explorer).
+        - Existing `joinorder_sf1_*` published bundles have been
+          re-tagged as `joinorder_synthetic_sf1_*` to reflect their
+          actual provenance.
+
+        ### Added
+        - Reusable `benchbox.core.data_fetch` infrastructure for
+          benchmarks with canonical real-world datasets.
+        - DATA-LICENSE.md per benchmark for real-data provenance.
+        - Reference cardinalities for all 113 canonical JOB queries.
+
+      Per Joe's preference: terse user-facing bullets; no
+      retrospective edits to prior releases.
+
+  - id: w17
+    summary: "Pre-flight + UAT smoke on DuckDB + 1 other engine end-to-end"
+    status: pending
+    needs: [w1, w4, w5, w6, w7, w10, w11, w12, w13, w14, w15, w16]
+    notes: |
+      Pre-flight:
+        make pr-preflight
+
+      UAT smoke (full canonical joinorder, sf=1, end-to-end):
+        make uat-cell PLATFORM=duckdb BENCHMARK=joinorder SCALE=1
+        make uat-cell PLATFORM=<second_engine> BENCHMARK=joinorder SCALE=1
+
+      Second engine choice: pick from already-supported list with
+      Parquet ingestion (e.g., starrocks, spark, clickhouse-local).
+      The choice doesn't matter for cutover correctness as long as
+      one non-DuckDB engine succeeds end-to-end.
+
+      Verify:
+        - data_fetch downloads from DRAFT Release URL (with auth
+          token; the URL is fetchable while draft)
+        - All 113 SQL queries execute and produce non-zero results
+        - Result bundle records correct dataset_version
+        - Cardinalities match reference_cardinalities.json on full
+          canonical (key gate before publishing)
+
+  - id: w18
+    summary: "Promote DRAFT GitHub Release to published"
+    status: pending
+    needs: [w17]
+    notes: |
+      Only after UAT smoke passes:
+        gh release edit data/joinorder-imdb-2013-v1 --draft=false
+
+      Verify the asset is publicly downloadable without auth:
+        curl -sSL --head <release-asset-url> | head -1
+        # expect: HTTP/2 200
+
+      Update `benchbox/core/joinorder/data_manifest.toml` if the
+      published URL differs from the draft URL (it shouldn't, but
+      verify).
+
+  - id: w19
+    summary: "Open PR via make pr-open"
+    status: pending
+    needs: [w18]
+    notes: |
+      Branch: `feat/joinorder-canonical-imdb-2013` (the cutover
+      worktree branch — claim via `make worktree-claim
+      BRANCH=feat/joinorder-canonical-imdb-2013` at the start of
+      this TODO's implementation).
+
+      make pr-open
+
+      PR title: "feat(joinorder): canonical IMDb 2013 dataset; rename synthetic"
+
+      PR body sections (use HEREDOC):
+        ## Summary
+        - Closes #289
+        - `joinorder` now uses canonical IMDb 2013 Parquet
+          (sf=1 only; first-run downloads from GitHub Release)
+        - Synthetic generator renamed to `joinorder_synthetic`,
+          hidden from explorer (surface: internal)
+        - SQL coverage extended from 13 → 113 canonical queries
+        - Reusable data_fetch infrastructure added
+
+        ## Breaking
+        - User scripts invoking joinorder at sf!=1 will fail with
+          ScaleFactorNotSupportedError pointing at joinorder_synthetic
+        - Existing joinorder_sf1_* bundles re-tagged
+
+        ## Test plan
+        - [x] make pr-preflight
+        - [x] UAT smoke: DuckDB joinorder sf=1 end-to-end
+        - [x] UAT smoke: <second engine> joinorder sf=1 end-to-end
+        - [x] All 113 query reference cardinalities match
+              against full canonical via Postgres oracle
+        - [x] Tiny fixture covers all 113 query predicates
+
+verification:
+  - description: "joinorder rejects sf!=1 with a clear error"
+    command: "uv run -- python -m pytest tests/unit/core/test_scale_factor_validation.py::test_joinorder_rejects_non_unit_scale -q"
+    expected_output: "1 passed"
+  - description: "joinorder_synthetic accepts sf=0.01 (back-compat for verbosity tests)"
+    command: "uv run -- python -m pytest tests/unit/core/test_core_verbosity.py tests/unit/core/test_core_quiet.py -q"
+    expected_output: "all 3 tests pass"
+  - description: "All 113 SQL queries registered for joinorder"
+    command: "uv run -- python -c 'from benchbox.core.joinorder.queries import QUERY_TEMPLATES; print(len(QUERY_TEMPLATES))'"
+    expected_output: "113"
+  - description: "Tiny fixture predicate-satisfies all 113 queries"
+    command: "uv run -- python -m pytest tests/unit/core/joinorder/test_canonical_queries.py -q"
+    expected_output: "113 passed"
+  - description: "DataFrame queries fail loudly for the 100 untranslated"
+    command: "uv run -- python -c 'from benchbox.core.joinorder.dataframe_queries import query_2a; query_2a(None)' 2>&1 | grep -c 'NotImplementedError\\|track2-joinorder-dataframe-coverage'"
+    expected_output: ">= 1"
+  - description: "joinorder_synthetic is hidden from the result-publisher's public surface"
+    command: "uv run -- python -m pytest tests/unit/core/test_registry_surface_field.py::test_joinorder_synthetic_hidden -q"
+    expected_output: "1 passed"
+  - description: "Bundle migration completed: no joinorder_sf1_* directories remain"
+    command: "ls results-data/bundles/ | grep -c '^joinorder_sf1_'"
+    expected_output: "0"
+  - description: "Bundle migration: 10 joinorder_synthetic_sf1_* directories present"
+    command: "ls results-data/bundles/ | grep -c '^joinorder_synthetic_sf1_'"
+    expected_output: "10"
+  - description: "DATA-LICENSE.md exists for joinorder with required sections"
+    command: "test -f benchbox/core/joinorder/DATA-LICENSE.md && grep -cE 'Information courtesy of IMDb|takedown|Harvard Dataverse|10\\.7910/DVN/2QYZBT' benchbox/core/joinorder/DATA-LICENSE.md"
+    expected_output: ">= 4"
+  - description: "Result bundle manifests record dataset_version for joinorder; null for tpch"
+    command: "uv run -- python -m pytest tests/unit/core/publishing/test_dataset_version_field.py -q"
+    expected_output: "all tests pass"
+  - description: "GitHub Release is published (not draft)"
+    command: "gh release view data/joinorder-imdb-2013-v1 --json isDraft --jq .isDraft"
+    expected_output: "false"
+  - description: "Release asset is publicly downloadable"
+    command: "curl -sSL -o /dev/null -w '%{http_code}' \"$(gh release view data/joinorder-imdb-2013-v1 --json assets --jq '.assets[0].url')\""
+    expected_output: "200"
+  - description: "PR opened against develop with #289 reference"
+    command: "gh pr list --base develop --head feat/joinorder-canonical-imdb-2013 --json title,body --jq '.[] | select(.body | contains(\"#289\")) | .title'"
+    expected_output: "feat(joinorder)..."
+
+must_preserve:
+  - "Existing joinorder bundle filenames in published-results branch — those are on the published-results branch, NOT touched here; this TODO only re-tags bundles in the develop tree's results-data/bundles/"
+  - "DataFrame mode for the 13 already-translated queries — they continue to work on canonical data because they are schema-correct"
+  - "Other benchmarks (tpch, tpcds, etc.) — no behavior change; their scale_options remain unchanged"
+  - "MCP run_benchmark API signature — adding --data-path / env var must be additive only"
+  - "Result-explorer UI — zero changes; the surface: internal field filters at data layer only"
+  - "Existing test suite at fast tier — runs in same time bounds (verbosity tests now hit joinorder_synthetic which generates at sf=0.01 just as before)"
+
+approach: |
+  This TODO is the visible cutover. The foundation TODO did the
+  invisible work; here we land everything in one PR so users see a
+  coherent change.
+
+  Sequence rationale:
+    1. w1 (wire canonical) is independent foundation; do first
+    2. w2 (git mv) → w3 (split benchmark.py) → w4 (registry +
+       docstring) is the rename chain; do early so subsequent
+       work units can target the new structure
+    3. w5 onwards are mostly parallelizable after w1+w4
+    4. w8 (import) → w9 (DuckDB smoke) → w10 (per-engine triage)
+       is the query-coverage chain
+    5. w13 (DATA-LICENSE) and w14 (docs) come after structure
+       settles
+    6. w15 (bundle migration) — DRY-RUN review gate, then atomic
+       single-commit apply; mechanical once w4 lands
+    7. w16 (CHANGELOG) requires the full picture
+    8. w17 (UAT smoke) gates everything visible
+    9. w18 (promote Release) is a one-liner; gate on UAT
+    10. w19 (open PR) closes the work
+
+  Critical detail: the GitHub Release stays DRAFT until UAT
+  passes. If UAT reveals a bug in the data or pipeline that
+  requires rebuilding the archive, we don't have a public bad
+  version to retract — we just rebuild and re-stage the draft.
+  Promotion is a deliberate gate, not a side-effect.
+
+  Per Joe's CLAUDE.md: write work on a worktree ends at make pr-open,
+  not at git push. This TODO ends at w19 (PR open); reviewing /
+  merging the PR is a separate action.
+
+anti_patterns:
+  - "DO NOT skip the UAT smoke before promoting the GitHub Release — because once the URL is public, retraction is messy and confusing for any user who downloaded during the window — the draft-then-promote sequence is the gate"
+  - "DO NOT add UI changes to the result explorer to hide synthetic bundles — because Joe explicitly said no explorer complexity — the surface: internal registry field filters at the result-publisher layer; explorer reads only filtered data"
+  - "DO NOT translate the 100 missing DataFrame queries in this TODO — because that is significant scope and not required by issue #289 (SQL is the canonical surface) — file Track-2 follow-up TODO instead"
+  - "DO NOT add a click-through license acceptance — because this matches no other JOB ecosystem mirror (gregrahn, CWI, CedarDB) and adds friction without legal upside — DATA-LICENSE.md is sufficient"
+  - "DO NOT amend the existing joinorder bundles' source data hashes when re-tagging — because those bundles' results are bound to the synthetic data they were run against; re-tagging only changes the directory name and benchmark_id field — the original data hash stays for forensic value"
+  - "DO NOT run UAT smoke against ClickHouse-Cloud or other paid tiers — because the cost is not justified for Step 1; DuckDB + one OSS engine is sufficient — paid platform fallout (if any) is a follow-up"
+  - "DO NOT publish the Release without verifying takedown contact email is in DATA-LICENSE.md — because that is the BenchBox-side commitment to the license posture and must be reachable — verify in w18 before promotion"
+  - "DO NOT rebuild the canonical archive in this TODO — because the foundation TODO already did the build with provenance — only the URL pointer changes (draft → published)"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/joinorder/benchmark.py"
+    - "benchbox/core/joinorder/queries.py (new content: 113 queries)"
+    - "benchbox/core/joinorder/dataframe_queries.py (NotImplementedError stubs for 100)"
+    - "benchbox/core/joinorder/DATA-LICENSE.md (new)"
+    - "benchbox/core/joinorder_synthetic/ (new module — receives moved files via git mv)"
+    - "benchbox/core/benchmark_registry.py (joinorder + joinorder_synthetic entries)"
+    - "benchbox/core/publishing/bundle_publisher.py (dataset_version field)"
+    - "benchbox/cli/* and benchbox/mcp/tools/benchmark.py (--data-path flag, help text)"
+    - "tests/unit/core/joinorder/ (canonical query coverage test)"
+    - "tests/unit/core/joinorder_synthetic/ (moved synthetic tests)"
+    - "tests/unit/core/test_core_verbosity.py, test_core_quiet.py (3 line changes — synthetic import)"
+    - "tests/unit/core/publishing/test_dataset_version_field.py (new)"
+    - "tests/conftest.py (joinorder_canonical_tiny fixture)"
+    - "results-data/bundles/joinorder_sf1_* → joinorder_synthetic_sf1_* (rename + manifest field)"
+    - "_project/scripts/migrate_joinorder_bundles.py (new)"
+    - "_project/TODO/main/planning/track2-joinorder-dataframe-coverage.yaml (new seed)"
+    - "README.md, CHANGELOG.md, docs/benchmarks/join-order.md"
+    - "_project/design/data-fetch-infra-reuse-guide.md (DATA-LICENSE template section)"
+  do_not_modify:
+    - "benchbox/core/data_fetch/ (foundation TODO finalized this — only consume here)"
+    - "benchbox/core/joinorder/data_manifest.toml (foundation TODO produced; only consume)"
+    - "_project/joinorder/reference_cardinalities.json (foundation TODO produced)"
+    - "tests/fixtures/joinorder_canonical_tiny/ (foundation TODO produced)"
+    - "Any explorer UI / frontend code (zero UI changes per Joe)"
+    - "tests/unit/generators/test_scale_factor_harmonization.py (already pinned to sf=1 for joinorder; no change needed)"
+    - "Other benchmarks' code paths (tpch, tpcds, etc.) — only their registry default `surface: public` is added by the foundation TODO"
+    - "published-results branch (separate branch; bundle re-tagging here is on develop only)"
+
+deferred:
+  - summary: "Translate the 100 missing DataFrame queries"
+    reason: "Track-2 follow-up. Issue #289 is about SQL canonical fidelity; DataFrame parity is a separate axis. Seeded as track2-joinorder-dataframe-coverage."
+  - summary: "Per-engine SQL dialect translation for the 113 queries on non-DuckDB engines"
+    reason: "Engines that fail UAT smoke get per-engine follow-up TODOs. Step 1 ships with DuckDB as reference and at least one OSS engine validated."
+  - summary: "Statistics-as-phase support in benchmark phase model"
+    reason: "Step 2 (Track 2) — see joinorder-track2-groundwork TODO."
+  - summary: "Re-tagging bundles in published-results branch"
+    reason: "The published-results branch is the community submission target; bundle re-tagging there requires a separate PR with curation review. This TODO only renames in develop's results-data/bundles/ tree."
+  - summary: "Removing joinorder_synthetic in a future release"
+    reason: "Decision deferred. Joe stated no specific deprecation contract. Likely retained as Track-2 testbed; remove decision deferred to post-Step-2."
+
+metadata:
+  tags:
+    - joinorder
+    - issue-289
+    - canonical-imdb-2013
+    - cutover
+    - breaking-change
+  estimated_effort: "Large (1-2 weeks for cutover + UAT)"
+  created_date: "2026-05-09"
+  last_updated: "2026-05-09"
+
+impact:
+  business_value: |
+    Resolves #289. After this PR merges, `joinorder` results in
+    BenchBox are bit-comparable to academic literature. Engines'
+    cardinality-estimation differences become visible (the entire
+    point of JOB). Future Track-2 work on statistics maintenance
+    builds on a meaningful baseline.
+
+    Reusable data_fetch infrastructure (foundation TODO) gets its
+    first user, validating the design for ClickBench / Wikipedia /
+    GitHub Archive follow-on benchmarks.
+  user_impact: |
+    Breaking change for users running `joinorder` at sf!=1: clear
+    error pointing at `joinorder_synthetic`. Otherwise transparent —
+    first run downloads ~1.2 GB silently, subsequent runs cached.
+    `--data-path` opt-out for air-gapped environments.
+  technical_debt: |
+    Eliminates JOB-correctness debt. Establishes patterns
+    (DATA-LICENSE per benchmark, dataset_version in result bundles,
+    surface: internal for hidden benchmarks) that pay forward.
+
+success_metrics:
+  - "PR closes #289 cleanly with passing pre-flight + UAT smoke"
+  - "joinorder canonical fidelity: all 113 queries return non-zero rows on canonical data; row counts match reference cardinalities computed by foundation TODO"
+  - "joinorder_synthetic is registered, runnable, and hidden from result-publisher public surface"
+  - "Existing 10 joinorder_sf1_* bundles successfully re-tagged in develop tree; no orphans"
+  - "Documentation no longer claims synthetic data preserves join characteristics or realistic distributions"
+  - "GitHub Release at data/joinorder-imdb-2013-v1 is published, publicly downloadable, sha256 verified"
+  - "Three speed-sensitive verbosity tests still run at fast-tier speed via joinorder_synthetic"
+  - "Submission terminal state: merged-to-develop"
+
+open_questions:
+  - "Which non-DuckDB engine to use for UAT smoke (w17). Plan: pick from {starrocks, spark, clickhouse-local} based on Parquet ingestion stability at the time of cutover; document choice in PR body."
+  - "If a per-engine SQL dialect surfaces failures on some of the 113 queries, do we ship with partial coverage flagged or block on full coverage? Plan: ship with partial coverage if DuckDB + one OSS engine pass full 113; per-engine gaps become follow-up TODOs."
+  - "Takedown contact email for DATA-LICENSE.md. Plan: Joe to provide before w18 promotion. Default: joeharris76@gmail.com (matches user.email config) unless Joe specifies a project-specific alias."

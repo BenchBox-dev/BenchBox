@@ -405,8 +405,8 @@ describe("Home", () => {
     expect(within(activeSummary).getByText("All scales")).toBeTruthy();
     expect(within(activeSummary).getByText("All phases")).toBeTruthy();
     expectDocumentOrder(headline, activeSummary);
-    expectDocumentOrder(activeSummary, leaderboard);
-    expectDocumentOrder(leaderboard, selector);
+    expectDocumentOrder(activeSummary, selector);
+    expectDocumentOrder(selector, leaderboard);
     expectDocumentOrder(leaderboard, workflow);
     expectDocumentOrder(leaderboard, recentHeading);
   });
@@ -439,6 +439,16 @@ describe("Home", () => {
     fireEvent.click(screen.getByRole("radio", { name: "Ranks" }));
 
     await waitFor(() => expect(new URL(window.location.href).searchParams.get("mode")).toBe("ranks"));
+  });
+
+  it("renders a Compare entrypoint inside the leaderboard cohort selector", async () => {
+    render(<Home />);
+    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+
+    const entrypoint = screen.getByTestId("home-compare-entrypoint");
+    expect(entrypoint).toHaveAttribute("href", "/results/compare/");
+    const selector = screen.getByRole("region", { name: "Leaderboard cohort selector" });
+    expect(selector.contains(entrypoint)).toBe(true);
   });
 
   it("renders a compact run-compare-submit workflow near the leaderboard", async () => {

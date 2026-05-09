@@ -24,6 +24,13 @@ export interface PercentileStatsRow {
    *  not collide on `key={platform}`. */
   result_id: string;
   platform: string;
+  /**
+   * Cohort-aware label from `formatRunIdentitiesForCohort`. When the row
+   * is part of a cohort with duplicate platform names, the caller passes
+   * a disambiguated label (e.g. "DataFusion v44 2026-04-12"). Falls back
+   * to `platform` when not provided so older callers still render.
+   */
+  displayLabel?: string;
   percentile_stats: PercentileStats;
   colorIdx?: number;
 }
@@ -110,7 +117,10 @@ export function PercentileLadder({ rows }: Props) {
                 class="text-xs fill-[var(--bb-data-fg-primary)]"
                 style={{ fontSize: "11px" }}
               >
-                {row.platform.length > 18 ? row.platform.slice(0, 17) + "…" : row.platform}
+                {(() => {
+                  const label = row.displayLabel ?? row.platform;
+                  return label.length > 18 ? label.slice(0, 17) + "…" : label;
+                })()}
               </text>
 
               {/* Rung bars */}

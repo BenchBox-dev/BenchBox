@@ -9,6 +9,7 @@ import type {
 import type { ResultRow } from "@/lib/duckdbQueries";
 import { getMetaLeaderboardData, listResults } from "@/lib/duckdbQueries";
 import { BENCHMARK_LABELS, humanizeBenchmark, fmtScore, fmtGeomean, errMsg } from "@/utils";
+import { formatBenchmarkLabel } from "@/lib/displayLabels";
 import { MetaLeaderboardSkeleton, SkeletonBlock } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { MetaLeaderboard } from "@/components/MetaLeaderboard";
@@ -302,32 +303,13 @@ export function Home(_: RoutableProps) {
       </section>
 
       <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {filteredMetaLeaderboard && (
-          <MetaLeaderboard
-            data={filteredMetaLeaderboard}
-            mode={mode}
-            onModeChange={(value) => setModeRaw(value)}
-            cohortHref={buildCohortHref}
-            platformHref={buildPlatformHref}
-            resultMetadataById={resultById}
-          />
-        )}
-
-        {filteredMetaLeaderboard && filteredMetaLeaderboard.cohorts.length === 0 && (
-          <CoverageEmptyState
-            activeFacets={activeFacetSummaries}
-            canClearScale={scaleFilters.length > 0}
-            canClearPlatform={facets.platform.length > 0}
-            onClearScale={() => setFacet("scale_factor", [])}
-            onClearPlatform={() => setFacet("platform", [])}
-            onReset={resetFacets}
-          />
-        )}
-
+        {/* Cohort selector renders above the matrix so users can change
+            benchmark/scale/phase context without scrolling past the
+            matrix to find the controls. */}
         {filteredMetaLeaderboard && (
           <section
             aria-label="Leaderboard cohort selector"
-            class="mb-8 rounded-lg border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] p-3"
+            class="mb-6 rounded-lg border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] p-3"
           >
             <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <MultiSelectFilter
@@ -341,7 +323,7 @@ export function Home(_: RoutableProps) {
                     value === "all" ? [] : toggleFacetValue(benchmarkFilters, value),
                   )
                 }
-                format={(value) => humanizeBenchmark(value)}
+                format={(value) => formatBenchmarkLabel(value)}
               />
               <MultiSelectFilter
                 label="Scale factor"
@@ -394,7 +376,46 @@ export function Home(_: RoutableProps) {
                 />
               </div>
             </details>
+            {/* w5 (compare-flow-entrypoints): Home now exposes a direct
+                entry point into the in-page Compare builder. The builder
+                handles the empty state itself, so no ?ids= prefilling is
+                needed — users land on the cohort filters and pick from
+                the candidate list. */}
+            <div class="mt-3 flex items-center justify-between gap-3 border-t border-[var(--bb-border-default)] pt-3">
+              <p class="text-xs text-[var(--bb-fg-muted)]">
+                Compare two or more runs from the corpus side by side.
+              </p>
+              <a
+                href="/results/compare/"
+                data-testid="home-compare-entrypoint"
+                class="rounded-md border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] px-3 py-1.5 text-sm font-medium text-[var(--bb-fg-primary)] shadow-sm hover:bg-[var(--bb-surface-data-muted)]"
+              >
+                Start a comparison →
+              </a>
+            </div>
           </section>
+        )}
+
+        {filteredMetaLeaderboard && (
+          <MetaLeaderboard
+            data={filteredMetaLeaderboard}
+            mode={mode}
+            onModeChange={(value) => setModeRaw(value)}
+            cohortHref={buildCohortHref}
+            platformHref={buildPlatformHref}
+            resultMetadataById={resultById}
+          />
+        )}
+
+        {filteredMetaLeaderboard && filteredMetaLeaderboard.cohorts.length === 0 && (
+          <CoverageEmptyState
+            activeFacets={activeFacetSummaries}
+            canClearScale={scaleFilters.length > 0}
+            canClearPlatform={facets.platform.length > 0}
+            onClearScale={() => setFacet("scale_factor", [])}
+            onClearPlatform={() => setFacet("platform", [])}
+            onReset={resetFacets}
+          />
         )}
 
         {filteredMetaLeaderboard && <FlywheelStrip />}
@@ -471,7 +492,7 @@ export function Home(_: RoutableProps) {
             title="Browse by Benchmark"
             items={benchmarks}
             hrefFn={(benchmark) => `/results/${benchmark}/`}
-            labelFn={humanizeBenchmark}
+            labelFn={formatBenchmarkLabel}
           />
           <BrowseSection
             title="Browse by Platform"

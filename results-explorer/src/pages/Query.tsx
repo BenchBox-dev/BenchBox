@@ -18,10 +18,18 @@ import {
 import { getTableSchema, type SchemaColumn } from "@/lib/duckdbSchema";
 import { useFacetField } from "@/lib/facetModel";
 import { toDateWindowFacet, toggleFacetValue } from "@/lib/facetMatching";
+import { buildCompareUrl, compareIdForRow } from "@/lib/resultLinks";
 import { STARTER_QUERY_CATEGORIES, starterQueriesByCategory, type StarterQueryCategory } from "@/lib/starterQueries";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { memoizedSnapshotQueryRows } from "@/lib/duckdbQueries";
 import { formatQueryCell, formatQueryColumnLabel, formatQueryFacetValue } from "@/lib/queryLabels";
+import {
+  formatBenchmarkLabel,
+  formatCostStatus,
+  formatTrustLabel,
+  formatValidationStatus,
+  formatVisibility,
+} from "@/lib/displayLabels";
 import {
   EXPLORER_PERFORMANCE_MARKS,
   EXPLORER_PERFORMANCE_MEASURES,
@@ -88,6 +96,19 @@ export function Query(_: RoutableProps) {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [visibleResultLimit, setVisibleResultLimit] = useState(TABLE_RENDER_LIMIT);
   const [visibleSqlLimit, setVisibleSqlLimit] = useState(TABLE_RENDER_LIMIT);
+  // w4 (compare-flow-entrypoints): select-for-compare state. The first
+  // pick locks the cohort signature; subsequent rows that don't match
+  // render disabled. The Compare tray below the result count surfaces
+  // the active cohort and the launch button.
+  const [compareSelectedIds, setCompareSelectedIds] = useState<Set<string>>(new Set());
+  const toggleCompareSelection = (resultId: string) =>
+    setCompareSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(resultId)) next.delete(resultId);
+      else next.add(resultId);
+      return next;
+    });
+  const clearCompareSelection = () => setCompareSelectedIds(new Set());
   const rowLimitMode = rowLimitRaw === "all" ? "all" : "default";
   const rowLimit = rowLimitMode === "all" ? UNLIMITED_ROW_LIMIT : DEFAULT_ROW_LIMIT;
 
@@ -254,37 +275,65 @@ export function Query(_: RoutableProps) {
 
   const columnNames = schema.map((column) => column.name);
   const facetGroups: FacetGroup[] = [
-    makeFacetGroup("benchmark", "Benchmark", facetCounts.benchmark ?? [], benchmarks),
-    makeFacetGroup("platform", "Platform", facetCounts.platform ?? [], platforms),
+    makeFacetGroup("benchmark", "Benchmark", facetCounts.benchmark ?? [], benchmarks, {
+      formatLabel: formatBenchmarkLabel,
+      searchable: true,
+    }),
+    makeFacetGroup("platform", "Platform", facetCounts.platform ?? [], platforms, {
+      searchable: true,
+    }),
     makeFacetGroup("scale_factor", "Scale", facetCounts.scale_factor ?? [], scaleFactors),
-    makeFacetGroup("tuning_mode", "Tuning", facetCounts.tuning_mode ?? [], tuningModes),
-    makeFacetGroup("trust_tier", "Trust", facetCounts.trust_label ?? [], trustTiers),
-    makeFacetGroup("validation_status", "Validation", facetCounts.validation_status ?? [], validationStatuses),
-    makeFacetGroup("cost_status", "Cost status", facetCounts.cost_status ?? [], costStatuses),
-    makeFacetGroup("cost_model", "Cost model", facetCounts.cost_model_version ?? [], costModelVersions),
-    makeFacetGroup("deployment_class", "Deployment", facetCounts.deployment_class ?? [], deploymentClasses),
-    makeFacetGroup("cloud_provider", "Cloud provider", facetCounts.cloud_provider ?? [], cloudProviders),
-    makeFacetGroup("cloud_region", "Cloud region", facetCounts.cloud_region ?? [], cloudRegions),
+    makeFacetGroup("tuning_mode", "Tuning", facetCounts.tuning_mode ?? [], tuningModes, {
+      defaultCollapsed: true,
+    }),
+    makeFacetGroup("trust_tier", "Trust", facetCounts.trust_label ?? [], trustTiers, {
+      formatLabel: formatTrustLabel,
+      defaultCollapsed: true,
+    }),
+    makeFacetGroup("validation_status", "Validation", facetCounts.validation_status ?? [], validationStatuses, {
+      formatLabel: formatValidationStatus,
+      defaultCollapsed: true,
+    }),
+    makeFacetGroup("cost_status", "Cost status", facetCounts.cost_status ?? [], costStatuses, {
+      formatLabel: formatCostStatus,
+      defaultCollapsed: true,
+    }),
+    makeFacetGroup("cost_model", "Cost model", facetCounts.cost_model_version ?? [], costModelVersions, {
+      defaultCollapsed: true,
+    }),
+    makeFacetGroup("deployment_class", "Deployment", facetCounts.deployment_class ?? [], deploymentClasses, {
+      defaultCollapsed: true,
+    }),
+    makeFacetGroup("cloud_provider", "Cloud provider", facetCounts.cloud_provider ?? [], cloudProviders, {
+      defaultCollapsed: true,
+    }),
+    makeFacetGroup("cloud_region", "Cloud region", facetCounts.cloud_region ?? [], cloudRegions, {
+      searchable: true,
+      defaultCollapsed: true,
+    }),
     makeFacetGroup(
       "instance_or_warehouse",
       "Instance / warehouse",
       facetCounts.instance_or_warehouse ?? [],
       instanceOrWarehouses,
+      { searchable: true, defaultCollapsed: true },
     ),
-    makeFacetGroup("storage_format", "Storage", facetCounts.storage_format ?? [], storageFormats),
+    makeFacetGroup("storage_format", "Storage", facetCounts.storage_format ?? [], storageFormats, {
+      defaultCollapsed: true,
+    }),
     makeFacetGroup(
       "has_cost",
       "Has cost",
       [{ value: "all", count: rows.length }, ...(facetCounts.has_cost ?? [])],
       [hasCost],
-      formatHasCostLabel,
+      { formatLabel: formatHasCostLabel, defaultCollapsed: true },
     ),
     makeFacetGroup(
       "date_window",
       "Date window",
       [{ value: "all", count: rows.length }, ...(facetCounts.date_window ?? [])],
       [dateWindow],
-      formatDateWindowLabel,
+      { formatLabel: formatDateWindowLabel, defaultCollapsed: true },
     ),
   ].filter((group) => group.options.length > 0);
   const activeFilterChips: ActiveFacetChip[] = [
@@ -328,6 +377,25 @@ export function Query(_: RoutableProps) {
       }
       return [...current, column];
     });
+  }
+
+  // Bulk visible-column actions for the disclosure header.
+  // "Reset to default" restores the DEFAULT_COLUMNS subset (those present
+  // in the snapshot schema). "Select all" / "Clear optional" exist so
+  // power users don't have to toggle 20+ checkboxes one by one.
+  // We keep at least one identifying/result column visible at all times
+  // (`result_id` if present, else first available); otherwise the table
+  // would render with no data columns and only View links.
+  function resetVisibleColumnsToDefault() {
+    setVisibleColumns(DEFAULT_COLUMNS.filter((column) => columnNames.includes(column)));
+  }
+  function selectAllVisibleColumns() {
+    setVisibleColumns([...columnNames]);
+  }
+  function clearOptionalVisibleColumns() {
+    if (columnNames.length === 0) return;
+    const required = columnNames.includes("result_id") ? ["result_id"] : columnNames.slice(0, 1);
+    setVisibleColumns(required);
   }
 
   function toggleSort(column: string) {
@@ -491,7 +559,7 @@ export function Query(_: RoutableProps) {
 
   return (
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <div class="mb-6 lg:mb-3">
+      <div class="mb-6">
         <h1 class="text-3xl font-bold text-[var(--bb-data-fg-primary)]">Results Query Workbench</h1>
         <p class="mt-2 max-w-3xl text-sm text-[var(--bb-data-fg-muted)]">
           Query the <code class="rounded bg-[var(--bb-surface-app)] px-1 font-mono text-xs">results.duckdb</code> snapshot in-browser
@@ -503,7 +571,7 @@ export function Query(_: RoutableProps) {
         <section class="flex min-w-0 flex-col gap-4 lg:col-start-2">
           <div
             data-testid="query-result-summary"
-            class="order-1 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-4 shadow-sm lg:order-2"
+            class="order-1 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-4 shadow-sm"
           >
             <div class="text-sm text-[var(--bb-data-fg-muted)]">
               {rows.length} matching result bundle(s)
@@ -574,56 +642,160 @@ export function Query(_: RoutableProps) {
                   <span>Query limit: {rowLimitMode === "all" ? "all" : DEFAULT_ROW_LIMIT.toLocaleString()}</span>
                   <span class="bb-scroll-affordance" data-testid="query-results-scroll-hint">← scroll →</span>
                 </div>
-                <div class="overflow-x-auto">
-                  <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">
-                    <thead class="bg-[var(--bb-surface-data-muted)]">
-                      <tr>
-                        {visibleColumns.map((column) => {
-                          const isActive = sort.column === column;
-                          const arrow = isActive ? (sort.direction === "asc" ? " ↑" : " ↓") : "";
-                          const ariaSort = isActive
-                            ? sort.direction === "asc"
-                              ? "ascending"
-                              : "descending"
-                            : "none";
-                          return (
-                            <th
-                              key={column}
-                              scope="col"
-                              aria-sort={ariaSort}
-                              class="p-0"
+                {(() => {
+                  const lockSig = (() => {
+                    const firstId = [...compareSelectedIds][0];
+                    if (firstId === undefined) return null;
+                    const firstRow = rows.find((row) => String(row.result_id) === firstId);
+                    if (!firstRow) return null;
+                    return {
+                      benchmark: String(firstRow.benchmark ?? ""),
+                      scale_factor: firstRow.scale_factor ?? null,
+                      phase: String(firstRow.phase ?? ""),
+                      primary_metric: String(firstRow.primary_metric ?? ""),
+                    };
+                  })();
+                  const lockReason = (row: ResultRow): string | undefined => {
+                    if (lockSig === null) return undefined;
+                    const id = String(row.result_id);
+                    if (compareSelectedIds.has(id)) return undefined;
+                    const mismatches: string[] = [];
+                    if (String(row.benchmark ?? "") !== lockSig.benchmark) mismatches.push("benchmark");
+                    if ((row.scale_factor ?? null) !== lockSig.scale_factor) mismatches.push("scale");
+                    if (String(row.phase ?? "") !== lockSig.phase) mismatches.push("phase");
+                    if (String(row.primary_metric ?? "") !== lockSig.primary_metric)
+                      mismatches.push("primary metric");
+                    if (mismatches.length === 0) return undefined;
+                    return `Locked: first selection is ${formatBenchmarkLabel(lockSig.benchmark)} SF ${lockSig.scale_factor} ${lockSig.phase}. This row differs by ${mismatches.join(", ")}.`;
+                  };
+                  const selectedCompareIds = [...compareSelectedIds]
+                    .map((id) => {
+                      const row = rows.find((r) => String(r.result_id) === id);
+                      return row ? compareIdForRow(row as Parameters<typeof compareIdForRow>[0]) : id;
+                    });
+                  const compareUrl = compareSelectedIds.size >= 2 ? buildCompareUrl(selectedCompareIds) : null;
+                  return (
+                    <>
+                      <div
+                        class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-2 text-sm text-[var(--bb-data-fg-muted)]"
+                        data-testid="query-compare-tray"
+                      >
+                        <span>
+                          {compareSelectedIds.size === 0 ? (
+                            "Select two or more rows to compare. The first pick locks the cohort."
+                          ) : compareSelectedIds.size === 1 ? (
+                            "1 result selected — pick a compatible second row to enable Compare."
+                          ) : (
+                            `${compareSelectedIds.size} results selected.`
+                          )}
+                        </span>
+                        <span class="flex items-center gap-2">
+                          {compareSelectedIds.size > 0 && (
+                            <button
+                              type="button"
+                              class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1 text-xs font-medium hover:bg-[var(--bb-surface-data-muted)]"
+                              onClick={clearCompareSelection}
+                              data-testid="query-compare-clear"
                             >
-                              <button
-                                type="button"
-                                class="table-th block w-full cursor-pointer select-none border-0 bg-transparent text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--bb-accent)]"
-                                onClick={() => toggleSort(column)}
-                              >
-                                {formatQueryColumnLabel(column)}{arrow}
-                              </button>
-                            </th>
-                          );
-                        })}
-                        <th class="table-th sticky right-0 z-10 bg-[var(--bb-surface-data-muted)]" />
-                      </tr>
-                    </thead>
-                    <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
-                      {visibleRows.map((row) => (
-                        <tr key={String(row.result_id)} class="hover:bg-[var(--bb-surface-data-muted)]">
-                          {visibleColumns.map((column) => (
-                            <td key={column} class="table-td">
-                              {formatQueryCell(column, row[column])}
-                            </td>
-                          ))}
-                          <td class="table-td sticky right-0 z-10 bg-[var(--bb-surface-data)] text-right">
-                            <a href={`/results/r/${row.result_id}`} class="text-xs font-medium no-underline">
-                              View →
+                              Clear selection
+                            </button>
+                          )}
+                          {compareUrl ? (
+                            <a
+                              href={compareUrl}
+                              class="rounded-md bg-[var(--bb-accent)] px-3 py-1 text-xs font-medium text-white shadow-sm"
+                              data-testid="query-compare-launch"
+                            >
+                              Compare {compareSelectedIds.size} selected →
                             </a>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled
+                              class="rounded-md border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-3 py-1 text-xs font-medium text-[var(--bb-data-fg-subtle)]"
+                              data-testid="query-compare-launch-disabled"
+                            >
+                              Compare (need 2+)
+                            </button>
+                          )}
+                        </span>
+                      </div>
+                      <div class="overflow-x-auto">
+                        <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">
+                          <thead class="bg-[var(--bb-surface-data-muted)]">
+                            <tr>
+                              <th
+                                scope="col"
+                                class="table-th sticky left-0 z-10 w-12 min-w-12 bg-[var(--bb-surface-data-muted)] text-left"
+                              >
+                                <span class="sr-only">Compare</span>
+                              </th>
+                              {visibleColumns.map((column) => {
+                                const isActive = sort.column === column;
+                                const arrow = isActive ? (sort.direction === "asc" ? " ↑" : " ↓") : "";
+                                const ariaSort = isActive
+                                  ? sort.direction === "asc"
+                                    ? "ascending"
+                                    : "descending"
+                                  : "none";
+                                return (
+                                  <th
+                                    key={column}
+                                    scope="col"
+                                    aria-sort={ariaSort}
+                                    class="p-0"
+                                  >
+                                    <button
+                                      type="button"
+                                      class="table-th block w-full cursor-pointer select-none border-0 bg-transparent text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--bb-accent)]"
+                                      onClick={() => toggleSort(column)}
+                                    >
+                                      {formatQueryColumnLabel(column)}{arrow}
+                                    </button>
+                                  </th>
+                                );
+                              })}
+                              <th class="table-th sticky right-0 z-10 bg-[var(--bb-surface-data-muted)]" />
+                            </tr>
+                          </thead>
+                          <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
+                            {visibleRows.map((row) => {
+                              const id = String(row.result_id);
+                              const isSelected = compareSelectedIds.has(id);
+                              const reason = lockReason(row);
+                              return (
+                                <tr key={id} class="hover:bg-[var(--bb-surface-data-muted)]">
+                                  <td class="table-td sticky left-0 z-10 bg-[var(--bb-surface-data)]">
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      disabled={Boolean(reason)}
+                                      title={reason}
+                                      onChange={() => toggleCompareSelection(id)}
+                                      class="h-4 w-4 rounded border-[var(--bb-data-border-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+                                      aria-label={`Select ${id} for comparison`}
+                                      data-testid={`query-compare-checkbox-${id}`}
+                                    />
+                                  </td>
+                                  {visibleColumns.map((column) => (
+                                    <td key={column} class="table-td">
+                                      {formatQueryRowCell(column, row[column])}
+                                    </td>
+                                  ))}
+                                  <td class="table-td sticky right-0 z-10 bg-[var(--bb-surface-data)] text-right">
+                                    <a href={`/results/r/${row.result_id}`} class="text-xs font-medium no-underline">
+                                      View →
+                                    </a>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  );
+                })()}
                 {visibleRows.length < rows.length && (
                   <div class="border-t border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-3 text-center">
                     <button
@@ -709,17 +881,39 @@ export function Query(_: RoutableProps) {
 
           <details
             data-testid="query-visible-columns"
-            class="order-5 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-4 shadow-sm lg:order-1"
+            class="order-5 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-4 shadow-sm"
           >
             <summary class="cursor-pointer text-sm font-medium text-[var(--bb-data-fg-primary)]">
               Configure visible columns
             </summary>
-            <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)]">Visible Columns</h2>
+            <div class="mt-3 space-y-3">
+              <div class="flex flex-wrap items-center justify-between gap-3">
                 <p class="text-xs text-[var(--bb-data-fg-muted)]">
                   Driven from DuckDB <code class="rounded bg-[var(--bb-surface-app)] px-1 font-mono">bench.results</code> introspection.
                 </p>
+                <div class="flex flex-wrap gap-2" role="group" aria-label="Bulk visible-column actions">
+                  <button
+                    type="button"
+                    class="btn btn-secondary text-xs"
+                    onClick={resetVisibleColumnsToDefault}
+                  >
+                    Reset to default
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-secondary text-xs"
+                    onClick={selectAllVisibleColumns}
+                  >
+                    Select all
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-secondary text-xs"
+                    onClick={clearOptionalVisibleColumns}
+                  >
+                    Clear optional
+                  </button>
+                </div>
               </div>
               <div class="flex flex-wrap gap-2">
                 {columnNames.map((column) => (
@@ -760,17 +954,27 @@ export function Query(_: RoutableProps) {
   );
 }
 
+interface MakeFacetGroupOptions {
+  formatLabel?: (value: string) => string;
+  searchable?: boolean;
+  defaultCollapsed?: boolean;
+}
+
 function makeFacetGroup(
   key: string,
   label: string,
   buckets: FacetBucket[],
   selected: string[],
-  formatLabel: (value: string) => string = (value) => formatQueryFacetValue(key, value),
+  options: MakeFacetGroupOptions = {},
 ): FacetGroup {
+  const formatLabel =
+    options.formatLabel ?? ((value: string) => formatQueryFacetValue(key, value));
   return {
     key,
     label,
     selected,
+    searchable: options.searchable,
+    defaultCollapsed: options.defaultCollapsed,
     options: buckets.map((bucket) => ({
       value: bucket.value,
       label: formatLabel(bucket.value),
@@ -811,6 +1015,25 @@ function formatCell(value: unknown): string {
 
 function projectVisibleRow(row: ResultRow, visibleColumns: string[]): ResultRow {
   return Object.fromEntries(visibleColumns.map((column) => [column, row[column]]));
+}
+
+// Cell formatter that intercepts known enum columns (trust_label,
+// validation_status, visibility, cost_status) before falling back to
+// `formatQueryCell`. Without this wrapper the raw enum values flow
+// through `readableToken` (underscore-only), which leaves dashed values
+// like "maintainer-run" unchanged. PR #277 addressed the trust_label
+// case by aligning the test fixture; this wrapper centralizes the
+// formatting so future call sites (Result Detail, exports, tooltips)
+// share one humanization rule.
+function formatQueryRowCell(column: string, value: unknown): string {
+  if (typeof value === "string" && value !== "") {
+    if (column === "trust_label") return formatTrustLabel(value);
+    if (column === "validation_status") return formatValidationStatus(value);
+    if (column === "visibility") return formatVisibility(value);
+    if (column === "cost_status") return formatCostStatus(value);
+    if (column === "benchmark") return formatBenchmarkLabel(value);
+  }
+  return formatQueryCell(column, value);
 }
 
 function buildQueryFacetCountQueries(

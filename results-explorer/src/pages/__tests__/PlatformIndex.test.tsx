@@ -6,7 +6,7 @@
  * that default switches direction on repeated clicks of the same key.
  */
 
-import { render, screen, fireEvent, waitFor } from "@testing-library/preact";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/preact";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { PlatformIndexRowRow } from "@/lib/duckdbQueries";
 
@@ -15,6 +15,14 @@ vi.mock("@/lib/duckdbQueries", async () => {
   return {
     ...actual,
     getPlatformIndexRows: vi.fn(),
+  };
+});
+
+vi.mock("preact-router", async () => {
+  const actual = await vi.importActual<typeof import("preact-router")>("preact-router");
+  return {
+    ...actual,
+    route: vi.fn(),
   };
 });
 
@@ -102,6 +110,120 @@ describe("PlatformIndex - sortable table headers", () => {
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
     await waitFor(() => expect(document.title).toBe("DuckDB · BenchBox Results"));
     expect(getRowOrder(container)).toEqual(["r-tpch-fast", "r-ssb-mid", "r-tpch-slow", "r-null-geo"]);
+  });
+
+  it("renders a Platform switcher that routes to a sibling without preserving tuning", async () => {
+    const preactRouter = await import("preact-router");
+    const routeMock = vi.mocked(preactRouter.route);
+    routeMock.mockClear();
+
+    const multiPlatformRows = [
+      ...ROWS,
+      makeRow({ result_id: "r-pg", short_id: "pg00000a", platform_id: "postgres", platform: "Postgres" }),
+    ];
+    vi.mocked(getPlatformIndexRows).mockResolvedValue(multiPlatformRows);
+
+    render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    const switcher = screen.getByTestId("platform-switcher") as HTMLSelectElement;
+    expect(switcher.value).toBe("duckdb");
+    expect(within(switcher).getByRole("option", { name: "Postgres" })).toBeTruthy();
+
+    fireEvent.change(switcher, { target: { value: "postgres" } });
+    expect(routeMock).toHaveBeenCalledTimes(1);
+    expect(routeMock).toHaveBeenCalledWith("/results/p/postgres/");
+  });
+
+  it("renders the platform filter strip when the cohort has >=25 rows and reset clears it", async () => {
+    const denseRows: PlatformIndexRowRow[] = Array.from({ length: 30 }, (_, idx) =>
+      makeRow({
+        result_id: `r-dense-${idx}`,
+        short_id: `dense${String(idx).padStart(4, "0")}`,
+        benchmark: idx < 18 ? "tpch" : "clickbench",
+        scale_factor: idx % 2 === 0 ? 0.1 : 1,
+        run_date: "2026-04-10",
+        geomean_ms: 10 + idx,
+      }),
+    );
+    vi.mocked(getPlatformIndexRows).mockResolvedValue(denseRows);
+
+    render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    const filterStrip = screen.getByTestId("platform-detail-filters");
+    expect(filterStrip).toBeTruthy();
+    expect(screen.getByText("Showing 30 of 30 results")).toBeTruthy();
+
+    fireEvent.change(screen.getByTestId("platform-filter-benchmark"), {
+      target: { value: "clickbench" },
+    });
+    await waitFor(() => expect(screen.getByText("Showing 12 of 12 results")).toBeTruthy());
+
+    fireEvent.click(screen.getByTestId("platform-filter-reset"));
+    await waitFor(() => expect(screen.getByText("Showing 30 of 30 results")).toBeTruthy());
+    expect(screen.queryByTestId("platform-filter-reset")).toBeNull();
+  });
+
+  it("locks the cohort signature after the first compare selection", async () => {
+    const cohortRows: PlatformIndexRowRow[] = [
+      makeRow({
+        result_id: "r-tpch-a",
+        short_id: "tpcha000",
+        benchmark: "tpch",
+        scale_factor: 0.1,
+        phase: "power",
+        run_date: "2026-04-01",
+        primary_metric: "display_geomean_ms",
+      }),
+      makeRow({
+        result_id: "r-tpch-b",
+        short_id: "tpchb000",
+        benchmark: "tpch",
+        scale_factor: 0.1,
+        phase: "power",
+        run_date: "2026-04-02",
+        primary_metric: "display_geomean_ms",
+      }),
+      makeRow({
+        result_id: "r-clickbench",
+        short_id: "click000",
+        benchmark: "clickbench",
+        scale_factor: 0.1,
+        phase: "power",
+        run_date: "2026-04-03",
+        primary_metric: "display_geomean_ms",
+      }),
+    ];
+    vi.mocked(getPlatformIndexRows).mockResolvedValue(cohortRows);
+
+    render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    const checkboxA = screen.getByTestId("platform-compare-checkbox-r-tpch-a") as HTMLInputElement;
+    const checkboxB = screen.getByTestId("platform-compare-checkbox-r-tpch-b") as HTMLInputElement;
+    const checkboxClickbench = screen.getByTestId(
+      "platform-compare-checkbox-r-clickbench",
+    ) as HTMLInputElement;
+
+    expect(checkboxA.disabled).toBe(false);
+    expect(checkboxB.disabled).toBe(false);
+    expect(checkboxClickbench.disabled).toBe(false);
+
+    fireEvent.click(checkboxA);
+    expect(checkboxA.checked).toBe(true);
+    expect(checkboxB.disabled).toBe(false);
+    expect(checkboxClickbench.disabled).toBe(true);
+    expect(checkboxClickbench.title).toContain("differs by benchmark");
+
+    fireEvent.click(checkboxA);
+    expect(checkboxClickbench.disabled).toBe(false);
+  });
+
+  it("hides the platform filter strip when the cohort has fewer than 25 rows", async () => {
+    render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+    expect(screen.queryByTestId("platform-detail-filters")).toBeNull();
   });
 
   it("shows persistent compare guidance and cohort labels before selection", async () => {

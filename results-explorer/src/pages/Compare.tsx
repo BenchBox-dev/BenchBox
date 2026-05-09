@@ -12,6 +12,7 @@ import {
 } from "@/lib/duckdbQueries";
 import { humanizeBenchmark, errMsg, fmtGeomean } from "@/utils";
 import { buildCompareUrl } from "@/lib/resultLinks";
+import { formatRunIdentitiesForCohort, type RunIdentitySource } from "@/lib/runIdentity";
 import { CompareSummarySkeleton } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { Breadcrumb } from "@/components/Breadcrumb";
@@ -213,9 +214,26 @@ export function Compare(_: RoutableProps) {
   const slowestPrimary =
     validPrimaries.length > 0 ? (higherIsBetter ? Math.min(...validPrimaries) : Math.max(...validPrimaries)) : null;
 
-  const rowData = results.map((r) => ({
+  // Cohort-aware run identity labels. When the comparison includes
+  // multiple runs of the same platform (e.g., DataFusion v44 vs v53,
+  // or two PySpark runs from different dates), this disambiguates them
+  // with the shortest qualifier suffix that makes the cohort unique.
+  // Singletons keep the bare platform name.
+  const identitySources: RunIdentitySource[] = results.map((r) => ({
+    result_id: r.result_id,
+    platform: r.platform,
+    platform_version: r.platform_version,
+    driver_version: r.driver_version,
+    run_date: r.run_date,
+    scale_factor: r.scale_factor,
+    trust_label: r.trust_label,
+  }));
+  const cohortIdentities = formatRunIdentitiesForCohort(identitySources, "table");
+  const cohortIdentitiesCompact = formatRunIdentitiesForCohort(identitySources, "compact");
+
+  const rowData = results.map((r, idx) => ({
     resultId: r.result_id,
-    label: r.platform,
+    label: cohortIdentities[idx]!,
     trustLabel: r.trust_label,
     runDate: r.run_date,
     tuningMode: r.tuning_mode,
@@ -259,7 +277,8 @@ export function Compare(_: RoutableProps) {
             <p class="text-xs font-semibold uppercase tracking-wide text-[var(--bb-data-fg-subtle)]">Compare</p>
             <h1 class="mt-1 text-3xl font-bold text-[var(--bb-data-fg-primary)]">{benchmarkLabel} Comparison</h1>
             <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">
-              Scale factor: {scaleFactorLabel} - {rowCount} platforms
+              Scale factor: {scaleFactorLabel} - {rowCount}{" "}
+              {new Set(results.map((r) => r.platform)).size === results.length ? "platforms" : "runs"}
             </p>
             {/* Trust tier diversity note - informational, not a warning */}
             {(() => {
@@ -290,7 +309,10 @@ export function Compare(_: RoutableProps) {
             ariaLabel="Baseline"
             value={String(normalizedBaselineIndex)}
             onChange={(value) => setBaselineIndex(Number(value))}
-            options={results.map((result, index) => ({ value: String(index), label: result.platform }))}
+            options={results.map((_result, index) => ({
+              value: String(index),
+              label: cohortIdentitiesCompact[index]!,
+            }))}
             size="sm"
           />
         </div>

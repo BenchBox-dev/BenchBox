@@ -1,0 +1,91 @@
+# w4 + w5 + w6 — Compare flow entrypoints
+
+Branch: feat/explorer-compare-flow-entrypoints
+Develop tip at start: 6c28d2b45 + #303 (post-merge)
+
+User authorized /skill:code review path instead of /ultrareview for this
+session — recorded above the fold so future sessions don't replay the
+gate violation.
+
+## Current state on develop tip
+
+- `Compare.tsx` (CompareBuilder) is already in place from #284. Both
+  empty `/results/compare` and `?ids=<one>` (single-result) start
+  states render the builder correctly with cohort filters and a
+  launchable selection.
+- `Query.tsx` (line 622-693) renders result rows but has no compare
+  selection column or tray. There is no path from Query's filtered
+  result set into Compare.
+- `Home.tsx` (951 lines) renders the meta-leaderboard matrix and
+  cohort selector but has no entry point into Compare. Users coming
+  from the corpus page have no way to start a comparison without
+  either drilling into a benchmark/platform detail page or editing
+  `/results/compare?ids=` by hand.
+- `PlatformIndex.tsx` accumulates `selected: Set<string>` (line 99 on
+  the post-#303 develop tip) but does not gate selection by cohort.
+  A user can pick rows from different benchmarks, scales, or phases;
+  those rows then land in CompareBuilder which suppresses winner
+  claims, but the misuse should be prevented at the selection step.
+
+## Defects vs the w0 review
+
+- D1 (w4): No way to select Query rows for comparison; users must
+  open the result detail and use its compare CTA.
+- D2 (w5): No compare entry point on Home.
+- D3 (w6): Platform detail accepts mixed-cohort selections without
+  visible feedback at the row checkbox level.
+
+## Planned change
+
+### w4 — Query Workbench compare selection
+1. Add `compareSelectedIds: Set<string>` state in `Query.tsx`.
+2. Track the first-selected row's cohort signature
+   `(benchmark, scale_factor, phase, primary_metric)`. Subsequent rows
+   that do not match the cohort signature render a disabled checkbox
+   with a tooltip explaining the lock.
+3. Add a new leftmost column "Compare" containing a checkbox. The
+   column is always visible (independent of the configurable visible
+   columns) so the affordance is never hidden.
+4. Add a sticky compare tray below the table count strip that shows
+   the selection count, the locked cohort (if any), and an enabled
+   "Compare N selected" button when 2+ rows are picked. The button
+   builds the compare URL via the existing `buildCompareUrl` helper.
+5. Hidden `result_id` is already present on every row (see existing
+   `View →` link at line 672) so no additional plumbing is needed.
+
+### w5 — Home compare entrypoint
+1. Add a compact "Start a comparison" CTA in the Home cohort selector
+   region (inside the leaderboard cohort selector section that #303
+   moved above the matrix). The button routes to `/results/compare/`.
+2. CompareBuilder already handles the empty state — it lists all
+   compatible candidates, lets the user filter and launch.
+
+The brief's alternative (row checkboxes on the matrix) is heavier:
+the meta-leaderboard renders aggregate cohort cells, not individual
+runs, so checkboxes would have to drill into the cohort. The
+prefilled-builder route is the cheaper path described in the YAML.
+
+### w6 — Platform detail cohort lock
+1. Compute the cohort signature of the first selected row in
+   `PlatformIndex.tsx`.
+2. When rendering each row's checkbox, disable it (with a tooltip)
+   when the row does not share that signature with the first
+   selection. Selecting/deselecting still works for rows that already
+   match.
+
+## Manual route walk
+
+- /results/query default: rows visible, no compare affordance.
+- /results/compare/ empty: builder renders correctly (post-#284). No
+  changes needed here.
+- /results/p/duckdb/: tuning + the new w5-from-#305 filter strip
+  visible; selection is unconstrained by cohort signature.
+- /results/ Home: cohort selector visible above the matrix
+  (post-#303). No compare entry point.
+
+## Verification commands
+
+- `cd results-explorer && npm test -- --run src/pages/__tests__/Query.test.tsx src/pages/__tests__/PlatformIndex.test.tsx src/pages/__tests__/Home.test.tsx src/pages/__tests__/Compare.test.tsx`
+- `cd results-explorer && npm run typecheck`
+- `cd results-explorer && npm run build`
+- Browser walks deferred to release-gate Playwright (TODO #8 w3).
