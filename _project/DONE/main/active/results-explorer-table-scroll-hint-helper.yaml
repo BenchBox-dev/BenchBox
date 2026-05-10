@@ -2,7 +2,8 @@ id: results-explorer-table-scroll-hint-helper
 title: "Extract a shared TableScrollHint helper to converge bb-scroll-affordance copies"
 worktree: main
 priority: Low
-status: Not Started
+status: Completed
+completed_date: "2026-05-10"
 category: Frontend / Refactor
 
 description: |
@@ -40,33 +41,44 @@ context_sections:
 work:
   - id: w1
     summary: "Add TableScrollHint component with the standardized markup"
-    status: pending
+    status: done
     notes: |
-      New file `results-explorer/src/components/TableScrollHint.tsx` exporting
-      `<TableScrollHint testId={string} label={string} className?={string} />`.
-      Default label is "← scroll →"; Home/MetaLeaderboard pass the longer
-      "Scroll table for more columns →" / "Scroll table for more cohorts →"
-      copy.
+      New `results-explorer/src/components/TableScrollHint.tsx` exports
+      `TableScrollHint({ label?, testId?, className?, wrapperClassName? })`.
+      Default label is "← scroll →"; default wrapper is
+      `mb-2 flex justify-end`. `wrapperClassName={null}` renders only the
+      span (used inside meta-rows). Six-test vitest suite at
+      `__tests__/TableScrollHint.test.tsx` covers default, custom label
+      + className, custom wrapper class, bare-span (null wrapper), and
+      omitted-testId paths.
 
   - id: w2
     summary: "Refactor existing call sites to use TableScrollHint"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      Replace inline `<span class="bb-scroll-affordance">` in each call site
-      with `<TableScrollHint />`. Preserve every existing data-testid so
-      Playwright assertions in `responsive.spec.ts` keep working unchanged.
+      Eight call sites converted: QueryDiffTable, DataTable,
+      MetaLeaderboard, Home (Recent Results), Query (results meta bar),
+      Query (SQL meta bar), ResultDetail (timings),
+      ResultDetail (samples). Each preserves its existing data-testid;
+      the meta-bar sites use `wrapperClassName={null}` to keep the
+      bare-span layout. Verified by `grep -rE 'bb-scroll-affordance'
+      results-explorer/src/ --include="*.tsx"`: only TableScrollHint.tsx
+      itself references the class string now.
 
   - id: w3
     summary: "Optional: gate hint on actual overflow"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
-      Add `onlyWhenOverflowing` boolean prop. When true, the helper measures
-      the nearest `[data-scroll-container]` ancestor and only renders when
-      `scrollWidth > clientWidth`. Mirrors QueryHeatmap behavior. Adopt on
-      DataTable first (its callers may have few-column tables that don't
-      actually overflow) before the dense tables.
+      Deferred — explicitly out of scope for this PR. The TODO marks w3
+      as "Optional"; adopting `onlyWhenOverflowing` on DataTable would
+      require a `data-scroll-container` ancestor contract that does not
+      yet exist on every call site, plus a `useLayoutEffect` measure +
+      ResizeObserver pattern. Not landing now to keep the helper PR
+      focused on the layout/class-wiring consolidation; create a
+      follow-up TODO if the hint visually competes with content on
+      few-column DataTable instances.
 
 verification:
   - description: "Helper exists and is exported"

@@ -13,6 +13,7 @@ import { formatBenchmarkLabel } from "@/lib/displayLabels";
 import { MetaLeaderboardSkeleton, SkeletonBlock } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { MetaLeaderboard } from "@/components/MetaLeaderboard";
+import { TableScrollHint } from "@/components/TableScrollHint";
 import type { MetaLeaderboardMode } from "@/components/MetaLeaderboard";
 import {
   FACET_KEYS,
@@ -446,11 +447,12 @@ export function Home(_: RoutableProps) {
         <section class="mb-12">
           <h2 class="mb-4 text-xl font-semibold text-[var(--bb-data-fg-primary)]">Recent Results</h2>
           <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
-            <div class="flex justify-end">
-              <span class="bb-scroll-affordance m-2" data-testid="recent-results-scroll-hint">
-                Scroll table for row actions →
-              </span>
-            </div>
+            <TableScrollHint
+              testId="recent-results-scroll-hint"
+              label="Scroll table for row actions →"
+              wrapperClassName="flex justify-end"
+              className="m-2"
+            />
             <div class="overflow-x-auto" data-testid="recent-results-scroll-container">
               <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">
                 <thead class="bg-[var(--bb-surface-data-muted)]">

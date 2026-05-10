@@ -6,6 +6,7 @@ import { colorForCell, lightnessForCell } from "@/lib/chartMath";
 import { fmtGeomean, fmtScore } from "@/utils";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 import { SegmentedControl } from "@/components/SegmentedControl";
+import { TableScrollHint } from "@/components/TableScrollHint";
 import {
   EXPLORER_PERFORMANCE_MARKS,
   EXPLORER_PERFORMANCE_MEASURES,
@@ -230,11 +231,12 @@ export function MetaLeaderboard({
       </div>
 
       <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
-        <div class="flex justify-end">
-          <span class="bb-scroll-affordance m-2" data-testid="meta-leaderboard-scroll-hint">
-            Scroll table for more cohorts →
-          </span>
-        </div>
+        <TableScrollHint
+          testId="meta-leaderboard-scroll-hint"
+          label="Scroll table for more cohorts →"
+          wrapperClassName="flex justify-end"
+          className="m-2"
+        />
         <div class="overflow-x-auto" data-testid="meta-leaderboard-scroll-container">
           <table
             ref={gridRef}

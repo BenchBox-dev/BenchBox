@@ -8,6 +8,7 @@ import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
+import { TableScrollHint } from "@/components/TableScrollHint";
 import { TuningBadge } from "@/components/TuningBadge";
 import { StatusBadge } from "@/components/StatusBadge";
 import { MethodologyDisclosure } from "@/components/MethodologyDisclosure";
@@ -340,9 +341,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
             <h2 class="mb-4 text-base font-semibold text-[var(--bb-data-fg-primary)]">
               Query Timings ({detail.display_timings.length})
             </h2>
-            <div class="mb-2 flex justify-end">
-              <span class="bb-scroll-affordance" data-testid="detail-timings-scroll-hint">← scroll →</span>
-            </div>
+            <TableScrollHint testId="detail-timings-scroll-hint" />
             <div class="overflow-x-auto" data-testid="detail-timings-scroll-container">
               <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">
                 <thead class="bg-[var(--bb-surface-data-muted)]">
@@ -388,9 +387,10 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
                 <summary class="cursor-pointer select-none text-sm text-[var(--bb-data-fg-muted)] hover:text-[var(--bb-data-fg-primary)]">
                   Individual samples ({detail.queries.length})
                 </summary>
-                <div class="mt-3 mb-2 flex justify-end">
-                  <span class="bb-scroll-affordance" data-testid="detail-samples-scroll-hint">← scroll →</span>
-                </div>
+                <TableScrollHint
+                  testId="detail-samples-scroll-hint"
+                  wrapperClassName="mt-3 mb-2 flex justify-end"
+                />
                 <div class="overflow-x-auto" data-testid="detail-samples-scroll-container">
                   <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">
                     <thead class="bg-[var(--bb-surface-data-muted)]">
