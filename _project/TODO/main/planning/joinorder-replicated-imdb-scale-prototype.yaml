@@ -47,7 +47,7 @@ work:
           claim stats-maintenance conclusions;
         - the scale-stress decision note contains exactly one `Stats phase gate:
           completed`, `Stats phase gate: smoke-only`, or `Stats phase gate:
-          dependency:joinorder-statistics-phase-measurement` line; if the
+          dependency:track2-joinorder-stats-phase` line; if the
           dependency gate is used, add that TODO to this item's `deps.needs`
           before coding;
         - result-bundle labels and manifest fields for replicated_imdb are
@@ -132,6 +132,14 @@ deferred:
   - summary: "Cloud/distributed platform scale-stress matrix"
     reason: "Start local to validate semantics and measurement before spending cloud resources."
 
+prior_art:
+  - "benchbox/core/joinorder_synthetic/ (created by canonical-cutover w2-w4) — reuse: sibling module-and-registry-entry precedent for a derived/non-canonical joinorder workload; replicated module follows the same `surface: internal` registry pattern"
+  - "benchbox/core/joinorder/ (canonical, post-cutover) — supersede location: replicated logic NEVER lives under canonical to keep the canonical/derived separation at the file-system boundary; replicated code is in benchbox/core/joinorder_replicated/"
+  - "benchbox/core/benchmark_registry.py — extend: register `joinorder_replicated` as a separate benchmark id with surface=internal; do not add a 'derived mode' flag on canonical joinorder (silent canonical→derived selection is forbidden by must_preserve)"
+  - "_project/joinorder/reference_cardinalities.json (foundation TODO) — reuse as oracle: w4 validates replicated query cardinalities by deriving expected scaled values from the canonical Postgres oracle, not by re-running queries on the replicated archive itself"
+  - "benchbox/core/data_fetch + data_manifest.toml (foundation TODO) — reuse: derived archive carries its own data_manifest.toml with source_dataset_version pointing back to canonical; replicated builder writes a derived manifest with the same schema"
+  - "benchbox/core/publishing/bundle_publisher.py (cutover w12 dataset_version field) — reuse: derived bundles record source canonical dataset_version, derived manifest hash, replica factor, builder version through the same manifest field surface"
+
 must_preserve:
   - "Canonical joinorder remains SF=1 canonical_imdb and literature-comparable only."
   - "No hosted replicated_imdb archive may ship unless the IMDb/JOB data licensing decision explicitly approves derived archive redistribution (decision-framework w8 produces this)."
@@ -171,10 +179,10 @@ verification:
     command: "grep -hEc '^Recommendation: (replicated_imdb baseline|staged combination)' _project/decisions/joinorder-scale-stress-decision-*.md | awk '{ s += $1 } END { print s }'"
     expected_output: "1"
   - description: "Stats/analyze phase handling is decided with a concrete gate"
-    command: "grep -hEc '^Stats phase gate: (completed|smoke-only|dependency:joinorder-statistics-phase-measurement)' _project/decisions/joinorder-scale-stress-decision-*.md | awk '{ s += $1 } END { print s }'"
+    command: "grep -hEc '^Stats phase gate: (completed|smoke-only|dependency:track2-joinorder-stats-phase)' _project/decisions/joinorder-scale-stress-decision-*.md | awk '{ s += $1 } END { print s }'"
     expected_output: "1"
   - description: "Stats/analyze dependency gate is reflected in prototype dependencies before coding"
-    command: "! grep -hEq '^Stats phase gate: dependency:joinorder-statistics-phase-measurement' _project/decisions/joinorder-scale-stress-decision-*.md || rg -n 'joinorder-statistics-phase-measurement' _project/TODO/main/planning/joinorder-replicated-imdb-scale-prototype.yaml"
+    command: "! grep -hEq '^Stats phase gate: dependency:track2-joinorder-stats-phase' _project/decisions/joinorder-scale-stress-decision-*.md || rg -n 'track2-joinorder-stats-phase' _project/TODO/main/planning/joinorder-replicated-imdb-scale-prototype.yaml"
     expected_output: "no output unless dependency gate is selected; otherwise TODO references the dependency"
   - description: "Replicated archive builder produces deterministic output (re-run same input → same sha256)"
     command: "uv run -- python -m pytest tests/unit/core/joinorder_replicated/test_builder_determinism.py -q"
@@ -191,8 +199,8 @@ verification:
   - description: "Result bundles tagged replicated_imdb carry source canonical dataset_version"
     command: "uv run -- python -m pytest tests/unit/core/publishing/test_replicated_imdb_bundle_metadata.py -q"
     expected_output: "all tests pass"
-  - description: "Prototype evaluation note covers all required questions"
-    command: "grep -cE '^## (Useful stats or physical-scale|Replication artifacts|Keep as derived baseline|Next step)' _project/decisions/joinorder-replicated-imdb-prototype-*.md | head -1"
+  - description: "Prototype evaluation note covers all required questions (multi-file safe — sums section-header counts across any dated decision files)"
+    command: "grep -hEc '^## (Useful stats or physical-scale|Replication artifacts|Keep as derived baseline|Next step)' _project/decisions/joinorder-replicated-imdb-prototype-*.md | awk '{ s += $1 } END { print s }'"
     expected_output: ">= 4"
   - description: "Prototype keeps TODO graph valid"
     command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph"
