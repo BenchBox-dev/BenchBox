@@ -1,0 +1,521 @@
+# results-explorer-post-completion-release-gate w0
+captured_at_utc: 2026-05-10T21:23:57Z
+worktree_head: 8c1589c4b8add656a35345b38de68eff2e766cef
+origin_develop: 8c1589c4b8add656a35345b38de68eff2e766cef
+
+Dependent TODO files:
+
+--- _project/DONE/main/active/results-explorer-post-completion-compare-selection-recovery.yaml ---
+
+====================================================================================================
+Repair post-completion Results Explorer compare selection recovery
+====================================================================================================
+
+Priority:  Critical
+Status:    Completed
+Worktree:  main
+Category:  Frontend UX
+File:      _project/DONE/main/active/results-explorer-post-completion-compare-selection-recovery.yaml
+
+Description:
+----------------------------------------------------------------------------------------------------
+The 2026-05-09 post-completion Results Explorer review on develop
+dbac33ee1 found that compare entrypoints are still not reliably usable from
+every page. Benchmark detail checkboxes render at 0x0 and cannot be clicked;
+Compare and Query Workbench both hide compatible second choices far below
+the current viewport after the first selection; and Compare picker checkbox
+accessible names are still under-disambiguated.
+
+This item addresses review findings #1, #2, #3, and #11 recorded in
+_project/audits/results-explorer-post-completion-review-2026-05-09.md.
+
+
+Implementation Guardrails:
+----------------------------------------------------------------------------------------------------
+  Must Preserve:
+    - Existing /results/compare?ids=... deep links continue to render comparisons.
+    - Cohort compatibility remains benchmark + scale + phase + primary metric.
+    - Platform detail compare selection that already generates a URL remains functional.
+    - Static export behavior remains client-only; no server endpoint is introduced.
+
+  Approach:
+    Start with shared compare-selection state and row ordering helpers before
+    touching individual pages. Fix BenchmarkIndex visibility first because it is
+    the only remaining hard blocker. Then reuse the same compatible-row ordering
+    behavior in Compare and Query so the recovery affordance is consistent.
+
+  Anti-Patterns:
+    - DO NOT use zero-size inputs with no visible proxy control.
+    - DO NOT strand compatible rows below hundreds of incompatible disabled rows.
+    - DO NOT relax cohort compatibility just to make two visible rows selectable.
+    - DO NOT add URL-editing instructions as a fallback.
+
+  Verification:
+    - Targeted compare-selection tests pass
+      Command: cd results-explorer && npm test -- --run src/pages/__tests__/BenchmarkIndex.test.tsx src/pages/__tests__/Compare.test.tsx src/pages/__tests__/Query.test.tsx src/pages/__tests__/PlatformIndex.test.tsx
+      Expected: all targeted tests pass
+    - Frontend typecheck passes
+      Command: cd results-explorer && npm run typecheck
+      Expected: exit 0
+    - Frontend build passes
+      Command: cd results-explorer && npm run build
+      Expected: exit 0
+    - Browser compare-selection smoke passes
+      Command: echo 'Manual/browser: select two compatible rows from /results/tpch/, /results/compare, /results/query, and /results/p/polars/; each opens a valid compare page'
+      Expected: manual evidence captured in PR notes or verification log
+
+  Scope Limit:
+    Only modify:
+      - results-explorer/src/pages/BenchmarkIndex.tsx
+      - results-explorer/src/pages/Compare.tsx
+      - results-explorer/src/pages/Query.tsx
+      - results-explorer/src/pages/PlatformIndex.tsx
+      - results-explorer/src/lib/resultLinks.ts
+      - results-explorer/src/lib/compareSummary.ts
+      - results-explorer/src/pages/__tests__/
+      - results-explorer/e2e/
+      - results-explorer/scripts/
+      - _project/verification-logs/results-explorer-post-completion-compare-selection-recovery/
+    Do not modify:
+      - benchmark_runs/
+      - benchbox/
+
+Metadata:
+----------------------------------------------------------------------------------------------------
+tags: ['results-explorer', 'compare', 'p0', 'usability-review']
+estimated_effort: Large (2-4 days)
+created_date: 2026-05-09
+last_updated: 2026-05-09T20:51:29-0400
+
+Impact:
+----------------------------------------------------------------------------------------------------
+business_value:
+  Restores the core comparison workflow promised by Results Explorer.
+
+user_impact:
+  Database engineers can start a comparison from the pages where they find
+runs, without invisible controls or off-screen compatible candidates.
+
+technical_debt:
+  Consolidates compare selection behavior and makes it testable by result id.
+
+
+====================================================================================================
+
+Work-unit status summary for results-explorer-post-completion-compare-selection-recovery:
+5:status: Completed
+26:    status: done
+39:    status: done
+53:    status: done
+70:    status: done
+85:    status: done
+102:    status: done
+
+--- _project/DONE/main/active/results-explorer-post-completion-leaderboard-data-consistency.yaml ---
+
+====================================================================================================
+Fix post-completion Results Explorer leaderboard data consistency
+====================================================================================================
+
+Priority:  High
+Status:    Completed
+Worktree:  main
+Category:  Frontend UX
+File:      _project/DONE/main/active/results-explorer-post-completion-leaderboard-data-consistency.yaml
+
+Description:
+----------------------------------------------------------------------------------------------------
+The 2026-05-09 post-completion review on develop dbac33ee1 found that the
+Cross-Benchmark Leaderboard still renders a linked "No run" cell for TPC-H
+Polars SF 0.1, while the linked result detail page renders a valid Polars
+TPC-H SF 0.1 power score. The leaderboard and detail page therefore
+contradict each other about the same result.
+
+This item addresses review finding #4 recorded in
+_project/audits/results-explorer-post-completion-review-2026-05-09.md.
+
+
+Implementation Guardrails:
+----------------------------------------------------------------------------------------------------
+  Must Preserve:
+    - Meta-leaderboard modes Times, Ranks, and Speedup keep their existing semantics.
+    - Missing cohorts that truly have no published result still render as unavailable.
+    - Result detail links continue to point at canonical result ids.
+
+  Approach:
+    Treat this as a data-contract bug rather than a copy tweak. First prove which
+    source says the run exists and which source says it does not. Then make the
+    rendered cell depend on one coherent availability decision.
+
+  Anti-Patterns:
+    - DO NOT hide the link without checking whether the run should contribute to the leaderboard.
+    - DO NOT special-case Polars or TPC-H by display name.
+    - DO NOT change generated result fixtures unless the read model cannot represent the truth.
+
+  Verification:
+    - Meta-leaderboard tests pass
+      Command: cd results-explorer && npm test -- --run src/components/__tests__/MetaLeaderboard.test.tsx src/components/__tests__/MetaLeaderboard.a11y.test.tsx src/pages/__tests__/Home.test.tsx
+      Expected: all targeted tests pass
+    - Frontend typecheck passes
+      Command: cd results-explorer && npm run typecheck
+      Expected: exit 0
+    - Frontend build passes
+      Command: cd results-explorer && npm run build
+      Expected: exit 0
+    - Manual leaderboard consistency check passes
+      Command: echo 'Manual/browser: /results/ has no linked No run cells; TPC-H Polars SF 0.1 agrees with its detail page'
+      Expected: manual evidence captured in PR notes or verification log
+
+  Scope Limit:
+    Only modify:
+      - results-explorer/src/components/MetaLeaderboard.tsx
+      - results-explorer/src/pages/Home.tsx
+      - results-explorer/src/lib/resultLinks.ts
+      - results-explorer/src/lib/displayLabels.ts
+      - results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx
+      - results-explorer/src/components/__tests__/MetaLeaderboard.a11y.test.tsx
+      - results-explorer/src/pages/__tests__/Home.test.tsx
+      - _project/verification-logs/results-explorer-post-completion-leaderboard-data-consistency/
+    Do not modify:
+      - benchbox/
+      - benchmark_runs/
+
+Metadata:
+----------------------------------------------------------------------------------------------------
+tags: ['results-explorer', 'leaderboard', 'data-consistency']
+estimated_effort: Medium (1-2 days)
+created_date: 2026-05-09
+last_updated: 2026-05-09T20:51:29-0400
+
+Impact:
+----------------------------------------------------------------------------------------------------
+business_value:
+  Keeps public leaderboard claims trustworthy.
+
+user_impact:
+  Users no longer see one page claim a run is missing while another page
+shows a valid score for the same run.
+
+technical_debt:
+  Clarifies the availability contract between result details and aggregate
+leaderboard cells.
+
+
+====================================================================================================
+
+Work-unit status summary for results-explorer-post-completion-leaderboard-data-consistency:
+5:status: Completed
+26:    status: done
+36:    status: done
+47:    status: done
+57:    status: done
+
+--- _project/DONE/main/active/results-explorer-post-completion-chart-tabs-and-disambiguation.yaml ---
+
+====================================================================================================
+Fix post-completion Results Explorer chart tabs and run-label disambiguation
+====================================================================================================
+
+Priority:  High
+Status:    Completed
+Worktree:  main
+Category:  Frontend UX
+File:      _project/DONE/main/active/results-explorer-post-completion-chart-tabs-and-disambiguation.yaml
+
+Description:
+----------------------------------------------------------------------------------------------------
+The 2026-05-09 post-completion review on develop dbac33ee1 found remaining
+chart-panel defects: the TPC-H Charts Rank tab does not activate from the
+default Overview state, the Per-query Heatmap again duplicates the primary
+benchmark matrix, and Distribution box-plot labels still truncate repeated
+run identities in a way that leaves multiple indistinguishable DataFusion,
+Polars, PySpark, Spark, and SQLite labels.
+
+This item addresses review findings #5, #6, and #7 recorded in
+_project/audits/results-explorer-post-completion-review-2026-05-09.md.
+
+
+Implementation Guardrails:
+----------------------------------------------------------------------------------------------------
+  Must Preserve:
+    - All chart tabs that contain distinct data remain reachable.
+    - Chart labels stay compact enough to fit at desktop width.
+    - Full run identity remains available through title/tooltip or accessible label.
+
+  Approach:
+    Fix the tab-state bug before changing labels so test failures are easier to
+    localize. Reuse the existing RunIdentity helpers rather than rebuilding label
+    strings in every chart component. Treat the duplicate Per-query heatmap as a
+    scope problem, not a styling problem.
+
+  Anti-Patterns:
+    - DO NOT make Rank accessible only after another tab is clicked first.
+    - DO NOT truncate all differentiators away from repeated run labels.
+    - DO NOT keep two identical matrices on the same benchmark detail page.
+
+  Verification:
+    - Chart component tests pass
+      Command: cd results-explorer && npm test -- --run src/components/__tests__/ChartPanel.test.tsx src/components/__tests__/RankTable.test.tsx src/components/__tests__/DistributionBox.test.tsx src/pages/__tests__/BenchmarkIndex.test.tsx
+      Expected: all targeted tests pass
+    - Frontend typecheck passes
+      Command: cd results-explorer && npm run typecheck
+      Expected: exit 0
+    - Frontend build passes
+      Command: cd results-explorer && npm run build
+      Expected: exit 0
+    - Manual chart browser check passes
+      Command: echo 'Manual/browser: on /results/tpch/, every chart tab activates; Per-query does not duplicate the primary matrix; duplicate runs have visible disambiguators'
+      Expected: manual evidence captured in PR notes or verification log
+
+  Scope Limit:
+    Only modify:
+      - results-explorer/src/components/ChartPanel.tsx
+      - results-explorer/src/components/RankTable.tsx
+      - results-explorer/src/components/DistributionBox.tsx
+      - results-explorer/src/components/SparklineTable.tsx
+      - results-explorer/src/components/TimeSeries.tsx
+      - results-explorer/src/lib/runIdentity.ts
+      - results-explorer/src/lib/chartRegistry.ts
+      - results-explorer/src/pages/BenchmarkIndex.tsx
+      - results-explorer/src/components/__tests__/
+      - results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx
+      - results-explorer/e2e/
+      - _project/verification-logs/results-explorer-post-completion-chart-tabs-and-disambiguation/
+    Do not modify:
+      - benchbox/
+      - benchmark_runs/
+
+Metadata:
+----------------------------------------------------------------------------------------------------
+tags: ['results-explorer', 'charts', 'run-identity']
+estimated_effort: Medium-High (1-3 days)
+created_date: 2026-05-09
+last_updated: 2026-05-10T09:52:56-0400
+
+Impact:
+----------------------------------------------------------------------------------------------------
+business_value:
+  Keeps chart panels credible and usable for comparing repeated platform runs.
+
+user_impact:
+  Users can activate every chart tab and tell repeated runs apart without
+reverse-engineering hidden ids.
+
+technical_debt:
+  Forces chart components to share a tested run-label contract.
+
+
+====================================================================================================
+
+Work-unit status summary for results-explorer-post-completion-chart-tabs-and-disambiguation:
+5:status: Completed
+27:    status: done
+38:    status: done
+48:    status: done
+67:    status: done
+86:    status: done
+
+--- _project/DONE/main/active/results-explorer-post-completion-compare-summary-semantics.yaml ---
+
+====================================================================================================
+Correct post-completion Results Explorer compare summary semantics
+====================================================================================================
+
+Priority:  Medium-High
+Status:    Completed
+Worktree:  main
+Category:  Frontend UX
+File:      _project/DONE/main/active/results-explorer-post-completion-compare-summary-semantics.yaml
+
+Description:
+----------------------------------------------------------------------------------------------------
+The 2026-05-09 post-completion review on develop dbac33ee1 found that Compare
+summaries still make ambiguous or misleading claims. Same-platform comparisons
+say "Polars is 1.00x faster" and "WINNER Polars" when both selected runs are
+Polars v1.40.0 from different dates; Query Wins mixes comparable and missing
+denominators; the empty Compare picker has duplicate SSB benchmark options;
+and comparability copy says only benchmark and scale even though phase is also
+required.
+
+This item addresses review findings #8, #9, #10, and #13 recorded in
+_project/audits/results-explorer-post-completion-review-2026-05-09.md. It
+depends on compare-selection recovery so the Compare route is not edited in
+two conflicting passes.
+
+
+Implementation Guardrails:
+----------------------------------------------------------------------------------------------------
+  Must Preserve:
+    - Existing valid Compare deep links keep working.
+    - Speedup charts still compute from the selected baseline.
+    - Comparable-only default behavior introduced by prior fixes remains intact.
+
+  Approach:
+    Treat this as copy driven by computed state. Fix the underlying summary
+    model first, then update rendered copy. Reuse RunIdentity for same-platform
+    labels and reuse the same comparable/missing query counts that feed the
+    normalized speedup chart.
+
+  Anti-Patterns:
+    - DO NOT declare a winner when the displayed speedup is exactly 1.00x.
+    - DO NOT use platform name alone when multiple selected runs share it.
+    - DO NOT mix missing-query counts into comparable-query win denominators.
+
+  Verification:
+    - Compare summary tests pass
+      Command: cd results-explorer && npm test -- --run src/lib/__tests__/compareSummary.test.ts src/components/__tests__/CompareSummary.test.tsx src/components/__tests__/NormalizedSpeedupChart.test.tsx src/pages/__tests__/Compare.test.tsx
+      Expected: all targeted tests pass
+    - Frontend typecheck passes
+      Command: cd results-explorer && npm run typecheck
+      Expected: exit 0
+    - Frontend build passes
+      Command: cd results-explorer && npm run build
+      Expected: exit 0
+    - Manual same-platform compare copy check passes
+      Command: echo 'Manual/browser: same-platform compare names runs, handles 1.00x as tie/no material winner, and separates comparable vs missing counts'
+      Expected: manual evidence captured in PR notes or verification log
+
+  Scope Limit:
+    Only modify:
+      - results-explorer/src/pages/Compare.tsx
+      - results-explorer/src/components/CompareSummary.tsx
+      - results-explorer/src/components/NormalizedSpeedupChart.tsx
+      - results-explorer/src/lib/compareSummary.ts
+      - results-explorer/src/lib/runIdentity.ts
+      - results-explorer/src/lib/displayLabels.ts
+      - results-explorer/src/lib/__tests__/compareSummary.test.ts
+      - results-explorer/src/components/__tests__/CompareSummary.test.tsx
+      - results-explorer/src/components/__tests__/NormalizedSpeedupChart.test.tsx
+      - results-explorer/src/pages/__tests__/Compare.test.tsx
+      - _project/verification-logs/results-explorer-post-completion-compare-summary-semantics/
+    Do not modify:
+      - benchbox/
+      - benchmark_runs/
+
+Metadata:
+----------------------------------------------------------------------------------------------------
+tags: ['results-explorer', 'compare', 'copy', 'semantics']
+estimated_effort: Medium (1-2 days)
+created_date: 2026-05-09
+last_updated: 2026-05-10T09:52:56-0400
+
+Impact:
+----------------------------------------------------------------------------------------------------
+business_value:
+  Prevents Compare from making decision-summary claims that overstate or
+misidentify winners.
+
+user_impact:
+  Users can interpret same-platform comparisons and query-win counts without
+ambiguity.
+
+technical_debt:
+  Centralizes summary wording around explicit computed states.
+
+
+====================================================================================================
+
+Work-unit status summary for results-explorer-post-completion-compare-summary-semantics:
+5:status: Completed
+30:    status: done
+41:    status: done
+61:    status: done
+71:    status: done
+81:    status: done
+91:    status: done
+
+--- _project/DONE/main/active/results-explorer-post-completion-result-receipt-cost-copy.yaml ---
+
+====================================================================================================
+Clean post-completion Results Explorer result receipt cost copy
+====================================================================================================
+
+Priority:  Medium
+Status:    Completed
+Worktree:  main
+Category:  Frontend UX
+File:      _project/DONE/main/active/results-explorer-post-completion-result-receipt-cost-copy.yaml
+
+Description:
+----------------------------------------------------------------------------------------------------
+The 2026-05-09 post-completion review on develop dbac33ee1 found that result
+receipts still leak raw enum values in the Cost section, for example
+"compute only, billing: not_applicable, region: not_applicable" on
+/results/r/tpch-polars-sf0.1-20260502-0093bb7a.
+
+This item addresses review finding #12 recorded in
+_project/audits/results-explorer-post-completion-review-2026-05-09.md.
+
+
+Implementation Guardrails:
+----------------------------------------------------------------------------------------------------
+  Must Preserve:
+    - Cost model version/source remains visible when recorded.
+    - Local normalized-cost status remains distinguishable from missing cost data.
+    - Result receipt field grouping remains unchanged.
+
+  Approach:
+    Reuse and extend results-explorer/src/lib/costDisplay.ts rather than adding
+    display conditionals directly inside RunReceipt. Keep the mapping small and
+    explicit so raw values remain available in data but not in user-facing copy.
+
+  Anti-Patterns:
+    - DO NOT globally strip underscores from every enum value.
+    - DO NOT hide the whole Cost section when only billing or region is not applicable.
+    - DO NOT change cost data generation to solve a presentation-only copy issue.
+
+  Verification:
+    - Cost display and receipt tests pass
+      Command: cd results-explorer && npm test -- --run src/lib/__tests__/costDisplay.test.ts src/components/__tests__/RunReceipt.test.tsx src/pages/__tests__/ResultDetail.test.tsx src/__tests__/userFacingStringHygiene.test.ts
+      Expected: all targeted tests pass
+    - Frontend typecheck passes
+      Command: cd results-explorer && npm run typecheck
+      Expected: exit 0
+    - Frontend build passes
+      Command: cd results-explorer && npm run build
+      Expected: exit 0
+    - Manual receipt cost-copy check passes
+      Command: echo 'Manual/browser: result receipt Cost section does not render not_applicable raw enum values'
+      Expected: manual evidence captured in PR notes or verification log
+
+  Scope Limit:
+    Only modify:
+      - results-explorer/src/lib/costDisplay.ts
+      - results-explorer/src/lib/__tests__/costDisplay.test.ts
+      - results-explorer/src/components/RunReceipt.tsx
+      - results-explorer/src/components/__tests__/RunReceipt.test.tsx
+      - results-explorer/src/pages/ResultDetail.tsx
+      - results-explorer/src/pages/__tests__/ResultDetail.test.tsx
+      - results-explorer/src/__tests__/userFacingStringHygiene.test.ts
+      - _project/verification-logs/results-explorer-post-completion-result-receipt-cost-copy/
+    Do not modify:
+      - benchbox/
+      - benchmark_runs/
+
+Metadata:
+----------------------------------------------------------------------------------------------------
+tags: ['results-explorer', 'result-detail', 'cost', 'copy']
+estimated_effort: Small (0.5-1 day)
+created_date: 2026-05-09
+last_updated: 2026-05-09T20:51:29-0400
+
+Impact:
+----------------------------------------------------------------------------------------------------
+business_value:
+  Keeps receipts polished and understandable for public result inspection.
+
+user_impact:
+  Users see human-readable cost scope instead of internal enum names.
+
+technical_debt:
+  Moves cost-string normalization into one tested helper.
+
+
+====================================================================================================
+
+Work-unit status summary for results-explorer-post-completion-result-receipt-cost-copy:
+5:status: Completed
+24:    status: done
+36:    status: done
+48:    status: done
+60:    status: done
