@@ -2,7 +2,8 @@ id: results-explorer-post-completion-leaderboard-data-consistency
 title: "Fix post-completion Results Explorer leaderboard data consistency"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-05-10"
 category: Frontend UX
 
 description: |
@@ -22,7 +23,7 @@ deps:
 work:
   - id: w0
     summary: "Revalidate the linked No run leaderboard contradiction"
-    status: pending
+    status: done
     notes: |
       On current develop, open /results/ and capture every linked "No run"
       cell, its href, the linked detail page primary metric, and whether the
@@ -32,7 +33,7 @@ work:
   - id: w1
     summary: "Trace the meta-leaderboard score source and availability rules"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Inspect MetaLeaderboard, Home, result link helpers, and the snapshot read
       model to determine why a row can have a detail href but render "No run".
@@ -43,7 +44,7 @@ work:
   - id: w2
     summary: "Make leaderboard cells agree with detail-page run availability"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       If the run has a valid primary metric, render the value in the leaderboard
       cell and include it in ranking/scoring as appropriate. If the run is not
@@ -53,7 +54,7 @@ work:
   - id: w3
     summary: "Add regression coverage for linked unavailable cells"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Add tests that fail when a leaderboard cell is both linked to a result
       detail page and labelled "No run". Include the TPC-H Polars SF 0.1 case
