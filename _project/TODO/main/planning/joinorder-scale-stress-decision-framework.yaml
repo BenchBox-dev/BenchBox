@@ -120,14 +120,18 @@ work:
           for PostgreSQL, sample size for StarRocks).
         - Idempotence: re-running ANALYZE on already-analyzed data
           must produce the same plan (sanity check).
-      If a first-class stats/analyze phase is required, create
-      `_project/TODO/main/planning/joinorder-statistics-phase-measurement.yaml`
-      and make any implementation prototype depend on it before coding. The
-      decision must identify required changes to runner phases, result bundles,
-      platform adapter hooks, CLI phase parsing, and validation/reporting.
+      If a first-class stats/analyze phase is required, the canonical
+      slug for that follow-up TODO is
+      `_project/TODO/main/planning/track2-joinorder-stats-phase.yaml`
+      (seeded by joinorder-track2-groundwork w2; reuse rather than
+      creating a separate `joinorder-statistics-phase-measurement.yaml`
+      to avoid duplicate stewardship). Make any implementation prototype
+      depend on that TODO before coding. The decision must identify
+      required changes to runner phases, result bundles, platform
+      adapter hooks, CLI phase parsing, and validation/reporting.
       The decision note must include exactly one machine-checkable line:
       `Stats phase gate: completed`, `Stats phase gate: smoke-only`, or
-      `Stats phase gate: dependency:joinorder-statistics-phase-measurement`.
+      `Stats phase gate: dependency:track2-joinorder-stats-phase`.
       Use `smoke-only` only when the prototype is explicitly narrowed so it
       cannot claim publication-quality stats-maintenance conclusions.
 
@@ -288,7 +292,7 @@ verification:
     command: "grep -hEc 'canonical_imdb|replicated_imdb|expanded_imdb|parameterized_imdb|synthetic_schema' _project/decisions/joinorder-scale-stress-decision-*.md | awk '{ s += $1 } END { print s }'"
     expected_output: ">= 5"
   - description: "Stats/analyze prototype gate is concrete and machine-checkable"
-    command: "grep -hEc '^Stats phase gate: (completed|smoke-only|dependency:joinorder-statistics-phase-measurement)' _project/decisions/joinorder-scale-stress-decision-*.md | awk '{ s += $1 } END { print s }'"
+    command: "grep -hEc '^Stats phase gate: (completed|smoke-only|dependency:track2-joinorder-stats-phase)' _project/decisions/joinorder-scale-stress-decision-*.md | awk '{ s += $1 } END { print s }'"
     expected_output: "1"
   - description: "Recommendation is explicit and unambiguous (one of 5 named choices, not 'maybe')"
     command: "grep -hEc '^Recommendation: (no scaled JOB|replicated_imdb baseline|expanded_imdb research|parameterized_imdb|staged combination)' _project/decisions/joinorder-scale-stress-decision-*.md | awk '{ s += $1 } END { print s }'"
@@ -312,7 +316,7 @@ scope_limit:
     - "_project/decisions/joinorder-scale-stress-licensing-*.md"
     - "_project/TODO/main/planning/joinorder-scale-stress-decision-framework.yaml"
     - "_project/TODO/main/planning/joinorder-replicated-imdb-scale-prototype.yaml"
-    - "_project/TODO/main/planning/joinorder-statistics-phase-measurement.yaml"
+    - "_project/TODO/main/planning/track2-joinorder-stats-phase.yaml (canonical stats-phase follow-up slug; seeded by track2-groundwork w2 — referenced from this TODO's `Stats phase gate: dependency:` line, not created here)"
     - "docs/benchmarks/join-order.md"
     - "docs/development/"
   do_not_modify:

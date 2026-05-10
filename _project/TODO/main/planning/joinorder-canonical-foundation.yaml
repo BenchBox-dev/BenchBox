@@ -488,6 +488,16 @@ verification:
     command: "test -f benchbox/core/joinorder/data_manifest.toml && grep -cE '^url|^sha256|^version|^dataset_version|^manifest_hash|^data_archive_hash' benchbox/core/joinorder/data_manifest.toml"
     expected_output: ">= 6"
 
+prior_art:
+  - "benchbox/utils/path_utils.py:resolve_benchmark_runs_dir (line 31) — reuse: the data_fetch manager resolves output_dir via this helper, no new env var or location policy"
+  - "benchbox/cli/config.py:get_datagen_path (line 954) — reuse: per-benchmark/per-scale datagen directory; data_fetch downloads into the same path so air-gapped users hit the existing convention"
+  - "benchbox/core/nyctaxi/downloader.py — extend: nyctaxi uses .exists()-skip for presence check; data_fetch generalizes that to manifest-driven sha256 verification (nyctaxi itself stays unchanged in Step 1; potential follow-up to back-port the gate)"
+  - "benchbox/core/benchmark_registry.py (line 264 joinorder entry; categories at line 31) — extend: add new optional `surface: public|internal` field and `data_manifest` field; existing entries default surface=public so behavior is unchanged"
+  - "benchbox/core/runner/runner.py — extend: add a single `validate_scale_factor()` call before generator/load; reuses the registry's existing scale_options list (joinorder already declares scale_options=[1.0])"
+  - "benchbox/core/errors.py — extend: add ScaleFactorNotSupportedError to the existing exception hierarchy"
+  - "_project/scripts/pyproject.toml — reuse: established pattern for offline-pipeline dependencies in their own uv project, isolated from the main package"
+  - "_project/joinorder/build-inputs/queries/*.sql sourcing from gregrahn/join-order-benchmark — reuse: same upstream that CWI mirror, CedarDB, and MIT learnedsystems all draw from; pin commit SHA in build manifest"
+
 must_preserve:
   - "Existing benchmarks (tpch, tpcds, etc.) continue to accept their declared scale_factor ranges — the new validate_scale_factor() must read each benchmark's scale_options from the registry, not hard-code joinorder"
   - "Existing benchmark_registry.py entries for non-joinorder benchmarks default to surface=public — no behavior change for them"

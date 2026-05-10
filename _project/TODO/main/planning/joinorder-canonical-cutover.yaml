@@ -207,7 +207,7 @@ work:
       actually work."
 
   - id: w8
-    summary: "Import 113 canonical JOB queries from foundation build-inputs into joinorder/queries.py"
+    summary: "Import 113 canonical JOB queries from foundation build-inputs into joinorder/queries.py (preserve JoinOrderQueryManager API)"
     status: pending
     needs: [w1]
     notes: |
@@ -217,13 +217,29 @@ work:
       runtime module.
 
       File: `benchbox/core/joinorder/queries.py`
-      Structure: dict keyed by canonical query id (e.g., "1a", "33c");
-      values are SQL strings (Postgres dialect — engine-specific
-      translations happen at runtime via existing dialect infra).
+      Existing API surface (PRESERVE — do not restructure):
+        class JoinOrderQueryManager
+          .get_query(query_id) -> str
+          .get_all_queries() -> dict[str, str]
+          .get_query_ids() -> list[str]
+          .get_query_count() -> int
+          .get_queries_by_complexity() -> ...
+          .get_queries_by_pattern() -> ...
+
+      Callers today (preserved as-is):
+        - benchbox/core/joinorder/benchmark.py:89,169,171,177,185,193,201,209,217
+        - benchbox/joinorder.py:12 (via JoinOrderBenchmark)
+        - tests/unit/core/test_concurrency_executor_and_joinorder.py
+
+      Implementation: expand `_load_embedded_queries` from 13
+      `queries["1a"] = "..."` assignments to all 113 (1a-33c).
+      Source SQL is the gregrahn upstream text imported by
+      foundation w10. Postgres dialect; engine-specific
+      translations happen at runtime via existing dialect infra.
 
       Test: `tests/unit/core/joinorder/test_query_coverage.py`
-        - Assert 113 queries registered
-        - Assert canonical id format (e.g., regex ^\d+[a-z]$)
+        - JoinOrderQueryManager().get_query_count() == 113
+        - get_query_ids() match canonical id regex ^\d+[a-z]$
         - Each query is parseable as SQL via sqlglot
 
   - id: w9
@@ -274,19 +290,46 @@ work:
       advertised as canonical-ready.
 
   - id: w11
-    summary: "DataFrame mode: explicit NotImplementedError for the 100 untranslated queries; seed Track-2 TODO"
+    summary: "DataFrame mode: NotImplementedError for the 100 untranslated queries (preserve existing q<id>_expression_impl / q<id>_pandas_impl + QueryRegistry API); seed Track-2 TODO"
     status: pending
     needs: [w1, w8]
     notes: |
       File: `benchbox/core/joinorder/dataframe_queries.py`
 
-      For each of the 100 queries not yet DataFrame-translated:
-        def query_<id>(ctx):
+      Existing API surface (PRESERVE — do not restructure):
+        - Per-query implementation pair functions named
+          `q<id>_expression_impl(ctx)` and `q<id>_pandas_impl(ctx)`
+        - Module-level `get_dataframe_queries() -> QueryRegistry`
+          that registers each query via
+          `register(... expression_impl=..., pandas_impl=...)`
+        - Caller today: benchbox/core/joinorder/benchmark.py:315
+          (`from benchbox.core.joinorder.dataframe_queries import
+            get_dataframe_queries`)
+
+      For each of the 100 queries NOT YET DataFrame-translated, add
+      a stub pair following the existing naming convention:
+
+        def q<id>_expression_impl(ctx: DataFrameContext) -> Any:
             raise NotImplementedError(
-              f"DataFrame translation for query {id} not yet "
+              f"DataFrame translation for query <id> not yet "
               f"available. Track-2 TODO: "
-              f"_project/TODO/main/planning/track2-joinorder-dataframe-coverage.yaml"
+              f"_project/TODO/main/planning/"
+              f"track2-joinorder-dataframe-coverage.yaml"
             )
+
+        def q<id>_pandas_impl(ctx: DataFrameContext) -> Any:
+            raise NotImplementedError(... same message ...)
+
+      Register each stub pair through the existing `register(...)`
+      block at the bottom of the module (mirrors how the 13
+      already-translated pairs are registered today).
+
+      DataFrame default query selection (must_preserve): the
+      QueryRegistry default-queries list must continue to expose
+      ONLY the 13 already-translated query ids until Track-2
+      DataFrame coverage lands. Stubs are registered (so the API
+      surface stays uniform) but excluded from default selection
+      via the registry's existing implemented/unimplemented mark.
 
       Seed the follow-up TODO file. NOTE: the Track-2 groundwork
       TODO seeds two OTHER Track-2 items (stats-phase and scaling-
@@ -344,9 +387,13 @@ work:
         5. Takedown contact: <email TBD by Joe before publish>.
 
       Document the template shape in
-      `_project/design/data-fetch-infra-reuse-guide.md` (foundation TODO
-      created the file; this work unit fills the DATA-LICENSE template
-      section).
+      `_project/design/data-fetch-infra-reuse-guide.md` — cutover w13
+      OWNS section "## DATA-LICENSE.md template" of that file. The
+      sibling track2-groundwork TODO (w5) owns the other sections
+      ("## When to use", "## Step-by-step", "## Common pitfalls",
+      "## Infrastructure components reused"). This split is recorded
+      in both TODOs' scope_limit; merge conflicts on this file are
+      contained to disjoint sections.
 
   - id: w14
     summary: "Update documentation: README, docs/benchmarks/join-order.md, MCP/CLI help"
@@ -371,35 +418,47 @@ work:
         - CLI help text in run_benchmark equivalent
 
   - id: w15
-    summary: "Migrate existing 10 published bundles: rename joinorder_sf1_* → joinorder_synthetic_sf1_*"
+    summary: "Migrate existing 10 published bundle files: rename joinorder_sf1_* → joinorder_synthetic_sf1_*"
     status: pending
     needs: [w4, w12]
     notes: |
       Script: `_project/scripts/migrate_joinorder_bundles.py`
+
+      Inventory model (verified at TODO-creation time): bundles in
+      `results-data/bundles/` live as **paired files** at the directory
+      root, NOT as per-bundle subdirectories. For each bundle there is
+      a result file `joinorder_sf1_<engine>_sql_<ts>_<hash>.json` and a
+      sidecar `joinorder_sf1_<engine>_sql_<ts>_<hash>.manifest.json`.
+      Current count: 5 result files + 5 manifest files = 10 files
+      across {clickhouse_local, duckdb, spark, sqlite, starrocks}.
 
       Two-phase execution:
 
       Phase 1 — DRY RUN (mandatory, manual review gate):
         Run `python _project/scripts/migrate_joinorder_bundles.py
              --dry-run --output _project/joinorder/migration-plan.md`
-        Output: a markdown report listing each bundle directory
-        rename, each manifest field change, and any anomalies
-        (orphaned files, schema-version conflicts, etc.).
+        Output: a markdown report listing each (result, manifest)
+        file pair to rename, each manifest field change, and any
+        anomalies (orphaned files, unpaired result/manifest,
+        schema-version conflicts).
         REVIEW the plan before proceeding to phase 2.
 
       Phase 2 — APPLY (single atomic commit):
         Run `python _project/scripts/migrate_joinorder_bundles.py
              --apply`
-        For each `results-data/bundles/joinorder_sf1_*`:
-          - `git mv` directory to `joinorder_synthetic_sf1_*`
-          - Update bundle manifest:
+        For each `results-data/bundles/joinorder_sf1_*.json` and its
+        sibling `*.manifest.json`:
+          - `git mv` the file to its `joinorder_synthetic_sf1_*`
+            counterpart (rename both the result and the manifest;
+            keep the engine/timestamp/hash suffix unchanged)
+          - Update the manifest JSON contents:
               benchmark_id: joinorder → joinorder_synthetic
               (preserve all other metadata)
           - Bump bundle schema version if applicable
         ALL renames + manifest edits land in a single commit
         titled `chore(joinorder): re-tag synthetic results bundles
-        (10 bundles)`. Single-commit policy = single-revert if the
-        cutover regresses post-merge.
+        (10 files / 5 bundles)`. Single-commit policy = single-revert
+        if the cutover regresses post-merge.
 
       Since `joinorder_synthetic` has `surface: internal` (w4),
       these bundles are filtered out of the explorer view at the
@@ -541,14 +600,14 @@ verification:
   - description: "joinorder_synthetic accepts sf=0.01 (back-compat for verbosity tests)"
     command: "uv run -- python -m pytest tests/unit/core/test_core_verbosity.py tests/unit/core/test_core_quiet.py -q"
     expected_output: "all 3 tests pass"
-  - description: "All 113 SQL queries registered for joinorder"
-    command: "uv run -- python -c 'from benchbox.core.joinorder.queries import QUERY_TEMPLATES; print(len(QUERY_TEMPLATES))'"
+  - description: "All 113 SQL queries registered for joinorder via JoinOrderQueryManager"
+    command: "uv run -- python -c 'from benchbox.core.joinorder.queries import JoinOrderQueryManager; print(JoinOrderQueryManager().get_query_count())'"
     expected_output: "113"
   - description: "Tiny fixture predicate-satisfies all 113 queries"
     command: "uv run -- python -m pytest tests/unit/core/joinorder/test_canonical_queries.py -q"
     expected_output: "113 passed"
-  - description: "DataFrame queries fail loudly for the 100 untranslated"
-    command: "uv run -- python -c 'from benchbox.core.joinorder.dataframe_queries import query_2a; query_2a(None)' 2>&1 | grep 'NotImplementedError' | grep -c '_project/TODO/main/planning/track2-joinorder-dataframe-coverage.yaml'"
+  - description: "DataFrame queries fail loudly for an untranslated query (q13a_expression_impl raises NotImplementedError pointing at Track-2 seed)"
+    command: "uv run -- python -c 'from benchbox.core.joinorder.dataframe_queries import q13a_expression_impl; q13a_expression_impl(None)' 2>&1 | grep -c 'track2-joinorder-dataframe-coverage'"
     expected_output: ">= 1"
   - description: "DataFrame default query list exposes only implemented queries"
     command: "uv run -- python -m pytest tests/unit/core/joinorder/test_dataframe_query_capabilities.py -q"
@@ -556,12 +615,15 @@ verification:
   - description: "joinorder_synthetic is hidden from the result-publisher's public surface"
     command: "uv run -- python -m pytest tests/unit/core/test_registry_surface_field.py::test_joinorder_synthetic_hidden -q"
     expected_output: "1 passed"
-  - description: "Bundle migration completed: no joinorder_sf1_* directories remain"
-    command: "ls results-data/bundles/ | grep -c '^joinorder_sf1_'"
+  - description: "Bundle migration completed: no joinorder_sf1_* files remain at the bundles root"
+    command: "find results-data/bundles -maxdepth 1 -name 'joinorder_sf1_*' -type f | wc -l | tr -d ' '"
     expected_output: "0"
-  - description: "Bundle migration: 10 joinorder_synthetic_sf1_* directories present"
-    command: "ls results-data/bundles/ | grep -c '^joinorder_synthetic_sf1_'"
+  - description: "Bundle migration: 10 joinorder_synthetic_sf1_* files present (5 result + 5 manifest)"
+    command: "find results-data/bundles -maxdepth 1 -name 'joinorder_synthetic_sf1_*' -type f | wc -l | tr -d ' '"
     expected_output: "10"
+  - description: "Each renamed result file has a matching .manifest.json sibling"
+    command: "find results-data/bundles -maxdepth 1 -name 'joinorder_synthetic_sf1_*.json' -not -name '*.manifest.json' -type f | while read f; do test -f \"${f%.json}.manifest.json\" || echo MISSING; done | grep -c MISSING"
+    expected_output: "0"
   - description: "DATA-LICENSE.md exists for joinorder with required sections and final takedown contact"
     command: "test -f benchbox/core/joinorder/DATA-LICENSE.md && grep -qE 'Information courtesy of IMDb' benchbox/core/joinorder/DATA-LICENSE.md && grep -qE 'Harvard Dataverse|10\\.7910/DVN/2QYZBT' benchbox/core/joinorder/DATA-LICENSE.md && grep -qi 'takedown' benchbox/core/joinorder/DATA-LICENSE.md && ! grep -qE '<email TBD|TBD by Joe|joe@example' benchbox/core/joinorder/DATA-LICENSE.md"
     expected_output: "required sections present and no placeholder takedown contact remains"
@@ -581,8 +643,20 @@ verification:
     command: "gh pr list --base develop --head feat/joinorder-canonical-imdb-2013 --json title,body --jq '.[] | select(.body | contains(\"#289\")) | .title'"
     expected_output: "feat(joinorder)..."
 
+prior_art:
+  - "benchbox/core/joinorder/{generator.py,queries.py,dataframe_queries.py} — supersede location: w2 git-mvs these into benchbox/core/joinorder_synthetic/ to free the canonical name; existing class APIs (JoinOrderGenerator, JoinOrderQueryManager, get_dataframe_queries) stay intact at the new location"
+  - "benchbox/core/benchmark_registry.py:264 (joinorder entry) — extend: registry already declares scale_options=[1.0] and num_queries=113; cutover adds the new joinorder_synthetic entry alongside it and sets joinorder's `surface: public` + `data_manifest` (foundation TODO seeds the surface field)"
+  - "benchbox/core/data_fetch (foundation TODO) — reuse: cutover w1 calls fetch_data() and get_datagen_path() with no new env vars or CLI flags"
+  - "benchbox/core/joinorder/benchmark.py:315 (`from benchbox.core.joinorder.dataframe_queries import get_dataframe_queries`) — reuse: dataframe_queries module retains this entrypoint; w11 only adds 100 stub q<id>_*_impl pairs, registered through the same QueryRegistry"
+  - "benchbox/joinorder.py:12 (top-level facade) — reuse: facade keeps importing JoinOrderBenchmark and forwarding the manager API; no facade rewrite"
+  - "benchbox/core/publishing/bundle_publisher.py:176-177 — extend: insert dataset_version/manifest_hash/data_archive_hash fields next to existing manifest fields"
+  - "results-data/bundles/joinorder_sf1_*.{json,manifest.json} — pattern reuse: bundles live as paired files at the bundles root (verified at TODO-creation: 5 result + 5 manifest = 10 files; 0 directories); migration script renames file pairs, not subdirectories"
+  - "benchbox/core/joinorder_synthetic surface: internal precedent (created by w4 here) — supersede: future internal benchmarks register surface=internal to opt out of the public explorer surface without explorer UI changes"
+
 must_preserve:
-  - "Existing joinorder bundle filenames in published-results branch — those are on the published-results branch, NOT touched here; this TODO only re-tags bundles in the develop tree's results-data/bundles/"
+  - "JoinOrderQueryManager public API surface (get_query, get_all_queries, get_query_ids, get_query_count, get_queries_by_complexity, get_queries_by_pattern). w8 expands the embedded query dict from 13 to 113 entries; do NOT replace the manager class with a module-level QUERY_TEMPLATES dict — 9+ call sites depend on the current API (benchbox/core/joinorder/benchmark.py:89..217, benchbox/joinorder.py:12, tests/unit/core/test_concurrency_executor_and_joinorder.py)"
+  - "DataFrame query API surface: per-query `q<id>_expression_impl` / `q<id>_pandas_impl` functions registered through the module-level `get_dataframe_queries() -> QueryRegistry`. w11 adds 100 stub pairs that raise NotImplementedError — do NOT introduce a new `query_<id>(ctx)` shape; benchmark.py:315 imports `get_dataframe_queries` and that contract stays"
+  - "Existing joinorder bundle filenames in published-results branch — those are on the published-results branch, NOT touched here; this TODO only re-tags bundle FILES (paired result + manifest) in the develop tree's results-data/bundles/"
   - "DataFrame mode for the 13 already-translated queries — they continue to work on canonical data because they are schema-correct"
   - "DataFrame query selection defaults must expose only implemented queries until the 100 untranslated queries are translated"
   - "Other benchmarks (tpch, tpcds, etc.) — no behavior change; their scale_options remain unchanged"
@@ -636,9 +710,9 @@ anti_patterns:
 
 scope_limit:
   only_modify:
-    - "benchbox/core/joinorder/benchmark.py"
-    - "benchbox/core/joinorder/queries.py (new content: 113 queries)"
-    - "benchbox/core/joinorder/dataframe_queries.py (NotImplementedError stubs for 100)"
+    - "benchbox/core/joinorder/benchmark.py (canonical wiring; preserves existing JoinOrderQueryManager + get_dataframe_queries imports — see must_preserve)"
+    - "benchbox/core/joinorder/queries.py (expand JoinOrderQueryManager._load_embedded_queries from 13 → 113 entries; preserve class API)"
+    - "benchbox/core/joinorder/dataframe_queries.py (add 100 stub q<id>_expression_impl/q<id>_pandas_impl pairs that raise NotImplementedError; register through existing QueryRegistry block)"
     - "benchbox/core/joinorder/DATA-LICENSE.md (new)"
     - "benchbox/core/joinorder_synthetic/ (new module — receives moved files via git mv)"
     - "benchbox/core/benchmark_registry.py (joinorder + joinorder_synthetic entries)"
@@ -650,11 +724,11 @@ scope_limit:
     - "tests/unit/core/test_core_verbosity.py, test_core_quiet.py (3 line changes — synthetic import)"
     - "tests/unit/core/publishing/test_dataset_version_field.py (new)"
     - "tests/conftest.py (joinorder_canonical_tiny fixture)"
-    - "results-data/bundles/joinorder_sf1_* → joinorder_synthetic_sf1_* (rename + manifest field)"
+    - "results-data/bundles/joinorder_sf1_*.json + .manifest.json file pairs → joinorder_synthetic_sf1_*.json + .manifest.json (paired-file rename + benchmark_id field edit inside each .manifest.json — bundles live as flat files at the bundles root, NOT subdirectories)"
     - "_project/scripts/migrate_joinorder_bundles.py (new)"
     - "_project/TODO/main/planning/track2-joinorder-dataframe-coverage.yaml (new seed)"
     - "README.md, CHANGELOG.md, docs/benchmarks/join-order.md"
-    - "_project/design/data-fetch-infra-reuse-guide.md (DATA-LICENSE template section)"
+    - "_project/design/data-fetch-infra-reuse-guide.md — ONLY the '## DATA-LICENSE.md template' section. The other sections (When to use, Step-by-step, Common pitfalls, Infrastructure components reused) are owned by track2-groundwork w5; do not edit them here"
   do_not_modify:
     - "benchbox/core/data_fetch/ (foundation TODO finalized this — only consume here)"
     - "benchbox/core/joinorder/data_manifest.toml (foundation TODO produced; only consume unless w18 proves the public URL differs from the draft URL, in which case update in a small explicit follow-up commit)"

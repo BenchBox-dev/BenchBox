@@ -35,9 +35,11 @@ description: |
   `joinorder-canonical-foundation` is done. The reuse guide (3)
   consumes foundation outputs; the other two are independent.
 
-deps:
-  needs:
-    - joinorder-canonical-foundation
+# NOTE: item-level deps removed in 2026-05-10 readiness review. w1-w4
+# (phase-model survey + scaling-strategy doc + their seeds) are
+# independent of foundation outputs and can run in parallel with Track-1.
+# Only w5 (reuse guide) consumes foundation outputs; that constraint is
+# expressed via work-unit-level `needs` on w5 below.
 
 work:
   - id: w1
@@ -186,6 +188,13 @@ work:
     summary: "Reusable data-fetch infrastructure reuse guide"
     status: pending
     notes: |
+      PRECONDITION: this is the only work unit in this TODO that
+      consumes foundation outputs. Do not start w5 until
+      `joinorder-canonical-foundation` is Completed (foundation w1
+      creates the stub file at the path below; w5 fills in
+      step-by-step / template / pitfalls sections). w1-w4 above are
+      independent of foundation and may proceed in parallel.
+
       Output: `_project/design/data-fetch-infra-reuse-guide.md`
       (foundation TODO created the file as a stub; this work unit
       fills the per-benchmark instantiation guidance)
@@ -217,10 +226,13 @@ work:
            h. Add DATA-LICENSE.md (use joinorder's as template)
            i. Add per-benchmark CHANGELOG entry
         3. DATA-LICENSE.md template
-           - Reproduce the joinorder DATA-LICENSE.md structure
-             with placeholders
-           - Required sections: provenance, attribution, scope
-             clause, redistribution disclaimer, takedown contact
+           OWNED BY: cutover w13 (NOT this work unit). Cutover writes
+           this section as part of authoring joinorder's
+           DATA-LICENSE.md. Track2 w5 must NOT touch the
+           "## DATA-LICENSE.md template" section of the reuse guide.
+           If cutover has not landed yet when w5 runs, leave this
+           section as the foundation-stub placeholder and let cutover
+           fill it later — section-level merge contract.
         4. Common pitfalls (from joinorder Step 1)
            - Encoding round-trip gates needed (NFC/NFD silent
              normalization)
@@ -291,7 +303,7 @@ scope_limit:
   only_modify:
     - "_project/design/track2-joinorder-stats-as-phase.md (new)"
     - "_project/design/track2-joinorder-scaling-strategy.md (new)"
-    - "_project/design/data-fetch-infra-reuse-guide.md (foundation TODO created stub; fill in step-by-step + template + pitfalls sections)"
+    - "_project/design/data-fetch-infra-reuse-guide.md — fill ONLY these sections: '## When to use', '## Step-by-step: instantiating for a new benchmark', '## Common pitfalls (from joinorder Step 1)', '## Infrastructure components reused'. Do NOT touch the '## DATA-LICENSE.md template' section — that section is owned by cutover w13"
     - "_project/TODO/main/planning/track2-joinorder-stats-phase.yaml (new seed)"
     - "_project/TODO/main/planning/track2-joinorder-scaling-strategy.yaml (new seed)"
   do_not_modify:
