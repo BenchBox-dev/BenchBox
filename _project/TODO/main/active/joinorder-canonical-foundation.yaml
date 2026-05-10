@@ -120,7 +120,7 @@ work:
 
 - id: w2
   summary: "Build reusable data-fetch module skeleton in benchbox/core/data_fetch/"
-  status: pending
+  status: done
   needs: [w1]
   notes: |
     Module structure (minimum viable, fully tested):
