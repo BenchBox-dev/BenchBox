@@ -94,3 +94,18 @@ def test_unknown_benchmark_skips_validation() -> None:
     """Defensive default: unknown benchmark ids do not raise (the runner
     surfaces a 'no such benchmark' error elsewhere)."""
     validate_scale_factor("does-not-exist", 999.0)
+
+
+def test_float_tolerance_accepts_imperceptible_drift() -> None:
+    """Float comparison uses 1e-9 tolerance — a difference well below
+    that threshold (e.g., from JSON round-trip, numpy widening) must
+    still match the canonical scale."""
+    # 1.0 + 1e-12 is FAR inside the 1e-9 tolerance window.
+    validate_scale_factor("joinorder", 1.0 + 1e-12)
+
+
+def test_float_tolerance_rejects_perceptible_drift() -> None:
+    """Drift greater than the 1e-9 tolerance must reject — a user
+    typo of `1.0001` for joinorder is not silently accepted."""
+    with pytest.raises(ScaleFactorNotSupportedError):
+        validate_scale_factor("joinorder", 1.0001)

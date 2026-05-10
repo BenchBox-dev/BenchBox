@@ -15,7 +15,7 @@ import pytest
 import requests
 
 from benchbox.core.data_fetch import ChecksumMismatchError, DownloadError
-from benchbox.core.data_fetch.downloader import _sha256_of, download
+from benchbox.core.data_fetch.downloader import download, sha256_of
 
 pytestmark = [
     pytest.mark.unit,
@@ -61,7 +61,7 @@ def test_download_writes_payload_and_returns_path(tmp_path: Path) -> None:
     sess = _Session([(200, body)])
     out = download("https://x.test/blob", tmp_path / "blob", expected_sha256=sha, session=sess)
     assert out.read_bytes() == body
-    assert _sha256_of(out) == sha
+    assert sha256_of(out) == sha
 
 
 def test_download_checksum_mismatch_raises(tmp_path: Path) -> None:

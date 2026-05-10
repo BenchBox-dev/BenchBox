@@ -3,11 +3,20 @@
 Schema (from _project/design/joinorder-step1-foundations.md
 "Data-fetch infrastructure" section):
 
-    dataset_version    = "joinorder-imdb-2013-v1"   # logical id
-    manifest_hash      = "<sha256 of this file>"
-    data_archive_hash  = "<sha256 of packaged tar.zst>"
+    dataset_version    = "joinorder-imdb-2013-v1"   # logical immutable id
+    manifest_hash      = "<sha256 of this manifest file with the
+                          manifest_hash field excluded — bumps on any
+                          metadata-only correction>"
+    data_archive_hash  = "<sha256 of the packaged tar.zst as built by
+                          the offline pipeline; typed twice in the file
+                          (here for canonical record, archive_sha256
+                          below for the runtime download check) so
+                          callers can spot drift between the two>"
     url                = "https://github.com/.../release/.../archive.tar.zst"
-    archive_sha256     = "<sha256 of downloaded tarball>"
+    archive_sha256     = "<sha256 the downloader uses to verify the
+                          freshly-pulled tarball matches what the
+                          manifest declares; equals data_archive_hash
+                          when the manifest is in sync>"
     license_file       = "DATA-LICENSE.md"
 
     [[tables]]

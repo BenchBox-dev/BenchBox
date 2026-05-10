@@ -1,8 +1,8 @@
 """Tests for benchbox.core.data_fetch.manager.
 
 Exercises the air-gapped path (pre-populated files), the
-download-on-empty-dir path (mocked downloader), and the checksum
-mismatch surface.
+download-then-extract path (mocked downloader + ExtractionRequiredError),
+and the checksum mismatch surface.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ import pytest
 
 from benchbox.core.data_fetch import (
     ChecksumMismatchError,
+    ExtractionRequiredError,
     fetch_data,
 )
 
@@ -23,29 +24,35 @@ pytestmark = [
 ]
 
 
-def _hex(b: bytes) -> str:
-    return hashlib.sha256(b).hexdigest()
+# ---- named payloads + pre-computed shas (N2: readable diagnostics) ----
+
+ALPHA_PAYLOAD = b"alpha-table-row-bytes"
+BETA_PAYLOAD = b"beta-table-row-bytes"
+
+ALPHA_SHA = hashlib.sha256(ALPHA_PAYLOAD).hexdigest()
+BETA_SHA = hashlib.sha256(BETA_PAYLOAD).hexdigest()
+ARCHIVE_SHA = "00" * 32  # placeholder — fake_downloader doesn't recompute
 
 
-def _write_manifest(tmp: Path, *, table_payloads: dict[str, bytes], archive_sha: str = "00" * 32) -> Path:
-    """Build a minimal data_manifest.toml describing the given files.
-
-    The manifest sha256 fields are set to the actual sha of each
-    payload so the air-gapped verifier matches.
-    """
-    table_blocks = "\n".join(
-        f'[[tables]]\nname = "{name}"\nfile = "{name}.parquet"\n'
-        f'sha256 = "{_hex(payload)}"\nrow_count = {len(payload)}\n'
-        for name, payload in table_payloads.items()
-    )
+def _write_manifest(tmp: Path) -> Path:
+    """Build a minimal data_manifest.toml with two named tables."""
     body = (
         f'dataset_version    = "test-v1"\n'
         f'manifest_hash      = "{"a" * 64}"\n'
-        f'data_archive_hash  = "{archive_sha}"\n'
+        f'data_archive_hash  = "{ARCHIVE_SHA}"\n'
         f'url                = "https://example.com/test.tar.zst"\n'
-        f'archive_sha256     = "{archive_sha}"\n'
-        f'license_file       = "DATA-LICENSE.md"\n'
-        f"\n{table_blocks}\n"
+        f'archive_sha256     = "{ARCHIVE_SHA}"\n'
+        f'license_file       = "DATA-LICENSE.md"\n\n'
+        f"[[tables]]\n"
+        f'name      = "alpha"\n'
+        f'file      = "alpha.parquet"\n'
+        f'sha256    = "{ALPHA_SHA}"\n'
+        f"row_count = {len(ALPHA_PAYLOAD)}\n\n"
+        f"[[tables]]\n"
+        f'name      = "beta"\n'
+        f'file      = "beta.parquet"\n'
+        f'sha256    = "{BETA_SHA}"\n'
+        f"row_count = {len(BETA_PAYLOAD)}\n"
     )
     p = tmp / "data_manifest.toml"
     p.write_text(body)
@@ -53,61 +60,98 @@ def _write_manifest(tmp: Path, *, table_payloads: dict[str, bytes], archive_sha:
 
 
 def test_air_gapped_pre_populated_returns_dir(tmp_path: Path) -> None:
-    payloads = {"alpha": b"alpha rows", "beta": b"beta-rows"}
     out_dir = tmp_path / "out"
     out_dir.mkdir()
-    for name, payload in payloads.items():
-        (out_dir / f"{name}.parquet").write_bytes(payload)
-    manifest_path = _write_manifest(tmp_path, table_payloads=payloads)
+    (out_dir / "alpha.parquet").write_bytes(ALPHA_PAYLOAD)
+    (out_dir / "beta.parquet").write_bytes(BETA_PAYLOAD)
+    manifest_path = _write_manifest(tmp_path)
 
     result = fetch_data("test", manifest_path, out_dir)
     assert result == out_dir
 
 
-def test_pre_populated_with_bad_sha_raises(tmp_path: Path) -> None:
-    payloads = {"alpha": b"alpha rows"}
+def test_pre_populated_with_bad_sha_short_circuits_before_download(tmp_path: Path) -> None:
+    """Corrupt cache must surface ChecksumMismatchError WITHOUT touching
+    the downloader. Otherwise the manager would re-download wastefully on
+    every cache-rot event."""
     out_dir = tmp_path / "out"
     out_dir.mkdir()
-    # Write the wrong bytes — manifest's sha refers to the "alpha rows" payload.
     (out_dir / "alpha.parquet").write_bytes(b"corrupted contents")
-    manifest_path = _write_manifest(tmp_path, table_payloads=payloads)
+    (out_dir / "beta.parquet").write_bytes(BETA_PAYLOAD)
+    manifest_path = _write_manifest(tmp_path)
 
-    # downloader stub is invoked because the air-gapped check fails;
-    # it doesn't actually download (just records that it was called)
-    # so the manager re-verifies and surfaces a ChecksumMismatchError
-    # for the offending table file.
-    calls: list[tuple[str, Path]] = []
+    download_calls: list[str] = []
 
     def fake_downloader(url, dest, expected_sha256=None):
-        calls.append((url, dest))
-        # Simulate the user not having extracted yet — leave the file as is.
-        Path(dest).write_bytes(b"pretend-archive")
+        download_calls.append(url)
         return Path(dest)
 
     with pytest.raises(ChecksumMismatchError) as excinfo:
         fetch_data("test", manifest_path, out_dir, downloader=fake_downloader)
     assert "alpha.parquet" in excinfo.value.path
-    assert excinfo.value.expected_sha256 == _hex(b"alpha rows")
+    assert excinfo.value.expected_sha256 == ALPHA_SHA
+    assert download_calls == []
 
 
-def test_empty_output_triggers_download(tmp_path: Path) -> None:
-    payloads = {"alpha": b"alpha rows"}
-    manifest_path = _write_manifest(tmp_path, table_payloads=payloads)
+def test_empty_dir_downloads_then_raises_extraction_required(tmp_path: Path) -> None:
+    """When no per-table files are present, manager downloads but defers
+    extraction to the caller. ExtractionRequiredError carries the archive
+    path so the caller's tar driver can pick it up."""
+    manifest_path = _write_manifest(tmp_path)
     out_dir = tmp_path / "out"
     out_dir.mkdir()
 
-    calls: list[tuple[str, Path]] = []
+    download_calls: list[tuple[str, Path]] = []
 
     def fake_downloader(url, dest, expected_sha256=None):
-        calls.append((url, dest))
-        Path(dest).write_bytes(b"pretend-archive")
+        download_calls.append((url, Path(dest)))
+        Path(dest).write_bytes(b"pretend-archive-bytes")
         return Path(dest)
 
-    # No table files are present; manager downloads but extraction is
-    # the call site's responsibility — fetch_data returns the output
-    # directory once the download succeeds even if the per-table files
-    # aren't yet on disk.
-    result = fetch_data("test", manifest_path, out_dir, downloader=fake_downloader)
+    with pytest.raises(ExtractionRequiredError) as excinfo:
+        fetch_data("test", manifest_path, out_dir, downloader=fake_downloader)
+    assert excinfo.value.output_dir == str(out_dir)
+    assert "test.tar.zst" in excinfo.value.archive_path
+    assert download_calls == [("https://example.com/test.tar.zst", out_dir / "test.tar.zst")]
+
+
+def test_post_extraction_returns_dir(tmp_path: Path) -> None:
+    """If the caller extracts the tarball between the download and a
+    second fetch_data call, the manager verifies all per-table sha256s
+    and returns the directory."""
+    manifest_path = _write_manifest(tmp_path)
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+
+    def extracting_downloader(url, dest, expected_sha256=None):
+        # Simulate the caller running tar extraction inside the downloader
+        # for the purposes of this test — production code does this in
+        # the cutover wiring, NOT inside the downloader.
+        Path(dest).write_bytes(b"pretend-archive-bytes")
+        (out_dir / "alpha.parquet").write_bytes(ALPHA_PAYLOAD)
+        (out_dir / "beta.parquet").write_bytes(BETA_PAYLOAD)
+        return Path(dest)
+
+    result = fetch_data("test", manifest_path, out_dir, downloader=extracting_downloader)
     assert result == out_dir
-    assert len(calls) == 1
-    assert calls[0][0] == "https://example.com/test.tar.zst"
+
+
+def test_post_extraction_with_bad_sha_raises_checksum_mismatch(tmp_path: Path) -> None:
+    """If the caller's extractor produces a corrupted file, the
+    post-download verifier catches it via the structured-diagnostic
+    path and raises ChecksumMismatchError naming the offending file."""
+    manifest_path = _write_manifest(tmp_path)
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+
+    def buggy_extracting_downloader(url, dest, expected_sha256=None):
+        Path(dest).write_bytes(b"pretend-archive-bytes")
+        # alpha is corrupt; beta is intact
+        (out_dir / "alpha.parquet").write_bytes(b"truncated")
+        (out_dir / "beta.parquet").write_bytes(BETA_PAYLOAD)
+        return Path(dest)
+
+    with pytest.raises(ChecksumMismatchError) as excinfo:
+        fetch_data("test", manifest_path, out_dir, downloader=buggy_extracting_downloader)
+    assert "alpha.parquet" in excinfo.value.path
+    assert excinfo.value.expected_sha256 == ALPHA_SHA

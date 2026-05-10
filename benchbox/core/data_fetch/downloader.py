@@ -34,8 +34,8 @@ _DEFAULT_CHUNK_SIZE = 1 << 20  # 1 MiB
 _BACKOFF_BASE = 1.0  # seconds
 
 
-def _sha256_of(path: Path, chunk_size: int = _DEFAULT_CHUNK_SIZE) -> str:
-    """Compute sha256 of an existing file."""
+def sha256_of(path: Path, chunk_size: int = _DEFAULT_CHUNK_SIZE) -> str:
+    """Compute sha256 of an existing file by streaming `chunk_size` bytes at a time."""
     h = hashlib.sha256()
     with path.open("rb") as fh:
         while True:
@@ -109,7 +109,7 @@ def download(
             sleep(_BACKOFF_BASE * (2**attempt))
 
     if expected_sha256 is not None:
-        actual = _sha256_of(dest, chunk_size=chunk_size)
+        actual = sha256_of(dest, chunk_size=chunk_size)
         if actual != expected_sha256:
             raise ChecksumMismatchError(
                 path=str(dest),

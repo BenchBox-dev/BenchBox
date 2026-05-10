@@ -29,7 +29,7 @@ from .errors import (
     DownloadError,
     ManifestValidationError,
 )
-from .manager import fetch_data
+from .manager import ExtractionRequiredError, fetch_data
 from .manifest import DataManifest, TableEntry, load_manifest
 
 __all__ = [
@@ -41,4 +41,5 @@ __all__ = [
     "ManifestValidationError",
     "ChecksumMismatchError",
     "DownloadError",
+    "ExtractionRequiredError",
 ]
