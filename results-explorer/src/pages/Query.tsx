@@ -3,6 +3,7 @@ import type { RoutableProps } from "preact-router";
 import { getDb, queryRows } from "@/db";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { FacetDrawer, FacetRail, type ActiveFacetChip, type FacetGroup } from "@/components/FacetRail";
+import { TableScrollHint } from "@/components/TableScrollHint";
 import { QueryRowsSkeleton } from "@/components/LoadingSpinner";
 import { arraySerde, stringSerde, useUrlState } from "@/lib/useUrlState";
 import {
@@ -655,7 +656,7 @@ export function Query(_: RoutableProps) {
                     Showing {visibleRows.length.toLocaleString()} of {rows.length.toLocaleString()} returned rows
                   </span>
                   <span>Query limit: {rowLimitMode === "all" ? "all" : DEFAULT_ROW_LIMIT.toLocaleString()}</span>
-                  <span class="bb-scroll-affordance" data-testid="query-results-scroll-hint">← scroll →</span>
+                  <TableScrollHint testId="query-results-scroll-hint" wrapperClassName={null} />
                 </div>
                 {(() => {
                   const rowsByResultId = new Map(rows.map((row) => [String(row.result_id), row]));
@@ -845,7 +846,7 @@ export function Query(_: RoutableProps) {
                 <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)]">
                   <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
                     <span>Showing {visibleSqlRows.length.toLocaleString()} of {sqlRows.length.toLocaleString()} SQL rows</span>
-                    <span class="bb-scroll-affordance" data-testid="query-sql-scroll-hint">← scroll →</span>
+                    <TableScrollHint testId="query-sql-scroll-hint" wrapperClassName={null} />
                   </div>
                   <div class="overflow-x-auto">
                     <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">

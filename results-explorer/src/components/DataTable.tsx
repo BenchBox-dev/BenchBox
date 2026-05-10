@@ -1,4 +1,5 @@
 import type { ComponentChildren } from "preact";
+import { TableScrollHint } from "@/components/TableScrollHint";
 
 interface DataTableProps {
   ariaLabel?: string;
@@ -19,9 +20,11 @@ export function DataTable({ ariaLabel, caption, scrollable = false, class: extra
   if (!scrollable) return inner;
   return (
     <div>
-      <div class="flex justify-end">
-        <span class="bb-scroll-affordance mb-2">Scroll table for more columns →</span>
-      </div>
+      <TableScrollHint
+        label="Scroll table for more columns →"
+        wrapperClassName="flex justify-end"
+        className="mb-2"
+      />
       <div class="overflow-x-auto">{inner}</div>
     </div>
   );

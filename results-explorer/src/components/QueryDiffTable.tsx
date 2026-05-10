@@ -1,6 +1,7 @@
 import type { DetailResult } from "@/types";
 import { fmtMs } from "@/utils";
 import { StatusBadge, type StatusTone } from "@/components/StatusBadge";
+import { TableScrollHint } from "@/components/TableScrollHint";
 
 export type QueryDiffStatus = "faster" | "slower" | "tie" | "missing";
 
@@ -48,9 +49,7 @@ export function QueryDiffTable({ results, baselineIndex = 0, suppressionReason =
         </div>
       )}
 
-      <div class="mb-2 flex justify-end">
-        <span class="bb-scroll-affordance" data-testid="query-diff-scroll-hint">← scroll →</span>
-      </div>
+      <TableScrollHint testId="query-diff-scroll-hint" />
       <div class="overflow-x-auto" data-testid="query-diff-scroll-container">
         <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)] text-sm">
           <thead class="bg-[var(--bb-surface-data-muted)]">
