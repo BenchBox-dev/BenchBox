@@ -164,6 +164,7 @@ _sources/tpc-h/dbgen/dbgen_x86_64
 !_project/verification-logs/
 !_project/design/
 !_project/joinorder/
+!_project/config/
 !_project/TODO_SCHEMA.yaml
 !_project/PROJECT_TODO.md
 !_project/PROJECT_TODO.yaml
