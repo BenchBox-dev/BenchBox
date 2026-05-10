@@ -473,8 +473,38 @@ def execute_main(argv: list[str] | None = None) -> int:
     return 0 if summary["failed"] == 0 and summary["timed_out"] == 0 else 1
 
 
+def docker_cleanup_main(argv: list[str] | None = None) -> int:
+    """Implements `make uat-docker-cleanup [APPLY=1]`."""
+    from tests.uat import docker_cleanup
+
+    parser = argparse.ArgumentParser(prog="uat-docker-cleanup")
+    parser.add_argument(
+        "--prefix",
+        default=docker_cleanup.DEFAULT_UAT_PROJECT_PREFIX,
+        help="Docker compose project prefix that marks UAT-owned resources",
+    )
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="Remove UAT-owned resources. Without this flag the command only reports the plan.",
+    )
+    args = parser.parse_args(argv)
+
+    try:
+        report = docker_cleanup.recover_abandoned_uat_docker_usage(
+            project_prefix=args.prefix,
+            apply=args.apply,
+        )
+    except docker_cleanup.DockerCleanupError as exc:
+        print(f"[uat-docker-cleanup] ERROR: {exc}", file=sys.stderr)
+        return 2
+    print(docker_cleanup.format_cleanup_report(report))
+    return 0
+
+
 SUBCOMMANDS = {
     "cell": cell_main,
+    "docker-cleanup": docker_cleanup_main,
     "execute": execute_main,
     "validate": validate_main,
     "package": package_main,

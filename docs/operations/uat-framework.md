@@ -96,6 +96,30 @@ Inspect a UAT-owned stack with:
 docker compose -p <benchbox-uat-project> ps
 ```
 
+If a UAT run is interrupted hard enough that the execute-phase `finally`
+block cannot run, recover by inventorying Docker's compose-labelled
+resources:
+
+```bash
+make uat-docker-cleanup
+```
+
+The default is a dry run. It lists UAT-owned resources whose compose
+project label starts with `benchbox-uat`, shows when each item was
+created, and prints the targeted cleanup commands it would run.
+It also lists non-UAT containers, volumes, networks, and images that it
+will not remove automatically, with a manual cleanup command for each
+item. To remove only UAT-owned leftovers:
+
+```bash
+make uat-docker-cleanup APPLY=1
+```
+
+Use `PREFIX=<value>` only for a deliberately different UAT project
+prefix. The recovery command still does not run `docker system prune`,
+`docker volume prune`, or `docker image prune`; non-UAT cleanup remains
+an explicit operator decision using the commands printed in the report.
+
 ## Explorer smoke (browser)
 
 `make uat-explorer-smoke` invokes Playwright directly against a freshly
