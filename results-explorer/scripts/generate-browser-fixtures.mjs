@@ -127,6 +127,27 @@ const VARIANTS = [
     },
   },
   {
+    // Partial query-coverage variant: derived from the TPC-H DataFusion
+    // bundle with Q22 omitted. The follow-up usability release gate uses
+    // this to exercise Compare's normalized-speedup "Comparable only"
+    // default with a real browser corpus row that has at least one hidden
+    // partial query.
+    source: "tpch-datafusion-sf0.01-20260403-c0d4f3d9.json",
+    subdir: "partial-query",
+    derived: "tpch-datafusion-partial-sf0.01-20260403-query-gap.json",
+    mutate: (bundle) => {
+      const mutated = omitMeasurementQuery(bundle, "22");
+      mutated.platform = {
+        ...(mutated.platform ?? {}),
+        name: "DataFusion Partial",
+      };
+      if (mutated.run) {
+        mutated.run.id = `${mutated.run.id ?? "run"}-partial-query`;
+      }
+      return mutated;
+    },
+  },
+  {
     // Synthetic AWS managed-cloud variant: fixture-only coverage for the
     // environment facets flattened into the browser snapshot. This never
     // touches the public corpus.
@@ -362,6 +383,25 @@ const withEnvironmentFacetVariant = (bundle, options) => {
   };
   return mutated;
 };
+
+function omitMeasurementQuery(bundle, queryId) {
+  const mutated = structuredClone(bundle);
+  const queries = Array.isArray(mutated.queries) ? mutated.queries : [];
+  const remaining = queries.filter((query) => String(query?.id ?? "") !== String(queryId));
+  mutated.queries = remaining;
+
+  const successful = remaining.filter((query) => String(query?.status ?? "").toUpperCase() === "SUCCESS");
+  if (mutated.summary?.queries) {
+    mutated.summary.queries = {
+      ...mutated.summary.queries,
+      total: remaining.length,
+      passed: successful.length,
+      failed: remaining.length - successful.length,
+    };
+  }
+
+  return mutated;
+}
 
 const withNormalizedEnvironment = (bundle) => {
   const mutated = structuredClone(bundle);

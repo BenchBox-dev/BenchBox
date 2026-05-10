@@ -83,8 +83,9 @@ work:
       Output: `_project/design/joinorder-step1-foundations.md`
       Sections:
         1. Scale-factor enforcement gate
-           - Survey current scale_factor plumbing in benchbox/core/
-             (find the central runner entry point)
+           - Survey current scale_factor plumbing in benchbox/core/,
+             benchbox/core/runner/, and benchbox/cli/ (find every
+             path that can construct or run a benchmark)
            - Pattern: `validate_scale_factor(benchmark, sf, registry)`
              raises `ScaleFactorNotSupportedError` when sf not in
              registry[benchmark].scale_options
@@ -92,15 +93,24 @@ work:
         2. Data-fetch infrastructure (`benchbox/core/data_fetch/`)
            - Per-benchmark `data_manifest.toml` schema (URL, sha256,
              file layout, version, license file)
-           - Cache: ${BENCHBOX_DATA_CACHE:-~/.cache/benchbox/data}/
-             {benchmark}/{version}/
-           - User-supplied opt-out: `--data-path` CLI flag and
-             `BENCHBOX_DATA_PATH_<BENCHMARK>` env var
+           - Reuse BenchBox's existing datagen path convention:
+             `resolve_benchmark_runs_dir()` +
+             `get_datagen_path(benchmark, sf)`
+           - Add manifest-driven SHA256 verification on top of
+             nyctaxi-style `.exists()` presence checks
+           - No new env vars and no new CLI flags; air-gapped users
+             pre-populate the datagen directory and hit the same
+             checksum gate
            - Failure modes documented: ChecksumMismatchError,
              ManifestValidationError, DataFetchError
         3. Dataset versioning in result bundles
-           - New manifest field `dataset_version` = sha256 of
-             data_manifest.toml; null for purely-generated benchmarks
+           - Separate identity fields:
+             * `dataset_version`: logical immutable dataset id, e.g.
+               `joinorder-imdb-2013-v1`; null for generated benchmarks
+             * `manifest_hash`: sha256 of data_manifest.toml
+             * `data_archive_hash`: sha256 of the packaged archive, or
+               aggregate sha256 over per-table file hashes when no
+               archive is present
            - Surfaced at data layer only — explorer requires zero UI changes
         4. Registry `surface` field
            - "public" | "internal" — internal hidden from explorer
@@ -115,16 +125,14 @@ work:
       Module structure (minimum viable, fully tested):
         benchbox/core/data_fetch/__init__.py    # public API: fetch_data()
         benchbox/core/data_fetch/manifest.py    # parse data_manifest.toml
-        benchbox/core/data_fetch/manager.py     # orchestrate fetch/cache/validate
+        benchbox/core/data_fetch/manager.py     # orchestrate path, fetch, validate
         benchbox/core/data_fetch/downloader.py  # HTTP GET + progress + resume + retry
-        benchbox/core/data_fetch/cache.py       # cache location + lock files
         benchbox/core/data_fetch/errors.py      # exception hierarchy
 
       Tests (mocked HTTP):
         tests/unit/core/data_fetch/test_manifest.py
         tests/unit/core/data_fetch/test_manager.py
         tests/unit/core/data_fetch/test_downloader.py
-        tests/unit/core/data_fetch/test_cache.py
 
       Skeleton is benchmark-agnostic; no joinorder-specific code in
       this module. Joinorder wiring happens in the cutover TODO.
@@ -228,6 +236,8 @@ work:
     needs: [w6]
     notes: |
       Assemble `data_manifest.toml` with:
+        - dataset_version: logical immutable id, e.g.
+          `joinorder-imdb-2013-v1`
         - script git SHA (from `git rev-parse HEAD` at build time)
         - DuckDB version (from `duckdb.__version__`)
         - Postgres image tag (pinned in w4)
@@ -235,15 +245,18 @@ work:
           upstream pg_dump sha256
         - per-table block: file path, row count, sha256, schema
           (column name → Postgres type)
-        - aggregate sha256 (over all per-file hashes, in
-          deterministic table order) → this becomes the
-          `dataset_version` field
+        - data_archive_hash: aggregate sha256 over all per-file
+          hashes in deterministic table order
+        - manifest_hash: sha256 of the final data_manifest.toml
+          contents after all fields are populated
 
       The manifest is the gate document: any byte-difference in
-      the conversion downstream changes its sha256, which
-      changes dataset_version, which forces explicit version
-      bumps in result bundles. This is the reproducibility
-      contract.
+      the conversion downstream changes data_archive_hash and then
+      manifest_hash. dataset_version is a human-stable release id;
+      if the archive bytes change, either keep the same logical
+      dataset_version with a new manifest_hash for a metadata-only
+      correction, or intentionally bump dataset_version for a data
+      change. The design doc from w1 must state this policy.
 
   - id: w8
     summary: "Encoding round-trip gate (build-time pipeline assertion)"
@@ -259,10 +272,15 @@ work:
           `movie_companies.note`
 
       Round-trip test:
-        Parquet → DuckDB COPY TO csv → COPY back to Postgres TEMP table
-        → assert byte-identical to the original COPY output
+        Parquet → DuckDB scan → compare typed values against the
+        Postgres source rows for sampled primary keys, and compare
+        UTF-8 byte sequences for string/text columns before any
+        normalization. Do not require whole-row CSV serializer output
+        to be byte-identical; CSV quoting, ordering, and NULL
+        representation can legitimately differ across tools.
 
-      Pipeline aborts (non-zero exit) if any sampled row differs.
+      Pipeline aborts (non-zero exit) if any sampled value or string
+      byte sequence differs.
       This catches silent NFC/NFD normalization or encoding drift in
       the DuckDB writer. Sample size: 100 rows per table from the
       canonical-tricky set above.
@@ -328,7 +346,9 @@ work:
       (committed to repo). Schema:
         {
           "postgres_version": "16.2",
-          "dataset_version": "<sha256>",
+          "dataset_version": "joinorder-imdb-2013-v1",
+          "manifest_hash": "<sha256(data_manifest.toml)>",
+          "data_archive_hash": "<aggregate-data-sha256>",
           "gregrahn_commit": "<sha>",
           "queries": {
             "1a": {"row_count": ..., "first_row_sha256": "..."},
@@ -341,17 +361,22 @@ work:
     status: pending
     needs: [w11]
     notes: |
-      Leis et al. 2015 (https://vldb.org/pvldb/vol9/p204-leis.pdf)
-      publishes row counts for some JOB queries (see paper Table 4
-      and elsewhere in §3-4). Cross-check our computed cardinalities
-      against published values for those queries.
+      First verify whether Leis et al. 2015 or companion JOB materials
+      publish usable result cardinalities for any of the 113 queries.
+      The papers primarily publish optimizer/cardinality-estimation
+      error distributions, not a complete answer-set oracle, so this
+      work unit must not assume a table of reference row counts exists.
+      Cross-check our computed cardinalities only for values that are
+      actually published or otherwise traceable to a stable upstream
+      artifact.
 
       Output: `_project/joinorder/cardinality-cross-check.md`
-      Lists each query for which Leis 2015 publishes a count;
-      reports our computed count and PASS / DRIFT verdict.
-      Drift > ±2% requires investigation before proceeding (likely
-      indicates a conversion bug from w4 or query parsing issue
-      from w10).
+      Lists each query for which a published/traceable count exists,
+      reports our computed count and PASS / DRIFT verdict. If no
+      suitable published counts exist, the report must say so plainly
+      and explain that the authoritative oracle for BenchBox is the
+      Postgres run captured in w11. Drift > ±2% on any traceable count
+      requires investigation before proceeding.
 
   - id: w13
     summary: "Package full archive tarball with manifest + license + checksums + cardinalities"
@@ -388,7 +413,9 @@ work:
       Output: 21 tiny Parquet files checked into
       `tests/fixtures/joinorder_canonical_tiny/`, plus a tiny
       manifest with dataset_version distinct from full canonical
-      (so unit tests can reference both).
+      (so unit tests can reference both), plus
+      `_project/joinorder/tiny_reference_cardinalities.json` with the
+      same schema as full `reference_cardinalities.json`.
 
       Verification before commit: load tiny fixture into DuckDB,
       run all 113 queries from w10, assert every query returns
@@ -455,11 +482,11 @@ verification:
     command: "gh release view data/joinorder-imdb-2013-v1 --json isDraft,assets --jq '{draft: .isDraft, asset_count: (.assets | length)}'"
     expected_output: "{\"draft\": true, \"asset_count\": 2}"
   - description: "Tiny fixture is checked in and predicate-satisfying"
-    command: "ls tests/fixtures/joinorder_canonical_tiny/*.parquet | wc -l"
-    expected_output: "21"
+    command: "test \"$(ls tests/fixtures/joinorder_canonical_tiny/*.parquet | wc -l | tr -d ' ')\" = \"21\" && uv run -- python _project/scripts/build_joinorder_data.py verify-tiny-fixture --fixture tests/fixtures/joinorder_canonical_tiny --queries _project/joinorder/build-inputs/queries --cardinalities _project/joinorder/tiny_reference_cardinalities.json"
+    expected_output: "21 Parquets present and all 113 tiny-fixture query cardinalities validated"
   - description: "data_manifest.toml is wired up for joinorder"
-    command: "test -f benchbox/core/joinorder/data_manifest.toml && grep -cE '^url|^sha256|^version|^dataset_version' benchbox/core/joinorder/data_manifest.toml"
-    expected_output: ">= 4"
+    command: "test -f benchbox/core/joinorder/data_manifest.toml && grep -cE '^url|^sha256|^version|^dataset_version|^manifest_hash|^data_archive_hash' benchbox/core/joinorder/data_manifest.toml"
+    expected_output: ">= 6"
 
 must_preserve:
   - "Existing benchmarks (tpch, tpcds, etc.) continue to accept their declared scale_factor ranges — the new validate_scale_factor() must read each benchmark's scale_options from the registry, not hard-code joinorder"
@@ -510,12 +537,17 @@ scope_limit:
     - "_project/scripts/pyproject.toml (add deps if needed)"
     - "_project/joinorder/build-inputs/queries/*.sql (new — 113 queries from gregrahn)"
     - "_project/joinorder/reference_cardinalities.json (new)"
+    - "_project/joinorder/tiny_reference_cardinalities.json (new)"
     - "_project/joinorder/cardinality-cross-check.md (new — Leis 2015 cross-check report)"
     - "_project/joinorder/release-notes.md (new)"
     - "_project/verification-logs/joinorder-canonical-foundation/w0.log (new — re-validation log)"
     - "benchbox/core/data_fetch/ (new module)"
     - "benchbox/core/benchmark_registry.py (add `surface` field + scale validation hook)"
+    - "benchbox/core/runner/ (call reusable scale validation before generation/load)"
+    - "benchbox/cli/commands/run.py (ensure CLI construction path also reaches scale validation)"
+    - "benchbox/cli/orchestrator.py (ensure programmatic/CLI orchestration path also reaches scale validation)"
     - "benchbox/core/errors.py (add ScaleFactorNotSupportedError if not present)"
+    - "benchbox/utils/path_utils.py (only if the datagen verification helper extends existing path utilities)"
     - "benchbox/core/joinorder/data_manifest.toml (new)"
     - "tests/unit/core/data_fetch/ (new)"
     - "tests/unit/core/test_scale_factor_validation.py (new)"
@@ -566,11 +598,12 @@ impact:
     Reusable data-fetch infrastructure pays forward: ClickBench,
     Wikipedia pageviews, GitHub Archive, and any future real-data
     benchmark instantiates the same machinery rather than each one
-    solving downloader/manifest/cache from scratch.
+    solving downloader/manifest/verification from scratch.
   user_impact: |
     Users will need to acquire ~1.5 GB of canonical data on first
-    `joinorder` run (silent download by default, with `--data-path`
-    opt-out for air-gapped environments). In exchange they get
+    `joinorder` run (silent download by default into the existing
+    `BENCHBOX_OUTPUT_DIR` / `benchmark_runs/datagen/` tree; air-gapped
+    users pre-populate that directory). In exchange they get
     results that are bit-comparable across all BenchBox users and
     against the academic literature.
   technical_debt: |
@@ -582,7 +615,7 @@ impact:
 success_metrics:
   - "Bit-reproducible Parquet archive built from Harvard Dataverse pg_dump (DOI:10.7910/DVN/2QYZBT) with full provenance manifest"
   - "Reference cardinalities computed for all 113 canonical JOB queries via PostgreSQL oracle, committed to _project/joinorder/reference_cardinalities.json"
-  - "Reusable benchbox/core/data_fetch/ module: parses manifest, downloads with checksum validation, supports user-path opt-out, all tests pass without network access"
+  - "Reusable benchbox/core/data_fetch/ module: parses manifest, downloads with checksum validation into the existing datagen path, verifies pre-populated data, all tests pass without network access"
   - "scale_factor enforcement is registry-driven and reusable: parametrized tests verify joinorder rejects sf!=1 and other benchmarks accept their declared ranges"
   - "DRAFT GitHub Release at tag data/joinorder-imdb-2013-v1 stages the archive and is ready to be promoted by the cutover TODO"
   - "Tiny canonical fixture (~1MB) is checked in and satisfies all 113 query predicates"
@@ -592,7 +625,8 @@ open_questions:
   - "Harvard Dataverse pg_dump may differ from CWI mirror. Plan: cross-check row counts against Leis 2015 Table 3 in w4 (restore validation); if material drift, document the chosen snapshot and rationale in the manifest."
   - "DuckDB Parquet writer's encoding behavior on edge-case Unicode (combining characters, RTL text). Plan: w8 round-trip gate catches this; if it fails, fall back to Polars or pyarrow for the conversion step."
   - "Whether tiny fixture should be deterministic regen vs frozen sha256 in repo. Plan: deterministic regen via the build pipeline (w14), but the resulting Parquets are checked in (so unit tests don't need the full archive)."
-  - "Reference cardinality validation against Leis 2015 published numbers — only some queries have published row counts. Plan: w12 cross-checks where available; remaining queries rely on the Postgres-on-canonical oracle alone."
+  - "Reference cardinality validation against Leis 2015 or companion published numbers — usable row counts may not exist. Plan: w12 first verifies what is actually published; remaining queries rely on the Postgres-on-canonical oracle alone."
+  - "Nyctaxi currently uses the same datagen directory convention with `.exists()` skip behavior but not this manifest SHA256 gate. Plan: leave nyctaxi unchanged in Step 1 and file follow-up work if the checksum gate should be generalized there."
 
 context_sections:
   "Research Findings": |
@@ -626,12 +660,14 @@ context_sections:
       1. DATA-LICENSE.md per benchmark with IMDb attribution
          verbatim, Boncz-style scope clause, redistribution
          disclaimer, takedown contact
-      2. `--data-path` opt-out for users in stricter jurisdictions
+      2. Air-gapped/pre-populated datagen directory path for users in
+         stricter jurisdictions, using the existing `BENCHBOX_OUTPUT_DIR`
+         convention and the same manifest checksum verification
       3. Same-day takedown SLA: pull Release asset on objection,
-         fall back to user-supplied path
+         fall back to user-populated datagen directory instructions
       4. No click-through (matches field practice; no legal upside)
 
     See conversation history for the full evidence pack and
     sources. If posture conditions cannot be met before w14
     promotion, fall back to Option C: host conversion scripts
-    only, require user-supplied data path.
+    only, require users to pre-populate the standard datagen directory.

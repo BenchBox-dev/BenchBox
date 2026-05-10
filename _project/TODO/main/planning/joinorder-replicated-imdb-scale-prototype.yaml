@@ -45,6 +45,11 @@ work:
         - any required first-class stats/analyze phase TODO is completed or this
           prototype is explicitly narrowed to a measurement smoke that does not
           claim stats-maintenance conclusions;
+        - the scale-stress decision note contains exactly one `Stats phase gate:
+          completed`, `Stats phase gate: smoke-only`, or `Stats phase gate:
+          dependency:joinorder-statistics-phase-measurement` line; if the
+          dependency gate is used, add that TODO to this item's `deps.needs`
+          before coding;
         - result-bundle labels and manifest fields for replicated_imdb are
           already specified by the decision framework.
 
@@ -90,7 +95,8 @@ work:
           lookup tables,
         - fixed 113-query result cardinalities are either N times canonical
           or explicitly documented exceptions.
-      Use the canonical oracle artifacts from joinorder-canonical-dataset-contract.
+      Use the canonical oracle artifacts produced by joinorder-canonical-foundation
+      (specifically `_project/joinorder/reference_cardinalities.json` from foundation w11).
 
   - id: w5
     summary: "Run a narrow scale-stress comparison on local engines"
@@ -128,16 +134,30 @@ deferred:
 
 must_preserve:
   - "Canonical joinorder remains SF=1 canonical_imdb and literature-comparable only."
-  - "No hosted replicated_imdb archive may ship unless the IMDb/JOB data licensing decision explicitly approves derived archive redistribution."
-  - "replicated_imdb result bundles record source canonical dataset_version and derived manifest hash."
+  - "No hosted replicated_imdb archive may ship unless the IMDb/JOB data licensing decision explicitly approves derived archive redistribution (decision-framework w8 produces this)."
+  - "replicated_imdb result bundles record source canonical dataset_version, derived manifest hash, replica factor, and builder version."
   - "Predicate-bearing values must not be suffixed or mutated in the replicated baseline."
   - "Lookup tables must not be duplicated unless the schema contract explicitly requires it."
+  - "All replicated_imdb code lives under benchbox/core/joinorder_replicated/ — never in benchbox/core/joinorder/ — to enforce the canonical/derived separation at the module boundary."
+  - "The benchmark identifier registered in benchmark_registry.py is `joinorder_replicated` (not `joinorder` with a derived mode flag); silent selection via canonical joinorder is forbidden."
 
 approach: |
-  Implement this as a derived archive builder, not by teaching canonical
-  JoinOrderGenerator to synthesize larger data. Keep the implementation
-  deterministic and manifest-driven. Use the canonical oracle to prove expected
+  Implement this as a derived archive builder in its own module
+  (`benchbox/core/joinorder_replicated/`), not by teaching canonical
+  JoinOrderGenerator to synthesize larger data. The module separation
+  enforces the canonical/derived boundary at the file-system level —
+  agents working on canonical joinorder cannot accidentally touch
+  replicated logic and vice versa.
+
+  Keep the implementation deterministic and manifest-driven. Use the
+  canonical oracle artifacts (foundation TODO's
+  `_project/joinorder/reference_cardinalities.json`) to prove expected
   query/cardinality scaling before interpreting engine performance.
+
+  Result-bundle tagging: registered as `joinorder_replicated` in
+  benchmark_registry.py with `surface: internal` (matching the
+  joinorder_synthetic precedent — derived/research workloads stay
+  hidden from the public explorer until promoted explicitly).
 
 anti_patterns:
   - "DO NOT start implementation until licensing and stats/analyze phase prerequisites are resolved - because the prototype otherwise cannot produce shippable or interpretable scale-stress evidence."
@@ -147,24 +167,47 @@ anti_patterns:
   - "DO NOT run expensive cloud matrices during the prototype - because the first gate is semantic validity and local measurement - defer cloud until w6 approves continuation."
 
 verification:
-  - description: "Prerequisite decisions approve replication scope, distribution mode, and stats/analyze handling"
-    command: "rg -n \"replicated_imdb|derived archive|distribution mode|stats/analyze|recommended prototype\" _project/decisions/joinorder-scale-stress-*.md _project/decisions/joinorder-imdb-data-licensing-*.md"
-    expected_output: "decisions approve or explicitly constrain replicated_imdb before implementation starts"
+  - description: "Decision-framework approved replicated_imdb explicitly (not 'no scaled JOB' or other path)"
+    command: "grep -hEc '^Recommendation: (replicated_imdb baseline|staged combination)' _project/decisions/joinorder-scale-stress-decision-*.md | awk '{ s += $1 } END { print s }'"
+    expected_output: "1"
+  - description: "Stats/analyze phase handling is decided with a concrete gate"
+    command: "grep -hEc '^Stats phase gate: (completed|smoke-only|dependency:joinorder-statistics-phase-measurement)' _project/decisions/joinorder-scale-stress-decision-*.md | awk '{ s += $1 } END { print s }'"
+    expected_output: "1"
+  - description: "Stats/analyze dependency gate is reflected in prototype dependencies before coding"
+    command: "! grep -hEq '^Stats phase gate: dependency:joinorder-statistics-phase-measurement' _project/decisions/joinorder-scale-stress-decision-*.md || rg -n 'joinorder-statistics-phase-measurement' _project/TODO/main/planning/joinorder-replicated-imdb-scale-prototype.yaml"
+    expected_output: "no output unless dependency gate is selected; otherwise TODO references the dependency"
+  - description: "Replicated archive builder produces deterministic output (re-run same input → same sha256)"
+    command: "uv run -- python -m pytest tests/unit/core/joinorder_replicated/test_builder_determinism.py -q"
+    expected_output: "all tests pass"
+  - description: "FK integrity is validated across replicas"
+    command: "uv run -- python -m pytest tests/unit/core/joinorder_replicated/test_fk_integrity.py -q"
+    expected_output: "all tests pass"
+  - description: "Predicate-bearing string values unchanged in derived archive (anti-pattern guard)"
+    command: "uv run -- python -m pytest tests/unit/core/joinorder_replicated/test_predicate_preservation.py -q"
+    expected_output: "all tests pass"
+  - description: "Lookup tables remain single-copy (anti-pattern guard)"
+    command: "uv run -- python -m pytest tests/unit/core/joinorder_replicated/test_lookup_table_singleton.py -q"
+    expected_output: "all tests pass"
+  - description: "Result bundles tagged replicated_imdb carry source canonical dataset_version"
+    command: "uv run -- python -m pytest tests/unit/core/publishing/test_replicated_imdb_bundle_metadata.py -q"
+    expected_output: "all tests pass"
+  - description: "Prototype evaluation note covers all required questions"
+    command: "grep -cE '^## (Useful stats or physical-scale|Replication artifacts|Keep as derived baseline|Next step)' _project/decisions/joinorder-replicated-imdb-prototype-*.md | head -1"
+    expected_output: ">= 4"
   - description: "Prototype keeps TODO graph valid"
     command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph"
     expected_output: "Graph validation passed"
   - description: "This item validates individually"
     command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate _project/TODO/main/planning/joinorder-replicated-imdb-scale-prototype.yaml"
     expected_output: "is valid"
-  - description: "Prototype evaluation exists before this TODO completes"
-    command: "ls _project/decisions/joinorder-replicated-imdb-prototype-*.md"
-    expected_output: "at least one prototype evaluation note"
 
 scope_limit:
   only_modify:
-    - "benchbox/core/joinorder/"
+    - "benchbox/core/joinorder_replicated/"
+    - "benchbox/core/benchmark_registry.py"
     - "benchbox/cli/"
-    - "tests/unit/core/joinorder/"
+    - "tests/unit/core/joinorder_replicated/"
+    - "tests/unit/core/publishing/test_replicated_imdb_bundle_metadata.py"
     - "tests/integration/"
     - "docs/benchmarks/join-order.md"
     - "_project/decisions/joinorder-replicated-imdb-prototype-*.md"
@@ -174,6 +217,9 @@ scope_limit:
     - "results-explorer/"
     - "benchbox/core/tpch/"
     - "benchbox/core/tpcds/"
+    - "benchbox/core/joinorder/"
+    - "benchbox/core/joinorder_synthetic/"
+    - "_project/joinorder/reference_cardinalities.json"
 
 success_metrics:
   - "Prerequisite decision notes approve replicated_imdb scope, distribution mode, and stats/analyze phase handling before coding begins."

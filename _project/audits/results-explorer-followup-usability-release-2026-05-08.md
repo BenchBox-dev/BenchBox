@@ -1,3 +1,6 @@
+---
+develop_sha: 61de7ff3a0708d79c51bb654a26fc49fad75cc92
+---
 # Results Explorer follow-up usability — release evidence matrix
 
 Date: 2026-05-09

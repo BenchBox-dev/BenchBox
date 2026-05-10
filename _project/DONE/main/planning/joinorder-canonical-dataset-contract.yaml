@@ -2,8 +2,62 @@ id: joinorder-canonical-dataset-contract
 title: "Define the canonical JOB dataset contract and validation oracle"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-05-09"
 category: Core Functionality
+
+completion_summary: |
+  Superseded by `joinorder-canonical-foundation` (PR #302) which covers the
+  same design space with stronger work units, concrete verification gates, and
+  pairs the design effort with the implementation work that actually ships
+  canonical JOB. The substantive overlap was identified in a cross-trio
+  review on 2026-05-09:
+
+    - foundation w1 (design doc) covers the four reusable foundations:
+      scale-factor enforcement gate, data-fetch infra, dataset-versioning,
+      registry surface field — same scope as contract w1-w7.
+    - foundation w2 builds the reusable data_fetch module skeleton.
+    - foundation w3 implements the central scale-factor + surface field
+      enforcement (contract w5 only specified the design; foundation
+      implements it).
+    - foundation w4-w7 build the offline conversion pipeline with explicit
+      encoding round-trip and predicate-domain gates (contract w3 only
+      specified the gates).
+    - foundation w8 enforces encoding round-trip; w9 enforces predicate-
+      domain non-emptiness — both as build-time pipeline assertions
+      (contract w3 specified; foundation enforces).
+    - foundation w10-w12 import the 113 queries and compute reference
+      cardinalities via PostgreSQL oracle, with Leis 2015 cross-check
+      (contract w1 chose the oracle; foundation produces the artifacts).
+    - foundation w13-w14 package the canonical archive and tiny fixture
+      (contract w2 specified the archive format; foundation builds it).
+    - foundation w15-w16 stage the DRAFT GitHub Release and wire
+      data_manifest.toml.
+    - cutover w12 wires dataset_version into result-bundle manifests,
+      surfaced at data layer only (no explorer UI changes — resolves the
+      contract w4 requirement vs `do_not_modify: results-explorer/`
+      contradiction by avoiding the conflict).
+    - foundation context_sections.Research Findings pins the licensing
+      decision (AMBIGUOUS-LEANING-LOW posture with 4 hosting conditions)
+      that contract guardrails called for but never produced.
+
+  Critical gaps in the contract TODO that drove the supersession decision:
+
+    1. No work unit produced the implementation that closes #289.
+       Contract was design-only; no companion cutover TODO existed.
+    2. Verification commands only checked YAML validity — an agent could
+       mark the TODO complete with stub deliverables.
+    3. Licensing decision was a guardrail with no work unit to produce it.
+    4. scope_limit allowed implementation paths that work units never
+       referenced (`benchbox/core/joinorder/`, `benchbox/cli/`).
+    5. Internal contradiction: w4 required explorer surfacing of
+       dataset-version mismatches, but `do_not_modify: results-explorer/`
+       prevented it.
+
+  Decision-framework (`joinorder-scale-stress-decision-framework`) and
+  prototype (`joinorder-replicated-imdb-scale-prototype`) TODOs remain
+  active; their `deps.needs` is updated to reference
+  `joinorder-canonical-foundation` instead of this superseded item.
 
 description: |
   Issue #289 identified that BenchBox's current Join Order Benchmark data is

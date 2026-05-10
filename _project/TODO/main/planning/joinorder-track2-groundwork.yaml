@@ -47,11 +47,12 @@ work:
       Output: `_project/design/track2-joinorder-stats-as-phase.md`
 
       Sections:
-        1. Current phase model
-           - Survey benchbox/core/benchmark.py and platform-specific
-             benchmark phases. Document each phase, its boundary
-             (what counts as "in" vs "out"), and how its time is
-             measured.
+          1. Current phase model
+             - Survey benchbox/core/runner/runner.py,
+               benchbox/cli/commands/run.py, benchbox/cli/orchestrator.py,
+               benchbox/core/results/, and platform-specific load/analyze
+               hooks. Document each phase, its boundary (what counts as
+               "in" vs "out"), and how its time is measured.
            - Specifically: where does ANALYZE / COMPUTE STATISTICS /
              auto-statistics gathering land today? Likely rolled
              into either load (if the engine auto-analyzes after
@@ -189,6 +190,12 @@ work:
       (foundation TODO created the file as a stub; this work unit
       fills the per-benchmark instantiation guidance)
 
+      Frame the reusable infrastructure as a manifest-driven
+      verification step on top of BenchBox's existing datagen path
+      convention (`resolve_benchmark_runs_dir()` +
+      `get_datagen_path(benchmark, sf)`). Do not describe it as a
+      separate storage root with its own location policy.
+
       Sections:
         1. When to use this infrastructure
            - Real-data benchmarks with stable upstream data sources
@@ -205,7 +212,8 @@ work:
               checksums + DATA-LICENSE.md + reference cardinalities
            e. Stage as DRAFT GitHub Release; publish only after UAT
            f. Add data_manifest.toml in benchbox/core/<benchmark>/
-           g. Wire benchmark to fetch_data() in benchmark.py
+           g. Wire benchmark to `get_datagen_path(benchmark, sf)` +
+              `fetch_data(..., output_dir=...)` in benchmark.py
            h. Add DATA-LICENSE.md (use joinorder's as template)
            i. Add per-benchmark CHANGELOG entry
         3. DATA-LICENSE.md template
@@ -222,7 +230,10 @@ work:
              same engine that will be benchmarked
            - DRAFT-then-promote sequence for the GitHub Release
         5. Infrastructure components reused
-           - benchbox.core.data_fetch (downloader, cache, manifest)
+           - Existing datagen path convention (`BENCHBOX_OUTPUT_DIR`
+             / `benchmark_runs/datagen/<benchmark>_<sf>/`)
+           - benchbox.core.data_fetch (manifest parsing, downloader,
+             manager, errors, SHA256 verification)
            - benchmark_registry surface field (public/internal)
            - bundle_publisher dataset_version field
            - scale_factor enforcement gate
