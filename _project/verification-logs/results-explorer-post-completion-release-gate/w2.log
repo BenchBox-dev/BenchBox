@@ -1,0 +1,136 @@
+{
+  "captured_at_utc": "2026-05-10T21:26:11.723Z",
+  "develop_sha": "8c1589c4b8add656a35345b38de68eff2e766cef",
+  "fixture_dir": "/Users/joe/Developer/benchmark_runs/results_explorer_release_gate_20260510/data",
+  "server": [
+    "[serve-browser-tests] dist=/Users/joe/Developer/BenchBox.pool-06/results-explorer/dist",
+    "[serve-browser-tests] fixtures=/Users/joe/Developer/benchmark_runs/results_explorer_release_gate_20260510/data\n[serve-browser-tests] listening on http://127.0.0.1:4389/results/"
+  ],
+  "route_loads": [
+    {
+      "route": "/results/",
+      "pass": true,
+      "details": "h1=BenchBox Database Leaderboards; not_found=0",
+      "events": []
+    },
+    {
+      "route": "/results/tpch/",
+      "pass": true,
+      "details": "h1=TPC-H Results; not_found=0",
+      "events": []
+    },
+    {
+      "route": "/results/query",
+      "pass": true,
+      "details": "h1=Results Query Workbench; not_found=0",
+      "events": []
+    },
+    {
+      "route": "/results/compare",
+      "pass": true,
+      "details": "h1=Pick runs to compare; not_found=0",
+      "events": []
+    },
+    {
+      "route": "/results/p/polars/",
+      "pass": true,
+      "details": "h1=Polars Results; not_found=0",
+      "events": []
+    },
+    {
+      "route": "/results/r/tpch-polars-sf0.1-20260502-0093bb7a",
+      "pass": true,
+      "details": "h1=(none); not_found=1",
+      "events": []
+    },
+    {
+      "route": "/results/r/tpch-polars-sf0.1-20260502-85546f8e",
+      "pass": true,
+      "details": "h1=TPC-H - Polars; not_found=0",
+      "events": []
+    }
+  ],
+  "observations": [
+    {
+      "id": "#1",
+      "title": "Benchmark compare checkboxes visible and clickable",
+      "pass": true,
+      "details": "duckdb={\"x\":41,\"y\":892.5,\"width\":16,\"height\":16} datafusion={\"x\":41,\"y\":718.5,\"width\":16,\"height\":16} href=/results/compare?ids=342a7336,b8b5a2b1"
+    },
+    {
+      "id": "#2",
+      "title": "Compare picker surfaces compatible second choices",
+      "pass": true,
+      "details": "enabled_second_choices=6; status=2 selected. Cohort: TPC-H Data Vault · SF 0.01 · power"
+    },
+    {
+      "id": "#10",
+      "title": "Compare benchmark options disambiguate SSB slugs",
+      "pass": true,
+      "details": "ssb_labels=[\"SSB (legacy slug)\",\"SSB\"] duplicate_option_labels=[]"
+    },
+    {
+      "id": "#11",
+      "title": "Compare checkbox accessible names are unique",
+      "pass": true,
+      "details": "label_count=525 duplicate_labels=[]"
+    },
+    {
+      "id": "#3",
+      "title": "Query Workbench surfaces compatible second choices",
+      "pass": true,
+      "details": "enabled_second_choices=6; tray=2 results selected.Compatible onlyClear selectionCompare 2 selected →"
+    },
+    {
+      "id": "#4",
+      "title": "No linked No run leaderboard cells",
+      "pass": true,
+      "details": "linked_no_run_anchor_count=0"
+    },
+    {
+      "id": "#5",
+      "title": "Rank tab activates from default Overview",
+      "pass": true,
+      "details": "rank_aria_selected=true"
+    },
+    {
+      "id": "#6",
+      "title": "Benchmark page does not duplicate matrix heatmap inside Charts",
+      "pass": true,
+      "details": "heatmap_controls=0"
+    },
+    {
+      "id": "#7",
+      "title": "Distribution labels preserve unique run identities",
+      "pass": true,
+      "details": "title_count=19 duplicate_titles=[]"
+    },
+    {
+      "id": "#8",
+      "title": "Same-platform compare avoids generic 1.00x winner language",
+      "pass": true,
+      "details": "Results/TPC-H/CompareCompareTPC-H ComparisonScale factor: SF 0.1 - 2 runsShare URLComparability guardrailsSelected runs share the same benchmark, scale, and phase for winner claims.1 warningsDecision SummaryPolars v1.40.0 2026-05-02 leads by 1.02x on power score.Computed from selected runsWinnerPolars v1.40.0 2026-05-0256,714.246Power score1.02xvs lowest selectedQuery wins2 fastest of 22 comparable3 slower · 17 tiedTail shapep50 5 ms · p90 13 ms · p99 16 msBaselineRatios and deltas compare every"
+    },
+    {
+      "id": "#9",
+      "title": "Query Wins denominator separates comparable queries",
+      "pass": true,
+      "details": "Results/TPC-H/CompareCompareTPC-H ComparisonScale factor: SF 0.1 - 2 runsShare URLComparability guardrailsSelected runs share the same benchmark, scale, and phase for winner claims.1 warningsDecision SummaryPolars v1.40.0 2026-05-02 leads by 1.02x on power score.Computed from selected runsWinnerPolars v1.40.0 2026-05-0256,714.246Power score1.02xvs lowest selectedQuery wins2 fastest of 22 comparable3 slower · 17 tiedTail shapep50 5 ms · p90 13 ms · p99 16 msBaselineRatios and deltas compare every"
+    },
+    {
+      "id": "#13",
+      "title": "Compare guardrail names benchmark, scale, and phase",
+      "pass": true,
+      "details": "Selected runs share the same benchmark, scale, and phase for winner claims."
+    },
+    {
+      "id": "#12",
+      "title": "Result receipt Cost copy hides raw not_applicable enum",
+      "pass": true,
+      "details": "Run ReceiptReproducibility, platform, and integrity metadata for this result.tpch-pol12 fields not recorded for this run.Show missing metadataWorkloadBenchmarkTPC-HScale factorSF 0.1PhasepowerQuery count22Measurement samples66PlatformPlatformPolarsPlatform version1.40.04 fields not recordedEnvironmentNo environment metadata recorded.IntegrityTrustcommunity submissionVisibilitypublic (curated)Validationpassed2 fields not recordedArtifactsResult IDtpch-polars-sf0.1-20260502-85546f8eBundleDownload "
+    }
+  ],
+  "verdict": "PASS",
+  "failures": [],
+  "refreshed_full_compare_table_at_utc": "2026-05-10T21:29:13.007Z"
+}
