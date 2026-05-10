@@ -71,3 +71,36 @@ browser pass to produce
 If a finding here no longer reproduces on a future develop tip, the
 owning TODO's `w0` log records that fact and the finding is treated as
 already-satisfied at gate time.
+
+## Status notes (post-cited-tip changes)
+
+This section records changes that landed on `develop` *after* the cited
+`dbac33ee1` tip but *before* implementation work begins. It does not
+move findings; it just narrows where each `w0` should look.
+
+- **PR #316 (`b94cb59bb`)** — `fix(explorer): close follow-up usability
+  review gaps`. Centralized compare cohort locking via
+  `results-explorer/src/lib/compareCohort.ts`, capped entrypoint
+  selections at four runs, and threaded cohort-aware labels into the
+  remaining Compare chart consumers. Findings to re-verify in light of
+  this PR: #1 (still in BenchmarkIndex), #2/#3 (cohort lock helper now
+  exists; ordering of compatible candidates still unconfirmed), #8/#11
+  (Compare-side cohort labels may already disambiguate same-platform
+  copy in some surfaces).
+- **Already-shipped overlap to confirm in w0, not re-implement**:
+    - Finding #6 (Per-query Heatmap duplicate): matrix-view dedup
+      lives at `results-explorer/src/pages/BenchmarkIndex.tsx`
+      (`excludeChartIds={["query_heatmap"]}`, PR #300). w0 should
+      check whether the duplicate reappears in non-matrix view modes
+      or has regressed.
+    - Finding #10 (duplicate SSB options): legacy slug labeling lives
+      at `results-explorer/src/lib/displayLabels.ts:80`
+      (`"SSB (legacy slug)"`, PR #285). w0 should check whether the
+      Compare picker builds its option list from a source that
+      bypasses the labeler.
+    - Finding #7 (Distribution truncation): cohort-aware formatter
+      already applied to Distribution/Rank/Trend/Overview charts
+      (PRs #286 + #309). The remaining work is post-formatter
+      truncation budget; see
+      `results-explorer-post-completion-chart-tabs-and-disambiguation.yaml`
+      w3 notes.
