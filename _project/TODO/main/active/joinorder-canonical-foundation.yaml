@@ -140,7 +140,7 @@ work:
 
 - id: w3
   summary: "Add `surface` field to benchmark registry schema and reusable scale-factor enforcement"
-  status: pending
+  status: done
   needs: [w1]
   notes: |
     Two reusable changes in benchbox/core/benchmark_registry.py:

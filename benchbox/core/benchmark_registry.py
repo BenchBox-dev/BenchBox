@@ -537,17 +537,32 @@ def validate_scale_factor(
 ) -> None:
     """Validate scale factor against benchmark requirements.
 
-    For TPC-DS, validation is delegated to the compliance classifier in
-    ``benchbox.core.tpcds.compliance``.  All other benchmarks use the generic
-    ``min_scale`` metadata key.
+    Resolution order:
+
+    1. TPC-DS delegates to the compliance classifier in
+       ``benchbox.core.tpcds.compliance``.
+    2. If the benchmark declares ``scale_options`` (a list of canonical
+       scales), require ``scale_factor`` to be one of those values. This
+       is the primary gate — single-element lists like joinorder's
+       ``[1.0]`` reject everything else, multi-element lists like
+       tpch's ``[0.01, 0.1, 1.0, 10.0]`` reject any non-canonical SF.
+    3. Otherwise fall back to the legacy ``min_scale`` key, which only
+       enforces a lower bound.
 
     Args:
-        benchmark_id: The benchmark identifier (e.g., 'tpcds', 'tpch')
-        scale_factor: The requested scale factor
+        benchmark_id: The benchmark identifier (e.g., 'tpcds', 'tpch').
+        scale_factor: The requested scale factor.
 
     Raises:
-        ValueError: If scale factor violates benchmark constraints.
+        ScaleFactorNotSupportedError: If the benchmark declares
+            ``scale_options`` and ``scale_factor`` is not in that list.
+        ValueError: If the legacy ``min_scale`` lower bound is violated
+            (subclass-compatible — ``ScaleFactorNotSupportedError``
+            inherits from ``ValueError`` so existing handlers keep
+            working).
     """
+    from benchbox.core.errors import ScaleFactorNotSupportedError
+
     if benchmark_id == "tpcds":
         # TPC-DS uses the shared compliance classifier - not a simple min_scale check.
         from benchbox.core.tpcds.compliance import validate_tpcds_scale
@@ -559,6 +574,34 @@ def validate_scale_factor(
     if meta is None:
         return  # Unknown benchmark, skip validation
 
+    scale_options = meta.get("scale_options")
+    if scale_options:
+        # Compare as floats to avoid 1 vs 1.0 mismatches (e.g., when callers
+        # pass int literals).
+        try:
+            sf = float(scale_factor)
+        except (TypeError, ValueError) as exc:
+            raise ScaleFactorNotSupportedError(benchmark_id, scale_factor, scale_options) from exc
+        if not any(abs(sf - float(opt)) < 1e-9 for opt in scale_options):
+            raise ScaleFactorNotSupportedError(benchmark_id, scale_factor, scale_options)
+        return
+
     min_scale = meta.get("min_scale")
     if min_scale is not None and scale_factor < min_scale:
         raise ValueError(f"{benchmark_id.upper()} requires scale_factor >= {min_scale} (got {scale_factor}).")
+
+
+def get_benchmark_surface(benchmark_id: str) -> str:
+    """Return the registry-declared surface visibility for a benchmark.
+
+    "public" (default) means the benchmark is visible to result-publisher
+    discovery, MCP listings, and the result-explorer surface. "internal"
+    means the benchmark is hidden from those public surfaces but remains
+    runnable; result bundles publish locally.
+
+    Returns "public" for unregistered benchmarks (defensive default).
+    """
+    meta = get_benchmark_metadata(benchmark_id)
+    if meta is None:
+        return "public"
+    return str(meta.get("surface", "public"))
