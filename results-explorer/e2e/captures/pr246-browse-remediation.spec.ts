@@ -83,7 +83,7 @@ test.describe("@pr246-capture browse/platform remediation", () => {
           /Binder Error|Stack trace|No results found for platform|No published results yet/i,
         );
         if (route.highContrast) {
-          await page.getByRole("button", { name: "High contrast" }).click();
+          await page.getByRole("button", { name: /High contrast|Reduced color/ }).click();
         }
         await page.waitForTimeout(800);
         await page.screenshot({
