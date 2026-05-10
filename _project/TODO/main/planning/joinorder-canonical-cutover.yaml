@@ -313,8 +313,7 @@ work:
             raise NotImplementedError(
               f"DataFrame translation for query <id> not yet "
               f"available. Track-2 TODO: "
-              f"_project/TODO/main/planning/"
-              f"track2-joinorder-dataframe-coverage.yaml"
+              f"_project/TODO/main/planning/track2-joinorder-dataframe-coverage.yaml"
             )
 
         def q<id>_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -607,7 +606,7 @@ verification:
     command: "uv run -- python -m pytest tests/unit/core/joinorder/test_canonical_queries.py -q"
     expected_output: "113 passed"
   - description: "DataFrame queries fail loudly for an untranslated query (q13a_expression_impl raises NotImplementedError pointing at Track-2 seed)"
-    command: "uv run -- python -c 'from benchbox.core.joinorder.dataframe_queries import q13a_expression_impl; q13a_expression_impl(None)' 2>&1 | grep -c 'track2-joinorder-dataframe-coverage'"
+    command: "uv run -- python -c 'from benchbox.core.joinorder.dataframe_queries import q13a_expression_impl; q13a_expression_impl(None)' 2>&1 | grep -c '_project/TODO/main/planning/track2-joinorder-dataframe-coverage.yaml'"
     expected_output: ">= 1"
   - description: "DataFrame default query list exposes only implemented queries"
     command: "uv run -- python -m pytest tests/unit/core/joinorder/test_dataframe_query_capabilities.py -q"
