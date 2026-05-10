@@ -1,0 +1,118 @@
+id: results-explorer-post-completion-result-receipt-cost-copy
+title: "Clean post-completion Results Explorer result receipt cost copy"
+worktree: main
+priority: Medium
+status: Not Started
+category: Frontend UX
+
+description: |
+  The 2026-05-09 post-completion review on develop dbac33ee1 found that result
+  receipts still leak raw enum values in the Cost section, for example
+  "compute only, billing: not_applicable, region: not_applicable" on
+  /results/r/tpch-polars-sf0.1-20260502-0093bb7a.
+
+  This item addresses review finding #12 recorded in
+  _project/audits/results-explorer-post-completion-review-2026-05-09.md.
+
+deps:
+  needs: []
+
+work:
+  - id: w0
+    summary: "Revalidate cost-copy enum leakage on current develop"
+    status: pending
+    notes: |
+      Open at least one local/no-cloud result detail and one costed/cloud-like
+      result detail if available. Capture the rendered Cost section text and
+      underlying cost fields to
+      _project/verification-logs/results-explorer-post-completion-result-receipt-cost-copy/w0.log.
+
+  - id: w1
+    summary: "Map not-applicable cost fields to user-facing labels"
+    needs: [w0]
+    status: pending
+    notes: |
+      Extend the existing cost display helper so sentinel values such as
+      not_applicable, unknown, or empty strings do not render as raw enum text.
+      Local runs should render concise copy such as "local run" or
+      "not applicable" only where the field itself is useful.
+
+  - id: w2
+    summary: "Apply cost display mapping to Run Receipt"
+    needs: [w1]
+    status: pending
+    notes: |
+      Update RunReceipt/ResultDetail cost fields to use the centralized display
+      helper. Hide billing unit and region fragments when they are not
+      applicable, but keep meaningful cost model/version/source information
+      visible.
+
+  - id: w3
+    summary: "Add hygiene tests for user-facing cost strings"
+    needs: [w2]
+    status: pending
+    notes: |
+      Add tests that assert raw enum strings like not_applicable do not appear
+      in rendered cost receipt copy. Include a positive case where real billing
+      or region data still renders when present.
+
+must_preserve:
+  - "Cost model version/source remains visible when recorded."
+  - "Local normalized-cost status remains distinguishable from missing cost data."
+  - "Result receipt field grouping remains unchanged."
+
+approach: |
+  Reuse and extend results-explorer/src/lib/costDisplay.ts rather than adding
+  display conditionals directly inside RunReceipt. Keep the mapping small and
+  explicit so raw values remain available in data but not in user-facing copy.
+
+anti_patterns:
+  - "DO NOT globally strip underscores from every enum value."
+  - "DO NOT hide the whole Cost section when only billing or region is not applicable."
+  - "DO NOT change cost data generation to solve a presentation-only copy issue."
+
+verification:
+  - description: "Cost display and receipt tests pass"
+    command: "cd results-explorer && npm test -- --run src/lib/__tests__/costDisplay.test.ts src/components/__tests__/RunReceipt.test.tsx src/pages/__tests__/ResultDetail.test.tsx src/__tests__/userFacingStringHygiene.test.ts"
+    expected_output: "all targeted tests pass"
+  - description: "Frontend typecheck passes"
+    command: "cd results-explorer && npm run typecheck"
+    expected_output: "exit 0"
+  - description: "Frontend build passes"
+    command: "cd results-explorer && npm run build"
+    expected_output: "exit 0"
+  - description: "Manual receipt cost-copy check passes"
+    command: "echo 'Manual/browser: result receipt Cost section does not render not_applicable raw enum values'"
+    expected_output: "manual evidence captured in PR notes or verification log"
+
+scope_limit:
+  only_modify:
+    - "results-explorer/src/lib/costDisplay.ts"
+    - "results-explorer/src/lib/__tests__/costDisplay.test.ts"
+    - "results-explorer/src/components/RunReceipt.tsx"
+    - "results-explorer/src/components/__tests__/RunReceipt.test.tsx"
+    - "results-explorer/src/pages/ResultDetail.tsx"
+    - "results-explorer/src/pages/__tests__/ResultDetail.test.tsx"
+    - "results-explorer/src/__tests__/userFacingStringHygiene.test.ts"
+    - "_project/verification-logs/results-explorer-post-completion-result-receipt-cost-copy/"
+  do_not_modify:
+    - "benchbox/"
+    - "benchmark_runs/"
+
+metadata:
+  tags:
+    - results-explorer
+    - result-detail
+    - cost
+    - copy
+  estimated_effort: "Small (0.5-1 day)"
+  created_date: "2026-05-09"
+  last_updated: "2026-05-09T20:51:29-0400"
+
+impact:
+  business_value: |
+    Keeps receipts polished and understandable for public result inspection.
+  user_impact: |
+    Users see human-readable cost scope instead of internal enum names.
+  technical_debt: |
+    Moves cost-string normalization into one tested helper.

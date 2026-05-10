@@ -1,0 +1,158 @@
+id: results-explorer-post-completion-compare-selection-recovery
+title: "Repair post-completion Results Explorer compare selection recovery"
+worktree: main
+priority: Critical
+status: Not Started
+category: Frontend UX
+
+description: |
+  The 2026-05-09 post-completion Results Explorer review on develop
+  dbac33ee1 found that compare entrypoints are still not reliably usable from
+  every page. Benchmark detail checkboxes render at 0x0 and cannot be clicked;
+  Compare and Query Workbench both hide compatible second choices far below
+  the current viewport after the first selection; and Compare picker checkbox
+  accessible names are still under-disambiguated.
+
+  This item addresses review findings #1, #2, #3, and #11 recorded in
+  _project/audits/results-explorer-post-completion-review-2026-05-09.md.
+
+deps:
+  needs: []
+
+work:
+  - id: w0
+    summary: "Revalidate compare-selection defects on the current develop tip"
+    status: pending
+    notes: |
+      Restart the Results Explorer dev server and drive these routes in a
+      desktop browser: /results/tpch/, /results/compare, and /results/query.
+      Capture checkbox bounding boxes, selected-row state, disabled-row counts,
+      compatible-row positions after the first selection, and button/link
+      state to _project/verification-logs/results-explorer-post-completion-compare-selection-recovery/w0.log.
+      The log must prove whether the 0x0 benchmark checkbox bug and hidden
+      compatible-candidate trap still reproduce before implementation starts.
+
+  - id: w1
+    summary: "Make benchmark-detail compare checkboxes visible and clickable"
+    needs: [w0]
+    status: pending
+    notes: |
+      Fix the BenchmarkIndex matrix/list compare controls so the checkbox
+      column renders visible 16px controls, participates in sticky-left
+      offset calculations, and can be clicked by keyboard, pointer, and test
+      locators. After selecting two compatible TPC-H rows, the page must show
+      an enabled compare action that links to /results/compare?ids=... with
+      the selected result ids. Do not rely on hidden zero-size inputs.
+
+  - id: w2
+    summary: "Move compatible candidates into view in the Compare picker"
+    needs: [w0]
+    status: pending
+    notes: |
+      Once the first Compare picker row is selected, sort or filter compatible
+      rows to the top of the candidate table. Add a visible "Compatible only"
+      state that defaults on while the cohort is locked, keeps the selected
+      row visible, and can be cleared with the existing selection reset. The
+      user must not need to scroll thousands of pixels to find the second
+      compatible run.
+
+  - id: w3
+    summary: "Move compatible candidates into view in Query Workbench"
+    needs: [w0]
+    status: pending
+    notes: |
+      Apply the same cohort-locked compatible-row treatment to Query
+      Workbench. After the first row selection, compatible rows must remain
+      immediately visible or a clearly labelled "Show compatible rows" action
+      must filter the table. Keep the existing disabled-checkbox explanation
+      for incompatible rows, but do not leave every visible row disabled while
+      Compare still says "need 2+".
+
+  - id: w4
+    summary: "Disambiguate compare-selection accessible names everywhere"
+    needs: [w1, w2, w3]
+    status: pending
+    notes: |
+      Replace repeated labels such as "Select DuckDB for comparison" with
+      labels that include platform, benchmark, scale, run date, and a short
+      result id. Apply this to Compare picker, Benchmark detail, Query
+      Workbench, and Platform detail where applicable. Preserve compact visual
+      labels; this work is specifically for assistive tech and testability.
+
+  - id: w5
+    summary: "Add end-to-end regression coverage for compare selection starts"
+    needs: [w1, w2, w3, w4]
+    status: pending
+    notes: |
+      Add browser or Playwright coverage that starts compare from TPC-H
+      Benchmark detail, Compare picker, Query Workbench, and Polars Platform
+      detail. Each case must select two compatible rows and assert that a
+      comparison page opens without requiring manual URL edits or off-screen
+      hunting for compatible rows.
+
+must_preserve:
+  - "Existing /results/compare?ids=... deep links continue to render comparisons."
+  - "Cohort compatibility remains benchmark + scale + phase + primary metric."
+  - "Platform detail compare selection that already generates a URL remains functional."
+  - "Static export behavior remains client-only; no server endpoint is introduced."
+
+approach: |
+  Start with shared compare-selection state and row ordering helpers before
+  touching individual pages. Fix BenchmarkIndex visibility first because it is
+  the only remaining hard blocker. Then reuse the same compatible-row ordering
+  behavior in Compare and Query so the recovery affordance is consistent.
+
+anti_patterns:
+  - "DO NOT use zero-size inputs with no visible proxy control."
+  - "DO NOT strand compatible rows below hundreds of incompatible disabled rows."
+  - "DO NOT relax cohort compatibility just to make two visible rows selectable."
+  - "DO NOT add URL-editing instructions as a fallback."
+
+verification:
+  - description: "Targeted compare-selection tests pass"
+    command: "cd results-explorer && npm test -- --run src/pages/__tests__/BenchmarkIndex.test.tsx src/pages/__tests__/Compare.test.tsx src/pages/__tests__/Query.test.tsx src/pages/__tests__/PlatformIndex.test.tsx"
+    expected_output: "all targeted tests pass"
+  - description: "Frontend typecheck passes"
+    command: "cd results-explorer && npm run typecheck"
+    expected_output: "exit 0"
+  - description: "Frontend build passes"
+    command: "cd results-explorer && npm run build"
+    expected_output: "exit 0"
+  - description: "Browser compare-selection smoke passes"
+    command: "echo 'Manual/browser: select two compatible rows from /results/tpch/, /results/compare, /results/query, and /results/p/polars/; each opens a valid compare page'"
+    expected_output: "manual evidence captured in PR notes or verification log"
+
+scope_limit:
+  only_modify:
+    - "results-explorer/src/pages/BenchmarkIndex.tsx"
+    - "results-explorer/src/pages/Compare.tsx"
+    - "results-explorer/src/pages/Query.tsx"
+    - "results-explorer/src/pages/PlatformIndex.tsx"
+    - "results-explorer/src/lib/resultLinks.ts"
+    - "results-explorer/src/lib/compareSummary.ts"
+    - "results-explorer/src/pages/__tests__/"
+    - "results-explorer/e2e/"
+    - "results-explorer/scripts/"
+    - "_project/verification-logs/results-explorer-post-completion-compare-selection-recovery/"
+  do_not_modify:
+    - "benchmark_runs/"
+    - "benchbox/"
+
+metadata:
+  tags:
+    - results-explorer
+    - compare
+    - p0
+    - usability-review
+  estimated_effort: "Large (2-4 days)"
+  created_date: "2026-05-09"
+  last_updated: "2026-05-09T20:51:29-0400"
+
+impact:
+  business_value: |
+    Restores the core comparison workflow promised by Results Explorer.
+  user_impact: |
+    Database engineers can start a comparison from the pages where they find
+    runs, without invisible controls or off-screen compatible candidates.
+  technical_debt: |
+    Consolidates compare selection behavior and makes it testable by result id.

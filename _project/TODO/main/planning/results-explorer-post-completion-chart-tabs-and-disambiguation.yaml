@@ -1,0 +1,141 @@
+id: results-explorer-post-completion-chart-tabs-and-disambiguation
+title: "Fix post-completion Results Explorer chart tabs and run-label disambiguation"
+worktree: main
+priority: High
+status: Not Started
+category: Frontend UX
+
+description: |
+  The 2026-05-09 post-completion review on develop dbac33ee1 found remaining
+  chart-panel defects: the TPC-H Charts Rank tab does not activate from the
+  default Overview state, the Per-query Heatmap again duplicates the primary
+  benchmark matrix, and Distribution box-plot labels still truncate repeated
+  run identities in a way that leaves multiple indistinguishable DataFusion,
+  Polars, PySpark, Spark, and SQLite labels.
+
+  This item addresses review findings #5, #6, and #7 recorded in
+  _project/audits/results-explorer-post-completion-review-2026-05-09.md.
+
+deps:
+  needs:
+    - results-explorer-post-completion-compare-summary-semantics
+
+work:
+  - id: w0
+    summary: "Revalidate chart tab activation and duplicate chart scope"
+    status: pending
+    notes: |
+      On current develop, open /results/tpch/, scroll Charts into view, and
+      click Overview, Per-query, Distribution, Trend, and Rank from a fresh
+      page load. Capture selected tab state, visible panel text, table/svg
+      labels, and whether the Per-query panel duplicates the benchmark matrix
+      to _project/verification-logs/results-explorer-post-completion-chart-tabs-and-disambiguation/w0.log.
+
+  - id: w1
+    summary: "Make the Rank chart tab activate from every chart state"
+    needs: [w0]
+    status: pending
+    notes: |
+      Fix ChartPanel tab selection so clicking Rank from default Overview,
+      Distribution, Trend, and Per-query states sets Rank aria-selected=true
+      and renders the Rank table. Add a regression test that clicks Rank first
+      after initial render and asserts that Overview content is gone.
+
+  - id: w2
+    summary: "Remove or rescope the benchmark-detail duplicate Per-query heatmap"
+    needs: [w0]
+    status: pending
+    notes: |
+      On benchmark detail pages, do not render a Charts > Per-query > Heatmap
+      panel that repeats the page-level benchmark matrix directly above it.
+      Either exclude query_heatmap while the primary matrix is visible or
+      replace it with a genuinely different per-query chart. Preserve the
+      histogram if it is the only non-duplicate per-query chart.
+
+  - id: w3
+    summary: "Disambiguate chart run labels before truncation"
+    needs: [w0]
+    status: pending
+    notes: |
+      Update Distribution, Rank, Trend, and Overview chart labels so repeated
+      platform/version names include a visible differentiator before
+      truncation, such as date plus short result id. Example target:
+      "DataFusion 05-06 3b8bbc42" instead of four indistinguishable
+      "DataFusion v53.0.0 ..." labels. Keep full RunIdentity in title or
+      tooltip text.
+
+  - id: w4
+    summary: "Add chart-panel browser and unit coverage"
+    needs: [w1, w2, w3]
+    status: pending
+    notes: |
+      Extend ChartPanel, RankTable, DistributionBox, and BenchmarkIndex tests
+      to cover tab activation, per-query heatmap exclusion, and duplicate-run
+      label disambiguation. Add or update a browser fixture that clicks every
+      chart tab and records the active panel.
+
+must_preserve:
+  - "All chart tabs that contain distinct data remain reachable."
+  - "Chart labels stay compact enough to fit at desktop width."
+  - "Full run identity remains available through title/tooltip or accessible label."
+
+approach: |
+  Fix the tab-state bug before changing labels so test failures are easier to
+  localize. Reuse the existing RunIdentity helpers rather than rebuilding label
+  strings in every chart component. Treat the duplicate Per-query heatmap as a
+  scope problem, not a styling problem.
+
+anti_patterns:
+  - "DO NOT make Rank accessible only after another tab is clicked first."
+  - "DO NOT truncate all differentiators away from repeated run labels."
+  - "DO NOT keep two identical matrices on the same benchmark detail page."
+
+verification:
+  - description: "Chart component tests pass"
+    command: "cd results-explorer && npm test -- --run src/components/__tests__/ChartPanel.test.tsx src/components/__tests__/RankTable.test.tsx src/components/__tests__/DistributionBox.test.tsx src/pages/__tests__/BenchmarkIndex.test.tsx"
+    expected_output: "all targeted tests pass"
+  - description: "Frontend typecheck passes"
+    command: "cd results-explorer && npm run typecheck"
+    expected_output: "exit 0"
+  - description: "Frontend build passes"
+    command: "cd results-explorer && npm run build"
+    expected_output: "exit 0"
+  - description: "Manual chart browser check passes"
+    command: "echo 'Manual/browser: on /results/tpch/, every chart tab activates; Per-query does not duplicate the primary matrix; duplicate runs have visible disambiguators'"
+    expected_output: "manual evidence captured in PR notes or verification log"
+
+scope_limit:
+  only_modify:
+    - "results-explorer/src/components/ChartPanel.tsx"
+    - "results-explorer/src/components/RankTable.tsx"
+    - "results-explorer/src/components/DistributionBox.tsx"
+    - "results-explorer/src/components/SparklineTable.tsx"
+    - "results-explorer/src/components/TimeSeries.tsx"
+    - "results-explorer/src/lib/runIdentity.ts"
+    - "results-explorer/src/lib/chartRegistry.ts"
+    - "results-explorer/src/pages/BenchmarkIndex.tsx"
+    - "results-explorer/src/components/__tests__/"
+    - "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
+    - "results-explorer/e2e/"
+    - "_project/verification-logs/results-explorer-post-completion-chart-tabs-and-disambiguation/"
+  do_not_modify:
+    - "benchbox/"
+    - "benchmark_runs/"
+
+metadata:
+  tags:
+    - results-explorer
+    - charts
+    - run-identity
+  estimated_effort: "Medium-High (1-3 days)"
+  created_date: "2026-05-09"
+  last_updated: "2026-05-09T20:51:29-0400"
+
+impact:
+  business_value: |
+    Keeps chart panels credible and usable for comparing repeated platform runs.
+  user_impact: |
+    Users can activate every chart tab and tell repeated runs apart without
+    reverse-engineering hidden ids.
+  technical_debt: |
+    Forces chart components to share a tested run-label contract.

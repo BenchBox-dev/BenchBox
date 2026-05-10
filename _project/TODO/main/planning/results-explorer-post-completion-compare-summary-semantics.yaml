@@ -1,0 +1,152 @@
+id: results-explorer-post-completion-compare-summary-semantics
+title: "Correct post-completion Results Explorer compare summary semantics"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Frontend UX
+
+description: |
+  The 2026-05-09 post-completion review on develop dbac33ee1 found that Compare
+  summaries still make ambiguous or misleading claims. Same-platform comparisons
+  say "Polars is 1.00x faster" and "WINNER Polars" when both selected runs are
+  Polars v1.40.0 from different dates; Query Wins mixes comparable and missing
+  denominators; the empty Compare picker has duplicate SSB benchmark options;
+  and comparability copy says only benchmark and scale even though phase is also
+  required.
+
+  This item addresses review findings #8, #9, #10, and #13 recorded in
+  _project/audits/results-explorer-post-completion-review-2026-05-09.md. It
+  depends on compare-selection recovery so the Compare route is not edited in
+  two conflicting passes.
+
+deps:
+  needs:
+    - results-explorer-post-completion-compare-selection-recovery
+
+work:
+  - id: w0
+    summary: "Revalidate compare-summary semantic defects on current develop"
+    status: pending
+    notes: |
+      Open /results/compare with a same-platform two-id URL and /results/compare
+      with no ids. Capture decision summary text, winner card text, Query Wins
+      denominator copy, hidden/missing query counts, comparability guardrail
+      text, and benchmark select options to
+      _project/verification-logs/results-explorer-post-completion-compare-summary-semantics/w0.log.
+
+  - id: w1
+    summary: "Dedupe and label Compare benchmark filter options"
+    needs: [w0]
+    status: pending
+    notes: |
+      Canonicalize legacy benchmark aliases before rendering the Compare picker
+      benchmark select. If a legacy slug must remain visible, label it
+      explicitly as "SSB (legacy slug)" and ensure it filters to a distinct
+      value. Otherwise render exactly one SSB option.
+
+  - id: w2
+    summary: "Use run identity and tie-aware language in same-platform summaries"
+    needs: [w0]
+    status: pending
+    notes: |
+      Update CompareSummary so same-platform comparisons name the winning run
+      by compact run identity, not just platform. If geomean speedup rounds to
+      1.00x or falls inside the existing tie threshold, render tie/no-material
+      winner copy instead of "is 1.00x faster".
+
+  - id: w3
+    summary: "Split comparable and missing-query denominators"
+    needs: [w0]
+    status: pending
+    notes: |
+      Rewrite Query Wins and chart count copy so comparable-query counts and
+      excluded/missing-query counts are separate. Example target:
+      "4 fastest of 80 comparable; 69 queries excluded for missing data." Do
+      not add incomparable queries into the denominator used for win rates.
+
+  - id: w4
+    summary: "Make comparability guardrail copy match the actual cohort lock"
+    needs: [w0]
+    status: pending
+    notes: |
+      Update Compare guardrail text from "same benchmark and scale" to "same
+      benchmark, scale, and phase" wherever that is the actual winner-claim
+      requirement. Include primary metric where relevant if the code also
+      enforces it.
+
+  - id: w5
+    summary: "Add compare-summary regression tests"
+    needs: [w1, w2, w3, w4]
+    status: pending
+    notes: |
+      Add targeted tests for duplicate benchmark options, same-platform
+      same-speed/tie copy, query win denominators, and guardrail text. Include
+      at least one same-platform two-run fixture where platform names alone
+      would be ambiguous.
+
+must_preserve:
+  - "Existing valid Compare deep links keep working."
+  - "Speedup charts still compute from the selected baseline."
+  - "Comparable-only default behavior introduced by prior fixes remains intact."
+
+approach: |
+  Treat this as copy driven by computed state. Fix the underlying summary
+  model first, then update rendered copy. Reuse RunIdentity for same-platform
+  labels and reuse the same comparable/missing query counts that feed the
+  normalized speedup chart.
+
+anti_patterns:
+  - "DO NOT declare a winner when the displayed speedup is exactly 1.00x."
+  - "DO NOT use platform name alone when multiple selected runs share it."
+  - "DO NOT mix missing-query counts into comparable-query win denominators."
+
+verification:
+  - description: "Compare summary tests pass"
+    command: "cd results-explorer && npm test -- --run src/lib/__tests__/compareSummary.test.ts src/components/__tests__/CompareSummary.test.tsx src/components/__tests__/NormalizedSpeedupChart.test.tsx src/pages/__tests__/Compare.test.tsx"
+    expected_output: "all targeted tests pass"
+  - description: "Frontend typecheck passes"
+    command: "cd results-explorer && npm run typecheck"
+    expected_output: "exit 0"
+  - description: "Frontend build passes"
+    command: "cd results-explorer && npm run build"
+    expected_output: "exit 0"
+  - description: "Manual same-platform compare copy check passes"
+    command: "echo 'Manual/browser: same-platform compare names runs, handles 1.00x as tie/no material winner, and separates comparable vs missing counts'"
+    expected_output: "manual evidence captured in PR notes or verification log"
+
+scope_limit:
+  only_modify:
+    - "results-explorer/src/pages/Compare.tsx"
+    - "results-explorer/src/components/CompareSummary.tsx"
+    - "results-explorer/src/components/NormalizedSpeedupChart.tsx"
+    - "results-explorer/src/lib/compareSummary.ts"
+    - "results-explorer/src/lib/runIdentity.ts"
+    - "results-explorer/src/lib/displayLabels.ts"
+    - "results-explorer/src/lib/__tests__/compareSummary.test.ts"
+    - "results-explorer/src/components/__tests__/CompareSummary.test.tsx"
+    - "results-explorer/src/components/__tests__/NormalizedSpeedupChart.test.tsx"
+    - "results-explorer/src/pages/__tests__/Compare.test.tsx"
+    - "_project/verification-logs/results-explorer-post-completion-compare-summary-semantics/"
+  do_not_modify:
+    - "benchbox/"
+    - "benchmark_runs/"
+
+metadata:
+  tags:
+    - results-explorer
+    - compare
+    - copy
+    - semantics
+  estimated_effort: "Medium (1-2 days)"
+  created_date: "2026-05-09"
+  last_updated: "2026-05-09T20:51:29-0400"
+
+impact:
+  business_value: |
+    Prevents Compare from making decision-summary claims that overstate or
+    misidentify winners.
+  user_impact: |
+    Users can interpret same-platform comparisons and query-win counts without
+    ambiguity.
+  technical_debt: |
+    Centralizes summary wording around explicit computed states.
