@@ -239,6 +239,40 @@ test.describe("@followup-usability release-gate route walk", () => {
     await maybeCapture(page, "compare-builder-empty-state");
   });
 
+  test("Compare picker hides incompatible candidates after first selection by default", async ({ page }) => {
+    await page.goto("/results/compare/");
+    await waitForShell(page);
+    await waitForDataLoaded(page, /Compare/);
+
+    const builderCheckboxes = page.locator('[data-testid^="compare-builder-row-"] input[type="checkbox"]');
+    const initialCount = await builderCheckboxes.count();
+    if (initialCount < 2) {
+      // Fixture cohort cannot exercise this contract; vitest covers the helper.
+      return;
+    }
+    await builderCheckboxes.first().click();
+
+    const toggle = page.getByTestId("compare-builder-compatible-only");
+    await expect(toggle).toBeVisible();
+    await expect(toggle).toBeChecked();
+    const afterCount = await builderCheckboxes.count();
+    expect(afterCount).toBeLessThanOrEqual(initialCount);
+  });
+
+  test("Query compare tray defaults compatible-only after first selection", async ({ page }) => {
+    await page.goto("/results/query");
+    await waitForShell(page);
+    await waitForDataLoaded(page, /matching result bundle/);
+
+    const checkboxes = page.locator('input[data-testid^="query-compare-checkbox-"]');
+    if ((await checkboxes.count()) < 2) return;
+    await checkboxes.first().click();
+
+    const toggle = page.getByTestId("query-compare-compatible-only");
+    await expect(toggle).toBeVisible();
+    await expect(toggle).toBeChecked();
+  });
+
   test("Compare normalized-speedup chart uses builder-launched IDs and asserts comparable-only control when partials exist", async ({ page }) => {
     await launchFirstBuilderComparison(page);
 

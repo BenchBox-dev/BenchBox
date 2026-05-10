@@ -10,6 +10,7 @@ import {
   compareCohortLockReason,
   compareCohortSignatureForRow,
   compareCohortSummary,
+  compareSelectionLabel,
 } from "@/lib/compareCohort";
 import { buildCompareUrl, compareIdForRow, displayCompareId, MAX_COMPARE_SELECTIONS } from "@/lib/resultLinks";
 import { humanizeBenchmark, fmtScore, fmtGeomean, errMsg } from "@/utils";
@@ -848,7 +849,14 @@ function PlatformRow({ entry, checked, onToggle, disabledReason }: PlatformRowPr
           disabled={Boolean(disabledReason)}
           title={disabledReason}
           class="h-4 w-4 rounded border-[var(--bb-data-border-strong)] disabled:cursor-not-allowed disabled:opacity-50"
-          aria-label={`Select ${entry.result_id} for comparison`}
+          aria-label={compareSelectionLabel({
+            platform: entry.platform,
+            benchmark: entry.benchmark,
+            scaleFactor: entry.scale_factor,
+            phase: entry.phase ?? null,
+            runDate: entry.run_date,
+            resultId: entry.result_id,
+          })}
           data-testid={`platform-compare-checkbox-${entry.result_id}`}
         />
       </td>

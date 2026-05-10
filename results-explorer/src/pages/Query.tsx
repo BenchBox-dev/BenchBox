@@ -20,7 +20,9 @@ import { useFacetField } from "@/lib/facetModel";
 import { toDateWindowFacet, toggleFacetValue } from "@/lib/facetMatching";
 import {
   compareCohortLockReason,
+  compareCohortPartition,
   compareCohortSignatureForRow,
+  compareSelectionLabel,
 } from "@/lib/compareCohort";
 import { buildCompareUrl, compareIdForRow, MAX_COMPARE_SELECTIONS } from "@/lib/resultLinks";
 import { STARTER_QUERY_CATEGORIES, starterQueriesByCategory, type StarterQueryCategory } from "@/lib/starterQueries";
@@ -114,6 +116,9 @@ export function Query(_: RoutableProps) {
       return next;
     });
   const clearCompareSelection = () => setCompareSelectedIds(new Set());
+  // Default compatible-only on once the cohort signature locks; users can
+  // disable to inspect (still-disabled) incompatible rows. See finding #3.
+  const [compareCompatibleOnly, setCompareCompatibleOnly] = useState(true);
   const rowLimitMode = rowLimitRaw === "all" ? "all" : "default";
   const rowLimit = rowLimitMode === "all" ? UNLIMITED_ROW_LIMIT : DEFAULT_ROW_LIMIT;
 
@@ -175,7 +180,27 @@ export function Query(_: RoutableProps) {
         : buildSelectQuery(activeFilters, queryColumns, sort, rowLimit),
     [activeFilters, queryColumns, rowLimit, sort, visibleColumns.length],
   );
-  const visibleRows = rows.slice(0, visibleResultLimit);
+  // Cohort lock signature for compare-selection. Computed at the top of the
+  // component so visibleRows can re-partition compatible rows above
+  // incompatibles after the first selection (finding #3).
+  const compareCohortSignature = useMemo(() => {
+    const firstId = [...compareSelectedIds][0];
+    if (firstId === undefined) return null;
+    const firstRow = rows.find((row) => String(row.result_id) === firstId);
+    return firstRow ? compareCohortSignatureForRow(firstRow) : null;
+  }, [rows, compareSelectedIds]);
+  const compareRowPartition = useMemo(
+    () => compareCohortPartition(rows, compareCohortSignature),
+    [rows, compareCohortSignature],
+  );
+  const compareIncompatibleHiddenCount =
+    compareCohortSignature !== null && compareCompatibleOnly ? compareRowPartition.incompatible.length : 0;
+  const reorderedRows = useMemo(() => {
+    if (compareCohortSignature === null) return rows;
+    if (compareCompatibleOnly) return compareRowPartition.compatible;
+    return [...compareRowPartition.compatible, ...compareRowPartition.incompatible];
+  }, [compareCohortSignature, compareCompatibleOnly, compareRowPartition, rows]);
+  const visibleRows = reorderedRows.slice(0, visibleResultLimit);
   const visibleSqlRows = sqlRows.slice(0, visibleSqlLimit);
 
   useEffect(() => {
@@ -686,7 +711,11 @@ export function Query(_: RoutableProps) {
                           {compareSelectedIds.size === 0 ? (
                             "Select two or more rows to compare. The first pick locks the cohort."
                           ) : compareSelectedIds.size === 1 ? (
-                            "1 result selected — pick a compatible second row to enable Compare."
+                            `1 result selected — pick a compatible second row to enable Compare.${
+                              compareIncompatibleHiddenCount > 0
+                                ? ` ${compareIncompatibleHiddenCount} incompatible row${compareIncompatibleHiddenCount === 1 ? "" : "s"} hidden.`
+                                : ""
+                            }`
                           ) : compareSelectedIds.size >= MAX_COMPARE_SELECTIONS ? (
                             `${compareSelectedIds.size} results selected (maximum).`
                           ) : (
@@ -694,6 +723,23 @@ export function Query(_: RoutableProps) {
                           )}
                         </span>
                         <span class="flex items-center gap-2">
+                          {compareCohortSignature !== null && (
+                            <label
+                              class="flex items-center gap-1 text-xs"
+                              data-testid="query-compare-compatible-only-label"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={compareCompatibleOnly}
+                                onChange={(e) =>
+                                  setCompareCompatibleOnly((e.target as HTMLInputElement).checked)
+                                }
+                                class="h-4 w-4 rounded border-[var(--bb-data-border-strong)]"
+                                data-testid="query-compare-compatible-only"
+                              />
+                              Compatible only
+                            </label>
+                          )}
                           {compareSelectedIds.size > 0 && (
                             <button
                               type="button"
@@ -781,7 +827,14 @@ export function Query(_: RoutableProps) {
                                       title={reason}
                                       onChange={() => toggleCompareSelection(id)}
                                       class="h-4 w-4 rounded border-[var(--bb-data-border-strong)] disabled:cursor-not-allowed disabled:opacity-50"
-                                      aria-label={`Select ${id} for comparison`}
+                                      aria-label={compareSelectionLabel({
+                                        platform: row.platform as string | undefined,
+                                        benchmark: row.benchmark as string | undefined,
+                                        scaleFactor: row.scale_factor as string | number | undefined,
+                                        phase: (row.phase ?? row.test_type) as string | undefined,
+                                        runDate: row.run_date as string | undefined,
+                                        resultId: id,
+                                      })}
                                       data-testid={`query-compare-checkbox-${id}`}
                                     />
                                   </td>

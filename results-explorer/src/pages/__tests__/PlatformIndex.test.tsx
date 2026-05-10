@@ -478,8 +478,8 @@ describe("PlatformIndex - sortable table headers", () => {
     render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
 
-    fireEvent.click(screen.getByLabelText("Select r-tpch-fast for comparison"));
-    fireEvent.click(screen.getByLabelText("Select r-ssb-mid for comparison"));
+    fireEvent.click(screen.getByTestId("platform-compare-checkbox-r-tpch-fast"));
+    fireEvent.click(screen.getByTestId("platform-compare-checkbox-r-ssb-mid"));
 
     const tpchRow = screen.getByTestId("compare-tray-row-r-tpch-fast");
     const ssbRow = screen.getByTestId("compare-tray-row-r-ssb-mid");

@@ -25,6 +25,7 @@ import type { BenchmarkSummary, PlatformRow, SortDirection, SortState } from "@/
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 import { fmtMs as formatDurationMs, fmtScore, fmtGeomean, complianceLabel } from "@/utils";
 import { queryDisplayLabel, sortQueryIds } from "@/lib/queryLabels";
+import { compareSelectionLabel } from "@/lib/compareCohort";
 
 // ---------------------------------------------------------------------------
 // Color math - sourced from chartMath.ts (single source of truth for parity)
@@ -461,7 +462,14 @@ export function QueryHeatmap({
                     type="checkbox"
                     checked={isSelected}
                     onChange={() => toggleRow(row)}
-                    aria-label={`Select ${row.platform} for comparison`}
+                    aria-label={compareSelectionLabel({
+                      platform: row.platform,
+                      benchmark: summary.benchmark,
+                      scaleFactor: summary.scale_factor,
+                      phase: summary.phase,
+                      runDate: row.run_date,
+                      resultId: row.result_id,
+                    })}
                     class="mt-1 h-4 w-4 shrink-0 rounded border-[var(--bb-data-border-strong)]"
                   />
                 )}
@@ -601,7 +609,14 @@ export function QueryHeatmap({
                         type="checkbox"
                         checked={isSelected}
                         onChange={() => toggleRow(row)}
-                        aria-label={`Select ${row.platform} for comparison`}
+                        aria-label={compareSelectionLabel({
+                      platform: row.platform,
+                      benchmark: summary.benchmark,
+                      scaleFactor: summary.scale_factor,
+                      phase: summary.phase,
+                      runDate: row.run_date,
+                      resultId: row.result_id,
+                    })}
                         class="h-4 w-4 rounded border-[var(--bb-data-border-strong)]"
                       />
                     </td>

@@ -270,10 +270,71 @@ describe("Query", () => {
     await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
 
     fireEvent.click(screen.getByTestId("query-compare-checkbox-r1"));
+    // Compatible-only defaults on after the cohort lock; toggle it off to
+    // surface the still-disabled incompatible row for assertion.
+    fireEvent.click(screen.getByTestId("query-compare-compatible-only"));
     const incompatible = screen.getByTestId("query-compare-checkbox-r3") as HTMLInputElement;
     expect(incompatible.disabled).toBe(true);
     expect(incompatible.title).toContain("phase");
     expect(incompatible.title).toContain("primary metric");
+  });
+
+  it("query workbench hides incompatible rows by default and surfaces the hidden count", async () => {
+    resultRows = [
+      ...BASE_ROWS,
+      {
+        ...BASE_ROWS[0]!,
+        result_id: "r3",
+        platform: "DuckDB throughput",
+        run_date: "2026-04-15T12:00:00Z",
+        test_type: "throughput",
+        primary_metric: "power_score",
+      },
+    ];
+
+    render(<Query />);
+    await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
+
+    // Before any selection, no toggle and the incompatible row is visible.
+    expect(screen.queryByTestId("query-compare-compatible-only")).toBeNull();
+    expect(screen.getByTestId("query-compare-checkbox-r3")).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("query-compare-checkbox-r1"));
+    await waitFor(() =>
+      expect((screen.getByTestId("query-compare-compatible-only") as HTMLInputElement).checked).toBe(true),
+    );
+    expect(screen.queryByTestId("query-compare-checkbox-r3")).toBeNull();
+    expect(screen.getByTestId("query-compare-tray").textContent).toContain("1 incompatible row hidden");
+  });
+
+  it("query workbench checkbox aria-labels disambiguate same-platform rows", async () => {
+    resultRows = [
+      {
+        ...BASE_ROWS[0]!,
+        result_id: "tpch-duckdb-sf0.1-20260502-aaaa1111",
+        platform: "DuckDB",
+        run_date: "2026-05-02T18:11:00Z",
+      },
+      {
+        ...BASE_ROWS[0]!,
+        result_id: "tpch-duckdb-sf0.1-20260508-bbbb2222",
+        platform: "DuckDB",
+        run_date: "2026-05-08T18:11:00Z",
+      },
+    ];
+
+    render(<Query />);
+    await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
+
+    const labelA = screen
+      .getByTestId("query-compare-checkbox-tpch-duckdb-sf0.1-20260502-aaaa1111")
+      .getAttribute("aria-label") ?? "";
+    const labelB = screen
+      .getByTestId("query-compare-checkbox-tpch-duckdb-sf0.1-20260508-bbbb2222")
+      .getAttribute("aria-label") ?? "";
+    expect(labelA).not.toBe(labelB);
+    expect(labelA).toContain("aaaa1111");
+    expect(labelB).toContain("bbbb2222");
   });
 
   it("caps Query compare selections at four runs", async () => {
@@ -442,7 +503,7 @@ describe("Query", () => {
     await waitFor(() => expect(screen.getAllByText("Platform").length).toBeGreaterThan(0));
     const resultsTable = screen.getAllByRole("table")[0]!;
 
-    fireEvent.click(screen.getByLabelText(/DuckDB/i));
+    fireEvent.click(screen.getByLabelText(/^Platform: DuckDB/));
     await waitFor(() => {
       const selectCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) => isDefaultResultSelect(sql));
       expect(selectCalls.at(-1)?.[0]).toContain("platform IN (?)");

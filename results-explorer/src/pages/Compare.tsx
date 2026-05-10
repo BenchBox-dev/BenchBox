@@ -12,6 +12,12 @@ import {
 } from "@/lib/duckdbQueries";
 import { humanizeBenchmark, errMsg, fmtGeomean } from "@/utils";
 import { buildCompareUrl, MAX_COMPARE_SELECTIONS } from "@/lib/resultLinks";
+import {
+  compareCohortPartition,
+  compareCohortSignatureForRow,
+  compareSelectionLabel,
+  type CompareCohortSignature,
+} from "@/lib/compareCohort";
 import { formatRunIdentitiesForCohort, type RunIdentitySource } from "@/lib/runIdentity";
 import { CompareSummarySkeleton } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
@@ -551,6 +557,17 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
     };
   }, [candidates, selectedIds]);
 
+  const cohortSignature = useMemo<CompareCohortSignature | null>(() => {
+    if (cohortLock === null) return null;
+    return compareCohortSignatureForRow({
+      benchmark: cohortLock.benchmark,
+      scale_factor: cohortLock.scale_factor,
+      test_type: cohortLock.test_type,
+    });
+  }, [cohortLock]);
+
+  const [compatibleOnly, setCompatibleOnly] = useState(true);
+
   const benchmarkOptions = useMemo(() => {
     if (candidates === null) return [];
     return Array.from(new Set(candidates.map((row) => row.benchmark))).sort();
@@ -572,7 +589,7 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
     return Array.from(new Set(filtered.map((row) => row.test_type ?? ""))).filter(Boolean).sort();
   }, [candidates, benchmarkFilter, scaleFilter]);
 
-  const filteredRows = useMemo(() => {
+  const userFilteredRows = useMemo(() => {
     if (candidates === null) return [];
     return candidates.filter((row) => {
       if (benchmarkFilter && row.benchmark !== benchmarkFilter) return false;
@@ -581,6 +598,22 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
       return true;
     });
   }, [candidates, benchmarkFilter, scaleFilter, phaseFilter]);
+
+  // Partition by compatibility against the locked cohort. Compatible rows
+  // surface above incompatibles so users do not have to scroll past hundreds
+  // of disabled rows to find a second compatible candidate (finding #2).
+  const partitioned = useMemo(
+    () => compareCohortPartition(userFilteredRows, cohortSignature),
+    [userFilteredRows, cohortSignature],
+  );
+  const incompatibleHiddenCount = cohortSignature !== null && compatibleOnly ? partitioned.incompatible.length : 0;
+  const filteredRows = useMemo(
+    () =>
+      cohortSignature !== null && compatibleOnly
+        ? partitioned.compatible
+        : [...partitioned.compatible, ...partitioned.incompatible],
+    [cohortSignature, compatibleOnly, partitioned],
+  );
 
   function isCompatible(row: ResultRow): boolean {
     if (!cohortLock) return true;
@@ -679,6 +712,21 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
               ))}
             </select>
           </label>
+          {cohortSignature !== null && (
+            <label
+              class="flex items-center gap-2 self-end pb-1 text-sm text-[var(--bb-data-fg-muted)]"
+              data-testid="compare-builder-compatible-only-label"
+            >
+              <input
+                type="checkbox"
+                checked={compatibleOnly}
+                onChange={(e) => setCompatibleOnly((e.target as HTMLInputElement).checked)}
+                class="h-4 w-4 rounded border-[var(--bb-data-border-strong)]"
+                data-testid="compare-builder-compatible-only"
+              />
+              Compatible only
+            </label>
+          )}
         </div>
       </section>
 
@@ -687,7 +735,11 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
           {selectedCount === 0
             ? `${filteredRows.length} candidate${filteredRows.length === 1 ? "" : "s"}. Select at least 2 to launch a comparison.`
             : selectedCount < 2
-            ? `1 selected. Select 1 more compatible run to launch.`
+            ? `1 selected. Select 1 more compatible run to launch.${
+                incompatibleHiddenCount > 0
+                  ? ` ${incompatibleHiddenCount} incompatible row${incompatibleHiddenCount === 1 ? "" : "s"} hidden.`
+                  : ""
+              }`
             : `${selectedCount} selected. ${cohortLock ? `Cohort: ${humanizeBenchmark(cohortLock.benchmark)} · SF ${cohortLock.scale_factor}${cohortLock.test_type ? ` · ${cohortLock.test_type}` : ""}` : ""}`}
         </p>
         <div class="flex gap-2">
@@ -761,7 +813,14 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
                       type="checkbox"
                       checked={isSelected}
                       disabled={!isSelected && !!disabledReason}
-                      aria-label={`Select ${row.platform} for comparison`}
+                      aria-label={compareSelectionLabel({
+                        platform: row.platform,
+                        benchmark: row.benchmark,
+                        scaleFactor: row.scale_factor,
+                        phase: row.test_type ?? null,
+                        runDate: row.run_date,
+                        resultId: row.result_id,
+                      })}
                       title={disabledReason || undefined}
                       onChange={() => toggleSelection(row)}
                       class="h-4 w-4 rounded border-[var(--bb-data-border-strong)]"
