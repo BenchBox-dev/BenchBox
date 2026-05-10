@@ -483,40 +483,31 @@ work:
 
 verification:
 - description: "Foundation design doc exists with all four sections"
-  command: "test -f _project/design/joinorder-step1-foundations.md && grep -cE '^## (Scale-factor|Data-fetch|Dataset versioning|Registry
-    surface)' _project/design/joinorder-step1-foundations.md"
+  command: "test -f _project/design/joinorder-step1-foundations.md && grep -cE '^## (Scale-factor|Data-fetch|Dataset versioning|Registry surface)' _project/design/joinorder-step1-foundations.md"
   expected_output: ">= 4"
 - description: "data_fetch module skeleton imports cleanly and tests pass"
-  command: "uv run -- python -c 'from benchbox.core.data_fetch import fetch_data' && uv run -- python -m pytest tests/unit/core/data_fetch/
-    -q"
+  command: "uv run -- python -c 'from benchbox.core.data_fetch import fetch_data' && uv run -- python -m pytest tests/unit/core/data_fetch/ -q"
   expected_output: "no import error, all tests pass"
 - description: "scale_factor validation rejects sf!=1 for joinorder"
-  command: "uv run -- python -m pytest tests/unit/core/test_scale_factor_validation.py::test_joinorder_rejects_non_unit_scale
-    -q"
+  command: "uv run -- python -m pytest tests/unit/core/test_scale_factor_validation.py::test_joinorder_rejects_non_unit_scale -q"
   expected_output: "1 passed"
 - description: "Build pipeline produces archive with all 21 Parquets + manifest + checksums + reference cardinalities"
-  command: "tar -tf joinorder-imdb-2013-v1.tar.zst | sort | grep -cE '\\.parquet$|^data_manifest\\.toml$|^DATA-LICENSE\\.md$|^checksums\\\
-    .txt$|^reference_cardinalities\\.json$'"
+  command: "tar -tf joinorder-imdb-2013-v1.tar.zst | sort | grep -cE '\\.parquet$|^data_manifest\\.toml$|^DATA-LICENSE\\.md$|^checksums\\.txt$|^reference_cardinalities\\.json$'"
   expected_output: ">= 25 (21 parquets + 4 metadata files)"
 - description: "Encoding round-trip gate is enforced"
   command: "grep -cE 'def (test_)?encoding_round_trip|encoding[_ ]round[_ ]trip' _project/scripts/build_joinorder_data.py"
   expected_output: ">= 1"
 - description: "Reference cardinalities cover all 113 queries"
-  command: "uv run -- python -c 'import json; d = json.load(open(\"_project/joinorder/reference_cardinalities.json\")); print(len(d[\"\
-    queries\"]))'"
+  command: "uv run -- python -c 'import json; d = json.load(open(\"_project/joinorder/reference_cardinalities.json\")); print(len(d[\"queries\"]))'"
   expected_output: "113"
 - description: "DRAFT GitHub Release exists with archive asset"
-  command: "gh release view data/joinorder-imdb-2013-v1 --json isDraft,assets --jq '{draft: .isDraft, asset_count: (.assets
-    | length)}'"
+  command: "gh release view data/joinorder-imdb-2013-v1 --json isDraft,assets --jq '{draft: .isDraft, asset_count: (.assets | length)}'"
   expected_output: "{\"draft\": true, \"asset_count\": 2}"
 - description: "Tiny fixture is checked in and predicate-satisfying"
-  command: "test \"$(ls tests/fixtures/joinorder_canonical_tiny/*.parquet | wc -l | tr -d ' ')\" = \"21\" && uv run -- python
-    _project/scripts/build_joinorder_data.py verify-tiny-fixture --fixture tests/fixtures/joinorder_canonical_tiny --queries
-    _project/joinorder/build-inputs/queries --cardinalities _project/joinorder/tiny_reference_cardinalities.json"
+  command: "test \"$(ls tests/fixtures/joinorder_canonical_tiny/*.parquet | wc -l | tr -d ' ')\" = \"21\" && uv run -- python _project/scripts/build_joinorder_data.py verify-tiny-fixture --fixture tests/fixtures/joinorder_canonical_tiny --queries _project/joinorder/build-inputs/queries --cardinalities _project/joinorder/tiny_reference_cardinalities.json"
   expected_output: "21 Parquets present and all 113 tiny-fixture query cardinalities validated"
 - description: "data_manifest.toml is wired up for joinorder"
-  command: "test -f benchbox/core/joinorder/data_manifest.toml && grep -cE '^url|^sha256|^version|^dataset_version|^manifest_hash|^data_archive_hash'
-    benchbox/core/joinorder/data_manifest.toml"
+  command: "test -f benchbox/core/joinorder/data_manifest.toml && grep -cE '^url|^sha256|^version|^dataset_version|^manifest_hash|^data_archive_hash' benchbox/core/joinorder/data_manifest.toml"
   expected_output: ">= 6"
 
 prior_art:
