@@ -112,6 +112,18 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(getRowOrder(container)).toEqual(["r-tpch-fast", "r-ssb-mid", "r-tpch-slow", "r-null-geo"]);
   });
 
+  it("matches lower-case platform URLs against mixed-case platform IDs", async () => {
+    vi.mocked(getPlatformIndexRows).mockResolvedValue(
+      ROWS.map((row) => ({ ...row, platform_id: "DuckDB" })),
+    );
+
+    const { container } = render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    expect(screen.queryByText(/No results found for platform/i)).toBeNull();
+    expect(getRowOrder(container)).toEqual(["r-tpch-fast", "r-ssb-mid", "r-tpch-slow", "r-null-geo"]);
+  });
+
   it("renders a Platform switcher that routes to a sibling without preserving tuning", async () => {
     const preactRouter = await import("preact-router");
     const routeMock = vi.mocked(preactRouter.route);

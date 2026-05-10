@@ -284,7 +284,7 @@ export function Home(_: RoutableProps) {
   return (
     <div>
       <section class="border-b border-[var(--bb-border-default)] bg-[var(--bb-bg-primary)] text-[var(--bb-fg-primary)]">
-        <div class="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8">
+        <div class="mx-auto max-w-7xl px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
           <div class="max-w-4xl">
             <h1 class="text-3xl font-bold sm:text-4xl">BenchBox Database Leaderboards</h1>
             <p class="mt-3 max-w-3xl text-base text-[var(--bb-fg-muted)] sm:text-lg">
@@ -303,16 +303,16 @@ export function Home(_: RoutableProps) {
         </div>
       </section>
 
-      <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <div class="mx-auto max-w-7xl px-4 py-5 sm:px-6 sm:py-8 lg:px-8">
         {/* Cohort selector renders above the matrix so users can change
             benchmark/scale/phase context without scrolling past the
             matrix to find the controls. */}
         {filteredMetaLeaderboard && (
           <section
             aria-label="Leaderboard cohort selector"
-            class="mb-6 rounded-lg border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] p-3"
+            class="mb-4 rounded-lg border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] p-2 sm:mb-6 sm:p-3"
           >
-            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div class="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-2 xl:grid-cols-4">
               <MultiSelectFilter
                 label="Benchmark"
                 allLabel="All benchmarks"
@@ -377,23 +377,6 @@ export function Home(_: RoutableProps) {
                 />
               </div>
             </details>
-            {/* w5 (compare-flow-entrypoints): Home now exposes a direct
-                entry point into the in-page Compare builder. The builder
-                handles the empty state itself, so no ?ids= prefilling is
-                needed — users land on the cohort filters and pick from
-                the candidate list. */}
-            <div class="mt-3 flex items-center justify-between gap-3 border-t border-[var(--bb-border-default)] pt-3">
-              <p class="text-xs text-[var(--bb-fg-muted)]">
-                Compare two or more runs from the corpus side by side.
-              </p>
-              <a
-                href="/results/compare/"
-                data-testid="home-compare-entrypoint"
-                class="rounded-md border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] px-3 py-1.5 text-sm font-medium text-[var(--bb-fg-primary)] shadow-sm hover:bg-[var(--bb-surface-data-muted)]"
-              >
-                Start a comparison →
-              </a>
-            </div>
           </section>
         )}
 
@@ -421,7 +404,7 @@ export function Home(_: RoutableProps) {
 
         {filteredMetaLeaderboard && <FlywheelStrip />}
 
-        <section aria-label="Corpus summary" class="mb-12 grid grid-cols-2 gap-4 text-center lg:grid-cols-4">
+        <section aria-label="Corpus summary" class="mb-8 grid grid-cols-2 gap-4 text-center sm:mb-12 lg:grid-cols-4">
           <StatCard
             value={SUPPORTED_BENCHMARK_COUNT}
             label="supported benchmarks"
@@ -444,7 +427,7 @@ export function Home(_: RoutableProps) {
           />
         </section>
 
-        <section class="mb-12">
+        <section class="mb-8 sm:mb-12">
           <h2 class="mb-4 text-xl font-semibold text-[var(--bb-data-fg-primary)]">Recent Results</h2>
           <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
             <TableScrollHint
@@ -594,21 +577,20 @@ function ActiveLeaderboardSummary({
   return (
     <section
       aria-label="Active leaderboard filters"
-      class="mt-5 rounded-lg border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] p-3"
+      class="mt-4 rounded-lg border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] p-2 sm:mt-5 sm:p-3"
     >
-      <div class="grid gap-2 sm:grid-cols-3">
+      <dl class="flex flex-wrap gap-2">
         {items.map((item) => (
           <div
             key={item.label}
-            class="rounded-md border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-primary)] px-3 py-2"
+            class="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-[var(--bb-border-subtle)] bg-[var(--bb-bg-primary)] px-2.5 py-1 text-xs"
+            title={`${item.label}: ${item.value}`}
           >
-            <div class="text-[11px] font-semibold uppercase tracking-wide text-[var(--bb-fg-muted)]">
-              {item.label}
-            </div>
-            <div class="mt-1 text-sm font-medium text-[var(--bb-fg-primary)]">{item.value}</div>
+            <dt class="shrink-0 font-semibold uppercase tracking-wide text-[var(--bb-fg-muted)]">{item.label}</dt>
+            <dd class="truncate font-medium text-[var(--bb-fg-primary)]">{item.value}</dd>
           </div>
         ))}
-      </div>
+      </dl>
       {activeFacets.length > 0 && (
         <div aria-label="Active filter chips" class="mt-3 flex flex-wrap gap-2">
           {activeFacets.map((facet) => (
@@ -846,6 +828,16 @@ function CoverageSummary() {
         <span class="rounded-full bg-[var(--bb-surface-app)] px-3 py-1.5 text-xs font-medium text-[var(--bb-data-fg-muted)]">
           All public coverage
         </span>
+        {/* w5 (compare-flow-entrypoints): Home exposes a direct entry point
+            into the in-page Compare builder. The builder handles the empty
+            state itself, so no ?ids= prefilling is needed. */}
+        <a
+          href="/results/compare/"
+          data-testid="home-compare-entrypoint"
+          class="rounded-full border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] px-3 py-1.5 text-xs font-medium text-[var(--bb-fg-primary)] no-underline shadow-sm hover:bg-[var(--bb-surface-data-muted)]"
+        >
+          Compare →
+        </a>
       </div>
     </div>
   );

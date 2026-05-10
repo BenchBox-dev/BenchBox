@@ -58,6 +58,15 @@ interface TrendCohort {
   entries: PlatformIndexRowRow[];
 }
 
+function normalizePlatformKey(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function matchesRequestedPlatform(row: PlatformIndexRowRow, platform: string): boolean {
+  const requested = normalizePlatformKey(platform);
+  return normalizePlatformKey(row.platform_id) === requested || normalizePlatformKey(row.platform) === requested;
+}
+
 function trendMetricDescription(metric: TrendMetric): string {
   return metric === "power_score" ? "power score (higher is better)" : "geomean latency, ms (lower is faster)";
 }
@@ -148,8 +157,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     key: "geomean_ms",
     direction: "asc",
   });
-  const platformDisplayName =
-    rows?.find((r) => r.platform_id === platform || r.platform === platform)?.platform ?? platform;
+  const platformDisplayName = rows?.find((row) => matchesRequestedPlatform(row, platform))?.platform ?? platform;
   useDocumentTitle(`${platformDisplayName} · BenchBox Results`);
 
   useEffect(() => {
@@ -197,19 +205,19 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   // Match by platform_id (URL slug) - platform_id is stable and URL-safe.
   // Fall back to matching by display name for backward compatibility with any
   // old links constructed from the display name.
-  const allPlatformResults = rows.filter((r) => r.platform_id === platform || r.platform === platform);
+  const allPlatformResults = rows.filter((row) => matchesRequestedPlatform(row, platform));
+  const canonicalPlatformId = normalizePlatformKey(allPlatformResults[0]?.platform_id ?? platform);
 
   // Distinct platform options for the in-page sibling pivot, sorted by
-  // display name. Each row carries (platform_id, platform); we keep the
-  // first display name encountered for each id.
+  // display name. Platform ids can arrive with mixed casing from older
+  // snapshots, so option identity is normalized to the URL slug form.
   const platformOptions = (() => {
-    const byId = new Map<string, string>();
+    const byId = new Map<string, { platform_id: string; platform: string }>();
     for (const row of rows) {
-      if (!byId.has(row.platform_id)) byId.set(row.platform_id, row.platform);
+      const platform_id = normalizePlatformKey(row.platform_id);
+      if (!byId.has(platform_id)) byId.set(platform_id, { platform_id, platform: row.platform });
     }
-    return [...byId.entries()]
-      .map(([platform_id, platform]) => ({ platform_id, platform }))
-      .sort((a, b) => a.platform.localeCompare(b.platform));
+    return [...byId.values()].sort((a, b) => a.platform.localeCompare(b.platform));
   })();
 
   // Unique non-null tuning modes - only show filter when multiple modes present.
@@ -355,10 +363,10 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                 id="platform-switcher"
                 data-testid="platform-switcher"
                 class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1.5 text-sm shadow-sm"
-                value={platform}
+                value={canonicalPlatformId}
                 onChange={(event) => {
                   const next = (event.target as HTMLSelectElement).value;
-                  if (next === platform) return;
+                  if (next === canonicalPlatformId) return;
                   route(`/results/p/${next}/`);
                 }}
               >
@@ -367,8 +375,8 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                     {option.platform}
                   </option>
                 ))}
-                {!platformOptions.some((option) => option.platform_id === platform) && (
-                  <option value={platform}>{platformDisplayName}</option>
+                {!platformOptions.some((option) => option.platform_id === canonicalPlatformId) && (
+                  <option value={canonicalPlatformId}>{platformDisplayName}</option>
                 )}
               </select>
             </div>

@@ -169,7 +169,10 @@ test.describe("responsive explorer assertions", () => {
     await expect.poll(async () => (await pageStickyHeader.boundingBox())?.y ?? 999).toBeLessThanOrEqual(1);
     await expect.poll(async () => (await heatmap.locator("thead tr").first().boundingBox())?.y ?? 999).toBeLessThan(0);
     await expect(pageStickyHeader.getByText("Platform").first()).toBeVisible();
-    await expect(pageStickyHeader.getByText("Q1").first()).toBeVisible();
+    // The mirrored sticky header tracks horizontal table scroll; after
+    // scrollLeft=160 the first query column may be off-screen, so assert that
+    // a visible scrolled query header is present rather than pinning Q1.
+    await expect(pageStickyHeader.locator("th", { hasText: /^3\b/ }).first()).toBeVisible();
   });
 
   for (const viewport of VIEWPORTS.filter((item) => item.width <= 768)) {
@@ -229,6 +232,7 @@ async function expectNoDocumentOverflow(page: Page, label: string) {
     return Array.from(document.querySelectorAll<HTMLElement>("body *"))
       .filter((element) => {
         if (element.closest(".overflow-x-auto") || element.closest("svg[role='img']")) return false;
+        if (element.closest('[data-testid="query-heatmap-page-sticky-header"]')) return false;
         const rect = element.getBoundingClientRect();
         return rect.right > viewportWidth + 1 || rect.left < -1;
       })
