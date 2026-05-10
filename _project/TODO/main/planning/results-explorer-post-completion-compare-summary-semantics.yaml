@@ -35,14 +35,24 @@ work:
       _project/verification-logs/results-explorer-post-completion-compare-summary-semantics/w0.log.
 
   - id: w1
-    summary: "Dedupe and label Compare benchmark filter options"
+    summary: "Dedupe Compare benchmark filter options for the legacy SSB slug"
     needs: [w0]
     status: pending
     notes: |
-      Canonicalize legacy benchmark aliases before rendering the Compare picker
-      benchmark select. If a legacy slug must remain visible, label it
-      explicitly as "SSB (legacy slug)" and ensure it filters to a distinct
-      value. Otherwise render exactly one SSB option.
+      Prior art: PR #285 already labels the legacy slug
+      `"SSB (legacy slug)"` in
+      `results-explorer/src/lib/displayLabels.ts`, so the *labeling* half of
+      this work is shipped. Finding #10 reproduces if the Compare picker
+      builds its benchmark options from a source that yields both `ssb` and
+      `star_schema` as separate filter values.
+
+      Scope of this work unit is the filter-option list only: canonicalize
+      legacy aliases before rendering the Compare picker benchmark select so
+      exactly one SSB option appears, or — if both must remain visible for
+      data routing — keep the existing "SSB (legacy slug)" label and ensure
+      each option filters to a distinct, non-overlapping result set. If w0
+      cannot reproduce duplicate options against the current develop tip,
+      record the stale finding in the w0 log and skip implementation.
 
   - id: w2
     summary: "Use run identity and tie-aware language in same-platform summaries"
@@ -139,7 +149,7 @@ metadata:
     - semantics
   estimated_effort: "Medium (1-2 days)"
   created_date: "2026-05-09"
-  last_updated: "2026-05-09T20:51:29-0400"
+  last_updated: "2026-05-10T09:52:56-0400"
 
 impact:
   business_value: |
