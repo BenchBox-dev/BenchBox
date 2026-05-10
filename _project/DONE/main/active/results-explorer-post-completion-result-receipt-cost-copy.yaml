@@ -2,7 +2,8 @@ id: results-explorer-post-completion-result-receipt-cost-copy
 title: "Clean post-completion Results Explorer result receipt cost copy"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-05-10"
 category: Frontend UX
 
 description: |
@@ -20,41 +21,57 @@ deps:
 work:
   - id: w0
     summary: "Revalidate cost-copy enum leakage on current develop"
-    status: pending
+    status: done
     notes: |
-      Open at least one local/no-cloud result detail and one costed/cloud-like
-      result detail if available. Capture the rendered Cost section text and
-      underlying cost fields to
-      _project/verification-logs/results-explorer-post-completion-result-receipt-cost-copy/w0.log.
+      Static-source revalidation captured against develop tip 21376cb58
+      to _project/verification-logs/results-explorer-post-completion-result-receipt-cost-copy/w0.log.
+      Finding #12 reproduces in `costDisplay.ts:48-58` `costScopeSummary`:
+      truthy-only check on `billing_unit`/`pricing_region` interpolates
+      raw `"not_applicable"` into the rendered string. RunReceipt.tsx:117
+      surfaces it under "Cost scope".
 
   - id: w1
     summary: "Map not-applicable cost fields to user-facing labels"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
-      Extend the existing cost display helper so sentinel values such as
-      not_applicable, unknown, or empty strings do not render as raw enum text.
-      Local runs should render concise copy such as "local run" or
-      "not applicable" only where the field itself is useful.
+      `costDisplay.ts` grew `humanizeBillingFragment(value)`. Returns
+      `null` for sentinel values (`not_applicable`, `unknown`, `none`,
+      `n/a`, `na`, empty/whitespace) — case-insensitive — so callers can
+      drop the fragment. Otherwise returns the trimmed underscore-replaced
+      humanization. Existing `costStatusLabel("not_applicable_local")`
+      → `"local"` mapping is unchanged.
 
   - id: w2
     summary: "Apply cost display mapping to Run Receipt"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      Update RunReceipt/ResultDetail cost fields to use the centralized display
-      helper. Hide billing unit and region fragments when they are not
-      applicable, but keep meaningful cost model/version/source information
-      visible.
+      `costScopeSummary` now uses `humanizeBillingFragment` for both
+      `billing_unit` and `pricing_region`. Local-no-cloud rows render
+      just the cost scope (e.g. `"compute only"`); rows with real
+      values still surface them. Cost model/version/source rendering is
+      unchanged. RunReceipt and ResultDetail consume `costScopeSummary`
+      via existing imports, so no call-site changes were needed.
 
   - id: w3
     summary: "Add hygiene tests for user-facing cost strings"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
-      Add tests that assert raw enum strings like not_applicable do not appear
-      in rendered cost receipt copy. Include a positive case where real billing
-      or region data still renders when present.
+      New `costDisplay.test.ts` (15 tests) covers the helper contract:
+      null/whitespace/sentinel handling for `humanizeBillingFragment`,
+      four `costScopeSummary` shapes (sentinel both, real both, mixed,
+      all-missing), and pre-existing `costStatusLabel` /
+      `normalizedCost*` paths to prove they were unaffected.
+      RunReceipt.test.tsx grows a regression case
+      ("does not leak raw not_applicable enum into the Cost section
+      copy (finding #12)") that pins the audited route's behavior.
+      The broad `userFacingStringHygiene.test.ts` scanner was not
+      extended because `not_applicable_local` is a legitimate
+      `cost_status` enum referenced in source code; a focused
+      regex-on-rendered-output assertion in the receipt test owns the
+      contract.
 
 must_preserve:
   - "Cost model version/source remains visible when recorded."

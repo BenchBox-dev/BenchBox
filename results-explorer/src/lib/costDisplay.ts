@@ -45,16 +45,43 @@ export function costModelSummary(row: CostDeploymentFields): string {
 }
 
 export function costScopeSummary(row: CostDeploymentFields): string {
+  const billing = humanizeBillingFragment(row.billing_unit);
+  const region = humanizeBillingFragment(row.pricing_region);
   return [
     formatCostScope(row.cost_scope) ?? "Not recorded",
-    row.billing_unit ? `billing: ${row.billing_unit}` : null,
-    row.pricing_region ? `region: ${row.pricing_region}` : null,
+    billing !== null ? `billing: ${billing}` : null,
+    region !== null ? `region: ${region}` : null,
   ].filter((part): part is string => part !== null).join(", ");
 }
 
 function formatCostScope(scope: string | null | undefined): string | null {
   if (!scope) return null;
   return scope.split("_").join(" ");
+}
+
+/**
+ * Convert a `billing_unit` / `pricing_region` raw value into user-facing copy.
+ * The corpus stores sentinel values like `not_applicable` for local-no-cloud
+ * runs; rendering those verbatim in the Run Receipt was finding #12 of the
+ * 2026-05-09 post-completion review. Returns `null` when the field carries a
+ * sentinel so callers can drop the fragment entirely; otherwise returns the
+ * humanized form (trimmed, underscores replaced with spaces).
+ */
+const BILLING_FRAGMENT_SENTINELS = new Set([
+  "not_applicable",
+  "not applicable",
+  "unknown",
+  "none",
+  "n/a",
+  "na",
+]);
+
+export function humanizeBillingFragment(value: string | null | undefined): string | null {
+  if (value === null || value === undefined) return null;
+  const trimmed = value.trim();
+  if (trimmed === "") return null;
+  if (BILLING_FRAGMENT_SENTINELS.has(trimmed.toLowerCase())) return null;
+  return trimmed.split("_").join(" ");
 }
 
 function uniqueNonEmpty(values: Array<string | null | undefined>): string[] {

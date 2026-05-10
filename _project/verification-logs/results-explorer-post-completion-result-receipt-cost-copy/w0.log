@@ -1,0 +1,53 @@
+# w0 — Revalidate cost-copy enum leakage on current develop
+
+**Date:** 2026-05-10
+**Develop tip rebased onto:** 21376cb58 (post-#321/#322)
+**Method:** Static source analysis. The audit doc's acceptance contract
+allows w0 to record source evidence in lieu of a live browser walk
+when the defect is unambiguously visible in code.
+
+## Finding #12 — Result receipt Cost section leaks raw `not_applicable` enum values
+
+**Reproduces.**
+`results-explorer/src/lib/costDisplay.ts:48-58` defines:
+
+```ts
+export function costScopeSummary(row: CostDeploymentFields): string {
+  return [
+    formatCostScope(row.cost_scope) ?? "Not recorded",
+    row.billing_unit ? `billing: ${row.billing_unit}` : null,
+    row.pricing_region ? `region: ${row.pricing_region}` : null,
+  ].filter((part): part is string => part !== null).join(", ");
+}
+```
+
+When a local-no-cloud result carries `billing_unit = "not_applicable"`
+and `pricing_region = "not_applicable"`, the truthy check passes, and
+the rendered Cost row text is:
+
+> compute only, billing: not_applicable, region: not_applicable
+
+verbatim. RunReceipt.tsx:117 surfaces this string under the "Cost
+scope" key. Same defect on /results/r/tpch-polars-sf0.1-20260502-0093bb7a
+(audit reference) and on every other local-only run.
+
+The first fragment (`formatCostScope("compute_only")` →
+`"compute only"`) does the right thing because `formatCostScope` does
+a simple underscore→space replace. That same humanization is **not**
+applied to billing_unit or pricing_region.
+
+## Implementation plan
+
+- Add a small `humanizeBillingFragment(value)` helper to
+  `costDisplay.ts` that returns `null` for sentinel values
+  (`not_applicable`, `unknown`, `none`, `n/a`, empty/whitespace) and
+  otherwise returns the humanized form (`split("_").join(" ")`).
+- Use it inside `costScopeSummary` for both `billing_unit` and
+  `pricing_region`. Local-no-cloud rows now render just the cost
+  scope (e.g. `"compute only"`); rows with real billing/region data
+  still surface them.
+- Add tests in `costDisplay.test.ts` (does not yet exist) that pin
+  the contract for sentinel filtering, real-value humanization, and
+  the empty-fragments edge case.
+- Add a `userFacingStringHygiene` regex assertion that no rendered
+  receipt copy contains the literal `not_applicable`.
