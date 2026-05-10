@@ -11,7 +11,7 @@ import {
   type ResultRow,
 } from "@/lib/duckdbQueries";
 import { humanizeBenchmark, errMsg, fmtGeomean } from "@/utils";
-import { buildCompareUrl } from "@/lib/resultLinks";
+import { buildCompareUrl, MAX_COMPARE_SELECTIONS } from "@/lib/resultLinks";
 import { formatRunIdentitiesForCohort, type RunIdentitySource } from "@/lib/runIdentity";
 import { CompareSummarySkeleton } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
@@ -496,8 +496,6 @@ function severeCohortMismatchReason(results: DetailResult[]) {
   }
   return reasons.length > 0 ? reasons.join(" and ") : null;
 }
-
-const MAX_COMPARE_SELECTIONS = 4;
 
 function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
   const [candidates, setCandidates] = useState<ResultRow[] | null>(null);

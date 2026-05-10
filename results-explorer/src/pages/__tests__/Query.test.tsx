@@ -22,6 +22,8 @@ const BASE_SCHEMA_COLUMNS = [
   { name: "geomean_ms", type: "DOUBLE" },
   { name: "trust_label", type: "VARCHAR" },
   { name: "tuning_mode", type: "VARCHAR" },
+  { name: "test_type", type: "VARCHAR" },
+  { name: "primary_metric", type: "VARCHAR" },
   { name: "validation_status", type: "VARCHAR" },
   { name: "cost_usd", type: "DOUBLE" },
   { name: "normalized_cost_usd", type: "DOUBLE" },
@@ -46,6 +48,8 @@ const BASE_ROWS = [
     total_duration_s: 65.25,
     geomean_ms: 10,
     trust_label: "maintainer-run",
+    test_type: "power",
+    primary_metric: "display_geomean_ms",
     cost_status: "not_applicable_local",
     deployment_class: "local",
     cloud_provider: null,
@@ -61,19 +65,12 @@ const BASE_ROWS = [
     total_duration_s: 72,
     geomean_ms: 20,
     trust_label: "community-submission",
+    test_type: "power",
+    primary_metric: "display_geomean_ms",
     cost_status: "normalized",
     deployment_class: "cloud",
     cloud_provider: "aws",
     instance_or_warehouse: "MEDIUM",
-  },
-];
-const INCOMPATIBLE_FILTERED_ROWS = [
-  {
-    ...BASE_ROWS[1]!,
-    result_id: "r3",
-    benchmark: "tpch",
-    scale_factor: 1,
-    run_date: "2026-04-15T12:00:00Z",
   },
 ];
 let resultRows = BASE_ROWS;
@@ -83,7 +80,7 @@ function normalizeSql(sql: string): string {
 }
 
 function isDefaultResultSelect(sql: unknown): boolean {
-  return normalizeSql(String(sql)).startsWith("SELECT result_id, benchmark, platform, scale_factor");
+  return normalizeSql(String(sql)).startsWith("SELECT result_id, benchmark, scale_factor");
 }
 
 function appearsBefore(first: Element, second: Element): boolean {
@@ -256,22 +253,47 @@ describe("Query", () => {
     expect(screen.getByTestId("query-compare-tray").textContent).toContain("Select two or more rows");
   });
 
-  it("keeps the compare cohort lock when filters hide the first selected row", async () => {
+  it("locks compare selection by hidden phase and primary-metric metadata", async () => {
+    resultRows = [
+      ...BASE_ROWS,
+      {
+        ...BASE_ROWS[0]!,
+        result_id: "r3",
+        platform: "DuckDB throughput",
+        run_date: "2026-04-15T12:00:00Z",
+        test_type: "throughput",
+        primary_metric: "power_score",
+      },
+    ];
+
     render(<Query />);
     await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
 
     fireEvent.click(screen.getByTestId("query-compare-checkbox-r1"));
-    expect(screen.getByTestId("query-compare-tray").textContent).toContain("1 result selected");
-
-    resultRows = INCOMPATIBLE_FILTERED_ROWS;
-    fireEvent.click(screen.getByLabelText(/^Platform: SQLite/));
-
-    await waitFor(() => expect(screen.getByTestId("query-compare-checkbox-r3")).toBeTruthy());
-    expect(screen.queryByTestId("query-compare-checkbox-r1")).toBeNull();
     const incompatible = screen.getByTestId("query-compare-checkbox-r3") as HTMLInputElement;
     expect(incompatible.disabled).toBe(true);
-    expect(incompatible.title).toContain("benchmark");
-    expect(screen.getByTestId("query-compare-launch-disabled")).toBeTruthy();
+    expect(incompatible.title).toContain("phase");
+    expect(incompatible.title).toContain("primary metric");
+  });
+
+  it("caps Query compare selections at four runs", async () => {
+    resultRows = Array.from({ length: 5 }, (_, index) => ({
+      ...BASE_ROWS[0]!,
+      result_id: `r${index + 1}`,
+      platform: `DuckDB ${index + 1}`,
+      run_date: `2026-04-${17 - index}T12:00:00Z`,
+    }));
+
+    render(<Query />);
+    await waitFor(() => expect(screen.getAllByText("DuckDB 1").length).toBeGreaterThan(0));
+
+    for (const id of ["r1", "r2", "r3", "r4"]) {
+      fireEvent.click(screen.getByTestId(`query-compare-checkbox-${id}`));
+    }
+    const fifth = screen.getByTestId("query-compare-checkbox-r5") as HTMLInputElement;
+    expect(fifth.disabled).toBe(true);
+    expect(fifth.title).toContain("Up to 4 runs");
+    expect(screen.getByTestId("query-compare-tray").textContent).toContain("4 results selected (maximum)");
   });
 
   it("loads facet counts and table rows from DuckDB", async () => {

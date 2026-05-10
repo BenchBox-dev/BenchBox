@@ -48,6 +48,8 @@ const ALLOWED_COLUMNS = new Set([
   "tuning_mode",
   "tuning_hash",
   "test_type",
+  "phase",
+  "primary_metric",
   "validation_status",
   "cost_usd",
   "normalized_cost_usd",

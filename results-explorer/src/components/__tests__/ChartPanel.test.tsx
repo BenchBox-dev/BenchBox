@@ -217,6 +217,42 @@ describe("ChartPanel", () => {
     expect(screen.getByRole("tabpanel", { name: "Per-query chart" })).toBeTruthy();
   });
 
+  it("threads cohort-aware labels into Compare per-query charts", () => {
+    const details = [
+      makeDetail({
+        result_id: "df-44",
+        platform: "DataFusion",
+        platform_id: "datafusion-44",
+        platform_version: "44",
+        display_timings: [
+          { query_id: "Q1", display_ms: 10, sample_count: 3 },
+          { query_id: "Q2", display_ms: 30, sample_count: 3 },
+        ],
+      }),
+      makeDetail({
+        result_id: "df-45",
+        platform: "DataFusion",
+        platform_id: "datafusion-45",
+        platform_version: "45",
+        display_timings: [
+          { query_id: "Q1", display_ms: 12, sample_count: 3 },
+          { query_id: "Q2", display_ms: 15, sample_count: 3 },
+        ],
+      }),
+    ];
+    const { container } = render(
+      <ChartPanel context={{ kind: "compare", results: details, primaryMetric: "display_geomean_ms" }} />,
+    );
+
+    expect(screen.getByText("DataFusion v44")).toBeTruthy();
+    expect(screen.getByText("DataFusion v45")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Comparison Bar" }));
+    const tooltips = Array.from(container.querySelectorAll("rect title")).map((title) => title.textContent ?? "");
+    expect(tooltips.some((text) => text.includes("DataFusion v44"))).toBe(true);
+    expect(tooltips.some((text) => text.includes("DataFusion v45"))).toBe(true);
+  });
+
   it("uses responsive segmented chart controls with short visible labels", () => {
     render(
       <ChartPanel

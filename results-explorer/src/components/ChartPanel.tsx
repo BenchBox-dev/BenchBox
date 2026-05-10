@@ -86,6 +86,26 @@ export function ChartPanel({
           : [],
     [context],
   );
+  const summaryPlatformChartLabels = useMemo(
+    () =>
+      summary
+        ? formatRunIdentitiesForCohort(
+            summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
+            "chart",
+          )
+        : [],
+    [summary],
+  );
+  const summaryPlatformSelectLabels = useMemo(
+    () =>
+      summary
+        ? formatRunIdentitiesForCohort(
+            summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
+            "selectOption",
+          )
+        : [],
+    [summary],
+  );
   const compareRows = useMemo(() => {
     if (context.kind !== "compare" || !summary) return [];
     return summary.query_ids.map((queryId) => ({
@@ -103,13 +123,13 @@ export function ChartPanel({
       values: summary.platforms.map((platform, index) => {
         const timing = platform.timings[queryId];
         return {
-          label: platform.platform,
+          label: summaryPlatformChartLabels[index] ?? platform.platform,
           value: timing ?? null,
           color: paletteColor(index),
         };
       }),
     }));
-  }, [context, summary]);
+  }, [context, summary, summaryPlatformChartLabels]);
   const preferredId = useMemo(() => preferredChartId(context, charts), [context, charts]);
   const [activeId, setActiveId] = useState<string>(preferredId);
   const [localBaselineIdx, setLocalBaselineIdx] = useState(0);
@@ -225,7 +245,7 @@ export function ChartPanel({
             >
               {summary.platforms.map((platform, index) => (
                 <option key={platform.result_id} value={String(index)}>
-                  {platform.platform}
+                  {summaryPlatformSelectLabels[index] ?? platform.platform}
                 </option>
               ))}
             </select>
@@ -241,6 +261,7 @@ export function ChartPanel({
           compareRows,
           compareGroups,
           baselineIdx,
+          platformLabels: summaryPlatformChartLabels,
           suppressWinnerClaims,
           suppressionReason,
         })}
@@ -295,6 +316,7 @@ function renderChart(
     compareRows,
     compareGroups,
     baselineIdx,
+    platformLabels,
     suppressWinnerClaims = false,
     suppressionReason,
   }: {
@@ -304,6 +326,7 @@ function renderChart(
     compareRows: CompareQueryRow[];
     compareGroups: { queryId: string; values: { label: string; value: number | null; color: string }[] }[];
     baselineIdx: number;
+    platformLabels: string[];
     suppressWinnerClaims?: boolean;
     suppressionReason?: string;
   },
@@ -363,7 +386,9 @@ function renderChart(
       return summary ? (
         <DivergingBarChart
           queries={compareRows}
-          results={summary.platforms.map((platform) => ({ platform: platform.platform }))}
+          results={summary.platforms.map((platform, index) => ({
+            platform: platformLabels[index] ?? platform.platform,
+          }))}
           baselineIdx={baselineIdx}
         />
       ) : null;
@@ -406,7 +431,9 @@ function renderChart(
       return summary ? (
         <NormalizedSpeedupChart
           queries={compareRows}
-          results={summary.platforms.map((platform) => ({ platform: platform.platform }))}
+          results={summary.platforms.map((platform, index) => ({
+            platform: platformLabels[index] ?? platform.platform,
+          }))}
           baselineIdx={baselineIdx}
         />
       ) : null;

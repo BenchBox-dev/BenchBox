@@ -135,6 +135,23 @@ describe("NormalizedSpeedupChart", () => {
     expect(new Set(queryLabelsAfterToggle)).toEqual(new Set(["Q1", "Q2", "Q3"]));
   });
 
+  it("keeps the comparable-only toggle visible when the comparable subset is parity-only", () => {
+    const sparseParityQueries = [
+      { queryId: "Q1", timings: [{ ms: 100, status: "pass" }, { ms: 100, status: "pass" }] },
+      { queryId: "Q2", timings: [{ ms: 100, status: "pass" }, null] },
+    ];
+    const { container } = render(
+      <NormalizedSpeedupChart queries={sparseParityQueries} results={RESULTS} baselineIdx={0} />,
+    );
+
+    expect(screen.queryByText("No meaningful per-query speedup difference")).toBeNull();
+    expect(screen.getByTestId("normalized-speedup-comparable-only-toggle")).toBeTruthy();
+    const queryLabels = Array.from(container.querySelectorAll("text"))
+      .map((el) => el.textContent ?? "")
+      .filter((label) => /^Q[12]$/.test(label));
+    expect(queryLabels).toEqual(["Q1"]);
+  });
+
   it("renders both rows when two queries share the same queryId", () => {
     const queriesWithDuplicate = [
       { queryId: "Q1", timings: [{ ms: 100, status: "pass" }, { ms: 50, status: "pass" }] },

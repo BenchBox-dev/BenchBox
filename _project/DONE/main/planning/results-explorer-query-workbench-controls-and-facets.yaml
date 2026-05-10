@@ -2,7 +2,7 @@ id: results-explorer-query-workbench-controls-and-facets
 title: "Tighten Query Workbench controls, facets, and labels"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
 category: Frontend UX
 
 description: |
@@ -107,7 +107,7 @@ work:
 - id: w7
   summary: "Cover Query controls, facets, and label formatting"
   needs: [w2, w3, w4, w5, w6]
-  status: pending
+  status: done
   notes: |
     Add tests for column disclosure open/close, bulk actions, export
     visible column behavior, facet collapse/show all, duplicate benchmark

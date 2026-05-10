@@ -2,7 +2,7 @@ id: results-explorer-chart-panel-scope-and-labeling
 title: "Trim chart panel dead space and correct chart metric labeling"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
 category: Frontend UX
 
 description: |
