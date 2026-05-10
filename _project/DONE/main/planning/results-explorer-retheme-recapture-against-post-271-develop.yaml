@@ -1,0 +1,170 @@
+id: results-explorer-retheme-recapture-against-post-271-develop
+title: "Re-run release-final retheme capture against post-#271 develop tip"
+worktree: main
+priority: Medium
+status: Completed
+completed_date: "2026-05-10"
+category: Testing and Quality Assurance
+
+description: |
+  The release-readiness artifact set under
+  `_project/audits/results-explorer-retheme-final-2026-05-10.md` and
+  its screenshots under
+  `_project/audits/screenshots/results-explorer-retheme-final-2026-05-10/`
+  were generated against PR #269's branch tree. PR #268 had already
+  introduced literal-styled `Result summary` and `Compare guardrails`
+  sections that survived PR #269's squash merge, contradicting the
+  README's READY verdict. PR #271 (`274a4a11e`,
+  `fix(explorer): retokenize result/compare panels reintroduced by
+  PR #268/#269 squash race`) closed the regression on develop.
+
+  The artifact set on disk still describes the pre-#271 tree. Re-run
+  the release-final capture against the current develop tip,
+  regenerate the screenshots, and replace (or supersede) the 2026-05-07
+  audit so the on-disk artifacts reflect the shipped state. Once
+  `audit-develop-sha-stamping-and-ci-gate` lands its `develop_sha:`
+  field requirement, this re-capture exercises and validates that
+  contract end-to-end.
+
+  This is a one-shot evidence task. It does not modify production
+  code, only audit artifacts and the capture spec's recorded
+  metadata.
+
+deps:
+  needs:
+  - audit-develop-sha-stamping-and-ci-gate
+
+context_sections:
+  "Source blind-spot": |
+    Recorded: _project/blind-spots/2026-05-07-211858-release-readiness-against-pre-merge-tree.md
+    Step #4 of the suggested next steps.
+  "What 'against post-#271 develop tip' means": |
+    `git log --oneline -5 -- results-explorer/src/pages/ResultDetail.tsx
+    results-explorer/src/pages/Compare.tsx` should include 274a4a11e
+    among the captured tree's ancestry. The new capture must be
+    generated from a workspace whose `git rev-parse origin/develop`
+    resolves to a commit at or after 274a4a11e.
+
+work:
+- id: w1
+  summary: "Confirm post-#271 develop tip and regenerate screenshots"
+  status: done
+  notes: |
+    From a fresh worktree off `develop`:
+      - `git rev-parse origin/develop` -> capture SHA (must be
+        274a4a11e or a descendant).
+      - Run the release-final capture spec under
+        `results-explorer/e2e/captures/release-final.spec.ts` and
+        collect the resulting screenshot set.
+    Confirm the captured Result Detail and Compare panels render
+    tokenized colors (no literal `text-gray-*` / `bg-slate-*`
+    classes in the rendered DOM).
+
+- id: w2
+  summary: "Replace the 2026-05-07 audit in place with the post-#271 capture"
+  needs: [w1]
+  status: done
+  notes: |
+    Overwrite `_project/audits/results-explorer-retheme-final-2026-05-10.md`
+    with the new audit body generated against the post-#271 develop
+    tip. Required edits:
+      - Update the `date:` frontmatter to the recapture date.
+      - Add the `develop_sha:` frontmatter field per the contract
+        from `audit-develop-sha-stamping-and-ci-gate`.
+      - Rename the file to `results-explorer-retheme-final-<YYYY-MM-DD>.md`
+        where `<YYYY-MM-DD>` is the recapture date (use `git mv` so
+        history follows). Update any cross-references (TODO yamls,
+        docs) that link to the old filename.
+      - Replace the screenshot directory under
+        `_project/audits/screenshots/results-explorer-retheme-final-2026-05-10/`
+        with the new capture set (also `git mv` to the new dated
+        path).
+    Git history preserves the pre-#271 version of the file —
+    reviewers can `git log -p` the old path if the historical
+    verdict is needed for a post-mortem.
+
+- id: w3
+  summary: "Run audit-sha-check on the new audit and confirm CI gate passes"
+  needs: [w2]
+  status: done
+  notes: |
+    `make audit-sha-check FILE=_project/audits/results-explorer-retheme-final-<YYYY-MM-DD>.md`
+    should exit 0. Push the audit on a small PR and confirm the
+    path-aware audit-sha-check CI job runs and passes. This is the
+    end-to-end validation of the framework introduced by
+    `audit-develop-sha-stamping-and-ci-gate`.
+
+must_preserve:
+- "Git history of the pre-#271 audit and screenshots — replacement uses `git mv` so the file's `git log` chain still resolves."
+- "Cross-references from other repo files (TODO yamls, docs) — w2 must update every link to the renamed audit/screenshot paths
+  in the same commit."
+
+approach: |
+  Treat this as an evidence-only task. Do not edit
+  `results-explorer/src/` to make the capture pass — if the new
+  capture surfaces a regression, that's a separate bug TODO with the
+  new screenshot as evidence. The point of the re-run is to make the
+  on-disk artifact match the shipping tree, not to fix new bugs as a
+  side-effect. Use `git mv` (not delete + add) so reviewers can
+  `git log --follow` to recover the pre-#271 verdict if a future
+  post-mortem needs it.
+
+anti_patterns:
+- "DO NOT use `rm` + `add` to replace the 2026-05-07 audit — because that breaks `git log --follow` and makes the pre-#271
+  verdict harder to recover for post-mortems — use `git mv` so the rename is recorded as a rename."
+- "DO NOT bundle source-code edits with this re-capture — because a re-capture's only job is to match the shipping tree —
+  file any newly-surfaced regressions as separate TODOs with the new screenshots as evidence."
+- "DO NOT run the capture from a stale worktree — because that defeats the entire point — verify `git rev-parse origin/develop`
+  resolves at or after 274a4a11e before recording any screenshot."
+- "DO NOT leave dangling links — because cross-references from other TODOs/docs to the 2026-05-07 path will break when the
+  file is renamed — grep the repo for the old filename and update every hit in the same commit as the rename."
+
+verification:
+- description: "Captured tree is at or after PR #271"
+  command: "bash -lc 'git fetch --no-tags origin develop >/dev/null && git merge-base --is-ancestor 274a4a11e $(git rev-parse
+    origin/develop)'"
+  expected_output: "exit 0"
+- description: "New audit passes audit-sha-check"
+  command: "make audit-sha-check FILE=_project/audits/results-explorer-retheme-final-<YYYY-MM-DD>.md"
+  expected_output: "exit 0"
+- description: "Result Detail and Compare panels render no literal Tailwind palette classes in the captured DOM"
+  command: "bash -lc 'set -e; cd results-explorer && grep -RnE \"text-(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-(50|100|200|300|400|500|600|700|800|900|950)\"\
+    \ e2e/captures/release-final-output/dom-snapshots/ResultDetail* e2e/captures/release-final-output/dom-snapshots/Compare*
+    || true'"
+  expected_output: "no matches (or only allow-listed inline-SVG attributes)"
+
+scope_limit:
+  only_modify:
+  - "_project/audits/"
+  - "_project/blind-spots/2026-05-07-211858-release-readiness-against-pre-merge-tree.md"
+  - "results-explorer/e2e/captures/"    # only metadata/manifest fields, not test logic
+  do_not_modify:
+  - "results-explorer/src/"
+  - "results-data/"
+  - "benchbox/"
+
+success_metrics:
+- "Renamed retheme release-final audit (`results-explorer-retheme-final-<recapture-date>.md`) exists with a develop_sha matching
+  post-#271 develop tip."
+- "audit-sha-check passes on the renamed audit, both locally and via the CI gate from `audit-develop-sha-stamping-and-ci-gate`."
+- "`git log --follow` on the renamed audit traces back to the 2026-05-07 file (rename detected, history intact)."
+- "No file in the repo (TODOs, docs, other audits) still references the stale pre-recapture audit path after the rename."
+
+metadata:
+  tags:
+  - results-explorer
+  - retheme
+  - audit-evidence
+  - one-shot
+  estimated_effort: "Small (~0.5 day)"
+  created_date: "2026-05-08"
+
+impact:
+  business_value: |
+    Replaces the misaligned 2026-05-07 release-readiness artifact with
+    one that actually describes the shipped tree, restoring trust in
+    the audit folder as a release record.
+  user_impact: |
+    Indirect: closes the loop on a user-visible regression (literal
+    grays on Result Detail and Compare guardrails) by recording its
+    fix in the same artifact set that originally claimed READY.

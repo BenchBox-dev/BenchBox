@@ -1,0 +1,122 @@
+# retheme recapture w1
+started_at_utc: 2026-05-10T21:38:53Z
+head: 8c1589c4b8add656a35345b38de68eff2e766cef
+origin_develop_before_fetch: 8c1589c4b8add656a35345b38de68eff2e766cef
+From https://github.com/joeharris76/BenchBox
+ * branch                develop    -> FETCH_HEAD
+origin_develop_after_fetch: 8c1589c4b8add656a35345b38de68eff2e766cef
+post_271_ancestor_check: PASS
+capture_route_metadata_update: platform-datafusion accepts current empty-state landmark; compare-empty accepts current builder landmark
+fixture_dir: /Users/joe/Developer/BenchBox.pool-06/results-explorer/test-fixtures/.generated/data
+
+## npm run test:e2e:fixtures
+
+> results-explorer@0.1.0 test:e2e:fixtures
+> node scripts/generate-browser-fixtures.mjs && node scripts/verify-browser-fixtures.mjs
+
+[generate-browser-fixtures] sourceRoot=/Users/joe/Developer/BenchBox.pool-06/results-explorer/test-fixtures/source
+[generate-browser-fixtures] genRoot=/Users/joe/Developer/BenchBox.pool-06/results-explorer/test-fixtures/.generated
+[generate-browser-fixtures] validated explorer build contract 3 (benchbox explorer build)
+[generate-browser-fixtures] copied 4 source bundle(s)
+[generate-browser-fixtures] wrote variant community/tpch-duckdb-sf0.01-20260403-community.json
+[generate-browser-fixtures] wrote variant tuned/tpch-duckdb-sf0.01-20260403-tuned.json
+[generate-browser-fixtures] wrote variant sf01/tpch-duckdb-sf0.1-20260403-scale.json
+[generate-browser-fixtures] wrote variant partial-query/tpch-datafusion-partial-sf0.01-20260403-query-gap.json
+[generate-browser-fixtures] wrote variant environment/aws-cloud/tpch-fixture-aws-sf0.01-20260403-environment.json
+[generate-browser-fixtures] wrote variant environment/gcp-serverless/tpch-fixture-gcp-sf0.01-20260403-environment.json
+[generate-browser-fixtures] wrote variant environment/container-local/tpch-fixture-container-sf0.01-20260403-environment.json
+[generate-browser-fixtures] uv run -- benchbox explorer build --data-dir /Users/joe/Developer/BenchBox.pool-06/results-explorer/test-fixtures/.generated/source --output /Users/joe/Developer/BenchBox.pool-06/results-explorer/test-fixtures/.generated/data (cwd=/Users/joe/Developer/BenchBox.pool-06)
+Explorer build
+  Data dir:
+/Users/joe/Developer/BenchBox.pool-06/results-explorer/test-fixtures/.generated/
+source
+  Output dir:
+/Users/joe/Developer/BenchBox.pool-06/results-explorer/test-fixtures/.generated/
+data
+  Trust label: maintainer-run
+  Visibility:  public-curated
+
+Done. Processed 11 result(s) across 3 cohort(s) →
+/Users/joe/Developer/BenchBox.pool-06/results-explorer/test-fixtures/.generated/
+data
+[generate-browser-fixtures] generated /Users/joe/Developer/BenchBox.pool-06/results-explorer/test-fixtures/.generated/data/results.duckdb
+[verify-browser-fixtures] environment coverage OK {"environment_values":{"deployment_class":["cloud","local"],"cloud_provider":["aws","gcp"],"cloud_region":["us-central1","us-east-1"],"instance_or_warehouse":["container-cpu-10","m6i.large","serverless-slots-4"],"storage_format":["duckdb_native","parquet"]},"cloud_rows":2,"container_rows":1,"runtime_types":["dataframe_process","docker_container","local_process","managed_cloud","serverless"]}
+[verify-browser-fixtures] OK {"platforms_per_cohort":[["tpch",0.01,7],["tpch",0.1,1],["star_schema",0.01,1]],"benchmarks":["star_schema","tpch"],"trust_labels":["community-submission","maintainer-run"],"environment_values":{"deployment_class":["cloud","local"],"cloud_provider":["aws","gcp"],"cloud_region":["us-central1","us-east-1"],"instance_or_warehouse":["container-cpu-10","m6i.large","serverless-slots-4"],"storage_format":["duckdb_native","parquet"]},"cloud_rows":[["tpch-fixture-aws-sql-sf0.01-20260403-e73da6ce","Fixture AWS SQL","aws","us-east-1","m6i.large","parquet","community-submission"],["tpch-fixture-gcp-serverless-sf0.01-20260403-fb7f77e8","Fixture GCP Serverless","gcp","us-central1","serverless-slots-4","parquet","community-submission"]],"container_rows":[["tpch-fixture-container-sql-sf0.01-20260403-06c0f5d9","Fixture Container SQL","local","container-cpu-10","duckdb_native","maintainer-run"]]}
+[generate-browser-fixtures] sourceRoot=/Users/joe/Developer/BenchBox.pool-06/results-explorer/test-fixtures/source
+[generate-browser-fixtures] genRoot=/Users/joe/Developer/BenchBox.pool-06/results-explorer/test-fixtures/.generated
+[generate-browser-fixtures] validated explorer build contract 3 (benchbox explorer build)
+[generate-browser-fixtures] copied 4 source bundle(s)
+[generate-browser-fixtures] wrote variant community/tpch-duckdb-sf0.01-20260403-community.json
+[generate-browser-fixtures] wrote variant tuned/tpch-duckdb-sf0.01-20260403-tuned.json
+[generate-browser-fixtures] wrote variant sf01/tpch-duckdb-sf0.1-20260403-scale.json
+[generate-browser-fixtures] wrote variant partial-query/tpch-datafusion-partial-sf0.01-20260403-query-gap.json
+[generate-browser-fixtures] wrote variant environment/aws-cloud/tpch-fixture-aws-sf0.01-20260403-environment.json
+[generate-browser-fixtures] wrote variant environment/gcp-serverless/tpch-fixture-gcp-sf0.01-20260403-environment.json
+[generate-browser-fixtures] wrote variant environment/container-local/tpch-fixture-container-sf0.01-20260403-environment.json
+[generate-browser-fixtures] uv run -- benchbox explorer build --data-dir /Users/joe/Developer/BenchBox.pool-06/results-explorer/test-fixtures/.generated/source --output /Users/joe/Developer/BenchBox.pool-06/results-explorer/test-fixtures/.generated/data (cwd=/Users/joe/Developer/BenchBox.pool-06)
+Explorer build
+  Data dir:
+/Users/joe/Developer/BenchBox.pool-06/results-explorer/test-fixtures/.generated/
+source
+  Output dir:
+/Users/joe/Developer/BenchBox.pool-06/results-explorer/test-fixtures/.generated/
+data
+  Trust label: maintainer-run
+  Visibility:  public-curated
+
+Done. Processed 11 result(s) across 3 cohort(s) →
+/Users/joe/Developer/BenchBox.pool-06/results-explorer/test-fixtures/.generated/
+data
+[generate-browser-fixtures] generated /Users/joe/Developer/BenchBox.pool-06/results-explorer/test-fixtures/.generated/data/results.duckdb
+[verify-browser-fixtures] determinism OK {"allowlist":{"data/results.duckdb":"DuckDB file bytes include nondeterministic container metadata; logical table digest is compared instead."}}
+
+## npm run build
+
+> results-explorer@0.1.0 build
+> vite build
+
+vite v6.4.2 building for production...
+transforming...
+✓ 216 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                                 0.73 kB │ gzip:     0.40 kB
+dist/assets/duckdb-browser-coi.pthread.worker-BSvKBYxk.js     667.99 kB
+dist/assets/duckdb-browser-eh.worker-hQa-dcAV.js              772.76 kB
+dist/assets/duckdb-browser-mvp.worker-C9hF7LGh.js             844.64 kB
+dist/assets/duckdb-browser-coi.worker-D2-Qa4hF.js             887.11 kB
+dist/assets/duckdb-coi-DrUF0TBm.wasm                       33,968.07 kB │ gzip: 7,760.09 kB
+dist/assets/duckdb-eh-9ubY-jlA.wasm                        34,242.59 kB │ gzip: 7,695.33 kB
+dist/assets/duckdb-mvp-BP0pRkMH.wasm                       39,362.65 kB │ gzip: 8,766.50 kB
+dist/assets/index-CJO3GUHH.css                                 29.22 kB │ gzip:     6.52 kB
+dist/assets/duckdb-DHa6yhW2.js                                192.31 kB │ gzip:    45.04 kB
+dist/assets/index-Cb-1jPCO.js                                 301.61 kB │ gzip:    81.04 kB
+✓ built in 1.59s
+
+## RETHEME_CAPTURE=1 npx playwright test --project=chromium e2e/captures/release-final.spec.ts --workers=1
+[2m[WebServer] [22m(node:61930) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+[2m[WebServer] [22m[serve-browser-tests] dist=/Users/joe/Developer/BenchBox.pool-06/results-explorer/dist
+[2m[WebServer] [22m[serve-browser-tests] fixtures=/Users/joe/Developer/BenchBox.pool-06/results-explorer/test-fixtures/.generated/data
+[2m[WebServer] [22m[serve-browser-tests] listening on http://127.0.0.1:4392/results/
+
+Running 1 test using 1 worker
+
+(node:61931) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:61931) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Release-final audit frontmatter snippet:
+---
+date: 2026-05-10
+develop_sha: 8c1589c4b8add656a35345b38de68eff2e766cef
+---
+  ✓  1 [chromium] › e2e/captures/release-final.spec.ts:101:3 › @retheme-capture release-final › captures every QA matrix route at 4 widths with console + network log (49.1s)
+
+  1 passed (49.7s)
+finished_at_utc: 2026-05-10T21:39:51Z
+status: PASS
+
+## DOM snapshot literal Tailwind palette check
+snapshot_dir: results-explorer/e2e/captures/release-final-output/dom-snapshots
+literal_palette_check: PASS

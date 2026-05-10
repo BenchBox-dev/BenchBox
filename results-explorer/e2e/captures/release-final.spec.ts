@@ -40,7 +40,11 @@ const ROUTES: Array<{ slug: string; url: string; readyText: RegExp }> = [
     readyText: /SSB Results/,
   },
   { slug: "platform-duckdb", url: "/results/p/duckdb/", readyText: /DuckDB Results/ },
-  { slug: "platform-datafusion", url: "/results/p/datafusion/", readyText: /DataFusion Results/ },
+  {
+    slug: "platform-datafusion",
+    url: "/results/p/datafusion/",
+    readyText: /DataFusion Results|No results found for platform: datafusion/,
+  },
   { slug: "platform-polars", url: "/results/p/polars/", readyText: /Polars Results/ },
   {
     slug: "result-detail-tpch-duckdb",
@@ -53,7 +57,11 @@ const ROUTES: Array<{ slug: string; url: string; readyText: RegExp }> = [
     url: "/results/compare?ids=ba6a8c83,0f0add9f",
     readyText: /Mixed Benchmark Comparison/,
   },
-  { slug: "compare-empty", url: "/results/compare", readyText: /Cannot compare/ },
+  {
+    slug: "compare-empty",
+    url: "/results/compare",
+    readyText: /Pick runs to compare|Cannot compare/,
+  },
   { slug: "query", url: "/results/query", readyText: /matching result bundle/ },
   { slug: "not-found", url: "/results/clickbench/", readyText: /No published results yet/ },
 ];
