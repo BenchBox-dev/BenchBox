@@ -500,7 +500,7 @@ describe("Compare", () => {
     const queryDiffHeading = screen.getByRole("heading", { name: "Query-Level Diff" });
 
     expect(summary.closest("section")).toHaveTextContent("DuckDB leads by 10.00x on power score.");
-    expect(summary.closest("section")).toHaveTextContent("2/2 fastest");
+    expect(summary.closest("section")).toHaveTextContent("2 fastest of 2 comparable");
     expect(summary.compareDocumentPosition(chartsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(summary.compareDocumentPosition(queryDiffHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(chartsHeading.compareDocumentPosition(queryDiffHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -569,8 +569,8 @@ describe("Compare", () => {
 
     const summary = screen.getByRole("heading", { name: "Decision Summary" }).closest("section");
     const queryDiff = screen.getByRole("heading", { name: "Query-Level Diff" }).closest("section");
-    expect(summary).toHaveTextContent("1/1 fastest");
-    expect(summary).toHaveTextContent("2 missing");
+    expect(summary).toHaveTextContent("1 fastest of 1 comparable");
+    expect(summary).toHaveTextContent("2 excluded for missing data");
     expect(queryDiff).toHaveTextContent("3 comparisons");
     expect(queryDiff).toHaveTextContent("Missing");
   });

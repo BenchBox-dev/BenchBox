@@ -247,4 +247,40 @@ describe("buildCompareDecisionSummary", () => {
       "Not directly comparable: benchmarks differ. Winner language is suppressed; raw query evidence remains available.",
     );
   });
+
+  it("renders tie copy when same-platform comparison rounds to 1.00x (finding #8)", () => {
+    const summary = buildCompareDecisionSummary(
+      [
+        makeResult({ result_id: "polars-a", platform: "Polars", power_score: 1000 }),
+        makeResult({ result_id: "polars-b", platform: "Polars", power_score: 1000 }),
+      ],
+      "power_score",
+    );
+
+    expect(summary.isTie).toBe(true);
+    expect(summary.headline).toContain("tie threshold");
+    expect(summary.headline).not.toContain("leads by");
+    expect(summary.headline).not.toContain("faster");
+  });
+
+  it("uses the cohort-aware run label in the headline when runLabels are provided", () => {
+    const summary = buildCompareDecisionSummary(
+      [
+        makeResult({ result_id: "polars-a", platform: "Polars", power_score: 1500 }),
+        makeResult({ result_id: "polars-b", platform: "Polars", power_score: 1000 }),
+      ],
+      "power_score",
+      {
+        runLabels: {
+          "polars-a": "Polars 2026-05-08 (deadbeef)",
+          "polars-b": "Polars 2026-05-02 (0093bb7a)",
+        },
+      },
+    );
+
+    expect(summary.isTie).toBe(false);
+    expect(summary.winnerLabel).toBe("Polars 2026-05-08 (deadbeef)");
+    expect(summary.headline).toContain("Polars 2026-05-08 (deadbeef)");
+    expect(summary.headline).not.toMatch(/^Polars leads/);
+  });
 });

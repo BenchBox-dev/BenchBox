@@ -32,9 +32,14 @@ export function CompareSummary({ summary }: CompareSummaryProps) {
         <SummaryCard label="Winner">
           {summary.claimSuppressed ? (
             <p class="text-sm text-[var(--bb-data-fg-muted)]">Not claimed</p>
+          ) : summary.isTie ? (
+            <>
+              <p class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">Tie</p>
+              <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">No material difference on the primary metric.</p>
+            </>
           ) : summary.winner ? (
             <>
-              <p class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">{summary.winner.platform}</p>
+              <p class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">{summary.winnerLabel ?? summary.winner.platform}</p>
               <p class="mt-1 font-mono text-xs text-[var(--bb-data-fg-muted)]">
                 {formatPrimaryValue(summary.winner.value, summary.primaryMetric)}
               </p>
@@ -66,11 +71,18 @@ export function CompareSummary({ summary }: CompareSummaryProps) {
           ) : (
             <>
               <p class="font-mono text-sm font-semibold text-[var(--bb-data-fg-primary)]">
-                {summary.queryRecord.wins}/{summary.queryRecord.comparableQueries} fastest
+                {summary.queryRecord.wins} fastest of {summary.queryRecord.comparableQueries} comparable
               </p>
               <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">
-                {summary.queryRecord.losses} slower, {summary.queryRecord.ties} tied,{" "}
-                {summary.queryRecord.missing} missing
+                {summary.queryRecord.losses} slower · {summary.queryRecord.ties} tied
+                {summary.queryRecord.missing > 0 ? (
+                  <>
+                    {" · "}
+                    <span data-testid="compare-query-wins-missing">
+                      {summary.queryRecord.missing} excluded for missing data
+                    </span>
+                  </>
+                ) : null}
               </p>
             </>
           )}

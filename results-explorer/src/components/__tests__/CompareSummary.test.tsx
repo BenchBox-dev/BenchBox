@@ -67,7 +67,7 @@ describe("CompareSummary", () => {
     const summaryRegion = screen.getByRole("heading", { name: "Decision Summary" }).closest("section");
     expect(summaryRegion).not.toBeNull();
     expect(summaryRegion).toHaveTextContent("DuckDB leads by 10.00x on power score.");
-    expect(summaryRegion).toHaveTextContent("2/2 fastest");
+    expect(summaryRegion).toHaveTextContent("2 fastest of 2 comparable");
     expect(summaryRegion).toHaveTextContent("p50 15 ms");
     expect(summaryRegion).toHaveTextContent("winner cost $0.50");
     expect(summaryRegion).toHaveTextContent("30.00x cost/performance");
