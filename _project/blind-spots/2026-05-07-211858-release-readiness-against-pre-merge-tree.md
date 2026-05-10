@@ -5,7 +5,7 @@ status: actionable
 finding_kind: framework-gap
 review_context: "PR #269 review (results-explorer-retheme-audit-followups) → PR #271 (results-explorer-retheme-postmerge-tokenize)"
 related_paths:
-  - _project/audits/results-explorer-retheme-final-2026-05-07.md
+  - _project/audits/results-explorer-retheme-final-2026-05-10.md
   - results-explorer/e2e/captures/release-final.spec.ts
   - results-explorer/src/pages/ResultDetail.tsx
   - results-explorer/src/pages/Compare.tsx
@@ -65,7 +65,7 @@ same exposure if the report and the merge are not regenerated together.
       include the develop SHA it describes, and reviewers should refuse to
       merge a release-readiness PR whose report SHA is older than the merge
       target.
-- [ ] Sweep: re-run `results-explorer-retheme-final-2026-05-07.md` with a
+- [x] Sweep: re-run `results-explorer-retheme-final-2026-05-10.md` with a
       capture against develop tip after PR #271 lands, so the artifact set
       reflects the shipped state.
 
@@ -113,7 +113,7 @@ Step #1 is already tracked by TODO
 3. **Re-run the release-final capture against post-#271 develop tip.**
    PR #271 (`274a4a11e`) closed the literal regression, but the
    2026-05-07 audit and screenshot set under
-   `_project/audits/screenshots/results-explorer-retheme-final-2026-05-07/`
+   `_project/audits/screenshots/results-explorer-retheme-final-2026-05-10/`
    still describe the pre-#271 tree. Regenerate the audit and capture
    on top of the current `develop` and replace the 2026-05-07 artifact
    in place via `git mv` (rename to a fresh dated path so `git log

@@ -57,7 +57,7 @@ work:
   status: done
   notes: |
     Outcome: 48 fullPage screenshots are stored under
-    `_project/audits/screenshots/results-explorer-retheme-final-2026-05-07/`
+    `_project/audits/screenshots/results-explorer-retheme-final-2026-05-10/`
     (12 routes × 4 widths), including Result Detail and same/mismatch Compare
     routes.
 
@@ -89,7 +89,7 @@ work:
   needs: [w5]
   status: done
   notes: |
-    Outcome: `_project/audits/results-explorer-retheme-final-2026-05-07.md`
+    Outcome: `_project/audits/results-explorer-retheme-final-2026-05-10.md`
     now contains the expanded route matrix, 48-screenshot index,
     console/network summary, accessibility/responsive summary, and residual
     minor product UX items. No blocker or unowned major finding remains.

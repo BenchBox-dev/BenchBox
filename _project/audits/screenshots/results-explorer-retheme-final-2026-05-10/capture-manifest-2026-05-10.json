@@ -1,0 +1,62 @@
+{
+  "capture_date": "2026-05-10",
+  "develop_sha": "8c1589c4b8add656a35345b38de68eff2e766cef",
+  "routes": [
+    {
+      "slug": "home",
+      "url": "/results/"
+    },
+    {
+      "slug": "benchmark-tpch-sf001",
+      "url": "/results/tpch/?sf=0.01&phase=standard"
+    },
+    {
+      "slug": "benchmark-star-schema-sf01",
+      "url": "/results/star_schema/?sf=0.1&phase=power"
+    },
+    {
+      "slug": "platform-duckdb",
+      "url": "/results/p/duckdb/"
+    },
+    {
+      "slug": "platform-datafusion",
+      "url": "/results/p/datafusion/"
+    },
+    {
+      "slug": "platform-polars",
+      "url": "/results/p/polars/"
+    },
+    {
+      "slug": "result-detail-tpch-duckdb",
+      "url": "/results/r/tpch-duckdb-sf0.01-20260403-010ee756"
+    },
+    {
+      "slug": "compare-same-cohort",
+      "url": "/results/compare?ids=ba6a8c83,5e6c5eba"
+    },
+    {
+      "slug": "compare-mismatch-benchmark",
+      "url": "/results/compare?ids=ba6a8c83,0f0add9f"
+    },
+    {
+      "slug": "compare-empty",
+      "url": "/results/compare"
+    },
+    {
+      "slug": "query",
+      "url": "/results/query"
+    },
+    {
+      "slug": "not-found",
+      "url": "/results/clickbench/"
+    }
+  ],
+  "widths": [
+    390,
+    768,
+    1280,
+    1600
+  ],
+  "output_dir": "_project/audits/screenshots/results-explorer-retheme-final-2026-05-10",
+  "console_network_log": "_project/audits/screenshots/results-explorer-retheme-final-2026-05-10/console-network-2026-05-10.log"
+}
