@@ -1,7 +1,7 @@
 {
   "enabled": true,
-  "max_fast_tests": 22000,
-  "_ceiling_note": "Bumped 13200 -> 22000 on 2026-04-13 to reflect grown fast-lane (20,184 collected). Ratchet down if the lane contracts; never raise without justification.",
+  "max_fast_tests": 22100,
+  "_ceiling_note": "Bumped 13200 -> 22000 on 2026-04-13 to reflect grown fast-lane (20,184 collected). Bumped 22000 -> 22100 on 2026-05-10 for joinorder-canonical-foundation Phase-1 (data_fetch + scale-factor + surface-field tests; 22038 collected). Ratchet down if the lane contracts; never raise without justification.",
   "forbidden_marker_expressions": [
     "resource_heavy",
     "stress",
