@@ -90,7 +90,9 @@ describe("RunReceipt", () => {
     expect(within(receipt).getByText("Plans not published")).toBeTruthy();
     expect(within(receipt).getByText("unavailable")).toBeTruthy();
     expect(within(receipt).getByText("2026.05.0 (benchbox.core.cost.pricing)")).toBeTruthy();
-    expect(within(receipt).getByText("compute only, billing: unknown, region: unknown")).toBeTruthy();
+    // Sentinel "unknown" for billing/region is suppressed (finding #12);
+    // only the cost scope renders.
+    expect(within(receipt).getByText("compute only")).toBeTruthy();
   });
 
   it("renders normalized cost metadata when it is present", () => {
@@ -107,7 +109,26 @@ describe("RunReceipt", () => {
 
     const receipt = screen.getByRole("region", { name: "Run receipt" });
     expect(within(receipt).getByText("$0.42")).toBeTruthy();
-    expect(within(receipt).getByText("compute only, billing: warehouse_hour, region: us-east-1")).toBeTruthy();
+    expect(within(receipt).getByText("compute only, billing: warehouse hour, region: us-east-1")).toBeTruthy();
+  });
+
+  it("does not leak raw not_applicable enum into the Cost section copy (finding #12)", () => {
+    render(
+      <RunReceipt
+        detail={makeDetail({
+          cost_status: "not_applicable_local",
+          cost_scope: "compute_only",
+          billing_unit: "not_applicable",
+          pricing_region: "not_applicable",
+        })}
+      />,
+    );
+
+    const receipt = screen.getByRole("region", { name: "Run receipt" });
+    expect(within(receipt).getByText("compute only")).toBeTruthy();
+    expect(receipt.textContent ?? "").not.toMatch(/not_applicable/);
+    expect(receipt.textContent ?? "").not.toMatch(/billing: not applicable/);
+    expect(receipt.textContent ?? "").not.toMatch(/region: not applicable/);
   });
 
   it("counts placeholder cost summaries as missing receipt metadata", () => {
