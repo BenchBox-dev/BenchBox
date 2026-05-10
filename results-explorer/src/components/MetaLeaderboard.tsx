@@ -342,7 +342,11 @@ export function MetaLeaderboard({
                         }}
                         onKeyDown={(event) => handleCellKey(event, rowIdx, colIdx)}
                       >
-                        {receiptHref ? (
+                        {receiptHref && rank ? (
+                          // Only wrap the cell value in a link when there is
+                          // a rank entry — otherwise we would emit a linked
+                          // "No run" cell whose href contradicts the missing
+                          // text (audit finding #4 / 2026-05-09).
                           <a
                             href={receiptHref}
                             class="font-mono no-underline hover:text-[var(--bb-accent-hover)]"

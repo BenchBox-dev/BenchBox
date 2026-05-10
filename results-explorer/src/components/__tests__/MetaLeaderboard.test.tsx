@@ -448,4 +448,51 @@ describe("MetaLeaderboard", () => {
     fireEvent.keyDown(activeCell!, { key: "Enter" });
     expect(routeMock).toHaveBeenLastCalledWith("/results/p/sqlite/");
   });
+
+  it("does not render a linked 'No run' cell when rank data is missing for a published result (finding #4)", () => {
+    // Reproduction shape from the audit: a result is in cohort.platforms
+    // (so resultMetadataById/receiptHref both resolve) but the platform's
+    // ranks map is missing the cohort entry. The cell must read "No run"
+    // and must NOT be wrapped in an <a>.
+    const data: MetaLeaderboardData = {
+      ...DATA,
+      cohorts: [
+        {
+          ...DATA.cohorts[0]!,
+          key: "tpch-sf0.1-power",
+          benchmark: "tpch",
+          label: "TPC-H SF0.1",
+          href: "/results/tpch/",
+          platforms: [
+            {
+              platform_id: "polars",
+              platform: "Polars",
+              result_id: "polars-tpch-r1",
+              rank: 1,
+              metric_value: 9001,
+              speedup_vs_best: 1,
+              primary_metric: "power_score",
+              primary_order: "desc" as const,
+            },
+          ],
+        },
+      ],
+      platforms: [
+        {
+          platform_id: "polars",
+          platform: "Polars",
+          ranks: {}, // <- the contradiction: result exists, ranks map is empty
+          avg_rank: 0,
+          n_cohorts: 0,
+        },
+      ],
+    };
+    render(<MetaLeaderboard data={data} mode="times" onModeChange={vi.fn()} />);
+
+    const cell = screen.getAllByRole("gridcell").find((el) => el.textContent?.includes("No run"));
+    expect(cell).toBeTruthy();
+    // Critical assertion: the "No run" text must not be inside an anchor.
+    const link = cell!.querySelector("a");
+    expect(link).toBeNull();
+  });
 });
