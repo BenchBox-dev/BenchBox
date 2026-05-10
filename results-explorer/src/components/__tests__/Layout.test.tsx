@@ -84,4 +84,19 @@ describe("Layout", () => {
     });
     expect(within(explorerNav).getByRole("link", { name: "Leaderboards" })).not.toHaveAttribute("aria-current");
   });
+
+  it("ExplorerNavLink and GlobalNavLink expose explicit focus-visible outline classes (PR #246 VH-1 follow-up)", () => {
+    renderAt("/results/");
+    const explorerNav = screen.getByRole("navigation", { name: "Results Explorer" });
+    const globalNav = screen.getByRole("navigation", { name: "BenchBox" });
+
+    for (const link of [
+      ...within(explorerNav).getAllByRole("link"),
+      ...within(globalNav).getAllByRole("link"),
+    ]) {
+      const cls = link.getAttribute("class") ?? "";
+      expect(cls).toMatch(/focus-visible:outline\b/);
+      expect(cls).toMatch(/focus-visible:outline-\[var\(--bb-focus-ring\)\]/);
+    }
+  });
 });

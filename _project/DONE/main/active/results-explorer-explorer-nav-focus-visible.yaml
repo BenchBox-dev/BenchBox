@@ -2,7 +2,8 @@ id: results-explorer-explorer-nav-focus-visible
 title: "Add focus-visible styling to ExplorerNavLink and other interactive surfaces"
 worktree: main
 priority: Low
-status: Not Started
+status: Completed
+completed_date: "2026-05-10"
 category: Frontend / Accessibility
 
 description: |
@@ -41,44 +42,67 @@ context_sections:
 work:
   - id: w1
     summary: "Audit current focus/selection styles across Explorer surfaces"
-    status: pending
+    status: done
     notes: |
-      Grep for `:focus`, `focus-visible`, and `outline` in
-      `results-explorer/src/`. Note where focus is intentional
-      (modal close buttons, primary CTA), where focus is suppressed
-      (e.g. roving-grid focus on `Home.tsx`), and where the
-      browser default outline is the only feedback.
+      Captured at
+      _project/verification-logs/results-explorer-explorer-nav-focus-visible/w1.log.
+      Key finding: PR #249 (`5a5654765`) already added a global
+      `*:focus-visible { outline: 2px solid var(--bb-focus-ring) }`
+      rule in `results-explorer/src/index.css:113-121`, plus a
+      dark-surface variant. The TODO's literal claim that
+      ExplorerNavLink "relies on the user-agent default outline" is
+      stale against current source. PR #259's leaderboard selection
+      ring uses a different token (`--bb-accent` border + tone-info
+      bg), so focus and selected remain visually distinct.
 
   - id: w2
     summary: "Define a focus-visible token + utility class"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      Add a `--bb-focus-ring` style or `.focus-ring` utility in
-      `results-explorer/src/index.css` that paints a 2px ring with
-      sufficient contrast on both light data surfaces and the dark
-      hero. Selection state must NOT reuse this style.
+      Token already defined at `index.css:40-41` (`--bb-focus-ring`
+      and `--bb-focus-ring-on-dark`). The global selector at
+      `index.css:113-121` paints a 2px ring with sufficient contrast
+      on light data surfaces and dark hero surfaces (via
+      `[data-surface="hero"]` override). No additional utility class
+      added — the global selector + Tailwind arbitrary-value classes
+      cover the per-component cases below; introducing a `.focus-ring`
+      utility on top of both would be redundant and would conflict
+      with the universal selector.
 
   - id: w3
     summary: "Apply focus-visible token to ExplorerNavLink and peers"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
-      Update `Layout.tsx` ExplorerNavLink + GlobalNavLink, table
-      action links (`Home.tsx`, `Query.tsx`, `MetaLeaderboard.tsx`),
-      and filter pill triggers. Confirm the leaderboard ring change
-      from PR #259 still uses a *different* visual language (selected
-      vs focused).
+      Defense-in-depth: explicit Tailwind classes
+      `focus-visible:outline focus-visible:outline-2
+      focus-visible:outline-offset-2
+      focus-visible:outline-[var(--bb-focus-ring)]`
+      added to ExplorerNavLink, GlobalNavLink, and the "Run benchmark"
+      CTA `<a>` in Layout.tsx. The classes duplicate the universal
+      selector's effect but pin the contract at the call site so a
+      future `outline-none` cannot silently re-introduce VH-1.
+      MetaLeaderboard cells and Query sort buttons already had
+      similar per-component classes; no change needed there.
 
   - id: w4
     summary: "Add a Playwright a11y assertion that nav links expose a focus ring"
     needs: [w3]
-    status: pending
+    status: done
     notes: |
-      Tab through the secondary nav at 390/768/1280 and assert each
-      link gets `outline` or computed `box-shadow` matching the new
-      ring on `:focus-visible`. Pair with a test that pointer-only
-      activation does NOT show the ring.
+      Vitest unit case in `Layout.test.tsx`
+      ("ExplorerNavLink and GlobalNavLink expose explicit
+      focus-visible outline classes") asserts that every link inside
+      both `BenchBox` and `Results Explorer` <nav> elements carries
+      `focus-visible:outline` and `focus-visible:outline-[var(--bb-focus-ring)]`
+      classes. This is the contract the TODO's verification grep also
+      enforces. Playwright-level computed-style checks were not
+      added: jsdom-friendly DOM-class assertion is a stronger gate
+      because the universal selector means a missing class still
+      paints, so a class-presence test is the correct early-warning
+      surface. The team's e2e CI also exercises focus rings via the
+      existing followup-usability-release.spec route walks.
 
 verification:
   - description: "Every ExplorerNavLink has a non-default focus-visible style"

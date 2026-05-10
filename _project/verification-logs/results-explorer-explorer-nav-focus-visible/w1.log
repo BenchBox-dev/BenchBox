@@ -1,0 +1,79 @@
+# w1 — Audit current focus/selection styles across Explorer surfaces
+
+**Date:** 2026-05-10
+**Develop tip rebased onto:** post-21376cb58
+**Method:** Static source analysis.
+
+## Existing focus-ring contract (already in source)
+
+A global selector lives at `results-explorer/src/index.css:113-121`
+(landed in PR #249 — `5a5654765 feat(explorer): theme tokens and shared
+UI primitives`):
+
+```css
+*:focus-visible {
+    outline: 2px solid var(--bb-focus-ring);
+    outline-offset: 2px;
+}
+.surface-hero *:focus-visible,
+[data-surface="hero"] *:focus-visible {
+    outline-color: var(--bb-focus-ring-on-dark);
+}
+```
+
+`--bb-focus-ring` (`#2563eb`) and `--bb-focus-ring-on-dark` (`#93c5fd`)
+are defined in the same file at `:root` (line 40-41). The contract
+applies to every focusable element via the universal selector.
+
+This means the TODO's literal claim that
+`ExplorerNavLink (Layout.tsx:97-119) still has no focus-visible: style
+and relies on the user-agent default outline`
+is **stale**: the global rule paints a 2px ring on every nav link
+focus-visible event, including ExplorerNavLink, GlobalNavLink, the
+"Run benchmark" CTA link, and table action `<a>` elements.
+
+## Selection vs focus visual distinction
+
+PR #259's leaderboard ring fix (VH-1) uses the `selected-ring` token
+on a per-cell border, not the focus token, so selected cells use
+border + bg-tone (e.g. `border-[var(--bb-accent)]
+bg-[var(--bb-tone-info-bg)]`) and focused cells use the universal
+outline. The two styles remain visually distinct.
+
+## Per-component focus-visible references already in source
+
+Two surfaces add a focus-visible Tailwind class even though the global
+rule covers them — defense-in-depth:
+
+- `MetaLeaderboard.tsx` table cells:
+  `focus-visible:outline focus-visible:outline-2
+  focus-visible:-outline-offset-2 focus-visible:outline-[var(--bb-focus-ring)]`
+- `Query.tsx` sortable column buttons:
+  `focus-visible:outline focus-visible:outline-2
+  focus-visible:outline-[var(--bb-accent)]`
+
+The `bb-accent` color on Query is intentional — sort buttons are
+nav-flow controls, not data, and the accent is consistent with the
+column-active treatment.
+
+## Implementation plan after w1
+
+The TODO's verification gate:
+
+> grep -nE 'focus-visible' results-explorer/src/components/Layout.tsx
+> Expected: >= 1 match
+
+currently fails (0 matches in Layout.tsx). The contract is met via
+the universal CSS rule, but the per-component check codifies the
+contract at the call site. Add explicit `focus-visible:` Tailwind
+classes to `ExplorerNavLink` and `GlobalNavLink` so:
+
+1. The grep gate passes.
+2. A future change that opts a component out of the universal rule
+   (e.g. `outline-none focus:outline-none`) cannot silently re-introduce
+   VH-1 without removing the per-component classes too.
+3. The "Run benchmark" CTA `<a>` (Layout.tsx:42-47) gets the same
+   treatment for parity.
+
+Apply also to `View →` table action links on Home, Query, and
+MetaLeaderboard (already covered for table-cell roving focus).
