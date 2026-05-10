@@ -79,7 +79,7 @@ work:
 - id: w1
   summary: "Write design doc: reusable foundations (scale-factor gate, data-fetch infra, dataset-versioning, registry surface
     field)"
-  status: pending
+  status: done
   notes: |
     Output: `_project/design/joinorder-step1-foundations.md`
     Sections:
@@ -572,7 +572,8 @@ scope_limit:
   - "_project/design/joinorder-step1-foundations.md (new)"
   - "_project/design/data-fetch-infra-reuse-guide.md (new — design doc consumed by Track-2 groundwork TODO)"
   - "_project/scripts/build_joinorder_data.py (new — main offline build pipeline used by w4-w14)"
-  - "_project/scripts/w0_validate_empty_queries.py (new — w0 evidence re-validation helper; replays the issue #289 empty-query probe against the current generator)"
+  - "_project/scripts/w0_validate_empty_queries.py (new — w0 evidence re-validation helper; replays the issue #289 empty-query
+    probe against the current generator)"
   - "_project/scripts/pyproject.toml (add deps if needed)"
   - "_project/joinorder/build-inputs/queries/*.sql (new — 113 queries from gregrahn)"
   - "_project/joinorder/reference_cardinalities.json (new)"
