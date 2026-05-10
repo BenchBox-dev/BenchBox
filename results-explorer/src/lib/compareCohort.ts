@@ -132,6 +132,15 @@ export interface CompareSelectionLabelInput {
   resultId?: string | null;
 }
 
+/**
+ * Suffix for status copy when a cohort lock hides incompatible rows.
+ * Returns an empty string for `count <= 0` so callers can append unconditionally.
+ */
+export function hiddenIncompatibleSuffix(count: number): string {
+  if (count <= 0) return "";
+  return ` ${count} incompatible row${count === 1 ? "" : "s"} hidden.`;
+}
+
 export function compareSelectionLabel(input: CompareSelectionLabelInput): string {
   const parts: string[] = [];
   const platform = (input.platform ?? "").toString().trim();

@@ -13,9 +13,11 @@ import {
 import { humanizeBenchmark, errMsg, fmtGeomean } from "@/utils";
 import { buildCompareUrl, MAX_COMPARE_SELECTIONS } from "@/lib/resultLinks";
 import {
+  compareCohortMismatches,
   compareCohortPartition,
   compareCohortSignatureForRow,
   compareSelectionLabel,
+  hiddenIncompatibleSuffix,
   type CompareCohortSignature,
 } from "@/lib/compareCohort";
 import { formatRunIdentitiesForCohort, type RunIdentitySource } from "@/lib/runIdentity";
@@ -616,12 +618,8 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
   );
 
   function isCompatible(row: ResultRow): boolean {
-    if (!cohortLock) return true;
-    return (
-      row.benchmark === cohortLock.benchmark &&
-      row.scale_factor === cohortLock.scale_factor &&
-      (row.test_type ?? "") === cohortLock.test_type
-    );
+    if (cohortSignature === null) return true;
+    return compareCohortMismatches(row, cohortSignature).length === 0;
   }
 
   function toggleSelection(row: ResultRow) {
@@ -735,11 +733,7 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
           {selectedCount === 0
             ? `${filteredRows.length} candidate${filteredRows.length === 1 ? "" : "s"}. Select at least 2 to launch a comparison.`
             : selectedCount < 2
-            ? `1 selected. Select 1 more compatible run to launch.${
-                incompatibleHiddenCount > 0
-                  ? ` ${incompatibleHiddenCount} incompatible row${incompatibleHiddenCount === 1 ? "" : "s"} hidden.`
-                  : ""
-              }`
+            ? `1 selected. Select 1 more compatible run to launch.${hiddenIncompatibleSuffix(incompatibleHiddenCount)}`
             : `${selectedCount} selected. ${cohortLock ? `Cohort: ${humanizeBenchmark(cohortLock.benchmark)} · SF ${cohortLock.scale_factor}${cohortLock.test_type ? ` · ${cohortLock.test_type}` : ""}` : ""}`}
         </p>
         <div class="flex gap-2">

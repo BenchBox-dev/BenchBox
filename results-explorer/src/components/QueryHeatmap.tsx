@@ -610,13 +610,13 @@ export function QueryHeatmap({
                         checked={isSelected}
                         onChange={() => toggleRow(row)}
                         aria-label={compareSelectionLabel({
-                      platform: row.platform,
-                      benchmark: summary.benchmark,
-                      scaleFactor: summary.scale_factor,
-                      phase: summary.phase,
-                      runDate: row.run_date,
-                      resultId: row.result_id,
-                    })}
+                          platform: row.platform,
+                          benchmark: summary.benchmark,
+                          scaleFactor: summary.scale_factor,
+                          phase: summary.phase,
+                          runDate: row.run_date,
+                          resultId: row.result_id,
+                        })}
                         class="h-4 w-4 rounded border-[var(--bb-data-border-strong)]"
                       />
                     </td>

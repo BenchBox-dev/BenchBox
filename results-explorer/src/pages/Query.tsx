@@ -23,6 +23,7 @@ import {
   compareCohortPartition,
   compareCohortSignatureForRow,
   compareSelectionLabel,
+  hiddenIncompatibleSuffix,
 } from "@/lib/compareCohort";
 import { buildCompareUrl, compareIdForRow, MAX_COMPARE_SELECTIONS } from "@/lib/resultLinks";
 import { STARTER_QUERY_CATEGORIES, starterQueriesByCategory, type StarterQueryCategory } from "@/lib/starterQueries";
@@ -684,16 +685,10 @@ export function Query(_: RoutableProps) {
                 </div>
                 {(() => {
                   const rowsByResultId = new Map(rows.map((row) => [String(row.result_id), row]));
-                  const lockSig = (() => {
-                    const firstId = [...compareSelectedIds][0];
-                    if (firstId === undefined) return null;
-                    const firstRow = rowsByResultId.get(firstId);
-                    return firstRow ? compareCohortSignatureForRow(firstRow) : null;
-                  })();
                   const lockReason = (row: ResultRow): string | undefined => {
                     const id = String(row.result_id);
                     if (compareSelectedIds.has(id)) return undefined;
-                    return compareCohortLockReason(row, lockSig);
+                    return compareCohortLockReason(row, compareCohortSignature);
                   };
                   const selectedCompareIds = [...compareSelectedIds]
                     .map((id) => {
@@ -711,11 +706,7 @@ export function Query(_: RoutableProps) {
                           {compareSelectedIds.size === 0 ? (
                             "Select two or more rows to compare. The first pick locks the cohort."
                           ) : compareSelectedIds.size === 1 ? (
-                            `1 result selected — pick a compatible second row to enable Compare.${
-                              compareIncompatibleHiddenCount > 0
-                                ? ` ${compareIncompatibleHiddenCount} incompatible row${compareIncompatibleHiddenCount === 1 ? "" : "s"} hidden.`
-                                : ""
-                            }`
+                            `1 result selected — pick a compatible second row to enable Compare.${hiddenIncompatibleSuffix(compareIncompatibleHiddenCount)}`
                           ) : compareSelectedIds.size >= MAX_COMPARE_SELECTIONS ? (
                             `${compareSelectedIds.size} results selected (maximum).`
                           ) : (

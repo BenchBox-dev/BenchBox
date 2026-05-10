@@ -3,6 +3,7 @@ import {
   compareCohortPartition,
   compareCohortSignatureForRow,
   compareSelectionLabel,
+  hiddenIncompatibleSuffix,
 } from "@/lib/compareCohort";
 
 describe("compareCohortPartition", () => {
@@ -87,6 +88,27 @@ describe("compareSelectionLabel", () => {
 
   it("falls back to a generic label when no inputs are provided", () => {
     expect(compareSelectionLabel({})).toBe("Select run for comparison");
+  });
+
+  it("truncates ISO-timestamp run dates to YYYY-MM-DD", () => {
+    const label = compareSelectionLabel({
+      platform: "Polars",
+      runDate: "2026-05-02T18:11:00Z",
+      resultId: "abc-1234",
+    });
+    expect(label).toBe("Select Polars 2026-05-02 (1234) for comparison");
+  });
+});
+
+describe("hiddenIncompatibleSuffix", () => {
+  it("returns an empty string for non-positive counts", () => {
+    expect(hiddenIncompatibleSuffix(0)).toBe("");
+    expect(hiddenIncompatibleSuffix(-1)).toBe("");
+  });
+
+  it("uses singular and plural forms correctly", () => {
+    expect(hiddenIncompatibleSuffix(1)).toBe(" 1 incompatible row hidden.");
+    expect(hiddenIncompatibleSuffix(7)).toBe(" 7 incompatible rows hidden.");
   });
 
   it("trims null/undefined inputs without leaving stray separators", () => {
