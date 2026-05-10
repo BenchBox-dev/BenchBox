@@ -2,8 +2,29 @@ id: joinorder-canonical-foundation
 title: "joinorder canonical IMDb 2013 — Foundation & archive build (Step 1, part 1 of 2)"
 worktree: main
 priority: High
-status: In Progress
+status: Blocked
 category: Core Functionality
+
+# 2026-05-10 implementation status (foundation Phase 1 PR):
+#   w0  Re-validate empty-query claim                           — DONE
+#   w1  Step-1 design doc + reuse-guide stub                    — DONE
+#   w2  data_fetch module skeleton (5 modules + 16 tests)       — DONE
+#   w3  Registry surface field + strict scale-factor gate       — DONE
+#   w4  Postgres container + Harvard Dataverse pg_dump restore  — BLOCKED
+#   w5..w16  (sequential downstream of w4)                      — BLOCKED
+#
+# Blocker: Docker daemon is not running on the implementing host
+# (verified 2026-05-10: `docker version --format ...` returns
+# "Cannot connect to the Docker daemon"). The build pipeline (w4)
+# requires docker for the ephemeral Postgres restore; w5-w12
+# extract data from that restored Postgres; w13-w16 package and
+# stage the GitHub Release. No alternative path is feasible without
+# either (a) starting Docker Desktop, or (b) targeting a different
+# Postgres deployment (out of scope for the locked-in design).
+#
+# Cutover TODO MUST NOT start until w4-w16 land. Per the foundation
+# planning contract, the manifest, the archive URL, and the tiny
+# fixture are all consumed by the cutover.
 
 description: |
   Step 1 of the dual-track JOB strategy responding to GitHub issue #289
