@@ -1,5 +1,18 @@
 import { formatBenchmarkLabel } from "@/lib/displayLabels";
 
+/**
+ * Extract the trailing short-hash token from a result id for a11y disambiguation.
+ * Result IDs follow `<benchmark>-<platform>-sf<scale>-<date>-<shorthash>`; the
+ * trailing token is the unique fingerprint that distinguishes otherwise-similar
+ * runs. Strings without a `-` are returned as-is so callers can pass already-short
+ * ids without surprise.
+ */
+function compareSelectionShortId(id: string): string {
+  if (id.length === 0) return "";
+  const trailing = id.split("-").pop()!;
+  return trailing.length > 0 ? trailing : id;
+}
+
 export interface CompareCohortSignature {
   benchmark: string;
   scaleFactor: string;
@@ -78,4 +91,73 @@ export function compareCohortLockReason(
     `Locked: first selection is ${compareCohortSummary(signature)}. ` +
     `This row differs by ${mismatches.join(", ")}.`
   );
+}
+
+/**
+ * Stable partition of rows into `{compatible, incompatible}` against a locked
+ * cohort signature. Used by Compare and Query Workbench so compatible
+ * candidates surface above incompatibles after the first selection,
+ * regardless of the user's column-sort choice.
+ *
+ * Stability: relative order within each bucket matches the input order. When
+ * `signature` is null (no selection yet) every row is treated as compatible.
+ */
+export function compareCohortPartition<T extends CompareCohortRow>(
+  rows: readonly T[],
+  signature: CompareCohortSignature | null,
+): { compatible: T[]; incompatible: T[] } {
+  if (signature === null) return { compatible: [...rows], incompatible: [] };
+  const compatible: T[] = [];
+  const incompatible: T[] = [];
+  for (const row of rows) {
+    if (compareCohortMismatches(row, signature).length === 0) compatible.push(row);
+    else incompatible.push(row);
+  }
+  return { compatible, incompatible };
+}
+
+/**
+ * Build a disambiguated accessible name for compare-selection checkboxes.
+ * Repeated platform names ("Select DuckDB for comparison" five times) are
+ * indistinguishable to assistive technology and locator-driven tests; this
+ * helper appends benchmark, scale, phase, run date, and a short result-id
+ * suffix so each row has a unique accessible name.
+ */
+export interface CompareSelectionLabelInput {
+  platform?: string | null;
+  benchmark?: string | null;
+  scaleFactor?: string | number | null;
+  phase?: string | null;
+  runDate?: string | null;
+  resultId?: string | null;
+}
+
+/**
+ * Suffix for status copy when a cohort lock hides incompatible rows.
+ * Returns an empty string for `count <= 0` so callers can append unconditionally.
+ */
+export function hiddenIncompatibleSuffix(count: number): string {
+  if (count <= 0) return "";
+  return ` ${count} incompatible row${count === 1 ? "" : "s"} hidden.`;
+}
+
+export function compareSelectionLabel(input: CompareSelectionLabelInput): string {
+  const parts: string[] = [];
+  const platform = (input.platform ?? "").toString().trim();
+  const benchmark = (input.benchmark ?? "").toString().trim();
+  const scale =
+    input.scaleFactor === null || input.scaleFactor === undefined ? "" : String(input.scaleFactor).trim();
+  const phase = (input.phase ?? "").toString().trim();
+  const runDate = (input.runDate ?? "").toString().slice(0, 10);
+  const resultId = (input.resultId ?? "").toString().trim();
+
+  if (platform !== "") parts.push(platform);
+  if (benchmark !== "") parts.push(formatBenchmarkLabel(benchmark));
+  if (scale !== "") parts.push(`SF ${scale}`);
+  if (phase !== "") parts.push(phase);
+  if (runDate !== "") parts.push(runDate);
+  if (resultId !== "") parts.push(`(${compareSelectionShortId(resultId)})`);
+
+  if (parts.length === 0) return "Select run for comparison";
+  return `Select ${parts.join(" ")} for comparison`;
 }

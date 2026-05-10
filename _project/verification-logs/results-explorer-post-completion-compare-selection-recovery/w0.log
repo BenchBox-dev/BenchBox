@@ -1,0 +1,77 @@
+# w0 — Revalidate compare-selection defects on the current develop tip
+
+**Date:** 2026-05-10
+**Develop tip rebased onto:** 21f1980c2 + ebf0c2a95 (PR #321 branch)
+**Method:** Static source analysis (no live browser available in this
+session). Each finding is checked against the rendered DOM in code, not
+against a captured browser screenshot. Where a finding cannot be
+disambiguated from source alone, the implementing change still ships
+with a Vitest assertion that pins the contract.
+
+## Findings reproducing in source
+
+### Finding #2 — Compare picker hides compatible second choices below the viewport
+**Reproduces.** `results-explorer/src/pages/Compare.tsx:575-583`
+(`filteredRows`) filters only by user-controlled `benchmarkFilter`,
+`scaleFilter`, and `phaseFilter`. There is no compatible-first sort
+after the first selection: incompatible rows render disabled with
+`opacity-60` (line 755) but keep their original ordering. With hundreds
+of rows in the corpus, compatible candidates can sit far below the
+viewport.
+
+### Finding #3 — Query Workbench leaves every visible row disabled
+**Reproduces.** `results-explorer/src/pages/Query.tsx:780-783` shows
+the row checkbox `disabled={Boolean(reason)}` after the cohort lock
+fires. Compatible rows are not pulled to the top, so the user can scroll
+through pages of disabled checkboxes while the tray still says
+"Select two or more rows to compare." (line 687).
+
+### Finding #11 — Compare-selection accessible names are under-disambiguated
+**Reproduces across four surfaces.**
+
+- `results-explorer/src/components/QueryHeatmap.tsx:464,604` → mobile
+  cards and desktop table both render `aria-label="Select ${platform}
+  for comparison"`. Multiple rows with the same platform render
+  identical accessible names.
+- `results-explorer/src/pages/Compare.tsx:764` → same string.
+- `results-explorer/src/pages/Query.tsx:780-783` → uses `runIdentity`
+  fragment but the underlying disambiguator on the duplicate-platform
+  case is unverified.
+- `results-explorer/src/pages/PlatformIndex.tsx:845` → has its own
+  variant; needs audit.
+
+## Findings NOT reproducing in source
+
+### Finding #1 — Benchmark-detail compare checkboxes render at 0×0
+**Does NOT reproduce.** Both render paths in `QueryHeatmap.tsx` use
+`class="h-4 w-4 ..."` (16×16 px) checkboxes inside cells sized
+`w-12 min-w-12` (48 px wide). Mobile cards (line 459) include
+`shrink-0`; desktop table cells (line 595) are `sticky` and visible.
+There is no `class="sr-only"`, no `style="width:0"`, no
+`opacity-0` overlay on the input itself.
+
+This finding may have been speculative when the audit was
+reconstructed, or it was addressed by an intervening PR
+(#284/#286/#300/#316). Per the audit doc's acceptance contract:
+> If a finding here no longer reproduces on a future develop tip,
+> the owning TODO's w0 log records that fact and the finding is
+> treated as already-satisfied at gate time.
+
+**w1 will be skipped.** Implementation focus moves to w2/w3/w4 plus
+the w5 regression coverage.
+
+## Implementation plan after w0
+
+- Skip w1.
+- w2: extend Compare filteredRows to (a) sort compatible rows above
+  incompatibles after the first selection, and (b) add a
+  "Compatible only" toggle defaulted on while a cohort is locked.
+- w3: apply the same compatible-first ordering + Compatible-only
+  toggle to Query Workbench's row list.
+- w4: replace `Select ${platform} for comparison` everywhere with a
+  helper that returns `Select ${platform} ${benchmark} SF${scale}
+  ${run_date} (${shortId}) for comparison`. Keep the visible label
+  short; this one is for SR/locator parity.
+- w5: add Playwright fixtures that drive
+  `/results/tpch/`, `/results/compare`, `/results/query`, and
+  `/results/p/polars/` and assert each opens a comparison page.

@@ -349,7 +349,13 @@ describe("Compare", () => {
     const r1Checkbox = within(getByTestId("compare-builder-row-r1")).getByRole("checkbox") as HTMLInputElement;
     r1Checkbox.click();
 
-    // r3 (different benchmark) should now be disabled
+    // Compatible-only defaults on after the cohort lock; r3 (different benchmark)
+    // is hidden until the user opts to see it.
+    await waitFor(() => {
+      expect((getByTestId("compare-builder-compatible-only") as HTMLInputElement).checked).toBe(true);
+    });
+    expect(() => getByTestId("compare-builder-row-r3")).toThrow();
+    (getByTestId("compare-builder-compatible-only") as HTMLInputElement).click();
     await waitFor(() => {
       const r3Checkbox = within(getByTestId("compare-builder-row-r3")).getByRole("checkbox") as HTMLInputElement;
       expect(r3Checkbox.disabled).toBe(true);
@@ -369,6 +375,71 @@ describe("Compare", () => {
       expect(compareCall).toContain("r1");
       expect(compareCall).toContain("r2");
     });
+  });
+
+  it("compare picker hides incompatible candidates by default and surfaces the hidden count", async () => {
+    setupUrl([]);
+    vi.mocked(listResults).mockResolvedValue([
+      makeResultRow({ result_id: "r1", platform: "DuckDB", platform_id: "duckdb" }),
+      makeResultRow({
+        result_id: "r2",
+        platform: "SQLite",
+        platform_id: "sqlite",
+        power_score: 220,
+        geomean_ms: 70,
+      }),
+      makeResultRow({
+        result_id: "r3",
+        platform: "DuckDB",
+        platform_id: "duckdb",
+        benchmark: "clickbench",
+      }),
+    ]);
+    const { getByTestId, queryByTestId } = render(<Compare />);
+    await waitFor(() => expect(getByTestId("compare-builder")).toBeTruthy());
+    await waitFor(() => expect(getByTestId("compare-builder-row-r1")).toBeTruthy());
+
+    // Before any selection, the toggle is not present and incompatibles render with the compatibles.
+    expect(queryByTestId("compare-builder-compatible-only")).toBeNull();
+    expect(getByTestId("compare-builder-row-r3")).toBeTruthy();
+
+    const r1Checkbox = within(getByTestId("compare-builder-row-r1")).getByRole("checkbox") as HTMLInputElement;
+    r1Checkbox.click();
+
+    await waitFor(() => {
+      expect((getByTestId("compare-builder-compatible-only") as HTMLInputElement).checked).toBe(true);
+    });
+    expect(queryByTestId("compare-builder-row-r3")).toBeNull();
+    expect(getByTestId("compare-builder-status").textContent).toContain("1 incompatible row hidden");
+  });
+
+  it("compare picker uses disambiguated aria-labels for same-platform rows", async () => {
+    setupUrl([]);
+    vi.mocked(listResults).mockResolvedValue([
+      makeResultRow({
+        result_id: "tpch-duckdb-sf0.1-20260502-aaaa1111",
+        platform: "DuckDB",
+        platform_id: "duckdb",
+        run_date: "2026-05-02",
+      }),
+      makeResultRow({
+        result_id: "tpch-duckdb-sf0.1-20260508-bbbb2222",
+        platform: "DuckDB",
+        platform_id: "duckdb",
+        run_date: "2026-05-08",
+      }),
+    ]);
+    const { findAllByRole } = render(<Compare />);
+    const checkboxes = (await findAllByRole("checkbox")) as HTMLInputElement[];
+    const labels = checkboxes
+      .map((cb) => cb.getAttribute("aria-label") ?? "")
+      .filter((label) => label.startsWith("Select "));
+    // Each row checkbox label is unique even though both rows are DuckDB on
+    // the same benchmark/scale/phase: the trailing short id and run date
+    // disambiguate.
+    expect(new Set(labels).size).toBe(labels.length);
+    expect(labels.some((label) => label.includes("aaaa1111"))).toBe(true);
+    expect(labels.some((label) => label.includes("bbbb2222"))).toBe(true);
   });
 
   it("loads selected runs after builder navigation changes only the compare query string", async () => {
