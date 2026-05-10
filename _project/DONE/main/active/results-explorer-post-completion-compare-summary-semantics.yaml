@@ -2,7 +2,8 @@ id: results-explorer-post-completion-compare-summary-semantics
 title: "Correct post-completion Results Explorer compare summary semantics"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-05-10"
 category: Frontend UX
 
 description: |
@@ -26,7 +27,7 @@ deps:
 work:
   - id: w0
     summary: "Revalidate compare-summary semantic defects on current develop"
-    status: pending
+    status: done
     notes: |
       Open /results/compare with a same-platform two-id URL and /results/compare
       with no ids. Capture decision summary text, winner card text, Query Wins
@@ -37,7 +38,7 @@ work:
   - id: w1
     summary: "Dedupe Compare benchmark filter options for the legacy SSB slug"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Prior art: PR #285 already labels the legacy slug
       `"SSB (legacy slug)"` in
@@ -57,7 +58,7 @@ work:
   - id: w2
     summary: "Use run identity and tie-aware language in same-platform summaries"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Update CompareSummary so same-platform comparisons name the winning run
       by compact run identity, not just platform. If geomean speedup rounds to
@@ -67,7 +68,7 @@ work:
   - id: w3
     summary: "Split comparable and missing-query denominators"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Rewrite Query Wins and chart count copy so comparable-query counts and
       excluded/missing-query counts are separate. Example target:
@@ -77,7 +78,7 @@ work:
   - id: w4
     summary: "Make comparability guardrail copy match the actual cohort lock"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Update Compare guardrail text from "same benchmark and scale" to "same
       benchmark, scale, and phase" wherever that is the actual winner-claim
@@ -87,7 +88,7 @@ work:
   - id: w5
     summary: "Add compare-summary regression tests"
     needs: [w1, w2, w3, w4]
-    status: pending
+    status: done
     notes: |
       Add targeted tests for duplicate benchmark options, same-platform
       same-speed/tie copy, query win denominators, and guardrail text. Include

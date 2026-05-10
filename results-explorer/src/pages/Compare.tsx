@@ -11,6 +11,7 @@ import {
   type ResultRow,
 } from "@/lib/duckdbQueries";
 import { humanizeBenchmark, errMsg, fmtGeomean } from "@/utils";
+import { formatBenchmarkLabel } from "@/lib/displayLabels";
 import { buildCompareUrl, MAX_COMPARE_SELECTIONS } from "@/lib/resultLinks";
 import {
   compareCohortMismatches,
@@ -233,9 +234,34 @@ export function Compare({ url }: CompareProps) {
   const primaries: (number | null)[] = results.map((r) =>
     primaryMetric === "power_score" ? r.power_score : r.display_geomean_ms,
   );
+  // Cohort-aware run identity labels for the decision summary headline +
+  // winner card (finding #8). Using `formatRunIdentitiesForCohort` here means
+  // that two same-platform runs (e.g. two Polars v1.40.0 from different
+  // dates) get a unique label like "Polars 2026-05-02 (0093bb7a)" instead
+  // of the bare "Polars" that appears in the bug report.
+  const summaryRunLabels: Record<string, string> = (() => {
+    const labels = formatRunIdentitiesForCohort(
+      results.map((r) => ({
+        result_id: r.result_id,
+        platform: r.platform,
+        platform_version: r.platform_version,
+        driver_version: r.driver_version,
+        run_date: r.run_date,
+        scale_factor: r.scale_factor,
+        trust_label: r.trust_label,
+      })),
+      "compact",
+    );
+    const out: Record<string, string> = {};
+    results.forEach((r, i) => {
+      out[r.result_id] = labels[i] ?? r.platform;
+    });
+    return out;
+  })();
   const decisionSummary = buildCompareDecisionSummary(results, primaryMetric, {
     suppressWinnerClaims: severeMismatchReason !== null,
     suppressionReason: severeMismatchReason ?? undefined,
+    runLabels: summaryRunLabels,
   });
 
   const validPrimaries = primaries.filter((v): v is number => v !== null);
@@ -480,7 +506,7 @@ function CompareGuardrailSummary({
           <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">
             {hasSevereMismatch
               ? `Winner claims are suppressed because ${severeMismatchReason}.`
-              : "Selected runs share the same benchmark and scale for winner claims."}
+              : "Selected runs share the same benchmark, scale, and phase for winner claims."}
           </p>
         </div>
         <StatusBadge
@@ -680,7 +706,7 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
             >
               <option value="">Any benchmark</option>
               {benchmarkOptions.map((bm) => (
-                <option key={bm} value={bm}>{humanizeBenchmark(bm)}</option>
+                <option key={bm} value={bm}>{formatBenchmarkLabel(bm)}</option>
               ))}
             </select>
           </label>

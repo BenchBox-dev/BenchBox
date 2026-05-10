@@ -2,6 +2,14 @@ import type { DetailResult } from "@/types";
 
 export type ComparePrimaryMetric = "power_score" | "display_geomean_ms";
 
+/**
+ * Below this absolute distance from 1.0, two runs are treated as a tie
+ * for headline purposes. Picked so a ratio that rounds to "1.00x" via
+ * `formatRatio` (two decimals) is always inside the threshold; this is
+ * how the audit's same-platform-1.00x reproduction case is closed.
+ */
+export const COMPARE_TIE_THRESHOLD = 0.005;
+
 export interface CompareResultMetric {
   resultId: string;
   platform: string;
@@ -39,9 +47,13 @@ export interface CompareDecisionSummary {
   claimSuppressed: boolean;
   claimSuppressionReason: string | null;
   winner: CompareResultMetric | null;
+  /** Cohort-aware label for the winner (run identity when same-platform). */
+  winnerLabel: string | null;
   comparison: CompareResultMetric | null;
   comparisonRatio: number | null;
   comparisonLabel: string;
+  /** True when comparisonRatio is within COMPARE_TIE_THRESHOLD of 1.0. */
+  isTie: boolean;
   headline: string;
   queryRecord: WinnerQueryRecord;
   percentiles: ComparePercentiles[];
@@ -51,6 +63,13 @@ export interface CompareDecisionSummary {
 interface CompareDecisionSummaryOptions {
   suppressWinnerClaims?: boolean;
   suppressionReason?: string;
+  /**
+   * Optional per-result-id labels. When the cohort contains multiple runs
+   * of the same platform, callers pass cohort-aware run identities here so
+   * the headline names the specific run instead of just the platform.
+   * Falls back to `metric.platform` when a label is missing.
+   */
+  runLabels?: Record<string, string>;
 }
 
 export function buildCompareDecisionSummary(
@@ -78,6 +97,8 @@ export function buildCompareDecisionSummary(
   const queryRecord = buildWinnerQueryRecord(results, winner?.resultId ?? null);
   const percentiles = results.map((result) => buildPercentiles(result));
   const cost = buildCostSummary(results, winner, primaryMetric);
+  const isTie = comparisonRatio !== null && Math.abs(comparisonRatio - 1) < COMPARE_TIE_THRESHOLD;
+  const winnerLabel = winner ? options.runLabels?.[winner.resultId] ?? winner.platform : null;
 
   return {
     primaryMetric,
@@ -86,9 +107,11 @@ export function buildCompareDecisionSummary(
     claimSuppressed,
     claimSuppressionReason: options.suppressionReason ?? null,
     winner,
+    winnerLabel,
     comparison,
     comparisonRatio,
     comparisonLabel,
+    isTie,
     headline: buildHeadline(winner, comparisonRatio, primaryMetric, options),
     queryRecord,
     percentiles,
@@ -112,11 +135,15 @@ function buildHeadline(
     return `Not directly comparable: ${reason}. Winner language is suppressed; raw query evidence remains available.`;
   }
   if (!winner) return "No winner claim: selected results are missing the primary metric.";
-  if (comparisonRatio === null) return `${winner.platform} leads on the selected primary metric.`;
-  if (primaryMetric === "power_score") {
-    return `${winner.platform} leads by ${formatRatio(comparisonRatio)} on power score.`;
+  const winnerLabel = options.runLabels?.[winner.resultId] ?? winner.platform;
+  if (comparisonRatio === null) return `${winnerLabel} leads on the selected primary metric.`;
+  if (Math.abs(comparisonRatio - 1) < COMPARE_TIE_THRESHOLD) {
+    return `Selected runs are within the tie threshold (${formatRatio(comparisonRatio)}); no material winner on the selected primary metric.`;
   }
-  return `${winner.platform} is ${formatRatio(comparisonRatio)} faster by geomean query time.`;
+  if (primaryMetric === "power_score") {
+    return `${winnerLabel} leads by ${formatRatio(comparisonRatio)} on power score.`;
+  }
+  return `${winnerLabel} is ${formatRatio(comparisonRatio)} faster by geomean query time.`;
 }
 
 function buildWinnerQueryRecord(results: DetailResult[], winnerResultId: string | null): WinnerQueryRecord {

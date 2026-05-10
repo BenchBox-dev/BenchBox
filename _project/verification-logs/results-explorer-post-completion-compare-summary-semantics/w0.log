@@ -1,0 +1,59 @@
+# w0 — Revalidate compare-summary semantic defects on current develop
+
+**Date:** 2026-05-10
+**Develop tip rebased onto:** 21376cb58 + #324 branch (compare-cohort helpers)
+
+## Findings reproducing in source
+
+### Finding #8 — Same-platform compare summary says "1.00× faster" with WINNER
+**Reproduces.** `compareSummary.ts:117/119` (`buildHeadline`) formats
+`comparisonRatio` unconditionally:
+```
+return `${winner.platform} is ${formatRatio(comparisonRatio)} faster by geomean query time.`;
+```
+Two Polars v1.40.0 runs from different dates with similar values yield
+ratio ≈ 1.00, producing "Polars is 1.00× faster" + "WINNER Polars" copy.
+There is no tie-threshold guard.
+
+### Finding #10 — Compare picker shows duplicate SSB options
+**Reproduces.** `Compare.tsx:683` renders
+`<option>{humanizeBenchmark(bm)}</option>` and `humanizeBenchmark`
+returns `"SSB"` for both `ssb` (legacy) and `star_schema` (canonical).
+If both slugs appear in the candidate data the picker shows two
+identically-labelled `"SSB"` options. `formatBenchmarkLabel` in
+`displayLabels.ts:79-81` already returns `"SSB (legacy slug)"` for the
+legacy slug; the picker just isn't using it.
+
+### Finding #13 — Comparability guardrail copy
+**Mixed.** `Compare.tsx:641` (the empty-state intro) already says
+"same benchmark, scale, and phase". `Compare.tsx:483` (the runs-loaded
+banner) still says "same benchmark and scale" — the audit's reproduction
+route. Single-line copy update.
+
+### Finding #9 — Query Wins denominator
+**Already structurally separated.** `WinnerQueryRecord` exposes
+`comparableQueries` (denominator without missing) and `missing` (excluded
+for missing data) as separate fields; `CompareSummary.tsx:69-73`
+renders both. The audit's "denominator mixes comparable and missing"
+claim is about copy clarity, not the math: target wording is
+"X fastest of Y comparable; Z queries excluded for missing data."
+Fix is the rendered string, not the data model.
+
+## Implementation plan
+
+- w1: Compare picker uses `formatBenchmarkLabel` instead of
+  `humanizeBenchmark` for the benchmark option list. The two SSB
+  options become "SSB" (canonical) and "SSB (legacy slug)" with
+  distinct labels routing to distinct slugs.
+- w2: Add `TIE_THRESHOLD` constant + tie-aware headline. Detect
+  `Math.abs(comparisonRatio - 1) < TIE_THRESHOLD` and emit
+  "Selected runs are within a tie threshold; no material winner."
+  copy. Plumb `runLabels` (cohort-aware identity) from Compare.tsx
+  into `buildHeadline` so same-platform comparisons name the
+  specific run rather than just the platform.
+- w3: `CompareSummary.tsx` Query Wins copy rewrites to
+  "X fastest of Y comparable" plus a parallel "Z queries excluded
+  for missing data" line so comparable and missing counts read as
+  separate facts.
+- w4: `Compare.tsx:483` guardrail copy updated to
+  "same benchmark, scale, and phase".
