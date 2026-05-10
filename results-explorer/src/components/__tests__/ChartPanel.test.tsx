@@ -482,6 +482,29 @@ describe("ChartPanel", () => {
     expect(screen.queryByRole("button", { name: "Performance Trend" })).toBeNull();
   });
 
+  it("activates the Rank tab from the default Overview state on a fresh render (finding #5)", () => {
+    render(
+      <ChartPanel
+        context={{
+          kind: "summary",
+          summary: makeSummary(),
+        }}
+      />,
+    );
+
+    // Fresh page load defaults to Overview. The audit reproducer was that
+    // clicking Rank from this state did not switch the panel.
+    expect(screen.getByRole("tab", { name: "Overview" }).getAttribute("aria-selected")).toBe("true");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Rank" }));
+
+    expect(screen.getByRole("tab", { name: "Rank" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("tab", { name: "Overview" }).getAttribute("aria-selected")).toBe("false");
+    expect(screen.getByRole("table", { name: "Per-query platform rankings (1st = fastest)" })).toBeTruthy();
+    // Overview's signature button should no longer be in the active group.
+    expect(screen.queryByRole("button", { name: "Sparkline Table" })).toBeNull();
+  });
+
   it("uses winner language by default in the summary box", () => {
     render(
       <ChartPanel

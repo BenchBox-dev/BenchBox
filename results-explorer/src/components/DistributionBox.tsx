@@ -18,6 +18,7 @@ import { useElementSize } from "@/lib/useElementSize";
 import { paletteColor } from "@/lib/chartTheme";
 import { buildLogLatencyScale, computeBoxStats, logLatencyFraction, logLatencyTicks } from "@/lib/chartMath";
 import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
+import { preserveUniqueAfterTruncation } from "@/components/RankTable";
 
 const LABEL_W = 144;
 const ROW_H = 48;
@@ -37,14 +38,23 @@ export function DistributionBox({ summary }: Props) {
     summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
     "chart",
   );
+  // Truncation budget = 20 chars (LABEL_W=144 px / ~7 px per char). When
+  // truncation would collapse otherwise-unique cohort identities to the same
+  // prefix (e.g. four "DataFusion v53.0.0 …"), preserveUniqueAfterTruncation
+  // returns the full identity for the affected rows so the disambiguator
+  // (date + short id) survives. Audit finding #7.
+  const rawLabels = summary.platforms.map((p, i) => cohortLabels[i] ?? p.platform);
+  const displayLabels = preserveUniqueAfterTruncation(rawLabels, 20);
   const rows = summary.platforms
     .map((p, i) => ({
-      label: cohortLabels[i] ?? p.platform,
+      label: displayLabels[i] ?? p.platform,
+      fullLabel: rawLabels[i] ?? p.platform,
       color: paletteColor(i),
       stats: computeBoxStats(Object.values(p.timings)),
     }))
     .filter((r) => r.stats !== null) as {
     label: string;
+    fullLabel: string;
     color: string;
     stats: NonNullable<ReturnType<typeof computeBoxStats>>;
   }[];
@@ -78,6 +88,7 @@ export function DistributionBox({ summary }: Props) {
             <g key={row.label}>
               {/* Platform label */}
               <text x={LABEL_W - 6} y={midY + 4} textAnchor="end" style={{ fontSize: "11px", fill: "#374151" }}>
+                <title>{row.fullLabel}</title>
                 {row.label.length > 20 ? `${row.label.slice(0, 19)}…` : row.label}
               </text>
 

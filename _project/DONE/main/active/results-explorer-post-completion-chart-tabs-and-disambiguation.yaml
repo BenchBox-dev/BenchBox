@@ -2,7 +2,8 @@ id: results-explorer-post-completion-chart-tabs-and-disambiguation
 title: "Fix post-completion Results Explorer chart tabs and run-label disambiguation"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-05-10"
 category: Frontend UX
 
 description: |
@@ -23,7 +24,7 @@ deps:
 work:
   - id: w0
     summary: "Revalidate chart tab activation and duplicate chart scope"
-    status: pending
+    status: done
     notes: |
       On current develop, open /results/tpch/, scroll Charts into view, and
       click Overview, Per-query, Distribution, Trend, and Rank from a fresh
@@ -34,7 +35,7 @@ work:
   - id: w1
     summary: "Make the Rank chart tab activate from every chart state"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Fix ChartPanel tab selection so clicking Rank from default Overview,
       Distribution, Trend, and Per-query states sets Rank aria-selected=true
@@ -44,7 +45,7 @@ work:
   - id: w2
     summary: "Remove or rescope the benchmark-detail duplicate Per-query heatmap"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       On benchmark detail pages, do not render a Charts > Per-query > Heatmap
       panel that repeats the page-level benchmark matrix directly above it.
@@ -63,7 +64,7 @@ work:
   - id: w3
     summary: "Tighten chart run-label truncation so disambiguated suffixes survive"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Cohort-aware label formatting already ships via
       `results-explorer/src/lib/runIdentity.ts` and is consumed by
@@ -82,7 +83,7 @@ work:
   - id: w4
     summary: "Add chart-panel browser and unit coverage"
     needs: [w1, w2, w3]
-    status: pending
+    status: done
     notes: |
       Extend ChartPanel, RankTable, DistributionBox, and BenchmarkIndex tests
       to cover tab activation, per-query heatmap exclusion, and duplicate-run
