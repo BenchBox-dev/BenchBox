@@ -143,6 +143,27 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(getRowOrder(container)).toEqual(["r-tpch-fast", "r-ssb-mid", "r-tpch-slow", "r-null-geo"]);
   });
 
+  it("retries a transient empty platform index before rendering a terminal empty state", async () => {
+    vi.mocked(getPlatformIndexRows).mockResolvedValueOnce([]).mockResolvedValueOnce(ROWS);
+
+    const { container } = render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    expect(getPlatformIndexRows).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText(/No results found for platform/i)).toBeNull();
+    expect(getRowOrder(container)).toEqual(["r-tpch-fast", "r-ssb-mid", "r-tpch-slow", "r-null-geo"]);
+  });
+
+  it("does not brand a genuinely empty snapshot as a missing lower-case platform", async () => {
+    vi.mocked(getPlatformIndexRows).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+    render(<PlatformIndex platform="polars" />);
+    await waitFor(() => expect(screen.getByText("No published platform results are available in this snapshot.")).toBeTruthy());
+
+    expect(screen.queryByText("polars Results")).toBeNull();
+    expect(screen.queryByText(/No results found for platform/i)).toBeNull();
+  });
+
   it("does not merge distinct platform IDs that share a display name", async () => {
     vi.mocked(getPlatformIndexRows).mockResolvedValue([
       makeRow({

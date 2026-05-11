@@ -1,0 +1,49 @@
+W0 direct route/copy baseline
+fixture_command_initial_status=failed_contract_version_mismatch
+
+[generate-browser-fixtures] sourceRoot=/Users/joe/Developer/BenchBox.pool-01/results-explorer/test-fixtures/source
+[generate-browser-fixtures] genRoot=/Users/joe/Developer/BenchBox.pool-01/results-explorer/test-fixtures/.generated
+[generate-browser-fixtures] failed: Explorer build contract version 3 expected, got 4. Update results-explorer/scripts/explorer-build-contract.mjs or benchbox/core/explorer_pipeline/contract.py to re-align.
+fixture_command_after_harness_alignment=passed
+  Trust label: maintainer-run
+  Visibility:  public-curated
+
+Done. Processed 11 result(s) across 3 cohort(s) →
+/Users/joe/Developer/BenchBox.pool-01/results-explorer/test-fixtures/.generated/
+data
+[generate-browser-fixtures] generated /Users/joe/Developer/BenchBox.pool-01/results-explorer/test-fixtures/.generated/data/results.duckdb
+[verify-browser-fixtures] determinism OK {"allowlist":{"data/results.duckdb":"DuckDB file bytes include nondeterministic container metadata; logical table digest is compared instead."}}
+build_command_status=passed
+dist/assets/duckdb-eh-9ubY-jlA.wasm                        34,242.59 kB │ gzip: 7,695.33 kB
+dist/assets/duckdb-mvp-BP0pRkMH.wasm                       39,362.65 kB │ gzip: 8,766.50 kB
+dist/assets/index-7SB2PVq5.css                                 29.75 kB │ gzip:     6.58 kB
+dist/assets/duckdb-DHa6yhW2.js                                192.31 kB │ gzip:    45.04 kB
+dist/assets/index-CQxlJFZT.js                                 317.88 kB │ gzip:    84.81 kB
+✓ built in 1.83s
+PROBE_START direct /results/p/polars/
+PROBE_START in_app /results/p/polars/
+{"path":"/results/p/polars/","mode":"direct","finalUrl":"http://127.0.0.1:4327/results/p/polars/","h1":"Polars Results","tableRows":1,"expectedRows":1,"transitions":["loading","content"],"falseEmpty":false,"consoleEvents":[],"networkEvents":[]}
+{"path":"/results/p/polars/","mode":"in_app","finalUrl":"http://127.0.0.1:4327/results/p/polars/","h1":"Polars Results","tableRows":1,"expectedRows":1,"transitions":["loading","content"],"falseEmpty":false,"consoleEvents":[],"networkEvents":["in_app_link_missing fallback_goto /results/p/polars/"]}
+CHECK /results/p/polars/ rows direct=1 in_app=1 expected=1
+PROBE_START direct /results/p/duckdb/
+PROBE_START in_app /results/p/duckdb/
+{"path":"/results/p/duckdb/","mode":"direct","finalUrl":"http://127.0.0.1:4327/results/p/duckdb/","h1":"DuckDB Results","tableRows":5,"expectedRows":5,"transitions":["loading","content"],"falseEmpty":false,"consoleEvents":[],"networkEvents":["failed http://127.0.0.1:4327/results/assets/duckdb-coi-DrUF0TBm.wasm net::ERR_ABORTED"]}
+{"path":"/results/p/duckdb/","mode":"in_app","finalUrl":"http://127.0.0.1:4327/results/p/duckdb/","h1":"DuckDB Results","tableRows":5,"expectedRows":5,"transitions":["loading","content"],"falseEmpty":false,"consoleEvents":[],"networkEvents":[]}
+CHECK /results/p/duckdb/ rows direct=5 in_app=5 expected=5
+PROBE_START direct /results/tpch/
+PROBE_START in_app /results/tpch/
+{"path":"/results/tpch/","mode":"direct","finalUrl":"http://127.0.0.1:4327/results/tpch/?phase=standard","h1":"TPC-H Results","tableRows":6,"expectedRows":null,"transitions":["loading","content"],"falseEmpty":false,"consoleEvents":[],"networkEvents":[]}
+{"path":"/results/tpch/","mode":"in_app","finalUrl":"http://127.0.0.1:4327/results/tpch/?phase=standard","h1":"TPC-H Results","tableRows":6,"expectedRows":null,"transitions":["content","loading","content"],"falseEmpty":false,"consoleEvents":[],"networkEvents":[]}
+PROBE_START direct /results/query
+PROBE_START in_app /results/query
+{"path":"/results/query","mode":"direct","finalUrl":"http://127.0.0.1:4327/results/query","h1":"Results Query Workbench","tableRows":6,"expectedRows":null,"transitions":["content"],"falseEmpty":false,"consoleEvents":[],"networkEvents":[]}
+{"path":"/results/query","mode":"in_app","finalUrl":"http://127.0.0.1:4327/results/query","h1":"Results Query Workbench","tableRows":6,"expectedRows":null,"transitions":["content"],"falseEmpty":false,"consoleEvents":[],"networkEvents":[]}
+PROBE_START direct /results/compare
+PROBE_START in_app /results/compare
+{"path":"/results/compare","mode":"direct","finalUrl":"http://127.0.0.1:4327/results/compare","h1":"Pick runs to compare","tableRows":1,"expectedRows":null,"transitions":["loading"],"falseEmpty":false,"consoleEvents":[],"networkEvents":[]}
+{"path":"/results/compare","mode":"in_app","finalUrl":"http://127.0.0.1:4327/results/compare","h1":"Pick runs to compare","tableRows":1,"expectedRows":null,"transitions":["content","loading"],"falseEmpty":false,"consoleEvents":[],"networkEvents":[]}
+PROBE_START copy one-warning
+{"label":"one-warning","path":"/results/compare?ids=ba6a8c83,5e6c5eba","finalUrl":"http://127.0.0.1:4327/results/compare?ids=ba6a8c83,5e6c5eba","h1":"TPC-H Comparison","guardrails":"Comparability guardrails Selected runs share the same benchmark, scale, and phase for winner claims. Warning classes: Platform version. Review receipt. 1 warnings","receiptSummary":"Comparability Receipt |  | Workload, version, validation, and environment checks for the selected result set. |  | 1 warnings | BENCHMARK | Match | ","singularWarningPresent":false,"pluralBug":true,"duplicatedPunctuation":false,"consoleEvents":[],"networkEvents":["failed http://127.0.0.1:4327/results/assets/duckdb-coi-DrUF0TBm.wasm net::ERR_ABORTED"]}
+PROBE_START copy multi-warning
+{"label":"multi-warning","path":"/results/compare?ids=ba6a8c83,0820b170","finalUrl":"http://127.0.0.1:4327/results/compare?ids=ba6a8c83,0820b170","h1":"TPC-H Comparison","guardrails":"Comparability guardrails Winner claims are suppressed because scale factors differ. Warning classes: Scale factor. Review receipt. 1 warnings","receiptSummary":"Comparability Receipt |  | Workload, version, validation, and environment checks for the selected result set. |  | 1 warnings | BENCHMARK | Match | ","singularWarningPresent":false,"pluralBug":true,"duplicatedPunctuation":false,"consoleEvents":[],"networkEvents":["failed http://127.0.0.1:4327/results/assets/duckdb-coi-DrUF0TBm.wasm net::ERR_ABORTED"]}
+CORRECTION multi-warning baseline case: /results/compare?ids=ba6a8c83,009ee9fd,5e6c5eba renders "2 warnings" and currently pluralizes one-warning cases as "1 warnings".

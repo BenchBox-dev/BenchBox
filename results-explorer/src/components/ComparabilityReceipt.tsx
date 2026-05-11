@@ -1,6 +1,7 @@
 import type { DetailResult, Environment } from "@/types";
 import { humanizeBenchmark } from "@/utils";
 import { costModelSummary, costScopeSummary, normalizedCostLabel } from "@/lib/costDisplay";
+import { formatCount, formatWarningCount } from "@/lib/copyFormatters";
 import { StatusBadge, type StatusTone } from "@/components/StatusBadge";
 
 interface ComparabilityReceiptProps {
@@ -32,7 +33,7 @@ export function ComparabilityReceipt({ results }: ComparabilityReceiptProps) {
           </p>
         </div>
         <StatusBadge role="comparison" tone={warningCount > 0 ? "warning" : "success"}>
-          {warningCount > 0 ? `${warningCount} warnings` : "No differences"}
+          {warningCount > 0 ? formatWarningCount(warningCount) : "No differences"}
         </StatusBadge>
       </div>
 
@@ -52,7 +53,7 @@ export function buildComparabilityFields(results: DetailResult[]): Comparability
     compareValues("Benchmark", results, (result) => humanizeBenchmark(result.benchmark)),
     compareValues("Scale factor", results, (result) => `SF ${result.scale_factor}`),
     compareValues("Phase", results, (result) => valueOrMissing(result.test_type)),
-    compareValues("Query scope", results, (result) => `${queryCount(result)} queries`),
+    compareValues("Query scope", results, (result) => formatCount(queryCount(result), "query", "queries")),
     buildDateWindowField(results),
     compareValues("Platform version", results, (result) => valueOrMissing(result.platform_version)),
     compareValues("Driver version", results, (result) => valueOrMissing(result.driver_version)),
