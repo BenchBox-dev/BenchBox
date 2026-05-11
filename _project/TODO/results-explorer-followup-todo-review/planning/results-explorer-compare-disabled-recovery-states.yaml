@@ -1,0 +1,160 @@
+id: results-explorer-compare-disabled-recovery-states
+title: "Make disabled compare rows and zero-selection states explainable and recoverable"
+worktree: results-explorer-followup-todo-review
+priority: High
+status: Not Started
+category: User Experience
+
+description: |
+  The compare builder and source pages currently expose disabled row checkboxes
+  with the reason hidden in `title` text or not visible at all. When no rows are
+  selectable, the user sees controls but no recovery path. This TODO adds
+  visible, keyboard-accessible reason and recovery states for every page that
+  contains compare selection.
+
+deps:
+  needs:
+  - results-explorer-comparison-eligibility-contract-repair
+
+work:
+- id: w0
+  summary: "Inventory every disabled compare control and current reason source"
+  status: pending
+  notes: |
+    Inspect benchmark detail, platform detail, Query Workbench, Compare
+    builder, and result-detail builder state on the checked git SHA after the
+    eligibility repair has regenerated the snapshot. Record route, fixture
+    result IDs, exclusion reason codes, where each disabled reason comes from,
+    whether it is visible, and whether a user can recover by changing filters.
+    Store screenshots or DOM text evidence in
+    `_project/verification-logs/results-explorer-compare-disabled-recovery-states/w0.log`.
+
+- id: w1
+  summary: "Create a shared compare exclusion reason formatter"
+  needs: [w0]
+  status: pending
+  notes: |
+    Add a small shared formatter that maps stable reason codes to:
+      - short row text;
+      - detailed tooltip/help text;
+      - recovery hint when applicable;
+      - severity/category.
+    Cover at least `no_queries`, `no_valid_display_timing`,
+    `missing_timings`, `insufficient_query_coverage`, and any rank-only
+    exclusion code. Include pluralization and punctuation here so pages do not
+    reimplement copy differently.
+
+- id: w2
+  summary: "Show visible disabled reasons in the Compare builder"
+  needs: [w1]
+  status: pending
+  notes: |
+    Add a compact reason column or inline muted reason next to disabled rows in
+    `/results/compare`. The row must not rely on browser `title` as the only
+    explanation. Add a page-level zero-selectable callout with the dominant
+    reason counts and one recovery action, such as clearing filters or choosing
+    another cohort.
+
+- id: w3
+  summary: "Show visible disabled reasons on benchmark, platform, and query pages"
+  needs: [w1]
+  status: pending
+  notes: |
+    For each source page, disabled compare controls need an adjacent row status
+    or an accessible details affordance. Disabled primary buttons must look
+    disabled and state what is missing: not enough selected rows, no eligible
+    rows in current filters, or selected rows from incompatible cohorts.
+
+- id: w4
+  summary: "Add zero-selection and mixed-selection tests"
+  needs: [w2, w3]
+  status: pending
+  notes: |
+    Add tests for:
+      - all rows disabled with visible reason summary;
+      - some rows enabled and some disabled;
+      - selecting one row updates button copy;
+      - selecting incompatible rows is impossible or explains why;
+      - keyboard focus announces disabled reason text.
+
+- id: w5
+  summary: "Browser-check recovery paths with filters"
+  needs: [w4]
+  status: pending
+  notes: |
+    In a browser, intentionally filter to a zero-selectable state, confirm the
+    callout appears, use the recovery action, and verify selectable rows return.
+    Decision gate: do not complete this item if a user can still encounter a
+    disabled compare screen with no visible reason or next action.
+
+prior_art:
+- "results-explorer/src/pages/Compare.tsx:disabled checkbox title text and builder row rendering."
+- "results-explorer/src/pages/BenchmarkIndex.tsx:compare selection state on benchmark detail."
+- "results-explorer/src/pages/PlatformIndex.tsx:compare selection state on platform detail."
+- "results-explorer/src/pages/Query.tsx:Query Workbench compare action."
+- "results-explorer/src/lib/displayEligibility.ts or equivalent shared eligibility helper should own reason formatting."
+
+must_preserve:
+- "Ineligible rows remain unselectable."
+- "Reason text must be visible without mouse hover and available to screen readers."
+- "Reason formatting must use stable reason codes, not ad hoc string matching."
+- "Recovery actions must not silently broaden filters without user action."
+
+approach: |
+  Centralize reason copy first, then add compact row-level display and
+  page-level zero-state recovery on each compare surface.
+
+anti_patterns:
+- "DO NOT use only the checkbox `title` attribute for important reasons."
+- "DO NOT make disabled controls visually indistinguishable from enabled controls."
+- "DO NOT show generic `not comparable` copy when the row has a specific machine-readable reason."
+- "DO NOT provide a recovery action that changes selected rows without making the change visible."
+
+verification:
+- description: "Disabled compare reason tests pass"
+  command: "cd results-explorer && npm test -- --run src/pages/__tests__/Compare.test.tsx src/pages/__tests__/BenchmarkIndex.test.tsx src/pages/__tests__/PlatformIndex.test.tsx src/pages/__tests__/Query.test.tsx"
+  expected_output: "all targeted tests pass"
+- description: "Accessibility checks cover visible reasons"
+  command: "cd results-explorer && npm test -- --run src/pages/__tests__/Compare.a11y.test.tsx src/pages/__tests__/BenchmarkIndex.a11y.test.tsx src/pages/__tests__/PlatformIndex.a11y.test.tsx src/pages/__tests__/Query.a11y.test.tsx"
+  expected_output: "focused accessibility tests for visible disabled reasons pass"
+- description: "Browser recovery evidence exists"
+  command: "rg -n \"zero-selectable|disabled reason|clear filters|PASS|FAIL\" _project/verification-logs/results-explorer-compare-disabled-recovery-states/"
+  expected_output: "logs include browser evidence for zero-selection recovery"
+
+scope_limit:
+  only_modify:
+  - "results-explorer/src/lib/displayEligibility.ts"
+  - "results-explorer/src/lib/compareExclusionReasons.ts"
+  - "results-explorer/src/pages/Compare.tsx"
+  - "results-explorer/src/pages/BenchmarkIndex.tsx"
+  - "results-explorer/src/pages/PlatformIndex.tsx"
+  - "results-explorer/src/pages/Query.tsx"
+  - "results-explorer/src/pages/__tests__/"
+  - "results-explorer/src/components/__tests__/"
+  - "_project/verification-logs/results-explorer-compare-disabled-recovery-states/"
+  do_not_modify:
+  - "benchbox/core/explorer_pipeline/"
+  - "results-explorer/public/data/"
+
+success_metrics:
+- "Every disabled compare row has visible explanatory text."
+- "Every zero-selectable compare state has a page-level recovery path."
+- "Button copy distinguishes no selection, one selection, incompatible selection, and ready-to-compare."
+- "Reason copy is centralized and tested."
+
+metadata:
+  tags:
+  - results-explorer
+  - compare
+  - accessibility
+  - recovery-state
+  estimated_effort: "Medium (1-2 days)"
+  created_date: "2026-05-11"
+
+impact:
+  business_value: |
+    Reduces support and trust issues when real data is excluded from comparison.
+  user_impact: |
+    Users understand why a run cannot be compared and what to do next.
+  technical_debt: |
+    Removes duplicated, inconsistent exclusion copy from individual pages.

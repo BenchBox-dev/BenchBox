@@ -1,0 +1,193 @@
+id: results-explorer-comparison-eligibility-contract-repair
+title: "Repair Results Explorer comparison eligibility at the read-model contract"
+worktree: results-explorer-followup-todo-review
+priority: Critical
+status: Not Started
+category: Core Functionality
+
+description: |
+  The post-remediation evaluation found a P0 regression: the Results Explorer
+  exposes compare entrypoints, but every public result row is non-comparable.
+  A fresh snapshot reported 525 total results, 0 comparable rows, and 371
+  displayable rows. The dominant exclusion reason was
+  `insufficient_query_coverage`, including normal TPC-H rows that have 22 valid
+  logical query timings but 66 or 88 raw execution samples.
+
+  The suspected root cause is that backend eligibility compares
+  `valid_query_count` against `summary.queries.total`, where `total` can be raw
+  samples/repetitions rather than the logical benchmark query count. This TODO
+  repairs the data contract so comparison eligibility is based on valid
+  display timings over the logical comparable query scope, not raw sample count.
+
+deps:
+  needs: []
+
+work:
+- id: w0
+  summary: "Reproduce and capture the current zero-comparable-row invariant"
+  status: pending
+  notes: |
+    Regenerate or inspect the current browser DuckDB snapshot and capture the
+    checked git SHA, snapshot file path/checksum, SQL used, and:
+      - total result rows;
+      - displayable rows;
+      - compare-eligible rows;
+      - ranking-eligible rows;
+      - counts by `comparison_exclusion_reason`;
+      - at least one TPC-H row showing `valid_query_count=22` with a larger
+        raw `query_count`.
+    Store the SQL and output in
+    `_project/verification-logs/results-explorer-comparison-eligibility-contract-repair/w0.log`.
+    Decision gate: if comparable rows are already nonzero on the checked SHA,
+    continue anyway and prove the logical/raw query-count contract with tests
+    so the regression cannot return.
+
+- id: w1
+  summary: "Document the logical query-count contract used by compare eligibility"
+  needs: [w0]
+  status: pending
+  notes: |
+    Trace query-count fields from bundle summaries through
+    `BundleTransformer`, `timing_eligibility`, DuckDB schema generation, and
+    frontend query helpers. Explicitly identify which field means:
+      - raw execution sample count;
+      - logical benchmark query count;
+      - valid display timing count;
+      - missing logical query count;
+      - comparable query denominator.
+    Add implementation notes to this TODO before editing behavior. Do not
+    proceed to w2 if there is no stable logical denominator available; create
+    it first in the read model.
+
+- id: w2
+  summary: "Change backend comparison eligibility to use logical display-query coverage"
+  needs: [w1]
+  status: pending
+  notes: |
+    Update `timing_eligibility()` and its call sites so a row with all logical
+    query timings present is compare-eligible even when raw sample count is
+    higher due to repetitions. Keep exclusion for rows with no query timings,
+    no valid positive display timings, missing required logical queries, or
+    coverage below the policy threshold. Keep ranking eligibility separate from
+    comparison eligibility: trust or ranking exclusion can block leaderboard
+    rank claims without automatically blocking a valid timing comparison.
+
+- id: w3
+  summary: "Normalize exclusion reason fields and snapshot invariants"
+  needs: [w2]
+  status: pending
+  notes: |
+    Ensure generated rows expose stable, user-facing reason codes for:
+      - no queries;
+      - no valid display timing;
+      - missing timings;
+      - insufficient logical query coverage;
+      - rank-only exclusion;
+      - display-only exclusion.
+    Extend snapshot invariant checks so they fail when every public row is
+    non-comparable, when a fully covered logical cohort is excluded for raw
+    sample count, or when a compare-eligible row lacks valid display timings.
+
+- id: w4
+  summary: "Add focused backend tests for logical-vs-raw query counts"
+  needs: [w2, w3]
+  status: pending
+  notes: |
+    Add tests with fixtures covering:
+      - TPC-H-like row: 22 valid logical queries, 66 raw samples, compare-safe;
+      - SSB-like row: all logical queries covered, compare-safe;
+      - one valid logical query out of many, compare-excluded;
+      - zero/negative/NaN display timings, compare-excluded;
+      - no query records, compare-excluded;
+      - trust/ranking-excluded but timing-comparable row, compare-safe but not
+        rank-safe.
+
+- id: w5
+  summary: "Regenerate snapshot and prove at least two comparable cohorts exist"
+  needs: [w3, w4]
+  status: pending
+  notes: |
+    Regenerate the Results Explorer DuckDB snapshot from the current corpus and
+    rerun the SQL from w0. Decision gate: do not mark this item complete unless
+    the snapshot has nonzero compare-eligible rows and at least one TPC-H cohort
+    plus one non-TPC-H cohort have two or more compare-eligible rows.
+
+prior_art:
+- "_project/DONE/main/planning/results-explorer-read-model-eligibility-contract.yaml introduced the current explicit display/rank/compare eligibility fields; extend or repair that contract rather than creating a parallel one."
+- "benchbox/core/explorer_pipeline/models.py:timing_eligibility currently owns comparison exclusion decisions."
+- "benchbox/core/explorer_pipeline/transformer.py:BundleTransformer passes query summary counts into eligibility."
+- "benchbox/core/explorer_pipeline/duckdb_builder.py and docs/development/browser-duckdb-schema.sql define the browser snapshot contract."
+- "_project/scripts/results_explorer_snapshot_invariants.py should become the release-blocking check for contradictory eligibility states."
+- "results-explorer/src/lib/duckdbQueries.ts consumes eligibility and reason fields in frontend pages."
+
+must_preserve:
+- "Do not relax comparison eligibility by ignoring missing logical queries."
+- "Do not make invalid zero/negative/NaN timings compare-safe."
+- "Do not conflate validation cleanliness, ranking eligibility, and comparison eligibility."
+- "Do not remove excluded rows from provenance, receipt, or result-detail surfaces."
+- "Do not add frontend-only eligibility derivations that can drift from the DuckDB snapshot."
+
+approach: |
+  Fix the read-model contract first, then regenerate the snapshot and add
+  invariant tests. Only after the backend contract proves that comparable rows
+  exist should frontend entrypoint work proceed.
+
+anti_patterns:
+- "DO NOT special-case TPC-H by name; the fix must apply to any benchmark with repeated raw samples."
+- "DO NOT lower the threshold until rows become comparable; use the policy denominator and fail if data genuinely lacks evidence."
+- "DO NOT hide the zero-comparable state with UI copy; the product needs actual compare-safe rows."
+- "DO NOT change result validation semantics to make compare work; add or correct eligibility semantics instead."
+
+verification:
+- description: "Backend eligibility and snapshot tests pass"
+  command: "uv run -- python -m pytest tests/unit/core/explorer_pipeline -k 'eligibility or read_model or duckdb or transformer' --tb=short"
+  expected_output: "all targeted tests pass"
+- description: "Snapshot invariants pass against the regenerated DuckDB file"
+  command: "uv run -- python _project/scripts/results_explorer_snapshot_invariants.py results-explorer/public/data/results.duckdb"
+  expected_output: "exit 0 with nonzero comparable rows and no contradictory eligibility states"
+- description: "SQL evidence proves comparable rows exist"
+  command: "rg -n \"compare-eligible rows|TPC-H|SSB|insufficient_query_coverage\" _project/verification-logs/results-explorer-comparison-eligibility-contract-repair/w5.log"
+  expected_output: "w5 log includes nonzero compare-eligible row counts and at least two eligible cohorts"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/explorer_pipeline/models.py"
+  - "benchbox/core/explorer_pipeline/transformer.py"
+  - "benchbox/core/explorer_pipeline/duckdb_builder.py"
+  - "docs/development/browser-duckdb-schema.sql"
+  - "_project/scripts/results_explorer_snapshot_invariants.py"
+  - "tests/unit/core/explorer_pipeline/"
+  - "results-explorer/src/types.ts"
+  - "results-explorer/src/lib/duckdbQueries.ts"
+  - "_project/verification-logs/results-explorer-comparison-eligibility-contract-repair/"
+  do_not_modify:
+  - "results-explorer/src/pages/"
+  - "results-explorer/src/components/"
+  - "benchmark_runs/"
+
+success_metrics:
+- "The snapshot no longer reports zero compare-eligible rows when valid logical query coverage exists."
+- "Rows with full logical query coverage are not excluded because raw sample count is larger."
+- "Comparison, ranking, display, validation, and provenance states remain separately auditable."
+- "Snapshot invariants fail loudly if comparable rows collapse to zero again."
+
+metadata:
+  tags:
+  - results-explorer
+  - compare
+  - duckdb
+  - eligibility
+  - read-model
+  estimated_effort: "Medium (2-3 days)"
+  created_date: "2026-05-11"
+
+impact:
+  business_value: |
+    Restores the central Results Explorer compare workflow and prevents the
+    site from advertising comparison controls that cannot ever complete.
+  user_impact: |
+    Database engineers can select real comparable runs without understanding
+    raw URL IDs or internal query-count fields.
+  technical_debt: |
+    Replaces a brittle inferred eligibility rule with an explicit, tested data
+    contract.
