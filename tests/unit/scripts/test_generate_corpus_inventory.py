@@ -108,6 +108,20 @@ class TestGenerateInventory:
             "tpch@sf0.1": ["DataFusion", "DuckDB", "Polars"],
         }
 
+    def test_internal_benchmark_bundles_are_hidden(self, tmp_path: Path) -> None:
+        _write_bundle(tmp_path / "joinorder.json", benchmark_id="joinorder", scale_factor=1.0, platform="DuckDB")
+        _write_bundle(
+            tmp_path / "joinorder_synthetic.json",
+            benchmark_id="joinorder_synthetic",
+            scale_factor=1.0,
+            platform="DuckDB",
+        )
+
+        inventory = script.generate_inventory(tmp_path)
+
+        assert [entry["benchmark"] for entry in inventory["bundles"]] == ["joinorder"]
+        assert inventory["summary"]["by_benchmark"] == {"joinorder": 1}
+
     def test_extract_metadata_raises_clear_error_for_malformed_json(self, tmp_path: Path) -> None:
         bad_bundle = tmp_path / "broken.json"
         bad_bundle.write_text("{", encoding="utf-8")

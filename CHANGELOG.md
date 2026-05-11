@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking
+
+- `joinorder` now uses the canonical IMDb 2013 Parquet archive at sf=1
+  only. First run downloads and verifies the archive into
+  `benchmark_runs/datagen/joinorder_sf1/`; air-gapped users can
+  pre-populate that directory under `BENCHBOX_OUTPUT_DIR`. (#289)
+- The previous uniformly-random synthetic generator is now
+  `joinorder_synthetic` and is internal-only, hidden from the public
+  result explorer surface.
+- Existing `joinorder_sf1_*` published-result bundles in the develop
+  tree have been re-tagged as `joinorder_synthetic_sf1_*` to reflect
+  their synthetic provenance.
+
+### Added
+
+- Canonical Join Order Benchmark coverage for all 113 JOB SQL queries,
+  with reference cardinality checks and tiny-fixture predicate oracles.
+- Per-benchmark `DATA-LICENSE.md` provenance notes for real-world
+  benchmark datasets.
+- Result bundle dataset identity fields for benchmarks backed by a
+  data manifest: `dataset_version`, `manifest_hash`, and
+  `data_archive_hash`.
+
 ### Verified
 
 - **write_primitives sketch (sweep variants)** — live SF=0.01 measurement

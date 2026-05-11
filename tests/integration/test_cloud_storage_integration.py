@@ -36,7 +36,7 @@ except ImportError:
 from benchbox.core.amplab.generator import AMPLabDataGenerator
 from benchbox.core.clickbench.generator import ClickBenchDataGenerator
 from benchbox.core.h2odb.generator import H2ODataGenerator
-from benchbox.core.joinorder.generator import JoinOrderGenerator
+from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator
 from benchbox.core.read_primitives.generator import ReadPrimitivesDataGenerator
 from benchbox.core.ssb.generator import SSBDataGenerator
 from benchbox.core.tpcdi.generator import TPCDIDataGenerator

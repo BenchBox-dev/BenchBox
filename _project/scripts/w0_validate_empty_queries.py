@@ -24,9 +24,9 @@ from pathlib import Path
 
 import duckdb
 
-from benchbox.core.joinorder.generator import JoinOrderGenerator
-from benchbox.core.joinorder.queries import JoinOrderQueryManager
 from benchbox.core.joinorder.schema import JoinOrderSchema
+from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator
+from benchbox.core.joinorder_synthetic.queries import JoinOrderQueryManager
 
 
 def main() -> int:

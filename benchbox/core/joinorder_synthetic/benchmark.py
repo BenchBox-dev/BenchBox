@@ -1,8 +1,8 @@
-"""Canonical Join Order Benchmark implementation.
+"""Synthetic Join Order Benchmark implementation.
 
-This module provides the main benchmark class for the Join Order Benchmark,
-which tests query optimizer join order selection using a complex schema based
-on the canonical IMDb 2013 dataset used by the JOB paper.
+This module preserves BenchBox's previous uniformly-random Join Order data
+generator as an internal smoke-test benchmark. The public ``joinorder`` module
+uses the canonical IMDb 2013 JOB dataset.
 
 Copyright 2026 Joe Harris / BenchBox Project
 
@@ -11,29 +11,26 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
-import shutil
-import tarfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Union
 
 from benchbox.base import BaseBenchmark
-from benchbox.core.data_fetch import ExtractionRequiredError, fetch_data, load_manifest
+from benchbox.core.joinorder.schema import JoinOrderSchema
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
+from .generator import JoinOrderGenerator
 from .queries import JoinOrderQueryManager
-from .schema import JoinOrderSchema
 
 if TYPE_CHECKING:
     from benchbox.core.dataframe.query import QueryRegistry
     from benchbox.core.tuning import UnifiedTuningConfiguration
 
 
-class JoinOrderBenchmark(BaseBenchmark):
-    """Canonical Join Order Benchmark implementation.
+class JoinOrderSyntheticBenchmark(BaseBenchmark):
+    """Synthetic Join Order Benchmark implementation.
 
-    The public ``joinorder`` benchmark uses the canonical IMDb 2013 Parquet
-    archive produced by the foundation build. The old synthetic generator is
-    available as the internal ``joinorder_synthetic`` benchmark.
+    This internal surface is for fast schema and loader smoke tests only.
+    It is not a cardinality-estimation substitute for canonical JOB.
     """
 
     # CSV dialect for resolve_csv_dialect path (b) — used when manifest metadata is absent
@@ -45,7 +42,6 @@ class JoinOrderBenchmark(BaseBenchmark):
     # that produce lines like "1,Comedy Adventure,,4,1957,,,,,,,".
     csv_delimiter = ","
     csv_null_marker = ""
-    data_manifest_path = Path(__file__).with_name("data_manifest.toml")
 
     def __init__(
         self,
@@ -61,9 +57,9 @@ class JoinOrderBenchmark(BaseBenchmark):
         """Initialize the Join Order benchmark.
 
         Args:
-            scale_factor: Canonical JoinOrder only supports 1.0.
-            output_dir: Directory for verified Parquet files
-                (defaults to benchmark_runs/datagen/joinorder_sf1)
+            scale_factor: Scale factor for synthetic data generation.
+            output_dir: Directory for generated data files
+                (defaults to benchmark_runs/datagen/joinorder_synthetic_sf{X})
             queries_dir: Directory containing Join Order Benchmark query files (optional)
             verbose: Verbosity level (-v=1, -vv=2; bool True treated as 1)
             parallel: Number of parallel workers for data generation
@@ -72,14 +68,15 @@ class JoinOrderBenchmark(BaseBenchmark):
         """
         if not isinstance(parallel, int) or parallel < 1:
             raise ValueError(f"parallel must be a positive integer, got {parallel}")
-        if abs(float(scale_factor) - 1.0) > 1e-9:
-            raise ValueError(
-                "joinorder now uses canonical IMDb 2013 data and accepts only scale_factor=1.0; "
-                "use joinorder_synthetic for scaled synthetic smoke-test data."
-            )
 
         # Extract quiet from kwargs to avoid duplicate parameter
         quiet = kwargs.pop("quiet", False)
+
+        if output_dir is None:
+            from benchbox.utils.scale_factor import format_scale_factor
+
+            sf_str = format_scale_factor(scale_factor)
+            output_dir = Path.cwd() / "benchmark_runs" / "datagen" / f"joinorder_synthetic_{sf_str}"
 
         super().__init__(
             scale_factor=scale_factor,
@@ -94,71 +91,36 @@ class JoinOrderBenchmark(BaseBenchmark):
         self.queries_dir = queries_dir
         self._schema = JoinOrderSchema()
         self._query_manager = JoinOrderQueryManager(queries_dir)
-        self._data_manifest = load_manifest(self.data_manifest_path)
+
+        # Pass all kwargs through to generator (includes compression params)
+        generator_kwargs: dict[str, Any] = {
+            "force_regenerate": force_regenerate,
+            **kwargs,
+        }
+
+        self._generator = JoinOrderGenerator(
+            scale_factor=scale_factor,
+            output_dir=self.output_dir,
+            verbose=verbose,
+            quiet=quiet,
+            **generator_kwargs,
+        )
 
     def generate_data(self) -> list[Path]:
-        """Ensure the canonical Join Order Benchmark dataset is present.
+        """Generate Join Order Benchmark dataset.
 
         Returns:
-            List of verified Parquet data file paths.
+            List of generated data file paths
         """
-        self.log_verbose("Ensuring canonical JoinOrder IMDb 2013 data is available...")
+        self.log_verbose(f"Generating synthetic Join Order data at scale factor {self.scale_factor}...")
 
         start_time = mono_time()
-        if self.force_regenerate:
-            self._clear_cached_data()
-        data_dir = self._fetch_and_verify_data()
-        data_files = [data_dir / table.file for table in self._data_manifest.tables]
-        self.tables = {table.name: data_dir / table.file for table in self._data_manifest.tables}
-        fetch_time = elapsed_seconds(start_time)
+        data_files = self._generator.generate_data()
+        generation_time = elapsed_seconds(start_time)
 
-        self.log_verbose(f"Verified {len(data_files)} canonical Parquet files in {fetch_time:.2f}s")
+        self.log_verbose(f"Generated {len(data_files)} data files in {generation_time:.2f}s")
 
         return data_files
-
-    def _clear_cached_data(self) -> None:
-        """Remove manifest-owned cache files before a forced refresh."""
-        for table in self._data_manifest.tables:
-            (self.output_dir / table.file).unlink(missing_ok=True)
-        archive_name = Path(self._data_manifest.url).name or "joinorder-imdb-2013-v1.tar.zst"
-        (self.output_dir / archive_name).unlink(missing_ok=True)
-
-    def _fetch_and_verify_data(self) -> Path:
-        """Fetch, extract when needed, and verify canonical table files."""
-        try:
-            return fetch_data("joinorder", self.data_manifest_path, self.output_dir)
-        except ExtractionRequiredError as exc:
-            self._extract_tar_zst(Path(exc.archive_path), Path(exc.output_dir))
-            return fetch_data("joinorder", self.data_manifest_path, self.output_dir)
-
-    @staticmethod
-    def _extract_tar_zst(archive_path: Path, output_dir: Path) -> None:
-        """Extract a zstd-compressed tarball while rejecting unsafe paths."""
-        try:
-            import zstandard as zstd
-        except ImportError as exc:  # pragma: no cover - dependency is required by pyproject
-            raise RuntimeError("zstandard is required to extract canonical JoinOrder data") from exc
-
-        output_dir.mkdir(parents=True, exist_ok=True)
-        output_root = output_dir.resolve()
-        with archive_path.open("rb") as raw:
-            with zstd.ZstdDecompressor().stream_reader(raw) as reader:
-                with tarfile.open(fileobj=reader, mode="r|") as tar:
-                    for member in tar:
-                        target = (output_dir / member.name).resolve()
-                        if output_root not in (target, *target.parents):
-                            raise RuntimeError(f"unsafe path in JoinOrder archive: {member.name}")
-                        if member.isdir():
-                            target.mkdir(parents=True, exist_ok=True)
-                            continue
-                        if not member.isfile():
-                            raise RuntimeError(f"unsupported archive member in JoinOrder archive: {member.name}")
-                        target.parent.mkdir(parents=True, exist_ok=True)
-                        extracted = tar.extractfile(member)
-                        if extracted is None:
-                            raise RuntimeError(f"unable to extract JoinOrder archive member: {member.name}")
-                        with extracted, target.open("wb") as output:
-                            shutil.copyfileobj(extracted, output)
 
     def get_schema(self) -> dict[str, dict]:
         """Get the Join Order Benchmark schema definitions.
@@ -291,11 +253,7 @@ class JoinOrderBenchmark(BaseBenchmark):
         Returns:
             Estimated total data size in bytes
         """
-        return sum(
-            (self.output_dir / table.file).stat().st_size
-            for table in self._data_manifest.tables
-            if (self.output_dir / table.file).exists()
-        )
+        return self._generator.get_total_size_estimate()
 
     def get_table_row_count(self, table_name: str) -> int:
         """Get expected row count for a table.
@@ -306,10 +264,7 @@ class JoinOrderBenchmark(BaseBenchmark):
         Returns:
             Expected number of rows at current scale factor
         """
-        try:
-            return self._data_manifest.table(table_name).row_count
-        except KeyError:
-            return 0
+        return self._generator.get_table_row_count(table_name)
 
     def validate_query(self, query_id: str) -> bool:
         """Validate that a query is syntactically correct.
@@ -336,8 +291,8 @@ class JoinOrderBenchmark(BaseBenchmark):
             Dictionary with benchmark metadata
         """
         return {
-            "benchmark_name": "Join Order Benchmark",
-            "description": "Canonical IMDb 2013 Join Order Benchmark",
+            "benchmark_name": "Synthetic Join Order Benchmark",
+            "description": "Uniformly-random Join Order schema smoke-test benchmark",
             "scale_factor": self.scale_factor,
             "output_dir": str(self.output_dir),
             "queries_dir": self.queries_dir,
@@ -346,8 +301,6 @@ class JoinOrderBenchmark(BaseBenchmark):
             "relationship_tables": len(self.get_relationship_tables()),
             "dimension_tables": len(self.get_dimension_tables()),
             "estimated_size_bytes": self.get_estimated_data_size(),
-            "dataset_version": self._data_manifest.dataset_version,
-            "data_archive_hash": self._data_manifest.data_archive_hash,
             "query_complexity_distribution": self.get_queries_by_complexity(),
             "join_pattern_distribution": self.get_queries_by_pattern(),
             "reference_paper": "How Good Are Query Optimizers, Really? (VLDB 2015)",
@@ -357,21 +310,15 @@ class JoinOrderBenchmark(BaseBenchmark):
     def get_dataframe_queries(self) -> QueryRegistry:
         """Get DataFrame query implementations for JoinOrder.
 
-        Returns a registry containing all canonical query IDs. Thirteen have
-        DataFrame implementations; the rest are registered as Track-2 stubs.
+        Returns the QueryRegistry containing DataFrame implementations of all
+        13 JoinOrder queries for both expression-family and pandas-family platforms.
 
         Returns:
-            QueryRegistry for canonical JoinOrder DataFrame queries.
+            QueryRegistry with all 13 JoinOrder DataFrame queries
         """
-        from benchbox.core.joinorder.dataframe_queries import get_dataframe_queries
+        from benchbox.core.joinorder_synthetic.dataframe_queries import get_dataframe_queries
 
         return get_dataframe_queries()
-
-    def get_dataframe_skip_queries(self) -> list[str]:
-        """Skip canonical queries whose DataFrame translations are Track-2 stubs."""
-        from benchbox.core.joinorder.dataframe_queries import get_untranslated_dataframe_query_ids
-
-        return get_untranslated_dataframe_query_ids()
 
     def __repr__(self) -> str:
         """String representation of the benchmark.
@@ -379,7 +326,7 @@ class JoinOrderBenchmark(BaseBenchmark):
         Returns:
             String representation
         """
-        return f"JoinOrderBenchmark(scale_factor={self.scale_factor}, queries={self.get_query_count()})"
+        return f"JoinOrderSyntheticBenchmark(scale_factor={self.scale_factor}, queries={self.get_query_count()})"
 
 
 # ---------------------------------------------------------------------------
@@ -392,7 +339,7 @@ from benchbox.cli.benchmark_hooks import (  # noqa: E402
 )
 
 BenchmarkHookRegistry.register_option_specs(
-    "joinorder",
+    "joinorder_synthetic",
     BenchmarkOptionSpec(
         name="queries_dir",
         help="Directory containing custom query files",
@@ -401,7 +348,12 @@ BenchmarkHookRegistry.register_option_specs(
     BenchmarkOptionSpec(
         name="force_regenerate",
         parser=lambda v: v.strip().lower() in ("true", "1", "yes"),
-        help="Refresh the canonical IMDb 2013 archive cache and re-verify Parquet files",
+        help="Force data regeneration",
         aliases=("force-regenerate",),
     ),
 )
+
+
+# Backward-compatible alias for callers that import the class from this module
+# before going through the registry.
+JoinOrderBenchmark = JoinOrderSyntheticBenchmark

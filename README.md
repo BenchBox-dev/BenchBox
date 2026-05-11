@@ -913,7 +913,7 @@ print(normalize_output_root("s3://bucket/prefix", "tpch", 0.01))
     * Original paper: https://www.cs.umb.edu/~poneil/StarSchemaB.PDF
 * **AMPLab** - Big data benchmark with text processing. Complex data patterns.
     * Original site: https://amplab.cs.berkeley.edu/benchmark/
-* **Join Order** - IMDB dataset for join optimization testing. Complex join patterns test cardinality estimation.
+* **Join Order** - Canonical IMDb 2013 JOB dataset for join optimization testing. Runs at sf=1 only; first use downloads and verifies the Parquet archive under `BENCHBOX_OUTPUT_DIR` / `benchmark_runs/datagen/joinorder_sf1/`.
     * Original paper: https://www.vldb.org/pvldb/vol9/p204-leis.pdf
 
 ### Industry Benchmarks

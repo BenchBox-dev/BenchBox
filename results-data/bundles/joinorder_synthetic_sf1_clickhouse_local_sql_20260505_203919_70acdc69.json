@@ -1,7 +1,7 @@
 {
   "benchmark": {
-    "id": "joinorder",
-    "name": "JoinOrderBenchmark",
+    "id": "joinorder_synthetic",
+    "name": "JoinOrderSyntheticBenchmark",
     "scale_factor": 1.0,
     "test_type": "power"
   },
@@ -16,19 +16,20 @@
       "power"
     ],
     "platform_option_sources": {
+      "data_path": "path_d969e086da79",
       "force_recreate": "saved_config",
       "force_upload": "saved_config",
       "show_query_plans": "saved_config"
     },
     "platform_options": {
+      "data_path": "path_0b427960d0e3",
       "force_recreate": false,
       "force_upload": false,
       "show_query_plans": false
     }
   },
   "cost": {
-    "model": "estimated",
-    "total_usd": 0
+    "model": "estimated"
   },
   "environment": {
     "arch": "arm64",
@@ -42,7 +43,7 @@
     "os": "Darwin",
     "platform_runtime": {
       "collection_status": "partial",
-      "engine_host": "host_e9490ed88fd5",
+      "engine_host": "host_ae35e4222f17",
       "runtime_type": "local_process",
       "source": "inferred"
     },
@@ -52,11 +53,11 @@
     "compression": {
       "type": "zstd"
     },
-    "driver_package": "pyspark",
-    "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-10/.venv/bin/python3",
+    "driver_package": "chdb",
+    "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-02/.venv/bin/python3",
     "driver_runtime_strategy": "current-process",
-    "driver_version_actual": "4.1.1",
-    "driver_version_resolved": "4.1.1",
+    "driver_version_actual": "4.1.6",
+    "driver_version_resolved": "4.1.6",
     "entry_point": "cli",
     "mode": "sql",
     "non_interactive": true,
@@ -64,24 +65,24 @@
       "load",
       "power"
     ],
-    "timestamp": "2026-05-06T09:24:45.270422",
+    "timestamp": "2026-05-05T20:39:12.948126",
     "tuning_mode": "tuned"
   },
   "export": {
     "anonymized": true,
-    "timestamp": "2026-05-06T09:29:10.591110",
+    "timestamp": "2026-05-05T20:39:19.868384",
     "tool": "benchbox-exporter"
   },
   "normalized_cost": {
-    "billing_unit": "not_applicable",
+    "billing_unit": "unknown",
     "cost_model_source": "benchbox.core.cost.pricing",
     "cost_model_version": "2025.11",
     "cost_scope": "compute_only",
-    "cost_status": "not_applicable_local",
+    "cost_status": "unavailable",
     "cost_usd": null,
     "deployment": {
-      "cloud_provider": null,
-      "cloud_region": null,
+      "cloud_provider": "aws",
+      "cloud_region": "us-east-1",
       "cluster_size": null,
       "instance_type": null,
       "node_count": null,
@@ -89,8 +90,8 @@
       "storage_tier": null,
       "warehouse_size": null
     },
-    "normalized_cost_usd": "0",
-    "pricing_region": "not_applicable"
+    "normalized_cost_usd": null,
+    "pricing_region": "us-east-1"
   },
   "phases": {
     "data_generation": {
@@ -98,55 +99,48 @@
       "status": "SUCCESS"
     },
     "data_loading": {
-      "duration_ms": 9554,
+      "duration_ms": 5030,
       "status": "SUCCESS"
     },
     "power_test": {
-      "duration_ms": 251606,
+      "duration_ms": 1615,
       "status": "COMPLETED"
     },
     "schema_creation": {
-      "duration_ms": 298,
+      "duration_ms": 48,
       "status": "SUCCESS"
     },
     "throughput_test": {
       "status": "NOT_RUN"
     },
     "validation": {
-      "duration_ms": 550,
+      "duration_ms": 50,
       "status": "PASSED"
     }
   },
   "platform": {
-    "client_version": "4.1.1",
+    "client_version": "26.1.0",
     "cloud": {
       "collection_status": "unavailable",
       "source": "unavailable"
     },
     "compute": {
-      "collection_status": "unavailable",
-      "source": "unavailable"
+      "collection_status": "partial",
+      "result_cache_enabled": false,
+      "source": "requested"
     },
     "config": {
-      "adaptive_enabled": true,
       "connection_mode": "local",
-      "database": "database_f9d6fe6ded1d",
-      "driver_memory": "4g",
-      "driver_package": "pyspark",
-      "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-10/.venv/bin/python3",
+      "data_path": "path_0ce54145345b",
+      "deployment_mode": "local",
+      "driver_package": "chdb",
+      "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-02/.venv/bin/python3",
       "driver_runtime_strategy": "current-process",
-      "driver_version_actual": "4.1.1",
-      "driver_version_resolved": "4.1.1",
+      "driver_version_actual": "4.1.6",
+      "driver_version_resolved": "4.1.6",
       "execution_mode": "sql",
-      "executor_cores": 2,
-      "executor_memory": "4g",
-      "hive_enabled": false,
-      "master": "local[*]",
-      "num_executors": 0,
-      "shuffle_partitions": 200,
-      "spark_app_id": "local-1778073886449",
-      "spark_master": "local[*]",
-      "table_format": "parquet"
+      "mode": "local",
+      "result_cache_enabled": false
     },
     "deployment": {
       "collection_status": "partial",
@@ -155,39 +149,30 @@
       "endpoint_class": "unknown",
       "metadata_source": "inferred"
     },
-    "driver_actual_version": "4.1.1",
-    "driver_package": "pyspark",
-    "driver_resolved_version": "4.1.1",
+    "driver_actual_version": "4.1.6",
+    "driver_package": "chdb",
+    "driver_resolved_version": "4.1.6",
     "driver_runtime_strategy": "current-process",
-    "name": "Spark",
+    "name": "ClickHouse Local",
     "raw_config": {
-      "adaptive_enabled": true,
-      "database": "database_f9d6fe6ded1d",
-      "driver_memory": "4g",
-      "executor_cores": 2,
-      "executor_memory": "4g",
-      "hive_enabled": false,
-      "num_executors": 0,
-      "shuffle_partitions": 200,
-      "spark_app_id": "local-1778073886449",
-      "spark_master": "local[*]",
-      "table_format": "parquet"
-    },
-    "raw_metadata": {
-      "master": "local[*]"
+      "data_path": "path_0ce54145345b",
+      "database_path": "path_af05fa8f9e06",
+      "deployment_mode": "local",
+      "mode": "local",
+      "result_cache_enabled": false,
+      "tuning_config": "UnifiedTuningConfiguration(primary_keys=PrimaryKeyConfiguration(enabled=True, enforce_uniqueness=True, nullable=False), foreign_keys=ForeignKeyConfiguration(enabled=True, enforce_referential_integrity=True, on_delete_action='RESTRICT', on_update_action='RESTRICT'), unique_constraints=UniqueConstraintConfiguration(enabled=True, ignore_nulls=False), check_constraints=CheckConstraintConfiguration(enabled=True, enforce_on_insert=True, enforce_on_update=True), platform_optimizations=PlatformOptimizationConfiguration(z_ordering_enabled=False, z_ordering_columns=[], liquid_clustering_enabled=False, liquid_clustering_columns=[], databricks_clustering_strategy='z_order', sorted_ingestion_mode='off', sorted_ingestion_method='auto', auto_optimize_enabled=False, auto_compact_enabled=False, bloom_filters_enabled=False, bloom_filter_columns=[], materialized_views_enabled=False), table_tunings={})"
     },
     "storage": {
-      "collection_status": "partial",
-      "source": "requested",
-      "table_format": "parquet"
+      "collection_status": "unavailable",
+      "source": "unavailable"
     },
-    "version": "4.1.1"
+    "version": "unknown"
   },
   "queries": [
     {
       "id": "1a",
       "iter": 0,
-      "ms": 15941.0,
+      "ms": 10.0,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -196,7 +181,7 @@
     {
       "id": "1b",
       "iter": 0,
-      "ms": 15710.0,
+      "ms": 5.0,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -205,7 +190,7 @@
     {
       "id": "2a",
       "iter": 0,
-      "ms": 15844.0,
+      "ms": 27.0,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -214,7 +199,7 @@
     {
       "id": "3a",
       "iter": 0,
-      "ms": 363.0,
+      "ms": 65.0,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -223,7 +208,7 @@
     {
       "id": "4a",
       "iter": 0,
-      "ms": 321.0,
+      "ms": 21.0,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -232,7 +217,7 @@
     {
       "id": "5a",
       "iter": 0,
-      "ms": 429.0,
+      "ms": 5.0,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -241,7 +226,7 @@
     {
       "id": "6a",
       "iter": 0,
-      "ms": 262.0,
+      "ms": 19.0,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -250,7 +235,7 @@
     {
       "id": "7a",
       "iter": 0,
-      "ms": 103.0,
+      "ms": 11.0,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -259,7 +244,7 @@
     {
       "id": "8a",
       "iter": 0,
-      "ms": 102.0,
+      "ms": 21.0,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -268,7 +253,7 @@
     {
       "id": "9a",
       "iter": 0,
-      "ms": 148.0,
+      "ms": 19.0,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -277,7 +262,7 @@
     {
       "id": "10a",
       "iter": 0,
-      "ms": 288.0,
+      "ms": 45.0,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -286,7 +271,7 @@
     {
       "id": "11a",
       "iter": 0,
-      "ms": 12278.0,
+      "ms": 3.0,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -295,7 +280,7 @@
     {
       "id": "12a",
       "iter": 0,
-      "ms": 604.0,
+      "ms": 114.0,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -304,7 +289,7 @@
     {
       "id": "1a",
       "iter": 1,
-      "ms": 15803.0,
+      "ms": 8.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -313,7 +298,7 @@
     {
       "id": "1b",
       "iter": 1,
-      "ms": 16051.0,
+      "ms": 24.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -322,7 +307,7 @@
     {
       "id": "2a",
       "iter": 1,
-      "ms": 15834.0,
+      "ms": 19.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -331,7 +316,7 @@
     {
       "id": "3a",
       "iter": 1,
-      "ms": 544.0,
+      "ms": 106.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -340,7 +325,7 @@
     {
       "id": "4a",
       "iter": 1,
-      "ms": 271.0,
+      "ms": 44.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -349,7 +334,7 @@
     {
       "id": "5a",
       "iter": 1,
-      "ms": 444.0,
+      "ms": 6.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -358,7 +343,7 @@
     {
       "id": "6a",
       "iter": 1,
-      "ms": 182.0,
+      "ms": 75.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -367,7 +352,7 @@
     {
       "id": "7a",
       "iter": 1,
-      "ms": 103.0,
+      "ms": 14.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -376,7 +361,7 @@
     {
       "id": "8a",
       "iter": 1,
-      "ms": 101.0,
+      "ms": 44.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -385,7 +370,7 @@
     {
       "id": "9a",
       "iter": 1,
-      "ms": 154.0,
+      "ms": 42.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -394,7 +379,7 @@
     {
       "id": "10a",
       "iter": 1,
-      "ms": 326.0,
+      "ms": 79.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -403,7 +388,7 @@
     {
       "id": "11a",
       "iter": 1,
-      "ms": 12335.0,
+      "ms": 4.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -412,7 +397,7 @@
     {
       "id": "12a",
       "iter": 1,
-      "ms": 689.0,
+      "ms": 66.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -421,7 +406,7 @@
     {
       "id": "1a",
       "iter": 2,
-      "ms": 15934.0,
+      "ms": 8.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -430,7 +415,7 @@
     {
       "id": "1b",
       "iter": 2,
-      "ms": 15833.0,
+      "ms": 8.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -439,7 +424,7 @@
     {
       "id": "2a",
       "iter": 2,
-      "ms": 15801.0,
+      "ms": 36.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -448,7 +433,7 @@
     {
       "id": "3a",
       "iter": 2,
-      "ms": 443.0,
+      "ms": 58.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -457,7 +442,7 @@
     {
       "id": "4a",
       "iter": 2,
-      "ms": 264.0,
+      "ms": 27.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -466,7 +451,7 @@
     {
       "id": "5a",
       "iter": 2,
-      "ms": 468.0,
+      "ms": 8.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -475,7 +460,7 @@
     {
       "id": "6a",
       "iter": 2,
-      "ms": 159.0,
+      "ms": 47.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -484,7 +469,7 @@
     {
       "id": "7a",
       "iter": 2,
-      "ms": 90.0,
+      "ms": 10.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -492,6 +477,42 @@
     },
     {
       "id": "8a",
+      "iter": 2,
+      "ms": 29.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "9a",
+      "iter": 2,
+      "ms": 19.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "10a",
+      "iter": 2,
+      "ms": 33.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "11a",
+      "iter": 2,
+      "ms": 3.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "12a",
       "iter": 2,
       "ms": 73.0,
       "rows": 1,
@@ -500,45 +521,9 @@
       "stream": 2
     },
     {
-      "id": "9a",
-      "iter": 2,
-      "ms": 144.0,
-      "rows": 1,
-      "run_type": "measurement",
-      "status": "SUCCESS",
-      "stream": 2
-    },
-    {
-      "id": "10a",
-      "iter": 2,
-      "ms": 260.0,
-      "rows": 1,
-      "run_type": "measurement",
-      "status": "SUCCESS",
-      "stream": 2
-    },
-    {
-      "id": "11a",
-      "iter": 2,
-      "ms": 12212.0,
-      "rows": 1,
-      "run_type": "measurement",
-      "status": "SUCCESS",
-      "stream": 2
-    },
-    {
-      "id": "12a",
-      "iter": 2,
-      "ms": 471.0,
-      "rows": 1,
-      "run_type": "measurement",
-      "status": "SUCCESS",
-      "stream": 2
-    },
-    {
       "id": "1a",
       "iter": 3,
-      "ms": 15928.0,
+      "ms": 9.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -547,7 +532,7 @@
     {
       "id": "1b",
       "iter": 3,
-      "ms": 15899.0,
+      "ms": 7.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -556,7 +541,7 @@
     {
       "id": "2a",
       "iter": 3,
-      "ms": 16294.0,
+      "ms": 39.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -565,7 +550,7 @@
     {
       "id": "3a",
       "iter": 3,
-      "ms": 356.0,
+      "ms": 55.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -574,7 +559,7 @@
     {
       "id": "4a",
       "iter": 3,
-      "ms": 315.0,
+      "ms": 23.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -583,7 +568,7 @@
     {
       "id": "5a",
       "iter": 3,
-      "ms": 448.0,
+      "ms": 5.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -592,7 +577,7 @@
     {
       "id": "6a",
       "iter": 3,
-      "ms": 178.0,
+      "ms": 38.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -601,7 +586,7 @@
     {
       "id": "7a",
       "iter": 3,
-      "ms": 73.0,
+      "ms": 11.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -610,7 +595,7 @@
     {
       "id": "8a",
       "iter": 3,
-      "ms": 98.0,
+      "ms": 21.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -619,7 +604,7 @@
     {
       "id": "9a",
       "iter": 3,
-      "ms": 129.0,
+      "ms": 23.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -628,7 +613,7 @@
     {
       "id": "10a",
       "iter": 3,
-      "ms": 449.0,
+      "ms": 35.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -637,7 +622,7 @@
     {
       "id": "11a",
       "iter": 3,
-      "ms": 13278.0,
+      "ms": 4.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -646,7 +631,7 @@
     {
       "id": "12a",
       "iter": 3,
-      "ms": 752.0,
+      "ms": 64.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -654,16 +639,16 @@
     }
   ],
   "run": {
-    "id": "4f603854",
+    "id": "70acdc69",
     "iterations": 3,
-    "query_time_ms": 189186,
+    "query_time_ms": 1224,
     "streams": 3,
-    "timestamp": "2026-05-06T09:29:10.443317",
-    "total_duration_ms": 265120
+    "timestamp": "2026-05-05T20:39:19.831409",
+    "total_duration_ms": 6808
   },
   "summary": {
     "data": {
-      "load_time_ms": 9554.8,
+      "load_time_ms": 5030.8,
       "rows_loaded": 14680069
     },
     "queries": {
@@ -672,17 +657,21 @@
       "total": 39
     },
     "timing": {
-      "avg_ms": 4850.9,
-      "geometric_mean_ms": 847.7,
-      "max_ms": 16294,
-      "min_ms": 73,
-      "p90_ms": 15928,
-      "p95_ms": 16051,
-      "p99_ms": 16294,
-      "stdev_ms": 6972.7,
-      "total_ms": 189186
+      "avg_ms": 31.4,
+      "geometric_mean_ms": 21.3,
+      "max_ms": 106,
+      "min_ms": 3,
+      "p90_ms": 73,
+      "p95_ms": 79,
+      "p99_ms": 106,
+      "stdev_ms": 25.4,
+      "total_ms": 1224
     },
     "validation": "passed"
+  },
+  "synthetic_retag": {
+    "previous_benchmark_id": "joinorder",
+    "reason": "pre-cutover JoinOrder bundles used the synthetic generator"
   },
   "tables": {
     "aka_name": {

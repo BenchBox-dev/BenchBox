@@ -1,6 +1,6 @@
 {
   "schema_version": "2.2",
-  "generated_at": "2026-05-08T20:20:14.877480+00:00",
+  "generated_at": "2026-05-11T18:11:50.816650+00:00",
   "bundles": [
     {
       "file": "ai_primitives_sf001_doris_sql_20260506_133640_6e90e5e7.json",
@@ -2449,66 +2449,6 @@
       "query_count": 30,
       "trust_label": "community-submission",
       "bundle_sha256": "9f7174cc782ee538c8bc2a11d816e5942b753e9e4b49e88fa5e7845fec45b5b3"
-    },
-    {
-      "file": "joinorder_sf1_clickhouse_local_sql_20260505_203919_70acdc69.json",
-      "benchmark": "joinorder",
-      "benchmark_name": "JoinOrderBenchmark",
-      "platform": "ClickHouse Local",
-      "platform_version": "unknown",
-      "scale_factor": 1.0,
-      "timestamp": "2026-05-05T20:39:19.831409",
-      "query_count": 39,
-      "trust_label": "community-submission",
-      "bundle_sha256": "f99485047374dbf8316945d2547cfd4ddb405e7721d7378e7d702fff80acf1e6"
-    },
-    {
-      "file": "joinorder_sf1_duckdb_sql_20260505_195300_be289a53.json",
-      "benchmark": "joinorder",
-      "benchmark_name": "JoinOrderBenchmark",
-      "platform": "DuckDB",
-      "platform_version": "1.3.2",
-      "scale_factor": 1.0,
-      "timestamp": "2026-05-05T19:53:00.790367",
-      "query_count": 39,
-      "trust_label": "community-submission",
-      "bundle_sha256": "712f699db115bb83767acdcc613a5741cb4480f2188f630f920a50ea444ae02b"
-    },
-    {
-      "file": "joinorder_sf1_sqlite_sql_20260506_085050_4e521870.json",
-      "benchmark": "joinorder",
-      "benchmark_name": "JoinOrderBenchmark",
-      "platform": "SQLite",
-      "platform_version": "3.50.4",
-      "scale_factor": 1.0,
-      "timestamp": "2026-05-06T08:50:50.295557",
-      "query_count": 39,
-      "trust_label": "community-submission",
-      "bundle_sha256": "f350de4c1e17a229bef9d589701ead2369edf16323e810790546020edb69114f"
-    },
-    {
-      "file": "joinorder_sf1_spark_sql_20260506_092910_4f603854.json",
-      "benchmark": "joinorder",
-      "benchmark_name": "JoinOrderBenchmark",
-      "platform": "Spark",
-      "platform_version": "4.1.1",
-      "scale_factor": 1.0,
-      "timestamp": "2026-05-06T09:29:10.443317",
-      "query_count": 39,
-      "trust_label": "community-submission",
-      "bundle_sha256": "f4808b3620edcb63b461a489968b96b4eba204850f4185954a64c13def13ecb5"
-    },
-    {
-      "file": "joinorder_sf1_starrocks_sql_20260506_112717_d3968adb.json",
-      "benchmark": "joinorder",
-      "benchmark_name": "JoinOrderBenchmark",
-      "platform": "StarRocks",
-      "platform_version": "8.0.33",
-      "scale_factor": 1.0,
-      "timestamp": "2026-05-06T11:27:17.519711",
-      "query_count": 39,
-      "trust_label": "community-submission",
-      "bundle_sha256": "ea15c7f82efc897a10b5264be47c3a6247922db2d8c4edda791451f1e4db45ba"
     },
     {
       "file": "metadata_primitives_sf1_datafusion_sql_20260502_182730_9bf19029.json",
@@ -6495,13 +6435,6 @@
       "Spark",
       "StarRocks"
     ],
-    "joinorder@sf1.0": [
-      "ClickHouse Local",
-      "DuckDB",
-      "SQLite",
-      "Spark",
-      "StarRocks"
-    ],
     "metadata_primitives@sf1.0": [
       "DataFusion",
       "DuckDB",
@@ -6796,7 +6729,7 @@
     ]
   },
   "summary": {
-    "total_bundles": 525,
+    "total_bundles": 520,
     "by_benchmark": {
       "ai_primitives": 12,
       "amplab": 50,
@@ -6805,7 +6738,6 @@
       "datavault": 21,
       "flightdata": 17,
       "h2odb": 47,
-      "joinorder": 5,
       "metadata_primitives": 8,
       "nyctaxi": 29,
       "read_primitives": 18,
@@ -6824,21 +6756,21 @@
     "by_platform": {
       "Apache Doris": 19,
       "CedarDB": 3,
-      "ClickHouse Local": 37,
+      "ClickHouse Local": 36,
       "Dask": 21,
       "DataFusion": 99,
-      "DuckDB": 54,
+      "DuckDB": 53,
       "Pandas": 23,
       "Polars": 70,
       "PostgreSQL": 17,
       "Presto": 3,
       "PySpark": 57,
-      "SQLite": 37,
-      "Spark": 44,
-      "StarRocks": 41
+      "SQLite": 36,
+      "Spark": 43,
+      "StarRocks": 40
     },
     "by_trust_label": {
-      "community-submission": 513,
+      "community-submission": 508,
       "maintainer-run": 12
     }
   }

@@ -1,7 +1,7 @@
 {
-  "benchmark": "JoinOrderBenchmark",
-  "bundle_file": "joinorder_sf1_spark_sql_20260506_092910_4f603854.json",
-  "bundle_hash": "f4808b3620edcb63b461a489968b96b4eba204850f4185954a64c13def13ecb5",
+  "benchmark": "JoinOrderSyntheticBenchmark",
+  "bundle_file": "joinorder_synthetic_sf1_spark_sql_20260506_092910_4f603854.json",
+  "bundle_hash": "0df799318b37cf0749e9d0ea54ed9c6b29c6154261b3a6641c0769f88437cd12",
   "companion_hashes": {},
   "phase": 2,
   "platform": "Spark",

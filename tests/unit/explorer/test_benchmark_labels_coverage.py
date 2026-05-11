@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from benchbox.core.benchmark_registry import list_benchmark_ids
+from benchbox.core.benchmark_registry import get_benchmark_surface, list_benchmark_ids
 
 pytestmark = [
     pytest.mark.unit,
@@ -52,7 +52,7 @@ def _parse_label_keys(source: str) -> frozenset[str]:
 
 def test_explorer_labels_cover_every_canonical_benchmark_id() -> None:
     explorer_keys = _parse_label_keys(EXPLORER_UTILS.read_text(encoding="utf-8"))
-    canonical = frozenset(list_benchmark_ids())
+    canonical = frozenset(bid for bid in list_benchmark_ids() if get_benchmark_surface(bid) == "public")
 
     missing = canonical - explorer_keys
     assert not missing, (
@@ -63,7 +63,7 @@ def test_explorer_labels_cover_every_canonical_benchmark_id() -> None:
 
 def test_explorer_labels_have_no_unexplained_extras() -> None:
     explorer_keys = _parse_label_keys(EXPLORER_UTILS.read_text(encoding="utf-8"))
-    canonical = frozenset(list_benchmark_ids())
+    canonical = frozenset(bid for bid in list_benchmark_ids() if get_benchmark_surface(bid) == "public")
 
     extras = explorer_keys - canonical - KNOWN_DISPLAY_ALIASES
     assert not extras, (

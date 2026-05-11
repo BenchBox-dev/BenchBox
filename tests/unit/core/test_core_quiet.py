@@ -2,7 +2,7 @@ import logging
 
 import pytest
 
-from benchbox.core.joinorder.benchmark import JoinOrderBenchmark
+from benchbox.core.joinorder_synthetic.benchmark import JoinOrderSyntheticBenchmark
 
 pytestmark = [
     pytest.mark.unit,
@@ -12,7 +12,7 @@ pytestmark = [
 
 def test_core_quiet_suppresses_logs_and_output(caplog, capsys):
     caplog.set_level(logging.DEBUG)
-    b = JoinOrderBenchmark(scale_factor=0.01, output_dir="/tmp/joinorder", verbose=2)
+    b = JoinOrderSyntheticBenchmark(scale_factor=0.01, output_dir="/tmp/joinorder_synthetic", verbose=2)
     # Force quiet after init to simulate CLI propagation
     b.quiet = True
     b.generate_data = list

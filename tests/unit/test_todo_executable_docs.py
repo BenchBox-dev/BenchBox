@@ -35,6 +35,14 @@ def _verification_commands(path: Path) -> list[str]:
     return commands
 
 
+def _todo_or_done_item(worktree: str, phase: str, filename: str) -> Path:
+    for root in ("TODO", "DONE"):
+        path = REPO_ROOT / "_project" / root / worktree / phase / filename
+        if path.exists():
+            return path
+    raise AssertionError(f"Could not find TODO/DONE item {worktree}/{phase}/{filename}")
+
+
 def test_completed_codex_followup_validates_current_done_path() -> None:
     path = REPO_ROOT / "_project" / "DONE" / "main" / "active" / "codex-pr-review-followups-week-2026-05-01.yaml"
     text = path.read_text(encoding="utf-8")
@@ -64,7 +72,7 @@ def test_codex_thread_rescan_audit_does_not_claim_present_blind_spots_are_missin
 
 
 def test_joinorder_dataframe_followup_path_uses_seeded_yaml() -> None:
-    path = REPO_ROOT / "_project" / "TODO" / "main" / "planning" / "joinorder-canonical-cutover.yaml"
+    path = _todo_or_done_item("main", "planning", "joinorder-canonical-cutover.yaml")
     text = path.read_text(encoding="utf-8")
 
     seeded_path = "_project/TODO/main/planning/track2-joinorder-dataframe-coverage.yaml"

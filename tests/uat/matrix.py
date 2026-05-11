@@ -244,6 +244,7 @@ class BenchmarkInfo:
     min_scale: float | None
     scale_options: tuple[float, ...]
     supports_dataframe: bool
+    surface: str = "public"
 
 
 def load_benchmarks() -> dict[str, BenchmarkInfo]:
@@ -261,6 +262,7 @@ def load_benchmarks() -> dict[str, BenchmarkInfo]:
         out[bid] = BenchmarkInfo(
             benchmark_id=bid,
             category=meta.get("category", ""),
+            surface=str(meta.get("surface", "public")),
             default_scale=float(meta.get("default_scale", 1.0)),
             min_scale=(float(meta["min_scale"]) if meta.get("min_scale") is not None else None),
             scale_options=tuple(float(s) for s in meta.get("scale_options", ())),
@@ -307,7 +309,7 @@ def resolve_benchmarks(
             raise ValueError(f"Unknown benchmark group {group!r}; valid: {sorted(CATEGORY_GROUPS)}")
         target_categories = set(CATEGORY_GROUPS[group])
         for bid, info in benchmarks.items():
-            if info.category in target_categories and bid not in seen:
+            if info.surface == "public" and info.category in target_categories and bid not in seen:
                 seen.add(bid)
                 resolved.append(bid)
     for bid in include:

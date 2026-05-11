@@ -147,6 +147,9 @@ def fetch_data(
     # against the manifest) and tell the caller it must extract.
     archive_name = archive_filename or Path(manifest.url).name or f"{benchmark_id}.tar.zst"
     archive_path = out / archive_name
+    if archive_path.exists() and sha256_of(archive_path) == manifest.archive_sha256:
+        raise ExtractionRequiredError(archive_path=str(archive_path), output_dir=str(out))
+
     fetch = downloader or download
     fetch(manifest.url, archive_path, expected_sha256=manifest.archive_sha256)
 

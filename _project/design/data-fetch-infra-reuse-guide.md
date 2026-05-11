@@ -8,8 +8,21 @@ and Track-2 groundwork fill in the sections each owns.
 
 OWNED BY: joinorder-canonical-cutover w13. Filled in when cutover
 authors `benchbox/core/joinorder/DATA-LICENSE.md` and lifts its
-shape into a reusable template here. Until then this section is
-intentionally empty.
+shape into a reusable template here.
+
+Required shape for real-data benchmarks:
+
+1. Dataset provenance: name the upstream archive, DOI or durable URL,
+   source snapshot date, conversion/parsing path, and final BenchBox
+   storage format.
+2. Upstream attribution: include any attribution text supplied by the
+   source project verbatim.
+3. Scope clause: state the research or benchmark-only usage intent.
+4. Redistribution disclaimer: BenchBox redistributes a derivative form
+   for reproducibility, claims no ownership over upstream data, and will
+   honor takedown requests.
+5. Takedown contact: include a real reachable address; no placeholders
+   are allowed before publishing a release asset.
 
 ## When to use
 

@@ -12,6 +12,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 # parallelism by the worker count, causing CPU oversubscription and machine
 # lock-ups on developer workstations.
 import os
+import shutil
 from types import FrameType
 
 os.environ.setdefault("POLARS_MAX_THREADS", "2")
@@ -48,6 +49,21 @@ pytest_plugins = [
     "tests.fixtures.platform_fixtures",
     "tests.fixtures.utility_fixtures",
 ]
+
+
+@pytest.fixture
+def joinorder_canonical_tiny(tmp_path: Path) -> Path:
+    """Copy the canonical tiny JOB fixture and return its isolated path.
+
+    Predicate oracle: every non-known-zero embedded canonical query has at
+    least one underlying row; 2c, 5a, 5b, 10b, and 32a intentionally preserve
+    zero-underlying-row aggregate semantics.
+    """
+    source = Path(__file__).parent / "fixtures" / "joinorder_canonical_tiny"
+    target = tmp_path / "joinorder_canonical_tiny"
+    shutil.copytree(source, target)
+    return target
+
 
 # ── Parallel test run mutual exclusion ──────────────────────────────────────
 _test_lock_fd: int | None = None  # Kept open to hold the flock for the session lifetime.
