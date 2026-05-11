@@ -47,6 +47,8 @@ interface QualifierSlot {
   value: string;
 }
 
+const RESULT_ID_QUALIFIER_KEYS = new Set(["short_result_id", "result_id"]);
+
 // Natural qualifiers (in priority order) that distinguish runs in a
 // human-meaningful way. The result_id tiebreaker is intentionally NOT
 // in this list — it is only appended by the cohort-aware code path
@@ -116,6 +118,56 @@ function distinguishingQualifierKeys(slotsBySource: readonly QualifierSlot[][], 
   return distinguishing;
 }
 
+function naturalQualifierLists(
+  slotsBySource: readonly QualifierSlot[][],
+  indices: readonly number[],
+  distinguishingKeys: ReadonlySet<string>,
+): Map<number, string[]> {
+  const filteredNaturalSlots = new Map(
+    indices.map((i) => [
+      i,
+      slotsBySource[i]!.filter(
+        (slot) => !RESULT_ID_QUALIFIER_KEYS.has(slot.key) && distinguishingKeys.has(slot.key),
+      ),
+    ]),
+  );
+  const allNaturalSlots = new Map(
+    indices.map((i) => [
+      i,
+      slotsBySource[i]!.filter((slot) => !RESULT_ID_QUALIFIER_KEYS.has(slot.key)),
+    ]),
+  );
+  const filteredLabels = indices.map((i) => filteredNaturalSlots.get(i)!.map((slot) => slot.value).join("\u0000"));
+  const filteredNaturalLabelsAreUnique = new Set(filteredLabels).size === filteredLabels.length;
+
+  return new Map(
+    indices.map((i) => {
+      const filtered = filteredNaturalSlots.get(i)!;
+      const allNatural = allNaturalSlots.get(i)!;
+      if (!filteredNaturalLabelsAreUnique || (filtered.length === 0 && allNatural.length > 0)) {
+        return [i, allNatural.map((slot) => slot.value)];
+      }
+      return [i, filtered.map((slot) => slot.value)];
+    }),
+  );
+}
+
+function findUniqueQualifierRound(
+  sources: readonly RunIdentitySource[],
+  indices: readonly number[],
+  qualifierLists: ReadonlyMap<number, string[]>,
+): number | null {
+  const maxQualifiers = Math.max(...indices.map((i) => qualifierLists.get(i)!.length));
+  for (let round = 0; round <= maxQualifiers; round += 1) {
+    const provisional = indices.map((i) => {
+      const used = qualifierLists.get(i)!.slice(0, round);
+      return `${sources[i]!.platform}${used.length > 0 ? " " + used.join(" ") : ""}`;
+    });
+    if (new Set(provisional).size === provisional.length) return round;
+  }
+  return null;
+}
+
 function joinForVariant(base: string, qualifiers: string[], variant: RunIdentityVariant): string {
   if (qualifiers.length === 0) return base;
   switch (variant) {
@@ -175,37 +227,20 @@ export function formatRunIdentitiesForCohort(
   // entry stay empty.
   const usedQualifiers = sources.map((): string[] => []);
 
-  // For every duplicate bucket, discard qualifiers that are invariant within
-  // that bucket, then append distinguishing qualifiers until every label is
-  // unique. The cap still walks through the terminal full-result_id fallback,
-  // so ordinary same-platform duplicates do not silently collapse.
+  // For every duplicate bucket, first try natural qualifiers only. Invariant
+  // natural qualifiers stay out of ordinary labels, but they remain ahead of
+  // result_id fallbacks for runs that otherwise have no distinguishing natural
+  // slot to use.
   for (const [, indices] of bucketsByLabel) {
     if (indices.length < 2) continue;
     const distinguishingKeys = distinguishingQualifierKeys(slotsBySource, indices);
-    const qualifierLists = new Map(
-      indices.map((i) => [
-        i,
-        slotsBySource[i]!
-          .filter((slot) => distinguishingKeys.has(slot.key))
-          .map((slot) => slot.value),
-      ]),
-    );
-    const maxQualifiers = Math.max(...indices.map((i) => qualifierLists.get(i)!.length));
-    let round = 0;
-    while (round <= maxQualifiers) {
-      const provisional = indices.map((i) => {
-        const used = qualifierLists.get(i)!.slice(0, round);
-        return `${sources[i]!.platform}${used.length > 0 ? " " + used.join(" ") : ""}`;
-      });
-      const seen = new Map<string, number>();
-      let allUnique = true;
-      for (const label of provisional) {
-        const count = (seen.get(label) ?? 0) + 1;
-        seen.set(label, count);
-        if (count > 1) allUnique = false;
-      }
-      if (allUnique) break;
-      round += 1;
+    let qualifierLists = naturalQualifierLists(slotsBySource, indices, distinguishingKeys);
+    let round = findUniqueQualifierRound(sources, indices, qualifierLists);
+    if (round === null) {
+      qualifierLists = new Map(indices.map((i) => [i, slotsBySource[i]!.map((slot) => slot.value)]));
+      round =
+        findUniqueQualifierRound(sources, indices, qualifierLists) ??
+        Math.max(...indices.map((i) => qualifierLists.get(i)!.length));
     }
     for (const i of indices) usedQualifiers[i] = qualifierLists.get(i)!.slice(0, round);
   }

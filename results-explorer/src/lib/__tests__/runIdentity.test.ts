@@ -129,6 +129,28 @@ describe("formatRunIdentitiesForCohort", () => {
     expect(labels.join(" ")).not.toContain("v53.0.0");
   });
 
+  it("keeps shared natural qualifiers ahead of the result id fallback", () => {
+    const cohort = [
+      source({
+        result_id: "tpch-spark-sf0.01-20260501-1111aaaa",
+        platform: "Spark",
+        driver_version: "3.5.0",
+        run_date: "2026-05-01",
+        scale_factor: 0.01,
+      }),
+      source({
+        result_id: "tpch-spark-sf0.01-20260501-2222bbbb",
+        platform: "Spark",
+        run_date: "2026-05-01",
+        scale_factor: 0.01,
+      }),
+    ];
+    const labels = formatRunIdentitiesForCohort(cohort, "chart");
+
+    expect(labels).toEqual(["Spark v3.5.0", "Spark 2026-05-01"]);
+    expect(labels.join(" ")).not.toMatch(/1111aaaa|2222bbbb/);
+  });
+
   it("uses short result_id as the last-resort tiebreaker", () => {
     const cohort = [
       source({ result_id: "tpch-spark-sf0.01-20260403-1111aaaa", platform: "Spark" }),
