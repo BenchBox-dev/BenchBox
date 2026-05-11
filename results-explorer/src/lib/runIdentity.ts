@@ -20,6 +20,7 @@
 
 export interface RunIdentitySource {
   result_id: string;
+  short_id?: string | null;
   platform: string;
   platform_version?: string | null;
   driver_version?: string | null;
@@ -36,6 +37,15 @@ export type RunIdentityVariant =
   | "table"
   | "selectOption"
   | "tooltip";
+
+export interface RunIdentityLabels {
+  compact: string;
+  disambiguated: string;
+  table: string;
+  full: string;
+  title: string;
+  ariaLabel: string;
+}
 
 interface QualifierDescriptor {
   key: string;
@@ -54,7 +64,7 @@ interface QualifierSlot {
 const NATURAL_QUALIFIERS: QualifierDescriptor[] = [
   {
     key: "version",
-    value: (s) => (s.driver_version ? `v${s.driver_version}` : s.platform_version ? `v${s.platform_version}` : null),
+    value: (s) => versionLabel(s.driver_version ?? s.platform_version ?? null),
   },
   { key: "run_date", value: (s) => (s.run_date ? s.run_date.slice(0, 10) : null) },
   {
@@ -82,10 +92,20 @@ function describeNaturalQualifiers(source: RunIdentitySource): string[] {
   return out;
 }
 
+function versionLabel(version: string | null | undefined): string | null {
+  if (!version) return null;
+  return version.startsWith("v") || version.startsWith("V") ? version : `v${version}`;
+}
+
 function shortResultIdToken(resultId: string): string {
   const parts = resultId.split(/[-_./:]+/).filter(Boolean);
   if (parts.length > 1) return parts[parts.length - 1]!;
   return resultId.slice(-8);
+}
+
+function compactIdToken(source: RunIdentitySource): string {
+  const shortId = source.short_id?.trim();
+  return shortId && /^[0-9a-f]{8,}$/i.test(shortId) ? shortId : shortResultIdToken(source.result_id);
 }
 
 // Cohort-aware qualifier list: natural qualifiers, then the trailing
@@ -99,7 +119,7 @@ function describeCohortQualifierSlots(source: RunIdentitySource): QualifierSlot[
     const value = qualifier.value(source);
     if (value !== null && value !== "") slots.push({ key: qualifier.key, value });
   }
-  slots.push({ key: "short_result_id", value: shortResultIdToken(source.result_id) });
+  slots.push({ key: "short_result_id", value: compactIdToken(source) });
   slots.push({ key: "result_id", value: source.result_id });
   return slots;
 }
@@ -212,5 +232,79 @@ export function formatRunIdentitiesForCohort(
 
   return sources.map((source, i) => {
     return joinForVariant(source.platform, usedQualifiers[i]!, variant);
+  });
+}
+
+export function formatRunIdentityFull(source: RunIdentitySource): string {
+  const parts = [
+    source.platform,
+    versionLabel(source.driver_version ?? source.platform_version ?? null),
+    source.run_date ? source.run_date.slice(0, 10) : null,
+    source.scale_factor !== null && source.scale_factor !== undefined ? `SF ${source.scale_factor}` : null,
+    NATURAL_QUALIFIERS.find((qualifier) => qualifier.key === "deployment")?.value(source) ?? null,
+    source.trust_label ?? null,
+    compactIdToken(source),
+  ].filter((part): part is string => part !== null && part !== "");
+  return parts.join(" · ");
+}
+
+export function formatRunIdentityLabelsForCohort(
+  sources: readonly RunIdentitySource[],
+): RunIdentityLabels[] {
+  const compact = formatRunIdentitiesForCohort(sources, "compact");
+  const disambiguated = formatRunIdentitiesForCohort(sources, "chart");
+  const table = formatRunIdentitiesForCohort(sources, "table");
+  return sources.map((source, index) => {
+    const full = formatRunIdentityFull(source);
+    return {
+      compact: compact[index] ?? source.platform,
+      disambiguated: disambiguated[index] ?? source.platform,
+      table: table[index] ?? source.platform,
+      full,
+      title: full,
+      ariaLabel: full,
+    };
+  });
+}
+
+export function truncateRunIdentityLabel(label: string, maxLen: number): string {
+  if (label.length <= maxLen) return label;
+  if (maxLen <= 1) return "…";
+
+  const trailingToken = label.split(/\s+/).filter(Boolean).at(-1) ?? "";
+  if (trailingToken.length >= 4 && trailingToken.length <= maxLen - 3) {
+    const suffix = ` ${trailingToken}`;
+    const headLen = Math.max(1, maxLen - suffix.length - 1);
+    return `${label.slice(0, headLen).trimEnd()}…${suffix}`;
+  }
+
+  return middleTruncate(label, maxLen);
+}
+
+function middleTruncate(label: string, maxLen: number): string {
+  if (label.length <= maxLen) return label;
+  if (maxLen <= 1) return "…";
+  const tailLen = Math.max(4, Math.floor((maxLen - 1) / 2));
+  const headLen = Math.max(1, maxLen - tailLen - 1);
+  return `${label.slice(0, headLen).trimEnd()}…${label.slice(-tailLen)}`;
+}
+
+export function preserveUniqueAfterTruncation(identities: readonly string[], maxLen: number): string[] {
+  const truncated = identities.map((identity) => truncateRunIdentityLabel(identity, maxLen));
+  const counts = new Map<string, number>();
+  for (const value of truncated) counts.set(value, (counts.get(value) ?? 0) + 1);
+  if ([...counts.values()].every((count) => count === 1)) return truncated;
+
+  const repaired = identities.map((identity, index) => {
+    const candidate = truncated[index]!;
+    return (counts.get(candidate) ?? 0) > 1 ? middleTruncate(identity, maxLen) : candidate;
+  });
+  const repairedCounts = new Map<string, number>();
+  for (const value of repaired) repairedCounts.set(value, (repairedCounts.get(value) ?? 0) + 1);
+  if ([...repairedCounts.values()].every((count) => count === 1)) return repaired;
+
+  return identities.map((identity, index) => {
+    const candidate = repaired[index]!;
+    return (repairedCounts.get(candidate) ?? 0) > 1 ? middleTruncate(`${identity} ${index + 1}`, maxLen) : candidate;
   });
 }

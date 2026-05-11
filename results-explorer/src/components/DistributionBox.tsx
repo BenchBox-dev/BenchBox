@@ -18,8 +18,7 @@ import { useElementSize } from "@/lib/useElementSize";
 import { paletteColor } from "@/lib/chartTheme";
 import { buildLogLatencyScale, computeBoxStats, logLatencyFraction, logLatencyTicks } from "@/lib/chartMath";
 import { formatTimingExclusion, isTimingDisplayable, platformTimingValue } from "@/lib/displayEligibility";
-import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
-import { preserveUniqueAfterTruncation } from "@/components/RankTable";
+import { formatRunIdentityLabelsForCohort, preserveUniqueAfterTruncation } from "@/lib/runIdentity";
 
 const LABEL_W = 144;
 const ROW_H = 48;
@@ -35,21 +34,20 @@ export function DistributionBox({ summary }: Props) {
   const [containerRef, { width: containerWidth }] = useElementSize();
   const w = Math.max(containerWidth, 400);
 
-  const cohortLabels = formatRunIdentitiesForCohort(
+  const cohortLabels = formatRunIdentityLabelsForCohort(
     summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
-    "chart",
   );
   // Truncation budget = 20 chars (LABEL_W=144 px / ~7 px per char). When
   // truncation would collapse otherwise-unique cohort identities to the same
   // prefix (e.g. four "DataFusion v53.0.0 …"), preserveUniqueAfterTruncation
-  // returns the full identity for the affected rows so the disambiguator
-  // (date + short id) survives. Audit finding #7.
-  const rawLabels = summary.platforms.map((p, i) => cohortLabels[i] ?? p.platform);
+  // preserves the distinguishing suffix (date or short id) inside the same
+  // budget. Audit finding #7.
+  const rawLabels = summary.platforms.map((p, i) => cohortLabels[i]?.disambiguated ?? p.platform);
   const displayLabels = preserveUniqueAfterTruncation(rawLabels, 20);
   const rows = summary.platforms
     .map((p, i) => ({
       label: displayLabels[i] ?? p.platform,
-      fullLabel: rawLabels[i] ?? p.platform,
+      fullLabel: cohortLabels[i]?.full ?? rawLabels[i] ?? p.platform,
       color: paletteColor(i),
       isDisplayable: isTimingDisplayable(p),
       stats: computeBoxStats(summary.query_ids.map((queryId) => platformTimingValue(p, queryId))),
@@ -93,7 +91,7 @@ export function DistributionBox({ summary }: Props) {
               {/* Platform label */}
               <text x={LABEL_W - 6} y={midY + 4} textAnchor="end" style={{ fontSize: "11px", fill: "#374151" }}>
                 <title>{row.fullLabel}</title>
-                {row.label.length > 20 ? `${row.label.slice(0, 19)}…` : row.label}
+                {row.label}
               </text>
 
               {/* Whisker (min-max) */}

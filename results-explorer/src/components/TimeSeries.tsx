@@ -14,7 +14,7 @@
 import type { ChartHistoricalEntry } from "@/lib/chartRegistry";
 import { useElementSize } from "@/lib/useElementSize";
 import { timeSeriesColor } from "@/lib/chartTheme";
-import { formatRunIdentitiesForCohort, type RunIdentitySource } from "@/lib/runIdentity";
+import { formatRunIdentityLabelsForCohort, type RunIdentitySource } from "@/lib/runIdentity";
 
 const LABEL_W = 58;
 const AXIS_H = 32;
@@ -44,6 +44,7 @@ interface SeriesPoint {
 interface Series {
   platformId: string;
   label: string;
+  fullLabel: string;
   color: string;
   points: SeriesPoint[];
 }
@@ -95,18 +96,18 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
       seriesDescriptors.push({ pid, firstEntry: sorted[0], points });
     }
   }
-  const cohortLabels = formatRunIdentitiesForCohort(
+  const cohortLabels = formatRunIdentityLabelsForCohort(
     seriesDescriptors.map((descriptor): RunIdentitySource => ({
       result_id: descriptor.firstEntry.result_id,
       platform: descriptor.firstEntry.platform,
       run_date: descriptor.firstEntry.run_date,
       scale_factor: descriptor.firstEntry.scale_factor,
     })),
-    "chart",
   );
   const allSeries: Series[] = seriesDescriptors.map((descriptor, idx) => ({
     platformId: descriptor.pid,
-    label: cohortLabels[idx] ?? descriptor.firstEntry.platform,
+    label: cohortLabels[idx]?.disambiguated ?? descriptor.firstEntry.platform,
+    fullLabel: cohortLabels[idx]?.full ?? descriptor.firstEntry.platform,
     color: timeSeriesColor(colorIdx++),
     points: descriptor.points,
   }));
@@ -211,7 +212,7 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
                   r={3}
                   fill={s.color}
                 >
-                  <title>{`${s.label}: ${p.date} = ${p.value.toFixed(1)}`}</title>
+                  <title>{`${s.fullLabel}: ${p.date} = ${p.value.toFixed(1)}`}</title>
                 </circle>
               ))}
             </g>
@@ -246,7 +247,9 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
           {allSeries.map((s) => (
             <span key={s.platformId} class="flex items-center gap-1.5">
               <span class="inline-block w-5 border-t-2" style={{ borderColor: s.color }} />
-              {s.label}
+              <span title={s.fullLabel}>
+                {s.label}
+              </span>
             </span>
           ))}
         </div>

@@ -368,8 +368,8 @@ describe("ChartPanel", () => {
     ).toBe("inside");
 
     const tooltips = Array.from(container.querySelectorAll("rect title")).map((title) => title.textContent);
-    expect(tooltips).toContain("FastDB: 10 ms");
-    expect(tooltips).toContain("SlowDB: 1000 ms");
+    expect(tooltips.some((tooltip) => tooltip?.includes("FastDB") && tooltip.includes("10 ms"))).toBe(true);
+    expect(tooltips.some((tooltip) => tooltip?.includes("SlowDB") && tooltip.includes("1000 ms"))).toBe(true);
   });
 
   it("hides the Cost tab when no cohort row carries normalized cost data", () => {
