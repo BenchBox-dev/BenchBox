@@ -2136,6 +2136,32 @@ def export_tiny_fixture(
 
 
 def verify_tiny_fixture(*, fixture_dir: Path, query_dir: Path, cardinalities_path: Path) -> None:
+    query_paths = query_files(query_dir)
+    cardinalities = json.loads(cardinalities_path.read_text(encoding="utf-8"))
+    expected_queries = cardinalities.get("queries")
+    if not isinstance(expected_queries, Mapping):
+        raise JoinOrderBuildError(f"Cardinality oracle {cardinalities_path} is missing a queries object")
+    if len(query_paths) != EXPECTED_QUERY_COUNT:
+        raise JoinOrderBuildError(
+            f"Expected {EXPECTED_QUERY_COUNT} canonical query files in {query_dir}, found {len(query_paths)}"
+        )
+    if len(expected_queries) != EXPECTED_QUERY_COUNT:
+        raise JoinOrderBuildError(
+            f"Expected {EXPECTED_QUERY_COUNT} cardinality oracle entries in {cardinalities_path}, "
+            f"found {len(expected_queries)}"
+        )
+    query_ids = {path.stem for path in query_paths}
+    expected_query_ids = {str(query_id) for query_id in expected_queries}
+    missing = sorted(expected_query_ids - query_ids, key=query_sort_key)
+    unexpected = sorted(query_ids - expected_query_ids, key=query_sort_key)
+    if missing or unexpected:
+        details = []
+        if missing:
+            details.append(f"missing query files: {', '.join(missing)}")
+        if unexpected:
+            details.append(f"unexpected query files: {', '.join(unexpected)}")
+        raise JoinOrderBuildError("Tiny fixture query coverage mismatch: " + "; ".join(details))
+
     try:
         import duckdb
     except ImportError as exc:
@@ -2144,13 +2170,12 @@ def verify_tiny_fixture(*, fixture_dir: Path, query_dir: Path, cardinalities_pat
     con = duckdb.connect()
     try:
         load_queries_for_duckdb(con, fixture_dir)
-        cardinalities = json.loads(cardinalities_path.read_text(encoding="utf-8"))
-        for path in query_files(query_dir):
+        for path in query_paths:
             sql = strip_query_semicolon(path.read_text(encoding="utf-8"))
             underlying = int(
                 con.execute(duckdb_compatible_query_sql(underlying_count_sql(sql, query_id=path.stem))).fetchone()[0]
             )
-            expected = int(cardinalities["queries"][path.stem]["underlying_row_count"])
+            expected = int(expected_queries[path.stem]["underlying_row_count"])
             failure = underlying_count_failure(path.stem, underlying)
             if underlying != expected or failure is not None:
                 raise JoinOrderBuildError(

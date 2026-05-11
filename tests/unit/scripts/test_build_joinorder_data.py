@@ -393,6 +393,61 @@ def test_validate_predicate_domain_rejects_incomplete_query_directory(
         )
 
 
+def test_verify_tiny_fixture_rejects_incomplete_query_directory(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    query_dir = tmp_path / "queries"
+    query_dir.mkdir()
+    (query_dir / "1a.sql").write_text("SELECT MIN(t.id) FROM title AS t WHERE t.id > 0;", encoding="utf-8")
+    cardinalities_path = tmp_path / "tiny_reference_cardinalities.json"
+    cardinalities_path.write_text(
+        json.dumps(
+            {
+                "queries": {
+                    f"{index}a": {"underlying_row_count": 1}
+                    for index in range(1, build_joinorder_data.EXPECTED_QUERY_COUNT + 1)
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    class FakeResult:
+        def fetchone(self) -> tuple[int]:
+            return (1,)
+
+    class FakeConnection:
+        def execute(self, *_args, **_kwargs) -> FakeResult:
+            return FakeResult()
+
+        def close(self) -> None:
+            return None
+
+    class FakeDuckDB:
+        @staticmethod
+        def connect() -> FakeConnection:
+            return FakeConnection()
+
+    loaded_fixture = False
+
+    def fake_load_queries_for_duckdb(*_args, **_kwargs) -> None:
+        nonlocal loaded_fixture
+        loaded_fixture = True
+
+    monkeypatch.setitem(sys.modules, "duckdb", FakeDuckDB)
+    monkeypatch.setattr(build_joinorder_data, "load_queries_for_duckdb", fake_load_queries_for_duckdb)
+
+    with pytest.raises(build_joinorder_data.JoinOrderBuildError, match="Expected 113 canonical query files"):
+        build_joinorder_data.verify_tiny_fixture(
+            fixture_dir=tmp_path / "fixture",
+            query_dir=query_dir,
+            cardinalities_path=cardinalities_path,
+        )
+
+    assert loaded_fixture is False
+
+
 def test_aggregate_table_hash_is_deterministic_independent_of_input_order(tmp_path: Path) -> None:
     a = build_joinorder_data.TableFile("aka_name", tmp_path / "a.parquet", "a" * 64, 10, 1)
     b = build_joinorder_data.TableFile("title", tmp_path / "t.parquet", "b" * 64, 20, 2)
