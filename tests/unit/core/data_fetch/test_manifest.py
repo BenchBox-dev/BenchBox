@@ -26,6 +26,7 @@ pytestmark = [
 
 _HEX_B = "b" * 64
 _HEX_C = "c" * 64
+_HEX_D = "d" * 64
 _HASH_PLACEHOLDER = "0" * 64
 
 _MINIMAL = f"""\
@@ -111,6 +112,15 @@ def test_manifest_hash_mismatch_raises(tmp_path: Path) -> None:
     )
     with pytest.raises(ManifestValidationError, match="manifest_hash mismatch"):
         load_manifest(p)
+
+
+def test_manifest_hash_ignores_archive_sha256_transport_checksum(tmp_path: Path) -> None:
+    p = _write(tmp_path, _MINIMAL)
+    original_hash = compute_manifest_hash(p)
+    p.write_text(p.read_text().replace(f'archive_sha256     = "{_HEX_C}"', f'archive_sha256     = "{_HEX_D}"'))
+
+    assert compute_manifest_hash(p) == original_hash
+    assert load_manifest(p).archive_sha256 == _HEX_D
 
 
 def test_missing_table_field_raises(tmp_path: Path) -> None:

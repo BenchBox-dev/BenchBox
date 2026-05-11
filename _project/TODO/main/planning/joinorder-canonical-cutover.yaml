@@ -182,11 +182,13 @@ work:
             # copy fixture to tmp, return path
             ...
 
-      Document the fixture's predicate-satisfying property: every
-      embedded canonical query returns >=1 row against this fixture.
+      Document the fixture's predicate oracle property: every
+      non-known-zero embedded canonical query has >=1 underlying row
+      against this fixture, while `2c`, `5a`, `5b`, `10b`, and `32a`
+      preserve zero underlying rows.
 
   - id: w7
-    summary: "Add unit test: canonical queries return non-zero against tiny fixture"
+    summary: "Add unit test: canonical queries preserve tiny-fixture oracle"
     status: pending
     needs: [w6, w8]
     notes: |
@@ -194,7 +196,9 @@ work:
 
       For each of 113 canonical JOB queries:
         - Load tiny fixture into DuckDB
-        - Run query, assert row count >= 1
+        - Run query, assert one aggregate result row
+        - Assert non-known-zero queries have >=1 underlying row and
+          known-zero queries preserve 0 underlying rows
         - Cross-check row count against
           `_project/joinorder/reference_cardinalities.json`'s tiny
           fixture entries (NB: foundation TODO produced reference
@@ -204,7 +208,8 @@ work:
           (foundation w14).
 
       This is the validator Joe asked for: "ensure all queries
-      actually work."
+      actually work," with canonical zero-underlying aggregate-query
+      semantics preserved.
 
   - id: w8
     summary: "Import 113 canonical JOB queries from foundation build-inputs into joinorder/queries.py (preserve JoinOrderQueryManager API)"
@@ -250,7 +255,10 @@ work:
       Smoke test: load tiny canonical fixture (foundation w14),
       execute every one of the 113 queries via DuckDB. Assert:
         - All 113 execute without parse/runtime error
-        - All 113 return ≥1 row (the predicate-domain guarantee)
+        - All 113 return one aggregate result row
+        - Non-known-zero queries have >=1 underlying row in the tiny
+          fixture; `2c`, `5a`, `5b`, `10b`, and `32a` preserve zero
+          underlying rows
 
       DuckDB is the default runtime smoke engine, not the reference
       oracle. PostgreSQL cardinalities from foundation w11 remain the
@@ -524,7 +532,8 @@ work:
       Verify:
         - data_fetch downloads from DRAFT Release URL (with auth
           token; the URL is fetchable while draft)
-        - All 113 SQL queries execute and produce non-zero results
+        - All 113 SQL queries execute and preserve canonical predicate
+          oracle semantics
         - Result bundle records correct dataset_version, manifest_hash,
           and data_archive_hash
         - Cardinalities match reference_cardinalities.json on full
@@ -590,7 +599,7 @@ work:
         - [x] UAT smoke: <second engine> joinorder sf=1 end-to-end
         - [x] All 113 query reference cardinalities match
               against full canonical via Postgres oracle
-        - [x] Tiny fixture covers all 113 query predicates
+        - [x] Tiny fixture preserves all 113 query predicate oracle counts
 
 verification:
   - description: "joinorder rejects sf!=1 with a clear error"
@@ -602,7 +611,7 @@ verification:
   - description: "All 113 SQL queries registered for joinorder via JoinOrderQueryManager"
     command: "uv run -- python -c 'from benchbox.core.joinorder.queries import JoinOrderQueryManager; print(JoinOrderQueryManager().get_query_count())'"
     expected_output: "113"
-  - description: "Tiny fixture predicate-satisfies all 113 queries"
+  - description: "Tiny fixture preserves canonical predicate oracle for all 113 queries"
     command: "uv run -- python -m pytest tests/unit/core/joinorder/test_canonical_queries.py -q"
     expected_output: "113 passed"
   - description: "DataFrame queries fail loudly for an untranslated query (q13a_expression_impl raises NotImplementedError pointing at Track-2 seed)"
@@ -785,7 +794,7 @@ impact:
 
 success_metrics:
   - "PR closes #289 cleanly with passing pre-flight + UAT smoke"
-  - "joinorder canonical fidelity: all 113 queries return non-zero rows on canonical data; row counts match Postgres reference cardinalities computed by foundation TODO"
+  - "joinorder canonical fidelity: all 113 queries execute on canonical data; non-known-zero underlying cardinalities are nonzero, the five known-zero canonical predicates remain zero, and row counts match Postgres reference cardinalities computed by foundation TODO"
   - "joinorder_synthetic is registered, runnable, and hidden from result-publisher public surface"
   - "Existing 10 joinorder_sf1_* bundles successfully re-tagged in develop tree; no orphans"
   - "Documentation no longer claims synthetic data preserves join characteristics or realistic distributions"

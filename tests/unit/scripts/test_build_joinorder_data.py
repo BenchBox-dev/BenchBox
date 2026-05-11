@@ -179,3 +179,222 @@ def test_download_pgdump_recovers_invalid_cached_file(monkeypatch: pytest.Monkey
     assert not destination.with_name("imdb_pg11.part").exists()
     assert artifact.path == destination
     assert artifact.sha256 == hashlib.sha256(valid_payload).hexdigest()
+
+
+def test_query_aliases_and_underlying_count_sql_parse_flat_job_query() -> None:
+    sql = """\
+SELECT MIN(mc.note), MIN(t.title)
+FROM company_type AS ct,
+     movie_companies AS mc,
+     title AS t
+WHERE ct.kind = 'production companies'
+  AND ct.id = mc.company_type_id
+  AND t.id = mc.movie_id;
+"""
+
+    aliases = build_joinorder_data.query_aliases(sql, query_id="1a")
+    count_sql = build_joinorder_data.underlying_count_sql(sql, query_id="1a")
+    id_sql = build_joinorder_data.alias_id_sql(sql, query_id="1a", limit=2)
+
+    assert aliases == [
+        build_joinorder_data.QueryAlias(table="company_type", alias="ct"),
+        build_joinorder_data.QueryAlias(table="movie_companies", alias="mc"),
+        build_joinorder_data.QueryAlias(table="title", alias="t"),
+    ]
+    assert count_sql.startswith("SELECT count(*) FROM company_type AS ct")
+    assert "WHERE ct.kind = 'production companies'" in count_sql
+    assert 'ct.id AS "ct__id"' in id_sql
+    assert id_sql.endswith("LIMIT 2")
+
+
+def test_underlying_count_contract_allows_only_canonical_known_zero_queries() -> None:
+    assert build_joinorder_data.underlying_count_failure("2c", 0) is None
+    assert build_joinorder_data.underlying_count_failure("1a", 1) is None
+
+    assert build_joinorder_data.underlying_count_failure("1a", 0) == {
+        "query_id": "1a",
+        "expected_underlying_row_count": ">=1",
+        "actual_underlying_row_count": 0,
+        "reason": "unexpected_empty",
+    }
+    assert build_joinorder_data.underlying_count_failure("2c", 1) == {
+        "query_id": "2c",
+        "expected_underlying_row_count": 0,
+        "actual_underlying_row_count": 1,
+        "reason": "known_zero_drift",
+    }
+
+
+def test_validate_predicate_domain_accepts_known_zero_and_exact_null_counts(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    query_dir = tmp_path / "queries"
+    query_dir.mkdir()
+    (query_dir / "1a.sql").write_text("SELECT MIN(t.id) FROM title AS t WHERE t.id > 0;", encoding="utf-8")
+    (query_dir / "2c.sql").write_text("SELECT MIN(t.id) FROM title AS t WHERE t.id < 0;", encoding="utf-8")
+
+    def fake_psql(*, container_name: str, database: str, user: str, sql: str) -> str:
+        assert container_name == "pg"
+        assert database == "imdb"
+        assert user == "postgres"
+        if "t.id < 0" in sql:
+            return "0\n"
+        if "t.id > 0" in sql:
+            return "7\n"
+        raise AssertionError(sql)
+
+    def fake_psql_json_rows(*, container_name: str, database: str, user: str, sql: str) -> list[dict]:
+        assert container_name == "pg"
+        assert database == "imdb"
+        assert user == "postgres"
+        for (table, _column), (nulls, rows) in build_joinorder_data.CANONICAL_NULL_COUNTS.items():
+            if f'FROM public."{table}"' in sql:
+                return [{"row_count": rows, "null_count": nulls}]
+        raise AssertionError(sql)
+
+    monkeypatch.setattr(build_joinorder_data, "psql", fake_psql)
+    monkeypatch.setattr(build_joinorder_data, "psql_json_rows", fake_psql_json_rows)
+
+    report = build_joinorder_data.validate_predicate_domain(
+        work_dir=tmp_path,
+        query_dir=query_dir,
+        container_name="pg",
+        database="imdb",
+        user="postgres",
+        expected_query_count=None,
+    )
+
+    assert report["query_failures"] == []
+    assert report["known_zero_underlying_row_counts"] == {"2c": 0}
+    assert report["query_underlying_row_counts"] == {"1a": 7, "2c": 0}
+    assert report["null_count_failures"] == []
+
+
+def test_validate_predicate_domain_rejects_unexpected_empty_query(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    query_dir = tmp_path / "queries"
+    query_dir.mkdir()
+    (query_dir / "1a.sql").write_text("SELECT MIN(t.id) FROM title AS t WHERE t.id > 0;", encoding="utf-8")
+
+    monkeypatch.setattr(build_joinorder_data, "psql", lambda **_kwargs: "0\n")
+    monkeypatch.setattr(
+        build_joinorder_data,
+        "psql_json_rows",
+        lambda **_kwargs: [{"row_count": 2_609_129, "null_count": 1_271_989}],
+    )
+
+    with pytest.raises(build_joinorder_data.JoinOrderBuildError, match="1 unexpected empty"):
+        build_joinorder_data.validate_predicate_domain(
+            work_dir=tmp_path,
+            query_dir=query_dir,
+            container_name="pg",
+            database="imdb",
+            user="postgres",
+            expected_query_count=None,
+        )
+
+
+def test_validate_predicate_domain_rejects_incomplete_query_directory(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    query_dir = tmp_path / "queries"
+    query_dir.mkdir()
+    (query_dir / "1a.sql").write_text("SELECT MIN(t.id) FROM title AS t WHERE t.id > 0;", encoding="utf-8")
+
+    monkeypatch.setattr(build_joinorder_data, "psql", lambda **_kwargs: "7\n")
+    monkeypatch.setattr(
+        build_joinorder_data,
+        "psql_json_rows",
+        lambda **_kwargs: [{"row_count": 2_609_129, "null_count": 1_271_989}],
+    )
+
+    with pytest.raises(build_joinorder_data.JoinOrderBuildError, match="query-count failures"):
+        build_joinorder_data.validate_predicate_domain(
+            work_dir=tmp_path,
+            query_dir=query_dir,
+            container_name="pg",
+            database="imdb",
+            user="postgres",
+            expected_query_count=build_joinorder_data.EXPECTED_QUERY_COUNT,
+        )
+
+
+def test_aggregate_table_hash_is_deterministic_independent_of_input_order(tmp_path: Path) -> None:
+    a = build_joinorder_data.TableFile("aka_name", tmp_path / "a.parquet", "a" * 64, 10, 1)
+    b = build_joinorder_data.TableFile("title", tmp_path / "t.parquet", "b" * 64, 20, 2)
+
+    assert build_joinorder_data.aggregate_table_hash([a, b]) == build_joinorder_data.aggregate_table_hash([b, a])
+
+
+def test_render_data_manifest_writes_self_consistent_hash(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(build_joinorder_data, "git_head_sha", lambda: "abc123")
+    schema = {
+        "title": [
+            build_joinorder_data.ColumnSchema(
+                table="title",
+                name="id",
+                postgres_type="integer",
+                udt_name="int4",
+                ordinal_position=1,
+                is_nullable=False,
+            ),
+            build_joinorder_data.ColumnSchema(
+                table="title",
+                name="title",
+                postgres_type="character varying",
+                udt_name="varchar",
+                ordinal_position=2,
+                is_nullable=True,
+            ),
+        ]
+    }
+    table_files = [
+        build_joinorder_data.TableFile(
+            table="title",
+            path=tmp_path / "title.parquet",
+            sha256="c" * 64,
+            bytes=123,
+            row_count=2,
+        )
+    ]
+    manifest_path = tmp_path / "data_manifest.toml"
+
+    build_joinorder_data.render_data_manifest(
+        work_dir=tmp_path,
+        schema=schema,
+        table_files=table_files,
+        url="https://example.com/archive.tar.zst",
+        archive_sha256="d" * 64,
+        output_path=manifest_path,
+    )
+
+    text = manifest_path.read_text(encoding="utf-8")
+    assert f'manifest_hash = "{build_joinorder_data.compute_manifest_hash(manifest_path)}"' in text
+    assert 'schema.id = "integer"' in text
+    assert 'schema.title = "character varying"' in text
+
+
+def test_manifest_hash_ignores_archive_sha256_after_packaging(tmp_path: Path) -> None:
+    manifest = tmp_path / "data_manifest.toml"
+    archive_hash_a = "a" * 64
+    archive_hash_b = "b" * 64
+    manifest.write_text(
+        "\n".join(
+            [
+                'dataset_version = "joinorder-imdb-2013-v1"',
+                'manifest_hash = "0"',
+                f'archive_sha256 = "{archive_hash_a}"',
+                'data_archive_hash = "logical"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    before = build_joinorder_data.compute_manifest_hash(manifest)
+    manifest.write_text(manifest.read_text(encoding="utf-8").replace(archive_hash_a, archive_hash_b), encoding="utf-8")
+
+    assert build_joinorder_data.compute_manifest_hash(manifest) == before

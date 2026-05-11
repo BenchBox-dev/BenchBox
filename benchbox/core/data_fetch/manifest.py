@@ -5,18 +5,18 @@ Schema (from _project/design/joinorder-step1-foundations.md
 
     dataset_version    = "joinorder-imdb-2013-v1"   # logical immutable id
     manifest_hash      = "<sha256 of this manifest file with the
-                          manifest_hash field excluded — bumps on any
-                          metadata-only correction>"
-    data_archive_hash  = "<sha256 of the packaged tar.zst as built by
-                          the offline pipeline; typed twice in the file
-                          (here for canonical record, archive_sha256
-                          below for the runtime download check) so
-                          callers can spot drift between the two>"
+                          manifest_hash and archive_sha256 fields
+                          excluded — bumps on logical data or metadata
+                          corrections, not transport-wrapper changes>"
+    data_archive_hash  = "<aggregate sha256 over per-table file hashes
+                          in deterministic table order; this is the
+                          logical data identity copied into result
+                          bundles>"
     url                = "https://github.com/.../release/.../archive.tar.zst"
     archive_sha256     = "<sha256 the downloader uses to verify the
-                          freshly-pulled tarball matches what the
-                          manifest declares; equals data_archive_hash
-                          when the manifest is in sync>"
+                          freshly-pulled tarball; distinct from
+                          data_archive_hash because the tarball also
+                          contains metadata files>"
     license_file       = "DATA-LICENSE.md"
 
     [[tables]]
@@ -36,9 +36,10 @@ Schema (from _project/design/joinorder-step1-foundations.md
 
 The manifest_hash is computed externally (build-pipeline) and pinned
 in the file. At runtime, callers verify the manifest_hash field
-matches a sha256 of the file contents with `manifest_hash` itself
-removed from the hash input — that bootstraps tamper detection
-without needing an out-of-band hash file.
+matches a sha256 of the file contents with top-level `manifest_hash`
+and `archive_sha256` removed from the hash input — that bootstraps
+logical manifest tamper detection without making the hash circular
+with the tarball's transport checksum.
 
 This module only PARSES + VALIDATES the manifest; it does not fetch
 or verify the data files. That's manager.py's job.
@@ -67,16 +68,17 @@ _REQUIRED_TOP_KEYS = (
 
 
 def _manifest_hash_input(raw: bytes) -> bytes:
-    """Return manifest bytes with the top-level manifest_hash assignment removed."""
+    """Return manifest bytes with top-level transport/bootstrap hashes removed."""
+    excluded_top_level_keys = {b"archive_sha256", b"manifest_hash"}
     lines: list[bytes] = []
     in_top_level = True
     for line in raw.splitlines(keepends=True):
         stripped = line.lstrip()
         if stripped.startswith(b"["):
             in_top_level = False
-        if in_top_level and stripped.startswith(b"manifest_hash"):
+        if in_top_level:
             before_equals = stripped.split(b"=", 1)[0].strip()
-            if before_equals == b"manifest_hash":
+            if before_equals in excluded_top_level_keys:
                 continue
         lines.append(line)
     return b"".join(lines)
