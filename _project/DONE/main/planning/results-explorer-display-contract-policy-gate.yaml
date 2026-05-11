@@ -2,7 +2,8 @@ id: results-explorer-display-contract-policy-gate
 title: "Define Results Explorer display, ranking, and comparison eligibility contract"
 worktree: main
 priority: Critical
-status: Not Started
+status: Completed
+completed_date: "2026-05-11"
 category: Core Functionality
 
 description: |
@@ -38,7 +39,7 @@ context_sections:
 work:
 - id: w0
   summary: "Re-capture the current broken-state SQL and browser evidence"
-  status: pending
+  status: done
   notes: |
     Capture the current evidence before any code changes. Store command output
     under `_project/verification-logs/results-explorer-display-contract-policy-gate/w0.log`.
@@ -57,7 +58,7 @@ work:
 - id: w1
   summary: "Write the Results Explorer eligibility vocabulary and state table"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     Create a short decision artifact under `_project/analysis/` that defines
     each state and its source of truth:
@@ -78,7 +79,7 @@ work:
 - id: w2
   summary: "Make a decision on zero and sub-millisecond timing semantics"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Decide whether `display_ms = 0.0` means invalid data, measured
     sub-millisecond data, or a legacy rounding artifact. Document the rule and
@@ -89,7 +90,7 @@ work:
 - id: w3
   summary: "Define evidence thresholds for Compare winner language"
   needs: [w1, w2]
-  status: pending
+  status: done
   notes: |
     Define the minimum comparable query coverage required before Compare may
     emit winner language such as "X is faster". The rule must include both an
@@ -101,7 +102,7 @@ work:
 - id: w4
   summary: "Define page-level behavior for excluded rows and unrankable cohorts"
   needs: [w1, w2, w3]
-  status: pending
+  status: done
   notes: |
     Specify how each page treats rows that are public but not display-safe:
       - Home meta leaderboard;
@@ -117,7 +118,7 @@ work:
 - id: w5
   summary: "Review the policy with the current TODO sequence before implementation"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     Before starting dependent implementation TODOs, update their guardrails if
     the decisions in w1-w4 change the proposed scope. This is the decision gate:
@@ -125,9 +126,12 @@ work:
     item is complete.
 
 prior_art:
-- "benchbox/core/explorer_pipeline/transformer.py:_query_display_ms — reuse as the canonical per-query display reduction entry point."
-- "benchbox/core/explorer_pipeline/ranking.py:rank_platforms — extend for rankability semantics rather than ranking in the frontend."
-- "benchbox/core/results/status.py:validation status helpers — reuse for validation/pass semantics but do not overload them as rankability."
+- "benchbox/core/explorer_pipeline/transformer.py:_query_display_ms — reuse as the canonical per-query display reduction entry
+  point."
+- "benchbox/core/explorer_pipeline/ranking.py:rank_platforms — extend for rankability semantics rather than ranking in the
+  frontend."
+- "benchbox/core/results/status.py:validation status helpers — reuse for validation/pass semantics but do not overload them
+  as rankability."
 - "docs/development/browser-duckdb-schema.sql:read-model schema — extend as the contract surface consumed by the frontend."
 - "_project/planning/visible_metrics.yaml:visible metric catalog — extend with eligibility and exclusion fields."
 
@@ -145,14 +149,21 @@ approach: |
   provenance, but the product must not make unsupported winner or rank claims.
 
 anti_patterns:
-- "DO NOT fix individual screenshots before defining eligibility semantics - because each component currently applies a different local rule - define the shared contract first."
-- "DO NOT treat `validation_status=passed` as proof of timing quality - because AMPLab has passed rows with no display timings - add separate timing/ranking/comparison states."
-- "DO NOT replace zero timings with arbitrary epsilon values - because that corrupts benchmark metrics - preserve true values and mark invalid/excluded where needed."
-- "DO NOT hide excluded rows without a provenance path - because users still need to audit submitted results - quarantine them with reasons instead."
+- "DO NOT fix individual screenshots before defining eligibility semantics - because each component currently applies a different
+  local rule - define the shared contract first."
+- "DO NOT treat `validation_status=passed` as proof of timing quality - because AMPLab has passed rows with no display timings
+  - add separate timing/ranking/comparison states."
+- "DO NOT replace zero timings with arbitrary epsilon values - because that corrupts benchmark metrics - preserve true values
+  and mark invalid/excluded where needed."
+- "DO NOT hide excluded rows without a provenance path - because users still need to audit submitted results - quarantine
+  them with reasons instead."
 
 verification:
 - description: "Evidence log captures current broken state and browser routes"
-  command: "test -s _project/verification-logs/results-explorer-display-contract-policy-gate/w0.log && rg -n \"HEAD|/results/|/results/amplab/|/results/compare\\?ids=61ba4644,e16ac6db,07650b37|no_geomean|eligible|PASS|FAIL\" _project/verification-logs/results-explorer-display-contract-policy-gate/w0.log"
+  command: >-
+    test -s _project/verification-logs/results-explorer-display-contract-policy-gate/w0.log &&
+    rg -n "HEAD|/results/|/results/amplab/|/results/compare\?ids=61ba4644,e16ac6db,07650b37|no_geomean|eligible|PASS|FAIL"
+    _project/verification-logs/results-explorer-display-contract-policy-gate/w0.log
   expected_output: "w0.log includes checked SHA, SQL counts, and route-level browser PASS/FAIL notes"
 - description: "TODO graph validates after creating this policy gate"
   command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate"
