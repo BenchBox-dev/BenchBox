@@ -15,7 +15,13 @@ from benchbox.core.explorer_pipeline.models import (
     BenchmarkSummary,
     DetailResult,
     ManifestEntry,
+    PlatformRow,
+    QueryDisplayTiming,
+    TimingEligibility,
+    display_timing_is_valid,
     is_ranking_eligible,
+    timing_eligibility,
+    timing_exclusion_reason,
 )
 from benchbox.core.explorer_pipeline.ranking import rank_platforms
 
@@ -162,6 +168,25 @@ def _legacy_cost_deployment_column_values(entry: ManifestEntry) -> tuple:
     )
 
 
+def _platform_row_timing_eligibility(row: PlatformRow, query_count: int) -> TimingEligibility:
+    display_timings = [
+        QueryDisplayTiming(query_id=query_id, display_ms=display_ms, sample_count=0)
+        for query_id, display_ms in row.timings.items()
+    ]
+    return timing_eligibility(display_timings, query_count)
+
+
+def _entry_timing_eligibility(entry: ManifestEntry) -> TimingEligibility:
+    return TimingEligibility(
+        has_display_timing=entry.has_display_timing,
+        valid_query_count=entry.valid_query_count,
+        missing_query_count=entry.missing_query_count,
+        zero_timing_count=entry.zero_timing_count,
+        display_exclusion_reason=entry.display_exclusion_reason,
+        comparison_exclusion_reason=entry.comparison_exclusion_reason,
+    )
+
+
 class DuckDBSnapshotBuilder:
     """Builds results.duckdb from a collection of manifest entries."""
 
@@ -177,7 +202,15 @@ class DuckDBSnapshotBuilder:
         ("power_score", "DOUBLE"),
         ("total_duration_s", "DOUBLE"),
         ("geomean_ms", "DOUBLE"),
+        ("display_geomean_ms", "DOUBLE"),
         ("query_count", "INTEGER"),
+        ("has_display_timing", "BOOLEAN"),
+        ("valid_query_count", "INTEGER"),
+        ("missing_query_count", "INTEGER"),
+        ("zero_timing_count", "INTEGER"),
+        ("display_exclusion_reason", "VARCHAR"),
+        ("comparison_exclusion_reason", "VARCHAR"),
+        ("ranking_exclusion_reason", "VARCHAR"),
         ("trust_label", "VARCHAR"),
         ("visibility", "VARCHAR"),
         ("platform_version", "VARCHAR"),
@@ -297,8 +330,9 @@ class DuckDBSnapshotBuilder:
             self._populate_query_display_timings(con, entries, details_map)
             self._populate_query_executions(con, entries, details_map)
             self._populate_benchmark_matrix_cells(con, summaries)
-            self._populate_benchmark_rankings(con, summaries, full_to_short)
-            self._populate_cohort_metadata(con, meta)
+            entries_by_result = {entry.result_id: entry for entry in entries}
+            self._populate_benchmark_rankings(con, summaries, full_to_short, entries_by_result)
+            self._populate_cohort_metadata(con, meta, summaries, entries_by_result)
             self._populate_meta_leaderboard(con, meta)
             self._populate_short_ids(con, short_id_map)
 
@@ -342,6 +376,13 @@ class DuckDBSnapshotBuilder:
                 geomean_ms           DOUBLE,
                 display_geomean_ms   DOUBLE,
                 query_count          INTEGER  NOT NULL,
+                has_display_timing   BOOLEAN  NOT NULL,
+                valid_query_count    INTEGER  NOT NULL,
+                missing_query_count  INTEGER  NOT NULL,
+                zero_timing_count    INTEGER  NOT NULL,
+                display_exclusion_reason    VARCHAR,
+                comparison_exclusion_reason VARCHAR,
+                ranking_exclusion_reason    VARCHAR,
                 trust_label          VARCHAR  NOT NULL,
                 visibility           VARCHAR  NOT NULL,
                 platform_version     VARCHAR,
@@ -391,6 +432,13 @@ class DuckDBSnapshotBuilder:
                 r.geomean_ms,
                 r.display_geomean_ms,
                 r.query_count,
+                r.has_display_timing,
+                r.valid_query_count,
+                r.missing_query_count,
+                r.zero_timing_count,
+                r.display_exclusion_reason,
+                r.comparison_exclusion_reason,
+                r.ranking_exclusion_reason,
                 r.trust_label,
                 r.visibility,
                 r.platform_version,
@@ -436,6 +484,8 @@ class DuckDBSnapshotBuilder:
                 query_id     VARCHAR  NOT NULL,
                 display_ms   DOUBLE,
                 sample_count INTEGER  NOT NULL,
+                is_valid_display_timing BOOLEAN NOT NULL,
+                timing_exclusion_reason VARCHAR,
                 PRIMARY KEY (result_id, query_id)
             )
         """)
@@ -460,6 +510,8 @@ class DuckDBSnapshotBuilder:
                 platform_id  VARCHAR  NOT NULL,
                 query_id     VARCHAR  NOT NULL,
                 display_ms   DOUBLE,
+                is_valid_display_timing BOOLEAN NOT NULL,
+                timing_exclusion_reason VARCHAR,
                 PRIMARY KEY (benchmark, scale_factor, phase, result_id, query_id)
             )
         """)
@@ -480,6 +532,13 @@ class DuckDBSnapshotBuilder:
                 compliance_class             VARCHAR,
                 run_date                     VARCHAR  NOT NULL,
                 is_ranking_eligible          BOOLEAN  NOT NULL,
+                has_display_timing           BOOLEAN  NOT NULL,
+                valid_query_count            INTEGER  NOT NULL,
+                missing_query_count          INTEGER  NOT NULL,
+                zero_timing_count            INTEGER  NOT NULL,
+                display_exclusion_reason     VARCHAR,
+                comparison_exclusion_reason  VARCHAR,
+                ranking_exclusion_reason     VARCHAR,
                 power_score                  DOUBLE,
                 display_geomean_ms           DOUBLE,
                 sample_geomean_ms            DOUBLE,
@@ -488,6 +547,8 @@ class DuckDBSnapshotBuilder:
                 primary_order                VARCHAR  NOT NULL,
                 rank                         INTEGER,
                 total_in_cohort              INTEGER  NOT NULL,
+                cohort_ranked_count          INTEGER  NOT NULL,
+                cohort_ranking_exclusion_reason VARCHAR,
                 percentile_p50               DOUBLE,
                 percentile_p90               DOUBLE,
                 percentile_p95               DOUBLE,
@@ -513,6 +574,13 @@ class DuckDBSnapshotBuilder:
                 geomean_ms,
                 display_geomean_ms,
                 query_count,
+                has_display_timing,
+                valid_query_count,
+                missing_query_count,
+                zero_timing_count,
+                display_exclusion_reason,
+                comparison_exclusion_reason,
+                ranking_exclusion_reason,
                 trust_label,
                 tuning_mode,
                 execution_mode,
@@ -546,6 +614,8 @@ class DuckDBSnapshotBuilder:
                 cohort_label     VARCHAR  NOT NULL,
                 cohort_href      VARCHAR  NOT NULL,
                 platform_count   INTEGER  NOT NULL,
+                cohort_ranked_count INTEGER NOT NULL,
+                cohort_ranking_exclusion_reason VARCHAR,
                 primary_metric   VARCHAR  NOT NULL,
                 primary_order    VARCHAR  NOT NULL,
                 platform_id      VARCHAR  NOT NULL,
@@ -554,6 +624,13 @@ class DuckDBSnapshotBuilder:
                 short_id         VARCHAR  NOT NULL,
                 tuning_mode      VARCHAR,
                 trust_label      VARCHAR  NOT NULL,
+                has_display_timing BOOLEAN NOT NULL,
+                valid_query_count INTEGER NOT NULL,
+                missing_query_count INTEGER NOT NULL,
+                zero_timing_count INTEGER NOT NULL,
+                display_exclusion_reason VARCHAR,
+                comparison_exclusion_reason VARCHAR,
+                ranking_exclusion_reason VARCHAR,
                 rank             INTEGER,
                 metric_value     DOUBLE,
                 speedup_vs_best  DOUBLE,
@@ -641,6 +718,13 @@ class DuckDBSnapshotBuilder:
                     entry.geomean_ms,
                     entry.display_geomean_ms,
                     entry.query_count,
+                    entry.has_display_timing,
+                    entry.valid_query_count,
+                    entry.missing_query_count,
+                    entry.zero_timing_count,
+                    entry.display_exclusion_reason,
+                    entry.comparison_exclusion_reason,
+                    entry.ranking_exclusion_reason,
                     entry.trust_label,
                     entry.visibility,
                     entry.platform_version,
@@ -677,9 +761,18 @@ class DuckDBSnapshotBuilder:
             if detail is None:
                 continue
             for dt in detail.display_timings:
-                rows.append((entry.result_id, dt.query_id, dt.display_ms, dt.sample_count))
+                rows.append(
+                    (
+                        entry.result_id,
+                        dt.query_id,
+                        dt.display_ms,
+                        dt.sample_count,
+                        display_timing_is_valid(dt.display_ms),
+                        timing_exclusion_reason(dt.display_ms),
+                    )
+                )
         if rows:
-            con.executemany("INSERT INTO query_display_timings VALUES (?, ?, ?, ?)", rows)
+            con.executemany("INSERT INTO query_display_timings VALUES (?, ?, ?, ?, ?, ?)", rows)
 
     def _populate_query_executions(
         self,
@@ -725,16 +818,19 @@ class DuckDBSnapshotBuilder:
                             platform_row.platform_id,
                             query_id,
                             display_ms,
+                            display_timing_is_valid(display_ms),
+                            timing_exclusion_reason(display_ms),
                         )
                     )
         if rows:
-            con.executemany("INSERT INTO benchmark_matrix_cells VALUES (?, ?, ?, ?, ?, ?, ?)", rows)
+            con.executemany("INSERT INTO benchmark_matrix_cells VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", rows)
 
     def _populate_benchmark_rankings(
         self,
         con: Any,
         summaries: list[tuple[_SummaryKey, BenchmarkSummary]],
         full_to_short: dict[str, str],
+        entries_by_result: dict[str, ManifestEntry],
     ) -> None:
         rows: list[tuple] = []
         for (benchmark, scale_factor, phase), summary in summaries:
@@ -742,6 +838,15 @@ class DuckDBSnapshotBuilder:
 
             for ranked_row in ranked.rows:
                 platform_row = ranked_row.row
+                entry = entries_by_result.get(platform_row.result_id)
+                timing_contract = (
+                    _entry_timing_eligibility(entry)
+                    if entry is not None
+                    else _platform_row_timing_eligibility(platform_row, len(summary.query_ids))
+                )
+                ranking_reason = (
+                    entry.ranking_exclusion_reason if entry is not None else ranked_row.ranking_exclusion_reason
+                )
                 ps = platform_row.percentile_stats
                 rows.append(
                     (
@@ -759,6 +864,13 @@ class DuckDBSnapshotBuilder:
                         platform_row.compliance_class,
                         platform_row.run_date,
                         platform_row.is_ranking_eligible,
+                        timing_contract.has_display_timing,
+                        timing_contract.valid_query_count,
+                        timing_contract.missing_query_count,
+                        timing_contract.zero_timing_count,
+                        timing_contract.display_exclusion_reason,
+                        timing_contract.comparison_exclusion_reason,
+                        ranking_reason,
                         platform_row.power_score,
                         platform_row.display_geomean_ms,
                         platform_row.sample_geomean_ms,
@@ -767,6 +879,8 @@ class DuckDBSnapshotBuilder:
                         ranked.primary_order,
                         ranked_row.rank,
                         ranked_row.total_ranked,
+                        ranked.total_ranked,
+                        "no_rankable_results" if ranked.total_ranked == 0 else None,
                         ps.p50 if ps else None,
                         ps.p90 if ps else None,
                         ps.p95 if ps else None,
@@ -779,12 +893,36 @@ class DuckDBSnapshotBuilder:
             placeholders = ", ".join(["?"] * len(rows[0]))
             con.executemany(f"INSERT INTO benchmark_rankings VALUES ({placeholders})", rows)
 
-    def _populate_cohort_metadata(self, con: Any, meta: dict[str, Any]) -> None:
+    def _populate_cohort_metadata(
+        self,
+        con: Any,
+        meta: dict[str, Any],
+        summaries: list[tuple[_SummaryKey, BenchmarkSummary]],
+        entries_by_result: dict[str, ManifestEntry],
+    ) -> None:
         # One row per (cohort_key, result_id) - every publishable variant is
         # preserved. The same platform may appear more than once per cohort
         # when run with different tuning_mode or trust_label; the UI layer
         # decides any display-time collapsing.
         rows: list[tuple] = []
+        ranking_context_by_result: dict[str, tuple[TimingEligibility, str | None, int, str | None]] = {}
+        for _, summary in summaries:
+            ranked = rank_platforms(summary)
+            cohort_reason = "no_rankable_results" if ranked.total_ranked == 0 else None
+            for ranked_row in ranked.rows:
+                entry = entries_by_result.get(ranked_row.row.result_id)
+                timing_contract = (
+                    _entry_timing_eligibility(entry)
+                    if entry is not None
+                    else _platform_row_timing_eligibility(ranked_row.row, len(summary.query_ids))
+                )
+                ranking_context_by_result[ranked_row.row.result_id] = (
+                    timing_contract,
+                    entry.ranking_exclusion_reason if entry is not None else ranked_row.ranking_exclusion_reason,
+                    ranked.total_ranked,
+                    cohort_reason,
+                )
+
         for cohort in meta.get("cohorts", []):
             cohort_key = cohort["key"]
             benchmark = cohort["benchmark"]
@@ -793,9 +931,30 @@ class DuckDBSnapshotBuilder:
             cohort_label = cohort["label"]
             cohort_href = cohort["href"]
             platform_count = cohort["platform_count"]
+            cohort_ranked_count = cohort.get("cohort_ranked_count", platform_count)
+            cohort_ranking_exclusion_reason = cohort.get(
+                "cohort_ranking_exclusion_reason",
+                "no_rankable_results" if cohort_ranked_count == 0 else None,
+            )
             primary_metric = cohort["primary_metric"]
             primary_order = cohort["primary_order"]
             for p in cohort.get("platforms", []):
+                timing_contract, row_ranking_reason, ranked_count, cohort_reason = ranking_context_by_result.get(
+                    p["result_id"],
+                    (
+                        TimingEligibility(
+                            has_display_timing=False,
+                            valid_query_count=0,
+                            missing_query_count=0,
+                            zero_timing_count=0,
+                            display_exclusion_reason="missing_timing_context",
+                            comparison_exclusion_reason="missing_timing_context",
+                        ),
+                        p.get("ranking_exclusion_reason"),
+                        cohort_ranked_count,
+                        cohort_ranking_exclusion_reason,
+                    ),
+                )
                 # Required keys are contractually emitted by
                 # ``pipeline._build_meta_leaderboard``. A missing key here
                 # means an upstream change broke the contract; fail loudly
@@ -815,6 +974,8 @@ class DuckDBSnapshotBuilder:
                         cohort_label,
                         cohort_href,
                         platform_count,
+                        ranked_count,
+                        cohort_reason,
                         primary_metric,
                         primary_order,
                         p["platform_id"],
@@ -823,6 +984,13 @@ class DuckDBSnapshotBuilder:
                         p["short_id"],
                         p.get("tuning_mode"),
                         p["trust_label"],
+                        timing_contract.has_display_timing,
+                        timing_contract.valid_query_count,
+                        timing_contract.missing_query_count,
+                        timing_contract.zero_timing_count,
+                        timing_contract.display_exclusion_reason,
+                        timing_contract.comparison_exclusion_reason,
+                        row_ranking_reason,
                         p.get("rank"),
                         p.get("metric_value"),
                         p.get("speedup_vs_best"),
@@ -864,7 +1032,15 @@ class DuckDBSnapshotBuilder:
             entry.power_score,
             entry.total_duration_s,
             entry.geomean_ms,
+            entry.display_geomean_ms,
             entry.query_count,
+            entry.has_display_timing,
+            entry.valid_query_count,
+            entry.missing_query_count,
+            entry.zero_timing_count,
+            entry.display_exclusion_reason,
+            entry.comparison_exclusion_reason,
+            entry.ranking_exclusion_reason,
             entry.trust_label,
             entry.visibility,
             entry.platform_version,

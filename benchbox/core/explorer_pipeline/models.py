@@ -6,7 +6,9 @@ pipeline and consumed by the results-explorer frontend.
 
 from __future__ import annotations
 
+import math
 import re
+from dataclasses import dataclass
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -100,6 +102,13 @@ class ManifestEntry(BaseModel):
     geomean_ms: float | None = None
     display_geomean_ms: float | None = None
     query_count: int
+    has_display_timing: bool = False
+    valid_query_count: int = 0
+    missing_query_count: int = 0
+    zero_timing_count: int = 0
+    display_exclusion_reason: str | None = None
+    comparison_exclusion_reason: str | None = None
+    ranking_exclusion_reason: str | None = None
     trust_label: str
     visibility: str
     # Extended fields (null for bundles predating these fields)
@@ -139,6 +148,115 @@ class QueryDisplayTiming(BaseModel):
     sample_count: int  # number of passing runs that contributed
 
 
+@dataclass(frozen=True)
+class TimingEligibility:
+    """Display-timing eligibility counts and row-level exclusion reasons."""
+
+    has_display_timing: bool
+    valid_query_count: int
+    missing_query_count: int
+    zero_timing_count: int
+    display_exclusion_reason: str | None
+    comparison_exclusion_reason: str | None
+
+
+def display_timing_is_valid(display_ms: float | None) -> bool:
+    """Return True when a display timing can support charts and comparisons."""
+    return display_ms is not None and math.isfinite(float(display_ms)) and float(display_ms) > 0
+
+
+def timing_exclusion_reason(display_ms: float | None) -> str | None:
+    """Return the cell-level exclusion reason for one display timing."""
+    if display_timing_is_valid(display_ms):
+        return None
+    if display_ms is None:
+        return "missing_timing"
+    value = float(display_ms)
+    if not math.isfinite(value):
+        return "invalid_timing"
+    if value == 0:
+        return "zero_timing"
+    return "non_positive_timing"
+
+
+def timing_eligibility(display_timings: list[QueryDisplayTiming], query_count: int) -> TimingEligibility:
+    """Compute the canonical row-level timing eligibility contract.
+
+    Exact zero timings remain auditable but do not count as valid display
+    evidence. Missing count includes emitted NULL/invalid timings plus query
+    slots declared by the bundle summary that have no display-timing row.
+    """
+    valid_query_count = 0
+    missing_query_count = 0
+    zero_timing_count = 0
+    seen_query_ids: set[str] = set()
+
+    for timing in display_timings:
+        seen_query_ids.add(timing.query_id)
+        reason = timing_exclusion_reason(timing.display_ms)
+        if reason is None:
+            valid_query_count += 1
+        elif reason == "zero_timing":
+            zero_timing_count += 1
+        else:
+            missing_query_count += 1
+
+    missing_query_count += max(int(query_count) - len(seen_query_ids), 0)
+    has_display_timing = valid_query_count > 0
+    display_reason = _display_exclusion_reason(
+        query_count=int(query_count),
+        valid_query_count=valid_query_count,
+        missing_query_count=missing_query_count,
+        zero_timing_count=zero_timing_count,
+    )
+    comparison_reason = _comparison_exclusion_reason(
+        query_count=int(query_count),
+        valid_query_count=valid_query_count,
+        display_exclusion_reason=display_reason,
+    )
+    return TimingEligibility(
+        has_display_timing=has_display_timing,
+        valid_query_count=valid_query_count,
+        missing_query_count=missing_query_count,
+        zero_timing_count=zero_timing_count,
+        display_exclusion_reason=display_reason,
+        comparison_exclusion_reason=comparison_reason,
+    )
+
+
+def _display_exclusion_reason(
+    *,
+    query_count: int,
+    valid_query_count: int,
+    missing_query_count: int,
+    zero_timing_count: int,
+) -> str | None:
+    if valid_query_count > 0:
+        return None
+    if query_count <= 0:
+        return "no_queries"
+    if zero_timing_count > 0 and missing_query_count == 0:
+        return "zero_timings_only"
+    if missing_query_count > 0 and zero_timing_count == 0:
+        return "missing_timings"
+    return "no_valid_display_timing"
+
+
+def _comparison_exclusion_reason(
+    *,
+    query_count: int,
+    valid_query_count: int,
+    display_exclusion_reason: str | None,
+) -> str | None:
+    if display_exclusion_reason is not None:
+        return display_exclusion_reason
+    if valid_query_count < 2:
+        return "insufficient_valid_queries"
+    if query_count > 0 and valid_query_count * 2 < query_count:
+        return "insufficient_query_coverage"
+    return None
+
+
 class DetailResult(BaseModel):
     """Full detail for a single result, used to populate DuckDB detail tables."""
 
@@ -153,6 +271,13 @@ class DetailResult(BaseModel):
     geomean_ms: float | None = None
     display_geomean_ms: float | None = None
     power_score: float | None
+    has_display_timing: bool = False
+    valid_query_count: int = 0
+    missing_query_count: int = 0
+    zero_timing_count: int = 0
+    display_exclusion_reason: str | None = None
+    comparison_exclusion_reason: str | None = None
+    ranking_exclusion_reason: str | None = None
     environment: dict[str, Any]
     queries: list[QueryTiming]
     display_timings: list[QueryDisplayTiming] = []
@@ -195,6 +320,26 @@ def is_ranking_eligible(entry: ManifestEntry) -> bool:
         and entry.failed_query_count == 0
         and not validation_status_is_non_clean(entry.validation_status)
     )
+
+
+def ranking_exclusion_reason(entry: ManifestEntry, primary_metric: str | None = None) -> str | None:
+    """Return the row-level reason an entry cannot receive a rank."""
+    if entry.visibility not in RANKING_ELIGIBLE_VISIBILITIES:
+        return "visibility_not_rankable"
+    if entry.trust_label not in RANKING_ELIGIBLE_TRUST_LABELS:
+        return "trust_not_rankable"
+    if entry.failed_query_count != 0:
+        return "failed_queries"
+    if validation_status_is_non_clean(entry.validation_status):
+        return "validation_not_clean"
+
+    metric = primary_metric or get_ranking_config(entry.benchmark).primary_metric
+    value = entry.power_score if metric == "power_score" else entry.display_geomean_ms
+    if value is None:
+        return "missing_primary_metric"
+    if not math.isfinite(float(value)) or float(value) <= 0:
+        return "non_positive_primary_metric"
+    return None
 
 
 def select_canonical_row(entries: list[ManifestEntry]) -> ManifestEntry | None:
@@ -330,6 +475,13 @@ class PlatformRow(BaseModel):
     trust_label: str
     run_date: str
     is_ranking_eligible: bool
+    has_display_timing: bool = False
+    valid_query_count: int = 0
+    missing_query_count: int = 0
+    zero_timing_count: int = 0
+    display_exclusion_reason: str | None = None
+    comparison_exclusion_reason: str | None = None
+    ranking_exclusion_reason: str | None = None
     power_score: float | None
     display_geomean_ms: float | None  # median-per-query geomean (new contract)
     sample_geomean_ms: float | None  # raw all-sample geomean (audit only)
@@ -391,9 +543,14 @@ __all__ = [
     "RANKING_ELIGIBLE_TRUST_LABELS",
     "RANKING_ELIGIBLE_VISIBILITIES",
     "RANKING_METRIC_BY_FAMILY",
+    "TimingEligibility",
+    "display_timing_is_valid",
     "get_ranking_config",
     "is_ranking_eligible",
     "MetaRank",
+    "ranking_exclusion_reason",
     "select_canonical_row",
+    "timing_eligibility",
+    "timing_exclusion_reason",
     "unavailable_normalized_cost_payload",
 ]

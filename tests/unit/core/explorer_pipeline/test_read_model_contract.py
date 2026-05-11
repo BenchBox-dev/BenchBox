@@ -28,7 +28,9 @@ from benchbox.core.explorer_pipeline.models import (
     QueryTiming,
     _platform_id,
     is_ranking_eligible,
+    ranking_exclusion_reason,
     select_canonical_row,
+    timing_eligibility,
 )
 from benchbox.core.explorer_pipeline.transformer import (
     BundleTransformer,
@@ -231,6 +233,67 @@ class TestDisplayGeomean:
             assert dt.sample_count >= 1
 
 
+class TestTimingEligibilityContract:
+    def test_zero_timings_are_auditable_but_not_valid_display_evidence(self) -> None:
+        contract = timing_eligibility(
+            [
+                QueryDisplayTiming(query_id="Q1", display_ms=0.0, sample_count=3),
+                QueryDisplayTiming(query_id="Q2", display_ms=None, sample_count=0),
+            ],
+            query_count=3,
+        )
+
+        assert contract.has_display_timing is False
+        assert contract.valid_query_count == 0
+        assert contract.zero_timing_count == 1
+        assert contract.missing_query_count == 2
+        assert contract.display_exclusion_reason == "no_valid_display_timing"
+        assert contract.comparison_exclusion_reason == "no_valid_display_timing"
+
+    def test_comparison_requires_absolute_and_percentage_query_coverage(self) -> None:
+        one_query = timing_eligibility(
+            [QueryDisplayTiming(query_id="Q1", display_ms=1.0, sample_count=3)],
+            query_count=1,
+        )
+        low_coverage = timing_eligibility(
+            [
+                QueryDisplayTiming(query_id="Q1", display_ms=1.0, sample_count=3),
+                QueryDisplayTiming(query_id="Q2", display_ms=2.0, sample_count=3),
+            ],
+            query_count=5,
+        )
+        enough_coverage = timing_eligibility(
+            [
+                QueryDisplayTiming(query_id="Q1", display_ms=1.0, sample_count=3),
+                QueryDisplayTiming(query_id="Q2", display_ms=2.0, sample_count=3),
+            ],
+            query_count=4,
+        )
+
+        assert one_query.comparison_exclusion_reason == "insufficient_valid_queries"
+        assert low_coverage.comparison_exclusion_reason == "insufficient_query_coverage"
+        assert enough_coverage.comparison_exclusion_reason is None
+
+    def test_transformer_writes_timing_eligibility_fields(self, tmp_path: Path) -> None:
+        bundle = copy.deepcopy(MINIMAL_BUNDLE)
+        bundle["summary"]["queries"] = {"total": 3, "passed": 2, "failed": 1}
+        bundle["queries"] = [
+            {"id": "Q1", "ms": 0.0, "run_type": "measurement", "status": "SUCCESS"},
+            {"id": "Q2", "ms": 5.0, "run_type": "measurement", "status": "SUCCESS"},
+        ]
+        bundle_path = tmp_path / "b.json"
+        bundle_path.write_text(json.dumps(bundle))
+
+        entry = BundleTransformer().to_manifest_entry(bundle_path)
+
+        assert entry.has_display_timing is True
+        assert entry.valid_query_count == 1
+        assert entry.zero_timing_count == 1
+        assert entry.missing_query_count == 1
+        assert entry.display_exclusion_reason is None
+        assert entry.comparison_exclusion_reason == "insufficient_valid_queries"
+
+
 # ---------------------------------------------------------------------------
 # (g) is_ranking_eligible returns False for community-submission trust
 # ---------------------------------------------------------------------------
@@ -290,6 +353,15 @@ class TestRankingEligibility:
     def test_partial_validation_status_is_not_ranking_eligible(self) -> None:
         entry = self._make_entry("maintainer-run", "public-curated", validation_status="partial")
         assert is_ranking_eligible(entry) is False
+
+    def test_ranking_exclusion_reason_separates_provenance_from_metric_quality(self) -> None:
+        clean_but_no_metric = self._make_entry("maintainer-run", "public-curated")
+        community = self._make_entry("community-submission", "public-self-reported")
+        failed = self._make_entry("maintainer-run", "public-curated", failed_query_count=1)
+
+        assert ranking_exclusion_reason(clean_but_no_metric) == "missing_primary_metric"
+        assert ranking_exclusion_reason(community) == "visibility_not_rankable"
+        assert ranking_exclusion_reason(failed) == "failed_queries"
 
     def test_ranking_eligible_visibilities_constant(self) -> None:
         assert "public-curated" in RANKING_ELIGIBLE_VISIBILITIES

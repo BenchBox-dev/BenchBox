@@ -30,7 +30,7 @@ def test_explorer_build_contract_command_emits_expected_json() -> None:
 def test_explorer_build_contract_matches_duckdb_only_output_contract() -> None:
     outputs = EXPLORER_BUILD_CONTRACT["outputs"]
 
-    assert EXPLORER_BUILD_CONTRACT["version"] == "3"
+    assert EXPLORER_BUILD_CONTRACT["version"] == "4"
     assert "results_schema.json" not in outputs["required"]
     assert "results_schema.json" in outputs["removed_legacy"]
 

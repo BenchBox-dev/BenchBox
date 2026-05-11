@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 from benchbox.core.explorer_pipeline.compare_math import speedup_vs_best, speedup_vs_slowest
@@ -18,6 +19,7 @@ class RankedPlatform:
     total_ranked: int
     speedup_vs_best: float | None
     speedup_vs_slowest: float | None
+    ranking_exclusion_reason: str | None
 
 
 @dataclass(frozen=True)
@@ -49,8 +51,17 @@ def rank_platforms(summary: BenchmarkSummary) -> RankedCohort:
     def metric_value(row: PlatformRow) -> float | None:
         return row.power_score if primary_metric == "power_score" else row.display_geomean_ms
 
+    def ranking_exclusion_reason(row: PlatformRow, value: float | None) -> str | None:
+        if not row.is_ranking_eligible:
+            return row.ranking_exclusion_reason or "not_ranking_eligible"
+        if value is None:
+            return "missing_primary_metric"
+        if not math.isfinite(float(value)) or float(value) <= 0:
+            return "non_positive_primary_metric"
+        return None
+
     def is_rankable(row: PlatformRow, value: float | None) -> bool:
-        return row.is_ranking_eligible and value is not None and value > 0
+        return ranking_exclusion_reason(row, value) is None
 
     def sort_key(row: PlatformRow) -> tuple[bool, float, str, str]:
         value = metric_value(row)
@@ -75,7 +86,8 @@ def rank_platforms(summary: BenchmarkSummary) -> RankedCohort:
     previous_value: float | None = None
     for row in sorted_rows:
         value = metric_value(row)
-        if not is_rankable(row, value):
+        row_exclusion_reason = ranking_exclusion_reason(row, value)
+        if row_exclusion_reason is not None:
             rank = None
             rank_speedup_vs_best = None
             rank_speedup_vs_slowest = None
@@ -96,6 +108,7 @@ def rank_platforms(summary: BenchmarkSummary) -> RankedCohort:
                 total_ranked=len(rankable_values),
                 speedup_vs_best=rank_speedup_vs_best,
                 speedup_vs_slowest=rank_speedup_vs_slowest,
+                ranking_exclusion_reason=row_exclusion_reason,
             )
         )
 

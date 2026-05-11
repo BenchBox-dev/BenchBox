@@ -42,6 +42,13 @@ export interface ResultRow extends CostDeploymentFields {
   geomean_ms: number | null;
   display_geomean_ms: number | null;
   query_count: number;
+  has_display_timing: boolean;
+  valid_query_count: number;
+  missing_query_count: number;
+  zero_timing_count: number;
+  display_exclusion_reason: string | null;
+  comparison_exclusion_reason: string | null;
+  ranking_exclusion_reason: string | null;
   trust_label: string;
   visibility: string;
   platform_version: string | null;
@@ -73,6 +80,8 @@ export interface QueryDisplayTimingRow {
   query_id: string;
   display_ms: number | null;
   sample_count: number;
+  is_valid_display_timing: boolean;
+  timing_exclusion_reason: string | null;
 }
 
 export interface QueryExecutionRow {
@@ -93,6 +102,8 @@ export interface BenchmarkMatrixCellRow {
   platform_id: string;
   query_id: string;
   display_ms: number | null;
+  is_valid_display_timing: boolean;
+  timing_exclusion_reason: string | null;
 }
 
 export interface BenchmarkRankingRow extends CostDeploymentFields {
@@ -112,6 +123,13 @@ export interface BenchmarkRankingRow extends CostDeploymentFields {
   compliance_class: string | null;
   run_date: string;
   is_ranking_eligible: boolean;
+  has_display_timing: boolean;
+  valid_query_count: number;
+  missing_query_count: number;
+  zero_timing_count: number;
+  display_exclusion_reason: string | null;
+  comparison_exclusion_reason: string | null;
+  ranking_exclusion_reason: string | null;
   power_score: number | null;
   display_geomean_ms: number | null;
   sample_geomean_ms: number | null;
@@ -120,6 +138,8 @@ export interface BenchmarkRankingRow extends CostDeploymentFields {
   primary_order: "asc" | "desc";
   rank: number | null;
   total_in_cohort: number;
+  cohort_ranked_count: number;
+  cohort_ranking_exclusion_reason: string | null;
   percentile_p50: number | null;
   percentile_p90: number | null;
   percentile_p95: number | null;
@@ -143,6 +163,13 @@ export interface PlatformIndexRowRow extends CostDeploymentFields {
   geomean_ms: number | null;
   display_geomean_ms: number | null;
   query_count: number;
+  has_display_timing: boolean;
+  valid_query_count: number;
+  missing_query_count: number;
+  zero_timing_count: number;
+  display_exclusion_reason: string | null;
+  comparison_exclusion_reason: string | null;
+  ranking_exclusion_reason: string | null;
   trust_label: string;
   validation_status?: string | null;
   tuning_mode: string | null;
@@ -161,6 +188,8 @@ export interface CohortMetadataRow {
   cohort_href: string;
   /** Count of ranking-eligible rows with non-null primary metrics. */
   platform_count: number;
+  cohort_ranked_count: number;
+  cohort_ranking_exclusion_reason: string | null;
   primary_metric: string;
   primary_order: "asc" | "desc";
   platform_id: string;
@@ -169,6 +198,13 @@ export interface CohortMetadataRow {
   short_id: string;
   tuning_mode: string | null;
   trust_label: string;
+  has_display_timing: boolean;
+  valid_query_count: number;
+  missing_query_count: number;
+  zero_timing_count: number;
+  display_exclusion_reason: string | null;
+  comparison_exclusion_reason: string | null;
+  ranking_exclusion_reason: string | null;
   rank: number | null;
   metric_value: number | null;
   speedup_vs_best: number | null;
@@ -200,6 +236,188 @@ interface SnapshotQueryCacheOptions<T> {
 interface SnapshotRowsCacheOptions {
   cacheEmpty?: boolean;
 }
+
+const RESULT_COLUMNS = [
+  "result_id",
+  "benchmark",
+  "scale_factor",
+  "platform",
+  "platform_id",
+  "driver_version",
+  "run_date",
+  "power_score",
+  "total_duration_s",
+  "geomean_ms",
+  "display_geomean_ms",
+  "query_count",
+  "has_display_timing",
+  "valid_query_count",
+  "missing_query_count",
+  "zero_timing_count",
+  "display_exclusion_reason",
+  "comparison_exclusion_reason",
+  "ranking_exclusion_reason",
+  "trust_label",
+  "visibility",
+  "platform_version",
+  "execution_mode",
+  "tuning_mode",
+  "tuning_hash",
+  "test_type",
+  "validation_status",
+  "cost_usd",
+  "normalized_cost_usd",
+  "cost_model_version",
+  "cost_model_source",
+  "cost_scope",
+  "cost_status",
+  "billing_unit",
+  "pricing_region",
+  "deployment_class",
+  "cloud_provider",
+  "cloud_region",
+  "instance_or_warehouse",
+  "instance_type",
+  "warehouse_size",
+  "node_count",
+  "cluster_size",
+  "storage_format",
+  "storage_tier",
+  "compliance_class",
+  "is_ranking_eligible",
+  "has_plans",
+  "plans_published",
+  "has_tuning",
+  "bundle_download_url",
+].join(", ");
+
+const RESULT_DETAIL_METRICS_COLUMNS = [
+  "result_id",
+  "benchmark",
+  "scale_factor",
+  "platform",
+  "platform_id",
+  "driver_version",
+  "run_date",
+  "power_score",
+  "total_duration_s",
+  "geomean_ms",
+  "display_geomean_ms",
+  "query_count",
+  "has_display_timing",
+  "valid_query_count",
+  "missing_query_count",
+  "zero_timing_count",
+  "display_exclusion_reason",
+  "comparison_exclusion_reason",
+  "ranking_exclusion_reason",
+  "trust_label",
+  "visibility",
+  "platform_version",
+  "execution_mode",
+  "tuning_mode",
+  "tuning_hash",
+  "test_type",
+  "validation_status",
+  "cost_usd",
+  "normalized_cost_usd",
+  "cost_model_version",
+  "cost_model_source",
+  "cost_scope",
+  "cost_status",
+  "billing_unit",
+  "pricing_region",
+  "deployment_class",
+  "cloud_provider",
+  "cloud_region",
+  "instance_or_warehouse",
+  "instance_type",
+  "warehouse_size",
+  "node_count",
+  "cluster_size",
+  "storage_format",
+  "storage_tier",
+  "compliance_class",
+  "has_plans",
+  "plans_published",
+  "has_tuning",
+  "bundle_download_url",
+  "os",
+  "arch",
+  "cpu_count",
+  "memory_gb",
+  "python",
+].join(", ");
+
+const COHORT_METADATA_COLUMNS = [
+  "cohort_key",
+  "benchmark",
+  "scale_factor",
+  "phase",
+  "cohort_label",
+  "cohort_href",
+  "platform_count",
+  "cohort_ranked_count",
+  "cohort_ranking_exclusion_reason",
+  "primary_metric",
+  "primary_order",
+  "platform_id",
+  "platform",
+  "result_id",
+  "short_id",
+  "tuning_mode",
+  "trust_label",
+  "has_display_timing",
+  "valid_query_count",
+  "missing_query_count",
+  "zero_timing_count",
+  "display_exclusion_reason",
+  "comparison_exclusion_reason",
+  "ranking_exclusion_reason",
+  "rank",
+  "metric_value",
+  "speedup_vs_best",
+].join(", ");
+
+const BENCHMARK_RANKING_COLUMNS = [
+  "br.benchmark",
+  "br.scale_factor",
+  "br.phase",
+  "br.result_id",
+  "br.platform_id",
+  "br.platform",
+  "br.short_id",
+  "br.trust_label",
+  "br.tuning_mode",
+  "br.tuning_hash",
+  "br.execution_mode",
+  "br.compliance_class",
+  "br.run_date",
+  "br.is_ranking_eligible",
+  "br.has_display_timing",
+  "br.valid_query_count",
+  "br.missing_query_count",
+  "br.zero_timing_count",
+  "br.display_exclusion_reason",
+  "br.comparison_exclusion_reason",
+  "br.ranking_exclusion_reason",
+  "br.power_score",
+  "br.display_geomean_ms",
+  "br.sample_geomean_ms",
+  "br.cost_usd",
+  "br.primary_metric",
+  "br.primary_order",
+  "br.rank",
+  "br.total_in_cohort",
+  "br.cohort_ranked_count",
+  "br.cohort_ranking_exclusion_reason",
+  "br.percentile_p50",
+  "br.percentile_p90",
+  "br.percentile_p95",
+  "br.percentile_p99",
+  "br.speedup_vs_best",
+  "br.speedup_vs_slowest_in_cohort",
+].join(", ");
 
 function currentSnapshotCacheKey(): string {
   if (typeof window === "undefined") return RESULTS_SNAPSHOT_PATH;
@@ -253,13 +471,13 @@ export function memoizedSnapshotQueryRows<T>(
 }
 
 export async function listResults(where: FacetWhereClause = { sql: "", params: [] }): Promise<ResultRow[]> {
-  const sql = `SELECT * FROM bench.results ${where.sql} ORDER BY run_date DESC`;
+  const sql = `SELECT ${RESULT_COLUMNS} FROM bench.results ${where.sql} ORDER BY run_date DESC`;
   return memoizedSnapshotQueryRows<ResultRow>("list-results", { sql, params: where.params }, { cacheEmpty: false });
 }
 
 export async function getResultDetailMetrics(resultId: string): Promise<ResultDetailMetricsRow | null> {
   const rows = await queryRows<ResultDetailMetricsRow>(
-    "SELECT * FROM bench.result_detail_metrics WHERE result_id = ?",
+    `SELECT ${RESULT_DETAIL_METRICS_COLUMNS} FROM bench.result_detail_metrics WHERE result_id = ?`,
     [resultId],
   );
   return rows[0] ?? null;
@@ -267,7 +485,8 @@ export async function getResultDetailMetrics(resultId: string): Promise<ResultDe
 
 export async function getQueryDisplayTimings(resultId: string): Promise<QueryDisplayTimingRow[]> {
   return queryRows<QueryDisplayTimingRow>(
-    "SELECT result_id, query_id, display_ms, sample_count" +
+    "SELECT result_id, query_id, display_ms, sample_count," +
+      " is_valid_display_timing, timing_exclusion_reason" +
       " FROM bench.query_display_timings" +
       " WHERE result_id = ?" +
       " ORDER BY query_id",
@@ -314,6 +533,8 @@ export async function getDetailResult(resultId: string): Promise<DetailResult | 
     query_id: r.query_id,
     display_ms: r.display_ms,
     sample_count: r.sample_count,
+    is_valid_display_timing: r.is_valid_display_timing,
+    timing_exclusion_reason: r.timing_exclusion_reason,
   }));
 
   const queries: QueryTiming[] = executionRows.map((r) => ({
@@ -337,6 +558,13 @@ export async function getDetailResult(resultId: string): Promise<DetailResult | 
     geomean_ms: wide.geomean_ms,
     display_geomean_ms: wide.display_geomean_ms,
     power_score: wide.power_score,
+    has_display_timing: wide.has_display_timing,
+    valid_query_count: wide.valid_query_count,
+    missing_query_count: wide.missing_query_count,
+    zero_timing_count: wide.zero_timing_count,
+    display_exclusion_reason: wide.display_exclusion_reason,
+    comparison_exclusion_reason: wide.comparison_exclusion_reason,
+    ranking_exclusion_reason: wide.ranking_exclusion_reason,
     environment,
     queries,
     display_timings,
@@ -378,7 +606,8 @@ export async function getBenchmarkMatrixCells(
   phase: string,
 ): Promise<BenchmarkMatrixCellRow[]> {
   return queryRows<BenchmarkMatrixCellRow>(
-    "SELECT benchmark, scale_factor, phase, result_id, platform_id, query_id, display_ms" +
+    "SELECT benchmark, scale_factor, phase, result_id, platform_id, query_id, display_ms," +
+      " is_valid_display_timing, timing_exclusion_reason" +
       " FROM bench.benchmark_matrix_cells" +
       " WHERE benchmark = ? AND scale_factor = ? AND phase = ?" +
       " ORDER BY platform_id, query_id",
@@ -392,7 +621,8 @@ export async function getBenchmarkRanking(
   phase: string,
 ): Promise<BenchmarkRankingRow[]> {
   return queryRows<BenchmarkRankingRow>(
-    "SELECT br.*, r.normalized_cost_usd, r.cost_model_version, r.cost_model_source," +
+    `SELECT ${BENCHMARK_RANKING_COLUMNS}, r.platform_version, r.validation_status,` +
+      " r.normalized_cost_usd, r.cost_model_version, r.cost_model_source," +
       " r.cost_scope, r.cost_status, r.billing_unit, r.pricing_region," +
       " r.deployment_class, r.cloud_provider, r.cloud_region, r.instance_or_warehouse," +
       " r.storage_format" +
@@ -505,6 +735,13 @@ async function loadBenchmarkSummaryFromDuckDB(
       validation_status: row.validation_status ?? null,
       run_date: row.run_date,
       is_ranking_eligible: row.is_ranking_eligible,
+      has_display_timing: row.has_display_timing,
+      valid_query_count: row.valid_query_count,
+      missing_query_count: row.missing_query_count,
+      zero_timing_count: row.zero_timing_count,
+      display_exclusion_reason: row.display_exclusion_reason,
+      comparison_exclusion_reason: row.comparison_exclusion_reason,
+      ranking_exclusion_reason: row.ranking_exclusion_reason,
       power_score: row.power_score,
       display_geomean_ms: row.display_geomean_ms,
       sample_geomean_ms: row.sample_geomean_ms,
@@ -569,6 +806,13 @@ function loadPlatformIndexRows(platformId?: string): Promise<PlatformIndexRowRow
     " r.geomean_ms," +
     " r.display_geomean_ms," +
     " r.query_count," +
+    " r.has_display_timing," +
+    " r.valid_query_count," +
+    " r.missing_query_count," +
+    " r.zero_timing_count," +
+    " r.display_exclusion_reason," +
+    " r.comparison_exclusion_reason," +
+    " r.ranking_exclusion_reason," +
     " r.trust_label," +
     " r.validation_status," +
     " r.tuning_mode," +
@@ -603,7 +847,7 @@ export async function getCohort(cohortKey: string): Promise<CohortMetadataRow[]>
     `cohort:${cohortKey}`,
     () =>
       queryRows<CohortMetadataRow>(
-        "SELECT * FROM bench.cohort_metadata" +
+        `SELECT ${COHORT_METADATA_COLUMNS} FROM bench.cohort_metadata` +
           " WHERE cohort_key = ?" +
           " ORDER BY rank NULLS LAST, platform_id, result_id",
         [cohortKey],
@@ -653,7 +897,7 @@ async function loadMetaLeaderboardData(): Promise<MetaLeaderboard | null> {
     // carry no ranks and would only bloat the pivot - excluding them here
     // keeps the round-trip small on large corpora.
     queryRows<CohortMetadataRow>(
-      "SELECT * FROM bench.cohort_metadata" +
+      `SELECT ${COHORT_METADATA_COLUMNS} FROM bench.cohort_metadata` +
         " WHERE platform_count >= 2" +
         " ORDER BY benchmark, scale_factor, phase, rank NULLS LAST, platform_id, result_id",
     ),
@@ -676,6 +920,8 @@ async function loadMetaLeaderboardData(): Promise<MetaLeaderboard | null> {
         label: row.cohort_label,
         href: row.cohort_href,
         platform_count: row.platform_count,
+        cohort_ranked_count: row.cohort_ranked_count,
+        cohort_ranking_exclusion_reason: row.cohort_ranking_exclusion_reason,
         primary_metric: row.primary_metric,
         primary_order: row.primary_order,
         platforms: [],
@@ -691,6 +937,13 @@ async function loadMetaLeaderboardData(): Promise<MetaLeaderboard | null> {
       speedup_vs_best: row.speedup_vs_best,
       primary_metric: row.primary_metric,
       primary_order: row.primary_order,
+      has_display_timing: row.has_display_timing,
+      valid_query_count: row.valid_query_count,
+      missing_query_count: row.missing_query_count,
+      zero_timing_count: row.zero_timing_count,
+      display_exclusion_reason: row.display_exclusion_reason,
+      comparison_exclusion_reason: row.comparison_exclusion_reason,
+      ranking_exclusion_reason: row.ranking_exclusion_reason,
     });
 
     if (row.rank === null) continue;
@@ -711,7 +964,7 @@ async function loadMetaLeaderboardData(): Promise<MetaLeaderboard | null> {
     }
     ranks[row.cohort_key] = {
       rank: row.rank!,
-      total: row.platform_count,
+      total: row.cohort_ranked_count,
       metric_value: row.metric_value,
       speedup_vs_best: row.speedup_vs_best,
     };

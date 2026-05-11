@@ -22,6 +22,16 @@ import type { BenchmarkSummary } from "@/types";
 // Test fixtures
 // ---------------------------------------------------------------------------
 
+const TIMING_ELIGIBLE = {
+  has_display_timing: true,
+  valid_query_count: 2,
+  missing_query_count: 0,
+  zero_timing_count: 0,
+  display_exclusion_reason: null,
+  comparison_exclusion_reason: null,
+  ranking_exclusion_reason: null,
+};
+
 function makeSummary(overrides: Partial<BenchmarkSummary> = {}): BenchmarkSummary {
   return {
     benchmark: "tpch",
@@ -42,6 +52,7 @@ function makeSummary(overrides: Partial<BenchmarkSummary> = {}): BenchmarkSummar
         validation_status: "exact",
         run_date: "2026-04-01",
         is_ranking_eligible: true,
+        ...TIMING_ELIGIBLE,
         power_score: 3000,
         display_geomean_ms: 10,
         compliance_class: null,
@@ -64,6 +75,7 @@ function makeSummary(overrides: Partial<BenchmarkSummary> = {}): BenchmarkSummar
         validation_status: "loose",
         run_date: "2026-04-01",
         is_ranking_eligible: true,
+        ...TIMING_ELIGIBLE,
         power_score: 800,
         display_geomean_ms: 100,
         compliance_class: null,
@@ -180,6 +192,7 @@ describe("QueryHeatmap rendering", () => {
           ...makeSummary().platforms[0]!,
           result_id: "platform-noncompliant",
           is_ranking_eligible: false,
+          ranking_exclusion_reason: "compliance_not_rankable",
           compliance_class: "unofficial_subscale",
         },
       ],
@@ -348,6 +361,9 @@ describe("QueryHeatmap rendering", () => {
           trust_label: "maintainer-run",
           run_date: "2026-04-01",
           is_ranking_eligible: true,
+          ...TIMING_ELIGIBLE,
+          missing_query_count: 1,
+          comparison_exclusion_reason: "insufficient_valid_timings",
           power_score: 3000,
           display_geomean_ms: 10,
           compliance_class: null,
@@ -385,6 +401,7 @@ describe("QueryHeatmap rendering", () => {
           trust_label: "maintainer-run",
           run_date: "2026-04-01",
           is_ranking_eligible: true,
+          ...TIMING_ELIGIBLE,
           power_score: 3000,
           display_geomean_ms: 10,
           compliance_class: null,
@@ -429,6 +446,8 @@ describe("QueryHeatmap rendering", () => {
           trust_label: "community-submission",
           run_date: "2026-04-01",
           is_ranking_eligible: false,
+          ...TIMING_ELIGIBLE,
+          ranking_exclusion_reason: "trust_not_rankable",
           power_score: 9999,
           display_geomean_ms: 1,
           compliance_class: null,
@@ -450,6 +469,7 @@ describe("QueryHeatmap rendering", () => {
           trust_label: "maintainer-run",
           run_date: "2026-04-01",
           is_ranking_eligible: true,
+          ...TIMING_ELIGIBLE,
           power_score: 100,
           display_geomean_ms: 100,
           compliance_class: null,

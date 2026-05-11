@@ -62,11 +62,18 @@ function makeResult(overrides: Partial<DetailResult> = {}): DetailResult {
     geomean_ms: 10,
     display_geomean_ms: 10,
     power_score: 3000,
+    has_display_timing: true,
+    valid_query_count: 2,
+    missing_query_count: 0,
+    zero_timing_count: 0,
+    display_exclusion_reason: null,
+    comparison_exclusion_reason: null,
+    ranking_exclusion_reason: null,
     environment: {},
     queries: [],
     display_timings: [
-      { query_id: "Q1", display_ms: 10, sample_count: 3 },
-      { query_id: "Q2", display_ms: 20, sample_count: 3 },
+      { query_id: "Q1", display_ms: 10, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+      { query_id: "Q2", display_ms: 20, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
     ],
     has_plans: false,
     has_tuning: false,
@@ -99,8 +106,8 @@ const SQLITE = makeResult({
   display_geomean_ms: 100,
   power_score: 300,
   display_timings: [
-    { query_id: "Q1", display_ms: 100, sample_count: 3 },
-    { query_id: "Q2", display_ms: 200, sample_count: 3 },
+    { query_id: "Q1", display_ms: 100, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+    { query_id: "Q2", display_ms: 200, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
   ],
 });
 
@@ -111,8 +118,8 @@ const POSTGRES = makeResult({
   display_geomean_ms: 50,
   power_score: 1000,
   display_timings: [
-    { query_id: "Q1", display_ms: 50, sample_count: 3 },
-    { query_id: "Q2", display_ms: 80, sample_count: 3 },
+    { query_id: "Q1", display_ms: 50, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+    { query_id: "Q2", display_ms: 80, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
   ],
 });
 
@@ -130,6 +137,13 @@ function makeResultRow(overrides: Partial<ResultRow> = {}): ResultRow {
     geomean_ms: 10,
     display_geomean_ms: 10,
     query_count: 22,
+    has_display_timing: true,
+    valid_query_count: 22,
+    missing_query_count: 0,
+    zero_timing_count: 0,
+    display_exclusion_reason: null,
+    comparison_exclusion_reason: null,
+    ranking_exclusion_reason: null,
     trust_label: "maintainer-run",
     visibility: "public-curated",
     platform_version: null,
@@ -554,8 +568,8 @@ describe("Compare", () => {
       platform_id: "sqlite",
       power_score: 300,
       display_timings: [
-        { query_id: "Q1", display_ms: 100, sample_count: 3 },
-        { query_id: "Q3", display_ms: 300, sample_count: 3 },
+        { query_id: "Q1", display_ms: 100, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+        { query_id: "Q3", display_ms: 300, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
       ],
     });
     vi.mocked(getDetailResult).mockImplementation((id) =>
@@ -773,8 +787,8 @@ describe("Compare", () => {
       platform_id: "sqlite",
       power_score: 300,
       display_timings: [
-        { query_id: "Q1", display_ms: 100, sample_count: 3 },
-        { query_id: "Q2", display_ms: 200, sample_count: 3 },
+        { query_id: "Q1", display_ms: 100, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+        { query_id: "Q2", display_ms: 200, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
       ],
     });
     vi.mocked(getDetailResult).mockImplementation((id) =>

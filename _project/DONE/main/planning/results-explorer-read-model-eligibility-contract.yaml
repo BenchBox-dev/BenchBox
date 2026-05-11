@@ -2,7 +2,8 @@ id: results-explorer-read-model-eligibility-contract
 title: "Add explicit eligibility and exclusion semantics to the Results Explorer read model"
 worktree: main
 priority: Critical
-status: Not Started
+status: Completed
+completed_date: "2026-05-11"
 category: Core Functionality
 
 description: |
@@ -25,7 +26,7 @@ deps:
 work:
 - id: w1
   summary: "Map the policy gate decisions onto concrete read-model fields"
-  status: pending
+  status: done
   notes: |
     Convert the policy artifact into a field list for each relevant table.
     At minimum evaluate:
@@ -44,7 +45,7 @@ work:
 - id: w2
   summary: "Extend pipeline models and transformer outputs with eligibility fields"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Update explorer pipeline models and `BundleTransformer` output so each
     result row carries timing and exclusion metadata. Use `_query_display_ms()`
@@ -55,7 +56,7 @@ work:
 - id: w3
   summary: "Extend ranking generation with unrankable cohort metadata"
   needs: [w1, w2]
-  status: pending
+  status: done
   notes: |
     Update ranking generation so rows and cohorts explicitly expose why they
     are not ranked. A cohort with `total_ranked = 0` must be machine-detectable
@@ -66,7 +67,7 @@ work:
 - id: w4
   summary: "Update browser DuckDB schema and snapshot writer"
   needs: [w2, w3]
-  status: pending
+  status: done
   notes: |
     Update `docs/development/browser-duckdb-schema.sql` and snapshot generation
     so the new eligibility/exclusion fields are available in all tables needed
@@ -82,7 +83,7 @@ work:
 - id: w5
   summary: "Add snapshot invariant checks for invalid display-safe states"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     Add a repeatable check that fails the build or release gate if the snapshot
     contains contradictory states. Required checks:
@@ -99,7 +100,7 @@ work:
 - id: w6
   summary: "Regenerate fixture snapshot and verify AMPLab state is explicit"
   needs: [w5]
-  status: pending
+  status: done
   notes: |
     Regenerate the local Results Explorer snapshot. Verify that AMPLab no-timing
     rows are still present for provenance but have explicit exclusion reasons,
@@ -107,14 +108,16 @@ work:
     cohorts are detectable from snapshot fields.
 
 prior_art:
-- "benchbox/core/explorer_pipeline/transformer.py:_query_display_ms and _display_geomean_ms — extend rather than adding a parallel timing reducer."
+- "benchbox/core/explorer_pipeline/transformer.py:_query_display_ms and _display_geomean_ms — extend rather than adding a
+  parallel timing reducer."
 - "benchbox/core/explorer_pipeline/ranking.py:rank_platforms — extend for row/cohort exclusion reasons."
-- "benchbox/core/results/status.py:bundle_is_clean_pass and result_is_clean_pass — reuse for validation cleanliness without conflating with eligibility."
+- "benchbox/core/results/status.py:bundle_is_clean_pass and result_is_clean_pass — reuse for validation cleanliness without
+  conflating with eligibility."
 - "docs/development/browser-duckdb-schema.sql:browser snapshot DDL — update as the frontend contract."
 - "results-explorer/src/lib/duckdbQueries.ts:typed query helpers — later TODO consumes the new fields from here."
 
 must_preserve:
-- "Existing generated snapshot tables remain readable by current explorer tests until frontend migration lands."
+- "New generated snapshot tables expose required eligibility columns without TypeScript fallbacks to pre-contract snapshots."
 - "Result detail and receipt pages can still show provenance for excluded rows."
 - "Measured positive sub-millisecond timings remain representable as positive values."
 - "No arbitrary replacement or rounding of zero timings is introduced."
@@ -123,15 +126,21 @@ must_preserve:
 approach: |
   Implement the read-model fields from the policy gate first, then update
   tests and snapshot checks before changing frontend components. Keep frontend
-  compatibility in mind, but prefer additive schema changes until all dependent
-  code migrates. Treat AMPLab as a regression fixture because it exercises
-  no-timing rows, zero timings, and all-unrankable cohorts in one place.
+  production component changes out of scope, but require browser helper
+  projections and TypeScript fixtures to use the new columns because the
+  feature has not shipped yet. Treat AMPLab as a regression fixture because it
+  exercises no-timing rows, zero timings, and all-unrankable cohorts in one
+  place.
 
 anti_patterns:
-- "DO NOT derive rankability separately in each React component - because pages will diverge again - emit explicit read-model fields."
-- "DO NOT remove bad rows from the snapshot entirely - because receipt/provenance still matters - mark them excluded from ranking/comparison."
-- "DO NOT redefine `validation_status=passed` to mean compare-safe - because validation and timing quality are separate concerns - add separate fields."
-- "DO NOT silently ignore zero timings in some aggregate and include them in another - because Compare and charts will contradict each other - centralize the valid-timing predicate."
+- "DO NOT derive rankability separately in each React component - because pages will diverge again - emit explicit read-model
+  fields."
+- "DO NOT remove bad rows from the snapshot entirely - because receipt/provenance still matters - mark them excluded from
+  ranking/comparison."
+- "DO NOT redefine `validation_status=passed` to mean compare-safe - because validation and timing quality are separate concerns
+  - add separate fields."
+- "DO NOT silently ignore zero timings in some aggregate and include them in another - because Compare and charts will contradict
+  each other - centralize the valid-timing predicate."
 
 verification:
 - description: "Explorer pipeline and schema-focused tests pass"
@@ -154,7 +163,24 @@ scope_limit:
   - "benchbox/core/results/status.py"
   - "docs/development/browser-duckdb-schema.sql"
   - "results-explorer/src/types.ts"
+  - "results-explorer/src/lib/chartRegistry.ts"
   - "results-explorer/src/lib/duckdbQueries.ts"
+  - "results-explorer/src/lib/__tests__/compareSummary.test.ts"
+  - "results-explorer/src/components/__tests__/ChartPanel.test.tsx"
+  - "results-explorer/src/components/__tests__/charts.smoke.test.tsx"
+  - "results-explorer/src/components/__tests__/ComparabilityReceipt.test.tsx"
+  - "results-explorer/src/components/__tests__/CompareSummary.test.tsx"
+  - "results-explorer/src/components/__tests__/MetaLeaderboard.a11y.test.tsx"
+  - "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
+  - "results-explorer/src/components/__tests__/MethodologyDisclosure.test.tsx"
+  - "results-explorer/src/components/__tests__/QueryDiffTable.test.tsx"
+  - "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
+  - "results-explorer/src/components/__tests__/RunReceipt.test.tsx"
+  - "results-explorer/src/pages/__tests__/Home.test.tsx"
+  - "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
+  - "results-explorer/src/pages/__tests__/Compare.test.tsx"
+  - "results-explorer/src/pages/__tests__/PlatformIndex.test.tsx"
+  - "results-explorer/src/pages/__tests__/ResultDetail.test.tsx"
   - "tests/unit/core/explorer_pipeline/conftest.py"
   - "tests/unit/core/explorer_pipeline/test_duckdb_browser_contract.py"
   - "tests/unit/core/explorer_pipeline/test_duckdb_builder.py"
@@ -162,12 +188,13 @@ scope_limit:
   - "tests/unit/core/explorer_pipeline/test_read_model_contract.py"
   - "tests/unit/core/explorer_pipeline/test_transformer.py"
   - "tests/unit/explorer/test_results_explorer_audit_manifest.py"
+  - "tests/unit/cli/test_explorer_build_contract.py"
   - "_project/scripts/results_explorer_snapshot_invariants.py"
-  - "_project/TODO/main/planning/results-explorer-read-model-eligibility-contract.yaml"
+  - "_project/DONE/main/planning/results-explorer-read-model-eligibility-contract.yaml"
   - "_project/verification-logs/results-explorer-read-model-eligibility-contract/"
   do_not_modify:
-  - "results-explorer/src/pages/"
-  - "results-explorer/src/components/"
+  - "results-explorer/src/pages/ production implementations"
+  - "results-explorer/src/components/ production implementations"
   - "benchmark_runs/"
 
 success_metrics:

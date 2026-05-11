@@ -8,6 +8,16 @@ vi.mock("preact-router", () => ({
   route: (path: string) => routeMock(path),
 }));
 
+const META_TIMING_ELIGIBLE = {
+  has_display_timing: true,
+  valid_query_count: 2,
+  missing_query_count: 0,
+  zero_timing_count: 0,
+  display_exclusion_reason: null,
+  comparison_exclusion_reason: null,
+  ranking_exclusion_reason: null,
+};
+
 const DATA: MetaLeaderboardData = {
   generated_at: "2026-04-17T00:00:00Z",
   cohorts: [
@@ -19,6 +29,8 @@ const DATA: MetaLeaderboardData = {
       label: "ClickBench SF0.1",
       href: "/results/clickbench/",
       platform_count: 2,
+      cohort_ranked_count: 2,
+      cohort_ranking_exclusion_reason: null,
       primary_metric: "display_geomean_ms",
       primary_order: "asc",
       platforms: [
@@ -31,6 +43,7 @@ const DATA: MetaLeaderboardData = {
           speedup_vs_best: 1,
           primary_metric: "display_geomean_ms",
           primary_order: "asc",
+          ...META_TIMING_ELIGIBLE,
         },
         {
           platform_id: "sqlite",
@@ -41,6 +54,7 @@ const DATA: MetaLeaderboardData = {
           speedup_vs_best: 0.5,
           primary_metric: "display_geomean_ms",
           primary_order: "asc",
+          ...META_TIMING_ELIGIBLE,
         },
       ],
     },
@@ -161,6 +175,7 @@ describe("MetaLeaderboard", () => {
               speedup_vs_best: 0.5,
               primary_metric: "display_geomean_ms",
               primary_order: "asc" as const,
+              ...META_TIMING_ELIGIBLE,
             },
             {
               platform_id: "polars",
@@ -171,6 +186,7 @@ describe("MetaLeaderboard", () => {
               speedup_vs_best: 1,
               primary_metric: "display_geomean_ms",
               primary_order: "asc" as const,
+              ...META_TIMING_ELIGIBLE,
             },
           ],
         },
@@ -273,6 +289,7 @@ describe("MetaLeaderboard", () => {
               speedup_vs_best: 0.5,
               primary_metric: "display_geomean_ms",
               primary_order: "asc" as const,
+              ...META_TIMING_ELIGIBLE,
             },
           ],
         },
@@ -392,6 +409,7 @@ describe("MetaLeaderboard", () => {
         {
           ...DATA.cohorts[0]!,
           platform_count: 205,
+          cohort_ranked_count: 205,
           platforms: platforms.map((platform, index) => ({
             platform_id: platform.platform_id,
             platform: platform.platform,
@@ -401,6 +419,7 @@ describe("MetaLeaderboard", () => {
             speedup_vs_best: 1 / (index + 1),
             primary_metric: "display_geomean_ms",
             primary_order: "asc" as const,
+            ...META_TIMING_ELIGIBLE,
           })),
         },
       ],
@@ -473,6 +492,7 @@ describe("MetaLeaderboard", () => {
               speedup_vs_best: 1,
               primary_metric: "power_score",
               primary_order: "desc" as const,
+              ...META_TIMING_ELIGIBLE,
             },
           ],
         },

@@ -15,9 +15,19 @@ import {
 import { toggleFacetValue } from "@/lib/facetMatching";
 import { Home } from "@/pages/Home";
 
+const TIMING_ELIGIBLE = {
+  has_display_timing: true,
+  valid_query_count: 2,
+  missing_query_count: 0,
+  zero_timing_count: 0,
+  display_exclusion_reason: null,
+  comparison_exclusion_reason: null,
+  ranking_exclusion_reason: null,
+};
+
 /**
- * ResultRow fixtures - shape mirrors `bench.results` (SELECT * FROM bench.results).
- * Home consumes these via `listResults()`.
+ * ResultRow fixtures - shape mirrors the explicit `bench.results` projection
+ * used by `listResults()`.
  */
 const RESULT_ROWS = [
   {
@@ -33,6 +43,7 @@ const RESULT_ROWS = [
     geomean_ms: 10,
     display_geomean_ms: 10,
     query_count: 2,
+    ...TIMING_ELIGIBLE,
     trust_label: "maintainer-run",
     visibility: "public-curated",
     platform_version: null,
@@ -55,6 +66,7 @@ const RESULT_ROWS = [
     compliance_class: null,
     is_ranking_eligible: true,
     has_plans: false,
+    plans_published: false,
     has_tuning: true,
     bundle_download_url: "",
   },
@@ -71,6 +83,7 @@ const RESULT_ROWS = [
     geomean_ms: 20,
     display_geomean_ms: 20,
     query_count: 2,
+    ...TIMING_ELIGIBLE,
     trust_label: "community-submission",
     visibility: "public-curated",
     platform_version: null,
@@ -93,6 +106,7 @@ const RESULT_ROWS = [
     compliance_class: null,
     is_ranking_eligible: true,
     has_plans: false,
+    plans_published: false,
     has_tuning: false,
     bundle_download_url: "",
   },
@@ -109,6 +123,13 @@ const RESULT_ROWS = [
     geomean_ms: 30,
     display_geomean_ms: 30,
     query_count: 22,
+    has_display_timing: true,
+    valid_query_count: 22,
+    missing_query_count: 0,
+    zero_timing_count: 0,
+    display_exclusion_reason: null,
+    comparison_exclusion_reason: null,
+    ranking_exclusion_reason: null,
     trust_label: "maintainer-run",
     visibility: "public-curated",
     platform_version: null,
@@ -131,6 +152,7 @@ const RESULT_ROWS = [
     compliance_class: null,
     is_ranking_eligible: true,
     has_plans: false,
+    plans_published: false,
     has_tuning: true,
     bundle_download_url: "",
   },
@@ -156,6 +178,8 @@ const COHORT_ROWS = [
     cohort_label: "ClickBench SF0.1",
     cohort_href: "/results/clickbench/",
     platform_count: 2,
+    cohort_ranked_count: 2,
+    cohort_ranking_exclusion_reason: null,
     primary_metric: "display_geomean_ms",
     primary_order: "asc",
     platform_id: "duckdb",
@@ -164,6 +188,7 @@ const COHORT_ROWS = [
     short_id: "",
     tuning_mode: "tuned",
     trust_label: "maintainer-run",
+    ...TIMING_ELIGIBLE,
     rank: 1,
     metric_value: 10,
     speedup_vs_best: 1,
@@ -176,6 +201,8 @@ const COHORT_ROWS = [
     cohort_label: "ClickBench SF0.1",
     cohort_href: "/results/clickbench/",
     platform_count: 2,
+    cohort_ranked_count: 2,
+    cohort_ranking_exclusion_reason: null,
     primary_metric: "display_geomean_ms",
     primary_order: "asc",
     platform_id: "sqlite",
@@ -184,6 +211,7 @@ const COHORT_ROWS = [
     short_id: "",
     tuning_mode: "auto",
     trust_label: "community-submission",
+    ...TIMING_ELIGIBLE,
     rank: 2,
     metric_value: 20,
     speedup_vs_best: 0.5,
@@ -196,6 +224,8 @@ const COHORT_ROWS = [
     cohort_label: "TPC-H SF1",
     cohort_href: "/results/tpch/",
     platform_count: 1,
+    cohort_ranked_count: 1,
+    cohort_ranking_exclusion_reason: null,
     primary_metric: "power_score",
     primary_order: "desc",
     platform_id: "duckdb",
@@ -204,6 +234,13 @@ const COHORT_ROWS = [
     short_id: "",
     tuning_mode: "tuned",
     trust_label: "maintainer-run",
+    has_display_timing: true,
+    valid_query_count: 22,
+    missing_query_count: 0,
+    zero_timing_count: 0,
+    display_exclusion_reason: null,
+    comparison_exclusion_reason: null,
+    ranking_exclusion_reason: null,
     rank: 1,
     metric_value: 3000,
     speedup_vs_best: 1,
@@ -229,11 +266,11 @@ beforeEach(() => {
   window.history.replaceState(null, "", "/results/");
   vi.mocked(queryRows).mockImplementation(async (sql: string) => {
     const s = String(sql).replace(/\s+/g, " ").trim();
-    if (s.startsWith("SELECT * FROM bench.results")) return RESULT_ROWS;
+    if (s.includes("FROM bench.results")) return RESULT_ROWS;
     if (s.startsWith("SELECT platform_id, platform, avg_rank, n_cohorts FROM bench.meta_leaderboard")) {
       return META_LEADERBOARD_ROWS;
     }
-    if (s.startsWith("SELECT * FROM bench.cohort_metadata")) return COHORT_ROWS;
+    if (s.includes("FROM bench.cohort_metadata")) return COHORT_ROWS;
     return [];
   });
 });
@@ -242,9 +279,9 @@ describe("Home", () => {
   it("renders the results shell when no meta leaderboard cohorts are available", async () => {
     vi.mocked(queryRows).mockImplementation(async (sql: string) => {
       const s = String(sql).replace(/\s+/g, " ").trim();
-      if (s.startsWith("SELECT * FROM bench.results")) return RESULT_ROWS;
+      if (s.includes("FROM bench.results")) return RESULT_ROWS;
       if (s.startsWith("SELECT platform_id, platform, avg_rank, n_cohorts FROM bench.meta_leaderboard")) return [];
-      if (s.startsWith("SELECT * FROM bench.cohort_metadata")) return [];
+      if (s.includes("FROM bench.cohort_metadata")) return [];
       return [];
     });
 
@@ -270,11 +307,11 @@ describe("Home", () => {
     );
     vi.mocked(queryRows).mockImplementation(async (sql: string) => {
       const s = String(sql).replace(/\s+/g, " ").trim();
-      if (s.startsWith("SELECT * FROM bench.results")) return rows;
+      if (s.includes("FROM bench.results")) return rows;
       if (s.startsWith("SELECT platform_id, platform, avg_rank, n_cohorts FROM bench.meta_leaderboard")) {
         return [];
       }
-      if (s.startsWith("SELECT * FROM bench.cohort_metadata")) return [];
+      if (s.includes("FROM bench.cohort_metadata")) return [];
       return [];
     });
 
@@ -293,14 +330,14 @@ describe("Home", () => {
 
     vi.mocked(queryRows).mockImplementation(async (sql: string) => {
       const s = String(sql).replace(/\s+/g, " ").trim();
-      if (s.startsWith("SELECT * FROM bench.results")) {
+      if (s.includes("FROM bench.results")) {
         resultCalls += 1;
         return resultCalls === 1 ? [] : retryRows.promise;
       }
       if (s.startsWith("SELECT platform_id, platform, avg_rank, n_cohorts FROM bench.meta_leaderboard")) {
         return metaRows.promise;
       }
-      if (s.startsWith("SELECT * FROM bench.cohort_metadata")) {
+      if (s.includes("FROM bench.cohort_metadata")) {
         return cohortRows.promise;
       }
       return [];
@@ -338,14 +375,14 @@ describe("Home", () => {
 
     vi.mocked(queryRows).mockImplementation(async (sql: string) => {
       const s = String(sql).replace(/\s+/g, " ").trim();
-      if (s.startsWith("SELECT * FROM bench.results")) {
+      if (s.includes("FROM bench.results")) {
         resultCalls += 1;
         return [];
       }
       if (s.startsWith("SELECT platform_id, platform, avg_rank, n_cohorts FROM bench.meta_leaderboard")) {
         return META_LEADERBOARD_ROWS;
       }
-      if (s.startsWith("SELECT * FROM bench.cohort_metadata")) {
+      if (s.includes("FROM bench.cohort_metadata")) {
         return COHORT_ROWS;
       }
       return [];
@@ -531,7 +568,7 @@ describe("Home", () => {
 
     const resultCall = vi
       .mocked(queryRows)
-      .mock.calls.find(([sql]) => String(sql).replace(/\s+/g, " ").trim().startsWith("SELECT * FROM bench.results WHERE"));
+      .mock.calls.find(([sql]) => String(sql).replace(/\s+/g, " ").trim().includes("FROM bench.results WHERE"));
     expect(String(resultCall?.[0])).toContain("benchmark IN (?)");
     expect(String(resultCall?.[0])).toContain("scale_factor IN (?)");
     expect(String(resultCall?.[0])).toContain("test_type IN (?)");

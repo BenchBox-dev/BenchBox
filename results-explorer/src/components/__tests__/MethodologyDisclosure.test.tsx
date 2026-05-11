@@ -102,8 +102,8 @@ describe("MethodologyDisclosure", () => {
         { query_id: "Q2", duration_ms: 22, status: "pass", run_type: "measurement", iter: 3, stream: null },
       ],
       display_timings: [
-        { query_id: "Q1", display_ms: 11, sample_count: 3 },
-        { query_id: "Q2", display_ms: 21, sample_count: 3 },
+        { query_id: "Q1", display_ms: 11, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+        { query_id: "Q2", display_ms: 21, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
       ],
     });
 
@@ -126,8 +126,8 @@ describe("MethodologyDisclosure", () => {
         { query_id: "Q2", duration_ms: 22, status: "pass", run_type: null, iter: 3, stream: null },
       ],
       display_timings: [
-        { query_id: "Q1", display_ms: 11, sample_count: 3 },
-        { query_id: "Q2", display_ms: 21, sample_count: 3 },
+        { query_id: "Q1", display_ms: 11, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+        { query_id: "Q2", display_ms: 21, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
       ],
     });
     render(<MethodologyDisclosure detail={detail} />);
