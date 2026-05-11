@@ -44,6 +44,7 @@ import {
   markExplorerPerformance,
   measureExplorerPerformance,
 } from "@/lib/performanceMarks";
+import { formatTimingExclusion } from "@/lib/displayEligibility";
 
 const EMPTY_STRING_ARRAY: string[] = [];
 
@@ -66,7 +67,15 @@ const DEFAULT_COLUMNS = [
 ];
 const TABLE_RENDER_LIMIT = 200;
 const TABLE_RENDER_INCREMENT = 200;
-const COMPARE_METADATA_COLUMNS = ["result_id", "benchmark", "scale_factor", "test_type", "phase", "primary_metric"];
+const COMPARE_METADATA_COLUMNS = [
+  "result_id",
+  "benchmark",
+  "scale_factor",
+  "test_type",
+  "phase",
+  "primary_metric",
+  "comparison_exclusion_reason",
+];
 
 export function Query(_: RoutableProps) {
   useDocumentTitle("Query · BenchBox Results");
@@ -110,11 +119,12 @@ export function Query(_: RoutableProps) {
   // render disabled. The Compare tray below the result count surfaces
   // the active cohort and the launch button.
   const [compareSelectedIds, setCompareSelectedIds] = useState<Set<string>>(new Set());
-  const toggleCompareSelection = (resultId: string) =>
+  const toggleCompareSelection = (row: ResultRow) =>
     setCompareSelectedIds((prev) => {
+      const resultId = String(row.result_id);
       const next = new Set(prev);
       if (next.has(resultId)) next.delete(resultId);
-      else if (next.size < MAX_COMPARE_SELECTIONS) next.add(resultId);
+      else if (next.size < MAX_COMPARE_SELECTIONS && comparisonExclusionReason(row) === undefined) next.add(resultId);
       return next;
     });
   const clearCompareSelection = () => setCompareSelectedIds(new Set());
@@ -599,6 +609,12 @@ export function Query(_: RoutableProps) {
     }
   }
 
+  function comparisonExclusionReason(row: ResultRow): string | undefined {
+    const reason = row.comparison_exclusion_reason;
+    if (typeof reason !== "string" || reason.length === 0) return undefined;
+    return formatTimingExclusion(reason, "Result is not comparable.");
+  }
+
   return (
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <div class="mb-6">
@@ -805,6 +821,7 @@ export function Query(_: RoutableProps) {
                               const id = String(row.result_id);
                               const isSelected = compareSelectedIds.has(id);
                               const reason =
+                                (!isSelected ? comparisonExclusionReason(row) : undefined) ??
                                 lockReason(row) ??
                                 (!isSelected && compareSelectedIds.size >= MAX_COMPARE_SELECTIONS
                                   ? `Up to ${MAX_COMPARE_SELECTIONS} runs can be compared.`
@@ -817,7 +834,7 @@ export function Query(_: RoutableProps) {
                                       checked={isSelected}
                                       disabled={Boolean(reason)}
                                       title={reason}
-                                      onChange={() => toggleCompareSelection(id)}
+                                      onChange={() => toggleCompareSelection(row)}
                                       class="h-4 w-4 rounded border-[var(--bb-data-border-strong)] disabled:cursor-not-allowed disabled:opacity-50"
                                       aria-label={compareSelectionLabel({
                                         platform: row.platform as string | undefined,

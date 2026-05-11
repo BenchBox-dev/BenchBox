@@ -2,7 +2,7 @@ id: results-explorer-rank-and-compare-evidence-gates
 title: "Gate ranking and comparison surfaces on sufficient valid evidence"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
 category: Core Functionality
 
 description: |
@@ -31,7 +31,7 @@ deps:
 work:
 - id: w1
   summary: "Suppress or relabel rank tabs for all-unrankable cohorts"
-  status: pending
+  status: done
   notes: |
     On benchmark detail pages, if the summary reports `total_ranked = 0` or
     equivalent cohort exclusion state, do not present `Ranks` as an authoritative
@@ -42,7 +42,7 @@ work:
 - id: w2
   summary: "Move no-timing benchmark rows into an excluded-runs disclosure"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Public rows with no valid timing data should not appear as normal matrix,
     rank, sparkline, distribution, or compare rows. Keep provenance accessible
@@ -52,7 +52,7 @@ work:
 - id: w3
   summary: "Disable compare selection for non-comparable rows everywhere"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Benchmark pages, platform pages, and Query Workbench must disable or omit
     compare selection controls for rows with `comparison_exclusion_reason`.
@@ -62,7 +62,7 @@ work:
 - id: w4
   summary: "Suppress Compare winner claims when evidence threshold is not met"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Compare must apply the policy threshold from
     `results-explorer-display-contract-policy-gate`. If selected runs do not
@@ -73,7 +73,7 @@ work:
 - id: w5
   summary: "Make compare warnings actionable and locally visible"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     Change static warning count badges into real links or buttons that jump to
     the Comparability Receipt. The guardrail summary should name the first few
@@ -83,7 +83,7 @@ work:
 - id: w6
   summary: "Add rank and compare route-level tests"
   needs: [w1, w2, w3, w4, w5]
-  status: pending
+  status: done
   notes: |
     Add tests for:
       - all-unrankable benchmark cohort;
@@ -113,16 +113,21 @@ approach: |
   route because it exercises every gate.
 
 anti_patterns:
-- "DO NOT make winner copy conditional only on primary metric presence - because query coverage can be too weak even when geomean exists - apply the evidence threshold."
-- "DO NOT leave disabled rows without a reason - because users need to understand whether data is missing, invalid, or merely unrankable - show the exclusion reason."
-- "DO NOT make warning badges visually look clickable unless they are actual links/buttons - because this was one of the observed usability failures - use semantic controls."
+- "DO NOT make winner copy conditional only on primary metric presence - because query coverage can be too weak even when
+  geomean exists - apply the evidence threshold."
+- "DO NOT leave disabled rows without a reason - because users need to understand whether data is missing, invalid, or merely
+  unrankable - show the exclusion reason."
+- "DO NOT make warning badges visually look clickable unless they are actual links/buttons - because this was one of the observed
+  usability failures - use semantic controls."
 
 verification:
 - description: "Benchmark and Compare tests pass"
-  command: "cd results-explorer && npm test -- --run src/pages/__tests__/BenchmarkIndex.test.tsx src/pages/__tests__/Compare.test.tsx src/components/__tests__/ComparabilityReceipt.test.tsx"
+  command: "cd results-explorer && npm test -- --run src/pages/__tests__/BenchmarkIndex.test.tsx src/pages/__tests__/Compare.test.tsx
+    src/components/__tests__/ComparabilityReceipt.test.tsx"
   expected_output: "all targeted tests pass"
 - description: "Browser smoke covers AMPLab rank and compare gates"
-  command: "cd results-explorer && npm run build && cd .. && test -s _project/verification-logs/results-explorer-rank-and-compare-evidence-gates/browser-smoke.md && rg -n \"/results/amplab/|view=ranks|compare|Insufficient comparable query evidence|Excluded runs|PASS|FAIL\" _project/verification-logs/results-explorer-rank-and-compare-evidence-gates/browser-smoke.md"
+  command: "cd results-explorer && npm run build && cd .. && test -s _project/verification-logs/results-explorer-rank-and-compare-evidence-gates/browser-smoke.md
+    && rg -n \"/results/amplab/|view=ranks|compare|Insufficient comparable query evidence|Excluded runs|PASS|FAIL\" _project/verification-logs/results-explorer-rank-and-compare-evidence-gates/browser-smoke.md"
   expected_output: "build exits 0 and browser-smoke.md records rank and compare PASS/FAIL evidence"
 - description: "Frontend typecheck passes"
   command: "cd results-explorer && npm run typecheck"
@@ -159,6 +164,14 @@ success_metrics:
 - "Non-comparable rows cannot be selected for Compare."
 - "Compare suppresses winner claims when query coverage is insufficient."
 - "Warning counts provide a clear path to actual warning details."
+
+implementation_notes:
+- "Checked policy artifact: _project/verification-logs/results-explorer-display-contract-policy-gate/w0.log (policy SHA 66f207ee03182dbff4b3e5bc368d2c9be282a9b5)."
+- "Used AMPLab SF 0.01 power as the explicit route fixture in _project/verification-logs/results-explorer-rank-and-compare-evidence-gates/browser-smoke.md."
+- "Benchmark analysis surfaces now use display-safe rows, while no-timing rows move to an Excluded runs disclosure with reasons and receipt links."
+- "Compare selection is disabled for rows with comparison_exclusion_reason on benchmark pages, platform pages, Query Workbench, and the Compare builder."
+- "Compare decision summaries now render Insufficient comparable query evidence when the shared evidence threshold suppresses winner claims, and warning counts link to the Comparability Receipt."
+- "Verification passed: targeted TODO Vitest suite (60 tests), affected PlatformIndex/Query/compareSummary tests (62 additional tests), npm run build, npm run typecheck, and AMPLab browser smoke."
 
 metadata:
   tags:

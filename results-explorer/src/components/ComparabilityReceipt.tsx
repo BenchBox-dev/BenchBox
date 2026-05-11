@@ -23,7 +23,7 @@ export function ComparabilityReceipt({ results }: ComparabilityReceiptProps) {
   const warningCount = fields.filter((field) => field.status === "diff").length;
 
   return (
-    <section aria-label="Comparability receipt" class="panel-elevated mb-8 p-4">
+    <section id="comparability-receipt" aria-label="Comparability receipt" class="panel-elevated mb-8 p-4">
       <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)]">Comparability Receipt</h2>

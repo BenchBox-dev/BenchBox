@@ -331,6 +331,29 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(fifth.title).toContain("Up to 4 runs");
   });
 
+  it("disables Platform compare selection for non-comparable rows", async () => {
+    vi.mocked(getPlatformIndexRows).mockResolvedValue([
+      makeRow({ result_id: "r-comparable", short_id: "compare1", geomean_ms: 10 }),
+      makeRow({
+        result_id: "r-not-comparable",
+        short_id: "blocked1",
+        geomean_ms: 20,
+        comparison_exclusion_reason: "insufficient_valid_timings",
+      }),
+    ]);
+
+    render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    const blocked = screen.getByTestId("platform-compare-checkbox-r-not-comparable") as HTMLInputElement;
+    expect(blocked.disabled).toBe(true);
+    expect(blocked.title).toContain("Result does not have enough valid query timings");
+
+    fireEvent.click(blocked);
+    expect(screen.queryByRole("link", { name: /Compare 1 selected/ })).toBeNull();
+    expect(screen.getByTestId("platform-compare-guidance").textContent).toContain("Select two or more");
+  });
+
   it("hides the platform filter strip when the cohort has fewer than 25 rows", async () => {
     render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());

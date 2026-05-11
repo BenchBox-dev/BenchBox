@@ -10,6 +10,12 @@ import { facetsToWhereClause, useFacetState, type FacetKey, type FacetState } fr
 import { hasActiveFacets, matchesFacetRow, singleFacetValue } from "@/lib/facetMatching";
 import { buildCompareUrl, compareIdForRow, displayCompareId } from "@/lib/resultLinks";
 import { stringSerde, useUrlState } from "@/lib/useUrlState";
+import {
+  formatCohortExclusion,
+  formatTimingExclusion,
+  isComparable,
+  isTimingDisplayable,
+} from "@/lib/displayEligibility";
 import { BenchmarkMatrixSkeleton } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { Breadcrumb } from "@/components/Breadcrumb";
@@ -114,6 +120,10 @@ function benchmarkCompareGuidanceMessage(
     return `1 result selected in ${cohort}. Select one more result from this cohort to enable Compare.`;
   }
   return `${selectedCount} results selected in ${cohort}. The sticky tray opens Compare with the same benchmark, scale, and phase contract.`;
+}
+
+function isResultTimingDisplayable(row: ResultRow): boolean {
+  return row.display_exclusion_reason === null;
 }
 
 export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
@@ -360,14 +370,25 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
         }),
       }
     : null;
+  const analysisSummary: BenchmarkSummary | null = filteredSummary
+    ? {
+        ...filteredSummary,
+        platforms: filteredSummary.platforms.filter(isTimingDisplayable),
+      }
+    : null;
+  const excludedRows = filteredSummary?.platforms.filter((row) => !isTimingDisplayable(row)) ?? [];
+  const rankGateReason = filteredSummary ? formatCohortExclusion(filteredSummary) : null;
   const historicalEntries = benchmarkResults.filter((result) => {
     if (String(result.scale_factor) !== effectiveSf) return false;
     if ((result.test_type ?? "power") !== effectivePhase) return false;
+    if (!isResultTimingDisplayable(result)) return false;
     return matchesFacetRow(result, facets, { keys: BENCHMARK_ROW_FACET_KEYS });
   });
 
   const selectedCompareRowsById = new Map(
-    (summaryWithResultMetadata?.platforms ?? []).map((row) => [compareIdForRow(row), row]),
+    (analysisSummary?.platforms ?? [])
+      .filter(isComparable)
+      .map((row) => [compareIdForRow(row), row]),
   );
   const selectedCompareRows = [...selectedIds]
     .map((id) => selectedCompareRowsById.get(id))
@@ -375,13 +396,14 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
 
   // Build the Compare URL from selected compact IDs when available.
   const compareUrl =
-    selectedIds.size >= 2
-      ? buildCompareUrl([...selectedIds])
+    selectedCompareRows.length >= 2
+      ? buildCompareUrl(selectedCompareRows.map((row) => compareIdForRow(row)))
       : null;
   const benchmarkOptions = uniqueBenchmarkOptions();
   const hasCurrentBenchmarkOption = benchmarkOptions.some((option) => option.value === benchmark);
   const contextNote = benchmarkContextNote(benchmark);
-  const compareGuidance = benchmarkCompareGuidanceMessage(selectedIds.size, title, effectiveSf, effectivePhase);
+  const selectedComparableCount = selectedCompareRows.length;
+  const compareGuidance = benchmarkCompareGuidanceMessage(selectedComparableCount, title, effectiveSf, effectivePhase);
 
   return (
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -539,7 +561,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
             onChange={(value) => setViewMode(value)}
             options={[
               { value: "matrix", label: "Matrix" },
-              { value: "ranks", label: "Ranks" },
+              { value: "ranks", label: rankGateReason ? "Rank Evidence" : "Ranks" },
               { value: "list", label: "List" },
             ]}
           />
@@ -617,7 +639,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
             </div>
           ) : (
             <QueryHeatmap
-              summary={filteredSummary}
+              summary={analysisSummary ?? filteredSummary}
               selectedIds={selectedIds}
               onSelectionChange={setSelectedIds}
               highContrast={highContrast}
@@ -641,9 +663,16 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
                 No benchmark data available for {humanizeBenchmark(benchmark)} SF{effectiveSf} phase {effectivePhase}.
               </p>
             </div>
+          ) : rankGateReason ? (
+            <RankGateNotice
+              reason={rankGateReason}
+              benchmark={title}
+              scaleFactor={effectiveSf}
+              phase={effectivePhase}
+            />
           ) : (
             <div class="card">
-              <RankTable summary={filteredSummary} />
+              <RankTable summary={analysisSummary ?? filteredSummary} />
             </div>
           )}
         </>
@@ -654,12 +683,14 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
         <ListTable benchmark={benchmark} results={results} scaleFactor={effectiveSf} facets={facets} />
       )}
 
-      {filteredSummary && viewMode !== "list" && (
+      {viewMode !== "list" && <ExcludedRunsDisclosure rows={excludedRows} />}
+
+      {analysisSummary && analysisSummary.platforms.length > 0 && viewMode !== "list" && (
         <div class="mt-8">
           <ChartPanel
             context={{
               kind: "summary",
-              summary: filteredSummary,
+              summary: analysisSummary,
               historical: historicalEntries,
             }}
             excludeChartIds={viewMode === "matrix" ? ["query_heatmap"] : undefined}
@@ -673,7 +704,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
           <div class="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div class="min-w-0 flex-1">
               <div class="text-sm text-[var(--bb-data-fg-primary)]">
-                <strong>{selectedIds.size}</strong> platforms selected for compare
+                <strong>{selectedComparableCount}</strong> platforms selected for compare
               </div>
               <div
                 class="mt-2 flex max-h-32 flex-wrap gap-2 overflow-y-auto pr-1"
@@ -713,13 +744,81 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
                 Clear
               </button>
               <a href={compareUrl} class="btn btn-primary text-sm no-underline">
-                Compare {selectedIds.size} selected →
+                Compare {selectedComparableCount} selected →
               </a>
             </div>
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+function RankGateNotice({
+  reason,
+  benchmark,
+  scaleFactor,
+  phase,
+}: {
+  reason: string;
+  benchmark: string;
+  scaleFactor: string;
+  phase: string;
+}) {
+  return (
+    <section
+      class="rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-5 text-sm shadow-sm"
+      data-testid="rank-gate-notice"
+      aria-label="Rank gate"
+    >
+      <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)]">Ranks are unavailable</h2>
+      <p class="mt-2 text-[var(--bb-data-fg-muted)]">
+        {benchmark} SF {scaleFactor} {phase} is not published as a leaderboard because {reason}
+      </p>
+      <p class="mt-2 text-xs text-[var(--bb-data-fg-subtle)]">
+        Timing evidence and receipts remain available, but BenchBox will not rank this cohort.
+      </p>
+    </section>
+  );
+}
+
+function ExcludedRunsDisclosure({ rows }: { rows: PlatformRow[] }) {
+  if (rows.length === 0) return null;
+  return (
+    <details
+      class="mt-4 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm shadow-sm"
+      data-testid="excluded-runs"
+    >
+      <summary class="cursor-pointer font-medium text-[var(--bb-data-fg-primary)]">
+        Excluded runs ({rows.length})
+      </summary>
+      <div class="mt-3 overflow-x-auto">
+        <table class="min-w-full divide-y divide-[var(--bb-data-border)]">
+          <thead class="bg-[var(--bb-surface-data-muted)]">
+            <tr>
+              <th class="table-th text-left">Platform</th>
+              <th class="table-th text-left">Reason</th>
+              <th class="table-th text-left">Receipt</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-[var(--bb-data-border)]">
+            {rows.map((row) => (
+              <tr key={row.result_id} data-testid={`excluded-run-${row.result_id}`}>
+                <td class="table-td font-medium text-[var(--bb-data-fg-primary)]">{row.platform}</td>
+                <td class="table-td text-[var(--bb-data-fg-muted)]">
+                  {formatTimingExclusion(row.display_exclusion_reason, "Display timing is unavailable.")}
+                </td>
+                <td class="table-td">
+                  <a href={`/results/r/${row.result_id}#run-receipt`} class="text-xs font-medium no-underline">
+                    Receipt →
+                  </a>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </details>
   );
 }
 

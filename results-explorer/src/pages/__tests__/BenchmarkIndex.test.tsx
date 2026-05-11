@@ -74,6 +74,16 @@ const TIMING_ELIGIBLE = {
   ranking_exclusion_reason: null,
 };
 
+const NO_TIMING_INELIGIBLE = {
+  has_display_timing: false,
+  valid_query_count: 0,
+  missing_query_count: 2,
+  zero_timing_count: 0,
+  display_exclusion_reason: "no_valid_display_timing",
+  comparison_exclusion_reason: "insufficient_valid_timings",
+  ranking_exclusion_reason: "insufficient_valid_timings",
+};
+
 const TIMING_CELL_ELIGIBLE = {
   is_valid_display_timing: true,
   timing_exclusion_reason: null,
@@ -335,13 +345,17 @@ const SUMMARY: BenchmarkSummary = {
 
 type QueryRowsImpl = (sql: string, params?: unknown[]) => Promise<unknown[]>;
 
-function defaultImpl(rows: typeof RESULT_ROWS, rankings: typeof RANKING_ROWS, cells: typeof CELL_ROWS): QueryRowsImpl {
+function defaultImpl(
+  rows: readonly Record<string, unknown>[],
+  rankings: readonly Record<string, unknown>[],
+  cells: readonly Record<string, unknown>[],
+): QueryRowsImpl {
   return async (sql: string) => {
     const s = String(sql).replace(/\s+/g, " ").trim();
-    if (s.includes("FROM bench.results")) return rows;
-    if (s.includes("FROM bench.benchmark_rankings")) return rankings;
+    if (s.includes("FROM bench.results")) return [...rows];
+    if (s.includes("FROM bench.benchmark_rankings")) return [...rankings];
     if (s.startsWith("SELECT benchmark, scale_factor, phase, result_id, platform_id, query_id, display_ms")) {
-      return cells;
+      return [...cells];
     }
     if (s.startsWith("SELECT result_id, phase, duration_s FROM bench.result_phase_durations")) return [];
     return [];
@@ -359,7 +373,7 @@ beforeEach(() => {
 function getRenderedResultOrder(container: ParentNode): string[] {
   return Array.from(container.querySelectorAll("tbody tr[data-testid]")).map(
     (row) => row.getAttribute("data-testid") ?? "",
-  );
+  ).filter((id) => !id.startsWith("excluded-run-"));
 }
 
 // ---------------------------------------------------------------------------
@@ -498,6 +512,94 @@ describe("BenchmarkIndex", () => {
 
     const compareLink = screen.getByRole("link", { name: /Compare 2 selected/ }) as HTMLAnchorElement;
     expect(compareLink.getAttribute("href")).toBe("/results/compare?ids=aaaaaaaa,bbbbbbbb");
+  });
+
+  it("excludes no-timing rows from analysis and keeps receipt provenance in Excluded runs", async () => {
+    const noTimingResult = {
+      ...RESULT_ROWS[0]!,
+      result_id: "r3",
+      platform: "NoTimingDB",
+      platform_id: "notimingdb",
+      power_score: null,
+      geomean_ms: null,
+      display_geomean_ms: null,
+      query_count: 0,
+      ...NO_TIMING_INELIGIBLE,
+    };
+    const noTimingRanking = {
+      ...RANKING_ROWS[0]!,
+      result_id: "r3",
+      short_id: "cccccccc",
+      platform: "NoTimingDB",
+      platform_id: "notimingdb",
+      power_score: null,
+      display_geomean_ms: null,
+      sample_geomean_ms: null,
+      is_ranking_eligible: false,
+      rank: null,
+      ...NO_TIMING_INELIGIBLE,
+    };
+    vi.mocked(queryRows).mockImplementation(
+      defaultImpl([...RESULT_ROWS, noTimingResult], [...RANKING_ROWS, noTimingRanking], CELL_ROWS),
+    );
+
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => expect(screen.getByRole("button", { name: /^Q1/ })).toBeTruthy());
+
+    expect(getRenderedResultOrder(container)).toEqual(["r1", "r2"]);
+
+    const excluded = screen.getByTestId("excluded-runs");
+    expect(excluded.textContent).toContain("Excluded runs (1)");
+    expect(within(excluded).getByTestId("excluded-run-r3")).toHaveTextContent("NoTimingDB");
+    expect(within(excluded).getByTestId("excluded-run-r3")).toHaveTextContent("No valid display timing is available");
+    expect(within(excluded).getByRole("link", { name: "Receipt →" })).toHaveAttribute(
+      "href",
+      "/results/r/r3#run-receipt",
+    );
+  });
+
+  it("preserves direct rank URLs but gates all-unrankable cohorts", async () => {
+    window.history.replaceState(null, "", "/results/tpch/?view=ranks");
+    const unrankableRows = RANKING_ROWS.map((row) => ({
+      ...row,
+      is_ranking_eligible: false,
+      rank: null,
+      ranking_exclusion_reason: "trust_not_rankable",
+      cohort_ranked_count: 0,
+      cohort_ranking_exclusion_reason: "no_rankable_results",
+    }));
+    vi.mocked(queryRows).mockImplementation(defaultImpl(RESULT_ROWS, unrankableRows, CELL_ROWS));
+
+    render(<BenchmarkIndex benchmark="tpch" />);
+
+    await waitFor(() => expect(screen.getByTestId("rank-gate-notice")).toBeTruthy());
+    expect(screen.getByRole("radio", { name: "Rank Evidence" })).toBeTruthy();
+    expect(screen.getByTestId("rank-gate-notice").textContent).toContain("Ranks are unavailable");
+    expect(screen.getByTestId("rank-gate-notice").textContent).toContain("No rankable results are available");
+    expect(new URL(window.location.href).searchParams.get("view")).toBe("ranks");
+    expect(screen.queryByRole("table", { name: /Rank/i })).toBeNull();
+  });
+
+  it("disables compare selection for benchmark rows excluded from comparison", async () => {
+    const rows = RANKING_ROWS.map((row) =>
+      row.result_id === "r2"
+        ? {
+            ...row,
+            comparison_exclusion_reason: "insufficient_valid_timings",
+          }
+        : row,
+    );
+    vi.mocked(queryRows).mockImplementation(defaultImpl(RESULT_ROWS, rows, CELL_ROWS));
+
+    render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => expect(screen.getAllByText("SQLite").length).toBeGreaterThan(0));
+
+    const sqliteCheckboxes = screen.getAllByLabelText(/Select SQLite/) as HTMLInputElement[];
+    expect(sqliteCheckboxes.length).toBeGreaterThan(0);
+    for (const sqliteCheckbox of sqliteCheckboxes) {
+      expect(sqliteCheckbox.disabled).toBe(true);
+      expect(sqliteCheckbox.title).toContain("Result does not have enough valid query timings");
+    }
   });
 
   it("restores benchmark URL facets without letting cohort facets block option recovery", async () => {

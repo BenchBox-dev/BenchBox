@@ -13,6 +13,7 @@ import {
   compareSelectionLabel,
 } from "@/lib/compareCohort";
 import { buildCompareUrl, compareIdForRow, displayCompareId, MAX_COMPARE_SELECTIONS } from "@/lib/resultLinks";
+import { formatTimingExclusion } from "@/lib/displayEligibility";
 import { humanizeBenchmark, fmtScore, fmtGeomean, errMsg } from "@/utils";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
@@ -323,6 +324,8 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   }
 
   function toggleSelect(resultId: string) {
+    const row = rowsByResultId.get(resultId);
+    if (!row || (!selected.has(resultId) && comparisonExclusionReason(row))) return;
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(resultId)) {
@@ -347,6 +350,11 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   function cohortLockReason(row: PlatformIndexRowRow): string | undefined {
     if (selected.has(row.result_id)) return undefined;
     return compareCohortLockReason(row, cohortLockSignature);
+  }
+
+  function comparisonExclusionReason(row: PlatformIndexRowRow): string | undefined {
+    if (selected.has(row.result_id) || row.comparison_exclusion_reason === null) return undefined;
+    return formatTimingExclusion(row.comparison_exclusion_reason, "Result is not comparable.");
   }
 
   return (
@@ -673,6 +681,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                   checked={selected.has(r.result_id)}
                   onToggle={() => toggleSelect(r.result_id)}
                   disabledReason={
+                    comparisonExclusionReason(r) ??
                     cohortLockReason(r) ??
                     (!selected.has(r.result_id) && selected.size >= MAX_COMPARE_SELECTIONS
                       ? `Up to ${MAX_COMPARE_SELECTIONS} runs can be compared.`

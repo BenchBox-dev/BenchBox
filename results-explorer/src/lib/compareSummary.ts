@@ -150,6 +150,9 @@ function buildHeadline(
 ): string {
   if (options.suppressWinnerClaims) {
     const reason = options.suppressionReason ?? "selected runs are not from the same comparable cohort";
+    if (isQueryEvidenceSuppressionReason(reason)) {
+      return `Insufficient comparable query evidence: ${reason}. Winner language is suppressed; raw query evidence remains available.`;
+    }
     return `Not directly comparable: ${reason}. Winner language is suppressed; raw query evidence remains available.`;
   }
   if (!winner) return "No winner claim: selected results are missing the primary metric.";
@@ -162,6 +165,11 @@ function buildHeadline(
     return `${winnerLabel} leads by ${formatRatio(comparisonRatio)} on power score.`;
   }
   return `${winnerLabel} is ${formatRatio(comparisonRatio)} faster by geomean query time.`;
+}
+
+function isQueryEvidenceSuppressionReason(reason: string): boolean {
+  const normalized = reason.toLowerCase();
+  return normalized.includes("query") || normalized.includes("timing") || normalized.includes("coverage");
 }
 
 function buildWinnerQueryRecord(results: DetailResult[], winnerResultId: string | null): WinnerQueryRecord {

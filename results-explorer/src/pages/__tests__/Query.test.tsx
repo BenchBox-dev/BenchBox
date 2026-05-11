@@ -24,6 +24,7 @@ const BASE_SCHEMA_COLUMNS = [
   { name: "tuning_mode", type: "VARCHAR" },
   { name: "test_type", type: "VARCHAR" },
   { name: "primary_metric", type: "VARCHAR" },
+  { name: "comparison_exclusion_reason", type: "VARCHAR" },
   { name: "validation_status", type: "VARCHAR" },
   { name: "cost_usd", type: "DOUBLE" },
   { name: "normalized_cost_usd", type: "DOUBLE" },
@@ -50,6 +51,7 @@ const BASE_ROWS = [
     trust_label: "maintainer-run",
     test_type: "power",
     primary_metric: "display_geomean_ms",
+    comparison_exclusion_reason: null,
     cost_status: "not_applicable_local",
     deployment_class: "local",
     cloud_provider: null,
@@ -67,13 +69,14 @@ const BASE_ROWS = [
     trust_label: "community-submission",
     test_type: "power",
     primary_metric: "display_geomean_ms",
+    comparison_exclusion_reason: null,
     cost_status: "normalized",
     deployment_class: "cloud",
     cloud_provider: "aws",
     instance_or_warehouse: "MEDIUM",
   },
 ];
-let resultRows = BASE_ROWS;
+let resultRows: Record<string, unknown>[] = BASE_ROWS;
 
 function normalizeSql(sql: string): string {
   return sql.replace(/\s+/g, " ").trim();
@@ -277,6 +280,27 @@ describe("Query", () => {
     expect(incompatible.disabled).toBe(true);
     expect(incompatible.title).toContain("phase");
     expect(incompatible.title).toContain("primary metric");
+  });
+
+  it("disables Query Workbench compare selection for non-comparable rows", async () => {
+    resultRows = [
+      BASE_ROWS[0]!,
+      {
+        ...BASE_ROWS[1]!,
+        comparison_exclusion_reason: "insufficient_valid_timings",
+      },
+    ];
+
+    render(<Query />);
+    await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
+
+    const blocked = screen.getByTestId("query-compare-checkbox-r2") as HTMLInputElement;
+    expect(blocked.disabled).toBe(true);
+    expect(blocked.title).toContain("Result does not have enough valid query timings");
+
+    fireEvent.click(blocked);
+    expect(screen.getByTestId("query-compare-tray").textContent).toContain("Select two or more rows");
+    expect(screen.getByTestId("query-compare-launch-disabled")).toBeTruthy();
   });
 
   it("query workbench hides incompatible rows by default and surfaces the hidden count", async () => {
