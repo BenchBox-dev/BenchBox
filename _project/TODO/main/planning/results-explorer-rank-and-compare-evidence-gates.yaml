@@ -1,0 +1,180 @@
+id: results-explorer-rank-and-compare-evidence-gates
+title: "Gate ranking and comparison surfaces on sufficient valid evidence"
+worktree: main
+priority: High
+status: Not Started
+category: Core Functionality
+
+description: |
+  Benchmark rank tabs and Compare winner claims currently appear even when the
+  underlying cohort is not rankable or the selected runs have too little
+  comparable query evidence. The AMPLab SF0.01 power example shows both issues:
+  every row is unrankable, several rows have no timings, and Compare makes a
+  winner claim from only one comparable query.
+
+  This TODO applies the shared eligibility contract to user-facing benchmark
+  and Compare workflows. It should land after frontend eligibility
+  normalization so page behavior depends on one shared helper.
+
+context_sections:
+  evidence_binding: |
+    This TODO is pinned to the policy evidence captured by
+    `results-explorer-display-contract-policy-gate` w0 and to the frontend
+    helper behavior from `results-explorer-frontend-eligibility-normalization`.
+    Before implementation, record the policy artifact path and checked SHA in
+    implementation notes, then use AMPLab as the explicit route fixture.
+
+deps:
+  needs:
+  - results-explorer-frontend-eligibility-normalization
+
+work:
+- id: w1
+  summary: "Suppress or relabel rank tabs for all-unrankable cohorts"
+  status: pending
+  notes: |
+    On benchmark detail pages, if the summary reports `total_ranked = 0` or
+    equivalent cohort exclusion state, do not present `Ranks` as an authoritative
+    leaderboard. Either hide the tab or relabel it as a non-leaderboard timing
+    view with explicit copy. Direct navigation to a rank view must show the same
+    explanation, not an empty or misleading table.
+
+- id: w2
+  summary: "Move no-timing benchmark rows into an excluded-runs disclosure"
+  needs: [w1]
+  status: pending
+  notes: |
+    Public rows with no valid timing data should not appear as normal matrix,
+    rank, sparkline, distribution, or compare rows. Keep provenance accessible
+    in a disclosure titled like "Excluded runs" with per-row reasons and receipt
+    links. The default analysis view should contain only display-safe rows.
+
+- id: w3
+  summary: "Disable compare selection for non-comparable rows everywhere"
+  needs: [w2]
+  status: pending
+  notes: |
+    Benchmark pages, platform pages, and Query Workbench must disable or omit
+    compare selection controls for rows with `comparison_exclusion_reason`.
+    The user should see why the row cannot be compared, and keyboard/screen
+    reader users must not be able to select it accidentally.
+
+- id: w4
+  summary: "Suppress Compare winner claims when evidence threshold is not met"
+  needs: [w3]
+  status: pending
+  notes: |
+    Compare must apply the policy threshold from
+    `results-explorer-display-contract-policy-gate`. If selected runs do not
+    meet the comparable-query threshold, show a decision summary state such as
+    "Insufficient comparable query evidence" and move raw differences into the
+    query diff table without winner language.
+
+- id: w5
+  summary: "Make compare warnings actionable and locally visible"
+  needs: [w4]
+  status: pending
+  notes: |
+    Change static warning count badges into real links or buttons that jump to
+    the Comparability Receipt. The guardrail summary should name the first few
+    warning classes, for example date window, platform version, cost, or query
+    coverage, so the user knows what to inspect.
+
+- id: w6
+  summary: "Add rank and compare route-level tests"
+  needs: [w1, w2, w3, w4, w5]
+  status: pending
+  notes: |
+    Add tests for:
+      - all-unrankable benchmark cohort;
+      - no-timing rows excluded from default analysis view;
+      - disabled compare selection for excluded rows;
+      - Compare winner suppression at 1/8 comparable queries;
+      - warning-count link scrolls or anchors to the receipt;
+      - direct URL navigation to rank/compare states preserves the gate.
+
+prior_art:
+- "results-explorer/src/pages/BenchmarkIndex.tsx:view mode and compare selection — extend with eligibility gates."
+- "results-explorer/src/pages/Compare.tsx:CompareGuardrailSummary and baseline controls — extend with actionable warnings."
+- "results-explorer/src/components/ComparabilityReceipt.tsx:warning details — link to this from summary badges."
+- "results-explorer/src/components/QueryHeatmap.tsx:selection checkboxes — disable based on comparability."
+- "results-explorer/src/lib/compareSummary.ts:winner query record — use policy threshold before headline generation."
+
+must_preserve:
+- "Comparable rows still support the existing end-to-end Compare flow."
+- "Receipt links remain available for excluded rows."
+- "Compare URLs with valid IDs remain shareable."
+- "Raw query evidence remains visible even when winner claims are suppressed."
+
+approach: |
+  Use the shared frontend eligibility helper rather than checking individual
+  fields in each page. Start with benchmark route gating, then compare
+  selection, then Compare summary language. Treat AMPLab as the main regression
+  route because it exercises every gate.
+
+anti_patterns:
+- "DO NOT make winner copy conditional only on primary metric presence - because query coverage can be too weak even when geomean exists - apply the evidence threshold."
+- "DO NOT leave disabled rows without a reason - because users need to understand whether data is missing, invalid, or merely unrankable - show the exclusion reason."
+- "DO NOT make warning badges visually look clickable unless they are actual links/buttons - because this was one of the observed usability failures - use semantic controls."
+
+verification:
+- description: "Benchmark and Compare tests pass"
+  command: "cd results-explorer && npm test -- --run src/pages/__tests__/BenchmarkIndex.test.tsx src/pages/__tests__/Compare.test.tsx src/components/__tests__/ComparabilityReceipt.test.tsx"
+  expected_output: "all targeted tests pass"
+- description: "Browser smoke covers AMPLab rank and compare gates"
+  command: "cd results-explorer && npm run build && cd .. && test -s _project/verification-logs/results-explorer-rank-and-compare-evidence-gates/browser-smoke.md && rg -n \"/results/amplab/|view=ranks|compare|Insufficient comparable query evidence|Excluded runs|PASS|FAIL\" _project/verification-logs/results-explorer-rank-and-compare-evidence-gates/browser-smoke.md"
+  expected_output: "build exits 0 and browser-smoke.md records rank and compare PASS/FAIL evidence"
+- description: "Frontend typecheck passes"
+  command: "cd results-explorer && npm run typecheck"
+  expected_output: "exit 0"
+
+scope_limit:
+  only_modify:
+  - "results-explorer/src/pages/BenchmarkIndex.tsx"
+  - "results-explorer/src/pages/Compare.tsx"
+  - "results-explorer/src/pages/Query.tsx"
+  - "results-explorer/src/pages/PlatformIndex.tsx"
+  - "results-explorer/src/components/ComparabilityReceipt.tsx"
+  - "results-explorer/src/components/CompareSummary.tsx"
+  - "results-explorer/src/components/QueryHeatmap.tsx"
+  - "results-explorer/src/lib/compareSummary.ts"
+  - "results-explorer/src/lib/displayEligibility.ts"
+  - "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
+  - "results-explorer/src/pages/__tests__/Compare.test.tsx"
+  - "results-explorer/src/pages/__tests__/PlatformIndex.test.tsx"
+  - "results-explorer/src/pages/__tests__/Query.test.tsx"
+  - "results-explorer/src/components/__tests__/ComparabilityReceipt.test.tsx"
+  - "results-explorer/src/components/__tests__/CompareSummary.test.tsx"
+  - "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
+  - "results-explorer/src/lib/__tests__/compareSummary.test.ts"
+  - "_project/TODO/main/planning/results-explorer-rank-and-compare-evidence-gates.yaml"
+  - "_project/verification-logs/results-explorer-rank-and-compare-evidence-gates/"
+  do_not_modify:
+  - "benchbox/core/explorer_pipeline/"
+  - "docs/development/browser-duckdb-schema.sql"
+
+success_metrics:
+- "All-unrankable cohorts no longer show an authoritative Ranks leaderboard."
+- "No-timing rows are excluded from default analysis surfaces but remain auditable."
+- "Non-comparable rows cannot be selected for Compare."
+- "Compare suppresses winner claims when query coverage is insufficient."
+- "Warning counts provide a clear path to actual warning details."
+
+metadata:
+  tags:
+  - results-explorer
+  - compare
+  - ranking
+  - evidence-gate
+  estimated_effort: "Medium (2-3 days)"
+  created_date: "2026-05-11"
+
+impact:
+  business_value: |
+    Prevents unsupported benchmark winner and rank claims from appearing on the
+    public site.
+  user_impact: |
+    Analysts can distinguish valid comparisons from provenance-only submitted
+    rows.
+  technical_debt: |
+    Centralizes rank and compare gates around shared eligibility state.

@@ -1,0 +1,196 @@
+id: results-explorer-display-contract-policy-gate
+title: "Define Results Explorer display, ranking, and comparison eligibility contract"
+worktree: main
+priority: Critical
+status: Not Started
+category: Core Functionality
+
+description: |
+  The 2026-05-10 Results Explorer follow-up review found that the frontend
+  renders rows that are public but not meaningfully rankable or comparable.
+  AMPLab cohorts show the failure mode clearly: some rows have no non-null
+  query timings, some rows have `display_ms = 0.0`, every AMPLab row is
+  `is_ranking_eligible=false`, and Compare still emits winner language from
+  a single comparable query.
+
+  This TODO is the decision gate for the whole remediation sequence. It must
+  define the contract before implementation begins: what "published",
+  "displayable", "has timing data", "rankable", "comparable", "passed",
+  "No run", and "sub-millisecond" mean in the Results Explorer. Later TODOs
+  must consume this contract rather than inventing per-component exceptions.
+
+context_sections:
+  evidence_source: |
+    Observed against local `develop` after rebase on 2026-05-10:
+    - `/results/`
+    - `/results/amplab/`
+    - `/results/compare?ids=61ba4644,e16ac6db,07650b37`
+    Snapshot inspected: `results-explorer/public/data/results.duckdb`.
+  observed_failures: |
+    - Home benchmark filters imply corpus-wide scope but are derived from
+      `meta_leaderboard.cohorts`.
+    - AMPLab no-timing rows appear in matrix/rank/chart/compare surfaces.
+    - Compare claims a 1.59x winner while 7 of 8 queries are excluded.
+    - `display_ms = 0.0` is shown as `<1 ms`, `0 ms`, missing, or excluded
+      depending on component.
+    - Static status badges look actionable but do not navigate to details.
+
+work:
+- id: w0
+  summary: "Re-capture the current broken-state SQL and browser evidence"
+  status: pending
+  notes: |
+    Capture the current evidence before any code changes. Store command output
+    under `_project/verification-logs/results-explorer-display-contract-policy-gate/w0.log`.
+    Include:
+      - `git rev-parse HEAD`;
+      - SQL counts for no-geomean rows by benchmark/scale/phase;
+      - AMPLab SF0.01 power rows from `benchmark_rankings`;
+      - per-result non-null timing counts from `benchmark_matrix_cells`;
+      - zero-valued rows from `query_display_timings`;
+      - browser observations for `/results/`, `/results/amplab/`, and the
+        AMPLab Compare URL.
+    The log must include the checked SHA plus route-level PASS/FAIL notes.
+    If screenshots or browser traces are captured separately, store them under
+    the same verification-log directory and reference their paths from `w0.log`.
+
+- id: w1
+  summary: "Write the Results Explorer eligibility vocabulary and state table"
+  needs: [w0]
+  status: pending
+  notes: |
+    Create a short decision artifact under `_project/analysis/` that defines
+    each state and its source of truth:
+      - publishable;
+      - displayable;
+      - has_display_timing;
+      - valid_query_count;
+      - rankable;
+      - comparable;
+      - validation passed;
+      - trusted / trust tier;
+      - missing run;
+      - missing timing;
+      - sub-millisecond timing.
+    The table must explicitly say which states may be inferred by the frontend
+    and which must be emitted by the pipeline/read model.
+
+- id: w2
+  summary: "Make a decision on zero and sub-millisecond timing semantics"
+  needs: [w1]
+  status: pending
+  notes: |
+    Decide whether `display_ms = 0.0` means invalid data, measured
+    sub-millisecond data, or a legacy rounding artifact. Document the rule and
+    the migration behavior. The safe default is: positive fractional timings
+    may display as `<1 ms`; exact zero timings are invalid for ranking and
+    comparison until the pipeline can prove they were measured positive values.
+
+- id: w3
+  summary: "Define evidence thresholds for Compare winner language"
+  needs: [w1, w2]
+  status: pending
+  notes: |
+    Define the minimum comparable query coverage required before Compare may
+    emit winner language such as "X is faster". The rule must include both an
+    absolute floor and a percentage floor, for example: at least 2 comparable
+    queries and at least 50% of the cohort query set. If the threshold is not
+    met, Compare must show insufficient-evidence copy and suppress winner
+    claims.
+
+- id: w4
+  summary: "Define page-level behavior for excluded rows and unrankable cohorts"
+  needs: [w1, w2, w3]
+  status: pending
+  notes: |
+    Specify how each page treats rows that are public but not display-safe:
+      - Home meta leaderboard;
+      - benchmark matrix/rank/list pages;
+      - chart panels;
+      - platform detail tables;
+      - Compare selection;
+      - Query Workbench result rows.
+    The rule must distinguish hiding from default-visible exclusion disclosure.
+    Provenance should remain accessible, but no-timing rows must not look like
+    valid ranked/comparable evidence.
+
+- id: w5
+  summary: "Review the policy with the current TODO sequence before implementation"
+  needs: [w4]
+  status: pending
+  notes: |
+    Before starting dependent implementation TODOs, update their guardrails if
+    the decisions in w1-w4 change the proposed scope. This is the decision gate:
+    do not implement spot fixes in `results-explorer/src/` until this policy
+    item is complete.
+
+prior_art:
+- "benchbox/core/explorer_pipeline/transformer.py:_query_display_ms — reuse as the canonical per-query display reduction entry point."
+- "benchbox/core/explorer_pipeline/ranking.py:rank_platforms — extend for rankability semantics rather than ranking in the frontend."
+- "benchbox/core/results/status.py:validation status helpers — reuse for validation/pass semantics but do not overload them as rankability."
+- "docs/development/browser-duckdb-schema.sql:read-model schema — extend as the contract surface consumed by the frontend."
+- "_project/planning/visible_metrics.yaml:visible metric catalog — extend with eligibility and exclusion fields."
+
+must_preserve:
+- "Public result provenance remains accessible from receipt/detail pages."
+- "Validation status continues to mean validation status only; it must not be redefined as ranking/comparison eligibility."
+- "No timing values are fabricated to make charts or rankings look cleaner."
+- "Existing result detail URLs and receipt anchors remain stable."
+
+approach: |
+  Treat this item as architecture and policy. Gather durable evidence first,
+  then decide the vocabulary and thresholds. Use the decision artifact as the
+  contract for all dependent implementation TODOs. Prefer a stricter
+  suppress-and-explain policy where evidence is ambiguous; users can inspect
+  provenance, but the product must not make unsupported winner or rank claims.
+
+anti_patterns:
+- "DO NOT fix individual screenshots before defining eligibility semantics - because each component currently applies a different local rule - define the shared contract first."
+- "DO NOT treat `validation_status=passed` as proof of timing quality - because AMPLab has passed rows with no display timings - add separate timing/ranking/comparison states."
+- "DO NOT replace zero timings with arbitrary epsilon values - because that corrupts benchmark metrics - preserve true values and mark invalid/excluded where needed."
+- "DO NOT hide excluded rows without a provenance path - because users still need to audit submitted results - quarantine them with reasons instead."
+
+verification:
+- description: "Evidence log captures current broken state and browser routes"
+  command: "test -s _project/verification-logs/results-explorer-display-contract-policy-gate/w0.log && rg -n \"HEAD|/results/|/results/amplab/|/results/compare\\?ids=61ba4644,e16ac6db,07650b37|no_geomean|eligible|PASS|FAIL\" _project/verification-logs/results-explorer-display-contract-policy-gate/w0.log"
+  expected_output: "w0.log includes checked SHA, SQL counts, and route-level browser PASS/FAIL notes"
+- description: "TODO graph validates after creating this policy gate"
+  command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate"
+  expected_output: "validation passes"
+
+scope_limit:
+  only_modify:
+  - "_project/TODO/main/planning/results-explorer-display-contract-policy-gate.yaml"
+  - "_project/analysis/"
+  - "_project/verification-logs/results-explorer-display-contract-policy-gate/"
+  do_not_modify:
+  - "results-explorer/src/"
+  - "benchbox/"
+  - "results-explorer/public/data/results.duckdb"
+
+success_metrics:
+- "A reviewer can tell exactly when a result is public, displayable, rankable, comparable, or excluded."
+- "Zero/sub-millisecond timing policy is documented before frontend behavior changes."
+- "Compare winner-claim threshold is documented before Compare code changes."
+- "Dependent TODOs explicitly depend on this item."
+
+metadata:
+  tags:
+  - results-explorer
+  - data-contract
+  - policy-gate
+  - compare
+  - leaderboard
+  estimated_effort: "Small (0.5-1 day)"
+  created_date: "2026-05-11"
+
+impact:
+  business_value: |
+    Prevents the public results site from making unsupported ranking or
+    comparison claims.
+  user_impact: |
+    Gives database engineers a trustworthy distinction between published
+    provenance and valid comparison evidence.
+  technical_debt: |
+    Replaces component-local interpretations with a single contract that the
+    pipeline and frontend can share.
