@@ -318,6 +318,22 @@ describe("QueryHeatmap rendering", () => {
     expect(subMs?.getAttribute("aria-label")).toBe("<1 ms, fastest in column");
   });
 
+  it("preserves per-cell exclusion reasons for excluded non-zero timings", () => {
+    const summary = makeSummary();
+    summary.platforms[0]!.timings.Q1 = 12;
+    summary.platforms[0]!.timing_eligibility.Q1 = {
+      is_valid_display_timing: false,
+      timing_exclusion_reason: "non_positive_timing",
+    };
+
+    const { container } = render(<QueryHeatmap summary={summary} />);
+
+    const excluded = container.querySelector<HTMLElement>('[data-cell="0-0"]');
+    expect(excluded?.textContent).toBe("Excluded");
+    expect(excluded?.getAttribute("aria-label")).toBe("12 ms, excluded: Timing is not positive.");
+    expect(excluded?.getAttribute("title")).toBe("Timing is not positive.");
+  });
+
   it("activates reduced-color class when high contrast is requested", () => {
     const { container } = render(<QueryHeatmap summary={makeSummary()} highContrast />);
     expect(container.firstElementChild?.className).toContain("heatmap-reduced-color");
