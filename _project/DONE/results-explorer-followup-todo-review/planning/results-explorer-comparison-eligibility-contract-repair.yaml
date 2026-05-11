@@ -2,7 +2,8 @@ id: results-explorer-comparison-eligibility-contract-repair
 title: "Repair Results Explorer comparison eligibility at the read-model contract"
 worktree: results-explorer-followup-todo-review
 priority: Critical
-status: Not Started
+status: Completed
+completed_date: "2026-05-11"
 category: Core Functionality
 
 description: |
@@ -25,7 +26,7 @@ deps:
 work:
 - id: w0
   summary: "Reproduce and capture the current zero-comparable-row invariant"
-  status: pending
+  status: done
   notes: |
     Regenerate or inspect the current browser DuckDB snapshot and capture the
     checked git SHA, snapshot file path/checksum, SQL used, and:
@@ -45,7 +46,7 @@ work:
 - id: w1
   summary: "Document the logical query-count contract used by compare eligibility"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     Trace query-count fields from bundle summaries through
     `BundleTransformer`, `timing_eligibility`, DuckDB schema generation, and
@@ -62,7 +63,7 @@ work:
 - id: w2
   summary: "Change backend comparison eligibility to use logical display-query coverage"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Update `timing_eligibility()` and its call sites so a row with all logical
     query timings present is compare-eligible even when raw sample count is
@@ -75,7 +76,7 @@ work:
 - id: w3
   summary: "Normalize exclusion reason fields and snapshot invariants"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Ensure generated rows expose stable, user-facing reason codes for:
       - no queries;
@@ -91,7 +92,7 @@ work:
 - id: w4
   summary: "Add focused backend tests for logical-vs-raw query counts"
   needs: [w2, w3]
-  status: pending
+  status: done
   notes: |
     Add tests with fixtures covering:
       - TPC-H-like row: 22 valid logical queries, 66 raw samples, compare-safe;
@@ -105,7 +106,7 @@ work:
 - id: w5
   summary: "Regenerate snapshot and prove at least two comparable cohorts exist"
   needs: [w3, w4]
-  status: pending
+  status: done
   notes: |
     Regenerate the Results Explorer DuckDB snapshot from the current corpus and
     rerun the SQL from w0. Decision gate: do not mark this item complete unless
@@ -158,6 +159,7 @@ scope_limit:
   - "_project/scripts/results_explorer_snapshot_invariants.py"
   - "tests/unit/core/explorer_pipeline/"
   - "results-explorer/src/types.ts"
+  - "results-explorer/src/db.ts"
   - "results-explorer/src/lib/duckdbQueries.ts"
   - "_project/verification-logs/results-explorer-comparison-eligibility-contract-repair/"
   do_not_modify:
@@ -170,6 +172,15 @@ success_metrics:
 - "Rows with full logical query coverage are not excluded because raw sample count is larger."
 - "Comparison, ranking, display, validation, and provenance states remain separately auditable."
 - "Snapshot invariants fail loudly if comparable rows collapse to zero again."
+
+implementation_notes:
+- "w0 evidence captured at _project/verification-logs/results-explorer-comparison-eligibility-contract-repair/w0.log on af1c3d0b: 525 total rows, 371 displayable rows, 0 compare-eligible rows, and TPC-H rows with query_count 66/88 versus valid_query_count 22 excluded as insufficient_query_coverage."
+- "`query_count` remains the raw bundle summary sample count. New `logical_query_count` is the display/comparison denominator and is inferred from one display timing per logical query, known benchmark query counts, and repeated-sample evidence."
+- "`timing_eligibility()` now computes missing coverage and comparison coverage against `logical_query_count`, not raw samples."
+- "DuckDB schema, TypeScript query helpers, and frontend read-model types expose `logical_query_count` so consumers can audit raw sample count separately from logical coverage."
+- "Code review found the browser startup column guard also owns the DuckDB contract; `results-explorer/src/db.ts` was added to the implementation scope and now requires `logical_query_count` with the rest of `bench.results`."
+- "Snapshot invariants now fail when compare-eligible rows have insufficient logical coverage, when every displayable row is non-comparable, or when a fully covered logical row is excluded because raw sample count is larger."
+- "w5 evidence captured at _project/verification-logs/results-explorer-comparison-eligibility-contract-repair/w5.log after regeneration: 328 compare-eligible rows, TPC-H cohorts with 2+ eligible rows, and SSB/star_schema eligible cohorts."
 
 metadata:
   tags:
