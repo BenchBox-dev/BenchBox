@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-03T02:49:34.274281+00:00",
-  "bundle_file": "read_primitives_sf001_pyspark_df_20260502_213754_a17d36be.json",
-  "bundle_hash": "f2091f53c621629b69f0730da44452a5a3da3c2f542054cebef1bf2573ec9849",
-  "companion_hashes": {},
   "benchmark": "Read Primitives",
+  "bundle_file": "read_primitives_sf001_pyspark_df_20260502_213754_a17d36be.json",
+  "bundle_hash": "de944641de4db258422dc0841d35f732820277fa31dcc653d345b0fe2823f9ed",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "PySpark",
   "scale_factor": 0.01,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:49:34.274281+00:00",
   "submitted_by": "BenchBox UAT"
 }

@@ -1,84 +1,196 @@
 {
-  "version": "2.1",
-  "run": {
-    "id": "564d74cb",
-    "timestamp": "2026-05-06T10:49:36.692626",
-    "total_duration_ms": 65,
-    "query_time_ms": 0,
-    "iterations": 1,
-    "streams": 1
-  },
   "benchmark": {
     "id": "tsbs_devops",
     "name": "TSBS DevOps",
     "scale_factor": 0.01,
     "test_type": "power"
   },
-  "platform": {
-    "name": "Dask",
-    "version": "2026.3.0",
-    "client_version": "unknown",
-    "config": {
-      "execution_mode": "dataframe",
-      "family": "pandas",
-      "n_workers": 1,
-      "threads_per_worker": 2,
-      "use_distributed": true,
-      "memory_limit": "2GB",
-      "spill_to_disk": true,
-      "spill_directory": "path_9add7738c497",
-      "working_dir": "/Users/joe/Developer/benchmark_runs/datagen/tsbs_devops_sf001",
-      "scheduler_address": "tcp://[REDACTED]:59645",
-      "n_active_workers": 1,
-      "driver_runtime_strategy": "current-process"
+  "config": {
+    "compression": {
+      "level": null,
+      "type": "zstd"
     },
+    "mode": "dataframe",
+    "phases": [
+      "load",
+      "power"
+    ]
+  },
+  "cost": {
+    "model": "estimated",
+    "total_usd": 0
+  },
+  "environment": {
+    "client_host": {
+      "machine_id": "machine_45d1a3ef31a1728d"
+    },
+    "machine_id": "machine_45d1a3ef31a1728d",
+    "platform_runtime": {
+      "collection_status": "partial",
+      "engine_host": "host_83616c9df130",
+      "runtime_type": "dataframe_process",
+      "source": "inferred"
+    }
+  },
+  "execution": {
+    "compression": {
+      "type": "zstd"
+    },
+    "driver_runtime_strategy": "current-process",
+    "entry_point": "cli",
+    "mode": "sql",
+    "non_interactive": true,
+    "phases": [
+      "load",
+      "power"
+    ],
+    "timestamp": "2026-05-06T10:49:35.585124",
+    "tuning_mode": "tuned"
+  },
+  "export": {
+    "anonymized": true,
+    "timestamp": "2026-05-06T10:49:36.774521",
+    "tool": "benchbox-exporter"
+  },
+  "normalized_cost": {
+    "billing_unit": "not_applicable",
+    "cost_model_source": "benchbox.core.cost.pricing",
+    "cost_model_version": "2025.11",
+    "cost_scope": "compute_only",
+    "cost_status": "not_applicable_local",
+    "cost_usd": null,
     "deployment": {
-      "deployment_type": "dataframe",
-      "endpoint_class": "embedded_process",
-      "metadata_source": "inferred",
-      "collection_status": "partial"
+      "cloud_provider": null,
+      "cloud_region": null,
+      "cluster_size": null,
+      "instance_type": null,
+      "node_count": null,
+      "storage_format": null,
+      "storage_tier": null,
+      "warehouse_size": null
     },
+    "normalized_cost_usd": "0",
+    "pricing_region": "not_applicable"
+  },
+  "phases": {
+    "data_generation": {
+      "status": "NOT_RUN"
+    },
+    "data_loading": {
+      "duration_ms": 64,
+      "status": "SUCCESS"
+    },
+    "power_test": {
+      "status": "COMPLETED"
+    },
+    "schema_creation": {
+      "status": "NOT_RUN"
+    },
+    "throughput_test": {
+      "status": "NOT_RUN"
+    },
+    "validation": {
+      "status": "NOT_RUN"
+    }
+  },
+  "platform": {
+    "client_version": "unknown",
     "cloud": {
-      "source": "unavailable",
-      "collection_status": "unavailable"
+      "collection_status": "unavailable",
+      "source": "unavailable"
     },
     "compute": {
-      "source": "unavailable",
-      "collection_status": "unavailable"
+      "collection_status": "unavailable",
+      "source": "unavailable"
     },
-    "storage": {
-      "source": "unavailable",
-      "collection_status": "unavailable"
-    },
-    "raw_config": {
+    "config": {
+      "driver_runtime_strategy": "current-process",
+      "execution_mode": "dataframe",
+      "family": "pandas",
+      "memory_limit": "2GB",
+      "n_active_workers": 1,
       "n_workers": 1,
+      "scheduler_address": "tcp://[REDACTED]:59645",
+      "spill_directory": "path_9add7738c497",
+      "spill_to_disk": true,
       "threads_per_worker": 2,
       "use_distributed": true,
+      "working_dir": "/Users/joe/Developer/benchmark_runs/datagen/tsbs_devops_sf001"
+    },
+    "deployment": {
+      "collection_status": "partial",
+      "deployment_type": "dataframe",
+      "endpoint_class": "embedded_process",
+      "metadata_source": "inferred"
+    },
+    "driver_runtime_strategy": "current-process",
+    "name": "Dask",
+    "raw_config": {
+      "benchmark": "tsbs_devops",
+      "driver_auto_install": false,
+      "driver_auto_install_used": false,
+      "execution_mode": "dataframe",
       "memory_limit": "2GB",
-      "spill_to_disk": true,
-      "spill_directory": "path_9add7738c497",
-      "working_dir": "/Users/joe/Developer/benchmark_runs/datagen/tsbs_devops_sf001",
-      "scheduler_address": "tcp://[REDACTED]:59645",
       "n_active_workers": 1,
+      "n_workers": 1,
       "options": {
-        "driver_auto_install": false,
-        "verbose_level": 0,
-        "verbose_enabled": false,
-        "very_verbose": false,
-        "quiet": false,
-        "verbose": false,
-        "force_recreate": false,
-        "show_query_plans": false,
-        "tuning_enabled": true,
-        "force_upload": false,
         "capture_plans": false,
-        "strict_plan_capture": false,
+        "df_tuning_config": {
+          "data_types": {
+            "auto_categorize_strings": false,
+            "categorical_threshold": 0.5,
+            "dtype_backend": "pyarrow",
+            "enable_string_cache": false
+          },
+          "execution": {
+            "lazy_evaluation": true,
+            "streaming_mode": true
+          },
+          "gpu": {
+            "device_id": 0,
+            "enabled": false,
+            "pool_type": "default",
+            "spill_to_host": "endpoint_56077d355632"
+          },
+          "io": {
+            "memory_map": false,
+            "memory_pool": "default",
+            "pre_buffer": true
+          },
+          "memory": {
+            "chunk_size": 100000,
+            "memory_limit": "4GB",
+            "rechunk_after_filter": true,
+            "spill_to_disk": true
+          },
+          "metadata": {
+            "description": "Auto-generated defaults for dask",
+            "format": "dataframe_tuning",
+            "generated_by": "benchbox-smart-defaults",
+            "platform": "dask",
+            "version": "1.0"
+          },
+          "parallelism": {
+            "threads_per_worker": 4,
+            "worker_count": 1
+          },
+          "write": {
+            "compression": "zstd"
+          }
+        },
+        "driver_auto_install": false,
         "execution_mode": "dataframe",
+        "force_recreate": false,
+        "force_upload": false,
+        "quiet": false,
+        "show_query_plans": false,
+        "strict_plan_capture": false,
+        "tuning_enabled": true,
         "unified_tuning_configuration": {
-          "primary_keys": {
+          "check_constraints": {
             "enabled": true,
-            "enforce_uniqueness": true,
-            "nullable": false
+            "enforce_on_insert": true,
+            "enforce_on_update": true
           },
           "foreign_keys": {
             "enabled": true,
@@ -86,211 +198,99 @@
             "on_delete_action": "RESTRICT",
             "on_update_action": "RESTRICT"
           },
+          "platform_optimizations": {
+            "auto_compact_enabled": false,
+            "auto_optimize_enabled": false,
+            "bloom_filters_enabled": false,
+            "databricks_clustering_strategy": "z_order",
+            "liquid_clustering_enabled": false,
+            "materialized_views_enabled": false,
+            "sorted_ingestion_method": "auto",
+            "sorted_ingestion_mode": "off",
+            "z_ordering_enabled": false
+          },
+          "primary_keys": {
+            "enabled": true,
+            "enforce_uniqueness": true,
+            "nullable": false
+          },
           "unique_constraints": {
             "enabled": true,
             "ignore_nulls": false
-          },
-          "check_constraints": {
-            "enabled": true,
-            "enforce_on_insert": true,
-            "enforce_on_update": true
-          },
-          "platform_optimizations": {
-            "z_ordering_enabled": false,
-            "liquid_clustering_enabled": false,
-            "databricks_clustering_strategy": "z_order",
-            "sorted_ingestion_mode": "off",
-            "sorted_ingestion_method": "auto",
-            "auto_optimize_enabled": false,
-            "auto_compact_enabled": false,
-            "bloom_filters_enabled": false,
-            "materialized_views_enabled": false
           }
         },
-        "df_tuning_config": {
-          "parallelism": {
-            "worker_count": 1,
-            "threads_per_worker": 4
-          },
-          "memory": {
-            "memory_limit": "4GB",
-            "chunk_size": 100000,
-            "spill_to_disk": true,
-            "rechunk_after_filter": true
-          },
-          "execution": {
-            "streaming_mode": true,
-            "lazy_evaluation": true
-          },
-          "data_types": {
-            "dtype_backend": "pyarrow",
-            "enable_string_cache": false,
-            "auto_categorize_strings": false,
-            "categorical_threshold": 0.5
-          },
-          "io": {
-            "memory_pool": "default",
-            "memory_map": false,
-            "pre_buffer": true
-          },
-          "gpu": {
-            "enabled": false,
-            "device_id": 0,
-            "spill_to_host": "endpoint_56077d355632",
-            "pool_type": "default"
-          },
-          "write": {
-            "compression": "zstd"
-          },
-          "metadata": {
-            "version": "1.0",
-            "format": "dataframe_tuning",
-            "platform": "dask",
-            "description": "Auto-generated defaults for dask",
-            "generated_by": "benchbox-smart-defaults"
-          }
-        }
+        "verbose": false,
+        "verbose_enabled": false,
+        "verbose_level": 0,
+        "very_verbose": false
       },
-      "driver_auto_install": false,
-      "driver_auto_install_used": false,
-      "execution_mode": "dataframe",
-      "benchmark": "tsbs_devops",
       "scale_factor": 0.01,
+      "scheduler_address": "tcp://[REDACTED]:59645",
+      "spill_directory": "path_9add7738c497",
+      "spill_to_disk": true,
+      "thread_limit": 8,
+      "threads_per_worker": 2,
       "tuning_config": "UnifiedTuningConfiguration(primary_keys=PrimaryKeyConfiguration(enabled=True, enforce_uniqueness=True, nullable=False), foreign_keys=ForeignKeyConfiguration(enabled=True, enforce_referential_integrity=True, on_delete_action='RESTRICT', on_update_action='RESTRICT'), unique_constraints=UniqueConstraintConfiguration(enabled=True, ignore_nulls=False), check_constraints=CheckConstraintConfiguration(enabled=True, enforce_on_insert=True, enforce_on_update=True), platform_optimizations=PlatformOptimizationConfiguration(z_ordering_enabled=False, z_ordering_columns=[], liquid_clustering_enabled=False, liquid_clustering_columns=[], databricks_clustering_strategy='z_order', sorted_ingestion_mode='off', sorted_ingestion_method='auto', auto_optimize_enabled=False, auto_compact_enabled=False, bloom_filters_enabled=False, bloom_filter_columns=[], materialized_views_enabled=False), table_tunings={})",
-      "thread_limit": 8
+      "use_distributed": true,
+      "working_dir": "/Users/joe/Developer/benchmark_runs/datagen/tsbs_devops_sf001"
     },
     "raw_metadata": {
       "driver_runtime_strategy": "current-process"
     },
-    "driver_runtime_strategy": "current-process"
-  },
-  "config": {
-    "compression": {
-      "type": "zstd",
-      "level": null
+    "storage": {
+      "collection_status": "unavailable",
+      "source": "unavailable"
     },
-    "phases": [
-      "load",
-      "power"
-    ],
-    "mode": "dataframe"
+    "version": "2026.3.0"
+  },
+  "queries": [],
+  "run": {
+    "id": "564d74cb",
+    "iterations": 1,
+    "query_time_ms": 0,
+    "streams": 1,
+    "timestamp": "2026-05-06T10:49:36.692626",
+    "total_duration_ms": 65
   },
   "summary": {
+    "data": {
+      "load_time_ms": 64.9,
+      "rows_loaded": 1036810
+    },
     "queries": {
-      "total": 0,
+      "failed": 0,
       "passed": 0,
-      "failed": 0
+      "total": 0
     },
     "timing": {
-      "total_ms": 0,
       "avg_ms": 0,
+      "max_ms": 0,
       "min_ms": 0,
-      "max_ms": 0
-    },
-    "data": {
-      "rows_loaded": 1036810,
-      "load_time_ms": 64.9
+      "total_ms": 0
     },
     "validation": "passed"
   },
-  "phases": {
-    "data_generation": {
-      "status": "NOT_RUN"
-    },
-    "schema_creation": {
-      "status": "NOT_RUN"
-    },
-    "data_loading": {
-      "status": "SUCCESS",
-      "duration_ms": 64
-    },
-    "validation": {
-      "status": "NOT_RUN"
-    },
-    "power_test": {
-      "status": "COMPLETED"
-    },
-    "throughput_test": {
-      "status": "NOT_RUN"
-    }
-  },
-  "queries": [],
   "tables": {
     "cpu": {
-      "rows": 172800,
-      "load_ms": 15
+      "load_ms": 15,
+      "rows": 172800
     },
     "disk": {
-      "rows": 345600,
-      "load_ms": 16
+      "load_ms": 16,
+      "rows": 345600
     },
     "mem": {
-      "rows": 172800,
-      "load_ms": 15
+      "load_ms": 15,
+      "rows": 172800
     },
     "net": {
-      "rows": 345600,
-      "load_ms": 7
+      "load_ms": 7,
+      "rows": 345600
     },
     "tags": {
-      "rows": 10,
-      "load_ms": 9
+      "load_ms": 9,
+      "rows": 10
     }
   },
-  "cost": {
-    "total_usd": 0,
-    "model": "estimated"
-  },
-  "normalized_cost": {
-    "normalized_cost_usd": "0",
-    "cost_usd": null,
-    "cost_model_version": "2025.11",
-    "cost_model_source": "benchbox.core.cost.pricing",
-    "cost_scope": "compute_only",
-    "cost_status": "not_applicable_local",
-    "billing_unit": "not_applicable",
-    "pricing_region": "not_applicable",
-    "deployment": {
-      "cloud_provider": null,
-      "cloud_region": null,
-      "instance_type": null,
-      "warehouse_size": null,
-      "node_count": null,
-      "cluster_size": null,
-      "storage_format": null,
-      "storage_tier": null
-    }
-  },
-  "execution": {
-    "entry_point": "cli",
-    "timestamp": "2026-05-06T10:49:35.585124",
-    "phases": [
-      "load",
-      "power"
-    ],
-    "compression": {
-      "type": "zstd"
-    },
-    "mode": "sql",
-    "driver_runtime_strategy": "current-process",
-    "non_interactive": true,
-    "tuning_mode": "tuned"
-  },
-  "environment": {
-    "platform_runtime": {
-      "runtime_type": "dataframe_process",
-      "collection_status": "partial",
-      "source": "inferred",
-      "engine_host": "host_83616c9df130"
-    },
-    "machine_id": "machine_45d1a3ef31a1728d",
-    "client_host": {
-      "machine_id": "machine_45d1a3ef31a1728d"
-    }
-  },
-  "export": {
-    "timestamp": "2026-05-06T10:49:36.774521",
-    "tool": "benchbox-exporter",
-    "anonymized": true
-  }
+  "version": "2.1"
 }

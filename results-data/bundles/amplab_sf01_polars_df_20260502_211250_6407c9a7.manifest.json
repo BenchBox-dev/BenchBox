@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-03T02:46:45.943904+00:00",
-  "bundle_file": "amplab_sf01_polars_df_20260502_211250_6407c9a7.json",
-  "bundle_hash": "a03c4b7cd6d451e5084726ad347dd21ca9d5dddd3c81c2583594e8775e910697",
-  "companion_hashes": {},
   "benchmark": "AMPLab",
+  "bundle_file": "amplab_sf01_polars_df_20260502_211250_6407c9a7.json",
+  "bundle_hash": "7d2942f51601f628dde4e8c1e001dcb3ab59eeba6cfff6e2d04a89827aa7355f",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "Polars",
   "scale_factor": 0.1,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:46:45.943904+00:00",
   "submitted_by": "BenchBox UAT"
 }

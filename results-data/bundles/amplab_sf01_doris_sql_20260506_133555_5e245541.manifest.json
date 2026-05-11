@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:07:56.542416+00:00",
-  "bundle_file": "amplab_sf01_doris_sql_20260506_133555_5e245541.json",
-  "bundle_hash": "42dfe242ba5d7527b3dc545beef65849fddab65b911252c1c5a97a6314c82a75",
-  "companion_hashes": {},
   "benchmark": "AMPLab Big Data",
+  "bundle_file": "amplab_sf01_doris_sql_20260506_133555_5e245541.json",
+  "bundle_hash": "f3fd374b3464e7aaa044b3f5602b4eda038e3b16c31b585292d8c990d876a2d7",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "Apache Doris",
   "scale_factor": 0.1,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:07:56.542416+00:00",
   "submitted_by": "Joe Harris"
 }

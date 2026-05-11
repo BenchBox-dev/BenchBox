@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:10:38.316435+00:00",
-  "bundle_file": "nyctaxi_sf1_pandas_df_20260506_094949_fb204d0a.json",
-  "bundle_hash": "358fdd312d91228b64e0c0ae84d872191d30866e54046f89f64cbc53d11c0251",
-  "companion_hashes": {},
   "benchmark": "NYC Taxi",
+  "bundle_file": "nyctaxi_sf1_pandas_df_20260506_094949_fb204d0a.json",
+  "bundle_hash": "d5d0f66e91f7de4bd0baa2aa492a432c5309d7ff2bde798903db31e245b94848",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "Pandas",
   "scale_factor": 1.0,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:10:38.316435+00:00",
   "submitted_by": "Joe Harris"
 }

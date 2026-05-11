@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:13:49.032917+00:00",
-  "bundle_file": "tsbs_devops_sf1_clickhouse_local_sql_20260506_081322_4bcbc165.json",
-  "bundle_hash": "2c2520f55ea47ec00724a7e030087adea5762a9877941c504a7db88ae81b34f1",
-  "companion_hashes": {},
   "benchmark": "TSBS DevOps",
+  "bundle_file": "tsbs_devops_sf1_clickhouse_local_sql_20260506_081322_4bcbc165.json",
+  "bundle_hash": "9d8207a1e75e8489e6e0484469cec65dece4b9b008cb7e09aef740373e7842fd",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "ClickHouse Local",
   "scale_factor": 1.0,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:13:49.032917+00:00",
   "submitted_by": "Joe Harris"
 }

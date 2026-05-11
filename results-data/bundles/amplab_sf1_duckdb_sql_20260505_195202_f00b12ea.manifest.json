@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T00:46:07.349501+00:00",
-  "bundle_file": "amplab_sf1_duckdb_sql_20260505_195202_f00b12ea.json",
-  "bundle_hash": "6c8fea98d44a8108efd49a49ed2de05445de50a1b900975b6573c1ab1e3bab9a",
-  "companion_hashes": {},
   "benchmark": "AMPLab Big Data",
+  "bundle_file": "amplab_sf1_duckdb_sql_20260505_195202_f00b12ea.json",
+  "bundle_hash": "bf1323751eba199ae63c45c8a288565658e05324906a008f741d41714fc17bbc",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "DuckDB",
   "scale_factor": 1.0,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T00:46:07.349501+00:00",
   "submitted_by": "Joe Harris"
 }

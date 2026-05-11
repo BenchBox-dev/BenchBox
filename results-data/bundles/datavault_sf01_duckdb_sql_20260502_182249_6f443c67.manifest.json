@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-03T02:47:48.113675+00:00",
-  "bundle_file": "datavault_sf01_duckdb_sql_20260502_182249_6f443c67.json",
-  "bundle_hash": "55e982fc411540da8cb3e8626971bc685a387bfb0da3daedc62be83862295344",
-  "companion_hashes": {},
   "benchmark": "Data Vault",
+  "bundle_file": "datavault_sf01_duckdb_sql_20260502_182249_6f443c67.json",
+  "bundle_hash": "6681d41a7bdf867dc95d7e67881bdd589dbfcd0c953b0cd040cc1bf50f5b8519",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "DuckDB",
   "scale_factor": 0.1,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:47:48.113675+00:00",
   "submitted_by": "BenchBox UAT"
 }

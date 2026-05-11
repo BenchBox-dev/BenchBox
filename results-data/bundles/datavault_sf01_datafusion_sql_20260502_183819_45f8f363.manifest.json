@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-03T02:47:46.956549+00:00",
-  "bundle_file": "datavault_sf01_datafusion_sql_20260502_183819_45f8f363.json",
-  "bundle_hash": "b06f1e310eadca0aaf5549434778883d090a17304cb053270d835ccb46196f11",
-  "companion_hashes": {},
   "benchmark": "Data Vault",
+  "bundle_file": "datavault_sf01_datafusion_sql_20260502_183819_45f8f363.json",
+  "bundle_hash": "68efb77ca0caaaa3e27e9f01baaef37e0b6396386f966b29c4363990d71ea50b",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "DataFusion",
   "scale_factor": 0.1,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:47:46.956549+00:00",
   "submitted_by": "BenchBox UAT"
 }

@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-03T02:50:37.855177+00:00",
-  "bundle_file": "tpcdi_sf01_spark_sql_20260502_203818_817d210b.json",
-  "bundle_hash": "28beb9fa90bcf99f23d71a18fa8283e0e1dda7a1dc2bbe8f2a061fefda829e91",
-  "companion_hashes": {},
   "benchmark": "TPC-DI",
+  "bundle_file": "tpcdi_sf01_spark_sql_20260502_203818_817d210b.json",
+  "bundle_hash": "ef2b550d518762f4b5a0353058ba3b7b9bc3a5253b5934a38fba5e754884431c",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "Spark",
   "scale_factor": 0.1,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:50:37.855177+00:00",
   "submitted_by": "BenchBox UAT"
 }

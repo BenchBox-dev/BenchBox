@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:12:31.037612+00:00",
-  "bundle_file": "tpch_sf01_cedardb_sql_20260506_110532_562a9bd5.json",
-  "bundle_hash": "14f6c30b4ea1c7ac9a033b6dcb140dc7af0fd31aae3f85097df390b9d7b677e3",
-  "companion_hashes": {},
   "benchmark": "TPC-H",
+  "bundle_file": "tpch_sf01_cedardb_sql_20260506_110532_562a9bd5.json",
+  "bundle_hash": "b68a0b0e03955003abfd43d3cf0de161c028a38243171f98a5f4a89a974426f7",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "CedarDB",
   "scale_factor": 0.1,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:12:31.037612+00:00",
   "submitted_by": "Joe Harris"
 }

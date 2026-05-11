@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T00:47:22.333663+00:00",
-  "bundle_file": "tpcdi_sf1_duckdb_sql_20260505_194803_2cbfe3de.json",
-  "bundle_hash": "668038d297497c4e5853ebb0a38430d1908e4e9fb460bffbb5d98840d45ca75b",
-  "companion_hashes": {},
   "benchmark": "TPC-DI",
+  "bundle_file": "tpcdi_sf1_duckdb_sql_20260505_194803_2cbfe3de.json",
+  "bundle_hash": "bf5a4c08cb2b2bc4eed4af5f76b4b8dcb91c0f68b4316b4d5d786205f355f441",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "DuckDB",
   "scale_factor": 1.0,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T00:47:22.333663+00:00",
   "submitted_by": "Joe Harris"
 }

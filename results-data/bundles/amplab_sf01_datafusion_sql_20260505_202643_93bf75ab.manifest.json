@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T00:46:02.236150+00:00",
-  "bundle_file": "amplab_sf01_datafusion_sql_20260505_202643_93bf75ab.json",
-  "bundle_hash": "880719a97116b1487970f1dd508541d5318c7d5958886a912f9322f5c8afb21c",
-  "companion_hashes": {},
   "benchmark": "AMPLab Big Data",
+  "bundle_file": "amplab_sf01_datafusion_sql_20260505_202643_93bf75ab.json",
+  "bundle_hash": "9e337b515669508da23e218b3949eae02382a20342e07fcc1acd906021dccb7d",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "DataFusion",
   "scale_factor": 0.1,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T00:46:02.236150+00:00",
   "submitted_by": "Joe Harris"
 }

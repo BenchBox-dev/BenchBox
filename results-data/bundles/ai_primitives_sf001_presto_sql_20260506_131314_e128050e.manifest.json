@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:07:32.685963+00:00",
-  "bundle_file": "ai_primitives_sf001_presto_sql_20260506_131314_e128050e.json",
-  "bundle_hash": "e59783ec6603f47905211f6de60024d849e40289824c67637b849e604ff2470e",
-  "companion_hashes": {},
   "benchmark": "AI/ML Primitives",
+  "bundle_file": "ai_primitives_sf001_presto_sql_20260506_131314_e128050e.json",
+  "bundle_hash": "19ea1ec4026a1734c023a6f0a8f660b085f3d0a75f0cafa0970c95b0d53f2e4e",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "Presto",
   "scale_factor": 0.01,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:07:32.685963+00:00",
   "submitted_by": "Joe Harris"
 }

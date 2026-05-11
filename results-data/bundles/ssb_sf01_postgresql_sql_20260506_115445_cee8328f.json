@@ -1,627 +1,722 @@
 {
-  "version": "2.1",
-  "run": {
-    "id": "cee8328f",
-    "timestamp": "2026-05-06T11:54:45.732714",
-    "total_duration_ms": 1525,
-    "query_time_ms": 469,
-    "iterations": 3,
-    "streams": 3
-  },
   "benchmark": {
     "id": "ssb",
     "name": "Star Schema",
     "scale_factor": 0.1,
     "test_type": "power"
   },
-  "platform": {
-    "name": "PostgreSQL",
-    "version": "18.3",
-    "client_version": "3.3.3",
-    "config": {
-      "execution_mode": "sql",
-      "host": "localhost",
-      "port": 5432,
-      "dialect": "postgres",
-      "database": "database_37e793bed292",
-      "schema": "schema_3f002c1a217f",
-      "work_mem": "256MB",
-      "maintenance_work_mem": "512MB",
-      "max_parallel_workers_per_gather": 2,
-      "database_size": "73 MB",
-      "driver_package": "psycopg",
-      "driver_version_resolved": "3.3.3",
-      "driver_version_actual": "3.3.3",
-      "driver_runtime_strategy": "current-process",
-      "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-10/.venv/bin/python3"
-    },
-    "deployment": {
-      "deployment_type": "self_hosted",
-      "endpoint_class": "localhost_port",
-      "metadata_source": "inferred",
-      "collection_status": "partial"
-    },
-    "cloud": {
-      "source": "unavailable",
-      "collection_status": "unavailable"
-    },
-    "compute": {
-      "source": "unavailable",
-      "collection_status": "unavailable"
-    },
-    "storage": {
-      "source": "unavailable",
-      "collection_status": "unavailable"
-    },
-    "raw_config": {
-      "host": "localhost",
-      "port": 5432,
-      "username": "user_af92c5c00fd0",
-      "password": "<redacted>",
-      "schema": "schema_3f002c1a217f",
-      "sslmode": "prefer",
-      "admin_database": "postgres",
-      "work_mem": "256MB",
-      "maintenance_work_mem": "512MB",
-      "effective_cache_size": "1GB",
-      "max_parallel_workers_per_gather": 2,
-      "connect_timeout": 10,
-      "statement_timeout": 0,
-      "force_recreate": false,
-      "database": "database_37e793bed292",
-      "tuning_config": "UnifiedTuningConfiguration(primary_keys=PrimaryKeyConfiguration(enabled=True, enforce_uniqueness=True, nullable=False), foreign_keys=ForeignKeyConfiguration(enabled=True, enforce_referential_integrity=True, on_delete_action='RESTRICT', on_update_action='RESTRICT'), unique_constraints=UniqueConstraintConfiguration(enabled=True, ignore_nulls=False), check_constraints=CheckConstraintConfiguration(enabled=True, enforce_on_insert=True, enforce_on_update=True), platform_optimizations=PlatformOptimizationConfiguration(z_ordering_enabled=False, z_ordering_columns=[], liquid_clustering_enabled=False, liquid_clustering_columns=[], databricks_clustering_strategy='z_order', sorted_ingestion_mode='off', sorted_ingestion_method='auto', auto_optimize_enabled=False, auto_compact_enabled=False, bloom_filters_enabled=False, bloom_filter_columns=[], materialized_views_enabled=False), table_tunings={})",
-      "enable_timescale": "false",
-      "database_size": "73 MB"
-    },
-    "raw_metadata": {
-      "dialect": "postgres"
-    },
-    "driver_actual_version": "3.3.3",
-    "driver_package": "psycopg",
-    "driver_resolved_version": "3.3.3",
-    "driver_runtime_strategy": "current-process"
-  },
   "config": {
     "compression": {
-      "type": "zstd",
-      "level": null
+      "level": null,
+      "type": "zstd"
     },
+    "mode": "sql",
     "phases": [
       "load",
       "power"
     ],
-    "platform_options": {
-      "schema": "schema_3f002c1a217f",
-      "host": "localhost",
-      "port": 5432,
-      "username": "user_af92c5c00fd0",
-      "work_mem": "256MB",
-      "enable_timescale": "false",
-      "password": "<redacted>",
-      "status": "not_validated",
-      "force_recreate": false,
-      "show_query_plans": false,
-      "force_upload": false,
-      "admin_database": "postgres",
-      "sslmode": "prefer",
-      "maintenance_work_mem": "512MB",
-      "effective_cache_size": "1GB",
-      "max_parallel_workers_per_gather": 2
-    },
     "platform_option_sources": {
-      "schema": "schema_ea670f1f4924",
-      "host": "host_d82c4866bd3b",
-      "port": "saved_config",
-      "username": "user_4af2b511cbe3",
-      "work_mem": "saved_config",
-      "enable_timescale": "saved_config",
-      "password": "<redacted>",
-      "status": "saved_config",
-      "force_recreate": "saved_config",
-      "show_query_plans": "saved_config",
-      "force_upload": "saved_config",
       "admin_database": "saved_config",
-      "sslmode": "saved_config",
-      "maintenance_work_mem": "saved_config",
       "effective_cache_size": "saved_config",
-      "max_parallel_workers_per_gather": "saved_config"
+      "enable_timescale": "saved_config",
+      "force_recreate": "saved_config",
+      "force_upload": "saved_config",
+      "host": "host_d82c4866bd3b",
+      "maintenance_work_mem": "saved_config",
+      "max_parallel_workers_per_gather": "saved_config",
+      "password": "<redacted>",
+      "port": "saved_config",
+      "schema": "schema_ea670f1f4924",
+      "show_query_plans": "saved_config",
+      "sslmode": "saved_config",
+      "status": "saved_config",
+      "username": "user_4af2b511cbe3",
+      "work_mem": "saved_config"
     },
-    "mode": "sql"
+    "platform_options": {
+      "admin_database": "postgres",
+      "effective_cache_size": "1GB",
+      "enable_timescale": "false",
+      "force_recreate": false,
+      "force_upload": false,
+      "host": "localhost",
+      "maintenance_work_mem": "512MB",
+      "max_parallel_workers_per_gather": 2,
+      "password": "<redacted>",
+      "port": 5432,
+      "schema": "schema_3f002c1a217f",
+      "show_query_plans": false,
+      "sslmode": "prefer",
+      "status": "not_validated",
+      "username": "user_af92c5c00fd0",
+      "work_mem": "256MB"
+    }
   },
-  "summary": {
-    "queries": {
-      "total": 39,
-      "passed": 39,
-      "failed": 0
+  "cost": {
+    "model": "estimated",
+    "total_usd": 0
+  },
+  "environment": {
+    "arch": "arm64",
+    "client_host": {
+      "arch": "arm64",
+      "machine_id": "machine_45d1a3ef31a1728d",
+      "os": "Darwin",
+      "python": "3.12.11"
     },
-    "timing": {
-      "total_ms": 469,
-      "avg_ms": 12.0,
-      "min_ms": 2,
-      "max_ms": 51,
-      "geometric_mean_ms": 7.9,
-      "stdev_ms": 12.4,
-      "p90_ms": 18,
-      "p95_ms": 51,
-      "p99_ms": 51
+    "container": {
+      "collection_status": "available",
+      "container_id": "container_7e90a1b3949d",
+      "container_name": "container_5ca9746cdb8f",
+      "docker_engine_version": "29.4.0",
+      "image": "postgres:18",
+      "port_mappings": {
+        "5432/tcp": [
+          {
+            "HostIp": "[REDACTED]",
+            "HostPort": "5432"
+          },
+          {
+            "HostIp": "::",
+            "HostPort": "5432"
+          }
+        ]
+      },
+      "requested_platform": "linux",
+      "source": "observed",
+      "state": "running",
+      "volumes": [
+        {
+          "destination": "path_84ddf589591c",
+          "mode": "rw",
+          "rw": true,
+          "source": "path_ca64847467fc"
+        }
+      ]
     },
-    "data": {
-      "rows_loaded": 625757,
-      "load_time_ms": 706.2
+    "machine_id": "machine_45d1a3ef31a1728d",
+    "os": "Darwin",
+    "platform_runtime": {
+      "collection_status": "available",
+      "engine_host": "host_e0647dbc4998",
+      "runtime_type": "docker_container",
+      "source": "observed"
     },
-    "validation": "passed"
+    "python": "3.12.11"
+  },
+  "execution": {
+    "compression": {
+      "type": "zstd"
+    },
+    "driver_package": "psycopg",
+    "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-10/.venv/bin/python3",
+    "driver_runtime_strategy": "current-process",
+    "driver_version_actual": "3.3.3",
+    "driver_version_resolved": "3.3.3",
+    "entry_point": "cli",
+    "mode": "sql",
+    "non_interactive": true,
+    "phases": [
+      "load",
+      "power"
+    ],
+    "timestamp": "2026-05-06T11:54:44.105759",
+    "tuning_mode": "tuned"
+  },
+  "export": {
+    "anonymized": true,
+    "timestamp": "2026-05-06T11:54:45.750983",
+    "tool": "benchbox-exporter"
+  },
+  "normalized_cost": {
+    "billing_unit": "not_applicable",
+    "cost_model_source": "benchbox.core.cost.pricing",
+    "cost_model_version": "2025.11",
+    "cost_scope": "compute_only",
+    "cost_status": "not_applicable_local",
+    "cost_usd": null,
+    "deployment": {
+      "cloud_provider": null,
+      "cloud_region": null,
+      "cluster_size": null,
+      "instance_type": null,
+      "node_count": null,
+      "storage_format": null,
+      "storage_tier": null,
+      "warehouse_size": null
+    },
+    "normalized_cost_usd": "0",
+    "pricing_region": "not_applicable"
   },
   "phases": {
     "data_generation": {
-      "status": "SUCCESS",
-      "duration_ms": 0
-    },
-    "schema_creation": {
-      "status": "SUCCESS",
-      "duration_ms": 15
+      "duration_ms": 0,
+      "status": "SUCCESS"
     },
     "data_loading": {
-      "status": "SUCCESS",
-      "duration_ms": 706
-    },
-    "validation": {
-      "status": "PASSED",
-      "duration_ms": 50
+      "duration_ms": 706,
+      "status": "SUCCESS"
     },
     "power_test": {
-      "status": "COMPLETED",
-      "duration_ms": 651
+      "duration_ms": 651,
+      "status": "COMPLETED"
+    },
+    "schema_creation": {
+      "duration_ms": 15,
+      "status": "SUCCESS"
     },
     "throughput_test": {
       "status": "NOT_RUN"
+    },
+    "validation": {
+      "duration_ms": 50,
+      "status": "PASSED"
     }
+  },
+  "platform": {
+    "client_version": "3.3.3",
+    "cloud": {
+      "collection_status": "unavailable",
+      "source": "unavailable"
+    },
+    "compute": {
+      "collection_status": "unavailable",
+      "source": "unavailable"
+    },
+    "config": {
+      "database": "database_37e793bed292",
+      "database_size": "73 MB",
+      "dialect": "postgres",
+      "driver_package": "psycopg",
+      "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-10/.venv/bin/python3",
+      "driver_runtime_strategy": "current-process",
+      "driver_version_actual": "3.3.3",
+      "driver_version_resolved": "3.3.3",
+      "execution_mode": "sql",
+      "host": "localhost",
+      "maintenance_work_mem": "512MB",
+      "max_parallel_workers_per_gather": 2,
+      "port": 5432,
+      "schema": "schema_3f002c1a217f",
+      "work_mem": "256MB"
+    },
+    "deployment": {
+      "collection_status": "partial",
+      "deployment_type": "self_hosted",
+      "endpoint_class": "localhost_port",
+      "metadata_source": "inferred"
+    },
+    "driver_actual_version": "3.3.3",
+    "driver_package": "psycopg",
+    "driver_resolved_version": "3.3.3",
+    "driver_runtime_strategy": "current-process",
+    "name": "PostgreSQL",
+    "raw_config": {
+      "admin_database": "postgres",
+      "connect_timeout": 10,
+      "database": "database_37e793bed292",
+      "database_size": "73 MB",
+      "effective_cache_size": "1GB",
+      "enable_timescale": "false",
+      "force_recreate": false,
+      "host": "localhost",
+      "maintenance_work_mem": "512MB",
+      "max_parallel_workers_per_gather": 2,
+      "password": "<redacted>",
+      "port": 5432,
+      "schema": "schema_3f002c1a217f",
+      "sslmode": "prefer",
+      "statement_timeout": 0,
+      "tuning_config": "UnifiedTuningConfiguration(primary_keys=PrimaryKeyConfiguration(enabled=True, enforce_uniqueness=True, nullable=False), foreign_keys=ForeignKeyConfiguration(enabled=True, enforce_referential_integrity=True, on_delete_action='RESTRICT', on_update_action='RESTRICT'), unique_constraints=UniqueConstraintConfiguration(enabled=True, ignore_nulls=False), check_constraints=CheckConstraintConfiguration(enabled=True, enforce_on_insert=True, enforce_on_update=True), platform_optimizations=PlatformOptimizationConfiguration(z_ordering_enabled=False, z_ordering_columns=[], liquid_clustering_enabled=False, liquid_clustering_columns=[], databricks_clustering_strategy='z_order', sorted_ingestion_mode='off', sorted_ingestion_method='auto', auto_optimize_enabled=False, auto_compact_enabled=False, bloom_filters_enabled=False, bloom_filter_columns=[], materialized_views_enabled=False), table_tunings={})",
+      "username": "user_af92c5c00fd0",
+      "work_mem": "256MB"
+    },
+    "raw_metadata": {
+      "dialect": "postgres"
+    },
+    "storage": {
+      "collection_status": "unavailable",
+      "source": "unavailable"
+    },
+    "version": "18.3"
   },
   "queries": [
     {
       "id": "1.1",
+      "iter": 0,
       "ms": 12.0,
       "rows": 1,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "1.2",
+      "iter": 0,
       "ms": 12.0,
       "rows": 1,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "1.3",
+      "iter": 0,
       "ms": 12.0,
       "rows": 1,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "2.1",
-      "ms": 3.0,
       "iter": 0,
-      "stream": 0,
+      "ms": 3.0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "2.2",
-      "ms": 5.0,
       "iter": 0,
-      "stream": 0,
+      "ms": 5.0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "2.3",
-      "ms": 3.0,
       "iter": 0,
-      "stream": 0,
+      "ms": 3.0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "3.1",
+      "iter": 0,
       "ms": 14.0,
       "rows": 149,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "3.2",
+      "iter": 0,
       "ms": 11.0,
       "rows": 43,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "3.3",
-      "ms": 2.0,
       "iter": 0,
-      "stream": 0,
+      "ms": 2.0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "3.4",
-      "ms": 2.0,
       "iter": 0,
-      "stream": 0,
+      "ms": 2.0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "4.1",
+      "iter": 0,
       "ms": 15.0,
       "rows": 35,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "4.2",
+      "iter": 0,
       "ms": 52.0,
       "rows": 77,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "4.3",
-      "ms": 14.0,
       "iter": 0,
-      "stream": 0,
+      "ms": 14.0,
       "run_type": "warmup",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 0
     },
     {
       "id": "1.1",
+      "iter": 1,
       "ms": 13.0,
       "rows": 1,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "1.2",
+      "iter": 1,
       "ms": 14.0,
       "rows": 1,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "1.3",
+      "iter": 1,
       "ms": 12.0,
       "rows": 1,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "2.1",
-      "ms": 4.0,
       "iter": 1,
-      "stream": 1,
+      "ms": 4.0,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "2.2",
-      "ms": 4.0,
       "iter": 1,
-      "stream": 1,
+      "ms": 4.0,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "2.3",
-      "ms": 3.0,
       "iter": 1,
-      "stream": 1,
+      "ms": 3.0,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "3.1",
+      "iter": 1,
       "ms": 14.0,
       "rows": 149,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "3.2",
+      "iter": 1,
       "ms": 11.0,
       "rows": 43,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "3.3",
-      "ms": 2.0,
       "iter": 1,
-      "stream": 1,
+      "ms": 2.0,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "3.4",
-      "ms": 2.0,
       "iter": 1,
-      "stream": 1,
+      "ms": 2.0,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "4.1",
+      "iter": 1,
       "ms": 15.0,
       "rows": 35,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "4.2",
+      "iter": 1,
       "ms": 51.0,
       "rows": 77,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "4.3",
-      "ms": 14.0,
       "iter": 1,
-      "stream": 1,
+      "ms": 14.0,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 1
     },
     {
       "id": "1.1",
+      "iter": 2,
       "ms": 12.0,
       "rows": 1,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "1.2",
+      "iter": 2,
       "ms": 12.0,
       "rows": 1,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "1.3",
+      "iter": 2,
       "ms": 11.0,
       "rows": 1,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "2.1",
-      "ms": 3.0,
       "iter": 2,
-      "stream": 2,
+      "ms": 3.0,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "2.2",
-      "ms": 4.0,
       "iter": 2,
-      "stream": 2,
+      "ms": 4.0,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "2.3",
-      "ms": 3.0,
       "iter": 2,
-      "stream": 2,
+      "ms": 3.0,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "3.1",
+      "iter": 2,
       "ms": 14.0,
       "rows": 149,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "3.2",
+      "iter": 2,
       "ms": 12.0,
       "rows": 43,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "3.3",
-      "ms": 2.0,
       "iter": 2,
-      "stream": 2,
+      "ms": 2.0,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "3.4",
-      "ms": 2.0,
       "iter": 2,
-      "stream": 2,
+      "ms": 2.0,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "4.1",
+      "iter": 2,
       "ms": 16.0,
       "rows": 35,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "4.2",
+      "iter": 2,
       "ms": 51.0,
       "rows": 77,
-      "iter": 2,
-      "stream": 2,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "4.3",
-      "ms": 18.0,
       "iter": 2,
-      "stream": 2,
+      "ms": 18.0,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 2
     },
     {
       "id": "1.1",
+      "iter": 3,
       "ms": 11.0,
       "rows": 1,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "1.2",
+      "iter": 3,
       "ms": 11.0,
       "rows": 1,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "1.3",
+      "iter": 3,
       "ms": 13.0,
       "rows": 1,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "2.1",
-      "ms": 3.0,
       "iter": 3,
-      "stream": 3,
+      "ms": 3.0,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "2.2",
-      "ms": 4.0,
       "iter": 3,
-      "stream": 3,
+      "ms": 4.0,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "2.3",
-      "ms": 3.0,
       "iter": 3,
-      "stream": 3,
+      "ms": 3.0,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "3.1",
+      "iter": 3,
       "ms": 14.0,
       "rows": 149,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "3.2",
+      "iter": 3,
       "ms": 10.0,
       "rows": 43,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "3.3",
-      "ms": 2.0,
       "iter": 3,
-      "stream": 3,
+      "ms": 2.0,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "3.4",
-      "ms": 2.0,
       "iter": 3,
-      "stream": 3,
+      "ms": 2.0,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "4.1",
+      "iter": 3,
       "ms": 14.0,
       "rows": 35,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "4.2",
+      "iter": 3,
       "ms": 50.0,
       "rows": 77,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     },
     {
       "id": "4.3",
-      "ms": 13.0,
       "iter": 3,
-      "stream": 3,
+      "ms": 13.0,
       "run_type": "measurement",
-      "status": "SUCCESS"
+      "status": "SUCCESS",
+      "stream": 3
     }
   ],
+  "run": {
+    "id": "cee8328f",
+    "iterations": 3,
+    "query_time_ms": 469,
+    "streams": 3,
+    "timestamp": "2026-05-06T11:54:45.732714",
+    "total_duration_ms": 1525
+  },
+  "summary": {
+    "data": {
+      "load_time_ms": 706.2,
+      "rows_loaded": 625757
+    },
+    "queries": {
+      "failed": 0,
+      "passed": 39,
+      "total": 39
+    },
+    "timing": {
+      "avg_ms": 12.0,
+      "geometric_mean_ms": 7.9,
+      "max_ms": 51,
+      "min_ms": 2,
+      "p90_ms": 18,
+      "p95_ms": 51,
+      "p99_ms": 51,
+      "stdev_ms": 12.4,
+      "total_ms": 469
+    },
+    "validation": "passed"
+  },
   "tables": {
     "customer": {
       "rows": 3000
@@ -639,100 +734,5 @@
       "rows": 200
     }
   },
-  "cost": {
-    "total_usd": 0,
-    "model": "estimated"
-  },
-  "normalized_cost": {
-    "normalized_cost_usd": "0",
-    "cost_usd": null,
-    "cost_model_version": "2025.11",
-    "cost_model_source": "benchbox.core.cost.pricing",
-    "cost_scope": "compute_only",
-    "cost_status": "not_applicable_local",
-    "billing_unit": "not_applicable",
-    "pricing_region": "not_applicable",
-    "deployment": {
-      "cloud_provider": null,
-      "cloud_region": null,
-      "instance_type": null,
-      "warehouse_size": null,
-      "node_count": null,
-      "cluster_size": null,
-      "storage_format": null,
-      "storage_tier": null
-    }
-  },
-  "execution": {
-    "entry_point": "cli",
-    "timestamp": "2026-05-06T11:54:44.105759",
-    "phases": [
-      "load",
-      "power"
-    ],
-    "compression": {
-      "type": "zstd"
-    },
-    "mode": "sql",
-    "driver_package": "psycopg",
-    "driver_version_resolved": "3.3.3",
-    "driver_version_actual": "3.3.3",
-    "driver_runtime_strategy": "current-process",
-    "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-10/.venv/bin/python3",
-    "non_interactive": true,
-    "tuning_mode": "tuned"
-  },
-  "environment": {
-    "os": "Darwin",
-    "arch": "arm64",
-    "python": "3.12.11",
-    "client_host": {
-      "os": "Darwin",
-      "arch": "arm64",
-      "python": "3.12.11",
-      "machine_id": "machine_45d1a3ef31a1728d"
-    },
-    "platform_runtime": {
-      "runtime_type": "docker_container",
-      "collection_status": "available",
-      "source": "observed",
-      "engine_host": "host_e0647dbc4998"
-    },
-    "container": {
-      "collection_status": "available",
-      "source": "observed",
-      "docker_engine_version": "29.4.0",
-      "image": "postgres:18",
-      "container_id": "container_7e90a1b3949d",
-      "container_name": "container_5ca9746cdb8f",
-      "requested_platform": "linux",
-      "port_mappings": {
-        "5432/tcp": [
-          {
-            "HostIp": "[REDACTED]",
-            "HostPort": "5432"
-          },
-          {
-            "HostIp": "::",
-            "HostPort": "5432"
-          }
-        ]
-      },
-      "volumes": [
-        {
-          "source": "path_ca64847467fc",
-          "destination": "path_84ddf589591c",
-          "mode": "rw",
-          "rw": true
-        }
-      ],
-      "state": "running"
-    },
-    "machine_id": "machine_45d1a3ef31a1728d"
-  },
-  "export": {
-    "timestamp": "2026-05-06T11:54:45.750983",
-    "tool": "benchbox-exporter",
-    "anonymized": true
-  }
+  "version": "2.1"
 }

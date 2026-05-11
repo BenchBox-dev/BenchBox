@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:12:17.856014+00:00",
-  "bundle_file": "tpch_sf001_datafusion_sql_20260506_105956_6c4e805a.json",
-  "bundle_hash": "3b8bbc428414317fb87742c7aceda7fd95f273369de2f4ff5c3832da40c27d8a",
-  "companion_hashes": {},
   "benchmark": "TPC-H",
+  "bundle_file": "tpch_sf001_datafusion_sql_20260506_105956_6c4e805a.json",
+  "bundle_hash": "51d39a73b50d40c809f328c23fe9ed44fd9aa78bd14cf33d7f844eaa544bf96a",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "DataFusion",
   "scale_factor": 0.01,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:12:17.856014+00:00",
   "submitted_by": "Joe Harris"
 }

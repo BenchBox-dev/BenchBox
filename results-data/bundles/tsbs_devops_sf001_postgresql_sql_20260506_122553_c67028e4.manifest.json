@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:13:35.812455+00:00",
-  "bundle_file": "tsbs_devops_sf001_postgresql_sql_20260506_122553_c67028e4.json",
-  "bundle_hash": "35ef5a2bc5bd3769b2b02caaff9720d02baad05e5ff495ca4fd9aba340624d08",
-  "companion_hashes": {},
   "benchmark": "TSBS DevOps",
+  "bundle_file": "tsbs_devops_sf001_postgresql_sql_20260506_122553_c67028e4.json",
+  "bundle_hash": "c11a331d21b1b31fcbe0a35e7c8417d51c33953ace2c6820440b8ea8638c581b",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "PostgreSQL",
   "scale_factor": 0.01,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:13:35.812455+00:00",
   "submitted_by": "Joe Harris"
 }

@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:08:50.562100+00:00",
-  "bundle_file": "coffeeshop_sf1_postgresql_sql_20260506_120428_7013bbb1.json",
-  "bundle_hash": "07b78b17d749f4f496830427b4c22ecd32cad8ef72b0363fc127688d5c25a835",
-  "companion_hashes": {},
   "benchmark": "CoffeeShop",
+  "bundle_file": "coffeeshop_sf1_postgresql_sql_20260506_120428_7013bbb1.json",
+  "bundle_hash": "53a2af54bffcb308110d5b1a600c31ac8628d9f98cdceba6ba236bd5cb8628ec",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "PostgreSQL",
   "scale_factor": 1.0,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:08:50.562100+00:00",
   "submitted_by": "Joe Harris"
 }

@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T00:46:55.659506+00:00",
-  "bundle_file": "nyctaxi_sf001_duckdb_sql_20260505_195804_c08bdfbb.json",
-  "bundle_hash": "32e3e7162e42990494814f2e1b2167e4065c113681ad784d523c642d0b6d5db2",
-  "companion_hashes": {},
   "benchmark": "NYC Taxi OLAP",
+  "bundle_file": "nyctaxi_sf001_duckdb_sql_20260505_195804_c08bdfbb.json",
+  "bundle_hash": "29958f0971ec7e91a3352339c6247b8fdb51d23e4ccc539469dd34e3307ef2ff",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "DuckDB",
   "scale_factor": 0.01,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T00:46:55.659506+00:00",
   "submitted_by": "Joe Harris"
 }

@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-03T02:50:49.606492+00:00",
-  "bundle_file": "tpcdi_sf1_sqlite_sql_20260502_191515_a4c7659d.json",
-  "bundle_hash": "e058f0f620f9adcb77586afad40a10b32af1c7cee5276cc3d104b934b6b9fc90",
-  "companion_hashes": {},
   "benchmark": "TPC-DI",
+  "bundle_file": "tpcdi_sf1_sqlite_sql_20260502_191515_a4c7659d.json",
+  "bundle_hash": "f159a4254ea03f87c189fd3ffbe7a7be519c8c8db7d084d80a7d877c0916eeec",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "SQLite",
   "scale_factor": 1.0,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:50:49.606492+00:00",
   "submitted_by": "BenchBox UAT"
 }

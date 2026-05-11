@@ -1,679 +1,58 @@
 {
-  "version": "2.1",
-  "run": {
-    "id": "412a5b1c",
-    "timestamp": "2026-05-06T11:24:02.552293",
-    "total_duration_ms": 24151,
-    "query_time_ms": 796,
-    "iterations": 3,
-    "streams": 3
-  },
   "benchmark": {
     "id": "ssb",
     "name": "Star Schema",
     "scale_factor": 1.0,
     "test_type": "power"
   },
-  "platform": {
-    "name": "StarRocks",
-    "version": "8.0.33",
-    "client_version": "1.4.6",
-    "config": {
-      "execution_mode": "sql",
-      "deployment_mode": "self-hosted",
-      "host": "localhost",
-      "port": 19030,
-      "database": "database_1ed3694af06b",
-      "http_port": 18040,
-      "driver_package": "pymysql",
-      "driver_version_resolved": "1.1.2",
-      "driver_version_actual": "1.1.2",
-      "driver_runtime_strategy": "current-process",
-      "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-10/.venv/bin/python3"
-    },
-    "deployment": {
-      "deployment_type": "self_hosted",
-      "endpoint_class": "localhost_port",
-      "metadata_source": "inferred",
-      "collection_status": "partial"
-    },
-    "cloud": {
-      "source": "unavailable",
-      "collection_status": "unavailable"
-    },
-    "compute": {
-      "source": "unavailable",
-      "collection_status": "unavailable"
-    },
-    "storage": {
-      "source": "unavailable",
-      "collection_status": "unavailable"
-    },
-    "raw_config": {
-      "host": "localhost",
-      "port": 19030,
-      "username": "user_34f059c63921",
-      "password": "<redacted>",
-      "http_port": 18040,
-      "database": "database_1ed3694af06b",
-      "tuning_config": "UnifiedTuningConfiguration(primary_keys=PrimaryKeyConfiguration(enabled=True, enforce_uniqueness=True, nullable=False), foreign_keys=ForeignKeyConfiguration(enabled=True, enforce_referential_integrity=True, on_delete_action='RESTRICT', on_update_action='RESTRICT'), unique_constraints=UniqueConstraintConfiguration(enabled=True, ignore_nulls=False), check_constraints=CheckConstraintConfiguration(enabled=True, enforce_on_insert=True, enforce_on_update=True), platform_optimizations=PlatformOptimizationConfiguration(z_ordering_enabled=False, z_ordering_columns=[], liquid_clustering_enabled=False, liquid_clustering_columns=[], databricks_clustering_strategy='z_order', sorted_ingestion_mode='off', sorted_ingestion_method='auto', auto_optimize_enabled=False, auto_compact_enabled=False, bloom_filters_enabled=False, bloom_filter_columns=[], materialized_views_enabled=False), table_tunings={})"
-    },
-    "raw_metadata": {
-      "deployment_mode": "self-hosted"
-    },
-    "driver_actual_version": "1.1.2",
-    "driver_package": "pymysql",
-    "driver_resolved_version": "1.1.2",
-    "driver_runtime_strategy": "current-process"
-  },
   "config": {
     "compression": {
-      "type": "zstd",
-      "level": null
+      "level": null,
+      "type": "zstd"
     },
+    "mode": "sql",
     "phases": [
       "load",
       "power"
     ],
-    "platform_options": {
-      "host": "localhost",
-      "port": "19030",
-      "username": "user_34f059c63921",
-      "http_port": "18040",
-      "force_recreate": false,
-      "show_query_plans": false,
-      "force_upload": false,
-      "password": "<redacted>"
-    },
     "platform_option_sources": {
-      "host": "host_d82c4866bd3b",
-      "port": "cli_option",
-      "username": "user_4af2b511cbe3",
-      "http_port": "cli_option",
       "force_recreate": "saved_config",
-      "show_query_plans": "saved_config",
       "force_upload": "saved_config",
-      "password": "<redacted>"
-    },
-    "mode": "sql"
-  },
-  "summary": {
-    "queries": {
-      "total": 39,
-      "passed": 39,
-      "failed": 0
-    },
-    "timing": {
-      "total_ms": 796,
-      "avg_ms": 20.4,
-      "min_ms": 8,
-      "max_ms": 49,
-      "geometric_mean_ms": 17.6,
-      "stdev_ms": 11.6,
-      "p90_ms": 37,
-      "p95_ms": 48,
-      "p99_ms": 49
-    },
-    "data": {
-      "rows_loaded": 6234557,
-      "load_time_ms": 22767.1
-    },
-    "validation": "passed"
-  },
-  "phases": {
-    "data_generation": {
-      "status": "SUCCESS",
-      "duration_ms": 0
-    },
-    "schema_creation": {
-      "status": "SUCCESS",
-      "duration_ms": 17
-    },
-    "data_loading": {
-      "status": "SUCCESS",
-      "duration_ms": 22767
-    },
-    "validation": {
-      "status": "PASSED",
-      "duration_ms": 50
-    },
-    "power_test": {
-      "status": "COMPLETED",
-      "duration_ms": 1153
-    },
-    "throughput_test": {
-      "status": "NOT_RUN"
-    }
-  },
-  "queries": [
-    {
-      "id": "1.1",
-      "ms": 60.0,
-      "rows": 1,
-      "iter": 0,
-      "stream": 0,
-      "run_type": "warmup",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "1.2",
-      "ms": 13.0,
-      "rows": 1,
-      "iter": 0,
-      "stream": 0,
-      "run_type": "warmup",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "1.3",
-      "ms": 9.0,
-      "rows": 1,
-      "iter": 0,
-      "stream": 0,
-      "run_type": "warmup",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "2.1",
-      "ms": 23.0,
-      "iter": 0,
-      "stream": 0,
-      "run_type": "warmup",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "2.2",
-      "ms": 13.0,
-      "iter": 0,
-      "stream": 0,
-      "run_type": "warmup",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "2.3",
-      "ms": 13.0,
-      "iter": 0,
-      "stream": 0,
-      "run_type": "warmup",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "3.1",
-      "ms": 61.0,
-      "rows": 150,
-      "iter": 0,
-      "stream": 0,
-      "run_type": "warmup",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "3.2",
-      "ms": 24.0,
-      "rows": 266,
-      "iter": 0,
-      "stream": 0,
-      "run_type": "warmup",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "3.3",
-      "ms": 17.0,
-      "iter": 0,
-      "stream": 0,
-      "run_type": "warmup",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "3.4",
-      "ms": 13.0,
-      "iter": 0,
-      "stream": 0,
-      "run_type": "warmup",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "4.1",
-      "ms": 48.0,
-      "rows": 35,
-      "iter": 0,
-      "stream": 0,
-      "run_type": "warmup",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "4.2",
-      "ms": 24.0,
-      "rows": 10,
-      "iter": 0,
-      "stream": 0,
-      "run_type": "warmup",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "4.3",
-      "ms": 15.0,
-      "iter": 0,
-      "stream": 0,
-      "run_type": "warmup",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "1.1",
-      "ms": 10.0,
-      "rows": 1,
-      "iter": 1,
-      "stream": 1,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "1.2",
-      "ms": 9.0,
-      "rows": 1,
-      "iter": 1,
-      "stream": 1,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "1.3",
-      "ms": 8.0,
-      "rows": 1,
-      "iter": 1,
-      "stream": 1,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "2.1",
-      "ms": 10.0,
-      "iter": 1,
-      "stream": 1,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "2.2",
-      "ms": 16.0,
-      "iter": 1,
-      "stream": 1,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "2.3",
-      "ms": 12.0,
-      "iter": 1,
-      "stream": 1,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "3.1",
-      "ms": 32.0,
-      "rows": 150,
-      "iter": 1,
-      "stream": 1,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "3.2",
-      "ms": 23.0,
-      "rows": 266,
-      "iter": 1,
-      "stream": 1,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "3.3",
-      "ms": 12.0,
-      "iter": 1,
-      "stream": 1,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "3.4",
-      "ms": 17.0,
-      "iter": 1,
-      "stream": 1,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "4.1",
-      "ms": 37.0,
-      "rows": 35,
-      "iter": 1,
-      "stream": 1,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "4.2",
-      "ms": 49.0,
-      "rows": 10,
-      "iter": 1,
-      "stream": 1,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "4.3",
-      "ms": 43.0,
-      "iter": 1,
-      "stream": 1,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "1.1",
-      "ms": 12.0,
-      "rows": 1,
-      "iter": 2,
-      "stream": 2,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "1.2",
-      "ms": 16.0,
-      "rows": 1,
-      "iter": 2,
-      "stream": 2,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "1.3",
-      "ms": 19.0,
-      "rows": 1,
-      "iter": 2,
-      "stream": 2,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "2.1",
-      "ms": 11.0,
-      "iter": 2,
-      "stream": 2,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "2.2",
-      "ms": 16.0,
-      "iter": 2,
-      "stream": 2,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "2.3",
-      "ms": 19.0,
-      "iter": 2,
-      "stream": 2,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "3.1",
-      "ms": 27.0,
-      "rows": 150,
-      "iter": 2,
-      "stream": 2,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "3.2",
-      "ms": 26.0,
-      "rows": 266,
-      "iter": 2,
-      "stream": 2,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "3.3",
-      "ms": 14.0,
-      "iter": 2,
-      "stream": 2,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "3.4",
-      "ms": 10.0,
-      "iter": 2,
-      "stream": 2,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "4.1",
-      "ms": 48.0,
-      "rows": 35,
-      "iter": 2,
-      "stream": 2,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "4.2",
-      "ms": 36.0,
-      "rows": 10,
-      "iter": 2,
-      "stream": 2,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "4.3",
-      "ms": 22.0,
-      "iter": 2,
-      "stream": 2,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "1.1",
-      "ms": 10.0,
-      "rows": 1,
-      "iter": 3,
-      "stream": 3,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "1.2",
-      "ms": 9.0,
-      "rows": 1,
-      "iter": 3,
-      "stream": 3,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "1.3",
-      "ms": 9.0,
-      "rows": 1,
-      "iter": 3,
-      "stream": 3,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "2.1",
-      "ms": 16.0,
-      "iter": 3,
-      "stream": 3,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "2.2",
-      "ms": 11.0,
-      "iter": 3,
-      "stream": 3,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "2.3",
-      "ms": 9.0,
-      "iter": 3,
-      "stream": 3,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "3.1",
-      "ms": 31.0,
-      "rows": 150,
-      "iter": 3,
-      "stream": 3,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "3.2",
-      "ms": 22.0,
-      "rows": 266,
-      "iter": 3,
-      "stream": 3,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "3.3",
-      "ms": 11.0,
-      "iter": 3,
-      "stream": 3,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "3.4",
-      "ms": 16.0,
-      "iter": 3,
-      "stream": 3,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "4.1",
-      "ms": 33.0,
-      "rows": 35,
-      "iter": 3,
-      "stream": 3,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "4.2",
-      "ms": 31.0,
-      "rows": 10,
-      "iter": 3,
-      "stream": 3,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    },
-    {
-      "id": "4.3",
-      "ms": 34.0,
-      "iter": 3,
-      "stream": 3,
-      "run_type": "measurement",
-      "status": "SUCCESS"
-    }
-  ],
-  "tables": {
-    "customer": {
-      "rows": 30000
-    },
-    "date": {
-      "rows": 2557
-    },
-    "lineorder": {
-      "rows": 6000000
-    },
-    "part": {
-      "rows": 200000
-    },
-    "supplier": {
-      "rows": 2000
+      "host": "host_d82c4866bd3b",
+      "http_port": "cli_option",
+      "password": "<redacted>",
+      "port": "cli_option",
+      "show_query_plans": "saved_config",
+      "username": "user_4af2b511cbe3"
+    },
+    "platform_options": {
+      "force_recreate": false,
+      "force_upload": false,
+      "host": "localhost",
+      "http_port": "18040",
+      "password": "<redacted>",
+      "port": "19030",
+      "show_query_plans": false,
+      "username": "user_34f059c63921"
     }
   },
   "cost": {
     "model": "estimated"
   },
-  "normalized_cost": {
-    "normalized_cost_usd": null,
-    "cost_usd": null,
-    "cost_model_version": "2025.11",
-    "cost_model_source": "benchbox.core.cost.pricing",
-    "cost_scope": "compute_only",
-    "cost_status": "unavailable",
-    "billing_unit": "unknown",
-    "pricing_region": "us-east-1",
-    "deployment": {
-      "cloud_provider": "aws",
-      "cloud_region": "us-east-1",
-      "instance_type": null,
-      "warehouse_size": null,
-      "node_count": null,
-      "cluster_size": null,
-      "storage_format": null,
-      "storage_tier": null
-    }
-  },
-  "execution": {
-    "entry_point": "cli",
-    "timestamp": "2026-05-06T11:23:38.187313",
-    "phases": [
-      "load",
-      "power"
-    ],
-    "compression": {
-      "type": "zstd"
-    },
-    "mode": "sql",
-    "driver_package": "pymysql",
-    "driver_version_resolved": "1.1.2",
-    "driver_version_actual": "1.1.2",
-    "driver_runtime_strategy": "current-process",
-    "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-10/.venv/bin/python3",
-    "non_interactive": true,
-    "tuning_mode": "tuned"
-  },
   "environment": {
-    "os": "Darwin",
     "arch": "arm64",
-    "python": "3.12.11",
     "client_host": {
-      "os": "Darwin",
       "arch": "arm64",
-      "python": "3.12.11",
-      "machine_id": "machine_45d1a3ef31a1728d"
-    },
-    "platform_runtime": {
-      "runtime_type": "docker_container",
-      "collection_status": "available",
-      "source": "observed",
-      "engine_host": "host_71605fd95ff2"
+      "machine_id": "machine_45d1a3ef31a1728d",
+      "os": "Darwin",
+      "python": "3.12.11"
     },
     "container": {
       "collection_status": "available",
-      "source": "observed",
-      "docker_engine_version": "29.4.0",
-      "image": "starrocks/allin1-ubuntu:3.5.16",
       "container_id": "container_d2e3042978cc",
       "container_name": "container_668599d65f08",
-      "requested_platform": "linux",
+      "docker_engine_version": "29.4.0",
+      "image": "starrocks/allin1-ubuntu:3.5.16",
       "port_mappings": {
         "8040/tcp": [
           {
@@ -696,27 +75,648 @@
           }
         ]
       },
+      "requested_platform": "linux",
+      "source": "observed",
+      "state": "running",
       "volumes": [
         {
-          "source": "path_79ed7a2a762b",
           "destination": "path_991740d27d63",
           "mode": "rw",
-          "rw": true
+          "rw": true,
+          "source": "path_79ed7a2a762b"
         },
         {
-          "source": "path_84064957df60",
           "destination": "path_672529c8acbe",
           "mode": "rw",
-          "rw": true
+          "rw": true,
+          "source": "path_84064957df60"
         }
-      ],
-      "state": "running"
+      ]
     },
-    "machine_id": "machine_45d1a3ef31a1728d"
+    "machine_id": "machine_45d1a3ef31a1728d",
+    "os": "Darwin",
+    "platform_runtime": {
+      "collection_status": "available",
+      "engine_host": "host_71605fd95ff2",
+      "runtime_type": "docker_container",
+      "source": "observed"
+    },
+    "python": "3.12.11"
+  },
+  "execution": {
+    "compression": {
+      "type": "zstd"
+    },
+    "driver_package": "pymysql",
+    "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-10/.venv/bin/python3",
+    "driver_runtime_strategy": "current-process",
+    "driver_version_actual": "1.1.2",
+    "driver_version_resolved": "1.1.2",
+    "entry_point": "cli",
+    "mode": "sql",
+    "non_interactive": true,
+    "phases": [
+      "load",
+      "power"
+    ],
+    "timestamp": "2026-05-06T11:23:38.187313",
+    "tuning_mode": "tuned"
   },
   "export": {
+    "anonymized": true,
     "timestamp": "2026-05-06T11:24:02.568638",
-    "tool": "benchbox-exporter",
-    "anonymized": true
-  }
+    "tool": "benchbox-exporter"
+  },
+  "normalized_cost": {
+    "billing_unit": "unknown",
+    "cost_model_source": "benchbox.core.cost.pricing",
+    "cost_model_version": "2025.11",
+    "cost_scope": "compute_only",
+    "cost_status": "unavailable",
+    "cost_usd": null,
+    "deployment": {
+      "cloud_provider": "aws",
+      "cloud_region": "us-east-1",
+      "cluster_size": null,
+      "instance_type": null,
+      "node_count": null,
+      "storage_format": null,
+      "storage_tier": null,
+      "warehouse_size": null
+    },
+    "normalized_cost_usd": null,
+    "pricing_region": "us-east-1"
+  },
+  "phases": {
+    "data_generation": {
+      "duration_ms": 0,
+      "status": "SUCCESS"
+    },
+    "data_loading": {
+      "duration_ms": 22767,
+      "status": "SUCCESS"
+    },
+    "power_test": {
+      "duration_ms": 1153,
+      "status": "COMPLETED"
+    },
+    "schema_creation": {
+      "duration_ms": 17,
+      "status": "SUCCESS"
+    },
+    "throughput_test": {
+      "status": "NOT_RUN"
+    },
+    "validation": {
+      "duration_ms": 50,
+      "status": "PASSED"
+    }
+  },
+  "platform": {
+    "client_version": "1.4.6",
+    "cloud": {
+      "collection_status": "unavailable",
+      "source": "unavailable"
+    },
+    "compute": {
+      "collection_status": "unavailable",
+      "source": "unavailable"
+    },
+    "config": {
+      "database": "database_1ed3694af06b",
+      "deployment_mode": "self-hosted",
+      "driver_package": "pymysql",
+      "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-10/.venv/bin/python3",
+      "driver_runtime_strategy": "current-process",
+      "driver_version_actual": "1.1.2",
+      "driver_version_resolved": "1.1.2",
+      "execution_mode": "sql",
+      "host": "localhost",
+      "http_port": 18040,
+      "port": 19030
+    },
+    "deployment": {
+      "collection_status": "partial",
+      "deployment_type": "self_hosted",
+      "endpoint_class": "localhost_port",
+      "metadata_source": "inferred"
+    },
+    "driver_actual_version": "1.1.2",
+    "driver_package": "pymysql",
+    "driver_resolved_version": "1.1.2",
+    "driver_runtime_strategy": "current-process",
+    "name": "StarRocks",
+    "raw_config": {
+      "database": "database_1ed3694af06b",
+      "host": "localhost",
+      "http_port": 18040,
+      "password": "<redacted>",
+      "port": 19030,
+      "tuning_config": "UnifiedTuningConfiguration(primary_keys=PrimaryKeyConfiguration(enabled=True, enforce_uniqueness=True, nullable=False), foreign_keys=ForeignKeyConfiguration(enabled=True, enforce_referential_integrity=True, on_delete_action='RESTRICT', on_update_action='RESTRICT'), unique_constraints=UniqueConstraintConfiguration(enabled=True, ignore_nulls=False), check_constraints=CheckConstraintConfiguration(enabled=True, enforce_on_insert=True, enforce_on_update=True), platform_optimizations=PlatformOptimizationConfiguration(z_ordering_enabled=False, z_ordering_columns=[], liquid_clustering_enabled=False, liquid_clustering_columns=[], databricks_clustering_strategy='z_order', sorted_ingestion_mode='off', sorted_ingestion_method='auto', auto_optimize_enabled=False, auto_compact_enabled=False, bloom_filters_enabled=False, bloom_filter_columns=[], materialized_views_enabled=False), table_tunings={})",
+      "username": "user_34f059c63921"
+    },
+    "raw_metadata": {
+      "deployment_mode": "self-hosted"
+    },
+    "storage": {
+      "collection_status": "unavailable",
+      "source": "unavailable"
+    },
+    "version": "8.0.33"
+  },
+  "queries": [
+    {
+      "id": "1.1",
+      "iter": 0,
+      "ms": 60.0,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "1.2",
+      "iter": 0,
+      "ms": 13.0,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "1.3",
+      "iter": 0,
+      "ms": 9.0,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "2.1",
+      "iter": 0,
+      "ms": 23.0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "2.2",
+      "iter": 0,
+      "ms": 13.0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "2.3",
+      "iter": 0,
+      "ms": 13.0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "3.1",
+      "iter": 0,
+      "ms": 61.0,
+      "rows": 150,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "3.2",
+      "iter": 0,
+      "ms": 24.0,
+      "rows": 266,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "3.3",
+      "iter": 0,
+      "ms": 17.0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "3.4",
+      "iter": 0,
+      "ms": 13.0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "4.1",
+      "iter": 0,
+      "ms": 48.0,
+      "rows": 35,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "4.2",
+      "iter": 0,
+      "ms": 24.0,
+      "rows": 10,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "4.3",
+      "iter": 0,
+      "ms": 15.0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "1.1",
+      "iter": 1,
+      "ms": 10.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "1.2",
+      "iter": 1,
+      "ms": 9.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "1.3",
+      "iter": 1,
+      "ms": 8.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "2.1",
+      "iter": 1,
+      "ms": 10.0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "2.2",
+      "iter": 1,
+      "ms": 16.0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "2.3",
+      "iter": 1,
+      "ms": 12.0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "3.1",
+      "iter": 1,
+      "ms": 32.0,
+      "rows": 150,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "3.2",
+      "iter": 1,
+      "ms": 23.0,
+      "rows": 266,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "3.3",
+      "iter": 1,
+      "ms": 12.0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "3.4",
+      "iter": 1,
+      "ms": 17.0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "4.1",
+      "iter": 1,
+      "ms": 37.0,
+      "rows": 35,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "4.2",
+      "iter": 1,
+      "ms": 49.0,
+      "rows": 10,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "4.3",
+      "iter": 1,
+      "ms": 43.0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "1.1",
+      "iter": 2,
+      "ms": 12.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "1.2",
+      "iter": 2,
+      "ms": 16.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "1.3",
+      "iter": 2,
+      "ms": 19.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "2.1",
+      "iter": 2,
+      "ms": 11.0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "2.2",
+      "iter": 2,
+      "ms": 16.0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "2.3",
+      "iter": 2,
+      "ms": 19.0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "3.1",
+      "iter": 2,
+      "ms": 27.0,
+      "rows": 150,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "3.2",
+      "iter": 2,
+      "ms": 26.0,
+      "rows": 266,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "3.3",
+      "iter": 2,
+      "ms": 14.0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "3.4",
+      "iter": 2,
+      "ms": 10.0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "4.1",
+      "iter": 2,
+      "ms": 48.0,
+      "rows": 35,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "4.2",
+      "iter": 2,
+      "ms": 36.0,
+      "rows": 10,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "4.3",
+      "iter": 2,
+      "ms": 22.0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "1.1",
+      "iter": 3,
+      "ms": 10.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "1.2",
+      "iter": 3,
+      "ms": 9.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "1.3",
+      "iter": 3,
+      "ms": 9.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "2.1",
+      "iter": 3,
+      "ms": 16.0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "2.2",
+      "iter": 3,
+      "ms": 11.0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "2.3",
+      "iter": 3,
+      "ms": 9.0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "3.1",
+      "iter": 3,
+      "ms": 31.0,
+      "rows": 150,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "3.2",
+      "iter": 3,
+      "ms": 22.0,
+      "rows": 266,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "3.3",
+      "iter": 3,
+      "ms": 11.0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "3.4",
+      "iter": 3,
+      "ms": 16.0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "4.1",
+      "iter": 3,
+      "ms": 33.0,
+      "rows": 35,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "4.2",
+      "iter": 3,
+      "ms": 31.0,
+      "rows": 10,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "4.3",
+      "iter": 3,
+      "ms": 34.0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    }
+  ],
+  "run": {
+    "id": "412a5b1c",
+    "iterations": 3,
+    "query_time_ms": 796,
+    "streams": 3,
+    "timestamp": "2026-05-06T11:24:02.552293",
+    "total_duration_ms": 24151
+  },
+  "summary": {
+    "data": {
+      "load_time_ms": 22767.1,
+      "rows_loaded": 6234557
+    },
+    "queries": {
+      "failed": 0,
+      "passed": 39,
+      "total": 39
+    },
+    "timing": {
+      "avg_ms": 20.4,
+      "geometric_mean_ms": 17.6,
+      "max_ms": 49,
+      "min_ms": 8,
+      "p90_ms": 37,
+      "p95_ms": 48,
+      "p99_ms": 49,
+      "stdev_ms": 11.6,
+      "total_ms": 796
+    },
+    "validation": "passed"
+  },
+  "tables": {
+    "customer": {
+      "rows": 30000
+    },
+    "date": {
+      "rows": 2557
+    },
+    "lineorder": {
+      "rows": 6000000
+    },
+    "part": {
+      "rows": 200000
+    },
+    "supplier": {
+      "rows": 2000
+    }
+  },
+  "version": "2.1"
 }

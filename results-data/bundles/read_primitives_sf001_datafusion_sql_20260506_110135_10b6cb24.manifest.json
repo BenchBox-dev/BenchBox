@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:10:46.703430+00:00",
-  "bundle_file": "read_primitives_sf001_datafusion_sql_20260506_110135_10b6cb24.json",
-  "bundle_hash": "473439049676c080150376e460d066ca8d60feee4e56804ce91c96c88f54bef0",
-  "companion_hashes": {},
   "benchmark": "Read Primitives",
+  "bundle_file": "read_primitives_sf001_datafusion_sql_20260506_110135_10b6cb24.json",
+  "bundle_hash": "3d6faa4a0d520e73c592bc413a019bee851a5eb7cb2f15114a807edc684be40f",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "DataFusion",
   "scale_factor": 0.01,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:10:46.703430+00:00",
   "submitted_by": "Joe Harris"
 }

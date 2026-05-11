@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-03T02:52:40.198760+00:00",
-  "bundle_file": "tpchavoc_sf01_spark_sql_20260502_210440_c8c039d6.json",
-  "bundle_hash": "286e6c2d5c2add13c57a12dfd3d2508143b1a7b69f30c589e04976692e771241",
-  "companion_hashes": {},
   "benchmark": "TPC-Havoc",
+  "bundle_file": "tpchavoc_sf01_spark_sql_20260502_210440_c8c039d6.json",
+  "bundle_hash": "30f1abb12b8bc5617fadd2ea76b9ff04b8ae0fc0b1f4385634785c85229f0aa6",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "Spark",
   "scale_factor": 0.1,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:52:40.198760+00:00",
   "submitted_by": "BenchBox UAT"
 }

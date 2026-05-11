@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-03T02:47:06.584283+00:00",
-  "bundle_file": "clickbench_sf1_spark_sql_20260502_204011_0677f492.json",
-  "bundle_hash": "3f7d9283d03a5448b58e4e04f13d42a6101ec311da3cba975c6f3caaf45d5e4a",
-  "companion_hashes": {},
   "benchmark": "ClickBench",
+  "bundle_file": "clickbench_sf1_spark_sql_20260502_204011_0677f492.json",
+  "bundle_hash": "ccd321ab0330092fd16c845049e319d7b59eaf1ce32f20947e1a542f99c1c034",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "Spark",
   "scale_factor": 1.0,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:47:06.584283+00:00",
   "submitted_by": "BenchBox UAT"
 }

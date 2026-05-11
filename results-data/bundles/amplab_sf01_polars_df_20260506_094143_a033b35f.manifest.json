@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:07:58.933301+00:00",
-  "bundle_file": "amplab_sf01_polars_df_20260506_094143_a033b35f.json",
-  "bundle_hash": "274f00d16a4e69563c3c764f0d4034deeaa695dfc8991776dac5205a75194d12",
-  "companion_hashes": {},
   "benchmark": "AMPLab",
+  "bundle_file": "amplab_sf01_polars_df_20260506_094143_a033b35f.json",
+  "bundle_hash": "e451845bb4da965ef0dbd671bc1d8deee2f68fdd20a9daf8c920d5bb74777775",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "Polars",
   "scale_factor": 0.1,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:07:58.933301+00:00",
   "submitted_by": "Joe Harris"
 }
