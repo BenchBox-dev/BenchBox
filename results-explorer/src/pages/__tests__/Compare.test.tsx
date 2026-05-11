@@ -561,7 +561,7 @@ describe("Compare", () => {
     expect(summary).toHaveTextContent("30.00x cost/performance");
   });
 
-  it("keeps missing query evidence visible in the summary and query diff table", async () => {
+  it("suppresses winner claims but keeps missing query evidence visible in the query diff table", async () => {
     const missingSqlite = makeResult({
       result_id: "r2",
       platform: "SQLite",
@@ -583,9 +583,10 @@ describe("Compare", () => {
 
     const summary = screen.getByRole("heading", { name: "Decision Summary" }).closest("section");
     const queryDiff = screen.getByRole("heading", { name: "Query-Level Diff" }).closest("section");
-    expect(summary).toHaveTextContent("1 fastest of 1 comparable");
-    expect(summary).toHaveTextContent("2 excluded for missing data");
+    expect(summary).toHaveTextContent("Claims suppressed");
+    expect(summary).toHaveTextContent("Selected runs do not share at least two valid query timings");
     expect(queryDiff).toHaveTextContent("3 comparisons");
+    expect(queryDiff).toHaveTextContent("Winner claims are suppressed because Selected runs do not share at least two valid query timings");
     expect(queryDiff).toHaveTextContent("Missing");
   });
 

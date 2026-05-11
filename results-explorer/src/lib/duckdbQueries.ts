@@ -694,21 +694,27 @@ async function loadBenchmarkSummaryFromDuckDB(
   const phaseDurationsByResult = await getResultPhaseDurations(rankingRows.map((r) => r.result_id));
 
   const queryIds = [...new Set(cellRows.map((c) => c.query_id))].sort();
-  const cellsByResult = new Map<string, Map<string, number | null>>();
+  const cellsByResult = new Map<string, Map<string, BenchmarkMatrixCellRow>>();
   for (const cell of cellRows) {
     let byQuery = cellsByResult.get(cell.result_id);
     if (!byQuery) {
       byQuery = new Map();
       cellsByResult.set(cell.result_id, byQuery);
     }
-    byQuery.set(cell.query_id, cell.display_ms);
+    byQuery.set(cell.query_id, cell);
   }
 
   const platforms: PlatformRow[] = rankingRows.map((row) => {
     const byQuery = cellsByResult.get(row.result_id);
     const timings: Record<string, number | null> = {};
+    const timingEligibility: PlatformRow["timing_eligibility"] = {};
     for (const qid of queryIds) {
-      timings[qid] = byQuery?.get(qid) ?? null;
+      const cell = byQuery?.get(qid) ?? null;
+      timings[qid] = cell?.display_ms ?? null;
+      timingEligibility[qid] = {
+        is_valid_display_timing: cell?.is_valid_display_timing ?? false,
+        timing_exclusion_reason: cell ? cell.timing_exclusion_reason : "missing_timing",
+      };
     }
     const percentileStats: PercentileStats | null =
       row.percentile_p50 !== null &&
@@ -762,6 +768,7 @@ async function loadBenchmarkSummaryFromDuckDB(
       percentile_stats: percentileStats,
       phase_durations: phaseDurationsByResult.get(row.result_id) ?? null,
       timings,
+      timing_eligibility: timingEligibility,
     };
   });
 

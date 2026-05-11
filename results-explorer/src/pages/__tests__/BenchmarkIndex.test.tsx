@@ -284,6 +284,10 @@ const SUMMARY: BenchmarkSummary = {
       percentile_stats: null,
       phase_durations: null,
       timings: { Q1: 10, Q2: 20 },
+      timing_eligibility: {
+        Q1: { is_valid_display_timing: true, timing_exclusion_reason: null },
+        Q2: { is_valid_display_timing: true, timing_exclusion_reason: null },
+      },
     },
     {
       result_id: "r2",
@@ -309,6 +313,10 @@ const SUMMARY: BenchmarkSummary = {
       percentile_stats: null,
       phase_durations: null,
       timings: { Q1: 100, Q2: 200 },
+      timing_eligibility: {
+        Q1: { is_valid_display_timing: true, timing_exclusion_reason: null },
+        Q2: { is_valid_display_timing: true, timing_exclusion_reason: null },
+      },
     },
   ],
   cell_reduction: "median_successful_measurement_ms",

@@ -4,6 +4,7 @@ import type { BenchmarkSummary, PlatformRow } from "@/types";
 import { DistributionBox } from "@/components/DistributionBox";
 
 function makePlatform(overrides: Partial<PlatformRow> = {}): PlatformRow {
+  const timings = overrides.timings ?? { q1: 100, q2: 200, q3: 300 };
   return {
     result_id: "r-default",
     platform: "DataFusion",
@@ -16,6 +17,13 @@ function makePlatform(overrides: Partial<PlatformRow> = {}): PlatformRow {
     deployment_class: null,
     instance_or_warehouse: null,
     is_ranking_eligible: true,
+    has_display_timing: true,
+    valid_query_count: 3,
+    missing_query_count: 0,
+    zero_timing_count: 0,
+    display_exclusion_reason: null,
+    comparison_exclusion_reason: null,
+    ranking_exclusion_reason: null,
     compliance_class: null,
     has_plans: false,
     plans_published: false,
@@ -31,7 +39,16 @@ function makePlatform(overrides: Partial<PlatformRow> = {}): PlatformRow {
     storage_format: null,
     billing_unit: null,
     pricing_region: null,
-    timings: { q1: 100, q2: 200, q3: 300 },
+    timings,
+    timing_eligibility: Object.fromEntries(
+      Object.entries(timings).map(([queryId, ms]) => [
+        queryId,
+        {
+          is_valid_display_timing: ms !== null && ms > 0,
+          timing_exclusion_reason: ms === null ? "missing_timing" : ms === 0 ? "zero_timing" : null,
+        },
+      ]),
+    ),
     visibility: "public-curated",
     test_type: null,
     tuning_mode: null,
@@ -74,6 +91,25 @@ function makeSummary(): BenchmarkSummary {
 }
 
 describe("DistributionBox label disambiguation (finding #7)", () => {
+  it("excludes cells using timing eligibility instead of raw positive values", () => {
+    const summary = {
+      ...makeSummary(),
+      platforms: [
+        makePlatform({
+          timings: { q1: 100, q2: 200, q3: 300 },
+          timing_eligibility: {
+            q1: { is_valid_display_timing: false, timing_exclusion_reason: "zero_timing" },
+            q2: { is_valid_display_timing: false, timing_exclusion_reason: "zero_timing" },
+            q3: { is_valid_display_timing: false, timing_exclusion_reason: "zero_timing" },
+          },
+        }),
+      ],
+    };
+
+    const { container } = render(<DistributionBox summary={summary} />);
+    expect(container.querySelector("svg")).toBeNull();
+  });
+
   it("preserves the disambiguator when the truncation budget would collide", () => {
     const { container } = render(<DistributionBox summary={makeSummary()} />);
     const labels = Array.from(container.querySelectorAll("text"))

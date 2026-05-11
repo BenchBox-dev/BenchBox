@@ -2,7 +2,7 @@ id: results-explorer-frontend-eligibility-normalization
 title: "Normalize Results Explorer frontend eligibility and timing semantics"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
 category: Core Functionality
 
 description: |
@@ -32,7 +32,7 @@ deps:
 work:
 - id: w1
   summary: "Add a shared frontend eligibility and timing helper"
-  status: pending
+  status: done
   notes: |
     Create a small shared helper, for example
     `results-explorer/src/lib/displayEligibility.ts`, that wraps the read-model
@@ -49,7 +49,7 @@ work:
 - id: w2
   summary: "Replace local zero/null timing predicates in chart math consumers"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Migrate `DistributionBox`, `CDFChart`, `NormalizedSpeedupChart`,
     `ChartPanel`, `SparklineTable`, and related chart math consumers to the
@@ -59,7 +59,7 @@ work:
 - id: w3
   summary: "Replace local eligibility checks in QueryHeatmap and RankTable"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Update matrix, rank, and mobile-card rendering so no-timing rows are not
     shown as normal evidence. If rows remain visible for provenance, render
@@ -69,7 +69,7 @@ work:
 - id: w4
   summary: "Replace local eligibility checks in CompareSummary and QueryDiffTable"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Make Compare use the same valid-timing predicate for:
       - primary metric winner selection;
@@ -84,7 +84,7 @@ work:
 - id: w5
   summary: "Update typed query models and tests for eligibility fields"
   needs: [w1, w2, w3, w4]
-  status: pending
+  status: done
   notes: |
     Update `types.ts`, DuckDB query helpers, and component test fixtures so
     new eligibility fields are present everywhere. Test fixtures must include:
@@ -97,7 +97,7 @@ work:
 - id: w6
   summary: "Add frontend regression tests for inconsistent timing semantics"
   needs: [w5]
-  status: pending
+  status: done
   notes: |
     Add targeted tests proving the same row is treated consistently by heatmap,
     rank table, box plot, CDF, compare summary, and query diff. Include an
@@ -174,6 +174,12 @@ success_metrics:
 - "No-timing rows cannot appear as normal ranked/comparable evidence."
 - "Compare suppresses winner claims when evidence coverage fails the policy threshold."
 - "Tests include AMPLab-shaped zero/no-timing regression fixtures."
+
+implementation_notes:
+- "Checked policy artifact: _project/analysis/results-explorer-display-contract-policy.md (policy SHA 66f207ee03182dbff4b3e5bc368d2c9be282a9b5)."
+- "Added shared frontend eligibility helper and required PlatformRow.timing_eligibility read-model field."
+- "Documented scope deviation: Compare.tsx, chartRegistry.ts, and adjacent fixtures were updated to propagate the required eligibility contract through existing compare/detail summary construction."
+- "Verification passed: targeted Vitest suite plus affected Compare/Benchmark/chart smoke tests (191 tests), npm run typecheck, npm run build."
 
 metadata:
   tags:

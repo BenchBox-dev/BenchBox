@@ -17,6 +17,7 @@ import type { BenchmarkSummary } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
 import { paletteColor } from "@/lib/chartTheme";
 import { buildLogLatencyScale, computeBoxStats, logLatencyFraction, logLatencyTicks } from "@/lib/chartMath";
+import { formatTimingExclusion, isTimingDisplayable, platformTimingValue } from "@/lib/displayEligibility";
 import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
 import { preserveUniqueAfterTruncation } from "@/components/RankTable";
 
@@ -50,16 +51,19 @@ export function DistributionBox({ summary }: Props) {
       label: displayLabels[i] ?? p.platform,
       fullLabel: rawLabels[i] ?? p.platform,
       color: paletteColor(i),
-      stats: computeBoxStats(Object.values(p.timings)),
+      isDisplayable: isTimingDisplayable(p),
+      stats: computeBoxStats(summary.query_ids.map((queryId) => platformTimingValue(p, queryId))),
     }))
-    .filter((r) => r.stats !== null) as {
+    .filter((r) => r.isDisplayable && r.stats !== null) as {
     label: string;
     fullLabel: string;
     color: string;
+    isDisplayable: boolean;
     stats: NonNullable<ReturnType<typeof computeBoxStats>>;
   }[];
 
   if (rows.length === 0) return null;
+  const excludedRows = summary.platforms.filter((platform) => !isTimingDisplayable(platform));
 
   const allMs = rows.flatMap((r) => [r.stats.min, r.stats.q1, r.stats.median, r.stats.q3, r.stats.max]);
   const scale = buildLogLatencyScale(allMs, { lowerPad: 0.3, upperPad: 0.3 });
@@ -156,6 +160,9 @@ export function DistributionBox({ summary }: Props) {
       </svg>
       <p class="mt-1 text-[10px] text-[var(--bb-data-fg-subtle)]">
         Box: Q1-Q3 · Line: median · Whiskers: min/max of per-query display latencies
+        {excludedRows.length > 0
+          ? ` · ${excludedRows.length} row(s) excluded: ${formatTimingExclusion(excludedRows[0])}`
+          : ""}
       </p>
     </div>
   );

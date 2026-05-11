@@ -1,4 +1,5 @@
 import type { DetailResult } from "@/types";
+import { isValidTimingValue, timingValueForQuery } from "@/lib/displayEligibility";
 import { fmtMs } from "@/utils";
 import { StatusBadge, type StatusTone } from "@/components/StatusBadge";
 import { TableScrollHint } from "@/components/TableScrollHint";
@@ -104,7 +105,7 @@ export function buildQueryDiffRows(results: DetailResult[], baselineIndex = 0): 
         candidatePlatform: candidate.platform,
         baselineMs,
         candidateMs,
-        ratio: baselineMs !== null && baselineMs > 0 && candidateMs !== null ? candidateMs / baselineMs : null,
+        ratio: isValidTimingValue(baselineMs) && isValidTimingValue(candidateMs) ? candidateMs / baselineMs : null,
         deltaMs,
         status: diffStatus(deltaMs),
       };
@@ -117,7 +118,7 @@ function normalizeBaselineIndex(results: DetailResult[], baselineIndex: number) 
 }
 
 function displayMsForQuery(result: DetailResult, queryId: string): number | null {
-  return result.display_timings.find((timing) => timing.query_id === queryId)?.display_ms ?? null;
+  return timingValueForQuery(result, queryId);
 }
 
 function diffStatus(deltaMs: number | null): QueryDiffStatus {

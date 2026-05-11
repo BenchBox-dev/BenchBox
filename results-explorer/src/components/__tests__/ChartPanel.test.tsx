@@ -24,6 +24,7 @@ const PERCENTILES: PercentileStats = {
 };
 
 function makePlatformRow(overrides: Partial<PlatformRow> = {}): PlatformRow {
+  const timings = overrides.timings ?? { Q1: 10, Q2: 12 };
   return {
     result_id: overrides.result_id ?? "row-1",
     short_id: overrides.short_id ?? "row-1",
@@ -65,7 +66,18 @@ function makePlatformRow(overrides: Partial<PlatformRow> = {}): PlatformRow {
     compliance_class: overrides.compliance_class ?? null,
     percentile_stats: overrides.percentile_stats ?? PERCENTILES,
     phase_durations: overrides.phase_durations ?? { load: 1.2, power: 3.4 },
-    timings: overrides.timings ?? { Q1: 10, Q2: 12 },
+    timings,
+    timing_eligibility:
+      overrides.timing_eligibility ??
+      Object.fromEntries(
+        Object.entries(timings).map(([queryId, ms]) => [
+          queryId,
+          {
+            is_valid_display_timing: ms !== null && ms > 0,
+            timing_exclusion_reason: ms === null ? "missing_timing" : ms === 0 ? "zero_timing" : null,
+          },
+        ]),
+      ),
   };
 }
 

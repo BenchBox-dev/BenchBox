@@ -158,6 +158,33 @@ describe("buildQueryDiffRows", () => {
       "Q2:candidate-b",
     ]);
   });
+
+  it("treats exact-zero display timings as excluded, not faster evidence", () => {
+    const rows = buildQueryDiffRows([
+      makeResult({
+        display_timings: [
+          { query_id: "Q1", display_ms: 10, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+        ],
+      }),
+      makeResult({
+        result_id: "candidate",
+        platform: "SQLite",
+        platform_id: "sqlite",
+        display_timings: [
+          { query_id: "Q1", display_ms: 0, sample_count: 0, is_valid_display_timing: false, timing_exclusion_reason: "zero_timing" },
+        ],
+      }),
+    ]);
+
+    expect(rows[0]).toMatchObject({
+      queryId: "Q1",
+      baselineMs: 10,
+      candidateMs: null,
+      ratio: null,
+      deltaMs: null,
+      status: "missing",
+    });
+  });
 });
 
 describe("QueryDiffTable", () => {

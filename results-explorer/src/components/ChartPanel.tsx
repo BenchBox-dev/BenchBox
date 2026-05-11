@@ -31,6 +31,13 @@ import {
   latencyScaleFraction,
   latencyScaleTicks,
 } from "@/lib/chartMath";
+import {
+  isRankable,
+  isTimingDisplayable,
+  isValidTimingValue,
+  platformTimingValue,
+  validPrimaryMetricValue,
+} from "@/lib/displayEligibility";
 
 interface ChartPanelProps {
   context: ChartContext;
@@ -111,7 +118,7 @@ export function ChartPanel({
     return summary.query_ids.map((queryId) => ({
       queryId,
       timings: summary.platforms.map((platform) => {
-        const ms = platform.timings[queryId] ?? null;
+        const ms = platformTimingValue(platform, queryId);
         return ms !== null ? { ms, status: "pass" as const } : null;
       }),
     }));
@@ -121,7 +128,7 @@ export function ChartPanel({
     return summary.query_ids.map((queryId) => ({
       queryId,
       values: summary.platforms.map((platform, index) => {
-        const timing = platform.timings[queryId];
+        const timing = platformTimingValue(platform, queryId);
         return {
           label: summaryPlatformChartLabels[index] ?? platform.platform,
           value: timing ?? null,
@@ -461,7 +468,7 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
     summary.platforms.map((platform, index) => [platform.result_id, cohortLabels[index] ?? platform.platform]),
   );
   const rows = summary.platforms
-    .filter((platform) => platform.display_geomean_ms !== null && platform.display_geomean_ms > 0)
+    .filter((platform) => isTimingDisplayable(platform) && isValidTimingValue(platform.display_geomean_ms))
     .sort((a, b) => (a.display_geomean_ms ?? Infinity) - (b.display_geomean_ms ?? Infinity))
     .map((platform, index) => ({
       ...platform,
@@ -690,16 +697,15 @@ function SummaryBoxPanel({
   // or the page-resolved primaryMetric threaded through ChartContext. The
   // geomean fallback is reached only when ranking is null, which happens for
   // a single-result detail with no matching benchmark_rankings row yet.
-  const primaryMetric = summary.ranking?.primary_metric ?? "display_geomean_ms";
+  const primaryMetric = summary.ranking?.primary_metric === "power_score" ? "power_score" : "display_geomean_ms";
   const higherIsBetter = summary.ranking?.primary_order === "desc";
   const best = [...summary.platforms]
     .filter((platform) => {
-      const value = primaryMetric === "power_score" ? platform.power_score : platform.display_geomean_ms;
-      return value !== null;
+      return isRankable(platform) && validPrimaryMetricValue(platform, primaryMetric) !== null;
     })
     .sort((a, b) => {
-      const av = primaryMetric === "power_score" ? (a.power_score ?? -Infinity) : (a.display_geomean_ms ?? Infinity);
-      const bv = primaryMetric === "power_score" ? (b.power_score ?? -Infinity) : (b.display_geomean_ms ?? Infinity);
+      const av = validPrimaryMetricValue(a, primaryMetric) ?? (higherIsBetter ? -Infinity : Infinity);
+      const bv = validPrimaryMetricValue(b, primaryMetric) ?? (higherIsBetter ? -Infinity : Infinity);
       return higherIsBetter ? bv - av : av - bv;
     })[0] ?? null;
 

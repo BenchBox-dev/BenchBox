@@ -13,6 +13,7 @@
 import type { BenchmarkSummary } from "@/types";
 import { paletteColor } from "@/lib/chartTheme";
 import { computeRankTable } from "@/lib/chartMath";
+import { formatTimingExclusion, isRankable, platformTimingValue } from "@/lib/displayEligibility";
 import { queryDisplayLabel, sortQueryIds } from "@/lib/queryLabels";
 import { formatRunIdentitiesForCohort, type RunIdentitySource } from "@/lib/runIdentity";
 
@@ -43,7 +44,14 @@ export function RankTable({ summary }: Props) {
 
   const ranks = computeRankTable(
     sortedQueryIds,
-    platforms.map((p) => p.timings),
+    platforms.map((platform) =>
+      Object.fromEntries(
+        sortedQueryIds.map((queryId) => [
+          queryId,
+          isRankable(platform) ? platformTimingValue(platform, queryId) : null,
+        ]),
+      ),
+    ),
   );
 
   const winCounts = platforms.map((_, i) =>
@@ -94,17 +102,23 @@ export function RankTable({ summary }: Props) {
             {platforms.map((p, i) => {
               const tooltip = headerTooltips[i] ?? p.platform;
               const truncated = displayedHeaders[i] ?? p.platform;
+              const exclusion = isRankable(p) ? null : formatTimingExclusion(p.ranking_exclusion_reason);
               return (
                 <th
                   key={p.result_id}
                   class="px-2 py-1.5 border-b border-[var(--bb-data-border)] text-[var(--bb-data-fg-primary)] font-semibold whitespace-nowrap text-center"
-                  title={tooltip}
+                  title={exclusion ? `${tooltip} - ${exclusion}` : tooltip}
                 >
                   <span
                     class="inline-block w-2 h-2 rounded-full mr-1 align-middle"
                     style={{ backgroundColor: paletteColor(i) }}
                   />
                   {truncated}
+                  {exclusion && (
+                    <span class="ml-1 text-[var(--bb-data-fg-subtle)]" aria-label={exclusion}>
+                      *
+                    </span>
+                  )}
                 </th>
               );
             })}

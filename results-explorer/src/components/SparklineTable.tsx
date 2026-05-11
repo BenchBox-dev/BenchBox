@@ -11,6 +11,7 @@
 import type { BenchmarkSummary } from "@/types";
 import { paletteColor } from "@/lib/chartTheme";
 import { costModelDisclosure, costStatusLabel, normalizedCostValue } from "@/lib/costDisplay";
+import { isRankable, isTimingDisplayable, isValidTimingValue } from "@/lib/displayEligibility";
 import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
 
 interface Props {
@@ -70,12 +71,18 @@ export function SparklineTable({ summary }: Props) {
   // geomean when the summary has no ranking config (synthetic summaries
   // built from a single DetailResult where geomean is always defined).
   const metric = summary.ranking?.primary_metric ?? "display_geomean_ms";
-  const showPower = metric === "power_score" && platforms.some((p) => p.power_score !== null);
-  const showP99 = platforms.some((p) => p.percentile_stats !== null);
+  const showPower = metric === "power_score" && platforms.some((p) => isRankable(p) && p.power_score !== null);
+  const showP99 = platforms.some((p) => isTimingDisplayable(p) && p.percentile_stats !== null);
   const showCost = platforms.some((p) => normalizedCostValue(p) !== null);
 
-  const maxGeomean = Math.max(...platforms.map((p) => p.display_geomean_ms ?? 0), 1);
-  const maxPower = Math.max(...platforms.map((p) => p.power_score ?? 0), 1);
+  const maxGeomean = Math.max(
+    ...platforms.map((p) => (isTimingDisplayable(p) && isValidTimingValue(p.display_geomean_ms) ? p.display_geomean_ms : 0)),
+    1,
+  );
+  const maxPower = Math.max(
+    ...platforms.map((p) => (isRankable(p) && isValidTimingValue(p.power_score) ? p.power_score : 0)),
+    1,
+  );
   const cohortLabels = formatRunIdentitiesForCohort(
     platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
     "table",
@@ -112,6 +119,10 @@ export function SparklineTable({ summary }: Props) {
         <tbody>
           {platforms.map((p, i) => {
             const color = paletteColor(i);
+            const geomeanValue =
+              isTimingDisplayable(p) && isValidTimingValue(p.display_geomean_ms) ? p.display_geomean_ms : null;
+            const powerValue = isRankable(p) && isValidTimingValue(p.power_score) ? p.power_score : null;
+            const p99Value = isTimingDisplayable(p) ? p.percentile_stats?.p99 ?? null : null;
             return (
               <tr key={p.result_id} class="border-b border-[var(--bb-data-border)] hover:bg-[var(--bb-surface-data-muted)]">
                 <td class="px-2 py-1.5 font-medium text-[var(--bb-data-fg-primary)]">
@@ -123,31 +134,31 @@ export function SparklineTable({ summary }: Props) {
                 </td>
                 {/* Geomean spark + value */}
                 <td class="px-1 py-1.5">
-                  <SparkBar value={p.display_geomean_ms} max={maxGeomean} color={color} />
+                  <SparkBar value={geomeanValue} max={maxGeomean} color={color} />
                 </td>
                 <td class="px-2 py-1.5 text-right font-mono text-[var(--bb-data-fg-primary)]">
-                  {fmtMs(p.display_geomean_ms)}
+                  {fmtMs(geomeanValue)}
                 </td>
                 {/* Power score spark + value */}
                 {showPower && (
                   <>
                     <td class="px-1 py-1.5">
                       <SparkBar
-                        value={p.power_score}
+                        value={powerValue}
                         max={maxPower}
                         color={color}
                         higherIsBetter
                       />
                     </td>
                     <td class="px-2 py-1.5 text-right font-mono text-[var(--bb-data-fg-primary)]">
-                      {fmtScore(p.power_score)}
+                      {fmtScore(powerValue)}
                     </td>
                   </>
                 )}
                 {/* P99 */}
                 {showP99 && (
                   <td class="px-2 py-1.5 text-right font-mono text-[var(--bb-data-fg-muted)]">
-                    {fmtMs(p.percentile_stats?.p99 ?? null)}
+                    {fmtMs(p99Value)}
                   </td>
                 )}
                 {/* Cost */}

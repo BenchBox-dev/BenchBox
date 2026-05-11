@@ -136,7 +136,7 @@ describe("buildCompareDecisionSummary", () => {
     });
   });
 
-  it("counts missing query evidence when winner or competitors lack timings", () => {
+  it("suppresses winner claims when selected runs lack common valid query evidence", () => {
     const summary = buildCompareDecisionSummary(
       [
         makeResult({
@@ -161,14 +161,109 @@ describe("buildCompareDecisionSummary", () => {
       "power_score",
     );
 
+    expect(summary.claimSuppressed).toBe(true);
+    expect(summary.winner).toBeNull();
+    expect(summary.headline).toContain("Not directly comparable");
     expect(summary.queryRecord).toMatchObject({
       totalQueries: 3,
-      comparableQueries: 1,
-      wins: 1,
+      comparableQueries: 0,
+      wins: 0,
       losses: 0,
       ties: 0,
-      missing: 2,
+      missing: 3,
     });
+  });
+
+  it("suppresses AMPLab-shaped winner language when zeros leave only one common valid query", () => {
+    const queryIds = Array.from({ length: 8 }, (_, index) => `Q${index + 1}`);
+    const zeroTimings = queryIds.map((queryId, index) => ({
+      query_id: queryId,
+      display_ms: index === 0 ? 10 : 0,
+      sample_count: index === 0 ? 3 : 0,
+      is_valid_display_timing: index === 0,
+      timing_exclusion_reason: index === 0 ? null : "zero_timing",
+    }));
+    const summary = buildCompareDecisionSummary(
+      [
+        makeResult({
+          result_id: "duck",
+          platform: "DuckDB",
+          display_timings: zeroTimings,
+        }),
+        makeResult({
+          result_id: "df",
+          platform: "DataFusion",
+          platform_id: "datafusion",
+          display_geomean_ms: 12,
+          display_timings: zeroTimings.map((timing) => ({
+            ...timing,
+            display_ms: timing.is_valid_display_timing ? 12 : 0,
+          })),
+        }),
+        makeResult({
+          result_id: "sqlite",
+          platform: "SQLite",
+          platform_id: "sqlite",
+          display_geomean_ms: 15,
+          display_timings: zeroTimings.map((timing) => ({
+            ...timing,
+            display_ms: timing.is_valid_display_timing ? 15 : 0,
+          })),
+        }),
+      ],
+      "display_geomean_ms",
+    );
+
+    expect(summary.claimSuppressed).toBe(true);
+    expect(summary.winner).toBeNull();
+    expect(summary.headline).toContain("Winner language is suppressed");
+    expect(summary.headline).not.toContain("faster by geomean");
+    expect(summary.percentiles[0]).toMatchObject({ p50: 10, p90: 10, p99: 10 });
+  });
+
+  it("allows winner claims with two common valid queries and per-result 50 percent coverage", () => {
+    const timing = (queryId: string, value: number | null) => ({
+      query_id: queryId,
+      display_ms: value,
+      sample_count: value === null ? 0 : 3,
+      is_valid_display_timing: value !== null,
+      timing_exclusion_reason: value === null ? "missing_timing" : null,
+    });
+    const summary = buildCompareDecisionSummary(
+      [
+        makeResult({
+          result_id: "a",
+          platform: "A",
+          display_timings: [
+            timing("Q1", 10),
+            timing("Q2", 20),
+            timing("Q3", 30),
+            timing("Q4", null),
+            timing("Q5", null),
+            timing("Q6", null),
+          ],
+        }),
+        makeResult({
+          result_id: "b",
+          platform: "B",
+          platform_id: "b",
+          display_geomean_ms: 40,
+          display_timings: [
+            timing("Q1", 20),
+            timing("Q2", 40),
+            timing("Q3", null),
+            timing("Q4", 60),
+            timing("Q5", null),
+            timing("Q6", null),
+          ],
+        }),
+      ],
+      "display_geomean_ms",
+    );
+
+    expect(summary.claimSuppressed).toBe(false);
+    expect(summary.queryRecord.comparableQueries).toBe(2);
+    expect(summary.winner?.platform).toBe("A");
   });
 
   it("suppresses winner claims when every selected result lacks the primary metric", () => {
