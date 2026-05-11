@@ -55,14 +55,14 @@ test.describe("Compare", () => {
       .toMatch(/^[0-9a-f]{8},[0-9a-f]{8}$/);
   });
 
-  test("a single-id compare URL redirects to the result detail page", async ({ page }) => {
+  test("a single-id compare URL opens the compare builder with the run pinned", async ({ page }) => {
     await page.goto(`/results/compare?ids=${SHORT_DUCKDB}`);
     await waitForShell(page);
 
-    await expect(page).toHaveURL(new RegExp(`/results/r/${LONG_DUCKDB}$`), {
-      timeout: 20_000,
-    });
-    await waitForDataLoaded(page, /Query Timings/);
+    await expect(page.getByTestId("compare-builder")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole("heading", { name: "Pick runs to compare" })).toBeVisible();
+    await expect(page.getByTestId("compare-builder-status")).toContainText("1 selected");
+    await expect(page.getByTestId(`compare-builder-row-${LONG_DUCKDB}`)).toContainText("(from result detail)");
   });
 
   test("Share URL button copies the current URL and updates its label", async ({
@@ -102,8 +102,8 @@ test.describe("Compare", () => {
     await waitForDataLoaded(page, /TPC-H Results/);
 
     // Checkboxes render on the matrix view by default, one per platform.
-    const duckdb = page.getByRole("checkbox", { name: /Select DuckDB for comparison/i });
-    const datafusion = page.getByRole("checkbox", { name: /Select DataFusion for comparison/i });
+    const duckdb = page.getByRole("checkbox", { name: /Select DuckDB .* for comparison/i });
+    const datafusion = page.getByRole("checkbox", { name: /Select DataFusion .* for comparison/i });
     await expect(duckdb.first()).toBeVisible();
     await duckdb.first().check();
     await datafusion.first().check();

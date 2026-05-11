@@ -247,14 +247,14 @@ export function MetaLeaderboard({
           >
             <thead class="bg-[var(--bb-surface-data-muted)]">
               <tr role="row">
-                <th scope="col" class="table-th sticky left-0 z-10 min-w-40 bg-[var(--bb-surface-data-muted)]">
+                <th scope="col" class="table-th sticky left-0 z-10 min-w-40 bg-[var(--bb-surface-data-muted)] py-2">
                   Platform
                 </th>
                 {cohorts.map((cohort) => (
                   <th
                     key={cohort.key}
                     scope="col"
-                    class="table-th whitespace-nowrap"
+                    class="table-th whitespace-nowrap py-2"
                   >
                     <a
                       href={cohortHref(cohort)}
@@ -270,7 +270,7 @@ export function MetaLeaderboard({
                 ))}
                 <th
                   scope="col"
-                  class="table-th whitespace-nowrap text-[var(--bb-data-fg-primary)]"
+                  class="table-th whitespace-nowrap py-2 text-[var(--bb-data-fg-primary)]"
                   title={`Average rank over cohorts where the platform has a published run. ${COVERAGE_POLICY_COPY}`}
                 >
                   {AVG_RANK_LABEL}
@@ -284,7 +284,7 @@ export function MetaLeaderboard({
                   class="cursor-pointer hover:bg-[var(--bb-surface-data-muted)]"
                   onClick={() => route(platformHref(platform.platform_id))}
                 >
-                  <td class="table-td sticky left-0 z-10 bg-[var(--bb-surface-data)] font-medium text-[var(--bb-data-fg-primary)]">
+                  <td class="table-td sticky left-0 z-10 bg-[var(--bb-surface-data)] py-2 font-medium text-[var(--bb-data-fg-primary)]">
                     <div class="flex flex-wrap items-center gap-2">
                       <a
                         href={platformHref(platform.platform_id)}
@@ -328,7 +328,7 @@ export function MetaLeaderboard({
                         aria-rowindex={rowIdx + 1}
                         aria-label={text}
                         title={missing ? MISSING_COHORT_TITLE : undefined}
-                        class={`table-td text-center font-mono focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--bb-focus-ring)] ${
+                        class={`table-td py-2 text-center font-mono focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--bb-focus-ring)] ${
                           hue !== null ? "meta-heatmap-cell" : ""
                         } ${
                           missing ? "bg-[var(--bb-surface-data-muted)] text-[var(--bb-data-fg-subtle)] italic" : ""
@@ -359,7 +359,7 @@ export function MetaLeaderboard({
                           renderCellValue(rank, cohort, mode)
                         )}
                         {metadata && (
-                          <div class="mt-1 flex flex-wrap justify-center gap-1">
+                          <div class="mt-0.5 flex flex-wrap justify-center gap-1">
                             <TrustBadge trustLabel={metadata.trust_label} compact />
                             <ValidationBadge validationStatus={metadata.validation_status} showMissing />
                           </div>
@@ -368,7 +368,7 @@ export function MetaLeaderboard({
                     );
                   })}
                   <td
-                    class="table-td text-center font-mono font-semibold text-[var(--bb-data-fg-primary)]"
+                    class="table-td py-2 text-center font-mono font-semibold text-[var(--bb-data-fg-primary)]"
                     title={`${AVG_RANK_LABEL}: ${platform.n_cohorts}/${cohorts.length}. ${COVERAGE_POLICY_COPY}`}
                   >
                     {platform.avg_rank !== null ? (

@@ -32,6 +32,10 @@ test.describe("Query workbench", () => {
     const summary = page.getByTestId("query-result-summary");
     await expect(summary).toContainText(/matching result bundle/);
 
+    for (const label of ["Deployment", "Cloud provider", "Cloud region", "Instance / warehouse", "Storage"]) {
+      await expandFacetGroup(page, label);
+    }
+
     await expect(facetCheckbox(page, "Deployment", "cloud")).toBeVisible();
     await expect(facetCheckbox(page, "Deployment", "local")).toHaveCount(1);
     await expect(page.getByRole("checkbox", { name: /^Deployment:\s+local\b/ })).toHaveCount(1);
@@ -49,7 +53,7 @@ test.describe("Query workbench", () => {
     await expectQueryParam(page, "cloud_region", "us-east-1");
     await expectQueryParam(page, "shape", "m6i.large");
     await expect(summary).toContainText("1 matching result bundle");
-    await expect(page.getByRole("cell", { name: "Fixture AWS SQL" })).toBeVisible();
+    await expect(page.getByRole("cell", { name: "Fixture AWS SQL", exact: true })).toBeVisible();
     await expect(page.getByRole("cell", { name: "Fixture GCP Serverless" })).toHaveCount(0);
 
     await facetCheckbox(page, "Instance / warehouse", "m6i.large").uncheck();
@@ -68,7 +72,7 @@ test.describe("Query workbench", () => {
     await expectQueryParam(page, "shape", "container-cpu-10");
     await expectQueryParam(page, "storage_format", "duckdb_native");
     await expect(summary).toContainText("1 matching result bundle");
-    await expect(page.getByRole("cell", { name: "Fixture Container SQL" })).toBeVisible();
+    await expect(page.getByRole("cell", { name: "Fixture Container SQL", exact: true })).toBeVisible();
     await expect(page.getByRole("cell", { name: "Fixture AWS SQL" })).toHaveCount(0);
   });
 
@@ -218,6 +222,15 @@ function facetCheckbox(page: Page, sectionLabel: string, optionValue: string): L
   return facetSection(page, sectionLabel).getByRole("checkbox", {
     name: new RegExp(`^${escapeRegExp(sectionLabel)}:\\s+${escapeRegExp(optionValue)}\\b`, "i"),
   });
+}
+
+async function expandFacetGroup(page: Page, sectionLabel: string): Promise<void> {
+  const toggle = facetSection(page, sectionLabel).getByRole("button", {
+    name: new RegExp(`^${escapeRegExp(sectionLabel)}\\b`),
+  });
+  if ((await toggle.getAttribute("aria-expanded")) !== "true") {
+    await toggle.click();
+  }
 }
 
 async function expectQueryParam(page: Page, key: string, value: string | null): Promise<void> {

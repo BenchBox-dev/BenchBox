@@ -38,13 +38,15 @@ test.describe("ResultDetail", () => {
     await expect(header).toContainText("↓");
   });
 
-  test("'Compare this result' single-id link resolves back to the result detail page", async ({ page }) => {
+  test("'Compare this result' opens the compare builder with the result pinned", async ({ page }) => {
     await page.goto(`/results/r/${TPCH_DUCKDB_ID}`);
     await waitForDataLoaded(page, /Query Timings/);
 
     await page.getByRole("link", { name: /Compare this result/i }).click();
-    await expect(page).toHaveURL(new RegExp(`/results/r/${TPCH_DUCKDB_ID}$`));
-    await waitForDataLoaded(page, /Query Timings/);
+    await expect(page).toHaveURL(new RegExp(`/results/compare\\?ids=${TPCH_DUCKDB_ID}$`));
+    await expect(page.getByTestId("compare-builder")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId("compare-builder-status")).toContainText("1 selected");
+    await expect(page.getByTestId(`compare-builder-row-${TPCH_DUCKDB_ID}`)).toContainText("(from result detail)");
   });
 
   test("a missing result_id surfaces a user-visible error rather than a blank screen", async ({ page }) => {
