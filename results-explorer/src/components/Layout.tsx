@@ -41,7 +41,7 @@ function Header() {
             <GlobalNavLink href="https://github.com/joeharris76/BenchBox">GitHub</GlobalNavLink>
             <a
               href="https://benchbox.dev/docs/usage/installation.html"
-              class="rounded-md bg-[var(--bb-accent)] px-3 py-1.5 text-sm font-semibold text-[var(--bb-fg-inverse)] no-underline hover:bg-[var(--bb-accent-hover)] hover:text-[var(--bb-fg-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--bb-focus-ring)]"
+              class="rounded-md bg-[var(--bb-accent)] px-3 py-1.5 text-sm font-semibold text-[var(--bb-fg-inverse)] no-underline hover:bg-[var(--bb-accent-hover)] hover:text-[var(--bb-fg-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--bb-focus-ring-on-dark)]"
             >
               Run benchmark
             </a>
@@ -93,7 +93,7 @@ function GlobalNavLink({
     <a
       href={href}
       aria-current={active ? "page" : undefined}
-      class={`font-medium no-underline rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--bb-focus-ring)] ${
+      class={`font-medium no-underline rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--bb-focus-ring-on-dark)] ${
         active ? "text-[var(--bb-fg-primary)]" : "text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg-primary)]"
       }`}
     >
@@ -115,7 +115,7 @@ function ExplorerNavLink({
     <a
       href={href}
       aria-current={active ? "page" : undefined}
-      class={`whitespace-nowrap border-b-2 py-3 font-medium no-underline rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--bb-focus-ring)] ${
+      class={`whitespace-nowrap border-b-2 py-3 font-medium no-underline rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--bb-focus-ring-on-dark)] ${
         active
           ? "border-[var(--bb-accent)] text-[var(--bb-fg-primary)]"
           : "border-transparent text-[var(--bb-fg-muted)] hover:border-[var(--bb-border-default)] hover:text-[var(--bb-fg-primary)]"
