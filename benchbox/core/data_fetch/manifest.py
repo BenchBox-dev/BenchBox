@@ -46,6 +46,7 @@ or verify the data files. That's manager.py's job.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -63,6 +64,27 @@ _REQUIRED_TOP_KEYS = (
     "archive_sha256",
     "license_file",
 )
+
+
+def _manifest_hash_input(raw: bytes) -> bytes:
+    """Return manifest bytes with the top-level manifest_hash assignment removed."""
+    lines: list[bytes] = []
+    in_top_level = True
+    for line in raw.splitlines(keepends=True):
+        stripped = line.lstrip()
+        if stripped.startswith(b"["):
+            in_top_level = False
+        if in_top_level and stripped.startswith(b"manifest_hash"):
+            before_equals = stripped.split(b"=", 1)[0].strip()
+            if before_equals == b"manifest_hash":
+                continue
+        lines.append(line)
+    return b"".join(lines)
+
+
+def compute_manifest_hash(path: str | Path) -> str:
+    """Compute the pinned manifest hash with `manifest_hash` itself excluded."""
+    return hashlib.sha256(_manifest_hash_input(Path(path).read_bytes())).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -110,14 +132,23 @@ def load_manifest(path: str | Path) -> DataManifest:
         raise ManifestValidationError(f"manifest not found at {p}")
 
     try:
-        with p.open("rb") as fh:
-            raw = tomllib.load(fh)
+        raw_bytes = p.read_bytes()
+        raw = tomllib.loads(raw_bytes.decode("utf-8"))
+    except UnicodeDecodeError as exc:
+        raise ManifestValidationError(f"manifest at {p} is not valid UTF-8: {exc}") from exc
     except tomllib.TOMLDecodeError as exc:
         raise ManifestValidationError(f"manifest at {p} is not valid TOML: {exc}") from exc
 
     missing = [k for k in _REQUIRED_TOP_KEYS if k not in raw]
     if missing:
         raise ManifestValidationError(f"manifest at {p} is missing required keys: {sorted(missing)}")
+
+    expected_manifest_hash = str(raw["manifest_hash"])
+    actual_manifest_hash = hashlib.sha256(_manifest_hash_input(raw_bytes)).hexdigest()
+    if expected_manifest_hash != actual_manifest_hash:
+        raise ManifestValidationError(
+            f"manifest_hash mismatch for {p}: expected {expected_manifest_hash}, got {actual_manifest_hash}"
+        )
 
     tables_raw = raw.get("tables", [])
     if not isinstance(tables_raw, list):

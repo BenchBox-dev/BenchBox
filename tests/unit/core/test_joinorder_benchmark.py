@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from benchbox.core.benchmark_loader import get_benchmark_instance
+from benchbox.core.errors import ScaleFactorNotSupportedError
 from benchbox.core.joinorder.benchmark import JoinOrderBenchmark
 from benchbox.core.schemas import BenchmarkConfig, SystemProfile
 
@@ -82,7 +83,7 @@ def test_get_benchmark_instance_handles_joinorder_compression() -> None:
     config = BenchmarkConfig(
         name="joinorder",
         display_name="JoinOrder",
-        scale_factor=0.1,
+        scale_factor=1.0,
         compress_data=True,
         compression_type="zstd",
         compression_level=5,
@@ -103,6 +104,17 @@ def test_get_benchmark_instance_handles_joinorder_compression() -> None:
     assert generator.compression_type == "zstd"
     assert generator.compression_level == 5
     assert generator.force_regenerate is True
+
+
+def test_get_benchmark_instance_rejects_unsupported_joinorder_scale() -> None:
+    config = BenchmarkConfig(
+        name="joinorder",
+        display_name="JoinOrder",
+        scale_factor=0.5,
+    )
+
+    with pytest.raises(ScaleFactorNotSupportedError, match=r"joinorder accepts scale_factor in \[1\.0\]"):
+        get_benchmark_instance(config, _make_system_profile())
 
 
 def test_joinorder_invalid_parallel_raises(tmp_path: Path) -> None:

@@ -15,6 +15,7 @@ import pytest
 from benchbox.core.data_fetch import (
     ChecksumMismatchError,
     ExtractionRequiredError,
+    compute_manifest_hash,
     fetch_data,
 )
 
@@ -32,13 +33,14 @@ BETA_PAYLOAD = b"beta-table-row-bytes"
 ALPHA_SHA = hashlib.sha256(ALPHA_PAYLOAD).hexdigest()
 BETA_SHA = hashlib.sha256(BETA_PAYLOAD).hexdigest()
 ARCHIVE_SHA = "00" * 32  # placeholder — fake_downloader doesn't recompute
+MANIFEST_HASH_PLACEHOLDER = "a" * 64
 
 
 def _write_manifest(tmp: Path) -> Path:
     """Build a minimal data_manifest.toml with two named tables."""
     body = (
         f'dataset_version    = "test-v1"\n'
-        f'manifest_hash      = "{"a" * 64}"\n'
+        f'manifest_hash      = "{MANIFEST_HASH_PLACEHOLDER}"\n'
         f'data_archive_hash  = "{ARCHIVE_SHA}"\n'
         f'url                = "https://example.com/test.tar.zst"\n'
         f'archive_sha256     = "{ARCHIVE_SHA}"\n'
@@ -56,6 +58,8 @@ def _write_manifest(tmp: Path) -> Path:
     )
     p = tmp / "data_manifest.toml"
     p.write_text(body)
+    manifest_hash = compute_manifest_hash(p)
+    p.write_text(body.replace(MANIFEST_HASH_PLACEHOLDER, manifest_hash))
     return p
 
 
