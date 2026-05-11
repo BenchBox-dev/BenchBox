@@ -17,6 +17,11 @@ AUDIT_SHA_REQUIRE_CURRENT ?=
 # directory before `make worktree-claim` will allocate a slot. Default
 # 5 GB. Override to 0 to bypass the check (e.g. during low-space CI).
 POOL_MIN_FREE_KB ?= 5000000
+JOINORDER_BUILD_DIR ?= $(HOME)/Developer/benchmark_runs/joinorder/build/joinorder-imdb-2013-v1
+JOINORDER_POSTGRES_DB ?= imdb
+JOINORDER_POSTGRES_USER ?= postgres
+JOINORDER_QUERIES ?= _project/joinorder/build-inputs/queries
+JOINORDER_REFERENCE ?= _project/joinorder/reference_cardinalities.json
 
 # Age threshold (in seconds) before a `.benchbox/claim_in_progress` marker
 # is treated as evidence of an aborted claim by `worktree-pool-check`.
@@ -34,7 +39,7 @@ POOL_CLAIM_MARKER_STALE_SECONDS ?= 600
 # truth instead of repeating the four-deep nested expansion.
 POOL_REPO_CMD = basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"
 
-.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-explorer-tokens audit-sha-check install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check skill-sync-lock-audit mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-status pr-review-followups pr-review-followups-list dev-loop-metrics worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-add worktree-list worktree-prune todo-reindex
+.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-explorer-tokens audit-sha-check install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check skill-sync-lock-audit mutation-test compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-status pr-review-followups pr-review-followups-list dev-loop-metrics worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-add worktree-list worktree-prune todo-reindex
 
 # Primary test commands using pytest marker system
 test: test-fast
@@ -102,6 +107,16 @@ test-smoke: test-quick
 test-local-matrix:
 	uv run -- python -m pytest tests/integration/test_local_platform_benchmark_matrix.py -m stress -n 0 --tb=short -v
 	@echo "Tip: set BENCHBOX_SERVICE_LOCAL_MATRIX=1 to include Trino/Presto/Firebolt/PostgreSQL/TimescaleDB service-backed locals."
+
+joinorder-verify-reference-results:
+	@[ -n "$(JOINORDER_POSTGRES_CONTAINER)" ] || { echo "JOINORDER_POSTGRES_CONTAINER is required"; exit 2; }
+	uv run -- python _project/scripts/build_joinorder_data.py verify-reference-results \
+		--work-dir "$(JOINORDER_BUILD_DIR)" \
+		--container-name "$(JOINORDER_POSTGRES_CONTAINER)" \
+		--database "$(JOINORDER_POSTGRES_DB)" \
+		--user "$(JOINORDER_POSTGRES_USER)" \
+		--queries "$(JOINORDER_QUERIES)" \
+		--reference "$(JOINORDER_REFERENCE)"
 
 # Database-specific testing
 test-duckdb:
