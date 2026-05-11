@@ -323,6 +323,133 @@ def test_validate_predicate_domain_rejects_incomplete_query_directory(
         )
 
 
+def test_verify_reference_results_accepts_matching_full_result_hashes(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    query_dir = tmp_path / "queries"
+    query_dir.mkdir()
+    (query_dir / "1a.sql").write_text("SELECT MIN(t.id) AS v FROM title AS t WHERE t.id > 0;", encoding="utf-8")
+    (query_dir / "2c.sql").write_text("SELECT MIN(t.id) AS v FROM title AS t WHERE t.id < 0;", encoding="utf-8")
+
+    row_json_by_query = {
+        "1a": '{"v":1}',
+        "2c": '{"v":null}',
+    }
+    reference = {
+        "dataset_version": "joinorder-imdb-2013-v1",
+        "postgres_version": "16.2",
+        "manifest_hash": "manifest",
+        "data_archive_hash": "archive",
+        "gregrahn_commit": "commit",
+        "queries": {
+            "1a": {
+                "row_count": 1,
+                "underlying_row_count": 7,
+                "first_row_sha256": hashlib.sha256(row_json_by_query["1a"].encode("utf-8")).hexdigest(),
+            },
+            "2c": {
+                "row_count": 1,
+                "underlying_row_count": 0,
+                "first_row_sha256": hashlib.sha256(row_json_by_query["2c"].encode("utf-8")).hexdigest(),
+            },
+        },
+    }
+    reference_path = tmp_path / "reference_cardinalities.json"
+    reference_path.write_text(json.dumps(reference), encoding="utf-8")
+
+    def fake_psql(*, container_name: str, database: str, user: str, sql: str) -> str:
+        assert container_name == "pg"
+        assert database == "imdb"
+        assert user == "postgres"
+        if sql == "SHOW server_version":
+            return "16.2\n"
+        if "row_to_json" in sql:
+            return (row_json_by_query["2c"] if "t.id < 0" in sql else row_json_by_query["1a"]) + "\n"
+        if "AS benchbox_q" in sql:
+            return "1\n"
+        if "t.id < 0" in sql:
+            return "0\n"
+        if "t.id > 0" in sql:
+            return "7\n"
+        raise AssertionError(sql)
+
+    monkeypatch.setattr(build_joinorder_data, "psql", fake_psql)
+
+    report = build_joinorder_data.verify_reference_results(
+        work_dir=tmp_path,
+        query_dir=query_dir,
+        reference_path=reference_path,
+        container_name="pg",
+        database="imdb",
+        user="postgres",
+        expected_query_count=None,
+    )
+
+    assert report["verified_query_count"] == 2
+    assert report["full_result_hashes_verified"] == 2
+    assert report["failures"] == []
+
+
+def test_verify_reference_results_rejects_full_result_hash_drift(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    query_dir = tmp_path / "queries"
+    query_dir.mkdir()
+    (query_dir / "1a.sql").write_text("SELECT MIN(t.id) AS v FROM title AS t WHERE t.id > 0;", encoding="utf-8")
+    reference_path = tmp_path / "reference_cardinalities.json"
+    reference_path.write_text(
+        json.dumps(
+            {
+                "queries": {
+                    "1a": {
+                        "row_count": 1,
+                        "underlying_row_count": 7,
+                        "first_row_sha256": "0" * 64,
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def fake_psql(*, container_name: str, database: str, user: str, sql: str) -> str:
+        if sql == "SHOW server_version":
+            return "16.2\n"
+        if "row_to_json" in sql:
+            return '{"v":1}\n'
+        if "AS benchbox_q" in sql:
+            return "1\n"
+        if "t.id > 0" in sql:
+            return "7\n"
+        raise AssertionError(sql)
+
+    monkeypatch.setattr(build_joinorder_data, "psql", fake_psql)
+
+    with pytest.raises(build_joinorder_data.JoinOrderBuildError, match="Reference result verification failed"):
+        build_joinorder_data.verify_reference_results(
+            work_dir=tmp_path,
+            query_dir=query_dir,
+            reference_path=reference_path,
+            container_name="pg",
+            database="imdb",
+            user="postgres",
+            expected_query_count=None,
+        )
+
+    manifest = json.loads((tmp_path / build_joinorder_data.BUILD_MANIFEST_NAME).read_text(encoding="utf-8"))
+    failures = manifest["reference_result_verification"]["failures"]
+    assert failures == [
+        {
+            "actual": hashlib.sha256(b'{"v":1}').hexdigest(),
+            "expected": "0" * 64,
+            "kind": "first_row_sha256",
+            "query_id": "1a",
+        }
+    ]
+
+
 def test_aggregate_table_hash_is_deterministic_independent_of_input_order(tmp_path: Path) -> None:
     a = build_joinorder_data.TableFile("aka_name", tmp_path / "a.parquet", "a" * 64, 10, 1)
     b = build_joinorder_data.TableFile("title", tmp_path / "t.parquet", "b" * 64, 20, 2)
