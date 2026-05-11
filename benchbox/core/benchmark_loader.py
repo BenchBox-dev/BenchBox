@@ -43,7 +43,7 @@ def get_benchmark_instance(config: BenchmarkConfig, system_profile: SystemProfil
             force_regenerate=force_regenerate,
             **benchmark_kwargs,
         )
-    elif benchmark_id == "joinorder":
+    elif benchmark_id in {"joinorder", "joinorder_synthetic"}:
         try:
             return benchmark_class(
                 parallel=cpu_cores,

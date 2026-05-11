@@ -2461,12 +2461,10 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
 
 @click.command("run", cls=BenchBoxCommand)
 # === Core Options (Tier 1 - Always visible) ===
+@click.option("--platform", type=str, help="Platform with optional deployment mode (platform:mode).")
 @click.option(
-    "--platform",
-    type=str,
-    help="Platform with optional deployment mode (platform:mode). Examples: duckdb, clickhouse:server, firebolt:core",
+    "--benchmark", type=str, help="Benchmark (tpch, tpcds, ssb, joinorder, clickbench); joinorder is IMDb SF=1."
 )
-@click.option("--benchmark", type=str, help="Benchmark (tpch, tpcds, ssb, clickbench)")
 @click.option("--scale", type=float, default=0.01, help="Scale factor", show_default=True)
 @click.option(
     "--output",

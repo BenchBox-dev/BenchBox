@@ -1,7 +1,7 @@
 {
   "benchmark": {
-    "id": "joinorder",
-    "name": "JoinOrderBenchmark",
+    "id": "joinorder_synthetic",
+    "name": "JoinOrderSyntheticBenchmark",
     "scale_factor": 1.0,
     "test_type": "power"
   },
@@ -18,18 +18,16 @@
     "platform_option_sources": {
       "force_recreate": "saved_config",
       "force_upload": "saved_config",
-      "memory_limit": "saved_config",
       "show_query_plans": "saved_config"
     },
     "platform_options": {
       "force_recreate": false,
       "force_upload": false,
-      "memory_limit": "8GB",
       "show_query_plans": false
     }
   },
   "cost": {
-    "model": "actual",
+    "model": "estimated",
     "total_usd": 0
   },
   "environment": {
@@ -44,7 +42,7 @@
     "os": "Darwin",
     "platform_runtime": {
       "collection_status": "partial",
-      "engine_host": "host_f8fb0209c83d",
+      "engine_host": "host_e9490ed88fd5",
       "runtime_type": "local_process",
       "source": "inferred"
     },
@@ -54,11 +52,11 @@
     "compression": {
       "type": "zstd"
     },
-    "driver_package": "duckdb",
-    "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-02/.venv/bin/python3",
+    "driver_package": "pyspark",
+    "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-10/.venv/bin/python3",
     "driver_runtime_strategy": "current-process",
-    "driver_version_actual": "1.3.2",
-    "driver_version_resolved": "1.3.2",
+    "driver_version_actual": "4.1.1",
+    "driver_version_resolved": "4.1.1",
     "entry_point": "cli",
     "mode": "sql",
     "non_interactive": true,
@@ -66,12 +64,12 @@
       "load",
       "power"
     ],
-    "timestamp": "2026-05-05T19:52:40.928641",
+    "timestamp": "2026-05-06T09:24:45.270422",
     "tuning_mode": "tuned"
   },
   "export": {
     "anonymized": true,
-    "timestamp": "2026-05-05T19:53:00.819309",
+    "timestamp": "2026-05-06T09:29:10.591110",
     "tool": "benchbox-exporter"
   },
   "normalized_cost": {
@@ -96,95 +94,100 @@
   },
   "phases": {
     "data_generation": {
-      "status": "NOT_RUN"
+      "duration_ms": 0,
+      "status": "SUCCESS"
     },
     "data_loading": {
-      "duration_ms": 3525,
+      "duration_ms": 9554,
       "status": "SUCCESS"
     },
     "power_test": {
-      "duration_ms": 339,
+      "duration_ms": 251606,
       "status": "COMPLETED"
     },
     "schema_creation": {
-      "duration_ms": 2,
+      "duration_ms": 298,
       "status": "SUCCESS"
     },
     "throughput_test": {
       "status": "NOT_RUN"
     },
     "validation": {
-      "duration_ms": 50,
+      "duration_ms": 550,
       "status": "PASSED"
     }
   },
   "platform": {
-    "client_version": "1.3.2",
+    "client_version": "4.1.1",
     "cloud": {
       "collection_status": "unavailable",
       "source": "unavailable"
     },
     "compute": {
-      "collection_status": "partial",
-      "result_cache_enabled": false,
-      "source": "requested"
-    },
-    "config": {
-      "connection_mode": "file",
-      "database_path": "path_8195e9441197",
-      "driver_package": "duckdb",
-      "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-02/.venv/bin/python3",
-      "driver_runtime_strategy": "current-process",
-      "driver_version_actual": "1.3.2",
-      "driver_version_resolved": "1.3.2",
-      "enable_progress_bar": false,
-      "execution_mode": "sql",
-      "memory_limit": "12GB",
-      "result_cache_enabled": false
-    },
-    "deployment": {
-      "collection_status": "partial",
-      "connection_mode": "file",
-      "deployment_type": "embedded",
-      "endpoint_class": "embedded_process",
-      "metadata_source": "inferred"
-    },
-    "driver_actual_version": "1.3.2",
-    "driver_package": "duckdb",
-    "driver_resolved_version": "1.3.2",
-    "driver_runtime_strategy": "current-process",
-    "name": "DuckDB",
-    "raw_config": {
-      "database_path": "path_8195e9441197",
-      "driver_auto_install": false,
-      "driver_auto_install_used": false,
-      "driver_package": "duckdb",
-      "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-02/.venv/bin/python3",
-      "driver_runtime_strategy": "current-process",
-      "driver_version_actual": "1.3.2",
-      "driver_version_resolved": "1.3.2",
-      "enable_progress_bar": false,
-      "force_recreate": false,
-      "memory_limit": "12GB",
-      "result_cache_enabled": false,
-      "tuning_config": "UnifiedTuningConfiguration(primary_keys=PrimaryKeyConfiguration(enabled=True, enforce_uniqueness=True, nullable=False), foreign_keys=ForeignKeyConfiguration(enabled=True, enforce_referential_integrity=True, on_delete_action='CASCADE', on_update_action='RESTRICT'), unique_constraints=UniqueConstraintConfiguration(enabled=True, ignore_nulls=False), check_constraints=CheckConstraintConfiguration(enabled=True, enforce_on_insert=True, enforce_on_update=True), platform_optimizations=PlatformOptimizationConfiguration(z_ordering_enabled=False, z_ordering_columns=[], liquid_clustering_enabled=False, liquid_clustering_columns=[], databricks_clustering_strategy='z_order', sorted_ingestion_mode='off', sorted_ingestion_method='auto', auto_optimize_enabled=False, auto_compact_enabled=False, bloom_filters_enabled=False, bloom_filter_columns=[], materialized_views_enabled=False), table_tunings={'movie_info': TableTuning(table_name='movie_info', partitioning=None, clustering=None, distribution=None, sorting=[TuningColumn(name='movie_id', type='INTEGER', order=1, sort_order='ASC', nulls_position='DEFAULT', compression=None)]), 'cast_info': TableTuning(table_name='cast_info', partitioning=None, clustering=None, distribution=None, sorting=[TuningColumn(name='movie_id', type='INTEGER', order=1, sort_order='ASC', nulls_position='DEFAULT', compression=None), TuningColumn(name='person_id', type='INTEGER', order=2, sort_order='ASC', nulls_position='DEFAULT', compression=None)]), 'title': TableTuning(table_name='title', partitioning=None, clustering=None, distribution=None, sorting=[TuningColumn(name='id', type='INTEGER', order=1, sort_order='ASC', nulls_position='DEFAULT', compression=None)])})"
-    },
-    "raw_metadata": {
-      "driver_runtime_strategy": "current-process",
-      "driver_version_actual": "1.3.2",
-      "driver_version_resolved": "1.3.2"
-    },
-    "storage": {
       "collection_status": "unavailable",
       "source": "unavailable"
     },
-    "version": "1.3.2"
+    "config": {
+      "adaptive_enabled": true,
+      "connection_mode": "local",
+      "database": "database_f9d6fe6ded1d",
+      "driver_memory": "4g",
+      "driver_package": "pyspark",
+      "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-10/.venv/bin/python3",
+      "driver_runtime_strategy": "current-process",
+      "driver_version_actual": "4.1.1",
+      "driver_version_resolved": "4.1.1",
+      "execution_mode": "sql",
+      "executor_cores": 2,
+      "executor_memory": "4g",
+      "hive_enabled": false,
+      "master": "local[*]",
+      "num_executors": 0,
+      "shuffle_partitions": 200,
+      "spark_app_id": "local-1778073886449",
+      "spark_master": "local[*]",
+      "table_format": "parquet"
+    },
+    "deployment": {
+      "collection_status": "partial",
+      "connection_mode": "local",
+      "deployment_type": "embedded",
+      "endpoint_class": "unknown",
+      "metadata_source": "inferred"
+    },
+    "driver_actual_version": "4.1.1",
+    "driver_package": "pyspark",
+    "driver_resolved_version": "4.1.1",
+    "driver_runtime_strategy": "current-process",
+    "name": "Spark",
+    "raw_config": {
+      "adaptive_enabled": true,
+      "database": "database_f9d6fe6ded1d",
+      "driver_memory": "4g",
+      "executor_cores": 2,
+      "executor_memory": "4g",
+      "hive_enabled": false,
+      "num_executors": 0,
+      "shuffle_partitions": 200,
+      "spark_app_id": "local-1778073886449",
+      "spark_master": "local[*]",
+      "table_format": "parquet"
+    },
+    "raw_metadata": {
+      "master": "local[*]"
+    },
+    "storage": {
+      "collection_status": "partial",
+      "source": "requested",
+      "table_format": "parquet"
+    },
+    "version": "4.1.1"
   },
   "queries": [
     {
       "id": "1a",
       "iter": 0,
-      "ms": 2.0,
+      "ms": 15941.0,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -193,7 +196,7 @@
     {
       "id": "1b",
       "iter": 0,
-      "ms": 2.0,
+      "ms": 15710.0,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -202,7 +205,7 @@
     {
       "id": "2a",
       "iter": 0,
-      "ms": 2.0,
+      "ms": 15844.0,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -211,7 +214,7 @@
     {
       "id": "3a",
       "iter": 0,
-      "ms": 13.0,
+      "ms": 363.0,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -220,7 +223,7 @@
     {
       "id": "4a",
       "iter": 0,
-      "ms": 9.0,
+      "ms": 321.0,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -229,7 +232,7 @@
     {
       "id": "5a",
       "iter": 0,
-      "ms": 6.0,
+      "ms": 429.0,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -238,7 +241,7 @@
     {
       "id": "6a",
       "iter": 0,
-      "ms": 9.0,
+      "ms": 262.0,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -247,7 +250,7 @@
     {
       "id": "7a",
       "iter": 0,
-      "ms": 1.0,
+      "ms": 103.0,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -256,7 +259,7 @@
     {
       "id": "8a",
       "iter": 0,
-      "ms": 3.0,
+      "ms": 102.0,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -265,7 +268,7 @@
     {
       "id": "9a",
       "iter": 0,
-      "ms": 5.0,
+      "ms": 148.0,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -274,7 +277,7 @@
     {
       "id": "10a",
       "iter": 0,
-      "ms": 13.0,
+      "ms": 288.0,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -283,7 +286,7 @@
     {
       "id": "11a",
       "iter": 0,
-      "ms": 6.0,
+      "ms": 12278.0,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -292,7 +295,7 @@
     {
       "id": "12a",
       "iter": 0,
-      "ms": 8.0,
+      "ms": 604.0,
       "rows": 1,
       "run_type": "warmup",
       "status": "SUCCESS",
@@ -301,7 +304,7 @@
     {
       "id": "1a",
       "iter": 1,
-      "ms": 2.0,
+      "ms": 15803.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -310,7 +313,7 @@
     {
       "id": "1b",
       "iter": 1,
-      "ms": 2.0,
+      "ms": 16051.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -319,7 +322,7 @@
     {
       "id": "2a",
       "iter": 1,
-      "ms": 2.0,
+      "ms": 15834.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -328,7 +331,7 @@
     {
       "id": "3a",
       "iter": 1,
-      "ms": 12.0,
+      "ms": 544.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -337,7 +340,7 @@
     {
       "id": "4a",
       "iter": 1,
-      "ms": 9.0,
+      "ms": 271.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -346,7 +349,7 @@
     {
       "id": "5a",
       "iter": 1,
-      "ms": 5.0,
+      "ms": 444.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -355,7 +358,7 @@
     {
       "id": "6a",
       "iter": 1,
-      "ms": 9.0,
+      "ms": 182.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -364,7 +367,7 @@
     {
       "id": "7a",
       "iter": 1,
-      "ms": 1.0,
+      "ms": 103.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -373,7 +376,7 @@
     {
       "id": "8a",
       "iter": 1,
-      "ms": 3.0,
+      "ms": 101.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -382,7 +385,7 @@
     {
       "id": "9a",
       "iter": 1,
-      "ms": 5.0,
+      "ms": 154.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -391,7 +394,7 @@
     {
       "id": "10a",
       "iter": 1,
-      "ms": 12.0,
+      "ms": 326.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -400,7 +403,7 @@
     {
       "id": "11a",
       "iter": 1,
-      "ms": 6.0,
+      "ms": 12335.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -409,7 +412,7 @@
     {
       "id": "12a",
       "iter": 1,
-      "ms": 10.0,
+      "ms": 689.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -418,7 +421,7 @@
     {
       "id": "1a",
       "iter": 2,
-      "ms": 3.0,
+      "ms": 15934.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -427,7 +430,7 @@
     {
       "id": "1b",
       "iter": 2,
-      "ms": 2.0,
+      "ms": 15833.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -436,7 +439,7 @@
     {
       "id": "2a",
       "iter": 2,
-      "ms": 1.0,
+      "ms": 15801.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -445,7 +448,7 @@
     {
       "id": "3a",
       "iter": 2,
-      "ms": 13.0,
+      "ms": 443.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -454,7 +457,7 @@
     {
       "id": "4a",
       "iter": 2,
-      "ms": 9.0,
+      "ms": 264.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -463,7 +466,7 @@
     {
       "id": "5a",
       "iter": 2,
-      "ms": 5.0,
+      "ms": 468.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -472,7 +475,7 @@
     {
       "id": "6a",
       "iter": 2,
-      "ms": 9.0,
+      "ms": 159.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -481,7 +484,7 @@
     {
       "id": "7a",
       "iter": 2,
-      "ms": 1.0,
+      "ms": 90.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -490,7 +493,7 @@
     {
       "id": "8a",
       "iter": 2,
-      "ms": 4.0,
+      "ms": 73.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -499,7 +502,7 @@
     {
       "id": "9a",
       "iter": 2,
-      "ms": 5.0,
+      "ms": 144.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -508,7 +511,7 @@
     {
       "id": "10a",
       "iter": 2,
-      "ms": 10.0,
+      "ms": 260.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -517,7 +520,7 @@
     {
       "id": "11a",
       "iter": 2,
-      "ms": 5.0,
+      "ms": 12212.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -526,7 +529,7 @@
     {
       "id": "12a",
       "iter": 2,
-      "ms": 8.0,
+      "ms": 471.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -535,7 +538,7 @@
     {
       "id": "1a",
       "iter": 3,
-      "ms": 3.0,
+      "ms": 15928.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -544,7 +547,7 @@
     {
       "id": "1b",
       "iter": 3,
-      "ms": 4.0,
+      "ms": 15899.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -553,7 +556,7 @@
     {
       "id": "2a",
       "iter": 3,
-      "ms": 2.0,
+      "ms": 16294.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -562,7 +565,7 @@
     {
       "id": "3a",
       "iter": 3,
-      "ms": 17.0,
+      "ms": 356.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -571,7 +574,7 @@
     {
       "id": "4a",
       "iter": 3,
-      "ms": 9.0,
+      "ms": 315.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -580,7 +583,7 @@
     {
       "id": "5a",
       "iter": 3,
-      "ms": 6.0,
+      "ms": 448.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -589,7 +592,7 @@
     {
       "id": "6a",
       "iter": 3,
-      "ms": 9.0,
+      "ms": 178.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -598,7 +601,7 @@
     {
       "id": "7a",
       "iter": 3,
-      "ms": 1.0,
+      "ms": 73.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -607,7 +610,7 @@
     {
       "id": "8a",
       "iter": 3,
-      "ms": 3.0,
+      "ms": 98.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -616,7 +619,7 @@
     {
       "id": "9a",
       "iter": 3,
-      "ms": 5.0,
+      "ms": 129.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -625,7 +628,7 @@
     {
       "id": "10a",
       "iter": 3,
-      "ms": 11.0,
+      "ms": 449.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -634,7 +637,7 @@
     {
       "id": "11a",
       "iter": 3,
-      "ms": 6.0,
+      "ms": 13278.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -643,7 +646,7 @@
     {
       "id": "12a",
       "iter": 3,
-      "ms": 7.0,
+      "ms": 752.0,
       "rows": 1,
       "run_type": "measurement",
       "status": "SUCCESS",
@@ -651,16 +654,16 @@
     }
   ],
   "run": {
-    "id": "be289a53",
+    "id": "4f603854",
     "iterations": 3,
-    "query_time_ms": 236,
+    "query_time_ms": 189186,
     "streams": 3,
-    "timestamp": "2026-05-05T19:53:00.790367",
-    "total_duration_ms": 3901
+    "timestamp": "2026-05-06T09:29:10.443317",
+    "total_duration_ms": 265120
   },
   "summary": {
     "data": {
-      "load_time_ms": 3525.7,
+      "load_time_ms": 9554.8,
       "rows_loaded": 14680069
     },
     "queries": {
@@ -669,17 +672,21 @@
       "total": 39
     },
     "timing": {
-      "avg_ms": 6.1,
-      "geometric_mean_ms": 4.7,
-      "max_ms": 17,
-      "min_ms": 1,
-      "p90_ms": 12,
-      "p95_ms": 13,
-      "p99_ms": 17,
-      "stdev_ms": 3.9,
-      "total_ms": 236
+      "avg_ms": 4850.9,
+      "geometric_mean_ms": 847.7,
+      "max_ms": 16294,
+      "min_ms": 73,
+      "p90_ms": 15928,
+      "p95_ms": 16051,
+      "p99_ms": 16294,
+      "stdev_ms": 6972.7,
+      "total_ms": 189186
     },
     "validation": "passed"
+  },
+  "synthetic_retag": {
+    "previous_benchmark_id": "joinorder",
+    "reason": "pre-cutover JoinOrder bundles used the synthetic generator"
   },
   "tables": {
     "aka_name": {

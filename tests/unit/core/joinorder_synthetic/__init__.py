@@ -1,0 +1,1 @@
+"""JoinOrder synthetic benchmark tests."""

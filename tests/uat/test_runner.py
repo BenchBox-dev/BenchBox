@@ -66,6 +66,18 @@ def test_extract_result_path_accepts_custom_runs_root():
     assert runner.extract_result_path(log) == "/tmp/shared-runs/results/duckdb_tpch_custom_root.json"
 
 
+def test_extract_result_path_accepts_rich_wrapped_result_path():
+    log = """\
+Exported JSON:
+/Users/joe/Developer/benchmark_runs/results/joinorder_sf1_duckdb_sql_20260511_13
+4905_62698da0.json
+"""
+    assert (
+        runner.extract_result_path(log)
+        == "/Users/joe/Developer/benchmark_runs/results/joinorder_sf1_duckdb_sql_20260511_134905_62698da0.json"
+    )
+
+
 def test_extract_result_path_returns_none_when_missing():
     log = "[info] running\n[error] failed before result capture\n"
     assert runner.extract_result_path(log) is None

@@ -20,8 +20,10 @@ from mcp.server.fastmcp import FastMCP
 from benchbox.core.benchmark_registry import (
     get_all_benchmarks,
     get_benchmark_class,
+    get_benchmark_default_scale,
     get_benchmark_metadata,
-    list_benchmark_ids,
+    get_benchmark_surface,
+    list_public_benchmark_ids,
 )
 
 logger = logging.getLogger(__name__)
@@ -39,6 +41,7 @@ def _build_benchmarks_list() -> str:
             "query_count": meta.get("num_queries", 0),
         }
         for name, meta in all_benchmarks.items()
+        if get_benchmark_surface(name) == "public"
     ]
     return json.dumps({"benchmarks": benchmarks, "count": len(benchmarks)}, indent=2)
 
@@ -49,7 +52,7 @@ def _get_benchmark_query_ids(benchmark_lower: str, name: str) -> list[str]:
     try:
         benchmark_class = get_benchmark_class(benchmark_lower)
         if benchmark_class is not None:
-            bm = benchmark_class(scale_factor=0.01)
+            bm = benchmark_class(scale_factor=get_benchmark_default_scale(benchmark_lower))
             if hasattr(bm, "query_manager") and hasattr(bm.query_manager, "get_all_queries"):
                 queries_dict = bm.query_manager.get_all_queries()
                 query_ids = list(queries_dict.keys())
@@ -65,11 +68,11 @@ def _build_benchmark_detail(name: str) -> str:
     benchmark_lower = name.lower()
     meta = get_benchmark_metadata(benchmark_lower)
 
-    if meta is None:
+    if meta is None or get_benchmark_surface(benchmark_lower) != "public":
         return json.dumps(
             {
                 "error": f"Benchmark '{name}' not found",
-                "available": list_benchmark_ids(),
+                "available": list_public_benchmark_ids(),
             }
         )
 

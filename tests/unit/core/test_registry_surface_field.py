@@ -20,6 +20,7 @@ import pytest
 from benchbox.core.benchmark_registry import (
     BENCHMARK_METADATA,
     get_benchmark_surface,
+    list_public_benchmark_ids,
 )
 
 pytestmark = [
@@ -91,3 +92,16 @@ def test_public_surface_recognized() -> None:
     }
     with patch.dict(BENCHMARK_METADATA, fake_meta, clear=False):
         assert get_benchmark_surface("x_public") == "public"
+
+
+def test_joinorder_synthetic_hidden() -> None:
+    """The cutover's synthetic compatibility surface is not public."""
+    assert get_benchmark_surface("joinorder_synthetic") == "internal"
+
+
+def test_public_benchmark_ids_exclude_joinorder_synthetic() -> None:
+    """Public discovery helpers omit internal benchmark surfaces."""
+    public_ids = list_public_benchmark_ids()
+
+    assert "joinorder" in public_ids
+    assert "joinorder_synthetic" not in public_ids

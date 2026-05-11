@@ -32,6 +32,7 @@ from tests.uat.timeouts import TimeoutResult, run_with_timeout
 # comma- or semicolon-separated log line does not collapse two paths into
 # a single match.
 RESULT_PATH_RE = re.compile(r"(?:(?:[A-Za-z]:)?/?[^\s,;]*/)?results/[^\s,;]+\.json")
+WRAPPED_RESULT_PATH_RE = re.compile(r"((?:(?:[A-Za-z]:)?/?[^\s,;]*/)?results/[^\s,;]*)\n([^\s,;]*\.json)")
 UNOFFICIAL_COMPLIANCE_CLASSES = frozenset({"unofficial_nonstandard", "unofficial_subscale"})
 
 
@@ -67,6 +68,7 @@ def extract_result_path(log_text: str) -> str | None:
     last occurrence so log re-prints (e.g. summary tables) take precedence
     over earlier diagnostic prints.
     """
+    log_text = WRAPPED_RESULT_PATH_RE.sub(r"\1\2", log_text)
     matches = RESULT_PATH_RE.findall(log_text)
     if not matches:
         return None

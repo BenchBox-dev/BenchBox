@@ -1,10 +1,8 @@
-"""Join Order Benchmark data generation.
+"""Synthetic Join Order schema smoke-test data generation.
 
-This module provides synthetic data generation for the Join Order Benchmark
-based on the IMDB schema. Since the original benchmark uses real IMDB data which
-requires specific licensing, this generator creates realistic synthetic data
-that preserves the join patterns and selectivity characteristics needed for
-join order optimization testing.
+This module creates synthetic data with uniformly-random distributions for
+joinorder schema smoke testing only. It is not a substitute for canonical JOB;
+see ``benchbox.core.joinorder`` for the canonical IMDb 2013 implementation.
 
 Copyright 2026 Joe Harris / BenchBox Project
 
@@ -26,10 +24,9 @@ if TYPE_CHECKING:
 
 PathLike = Union[Path, "CloudPath", "DatabricksPath"]
 
+from benchbox.core.joinorder.schema import JoinOrderSchema
 from benchbox.core.manifest_utils import write_generator_manifest
 from benchbox.utils.compression_mixin import CompressionMixin
-
-from .schema import JoinOrderSchema
 
 
 class JoinOrderGenerator(CompressionMixin, CloudStorageGeneratorMixin):
@@ -49,7 +46,8 @@ class JoinOrderGenerator(CompressionMixin, CloudStorageGeneratorMixin):
 
         Args:
             scale_factor: Scale factor for data generation (1.0 = ~1GB)
-            output_dir: Output directory for generated data files (defaults to benchmark_runs/datagen/joinorder_sf{X})
+            output_dir: Output directory for generated data files
+                (defaults to benchmark_runs/datagen/joinorder_synthetic_sf{X})
             verbose: Verbosity level (-v=1, -vv=2; bool True treated as 1)
             quiet: Suppress all output
             force_regenerate: Force regeneration even if data exists
@@ -66,7 +64,7 @@ class JoinOrderGenerator(CompressionMixin, CloudStorageGeneratorMixin):
             from benchbox.utils.scale_factor import format_scale_factor
 
             sf_str = format_scale_factor(scale_factor)
-            output_dir = Path.cwd() / "benchmark_runs" / "datagen" / f"joinorder_{sf_str}"
+            output_dir = Path.cwd() / "benchmark_runs" / "datagen" / f"joinorder_synthetic_{sf_str}"
         self.output_dir = create_path_handler(output_dir)
         self.schema = JoinOrderSchema()
         self.force_regenerate = force_regenerate
@@ -79,8 +77,8 @@ class JoinOrderGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         self.very_verbose = self.verbose_level >= 2 and not quiet
         self.quiet = bool(quiet)
 
-        # Base row counts preserve the synthetic IMDB-like proportions while
-        # bringing SF=1 closer to BenchBox's ~1GB baseline.
+        # Base row counts keep the historical smoke-test table sizes while
+        # bringing SF=1 closer to BenchBox's ~1GB synthetic baseline.
         self.base_row_counts = {
             # Reference tables (small, relatively static)
             "kind_type": 7,

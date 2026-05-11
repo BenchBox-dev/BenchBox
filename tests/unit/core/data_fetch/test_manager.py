@@ -36,14 +36,14 @@ ARCHIVE_SHA = "00" * 32  # placeholder — fake_downloader doesn't recompute
 MANIFEST_HASH_PLACEHOLDER = "a" * 64
 
 
-def _write_manifest(tmp: Path) -> Path:
+def _write_manifest(tmp: Path, archive_sha: str = ARCHIVE_SHA) -> Path:
     """Build a minimal data_manifest.toml with two named tables."""
     body = (
         f'dataset_version    = "test-v1"\n'
         f'manifest_hash      = "{MANIFEST_HASH_PLACEHOLDER}"\n'
-        f'data_archive_hash  = "{ARCHIVE_SHA}"\n'
+        f'data_archive_hash  = "{archive_sha}"\n'
         f'url                = "https://example.com/test.tar.zst"\n'
-        f'archive_sha256     = "{ARCHIVE_SHA}"\n'
+        f'archive_sha256     = "{archive_sha}"\n'
         f'license_file       = "DATA-LICENSE.md"\n\n'
         f"[[tables]]\n"
         f'name      = "alpha"\n'
@@ -117,6 +117,25 @@ def test_empty_dir_downloads_then_raises_extraction_required(tmp_path: Path) -> 
     assert excinfo.value.output_dir == str(out_dir)
     assert "test.tar.zst" in excinfo.value.archive_path
     assert download_calls == [("https://example.com/test.tar.zst", out_dir / "test.tar.zst")]
+
+
+def test_existing_verified_archive_raises_extraction_required_without_redownload(tmp_path: Path) -> None:
+    """Interrupted first-runs can leave a complete archive before extraction."""
+    archive_payload = b"complete-archive"
+    archive_sha = hashlib.sha256(archive_payload).hexdigest()
+    manifest_path = _write_manifest(tmp_path, archive_sha=archive_sha)
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    (out_dir / "test.tar.zst").write_bytes(archive_payload)
+
+    def fail_downloader(url, dest, expected_sha256=None):
+        raise AssertionError("verified archive cache should not be re-downloaded")
+
+    with pytest.raises(ExtractionRequiredError) as excinfo:
+        fetch_data("test", manifest_path, out_dir, downloader=fail_downloader)
+
+    assert excinfo.value.archive_path == str(out_dir / "test.tar.zst")
+    assert excinfo.value.output_dir == str(out_dir)
 
 
 def test_post_extraction_returns_dir(tmp_path: Path) -> None:

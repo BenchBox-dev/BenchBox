@@ -28,7 +28,7 @@ BENCHMARK_ORDER = {
         "ai_primitives",
     ],
     "Industry": ["clickbench", "h2odb", "coffeeshop"],
-    "Academic": ["ssb", "joinorder", "amplab"],
+    "Academic": ["ssb", "joinorder", "joinorder_synthetic", "amplab"],
     "Time Series": ["tsbs_devops"],
     "Real World": ["nyctaxi", "flightdata"],
     "AI/ML": ["vector_search"],
@@ -51,6 +51,7 @@ BENCHMARK_CLASS_NAMES: dict[str, str] = {
     "ai_primitives": "AIPrimitives",
     "transaction_primitives": "TransactionPrimitives",
     "joinorder": "JoinOrder",
+    "joinorder_synthetic": "JoinOrderSynthetic",
     "coffeeshop": "CoffeeShop",
     "tpchavoc": "TPCHavoc",
     "tpch_skew": "TPCHSkew",
@@ -263,7 +264,7 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
     },
     "joinorder": {
         "display_name": "JoinOrder",
-        "description": "Query optimizer testing",
+        "description": "Canonical IMDb 2013 Join Order Benchmark",
         "category": "Academic",
         "num_queries": 113,
         "query_description": "113 queries",
@@ -274,6 +275,25 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "complexity": "High",
         "estimated_time_range": (10, 30),
         "supports_dataframe": True,
+        "surface": "public",
+        "data_source": "canonical",
+        "data_manifest": "benchbox/core/joinorder/data_manifest.toml",
+    },
+    "joinorder_synthetic": {
+        "display_name": "JoinOrder Synthetic",
+        "description": "Uniformly-random Join Order schema smoke-test data",
+        "category": "Academic",
+        "num_queries": 13,
+        "query_description": "13 synthetic smoke queries",
+        "supports_streams": False,
+        "default_scale": 1.0,
+        "scale_options": [0.001, 0.01, 0.1, 0.5, 1.0, 2.0],
+        "min_scale": 0.001,
+        "complexity": "Medium",
+        "estimated_time_range": (2, 10),
+        "supports_dataframe": True,
+        "surface": "internal",
+        "data_source": "synthetic",
     },
     "coffeeshop": {
         "display_name": "CoffeeShop",
@@ -411,6 +431,20 @@ def get_benchmark_metadata(benchmark_id: str) -> dict[str, Any] | None:
     return BENCHMARK_METADATA.get(benchmark_id.lower())
 
 
+def get_benchmark_default_scale(benchmark_id: str, fallback: float = 0.01) -> float:
+    """Return a valid default scale factor for benchmark instantiation."""
+    meta = get_benchmark_metadata(benchmark_id)
+    if meta is None:
+        return fallback
+    default_scale = meta.get("default_scale")
+    if default_scale is not None:
+        return float(default_scale)
+    scale_options = meta.get("scale_options") or ()
+    if scale_options:
+        return float(scale_options[0])
+    return fallback
+
+
 def get_benchmark_class_name(benchmark_id: str) -> str | None:
     """Get the class name for a benchmark in the benchbox module.
 
@@ -489,6 +523,11 @@ def list_benchmark_ids() -> list[str]:
         List of benchmark identifiers.
     """
     return list(BENCHMARK_METADATA.keys())
+
+
+def list_public_benchmark_ids() -> list[str]:
+    """Get benchmark IDs visible on public discovery surfaces."""
+    return [bid for bid in list_benchmark_ids() if get_benchmark_surface(bid) == "public"]
 
 
 def list_loader_benchmark_ids() -> list[str]:

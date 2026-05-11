@@ -1,0 +1,25 @@
+id: track2-joinorder-dataframe-coverage
+title: "JoinOrder Track-2 DataFrame coverage for canonical 113 queries"
+worktree: main
+priority: Medium
+status: Identified
+category: Core Functionality
+
+description: |
+  Cutover registers all 113 canonical JoinOrder SQL query IDs in the
+  DataFrame registry, but only the original 13 have expression-family and
+  pandas-family translations. The remaining 100 raise NotImplementedError
+  and point here.
+
+  Flesh this TODO out when Track-2 starts: define translation strategy,
+  per-family validation against DuckDB SQL, platform skip policy, and
+  performance gates.
+
+work: []
+
+metadata:
+  tags:
+    - joinorder
+    - dataframe
+    - track2
+  created_date: "2026-05-11"

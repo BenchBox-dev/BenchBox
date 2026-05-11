@@ -86,10 +86,23 @@ def extract_metadata(bundle_path: Path, bundles_dir: Path) -> dict:
     }
 
 
+def _is_public_benchmark(benchmark_id: str) -> bool:
+    """Return whether a bundle should be included in the public corpus inventory."""
+    try:
+        from benchbox.core.benchmark_registry import get_benchmark_surface
+    except ImportError:
+        return True
+    return get_benchmark_surface(benchmark_id) == "public"
+
+
 def generate_inventory(bundles_dir: Path) -> dict:
     """Generate the full inventory dict."""
     bundle_paths = discover_bundles(bundles_dir)
-    entries = [extract_metadata(p, bundles_dir) for p in bundle_paths]
+    entries = []
+    for path in bundle_paths:
+        entry = extract_metadata(path, bundles_dir)
+        if _is_public_benchmark(entry["benchmark"]):
+            entries.append(entry)
 
     entries.sort(
         key=lambda e: (

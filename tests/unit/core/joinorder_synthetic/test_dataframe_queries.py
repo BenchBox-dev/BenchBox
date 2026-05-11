@@ -19,20 +19,20 @@ class TestQueryRegistration:
     """Tests for query registration and metadata."""
 
     def test_all_13_queries_registered(self):
-        from benchbox.core.joinorder.dataframe_queries import get_dataframe_queries
+        from benchbox.core.joinorder_synthetic.dataframe_queries import get_dataframe_queries
 
         registry = get_dataframe_queries()
         assert len(registry) == 13
 
     def test_registry_returns_consistent_object(self):
-        from benchbox.core.joinorder.dataframe_queries import get_dataframe_queries
+        from benchbox.core.joinorder_synthetic.dataframe_queries import get_dataframe_queries
 
         r1 = get_dataframe_queries()
         r2 = get_dataframe_queries()
         assert r1.get_query_ids() == r2.get_query_ids()
 
     def test_expected_query_ids_present(self):
-        from benchbox.core.joinorder.dataframe_queries import get_dataframe_queries
+        from benchbox.core.joinorder_synthetic.dataframe_queries import get_dataframe_queries
 
         registry = get_dataframe_queries()
         ids = registry.get_query_ids()
@@ -41,7 +41,7 @@ class TestQueryRegistration:
             assert qid in ids, f"Query {qid!r} not found in registry"
 
     def test_all_queries_have_both_impls(self):
-        from benchbox.core.joinorder.dataframe_queries import get_dataframe_queries
+        from benchbox.core.joinorder_synthetic.dataframe_queries import get_dataframe_queries
 
         registry = get_dataframe_queries()
         for query in registry.get_all_queries():
@@ -49,7 +49,7 @@ class TestQueryRegistration:
             assert query.has_pandas_impl(), f"{query.query_id} missing pandas_impl"
 
     def test_all_queries_have_categories(self):
-        from benchbox.core.joinorder.dataframe_queries import get_dataframe_queries
+        from benchbox.core.joinorder_synthetic.dataframe_queries import get_dataframe_queries
 
         registry = get_dataframe_queries()
         for query in registry.get_all_queries():
@@ -58,12 +58,12 @@ class TestQueryRegistration:
     def test_benchmark_registry_supports_dataframe(self):
         from benchbox.core.benchmark_registry import BENCHMARK_METADATA
 
-        assert BENCHMARK_METADATA["joinorder"]["supports_dataframe"] is True
+        assert BENCHMARK_METADATA["joinorder_synthetic"]["supports_dataframe"] is True
 
     def test_benchmark_class_exposes_registry(self):
-        from benchbox.core.joinorder.benchmark import JoinOrderBenchmark
+        from benchbox.core.joinorder_synthetic.benchmark import JoinOrderSyntheticBenchmark
 
-        bm = JoinOrderBenchmark(scale_factor=1.0)
+        bm = JoinOrderSyntheticBenchmark(scale_factor=1.0)
         registry = bm.get_dataframe_queries()
         assert len(registry) == 13
 
@@ -73,7 +73,7 @@ class TestPandasImplExecute:
 
     @pytest.fixture
     def pandas_ctx(self):
-        """Minimal pandas DataFrameContext with synthetic IMDB-like data."""
+        """Minimal pandas DataFrameContext with schema-shaped synthetic data."""
         pytest.importorskip("pandas")
         import pandas as pd
 
@@ -281,91 +281,91 @@ class TestPandasImplExecute:
         return SimplePandasContext()
 
     def test_q1a_pandas(self, pandas_ctx):
-        from benchbox.core.joinorder.dataframe_queries import q1a_pandas_impl
+        from benchbox.core.joinorder_synthetic.dataframe_queries import q1a_pandas_impl
 
         result = q1a_pandas_impl(pandas_ctx)
         assert result is not None
         assert "production_note" in result
 
     def test_q1b_pandas(self, pandas_ctx):
-        from benchbox.core.joinorder.dataframe_queries import q1b_pandas_impl
+        from benchbox.core.joinorder_synthetic.dataframe_queries import q1b_pandas_impl
 
         result = q1b_pandas_impl(pandas_ctx)
         assert result is not None
         assert "production_note" in result
 
     def test_q2a_pandas(self, pandas_ctx):
-        from benchbox.core.joinorder.dataframe_queries import q2a_pandas_impl
+        from benchbox.core.joinorder_synthetic.dataframe_queries import q2a_pandas_impl
 
         result = q2a_pandas_impl(pandas_ctx)
         assert result is not None
         assert "movie_title" in result
 
     def test_q3a_pandas(self, pandas_ctx):
-        from benchbox.core.joinorder.dataframe_queries import q3a_pandas_impl
+        from benchbox.core.joinorder_synthetic.dataframe_queries import q3a_pandas_impl
 
         result = q3a_pandas_impl(pandas_ctx)
         assert result is not None
         assert "movie_title" in result
 
     def test_q4a_pandas(self, pandas_ctx):
-        from benchbox.core.joinorder.dataframe_queries import q4a_pandas_impl
+        from benchbox.core.joinorder_synthetic.dataframe_queries import q4a_pandas_impl
 
         result = q4a_pandas_impl(pandas_ctx)
         assert result is not None
         assert "movie_title" in result
 
     def test_q5a_pandas(self, pandas_ctx):
-        from benchbox.core.joinorder.dataframe_queries import q5a_pandas_impl
+        from benchbox.core.joinorder_synthetic.dataframe_queries import q5a_pandas_impl
 
         result = q5a_pandas_impl(pandas_ctx)
         assert result is not None
         assert "typical_european_movie" in result
 
     def test_q6a_pandas(self, pandas_ctx):
-        from benchbox.core.joinorder.dataframe_queries import q6a_pandas_impl
+        from benchbox.core.joinorder_synthetic.dataframe_queries import q6a_pandas_impl
 
         result = q6a_pandas_impl(pandas_ctx)
         assert result is not None
         assert "hero_movie" in result
 
     def test_q7a_pandas(self, pandas_ctx):
-        from benchbox.core.joinorder.dataframe_queries import q7a_pandas_impl
+        from benchbox.core.joinorder_synthetic.dataframe_queries import q7a_pandas_impl
 
         result = q7a_pandas_impl(pandas_ctx)
         assert result is not None
         assert "biography_movie" in result
 
     def test_q8a_pandas(self, pandas_ctx):
-        from benchbox.core.joinorder.dataframe_queries import q8a_pandas_impl
+        from benchbox.core.joinorder_synthetic.dataframe_queries import q8a_pandas_impl
 
         result = q8a_pandas_impl(pandas_ctx)
         assert result is not None
         assert "japanese_movie_dubbed" in result
 
     def test_q9a_pandas(self, pandas_ctx):
-        from benchbox.core.joinorder.dataframe_queries import q9a_pandas_impl
+        from benchbox.core.joinorder_synthetic.dataframe_queries import q9a_pandas_impl
 
         result = q9a_pandas_impl(pandas_ctx)
         assert result is not None
         assert "american_movie" in result
 
     def test_q10a_pandas(self, pandas_ctx):
-        from benchbox.core.joinorder.dataframe_queries import q10a_pandas_impl
+        from benchbox.core.joinorder_synthetic.dataframe_queries import q10a_pandas_impl
 
         result = q10a_pandas_impl(pandas_ctx)
         assert result is not None
         assert "movie_with_american_producer" in result
 
     def test_q11a_pandas(self, pandas_ctx):
-        from benchbox.core.joinorder.dataframe_queries import q11a_pandas_impl
+        from benchbox.core.joinorder_synthetic.dataframe_queries import q11a_pandas_impl
 
         result = q11a_pandas_impl(pandas_ctx)
         assert result is not None
         assert "non_polish_sequel_movie" in result
 
     def test_q12a_pandas(self, pandas_ctx):
-        from benchbox.core.joinorder.dataframe_queries import q12a_pandas_impl
+        from benchbox.core.joinorder_synthetic.dataframe_queries import q12a_pandas_impl
 
         result = q12a_pandas_impl(pandas_ctx)
         assert result is not None
@@ -375,7 +375,7 @@ class TestPandasImplExecute:
         """All JoinOrder pandas impls return DataFrames."""
         import pandas as pd
 
-        from benchbox.core.joinorder.dataframe_queries import (
+        from benchbox.core.joinorder_synthetic.dataframe_queries import (
             q1a_pandas_impl,
             q2a_pandas_impl,
             q3a_pandas_impl,
@@ -409,7 +409,7 @@ class TestPandasImplExecute:
             assert isinstance(result, pd.DataFrame), f"{fn.__name__} should return pd.DataFrame"
 
     def test_q1a_executes_via_pandas_adapter(self, pandas_ctx):
-        from benchbox.core.joinorder.dataframe_queries import get_dataframe_queries
+        from benchbox.core.joinorder_synthetic.dataframe_queries import get_dataframe_queries
         from benchbox.platforms.dataframe.pandas_df import PandasDataFrameAdapter
 
         query = get_dataframe_queries().get_or_raise("1a")

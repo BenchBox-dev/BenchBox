@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from benchbox.core.joinorder.generator import JoinOrderGenerator
+from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator
 
 pytestmark = [
     pytest.mark.unit,

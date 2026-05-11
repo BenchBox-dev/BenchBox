@@ -118,7 +118,7 @@ class BundlePublisher:
             )
 
         # Extract informational metadata from the bundle header
-        benchmark, platform, scale_factor = _read_bundle_metadata(bundle_path)
+        metadata = _read_bundle_metadata(bundle_path)
 
         try:
             dest_filename = _copy_bundle(bundle_path, self.destination)
@@ -136,9 +136,12 @@ class BundlePublisher:
                 destination=self.destination,
                 reference=reference,
                 label=self.label,
-                benchmark=benchmark,
-                platform=platform,
-                scale_factor=scale_factor,
+                benchmark=metadata.benchmark,
+                platform=metadata.platform,
+                scale_factor=metadata.scale_factor,
+                dataset_version=metadata.dataset_version,
+                manifest_hash=metadata.manifest_hash,
+                data_archive_hash=metadata.data_archive_hash,
             )
         except Exception as exc:
             return BundlePublishResult(
@@ -159,7 +162,17 @@ class BundlePublisher:
 # ---------------------------------------------------------------------------
 
 
-def _read_bundle_metadata(bundle_path: Path) -> tuple[str, str, float]:
+@dataclass(frozen=True)
+class _BundleMetadata:
+    benchmark: str
+    platform: str
+    scale_factor: float
+    dataset_version: str | None = None
+    manifest_hash: str | None = None
+    data_archive_hash: str | None = None
+
+
+def _read_bundle_metadata(bundle_path: Path) -> _BundleMetadata:
     """Read benchmark/platform/scale_factor from a schema-v2 result bundle.
 
     Returns empty strings / 1.0 on any failure - metadata is informational only.
@@ -167,17 +180,52 @@ def _read_bundle_metadata(bundle_path: Path) -> tuple[str, str, float]:
     try:
         text = bundle_path.read_text(encoding="utf-8")
         data: dict = json.loads(text)
-        benchmark = (
-            data.get("benchmark", {}).get("name", "") or data.get("benchmark_name", "") or data.get("benchmark_id", "")
-        )
+        benchmark_block = data.get("benchmark", {})
+        benchmark = benchmark_block.get("id", "") or data.get("benchmark_id", "") or benchmark_block.get("name", "")
         platform = data.get("platform", {}).get("name", "") or data.get("platform", "")
         if isinstance(platform, dict):
             platform = platform.get("name", "")
         raw_sf = data.get("benchmark", {}).get("scale_factor") or data.get("scale_factor") or 1.0
         scale_factor = float(raw_sf) if raw_sf else 1.0
-        return str(benchmark), str(platform), scale_factor
+        identity = _read_dataset_identity(str(benchmark))
+        return _BundleMetadata(
+            benchmark=str(benchmark),
+            platform=str(platform),
+            scale_factor=scale_factor,
+            dataset_version=identity.dataset_version,
+            manifest_hash=identity.manifest_hash,
+            data_archive_hash=identity.data_archive_hash,
+        )
     except Exception:
-        return "", "", 1.0
+        return _BundleMetadata("", "", 1.0)
+
+
+@dataclass(frozen=True)
+class _DatasetIdentity:
+    dataset_version: str | None
+    manifest_hash: str | None
+    data_archive_hash: str | None
+
+
+def _read_dataset_identity(benchmark_id: str) -> _DatasetIdentity:
+    """Read benchmark data identity from registry-declared data_manifest."""
+    try:
+        from benchbox.core.benchmark_registry import get_benchmark_metadata
+        from benchbox.core.data_fetch import load_manifest
+
+        meta = get_benchmark_metadata(benchmark_id) or {}
+        manifest_rel = meta.get("data_manifest")
+        if not manifest_rel:
+            return _DatasetIdentity(None, None, None)
+        repo_root = Path(__file__).resolve().parents[3]
+        manifest = load_manifest(repo_root / str(manifest_rel))
+        return _DatasetIdentity(
+            dataset_version=manifest.dataset_version,
+            manifest_hash=manifest.manifest_hash,
+            data_archive_hash=manifest.data_archive_hash,
+        )
+    except Exception:
+        return _DatasetIdentity(None, None, None)
 
 
 def _copy_bundle(source: Path, destination: str) -> str:

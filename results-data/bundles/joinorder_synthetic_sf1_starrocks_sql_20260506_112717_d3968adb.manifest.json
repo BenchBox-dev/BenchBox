@@ -1,7 +1,7 @@
 {
-  "benchmark": "JoinOrderBenchmark",
-  "bundle_file": "joinorder_sf1_starrocks_sql_20260506_112717_d3968adb.json",
-  "bundle_hash": "ea15c7f82efc897a10b5264be47c3a6247922db2d8c4edda791451f1e4db45ba",
+  "benchmark": "JoinOrderSyntheticBenchmark",
+  "bundle_file": "joinorder_synthetic_sf1_starrocks_sql_20260506_112717_d3968adb.json",
+  "bundle_hash": "5dacbbaba1d72c6cd9cb08507039c4a074bb762d0bd4a372d1f484632c4c5128",
   "companion_hashes": {},
   "phase": 2,
   "platform": "StarRocks",
