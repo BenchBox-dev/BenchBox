@@ -16,6 +16,7 @@ import pytest
 
 from benchbox.core.benchmark_registry import (
     BENCHMARK_METADATA,
+    TPC_OFFICIAL_SCALE_OPTIONS,
     validate_scale_factor,
 )
 from benchbox.core.errors import ScaleFactorNotSupportedError
@@ -51,7 +52,12 @@ def test_joinorder_rejects_arbitrary_scales(bad_sf: float) -> None:
 
 @pytest.mark.parametrize("sf", [0.01, 0.1, 1.0, 10.0])
 def test_tpch_accepts_declared_scale_options(sf: float) -> None:
-    """tpch declares scale_options=[0.01, 0.1, 1.0, 10.0]; each must pass."""
+    """tpch development subscales and small official scales remain runnable."""
+    validate_scale_factor("tpch", sf)
+
+
+@pytest.mark.parametrize("sf", TPC_OFFICIAL_SCALE_OPTIONS)
+def test_tpch_accepts_tpc_official_scale_options(sf: float) -> None:
     validate_scale_factor("tpch", sf)
 
 
