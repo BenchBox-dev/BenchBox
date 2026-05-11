@@ -658,14 +658,16 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
     return Array.from(new Set(filtered.map((row) => row.test_type ?? ""))).filter(Boolean).sort();
   }, [candidates, benchmarkFilter, scaleFilter]);
 
+  function matchesBuilderFilters(row: ResultRow): boolean {
+    if (benchmarkFilter && row.benchmark !== benchmarkFilter) return false;
+    if (scaleFilter && String(row.scale_factor) !== scaleFilter) return false;
+    if (phaseFilter && (row.test_type ?? "") !== phaseFilter) return false;
+    return true;
+  }
+
   const userFilteredRows = useMemo(() => {
     if (candidates === null) return [];
-    return candidates.filter((row) => {
-      if (benchmarkFilter && row.benchmark !== benchmarkFilter) return false;
-      if (scaleFilter && String(row.scale_factor) !== scaleFilter) return false;
-      if (phaseFilter && (row.test_type ?? "") !== phaseFilter) return false;
-      return true;
-    });
+    return candidates.filter(matchesBuilderFilters);
   }, [candidates, benchmarkFilter, scaleFilter, phaseFilter]);
 
   // Partition by compatibility against the locked cohort. Compatible rows
@@ -676,13 +678,19 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
     [userFilteredRows, cohortSignature],
   );
   const incompatibleHiddenCount = cohortSignature !== null && compatibleOnly ? partitioned.incompatible.length : 0;
-  const filteredRows = useMemo(
-    () =>
+  const selectedRowsForDisplay = useMemo(
+    () => candidates?.filter((row) => selectedIds.has(row.result_id)) ?? [],
+    [candidates, selectedIds],
+  );
+  const filteredRows = useMemo(() => {
+    const visibleCandidates =
       cohortSignature !== null && compatibleOnly
         ? partitioned.compatible
-        : [...partitioned.compatible, ...partitioned.incompatible],
-    [cohortSignature, compatibleOnly, partitioned],
-  );
+        : [...partitioned.compatible, ...partitioned.incompatible];
+    if (selectedRowsForDisplay.length === 0) return visibleCandidates;
+    const selectedResultIds = new Set(selectedRowsForDisplay.map((row) => row.result_id));
+    return [...selectedRowsForDisplay, ...visibleCandidates.filter((row) => !selectedResultIds.has(row.result_id))];
+  }, [cohortSignature, compatibleOnly, partitioned, selectedRowsForDisplay]);
 
   function isCompatible(row: ResultRow): boolean {
     if (cohortSignature === null) return true;
@@ -878,6 +886,7 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
                 ? `Up to ${MAX_COMPARE_SELECTIONS} runs can be compared`
                 : "";
               const isPinned = row.result_id === pinnedId;
+              const selectedOutsideFilters = isSelected && !matchesBuilderFilters(row);
               return (
                 <tr
                   key={row.result_id}
@@ -909,6 +918,9 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
                       {row.platform}
                       {isPinned && (
                         <span class="ml-2 text-xs text-[var(--bb-data-fg-subtle)]">(from result detail)</span>
+                      )}
+                      {selectedOutsideFilters && (
+                        <span class="ml-2 text-xs text-[var(--bb-data-fg-subtle)]">(selected outside filters)</span>
                       )}
                     </div>
                     {row.platform_version && (
