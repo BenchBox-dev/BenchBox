@@ -183,7 +183,13 @@ def _cleanup_commands_for(resources: tuple[DockerUsageResource, ...]) -> list[tu
         ("network", ("docker", "network", "rm")),
         ("image", ("docker", "image", "rm")),
     ):
-        ids = [r.identifier for r in resources if r.kind == kind]
+        seen: set[str] = set()
+        ids: list[str] = []
+        for resource in resources:
+            if resource.kind != kind or resource.identifier in seen:
+                continue
+            seen.add(resource.identifier)
+            ids.append(resource.identifier)
         if ids:
             commands.append((*base, *ids))
     return commands
