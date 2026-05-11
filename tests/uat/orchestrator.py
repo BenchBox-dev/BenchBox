@@ -292,6 +292,14 @@ def run_sweep(  # noqa: C901
                 phase_exit_codes[phase] = 2
                 aborted_phase = phase
                 abort_reason = execute_outcome.abort_reason
+                if "free space" in (abort_reason or ""):
+                    _write_resume_manifest(
+                        log_dir=log_dir,
+                        config=config,
+                        aborted_phase=phase,
+                        abort_reason=abort_reason,
+                        attempted=execute_outcome.results,
+                    )
                 break
             phase_exit_codes[phase] = 0 if all(r.status == "passed" for r in execute_outcome.results) else 1
         elif phase == "validate":
