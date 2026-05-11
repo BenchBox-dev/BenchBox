@@ -1,7 +1,6 @@
 /**
- * Verifies the bench.results column-readiness guard introduced by
- * `results-explorer-retheme-schema-cost-regression`. The guard converts an
- * old/dropped-column snapshot from a deep "Binder Error" into an actionable
+ * Verifies the bench.results column-readiness guard. The guard converts a
+ * dropped-column snapshot from a deep "Binder Error" into an actionable
  * init-time failure naming the missing column(s).
  */
 
@@ -51,6 +50,19 @@ describe("verifyBenchResultsColumns guard", () => {
     await expect(
       _verifyBenchResultsColumnsForTest(conn as unknown as Parameters<typeof _verifyBenchResultsColumnsForTest>[0]),
     ).rejects.toThrow(/cost_status/);
+  });
+
+  it("rejects with the missing column names when eligibility contract columns are dropped", async () => {
+    const present = _BENCH_RESULTS_REQUIRED_COLUMNS_FOR_TEST.filter(
+      (column) => column !== "comparison_exclusion_reason" && column !== "is_ranking_eligible",
+    );
+    const conn = makeConn(present);
+    await expect(
+      _verifyBenchResultsColumnsForTest(conn as unknown as Parameters<typeof _verifyBenchResultsColumnsForTest>[0]),
+    ).rejects.toThrow(/comparison_exclusion_reason/);
+    await expect(
+      _verifyBenchResultsColumnsForTest(conn as unknown as Parameters<typeof _verifyBenchResultsColumnsForTest>[0]),
+    ).rejects.toThrow(/is_ranking_eligible/);
   });
 
   it("rejects mentioning the regenerator command for missing identity columns", async () => {

@@ -648,7 +648,7 @@ describe("Query", () => {
     expect(params.get("shape")).toBe("MEDIUM");
   });
 
-  it("does not query normalized cost facets when an older DuckDB schema lacks those columns", async () => {
+  it("does not build facet SQL for URL params absent from the introspected schema", async () => {
     schemaColumns = BASE_SCHEMA_COLUMNS.filter(
       (column) => !["cost_status", "deployment_class", "cloud_provider", "instance_or_warehouse"].includes(column.name),
     );

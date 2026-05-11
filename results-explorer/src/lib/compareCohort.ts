@@ -17,7 +17,7 @@ export interface CompareCohortSignature {
   benchmark: string;
   scaleFactor: string;
   phase: string;
-  /** Optional because generic `bench.results` rows may not carry ranking metadata. */
+  /** Nullable because generic `bench.results` rows are result-level, not ranking rows. */
   primaryMetric: string | null;
 }
 
@@ -39,11 +39,11 @@ function asText(value: unknown): string {
 /**
  * Build the comparable-cohort signature used by Query and Platform entrypoints.
  *
- * Benchmark + scale + phase are always compared when present. `primary_metric`
- * is compared only when both rows expose it; Query Workbench rows come from
- * `bench.results`, whose older schemas do not carry ranking metadata. In that
- * case the same-benchmark lock is still enough to keep the Compare page's
- * primary metric stable because it is resolved from the benchmark registry.
+ * Benchmark + scale + phase are always compared when present. When
+ * `primary_metric` is available from a ranking-aware helper, it is part of the
+ * lock. Plain `bench.results` workbench rows are result-level rows, so their
+ * same-benchmark lock keeps the Compare page's primary metric stable through
+ * the benchmark registry rather than through per-row ranking metadata.
  */
 export function compareCohortSignatureForRow(row: CompareCohortRow): CompareCohortSignature {
   return {

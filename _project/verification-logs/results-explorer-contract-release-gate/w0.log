@@ -1,0 +1,33 @@
+# results-explorer-contract-release-gate w0 dependency state
+checked_sha 651c5efd8e18833ee5f4abd0956934061db98521
+checked_commit 651c5efd8 fix(explorer): require query eligibility projection
+
+## results-explorer-display-contract-policy-gate
+location _project/DONE/main/planning/results-explorer-display-contract-policy-gate.yaml
+item_status=Completed
+done_work_units=6
+nonterminal_status_lines=
+
+## results-explorer-read-model-eligibility-contract
+location _project/DONE/main/planning/results-explorer-read-model-eligibility-contract.yaml
+item_status=Completed
+done_work_units=6
+nonterminal_status_lines=
+
+## results-explorer-frontend-eligibility-normalization
+location _project/DONE/main/planning/results-explorer-frontend-eligibility-normalization.yaml
+item_status=Completed
+done_work_units=6
+nonterminal_status_lines=
+
+## results-explorer-rank-and-compare-evidence-gates
+location _project/DONE/main/planning/results-explorer-rank-and-compare-evidence-gates.yaml
+item_status=Completed
+done_work_units=6
+nonterminal_status_lines=
+
+## results-explorer-home-scope-theme-and-identity
+location _project/DONE/main/planning/results-explorer-home-scope-theme-and-identity.yaml
+item_status=Completed
+done_work_units=6
+nonterminal_status_lines=

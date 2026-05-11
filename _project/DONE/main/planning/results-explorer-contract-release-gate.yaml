@@ -2,7 +2,8 @@ id: results-explorer-contract-release-gate
 title: "Gate Results Explorer contract remediation before marking follow-up complete"
 worktree: main
 priority: Critical
-status: Not Started
+status: Completed
+completed_date: "2026-05-11"
 category: Testing and Quality Assurance
 
 description: |
@@ -24,7 +25,7 @@ deps:
 work:
 - id: w0
   summary: "Confirm all dependent TODOs are completed with evidence"
-  status: pending
+  status: done
   notes: |
     Use the TODO CLI to show each dependent item. Confirm every work unit is
     done, every blocker is resolved, and each dependent item has verification
@@ -34,7 +35,7 @@ work:
 - id: w1
   summary: "Run snapshot contract invariants against the regenerated DuckDB file"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     Run the snapshot invariant checks introduced by
     `results-explorer-read-model-eligibility-contract` using
@@ -49,7 +50,7 @@ work:
 - id: w2
   summary: "Run automated frontend and pipeline verification"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Run the targeted pipeline tests, Results Explorer unit tests, typecheck,
     and build. Capture command status and failure tails to
@@ -58,7 +59,7 @@ work:
 - id: w3
   summary: "Run browser acceptance on the exact high-risk routes"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Restart the local dev server from a clean current tree and exercise:
       - `/results/`;
@@ -74,7 +75,7 @@ work:
 - id: w4
   summary: "Write the final release-gate audit artifact"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Write `_project/audits/results-explorer-contract-release-gate-<date>.md`
     with the checked SHA, commands run, SQL invariants, browser routes, and a
@@ -85,7 +86,7 @@ work:
 - id: w5
   summary: "Move completed remediation TODOs to DONE only after gate approval"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     When the audit passes, use the TODO complete workflow to mark each
     dependent remediation item Completed, move it to `_project/DONE`, regenerate
@@ -94,7 +95,8 @@ work:
     of marking completion.
 
 prior_art:
-- "_project/DONE/main/planning/results-explorer-post-completion-release-gate.yaml:previous release gate — reuse structure but strengthen data-contract checks."
+- "_project/DONE/main/planning/results-explorer-post-completion-release-gate.yaml:previous release gate — reuse structure
+  but strengthen data-contract checks."
 - "_project/scripts/todo_cli.py:TODO validation and graph checks — use for dependency and DONE-state verification."
 - "results-explorer/e2e/:browser acceptance patterns — extend for high-risk routes."
 - "_project/audits/:release-gate audit artifacts — reuse location and concise pass/fail table style."
@@ -111,8 +113,10 @@ approach: |
   dependent TODOs open or create precise follow-up TODOs.
 
 anti_patterns:
-- "DO NOT approve based only on unit tests - because prior completion missed browser-visible and snapshot-visible failures - run SQL and browser checks."
-- "DO NOT move TODOs to DONE before the audit passes - because stale completion state caused this review loop - gate first, complete second."
+- "DO NOT approve based only on unit tests - because prior completion missed browser-visible and snapshot-visible failures
+  - run SQL and browser checks."
+- "DO NOT move TODOs to DONE before the audit passes - because stale completion state caused this review loop - gate first,
+  complete second."
 - "DO NOT broaden this item into implementation - because dependent TODOs own fixes - this item owns verification and bookkeeping."
 
 verification:

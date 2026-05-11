@@ -243,7 +243,58 @@ def test_resume_manifest_written_on_disk_floor_abort(tmp_path: Path):
     with (
         patch.object(orchestrator.preflight_phase, "run_preflight", return_value=fake_preflight),
         patch.object(orchestrator.exec_phase, "run_cell", return_value=cell),
+        patch.object(orchestrator.exec_phase, "default_free_space_reader", return_value=100.0),
         patch.object(orchestrator.preflight_phase, "free_space_gib", return_value=1.0),
+    ):
+        result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
+
+    assert result.aborted_phase == "execute"
+    manifest = tmp_path / "logs" / "resume.json"
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    assert payload["aborted_phase"] == "execute"
+    assert payload["attempted"][0]["cell_key"] == "duckdb|tpch|0.01"
+
+
+def test_resume_manifest_written_on_execute_free_space_abort(tmp_path: Path):
+    cfg = validate_config(
+        {
+            "name": "resume-smoke",
+            "phases": ["preflight", "execute"],
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+        }
+    )
+    cell = CellResult(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.01,
+        status="passed",
+        exit_code=0,
+        elapsed_s=1.0,
+        log_path=tmp_path / "cell.log",
+        result_path=tmp_path / "result.json",
+    )
+    fake_preflight = type(
+        "Preflight",
+        (),
+        {"aborted": False, "abort_reason": None, "warnings": (), "disk_budget_summary": None},
+    )()
+    fake_execute = type(
+        "ExecuteOutcome",
+        (),
+        {
+            "results": (cell,),
+            "pruned": (),
+            "skipped_unreachable": (),
+            "aborted": True,
+            "abort_reason": "free space 1.0 GiB < cutoff 5.0 GiB after Docker teardown",
+        },
+    )()
+
+    with (
+        patch.object(orchestrator.preflight_phase, "run_preflight", return_value=fake_preflight),
+        patch.object(orchestrator.exec_phase, "run_execute", return_value=fake_execute),
     ):
         result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
 
