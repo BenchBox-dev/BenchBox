@@ -11,6 +11,7 @@
 
 import { useState } from "preact/hooks";
 import { speedupRatio } from "@/lib/chartMath";
+import { isValidTimingValue } from "@/lib/displayEligibility";
 import {
   FASTER_FILL,
   SLOWER_FILL,
@@ -60,7 +61,7 @@ export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props)
   // chart). Counts let the toggle disclose how many rows are hidden.
   const allEntries: SpeedupEntry[] = queries.map(({ queryId, timings }) => {
     const baselineT = timings[baselineIdx];
-    const baselineMs = baselineT && baselineT.ms > 0 ? baselineT.ms : null;
+    const baselineMs = isValidTimingValue(baselineT?.ms) ? baselineT.ms : null;
     const speedups = timings
       .filter((_, i) => i !== baselineIdx)
       .map((t) => speedupRatio(baselineMs, t?.ms ?? null));

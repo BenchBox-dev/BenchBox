@@ -13,6 +13,7 @@ import {
   getQueryExecutions,
   getBenchmarkMatrixCells,
   getBenchmarkRanking,
+  getBenchmarkSummaryFromDuckDB,
   getPlatformIndexRows,
   getCohort,
   getMetaLeaderboard,
@@ -140,6 +141,75 @@ describe("duckdbQueries - SQL targets and parameters", () => {
     expect(sql).toMatch(/deployment_class/);
     expect(sql).toMatch(/instance_or_warehouse/);
     expect(sql).toMatch(/ORDER BY br\.rank NULLS LAST/);
+  });
+
+  it("getBenchmarkSummaryFromDuckDB preserves per-cell timing eligibility", async () => {
+    mockedQueryRows
+      .mockResolvedValueOnce([
+        {
+          benchmark: "tpch",
+          scale_factor: 0.1,
+          phase: "power",
+          result_id: "r1",
+          platform_id: "duckdb",
+          platform: "DuckDB",
+          short_id: "r1",
+          trust_label: "maintainer-run",
+          run_date: "2026-04-01",
+          is_ranking_eligible: true,
+          has_display_timing: true,
+          valid_query_count: 1,
+          missing_query_count: 0,
+          zero_timing_count: 1,
+          display_exclusion_reason: null,
+          comparison_exclusion_reason: "insufficient_valid_timings",
+          ranking_exclusion_reason: "insufficient_valid_timings",
+          power_score: null,
+          display_geomean_ms: 10,
+          sample_geomean_ms: 10,
+          cost_usd: null,
+          compliance_class: null,
+          primary_metric: "display_geomean_ms",
+          primary_order: "asc",
+          percentile_p50: null,
+          percentile_p90: null,
+          percentile_p95: null,
+          percentile_p99: null,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          benchmark: "tpch",
+          scale_factor: 0.1,
+          phase: "power",
+          result_id: "r1",
+          platform_id: "duckdb",
+          query_id: "Q1",
+          display_ms: 10,
+          is_valid_display_timing: true,
+          timing_exclusion_reason: null,
+        },
+        {
+          benchmark: "tpch",
+          scale_factor: 0.1,
+          phase: "power",
+          result_id: "r1",
+          platform_id: "duckdb",
+          query_id: "Q2",
+          display_ms: 0,
+          is_valid_display_timing: false,
+          timing_exclusion_reason: "zero_timing",
+        },
+      ])
+      .mockResolvedValueOnce([]);
+
+    const summary = await getBenchmarkSummaryFromDuckDB("tpch", 0.1, "power");
+
+    expect(summary?.platforms[0]?.timings).toEqual({ Q1: 10, Q2: 0 });
+    expect(summary?.platforms[0]?.timing_eligibility).toEqual({
+      Q1: { is_valid_display_timing: true, timing_exclusion_reason: null },
+      Q2: { is_valid_display_timing: false, timing_exclusion_reason: "zero_timing" },
+    });
   });
 
   it("getPlatformIndexRows omits the filter when platformId is undefined", async () => {

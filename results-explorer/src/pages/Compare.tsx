@@ -33,6 +33,7 @@ import { QueryDiffTable } from "@/components/QueryDiffTable";
 import { modeLabel, testTypeLabel } from "@/components/MethodologyDisclosure";
 import { vsSlowestRatio } from "@/lib/chartMath";
 import { buildCompareDecisionSummary } from "@/lib/compareSummary";
+import { isValidTimingValue } from "@/lib/displayEligibility";
 import { paletteColor } from "@/lib/chartTheme";
 import { ChartPanel } from "@/components/ChartPanel";
 import { Select } from "@/components/Select";
@@ -264,7 +265,7 @@ export function Compare({ url }: CompareProps) {
     runLabels: summaryRunLabels,
   });
 
-  const validPrimaries = primaries.filter((v): v is number => v !== null);
+  const validPrimaries = primaries.filter(isValidTimingValue);
   const fastestPrimary =
     validPrimaries.length > 0 ? (higherIsBetter ? Math.max(...validPrimaries) : Math.min(...validPrimaries)) : null;
   const slowestPrimary =
@@ -380,8 +381,8 @@ export function Compare({ url }: CompareProps) {
             context={{ kind: "compare", results, primaryMetric }}
             baselineIndex={normalizedBaselineIndex}
             onBaselineIndexChange={setBaselineIndex}
-            suppressWinnerClaims={severeMismatchReason !== null}
-            suppressionReason={severeMismatchReason ?? undefined}
+            suppressWinnerClaims={decisionSummary.claimSuppressed}
+            suppressionReason={decisionSummary.claimSuppressionReason ?? undefined}
           />
         </div>
       )}
@@ -398,7 +399,7 @@ export function Compare({ url }: CompareProps) {
               : null
             : vsSlowestRatio(primary, slowestPrimary);
           const vsLabel = higherIsBetter ? "vs worst" : "vs slowest";
-          const showPrimaryClaims = severeMismatchReason === null;
+          const showPrimaryClaims = !decisionSummary.claimSuppressed;
           const isFastest =
             showPrimaryClaims && primary !== null && fastestPrimary !== null && primary === fastestPrimary;
 
@@ -483,7 +484,7 @@ export function Compare({ url }: CompareProps) {
       <QueryDiffTable
         results={results}
         baselineIndex={normalizedBaselineIndex}
-        suppressionReason={severeMismatchReason}
+        suppressionReason={decisionSummary.claimSuppressionReason}
       />
       <ComparabilityReceipt results={results} />
     </div>

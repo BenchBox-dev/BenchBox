@@ -23,9 +23,16 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import type { BenchmarkSummary, PlatformRow, SortDirection, SortState } from "@/types";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
-import { fmtMs as formatDurationMs, fmtScore, fmtGeomean, complianceLabel } from "@/utils";
+import { fmtMs as formatDurationMs, fmtScore, fmtGeomean } from "@/utils";
 import { queryDisplayLabel, sortQueryIds } from "@/lib/queryLabels";
 import { compareSelectionLabel } from "@/lib/compareCohort";
+import {
+  formatTimingExclusion,
+  isComparable,
+  isRankable,
+  platformTimingValue,
+  validPrimaryMetricValue,
+} from "@/lib/displayEligibility";
 
 // ---------------------------------------------------------------------------
 // Color math - sourced from chartMath.ts (single source of truth for parity)
@@ -95,7 +102,7 @@ interface QueryHeatmapProps {
 const MOBILE_OUTLIER_LIMIT = 3;
 
 function fmtQueryMs(ms: number): string {
-  if (ms >= 0 && ms < 1) return "<1 ms";
+  if (ms > 0 && ms < 1) return "<1 ms";
   return formatDurationMs(ms);
 }
 
@@ -124,16 +131,15 @@ export function QueryHeatmap({
     const mins: Record<string, number | null> = {};
     for (const qid of sortedQueryIds) {
       const vals = platforms
-        .map((p) => p.timings[qid] ?? null)
-        // Exclude zero/null cells; sub-ms values round to 0 in some runners.
-        .filter((v): v is number => v !== null && v > 0);
+        .map((p) => platformTimingValue(p, qid))
+        .filter((v): v is number => v !== null);
       mins[qid] = vals.length > 0 ? Math.min(...vals) : null;
     }
     return mins;
   }, [platforms, sortedQueryIds]);
 
   // Determine primary display metric from the artifact's ranking config.
-  const primaryMetric = ranking?.primary_metric ?? "display_geomean_ms";
+  const primaryMetric = ranking?.primary_metric === "power_score" ? "power_score" : "display_geomean_ms";
   const higherIsBetter = ranking?.primary_order === "desc";
   const defaultPrimaryDirection: SortDirection = higherIsBetter ? "desc" : "asc";
   type MatrixSortKey = "platform" | "primary" | "geomean" | `query:${string}`;
@@ -144,7 +150,7 @@ export function QueryHeatmap({
   const showGeomeanCol = ranking?.secondary_metric === "display_geomean_ms";
 
   function getPrimaryValue(row: PlatformRow): number | null {
-    return primaryMetric === "power_score" ? row.power_score : row.display_geomean_ms;
+    return validPrimaryMetricValue(row, primaryMetric);
   }
 
   function fmtPrimary(val: number | null): string {
@@ -168,17 +174,21 @@ export function QueryHeatmap({
         : b.platform.localeCompare(a.platform);
     }
     if (current.key === "primary") {
-      if (a.is_ranking_eligible !== b.is_ranking_eligible) {
-        return a.is_ranking_eligible ? -1 : 1;
+      if (isRankable(a) !== isRankable(b)) {
+        return isRankable(a) ? -1 : 1;
       }
       return compareNullableNumber(getPrimaryValue(a), getPrimaryValue(b), current.direction);
     }
     if (current.key === "geomean") {
-      return compareNullableNumber(a.display_geomean_ms, b.display_geomean_ms, current.direction);
+      return compareNullableNumber(
+        validPrimaryMetricValue(a, "display_geomean_ms"),
+        validPrimaryMetricValue(b, "display_geomean_ms"),
+        current.direction,
+      );
     }
     if (current.key.startsWith("query:")) {
       const queryId = current.key.slice("query:".length);
-      return compareNullableNumber(a.timings[queryId] ?? null, b.timings[queryId] ?? null, current.direction);
+      return compareNullableNumber(platformTimingValue(a, queryId), platformTimingValue(b, queryId), current.direction);
     }
     return 0;
   }
@@ -205,6 +215,7 @@ export function QueryHeatmap({
 
   function toggleRow(row: PlatformRow) {
     if (!onSelectionChange || !selectedIds) return;
+    if (!isComparable(row)) return;
     const key = rowKey(row);
     const next = new Set(selectedIds);
     if (next.has(key)) next.delete(key);
@@ -432,9 +443,9 @@ export function QueryHeatmap({
           Per-query latency (ms): lower is better
         </div>
         <div class="mt-1">
-          {heatmapMeaning} <strong>&lt;1 ms</strong> means a zero-or-sub-millisecond timing below display precision;{" "}
-          <strong>No run</strong> means missing data. The primary score column ({primaryLabel}) on the left of each row uses its
-          own metric and direction ({primaryDirectionLabel}).
+          {heatmapMeaning} <strong>&lt;1 ms</strong> means a positive sub-millisecond timing; exact zero timings are{" "}
+          excluded from heat, ranks, and comparisons. <strong>No run</strong> means missing data. The primary score column (
+          {primaryLabel}) on the left of each row uses its own metric and direction ({primaryDirectionLabel}).
         </div>
       </div>
 
@@ -446,6 +457,9 @@ export function QueryHeatmap({
       >
         {sorted.map((row) => {
           const isSelected = selectedIds?.has(rowKey(row)) ?? false;
+          const comparable = isComparable(row);
+          const comparisonExclusion = comparable ? null : formatTimingExclusion(row.comparison_exclusion_reason);
+          const rankingExclusion = isRankable(row) ? null : formatTimingExclusion(row.ranking_exclusion_reason);
           const outliers = queryOutliers(row, sortedQueryIds, colMins);
           return (
             <article
@@ -461,6 +475,7 @@ export function QueryHeatmap({
                   <input
                     type="checkbox"
                     checked={isSelected}
+                    disabled={!comparable}
                     onChange={() => toggleRow(row)}
                     aria-label={compareSelectionLabel({
                       platform: row.platform,
@@ -470,18 +485,19 @@ export function QueryHeatmap({
                       runDate: row.run_date,
                       resultId: row.result_id,
                     })}
+                    title={comparisonExclusion ?? undefined}
                     class="mt-1 h-4 w-4 shrink-0 rounded border-[var(--bb-data-border-strong)]"
                   />
                 )}
                 <div class="min-w-0 flex-1">
                   <div class="flex items-center gap-1">
                     <h2 class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">{row.platform}</h2>
-                    {!row.is_ranking_eligible && (
+                    {rankingExclusion && (
                       <span
                         role="img"
                         class="text-xs text-[var(--bb-data-fg-subtle)] cursor-help"
-                        title={`Compliance: ${complianceLabel(row.compliance_class).replace(/^\(|\)$/g, "")}`}
-                        aria-label={`Compliance: ${complianceLabel(row.compliance_class).replace(/^\(|\)$/g, "")}`}
+                        title={rankingExclusion}
+                        aria-label={rankingExclusion}
                         data-testid={`heatmap-mobile-compliance-marker-${row.result_id}`}
                       >
                         *
@@ -511,7 +527,7 @@ export function QueryHeatmap({
                 <ValidationBadge validationStatus={row.validation_status} showMissing />
                 {showGeomeanCol && (
                   <span class="rounded-full bg-[var(--bb-surface-app)] px-2 py-0.5 font-mono text-xs text-[var(--bb-data-fg-muted)]">
-                    Geomean {fmtGeomean(row.display_geomean_ms)}
+                    Geomean {fmtGeomean(validPrimaryMetricValue(row, "display_geomean_ms"))}
                   </span>
                 )}
               </div>
@@ -590,6 +606,9 @@ export function QueryHeatmap({
             <tbody class="divide-y divide-[var(--bb-data-border)]">
               {sorted.map((row, rowIdx) => {
                 const isSelected = selectedIds?.has(rowKey(row)) ?? false;
+                const comparable = isComparable(row);
+                const comparisonExclusion = comparable ? null : formatTimingExclusion(row.comparison_exclusion_reason);
+                const rankingExclusion = isRankable(row) ? null : formatTimingExclusion(row.ranking_exclusion_reason);
                 return (
                   <tr
                     key={row.result_id}
@@ -608,6 +627,7 @@ export function QueryHeatmap({
                       <input
                         type="checkbox"
                         checked={isSelected}
+                        disabled={!comparable}
                         onChange={() => toggleRow(row)}
                         aria-label={compareSelectionLabel({
                           platform: row.platform,
@@ -617,6 +637,7 @@ export function QueryHeatmap({
                           runDate: row.run_date,
                           resultId: row.result_id,
                         })}
+                        title={comparisonExclusion ?? undefined}
                         class="h-4 w-4 rounded border-[var(--bb-data-border-strong)]"
                       />
                     </td>
@@ -630,12 +651,12 @@ export function QueryHeatmap({
                   >
                     <div class="flex items-center gap-1">
                       <span class="font-medium text-[var(--bb-data-fg-primary)]">{row.platform}</span>
-                      {!row.is_ranking_eligible && (
+                      {rankingExclusion && (
                         <span
                           role="img"
                           class="text-xs text-[var(--bb-data-fg-subtle)] cursor-help"
-                          title={`Compliance: ${complianceLabel(row.compliance_class).replace(/^\(|\)$/g, "")}`}
-                          aria-label={`Compliance: ${complianceLabel(row.compliance_class).replace(/^\(|\)$/g, "")}`}
+                          title={rankingExclusion}
+                          aria-label={rankingExclusion}
                           data-testid={`heatmap-compliance-marker-${row.result_id}`}
                         >
                           *
@@ -683,16 +704,22 @@ export function QueryHeatmap({
                       }`}
                       style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "geomean"))}
                     >
-                      {fmtGeomean(row.display_geomean_ms)}
+                      {fmtGeomean(validPrimaryMetricValue(row, "display_geomean_ms"))}
                     </td>
                   )}
                   {sortedQueryIds.map((qid, colIdx) => {
-                    const ms = row.timings[qid] ?? null;
+                    const rawMs = row.timings[qid] ?? null;
+                    const ms = platformTimingValue(row, qid);
                     const minInCol = colMins[qid] ?? null;
                     const hue = suppressHeat ? null : colorForCell(ms, minInCol);
                     const lightness = suppressHeat ? null : lightnessForCell(ms, minInCol);
                     const ratio =
                       ms !== null && minInCol !== null && minInCol > 0 ? ms / minInCol : null;
+                    const isExcludedTiming = rawMs !== null && ms === null;
+                    const excludedReason =
+                      rawMs === 0
+                        ? formatTimingExclusion("zero_timing")
+                        : "Timing is excluded from display evidence.";
                     const ariaLabel =
                       ms !== null
                         ? ratio !== null
@@ -700,7 +727,9 @@ export function QueryHeatmap({
                             ? `${fmtQueryMs(ms)}, fastest in column`
                             : `${fmtQueryMs(ms)}, ${ratio.toFixed(1)}× fastest in column`
                           : fmtQueryMs(ms)
-                        : `No published query run for ${row.platform} ${qid}`;
+                        : isExcludedTiming
+                          ? `${formatDurationMs(rawMs)}, excluded: ${excludedReason}`
+                          : `No published query run for ${row.platform} ${qid}`;
 
                     const isFocused = focusPos.row === rowIdx && focusPos.col === colIdx;
 
@@ -723,11 +752,17 @@ export function QueryHeatmap({
                         }`}
                         style={cellStyle}
                         aria-label={ariaLabel}
-                        title={ms === null ? "No published run for this query/platform cell." : undefined}
+                        title={
+                          isExcludedTiming
+                            ? excludedReason
+                            : ms === null
+                              ? "No published run for this query/platform cell."
+                              : undefined
+                        }
                         onKeyDown={(e) => handleCellKey(e as KeyboardEvent, rowIdx, colIdx)}
                         onFocus={() => setAnnouncement(`${queryDisplayLabel(qid)}: ${ariaLabel}`)}
                       >
-                        {ms !== null ? fmtQueryMs(ms) : "No run"}
+                        {ms !== null ? fmtQueryMs(ms) : isExcludedTiming ? "Excluded" : "No run"}
                       </td>
                     );
                   })}
@@ -756,7 +791,7 @@ function queryOutliers(
 ): QueryOutlier[] {
   return sortedQueryIds
     .map((queryId) => {
-      const ms = row.timings[queryId] ?? null;
+      const ms = platformTimingValue(row, queryId);
       if (ms === null) return null;
       const minInCol = colMins[queryId] ?? null;
       const ratio = minInCol !== null && minInCol > 0 ? ms / minInCol : null;

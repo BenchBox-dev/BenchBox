@@ -16,7 +16,7 @@ import { fireEvent, render, screen, within } from "@testing-library/preact";
 import { describe, it, expect } from "vitest";
 import { expectNoAxeViolations } from "@/testing/axe-helper";
 import { QueryHeatmap } from "@/components/QueryHeatmap";
-import type { BenchmarkSummary } from "@/types";
+import type { BenchmarkSummary, PlatformRow } from "@/types";
 
 // ---------------------------------------------------------------------------
 // Test fixtures
@@ -32,8 +32,32 @@ const TIMING_ELIGIBLE = {
   ranking_exclusion_reason: null,
 };
 
-function makeSummary(overrides: Partial<BenchmarkSummary> = {}): BenchmarkSummary {
+function timingEligibility(timings: Record<string, number | null>): PlatformRow["timing_eligibility"] {
+  return Object.fromEntries(
+    Object.entries(timings).map(([queryId, ms]) => [
+      queryId,
+      {
+        is_valid_display_timing: ms !== null && ms > 0,
+        timing_exclusion_reason: ms === null ? "missing_timing" : ms === 0 ? "zero_timing" : null,
+      },
+    ]),
+  );
+}
+
+type PlatformRowFixture = Omit<PlatformRow, "timing_eligibility"> & Partial<Pick<PlatformRow, "timing_eligibility">>;
+type SummaryFixtureOverrides = Partial<Omit<BenchmarkSummary, "platforms">> & {
+  platforms?: PlatformRowFixture[];
+};
+
+function withTimingEligibility(row: PlatformRowFixture): PlatformRow {
   return {
+    ...row,
+    timing_eligibility: timingEligibility(row.timings),
+  };
+}
+
+function makeSummary(overrides: SummaryFixtureOverrides = {}): BenchmarkSummary {
+  const summary: Omit<BenchmarkSummary, "platforms"> & { platforms: PlatformRowFixture[] } = {
     benchmark: "tpch",
     scale_factor: 0.1,
     phase: "power",
@@ -61,6 +85,7 @@ function makeSummary(overrides: Partial<BenchmarkSummary> = {}): BenchmarkSummar
         percentile_stats: null,
         phase_durations: null,
         timings: { Q1: 10, Q2: 20 },
+        timing_eligibility: {},
       },
       {
         result_id: "r2",
@@ -84,6 +109,7 @@ function makeSummary(overrides: Partial<BenchmarkSummary> = {}): BenchmarkSummar
         percentile_stats: null,
         phase_durations: null,
         timings: { Q1: 100, Q2: 200 },
+        timing_eligibility: {},
       },
     ],
     cell_reduction: "median_successful_measurement_ms",
@@ -93,6 +119,10 @@ function makeSummary(overrides: Partial<BenchmarkSummary> = {}): BenchmarkSummar
       primary_order: "desc",
     },
     ...overrides,
+  };
+  return {
+    ...summary,
+    platforms: summary.platforms.map(withTimingEligibility),
   };
 }
 
@@ -201,9 +231,9 @@ describe("QueryHeatmap rendering", () => {
     const marker = screen.getByTestId("heatmap-compliance-marker-platform-noncompliant");
     expect(marker.textContent).toBe("*");
     expect(marker.getAttribute("role")).toBe("img");
-    expect(marker.getAttribute("title")).toContain("subscale");
-    expect(marker.getAttribute("aria-label")).toContain("subscale");
-    expect(screen.getAllByRole("img", { name: "Compliance: subscale" })).toHaveLength(2);
+    expect(marker.getAttribute("title")).toContain("outside the ranked compliance class");
+    expect(marker.getAttribute("aria-label")).toContain("outside the ranked compliance class");
+    expect(screen.getAllByRole("img", { name: "Result is outside the ranked compliance class." })).toHaveLength(2);
     expect(screen.queryByText("(subscale)")).toBeNull();
   });
 
@@ -254,7 +284,7 @@ describe("QueryHeatmap rendering", () => {
     expect(slowest?.getAttribute("aria-label")).toBe("100 ms, 10.0× fastest in column");
   });
 
-  it("shows the metric/heatmap legend and formats zero/sub-millisecond timings", () => {
+  it("shows the metric/heatmap legend, excludes exact zeroes, and formats positive sub-millisecond timings", () => {
     const summary = makeSummary({
       platforms: [
         {
@@ -263,7 +293,7 @@ describe("QueryHeatmap rendering", () => {
         },
         {
           ...makeSummary().platforms[1]!,
-          timings: { Q1: 4, Q2: 200 },
+          timings: { Q1: 0.4, Q2: 200 },
         },
       ],
     });
@@ -278,8 +308,12 @@ describe("QueryHeatmap rendering", () => {
     expect(legend.textContent).toContain("Power Score");
     expect(legend.textContent).toContain("higher is better");
     expect(legend.textContent).toContain("<1 ms");
+    expect(legend.textContent).toContain("exact zero timings are");
 
-    const subMs = container.querySelector<HTMLElement>('[data-cell="0-0"]');
+    const zero = container.querySelector<HTMLElement>('[data-cell="0-0"]');
+    const subMs = container.querySelector<HTMLElement>('[data-cell="1-0"]');
+    expect(zero?.textContent).toBe("Excluded");
+    expect(zero?.getAttribute("aria-label")).toContain("0 ms, excluded");
     expect(subMs?.textContent).toBe("<1 ms");
     expect(subMs?.getAttribute("aria-label")).toBe("<1 ms, fastest in column");
   });
@@ -340,6 +374,32 @@ describe("QueryHeatmap rendering", () => {
     fireEvent.click(checkbox);
 
     expect([...(selected ?? [])]).toEqual(["r1"]);
+  });
+
+  it("does not allow comparison selection for rows excluded by the read-model contract", () => {
+    let selected: Set<string> | null = null;
+    const summary = makeSummary({
+      platforms: [
+        {
+          ...makeSummary().platforms[0]!,
+          comparison_exclusion_reason: "insufficient_valid_timings",
+        },
+      ],
+    });
+    render(
+      <QueryHeatmap
+        summary={summary}
+        selectedIds={new Set()}
+        onSelectionChange={(ids) => {
+          selected = ids;
+        }}
+      />,
+    );
+
+    const checkbox = screen.getAllByRole("checkbox")[0] as HTMLInputElement;
+    expect(checkbox.disabled).toBe(true);
+    fireEvent.click(checkbox);
+    expect(selected).toBeNull();
   });
 
   // -----------------------------------------------------------------------

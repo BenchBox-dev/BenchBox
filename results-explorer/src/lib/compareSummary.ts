@@ -1,4 +1,12 @@
 import type { DetailResult } from "@/types";
+import {
+  compareEvidenceSummary,
+  isComparable,
+  isValidTimingValue,
+  primaryMetricValue,
+  timingValueForQuery,
+  validDisplayTimingValues,
+} from "@/lib/displayEligibility";
 
 export type ComparePrimaryMetric = "power_score" | "display_geomean_ms";
 
@@ -79,18 +87,24 @@ export function buildCompareDecisionSummary(
 ): CompareDecisionSummary {
   const higherIsBetter = primaryMetric === "power_score";
   const primaryMetricLabel = higherIsBetter ? "Power score" : "Geomean query time";
+  const evidence = compareEvidenceSummary(results);
+  const suppressWinnerClaims = options.suppressWinnerClaims === true || !evidence.comparable;
+  const suppressionReason = options.suppressionReason ?? evidence.reason ?? null;
   const metrics = results.map((result) => ({
     resultId: result.result_id,
     platform: result.platform,
-    value: primaryMetric === "power_score" ? result.power_score : result.display_geomean_ms,
+    value: primaryMetricValue(result, primaryMetric),
+    comparable: isComparable(result),
   }));
   const sortedMetrics = metrics
-    .filter((metric): metric is CompareResultMetric & { value: number } => metric.value !== null)
+    .filter(
+      (metric): metric is CompareResultMetric & { value: number; comparable: boolean } =>
+        metric.comparable && isValidTimingValue(metric.value),
+    )
     .sort((a, b) => (higherIsBetter ? b.value - a.value : a.value - b.value));
 
   const metricWinner = sortedMetrics[0] ?? null;
-  const claimSuppressed = options.suppressWinnerClaims === true;
-  const winner = claimSuppressed ? null : metricWinner;
+  const winner = suppressWinnerClaims ? null : metricWinner;
   const comparison = sortedMetrics.length > 1 ? sortedMetrics[sortedMetrics.length - 1]! : null;
   const comparisonRatio = winner && comparison ? metricRatio(winner.value, comparison.value, higherIsBetter) : null;
   const comparisonLabel = higherIsBetter ? "vs lowest selected" : "vs slowest selected";
@@ -104,15 +118,19 @@ export function buildCompareDecisionSummary(
     primaryMetric,
     primaryMetricLabel,
     higherIsBetter,
-    claimSuppressed,
-    claimSuppressionReason: options.suppressionReason ?? null,
+    claimSuppressed: suppressWinnerClaims,
+    claimSuppressionReason: suppressionReason,
     winner,
     winnerLabel,
     comparison,
     comparisonRatio,
     comparisonLabel,
     isTie,
-    headline: buildHeadline(winner, comparisonRatio, primaryMetric, options),
+    headline: buildHeadline(winner, comparisonRatio, primaryMetric, {
+      ...options,
+      suppressWinnerClaims,
+      suppressionReason: suppressionReason ?? undefined,
+    }),
     queryRecord,
     percentiles,
     cost,
@@ -120,7 +138,7 @@ export function buildCompareDecisionSummary(
 }
 
 function metricRatio(winnerValue: number, comparisonValue: number, higherIsBetter: boolean): number | null {
-  if (winnerValue <= 0 || comparisonValue <= 0) return null;
+  if (!isValidTimingValue(winnerValue) || !isValidTimingValue(comparisonValue)) return null;
   return higherIsBetter ? winnerValue / comparisonValue : comparisonValue / winnerValue;
 }
 
@@ -169,9 +187,9 @@ function buildWinnerQueryRecord(results: DetailResult[], winnerResultId: string 
     const entries = results
       .map((result) => ({
         resultId: result.result_id,
-        value: result.display_timings.find((timing) => timing.query_id === queryId)?.display_ms ?? null,
+        value: timingValueForQuery(result, queryId),
       }))
-      .filter((entry): entry is { resultId: string; value: number } => entry.value !== null && entry.value > 0);
+      .filter((entry): entry is { resultId: string; value: number } => isValidTimingValue(entry.value));
     const winnerEntry = entries.find((entry) => entry.resultId === winnerResultId);
     const competitorCount = entries.filter((entry) => entry.resultId !== winnerResultId).length;
     if (!winnerEntry || competitorCount === 0) {
@@ -201,10 +219,7 @@ function buildWinnerQueryRecord(results: DetailResult[], winnerResultId: string 
 }
 
 function buildPercentiles(result: DetailResult): ComparePercentiles {
-  const values = result.display_timings
-    .map((timing) => timing.display_ms)
-    .filter((value): value is number => value !== null && value >= 0)
-    .sort((a, b) => a - b);
+  const values = validDisplayTimingValues(result.display_timings).sort((a, b) => a - b);
   return {
     resultId: result.result_id,
     platform: result.platform,
@@ -233,17 +248,18 @@ function buildCostSummary(
   const normalized = results
     .map((result) => ({
       resultId: result.result_id,
+      comparable: isComparable(result),
       cost: result.normalized_cost_usd ?? null,
       costStatus: result.cost_status ?? null,
-      primaryValue: primaryMetric === "power_score" ? result.power_score : result.display_geomean_ms,
+      primaryValue: primaryMetricValue(result, primaryMetric),
     }))
     .filter(
-      (entry): entry is { resultId: string; cost: number; costStatus: string; primaryValue: number } =>
+      (entry): entry is { resultId: string; comparable: boolean; cost: number; costStatus: string; primaryValue: number } =>
+        entry.comparable &&
         entry.costStatus === "normalized" &&
         entry.cost !== null &&
         entry.cost > 0 &&
-        entry.primaryValue !== null &&
-        entry.primaryValue > 0,
+        isValidTimingValue(entry.primaryValue),
     );
 
   if (normalized.length === 0) return null;
@@ -260,7 +276,7 @@ function buildCostSummary(
   const sorted = [...scored].sort((a, b) => b.costPerformance - a.costPerformance);
   const worst = sorted[sorted.length - 1];
   const ratio =
-    winnerCost && worst && worst.costPerformance > 0 ? winnerCost.costPerformance / worst.costPerformance : null;
+    winnerCost && worst && isValidTimingValue(worst.costPerformance) ? winnerCost.costPerformance / worst.costPerformance : null;
 
   return {
     normalizedResultCount: normalized.length,

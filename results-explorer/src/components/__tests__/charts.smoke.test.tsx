@@ -30,6 +30,7 @@ import { SparklineTable } from "@/components/SparklineTable";
 function makePlatform(
   overrides: Partial<PlatformRow> = {},
 ): PlatformRow {
+  const timings = overrides.timings ?? { Q1: 10, Q2: 20, Q3: 30 };
   return {
     result_id: "r1",
     short_id: "",
@@ -56,7 +57,18 @@ function makePlatform(
     compliance_class: null,
     percentile_stats: null,
     phase_durations: null,
-    timings: { Q1: 10, Q2: 20, Q3: 30 },
+    timings,
+    timing_eligibility:
+      overrides.timing_eligibility ??
+      Object.fromEntries(
+        Object.entries(timings).map(([queryId, ms]) => [
+          queryId,
+          {
+            is_valid_display_timing: ms !== null && ms > 0,
+            timing_exclusion_reason: ms === null ? "missing_timing" : ms === 0 ? "zero_timing" : null,
+          },
+        ]),
+      ),
     ...overrides,
   };
 }

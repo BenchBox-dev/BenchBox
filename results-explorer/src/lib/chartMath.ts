@@ -15,6 +15,7 @@
  */
 
 import { HEAT_MIN_RATIO, HEAT_MAX_RATIO } from "@/lib/chartTheme";
+import { isValidTimingValue, validTimingValues } from "@/lib/displayEligibility";
 
 // ---------------------------------------------------------------------------
 // Latency magnitude scale
@@ -51,9 +52,7 @@ export function buildLatencyBarScale(
   values: (number | null)[],
   logThreshold = LATENCY_LOG_SCALE_THRESHOLD,
 ): LatencyBarScale | null {
-  const valid = values.filter((value): value is number =>
-    value !== null && value > 0 && Number.isFinite(value),
-  );
+  const valid = validTimingValues(values);
   if (valid.length === 0) return null;
 
   const min = Math.min(...valid);
@@ -76,12 +75,11 @@ export function buildLatencyBarScale(
 }
 
 export function latencyScaleFraction(value: number | null, scale: LatencyBarScale): number | null {
-  if (value === null || !Number.isFinite(value)) return null;
+  if (!isValidTimingValue(value)) return null;
   if (scale.mode === "linear") {
-    if (value < 0 || scale.domainMax <= 0) return null;
+    if (scale.domainMax <= 0) return null;
     return clamp01(value / scale.domainMax);
   }
-  if (value <= 0) return null;
 
   const logMin = log2Latency(scale.domainMin);
   const logMax = log2Latency(scale.domainMax);
@@ -142,7 +140,7 @@ export function buildLogLatencyScale(
     maxValue?: number;
   } = {},
 ): LogLatencyScale | null {
-  const valid = values.filter((value) => value > 0 && Number.isFinite(value));
+  const valid = validTimingValues(values);
   if (valid.length === 0) return null;
 
   const floorMs = options.floorMs ?? 0.1;
@@ -186,7 +184,7 @@ export function logLatencyTicks(scale: LogLatencyScale, tolerance = 0.05): numbe
  * Returns null for missing/invalid inputs so the caller can skip coloring.
  */
 export function colorForCell(ms: number | null, minInCol: number | null): number | null {
-  if (ms === null || minInCol === null || minInCol <= 0 || ms <= 0) return null;
+  if (!isValidTimingValue(ms) || !isValidTimingValue(minInCol)) return null;
   const ratio = Math.max(HEAT_MIN_RATIO, Math.min(HEAT_MAX_RATIO, ms / minInCol));
   const t = Math.log10(ratio);
   return Math.round(120 * (1 - t));
@@ -199,7 +197,7 @@ export function colorForCell(ms: number | null, minInCol: number | null): number
  * Returns null for missing/invalid inputs.
  */
 export function lightnessForCell(ms: number | null, minInCol: number | null): string | null {
-  if (ms === null || minInCol === null || minInCol <= 0 || ms <= 0) return null;
+  if (!isValidTimingValue(ms) || !isValidTimingValue(minInCol)) return null;
   const ratio = Math.max(HEAT_MIN_RATIO, Math.min(HEAT_MAX_RATIO, ms / minInCol));
   const t = Math.log10(ratio);
   return `${Math.round(95 - 70 * t)}%`;
@@ -237,7 +235,7 @@ export function lightnessForCell(ms: number | null, minInCol: number | null): st
  * @param slowestMs  Largest display_ms across all results for this benchmark.
  */
 export function vsSlowestRatio(thisMs: number | null, slowestMs: number | null): number | null {
-  if (thisMs === null || slowestMs === null || thisMs <= 0 || slowestMs <= 0) return null;
+  if (!isValidTimingValue(thisMs) || !isValidTimingValue(slowestMs)) return null;
   return slowestMs / thisMs;
 }
 
@@ -258,7 +256,7 @@ export function vsSlowestRatio(thisMs: number | null, slowestMs: number | null):
  * @param thisMs      Canonical display_ms for the result being compared.
  */
 export function speedupRatio(baselineMs: number | null, thisMs: number | null): number | null {
-  if (baselineMs === null || thisMs === null || baselineMs <= 0 || thisMs <= 0) return null;
+  if (!isValidTimingValue(baselineMs) || !isValidTimingValue(thisMs)) return null;
   return baselineMs / thisMs;
 }
 
@@ -280,7 +278,7 @@ export function speedupRatio(baselineMs: number | null, thisMs: number | null): 
  * Returns null when either input is null, zero, or negative.
  */
 export function deltaPct(thisMs: number | null, baselineMs: number | null): number | null {
-  if (thisMs === null || baselineMs === null || baselineMs <= 0 || thisMs <= 0) return null;
+  if (!isValidTimingValue(thisMs) || !isValidTimingValue(baselineMs)) return null;
   return ((thisMs - baselineMs) / baselineMs) * 100;
 }
 
@@ -325,10 +323,11 @@ export function sortByMagnitudeDesc<T extends { deltaPct: number }>(groups: [str
  *                 zero.
  */
 export function perQuerySpeedup(validMs: number[]): number | null {
-  if (validMs.length === 0) return null;
-  const fastest = Math.min(...validMs);
-  const slowest = Math.max(...validMs);
-  return fastest > 0 ? slowest / fastest : null;
+  const valid = validTimingValues(validMs);
+  if (valid.length === 0) return null;
+  const fastest = Math.min(...valid);
+  const slowest = Math.max(...valid);
+  return slowest / fastest;
 }
 
 // ---------------------------------------------------------------------------
@@ -349,7 +348,7 @@ export function perQuerySpeedup(validMs: number[]): number | null {
  * @param values  Mixed array of display_ms values (may contain nulls).
  */
 export function geomeanMs(values: (number | null)[]): number | null {
-  const valid = values.filter((v): v is number => v !== null && v > 0);
+  const valid = validTimingValues(values);
   if (valid.length === 0) return null;
   return Math.exp(valid.reduce((sum, v) => sum + Math.log(v), 0) / valid.length);
 }
@@ -383,7 +382,7 @@ export interface BoxStats {
  * Null and non-positive values are excluded.  Returns null when no valid values.
  */
 export function computeBoxStats(values: (number | null)[]): BoxStats | null {
-  const valid = values.filter((v): v is number => v !== null && v > 0 && isFinite(v));
+  const valid = validTimingValues(values);
   if (valid.length === 0) return null;
   const sorted = [...valid].sort((a, b) => a - b);
   return {
@@ -411,7 +410,7 @@ export function computeBoxStats(values: (number | null)[]): BoxStats | null {
  * Returns an empty array when no valid values exist.
  */
 export function computeECDFPoints(values: (number | null)[]): { x: number; y: number }[] {
-  const valid = values.filter((v): v is number => v !== null && v > 0 && isFinite(v));
+  const valid = validTimingValues(values);
   if (valid.length === 0) return [];
   const sorted = [...valid].sort((a, b) => a - b);
   const n = sorted.length;
@@ -454,7 +453,7 @@ export function computeRankTable(
     const valid: { i: number; ms: number }[] = [];
     for (let i = 0; i < nPlatforms; i++) {
       const ms = timingsByPlatform[i]?.[qid] ?? null;
-      if (ms !== null && ms > 0) valid.push({ i, ms });
+      if (isValidTimingValue(ms)) valid.push({ i, ms });
     }
     valid.sort((a, b) => a.ms - b.ms);
     const rankArr: (number | null)[] = new Array(nPlatforms).fill(null);

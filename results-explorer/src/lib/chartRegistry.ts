@@ -419,6 +419,15 @@ function detailToPlatformRow(detail: DetailResult): PlatformRow {
     percentile_stats: null,
     phase_durations: null,
     timings: Object.fromEntries(detail.display_timings.map((timing) => [timing.query_id, timing.display_ms])),
+    timing_eligibility: Object.fromEntries(
+      detail.display_timings.map((timing) => [
+        timing.query_id,
+        {
+          is_valid_display_timing: timing.is_valid_display_timing,
+          timing_exclusion_reason: timing.timing_exclusion_reason,
+        },
+      ]),
+    ),
   };
 }
 

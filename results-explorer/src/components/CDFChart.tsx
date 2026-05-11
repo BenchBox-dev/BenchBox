@@ -12,6 +12,7 @@ import type { BenchmarkSummary } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
 import { timeSeriesColor } from "@/lib/chartTheme";
 import { buildLogLatencyScale, computeECDFPoints, logLatencyFraction, logLatencyTicks } from "@/lib/chartMath";
+import { formatTimingExclusion, isTimingDisplayable, platformTimingValue } from "@/lib/displayEligibility";
 import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
 
 const Y_TICKS_PCT = [0, 25, 50, 75, 100];
@@ -38,11 +39,13 @@ export function CDFChart({ summary }: Props) {
     .map((p, i) => ({
       label: cohortLabels[i] ?? p.platform,
       color: timeSeriesColor(i),
-      points: computeECDFPoints(Object.values(p.timings)),
+      isDisplayable: isTimingDisplayable(p),
+      points: computeECDFPoints(summary.query_ids.map((queryId) => platformTimingValue(p, queryId))),
     }))
-    .filter((s) => s.points.length > 0);
+    .filter((s) => s.isDisplayable && s.points.length > 0);
 
   if (series.length === 0) return null;
+  const excludedRows = summary.platforms.filter((platform) => !isTimingDisplayable(platform));
 
   const allMs = series.flatMap((s) => s.points.map((p) => p.x));
   const scale = buildLogLatencyScale(allMs, { lowerPad: 0.2, upperPad: 0.2 });
@@ -119,6 +122,11 @@ export function CDFChart({ summary }: Props) {
           ))}
         </g>
       </svg>
+      {excludedRows.length > 0 && (
+        <p class="mt-1 text-[10px] text-[var(--bb-data-fg-subtle)]">
+          {excludedRows.length} row(s) excluded from CDF: {formatTimingExclusion(excludedRows[0])}
+        </p>
+      )}
     </div>
   );
 }

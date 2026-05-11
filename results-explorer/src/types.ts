@@ -145,6 +145,7 @@ export interface PlatformRow extends CostDeploymentFields {
   /** Phase durations in seconds keyed by phase name; null for pre-pipeline rows. */
   phase_durations: Record<string, number> | null;
   timings: Record<string, number | null>;
+  timing_eligibility: Record<string, Pick<QueryDisplayTiming, "is_valid_display_timing" | "timing_exclusion_reason">>;
 }
 
 export interface BenchmarkSummary {
