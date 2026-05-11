@@ -4,6 +4,16 @@ import { MetaLeaderboard } from "@/components/MetaLeaderboard";
 import { expectNoAxeViolations } from "@/testing/axe-helper";
 import type { MetaLeaderboard as MetaLeaderboardData } from "@/types";
 
+const META_TIMING_ELIGIBLE = {
+  has_display_timing: true,
+  valid_query_count: 2,
+  missing_query_count: 0,
+  zero_timing_count: 0,
+  display_exclusion_reason: null,
+  comparison_exclusion_reason: null,
+  ranking_exclusion_reason: null,
+};
+
 const DATA: MetaLeaderboardData = {
   generated_at: "2026-04-17T00:00:00Z",
   cohorts: [
@@ -15,6 +25,8 @@ const DATA: MetaLeaderboardData = {
       label: "ClickBench SF0.1",
       href: "/results/clickbench/",
       platform_count: 2,
+      cohort_ranked_count: 2,
+      cohort_ranking_exclusion_reason: null,
       primary_metric: "display_geomean_ms",
       primary_order: "asc",
       platforms: [
@@ -27,6 +39,7 @@ const DATA: MetaLeaderboardData = {
           speedup_vs_best: 1,
           primary_metric: "display_geomean_ms",
           primary_order: "asc",
+          ...META_TIMING_ELIGIBLE,
         },
         {
           platform_id: "sqlite",
@@ -37,6 +50,7 @@ const DATA: MetaLeaderboardData = {
           speedup_vs_best: 0.5,
           primary_metric: "display_geomean_ms",
           primary_order: "asc",
+          ...META_TIMING_ELIGIBLE,
         },
       ],
     },

@@ -79,6 +79,7 @@ def test_latency_speedup_references_ignore_non_positive_metric_values() -> None:
     assert ranked.total_ranked == 2
     assert by_platform["zero"].rank is None
     assert by_platform["zero"].total_ranked == 2
+    assert by_platform["zero"].ranking_exclusion_reason == "non_positive_primary_metric"
     assert by_platform["duckdb"].rank == 1
     assert by_platform["sqlite"].rank == 2
     assert by_platform["zero"].speedup_vs_best is None
@@ -108,6 +109,7 @@ def test_power_score_speedup_references_ignore_non_positive_metric_values() -> N
     assert by_platform["sqlite"].rank == 2
     assert by_platform["negative"].rank is None
     assert by_platform["negative"].total_ranked == 2
+    assert by_platform["negative"].ranking_exclusion_reason == "non_positive_primary_metric"
     assert by_platform["duckdb"].speedup_vs_best == pytest.approx(1.0)
     assert by_platform["sqlite"].speedup_vs_slowest == pytest.approx(1.0)
     assert by_platform["negative"].speedup_vs_slowest is None

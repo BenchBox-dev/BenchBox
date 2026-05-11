@@ -36,6 +36,13 @@ function makePlatformRow(overrides: Partial<PlatformRow> = {}): PlatformRow {
     trust_label: overrides.trust_label ?? "maintainer-run",
     run_date: overrides.run_date ?? "2026-04-17T12:00:00Z",
     is_ranking_eligible: overrides.is_ranking_eligible ?? true,
+    has_display_timing: overrides.has_display_timing ?? true,
+    valid_query_count: overrides.valid_query_count ?? 2,
+    missing_query_count: overrides.missing_query_count ?? 0,
+    zero_timing_count: overrides.zero_timing_count ?? 0,
+    display_exclusion_reason: overrides.display_exclusion_reason ?? null,
+    comparison_exclusion_reason: overrides.comparison_exclusion_reason ?? null,
+    ranking_exclusion_reason: overrides.ranking_exclusion_reason ?? null,
     power_score: overrides.power_score ?? 1000,
     display_geomean_ms: overrides.display_geomean_ms ?? 10,
     sample_geomean_ms: overrides.sample_geomean_ms ?? 10,
@@ -117,6 +124,13 @@ function makeDetail(overrides: Partial<DetailResult> = {}): DetailResult {
     geomean_ms: overrides.geomean_ms ?? 10,
     display_geomean_ms: overrides.display_geomean_ms ?? 10,
     power_score: overrides.power_score ?? 1000,
+    has_display_timing: overrides.has_display_timing ?? true,
+    valid_query_count: overrides.valid_query_count ?? 2,
+    missing_query_count: overrides.missing_query_count ?? 0,
+    zero_timing_count: overrides.zero_timing_count ?? 0,
+    display_exclusion_reason: overrides.display_exclusion_reason ?? null,
+    comparison_exclusion_reason: overrides.comparison_exclusion_reason ?? null,
+    ranking_exclusion_reason: overrides.ranking_exclusion_reason ?? null,
     environment: overrides.environment ?? { os: "macOS" },
     queries:
       overrides.queries ?? [
@@ -125,8 +139,8 @@ function makeDetail(overrides: Partial<DetailResult> = {}): DetailResult {
       ],
     display_timings:
       overrides.display_timings ?? [
-        { query_id: "Q1", display_ms: 10, sample_count: 3 },
-        { query_id: "Q2", display_ms: 12, sample_count: 3 },
+        { query_id: "Q1", display_ms: 10, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+        { query_id: "Q2", display_ms: 12, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
       ],
     has_plans: overrides.has_plans ?? false,
     has_tuning: overrides.has_tuning ?? false,
@@ -225,8 +239,8 @@ describe("ChartPanel", () => {
         platform_id: "datafusion-44",
         platform_version: "44",
         display_timings: [
-          { query_id: "Q1", display_ms: 10, sample_count: 3 },
-          { query_id: "Q2", display_ms: 30, sample_count: 3 },
+          { query_id: "Q1", display_ms: 10, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+          { query_id: "Q2", display_ms: 30, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
         ],
       }),
       makeDetail({
@@ -235,8 +249,8 @@ describe("ChartPanel", () => {
         platform_id: "datafusion-45",
         platform_version: "45",
         display_timings: [
-          { query_id: "Q1", display_ms: 12, sample_count: 3 },
-          { query_id: "Q2", display_ms: 15, sample_count: 3 },
+          { query_id: "Q1", display_ms: 12, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+          { query_id: "Q2", display_ms: 15, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
         ],
       }),
     ];
@@ -390,8 +404,8 @@ describe("ChartPanel", () => {
               display_geomean_ms: 18,
               geomean_ms: 18,
               display_timings: [
-                { query_id: "Q1", display_ms: 18, sample_count: 3 },
-                { query_id: "Q2", display_ms: 22, sample_count: 3 },
+                { query_id: "Q1", display_ms: 18, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+                { query_id: "Q2", display_ms: 22, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
               ],
             }),
           ],
@@ -422,8 +436,8 @@ describe("ChartPanel", () => {
               display_geomean_ms: 18,
               geomean_ms: 18,
               display_timings: [
-                { query_id: "Q1", display_ms: 18, sample_count: 3 },
-                { query_id: "Q2", display_ms: 22, sample_count: 3 },
+                { query_id: "Q1", display_ms: 18, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+                { query_id: "Q2", display_ms: 22, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
               ],
             }),
           ],
@@ -451,8 +465,8 @@ describe("ChartPanel", () => {
               geomean_ms: 18,
               test_type: "throughput",
               display_timings: [
-                { query_id: "Q1", display_ms: 18, sample_count: 3 },
-                { query_id: "Q2", display_ms: 22, sample_count: 3 },
+                { query_id: "Q1", display_ms: 18, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+                { query_id: "Q2", display_ms: 22, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
               ],
             }),
           ],

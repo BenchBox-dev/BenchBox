@@ -23,6 +23,8 @@ from benchbox.core.explorer_pipeline.models import (
     QueryDisplayTiming,
     QueryTiming,
     _platform_id,
+    ranking_exclusion_reason,
+    timing_eligibility,
 )
 from benchbox.core.results.status import bundle_failed_query_count, normalize_validation_status
 
@@ -675,12 +677,13 @@ class BundleTransformer:
         # large bundles (≤99 queries makes this negligible today).
         timings = _query_timings(bundle_data)
         display_timings = _build_display_timings(timings)
+        timing_contract = timing_eligibility(display_timings, int(query_count))
         normalized_cost = _normalized_cost(bundle_data)
         environment_facets = _environment_facets(
             bundle_data,
             normalized_cost=normalized_cost if _raw_normalized_cost_block(bundle_data) is not None else None,
         )
-        return ManifestEntry(
+        entry = ManifestEntry(
             result_id=rid,
             benchmark=benchmark,
             scale_factor=scale_factor,
@@ -693,6 +696,12 @@ class BundleTransformer:
             geomean_ms=_geomean_ms(bundle_data),
             display_geomean_ms=_display_geomean_ms(display_timings),
             query_count=int(query_count),
+            has_display_timing=timing_contract.has_display_timing,
+            valid_query_count=timing_contract.valid_query_count,
+            missing_query_count=timing_contract.missing_query_count,
+            zero_timing_count=timing_contract.zero_timing_count,
+            display_exclusion_reason=timing_contract.display_exclusion_reason,
+            comparison_exclusion_reason=timing_contract.comparison_exclusion_reason,
             trust_label=trust_label,
             visibility=visibility,
             platform_version=_platform_version(bundle_data),
@@ -711,6 +720,7 @@ class BundleTransformer:
             storage_format=environment_facets["storage_format"],
             compliance_class=_compliance_class(bundle_data),
         )
+        return entry.model_copy(update={"ranking_exclusion_reason": ranking_exclusion_reason(entry)})
 
     def to_detail_result(
         self,
@@ -744,8 +754,11 @@ class BundleTransformer:
 
         timings = _query_timings(bundle_data)
         display_timings = _build_display_timings(timings)
+        summary = bundle_data.get("summary", {})
+        query_count = summary.get("queries", {}).get("total", 0) if isinstance(summary, dict) else 0
+        timing_contract = timing_eligibility(display_timings, int(query_count))
         normalized_cost = _normalized_cost(bundle_data)
-        return DetailResult(
+        detail = DetailResult(
             result_id=result_id,
             benchmark=benchmark,
             scale_factor=scale_factor,
@@ -757,6 +770,12 @@ class BundleTransformer:
             geomean_ms=_geomean_ms(bundle_data),
             display_geomean_ms=_display_geomean_ms(display_timings),
             power_score=_power_score(bundle_data),
+            has_display_timing=timing_contract.has_display_timing,
+            valid_query_count=timing_contract.valid_query_count,
+            missing_query_count=timing_contract.missing_query_count,
+            zero_timing_count=timing_contract.zero_timing_count,
+            display_exclusion_reason=timing_contract.display_exclusion_reason,
+            comparison_exclusion_reason=timing_contract.comparison_exclusion_reason,
             environment=environment,
             queries=timings,
             display_timings=display_timings,
@@ -777,6 +796,25 @@ class BundleTransformer:
             compliance_class=_compliance_class(bundle_data),
             phase_durations=_phase_durations(bundle_data),
         )
+        manifest_peer = ManifestEntry(
+            result_id=result_id,
+            benchmark=benchmark,
+            scale_factor=scale_factor,
+            platform=platform,
+            platform_id=_platform_id(platform),
+            driver_version=_driver_version(bundle_data),
+            run_date=run_date,
+            power_score=detail.power_score,
+            total_duration_s=total_duration_s,
+            geomean_ms=detail.geomean_ms,
+            display_geomean_ms=detail.display_geomean_ms,
+            query_count=int(query_count),
+            trust_label=trust_label,
+            visibility=visibility,
+            validation_status=detail.validation_status,
+            failed_query_count=detail.failed_query_count,
+        )
+        return detail.model_copy(update={"ranking_exclusion_reason": ranking_exclusion_reason(manifest_peer)})
 
 
 __all__ = ["BundleTransformer"]

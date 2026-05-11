@@ -16,12 +16,19 @@ function makeResult(overrides: Partial<DetailResult> = {}): DetailResult {
     geomean_ms: 10,
     display_geomean_ms: 10,
     power_score: 3000,
+    has_display_timing: true,
+    valid_query_count: 2,
+    missing_query_count: 1,
+    zero_timing_count: 0,
+    display_exclusion_reason: null,
+    comparison_exclusion_reason: null,
+    ranking_exclusion_reason: null,
     environment: {},
     queries: [],
     display_timings: [
-      { query_id: "Q1", display_ms: 10, sample_count: 3 },
-      { query_id: "Q2", display_ms: 20, sample_count: 3 },
-      { query_id: "Q3", display_ms: null, sample_count: 0 },
+      { query_id: "Q1", display_ms: 10, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+      { query_id: "Q2", display_ms: 20, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+      { query_id: "Q3", display_ms: null, sample_count: 0, is_valid_display_timing: false, timing_exclusion_reason: "missing_timing" },
     ],
     has_plans: false,
     has_tuning: false,
@@ -49,9 +56,9 @@ describe("buildQueryDiffRows", () => {
         platform: "SQLite",
         platform_id: "sqlite",
         display_timings: [
-          { query_id: "Q1", display_ms: 20, sample_count: 3 },
-          { query_id: "Q2", display_ms: 10, sample_count: 3 },
-          { query_id: "Q3", display_ms: null, sample_count: 0 },
+          { query_id: "Q1", display_ms: 20, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+          { query_id: "Q2", display_ms: 10, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+          { query_id: "Q3", display_ms: null, sample_count: 0, is_valid_display_timing: false, timing_exclusion_reason: "missing_timing" },
         ],
       }),
     ]);
@@ -98,7 +105,7 @@ describe("buildQueryDiffRows", () => {
           result_id: "candidate",
           platform: "SQLite",
           platform_id: "sqlite",
-          display_timings: [{ query_id: "Q1", display_ms: 20, sample_count: 3 }],
+          display_timings: [{ query_id: "Q1", display_ms: 20, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null }],
         }),
       ],
       99,
@@ -119,8 +126,8 @@ describe("buildQueryDiffRows", () => {
       makeResult({
         result_id: "baseline",
         display_timings: [
-          { query_id: "Q1", display_ms: 10, sample_count: 3 },
-          { query_id: "Q2", display_ms: 20, sample_count: 3 },
+          { query_id: "Q1", display_ms: 10, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+          { query_id: "Q2", display_ms: 20, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
         ],
       }),
       makeResult({
@@ -128,8 +135,8 @@ describe("buildQueryDiffRows", () => {
         platform: "SQLite",
         platform_id: "sqlite",
         display_timings: [
-          { query_id: "Q1", display_ms: 20, sample_count: 3 },
-          { query_id: "Q2", display_ms: 40, sample_count: 3 },
+          { query_id: "Q1", display_ms: 20, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+          { query_id: "Q2", display_ms: 40, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
         ],
       }),
       makeResult({
@@ -137,8 +144,8 @@ describe("buildQueryDiffRows", () => {
         platform: "PostgreSQL",
         platform_id: "postgresql",
         display_timings: [
-          { query_id: "Q1", display_ms: 5, sample_count: 3 },
-          { query_id: "Q2", display_ms: 10, sample_count: 3 },
+          { query_id: "Q1", display_ms: 5, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+          { query_id: "Q2", display_ms: 10, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
         ],
       }),
     ]);
@@ -164,8 +171,8 @@ describe("QueryDiffTable", () => {
             platform: "SQLite",
             platform_id: "sqlite",
             display_timings: [
-              { query_id: "Q1", display_ms: 20, sample_count: 3 },
-              { query_id: "Q2", display_ms: 10, sample_count: 3 },
+              { query_id: "Q1", display_ms: 20, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+              { query_id: "Q2", display_ms: 10, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
             ],
           }),
         ]}

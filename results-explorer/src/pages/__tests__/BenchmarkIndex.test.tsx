@@ -64,6 +64,21 @@ import { BenchmarkIndex } from "@/pages/BenchmarkIndex";
 // Fixtures - raw DuckDB row shapes
 // ---------------------------------------------------------------------------
 
+const TIMING_ELIGIBLE = {
+  has_display_timing: true,
+  valid_query_count: 2,
+  missing_query_count: 0,
+  zero_timing_count: 0,
+  display_exclusion_reason: null,
+  comparison_exclusion_reason: null,
+  ranking_exclusion_reason: null,
+};
+
+const TIMING_CELL_ELIGIBLE = {
+  is_valid_display_timing: true,
+  timing_exclusion_reason: null,
+};
+
 const RESULT_ROWS = [
   {
     result_id: "r1",
@@ -78,6 +93,7 @@ const RESULT_ROWS = [
     geomean_ms: 10,
     display_geomean_ms: 10,
     query_count: 2,
+    ...TIMING_ELIGIBLE,
     trust_label: "maintainer-run",
     visibility: "public-curated",
     platform_version: null,
@@ -116,6 +132,8 @@ const RESULT_ROWS = [
     geomean_ms: 200,
     display_geomean_ms: 200,
     query_count: 2,
+    ...TIMING_ELIGIBLE,
+    ranking_exclusion_reason: "trust_not_rankable",
     trust_label: "community-submission",
     visibility: "public-curated",
     platform_version: null,
@@ -159,6 +177,7 @@ const RANKING_ROWS = [
     compliance_class: null,
     run_date: "2026-04-01",
     is_ranking_eligible: true,
+    ...TIMING_ELIGIBLE,
     power_score: 3000,
     display_geomean_ms: 10,
     sample_geomean_ms: 12,
@@ -176,7 +195,9 @@ const RANKING_ROWS = [
     primary_metric: "power_score",
     primary_order: "desc",
     rank: 1,
-    total_in_cohort: 2,
+    total_in_cohort: 1,
+    cohort_ranked_count: 1,
+    cohort_ranking_exclusion_reason: null,
     percentile_p50: null,
     percentile_p90: null,
     percentile_p95: null,
@@ -197,6 +218,8 @@ const RANKING_ROWS = [
     compliance_class: null,
     run_date: "2026-04-01",
     is_ranking_eligible: false,
+    ...TIMING_ELIGIBLE,
+    ranking_exclusion_reason: "trust_not_rankable",
     power_score: null,
     display_geomean_ms: 200,
     sample_geomean_ms: 220,
@@ -213,8 +236,10 @@ const RANKING_ROWS = [
     storage_format: null,
     primary_metric: "power_score",
     primary_order: "desc",
-    rank: 2,
-    total_in_cohort: 2,
+    rank: null,
+    total_in_cohort: 1,
+    cohort_ranked_count: 1,
+    cohort_ranking_exclusion_reason: null,
     percentile_p50: null,
     percentile_p90: null,
     percentile_p95: null,
@@ -223,10 +248,10 @@ const RANKING_ROWS = [
 ];
 
 const CELL_ROWS = [
-  { benchmark: "tpch", scale_factor: 0.1, phase: "power", result_id: "r1", platform_id: "duckdb", query_id: "Q1", display_ms: 10 },
-  { benchmark: "tpch", scale_factor: 0.1, phase: "power", result_id: "r1", platform_id: "duckdb", query_id: "Q2", display_ms: 20 },
-  { benchmark: "tpch", scale_factor: 0.1, phase: "power", result_id: "r2", platform_id: "sqlite", query_id: "Q1", display_ms: 100 },
-  { benchmark: "tpch", scale_factor: 0.1, phase: "power", result_id: "r2", platform_id: "sqlite", query_id: "Q2", display_ms: 200 },
+  { benchmark: "tpch", scale_factor: 0.1, phase: "power", result_id: "r1", platform_id: "duckdb", query_id: "Q1", display_ms: 10, ...TIMING_CELL_ELIGIBLE },
+  { benchmark: "tpch", scale_factor: 0.1, phase: "power", result_id: "r1", platform_id: "duckdb", query_id: "Q2", display_ms: 20, ...TIMING_CELL_ELIGIBLE },
+  { benchmark: "tpch", scale_factor: 0.1, phase: "power", result_id: "r2", platform_id: "sqlite", query_id: "Q1", display_ms: 100, ...TIMING_CELL_ELIGIBLE },
+  { benchmark: "tpch", scale_factor: 0.1, phase: "power", result_id: "r2", platform_id: "sqlite", query_id: "Q2", display_ms: 200, ...TIMING_CELL_ELIGIBLE },
 ];
 
 // The legacy SUMMARY fixture remains useful for the direct-component axe test.
@@ -248,6 +273,7 @@ const SUMMARY: BenchmarkSummary = {
       trust_label: "maintainer-run",
       run_date: "2026-04-01",
       is_ranking_eligible: true,
+      ...TIMING_ELIGIBLE,
       power_score: 3000,
       display_geomean_ms: 10,
       compliance_class: null,
@@ -271,6 +297,8 @@ const SUMMARY: BenchmarkSummary = {
       trust_label: "community-submission",
       run_date: "2026-04-01",
       is_ranking_eligible: false,
+      ...TIMING_ELIGIBLE,
+      ranking_exclusion_reason: "trust_not_rankable",
       power_score: null,
       display_geomean_ms: 200,
       compliance_class: null,
@@ -302,7 +330,7 @@ type QueryRowsImpl = (sql: string, params?: unknown[]) => Promise<unknown[]>;
 function defaultImpl(rows: typeof RESULT_ROWS, rankings: typeof RANKING_ROWS, cells: typeof CELL_ROWS): QueryRowsImpl {
   return async (sql: string) => {
     const s = String(sql).replace(/\s+/g, " ").trim();
-    if (s.startsWith("SELECT * FROM bench.results")) return rows;
+    if (s.includes("FROM bench.results")) return rows;
     if (s.includes("FROM bench.benchmark_rankings")) return rankings;
     if (s.startsWith("SELECT benchmark, scale_factor, phase, result_id, platform_id, query_id, display_ms")) {
       return cells;
@@ -479,7 +507,7 @@ describe("BenchmarkIndex", () => {
 
     const resultCall = vi
       .mocked(queryRows)
-      .mock.calls.find(([sql]) => String(sql).replace(/\s+/g, " ").trim().startsWith("SELECT * FROM bench.results WHERE"));
+      .mock.calls.find(([sql]) => String(sql).replace(/\s+/g, " ").trim().includes("FROM bench.results WHERE"));
     const resultSql = String(resultCall?.[0]);
     expect(resultSql).toContain("benchmark IN (?)");
     expect(resultSql).toContain("(platform IN (?) OR platform_id IN (?))");

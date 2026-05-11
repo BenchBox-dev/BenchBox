@@ -25,6 +25,8 @@ export interface QueryDisplayTiming {
   query_id: string;
   display_ms: number | null;
   sample_count: number;
+  is_valid_display_timing: boolean;
+  timing_exclusion_reason: string | null;
 }
 
 export interface CostDeploymentFields {
@@ -59,6 +61,13 @@ export interface DetailResult extends CostDeploymentFields {
   geomean_ms: number | null;
   display_geomean_ms: number | null;
   power_score: number | null;
+  has_display_timing: boolean;
+  valid_query_count: number;
+  missing_query_count: number;
+  zero_timing_count: number;
+  display_exclusion_reason: string | null;
+  comparison_exclusion_reason: string | null;
+  ranking_exclusion_reason: string | null;
   environment: Environment;
   queries: QueryTiming[];
   display_timings: QueryDisplayTiming[];
@@ -119,6 +128,13 @@ export interface PlatformRow extends CostDeploymentFields {
   validation_status?: string | null;
   run_date: string;
   is_ranking_eligible: boolean;
+  has_display_timing: boolean;
+  valid_query_count: number;
+  missing_query_count: number;
+  zero_timing_count: number;
+  display_exclusion_reason: string | null;
+  comparison_exclusion_reason: string | null;
+  ranking_exclusion_reason: string | null;
   power_score: number | null;
   display_geomean_ms: number | null;
   sample_geomean_ms: number | null;
@@ -172,6 +188,13 @@ export interface MetaCohortPlatform {
   speedup_vs_best: number | null;
   primary_metric: string;
   primary_order: "asc" | "desc";
+  has_display_timing: boolean;
+  valid_query_count: number;
+  missing_query_count: number;
+  zero_timing_count: number;
+  display_exclusion_reason: string | null;
+  comparison_exclusion_reason: string | null;
+  ranking_exclusion_reason: string | null;
 }
 
 export interface MetaCohort {
@@ -183,6 +206,8 @@ export interface MetaCohort {
   href: string;
   /** Count of ranking-eligible platforms with non-null primary metrics. */
   platform_count: number;
+  cohort_ranked_count: number;
+  cohort_ranking_exclusion_reason: string | null;
   primary_metric: string;
   primary_order: "asc" | "desc";
   platforms?: MetaCohortPlatform[];
