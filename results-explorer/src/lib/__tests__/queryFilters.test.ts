@@ -71,6 +71,37 @@ describe("buildSelectQuery LIMIT", () => {
     );
     expect(sql).toContain("ORDER BY normalized_cost_usd ASC");
   });
+
+  it("allows eligibility contract columns needed by hidden compare metadata", () => {
+    const { sql } = buildSelectQuery(
+      EMPTY_FILTERS,
+      [
+        "result_id",
+        "has_display_timing",
+        "valid_query_count",
+        "missing_query_count",
+        "zero_timing_count",
+        "display_exclusion_reason",
+        "comparison_exclusion_reason",
+        "ranking_exclusion_reason",
+        "is_ranking_eligible",
+      ],
+      { column: "run_date", direction: "desc" },
+      25,
+    );
+
+    expect(sql).toContain([
+      "SELECT result_id",
+      "has_display_timing",
+      "valid_query_count",
+      "missing_query_count",
+      "zero_timing_count",
+      "display_exclusion_reason",
+      "comparison_exclusion_reason",
+      "ranking_exclusion_reason",
+      "is_ranking_eligible",
+    ].join(", "));
+  });
 });
 
 describe("buildWhereClause - normalized cost/deployment facets", () => {

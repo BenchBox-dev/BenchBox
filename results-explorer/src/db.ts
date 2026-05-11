@@ -43,16 +43,11 @@ type DuckDBConnection = Awaited<ReturnType<duckdb.AsyncDuckDB["connect"]>>;
 
 // Required column contract for the canonical `bench.results` table.
 //
-// Scope: this is the *cost + identity + environment-facet subset* whose
-// disappearance triggered the 2026-05-07 retheme audit binder error
-// (specifically `normalized_cost_usd`, `cost_status`, `cost_model_*`,
-// `pricing_region`, `cloud_*`). It is intentionally a subset of the full
-// builder schema, not a mirror of every column read by deep queries — the
-// goal is to convert the cost-contract drift mode into an actionable
-// init-time error, not to lock down the entire builder schema. Other
-// columns (e.g. `display_geomean_ms`, `trust_label`) ARE read by deep
-// queries; their absence would still surface as a deeper binder error.
-// Extending this list is fine if a future regression motivates it.
+// The Results Explorer feature has not shipped with a legacy public snapshot,
+// so browser code should fail fast when the current read-model contract is
+// absent instead of tolerating partial schemas until a deeper query hits a
+// Binder Error. Keep this list aligned with the browser `bench.results`
+// contract exposed by `docs/development/browser-duckdb-schema.sql`.
 //
 // Builder source: `benchbox/core/explorer_pipeline/duckdb_builder.py`.
 const BENCH_RESULTS_REQUIRED_COLUMNS = [
@@ -61,6 +56,28 @@ const BENCH_RESULTS_REQUIRED_COLUMNS = [
   "scale_factor",
   "platform",
   "platform_id",
+  "driver_version",
+  "run_date",
+  "power_score",
+  "total_duration_s",
+  "geomean_ms",
+  "display_geomean_ms",
+  "query_count",
+  "has_display_timing",
+  "valid_query_count",
+  "missing_query_count",
+  "zero_timing_count",
+  "display_exclusion_reason",
+  "comparison_exclusion_reason",
+  "ranking_exclusion_reason",
+  "trust_label",
+  "visibility",
+  "platform_version",
+  "execution_mode",
+  "tuning_mode",
+  "tuning_hash",
+  "test_type",
+  "validation_status",
   "cost_usd",
   "normalized_cost_usd",
   "cost_model_version",
@@ -73,7 +90,18 @@ const BENCH_RESULTS_REQUIRED_COLUMNS = [
   "cloud_provider",
   "cloud_region",
   "instance_or_warehouse",
+  "instance_type",
+  "warehouse_size",
+  "node_count",
+  "cluster_size",
   "storage_format",
+  "storage_tier",
+  "compliance_class",
+  "is_ranking_eligible",
+  "has_plans",
+  "plans_published",
+  "has_tuning",
+  "bundle_download_url",
 ] as const;
 
 // Required scans must be queryable AND non-empty for the snapshot to be
