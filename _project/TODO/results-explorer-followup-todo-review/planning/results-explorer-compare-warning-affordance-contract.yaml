@@ -1,0 +1,179 @@
+id: results-explorer-compare-warning-affordance-contract
+title: "Make Compare warning counts actionable, localized, and consistent"
+worktree: results-explorer-followup-todo-review
+priority: High
+status: Not Started
+category: User Experience
+
+description: |
+  Compare guardrail badges can look like buttons without being clickable, and
+  warning counts do not reliably show users where the actual warnings live.
+  Copy issues such as `1 warnings` and duplicated punctuation point to the same
+  deeper issue: warning state is not represented as a structured UI contract.
+
+  This TODO makes warning counts actionable when they imply action, passive
+  when they are only labels, and consistent across guardrails, decision
+  summaries, receipts, shareable URLs, and browser reloads.
+
+deps:
+  needs:
+  - results-explorer-compare-entrypoint-happy-path-gates
+  - results-explorer-compare-disabled-recovery-states
+  - results-explorer-direct-route-and-copy-hardening
+
+work:
+- id: w0
+  summary: "Inventory Compare warning sources, badges, and receipt anchors"
+  status: pending
+  notes: |
+    Inspect Compare with zero warnings, one warning, and multiple warnings.
+    Capture:
+      - warning reason codes and display strings;
+      - guardrail summary badges;
+      - decision summary badges;
+      - comparability receipt sections;
+      - anchor/link targets;
+      - reload/share URL behavior.
+    Store route URLs, selected IDs, DOM text, and screenshots in
+    `_project/verification-logs/results-explorer-compare-warning-affordance-contract/w0.log`.
+
+- id: w1
+  summary: "Define Compare warning UI states and interactions"
+  needs: [w0]
+  status: pending
+  notes: |
+    Define states for:
+      - no warnings;
+      - one warning;
+      - multiple warnings with grouped categories;
+      - blocking incompatibility vs non-blocking warning;
+      - passive computed-from-selected-runs label.
+    For each state, specify whether the visible pill/badge is a button/link or
+    passive text. Decision gate: anything styled as a button must have an
+    action, and anything with a warning count must reveal or navigate to the
+    underlying warnings.
+
+- id: w2
+  summary: "Implement structured warning summary and anchors"
+  needs: [w1]
+  status: pending
+  notes: |
+    Update Compare guardrails and receipt components so warning counts use a
+    shared formatter and anchor model. Clicking a warning count should scroll
+    or focus the Comparability Receipt warning section. The target section must
+    be keyboard-focusable and preserve focus after navigation. Passive labels
+    such as `Computed from selected runs` must be restyled so they do not look
+    like clickable controls.
+
+- id: w3
+  summary: "Centralize warning copy, pluralization, and punctuation"
+  needs: [w1]
+  status: pending
+  notes: |
+    Move warning count formatting, reason titles, reason detail copy, and
+    punctuation into a shared formatter. Cover singular/plural labels,
+    sentence-final punctuation, repeated punctuation, and category summaries.
+    This can reuse `copyFormatters` if introduced by route/copy hardening.
+
+- id: w4
+  summary: "Add accessibility, reload, and interaction tests"
+  needs: [w2, w3]
+  status: pending
+  notes: |
+    Add tests for:
+      - one warning renders `1 warning`;
+      - multiple warnings render `N warnings`;
+      - clicking the count focuses or scrolls to receipt warnings;
+      - passive labels are not buttons and do not have button styling;
+      - share URL reload preserves warning state and anchors;
+      - screen-reader labels distinguish blocking errors from non-blocking
+        warnings.
+    If no Compare-specific a11y test files exist yet, create focused tests for
+    `Compare` and `ComparabilityReceipt` rather than relying on broad glob
+    commands that may miss the affected components.
+
+- id: w5
+  summary: "Browser-check warning affordances in Compare"
+  needs: [w4]
+  status: pending
+  notes: |
+    In a browser, complete Compare flows that yield zero, one, and multiple
+    warnings. Click every visible warning badge/link, reload the share URL, and
+    verify the warning targets remain reachable. Decision gate: do not complete
+    if any warning-looking pill is inert, if warning counts fail to reveal
+    details, or if pluralization/punctuation defects remain.
+
+prior_art:
+- "results-explorer/src/pages/Compare.tsx renders Compare guardrail and decision summary surfaces."
+- "results-explorer/src/components/ComparabilityReceipt.tsx renders detailed warning evidence."
+- "results-explorer/src/lib/compareSummary.ts generates warning and winner summary state."
+- "results-explorer/src/lib/copyFormatters.ts should own shared count/pluralization copy if present."
+
+must_preserve:
+- "Shareable Compare URLs continue to reload selected IDs and warning state."
+- "Warning links must not change selected runs or baseline state."
+- "Blocking incompatibilities remain visually distinct from non-blocking warnings."
+- "Keyboard and screen-reader users can reach the warning details."
+
+approach: |
+  Treat warnings as structured state with reason codes, counts, severity, and
+  target anchors. Then render interactive controls only when they actually move
+  the user to the warning evidence.
+
+anti_patterns:
+- "DO NOT style passive status pills like buttons."
+- "DO NOT show a warning count without a way to inspect the warnings."
+- "DO NOT duplicate pluralization and punctuation in separate components."
+- "DO NOT make warning links depend on transient scroll position or unmounted receipt content."
+
+verification:
+- description: "Compare warning tests pass"
+  command: "cd results-explorer && npm test -- --run src/pages/__tests__/Compare.test.tsx src/components/__tests__/ComparabilityReceipt.test.tsx src/lib/__tests__/compareSummary.test.ts"
+  expected_output: "all targeted tests pass"
+- description: "Accessibility tests cover warning affordances"
+  command: "cd results-explorer && npm test -- --run src/pages/__tests__/Compare.a11y.test.tsx src/components/__tests__/ComparabilityReceipt.a11y.test.tsx"
+  expected_output: "Compare-specific accessibility tests pass"
+- description: "Browser evidence confirms warning counts are actionable"
+  command: "rg -n \"0 warnings|1 warning|warnings|receipt|focus|passive label|PASS|FAIL\" _project/verification-logs/results-explorer-compare-warning-affordance-contract/"
+  expected_output: "logs include pass/fail evidence for zero, one, and multiple warning states"
+
+scope_limit:
+  only_modify:
+  - "results-explorer/src/pages/Compare.tsx"
+  - "results-explorer/src/components/ComparabilityReceipt.tsx"
+  - "results-explorer/src/lib/compareSummary.ts"
+  - "results-explorer/src/lib/copyFormatters.ts"
+  - "results-explorer/src/pages/__tests__/Compare.test.tsx"
+  - "results-explorer/src/pages/__tests__/Compare.a11y.test.tsx"
+  - "results-explorer/src/components/__tests__/ComparabilityReceipt.test.tsx"
+  - "results-explorer/src/components/__tests__/ComparabilityReceipt.a11y.test.tsx"
+  - "results-explorer/src/lib/__tests__/compareSummary.test.ts"
+  - "_project/verification-logs/results-explorer-compare-warning-affordance-contract/"
+  do_not_modify:
+  - "benchbox/core/explorer_pipeline/"
+  - "results-explorer/public/data/"
+
+success_metrics:
+- "Warning counts reveal or navigate to the actual warning details."
+- "Passive labels no longer look like dead buttons."
+- "`1 warning`, `N warnings`, and punctuation are consistent across Compare surfaces."
+- "Warning affordances work after share URL reload and are keyboard accessible."
+
+metadata:
+  tags:
+  - results-explorer
+  - compare
+  - warnings
+  - accessibility
+  estimated_effort: "Medium (1-2 days)"
+  created_date: "2026-05-11"
+
+impact:
+  business_value: |
+    Makes compare guardrails auditable instead of decorative.
+  user_impact: |
+    Users can understand and inspect warnings before trusting comparison
+    claims.
+  technical_debt: |
+    Replaces scattered warning-count copy with a structured warning UI
+    contract.

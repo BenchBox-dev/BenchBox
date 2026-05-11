@@ -1,0 +1,195 @@
+id: results-explorer-leaderboard-scope-filter-contract
+title: "Make Results Explorer leaderboard scope, filter availability, and tuning labels explicit"
+worktree: results-explorer-followup-todo-review
+priority: High
+status: Not Started
+category: User Experience
+
+description: |
+  The latest review raised unresolved UI questions on the Leaderboards page:
+  only SSB and TPC-H appear in the benchmark filter, only four platforms render
+  in the cross-benchmark table, and the tuning filter shows `All tuning`
+  without explaining whether tuning labels are absent, hidden, or collapsed.
+  These are not just copy issues. They reveal a scope contract gap between the
+  corpus, the rankable leaderboard subset, the public-coverage subset, and the
+  filter controls.
+
+  This TODO makes the homepage leaderboard scope auditable and explicit. Users
+  should understand why an option is present, absent, disabled, or counted, and
+  the UI should not silently imply that the whole corpus is represented when it
+  is only showing rankable/public-coverage cohorts.
+
+deps:
+  needs:
+  - results-explorer-leaderboard-rank-evidence-semantics
+
+work:
+- id: w0
+  summary: "Rebind leaderboard scope evidence on the checked snapshot"
+  status: pending
+  notes: |
+    Query the current DuckDB snapshot on the checked git SHA and capture:
+      - total benchmark count in the corpus;
+      - benchmarks with any published result;
+      - benchmarks with rankable cohorts;
+      - benchmarks included in the cross-benchmark leaderboard;
+      - total platform count in the corpus;
+      - platforms with any public result;
+      - platforms included in the visible leaderboard table;
+      - tuning mode values, including null/empty/unknown counts.
+    Store SQL, snapshot path/checksum, checked SHA, and output in
+    `_project/verification-logs/results-explorer-leaderboard-scope-filter-contract/w0.log`.
+    Decision gate: if the UI intentionally shows only rankable/public-coverage
+    cohorts, record the exact inclusion rule before editing controls.
+
+- id: w1
+  summary: "Define filter option states and scope copy"
+  needs: [w0]
+  status: pending
+  notes: |
+    Define a small homepage contract for each filter family:
+      - visible selectable option;
+      - disabled option with explanation;
+      - omitted option with explicit count in scope copy;
+      - empty/unknown tuning label;
+      - public-coverage vs full-corpus counts.
+    The header and table count must answer the observed questions directly:
+    why only these benchmarks, why only these platforms, and whether tuning
+    labels are unavailable or filtered out. Decision gate: do not implement
+    until the contract names the denominator for every displayed count.
+
+- id: w2
+  summary: "Update benchmark and platform filters to expose availability"
+  needs: [w1]
+  status: pending
+  notes: |
+    Update the Leaderboards filters so users can see whether SSB/TPC-H are the
+    only eligible leaderboard cohorts or merely the currently selected subset.
+    If other benchmarks/platforms exist but are not leaderboard-eligible, show
+    a compact availability message or disabled options with reason text instead
+    of silently omitting them. Counts such as `Showing 4 of 4 platforms` must
+    specify the denominator, for example `4 leaderboard-eligible platforms`
+    when the full corpus is larger.
+
+- id: w3
+  summary: "Add explicit tuning-mode labels and unknown handling"
+  needs: [w1]
+  status: pending
+  notes: |
+    Replace ambiguous `All tuning` with copy that distinguishes all tuning
+    modes from unknown/unlabelled tuning metadata. If tuning labels are absent
+    for the visible cohorts, show `Tuning: not labelled` or an equivalent
+    passive state with a short explanation. If tuning labels exist, expose
+    selectable labels and counts without changing the cohort metric contract.
+
+- id: w4
+  summary: "Add tests for leaderboard scope counts and filter states"
+  needs: [w2, w3]
+  status: pending
+  notes: |
+    Add tests for:
+      - full corpus contains more benchmarks/platforms than leaderboard scope;
+      - filters show, disable, or explain unavailable options according to the
+        contract;
+      - tuning labels render labelled and unlabelled states correctly;
+      - table count copy names the correct denominator;
+      - changing filters updates counts without implying hidden full-corpus
+        coverage.
+    Include one fixture where the full corpus contains benchmarks/platforms
+    that are not leaderboard-eligible, so the test proves the scope copy rather
+    than simply matching the current small seed corpus.
+
+- id: w5
+  summary: "Browser-check the Leaderboards page answers the scope questions"
+  needs: [w4]
+  status: pending
+  notes: |
+    In a browser at standard desktop width, verify the Leaderboards page
+    answers:
+      - why the benchmark filter has the displayed options;
+      - why the table has the displayed platforms;
+      - what `public coverage` means for the current table;
+      - whether tuning metadata is labelled or unavailable.
+    Capture text evidence and screenshots in the verification log directory.
+    Decision gate: do not complete if the page still leaves those questions to
+    inference or if counts disagree with the SQL from w0.
+
+prior_art:
+- "results-explorer/src/components/MetaLeaderboard.tsx renders the cross-benchmark leaderboard and scope counts."
+- "results-explorer/src/lib/duckdbQueries.ts owns leaderboard, cohort, platform, and filter option queries."
+- "docs/development/browser-duckdb-schema.sql documents table fields that can expose corpus vs leaderboard scope."
+- "_project/scripts/results_explorer_snapshot_invariants.py can host count consistency checks."
+
+must_preserve:
+- "Do not broaden the leaderboard to unrankable or non-public cohorts just to make filters look complete."
+- "Do not hide the distinction between full corpus, public result corpus, and leaderboard-eligible subset."
+- "Do not remove existing benchmark, scale, phase, trust, tuning, date, or deployment filters."
+- "Counts shown in the UI must be derivable from the current snapshot."
+
+approach: |
+  Treat filter options as evidence states, not static lists. First identify the
+  denominator and inclusion rule from the snapshot, then update filter copy and
+  option states so the visible UI can explain its scope.
+
+anti_patterns:
+- "DO NOT add a generic `limited data` note without naming which denominator is limited."
+- "DO NOT silently omit unavailable benchmarks or platforms when the UI claims `All benchmarks` or `All public coverage`."
+- "DO NOT use tuning labels as free-form display strings without normalizing empty and unknown values."
+- "DO NOT make disabled options look selectable."
+
+verification:
+- description: "Leaderboard scope and filter tests pass"
+  command: "cd results-explorer && npm test -- --run src/components/__tests__/MetaLeaderboard.test.tsx src/pages/__tests__/Home.test.tsx"
+  expected_output: "all targeted tests pass"
+- description: "Snapshot scope/count invariants pass"
+  command: "uv run -- python _project/scripts/results_explorer_snapshot_invariants.py results-explorer/public/data/results.duckdb"
+  expected_output: "exit 0 with consistent leaderboard scope, platform, benchmark, and tuning counts"
+- description: "Browser evidence confirms scope questions are answered"
+  command: "rg -n \"benchmark options|platform scope|public coverage|tuning|PASS|FAIL\" _project/verification-logs/results-explorer-leaderboard-scope-filter-contract/"
+  expected_output: "logs include pass/fail evidence for benchmark, platform, public-coverage, and tuning explanations"
+
+scope_limit:
+  only_modify:
+  - "results-explorer/src/components/MetaLeaderboard.tsx"
+  - "results-explorer/src/pages/Home.tsx"
+  - "results-explorer/src/lib/duckdbQueries.ts"
+  - "results-explorer/src/lib/copyFormatters.ts"
+  - "results-explorer/src/lib/facetDisplay.ts"
+  - "results-explorer/src/lib/displayLabels.ts"
+  - "results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx"
+  - "results-explorer/src/components/__tests__/MetaLeaderboard.a11y.test.tsx"
+  - "results-explorer/src/pages/__tests__/Home.test.tsx"
+  - "results-explorer/src/lib/__tests__/duckdbQueries.test.ts"
+  - "results-explorer/src/lib/__tests__/facetDisplay.test.ts"
+  - "_project/scripts/results_explorer_snapshot_invariants.py"
+  - "_project/verification-logs/results-explorer-leaderboard-scope-filter-contract/"
+  do_not_modify:
+  - "benchbox/core/results/"
+  - "benchmark_runs/"
+
+success_metrics:
+- "Leaderboard benchmark filters explain why only specific benchmark options are visible or selectable."
+- "Platform counts name the correct denominator and do not imply full-corpus coverage when showing a subset."
+- "Tuning controls distinguish labelled, all, and unavailable/unknown tuning metadata."
+- "Browser evidence shows the page answers the previously annotated scope questions without external context."
+
+metadata:
+  tags:
+  - results-explorer
+  - leaderboard
+  - filters
+  - scope
+  - tuning
+  estimated_effort: "Medium (1-2 days)"
+  created_date: "2026-05-11"
+
+impact:
+  business_value: |
+    Prevents users from mistaking a scoped leaderboard subset for complete
+    corpus coverage.
+  user_impact: |
+    Analysts can tell whether missing benchmarks or platforms are unavailable,
+    filtered out, unrankable, or outside the current public-coverage view.
+  technical_debt: |
+    Turns homepage filter availability into a tested data contract instead of
+    hard-coded option behavior.
