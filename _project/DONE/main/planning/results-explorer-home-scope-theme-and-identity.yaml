@@ -2,7 +2,7 @@ id: results-explorer-home-scope-theme-and-identity
 title: "Fix Results Explorer home scope, theme consistency, formatting, and run identity density"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
 category: Core Functionality
 
 description: |
@@ -34,7 +34,7 @@ deps:
 work:
 - id: w1
   summary: "Clarify home leaderboard scope and filter labels"
-  status: pending
+  status: done
   notes: |
     Update the home page so filters derived from `meta_leaderboard.cohorts`
     are labeled as leaderboard/cohort filters, not corpus-wide filters. Add
@@ -44,7 +44,7 @@ work:
 - id: w2
   summary: "Separate public corpus browse counts from leaderboard cohort counts"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     The page may show both all public benchmarks and leaderboard cohorts, but
     the UI must not imply they are the same set. If a benchmark appears in
@@ -55,7 +55,7 @@ work:
 - id: w3
   summary: "Resolve home theme ownership for dark and data surfaces"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Decide whether the home results page should be fully dark-themed or use a
     deliberate light data surface below a dark hero/filter band. Apply the
@@ -65,7 +65,7 @@ work:
 - id: w4
   summary: "Apply metric-specific formatting for power scores and timing values"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Format large power scores for scanning, for example zero decimals above
     1,000 and exact value in tooltip/detail. Keep latency formatting consistent
@@ -74,7 +74,7 @@ work:
 - id: w5
   summary: "Reduce run identity labels by removing cohort-invariant qualifiers"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Update run identity rendering so chart/table labels include only qualifiers
     needed to distinguish runs in the current context. On a single benchmark
@@ -85,7 +85,7 @@ work:
 - id: w6
   summary: "Add regression coverage for home scope, theme, formatting, and identity"
   needs: [w2, w3, w4, w5]
-  status: pending
+  status: done
   notes: |
     Add tests for:
       - home filter options are clearly labeled as leaderboard cohorts;
@@ -97,7 +97,8 @@ work:
 prior_art:
 - "results-explorer/src/pages/Home.tsx:home filters and browse sections — extend copy and scope labels."
 - "results-explorer/src/components/MetaLeaderboard.tsx:meta leaderboard controls and cells — update scope copy and formatting."
-- "results-explorer/src/lib/runIdentity.ts:cohort-aware formatter — refine qualifier selection rather than adding another formatter."
+- "results-explorer/src/lib/runIdentity.ts:cohort-aware formatter — refine qualifier selection rather than adding another
+  formatter."
 - "results-explorer/src/utils.ts:fmtScore/fmtMs — extend metric-aware formatting policy."
 - "results-explorer/src/components/DistributionBox.tsx:label truncation handling — preserve unique labels after shortening."
 
@@ -114,20 +115,26 @@ approach: |
   using the existing formatter, with tests to prove labels remain unique.
 
 anti_patterns:
-- "DO NOT relabel sparse meta-leaderboard data as the whole corpus - because that caused the misleading home dropdowns - use explicit cohort scope copy."
-- "DO NOT solve long labels by truncating away the only distinguishing token - because duplicate platforms become ambiguous - preserve date or short-id disambiguators."
-- "DO NOT make a one-off power-score formatter inside MetaLeaderboard - because score formatting appears on multiple surfaces - use shared metric formatting."
-- "DO NOT retheme by adding local hard-coded colors - because the previous half-theme came from inconsistent surface ownership - use existing tokens or extend them deliberately."
+- "DO NOT relabel sparse meta-leaderboard data as the whole corpus - because that caused the misleading home dropdowns - use
+  explicit cohort scope copy."
+- "DO NOT solve long labels by truncating away the only distinguishing token - because duplicate platforms become ambiguous
+  - preserve date or short-id disambiguators."
+- "DO NOT make a one-off power-score formatter inside MetaLeaderboard - because score formatting appears on multiple surfaces
+  - use shared metric formatting."
+- "DO NOT retheme by adding local hard-coded colors - because the previous half-theme came from inconsistent surface ownership
+  - use existing tokens or extend them deliberately."
 
 verification:
 - description: "Home and identity tests pass"
-  command: "cd results-explorer && npm test -- --run src/pages/__tests__/Home.test.tsx src/components/__tests__/MetaLeaderboard.test.tsx src/components/__tests__/DistributionBox.test.tsx"
+  command: "cd results-explorer && npm test -- --run src/pages/__tests__/Home.test.tsx src/components/__tests__/MetaLeaderboard.test.tsx
+    src/components/__tests__/DistributionBox.test.tsx"
   expected_output: "all targeted tests pass"
 - description: "Frontend typecheck passes"
   command: "cd results-explorer && npm run typecheck"
   expected_output: "exit 0"
 - description: "Browser spot check captures home and AMPLab chart labels"
-  command: "cd results-explorer && npm run build && cd .. && test -s _project/verification-logs/results-explorer-home-scope-theme-and-identity/browser-smoke.md && rg -n \"/results/|/results/amplab/|scope|theme|identity|PASS|FAIL\" _project/verification-logs/results-explorer-home-scope-theme-and-identity/browser-smoke.md"
+  command: "cd results-explorer && npm run build && cd .. && test -s _project/verification-logs/results-explorer-home-scope-theme-and-identity/browser-smoke.md
+    && rg -n \"/results/|/results/amplab/|scope|theme|identity|PASS|FAIL\" _project/verification-logs/results-explorer-home-scope-theme-and-identity/browser-smoke.md"
   expected_output: "build exits 0 and browser-smoke.md records route-level PASS/FAIL evidence for /results/ and /results/amplab/"
 
 scope_limit:
@@ -159,6 +166,12 @@ success_metrics:
 - "Home results surfaces use a deliberate, consistent theme."
 - "Large power scores are scan-friendly while exact values remain available."
 - "Duplicate platform run labels are unique without unnecessary repeated qualifiers."
+
+implementation_notes:
+- "Checked policy artifact before frontend edits: _project/verification-logs/results-explorer-display-contract-policy-gate/w0.log
+  (policy SHA 66f207ee03182dbff4b3e5bc368d2c9be282a9b5)."
+- "Checked frontend eligibility dependency before frontend edits: 936f8fcfd2855d6618198398b3a7b36917d9f93e feat(explorer):
+  normalize frontend eligibility (#345)."
 
 metadata:
   tags:

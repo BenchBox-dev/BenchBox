@@ -37,27 +37,46 @@ export type RunIdentityVariant =
   | "selectOption"
   | "tooltip";
 
+interface QualifierDescriptor {
+  key: string;
+  value: (source: RunIdentitySource) => string | null;
+}
+
+interface QualifierSlot {
+  key: string;
+  value: string;
+}
+
 // Natural qualifiers (in priority order) that distinguish runs in a
 // human-meaningful way. The result_id tiebreaker is intentionally NOT
 // in this list — it is only appended by the cohort-aware code path
 // when no natural qualifier disambiguates a duplicate platform name.
-const NATURAL_QUALIFIERS: ((s: RunIdentitySource) => string | null)[] = [
-  (s) => (s.driver_version ? `v${s.driver_version}` : s.platform_version ? `v${s.platform_version}` : null),
-  (s) => (s.run_date ? s.run_date.slice(0, 10) : null),
-  (s) => (s.scale_factor !== null && s.scale_factor !== undefined ? `SF ${s.scale_factor}` : null),
-  (s) => {
-    const parts: string[] = [];
-    if (s.deployment_class && s.deployment_class !== "local") parts.push(s.deployment_class);
-    if (s.instance_or_warehouse) parts.push(s.instance_or_warehouse);
-    return parts.length > 0 ? parts.join(" ") : null;
+const NATURAL_QUALIFIERS: QualifierDescriptor[] = [
+  {
+    key: "version",
+    value: (s) => (s.driver_version ? `v${s.driver_version}` : s.platform_version ? `v${s.platform_version}` : null),
   },
-  (s) => (s.trust_label ? s.trust_label : null),
+  { key: "run_date", value: (s) => (s.run_date ? s.run_date.slice(0, 10) : null) },
+  {
+    key: "scale_factor",
+    value: (s) => (s.scale_factor !== null && s.scale_factor !== undefined ? `SF ${s.scale_factor}` : null),
+  },
+  {
+    key: "deployment",
+    value: (s) => {
+      const parts: string[] = [];
+      if (s.deployment_class && s.deployment_class !== "local") parts.push(s.deployment_class);
+      if (s.instance_or_warehouse) parts.push(s.instance_or_warehouse);
+      return parts.length > 0 ? parts.join(" ") : null;
+    },
+  },
+  { key: "trust_label", value: (s) => (s.trust_label ? s.trust_label : null) },
 ];
 
 function describeNaturalQualifiers(source: RunIdentitySource): string[] {
   const out: string[] = [];
-  for (const fn of NATURAL_QUALIFIERS) {
-    const value = fn(source);
+  for (const qualifier of NATURAL_QUALIFIERS) {
+    const value = qualifier.value(source);
     if (value !== null && value !== "") out.push(value);
   }
   return out;
@@ -74,8 +93,27 @@ function shortResultIdToken(resultId: string): string {
 // a guaranteed-unique terminal fallback. BenchBox result_ids end in the
 // content hash segment, so the trailing token distinguishes typical
 // same-platform duplicate runs without appending their shared prefix.
-function describeCohortQualifiers(source: RunIdentitySource): string[] {
-  return [...describeNaturalQualifiers(source), shortResultIdToken(source.result_id), source.result_id];
+function describeCohortQualifierSlots(source: RunIdentitySource): QualifierSlot[] {
+  const slots: QualifierSlot[] = [];
+  for (const qualifier of NATURAL_QUALIFIERS) {
+    const value = qualifier.value(source);
+    if (value !== null && value !== "") slots.push({ key: qualifier.key, value });
+  }
+  slots.push({ key: "short_result_id", value: shortResultIdToken(source.result_id) });
+  slots.push({ key: "result_id", value: source.result_id });
+  return slots;
+}
+
+function distinguishingQualifierKeys(slotsBySource: readonly QualifierSlot[][], indices: readonly number[]): Set<string> {
+  const keys = new Set(slotsBySource.flatMap((slots) => slots.map((slot) => slot.key)));
+  const distinguishing = new Set<string>();
+  for (const key of keys) {
+    const values = new Set(
+      indices.map((index) => slotsBySource[index]!.find((slot) => slot.key === key)?.value ?? ""),
+    );
+    if (values.size > 1) distinguishing.add(key);
+  }
+  return distinguishing;
 }
 
 function joinForVariant(base: string, qualifiers: string[], variant: RunIdentityVariant): string {
@@ -131,28 +169,32 @@ export function formatRunIdentitiesForCohort(
     bucketsByLabel.get(label)!.push(i);
   });
 
-  // Per-source qualifier list (natural + last-resort short id).
-  const qualifierLists = sources.map(describeCohortQualifiers);
-  // Number of qualifier tiers each source needs to be unique within its
-  // bucket. Sources whose bucket has only one entry stay at 0.
-  const usedCounts = new Array(sources.length).fill(0);
+  // Per-source qualifier slots (natural + last-resort ids).
+  const slotsBySource = sources.map(describeCohortQualifierSlots);
+  // Qualifiers selected for each source. Sources whose bucket has only one
+  // entry stay empty.
+  const usedQualifiers = sources.map((): string[] => []);
 
-  // For every duplicate bucket, append qualifiers until every label in
-  // the bucket is unique. We track the qualifier-tier count per bucket
-  // and apply it uniformly so members of the bucket carry comparable
-  // detail. Round counts then translate to slices of each source's
-  // qualifier list. The cap walks the full qualifier ladder for the
-  // bucket — including the terminal full-result_id fallback — so the
-  // loop always terminates with unique labels (within data
-  // constraints) instead of silently accepting duplicates at a fixed
-  // round count.
+  // For every duplicate bucket, discard qualifiers that are invariant within
+  // that bucket, then append distinguishing qualifiers until every label is
+  // unique. The cap still walks through the terminal full-result_id fallback,
+  // so ordinary same-platform duplicates do not silently collapse.
   for (const [, indices] of bucketsByLabel) {
     if (indices.length < 2) continue;
-    const maxQualifiers = Math.max(...indices.map((i) => qualifierLists[i]!.length));
+    const distinguishingKeys = distinguishingQualifierKeys(slotsBySource, indices);
+    const qualifierLists = new Map(
+      indices.map((i) => [
+        i,
+        slotsBySource[i]!
+          .filter((slot) => distinguishingKeys.has(slot.key))
+          .map((slot) => slot.value),
+      ]),
+    );
+    const maxQualifiers = Math.max(...indices.map((i) => qualifierLists.get(i)!.length));
     let round = 0;
     while (round <= maxQualifiers) {
       const provisional = indices.map((i) => {
-        const used = qualifierLists[i]!.slice(0, round);
+        const used = qualifierLists.get(i)!.slice(0, round);
         return `${sources[i]!.platform}${used.length > 0 ? " " + used.join(" ") : ""}`;
       });
       const seen = new Map<string, number>();
@@ -165,11 +207,10 @@ export function formatRunIdentitiesForCohort(
       if (allUnique) break;
       round += 1;
     }
-    for (const i of indices) usedCounts[i] = round;
+    for (const i of indices) usedQualifiers[i] = qualifierLists.get(i)!.slice(0, round);
   }
 
   return sources.map((source, i) => {
-    const used = qualifierLists[i]!.slice(0, usedCounts[i]);
-    return joinForVariant(source.platform, used, variant);
+    return joinForVariant(source.platform, usedQualifiers[i]!, variant);
   });
 }

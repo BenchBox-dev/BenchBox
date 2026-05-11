@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isKnownBenchmark } from "@/utils";
+import { fmtScore, fmtScoreExact, isKnownBenchmark } from "@/utils";
 
 describe("isKnownBenchmark", () => {
   it("matches only explicit benchmark labels", () => {
@@ -8,5 +8,16 @@ describe("isKnownBenchmark", () => {
     expect(isKnownBenchmark("tsbs_devops")).toBe(true);
     expect(isKnownBenchmark("toString")).toBe(false);
     expect(isKnownBenchmark("does-not-exist")).toBe(false);
+  });
+});
+
+describe("score formatting", () => {
+  it("removes noisy decimals from large power scores", () => {
+    expect(fmtScore(3000.42)).toBe("3,000");
+    expect(fmtScore(1520.99)).toBe("1,521");
+  });
+
+  it("keeps exact score text available for tooltips and details", () => {
+    expect(fmtScoreExact(3000.42)).toBe("3,000.42");
   });
 });

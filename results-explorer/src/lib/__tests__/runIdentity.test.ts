@@ -105,6 +105,30 @@ describe("formatRunIdentitiesForCohort", () => {
     expect(labels[1]).toContain("2026-05-01");
   });
 
+  it("omits qualifiers that are invariant within the current cohort", () => {
+    const cohort = [
+      source({
+        result_id: "amplab-datafusion-sf0.01-20260501-a276dae0",
+        platform: "DataFusion",
+        driver_version: "53.0.0",
+        run_date: "2026-05-01",
+        scale_factor: 0.01,
+      }),
+      source({
+        result_id: "amplab-datafusion-sf0.01-20260502-bb1d4f90",
+        platform: "DataFusion",
+        driver_version: "53.0.0",
+        run_date: "2026-05-02",
+        scale_factor: 0.01,
+      }),
+    ];
+    const labels = formatRunIdentitiesForCohort(cohort, "chart");
+
+    expect(labels).toEqual(["DataFusion 2026-05-01", "DataFusion 2026-05-02"]);
+    expect(labels.join(" ")).not.toContain("SF 0.01");
+    expect(labels.join(" ")).not.toContain("v53.0.0");
+  });
+
   it("uses short result_id as the last-resort tiebreaker", () => {
     const cohort = [
       source({ result_id: "tpch-spark-sf0.01-20260403-1111aaaa", platform: "Spark" }),

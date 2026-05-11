@@ -110,6 +110,48 @@ describe("MetaLeaderboard", () => {
     expect(screen.getByText("0.50x")).toBeTruthy();
   });
 
+  it("formats large power scores for scanning while preserving the exact value in titles", () => {
+    const data: MetaLeaderboardData = {
+      ...DATA,
+      cohorts: [
+        {
+          ...DATA.cohorts[0]!,
+          primary_metric: "power_score",
+          primary_order: "desc",
+          platforms: [
+            {
+              ...DATA.cohorts[0]!.platforms![0]!,
+              metric_value: 3000.42,
+              primary_metric: "power_score",
+              primary_order: "desc" as const,
+            },
+          ],
+        },
+      ],
+      platforms: [
+        {
+          ...DATA.platforms[0]!,
+          ranks: {
+            "clickbench-sf0.1-power": {
+              rank: 1,
+              total: 1,
+              metric_value: 3000.42,
+              speedup_vs_best: 1,
+            },
+          },
+        },
+      ],
+    };
+
+    render(<MetaLeaderboard data={data} mode="times" onModeChange={vi.fn()} />);
+
+    expect(screen.getByText("3,000")).toBeTruthy();
+    const cell = screen.getByRole("gridcell", {
+      name: "DuckDB times for ClickBench SF0.1: 3,000",
+    });
+    expect(cell.getAttribute("title")).toContain("Exact power score: 3,000.42");
+  });
+
   it("renders interpretable heatmap cells without relying only on color", () => {
     const { container } = render(
       <MetaLeaderboard data={DATA} mode="times" onModeChange={vi.fn()} />,
@@ -428,13 +470,13 @@ describe("MetaLeaderboard", () => {
 
     const { container } = render(<MetaLeaderboard data={data} mode="times" onModeChange={vi.fn()} />);
 
-    expect(screen.getByText("Showing 200 of 205 platforms")).toBeTruthy();
+    expect(screen.getByText("Showing 200 of 205 ranked platforms across 1 leaderboard cohort")).toBeTruthy();
     expect(container.querySelectorAll("tbody tr")).toHaveLength(200);
     expect(screen.queryByText("Platform 204")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Show more platforms" }));
 
-    expect(screen.getByText("Showing 205 of 205 platforms")).toBeTruthy();
+    expect(screen.getByText("Showing 205 of 205 ranked platforms across 1 leaderboard cohort")).toBeTruthy();
     expect(container.querySelectorAll("tbody tr")).toHaveLength(205);
     expect(screen.getByText("Platform 204")).toBeTruthy();
   });

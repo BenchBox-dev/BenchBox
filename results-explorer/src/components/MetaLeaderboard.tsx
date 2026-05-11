@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { route } from "preact-router";
 import type { MetaCohort, MetaLeaderboard as MetaLeaderboardData, MetaPlatform, MetaRank } from "@/types";
 import { colorForCell, lightnessForCell } from "@/lib/chartMath";
-import { fmtGeomean, fmtScore } from "@/utils";
+import { fmtGeomean, fmtScore, fmtScoreExact } from "@/utils";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { TableScrollHint } from "@/components/TableScrollHint";
@@ -220,7 +220,8 @@ export function MetaLeaderboard({
 
       <div class="mb-2 flex flex-wrap items-baseline justify-between gap-3">
         <p class="text-sm text-[var(--bb-data-fg-muted)]">
-          Showing {visiblePlatforms.length.toLocaleString()} of {sortedPlatforms.length.toLocaleString()} platforms
+          Showing {visiblePlatforms.length.toLocaleString()} of {sortedPlatforms.length.toLocaleString()} ranked platforms across{" "}
+          {cohorts.length.toLocaleString()} leaderboard {cohorts.length === 1 ? "cohort" : "cohorts"}
         </p>
         <p id="meta-leaderboard-legend" class="text-xs text-[var(--bb-data-fg-subtle)]">
           {mode === "times" && "Heat: darker = faster within each cohort. "}
@@ -310,6 +311,7 @@ export function MetaLeaderboard({
                     const lightness = shadeMetric !== null ? lightnessForCell(shadeMetric, minInCol) : null;
                     const active = focusPos.row === rowIdx && focusPos.col === colIdx;
                     const text = describeCell(platform, cohort, rank, mode);
+                    const title = cellTitle(platform, cohort, rank, mode);
                     const result = cohort.platforms?.find((row) => row.platform_id === platform.platform_id);
                     const metadata = result ? resultMetadataById?.get(result.result_id) : undefined;
                     const receiptHref = result ? `/results/r/${result.result_id}#run-receipt` : null;
@@ -327,7 +329,7 @@ export function MetaLeaderboard({
                         aria-colindex={colIdx + 1}
                         aria-rowindex={rowIdx + 1}
                         aria-label={text}
-                        title={missing ? MISSING_COHORT_TITLE : undefined}
+                        title={title}
                         class={`table-td py-2 text-center font-mono focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--bb-focus-ring)] ${
                           hue !== null ? "meta-heatmap-cell" : ""
                         } ${
@@ -351,7 +353,7 @@ export function MetaLeaderboard({
                             href={receiptHref}
                             class="font-mono no-underline hover:text-[var(--bb-accent-hover)]"
                             onClick={(event) => event.stopPropagation()}
-                            title="Open result receipt"
+                            title={receiptLinkTitle(rank, cohort)}
                           >
                             {renderCellValue(rank, cohort, mode)}
                           </a>
@@ -447,6 +449,30 @@ function cellText(rank: MetaRank, cohort: MetaCohort, mode: MetaLeaderboardMode)
   }
   if (rank.metric_value === null || rank.metric_value === undefined) return "-";
   return cohort.primary_order === "desc" ? fmtScore(rank.metric_value) : fmtGeomean(rank.metric_value);
+}
+
+function exactMetricTitle(rank: MetaRank | undefined, cohort: MetaCohort): string | null {
+  if (!rank || rank.metric_value === null || rank.metric_value === undefined) return null;
+  if (cohort.primary_metric === "power_score") {
+    return `Exact power score: ${fmtScoreExact(rank.metric_value)}`;
+  }
+  return null;
+}
+
+function cellTitle(
+  platform: MetaPlatform,
+  cohort: MetaCohort,
+  rank: MetaRank | undefined,
+  mode: MetaLeaderboardMode,
+): string | undefined {
+  if (!rank) return MISSING_COHORT_TITLE;
+  const exact = exactMetricTitle(rank, cohort);
+  return exact ? `${platform.platform} ${MODE_LABELS[mode].toLowerCase()} for ${cohort.label}. ${exact}` : undefined;
+}
+
+function receiptLinkTitle(rank: MetaRank, cohort: MetaCohort): string {
+  const exact = exactMetricTitle(rank, cohort);
+  return exact ? `Open result receipt. ${exact}` : "Open result receipt";
 }
 
 function renderCellValue(
