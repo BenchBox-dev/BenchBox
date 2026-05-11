@@ -403,15 +403,15 @@ describe("Home", () => {
 
     expect(screen.getByRole("heading", { level: 1, name: "BenchBox Database Leaderboards" })).toBeTruthy();
     expect(
-      screen.getByText("Reproducible OLAP benchmark rankings by workload, scale, deployment, and normalized cost."),
+      screen.getByText("Reproducible OLAP benchmark rankings from rankable leaderboard cohorts, with public corpus browse below."),
     ).toBeTruthy();
 
     const selector = screen.getByRole("region", { name: "Leaderboard cohort selector" });
-    expect(within(selector).getByLabelText("Benchmark")).toBeTruthy();
-    expect(within(selector).getByLabelText("Scale factor")).toBeTruthy();
-    expect(within(selector).getByLabelText("Phase")).toBeTruthy();
-    expect(within(selector).getByText("Deployment / cost")).toBeTruthy();
-    expect(within(selector).getByText("All public coverage")).toBeTruthy();
+    expect(within(selector).getByLabelText("Cohort benchmark")).toBeTruthy();
+    expect(within(selector).getByLabelText("Cohort scale")).toBeTruthy();
+    expect(within(selector).getByLabelText("Cohort phase")).toBeTruthy();
+    expect(within(selector).getByText("Leaderboard scope")).toBeTruthy();
+    expect(within(selector).getByText("Ranked cohort filters")).toBeTruthy();
   });
 
   it("distinguishes supported benchmark coverage from published public corpus counts", async () => {
@@ -423,8 +423,35 @@ describe("Home", () => {
     expect(within(summary).getByText("2 with public results")).toBeTruthy();
     expect(within(summary).getByText("public result bundles")).toBeTruthy();
     expect(within(summary).getByText("platforms with public results")).toBeTruthy();
-    expect(within(summary).getByText("PR-validated corpus")).toBeTruthy();
+    expect(within(summary).getByText("leaderboard cohorts")).toBeTruthy();
+    expect(within(summary).getByText("2 visible; 2/2 ranked platforms")).toBeTruthy();
     expect(within(summary).queryByText(/^Benchmarks$/)).toBeNull();
+  });
+
+  it("states leaderboard cohort scope separately from public browse scope", async () => {
+    render(<Home />);
+    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+
+    expect(screen.getByText("Showing 2 of 2 ranked platforms across 2 leaderboard cohorts")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Browse Public Benchmark Results" })).toBeTruthy();
+    expect(
+      screen.getByText("2 public benchmark set(s). Leaderboard filters above only include 2 rankable cohort(s)."),
+    ).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Browse Public Platform Results" })).toBeTruthy();
+  });
+
+  it("keeps the home filter band on the dark surface and data sections on the light surface", async () => {
+    render(<Home />);
+    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+
+    const hero = screen.getByTestId("home-hero-filter-band");
+    const selector = within(hero).getByRole("region", { name: "Leaderboard cohort selector" });
+    const dataSurface = screen.getByTestId("home-data-surface");
+
+    expect(hero.className).toContain("surface-hero");
+    expect(selector.className).toContain("bg-[var(--bb-bg-panel)]");
+    expect(dataSurface.className).toContain("surface-app");
+    expect(dataSurface.contains(selector)).toBe(false);
   });
 
   it("keeps the leaderboard region before secondary workflow and recent-result sections", async () => {
@@ -438,9 +465,9 @@ describe("Home", () => {
     const workflow = screen.getByRole("navigation", { name: "Result contribution workflow" });
     const recentHeading = screen.getByRole("heading", { name: "Recent Results" });
 
-    expect(within(activeSummary).getByText("All benchmarks")).toBeTruthy();
-    expect(within(activeSummary).getByText("All scales")).toBeTruthy();
-    expect(within(activeSummary).getByText("All phases")).toBeTruthy();
+    expect(within(activeSummary).getByText("All leaderboard cohorts")).toBeTruthy();
+    expect(within(activeSummary).getByText("All cohort scales")).toBeTruthy();
+    expect(within(activeSummary).getByText("All cohort phases")).toBeTruthy();
     expectDocumentOrder(headline, activeSummary);
     expectDocumentOrder(activeSummary, selector);
     expectDocumentOrder(selector, leaderboard);
@@ -517,7 +544,7 @@ describe("Home", () => {
     expect(within(grid).getByRole("link", { name: /^ClickBench SF0.1/ })).toBeTruthy();
     expect(within(grid).getByRole("link", { name: /^TPC-H SF1/ })).toBeTruthy();
 
-    fireEvent.change(screen.getByLabelText("Benchmark"), { target: { value: "clickbench" } });
+    fireEvent.change(screen.getByLabelText("Cohort benchmark"), { target: { value: "clickbench" } });
 
     await waitFor(() => {
       expect(within(grid).getByRole("link", { name: /^ClickBench SF0.1/ })).toBeTruthy();

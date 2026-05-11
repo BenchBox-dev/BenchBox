@@ -8,7 +8,7 @@ import type {
 } from "@/types";
 import type { ResultRow } from "@/lib/duckdbQueries";
 import { getMetaLeaderboardData, listResults } from "@/lib/duckdbQueries";
-import { BENCHMARK_LABELS, humanizeBenchmark, fmtScore, fmtGeomean, errMsg } from "@/utils";
+import { BENCHMARK_LABELS, humanizeBenchmark, fmtScore, fmtScoreExact, fmtGeomean, errMsg } from "@/utils";
 import { formatBenchmarkLabel } from "@/lib/displayLabels";
 import { MetaLeaderboardSkeleton, SkeletonBlock } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
@@ -264,6 +264,10 @@ export function Home(_: RoutableProps) {
     .sort((a, b) => b.run_date.localeCompare(a.run_date))
     .slice(0, 5);
   const showRecentCost = recent.some((result) => normalizedCostValue(result) !== null);
+  const leaderboardCohortCount = metaLeaderboard?.cohorts.length ?? 0;
+  const leaderboardPlatformCount = metaLeaderboard?.platforms.length ?? 0;
+  const visibleLeaderboardCohortCount = filteredMetaLeaderboard?.cohorts.length ?? 0;
+  const visibleLeaderboardPlatformCount = filteredMetaLeaderboard?.platforms.length ?? 0;
 
   function buildCohortHref(cohort: MetaCohort): string {
     const params = new URLSearchParams();
@@ -283,103 +287,107 @@ export function Home(_: RoutableProps) {
 
   return (
     <div>
-      <section class="border-b border-[var(--bb-border-default)] bg-[var(--bb-bg-primary)] text-[var(--bb-fg-primary)]">
+      <section
+        class="surface-hero border-b border-[var(--bb-border-default)]"
+        data-testid="home-hero-filter-band"
+        data-surface="hero"
+      >
         <div class="mx-auto max-w-7xl px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
           <div class="max-w-4xl">
             <h1 class="text-3xl font-bold sm:text-4xl">BenchBox Database Leaderboards</h1>
             <p class="mt-3 max-w-3xl text-base text-[var(--bb-fg-muted)] sm:text-lg">
-              Reproducible OLAP benchmark rankings by workload, scale, deployment, and normalized cost.
+              Reproducible OLAP benchmark rankings from rankable leaderboard cohorts, with public corpus browse below.
             </p>
           </div>
 
           {filteredMetaLeaderboard && (
             <ActiveLeaderboardSummary
-              benchmark={summarizeSelection(benchmarkFilters, "All benchmarks", humanizeBenchmark)}
-              scaleFactor={summarizeSelection(scaleFilters, "All scales", (value) => `SF ${value}`)}
-              phase={phaseFilter === "all" ? "All phases" : phaseFilter}
+              benchmark={summarizeSelection(benchmarkFilters, "All leaderboard cohorts", humanizeBenchmark)}
+              scaleFactor={summarizeSelection(scaleFilters, "All cohort scales", (value) => `SF ${value}`)}
+              phase={phaseFilter === "all" ? "All cohort phases" : phaseFilter}
               activeFacets={activeFacetSummaries}
             />
+          )}
+
+          {/* Cohort selector renders above the matrix so users can change
+              benchmark/scale/phase context without scrolling past the
+              matrix to find the controls. */}
+          {filteredMetaLeaderboard && (
+            <section
+              aria-label="Leaderboard cohort selector"
+              class="mt-4 rounded-lg border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] p-2 sm:mt-5 sm:p-3"
+            >
+              <div class="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <MultiSelectFilter
+                  label="Cohort benchmark"
+                  allLabel="All leaderboard cohorts"
+                  options={benchmarkOptions}
+                  current={benchmarkFilters}
+                  onSelect={(value) =>
+                    setFacet(
+                      "benchmark",
+                      value === "all" ? [] : toggleFacetValue(benchmarkFilters, value),
+                    )
+                  }
+                  format={(value) => formatBenchmarkLabel(value)}
+                />
+                <MultiSelectFilter
+                  label="Cohort scale"
+                  allLabel="All cohort scales"
+                  options={scaleOptions}
+                  current={scaleFilters}
+                  onSelect={(value) =>
+                    setFacet(
+                      "scale_factor",
+                      value === "all" ? [] : toggleFacetValue(scaleFilters, value),
+                    )
+                  }
+                  format={(value) => `SF ${value}`}
+                />
+                <SelectFilter
+                  label="Cohort phase"
+                  options={["all", ...phaseOptions]}
+                  current={phaseFilter}
+                  onSelect={(value) => setFacet("phase", value === "all" ? [] : [value])}
+                  format={(value) => (value === "all" ? "All cohort phases" : value)}
+                />
+                <CoverageSummary />
+              </div>
+
+              <details class="mt-3 border-t border-[var(--bb-border-default)] pt-3">
+                <summary class="cursor-pointer text-sm font-medium text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg-primary)]">
+                  Advanced filters
+                </summary>
+                <div class="mt-3 grid gap-3 md:grid-cols-3">
+                  <SingleFilterGroup
+                    label="Tuning"
+                    options={tuningOptions}
+                    current={tuningFilter}
+                    onSelect={(value) => setFacet("tuning_mode", value === "all" ? [] : [value])}
+                    format={(value) => (value === "all" ? "All tuning" : value)}
+                  />
+                  <SingleFilterGroup
+                    label="Trust"
+                    options={trustOptions}
+                    current={trustFilter}
+                    onSelect={(value) => setFacet("trust_tier", value === "all" ? [] : [value])}
+                    format={(value) => (value === "all" ? "All trust tiers" : value)}
+                  />
+                  <SingleFilterGroup
+                    label="Date window"
+                    options={["all", "30d", "90d", "365d"]}
+                    current={dateWindow}
+                    onSelect={(value) => setFacet("date_window", toDateWindowFacet(value))}
+                    format={(value) => (value === "all" ? "All time" : `Last ${value}`)}
+                  />
+                </div>
+              </details>
+            </section>
           )}
         </div>
       </section>
 
-      <div class="mx-auto max-w-7xl px-4 py-5 sm:px-6 sm:py-8 lg:px-8">
-        {/* Cohort selector renders above the matrix so users can change
-            benchmark/scale/phase context without scrolling past the
-            matrix to find the controls. */}
-        {filteredMetaLeaderboard && (
-          <section
-            aria-label="Leaderboard cohort selector"
-            class="mb-4 rounded-lg border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] p-2 sm:mb-6 sm:p-3"
-          >
-            <div class="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <MultiSelectFilter
-                label="Benchmark"
-                allLabel="All benchmarks"
-                options={benchmarkOptions}
-                current={benchmarkFilters}
-                onSelect={(value) =>
-                  setFacet(
-                    "benchmark",
-                    value === "all" ? [] : toggleFacetValue(benchmarkFilters, value),
-                  )
-                }
-                format={(value) => formatBenchmarkLabel(value)}
-              />
-              <MultiSelectFilter
-                label="Scale factor"
-                allLabel="All scales"
-                options={scaleOptions}
-                current={scaleFilters}
-                onSelect={(value) =>
-                  setFacet(
-                    "scale_factor",
-                    value === "all" ? [] : toggleFacetValue(scaleFilters, value),
-                  )
-                }
-                format={(value) => `SF ${value}`}
-              />
-              <SelectFilter
-                label="Phase"
-                options={["all", ...phaseOptions]}
-                current={phaseFilter}
-                onSelect={(value) => setFacet("phase", value === "all" ? [] : [value])}
-                format={(value) => (value === "all" ? "All phases" : value)}
-              />
-              <CoverageSummary />
-            </div>
-
-            <details class="mt-3 border-t border-[var(--bb-border-default)] pt-3">
-              <summary class="cursor-pointer text-sm font-medium text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg-primary)]">
-                Advanced filters
-              </summary>
-              <div class="mt-3 grid gap-3 md:grid-cols-3">
-                <SingleFilterGroup
-                  label="Tuning"
-                  options={tuningOptions}
-                  current={tuningFilter}
-                  onSelect={(value) => setFacet("tuning_mode", value === "all" ? [] : [value])}
-                  format={(value) => (value === "all" ? "All tuning" : value)}
-                />
-                <SingleFilterGroup
-                  label="Trust"
-                  options={trustOptions}
-                  current={trustFilter}
-                  onSelect={(value) => setFacet("trust_tier", value === "all" ? [] : [value])}
-                  format={(value) => (value === "all" ? "All trust tiers" : value)}
-                />
-                <SingleFilterGroup
-                  label="Date window"
-                  options={["all", "30d", "90d", "365d"]}
-                  current={dateWindow}
-                  onSelect={(value) => setFacet("date_window", toDateWindowFacet(value))}
-                  format={(value) => (value === "all" ? "All time" : `Last ${value}`)}
-                />
-              </div>
-            </details>
-          </section>
-        )}
-
+      <div class="surface-app mx-auto max-w-7xl px-4 py-5 sm:px-6 sm:py-8 lg:px-8" data-testid="home-data-surface">
         {filteredMetaLeaderboard && (
           <MetaLeaderboard
             data={filteredMetaLeaderboard}
@@ -421,9 +429,9 @@ export function Home(_: RoutableProps) {
             detail="published platform IDs"
           />
           <StatCard
-            value="PR"
-            label="PR-validated corpus"
-            detail="bundles reviewed before publication"
+            value={leaderboardCohortCount}
+            label="leaderboard cohorts"
+            detail={`${visibleLeaderboardCohortCount} visible; ${visibleLeaderboardPlatformCount}/${leaderboardPlatformCount} ranked platforms`}
           />
         </section>
 
@@ -474,13 +482,15 @@ export function Home(_: RoutableProps) {
 
         <div class="grid grid-cols-1 gap-8 sm:grid-cols-2">
           <BrowseSection
-            title="Browse by Benchmark"
+            title="Browse Public Benchmark Results"
+            description={`${benchmarks.length.toLocaleString()} public benchmark set(s). Leaderboard filters above only include ${leaderboardCohortCount.toLocaleString()} rankable cohort(s).`}
             items={benchmarks}
             hrefFn={(benchmark) => `/results/${benchmark}/`}
             labelFn={formatBenchmarkLabel}
           />
           <BrowseSection
-            title="Browse by Platform"
+            title="Browse Public Platform Results"
+            description={`${platformIds.length.toLocaleString()} published platform ID(s) in the public corpus, independent of current leaderboard cohort coverage.`}
             items={platformIds}
             hrefFn={(platformId) => `/results/p/${platformId}/`}
             labelFn={(platformId) => platformIdToName.get(platformId) ?? platformId}
@@ -494,12 +504,12 @@ export function Home(_: RoutableProps) {
 function HomeLoadingSkeleton() {
   return (
     <div>
-      <section class="border-b border-[var(--bb-border-default)] bg-[var(--bb-bg-primary)] text-[var(--bb-fg-primary)]">
+      <section class="surface-hero border-b border-[var(--bb-border-default)]">
         <div class="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8">
           <div class="max-w-4xl">
             <h1 class="text-3xl font-bold sm:text-4xl">BenchBox Database Leaderboards</h1>
             <p class="mt-3 max-w-3xl text-base text-[var(--bb-fg-muted)] sm:text-lg">
-              Reproducible OLAP benchmark rankings by workload, scale, deployment, and normalized cost.
+              Reproducible OLAP benchmark rankings from rankable leaderboard cohorts, with public corpus browse below.
             </p>
           </div>
 
@@ -508,16 +518,16 @@ function HomeLoadingSkeleton() {
             class="mt-5 rounded-lg border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] p-3"
           >
             <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <SkeletonSelect label="Benchmark" />
-              <SkeletonSelect label="Scale factor" />
-              <SkeletonSelect label="Phase" />
+              <SkeletonSelect label="Cohort benchmark" />
+              <SkeletonSelect label="Cohort scale" />
+              <SkeletonSelect label="Cohort phase" />
               <CoverageSummary />
             </div>
           </section>
         </div>
       </section>
 
-      <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <div class="surface-app mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <MetaLeaderboardSkeleton />
       </div>
     </div>
@@ -527,7 +537,7 @@ function HomeLoadingSkeleton() {
 function SkeletonSelect({ label }: { label: string }) {
   return (
     <div>
-      <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--bb-data-fg-muted)]">{label}</div>
+      <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--bb-fg-muted)]">{label}</div>
       <SkeletonBlock className="h-9 w-full bb-skeleton-dark" />
     </div>
   );
@@ -569,9 +579,9 @@ function ActiveLeaderboardSummary({
   activeFacets: ActiveFacetSummary[];
 }) {
   const items = [
-    { label: "Benchmark", value: benchmark },
-    { label: "Scale", value: scaleFactor },
-    { label: "Phase", value: phase },
+    { label: "Cohort benchmark", value: benchmark },
+    { label: "Cohort scale", value: scaleFactor },
+    { label: "Cohort phase", value: phase },
   ];
 
   return (
@@ -766,9 +776,9 @@ function MultiSelectFilter({
 
   return (
     <label class="block">
-      <span class="mb-2 block text-xs font-semibold uppercase tracking-wide text-[var(--bb-data-fg-muted)]">{label}</span>
+      <span class="mb-2 block text-xs font-semibold uppercase tracking-wide text-[var(--bb-fg-muted)]">{label}</span>
       <select
-        class="h-9 w-full rounded-md border border-[var(--bb-border-default)] bg-[var(--bb-surface-data)] px-3 text-sm font-medium text-[var(--bb-data-fg-primary)]"
+        class="h-9 w-full rounded-md border border-[var(--bb-border-default)] bg-[var(--bb-bg-primary)] px-3 text-sm font-medium text-[var(--bb-fg-primary)]"
         value={value}
         onChange={(event) => onSelect((event.currentTarget as HTMLSelectElement).value)}
       >
@@ -804,9 +814,9 @@ function SelectFilter({
   if (options.length === 0) return null;
   return (
     <label class="block">
-      <span class="mb-2 block text-xs font-semibold uppercase tracking-wide text-[var(--bb-data-fg-muted)]">{label}</span>
+      <span class="mb-2 block text-xs font-semibold uppercase tracking-wide text-[var(--bb-fg-muted)]">{label}</span>
       <select
-        class="h-9 w-full rounded-md border border-[var(--bb-border-default)] bg-[var(--bb-surface-data)] px-3 text-sm font-medium text-[var(--bb-data-fg-primary)]"
+        class="h-9 w-full rounded-md border border-[var(--bb-border-default)] bg-[var(--bb-bg-primary)] px-3 text-sm font-medium text-[var(--bb-fg-primary)]"
         value={current}
         onChange={(event) => onSelect((event.currentTarget as HTMLSelectElement).value)}
       >
@@ -823,10 +833,10 @@ function SelectFilter({
 function CoverageSummary() {
   return (
     <div>
-      <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--bb-data-fg-muted)]">Deployment / cost</div>
+      <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--bb-fg-muted)]">Leaderboard scope</div>
       <div class="flex flex-wrap gap-2">
-        <span class="rounded-full bg-[var(--bb-surface-app)] px-3 py-1.5 text-xs font-medium text-[var(--bb-data-fg-muted)]">
-          All public coverage
+        <span class="rounded-full bg-[var(--bb-bg-elevated)] px-3 py-1.5 text-xs font-medium text-[var(--bb-fg-muted)]">
+          Ranked cohort filters
         </span>
         {/* w5 (compare-flow-entrypoints): Home exposes a direct entry point
             into the in-page Compare builder. The builder handles the empty
@@ -834,7 +844,7 @@ function CoverageSummary() {
         <a
           href="/results/compare/"
           data-testid="home-compare-entrypoint"
-          class="rounded-full border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] px-3 py-1.5 text-xs font-medium text-[var(--bb-fg-primary)] no-underline shadow-sm hover:bg-[var(--bb-surface-data-muted)]"
+          class="rounded-full border border-[var(--bb-border-default)] bg-[var(--bb-bg-primary)] px-3 py-1.5 text-xs font-medium text-[var(--bb-fg-primary)] no-underline shadow-sm hover:bg-[var(--bb-bg-elevated)]"
         >
           Compare →
         </a>
@@ -890,7 +900,7 @@ function SingleFilterGroup({
   if (options.length === 0) return null;
   return (
     <div>
-      <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--bb-data-fg-muted)]">{label}</div>
+      <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--bb-fg-muted)]">{label}</div>
       <div class="flex flex-wrap gap-2">
         {options.map((value) => {
           const active = current === value;
@@ -900,7 +910,7 @@ function SingleFilterGroup({
               class={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
                 active
                   ? "bg-[var(--bb-accent-hover)] text-[var(--bb-fg-primary)]"
-                  : "bg-[var(--bb-surface-app)] text-[var(--bb-data-fg-muted)] hover:bg-[var(--bb-data-border)]"
+                  : "bg-[var(--bb-bg-elevated)] text-[var(--bb-fg-muted)] hover:bg-[var(--bb-border-default)]"
               }`}
               onClick={() => onSelect(value)}
               aria-pressed={active}
@@ -923,7 +933,12 @@ function RecentRow({ entry, showCost }: { entry: ResultRow; showCost: boolean })
       </td>
       <td class="table-td">SF {entry.scale_factor}</td>
       <td class="table-td text-[var(--bb-data-fg-muted)]">{entry.run_date}</td>
-      <td class="table-td font-mono">{fmtScore(entry.power_score)}</td>
+      <td
+        class="table-td font-mono"
+        title={entry.power_score != null ? `Exact power score: ${fmtScoreExact(entry.power_score)}` : undefined}
+      >
+        {fmtScore(entry.power_score)}
+      </td>
       <td class="table-td font-mono">{fmtGeomean(entry.geomean_ms)}</td>
       {showCost && <td class="table-td font-mono text-[var(--bb-data-fg-muted)]">{normalizedCostLabel(entry)}</td>}
       <td class="table-td sticky right-0 z-10 bg-[var(--bb-surface-data)] text-right">
@@ -937,15 +952,17 @@ function RecentRow({ entry, showCost }: { entry: ResultRow; showCost: boolean })
 
 interface BrowseSectionProps {
   title: string;
+  description: string;
   items: string[];
   hrefFn: (item: string) => string;
   labelFn: (item: string) => string;
 }
 
-function BrowseSection({ title, items, hrefFn, labelFn }: BrowseSectionProps) {
+function BrowseSection({ title, description, items, hrefFn, labelFn }: BrowseSectionProps) {
   return (
     <section>
-      <h2 class="mb-3 text-xl font-semibold text-[var(--bb-data-fg-primary)]">{title}</h2>
+      <h2 class="text-xl font-semibold text-[var(--bb-data-fg-primary)]">{title}</h2>
+      <p class="mt-1 mb-3 text-sm text-[var(--bb-data-fg-muted)]">{description}</p>
       <div class="flex flex-wrap gap-2">
         {items.map((item) => (
           <a

@@ -39,8 +39,22 @@ export function isKnownBenchmark(benchmark: string): boolean {
   return Object.prototype.hasOwnProperty.call(BENCHMARK_LABELS, benchmark);
 }
 
-export function fmtScore(score: number | null): string {
-  return score !== null ? score.toLocaleString() : "-";
+export function fmtScore(score: number | null | undefined): string {
+  if (score == null) return "-";
+  const abs = Math.abs(score);
+  const maximumFractionDigits = abs >= 1000 ? 0 : abs >= 100 ? 1 : abs >= 10 ? 2 : 3;
+  return score.toLocaleString(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits,
+  });
+}
+
+export function fmtScoreExact(score: number | null | undefined): string {
+  if (score == null) return "-";
+  return score.toLocaleString(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 12,
+  });
 }
 
 /** Format a millisecond value for display. */
