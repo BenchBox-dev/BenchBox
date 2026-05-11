@@ -1,0 +1,195 @@
+id: results-explorer-frontend-eligibility-normalization
+title: "Normalize Results Explorer frontend eligibility and timing semantics"
+worktree: main
+priority: High
+status: Not Started
+category: Core Functionality
+
+description: |
+  After the read model exposes explicit display, ranking, and comparison
+  eligibility, the frontend must stop applying local, inconsistent rules.
+  Today, zero timings and no-timing rows are interpreted differently by
+  heatmaps, compare summaries, diff tables, box plots, CDFs, sparklines, rank
+  tables, and meta leaderboards.
+
+  This TODO adds a shared frontend eligibility layer and migrates display
+  components to consume it before any page-specific visual cleanup proceeds.
+
+context_sections:
+  evidence_binding: |
+    This TODO is pinned to the policy evidence captured by
+    `results-explorer-display-contract-policy-gate` w0 at
+    `_project/verification-logs/results-explorer-display-contract-policy-gate/w0.log`
+    and to the eligibility decision artifact produced under `_project/analysis/`.
+    Before editing frontend code, record the checked policy SHA or artifact path
+    in implementation notes so these changes are not based on stale review
+    memory.
+
+deps:
+  needs:
+  - results-explorer-read-model-eligibility-contract
+
+work:
+- id: w1
+  summary: "Add a shared frontend eligibility and timing helper"
+  status: pending
+  notes: |
+    Create a small shared helper, for example
+    `results-explorer/src/lib/displayEligibility.ts`, that wraps the read-model
+    fields and policy decisions. It should provide functions such as:
+      - `isTimingDisplayable(row)`;
+      - `isRankable(row)`;
+      - `isComparable(row)`;
+      - `validTimingValues(values)`;
+      - `formatTimingExclusion(row)`;
+      - `formatCohortExclusion(summary)`.
+    The helper must not recompute policy from scratch when a read-model field
+    exists.
+
+- id: w2
+  summary: "Replace local zero/null timing predicates in chart math consumers"
+  needs: [w1]
+  status: pending
+  notes: |
+    Migrate `DistributionBox`, `CDFChart`, `NormalizedSpeedupChart`,
+    `ChartPanel`, `SparklineTable`, and related chart math consumers to the
+    shared valid-timing rule. The same input row must either be included or
+    excluded consistently across chart types, with the same explanation.
+
+- id: w3
+  summary: "Replace local eligibility checks in QueryHeatmap and RankTable"
+  needs: [w1]
+  status: pending
+  notes: |
+    Update matrix, rank, and mobile-card rendering so no-timing rows are not
+    shown as normal evidence. If rows remain visible for provenance, render
+    them as excluded with an explicit reason and prevent them from influencing
+    sort/rank/heatmap semantics.
+
+- id: w4
+  summary: "Replace local eligibility checks in CompareSummary and QueryDiffTable"
+  needs: [w1]
+  status: pending
+  notes: |
+    Make Compare use the same valid-timing predicate for:
+      - primary metric winner selection;
+      - comparable query counts;
+      - query wins/ties/losses;
+      - diff table ratios;
+      - percentiles and tail shape;
+      - cost/performance summary.
+    Compare must not include zero timings in one section and exclude them in
+    another unless the policy explicitly says why.
+
+- id: w5
+  summary: "Update typed query models and tests for eligibility fields"
+  needs: [w1, w2, w3, w4]
+  status: pending
+  notes: |
+    Update `types.ts`, DuckDB query helpers, and component test fixtures so
+    new eligibility fields are present everywhere. Test fixtures must include:
+      - normal rankable row;
+      - public but unrankable row;
+      - no-timing row;
+      - zero-timing row;
+      - excluded compare candidate.
+
+- id: w6
+  summary: "Add frontend regression tests for inconsistent timing semantics"
+  needs: [w5]
+  status: pending
+  notes: |
+    Add targeted tests proving the same row is treated consistently by heatmap,
+    rank table, box plot, CDF, compare summary, and query diff. Include an
+    AMPLab-shaped fixture where 7/8 queries are zero or excluded and assert
+    that Compare suppresses unsupported winner language.
+
+prior_art:
+- "results-explorer/src/lib/chartMath.ts:valid-value filters — supersede ad hoc filtering with policy-backed helpers."
+- "results-explorer/src/components/QueryHeatmap.tsx:matrix sorting and selection — extend with eligibility helper."
+- "results-explorer/src/lib/compareSummary.ts:query record and percentiles — migrate to shared timing predicate."
+- "results-explorer/src/lib/duckdbQueries.ts:typed read-model access — consume new read-model fields from the backend TODO."
+- "results-explorer/src/components/StatusBadge.tsx:badge primitive — preserve as passive metadata only."
+
+must_preserve:
+- "Existing chart components still render valid rankable cohorts."
+- "Keyboard navigation and row selection behavior remain accessible for comparable rows."
+- "Result receipt/detail links remain available for excluded provenance rows."
+- "High-contrast/reduced-color chart paths continue to work."
+
+approach: |
+  Introduce the helper first, then migrate consumers in narrow slices. Tests
+  should pin behavior before broad visual refactoring. Keep policy decisions
+  out of components; components should ask whether a row is displayable,
+  rankable, or comparable and render the supplied reason.
+
+anti_patterns:
+- "DO NOT keep `value > 0` or `value >= 0` checks scattered across components - because the current bug is inconsistent local predicates - route through the shared helper."
+- "DO NOT make charts silently drop rows without an excluded-count or reason - because users need to know why rows disappeared - expose the reason near the surface."
+- "DO NOT disable selection only visually - because screen-reader and keyboard users could still activate it - use real disabled state and accessible reason copy."
+
+verification:
+- description: "Frontend unit tests for eligibility consumers pass"
+  command: "cd results-explorer && npm test -- --run src/components/__tests__/ChartPanel.test.tsx src/components/__tests__/DistributionBox.test.tsx src/components/__tests__/NormalizedSpeedupChart.test.tsx src/components/__tests__/QueryHeatmap.test.tsx src/components/__tests__/CompareSummary.test.tsx src/components/__tests__/QueryDiffTable.test.tsx src/lib/__tests__/compareSummary.test.ts src/lib/__tests__/duckdbQueries.test.ts src/__tests__/chartMath.scale.test.ts"
+  expected_output: "all targeted tests pass"
+- description: "Frontend typecheck passes"
+  command: "cd results-explorer && npm run typecheck"
+  expected_output: "exit 0"
+- description: "Frontend build passes"
+  command: "cd results-explorer && npm run build"
+  expected_output: "exit 0"
+
+scope_limit:
+  only_modify:
+  - "results-explorer/src/lib/displayEligibility.ts"
+  - "results-explorer/src/lib/chartMath.ts"
+  - "results-explorer/src/lib/compareSummary.ts"
+  - "results-explorer/src/lib/duckdbQueries.ts"
+  - "results-explorer/src/types.ts"
+  - "results-explorer/src/components/CDFChart.tsx"
+  - "results-explorer/src/components/ChartPanel.tsx"
+  - "results-explorer/src/components/CompareSummary.tsx"
+  - "results-explorer/src/components/DistributionBox.tsx"
+  - "results-explorer/src/components/NormalizedSpeedupChart.tsx"
+  - "results-explorer/src/components/QueryDiffTable.tsx"
+  - "results-explorer/src/components/QueryHeatmap.tsx"
+  - "results-explorer/src/components/SparklineTable.tsx"
+  - "results-explorer/src/components/__tests__/ChartPanel.test.tsx"
+  - "results-explorer/src/components/__tests__/CompareSummary.test.tsx"
+  - "results-explorer/src/components/__tests__/DistributionBox.test.tsx"
+  - "results-explorer/src/components/__tests__/NormalizedSpeedupChart.test.tsx"
+  - "results-explorer/src/components/__tests__/QueryDiffTable.test.tsx"
+  - "results-explorer/src/components/__tests__/QueryHeatmap.test.tsx"
+  - "results-explorer/src/lib/__tests__/compareSummary.test.ts"
+  - "results-explorer/src/lib/__tests__/duckdbQueries.test.ts"
+  - "results-explorer/src/__tests__/chartMath.scale.test.ts"
+  - "_project/TODO/main/planning/results-explorer-frontend-eligibility-normalization.yaml"
+  do_not_modify:
+  - "benchbox/core/explorer_pipeline/"
+  - "docs/development/browser-duckdb-schema.sql"
+  - "results-explorer/public/data/results.duckdb"
+
+success_metrics:
+- "Zero, null, and excluded timings are handled consistently across all chart and compare surfaces."
+- "No-timing rows cannot appear as normal ranked/comparable evidence."
+- "Compare suppresses winner claims when evidence coverage fails the policy threshold."
+- "Tests include AMPLab-shaped zero/no-timing regression fixtures."
+
+metadata:
+  tags:
+  - results-explorer
+  - frontend
+  - eligibility
+  - charts
+  - compare
+  estimated_effort: "Medium (2-3 days)"
+  created_date: "2026-05-11"
+
+impact:
+  business_value: |
+    Makes the Results Explorer UI internally consistent and defensible.
+  user_impact: |
+    Users see the same data-quality meaning across tables, charts, and compare
+    summaries.
+  technical_debt: |
+    Removes scattered timing and eligibility predicates from components.
