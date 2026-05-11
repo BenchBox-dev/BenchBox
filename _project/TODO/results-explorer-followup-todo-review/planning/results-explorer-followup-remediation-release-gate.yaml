@@ -1,0 +1,186 @@
+id: results-explorer-followup-remediation-release-gate
+title: "Gate the Results Explorer follow-up remediation with snapshot, browser, and TODO-state evidence"
+worktree: results-explorer-followup-todo-review
+priority: Critical
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  This is the final gate for the follow-up Results Explorer remediation plan.
+  It must run after the data-contract, compare-flow, disabled-state,
+  leaderboard/rank, chart-label, theme/density, and route/copy TODOs are
+  implemented. The gate blocks completion if any P0/P1 issue from the latest
+  review still reproduces or if the new checks lack evidence.
+
+deps:
+  needs:
+  - results-explorer-comparison-eligibility-contract-repair
+  - results-explorer-compare-entrypoint-happy-path-gates
+  - results-explorer-compare-disabled-recovery-states
+  - results-explorer-leaderboard-rank-evidence-semantics
+  - results-explorer-chart-run-identity-label-contract
+  - results-explorer-surface-theme-and-density-contract
+  - results-explorer-direct-route-and-copy-hardening
+
+work:
+- id: w0
+  summary: "Confirm dependency TODOs are complete with verification evidence"
+  status: pending
+  notes: |
+    Run `todo_cli.py show` or equivalent for each dependency on the checked git
+    SHA and verify every work unit is done, every verification item has output,
+    and no dependency remains in `_project/TODO`. Capture the dependency state in
+    `_project/verification-logs/results-explorer-followup-remediation-release-gate/w0.log`.
+    Decision gate: if any dependency lacks evidence, stop and return it to the
+    implementation owner.
+
+- id: w1
+  summary: "Run regenerated snapshot invariants and compare SQL smoke"
+  needs: [w0]
+  status: pending
+  notes: |
+    Regenerate or confirm the current Results Explorer DuckDB snapshot, then
+    run snapshot invariants plus SQL that reports:
+      - compare-eligible row count;
+      - cohorts with 2+ compare-eligible rows;
+      - comparison exclusion reasons;
+      - missing/unranked/ranked leaderboard states;
+      - duplicate chart labels if the formatter exposes a check.
+    Decision gate: zero compare-eligible rows, false `No run` badge states, or
+    duplicate chart labels block release.
+
+- id: w2
+  summary: "Run automated backend and frontend suites"
+  needs: [w1]
+  status: pending
+  notes: |
+    Run the targeted backend explorer pipeline tests, Results Explorer unit
+    tests, typecheck, build, and e2e/browser tests introduced by dependent
+    TODOs. Capture command status and failure tails under this gate's
+    verification log directory.
+
+- id: w3
+  summary: "Run comprehensive browser acceptance across all Results Explorer routes"
+  needs: [w2]
+  status: pending
+  notes: |
+    Restart the local dev server from the checked tree and exercise:
+      - `/results/`;
+      - `/results/<benchmark>/` Matrix, Ranks, List, and chart subtabs;
+      - `/results/p/<platform>/` filters and compare selection;
+      - `/results/query` filters, visible columns, SQL disclosure, exports,
+        and compare selection;
+      - `/results/compare` empty builder and explicit IDs;
+      - one result detail page and `Compare this result`.
+    Click every visible button/link/control at least once unless it performs an
+    external/destructive action. Record pass/fail evidence for each route.
+
+- id: w4
+  summary: "Produce final defect register and pass/fail closure artifact"
+  needs: [w3]
+  status: pending
+  notes: |
+    Write `_project/audits/results-explorer-followup-remediation-release-gate-<date>.md`
+    with:
+      - checked SHA;
+      - commands run;
+      - snapshot SQL counts;
+      - route acceptance matrix;
+      - closure status for every known issue;
+      - any new defects with severity, root cause, blind spot, and deeper
+        consideration.
+    Decision gate: any unresolved P0/P1 defect blocks moving this gate to DONE.
+
+- id: w5
+  summary: "Move completed TODOs to DONE only after the gate passes"
+  needs: [w4]
+  status: pending
+  notes: |
+    After the audit passes, use the TODO completion workflow to mark this item
+    and all dependency items Completed, move them to `_project/DONE`, reindex,
+    validate, and confirm no completed follow-up item remains in
+    `_project/TODO`. If the gate fails, leave items open and create narrowly
+    scoped follow-up TODOs for any remaining defects.
+
+prior_art:
+- "_project/DONE/main/planning/results-explorer-contract-release-gate.yaml is the prior release gate pattern."
+- "_project/scripts/todo_cli.py validates TODO schema, dependency graph, and indexes."
+- "_project/scripts/results_explorer_snapshot_invariants.py should own snapshot contract checks."
+- "results-explorer/e2e/ should contain route-level browser tests introduced by the dependent TODOs."
+
+must_preserve:
+- "No dependent TODO is marked complete without evidence from its own verification section."
+- "A P0/P1 browser-visible defect blocks this release gate."
+- "The audit names the exact checked SHA and data snapshot."
+- "TODO movement to DONE happens only after validation and graph checks pass."
+- "Unrelated source, TODO, DONE, and lock files are not modified."
+
+approach: |
+  Treat this as a release gate and bookkeeping item, not an implementation
+  task. It proves that the follow-up remediation is complete on one checked
+  tree and prevents stale TODO completion from masking unresolved defects.
+
+anti_patterns:
+- "DO NOT approve based on PR merge status alone."
+- "DO NOT rely on screenshots without route, SHA, and data snapshot evidence."
+- "DO NOT move TODOs to DONE before snapshot, automated, and browser gates pass."
+- "DO NOT fix newly discovered issues inside this gate; create focused follow-up TODOs unless the fix is trivial copy in the gate artifact."
+
+verification:
+- description: "TODO schema and graph validate"
+  command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate && uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph"
+  expected_output: "both commands exit 0"
+- description: "Snapshot invariants pass"
+  command: "uv run -- python _project/scripts/results_explorer_snapshot_invariants.py results-explorer/public/data/results.duckdb"
+  expected_output: "exit 0 with nonzero comparable rows and no contradictory leaderboard/rank states"
+- description: "Results Explorer frontend verification passes"
+  command: "cd results-explorer && npm test -- --run && npm run typecheck && npm run build"
+  expected_output: "all frontend checks pass"
+- description: "Browser acceptance evidence exists"
+  command: "rg -n \"Leaderboards|Benchmark|Platform|Query Workbench|Compare|Result detail|PASS|FAIL\" _project/verification-logs/results-explorer-followup-remediation-release-gate/"
+  expected_output: "logs include route acceptance evidence"
+
+scope_limit:
+  only_modify:
+  - "_project/TODO/results-explorer-followup-todo-review/planning/results-explorer-comparison-eligibility-contract-repair.yaml"
+  - "_project/TODO/results-explorer-followup-todo-review/planning/results-explorer-compare-entrypoint-happy-path-gates.yaml"
+  - "_project/TODO/results-explorer-followup-todo-review/planning/results-explorer-compare-disabled-recovery-states.yaml"
+  - "_project/TODO/results-explorer-followup-todo-review/planning/results-explorer-leaderboard-rank-evidence-semantics.yaml"
+  - "_project/TODO/results-explorer-followup-todo-review/planning/results-explorer-chart-run-identity-label-contract.yaml"
+  - "_project/TODO/results-explorer-followup-todo-review/planning/results-explorer-surface-theme-and-density-contract.yaml"
+  - "_project/TODO/results-explorer-followup-todo-review/planning/results-explorer-direct-route-and-copy-hardening.yaml"
+  - "_project/TODO/results-explorer-followup-todo-review/planning/results-explorer-followup-remediation-release-gate.yaml"
+  - "_project/DONE/results-explorer-followup-todo-review/planning/"
+  - "_project/audits/results-explorer-followup-remediation-release-gate-*.md"
+  - "_project/verification-logs/results-explorer-followup-remediation-release-gate/"
+  do_not_modify:
+  - "results-explorer/src/"
+  - "benchbox/"
+  - "docs/"
+  - "benchmark_runs/"
+
+success_metrics:
+- "All follow-up remediation TODOs are complete and moved to DONE only after evidence passes."
+- "Snapshot SQL proves compare eligibility and leaderboard/rank state semantics are valid."
+- "Browser acceptance covers every Results Explorer route and every compare entrypoint."
+- "The final audit lists no unresolved P0/P1 issues."
+
+metadata:
+  tags:
+  - results-explorer
+  - release-gate
+  - verification
+  - todo-cleanup
+  estimated_effort: "Small (0.5-1 day after dependent fixes)"
+  created_date: "2026-05-11"
+
+impact:
+  business_value: |
+    Prevents another cycle where merged PRs or completed TODOs leave the public
+    explorer with major workflow defects.
+  user_impact: |
+    Confirms the explorer is usable for discovery, filtering, comparison, and
+    evidence inspection before completion is claimed.
+  technical_debt: |
+    Adds a repeatable closure gate for future Results Explorer remediation
+    batches.

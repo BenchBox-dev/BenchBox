@@ -1,0 +1,161 @@
+id: results-explorer-leaderboard-rank-evidence-semantics
+title: "Separate missing, unranked, and ranked evidence in leaderboards and rank charts"
+worktree: results-explorer-followup-todo-review
+priority: High
+status: Not Started
+category: Core Functionality
+
+description: |
+  The latest review found that leaderboard cells can say `No run` while still
+  rendering trust/validation badges, and rank charts can show large all-dash
+  matrices for cohorts where rows are present but not rankable. This exposes a
+  deeper semantic bug: the UI conflates missing evidence, published-but-
+  unranked evidence, and ranked evidence.
+
+deps:
+  needs:
+  - results-explorer-comparison-eligibility-contract-repair
+
+work:
+- id: w0
+  summary: "Capture the current missing/unranked/ranked state matrix"
+  status: pending
+  notes: |
+    Query `meta_leaderboard`, `cohort_metadata`, `benchmark_rankings`, and any
+    chart source tables on the checked git SHA and current snapshot. Capture
+    SQL, snapshot path/checksum, row counts, and sample cells where:
+      - `rank IS NULL` and metric data exists;
+      - `rank IS NULL` and no metric data exists;
+      - `rank IS NOT NULL`;
+      - trust or validation badges exist with no rank.
+    Store SQL and row counts in
+    `_project/verification-logs/results-explorer-leaderboard-rank-evidence-semantics/w0.log`.
+
+- id: w1
+  summary: "Define the display contract for missing, unranked, and ranked states"
+  needs: [w0]
+  status: pending
+  notes: |
+    Document exact UI states:
+      - Missing run: no metric, no result link, no trust badges, copy `No run`;
+      - Published but unranked: metric/result exists, no rank, copy
+        `Unranked` or `Excluded`, show reason and optional receipt link;
+      - Ranked: rank and metric displayed with eligibility badges.
+    Decision gate: do not edit components until the contract is documented in
+    implementation notes and accepted by tests.
+
+- id: w2
+  summary: "Update cross-benchmark leaderboard cells to honor the state contract"
+  needs: [w1]
+  status: pending
+  notes: |
+    Update the meta leaderboard so `No run` cells never render trust or
+    validation badges. If a result exists but is unranked, show explicit
+    `Unranked` or `Excluded` state with the reason and a link to the result or
+    receipt only when that link is real.
+
+- id: w3
+  summary: "Update rank charts to avoid authoritative all-dash matrices"
+  needs: [w1]
+  status: pending
+  notes: |
+    Rank charts should require rankable cells before rendering a rank matrix.
+    If every row is unranked/excluded, show an empty state with the dominant
+    exclusion reasons and a link or affordance to inspect submitted evidence.
+    In mixed cohorts, separate or visually de-emphasize excluded rows so they
+    do not read as rankable competitors with missing data.
+
+- id: w4
+  summary: "Add invariant and component tests for contradictory evidence states"
+  needs: [w2, w3]
+  status: pending
+  notes: |
+    Add tests that fail when:
+      - `No run` renders badges or links;
+      - an unranked result is labelled as missing;
+      - an all-unrankable rank chart renders a normal rank matrix;
+      - rank chart and leaderboard disagree about the same cell state.
+
+- id: w5
+  summary: "Browser-check leaderboard and rank chart semantics"
+  needs: [w4]
+  status: pending
+  notes: |
+    In the browser, check `/results/`, one benchmark rank tab with unranked
+    rows, and one normal ranked benchmark. Capture screenshots or text logs.
+    Decision gate: do not complete if any visible `No run` cell still contains
+    provenance badges or if any all-unrankable cohort appears as a normal rank
+    leaderboard.
+
+prior_art:
+- "results-explorer/src/components/MetaLeaderboard.tsx renders cross-benchmark cells and badge metadata."
+- "results-explorer/src/components/RankTable.tsx and results-explorer/src/components/ChartPanel.tsx own benchmark rank-chart rendering."
+- "results-explorer/src/lib/duckdbQueries.ts provides meta leaderboard and chart rows."
+- "_project/scripts/results_explorer_snapshot_invariants.py should include contradictory cell-state checks."
+
+must_preserve:
+- "True missing runs stay visually lightweight and do not imply submission evidence."
+- "Published but unranked runs remain discoverable for provenance."
+- "Ranked cohorts keep existing rank ordering and metric display."
+- "The same result/cohort state renders consistently across leaderboard, rank chart, and detail pages."
+
+approach: |
+  Treat missing/unranked/ranked as first-class display states. Add data
+  invariants, then update components and charts to consume the explicit state.
+
+anti_patterns:
+- "DO NOT show trust or validation badges inside a `No run` cell."
+- "DO NOT hide unranked submitted evidence entirely; users need to audit why it was excluded."
+- "DO NOT render a rank chart when no row has a rankable value."
+- "DO NOT infer missing state from `rank == null` alone."
+
+verification:
+- description: "Leaderboard and rank component tests pass"
+  command: "cd results-explorer && npm test -- --run src/components/__tests__/MetaLeaderboard.test.tsx src/components/__tests__/ChartPanel.test.tsx src/components/__tests__/charts.smoke.test.tsx"
+  expected_output: "all targeted tests pass"
+- description: "Snapshot cell-state invariants pass"
+  command: "uv run -- python _project/scripts/results_explorer_snapshot_invariants.py results-explorer/public/data/results.duckdb"
+  expected_output: "exit 0 and no `No run` cells have badge/link metadata"
+- description: "Browser evidence covers both missing and unranked states"
+  command: "rg -n \"No run|Unranked|Excluded|rank chart|PASS|FAIL\" _project/verification-logs/results-explorer-leaderboard-rank-evidence-semantics/"
+  expected_output: "logs include pass/fail evidence for leaderboard and rank chart states"
+
+scope_limit:
+  only_modify:
+  - "results-explorer/src/components/MetaLeaderboard.tsx"
+  - "results-explorer/src/components/RankTable.tsx"
+  - "results-explorer/src/components/ChartPanel.tsx"
+  - "results-explorer/src/lib/duckdbQueries.ts"
+  - "results-explorer/src/lib/displayEligibility.ts"
+  - "results-explorer/src/components/__tests__/"
+  - "_project/scripts/results_explorer_snapshot_invariants.py"
+  - "_project/verification-logs/results-explorer-leaderboard-rank-evidence-semantics/"
+  do_not_modify:
+  - "benchbox/core/results/"
+  - "benchmark_runs/"
+
+success_metrics:
+- "`No run` never appears with trust, validation, receipt, or result-link badges."
+- "Published but unranked cells are explicitly labelled and explain why they are excluded."
+- "All-unrankable rank charts show an explanatory empty state instead of a normal matrix."
+- "Leaderboard and rank chart tests share the same display-state fixtures."
+
+metadata:
+  tags:
+  - results-explorer
+  - leaderboard
+  - rank
+  - evidence
+  estimated_effort: "Medium (1-2 days)"
+  created_date: "2026-05-11"
+
+impact:
+  business_value: |
+    Prevents public rankings from implying that missing, excluded, and valid
+    evidence are interchangeable.
+  user_impact: |
+    Analysts can distinguish absent coverage from submitted-but-unranked
+    results.
+  technical_debt: |
+    Establishes a shared cell-state contract instead of scattered rank-null
+    checks.

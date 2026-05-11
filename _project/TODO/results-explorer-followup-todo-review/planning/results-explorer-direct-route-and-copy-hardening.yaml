@@ -1,0 +1,162 @@
+id: results-explorer-direct-route-and-copy-hardening
+title: "Harden direct route loading and shared Results Explorer microcopy"
+worktree: results-explorer-followup-todo-review
+priority: Medium
+status: Not Started
+category: Reliability
+
+description: |
+  The review found an intermittent direct-route failure on `/results/p/polars/`
+  where the page briefly rendered as `polars Results` with `No results found`,
+  plus several copy defects such as `1 warnings` pluralization and duplicated
+  punctuation in guardrail text. This TODO adds direct-route regression tests
+  and centralizes small but trust-eroding microcopy states.
+
+deps:
+  needs: []
+
+work:
+- id: w0
+  summary: "Reproduce and instrument direct platform route loading"
+  status: pending
+  notes: |
+    Test hard reload and direct navigation on the checked git SHA, capturing
+    final URL, H1, row count, console/network errors, loading-state transitions,
+    and whether the route matches in-app navigation for:
+      - `/results/p/polars/`;
+      - `/results/p/duckdb/`;
+      - `/results/tpch/`;
+      - `/results/query`;
+      - `/results/compare`.
+    Also capture the exact one-warning and multi-warning Compare copy, including
+    duplicated punctuation and passive badge affordance states. Store results in
+    `_project/verification-logs/results-explorer-direct-route-and-copy-hardening/w0.log`.
+
+- id: w1
+  summary: "Prevent transient empty platform caches from becoming terminal state"
+  needs: [w0]
+  status: pending
+  notes: |
+    Inspect DuckDB loading/caching in platform queries. Ensure route components
+    distinguish loading, not found, empty filtered result, and real no-data
+    states. Do not cache transient zero-row results for a platform if the
+    platform index has not loaded or if DuckDB is still initializing.
+
+- id: w2
+  summary: "Add direct-route parity tests"
+  needs: [w1]
+  status: pending
+  notes: |
+    Add browser or integration tests that hard-load each route in w0 and
+    compare it with in-app navigation. Assert canonical capitalization
+    (`Polars Results`, not `polars Results`), expected row count, visible
+    filters/pivots, and absence of false `No results found` states.
+
+- id: w3
+  summary: "Centralize warning/count/status microcopy"
+  needs: [w0]
+  status: pending
+  notes: |
+    Add or extend a shared formatter for:
+      - `1 warning` vs `N warnings`;
+      - no duplicated punctuation such as `coverage..`;
+      - selected row count states;
+      - compare guardrail badge labels;
+      - missing/unranked status labels if not already covered by the
+        leaderboard semantics TODO.
+
+- id: w4
+  summary: "Apply microcopy formatter to Compare and guardrail surfaces"
+  needs: [w3]
+  status: pending
+  notes: |
+    Update Compare header, Comparability Guardrails, Decision Summary, receipt,
+    and button copy to use shared formatting. Any badge that visually looks
+    clickable must either be a real button/link or be restyled as passive text.
+
+- id: w5
+  summary: "Run direct-route and microcopy browser checks"
+  needs: [w2, w4]
+  status: pending
+  notes: |
+    Browser-check the routes from w0 plus a compare route with exactly one
+    warning and one with multiple warnings. Decision gate: do not complete if
+    any direct route can land in a false empty state, any visible copy shows
+    incorrect pluralization/punctuation, or any passive badge looks like a
+    clickable button.
+
+prior_art:
+- "results-explorer/src/pages/PlatformIndex.tsx owns direct platform detail loading and page heading."
+- "results-explorer/src/lib/duckdbQueries.ts contains platform query caching."
+- "results-explorer/src/pages/Compare.tsx and ComparabilityReceipt components render warning copy."
+- "results-explorer/src/lib/compareSummary.ts may already format guardrail messages."
+
+must_preserve:
+- "Legitimate empty filtered states still render as empty states with reset actions."
+- "Direct URLs remain static-export friendly and do not require server-side routing."
+- "Microcopy changes do not alter eligibility or ranking semantics."
+- "Passive badges are visually distinct from buttons unless they are interactive."
+
+approach: |
+  First prove whether the route failure is reproducible, then add route-state
+  tests that cover both hard reload and in-app navigation. In parallel,
+  centralize the small copy rules that repeatedly surface in compare UI.
+
+anti_patterns:
+- "DO NOT fix direct route failures by adding arbitrary timeouts."
+- "DO NOT cache empty arrays before the route has enough data to know the platform is genuinely empty."
+- "DO NOT leave count/pluralization copy embedded separately in each component."
+- "DO NOT style passive status pills like clickable buttons."
+
+verification:
+- description: "Direct-route tests pass"
+  command: "cd results-explorer && npm run test:e2e:fixtures && npm run build && npm run test:e2e -- --project=chromium --grep \"direct route\""
+  expected_output: "all direct-route tests pass"
+- description: "Microcopy unit tests pass"
+  command: "cd results-explorer && npm test -- --run src/lib/__tests__/copyFormatters.test.ts src/pages/__tests__/Compare.test.tsx src/components/__tests__/ComparabilityReceipt.test.tsx"
+  expected_output: "all targeted tests pass"
+- description: "Browser evidence confirms no false empty states or bad pluralization"
+  command: "rg -n \"Polars Results|No results found|1 warning|warnings|coverage\\.\\.|PASS|FAIL\" _project/verification-logs/results-explorer-direct-route-and-copy-hardening/"
+  expected_output: "logs include route and copy pass/fail evidence"
+
+scope_limit:
+  only_modify:
+  - "results-explorer/src/lib/duckdbQueries.ts"
+  - "results-explorer/src/lib/copyFormatters.ts"
+  - "results-explorer/src/pages/PlatformIndex.tsx"
+  - "results-explorer/src/pages/Compare.tsx"
+  - "results-explorer/src/components/ComparabilityReceipt.tsx"
+  - "results-explorer/src/lib/__tests__/"
+  - "results-explorer/src/pages/__tests__/"
+  - "results-explorer/src/components/__tests__/"
+  - "results-explorer/e2e/"
+  - "_project/verification-logs/results-explorer-direct-route-and-copy-hardening/"
+  do_not_modify:
+  - "benchbox/core/explorer_pipeline/"
+  - "results-explorer/public/data/"
+
+success_metrics:
+- "Hard-loaded platform routes render the same canonical content as in-app navigation."
+- "Transient DuckDB loading cannot surface as a permanent platform `No results found` page."
+- "Warning/count/status copy pluralizes and punctuates correctly."
+- "Passive warning/status badges no longer look like dead buttons."
+
+metadata:
+  tags:
+  - results-explorer
+  - routing
+  - copy
+  - reliability
+  estimated_effort: "Small-Medium (1-2 days)"
+  created_date: "2026-05-11"
+
+impact:
+  business_value: |
+    Prevents direct links and shared compare URLs from appearing broken or
+    careless.
+  user_impact: |
+    Users can trust shared links and understand guardrail copy without
+    guessing which badges are actionable.
+  technical_debt: |
+    Centralizes route-state and microcopy edge cases that previously regressed
+    across components.
