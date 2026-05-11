@@ -62,9 +62,14 @@ function normalizePlatformKey(value: string): string {
   return value.trim().toLowerCase();
 }
 
-function matchesRequestedPlatform(row: PlatformIndexRowRow, platform: string): boolean {
+function platformRowsForRequest(rows: PlatformIndexRowRow[], platform: string): PlatformIndexRowRow[] {
   const requested = normalizePlatformKey(platform);
-  return normalizePlatformKey(row.platform_id) === requested || normalizePlatformKey(row.platform) === requested;
+  // platform_id is the canonical URL identity. Only fall back to display
+  // labels when no canonical id matches, otherwise same-name sibling tracks
+  // such as datafusion/datafusion-44 would collapse into one page.
+  const idMatches = rows.filter((row) => normalizePlatformKey(row.platform_id) === requested);
+  if (idMatches.length > 0) return idMatches;
+  return rows.filter((row) => normalizePlatformKey(row.platform) === requested);
 }
 
 function trendMetricDescription(metric: TrendMetric): string {
@@ -157,7 +162,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     key: "geomean_ms",
     direction: "asc",
   });
-  const platformDisplayName = rows?.find((row) => matchesRequestedPlatform(row, platform))?.platform ?? platform;
+  const platformDisplayName = rows ? platformRowsForRequest(rows, platform)[0]?.platform ?? platform : platform;
   useDocumentTitle(`${platformDisplayName} · BenchBox Results`);
 
   useEffect(() => {
@@ -205,7 +210,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   // Match by platform_id (URL slug) - platform_id is stable and URL-safe.
   // Fall back to matching by display name for backward compatibility with any
   // old links constructed from the display name.
-  const allPlatformResults = rows.filter((row) => matchesRequestedPlatform(row, platform));
+  const allPlatformResults = platformRowsForRequest(rows, platform);
   const canonicalPlatformId = normalizePlatformKey(allPlatformResults[0]?.platform_id ?? platform);
 
   // Distinct platform options for the in-page sibling pivot, sorted by
