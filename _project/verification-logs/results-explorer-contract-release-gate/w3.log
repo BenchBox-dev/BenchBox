@@ -1,0 +1,42 @@
+# results-explorer-contract-release-gate w3 browser acceptance
+checked_sha 651c5efd8e18833ee5f4abd0956934061db98521
+server http://127.0.0.1:4337/results/
+fixture results-explorer/public/data
+command: node Playwright Chromium probe against high-risk Results Explorer routes
+
+| Route | Assertion | Result | Details |
+|---|---|---|---|
+| /results/ | route loads without Not found | PASS | url=http://127.0.0.1:4337/results/ |
+| /results/ | no browser page errors | PASS |  |
+| /results/ | home scope copy names ranked platform/cohort coverage | PASS | Showing 4 of 4 ranked platforms across 4 leaderboard cohorts |
+| /results/ | home separates leaderboard filters from public corpus browse | PASS | Leaderboard filters above only include 4 rankable cohort(s) |
+| /results/ | home public corpus and platform browse sections render | PASS | benchmark/platform browse visible |
+| /results/ | score formatting keeps no-run cells distinct from numeric values | PASS | No run and avg-rank label visible |
+| /results/amplab/ | route loads without Not found | PASS | url=http://127.0.0.1:4337/results/amplab/ |
+| /results/amplab/ | no browser page errors | PASS |  |
+| /results/amplab/ | no-timing and low-coverage cells render as excluded evidence | PASS | Excluded cells and disclosure visible |
+| /results/amplab/ | zero timing policy copy is visible and no 0 ms cells render | PASS | zero-copy present; no 0 ms token |
+| /results/amplab/ | compare controls are disabled with user-facing reasons | PASS | {"total":22,"disabled":22,"titles":["Insufficient valid queries.","Result does not have enough valid query coverage."]} |
+| /results/amplab/ | run identity labels disambiguate repeated platforms | PASS | date-qualified labels visible |
+| /results/amplab/ | excluded rows keep warning reasons and receipt links | PASS | receipt and reason text visible |
+| /results/amplab/?view=ranks | route loads without Not found | PASS | url=http://127.0.0.1:4337/results/amplab/?view=ranks |
+| /results/amplab/?view=ranks | no browser page errors | PASS |  |
+| /results/amplab/?view=ranks | rank tab/direct URL is gated for all-unrankable cohort | PASS | rank gate copy visible |
+| /results/amplab/?view=ranks | raw timing evidence remains available under rank gate | PASS | provenance copy visible |
+| /results/compare?ids=97631760,e9dec0d3 | route loads without Not found | PASS | url=http://127.0.0.1:4337/results/compare?ids=97631760,e9dec0d3 |
+| /results/compare?ids=97631760,e9dec0d3 | no browser page errors | PASS |  |
+| /results/compare?ids=97631760,e9dec0d3 | winner claims are suppressed for insufficient evidence | PASS | suppression copy visible |
+| /results/compare?ids=97631760,e9dec0d3 | warning link targets the Comparability Receipt | PASS | warningLink=Review receipt |
+| /results/compare?ids=97631760,e9dec0d3 | raw query evidence remains while winner language is absent | PASS | query diff visible; no leads-by text |
+| /results/query | route loads without Not found | PASS | url=http://127.0.0.1:4337/results/query |
+| /results/query | no browser page errors | PASS |  |
+| /results/query | query table displays no-timing rows with explicit copy | PASS | No timing recorded visible |
+| /results/query | query compare selection honors comparison_exclusion_reason projection | PASS | {"total":200,"disabled":200,"titles":["Result does not have enough valid query coverage.","No queries.","No valid display timing is available."]} |
+| /results/query | query score formatting avoids false power/timing values | PASS | No power score / No timing recorded visible |
+| /results/p/datafusion/ | route loads without Not found | PASS | url=http://127.0.0.1:4337/results/p/datafusion/ |
+| /results/p/datafusion/ | no browser page errors | PASS |  |
+| /results/p/datafusion/ | platform detail page renders compare selection surface | PASS | compare tray visible |
+| /results/p/datafusion/ | platform compare controls expose disabled reasons for non-comparable rows | PASS | {"total":99,"disabled":99,"titles":["Result does not have enough valid query coverage.","Insufficient valid queries.","Missing timings.","No queries."],"labels":["Select DataFusion H2ODB SF 0.01 power 2026-05-06 (b4d8d5e1) for comparison","Select DataFusion H2ODB SF 0.01 power 2026-05-05 (98f4a8c6) for comparison","Select DataFusion H2ODB SF 0.01 power 2026-05-02 (2b644837) for comparison"]} |
+| /results/p/datafusion/ | platform rows preserve metric contract and run identity labels | PASS | metric contract column visible |
+
+FAIL count: 0
