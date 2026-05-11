@@ -27,6 +27,10 @@ import { fmtMs as formatDurationMs, fmtScore, fmtGeomean } from "@/utils";
 import { queryDisplayLabel, sortQueryIds } from "@/lib/queryLabels";
 import { compareSelectionLabel } from "@/lib/compareCohort";
 import {
+  describeCompareExclusionReason,
+  type CompareExclusionReasonCopy,
+} from "@/lib/compareExclusionReasons";
+import {
   formatTimingExclusion,
   isComparable,
   isRankable,
@@ -104,6 +108,15 @@ const MOBILE_OUTLIER_LIMIT = 3;
 function fmtQueryMs(ms: number): string {
   if (ms > 0 && ms < 1) return "<1 ms";
   return formatDurationMs(ms);
+}
+
+function CompareDisabledReason({ id, copy }: { id?: string; copy: CompareExclusionReasonCopy }) {
+  return (
+    <div id={id} class="mt-1 text-xs text-[var(--bb-data-fg-muted)]" data-testid="query-heatmap-disabled-reason">
+      <span class="font-medium text-[var(--bb-tone-warning-fg)]">Disabled reason: {copy.shortText}</span>
+      <span class="block">{copy.recoveryHint}</span>
+    </div>
+  );
 }
 
 export function QueryHeatmap({
@@ -459,6 +472,8 @@ export function QueryHeatmap({
           const isSelected = selectedIds?.has(rowKey(row)) ?? false;
           const comparable = isComparable(row);
           const comparisonExclusion = comparable ? null : formatTimingExclusion(row.comparison_exclusion_reason);
+          const comparisonCopy = describeCompareExclusionReason(row.comparison_exclusion_reason);
+          const comparisonReasonId = comparisonCopy ? `query-heatmap-mobile-compare-reason-${row.result_id}` : undefined;
           const rankingExclusion = isRankable(row) ? null : formatTimingExclusion(row.ranking_exclusion_reason);
           const outliers = queryOutliers(row, sortedQueryIds, colMins);
           return (
@@ -485,6 +500,7 @@ export function QueryHeatmap({
                       runDate: row.run_date,
                       resultId: row.result_id,
                     })}
+                    aria-describedby={comparisonReasonId}
                     title={comparisonExclusion ?? undefined}
                     class="mt-1 h-4 w-4 shrink-0 rounded border-[var(--bb-data-border-strong)]"
                   />
@@ -506,6 +522,9 @@ export function QueryHeatmap({
                   </div>
                   {row.platform_version && (
                     <div class="mt-0.5 text-xs text-[var(--bb-data-fg-subtle)]">{row.platform_version}</div>
+                  )}
+                  {hasSelection && comparisonCopy && (
+                    <CompareDisabledReason id={comparisonReasonId} copy={comparisonCopy} />
                   )}
                   <a
                     href={`/results/r/${row.result_id}#run-receipt`}
@@ -608,6 +627,8 @@ export function QueryHeatmap({
                 const isSelected = selectedIds?.has(rowKey(row)) ?? false;
                 const comparable = isComparable(row);
                 const comparisonExclusion = comparable ? null : formatTimingExclusion(row.comparison_exclusion_reason);
+                const comparisonCopy = describeCompareExclusionReason(row.comparison_exclusion_reason);
+                const comparisonReasonId = comparisonCopy ? `query-heatmap-compare-reason-${row.result_id}` : undefined;
                 const rankingExclusion = isRankable(row) ? null : formatTimingExclusion(row.ranking_exclusion_reason);
                 return (
                   <tr
@@ -637,6 +658,7 @@ export function QueryHeatmap({
                           runDate: row.run_date,
                           resultId: row.result_id,
                         })}
+                        aria-describedby={comparisonReasonId}
                         title={comparisonExclusion ?? undefined}
                         class="h-4 w-4 rounded border-[var(--bb-data-border-strong)]"
                       />
@@ -665,6 +687,9 @@ export function QueryHeatmap({
                     </div>
                     {row.platform_version && (
                       <div class="mt-0.5 text-xs text-[var(--bb-data-fg-subtle)]">{row.platform_version}</div>
+                    )}
+                    {hasSelection && comparisonCopy && (
+                      <CompareDisabledReason id={comparisonReasonId} copy={comparisonCopy} />
                     )}
                   </td>
                   <td

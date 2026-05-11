@@ -16,6 +16,7 @@ import {
   isComparable,
   isTimingDisplayable,
 } from "@/lib/displayEligibility";
+import { summarizeCompareExclusionReasons } from "@/lib/compareExclusionReasons";
 import { BenchmarkMatrixSkeleton } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { Breadcrumb } from "@/components/Breadcrumb";
@@ -404,6 +405,12 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   const contextNote = benchmarkContextNote(benchmark);
   const selectedComparableCount = selectedCompareRows.length;
   const compareGuidance = benchmarkCompareGuidanceMessage(selectedComparableCount, title, effectiveSf, effectivePhase);
+  const matrixCompareRows = analysisSummary?.platforms ?? [];
+  const zeroSelectableCompareRows =
+    matrixCompareRows.length > 0 && matrixCompareRows.every((row) => !isComparable(row));
+  const zeroSelectableReasons = summarizeCompareExclusionReasons(
+    matrixCompareRows.map((row) => row.comparison_exclusion_reason),
+  );
 
   return (
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -621,6 +628,30 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
           )}
         </div>
       </section>
+
+      {zeroSelectableCompareRows && (
+        <section
+          class="mb-4 rounded-lg border border-[var(--bb-tone-warning-border)] bg-[var(--bb-tone-warning-bg)] px-4 py-3 text-sm text-[var(--bb-tone-warning-fg)]"
+          data-testid="benchmark-zero-selectable"
+          aria-label="No selectable benchmark compare rows"
+        >
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 class="font-semibold">No selectable compare rows</h2>
+              <p class="mt-1">
+                {zeroSelectableReasons.length > 0
+                  ? `${zeroSelectableReasons[0]!.count} ${zeroSelectableReasons[0]!.copy.shortText.toLowerCase()} row${
+                      zeroSelectableReasons[0]!.count === 1 ? "" : "s"
+                    }. ${zeroSelectableReasons[0]!.copy.recoveryHint}`
+                  : "This benchmark cohort does not expose a comparable run. Choose another cohort in the Compare builder."}
+              </p>
+            </div>
+            <a href="/results/compare" class="btn btn-secondary shrink-0 text-sm no-underline">
+              Choose another cohort
+            </a>
+          </div>
+        </section>
+      )}
 
       {/* Matrix view */}
       {viewMode === "matrix" && (
