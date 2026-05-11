@@ -15,7 +15,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/preact";
 import { describe, it, expect } from "vitest";
 import { expectNoAxeViolations } from "@/testing/axe-helper";
-import { QueryHeatmap } from "@/components/QueryHeatmap";
+import { BENCHMARK_MATRIX_DENSITY_CONTRACT, QueryHeatmap } from "@/components/QueryHeatmap";
 import type { BenchmarkSummary, PlatformRow } from "@/types";
 
 // ---------------------------------------------------------------------------
@@ -171,22 +171,21 @@ describe("QueryHeatmap rendering", () => {
   it("applies cumulative sticky-left offsets to the frozen header columns", () => {
     render(<QueryHeatmap summary={makeSummary()} />);
     const thead = matrixThead();
-    const trustHeader = within(thead).getByRole("columnheader", { name: "Trust" });
-    const primaryHeader = thead.querySelector('[aria-sort]:not([aria-sort=""])')!;
-    expect(trustHeader.getAttribute("style")).toContain("left: 11rem");
+    const primaryHeader = within(thead).getByRole("columnheader", { name: /^Power Score/ });
     const platformHeader = within(thead).getByRole("columnheader", { name: /^Platform/ });
     expect(platformHeader.getAttribute("style")).toContain("left: 0rem");
     expect(platformHeader.className).toContain("sticky");
-    expect(primaryHeader.getAttribute("style")?.includes("left:")).toBe(true);
+    expect(primaryHeader.getAttribute("style")).toContain("left: 11rem");
+    expect(within(thead).queryByRole("columnheader", { name: "Trust" })).toBeNull();
   });
 
   it("shifts sticky offsets right by the checkbox column width when selection is enabled", () => {
     render(<QueryHeatmap summary={makeSummary()} selectedIds={new Set()} onSelectionChange={() => {}} />);
     const thead = matrixThead();
     const platformHeader = within(thead).getByRole("columnheader", { name: /^Platform/ });
-    const trustHeader = within(thead).getByRole("columnheader", { name: "Trust" });
+    const primaryHeader = within(thead).getByRole("columnheader", { name: /^Power Score/ });
     expect(platformHeader.getAttribute("style")).toContain("left: 3rem");
-    expect(trustHeader.getAttribute("style")).toContain("left: 14rem");
+    expect(primaryHeader.getAttribute("style")).toContain("left: 14rem");
   });
 
   it("renders the page-sticky header outside the horizontal scroll container", () => {
@@ -205,14 +204,24 @@ describe("QueryHeatmap rendering", () => {
     expect(platformHeader.className).toMatch(/\bz-30\b/);
   });
 
-  it("renders the Receipt link inside the Trust column to keep the Platform cell identity-only", () => {
-    const { container } = render(<QueryHeatmap summary={makeSummary()} />);
+  it("keeps only identity and compact metadata affordance in the frozen platform cell", () => {
+    const { container } = render(
+      <QueryHeatmap
+        summary={makeSummary({
+          platforms: [{ ...makeSummary().platforms[0]!, platform_version: "V1.2.3" }],
+        })}
+      />,
+    );
     const firstRow = container.querySelector("tbody tr");
     expect(firstRow).not.toBeNull();
     const cells = firstRow!.querySelectorAll('td[role="gridcell"]');
-    // Platform cell is the first frozen-left gridcell; Trust is the second.
-    expect(cells[0]?.textContent ?? "").not.toContain("Receipt");
-    expect(cells[1]?.textContent ?? "").toContain("Receipt");
+    expect(within(cells[0] as HTMLElement).getByText("V1.2.3")).toBeTruthy();
+    expect(cells[0]?.textContent ?? "").not.toContain("vV1.2.3");
+    const details = within(cells[0] as HTMLElement).getByText(
+      BENCHMARK_MATRIX_DENSITY_CONTRACT.secondaryMetadataAffordance,
+    ).closest("details");
+    expect(details?.hasAttribute("open")).toBe(false);
+    expect(firstRow!.querySelectorAll("td.sticky")).toHaveLength(3);
   });
 
   it("renders a nameable compliance marker instead of inline parenthetical text", () => {
@@ -239,6 +248,9 @@ describe("QueryHeatmap rendering", () => {
 
   it("renders compact receipt links and validation status badges", () => {
     render(<QueryHeatmap summary={makeSummary()} />);
+    for (const details of screen.getAllByText(BENCHMARK_MATRIX_DENSITY_CONTRACT.secondaryMetadataAffordance)) {
+      fireEvent.click(details);
+    }
     const receiptLinks = screen.getAllByRole("link", { name: "Receipt →" }) as HTMLAnchorElement[];
 
     expect(receiptLinks[0]?.getAttribute("href")).toBe("/results/r/r1#run-receipt");
