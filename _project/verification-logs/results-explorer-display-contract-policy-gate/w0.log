@@ -1,0 +1,196 @@
+# Results Explorer display-contract policy evidence
+HEAD 66f207ee03182dbff4b3e5bc368d2c9be282a9b5
+snapshot_source primary_checkout_public_data_read_only
+snapshot /Users/joe/Developer/BenchBox/results-explorer/public/data/results.duckdb
+snapshot_sha256 7cb861d6cd43f98979b5647813c8c4cbacf2eee05beee0d91152f9df241b05b7
+
+## SQL: no_geomean and eligible counts
+benchmark,scale_factor,phase,row_count,no_geomean,eligible
+amplab,1.0,power,16,7,0
+amplab,0.01,power,18,7,0
+amplab,0.1,power,16,7,0
+h2odb,1.0,power,15,7,0
+h2odb,0.01,power,17,7,0
+h2odb,0.1,power,15,7,0
+nyctaxi,0.1,power,10,7,0
+nyctaxi,0.01,power,10,7,0
+nyctaxi,1.0,power,9,7,0
+ssb,1.0,power,17,7,0
+ssb,0.01,power,19,7,0
+ssb,0.1,power,17,7,0
+tsbs_devops,0.01,power,12,7,0
+tsbs_devops,1.0,power,12,7,0
+tsbs_devops,0.1,power,12,7,0
+ai_primitives,0.01,power,6,6,0
+tpch_skew,1.0,power,15,6,0
+tpch_skew,0.01,power,18,6,0
+tpch_skew,0.1,power,15,6,0
+coffeeshop,0.01,power,16,5,0
+
+## SQL: AMPLab SF0.01 power rows from benchmark_rankings
+benchmark,scale_factor,phase,result_id,platform_id,short_id,is_ranking_eligible,rank,total_in_cohort,power_score,display_geomean_ms
+amplab,0.01,power,amplab-apache-doris-sf0.01-20260506-24fe9dc2,apache-doris,76717498,false,NULL,0,NULL,6.739816231875747
+amplab,0.01,power,amplab-clickhouse-local-sf0.01-20260505-d0560738,clickhouse-local,e16ac6db,false,NULL,0,NULL,1.5874010519681994
+amplab,0.01,power,amplab-dask-sf0.01-20260506-7a95a8a1,dask,6b5ead27,false,NULL,0,NULL,NULL
+amplab,0.01,power,amplab-datafusion-sf0.01-20260502-8f6a2031,datafusion,380e978c,false,NULL,0,NULL,NULL
+amplab,0.01,power,amplab-datafusion-sf0.01-20260502-a276dae0,datafusion,07650b37,false,NULL,0,NULL,1.5874010519681994
+amplab,0.01,power,amplab-datafusion-sf0.01-20260505-d4177089,datafusion,161416ac,false,NULL,0,NULL,1.6983813295649528
+amplab,0.01,power,amplab-datafusion-sf0.01-20260506-ea4d8b08,datafusion,c6693d7b,false,NULL,0,NULL,1.5874010519681994
+amplab,0.01,power,amplab-duckdb-sf0.01-20260505-9af633ba,duckdb,61ba4644,false,NULL,0,NULL,1.0
+amplab,0.01,power,amplab-pandas-sf0.01-20260506-156d42d6,pandas,c8241fdf,false,NULL,0,NULL,NULL
+amplab,0.01,power,amplab-polars-sf0.01-20260502-067ce228,polars,cc40d528,false,NULL,0,NULL,NULL
+amplab,0.01,power,amplab-polars-sf0.01-20260506-99a54986,polars,72c3bd0c,false,NULL,0,NULL,NULL
+amplab,0.01,power,amplab-pyspark-sf0.01-20260502-1bd8b581,pyspark,34b0f85d,false,NULL,0,NULL,NULL
+amplab,0.01,power,amplab-pyspark-sf0.01-20260506-e6ffd653,pyspark,333da4e3,false,NULL,0,NULL,NULL
+amplab,0.01,power,amplab-spark-sf0.01-20260502-9a20c162,spark,67eefa61,false,NULL,0,NULL,49.41175187814185
+amplab,0.01,power,amplab-spark-sf0.01-20260506-073b4e99,spark,967fa6c1,false,NULL,0,NULL,50.41115824891813
+amplab,0.01,power,amplab-sqlite-sf0.01-20260502-e5aed157,sqlite,1e17df7a,false,NULL,0,NULL,5.102109363599131
+amplab,0.01,power,amplab-sqlite-sf0.01-20260506-4530c5b2,sqlite,5cda1caf,false,NULL,0,NULL,5.352699788576486
+amplab,0.01,power,amplab-starrocks-sf0.01-20260506-bdb01259,starrocks,cf318ed7,false,NULL,0,NULL,5.817682342460574
+
+## SQL: AMPLab per-result non-null timing counts from benchmark_matrix_cells
+result_id,query_rows,non_null_timings,positive_timings,zero_timings
+amplab-dask-sf0.01-20260506-7a95a8a1,8,0,0,0
+amplab-datafusion-sf0.01-20260502-8f6a2031,8,0,0,0
+amplab-pandas-sf0.01-20260506-156d42d6,8,0,0,0
+amplab-polars-sf0.01-20260502-067ce228,8,0,0,0
+amplab-polars-sf0.01-20260506-99a54986,8,0,0,0
+amplab-pyspark-sf0.01-20260502-1bd8b581,8,0,0,0
+amplab-pyspark-sf0.01-20260506-e6ffd653,8,0,0,0
+amplab-duckdb-sf0.01-20260505-9af633ba,8,8,1,7
+amplab-clickhouse-local-sf0.01-20260505-d0560738,8,8,6,2
+amplab-datafusion-sf0.01-20260502-a276dae0,8,8,6,2
+amplab-datafusion-sf0.01-20260505-d4177089,8,8,6,2
+amplab-datafusion-sf0.01-20260506-ea4d8b08,8,8,6,2
+amplab-sqlite-sf0.01-20260502-e5aed157,8,8,6,2
+amplab-sqlite-sf0.01-20260506-4530c5b2,8,8,6,2
+amplab-apache-doris-sf0.01-20260506-24fe9dc2,8,8,8,0
+amplab-spark-sf0.01-20260502-9a20c162,8,8,8,0
+amplab-spark-sf0.01-20260506-073b4e99,8,8,8,0
+amplab-starrocks-sf0.01-20260506-bdb01259,8,8,8,0
+
+## SQL: zero-valued rows from query_display_timings
+result_id,query_id,display_ms,sample_count
+ai_primitives-apache-doris-sf0.01-20260506-8c8d75df,embedding_batch,0.0,3
+ai_primitives-apache-doris-sf0.01-20260506-8c8d75df,embedding_large_dimension,0.0,3
+ai_primitives-apache-doris-sf0.01-20260506-8c8d75df,embedding_single,0.0,3
+ai_primitives-apache-doris-sf0.01-20260506-8c8d75df,generative_complete_customer_profile,0.0,3
+ai_primitives-apache-doris-sf0.01-20260506-8c8d75df,generative_complete_simple,0.0,3
+ai_primitives-apache-doris-sf0.01-20260506-8c8d75df,generative_question_answer,0.0,3
+ai_primitives-apache-doris-sf0.01-20260506-8c8d75df,generative_sql_generation,0.0,3
+ai_primitives-apache-doris-sf0.01-20260506-8c8d75df,nlp_classify_priority,0.0,3
+ai_primitives-apache-doris-sf0.01-20260506-8c8d75df,nlp_classify_segment,0.0,3
+ai_primitives-apache-doris-sf0.01-20260506-8c8d75df,nlp_entity_extraction,0.0,3
+ai_primitives-apache-doris-sf0.01-20260506-8c8d75df,nlp_sentiment_batch,0.0,3
+ai_primitives-apache-doris-sf0.01-20260506-8c8d75df,nlp_sentiment_single,0.0,3
+ai_primitives-apache-doris-sf0.01-20260506-8c8d75df,transform_grammar_fix,0.0,3
+ai_primitives-apache-doris-sf0.01-20260506-8c8d75df,transform_summarize_long,0.0,3
+ai_primitives-apache-doris-sf0.01-20260506-8c8d75df,transform_summarize_short,0.0,3
+ai_primitives-apache-doris-sf0.01-20260506-8c8d75df,transform_translate_comment,0.0,3
+ai_primitives-starrocks-sf0.01-20260506-ffa229dc,embedding_batch,0.0,3
+ai_primitives-starrocks-sf0.01-20260506-ffa229dc,embedding_large_dimension,0.0,3
+ai_primitives-starrocks-sf0.01-20260506-ffa229dc,embedding_single,0.0,3
+ai_primitives-starrocks-sf0.01-20260506-ffa229dc,generative_complete_customer_profile,0.0,3
+ai_primitives-starrocks-sf0.01-20260506-ffa229dc,generative_complete_simple,0.0,3
+ai_primitives-starrocks-sf0.01-20260506-ffa229dc,generative_question_answer,0.0,3
+ai_primitives-starrocks-sf0.01-20260506-ffa229dc,generative_sql_generation,0.0,3
+ai_primitives-starrocks-sf0.01-20260506-ffa229dc,nlp_classify_priority,0.0,3
+ai_primitives-starrocks-sf0.01-20260506-ffa229dc,nlp_classify_segment,0.0,3
+ai_primitives-starrocks-sf0.01-20260506-ffa229dc,nlp_entity_extraction,0.0,3
+ai_primitives-starrocks-sf0.01-20260506-ffa229dc,nlp_sentiment_batch,0.0,3
+ai_primitives-starrocks-sf0.01-20260506-ffa229dc,nlp_sentiment_single,0.0,3
+ai_primitives-starrocks-sf0.01-20260506-ffa229dc,transform_grammar_fix,0.0,3
+ai_primitives-starrocks-sf0.01-20260506-ffa229dc,transform_summarize_long,0.0,3
+ai_primitives-starrocks-sf0.01-20260506-ffa229dc,transform_summarize_short,0.0,3
+ai_primitives-starrocks-sf0.01-20260506-ffa229dc,transform_translate_comment,0.0,3
+ai_primitives-starrocks-sf0.1-20260506-a7b99f7a,embedding_batch,0.0,3
+ai_primitives-starrocks-sf0.1-20260506-a7b99f7a,embedding_large_dimension,0.0,3
+ai_primitives-starrocks-sf0.1-20260506-a7b99f7a,embedding_single,0.0,3
+ai_primitives-starrocks-sf0.1-20260506-a7b99f7a,generative_complete_customer_profile,0.0,3
+ai_primitives-starrocks-sf0.1-20260506-a7b99f7a,generative_complete_simple,0.0,3
+ai_primitives-starrocks-sf0.1-20260506-a7b99f7a,generative_question_answer,0.0,3
+ai_primitives-starrocks-sf0.1-20260506-a7b99f7a,generative_sql_generation,0.0,3
+ai_primitives-starrocks-sf0.1-20260506-a7b99f7a,nlp_classify_priority,0.0,3
+ai_primitives-starrocks-sf0.1-20260506-a7b99f7a,nlp_classify_segment,0.0,3
+ai_primitives-starrocks-sf0.1-20260506-a7b99f7a,nlp_entity_extraction,0.0,3
+ai_primitives-starrocks-sf0.1-20260506-a7b99f7a,nlp_sentiment_batch,0.0,3
+ai_primitives-starrocks-sf0.1-20260506-a7b99f7a,nlp_sentiment_single,0.0,3
+ai_primitives-starrocks-sf0.1-20260506-a7b99f7a,transform_grammar_fix,0.0,3
+ai_primitives-starrocks-sf0.1-20260506-a7b99f7a,transform_summarize_long,0.0,3
+ai_primitives-starrocks-sf0.1-20260506-a7b99f7a,transform_summarize_short,0.0,3
+ai_primitives-starrocks-sf0.1-20260506-a7b99f7a,transform_translate_comment,0.0,3
+ai_primitives-starrocks-sf1.0-20260506-8b9cf8ae,embedding_batch,0.0,3
+ai_primitives-starrocks-sf1.0-20260506-8b9cf8ae,embedding_large_dimension,0.0,3
+ai_primitives-starrocks-sf1.0-20260506-8b9cf8ae,embedding_single,0.0,3
+ai_primitives-starrocks-sf1.0-20260506-8b9cf8ae,generative_complete_customer_profile,0.0,3
+ai_primitives-starrocks-sf1.0-20260506-8b9cf8ae,generative_complete_simple,0.0,3
+ai_primitives-starrocks-sf1.0-20260506-8b9cf8ae,generative_question_answer,0.0,3
+ai_primitives-starrocks-sf1.0-20260506-8b9cf8ae,generative_sql_generation,0.0,3
+ai_primitives-starrocks-sf1.0-20260506-8b9cf8ae,nlp_classify_priority,0.0,3
+ai_primitives-starrocks-sf1.0-20260506-8b9cf8ae,nlp_classify_segment,0.0,3
+ai_primitives-starrocks-sf1.0-20260506-8b9cf8ae,nlp_entity_extraction,0.0,3
+ai_primitives-starrocks-sf1.0-20260506-8b9cf8ae,nlp_sentiment_batch,0.0,3
+ai_primitives-starrocks-sf1.0-20260506-8b9cf8ae,nlp_sentiment_single,0.0,3
+ai_primitives-starrocks-sf1.0-20260506-8b9cf8ae,transform_grammar_fix,0.0,3
+ai_primitives-starrocks-sf1.0-20260506-8b9cf8ae,transform_summarize_long,0.0,3
+ai_primitives-starrocks-sf1.0-20260506-8b9cf8ae,transform_summarize_short,0.0,3
+ai_primitives-starrocks-sf1.0-20260506-8b9cf8ae,transform_translate_comment,0.0,3
+amplab-clickhouse-local-sf0.01-20260505-d0560738,1,0.0,3
+amplab-clickhouse-local-sf0.01-20260505-d0560738,1a,0.0,3
+amplab-datafusion-sf0.01-20260502-a276dae0,1,0.0,3
+amplab-datafusion-sf0.01-20260502-a276dae0,1a,0.0,3
+amplab-datafusion-sf0.01-20260505-d4177089,1,0.0,3
+amplab-datafusion-sf0.01-20260505-d4177089,1a,0.0,3
+amplab-datafusion-sf0.01-20260506-ea4d8b08,1,0.0,3
+amplab-datafusion-sf0.01-20260506-ea4d8b08,1a,0.0,3
+amplab-datafusion-sf0.1-20260505-880719a9,1a,0.0,3
+amplab-duckdb-sf0.01-20260505-9af633ba,1,0.0,3
+amplab-duckdb-sf0.01-20260505-9af633ba,1a,0.0,3
+amplab-duckdb-sf0.01-20260505-9af633ba,2,0.0,3
+amplab-duckdb-sf0.01-20260505-9af633ba,2a,0.0,3
+amplab-duckdb-sf0.01-20260505-9af633ba,3,0.0,3
+amplab-duckdb-sf0.01-20260505-9af633ba,3a,0.0,3
+amplab-duckdb-sf0.01-20260505-9af633ba,5,0.0,3
+
+## SQL: compare target timing coverage
+result_id,query_rows,non_null_timings,positive_timings,zero_timings
+amplab-clickhouse-local-sf0.01-20260505-d0560738,8,8,6,2
+amplab-datafusion-sf0.01-20260502-a276dae0,8,8,6,2
+amplab-duckdb-sf0.01-20260505-9af633ba,8,8,1,7
+query_id,selected_positive_count,timings
+1,0,amplab-clickhouse-local-sf0.01-20260505-d0560738=0.0; amplab-datafusion-sf0.01-20260502-a276dae0=0.0; amplab-duckdb-sf0.01-20260505-9af633ba=0.0
+1a,0,amplab-clickhouse-local-sf0.01-20260505-d0560738=0.0; amplab-datafusion-sf0.01-20260502-a276dae0=0.0; amplab-duckdb-sf0.01-20260505-9af633ba=0.0
+2,2,amplab-clickhouse-local-sf0.01-20260505-d0560738=2.0; amplab-datafusion-sf0.01-20260502-a276dae0=2.0; amplab-duckdb-sf0.01-20260505-9af633ba=0.0
+2a,2,amplab-clickhouse-local-sf0.01-20260505-d0560738=1.0; amplab-datafusion-sf0.01-20260502-a276dae0=1.0; amplab-duckdb-sf0.01-20260505-9af633ba=0.0
+3,2,amplab-clickhouse-local-sf0.01-20260505-d0560738=1.0; amplab-datafusion-sf0.01-20260502-a276dae0=1.0; amplab-duckdb-sf0.01-20260505-9af633ba=0.0
+3a,2,amplab-clickhouse-local-sf0.01-20260505-d0560738=2.0; amplab-datafusion-sf0.01-20260502-a276dae0=2.0; amplab-duckdb-sf0.01-20260505-9af633ba=0.0
+4,3,amplab-clickhouse-local-sf0.01-20260505-d0560738=2.0; amplab-datafusion-sf0.01-20260502-a276dae0=2.0; amplab-duckdb-sf0.01-20260505-9af633ba=1.0
+5,2,amplab-clickhouse-local-sf0.01-20260505-d0560738=2.0; amplab-datafusion-sf0.01-20260502-a276dae0=2.0; amplab-duckdb-sf0.01-20260505-9af633ba=0.0
+
+## Browser observations
+PASS route /results/
+  url http://127.0.0.1:4327/results/
+  body_chars 620
+  home linked_no_run_anchor_count 0
+  home has_all_benchmarks_copy false
+  home has_leaderboard_copy true
+PASS route /results/amplab/
+  url http://127.0.0.1:4327/results/amplab/
+  body_chars 966
+  amplab no_run_text_count 0
+  amplab zero_or_sub_ms_copy false
+  amplab ranks_copy true
+  amplab first_lines ["BenchBox","Docs","Blog","Results","GitHub","Run benchmark","Leaderboards","Benchmarks","Platforms","Compare","Query","Results","/","AMPLab","AMPLab Results","Benchmark:"]
+PASS route /results/compare?ids=61ba4644,e16ac6db,07650b37 shell-loaded
+  url http://127.0.0.1:4327/results/compare?ids=61ba4644,e16ac6db,07650b37
+  body_chars 344
+  note Shell rendered before DuckDB data finished loading; the data-loaded observation below is authoritative for Compare policy.
+
+## Browser observation: compare after data load
+PASS route /results/compare?ids=61ba4644,e16ac6db,07650b37 data-loaded
+  compare winner_language true
+  compare insufficient_evidence_copy false
+  compare excluded_query_copy true
+  compare query_level_diff true
+  compare warning_count_copy true
+  compare relevant_lines ["Selected runs share the same benchmark, scale, and phase for winner claims.","4 warnings","DuckDB is 1.59x faster by geomean query time.","WINNER","1.59x","vs slowest selected","1 fastest of 1 comparable","0 slower · 0 tied · 7 excluded for missing data","1.59x","Geomean query time - geometric mean of per-query execution times (measurement runs only). More comparable than wall-clock total when query counts differ. Lower is faster.","Query-Level Diff","Baseline: DuckDB. Negative deltas mean the candidate is faster than baseline.","4 warnings"]
