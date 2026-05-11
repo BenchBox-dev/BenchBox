@@ -65,6 +65,7 @@ class TestG1SchemaContract:
             "geomean_ms",
             "display_geomean_ms",
             "query_count",
+            "logical_query_count",
             "has_display_timing",
             "valid_query_count",
             "missing_query_count",
@@ -143,6 +144,7 @@ class TestG1SchemaContract:
             "run_date",
             "is_ranking_eligible",
             "has_display_timing",
+            "logical_query_count",
             "valid_query_count",
             "missing_query_count",
             "zero_timing_count",
@@ -182,6 +184,7 @@ class TestG1SchemaContract:
             "platform",
             "result_id",
             "has_display_timing",
+            "logical_query_count",
             "valid_query_count",
             "missing_query_count",
             "zero_timing_count",
@@ -210,6 +213,7 @@ class TestG1SchemaContract:
             "geomean_ms",
             "display_geomean_ms",
             "query_count",
+            "logical_query_count",
             "has_display_timing",
             "valid_query_count",
             "missing_query_count",
@@ -267,6 +271,7 @@ class TestG1SchemaContract:
             "geomean_ms",
             "display_geomean_ms",
             "query_count",
+            "logical_query_count",
             "has_display_timing",
             "valid_query_count",
             "missing_query_count",
@@ -357,6 +362,7 @@ class TestSourceFidelity:
     def test_query_count_matches_bundle(self, db_path: Path) -> None:
         # MINIMAL_BUNDLE has 2 queries
         assert self._result_row(db_path)["query_count"] == 2
+        assert self._result_row(db_path)["logical_query_count"] == 2
 
     def test_power_score_matches_bundle(self, db_path: Path) -> None:
         # summary.tpc_metrics.power_at_size = 1234.56

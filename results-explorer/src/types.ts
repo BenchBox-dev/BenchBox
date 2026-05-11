@@ -62,6 +62,7 @@ export interface DetailResult extends CostDeploymentFields {
   display_geomean_ms: number | null;
   power_score: number | null;
   has_display_timing: boolean;
+  logical_query_count?: number;
   valid_query_count: number;
   missing_query_count: number;
   zero_timing_count: number;
@@ -129,6 +130,7 @@ export interface PlatformRow extends CostDeploymentFields {
   run_date: string;
   is_ranking_eligible: boolean;
   has_display_timing: boolean;
+  logical_query_count?: number;
   valid_query_count: number;
   missing_query_count: number;
   zero_timing_count: number;
@@ -190,6 +192,7 @@ export interface MetaCohortPlatform {
   primary_metric: string;
   primary_order: "asc" | "desc";
   has_display_timing: boolean;
+  logical_query_count?: number;
   valid_query_count: number;
   missing_query_count: number;
   zero_timing_count: number;

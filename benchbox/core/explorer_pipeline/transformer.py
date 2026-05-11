@@ -35,6 +35,15 @@ _PASS_STATUSES = {"SUCCESS", "PASS", "pass", "success"}
 _COST_MODEL_SOURCE = "benchbox.core.cost.pricing"
 _COST_SCOPES: frozenset[str] = frozenset({"compute_only", "compute_plus_storage"})
 _COST_STATUSES: frozenset[str] = frozenset({"normalized", "not_applicable_local", "unavailable"})
+_KNOWN_LOGICAL_QUERY_COUNTS: dict[str, int] = {
+    "tpch": 22,
+    "tpch_skew": 22,
+    "tpchavoc": 22,
+    "tpcds": 99,
+    "ssb": 13,
+    "star_schema": 13,
+    "clickbench": 43,
+}
 
 
 def _load_bundle(bundle_path: Path) -> tuple[dict[str, Any], bytes]:
@@ -599,6 +608,44 @@ def _display_geomean_ms(display_timings: list[QueryDisplayTiming]) -> float | No
     return math.exp(sum(math.log(v) for v in values) / len(values))
 
 
+def _summary_query_count(data: dict[str, Any]) -> int:
+    summary = data.get("summary", {})
+    if not isinstance(summary, dict):
+        return 0
+    queries = summary.get("queries", {})
+    if not isinstance(queries, dict):
+        return 0
+    try:
+        return int(queries.get("total", 0) or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _logical_query_count(data: dict[str, Any], display_timings: list[QueryDisplayTiming]) -> int:
+    """Infer the logical query denominator without treating repeats as misses.
+
+    ``summary.queries.total`` is retained as the raw sample count. For repeated
+    benchmark runs it can be 3x/4x the logical benchmark query count, while
+    ``display_timings`` has one row per logical query ID.
+    """
+    raw_query_count = _summary_query_count(data)
+    observed_query_count = len({timing.query_id for timing in display_timings if timing.query_id})
+    if observed_query_count <= 0:
+        return raw_query_count
+    if raw_query_count <= observed_query_count:
+        return raw_query_count or observed_query_count
+
+    benchmark = str(data.get("benchmark", {}).get("id", "unknown"))
+    known_count = _KNOWN_LOGICAL_QUERY_COUNTS.get(benchmark)
+    if known_count and observed_query_count <= known_count and raw_query_count % known_count == 0:
+        return known_count
+
+    if raw_query_count % observed_query_count == 0 and any(timing.sample_count > 1 for timing in display_timings):
+        return observed_query_count
+
+    return raw_query_count
+
+
 class BundleTransformer:
     """Transforms a schema-v2 result bundle into explorer read model artifacts."""
 
@@ -668,8 +715,7 @@ class BundleTransformer:
         total_duration_ms = bundle_data.get("run", {}).get("total_duration_ms", 0.0)
         total_duration_s = float(total_duration_ms) / 1000.0
 
-        summary = bundle_data.get("summary", {})
-        query_count = summary.get("queries", {}).get("total", 0) if isinstance(summary, dict) else 0
+        query_count = _summary_query_count(bundle_data)
         failed_query_count = bundle_failed_query_count(bundle_data)
 
         # Same _query_timings → _build_display_timings pass also runs in
@@ -677,7 +723,8 @@ class BundleTransformer:
         # large bundles (≤99 queries makes this negligible today).
         timings = _query_timings(bundle_data)
         display_timings = _build_display_timings(timings)
-        timing_contract = timing_eligibility(display_timings, int(query_count))
+        logical_query_count = _logical_query_count(bundle_data, display_timings)
+        timing_contract = timing_eligibility(display_timings, logical_query_count)
         normalized_cost = _normalized_cost(bundle_data)
         environment_facets = _environment_facets(
             bundle_data,
@@ -696,6 +743,7 @@ class BundleTransformer:
             geomean_ms=_geomean_ms(bundle_data),
             display_geomean_ms=_display_geomean_ms(display_timings),
             query_count=int(query_count),
+            logical_query_count=logical_query_count,
             has_display_timing=timing_contract.has_display_timing,
             valid_query_count=timing_contract.valid_query_count,
             missing_query_count=timing_contract.missing_query_count,
@@ -754,9 +802,9 @@ class BundleTransformer:
 
         timings = _query_timings(bundle_data)
         display_timings = _build_display_timings(timings)
-        summary = bundle_data.get("summary", {})
-        query_count = summary.get("queries", {}).get("total", 0) if isinstance(summary, dict) else 0
-        timing_contract = timing_eligibility(display_timings, int(query_count))
+        query_count = _summary_query_count(bundle_data)
+        logical_query_count = _logical_query_count(bundle_data, display_timings)
+        timing_contract = timing_eligibility(display_timings, logical_query_count)
         normalized_cost = _normalized_cost(bundle_data)
         detail = DetailResult(
             result_id=result_id,
@@ -771,6 +819,7 @@ class BundleTransformer:
             display_geomean_ms=_display_geomean_ms(display_timings),
             power_score=_power_score(bundle_data),
             has_display_timing=timing_contract.has_display_timing,
+            logical_query_count=logical_query_count,
             valid_query_count=timing_contract.valid_query_count,
             missing_query_count=timing_contract.missing_query_count,
             zero_timing_count=timing_contract.zero_timing_count,
@@ -809,6 +858,7 @@ class BundleTransformer:
             geomean_ms=detail.geomean_ms,
             display_geomean_ms=detail.display_geomean_ms,
             query_count=int(query_count),
+            logical_query_count=logical_query_count,
             trust_label=trust_label,
             visibility=visibility,
             validation_status=detail.validation_status,

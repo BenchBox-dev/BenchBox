@@ -63,6 +63,7 @@ const BENCH_RESULTS_REQUIRED_COLUMNS = [
   "geomean_ms",
   "display_geomean_ms",
   "query_count",
+  "logical_query_count",
   "has_display_timing",
   "valid_query_count",
   "missing_query_count",
