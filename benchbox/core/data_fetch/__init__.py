@@ -30,12 +30,13 @@ from .errors import (
     ManifestValidationError,
 )
 from .manager import ExtractionRequiredError, fetch_data
-from .manifest import DataManifest, TableEntry, load_manifest
+from .manifest import DataManifest, TableEntry, compute_manifest_hash, load_manifest
 
 __all__ = [
     "fetch_data",
     "DataManifest",
     "TableEntry",
+    "compute_manifest_hash",
     "load_manifest",
     "DataFetchError",
     "ManifestValidationError",

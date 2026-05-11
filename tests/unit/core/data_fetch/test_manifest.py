@@ -14,6 +14,7 @@ import pytest
 from benchbox.core.data_fetch import (
     DataManifest,
     ManifestValidationError,
+    compute_manifest_hash,
     load_manifest,
 )
 
@@ -23,13 +24,13 @@ pytestmark = [
 ]
 
 
-_HEX_A = "a" * 64
 _HEX_B = "b" * 64
 _HEX_C = "c" * 64
+_HASH_PLACEHOLDER = "0" * 64
 
 _MINIMAL = f"""\
 dataset_version    = "test-v1"
-manifest_hash      = "{_HEX_A}"
+manifest_hash      = "{_HASH_PLACEHOLDER}"
 data_archive_hash  = "{_HEX_B}"
 url                = "https://example.com/test.tar.zst"
 archive_sha256     = "{_HEX_C}"
@@ -56,6 +57,8 @@ retrieval_timestamp = "2026-05-10T14:00:00Z"
 def _write(tmp: Path, body: str) -> Path:
     p = tmp / "data_manifest.toml"
     p.write_text(body)
+    manifest_hash = compute_manifest_hash(p)
+    p.write_text(body.replace(_HASH_PLACEHOLDER, manifest_hash))
     return p
 
 
@@ -64,6 +67,7 @@ def test_load_minimal_manifest(tmp_path: Path) -> None:
     m = load_manifest(p)
     assert isinstance(m, DataManifest)
     assert m.dataset_version == "test-v1"
+    assert m.manifest_hash == compute_manifest_hash(p)
     assert len(m.tables) == 2
     assert m.tables[0].name == "t1"
     assert m.tables[1].row_count == 200
@@ -97,6 +101,18 @@ def test_missing_required_top_key_raises(tmp_path: Path) -> None:
         load_manifest(p)
 
 
+def test_manifest_hash_mismatch_raises(tmp_path: Path) -> None:
+    p = _write(tmp_path, _MINIMAL)
+    p.write_text(
+        p.read_text().replace(
+            'url                = "https://example.com/test.tar.zst"',
+            'url = "https://evil.test/archive.tar.zst"',
+        )
+    )
+    with pytest.raises(ManifestValidationError, match="manifest_hash mismatch"):
+        load_manifest(p)
+
+
 def test_missing_table_field_raises(tmp_path: Path) -> None:
     bad = _MINIMAL.replace('file      = "t1.parquet"\n', "")
     p = _write(tmp_path, bad)
@@ -106,7 +122,8 @@ def test_missing_table_field_raises(tmp_path: Path) -> None:
 
 def test_tables_must_be_array(tmp_path: Path) -> None:
     body = (
-        'dataset_version="x"\nmanifest_hash="x"\ndata_archive_hash="x"\nurl="x"\n'
+        f'dataset_version="x"\nmanifest_hash="{_HASH_PLACEHOLDER}"\n'
+        'data_archive_hash="x"\nurl="x"\n'
         'archive_sha256="x"\nlicense_file="x"\ntables = "this should be a list"\n'
     )
     p = _write(tmp_path, body)

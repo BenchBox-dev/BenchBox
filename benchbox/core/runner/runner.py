@@ -19,6 +19,7 @@ from typing import Any
 from benchbox.core.benchmark_loader import (
     get_benchmark_instance,
 )
+from benchbox.core.benchmark_registry import validate_scale_factor
 from benchbox.core.constants import (
     GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS,
     GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS,
@@ -1097,6 +1098,7 @@ def run_benchmark_lifecycle(
     options_map = getattr(benchmark_config, "options", {}) or {}
     verbosity_settings = _resolve_verbosity_settings(verbosity, options_map)
 
+    validate_scale_factor(benchmark_config.name, benchmark_config.scale_factor)
     benchmark = benchmark_instance or get_benchmark_instance(benchmark_config, system_profile)
     if isinstance(benchmark, VerbosityMixin):  # type: ignore[arg-type]
         benchmark.apply_verbosity(verbosity_settings)
