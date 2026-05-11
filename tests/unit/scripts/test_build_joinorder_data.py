@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import hashlib
 import importlib.util
 import json
@@ -31,6 +32,22 @@ def _load_script():
 
 
 build_joinorder_data = _load_script()
+
+
+def test_utc_now_iso_uses_python310_compatible_timezone(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakeDatetime:
+        @staticmethod
+        def now(tz: dt.tzinfo) -> dt.datetime:
+            assert tz is dt.timezone.utc
+            return dt.datetime(2026, 5, 11, 3, 22, 11, 123456, tzinfo=tz)
+
+    class FakeDatetimeModule:
+        datetime = FakeDatetime
+        timezone = dt.timezone
+
+    monkeypatch.setattr(build_joinorder_data, "dt", FakeDatetimeModule)
+
+    assert build_joinorder_data.utc_now_iso() == "2026-05-11T03:22:11Z"
 
 
 def _metadata(files: list[dict]) -> dict:
