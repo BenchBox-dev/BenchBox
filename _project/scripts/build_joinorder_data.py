@@ -631,6 +631,8 @@ def start_postgres_container(
             "POSTGRES_HOST_AUTH_METHOD=trust",
             "-e",
             f"POSTGRES_DB={database}",
+            "-e",
+            f"POSTGRES_USER={user}",
             image,
         ]
     )

@@ -198,6 +198,59 @@ def test_download_pgdump_recovers_invalid_cached_file(monkeypatch: pytest.Monkey
     assert artifact.sha256 == hashlib.sha256(valid_payload).hexdigest()
 
 
+def test_start_postgres_container_sets_postgres_user_for_custom_role(monkeypatch: pytest.MonkeyPatch) -> None:
+    stream_calls = []
+    wait_calls = []
+    removed = []
+
+    def fake_stream_command(args, *, check: bool = True) -> None:
+        assert check is True
+        stream_calls.append(args)
+
+    def fake_wait_for_postgres(
+        *,
+        container_name: str,
+        database: str,
+        user: str,
+        timeout_seconds: int = 90,
+    ) -> None:
+        wait_calls.append(
+            {
+                "container_name": container_name,
+                "database": database,
+                "user": user,
+                "timeout_seconds": timeout_seconds,
+            }
+        )
+
+    monkeypatch.setattr(build_joinorder_data, "stream_command", fake_stream_command)
+    monkeypatch.setattr(build_joinorder_data, "wait_for_postgres", fake_wait_for_postgres)
+    monkeypatch.setattr(build_joinorder_data, "remove_container", lambda container_name: removed.append(container_name))
+
+    build_joinorder_data.start_postgres_container(
+        container_name="job-pg",
+        image="postgres:16.2",
+        database="imdb",
+        user="benchbox",
+        replace_existing=True,
+    )
+
+    assert removed == ["job-pg"]
+    assert len(stream_calls) == 1
+    command = stream_calls[0]
+    assert "POSTGRES_DB=imdb" in command
+    assert "POSTGRES_USER=benchbox" in command
+    assert command.index("POSTGRES_USER=benchbox") < command.index("postgres:16.2")
+    assert wait_calls == [
+        {
+            "container_name": "job-pg",
+            "database": "imdb",
+            "user": "benchbox",
+            "timeout_seconds": 90,
+        }
+    ]
+
+
 def test_query_aliases_and_underlying_count_sql_parse_flat_job_query() -> None:
     sql = """\
 SELECT MIN(mc.note), MIN(t.title)
