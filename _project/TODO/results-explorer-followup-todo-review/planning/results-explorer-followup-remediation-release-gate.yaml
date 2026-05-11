@@ -8,9 +8,10 @@ category: Testing and Quality Assurance
 description: |
   This is the final gate for the follow-up Results Explorer remediation plan.
   It must run after the data-contract, compare-flow, disabled-state,
-  leaderboard/rank, chart-label, theme/density, and route/copy TODOs are
-  implemented. The gate blocks completion if any P0/P1 issue from the latest
-  review still reproduces or if the new checks lack evidence.
+  leaderboard/rank, leaderboard-scope, chart-label, chart-dataset,
+  metric-formatting, warning-affordance, theme/density, and route/copy TODOs
+  are implemented. The gate blocks completion if any P0/P1 issue from the
+  latest review still reproduces or if the new checks lack evidence.
 
 deps:
   needs:
@@ -18,7 +19,11 @@ deps:
   - results-explorer-compare-entrypoint-happy-path-gates
   - results-explorer-compare-disabled-recovery-states
   - results-explorer-leaderboard-rank-evidence-semantics
+  - results-explorer-leaderboard-scope-filter-contract
   - results-explorer-chart-run-identity-label-contract
+  - results-explorer-chart-dataset-eligibility-contract
+  - results-explorer-metric-formatting-contract
+  - results-explorer-compare-warning-affordance-contract
   - results-explorer-surface-theme-and-density-contract
   - results-explorer-direct-route-and-copy-hardening
 
@@ -45,9 +50,16 @@ work:
       - cohorts with 2+ compare-eligible rows;
       - comparison exclusion reasons;
       - missing/unranked/ranked leaderboard states;
-      - duplicate chart labels if the formatter exposes a check.
-    Decision gate: zero compare-eligible rows, false `No run` badge states, or
-    duplicate chart labels block release.
+      - leaderboard benchmark/platform/tuning scope counts;
+      - duplicate chart labels if the formatter exposes a check;
+      - chart dataset eligibility counts by chart class;
+      - metric-formatting samples for large scores, latency, coverage, and
+        speedup;
+      - compare warning counts and receipt-anchor targets.
+    Decision gate: zero compare-eligible rows, false `No run` badge states,
+    unexplained leaderboard scope counts, duplicate chart labels, invalid chart
+    datasets, misleading metric formatting, or inert warning affordances block
+    release.
 
 - id: w2
   summary: "Run automated backend and frontend suites"
@@ -73,7 +85,9 @@ work:
       - `/results/compare` empty builder and explicit IDs;
       - one result detail page and `Compare this result`.
     Click every visible button/link/control at least once unless it performs an
-    external/destructive action. Record pass/fail evidence for each route.
+    external/destructive action. Record pass/fail evidence for each route,
+    including leaderboard scope explanations, metric formatting, all chart
+    dataset empty/excluded states, and Compare warning anchors.
 
 - id: w4
   summary: "Produce final defect register and pass/fail closure artifact"
@@ -146,7 +160,11 @@ scope_limit:
   - "_project/TODO/results-explorer-followup-todo-review/planning/results-explorer-compare-entrypoint-happy-path-gates.yaml"
   - "_project/TODO/results-explorer-followup-todo-review/planning/results-explorer-compare-disabled-recovery-states.yaml"
   - "_project/TODO/results-explorer-followup-todo-review/planning/results-explorer-leaderboard-rank-evidence-semantics.yaml"
+  - "_project/TODO/results-explorer-followup-todo-review/planning/results-explorer-leaderboard-scope-filter-contract.yaml"
   - "_project/TODO/results-explorer-followup-todo-review/planning/results-explorer-chart-run-identity-label-contract.yaml"
+  - "_project/TODO/results-explorer-followup-todo-review/planning/results-explorer-chart-dataset-eligibility-contract.yaml"
+  - "_project/TODO/results-explorer-followup-todo-review/planning/results-explorer-metric-formatting-contract.yaml"
+  - "_project/TODO/results-explorer-followup-todo-review/planning/results-explorer-compare-warning-affordance-contract.yaml"
   - "_project/TODO/results-explorer-followup-todo-review/planning/results-explorer-surface-theme-and-density-contract.yaml"
   - "_project/TODO/results-explorer-followup-todo-review/planning/results-explorer-direct-route-and-copy-hardening.yaml"
   - "_project/TODO/results-explorer-followup-todo-review/planning/results-explorer-followup-remediation-release-gate.yaml"
@@ -162,7 +180,8 @@ scope_limit:
 success_metrics:
 - "All follow-up remediation TODOs are complete and moved to DONE only after evidence passes."
 - "Snapshot SQL proves compare eligibility and leaderboard/rank state semantics are valid."
-- "Browser acceptance covers every Results Explorer route and every compare entrypoint."
+- "Browser acceptance covers every Results Explorer route, chart tab, warning affordance, and compare entrypoint."
+- "Leaderboard scope counts, metric formatting, chart eligibility, and warning interactions are explicitly checked."
 - "The final audit lists no unresolved P0/P1 issues."
 
 metadata:
