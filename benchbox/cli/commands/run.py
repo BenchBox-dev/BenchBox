@@ -61,6 +61,7 @@ from benchbox.cli.tuning_runtime import (
     infer_runtime_tuning_mode,
     resolve_dataframe_tuning_config,
 )
+from benchbox.core.benchmark_registry import get_benchmark_default_scale
 from benchbox.core.config import DatabaseConfig
 from benchbox.core.platform_registry import PlatformRegistry
 from benchbox.core.results.status import result_non_clean_reason
@@ -583,6 +584,24 @@ def _parse_plat_bench_options(s: types.SimpleNamespace) -> None:
         _reject_external_tuned(console, s.logger, s.ctx)
 
 
+def _apply_benchmark_default_scale(s: types.SimpleNamespace) -> None:
+    """Use the selected benchmark's registry default when --scale was omitted."""
+    if not s.benchmark:
+        return
+
+    s.benchmark = normalize_benchmark_name(s.benchmark)
+    if not hasattr(s.ctx, "get_parameter_source"):
+        return
+
+    try:
+        scale_source = s.ctx.get_parameter_source("scale")
+    except Exception:
+        return
+
+    if scale_source == click.core.ParameterSource.DEFAULT:
+        s.scale = get_benchmark_default_scale(s.benchmark, fallback=s.scale)
+
+
 def _platform_option_sources_for_state(s: types.SimpleNamespace) -> dict[str, str]:
     """Return source provenance for parsed platform options in the current CLI state."""
     if not s.platform_key or not s.parsed_platform_options:
@@ -1076,6 +1095,7 @@ def _validate_output_dir(s: types.SimpleNamespace) -> None:
 def _prepare_run_state(s: types.SimpleNamespace) -> None:
     """Run the full preamble: normalize CLI params, validate, resolve configs."""
     _apply_cli_adapter(s)
+    _apply_benchmark_default_scale(s)
     _validate_initial_flags(s)
     _parse_plat_bench_options(s)
     _validate_non_interactive(s)

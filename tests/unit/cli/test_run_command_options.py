@@ -316,6 +316,59 @@ class TestDryRunValidation:
         # Should get past scale validation
         assert "must be whole integers" not in result.output
 
+    def test_dry_run_joinorder_omitted_scale_uses_benchmark_default(self, tmp_path):
+        """Omitted --scale should use JoinOrder's canonical SF=1 registry default."""
+        runner = CliRunner()
+
+        with patch("benchbox.cli.dryrun.DryRunExecutor") as dry_run_executor:
+            dry_run_executor.return_value.execute_dry_run.return_value = MagicMock()
+            dry_run_executor.return_value.save_dry_run_results.return_value = {}
+
+            result = runner.invoke(
+                run,
+                [
+                    "--dry-run",
+                    str(tmp_path / "drytest"),
+                    "--platform",
+                    "duckdb",
+                    "--benchmark",
+                    "joinorder",
+                    "--phases",
+                    "generate",
+                    "--non-interactive",
+                ],
+                obj=_run_obj(),
+            )
+
+        assert result.exit_code == 0, result.output
+        benchmark_config = dry_run_executor.return_value.execute_dry_run.call_args.args[0]
+        assert benchmark_config.name == "joinorder"
+        assert benchmark_config.scale_factor == 1.0
+
+    def test_dry_run_joinorder_explicit_unsupported_scale_still_rejected(self, tmp_path):
+        """Explicit --scale 0.01 must still be rejected for canonical JoinOrder."""
+        runner = CliRunner()
+        result = runner.invoke(
+            run,
+            [
+                "--dry-run",
+                str(tmp_path / "drytest"),
+                "--platform",
+                "duckdb",
+                "--benchmark",
+                "joinorder",
+                "--phases",
+                "generate",
+                "--scale",
+                "0.01",
+                "--non-interactive",
+            ],
+            obj=_run_obj(),
+        )
+
+        assert result.exit_code == 1
+        assert "joinorder accepts scale_factor in [1.0]; got 0.01" in result.output
+
     def test_dry_run_unknown_benchmark_rejected(self):
         """Dry run with an unknown benchmark name should fail gracefully."""
         runner = CliRunner()
