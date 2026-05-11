@@ -2,25 +2,26 @@ id: joinorder-canonical-foundation
 title: "joinorder canonical IMDb 2013 — Foundation & archive build (Step 1, part 1 of 2)"
 worktree: main
 priority: High
-status: Blocked
+status: In Progress
 category: Core Functionality
 
-# 2026-05-10 implementation status (foundation Phase 1 PR):
+# 2026-05-11 implementation status:
 #   w0  Re-validate empty-query claim                           — DONE
 #   w1  Step-1 design doc + reuse-guide stub                    — DONE
 #   w2  data_fetch module skeleton (5 modules + 16 tests)       — DONE
 #   w3  Registry surface field + strict scale-factor gate       — DONE
-#   w4  Postgres container + Harvard Dataverse pg_dump restore  — BLOCKED
-#   w5..w16  (sequential downstream of w4)                      — BLOCKED
+#   w4  Postgres container + Harvard Dataverse pg_dump restore  — DONE
+#   w5..w16  (sequential downstream of w4)                      — PENDING
 #
-# Blocker: Docker daemon is not running on the implementing host
-# (verified 2026-05-10: `docker version --format ...` returns
-# "Cannot connect to the Docker daemon"). The build pipeline (w4)
-# requires docker for the ephemeral Postgres restore; w5-w12
-# extract data from that restored Postgres; w13-w16 package and
-# stage the GitHub Release. No alternative path is feasible without
-# either (a) starting Docker Desktop, or (b) targeting a different
-# Postgres deployment (out of scope for the locked-in design).
+# Docker blocker resolved on 2026-05-11. w4 live gate passed with
+# log at `~/Developer/benchmark_runs/joinorder/logs/w4-20260511T025034Z.log`
+# and build manifest at
+# `~/Developer/benchmark_runs/joinorder/build/joinorder-imdb-2013-v1/build_manifest.json`.
+# The build manifest records Dataverse file id 3590041, MD5
+# `df3e976b235288005cb410cea09a115f`, upstream pg_dump SHA256
+# `1390a764ee76d03d80fd6743ec7a6e5f22493411967582e4f1ecc2e282c1a59c`,
+# 21/21 expected tables, zero missing tables, zero row-count failures,
+# and 74,190,187 restored rows under the +/-1% row-count gate.
 #
 # Cutover TODO MUST NOT start until w4-w16 land. Per the foundation
 # planning contract, the manifest, the archive URL, and the tiny
@@ -184,7 +185,7 @@ work:
 
 - id: w4
   summary: "Pipeline scaffolding: ephemeral Postgres container + pg_dump download/restore"
-  status: pending
+  status: done
   needs: [w1]
   notes: |
     Script foundation: `_project/scripts/build_joinorder_data.py`
@@ -207,6 +208,25 @@ work:
 
     Dependencies isolated in `_project/scripts/pyproject.toml`
     (already established pattern in this repo).
+
+    Completed 2026-05-11:
+      - Added `download-pgdump`, `restore-postgres`, and `w4`
+        subcommands.
+      - Dataverse metadata is resolved from the Harvard API and
+        constrained to the single `imdb_pg11` pg_dump file.
+      - Downloads use checksum validation, SHA256 provenance, and
+        curl retry/resume when available so a truncated transfer
+        cannot overwrite a valid cached artifact.
+      - `postgres:16.2` is pinned for restore; the container is
+        ephemeral by default and was torn down after validation.
+      - Live verification passed:
+        `~/Developer/benchmark_runs/joinorder/logs/w4-20260511T025034Z.log`
+      - Build manifest:
+        `~/Developer/benchmark_runs/joinorder/build/joinorder-imdb-2013-v1/build_manifest.json`
+      - Upstream pg_dump SHA256:
+        `1390a764ee76d03d80fd6743ec7a6e5f22493411967582e4f1ecc2e282c1a59c`
+      - Restore validation: 21/21 expected tables, 74,190,187 total
+        rows, no missing tables, no row-count failures.
 
 - id: w5
   summary: "Per-table CSV extract from restored Postgres with UTF-8 fidelity"
@@ -602,6 +622,7 @@ scope_limit:
   - "benchbox/utils/path_utils.py (only if the datagen verification helper extends existing path utilities)"
   - "benchbox/core/joinorder/data_manifest.toml (new)"
   - "tests/unit/core/data_fetch/ (new)"
+  - "tests/unit/scripts/test_build_joinorder_data.py (new — build-pipeline unit coverage)"
   - "tests/unit/core/test_scale_factor_validation.py (new)"
   - "tests/unit/core/test_registry_surface_field.py (new)"
   - "tests/fixtures/joinorder_canonical_tiny/ (new — 21 tiny Parquets)"
