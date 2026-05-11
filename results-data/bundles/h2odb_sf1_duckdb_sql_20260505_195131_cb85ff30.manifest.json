@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T00:46:45.529051+00:00",
-  "bundle_file": "h2odb_sf1_duckdb_sql_20260505_195131_cb85ff30.json",
-  "bundle_hash": "ff96f9eb8807a88622f05aff65f9c7e365a73cdb29a33144a6bb47b7dc832e95",
-  "companion_hashes": {},
   "benchmark": "H2O Database",
+  "bundle_file": "h2odb_sf1_duckdb_sql_20260505_195131_cb85ff30.json",
+  "bundle_hash": "723bb0fce309be6cb953b8bc661f96062f0f86d520a41a842b9a17f1dcb8f6fe",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "DuckDB",
   "scale_factor": 1.0,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T00:46:45.529051+00:00",
   "submitted_by": "Joe Harris"
 }

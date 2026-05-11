@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T00:48:15.325995+00:00",
-  "bundle_file": "tsbs_devops_sf1_duckdb_sql_20260505_195718_f6eda1af.json",
-  "bundle_hash": "7aeeda16fbfd815c1cb9b082accb40b711a5aaf0fb53336420c214be806fe013",
-  "companion_hashes": {},
   "benchmark": "TSBS DevOps",
+  "bundle_file": "tsbs_devops_sf1_duckdb_sql_20260505_195718_f6eda1af.json",
+  "bundle_hash": "9e65ed02bd2dcee3432e407d8d0b2af30d86647d28a78d38193051eb5a4f0127",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "DuckDB",
   "scale_factor": 1.0,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T00:48:15.325995+00:00",
   "submitted_by": "Joe Harris"
 }

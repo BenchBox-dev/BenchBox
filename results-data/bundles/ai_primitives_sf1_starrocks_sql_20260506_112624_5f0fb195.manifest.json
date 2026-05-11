@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:07:41.049517+00:00",
-  "bundle_file": "ai_primitives_sf1_starrocks_sql_20260506_112624_5f0fb195.json",
-  "bundle_hash": "8b9cf8aeb7271a37125d4c2f1e387aea5e66a575c1e6eadb07684d4ea8d65e3f",
-  "companion_hashes": {},
   "benchmark": "AI/ML Primitives",
+  "bundle_file": "ai_primitives_sf1_starrocks_sql_20260506_112624_5f0fb195.json",
+  "bundle_hash": "d772ee4cc2af35c1d10d5a89f94f28be969ac84803a89d2f4ba65fa7d6debdf3",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "StarRocks",
   "scale_factor": 1.0,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:07:41.049517+00:00",
   "submitted_by": "Joe Harris"
 }

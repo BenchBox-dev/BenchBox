@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:11:46.748572+00:00",
-  "bundle_file": "tpcdi_sf001_starrocks_sql_20260506_112305_70fc5203.json",
-  "bundle_hash": "2d0b9896eb9a7a722d25811dbfacadae0b04902caa29bd0473b1f4e260caa62e",
-  "companion_hashes": {},
   "benchmark": "TPC-DI",
+  "bundle_file": "tpcdi_sf001_starrocks_sql_20260506_112305_70fc5203.json",
+  "bundle_hash": "5907c79456948b011ea121ab07cf883d1f824873679532d4ee2d1066dad4f52a",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "StarRocks",
   "scale_factor": 0.01,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:11:46.748572+00:00",
   "submitted_by": "Joe Harris"
 }

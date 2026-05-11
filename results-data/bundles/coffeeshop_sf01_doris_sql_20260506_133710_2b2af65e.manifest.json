@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:08:38.533325+00:00",
-  "bundle_file": "coffeeshop_sf01_doris_sql_20260506_133710_2b2af65e.json",
-  "bundle_hash": "b9510ed3f67541cae072d4019e84dcd690a4f5159b601ce4c0204ada10e7fc7d",
-  "companion_hashes": {},
   "benchmark": "CoffeeShop",
+  "bundle_file": "coffeeshop_sf01_doris_sql_20260506_133710_2b2af65e.json",
+  "bundle_hash": "75bc292767306f2d93338efa1a70d08fe62dcca006e41e2704ee4b96bec73f88",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "Apache Doris",
   "scale_factor": 0.1,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:08:38.533325+00:00",
   "submitted_by": "Joe Harris"
 }

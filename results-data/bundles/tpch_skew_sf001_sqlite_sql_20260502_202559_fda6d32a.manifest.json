@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-03T02:52:02.511115+00:00",
-  "bundle_file": "tpch_skew_sf001_sqlite_sql_20260502_202559_fda6d32a.json",
-  "bundle_hash": "9c8156b3a485162730faecfc9307f9c12db4242c07cf5edbba7b97c81580ff51",
-  "companion_hashes": {},
   "benchmark": "TPC-H Skew Benchmark (moderate)",
+  "bundle_file": "tpch_skew_sf001_sqlite_sql_20260502_202559_fda6d32a.json",
+  "bundle_hash": "89521a09ec681d7340a8fae1216a8d48108fa1a98ad125405cbd1109b227ca8a",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "SQLite",
   "scale_factor": 0.01,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:52:02.511115+00:00",
   "submitted_by": "BenchBox UAT"
 }

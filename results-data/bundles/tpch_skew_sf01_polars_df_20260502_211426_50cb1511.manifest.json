@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-03T02:52:10.747905+00:00",
-  "bundle_file": "tpch_skew_sf01_polars_df_20260502_211426_50cb1511.json",
-  "bundle_hash": "d33d76758cfc25d25641298439e80239b13a43b3c70e0e775058ed3ebac6c040",
-  "companion_hashes": {},
   "benchmark": "TPC-H Skew",
+  "bundle_file": "tpch_skew_sf01_polars_df_20260502_211426_50cb1511.json",
+  "bundle_hash": "7c2db6b13cc0c90bae6714240ea6434697d0963172bee8494033481ce4d9ec98",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "Polars",
   "scale_factor": 0.1,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:52:10.747905+00:00",
   "submitted_by": "BenchBox UAT"
 }

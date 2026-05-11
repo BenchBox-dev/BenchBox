@@ -1,75 +1,679 @@
 {
-  "version": "2.1",
-  "run": {
-    "id": "95a24d45",
-    "timestamp": "2026-05-02T21:58:44.578346",
-    "total_duration_ms": 4934,
-    "query_time_ms": 0,
-    "iterations": 3,
-    "streams": 3
-  },
   "benchmark": {
     "id": "datavault",
     "name": "TPC-H Data Vault",
     "scale_factor": 0.01,
     "test_type": "power"
   },
+  "config": {
+    "compression": {
+      "level": null,
+      "type": "zstd"
+    },
+    "mode": "dataframe",
+    "phases": [
+      "load",
+      "power"
+    ]
+  },
+  "cost": {
+    "model": "estimated",
+    "total_usd": 0
+  },
+  "environment": {
+    "client_host": {
+      "machine_id": "machine_45d1a3ef31a1728d"
+    },
+    "machine_id": "machine_45d1a3ef31a1728d",
+    "platform_runtime": {
+      "collection_status": "partial",
+      "engine_host": "host_0a57d94f05f4",
+      "runtime_type": "dataframe_process",
+      "source": "inferred"
+    }
+  },
+  "errors": [
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "1",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "1",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "1",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "1",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#210,2026-04-16 08:36:21#211,#212,TPCH#213,2f9aad9a7870455984a25785f6088bf1#214,Customer#000000001#215,j5JsirBM9PsCy0O1m#216,25-989-741-2988#217,711.56#218,BUILDING#219,to the even, regular platelets. regular, ironic epitaphs nag e#220] parquet\n",
+      "phase": "query",
+      "query_id": "10",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#210,2026-04-16 08:36:21#211,#212,TPCH#213,2f9aad9a7870455984a25785f6088bf1#214,Customer#000000001#215,j5JsirBM9PsCy0O1m#216,25-989-741-2988#217,711.56#218,BUILDING#219,to the even, regular platelets. regular, ironic epitaphs nag e#220] parquet\n",
+      "phase": "query",
+      "query_id": "10",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#210,2026-04-16 08:36:21#211,#212,TPCH#213,2f9aad9a7870455984a25785f6088bf1#214,Customer#000000001#215,j5JsirBM9PsCy0O1m#216,25-989-741-2988#217,711.56#218,BUILDING#219,to the even, regular platelets. regular, ironic epitaphs nag e#220] parquet\n",
+      "phase": "query",
+      "query_id": "10",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#210,2026-04-16 08:36:21#211,#212,TPCH#213,2f9aad9a7870455984a25785f6088bf1#214,Customer#000000001#215,j5JsirBM9PsCy0O1m#216,25-989-741-2988#217,711.56#218,BUILDING#219,to the even, regular platelets. regular, ironic epitaphs nag e#220] parquet\n",
+      "phase": "query",
+      "query_id": "10",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `3325`, `771.64`, `TPCH`, `2026-04-16 08:36:21`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [b2595e9d5aa0b6f0be8f792ac7b8547a#290,2026-04-16 08:36:21#291,#292,TPCH#293,6f6625386dfb124092ebdf9574fec50d#294,3325#295L,771.64#296,, even theodolites. regular, final theodolites eat after the carefully pending foxes. furiously regular deposits sleep slyly. carefully bold realms above the ironic dependencies haggle careful#297] parquet\n",
+      "phase": "query",
+      "query_id": "11",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `3325`, `771.64`, `TPCH`, `2026-04-16 08"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `3325`, `771.64`, `TPCH`, `2026-04-16 08:36:21`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [b2595e9d5aa0b6f0be8f792ac7b8547a#290,2026-04-16 08:36:21#291,#292,TPCH#293,6f6625386dfb124092ebdf9574fec50d#294,3325#295L,771.64#296,, even theodolites. regular, final theodolites eat after the carefully pending foxes. furiously regular deposits sleep slyly. carefully bold realms above the ironic dependencies haggle careful#297] parquet\n",
+      "phase": "query",
+      "query_id": "11",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `3325`, `771.64`, `TPCH`, `2026-04-16 08"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `3325`, `771.64`, `TPCH`, `2026-04-16 08:36:21`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [b2595e9d5aa0b6f0be8f792ac7b8547a#290,2026-04-16 08:36:21#291,#292,TPCH#293,6f6625386dfb124092ebdf9574fec50d#294,3325#295L,771.64#296,, even theodolites. regular, final theodolites eat after the carefully pending foxes. furiously regular deposits sleep slyly. carefully bold realms above the ironic dependencies haggle careful#297] parquet\n",
+      "phase": "query",
+      "query_id": "11",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `3325`, `771.64`, `TPCH`, `2026-04-16 08"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `3325`, `771.64`, `TPCH`, `2026-04-16 08:36:21`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [b2595e9d5aa0b6f0be8f792ac7b8547a#290,2026-04-16 08:36:21#291,#292,TPCH#293,6f6625386dfb124092ebdf9574fec50d#294,3325#295L,771.64#296,, even theodolites. regular, final theodolites eat after the carefully pending foxes. furiously regular deposits sleep slyly. carefully bold realms above the ironic dependencies haggle careful#297] parquet\n",
+      "phase": "query",
+      "query_id": "11",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `3325`, `771.64`, `TPCH`, `2026-04-16 08"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "12",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "12",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "12",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "12",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0`, `172799.49`, `1996-01-02`, `5-LOW`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#310,2026-04-16 08:36:21#311,#312,TPCH#313,803842a3fede8ab7566cd6d81443fbf6#314,O#315,172799.49#316,1996-01-02#317,5-LOW#318,Clerk#000000951#319,0#320L,nstructions sleep furiously among #321] parquet\n",
+      "phase": "query",
+      "query_id": "13",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0`, `172799.49`, `1996-01-02`, `5-LOW`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0`, `172799.49`, `1996-01-02`, `5-LOW`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#310,2026-04-16 08:36:21#311,#312,TPCH#313,803842a3fede8ab7566cd6d81443fbf6#314,O#315,172799.49#316,1996-01-02#317,5-LOW#318,Clerk#000000951#319,0#320L,nstructions sleep furiously among #321] parquet\n",
+      "phase": "query",
+      "query_id": "13",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0`, `172799.49`, `1996-01-02`, `5-LOW`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0`, `172799.49`, `1996-01-02`, `5-LOW`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#310,2026-04-16 08:36:21#311,#312,TPCH#313,803842a3fede8ab7566cd6d81443fbf6#314,O#315,172799.49#316,1996-01-02#317,5-LOW#318,Clerk#000000951#319,0#320L,nstructions sleep furiously among #321] parquet\n",
+      "phase": "query",
+      "query_id": "13",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0`, `172799.49`, `1996-01-02`, `5-LOW`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0`, `172799.49`, `1996-01-02`, `5-LOW`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#310,2026-04-16 08:36:21#311,#312,TPCH#313,803842a3fede8ab7566cd6d81443fbf6#314,O#315,172799.49#316,1996-01-02#317,5-LOW#318,Clerk#000000951#319,0#320L,nstructions sleep furiously among #321] parquet\n",
+      "phase": "query",
+      "query_id": "13",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0`, `172799.49`, `1996-01-02`, `5-LOW`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "14",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "14",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "14",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "14",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "15",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "15",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "15",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "15",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [`Brand#13`, ``, `7`, `901.0`, `JUMBO PKG`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#260,2026-04-16 08:36:21#261,#262,TPCH#263,909189f0dd7156ede312c9240d4228e5#264,goldenrod lavender spring chocolate lace#265,Manufacturer#1#266,Brand#13#267,PROMO BURNISHED COPPER#268,7#269L,JUMBO PKG#270,901.0#271,ly. slyly ironi#272] parquet\n",
+      "phase": "query",
+      "query_id": "16",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [`Brand#13`, ``, `7`, `901.0`, `JUMBO PKG`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [`Brand#13`, ``, `7`, `901.0`, `JUMBO PKG`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#260,2026-04-16 08:36:21#261,#262,TPCH#263,909189f0dd7156ede312c9240d4228e5#264,goldenrod lavender spring chocolate lace#265,Manufacturer#1#266,Brand#13#267,PROMO BURNISHED COPPER#268,7#269L,JUMBO PKG#270,901.0#271,ly. slyly ironi#272] parquet\n",
+      "phase": "query",
+      "query_id": "16",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [`Brand#13`, ``, `7`, `901.0`, `JUMBO PKG`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [`Brand#13`, ``, `7`, `901.0`, `JUMBO PKG`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#260,2026-04-16 08:36:21#261,#262,TPCH#263,909189f0dd7156ede312c9240d4228e5#264,goldenrod lavender spring chocolate lace#265,Manufacturer#1#266,Brand#13#267,PROMO BURNISHED COPPER#268,7#269L,JUMBO PKG#270,901.0#271,ly. slyly ironi#272] parquet\n",
+      "phase": "query",
+      "query_id": "16",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [`Brand#13`, ``, `7`, `901.0`, `JUMBO PKG`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [`Brand#13`, ``, `7`, `901.0`, `JUMBO PKG`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#260,2026-04-16 08:36:21#261,#262,TPCH#263,909189f0dd7156ede312c9240d4228e5#264,goldenrod lavender spring chocolate lace#265,Manufacturer#1#266,Brand#13#267,PROMO BURNISHED COPPER#268,7#269L,JUMBO PKG#270,901.0#271,ly. slyly ironi#272] parquet\n",
+      "phase": "query",
+      "query_id": "16",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [`Brand#13`, ``, `7`, `901.0`, `JUMBO PKG`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "17",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "17",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "17",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "17",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#210,2026-04-16 08:36:21#211,#212,TPCH#213,2f9aad9a7870455984a25785f6088bf1#214,Customer#000000001#215,j5JsirBM9PsCy0O1m#216,25-989-741-2988#217,711.56#218,BUILDING#219,to the even, regular platelets. regular, ironic epitaphs nag e#220] parquet\n",
+      "phase": "query",
+      "query_id": "18",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#210,2026-04-16 08:36:21#211,#212,TPCH#213,2f9aad9a7870455984a25785f6088bf1#214,Customer#000000001#215,j5JsirBM9PsCy0O1m#216,25-989-741-2988#217,711.56#218,BUILDING#219,to the even, regular platelets. regular, ironic epitaphs nag e#220] parquet\n",
+      "phase": "query",
+      "query_id": "18",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#210,2026-04-16 08:36:21#211,#212,TPCH#213,2f9aad9a7870455984a25785f6088bf1#214,Customer#000000001#215,j5JsirBM9PsCy0O1m#216,25-989-741-2988#217,711.56#218,BUILDING#219,to the even, regular platelets. regular, ironic epitaphs nag e#220] parquet\n",
+      "phase": "query",
+      "query_id": "18",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#210,2026-04-16 08:36:21#211,#212,TPCH#213,2f9aad9a7870455984a25785f6088bf1#214,Customer#000000001#215,j5JsirBM9PsCy0O1m#216,25-989-741-2988#217,711.56#218,BUILDING#219,to the even, regular platelets. regular, ironic epitaphs nag e#220] parquet\n",
+      "phase": "query",
+      "query_id": "18",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "19",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "19",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "19",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "19",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [`Brand#13`, ``, `7`, `901.0`, `JUMBO PKG`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#260,2026-04-16 08:36:21#261,#262,TPCH#263,909189f0dd7156ede312c9240d4228e5#264,goldenrod lavender spring chocolate lace#265,Manufacturer#1#266,Brand#13#267,PROMO BURNISHED COPPER#268,7#269L,JUMBO PKG#270,901.0#271,ly. slyly ironi#272] parquet\n",
+      "phase": "query",
+      "query_id": "2",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [`Brand#13`, ``, `7`, `901.0`, `JUMBO PKG`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [`Brand#13`, ``, `7`, `901.0`, `JUMBO PKG`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#260,2026-04-16 08:36:21#261,#262,TPCH#263,909189f0dd7156ede312c9240d4228e5#264,goldenrod lavender spring chocolate lace#265,Manufacturer#1#266,Brand#13#267,PROMO BURNISHED COPPER#268,7#269L,JUMBO PKG#270,901.0#271,ly. slyly ironi#272] parquet\n",
+      "phase": "query",
+      "query_id": "2",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [`Brand#13`, ``, `7`, `901.0`, `JUMBO PKG`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [`Brand#13`, ``, `7`, `901.0`, `JUMBO PKG`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#260,2026-04-16 08:36:21#261,#262,TPCH#263,909189f0dd7156ede312c9240d4228e5#264,goldenrod lavender spring chocolate lace#265,Manufacturer#1#266,Brand#13#267,PROMO BURNISHED COPPER#268,7#269L,JUMBO PKG#270,901.0#271,ly. slyly ironi#272] parquet\n",
+      "phase": "query",
+      "query_id": "2",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [`Brand#13`, ``, `7`, `901.0`, `JUMBO PKG`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [`Brand#13`, ``, `7`, `901.0`, `JUMBO PKG`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#260,2026-04-16 08:36:21#261,#262,TPCH#263,909189f0dd7156ede312c9240d4228e5#264,goldenrod lavender spring chocolate lace#265,Manufacturer#1#266,Brand#13#267,PROMO BURNISHED COPPER#268,7#269L,JUMBO PKG#270,901.0#271,ly. slyly ironi#272] parquet\n",
+      "phase": "query",
+      "query_id": "2",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [`Brand#13`, ``, `7`, `901.0`, `JUMBO PKG`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `5755.94`, `TPCH`, `27-918-335-1736`, `Supplier#000000001`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#236,2026-04-16 08:36:21#237,#238,TPCH#239,c50a000fe3bcbf9d81a0d613fab5d09c#240,Supplier#000000001#241,sdrGnXCDRcfriBvY0KL,ipCanOTyK t NN1#242,27-918-335-1736#243,5755.94#244,each slyly above the careful#245] parquet\n",
+      "phase": "query",
+      "query_id": "20",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `5755.94`, `TPCH`, `27-918-335-1736`, `Supplier#000000001`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `5755.94`, `TPCH`, `27-918-335-1736`, `Supplier#000000001`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#236,2026-04-16 08:36:21#237,#238,TPCH#239,c50a000fe3bcbf9d81a0d613fab5d09c#240,Supplier#000000001#241,sdrGnXCDRcfriBvY0KL,ipCanOTyK t NN1#242,27-918-335-1736#243,5755.94#244,each slyly above the careful#245] parquet\n",
+      "phase": "query",
+      "query_id": "20",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `5755.94`, `TPCH`, `27-918-335-1736`, `Supplier#000000001`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `5755.94`, `TPCH`, `27-918-335-1736`, `Supplier#000000001`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#236,2026-04-16 08:36:21#237,#238,TPCH#239,c50a000fe3bcbf9d81a0d613fab5d09c#240,Supplier#000000001#241,sdrGnXCDRcfriBvY0KL,ipCanOTyK t NN1#242,27-918-335-1736#243,5755.94#244,each slyly above the careful#245] parquet\n",
+      "phase": "query",
+      "query_id": "20",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `5755.94`, `TPCH`, `27-918-335-1736`, `Supplier#000000001`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `5755.94`, `TPCH`, `27-918-335-1736`, `Supplier#000000001`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#236,2026-04-16 08:36:21#237,#238,TPCH#239,c50a000fe3bcbf9d81a0d613fab5d09c#240,Supplier#000000001#241,sdrGnXCDRcfriBvY0KL,ipCanOTyK t NN1#242,27-918-335-1736#243,5755.94#244,each slyly above the careful#245] parquet\n",
+      "phase": "query",
+      "query_id": "20",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `5755.94`, `TPCH`, `27-918-335-1736`, `Supplier#000000001`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `5755.94`, `TPCH`, `27-918-335-1736`, `Supplier#000000001`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#236,2026-04-16 08:36:21#237,#238,TPCH#239,c50a000fe3bcbf9d81a0d613fab5d09c#240,Supplier#000000001#241,sdrGnXCDRcfriBvY0KL,ipCanOTyK t NN1#242,27-918-335-1736#243,5755.94#244,each slyly above the careful#245] parquet\n",
+      "phase": "query",
+      "query_id": "21",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `5755.94`, `TPCH`, `27-918-335-1736`, `Supplier#000000001`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `5755.94`, `TPCH`, `27-918-335-1736`, `Supplier#000000001`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#236,2026-04-16 08:36:21#237,#238,TPCH#239,c50a000fe3bcbf9d81a0d613fab5d09c#240,Supplier#000000001#241,sdrGnXCDRcfriBvY0KL,ipCanOTyK t NN1#242,27-918-335-1736#243,5755.94#244,each slyly above the careful#245] parquet\n",
+      "phase": "query",
+      "query_id": "21",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `5755.94`, `TPCH`, `27-918-335-1736`, `Supplier#000000001`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `5755.94`, `TPCH`, `27-918-335-1736`, `Supplier#000000001`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#236,2026-04-16 08:36:21#237,#238,TPCH#239,c50a000fe3bcbf9d81a0d613fab5d09c#240,Supplier#000000001#241,sdrGnXCDRcfriBvY0KL,ipCanOTyK t NN1#242,27-918-335-1736#243,5755.94#244,each slyly above the careful#245] parquet\n",
+      "phase": "query",
+      "query_id": "21",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `5755.94`, `TPCH`, `27-918-335-1736`, `Supplier#000000001`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `5755.94`, `TPCH`, `27-918-335-1736`, `Supplier#000000001`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#236,2026-04-16 08:36:21#237,#238,TPCH#239,c50a000fe3bcbf9d81a0d613fab5d09c#240,Supplier#000000001#241,sdrGnXCDRcfriBvY0KL,ipCanOTyK t NN1#242,27-918-335-1736#243,5755.94#244,each slyly above the careful#245] parquet\n",
+      "phase": "query",
+      "query_id": "21",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `5755.94`, `TPCH`, `27-918-335-1736`, `Supplier#000000001`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#210,2026-04-16 08:36:21#211,#212,TPCH#213,2f9aad9a7870455984a25785f6088bf1#214,Customer#000000001#215,j5JsirBM9PsCy0O1m#216,25-989-741-2988#217,711.56#218,BUILDING#219,to the even, regular platelets. regular, ironic epitaphs nag e#220] parquet\n",
+      "phase": "query",
+      "query_id": "22",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#210,2026-04-16 08:36:21#211,#212,TPCH#213,2f9aad9a7870455984a25785f6088bf1#214,Customer#000000001#215,j5JsirBM9PsCy0O1m#216,25-989-741-2988#217,711.56#218,BUILDING#219,to the even, regular platelets. regular, ironic epitaphs nag e#220] parquet\n",
+      "phase": "query",
+      "query_id": "22",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#210,2026-04-16 08:36:21#211,#212,TPCH#213,2f9aad9a7870455984a25785f6088bf1#214,Customer#000000001#215,j5JsirBM9PsCy0O1m#216,25-989-741-2988#217,711.56#218,BUILDING#219,to the even, regular platelets. regular, ironic epitaphs nag e#220] parquet\n",
+      "phase": "query",
+      "query_id": "22",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#210,2026-04-16 08:36:21#211,#212,TPCH#213,2f9aad9a7870455984a25785f6088bf1#214,Customer#000000001#215,j5JsirBM9PsCy0O1m#216,25-989-741-2988#217,711.56#218,BUILDING#219,to the even, regular platelets. regular, ironic epitaphs nag e#220] parquet\n",
+      "phase": "query",
+      "query_id": "22",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#210,2026-04-16 08:36:21#211,#212,TPCH#213,2f9aad9a7870455984a25785f6088bf1#214,Customer#000000001#215,j5JsirBM9PsCy0O1m#216,25-989-741-2988#217,711.56#218,BUILDING#219,to the even, regular platelets. regular, ironic epitaphs nag e#220] parquet\n",
+      "phase": "query",
+      "query_id": "3",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#210,2026-04-16 08:36:21#211,#212,TPCH#213,2f9aad9a7870455984a25785f6088bf1#214,Customer#000000001#215,j5JsirBM9PsCy0O1m#216,25-989-741-2988#217,711.56#218,BUILDING#219,to the even, regular platelets. regular, ironic epitaphs nag e#220] parquet\n",
+      "phase": "query",
+      "query_id": "3",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#210,2026-04-16 08:36:21#211,#212,TPCH#213,2f9aad9a7870455984a25785f6088bf1#214,Customer#000000001#215,j5JsirBM9PsCy0O1m#216,25-989-741-2988#217,711.56#218,BUILDING#219,to the even, regular platelets. regular, ironic epitaphs nag e#220] parquet\n",
+      "phase": "query",
+      "query_id": "3",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#210,2026-04-16 08:36:21#211,#212,TPCH#213,2f9aad9a7870455984a25785f6088bf1#214,Customer#000000001#215,j5JsirBM9PsCy0O1m#216,25-989-741-2988#217,711.56#218,BUILDING#219,to the even, regular platelets. regular, ironic epitaphs nag e#220] parquet\n",
+      "phase": "query",
+      "query_id": "3",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0`, `172799.49`, `1996-01-02`, `5-LOW`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#310,2026-04-16 08:36:21#311,#312,TPCH#313,803842a3fede8ab7566cd6d81443fbf6#314,O#315,172799.49#316,1996-01-02#317,5-LOW#318,Clerk#000000951#319,0#320L,nstructions sleep furiously among #321] parquet\n",
+      "phase": "query",
+      "query_id": "4",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0`, `172799.49`, `1996-01-02`, `5-LOW`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0`, `172799.49`, `1996-01-02`, `5-LOW`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#310,2026-04-16 08:36:21#311,#312,TPCH#313,803842a3fede8ab7566cd6d81443fbf6#314,O#315,172799.49#316,1996-01-02#317,5-LOW#318,Clerk#000000951#319,0#320L,nstructions sleep furiously among #321] parquet\n",
+      "phase": "query",
+      "query_id": "4",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0`, `172799.49`, `1996-01-02`, `5-LOW`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0`, `172799.49`, `1996-01-02`, `5-LOW`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#310,2026-04-16 08:36:21#311,#312,TPCH#313,803842a3fede8ab7566cd6d81443fbf6#314,O#315,172799.49#316,1996-01-02#317,5-LOW#318,Clerk#000000951#319,0#320L,nstructions sleep furiously among #321] parquet\n",
+      "phase": "query",
+      "query_id": "4",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0`, `172799.49`, `1996-01-02`, `5-LOW`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0`, `172799.49`, `1996-01-02`, `5-LOW`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#310,2026-04-16 08:36:21#311,#312,TPCH#313,803842a3fede8ab7566cd6d81443fbf6#314,O#315,172799.49#316,1996-01-02#317,5-LOW#318,Clerk#000000951#319,0#320L,nstructions sleep furiously among #321] parquet\n",
+      "phase": "query",
+      "query_id": "4",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0`, `172799.49`, `1996-01-02`, `5-LOW`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `AFRICA`, `TPCH`, `2026-04-16 08:36:21`, `cfcd208495d565ef66e7dff9f98764da`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [cfcd208495d565ef66e7dff9f98764da#174,2026-04-16 08:36:21#175,#176,TPCH#177,40a957ae72e8cc00bbf91cef166da4a6#178,AFRICA#179,lar deposits. blithely final packages cajole. regular waters are final requests. regular accounts are according to #180] parquet\n",
+      "phase": "query",
+      "query_id": "5",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `AFRICA`, `TPCH`, `2026-04-16 08"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `AFRICA`, `TPCH`, `2026-04-16 08:36:21`, `cfcd208495d565ef66e7dff9f98764da`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [cfcd208495d565ef66e7dff9f98764da#174,2026-04-16 08:36:21#175,#176,TPCH#177,40a957ae72e8cc00bbf91cef166da4a6#178,AFRICA#179,lar deposits. blithely final packages cajole. regular waters are final requests. regular accounts are according to #180] parquet\n",
+      "phase": "query",
+      "query_id": "5",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `AFRICA`, `TPCH`, `2026-04-16 08"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `AFRICA`, `TPCH`, `2026-04-16 08:36:21`, `cfcd208495d565ef66e7dff9f98764da`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [cfcd208495d565ef66e7dff9f98764da#174,2026-04-16 08:36:21#175,#176,TPCH#177,40a957ae72e8cc00bbf91cef166da4a6#178,AFRICA#179,lar deposits. blithely final packages cajole. regular waters are final requests. regular accounts are according to #180] parquet\n",
+      "phase": "query",
+      "query_id": "5",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `AFRICA`, `TPCH`, `2026-04-16 08"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `AFRICA`, `TPCH`, `2026-04-16 08:36:21`, `cfcd208495d565ef66e7dff9f98764da`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [cfcd208495d565ef66e7dff9f98764da#174,2026-04-16 08:36:21#175,#176,TPCH#177,40a957ae72e8cc00bbf91cef166da4a6#178,AFRICA#179,lar deposits. blithely final packages cajole. regular waters are final requests. regular accounts are according to #180] parquet\n",
+      "phase": "query",
+      "query_id": "5",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `AFRICA`, `TPCH`, `2026-04-16 08"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "6",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "6",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "6",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "6",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "7",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "7",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "7",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "7",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "8",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "8",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "8",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "8",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "9",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "9",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "9",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    },
+    {
+      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n",
+      "phase": "query",
+      "query_id": "9",
+      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE"
+    }
+  ],
+  "execution": {
+    "compression": {
+      "type": "zstd"
+    },
+    "driver_runtime_strategy": "current-process",
+    "entry_point": "cli",
+    "mode": "sql",
+    "non_interactive": true,
+    "phases": [
+      "load",
+      "power"
+    ],
+    "timestamp": "2026-05-02T21:58:44.571628"
+  },
+  "export": {
+    "anonymized": true,
+    "timestamp": "2026-05-02T21:58:49.539402",
+    "tool": "benchbox-exporter"
+  },
+  "normalized_cost": {
+    "billing_unit": "not_applicable",
+    "cost_model_source": "benchbox.core.cost.pricing",
+    "cost_model_version": "2025.11",
+    "cost_scope": "compute_only",
+    "cost_status": "not_applicable_local",
+    "cost_usd": null,
+    "deployment": {
+      "cloud_provider": null,
+      "cloud_region": null,
+      "cluster_size": null,
+      "instance_type": null,
+      "node_count": null,
+      "storage_format": null,
+      "storage_tier": null,
+      "warehouse_size": null
+    },
+    "normalized_cost_usd": "0",
+    "pricing_region": "not_applicable"
+  },
+  "phases": {
+    "data_generation": {
+      "status": "NOT_RUN"
+    },
+    "data_loading": {
+      "duration_ms": 4296,
+      "status": "SUCCESS"
+    },
+    "power_test": {
+      "duration_ms": 568,
+      "status": "COMPLETED"
+    },
+    "schema_creation": {
+      "status": "NOT_RUN"
+    },
+    "throughput_test": {
+      "status": "NOT_RUN"
+    },
+    "validation": {
+      "status": "NOT_RUN"
+    }
+  },
   "platform": {
-    "name": "PySpark",
-    "version": "4.1.1",
     "client_version": "unknown",
+    "cloud": {
+      "collection_status": "unavailable",
+      "source": "unavailable"
+    },
+    "compute": {
+      "collection_status": "unavailable",
+      "source": "unavailable"
+    },
     "config": {
+      "aqe_enabled": true,
+      "driver_memory": "4g",
+      "driver_runtime_strategy": "current-process",
       "execution_mode": "dataframe",
       "family": "expression",
       "master": "local[*]",
-      "driver_memory": "4g",
       "shuffle_partitions": 10,
-      "aqe_enabled": true,
-      "working_dir": "/Users/joe/Developer/benchmark_runs/datagen/datavault_sf001",
-      "driver_runtime_strategy": "current-process"
+      "working_dir": "/Users/joe/Developer/benchmark_runs/datagen/datavault_sf001"
     },
     "deployment": {
+      "collection_status": "partial",
       "deployment_type": "dataframe",
       "endpoint_class": "embedded_process",
-      "metadata_source": "inferred",
-      "collection_status": "partial"
+      "metadata_source": "inferred"
     },
-    "cloud": {
-      "source": "unavailable",
-      "collection_status": "unavailable"
-    },
-    "compute": {
-      "source": "unavailable",
-      "collection_status": "unavailable"
-    },
-    "storage": {
-      "source": "unavailable",
-      "collection_status": "unavailable"
-    },
+    "driver_runtime_strategy": "current-process",
+    "name": "PySpark",
     "raw_config": {
-      "master": "local[*]",
-      "driver_memory": "4g",
-      "shuffle_partitions": 10,
       "aqe_enabled": true,
-      "working_dir": "/Users/joe/Developer/benchmark_runs/datagen/datavault_sf001",
+      "benchmark": "datavault",
+      "driver_auto_install": false,
+      "driver_auto_install_used": false,
+      "driver_memory": "4g",
+      "execution_mode": "dataframe",
+      "master": "local[*]",
+      "memory_limit": "12GB",
       "options": {
-        "verbose_level": 0,
-        "verbose_enabled": false,
-        "very_verbose": false,
-        "quiet": false,
-        "verbose": false,
-        "force_recreate": false,
-        "show_query_plans": false,
-        "tuning_enabled": false,
-        "force_upload": false,
         "capture_plans": false,
-        "strict_plan_capture": false,
         "execution_mode": "dataframe",
+        "force_recreate": false,
+        "force_upload": false,
+        "quiet": false,
+        "show_query_plans": false,
+        "strict_plan_capture": false,
+        "tuning_enabled": false,
         "unified_tuning_configuration": {
-          "primary_keys": {
+          "check_constraints": {
             "enabled": false,
-            "enforce_uniqueness": true,
-            "nullable": false
+            "enforce_on_insert": true,
+            "enforce_on_update": true
           },
           "foreign_keys": {
             "enabled": false,
@@ -77,1468 +681,864 @@
             "on_delete_action": "RESTRICT",
             "on_update_action": "RESTRICT"
           },
+          "platform_optimizations": {
+            "auto_compact_enabled": false,
+            "auto_optimize_enabled": false,
+            "bloom_filters_enabled": false,
+            "databricks_clustering_strategy": "z_order",
+            "liquid_clustering_enabled": false,
+            "materialized_views_enabled": false,
+            "sorted_ingestion_method": "auto",
+            "sorted_ingestion_mode": "off",
+            "z_ordering_enabled": false
+          },
+          "primary_keys": {
+            "enabled": false,
+            "enforce_uniqueness": true,
+            "nullable": false
+          },
           "unique_constraints": {
             "enabled": false,
             "ignore_nulls": false
-          },
-          "check_constraints": {
-            "enabled": false,
-            "enforce_on_insert": true,
-            "enforce_on_update": true
-          },
-          "platform_optimizations": {
-            "z_ordering_enabled": false,
-            "liquid_clustering_enabled": false,
-            "databricks_clustering_strategy": "z_order",
-            "sorted_ingestion_mode": "off",
-            "sorted_ingestion_method": "auto",
-            "auto_optimize_enabled": false,
-            "auto_compact_enabled": false,
-            "bloom_filters_enabled": false,
-            "materialized_views_enabled": false
           }
-        }
+        },
+        "verbose": false,
+        "verbose_enabled": false,
+        "verbose_level": 0,
+        "very_verbose": false
       },
-      "driver_auto_install": false,
-      "driver_auto_install_used": false,
-      "execution_mode": "dataframe",
-      "benchmark": "datavault",
       "scale_factor": 0.01,
+      "shuffle_partitions": 10,
+      "thread_limit": 8,
       "tuning_config": "UnifiedTuningConfiguration(primary_keys=PrimaryKeyConfiguration(enabled=False, enforce_uniqueness=True, nullable=False), foreign_keys=ForeignKeyConfiguration(enabled=False, enforce_referential_integrity=True, on_delete_action='RESTRICT', on_update_action='RESTRICT'), unique_constraints=UniqueConstraintConfiguration(enabled=False, ignore_nulls=False), check_constraints=CheckConstraintConfiguration(enabled=False, enforce_on_insert=True, enforce_on_update=True), platform_optimizations=PlatformOptimizationConfiguration(z_ordering_enabled=False, z_ordering_columns=[], liquid_clustering_enabled=False, liquid_clustering_columns=[], databricks_clustering_strategy='z_order', sorted_ingestion_mode='off', sorted_ingestion_method='auto', auto_optimize_enabled=False, auto_compact_enabled=False, bloom_filters_enabled=False, bloom_filter_columns=[], materialized_views_enabled=False), table_tunings={})",
-      "memory_limit": "12GB",
-      "thread_limit": 8
+      "working_dir": "/Users/joe/Developer/benchmark_runs/datagen/datavault_sf001"
     },
     "raw_metadata": {
       "driver_runtime_strategy": "current-process"
     },
-    "driver_runtime_strategy": "current-process"
-  },
-  "config": {
-    "compression": {
-      "type": "zstd",
-      "level": null
+    "storage": {
+      "collection_status": "unavailable",
+      "source": "unavailable"
     },
-    "phases": [
-      "load",
-      "power"
-    ],
-    "mode": "dataframe"
-  },
-  "summary": {
-    "queries": {
-      "total": 66,
-      "passed": 0,
-      "failed": 66
-    },
-    "timing": {
-      "total_ms": 0,
-      "avg_ms": 0,
-      "min_ms": 0,
-      "max_ms": 0
-    },
-    "data": {
-      "rows_loaded": 250389,
-      "load_time_ms": 4296.3
-    },
-    "validation": "partial"
-  },
-  "phases": {
-    "data_generation": {
-      "status": "NOT_RUN"
-    },
-    "schema_creation": {
-      "status": "NOT_RUN"
-    },
-    "data_loading": {
-      "status": "SUCCESS",
-      "duration_ms": 4296
-    },
-    "validation": {
-      "status": "NOT_RUN"
-    },
-    "power_test": {
-      "status": "COMPLETED",
-      "duration_ms": 568
-    },
-    "throughput_test": {
-      "status": "NOT_RUN"
-    }
+    "version": "4.1.1"
   },
   "queries": [
     {
       "id": "1",
+      "iter": 0,
       "ms": 100,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 0
     },
     {
       "id": "10",
+      "iter": 0,
       "ms": 10,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 0
     },
     {
       "id": "11",
+      "iter": 0,
       "ms": 9,
-      "iter": 0,
-      "stream": 0,
       "run_type": "warmup",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 0
     },
     {
       "id": "12",
-      "ms": 8,
       "iter": 0,
-      "stream": 0,
+      "ms": 8,
       "run_type": "warmup",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 0
     },
     {
       "id": "13",
-      "ms": 8,
       "iter": 0,
-      "stream": 0,
+      "ms": 8,
       "run_type": "warmup",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 0
     },
     {
       "id": "14",
-      "ms": 8,
       "iter": 0,
-      "stream": 0,
+      "ms": 8,
       "run_type": "warmup",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 0
     },
     {
       "id": "15",
-      "ms": 8,
       "iter": 0,
-      "stream": 0,
+      "ms": 8,
       "run_type": "warmup",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 0
     },
     {
       "id": "16",
-      "ms": 8,
       "iter": 0,
-      "stream": 0,
+      "ms": 8,
       "run_type": "warmup",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 0
     },
     {
       "id": "17",
-      "ms": 7,
       "iter": 0,
-      "stream": 0,
+      "ms": 7,
       "run_type": "warmup",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 0
     },
     {
       "id": "18",
-      "ms": 7,
       "iter": 0,
-      "stream": 0,
+      "ms": 7,
       "run_type": "warmup",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 0
     },
     {
       "id": "19",
-      "ms": 7,
       "iter": 0,
-      "stream": 0,
+      "ms": 7,
       "run_type": "warmup",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 0
     },
     {
       "id": "2",
-      "ms": 7,
       "iter": 0,
-      "stream": 0,
+      "ms": 7,
       "run_type": "warmup",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 0
     },
     {
       "id": "20",
-      "ms": 7,
       "iter": 0,
-      "stream": 0,
+      "ms": 7,
       "run_type": "warmup",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 0
     },
     {
       "id": "21",
-      "ms": 7,
       "iter": 0,
-      "stream": 0,
+      "ms": 7,
       "run_type": "warmup",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 0
     },
     {
       "id": "22",
-      "ms": 7,
       "iter": 0,
-      "stream": 0,
+      "ms": 7,
       "run_type": "warmup",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 0
     },
     {
       "id": "3",
-      "ms": 7,
       "iter": 0,
-      "stream": 0,
+      "ms": 7,
       "run_type": "warmup",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 0
     },
     {
       "id": "4",
-      "ms": 7,
       "iter": 0,
-      "stream": 0,
+      "ms": 7,
       "run_type": "warmup",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 0
     },
     {
       "id": "5",
-      "ms": 6,
       "iter": 0,
-      "stream": 0,
+      "ms": 6,
       "run_type": "warmup",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 0
     },
     {
       "id": "6",
-      "ms": 6,
       "iter": 0,
-      "stream": 0,
+      "ms": 6,
       "run_type": "warmup",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 0
     },
     {
       "id": "7",
-      "ms": 6,
       "iter": 0,
-      "stream": 0,
+      "ms": 6,
       "run_type": "warmup",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 0
     },
     {
       "id": "8",
-      "ms": 6,
       "iter": 0,
-      "stream": 0,
+      "ms": 6,
       "run_type": "warmup",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 0
     },
     {
       "id": "9",
-      "ms": 6,
       "iter": 0,
-      "stream": 0,
+      "ms": 6,
       "run_type": "warmup",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 0
     },
     {
       "id": "1",
-      "ms": 6,
       "iter": 1,
-      "stream": 1,
+      "ms": 6,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 1
     },
     {
       "id": "10",
-      "ms": 6,
       "iter": 1,
-      "stream": 1,
+      "ms": 6,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 1
     },
     {
       "id": "11",
+      "iter": 1,
       "ms": 7,
-      "iter": 1,
-      "stream": 1,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 1
     },
     {
       "id": "12",
-      "ms": 6,
       "iter": 1,
-      "stream": 1,
+      "ms": 6,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 1
     },
     {
       "id": "13",
-      "ms": 6,
       "iter": 1,
-      "stream": 1,
+      "ms": 6,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 1
     },
     {
       "id": "14",
-      "ms": 6,
       "iter": 1,
-      "stream": 1,
+      "ms": 6,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 1
     },
     {
       "id": "15",
-      "ms": 6,
       "iter": 1,
-      "stream": 1,
+      "ms": 6,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 1
     },
     {
       "id": "16",
-      "ms": 5,
       "iter": 1,
-      "stream": 1,
+      "ms": 5,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 1
     },
     {
       "id": "17",
-      "ms": 5,
       "iter": 1,
-      "stream": 1,
+      "ms": 5,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 1
     },
     {
       "id": "18",
-      "ms": 6,
       "iter": 1,
-      "stream": 1,
+      "ms": 6,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 1
     },
     {
       "id": "19",
-      "ms": 5,
       "iter": 1,
-      "stream": 1,
+      "ms": 5,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 1
     },
     {
       "id": "2",
-      "ms": 4,
       "iter": 1,
-      "stream": 1,
+      "ms": 4,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 1
     },
     {
       "id": "20",
-      "ms": 5,
       "iter": 1,
-      "stream": 1,
+      "ms": 5,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 1
     },
     {
       "id": "21",
-      "ms": 4,
       "iter": 1,
-      "stream": 1,
+      "ms": 4,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 1
     },
     {
       "id": "22",
-      "ms": 4,
       "iter": 1,
-      "stream": 1,
+      "ms": 4,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 1
     },
     {
       "id": "3",
-      "ms": 5,
       "iter": 1,
-      "stream": 1,
+      "ms": 5,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 1
     },
     {
       "id": "4",
-      "ms": 4,
       "iter": 1,
-      "stream": 1,
+      "ms": 4,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 1
     },
     {
       "id": "5",
-      "ms": 4,
       "iter": 1,
-      "stream": 1,
+      "ms": 4,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 1
     },
     {
       "id": "6",
-      "ms": 4,
       "iter": 1,
-      "stream": 1,
+      "ms": 4,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 1
     },
     {
       "id": "7",
-      "ms": 6,
       "iter": 1,
-      "stream": 1,
+      "ms": 6,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 1
     },
     {
       "id": "8",
-      "ms": 5,
       "iter": 1,
-      "stream": 1,
+      "ms": 5,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 1
     },
     {
       "id": "9",
-      "ms": 5,
       "iter": 1,
-      "stream": 1,
+      "ms": 5,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 1
     },
     {
       "id": "1",
-      "ms": 4,
       "iter": 2,
-      "stream": 2,
+      "ms": 4,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 2
     },
     {
       "id": "10",
-      "ms": 4,
       "iter": 2,
-      "stream": 2,
+      "ms": 4,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 2
     },
     {
       "id": "11",
-      "ms": 4,
       "iter": 2,
-      "stream": 2,
+      "ms": 4,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 2
     },
     {
       "id": "12",
-      "ms": 4,
       "iter": 2,
-      "stream": 2,
+      "ms": 4,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 2
     },
     {
       "id": "13",
-      "ms": 5,
       "iter": 2,
-      "stream": 2,
+      "ms": 5,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 2
     },
     {
       "id": "14",
-      "ms": 5,
       "iter": 2,
-      "stream": 2,
+      "ms": 5,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 2
     },
     {
       "id": "15",
-      "ms": 5,
       "iter": 2,
-      "stream": 2,
+      "ms": 5,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 2
     },
     {
       "id": "16",
-      "ms": 5,
       "iter": 2,
-      "stream": 2,
+      "ms": 5,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 2
     },
     {
       "id": "17",
-      "ms": 4,
       "iter": 2,
-      "stream": 2,
+      "ms": 4,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 2
     },
     {
       "id": "18",
-      "ms": 4,
       "iter": 2,
-      "stream": 2,
+      "ms": 4,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 2
     },
     {
       "id": "19",
-      "ms": 5,
       "iter": 2,
-      "stream": 2,
+      "ms": 5,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 2
     },
     {
       "id": "2",
-      "ms": 5,
       "iter": 2,
-      "stream": 2,
+      "ms": 5,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 2
     },
     {
       "id": "20",
-      "ms": 6,
       "iter": 2,
-      "stream": 2,
+      "ms": 6,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 2
     },
     {
       "id": "21",
-      "ms": 5,
       "iter": 2,
-      "stream": 2,
+      "ms": 5,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 2
     },
     {
       "id": "22",
-      "ms": 4,
       "iter": 2,
-      "stream": 2,
+      "ms": 4,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 2
     },
     {
       "id": "3",
-      "ms": 4,
       "iter": 2,
-      "stream": 2,
+      "ms": 4,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 2
     },
     {
       "id": "4",
-      "ms": 5,
       "iter": 2,
-      "stream": 2,
+      "ms": 5,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 2
     },
     {
       "id": "5",
-      "ms": 5,
       "iter": 2,
-      "stream": 2,
+      "ms": 5,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 2
     },
     {
       "id": "6",
-      "ms": 5,
       "iter": 2,
-      "stream": 2,
+      "ms": 5,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 2
     },
     {
       "id": "7",
-      "ms": 5,
       "iter": 2,
-      "stream": 2,
+      "ms": 5,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 2
     },
     {
       "id": "8",
-      "ms": 5,
       "iter": 2,
-      "stream": 2,
+      "ms": 5,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 2
     },
     {
       "id": "9",
-      "ms": 5,
       "iter": 2,
-      "stream": 2,
+      "ms": 5,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 2
     },
     {
       "id": "1",
-      "ms": 4,
       "iter": 3,
-      "stream": 3,
+      "ms": 4,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 3
     },
     {
       "id": "10",
-      "ms": 4,
       "iter": 3,
-      "stream": 3,
+      "ms": 4,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 3
     },
     {
       "id": "11",
-      "ms": 5,
       "iter": 3,
-      "stream": 3,
+      "ms": 5,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 3
     },
     {
       "id": "12",
-      "ms": 5,
       "iter": 3,
-      "stream": 3,
+      "ms": 5,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 3
     },
     {
       "id": "13",
-      "ms": 4,
       "iter": 3,
-      "stream": 3,
+      "ms": 4,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 3
     },
     {
       "id": "14",
-      "ms": 4,
       "iter": 3,
-      "stream": 3,
+      "ms": 4,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 3
     },
     {
       "id": "15",
-      "ms": 4,
       "iter": 3,
-      "stream": 3,
+      "ms": 4,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 3
     },
     {
       "id": "16",
-      "ms": 4,
       "iter": 3,
-      "stream": 3,
+      "ms": 4,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 3
     },
     {
       "id": "17",
+      "iter": 3,
       "ms": 8,
-      "iter": 3,
-      "stream": 3,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 3
     },
     {
       "id": "18",
-      "ms": 6,
       "iter": 3,
-      "stream": 3,
+      "ms": 6,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 3
     },
     {
       "id": "19",
-      "ms": 5,
       "iter": 3,
-      "stream": 3,
+      "ms": 5,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 3
     },
     {
       "id": "2",
-      "ms": 5,
       "iter": 3,
-      "stream": 3,
+      "ms": 5,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 3
     },
     {
       "id": "20",
-      "ms": 4,
       "iter": 3,
-      "stream": 3,
+      "ms": 4,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 3
     },
     {
       "id": "21",
-      "ms": 4,
       "iter": 3,
-      "stream": 3,
+      "ms": 4,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 3
     },
     {
       "id": "22",
-      "ms": 4,
       "iter": 3,
-      "stream": 3,
+      "ms": 4,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 3
     },
     {
       "id": "3",
-      "ms": 4,
       "iter": 3,
-      "stream": 3,
+      "ms": 4,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 3
     },
     {
       "id": "4",
-      "ms": 4,
       "iter": 3,
-      "stream": 3,
+      "ms": 4,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 3
     },
     {
       "id": "5",
-      "ms": 4,
       "iter": 3,
-      "stream": 3,
+      "ms": 4,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 3
     },
     {
       "id": "6",
-      "ms": 4,
       "iter": 3,
-      "stream": 3,
+      "ms": 4,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 3
     },
     {
       "id": "7",
-      "ms": 5,
       "iter": 3,
-      "stream": 3,
+      "ms": 5,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 3
     },
     {
       "id": "8",
-      "ms": 4,
       "iter": 3,
-      "stream": 3,
+      "ms": 4,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 3
     },
     {
       "id": "9",
-      "ms": 4,
       "iter": 3,
-      "stream": 3,
+      "ms": 4,
       "run_type": "measurement",
-      "status": "FAILED"
+      "status": "FAILED",
+      "stream": 3
     }
   ],
+  "run": {
+    "id": "95a24d45",
+    "iterations": 3,
+    "query_time_ms": 0,
+    "streams": 3,
+    "timestamp": "2026-05-02T21:58:44.578346",
+    "total_duration_ms": 4934
+  },
+  "summary": {
+    "data": {
+      "load_time_ms": 4296.3,
+      "rows_loaded": 250389
+    },
+    "queries": {
+      "failed": 66,
+      "passed": 0,
+      "total": 66
+    },
+    "timing": {
+      "avg_ms": 0,
+      "max_ms": 0,
+      "min_ms": 0,
+      "total_ms": 0
+    },
+    "validation": "partial"
+  },
   "tables": {
     "hub_customer": {
-      "rows": 1499,
-      "load_ms": 82
+      "load_ms": 82,
+      "rows": 1499
     },
     "hub_lineitem": {
-      "rows": 60174,
-      "load_ms": 64
+      "load_ms": 64,
+      "rows": 60174
     },
     "hub_nation": {
-      "rows": 24,
-      "load_ms": 81
+      "load_ms": 81,
+      "rows": 24
     },
     "hub_order": {
-      "rows": 14999,
-      "load_ms": 65
+      "load_ms": 65,
+      "rows": 14999
     },
     "hub_part": {
-      "rows": 1999,
-      "load_ms": 68
+      "load_ms": 68,
+      "rows": 1999
     },
     "hub_region": {
-      "rows": 4,
-      "load_ms": 3073
+      "load_ms": 3073,
+      "rows": 4
     },
     "hub_supplier": {
-      "rows": 99,
-      "load_ms": 74
+      "load_ms": 74,
+      "rows": 99
     },
     "link_customer_nation": {
-      "rows": 1499,
-      "load_ms": 62
+      "load_ms": 62,
+      "rows": 1499
     },
     "link_lineitem": {
-      "rows": 60174,
-      "load_ms": 49
+      "load_ms": 49,
+      "rows": 60174
     },
     "link_nation_region": {
-      "rows": 24,
-      "load_ms": 63
+      "load_ms": 63,
+      "rows": 24
     },
     "link_order_customer": {
-      "rows": 14999,
-      "load_ms": 51
+      "load_ms": 51,
+      "rows": 14999
     },
     "link_part_supplier": {
-      "rows": 7999,
-      "load_ms": 53
+      "load_ms": 53,
+      "rows": 7999
     },
     "link_supplier_nation": {
-      "rows": 99,
-      "load_ms": 55
+      "load_ms": 55,
+      "rows": 99
     },
     "sat_customer": {
-      "rows": 1499,
-      "load_ms": 52
+      "load_ms": 52,
+      "rows": 1499
     },
     "sat_lineitem": {
-      "rows": 60174,
-      "load_ms": 52
+      "load_ms": 52,
+      "rows": 60174
     },
     "sat_nation": {
-      "rows": 24,
-      "load_ms": 97
+      "load_ms": 97,
+      "rows": 24
     },
     "sat_order": {
-      "rows": 14999,
-      "load_ms": 48
+      "load_ms": 48,
+      "rows": 14999
     },
     "sat_part": {
-      "rows": 1999,
-      "load_ms": 47
+      "load_ms": 47,
+      "rows": 1999
     },
     "sat_partsupp": {
-      "rows": 7999,
-      "load_ms": 48
+      "load_ms": 48,
+      "rows": 7999
     },
     "sat_region": {
-      "rows": 4,
-      "load_ms": 52
+      "load_ms": 52,
+      "rows": 4
     },
     "sat_supplier": {
-      "rows": 99,
-      "load_ms": 48
+      "load_ms": 48,
+      "rows": 99
     }
   },
-  "cost": {
-    "total_usd": 0,
-    "model": "estimated"
-  },
-  "normalized_cost": {
-    "normalized_cost_usd": "0",
-    "cost_usd": null,
-    "cost_model_version": "2025.11",
-    "cost_model_source": "benchbox.core.cost.pricing",
-    "cost_scope": "compute_only",
-    "cost_status": "not_applicable_local",
-    "billing_unit": "not_applicable",
-    "pricing_region": "not_applicable",
-    "deployment": {
-      "cloud_provider": null,
-      "cloud_region": null,
-      "instance_type": null,
-      "warehouse_size": null,
-      "node_count": null,
-      "cluster_size": null,
-      "storage_format": null,
-      "storage_tier": null
-    }
-  },
-  "execution": {
-    "entry_point": "cli",
-    "timestamp": "2026-05-02T21:58:44.571628",
-    "phases": [
-      "load",
-      "power"
-    ],
-    "compression": {
-      "type": "zstd"
-    },
-    "mode": "sql",
-    "driver_runtime_strategy": "current-process",
-    "non_interactive": true
-  },
-  "environment": {
-    "platform_runtime": {
-      "runtime_type": "dataframe_process",
-      "collection_status": "partial",
-      "source": "inferred",
-      "engine_host": "host_0a57d94f05f4"
-    },
-    "machine_id": "machine_45d1a3ef31a1728d",
-    "client_host": {
-      "machine_id": "machine_45d1a3ef31a1728d"
-    }
-  },
-  "errors": [
-    {
-      "phase": "query",
-      "query_id": "1",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "1",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "1",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "1",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "10",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#210,2026-04-16 08:36:21#211,#212,TPCH#213,2f9aad9a7870455984a25785f6088bf1#214,Customer#000000001#215,j5JsirBM9PsCy0O1m#216,25-989-741-2988#217,711.56#218,BUILDING#219,to the even, regular platelets. regular, ironic epitaphs nag e#220] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "10",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#210,2026-04-16 08:36:21#211,#212,TPCH#213,2f9aad9a7870455984a25785f6088bf1#214,Customer#000000001#215,j5JsirBM9PsCy0O1m#216,25-989-741-2988#217,711.56#218,BUILDING#219,to the even, regular platelets. regular, ironic epitaphs nag e#220] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "10",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#210,2026-04-16 08:36:21#211,#212,TPCH#213,2f9aad9a7870455984a25785f6088bf1#214,Customer#000000001#215,j5JsirBM9PsCy0O1m#216,25-989-741-2988#217,711.56#218,BUILDING#219,to the even, regular platelets. regular, ironic epitaphs nag e#220] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "10",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#210,2026-04-16 08:36:21#211,#212,TPCH#213,2f9aad9a7870455984a25785f6088bf1#214,Customer#000000001#215,j5JsirBM9PsCy0O1m#216,25-989-741-2988#217,711.56#218,BUILDING#219,to the even, regular platelets. regular, ironic epitaphs nag e#220] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "11",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `3325`, `771.64`, `TPCH`, `2026-04-16 08",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `3325`, `771.64`, `TPCH`, `2026-04-16 08:36:21`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [b2595e9d5aa0b6f0be8f792ac7b8547a#290,2026-04-16 08:36:21#291,#292,TPCH#293,6f6625386dfb124092ebdf9574fec50d#294,3325#295L,771.64#296,, even theodolites. regular, final theodolites eat after the carefully pending foxes. furiously regular deposits sleep slyly. carefully bold realms above the ironic dependencies haggle careful#297] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "11",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `3325`, `771.64`, `TPCH`, `2026-04-16 08",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `3325`, `771.64`, `TPCH`, `2026-04-16 08:36:21`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [b2595e9d5aa0b6f0be8f792ac7b8547a#290,2026-04-16 08:36:21#291,#292,TPCH#293,6f6625386dfb124092ebdf9574fec50d#294,3325#295L,771.64#296,, even theodolites. regular, final theodolites eat after the carefully pending foxes. furiously regular deposits sleep slyly. carefully bold realms above the ironic dependencies haggle careful#297] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "11",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `3325`, `771.64`, `TPCH`, `2026-04-16 08",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `3325`, `771.64`, `TPCH`, `2026-04-16 08:36:21`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [b2595e9d5aa0b6f0be8f792ac7b8547a#290,2026-04-16 08:36:21#291,#292,TPCH#293,6f6625386dfb124092ebdf9574fec50d#294,3325#295L,771.64#296,, even theodolites. regular, final theodolites eat after the carefully pending foxes. furiously regular deposits sleep slyly. carefully bold realms above the ironic dependencies haggle careful#297] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "11",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `3325`, `771.64`, `TPCH`, `2026-04-16 08",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `3325`, `771.64`, `TPCH`, `2026-04-16 08:36:21`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [b2595e9d5aa0b6f0be8f792ac7b8547a#290,2026-04-16 08:36:21#291,#292,TPCH#293,6f6625386dfb124092ebdf9574fec50d#294,3325#295L,771.64#296,, even theodolites. regular, final theodolites eat after the carefully pending foxes. furiously regular deposits sleep slyly. carefully bold realms above the ironic dependencies haggle careful#297] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "12",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "12",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "12",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "12",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "13",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0`, `172799.49`, `1996-01-02`, `5-LOW`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0`, `172799.49`, `1996-01-02`, `5-LOW`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#310,2026-04-16 08:36:21#311,#312,TPCH#313,803842a3fede8ab7566cd6d81443fbf6#314,O#315,172799.49#316,1996-01-02#317,5-LOW#318,Clerk#000000951#319,0#320L,nstructions sleep furiously among #321] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "13",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0`, `172799.49`, `1996-01-02`, `5-LOW`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0`, `172799.49`, `1996-01-02`, `5-LOW`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#310,2026-04-16 08:36:21#311,#312,TPCH#313,803842a3fede8ab7566cd6d81443fbf6#314,O#315,172799.49#316,1996-01-02#317,5-LOW#318,Clerk#000000951#319,0#320L,nstructions sleep furiously among #321] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "13",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0`, `172799.49`, `1996-01-02`, `5-LOW`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0`, `172799.49`, `1996-01-02`, `5-LOW`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#310,2026-04-16 08:36:21#311,#312,TPCH#313,803842a3fede8ab7566cd6d81443fbf6#314,O#315,172799.49#316,1996-01-02#317,5-LOW#318,Clerk#000000951#319,0#320L,nstructions sleep furiously among #321] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "13",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0`, `172799.49`, `1996-01-02`, `5-LOW`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0`, `172799.49`, `1996-01-02`, `5-LOW`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#310,2026-04-16 08:36:21#311,#312,TPCH#313,803842a3fede8ab7566cd6d81443fbf6#314,O#315,172799.49#316,1996-01-02#317,5-LOW#318,Clerk#000000951#319,0#320L,nstructions sleep furiously among #321] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "14",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "14",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "14",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "14",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "15",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "15",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "15",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "15",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "16",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [`Brand#13`, ``, `7`, `901.0`, `JUMBO PKG`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [`Brand#13`, ``, `7`, `901.0`, `JUMBO PKG`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#260,2026-04-16 08:36:21#261,#262,TPCH#263,909189f0dd7156ede312c9240d4228e5#264,goldenrod lavender spring chocolate lace#265,Manufacturer#1#266,Brand#13#267,PROMO BURNISHED COPPER#268,7#269L,JUMBO PKG#270,901.0#271,ly. slyly ironi#272] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "16",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [`Brand#13`, ``, `7`, `901.0`, `JUMBO PKG`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [`Brand#13`, ``, `7`, `901.0`, `JUMBO PKG`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#260,2026-04-16 08:36:21#261,#262,TPCH#263,909189f0dd7156ede312c9240d4228e5#264,goldenrod lavender spring chocolate lace#265,Manufacturer#1#266,Brand#13#267,PROMO BURNISHED COPPER#268,7#269L,JUMBO PKG#270,901.0#271,ly. slyly ironi#272] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "16",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [`Brand#13`, ``, `7`, `901.0`, `JUMBO PKG`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [`Brand#13`, ``, `7`, `901.0`, `JUMBO PKG`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#260,2026-04-16 08:36:21#261,#262,TPCH#263,909189f0dd7156ede312c9240d4228e5#264,goldenrod lavender spring chocolate lace#265,Manufacturer#1#266,Brand#13#267,PROMO BURNISHED COPPER#268,7#269L,JUMBO PKG#270,901.0#271,ly. slyly ironi#272] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "16",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [`Brand#13`, ``, `7`, `901.0`, `JUMBO PKG`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [`Brand#13`, ``, `7`, `901.0`, `JUMBO PKG`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#260,2026-04-16 08:36:21#261,#262,TPCH#263,909189f0dd7156ede312c9240d4228e5#264,goldenrod lavender spring chocolate lace#265,Manufacturer#1#266,Brand#13#267,PROMO BURNISHED COPPER#268,7#269L,JUMBO PKG#270,901.0#271,ly. slyly ironi#272] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "17",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "17",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "17",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "17",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "18",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#210,2026-04-16 08:36:21#211,#212,TPCH#213,2f9aad9a7870455984a25785f6088bf1#214,Customer#000000001#215,j5JsirBM9PsCy0O1m#216,25-989-741-2988#217,711.56#218,BUILDING#219,to the even, regular platelets. regular, ironic epitaphs nag e#220] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "18",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#210,2026-04-16 08:36:21#211,#212,TPCH#213,2f9aad9a7870455984a25785f6088bf1#214,Customer#000000001#215,j5JsirBM9PsCy0O1m#216,25-989-741-2988#217,711.56#218,BUILDING#219,to the even, regular platelets. regular, ironic epitaphs nag e#220] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "18",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#210,2026-04-16 08:36:21#211,#212,TPCH#213,2f9aad9a7870455984a25785f6088bf1#214,Customer#000000001#215,j5JsirBM9PsCy0O1m#216,25-989-741-2988#217,711.56#218,BUILDING#219,to the even, regular platelets. regular, ironic epitaphs nag e#220] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "18",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#210,2026-04-16 08:36:21#211,#212,TPCH#213,2f9aad9a7870455984a25785f6088bf1#214,Customer#000000001#215,j5JsirBM9PsCy0O1m#216,25-989-741-2988#217,711.56#218,BUILDING#219,to the even, regular platelets. regular, ironic epitaphs nag e#220] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "19",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "19",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "19",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "19",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "2",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [`Brand#13`, ``, `7`, `901.0`, `JUMBO PKG`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [`Brand#13`, ``, `7`, `901.0`, `JUMBO PKG`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#260,2026-04-16 08:36:21#261,#262,TPCH#263,909189f0dd7156ede312c9240d4228e5#264,goldenrod lavender spring chocolate lace#265,Manufacturer#1#266,Brand#13#267,PROMO BURNISHED COPPER#268,7#269L,JUMBO PKG#270,901.0#271,ly. slyly ironi#272] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "2",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [`Brand#13`, ``, `7`, `901.0`, `JUMBO PKG`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [`Brand#13`, ``, `7`, `901.0`, `JUMBO PKG`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#260,2026-04-16 08:36:21#261,#262,TPCH#263,909189f0dd7156ede312c9240d4228e5#264,goldenrod lavender spring chocolate lace#265,Manufacturer#1#266,Brand#13#267,PROMO BURNISHED COPPER#268,7#269L,JUMBO PKG#270,901.0#271,ly. slyly ironi#272] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "2",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [`Brand#13`, ``, `7`, `901.0`, `JUMBO PKG`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [`Brand#13`, ``, `7`, `901.0`, `JUMBO PKG`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#260,2026-04-16 08:36:21#261,#262,TPCH#263,909189f0dd7156ede312c9240d4228e5#264,goldenrod lavender spring chocolate lace#265,Manufacturer#1#266,Brand#13#267,PROMO BURNISHED COPPER#268,7#269L,JUMBO PKG#270,901.0#271,ly. slyly ironi#272] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "2",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [`Brand#13`, ``, `7`, `901.0`, `JUMBO PKG`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [`Brand#13`, ``, `7`, `901.0`, `JUMBO PKG`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#260,2026-04-16 08:36:21#261,#262,TPCH#263,909189f0dd7156ede312c9240d4228e5#264,goldenrod lavender spring chocolate lace#265,Manufacturer#1#266,Brand#13#267,PROMO BURNISHED COPPER#268,7#269L,JUMBO PKG#270,901.0#271,ly. slyly ironi#272] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "20",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `5755.94`, `TPCH`, `27-918-335-1736`, `Supplier#000000001`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `5755.94`, `TPCH`, `27-918-335-1736`, `Supplier#000000001`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#236,2026-04-16 08:36:21#237,#238,TPCH#239,c50a000fe3bcbf9d81a0d613fab5d09c#240,Supplier#000000001#241,sdrGnXCDRcfriBvY0KL,ipCanOTyK t NN1#242,27-918-335-1736#243,5755.94#244,each slyly above the careful#245] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "20",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `5755.94`, `TPCH`, `27-918-335-1736`, `Supplier#000000001`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `5755.94`, `TPCH`, `27-918-335-1736`, `Supplier#000000001`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#236,2026-04-16 08:36:21#237,#238,TPCH#239,c50a000fe3bcbf9d81a0d613fab5d09c#240,Supplier#000000001#241,sdrGnXCDRcfriBvY0KL,ipCanOTyK t NN1#242,27-918-335-1736#243,5755.94#244,each slyly above the careful#245] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "20",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `5755.94`, `TPCH`, `27-918-335-1736`, `Supplier#000000001`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `5755.94`, `TPCH`, `27-918-335-1736`, `Supplier#000000001`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#236,2026-04-16 08:36:21#237,#238,TPCH#239,c50a000fe3bcbf9d81a0d613fab5d09c#240,Supplier#000000001#241,sdrGnXCDRcfriBvY0KL,ipCanOTyK t NN1#242,27-918-335-1736#243,5755.94#244,each slyly above the careful#245] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "20",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `5755.94`, `TPCH`, `27-918-335-1736`, `Supplier#000000001`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `5755.94`, `TPCH`, `27-918-335-1736`, `Supplier#000000001`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#236,2026-04-16 08:36:21#237,#238,TPCH#239,c50a000fe3bcbf9d81a0d613fab5d09c#240,Supplier#000000001#241,sdrGnXCDRcfriBvY0KL,ipCanOTyK t NN1#242,27-918-335-1736#243,5755.94#244,each slyly above the careful#245] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "21",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `5755.94`, `TPCH`, `27-918-335-1736`, `Supplier#000000001`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `5755.94`, `TPCH`, `27-918-335-1736`, `Supplier#000000001`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#236,2026-04-16 08:36:21#237,#238,TPCH#239,c50a000fe3bcbf9d81a0d613fab5d09c#240,Supplier#000000001#241,sdrGnXCDRcfriBvY0KL,ipCanOTyK t NN1#242,27-918-335-1736#243,5755.94#244,each slyly above the careful#245] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "21",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `5755.94`, `TPCH`, `27-918-335-1736`, `Supplier#000000001`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `5755.94`, `TPCH`, `27-918-335-1736`, `Supplier#000000001`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#236,2026-04-16 08:36:21#237,#238,TPCH#239,c50a000fe3bcbf9d81a0d613fab5d09c#240,Supplier#000000001#241,sdrGnXCDRcfriBvY0KL,ipCanOTyK t NN1#242,27-918-335-1736#243,5755.94#244,each slyly above the careful#245] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "21",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `5755.94`, `TPCH`, `27-918-335-1736`, `Supplier#000000001`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `5755.94`, `TPCH`, `27-918-335-1736`, `Supplier#000000001`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#236,2026-04-16 08:36:21#237,#238,TPCH#239,c50a000fe3bcbf9d81a0d613fab5d09c#240,Supplier#000000001#241,sdrGnXCDRcfriBvY0KL,ipCanOTyK t NN1#242,27-918-335-1736#243,5755.94#244,each slyly above the careful#245] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "21",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `5755.94`, `TPCH`, `27-918-335-1736`, `Supplier#000000001`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `5755.94`, `TPCH`, `27-918-335-1736`, `Supplier#000000001`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#236,2026-04-16 08:36:21#237,#238,TPCH#239,c50a000fe3bcbf9d81a0d613fab5d09c#240,Supplier#000000001#241,sdrGnXCDRcfriBvY0KL,ipCanOTyK t NN1#242,27-918-335-1736#243,5755.94#244,each slyly above the careful#245] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "22",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#210,2026-04-16 08:36:21#211,#212,TPCH#213,2f9aad9a7870455984a25785f6088bf1#214,Customer#000000001#215,j5JsirBM9PsCy0O1m#216,25-989-741-2988#217,711.56#218,BUILDING#219,to the even, regular platelets. regular, ironic epitaphs nag e#220] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "22",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#210,2026-04-16 08:36:21#211,#212,TPCH#213,2f9aad9a7870455984a25785f6088bf1#214,Customer#000000001#215,j5JsirBM9PsCy0O1m#216,25-989-741-2988#217,711.56#218,BUILDING#219,to the even, regular platelets. regular, ironic epitaphs nag e#220] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "22",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#210,2026-04-16 08:36:21#211,#212,TPCH#213,2f9aad9a7870455984a25785f6088bf1#214,Customer#000000001#215,j5JsirBM9PsCy0O1m#216,25-989-741-2988#217,711.56#218,BUILDING#219,to the even, regular platelets. regular, ironic epitaphs nag e#220] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "22",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#210,2026-04-16 08:36:21#211,#212,TPCH#213,2f9aad9a7870455984a25785f6088bf1#214,Customer#000000001#215,j5JsirBM9PsCy0O1m#216,25-989-741-2988#217,711.56#218,BUILDING#219,to the even, regular platelets. regular, ironic epitaphs nag e#220] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "3",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#210,2026-04-16 08:36:21#211,#212,TPCH#213,2f9aad9a7870455984a25785f6088bf1#214,Customer#000000001#215,j5JsirBM9PsCy0O1m#216,25-989-741-2988#217,711.56#218,BUILDING#219,to the even, regular platelets. regular, ironic epitaphs nag e#220] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "3",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#210,2026-04-16 08:36:21#211,#212,TPCH#213,2f9aad9a7870455984a25785f6088bf1#214,Customer#000000001#215,j5JsirBM9PsCy0O1m#216,25-989-741-2988#217,711.56#218,BUILDING#219,to the even, regular platelets. regular, ironic epitaphs nag e#220] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "3",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#210,2026-04-16 08:36:21#211,#212,TPCH#213,2f9aad9a7870455984a25785f6088bf1#214,Customer#000000001#215,j5JsirBM9PsCy0O1m#216,25-989-741-2988#217,711.56#218,BUILDING#219,to the even, regular platelets. regular, ironic epitaphs nag e#220] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "3",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `711.56`, `BUILDING`, `TPCH`, `25-989-741-2988`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#210,2026-04-16 08:36:21#211,#212,TPCH#213,2f9aad9a7870455984a25785f6088bf1#214,Customer#000000001#215,j5JsirBM9PsCy0O1m#216,25-989-741-2988#217,711.56#218,BUILDING#219,to the even, regular platelets. regular, ironic epitaphs nag e#220] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "4",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0`, `172799.49`, `1996-01-02`, `5-LOW`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0`, `172799.49`, `1996-01-02`, `5-LOW`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#310,2026-04-16 08:36:21#311,#312,TPCH#313,803842a3fede8ab7566cd6d81443fbf6#314,O#315,172799.49#316,1996-01-02#317,5-LOW#318,Clerk#000000951#319,0#320L,nstructions sleep furiously among #321] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "4",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0`, `172799.49`, `1996-01-02`, `5-LOW`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0`, `172799.49`, `1996-01-02`, `5-LOW`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#310,2026-04-16 08:36:21#311,#312,TPCH#313,803842a3fede8ab7566cd6d81443fbf6#314,O#315,172799.49#316,1996-01-02#317,5-LOW#318,Clerk#000000951#319,0#320L,nstructions sleep furiously among #321] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "4",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0`, `172799.49`, `1996-01-02`, `5-LOW`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0`, `172799.49`, `1996-01-02`, `5-LOW`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#310,2026-04-16 08:36:21#311,#312,TPCH#313,803842a3fede8ab7566cd6d81443fbf6#314,O#315,172799.49#316,1996-01-02#317,5-LOW#318,Clerk#000000951#319,0#320L,nstructions sleep furiously among #321] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "4",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0`, `172799.49`, `1996-01-02`, `5-LOW`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0`, `172799.49`, `1996-01-02`, `5-LOW`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [c4ca4238a0b923820dcc509a6f75849b#310,2026-04-16 08:36:21#311,#312,TPCH#313,803842a3fede8ab7566cd6d81443fbf6#314,O#315,172799.49#316,1996-01-02#317,5-LOW#318,Clerk#000000951#319,0#320L,nstructions sleep furiously among #321] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "5",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `AFRICA`, `TPCH`, `2026-04-16 08",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `AFRICA`, `TPCH`, `2026-04-16 08:36:21`, `cfcd208495d565ef66e7dff9f98764da`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [cfcd208495d565ef66e7dff9f98764da#174,2026-04-16 08:36:21#175,#176,TPCH#177,40a957ae72e8cc00bbf91cef166da4a6#178,AFRICA#179,lar deposits. blithely final packages cajole. regular waters are final requests. regular accounts are according to #180] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "5",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `AFRICA`, `TPCH`, `2026-04-16 08",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `AFRICA`, `TPCH`, `2026-04-16 08:36:21`, `cfcd208495d565ef66e7dff9f98764da`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [cfcd208495d565ef66e7dff9f98764da#174,2026-04-16 08:36:21#175,#176,TPCH#177,40a957ae72e8cc00bbf91cef166da4a6#178,AFRICA#179,lar deposits. blithely final packages cajole. regular waters are final requests. regular accounts are according to #180] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "5",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `AFRICA`, `TPCH`, `2026-04-16 08",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `AFRICA`, `TPCH`, `2026-04-16 08:36:21`, `cfcd208495d565ef66e7dff9f98764da`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [cfcd208495d565ef66e7dff9f98764da#174,2026-04-16 08:36:21#175,#176,TPCH#177,40a957ae72e8cc00bbf91cef166da4a6#178,AFRICA#179,lar deposits. blithely final packages cajole. regular waters are final requests. regular accounts are according to #180] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "5",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `AFRICA`, `TPCH`, `2026-04-16 08",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `AFRICA`, `TPCH`, `2026-04-16 08:36:21`, `cfcd208495d565ef66e7dff9f98764da`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [cfcd208495d565ef66e7dff9f98764da#174,2026-04-16 08:36:21#175,#176,TPCH#177,40a957ae72e8cc00bbf91cef166da4a6#178,AFRICA#179,lar deposits. blithely final packages cajole. regular waters are final requests. regular accounts are according to #180] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "6",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "6",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "6",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "6",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "7",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "7",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "7",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "7",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "8",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "8",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "8",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "8",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "9",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "9",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "9",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    },
-    {
-      "phase": "query",
-      "query_id": "9",
-      "type": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE",
-      "message": "[UNRESOLVED_COLUMN.WITH_SUGGESTION] A column, variable, or function parameter with name `load_end_dts` cannot be resolved. Did you mean one of the following? [``, `0.02`, `0.04`, `17`, `1996-02-12`]. SQLSTATE: 42703;\n'Filter 'isNull('load_end_dts)\n+- Relation [92cec9d0fb7ef6adaf0f325623436054#338,2026-04-16 08:36:21#339,#340,TPCH#341,5b09eeee5a02bf14f1b62e32efa0c214#342,17#343L,24710.35#344,0.04#345,0.02#346,N#347,O#348,1996-03-13#349,1996-02-12#350,1996-03-22#351,DELIVER IN PERSON#352,TRUCK#353,egular courts above the#354] parquet\n"
-    }
-  ],
-  "export": {
-    "timestamp": "2026-05-02T21:58:49.539402",
-    "tool": "benchbox-exporter",
-    "anonymized": true
-  }
+  "version": "2.1"
 }

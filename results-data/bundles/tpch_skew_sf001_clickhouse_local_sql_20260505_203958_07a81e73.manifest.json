@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T00:47:49.474153+00:00",
-  "bundle_file": "tpch_skew_sf001_clickhouse_local_sql_20260505_203958_07a81e73.json",
-  "bundle_hash": "04964063f7f34acc29b1cacee6111daae9c3ec57a7e1625f3528de0f3652822c",
-  "companion_hashes": {},
   "benchmark": "TPC-H Skew Benchmark (moderate)",
+  "bundle_file": "tpch_skew_sf001_clickhouse_local_sql_20260505_203958_07a81e73.json",
+  "bundle_hash": "9f557860a88baa89b1cc614b935d8a98ccfdd5e5c02885dfee043dd946a3ecc6",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "ClickHouse Local",
   "scale_factor": 0.01,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T00:47:49.474153+00:00",
   "submitted_by": "Joe Harris"
 }

@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-03T02:46:40.214557+00:00",
-  "bundle_file": "amplab_sf001_sqlite_sql_20260502_195711_0e182993.json",
-  "bundle_hash": "e5aed157d463f0f6a78cb0493bd291c4c7247c20c669bf098dca194f0173c674",
-  "companion_hashes": {},
   "benchmark": "AMPLab Big Data",
+  "bundle_file": "amplab_sf001_sqlite_sql_20260502_195711_0e182993.json",
+  "bundle_hash": "bd2413c6f3809c83bdb8bed817ec74696702980a5b8bea0ee96d03495633df85",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "SQLite",
   "scale_factor": 0.01,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-03T02:46:40.214557+00:00",
   "submitted_by": "BenchBox UAT"
 }

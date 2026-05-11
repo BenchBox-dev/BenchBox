@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:13:02.332616+00:00",
-  "bundle_file": "tpch_skew_sf01_pandas_df_20260506_094920_4fd2621f.json",
-  "bundle_hash": "27c9ad8cda1e345808da8f22cdd55eef9ff317f5b13c05ff566cae68bd69c5e0",
-  "companion_hashes": {},
   "benchmark": "TPC-H Skew",
+  "bundle_file": "tpch_skew_sf01_pandas_df_20260506_094920_4fd2621f.json",
+  "bundle_hash": "11dc4643a4b7724d3602f595c2a06c24fa4de2c81b2859157f2e777ffb6ce5b0",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "Pandas",
   "scale_factor": 0.1,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:13:02.332616+00:00",
   "submitted_by": "Joe Harris"
 }

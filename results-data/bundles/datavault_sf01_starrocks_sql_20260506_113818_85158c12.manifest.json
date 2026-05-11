@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:09:07.286057+00:00",
-  "bundle_file": "datavault_sf01_starrocks_sql_20260506_113818_85158c12.json",
-  "bundle_hash": "2c570c7edf723246a0fe1149de35a72c9c44c2ea289b0e0a4ee1dc31fdb75469",
-  "companion_hashes": {},
   "benchmark": "Data Vault",
+  "bundle_file": "datavault_sf01_starrocks_sql_20260506_113818_85158c12.json",
+  "bundle_hash": "30abcf1269a3769e36bd076385dce60cde860513577082d6856472fe4e0be89a",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "StarRocks",
   "scale_factor": 0.1,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:09:07.286057+00:00",
   "submitted_by": "Joe Harris"
 }

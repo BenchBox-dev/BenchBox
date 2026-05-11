@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:13:14.378740+00:00",
-  "bundle_file": "tpch_skew_sf1_starrocks_sql_20260506_113047_c5dc8608.json",
-  "bundle_hash": "eb40656b3cacdb892bbe051083d62652440741db128bc2987c0612c4ea0d1a6e",
-  "companion_hashes": {},
   "benchmark": "TPC-H Skew Benchmark (moderate)",
+  "bundle_file": "tpch_skew_sf1_starrocks_sql_20260506_113047_c5dc8608.json",
+  "bundle_hash": "c26e0e9699196076775fedb58a00a1fe301938358a7f64c04f274a5308d53726",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "StarRocks",
   "scale_factor": 1.0,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:13:14.378740+00:00",
   "submitted_by": "Joe Harris"
 }

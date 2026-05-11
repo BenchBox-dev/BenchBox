@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:09:08.489793+00:00",
-  "bundle_file": "datavault_sf1_clickhouse_local_sql_20260506_081938_54e6ae69.json",
-  "bundle_hash": "4f47a0533b9e7608a7e4adc97ac9777da146b18700226eb93ea64e68404c6b12",
-  "companion_hashes": {},
   "benchmark": "Data Vault",
+  "bundle_file": "datavault_sf1_clickhouse_local_sql_20260506_081938_54e6ae69.json",
+  "bundle_hash": "b3f4c9c088e8465da7e497486b74c36432c92c013a1051a89845f109ddf09e1f",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "ClickHouse Local",
   "scale_factor": 1.0,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:09:08.489793+00:00",
   "submitted_by": "Joe Harris"
 }

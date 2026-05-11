@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:08:58.925049+00:00",
-  "bundle_file": "datavault_sf001_doris_sql_20260506_134405_2c5add4b.json",
-  "bundle_hash": "6db32f9a439027c0aa068b0faa26b85e8d3eed7640a2d287a4d0824762b5b054",
-  "companion_hashes": {},
   "benchmark": "Data Vault",
+  "bundle_file": "datavault_sf001_doris_sql_20260506_134405_2c5add4b.json",
+  "bundle_hash": "040ccbe151cc94fb4eed3997ac95e4684ee6142841f19205b66ea51afd43a065",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "Apache Doris",
   "scale_factor": 0.01,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:08:58.925049+00:00",
   "submitted_by": "Joe Harris"
 }

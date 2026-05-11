@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T00:47:02.045320+00:00",
-  "bundle_file": "read_primitives_sf01_clickhouse_local_sql_20260505_203839_662a6efa.json",
-  "bundle_hash": "2c8e2790c811a76747599995ed539b6d7fecc923fe308857bc36747eda391051",
-  "companion_hashes": {},
   "benchmark": "Read Primitives",
+  "bundle_file": "read_primitives_sf01_clickhouse_local_sql_20260505_203839_662a6efa.json",
+  "bundle_hash": "d65315a71f25162d3c0c183e44b45514cfcf9709491154648c54c81a2aaa3396",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "ClickHouse Local",
   "scale_factor": 0.1,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T00:47:02.045320+00:00",
   "submitted_by": "Joe Harris"
 }

@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:09:54.047509+00:00",
-  "bundle_file": "h2odb_sf1_postgresql_sql_20260506_115637_2fc73c17.json",
-  "bundle_hash": "6539b3a77e384d2e401e24ca5063b733f177352e21804748b28487013dabc696",
-  "companion_hashes": {},
   "benchmark": "H2O Database",
+  "bundle_file": "h2odb_sf1_postgresql_sql_20260506_115637_2fc73c17.json",
+  "bundle_hash": "5fd627ac321b399c3fbfb2498145e29d94eec52ea0e378ce4740fac4d1ae1205",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "PostgreSQL",
   "scale_factor": 1.0,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:09:54.047509+00:00",
   "submitted_by": "Joe Harris"
 }

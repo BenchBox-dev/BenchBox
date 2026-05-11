@@ -1,13 +1,13 @@
 {
-  "submission_tool_version": "benchbox/0.2.1",
-  "submitted_at": "2026-05-06T18:08:43.337701+00:00",
-  "bundle_file": "coffeeshop_sf01_spark_sql_20260506_093017_23489a53.json",
-  "bundle_hash": "782cdd4863c4b3bf05107fa393755d132e94d80d48881dc39cb6ec0df024da2e",
-  "companion_hashes": {},
   "benchmark": "CoffeeShop",
+  "bundle_file": "coffeeshop_sf01_spark_sql_20260506_093017_23489a53.json",
+  "bundle_hash": "24b94b50ad59dc8c59c898b14e0320192666884a2c7031a6e189c39bff3b430c",
+  "companion_hashes": {},
+  "phase": 2,
   "platform": "Spark",
   "scale_factor": 0.1,
-  "phase": 2,
   "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.2.1",
+  "submitted_at": "2026-05-06T18:08:43.337701+00:00",
   "submitted_by": "Joe Harris"
 }
