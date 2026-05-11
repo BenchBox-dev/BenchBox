@@ -1467,7 +1467,7 @@ worktree-pool-disk-clean:
 		[ -d "$$wt" ] || continue; \
 		before=$$(du -sk "$$wt" 2>/dev/null | awk '{print $$1}'); \
 		find "$$wt" -type d \( -name '__pycache__' -o -name '.pytest_cache' -o -name '.ruff_cache' -o -name '.mypy_cache' \) -prune -exec rm -rf {} + 2>/dev/null || true; \
-		find "$$wt" -maxdepth 4 -type f -name '.coverage*' -exec rm -f {} + 2>/dev/null || true; \
+		find "$$wt" -maxdepth 4 -type f \( -name '.coverage' -o -name '.coverage.*' \) -exec rm -f {} + 2>/dev/null || true; \
 		[ -d "$$wt/.benchbox/cache" ] && rm -rf "$$wt/.benchbox/cache" || true; \
 		after=$$(du -sk "$$wt" 2>/dev/null | awk '{print $$1}'); \
 		delta=$$((before - after)); \
@@ -1539,7 +1539,7 @@ blind-spots-sweep: blind-spots-report
 # Operator-only; not exposed as `benchbox` CLI subcommands. UAT is a
 # project-developer concern, benchbox is a project-user concern.
 # ----------------------------------------------------------------------
-.PHONY: uat-cell uat-execute uat-validate uat-package uat-explorer-smoke uat-report uat-sweep uat-stress uat-bring-up
+.PHONY: uat-cell uat-execute uat-validate uat-package uat-explorer-smoke uat-report uat-sweep uat-stress uat-bring-up uat-docker-cleanup
 
 # make uat-cell PLATFORM=duckdb BENCHMARK=tpch SCALE=0.01
 uat-cell:
@@ -1616,6 +1616,12 @@ uat-bring-up:
 		$(if $(TIMEOUT_S),--timeout-s "$(TIMEOUT_S)",) \
 		$(if $(BENCHMARK_RUNS_DIR),--benchmark-runs-dir "$(BENCHMARK_RUNS_DIR)",) \
 		$(if $(DRY_RUN),--dry-run,)
+
+# make uat-docker-cleanup [APPLY=1] [PREFIX=benchbox-uat]
+uat-docker-cleanup:
+	@uv run --no-sync -- python -m tests.uat._cli docker-cleanup \
+		$(if $(PREFIX),--prefix "$(PREFIX)",) \
+		$(if $(APPLY),--apply,)
 
 # make uat-sweep CONFIG=tests/uat/configs/<name>.yaml [DRY_RUN=1]
 uat-sweep:
@@ -1713,6 +1719,10 @@ help:
 	@echo ""
 	@echo "Utility:"
 	@echo "  make run-test TEST=path Run a specific test file"
+	@echo ""
+	@echo "UAT Operations:"
+	@echo "  make uat-docker-cleanup        Report abandoned UAT Docker resources and non-UAT cleanup commands"
+	@echo "  make uat-docker-cleanup APPLY=1 Remove only UAT-owned Docker leftovers"
 	@echo ""
 	@echo "Coverage:"
 	@echo "  make coverage-fast   Run fast-marked tests with coverage (quick feedback)"

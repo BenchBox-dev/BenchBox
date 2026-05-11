@@ -96,6 +96,7 @@ def test_subcommands_table_covers_all_make_targets():
     """The dispatch table must cover every make uat-* target's subcommand."""
     expected = {
         "cell",
+        "docker-cleanup",
         "execute",
         "validate",
         "package",
@@ -140,6 +141,30 @@ def test_make_uat_sweep_forwards_dry_run_variable():
 
     assert "[DRY_RUN=1]" in target
     assert "$(if $(DRY_RUN),--dry-run,)" in target
+
+
+def test_make_uat_docker_cleanup_defaults_to_dry_run_and_supports_apply():
+    dry_run = subprocess.run(
+        ["make", "--no-print-directory", "-n", "uat-docker-cleanup"],
+        cwd=Path.cwd(),
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    apply = subprocess.run(
+        ["make", "--no-print-directory", "-n", "uat-docker-cleanup", "APPLY=1", "PREFIX=benchbox-uat-test"],
+        cwd=Path.cwd(),
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+    assert dry_run.returncode == 0, dry_run.stderr
+    assert "docker-cleanup" in dry_run.stdout
+    assert "--apply" not in dry_run.stdout
+    assert apply.returncode == 0, apply.stderr
+    assert '--prefix "benchbox-uat-test"' in apply.stdout
+    assert "--apply" in apply.stdout
 
 
 @pytest.mark.parametrize(

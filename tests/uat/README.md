@@ -111,6 +111,18 @@ or a safe override is added. Today that affects `pg-duckdb`,
 `pg-mooncake`, and `timescaledb`. Keep fast tests for this mapping in
 sync with `matrix.PLATFORM_GROUPS["docker"]`.
 
+Interrupted-run recovery is explicit:
+
+```bash
+make uat-docker-cleanup        # dry-run inventory + commands
+make uat-docker-cleanup APPLY=1
+```
+
+The recovery command removes only compose-labelled projects whose name
+starts with the UAT prefix (`benchbox-uat` by default). It also reports
+non-UAT Docker resources with creation time and a manual cleanup command,
+but it never deletes them automatically.
+
 ## Frozen-config hashes
 
 When you add a new FROZEN config:
