@@ -12,7 +12,7 @@
 import type { BenchmarkSummary } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
 import { paletteColor } from "@/lib/chartTheme";
-import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
+import { formatRunIdentityLabelsForCohort, preserveUniqueAfterTruncation } from "@/lib/runIdentity";
 
 const LABEL_W = 160;
 const ROW_H = 36;
@@ -28,12 +28,20 @@ export function PowerBar({ summary }: Props) {
   const [containerRef, { width: containerWidth }] = useElementSize();
   const w = Math.max(containerWidth, 400);
 
-  const cohortLabels = formatRunIdentitiesForCohort(
+  const cohortLabels = formatRunIdentityLabelsForCohort(
     summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
-    "chart",
+  );
+  const displayLabels = preserveUniqueAfterTruncation(
+    cohortLabels.map((label) => label.disambiguated),
+    22,
   );
   const rows = summary.platforms
-    .map((p, i) => ({ ...p, colorIdx: i, displayLabel: cohortLabels[i] ?? p.platform }))
+    .map((p, i) => ({
+      ...p,
+      colorIdx: i,
+      displayLabel: displayLabels[i] ?? p.platform,
+      fullLabel: cohortLabels[i]?.full ?? p.platform,
+    }))
     .filter((p) => p.power_score !== null && p.power_score > 0)
     .sort((a, b) => (b.power_score ?? 0) - (a.power_score ?? 0));
 
@@ -56,11 +64,18 @@ export function PowerBar({ summary }: Props) {
           const color = paletteColor(row.colorIdx);
           return (
             <g key={row.result_id}>
-              <text x={LABEL_W - 6} y={midY + 4} textAnchor="end" style={{ fontSize: "11px", fill: "#374151" }}>
-                {row.displayLabel.length > 22 ? `${row.displayLabel.slice(0, 21)}…` : row.displayLabel}
+              <text
+                x={LABEL_W - 6}
+                y={midY + 4}
+                textAnchor="end"
+                aria-label={row.fullLabel}
+                title={row.fullLabel}
+                style={{ fontSize: "11px", fill: "#374151" }}
+              >
+                {row.displayLabel}
               </text>
               <rect x={LABEL_W} y={midY - barH / 2} width={Math.max(2, barW)} height={barH} fill={color} rx={2}>
-                <title>{`${row.displayLabel}: ${row.power_score!.toLocaleString(undefined, { maximumFractionDigits: 0 })} QphH`}</title>
+                <title>{`${row.fullLabel}: ${row.power_score!.toLocaleString(undefined, { maximumFractionDigits: 0 })} QphH`}</title>
               </rect>
               <text x={LABEL_W + barW + 6} y={midY + 4} style={{ fontSize: "11px", fill: "#374151" }}>
                 {row.power_score!.toLocaleString(undefined, { maximumFractionDigits: 0 })}

@@ -13,7 +13,7 @@ import { useElementSize } from "@/lib/useElementSize";
 import { timeSeriesColor } from "@/lib/chartTheme";
 import { buildLogLatencyScale, computeECDFPoints, logLatencyFraction, logLatencyTicks } from "@/lib/chartMath";
 import { formatTimingExclusion, isTimingDisplayable, platformTimingValue } from "@/lib/displayEligibility";
-import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
+import { formatRunIdentityLabelsForCohort, preserveUniqueAfterTruncation } from "@/lib/runIdentity";
 
 const Y_TICKS_PCT = [0, 25, 50, 75, 100];
 
@@ -31,13 +31,17 @@ export function CDFChart({ summary }: Props) {
   const [containerRef, { width: containerWidth }] = useElementSize();
   const w = Math.max(containerWidth, 400);
 
-  const cohortLabels = formatRunIdentitiesForCohort(
+  const cohortLabels = formatRunIdentityLabelsForCohort(
     summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
-    "chart",
+  );
+  const displayLabels = preserveUniqueAfterTruncation(
+    cohortLabels.map((label) => label.disambiguated),
+    15,
   );
   const series = summary.platforms
     .map((p, i) => ({
-      label: cohortLabels[i] ?? p.platform,
+      label: displayLabels[i] ?? p.platform,
+      fullLabel: cohortLabels[i]?.full ?? p.platform,
       color: timeSeriesColor(i),
       isDisplayable: isTimingDisplayable(p),
       points: computeECDFPoints(summary.query_ids.map((queryId) => platformTimingValue(p, queryId))),
@@ -91,7 +95,11 @@ export function CDFChart({ summary }: Props) {
               return `H${x} V${y}`;
             })
             .join(" ");
-          return <path key={s.label} d={d} stroke={s.color} strokeWidth={2} fill="none" />;
+          return (
+            <path key={s.label} d={d} stroke={s.color} strokeWidth={2} fill="none">
+              <title>{s.fullLabel}</title>
+            </path>
+          );
         })}
 
         {/* X-axis */}
@@ -116,7 +124,8 @@ export function CDFChart({ summary }: Props) {
             <g key={s.label} transform={`translate(${LABEL_W + i * 130}, 0)`}>
               <line x1={0} y1={6} x2={16} y2={6} stroke={s.color} strokeWidth={2} />
               <text x={20} y={10} style={{ fontSize: "11px", fill: "#374151" }}>
-                {s.label.length > 15 ? `${s.label.slice(0, 14)}…` : s.label}
+                <title>{s.fullLabel}</title>
+                {s.label}
               </text>
             </g>
           ))}

@@ -15,7 +15,13 @@ import { paletteColor } from "@/lib/chartTheme";
 import { computeRankTable } from "@/lib/chartMath";
 import { formatTimingExclusion, isRankable, platformTimingValue } from "@/lib/displayEligibility";
 import { queryDisplayLabel, sortQueryIds } from "@/lib/queryLabels";
-import { formatRunIdentitiesForCohort, type RunIdentitySource } from "@/lib/runIdentity";
+import {
+  formatRunIdentitiesForCohort,
+  preserveUniqueAfterTruncation,
+  type RunIdentitySource,
+} from "@/lib/runIdentity";
+
+export { preserveUniqueAfterTruncation } from "@/lib/runIdentity";
 
 interface Props {
   summary: BenchmarkSummary;
@@ -25,16 +31,6 @@ function ordinal(n: number): string {
   const suffixes = ["th", "st", "nd", "rd"];
   const v = n % 100;
   return `${n}${suffixes[(v - 20) % 10] ?? suffixes[v] ?? suffixes[0]}`;
-}
-
-export function preserveUniqueAfterTruncation(identities: readonly string[], maxLen: number): string[] {
-  const truncated = identities.map((id) => (id.length > maxLen ? `${id.slice(0, maxLen - 1)}…` : id));
-  const counts = new Map<string, number>();
-  for (const value of truncated) counts.set(value, (counts.get(value) ?? 0) + 1);
-  return identities.map((id, i) => {
-    const candidate = truncated[i]!;
-    return (counts.get(candidate) ?? 0) > 1 ? id : candidate;
-  });
 }
 
 export function RankTable({ summary }: Props) {

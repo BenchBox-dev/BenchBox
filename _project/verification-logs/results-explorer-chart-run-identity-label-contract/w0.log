@@ -1,0 +1,30 @@
+checked_sha=3c436332119615b9644a3a296d292cda235d806c
+snapshot=results-explorer/public/data/results.duckdb
+
+Static inventory of run-label surfaces and current risks
+- results-explorer/src/lib/runIdentity.ts owns cohort-aware base labels but returns only strings, not visible/full/aria pairs.
+- results-explorer/src/components/DistributionBox.tsx uses preserveUniqueAfterTruncation, then slices labels from the end again in SVG text.
+- results-explorer/src/components/CDFChart.tsx truncates legend labels with prefix-only slice(0, 14), losing date/short-id suffixes.
+- results-explorer/src/components/PowerBar.tsx, ChartPanel.tsx PerformanceBar, and StackedPhase.tsx use prefix-only slice truncation.
+- results-explorer/src/components/RankTable.tsx preserves uniqueness by widening to the full label when prefix truncation collides.
+- results-explorer/src/components/QueryDiffTable.tsx displays candidate.platform without cohort-aware disambiguation.
+
+Current snapshot duplicate platform cohorts
+tpch	0.1	power	DataFusion	5	tpch-datafusion-sf0.1-20260404-4fb71bf9, tpch-datafusion-sf0.1-20260502-0ee59961, tpch-datafusion-sf0.1-20260502-c21d0500, tpch-datafusion-sf0.1-20260505-c02bca01, tpch-datafusion-sf0.1-20260506-9069b436
+amplab	0.01	power	DataFusion	4	amplab-datafusion-sf0.01-20260502-8d75e48e, amplab-datafusion-sf0.01-20260502-96de71a5, amplab-datafusion-sf0.01-20260505-0f878570, amplab-datafusion-sf0.01-20260506-db0be5df
+clickbench	1.0	power	DataFusion	4	clickbench-datafusion-sf1.0-20260502-bbd5a021, clickbench-datafusion-sf1.0-20260502-bdc5d9ee, clickbench-datafusion-sf1.0-20260505-33c6486f, clickbench-datafusion-sf1.0-20260506-bd6ebf70
+coffeeshop	0.01	power	DataFusion	4	coffeeshop-datafusion-sf0.01-20260502-22409a76, coffeeshop-datafusion-sf0.01-20260502-f7da8cb3, coffeeshop-datafusion-sf0.01-20260505-8d6454ae, coffeeshop-datafusion-sf0.01-20260506-65cc9564
+h2odb	0.01	power	DataFusion	4	h2odb-datafusion-sf0.01-20260502-2b644837, h2odb-datafusion-sf0.01-20260502-c75d0f4a, h2odb-datafusion-sf0.01-20260505-98f4a8c6, h2odb-datafusion-sf0.01-20260506-b4d8d5e1
+read_primitives	0.01	power	DataFusion	4	read_primitives-datafusion-sf0.01-20260502-555b7af4, read_primitives-datafusion-sf0.01-20260502-b4a5e7b4, read_primitives-datafusion-sf0.01-20260505-ce8e7e4e, read_primitives-datafusion-sf0.01-20260506-3d6faa4a
+read_primitives	0.1	power	DataFusion	4	read_primitives-datafusion-sf0.1-20260502-1a9fddec, read_primitives-datafusion-sf0.1-20260502-e9690140, read_primitives-datafusion-sf0.1-20260505-be235891, read_primitives-datafusion-sf0.1-20260506-3c568b25
+ssb	0.01	power	DataFusion	4	ssb-datafusion-sf0.01-20260502-66a5c9ac, ssb-datafusion-sf0.01-20260502-91f9db59, ssb-datafusion-sf0.01-20260505-029974c2, ssb-datafusion-sf0.01-20260506-5c0d0ca3
+tpch	0.01	power	DataFusion	4	tpch-datafusion-sf0.01-20260502-ea408762, tpch-datafusion-sf0.01-20260502-eabb7b14, tpch-datafusion-sf0.01-20260505-77daf86d, tpch-datafusion-sf0.01-20260506-51d39a73
+tpch	1.0	power	DataFusion	4	tpch-datafusion-sf1.0-20260502-61ffa803, tpch-datafusion-sf1.0-20260502-de0d3de4, tpch-datafusion-sf1.0-20260505-9b764fc4, tpch-datafusion-sf1.0-20260506-9ad9d7e5
+tpch_skew	0.01	power	DataFusion	4	tpch_skew-datafusion-sf0.01-20260502-7953f294, tpch_skew-datafusion-sf0.01-20260502-b12ead4f, tpch_skew-datafusion-sf0.01-20260505-bfbe125c, tpch_skew-datafusion-sf0.01-20260506-6d192b34
+tpch_skew	0.1	power	DataFusion	4	tpch_skew-datafusion-sf0.1-20260502-13b43895, tpch_skew-datafusion-sf0.1-20260502-ece702f5, tpch_skew-datafusion-sf0.1-20260505-dff52f70, tpch_skew-datafusion-sf0.1-20260506-c0149e8c
+
+Truncation reproducer
+DataFusion v53.0.0 2026-05-06 3b8bbc42	-> prefix20=DataFusion v53.0.0 …
+DataFusion v53.0.0 2026-05-07 deadbeef	-> prefix20=DataFusion v53.0.0 …
+DataFusion v53.0.0 2026-05-08 cafefeed	-> prefix20=DataFusion v53.0.0 …
+DataFusion v53.0.0 2026-05-09 feedface	-> prefix20=DataFusion v53.0.0 …

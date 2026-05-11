@@ -2,7 +2,8 @@ id: results-explorer-chart-run-identity-label-contract
 title: "Normalize chart run identity labels without duplicate or unreadable names"
 worktree: results-explorer-followup-todo-review
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-05-11"
 category: User Experience
 
 description: |
@@ -19,7 +20,7 @@ deps:
 work:
 - id: w0
   summary: "Inventory every chart and table label that identifies a run"
-  status: pending
+  status: done
   notes: |
     Inspect benchmark matrix headers, chart legends, rank chart headers, box
     plot axis labels, trend labels, compare cards, and platform detail rows
@@ -31,7 +32,7 @@ work:
 - id: w1
   summary: "Define compact, full, and accessible run identity formats"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     Create a contract for:
       - `compact`: platform only when unique in the current cohort;
@@ -45,7 +46,7 @@ work:
 - id: w2
   summary: "Implement a shared run identity formatter"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Add or extend a single helper used by all Results Explorer labels. It must
     handle missing version/date/id, preserve meaningful suffixes under
@@ -54,7 +55,7 @@ work:
 - id: w3
   summary: "Apply the formatter to all chart labels"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Update per-query legends, rank chart headers, distribution/box plot labels,
     sparklines, trend charts, compare charts, and benchmark matrix headers to
@@ -64,7 +65,7 @@ work:
 - id: w4
   summary: "Add tests for duplicate and long label cohorts"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Add tests with repeated DataFusion, Polars, PySpark, and Spark runs. Assert:
       - no duplicate visible chart labels for different result IDs;
@@ -75,7 +76,7 @@ work:
 - id: w5
   summary: "Browser-check chart labels at benchmark and compare routes"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     In a browser, verify labels on benchmark Per-query, Distribution/Box Plot,
     Rank, Overview/Sparklines, and Compare charts. Decision gate: do not
@@ -145,6 +146,13 @@ success_metrics:
 - "Long run labels preserve a distinguishing date or short ID."
 - "Full identity is available through tooltip/title/aria or details affordance."
 - "All chart components use the same identity formatter."
+
+implementation_notes:
+- "w0 evidence captured at _project/verification-logs/results-explorer-chart-run-identity-label-contract/w0.log on 3c436332: duplicate public DataFusion cohorts exist in the current snapshot, and several chart components still used prefix-only truncation after run identity formatting."
+- "The run identity helper now exposes compact/disambiguated/table/full labels, full title/aria text, suffix-preserving truncation, and uniqueness-preserving truncation for chart budgets."
+- "Chart labels now use the shared truncation/identity contract in DistributionBox, CDFChart, PowerBar, PerformanceBar, StackedPhase, PercentileLadder, RankTable, TimeSeries, SparklineTable, Compare summary/baseline controls, and QueryDiffTable."
+- "Non-hex short_id prefixes derived from full result IDs are ignored so compare-mode chart labels preserve the trailing hash token instead of falling back to full result IDs."
+- "w5 browser evidence captured at _project/verification-logs/results-explorer-chart-run-identity-label-contract/w5.log: Box Plot, Rank headers, Sparklines, Compare baseline options, and Compare chart labels all stayed unique and preserved date/short-id suffixes."
 
 metadata:
   tags:

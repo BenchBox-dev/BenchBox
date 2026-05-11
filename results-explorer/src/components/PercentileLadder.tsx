@@ -14,6 +14,7 @@ import type { PercentileStats } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
 import { paletteColor } from "@/lib/chartTheme";
 import { buildLogLatencyScale, logLatencyFraction, logLatencyTicks } from "@/lib/chartMath";
+import { truncateRunIdentityLabel } from "@/lib/runIdentity";
 
 // Neutral gray for opacity-only legend swatches (shows opacity levels, not platform identity).
 const LEGEND_SWATCH_COLOR = "#6b7280"; // Tailwind gray-500
@@ -119,7 +120,7 @@ export function PercentileLadder({ rows }: Props) {
               >
                 {(() => {
                   const label = row.displayLabel ?? row.platform;
-                  return label.length > 18 ? label.slice(0, 17) + "…" : label;
+                  return truncateRunIdentityLabel(label, 18);
                 })()}
               </text>
 
