@@ -2,8 +2,9 @@ id: joinorder-canonical-foundation
 title: "joinorder canonical IMDb 2013 — Foundation & archive build (Step 1, part 1 of 2)"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
 category: Core Functionality
+completed_date: "2026-05-11"
 
 # 2026-05-11 implementation status:
 #   w0  Re-validate empty-query claim                           — DONE
@@ -11,7 +12,18 @@ category: Core Functionality
 #   w2  data_fetch module skeleton (5 modules + 16 tests)       — DONE
 #   w3  Registry surface field + strict scale-factor gate       — DONE
 #   w4  Postgres container + Harvard Dataverse pg_dump restore  — DONE
-#   w5..w16  (sequential downstream of w4)                      — PENDING
+#   w5  CSV extract with UTF-8 fidelity                         — DONE
+#   w6  CSV -> zstd Parquet conversion                          — DONE
+#   w7  data_manifest.toml assembly                             — DONE
+#   w8  encoding round-trip gate                                — DONE
+#   w9  canonical predicate-domain oracle gate                  — DONE
+#   w10 gregrahn 113-query import                               — DONE
+#   w11 reference cardinalities via PostgreSQL oracle            — DONE
+#   w12 cardinality cross-check report                          — DONE
+#   w13 archive packaging                                       — DONE
+#   w14 tiny canonical fixture                                  — DONE
+#   w15 draft GitHub Release                                    — DONE
+#   w16 runtime data_manifest.toml                              — DONE
 #
 # Docker blocker resolved on 2026-05-11. w4 live gate passed with
 # log at `~/Developer/benchmark_runs/joinorder/logs/w4-20260511T025034Z.log`
@@ -66,6 +78,18 @@ description: |
     - Tiny canonical fixture (~1MB): checked into repo for unit tests;
       regenerated deterministically from full canonical via the build
       pipeline.
+
+research_notes:
+- date: "2026-05-11"
+  work: [w9, w11, w12, w13, w14, w15, w16]
+  decision: "Resolved w9 blocker by checking the original CWI JOB archive. The original CWI data and the Harvard Dataverse `imdb_pg11` restore have identical 21-table row counts, identical 113-query underlying cardinalities, and the same five canonical zero-underlying predicates: `2c`, `5a`, `5b`, `10b`, and `32a`. Keep the Harvard DOI source and encode those five as known-zero oracle rows, not restore failures."
+  evidence:
+  - "~/Developer/benchmark_runs/joinorder/logs/foundation-w9-predicate-20260511T083520Z.log"
+  - "~/Developer/benchmark_runs/joinorder/logs/foundation-w9-predicate-fix-20260511T142338Z.log"
+  - "~/Developer/benchmark_runs/joinorder/logs/foundation-w9-predicate-final-20260511T144725Z.log"
+  - "~/Developer/benchmark_runs/joinorder/build/joinorder-imdb-2013-v1/build_manifest.json:predicate_gate"
+  - "~/Developer/benchmark_runs/joinorder/original-cwi/cwi-job.duckdb"
+  implementation: "Patch w9 from a no-empty assertion to a canonical predicate oracle: the five known-zero queries must remain zero; all other canonical queries must have >=1 underlying joined row; exact null-count checks replace approximate null-fraction guesses."
 
 work:
 - id: w0
@@ -230,7 +254,7 @@ work:
 
 - id: w5
   summary: "Per-table CSV extract from restored Postgres with UTF-8 fidelity"
-  status: pending
+  status: done
   needs: [w4]
   notes: |
     For each of 21 IMDb tables in the restored Postgres:
@@ -253,7 +277,7 @@ work:
 
 - id: w6
   summary: "CSV → Parquet conversion via DuckDB with zstd compression"
-  status: pending
+  status: done
   needs: [w5]
   notes: |
     For each of 21 CSVs, convert to Parquet via DuckDB:
@@ -274,7 +298,7 @@ work:
 
 - id: w7
   summary: "Provenance manifest assembly with full reproducibility metadata"
-  status: pending
+  status: done
   needs: [w6]
   notes: |
     Assemble `data_manifest.toml` with:
@@ -302,7 +326,7 @@ work:
 
 - id: w8
   summary: "Encoding round-trip gate (build-time pipeline assertion)"
-  status: pending
+  status: done
   needs: [w7]
   notes: |
     After Parquet conversion, the pipeline MUST assert encoding
@@ -328,32 +352,41 @@ work:
     canonical-tricky set above.
 
 - id: w9
-  summary: "Predicate-domain validation gate (no-empty-query assertion)"
-  status: pending
+  summary: "Canonical predicate-domain validation gate (known-zero preserving)"
+  status: done
   needs: [w7]
   notes: |
     The defect that makes synthetic JOB worthless is that
     `movie_companies.note` and `cast_info.note` are always NULL,
     so queries filtering on those values match nothing. The
-    pipeline MUST assert this never happens for canonical data.
+    pipeline MUST assert the canonical source/query pair has the
+    expected predicate-domain shape.
 
     For each of the 113 canonical JOB queries:
-      - Parse the query for predicates on key string columns
-      - Assert there is >= 1 row in the converted data that
-        satisfies that predicate (compute via Postgres)
-      - Aggregate: every query has a non-empty result on canonical data
+      - Compute underlying joined predicate cardinality via Postgres
+        by replacing the aggregate SELECT list with COUNT(*).
+      - Assert known-zero canonical queries `2c`, `5a`, `5b`, `10b`,
+        and `32a` have exactly 0 underlying rows. These are also zero
+        on the original CWI JOB archive, so they are part of the
+        canonical oracle rather than Dataverse restore corruption.
+      - Assert every other canonical query has >=1 underlying joined
+        row.
+      - Preserve aggregate-result semantics separately: the known-zero
+        queries are MIN aggregate queries without GROUP BY, so SQL
+        returns one row with NULL aggregate values even though the
+        underlying join is empty.
 
-    Per-column null-fraction assertions against published reference
-    values (Leis 2015, Table 3, and pg_dump-derived counts):
-      - movie_companies.note: NULL fraction roughly 0.6
-      - cast_info.note: NULL fraction roughly 0.85
-      - title.episode_of_id: NULL fraction roughly 0.95
-    Concrete numbers TBD during w4 from the actual restore; bind
-    them then. Pipeline aborts if any column drifts ±5%.
+    Exact null-count assertions against the restored canonical source:
+      - movie_companies.note: 1,271,989 NULL / 2,609,129 rows
+      - cast_info.note: 22,007,252 NULL / 36,244,344 rows
+      - title.episode_of_id: 985,048 NULL / 2,528,312 rows
+
+    Pipeline aborts if any non-known-zero query becomes empty, any
+    known-zero query becomes nonzero, or any exact null count drifts.
 
 - id: w10
   summary: "Import 113 canonical JOB queries from gregrahn into a build-input directory"
-  status: pending
+  status: done
   needs: [w7]
   notes: |
     Source: gregrahn/join-order-benchmark canonical 113 queries
@@ -372,7 +405,7 @@ work:
 
 - id: w11
   summary: "Compute reference cardinalities via PostgreSQL oracle"
-  status: pending
+  status: done
   needs: [w10, w9]
   notes: |
     For each of 113 queries, run against the restored Postgres
@@ -400,7 +433,7 @@ work:
 
 - id: w12
   summary: "Cross-check reference cardinalities against Leis 2015 published values"
-  status: pending
+  status: done
   needs: [w11]
   notes: |
     First verify whether Leis et al. 2015 or companion JOB materials
@@ -422,7 +455,7 @@ work:
 
 - id: w13
   summary: "Package full archive tarball with manifest + license + checksums + cardinalities"
-  status: pending
+  status: done
   needs: [w7, w8, w9, w12]
   notes: |
     Tarball: `joinorder-imdb-2013-v1.tar.zst`
@@ -438,12 +471,12 @@ work:
 
 - id: w14
   summary: "Regenerate tiny canonical fixture (~1MB) and check into repo"
-  status: pending
+  status: done
   needs: [w13]
   notes: |
     Re-run the conversion pipeline with sampling: pick ~50 rows
     per table from the canonical Parquets, biased to ensure each
-    of the 113 query predicates has ≥1 satisfying row in the tiny
+    non-known-zero canonical query predicate has ≥1 satisfying row in the tiny
     sample. Sampling strategy:
       - For tables with predicate-targeted columns, sample rows
         where those columns have known query-matching values
@@ -460,12 +493,13 @@ work:
     same schema as full `reference_cardinalities.json`.
 
     Verification before commit: load tiny fixture into DuckDB,
-    run all 113 queries from w10, assert every query returns
-    ≥1 row.
+    run all 113 queries from w10, assert every non-known-zero query
+    has ≥1 underlying row, and assert the five known-zero canonical
+    queries preserve 0 underlying rows.
 
 - id: w15
   summary: "Stage as DRAFT GitHub Release on tag `data/joinorder-imdb-2013-v1`"
-  status: pending
+  status: done
   needs: [w13]
   notes: |
     `gh release create data/joinorder-imdb-2013-v1 \
@@ -489,7 +523,7 @@ work:
 
 - id: w16
   summary: "Add `data_manifest.toml` for joinorder pointing at the staged Release URL"
-  status: pending
+  status: done
   needs: [w15]
   notes: |
     File: `benchbox/core/joinorder/data_manifest.toml`
@@ -503,31 +537,39 @@ work:
 
 verification:
 - description: "Foundation design doc exists with all four sections"
-  command: "test -f _project/design/joinorder-step1-foundations.md && grep -cE '^## (Scale-factor|Data-fetch|Dataset versioning|Registry surface)' _project/design/joinorder-step1-foundations.md"
+  command: |
+    test -f _project/design/joinorder-step1-foundations.md && grep -cE '^## (Scale-factor|Data-fetch|Dataset versioning|Registry surface)' _project/design/joinorder-step1-foundations.md
   expected_output: ">= 4"
 - description: "data_fetch module skeleton imports cleanly and tests pass"
-  command: "uv run -- python -c 'from benchbox.core.data_fetch import fetch_data' && uv run -- python -m pytest tests/unit/core/data_fetch/ -q"
+  command: |
+    uv run -- python -c 'from benchbox.core.data_fetch import fetch_data' && uv run -- python -m pytest tests/unit/core/data_fetch/ -q
   expected_output: "no import error, all tests pass"
 - description: "scale_factor validation rejects sf!=1 for joinorder"
-  command: "uv run -- python -m pytest tests/unit/core/test_scale_factor_validation.py::test_joinorder_rejects_non_unit_scale -q"
+  command: |
+    uv run -- python -m pytest tests/unit/core/test_scale_factor_validation.py::test_joinorder_rejects_non_unit_scale -q
   expected_output: "1 passed"
 - description: "Build pipeline produces archive with all 21 Parquets + manifest + checksums + reference cardinalities"
-  command: "tar -tf joinorder-imdb-2013-v1.tar.zst | sort | grep -cE '\\.parquet$|^data_manifest\\.toml$|^DATA-LICENSE\\.md$|^checksums\\.txt$|^reference_cardinalities\\.json$'"
+  command: |
+    tar -tf joinorder-imdb-2013-v1.tar.zst | sort | grep -cE '\.parquet$|^data_manifest\.toml$|^DATA-LICENSE\.md$|^checksums\.txt$|^reference_cardinalities\.json$'
   expected_output: ">= 25 (21 parquets + 4 metadata files)"
 - description: "Encoding round-trip gate is enforced"
   command: "grep -cE 'def (test_)?encoding_round_trip|encoding[_ ]round[_ ]trip' _project/scripts/build_joinorder_data.py"
   expected_output: ">= 1"
 - description: "Reference cardinalities cover all 113 queries"
-  command: "uv run -- python -c 'import json; d = json.load(open(\"_project/joinorder/reference_cardinalities.json\")); print(len(d[\"queries\"]))'"
+  command: |
+    uv run -- python -c 'import json; d = json.load(open("_project/joinorder/reference_cardinalities.json")); print(len(d["queries"]))'
   expected_output: "113"
 - description: "DRAFT GitHub Release exists with archive asset"
-  command: "gh release view data/joinorder-imdb-2013-v1 --json isDraft,assets --jq '{draft: .isDraft, asset_count: (.assets | length)}'"
+  command: |
+    gh release view data/joinorder-imdb-2013-v1 --json isDraft,assets --jq '{draft: .isDraft, asset_count: (.assets | length)}'
   expected_output: "{\"draft\": true, \"asset_count\": 2}"
-- description: "Tiny fixture is checked in and predicate-satisfying"
-  command: "test \"$(ls tests/fixtures/joinorder_canonical_tiny/*.parquet | wc -l | tr -d ' ')\" = \"21\" && uv run -- python _project/scripts/build_joinorder_data.py verify-tiny-fixture --fixture tests/fixtures/joinorder_canonical_tiny --queries _project/joinorder/build-inputs/queries --cardinalities _project/joinorder/tiny_reference_cardinalities.json"
+- description: "Tiny fixture is checked in and preserves canonical predicate oracle"
+  command: |
+    test "$(ls tests/fixtures/joinorder_canonical_tiny/*.parquet | wc -l | tr -d ' ')" = "21" && uv run -- python _project/scripts/build_joinorder_data.py verify-tiny-fixture --fixture tests/fixtures/joinorder_canonical_tiny --queries _project/joinorder/build-inputs/queries --cardinalities _project/joinorder/tiny_reference_cardinalities.json
   expected_output: "21 Parquets present and all 113 tiny-fixture query cardinalities validated"
 - description: "data_manifest.toml is wired up for joinorder"
-  command: "test -f benchbox/core/joinorder/data_manifest.toml && grep -cE '^url|^sha256|^version|^dataset_version|^manifest_hash|^data_archive_hash' benchbox/core/joinorder/data_manifest.toml"
+  command: |
+    test -f benchbox/core/joinorder/data_manifest.toml && grep -cE '^url|^sha256|^version|^dataset_version|^manifest_hash|^data_archive_hash' benchbox/core/joinorder/data_manifest.toml
   expected_output: ">= 6"
 
 prior_art:
@@ -695,12 +737,12 @@ success_metrics:
 - "scale_factor enforcement is registry-driven and reusable: parametrized tests verify joinorder rejects sf!=1 and other benchmarks
   accept their declared ranges"
 - "DRAFT GitHub Release at tag data/joinorder-imdb-2013-v1 stages the archive and is ready to be promoted by the cutover TODO"
-- "Tiny canonical fixture (~1MB) is checked in and satisfies all 113 query predicates"
+- "Tiny canonical fixture (~1MB) is checked in, satisfies all non-known-zero query predicates, and preserves the five canonical zero-underlying query predicates"
 - "Build pipeline encoding round-trip gate is enforced and would fail on silent NFC/NFD normalization"
 
 open_questions:
-- "Harvard Dataverse pg_dump may differ from CWI mirror. Plan: cross-check row counts against Leis 2015 Table 3 in w4 (restore
-  validation); if material drift, document the chosen snapshot and rationale in the manifest."
+- "Resolved 2026-05-11: Harvard Dataverse pg_dump and original CWI JOB archive match on 21/21 table row counts, 74,190,187
+  total rows, and all 113 underlying query cardinalities, including the five known-zero canonical predicates."
 - "DuckDB Parquet writer's encoding behavior on edge-case Unicode (combining characters, RTL text). Plan: w8 round-trip gate
   catches this; if it fails, fall back to Polars or pyarrow for the conversion step."
 - "Whether tiny fixture should be deterministic regen vs frozen sha256 in repo. Plan: deterministic regen via the build pipeline

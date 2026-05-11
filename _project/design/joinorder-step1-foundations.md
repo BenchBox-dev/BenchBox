@@ -94,10 +94,10 @@ Fields (TOML keys):
 | Key | Type | Purpose |
 |---|---|---|
 | `dataset_version` | str | Logical immutable id, e.g. `joinorder-imdb-2013-v1`. Stable across metadata-only manifest changes; bumped on intentional data revisions. |
-| `manifest_hash` | str | sha256 over the manifest contents (computed/verified at runtime). |
-| `data_archive_hash` | str | sha256 of the packaged tar.zst on disk. |
+| `manifest_hash` | str | sha256 over logical manifest contents, excluding top-level `manifest_hash` and `archive_sha256` so the transport checksum can be filled after packaging without changing logical data identity. |
+| `data_archive_hash` | str | Aggregate sha256 over per-table Parquet sha256 values in deterministic table order. |
 | `url` | str | Public download URL (GitHub Release asset). |
-| `archive_sha256` | str | sha256 of the downloaded tar.zst (must match `data_archive_hash`). |
+| `archive_sha256` | str | sha256 of the downloaded tar.zst. This is separate from `data_archive_hash` because the tarball also contains metadata files. |
 | `[[tables]]` array | table | Per-table block: `name`, `file` (relative path inside archive), `sha256`, `row_count`, `schema` (`{column → postgres_type}`). |
 | `[provenance]` | table | `source_doi`, `retrieval_timestamp` (ISO-8601 UTC), `pg_dump_sha256`, `postgres_image`, `duckdb_version`, `gregrahn_commit`, `script_git_sha`. |
 | `license_file` | str | Relative path to `DATA-LICENSE.md`. |
@@ -214,12 +214,12 @@ build_joinorder_data.py
     convert-parquet   # w6: DuckDB read_csv_auto + COPY (zstd)
     assemble-manifest # w7: data_manifest.toml with provenance
     encoding-gate     # w8: Parquet → DuckDB → Postgres-row-byte compare
-    predicate-gate    # w9: ≥1 row per query against canonical Postgres
+    predicate-gate    # w9: canonical known-zero/nonzero predicate oracle
     import-queries    # w10: gregrahn → build-inputs/queries/*.sql
     cardinalities     # w11: Postgres oracle, 113 queries
     cross-check       # w12: Leis 2015 published values
     package           # w13: tar.zst + checksums
-    tiny-fixture      # w14: ~50 rows × 21 tables, predicate-satisfying
+    tiny-fixture      # w14: ~50 rows × 21 tables, oracle-preserving
 ```
 
 Each subcommand is idempotent and writes to a single
@@ -234,12 +234,14 @@ w8 encoding gate samples 100 rows × 21 tables of "tricky" classes
 asserts byte-for-byte UTF-8 match against Postgres source rows. The
 gate fires AFTER Parquet conversion and BEFORE manifest assembly.
 
-w9 predicate-domain gate parses each of the 113 canonical queries
-for predicates on key string columns and asserts ≥1 row in the
-converted data satisfies that predicate (computed via Postgres on
-the restored canonical). Per-column null-fraction assertions
-against published reference values are also part of this gate
-(numbers TBD during w4 from the actual restore).
+w9 predicate-domain gate computes each of the 113 canonical queries'
+underlying joined row count via Postgres on the restored canonical
+source. The original CWI JOB archive and the Harvard Dataverse
+restore both have five zero-underlying canonical queries (`2c`,
+`5a`, `5b`, `10b`, `32a`), so the gate preserves that oracle:
+those five must remain zero and every other query must have at least
+one underlying row. Exact null-count assertions from the canonical
+source replace earlier approximate null-fraction guesses.
 
 Both gates abort the pipeline (non-zero exit) on any failure. The
 TODO's anti-pattern catalog explicitly forbids skipping w8 because
@@ -263,10 +265,9 @@ canonical wiring) is the cutover TODO's job.
 
 ## Open questions (rolled forward)
 
-- Harvard Dataverse pg_dump may differ from the CWI mirror.
-  Mitigation: w4 cross-checks restored row counts against Leis 2015
-  Table 3; if material drift, document the chosen snapshot in the
-  manifest.
+- Resolved 2026-05-11: Harvard Dataverse pg_dump and the original
+  CWI JOB archive match on all 21 table row counts and all 113
+  underlying query cardinalities.
 - DuckDB Parquet writer's encoding behavior on edge-case Unicode
   (combining characters, RTL text) is not certified. Mitigation:
   w8 round-trip gate; fall back to Polars/pyarrow if it fails.

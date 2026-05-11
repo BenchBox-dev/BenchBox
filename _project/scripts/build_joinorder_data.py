@@ -2,19 +2,22 @@
 
 This script is intentionally outside the BenchBox runtime package. It owns the
 network, Docker, and PostgreSQL tooling needed to turn the upstream Harvard
-Dataverse pg_dump into build artifacts consumed by later foundation slices.
+Dataverse pg_dump into build artifacts consumed by the cutover TODO.
 
-w4 scope:
+Foundation scope:
   - resolve and download the Harvard Dataverse pg_dump for doi:10.7910/DVN/2QYZBT
   - compute and record the upstream sha256 in a local build manifest
   - restore the custom-format pg_dump into a pinned PostgreSQL container
   - validate expected JOB tables and row counts within the TODO's +/-1% gate
-  - tear down the container by default
+  - extract CSV with explicit UTF-8/NULL semantics
+  - convert to zstd Parquet, assemble manifests, gates, cardinalities, archive
+  - stage the draft data release and emit the runtime data_manifest.toml
 """
 
 from __future__ import annotations
 
 import argparse
+import csv
 import dataclasses
 import datetime as dt
 import hashlib
@@ -25,8 +28,10 @@ import re
 import shutil
 import subprocess
 import sys
+import tarfile
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -40,9 +45,36 @@ DATAVERSE_FILE_ACCESS_TEMPLATE = "https://dataverse.harvard.edu/api/access/dataf
 DEFAULT_POSTGRES_IMAGE = "postgres:16.2"
 DEFAULT_POSTGRES_DB = "imdb"
 DEFAULT_POSTGRES_USER = "postgres"
+GITHUB_REPO = "joeharris76/BenchBox"
+GITHUB_RELEASE_TAG = f"data/{DATASET_VERSION}"
+ARCHIVE_NAME = f"{DATASET_VERSION}.tar.zst"
+ARCHIVE_SHA_NAME = f"{ARCHIVE_NAME}.sha256"
+GREGRAHN_REPO = "https://github.com/gregrahn/join-order-benchmark.git"
+GREGRAHN_COMMIT = "a39603662e023e449cb2121997a5034df9e02ebf"
+EXPECTED_QUERY_COUNT = 113
 BUILD_MANIFEST_NAME = "build_manifest.json"
 PGDUMP_MAGIC = b"PGDMP"
 ROW_COUNT_TOLERANCE = 0.01
+CSV_NULL = r"\N"
+
+QUERY_ID_RE = re.compile(r"^\d+[a-z]$")
+
+STRING_SAMPLE_COLUMNS: dict[str, str] = {
+    "aka_name": "name",
+    "name": "name",
+    "aka_title": "title",
+    "title": "title",
+    "cast_info": "note",
+    "movie_companies": "note",
+}
+
+KNOWN_ZERO_UNDERLYING_QUERIES = frozenset({"2c", "5a", "5b", "10b", "32a"})
+
+CANONICAL_NULL_COUNTS: dict[tuple[str, str], tuple[int, int]] = {
+    ("movie_companies", "note"): (1_271_989, 2_609_129),
+    ("cast_info", "note"): (22_007_252, 36_244_344),
+    ("title", "episode_of_id"): (985_048, 2_528_312),
+}
 
 # JOB / IMDb cardinalities published with the canonical CSV import flow and
 # cross-checked during w4 against the restored Dataverse pg_dump. Small lookup
@@ -71,6 +103,8 @@ EXPECTED_ROW_COUNTS: dict[str, int] = {
     "title": 2_528_312,
 }
 
+TABLE_NAMES = tuple(sorted(EXPECTED_ROW_COUNTS))
+
 
 class JoinOrderBuildError(RuntimeError):
     """Raised when the canonical JoinOrder build pipeline cannot proceed."""
@@ -86,6 +120,10 @@ class DownloadIntegrityError(JoinOrderBuildError):
 
 class DockerUnavailableError(JoinOrderBuildError):
     """Raised when Docker is not available for the PostgreSQL restore step."""
+
+
+class QueryImportError(JoinOrderBuildError):
+    """Raised when canonical JOB query import/validation fails."""
 
 
 @dataclasses.dataclass(frozen=True)
@@ -133,6 +171,61 @@ class RestoreValidation:
     @property
     def ok(self) -> bool:
         return not self.missing_tables and not self.row_count_failures
+
+
+@dataclasses.dataclass(frozen=True)
+class ColumnSchema:
+    """Column metadata read from PostgreSQL information_schema."""
+
+    table: str
+    name: str
+    postgres_type: str
+    udt_name: str
+    ordinal_position: int
+    is_nullable: bool
+
+    @property
+    def duckdb_type(self) -> str:
+        return postgres_type_to_duckdb(self.postgres_type, self.udt_name)
+
+
+@dataclasses.dataclass(frozen=True)
+class TableFile:
+    """A generated per-table artifact and its integrity metadata."""
+
+    table: str
+    path: Path
+    sha256: str
+    bytes: int
+    row_count: int
+
+
+@dataclasses.dataclass(frozen=True)
+class QueryParts:
+    """Simple SELECT/FROM/WHERE split for canonical flat JOB SQL."""
+
+    query_id: str
+    select_part: str
+    from_part: str
+    where_part: str
+
+
+@dataclasses.dataclass(frozen=True)
+class QueryAlias:
+    """One table alias from a JOB FROM list."""
+
+    table: str
+    alias: str
+
+
+@dataclasses.dataclass(frozen=True)
+class ForeignKey:
+    """Simple FK relation used to close the tiny fixture over parent rows."""
+
+    child_table: str
+    child_column: str
+    parent_table: str
+    parent_column: str
 
 
 def utc_now_iso() -> str:
@@ -263,6 +356,94 @@ def hash_file(path: Path) -> tuple[str, str, int]:
             md5.update(chunk)
             size += len(chunk)
     return sha256.hexdigest(), md5.hexdigest(), size
+
+
+def sha256_file(path: Path) -> str:
+    return hash_file(path)[0]
+
+
+def repo_root() -> Path:
+    result = run_command(["git", "rev-parse", "--show-toplevel"])
+    return Path(result.stdout.strip()).resolve()
+
+
+def git_head_sha() -> str:
+    result = run_command(["git", "rev-parse", "HEAD"])
+    return result.stdout.strip()
+
+
+def github_release_asset_url() -> str:
+    encoded_tag = urllib.parse.quote(GITHUB_RELEASE_TAG, safe="")
+    return f"https://github.com/{GITHUB_REPO}/releases/download/{encoded_tag}/{ARCHIVE_NAME}"
+
+
+def manifest_hash_input(raw: bytes) -> bytes:
+    """Match benchbox.core.data_fetch.manifest.compute_manifest_hash."""
+
+    excluded_top_level_keys = {b"archive_sha256", b"manifest_hash"}
+    lines: list[bytes] = []
+    in_top_level = True
+    for line in raw.splitlines(keepends=True):
+        stripped = line.lstrip()
+        if stripped.startswith(b"["):
+            in_top_level = False
+        if in_top_level:
+            before_equals = stripped.split(b"=", 1)[0].strip()
+            if before_equals in excluded_top_level_keys:
+                continue
+        lines.append(line)
+    return b"".join(lines)
+
+
+def compute_manifest_hash(path: Path) -> str:
+    return hashlib.sha256(manifest_hash_input(path.read_bytes())).hexdigest()
+
+
+def aggregate_table_hash(table_files: Sequence[TableFile]) -> str:
+    """Stable data identity hash over table sha256s, independent of tar metadata."""
+
+    payload = "\n".join(f"{entry.table}:{entry.sha256}" for entry in sorted(table_files, key=lambda f: f.table))
+    return hashlib.sha256((payload + "\n").encode("utf-8")).hexdigest()
+
+
+def sql_literal(value: str) -> str:
+    return "'" + value.replace("'", "''") + "'"
+
+
+def duckdb_literal(value: str | Path) -> str:
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+def postgres_type_to_duckdb(postgres_type: str, udt_name: str) -> str:
+    normalized = postgres_type.lower()
+    udt = udt_name.lower()
+    if normalized in {"smallint", "integer", "bigint"} or udt in {"int2", "int4", "int8"}:
+        return "BIGINT"
+    if normalized in {"real", "double precision"} or udt in {"float4", "float8"}:
+        return "DOUBLE"
+    if normalized == "numeric":
+        return "DOUBLE"
+    if normalized in {"boolean"} or udt == "bool":
+        return "BOOLEAN"
+    if normalized == "date":
+        return "DATE"
+    if "timestamp" in normalized:
+        return "TIMESTAMP"
+    return "VARCHAR"
+
+
+def format_toml_string(value: str) -> str:
+    return json.dumps(value, ensure_ascii=False)
+
+
+def format_toml_value(value: Any) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        return repr(value)
+    return format_toml_string(str(value))
 
 
 def validate_pgdump_file(path: Path, dataverse_file: DataverseFile) -> PgDumpArtifact:
@@ -444,6 +625,8 @@ def start_postgres_container(
             "--detach",
             "--name",
             container_name,
+            "--shm-size",
+            "1g",
             "-e",
             "POSTGRES_HOST_AUTH_METHOD=trust",
             "-e",
@@ -631,6 +814,7 @@ def quote_ident(identifier: str) -> str:
 
 
 def psql(*, container_name: str, database: str, user: str, sql: str) -> str:
+    sql_to_run = f"SET max_parallel_workers_per_gather = 0; {sql}"
     result = run_command(
         [
             "docker",
@@ -645,10 +829,1438 @@ def psql(*, container_name: str, database: str, user: str, sql: str) -> str:
             "-v",
             "ON_ERROR_STOP=1",
             "-c",
-            sql,
+            sql_to_run,
         ]
     )
     return result.stdout
+
+
+def psql_json_rows(*, container_name: str, database: str, user: str, sql: str) -> list[dict[str, Any]]:
+    wrapped = f"SELECT COALESCE(json_agg(row_to_json(_benchbox_q)), '[]'::json)::text FROM ({sql}) AS _benchbox_q"
+    raw = psql(container_name=container_name, database=database, user=user, sql=wrapped).strip()
+    data = json.loads(raw or "[]")
+    if not isinstance(data, list):
+        raise JoinOrderBuildError("PostgreSQL JSON wrapper did not return a list")
+    rows: list[dict[str, Any]] = []
+    for row in data:
+        if not isinstance(row, dict):
+            raise JoinOrderBuildError("PostgreSQL JSON wrapper returned a non-object row")
+        rows.append(row)
+    return rows
+
+
+def postgres_schema(*, container_name: str, database: str, user: str) -> dict[str, list[ColumnSchema]]:
+    rows = psql_json_rows(
+        container_name=container_name,
+        database=database,
+        user=user,
+        sql=(
+            "SELECT table_name, column_name, data_type, udt_name, ordinal_position, is_nullable "
+            "FROM information_schema.columns "
+            "WHERE table_schema = 'public' "
+            "ORDER BY table_name, ordinal_position"
+        ),
+    )
+    schema: dict[str, list[ColumnSchema]] = {table: [] for table in TABLE_NAMES}
+    for row in rows:
+        table = str(row["table_name"])
+        if table not in schema:
+            continue
+        schema[table].append(
+            ColumnSchema(
+                table=table,
+                name=str(row["column_name"]),
+                postgres_type=str(row["data_type"]),
+                udt_name=str(row["udt_name"]),
+                ordinal_position=int(row["ordinal_position"]),
+                is_nullable=str(row["is_nullable"]).upper() == "YES",
+            )
+        )
+    missing = [table for table, columns in schema.items() if not columns]
+    if missing:
+        raise JoinOrderBuildError(f"Missing PostgreSQL schema metadata for tables: {', '.join(missing)}")
+    return schema
+
+
+def postgres_foreign_keys(*, container_name: str, database: str, user: str) -> list[ForeignKey]:
+    rows = psql_json_rows(
+        container_name=container_name,
+        database=database,
+        user=user,
+        sql=(
+            "SELECT tc.table_name AS child_table, kcu.column_name AS child_column, "
+            "ccu.table_name AS parent_table, ccu.column_name AS parent_column "
+            "FROM information_schema.table_constraints AS tc "
+            "JOIN information_schema.key_column_usage AS kcu "
+            "  ON tc.constraint_name = kcu.constraint_name "
+            " AND tc.table_schema = kcu.table_schema "
+            "JOIN information_schema.constraint_column_usage AS ccu "
+            "  ON ccu.constraint_name = tc.constraint_name "
+            " AND ccu.table_schema = tc.table_schema "
+            "WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = 'public' "
+            "ORDER BY child_table, child_column"
+        ),
+    )
+    keys: list[ForeignKey] = []
+    for row in rows:
+        child_table = str(row["child_table"])
+        parent_table = str(row["parent_table"])
+        if child_table in EXPECTED_ROW_COUNTS and parent_table in EXPECTED_ROW_COUNTS:
+            keys.append(
+                ForeignKey(
+                    child_table=child_table,
+                    child_column=str(row["child_column"]),
+                    parent_table=parent_table,
+                    parent_column=str(row["parent_column"]),
+                )
+            )
+    return keys
+
+
+def copy_table_to_csv(
+    *,
+    container_name: str,
+    database: str,
+    user: str,
+    table: str,
+    destination: Path,
+    sql_where: str | None = None,
+) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    source = f"public.{quote_ident(table)}"
+    if sql_where:
+        source = f"(SELECT * FROM {source} WHERE {sql_where} ORDER BY id)"
+    copy_sql = (
+        f"COPY {source} TO STDOUT WITH "
+        "(FORMAT csv, ENCODING 'UTF8', HEADER true, QUOTE '\"', ESCAPE '\"', FORCE_QUOTE *, NULL '\\N')"
+    )
+    with destination.open("wb") as handle:
+        result = subprocess.run(
+            [
+                "docker",
+                "exec",
+                container_name,
+                "psql",
+                "-U",
+                user,
+                "-d",
+                database,
+                "-v",
+                "ON_ERROR_STOP=1",
+                "-c",
+                copy_sql,
+            ],
+            check=False,
+            stdout=handle,
+            stderr=subprocess.PIPE,
+        )
+    if result.returncode != 0:
+        destination.unlink(missing_ok=True)
+        raise JoinOrderBuildError(
+            f"PostgreSQL CSV COPY failed for {table} ({result.returncode}): "
+            + result.stderr.decode("utf-8", errors="replace").strip()
+        )
+
+
+def find_csv_value(csv_path: Path, *, row_id: int, column: str) -> str:
+    with csv_path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            if row.get("id") == str(row_id):
+                return row[column]
+    raise JoinOrderBuildError(f"Could not find id={row_id} in {csv_path}")
+
+
+def verify_csv_utf8_fidelity(
+    *,
+    container_name: str,
+    database: str,
+    user: str,
+    csv_dir: Path,
+) -> list[dict[str, Any]]:
+    samples: list[dict[str, Any]] = []
+    for table, column in {"name": "name", "title": "title"}.items():
+        rows = psql_json_rows(
+            container_name=container_name,
+            database=database,
+            user=user,
+            sql=(
+                f"SELECT id, {quote_ident(column)} AS value, "
+                f"encode(convert_to({quote_ident(column)}, 'UTF8'), 'hex') AS utf8_hex "
+                f"FROM public.{quote_ident(table)} "
+                f"WHERE {quote_ident(column)} IS NOT NULL AND {quote_ident(column)} ~ '[^ -~]' "
+                "ORDER BY id LIMIT 1"
+            ),
+        )
+        if not rows:
+            raise JoinOrderBuildError(f"No non-ASCII UTF-8 sample found in {table}.{column}")
+        sample = rows[0]
+        csv_value = find_csv_value(csv_dir / f"{table}.csv", row_id=int(sample["id"]), column=column)
+        csv_hex = csv_value.encode("utf-8").hex()
+        if csv_hex != sample["utf8_hex"]:
+            raise JoinOrderBuildError(
+                f"CSV UTF-8 drift for {table}.{column} id={sample['id']}: "
+                f"postgres {sample['utf8_hex']} csv {csv_hex}"
+            )
+        samples.append({"table": table, "column": column, "id": sample["id"], "utf8_hex": csv_hex})
+    return samples
+
+
+def verify_csv_utf8_fidelity_for_table(
+    *,
+    container_name: str,
+    database: str,
+    user: str,
+    csv_path: Path,
+    table: str,
+    column: str,
+) -> dict[str, Any]:
+    rows = psql_json_rows(
+        container_name=container_name,
+        database=database,
+        user=user,
+        sql=(
+            f"SELECT id, {quote_ident(column)} AS value, "
+            f"encode(convert_to({quote_ident(column)}, 'UTF8'), 'hex') AS utf8_hex "
+            f"FROM public.{quote_ident(table)} "
+            f"WHERE {quote_ident(column)} IS NOT NULL AND {quote_ident(column)} ~ '[^ -~]' "
+            "ORDER BY id LIMIT 1"
+        ),
+    )
+    if not rows:
+        raise JoinOrderBuildError(f"No non-ASCII UTF-8 sample found in {table}.{column}")
+    sample = rows[0]
+    csv_value = find_csv_value(csv_path, row_id=int(sample["id"]), column=column)
+    csv_hex = csv_value.encode("utf-8").hex()
+    if csv_hex != sample["utf8_hex"]:
+        raise JoinOrderBuildError(
+            f"CSV UTF-8 drift for {table}.{column} id={sample['id']}: postgres {sample['utf8_hex']} csv {csv_hex}"
+        )
+    return {"table": table, "column": column, "id": sample["id"], "utf8_hex": csv_hex}
+
+
+def extract_csv_files(
+    *,
+    work_dir: Path,
+    container_name: str,
+    database: str,
+    user: str,
+) -> list[TableFile]:
+    csv_dir = work_dir / "csv"
+    row_counts = load_build_manifest(work_dir).get("restore", {}).get("row_counts", EXPECTED_ROW_COUNTS)
+    files: list[TableFile] = []
+    for table in TABLE_NAMES:
+        destination = csv_dir / f"{table}.csv"
+        copy_table_to_csv(
+            container_name=container_name,
+            database=database,
+            user=user,
+            table=table,
+            destination=destination,
+        )
+        sha256, _md5, size = hash_file(destination)
+        files.append(
+            TableFile(
+                table=table,
+                path=destination,
+                sha256=sha256,
+                bytes=size,
+                row_count=int(row_counts.get(table, EXPECTED_ROW_COUNTS[table])),
+            )
+        )
+        print(f"csv {table}: {size} bytes sha256={sha256}", flush=True)
+
+    utf8_samples = verify_csv_utf8_fidelity(
+        container_name=container_name,
+        database=database,
+        user=user,
+        csv_dir=csv_dir,
+    )
+    write_build_manifest(
+        work_dir,
+        {
+            "csv_extract": {
+                "csv_dir": str(csv_dir),
+                "null_string": CSV_NULL,
+                "extracted_at": utc_now_iso(),
+                "files": [dataclasses.asdict(f) | {"path": str(f.path)} for f in files],
+                "utf8_samples": utf8_samples,
+            }
+        },
+    )
+    return files
+
+
+def duckdb_cast_expression(column: ColumnSchema) -> str:
+    quoted = '"' + column.name.replace('"', '""') + '"'
+    if column.duckdb_type == "VARCHAR":
+        return f"NULLIF({quoted}, '{CSV_NULL}') AS {quoted}"
+    return f"CAST(NULLIF({quoted}, '{CSV_NULL}') AS {column.duckdb_type}) AS {quoted}"
+
+
+def convert_csv_table_to_parquet(
+    *,
+    con: Any,
+    csv_path: Path,
+    parquet_path: Path,
+    table: str,
+    columns: Sequence[ColumnSchema],
+) -> TableFile:
+    parquet_path.parent.mkdir(parents=True, exist_ok=True)
+    select_list = ", ".join(duckdb_cast_expression(column) for column in columns)
+    con.execute(
+        f"""
+        COPY (
+          SELECT {select_list}
+          FROM read_csv_auto(
+            {duckdb_literal(csv_path)},
+            header=true,
+            all_varchar=true,
+            sample_size=-1
+          )
+        )
+        TO {duckdb_literal(parquet_path)}
+        (FORMAT 'parquet', COMPRESSION 'zstd', ROW_GROUP_SIZE 100000)
+        """
+    )
+    row_count = con.execute(f"SELECT count(*) FROM read_parquet({duckdb_literal(parquet_path)})").fetchone()[0]
+    expected = EXPECTED_ROW_COUNTS[table]
+    if int(row_count) != expected:
+        raise JoinOrderBuildError(f"Parquet row count mismatch for {table}: expected {expected}, got {row_count}")
+    sha256, _md5, size = hash_file(parquet_path)
+    return TableFile(table=table, path=parquet_path, sha256=sha256, bytes=size, row_count=int(row_count))
+
+
+def convert_csv_to_parquet(
+    *,
+    work_dir: Path,
+    schema: Mapping[str, Sequence[ColumnSchema]],
+) -> list[TableFile]:
+    try:
+        import duckdb
+    except ImportError as exc:
+        raise JoinOrderBuildError("duckdb is required in _project/scripts to convert JoinOrder CSV files") from exc
+
+    csv_dir = work_dir / "csv"
+    parquet_dir = work_dir / "parquet"
+    parquet_dir.mkdir(parents=True, exist_ok=True)
+    con = duckdb.connect()
+    files: list[TableFile] = []
+    forced_types: dict[str, dict[str, str]] = {}
+    try:
+        for table in TABLE_NAMES:
+            csv_path = csv_dir / f"{table}.csv"
+            parquet_path = parquet_dir / f"{table}.parquet"
+            if not csv_path.exists():
+                raise JoinOrderBuildError(f"CSV input missing for {table}: {csv_path}")
+            columns = list(schema[table])
+            forced_types[table] = {column.name: column.duckdb_type for column in columns}
+            table_file = convert_csv_table_to_parquet(
+                con=con,
+                csv_path=csv_path,
+                parquet_path=parquet_path,
+                table=table,
+                columns=columns,
+            )
+            files.append(table_file)
+            print(
+                f"parquet {table}: {table_file.row_count} rows {table_file.bytes} bytes sha256={table_file.sha256}",
+                flush=True,
+            )
+    finally:
+        con.close()
+
+    write_build_manifest(
+        work_dir,
+        {
+            "parquet": {
+                "parquet_dir": str(parquet_dir),
+                "converted_at": utc_now_iso(),
+                "duckdb_version": duckdb.__version__,
+                "forced_types": forced_types,
+                "files": [dataclasses.asdict(f) | {"path": str(f.path)} for f in files],
+            }
+        },
+    )
+    return files
+
+
+def extract_and_convert_parquet_streaming(
+    *,
+    work_dir: Path,
+    schema: Mapping[str, Sequence[ColumnSchema]],
+    container_name: str,
+    database: str,
+    user: str,
+) -> list[TableFile]:
+    try:
+        import duckdb
+    except ImportError as exc:
+        raise JoinOrderBuildError("duckdb is required in _project/scripts to convert JoinOrder CSV files") from exc
+
+    csv_dir = work_dir / "csv"
+    parquet_dir = work_dir / "parquet"
+    row_counts = load_build_manifest(work_dir).get("restore", {}).get("row_counts", EXPECTED_ROW_COUNTS)
+    csv_files: list[TableFile] = []
+    parquet_files: list[TableFile] = []
+    utf8_samples: list[dict[str, Any]] = []
+    forced_types: dict[str, dict[str, str]] = {}
+    con = duckdb.connect()
+    try:
+        for table in TABLE_NAMES:
+            csv_path = csv_dir / f"{table}.csv"
+            parquet_path = parquet_dir / f"{table}.parquet"
+            copy_table_to_csv(
+                container_name=container_name,
+                database=database,
+                user=user,
+                table=table,
+                destination=csv_path,
+            )
+            csv_sha, _md5, csv_size = hash_file(csv_path)
+            csv_files.append(
+                TableFile(
+                    table=table,
+                    path=csv_path,
+                    sha256=csv_sha,
+                    bytes=csv_size,
+                    row_count=int(row_counts.get(table, EXPECTED_ROW_COUNTS[table])),
+                )
+            )
+            if table in {"name", "title"}:
+                utf8_samples.append(
+                    verify_csv_utf8_fidelity_for_table(
+                        container_name=container_name,
+                        database=database,
+                        user=user,
+                        csv_path=csv_path,
+                        table=table,
+                        column=STRING_SAMPLE_COLUMNS[table],
+                    )
+                )
+            forced_types[table] = {column.name: column.duckdb_type for column in schema[table]}
+            table_file = convert_csv_table_to_parquet(
+                con=con,
+                csv_path=csv_path,
+                parquet_path=parquet_path,
+                table=table,
+                columns=schema[table],
+            )
+            parquet_files.append(table_file)
+            csv_path.unlink()
+            print(
+                f"streamed {table}: csv_sha256={csv_sha} parquet_sha256={table_file.sha256} rows={table_file.row_count}",
+                flush=True,
+            )
+    finally:
+        con.close()
+
+    write_build_manifest(
+        work_dir,
+        {
+            "csv_extract": {
+                "csv_dir": str(csv_dir),
+                "csv_retained": False,
+                "null_string": CSV_NULL,
+                "extracted_at": utc_now_iso(),
+                "files": [dataclasses.asdict(f) | {"path": str(f.path)} for f in csv_files],
+                "utf8_samples": utf8_samples,
+            },
+            "parquet": {
+                "parquet_dir": str(parquet_dir),
+                "converted_at": utc_now_iso(),
+                "duckdb_version": duckdb.__version__,
+                "forced_types": forced_types,
+                "files": [dataclasses.asdict(f) | {"path": str(f.path)} for f in parquet_files],
+            },
+        },
+    )
+    return parquet_files
+
+
+def load_table_files_from_manifest(work_dir: Path, key: str) -> list[TableFile]:
+    section = load_build_manifest(work_dir).get(key, {})
+    raw_files = section.get("files", [])
+    files: list[TableFile] = []
+    for entry in raw_files:
+        if not isinstance(entry, Mapping):
+            continue
+        files.append(
+            TableFile(
+                table=str(entry["table"]),
+                path=Path(str(entry["path"])),
+                sha256=str(entry["sha256"]),
+                bytes=int(entry["bytes"]),
+                row_count=int(entry["row_count"]),
+            )
+        )
+    if len(files) != len(TABLE_NAMES):
+        raise JoinOrderBuildError(f"Manifest section {key!r} does not contain {len(TABLE_NAMES)} table files")
+    return sorted(files, key=lambda item: item.table)
+
+
+def render_data_manifest(
+    *,
+    work_dir: Path,
+    schema: Mapping[str, Sequence[ColumnSchema]],
+    table_files: Sequence[TableFile],
+    url: str,
+    archive_sha256: str,
+    output_path: Path,
+) -> Path:
+    manifest = load_build_manifest(work_dir)
+    source = manifest.get("source", {})
+    restore = manifest.get("restore", {})
+    parquet = manifest.get("parquet", {})
+    query_import = manifest.get("query_import", {})
+    data_archive_hash = aggregate_table_hash(table_files)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    lines: list[str] = [
+        f"dataset_version = {format_toml_string(DATASET_VERSION)}",
+        'manifest_hash = "0"',
+        f"data_archive_hash = {format_toml_string(data_archive_hash)}",
+        f"url = {format_toml_string(url)}",
+        f"archive_sha256 = {format_toml_string(archive_sha256)}",
+        'license_file = "DATA-LICENSE.md"',
+        "",
+    ]
+    for table_file in sorted(table_files, key=lambda f: f.table):
+        lines.extend(
+            [
+                "[[tables]]",
+                f"name = {format_toml_string(table_file.table)}",
+                f"file = {format_toml_string(table_file.path.name)}",
+                f"sha256 = {format_toml_string(table_file.sha256)}",
+                f"row_count = {table_file.row_count}",
+            ]
+        )
+        for column in schema[table_file.table]:
+            lines.append(f"schema.{column.name} = {format_toml_string(column.postgres_type)}")
+        lines.append("")
+
+    provenance = {
+        "source_doi": SOURCE_DOI,
+        "retrieval_timestamp": source.get("retrieved_at", ""),
+        "pg_dump_sha256": source.get("sha256", restore.get("pg_dump_sha256", "")),
+        "postgres_image": restore.get("postgres_image", DEFAULT_POSTGRES_IMAGE),
+        "duckdb_version": parquet.get("duckdb_version", ""),
+        "gregrahn_commit": query_import.get("gregrahn_commit", GREGRAHN_COMMIT),
+        "script_git_sha": git_head_sha(),
+    }
+    lines.append("[provenance]")
+    for key, value in provenance.items():
+        lines.append(f"{key} = {format_toml_value(value)}")
+    lines.append("")
+
+    output_path.write_text("\n".join(lines), encoding="utf-8")
+    digest = compute_manifest_hash(output_path)
+    text = output_path.read_text(encoding="utf-8")
+    output_path.write_text(text.replace('manifest_hash = "0"', f'manifest_hash = "{digest}"'), encoding="utf-8")
+    return output_path
+
+
+def assemble_manifest(
+    *,
+    work_dir: Path,
+    schema: Mapping[str, Sequence[ColumnSchema]],
+    table_files: Sequence[TableFile],
+    archive_sha256: str = "",
+) -> Path:
+    manifest_path = work_dir / "manifest" / "data_manifest.toml"
+    render_data_manifest(
+        work_dir=work_dir,
+        schema=schema,
+        table_files=table_files,
+        url=github_release_asset_url(),
+        archive_sha256=archive_sha256,
+        output_path=manifest_path,
+    )
+    write_build_manifest(
+        work_dir,
+        {
+            "data_manifest": {
+                "path": str(manifest_path),
+                "manifest_hash": compute_manifest_hash(manifest_path),
+                "data_archive_hash": aggregate_table_hash(table_files),
+                "archive_sha256": archive_sha256,
+                "assembled_at": utc_now_iso(),
+            }
+        },
+    )
+    return manifest_path
+
+
+def query_sort_key(query_id: str) -> tuple[int, str]:
+    match = re.fullmatch(r"(\d+)([a-z])", query_id)
+    if match is None:
+        return (10_000, query_id)
+    return (int(match.group(1)), match.group(2))
+
+
+def query_files(query_dir: Path) -> list[Path]:
+    files = sorted(query_dir.glob("*.sql"), key=lambda p: query_sort_key(p.stem))
+    return [p for p in files if QUERY_ID_RE.fullmatch(p.stem)]
+
+
+def strip_query_semicolon(sql: str) -> str:
+    return sql.strip().removesuffix(";").strip()
+
+
+def duckdb_compatible_query_sql(sql: str) -> str:
+    """Apply runtime-only compatibility fixes for canonical PostgreSQL JOB SQL."""
+
+    sql = re.sub(r"\bAS\s+at\b", 'AS "at"', sql, flags=re.IGNORECASE)
+    return re.sub(r"\bat\.", '"at".', sql)
+
+
+def underlying_count_failure(query_id: str, count: int) -> dict[str, Any] | None:
+    if query_id in KNOWN_ZERO_UNDERLYING_QUERIES:
+        if count != 0:
+            return {
+                "query_id": query_id,
+                "expected_underlying_row_count": 0,
+                "actual_underlying_row_count": count,
+                "reason": "known_zero_drift",
+            }
+        return None
+    if count < 1:
+        return {
+            "query_id": query_id,
+            "expected_underlying_row_count": ">=1",
+            "actual_underlying_row_count": count,
+            "reason": "unexpected_empty",
+        }
+    return None
+
+
+def split_query(query_id: str, sql: str) -> QueryParts:
+    stripped = strip_query_semicolon(sql)
+    from_match = re.search(r"\bFROM\b", stripped, flags=re.IGNORECASE)
+    where_match = re.search(r"\bWHERE\b", stripped, flags=re.IGNORECASE)
+    if from_match is None or where_match is None or where_match.start() <= from_match.end():
+        raise QueryImportError(f"Query {query_id} is not a flat SELECT/FROM/WHERE JOB query")
+    return QueryParts(
+        query_id=query_id,
+        select_part=stripped[: from_match.start()].strip(),
+        from_part=stripped[from_match.end() : where_match.start()].strip(),
+        where_part=stripped[where_match.end() :].strip(),
+    )
+
+
+def split_from_items(from_part: str) -> list[str]:
+    items: list[str] = []
+    current: list[str] = []
+    quote: str | None = None
+    depth = 0
+    for char in from_part:
+        if quote:
+            current.append(char)
+            if char == quote:
+                quote = None
+            continue
+        if char in {"'", '"'}:
+            quote = char
+            current.append(char)
+            continue
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+        if char == "," and depth == 0:
+            item = "".join(current).strip()
+            if item:
+                items.append(item)
+            current = []
+            continue
+        current.append(char)
+    item = "".join(current).strip()
+    if item:
+        items.append(item)
+    return items
+
+
+def query_aliases(sql: str, query_id: str = "?") -> list[QueryAlias]:
+    parts = split_query(query_id, sql)
+    aliases: list[QueryAlias] = []
+    for item in split_from_items(parts.from_part):
+        cleaned = " ".join(item.split())
+        match = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_]*)\s+(?:AS\s+)?([A-Za-z_][A-Za-z0-9_]*)", cleaned, re.I)
+        if match is None:
+            raise QueryImportError(f"Unable to parse FROM item in query {query_id}: {item!r}")
+        aliases.append(QueryAlias(table=match.group(1), alias=match.group(2)))
+    return aliases
+
+
+def underlying_count_sql(sql: str, query_id: str = "?") -> str:
+    parts = split_query(query_id, sql)
+    return f"SELECT count(*) FROM {parts.from_part} WHERE {parts.where_part}"
+
+
+def alias_id_sql(sql: str, query_id: str = "?", *, limit: int = 3) -> str:
+    parts = split_query(query_id, sql)
+    aliases = query_aliases(sql, query_id=query_id)
+    select_list = ", ".join(f"{alias.alias}.id AS {quote_ident(alias.alias + '__id')}" for alias in aliases)
+    order_list = ", ".join(f"{alias.alias}.id" for alias in aliases)
+    return f"SELECT {select_list} FROM {parts.from_part} WHERE {parts.where_part} ORDER BY {order_list} LIMIT {limit}"
+
+
+def import_canonical_queries(*, work_dir: Path, destination: Path | None = None) -> Path:
+    try:
+        import sqlglot
+    except ImportError as exc:
+        raise JoinOrderBuildError("sqlglot is required in _project/scripts to validate JOB SQL") from exc
+
+    dest_dir = destination or repo_root() / "_project" / "joinorder" / "build-inputs" / "queries"
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    clone_dir = work_dir / "upstream" / f"join-order-benchmark-{GREGRAHN_COMMIT[:12]}"
+    if not clone_dir.exists():
+        clone_dir.parent.mkdir(parents=True, exist_ok=True)
+        stream_command(["git", "clone", "--quiet", GREGRAHN_REPO, str(clone_dir)])
+    run_command(["git", "-C", str(clone_dir), "fetch", "--quiet", "origin", GREGRAHN_COMMIT])
+    run_command(["git", "-C", str(clone_dir), "checkout", "--quiet", GREGRAHN_COMMIT])
+
+    source_files = sorted(clone_dir.glob("*.sql"), key=lambda p: query_sort_key(p.stem))
+    source_files = [p for p in source_files if QUERY_ID_RE.fullmatch(p.stem)]
+    if len(source_files) != EXPECTED_QUERY_COUNT:
+        raise QueryImportError(f"Expected {EXPECTED_QUERY_COUNT} canonical JOB queries, found {len(source_files)}")
+
+    for stale in dest_dir.glob("*.sql"):
+        stale.unlink()
+    for source in source_files:
+        text = source.read_text(encoding="utf-8")
+        sqlglot.parse_one(text, read="postgres")
+        split_query(source.stem, text)
+        if not text.endswith("\n"):
+            text += "\n"
+        (dest_dir / source.name).write_text(text, encoding="utf-8")
+
+    write_build_manifest(
+        work_dir,
+        {
+            "query_import": {
+                "source_repo": GREGRAHN_REPO,
+                "gregrahn_commit": GREGRAHN_COMMIT,
+                "query_count": len(source_files),
+                "destination": str(dest_dir),
+                "imported_at": utc_now_iso(),
+            }
+        },
+    )
+    return dest_dir
+
+
+def validate_predicate_domain(
+    *,
+    work_dir: Path,
+    query_dir: Path,
+    container_name: str,
+    database: str,
+    user: str,
+    expected_query_count: int | None = EXPECTED_QUERY_COUNT,
+) -> dict[str, Any]:
+    failures: list[dict[str, Any]] = []
+    counts: dict[str, int] = {}
+    known_zero_counts: dict[str, int] = {}
+    for path in query_files(query_dir):
+        sql = path.read_text(encoding="utf-8")
+        count_raw = psql(
+            container_name=container_name,
+            database=database,
+            user=user,
+            sql=underlying_count_sql(sql, query_id=path.stem),
+        ).strip()
+        count = int(count_raw)
+        counts[path.stem] = count
+        if path.stem in KNOWN_ZERO_UNDERLYING_QUERIES:
+            known_zero_counts[path.stem] = count
+        failure = underlying_count_failure(path.stem, count)
+        if failure is not None:
+            failures.append(failure)
+    query_count_failures: list[dict[str, Any]] = []
+    if expected_query_count is not None and len(counts) != expected_query_count:
+        query_count_failures.append(
+            {
+                "expected_query_count": expected_query_count,
+                "actual_query_count": len(counts),
+            }
+        )
+    missing_known_zero_queries = sorted(set(KNOWN_ZERO_UNDERLYING_QUERIES) - set(counts), key=query_sort_key)
+    if expected_query_count is not None and missing_known_zero_queries:
+        query_count_failures.append({"missing_known_zero_queries": missing_known_zero_queries})
+
+    null_fractions: dict[str, float] = {}
+    null_failures: list[dict[str, Any]] = []
+    null_counts: dict[str, dict[str, Any]] = {}
+    for (table, column), (expected_nulls, expected_rows) in CANONICAL_NULL_COUNTS.items():
+        rows = psql_json_rows(
+            container_name=container_name,
+            database=database,
+            user=user,
+            sql=(
+                "SELECT count(*)::bigint AS row_count, "
+                f"count(*) FILTER (WHERE {quote_ident(column)} IS NULL)::bigint AS null_count "
+                f"FROM public.{quote_ident(table)}"
+            ),
+        )
+        if len(rows) != 1:
+            raise JoinOrderBuildError(f"Null-count gate returned {len(rows)} rows for {table}.{column}")
+        actual_rows = int(rows[0]["row_count"])
+        actual_nulls = int(rows[0]["null_count"])
+        actual = actual_nulls / actual_rows
+        key = f"{table}.{column}"
+        null_fractions[key] = actual
+        null_counts[key] = {
+            "null_count": actual_nulls,
+            "row_count": actual_rows,
+            "null_fraction": actual,
+            "expected_null_count": expected_nulls,
+            "expected_row_count": expected_rows,
+            "expected_null_fraction": expected_nulls / expected_rows,
+        }
+        if actual_nulls != expected_nulls or actual_rows != expected_rows:
+            null_failures.append(
+                {
+                    "column": key,
+                    "expected_null_count": expected_nulls,
+                    "actual_null_count": actual_nulls,
+                    "expected_row_count": expected_rows,
+                    "actual_row_count": actual_rows,
+                    "expected_null_fraction": expected_nulls / expected_rows,
+                    "actual_null_fraction": actual,
+                }
+            )
+
+    report = {
+        "query_underlying_row_counts": counts,
+        "known_zero_underlying_queries": sorted(KNOWN_ZERO_UNDERLYING_QUERIES, key=query_sort_key),
+        "known_zero_underlying_row_counts": dict(sorted(known_zero_counts.items(), key=lambda item: query_sort_key(item[0]))),
+        "query_count_failures": query_count_failures,
+        "query_failures": failures,
+        "unexpected_empty_query_failures": [failure for failure in failures if failure["reason"] == "unexpected_empty"],
+        "known_zero_drift_failures": [failure for failure in failures if failure["reason"] == "known_zero_drift"],
+        "null_counts": null_counts,
+        "null_fractions": null_fractions,
+        "null_count_failures": null_failures,
+        "null_fraction_failures": null_failures,
+        "validated_at": utc_now_iso(),
+    }
+    write_build_manifest(work_dir, {"predicate_gate": report})
+    if query_count_failures or failures or null_failures:
+        raise JoinOrderBuildError(
+            "Predicate-domain gate failed: "
+            f"{len(query_count_failures)} query-count failures, "
+            f"{len(report['unexpected_empty_query_failures'])} unexpected empty query predicates, "
+            f"{len(report['known_zero_drift_failures'])} known-zero drifts, "
+            f"{len(null_failures)} null-count drifts"
+        )
+    return report
+
+
+def validate_encoding_round_trip(
+    *,
+    work_dir: Path,
+    query_sample_size: int,
+    container_name: str,
+    database: str,
+    user: str,
+) -> dict[str, Any]:
+    try:
+        import duckdb
+    except ImportError as exc:
+        raise JoinOrderBuildError("duckdb is required in _project/scripts for encoding round-trip validation") from exc
+
+    con = duckdb.connect()
+    parquet_dir = work_dir / "parquet"
+    results: dict[str, Any] = {"samples": [], "validated_at": utc_now_iso()}
+    try:
+        for table, column in STRING_SAMPLE_COLUMNS.items():
+            predicate = f"{quote_ident(column)} IS NOT NULL"
+            if column in {"name", "title"}:
+                predicate += f" AND {quote_ident(column)} ~ '[^ -~]'"
+            rows = psql_json_rows(
+                container_name=container_name,
+                database=database,
+                user=user,
+                sql=(
+                    f"SELECT id, {quote_ident(column)} AS value, "
+                    f"encode(convert_to({quote_ident(column)}, 'UTF8'), 'hex') AS utf8_hex "
+                    f"FROM public.{quote_ident(table)} WHERE {predicate} ORDER BY id LIMIT {query_sample_size}"
+                ),
+            )
+            if not rows:
+                raise JoinOrderBuildError(f"No encoding-gate samples found for {table}.{column}")
+            for row in rows:
+                parquet_value = con.execute(
+                    f"SELECT {quote_ident(column)} FROM read_parquet({duckdb_literal(parquet_dir / f'{table}.parquet')}) "
+                    "WHERE id = ?",
+                    [int(row["id"])],
+                ).fetchone()
+                if parquet_value is None:
+                    raise JoinOrderBuildError(f"Encoding sample id={row['id']} missing from {table}.parquet")
+                value = parquet_value[0]
+                actual_hex = value.encode("utf-8").hex() if value is not None else ""
+                if actual_hex != row["utf8_hex"]:
+                    raise JoinOrderBuildError(
+                        f"Encoding round-trip drift for {table}.{column} id={row['id']}: "
+                        f"postgres {row['utf8_hex']} parquet {actual_hex}"
+                    )
+            results["samples"].append({"table": table, "column": column, "count": len(rows)})
+    finally:
+        con.close()
+    write_build_manifest(work_dir, {"encoding_round_trip": results})
+    return results
+
+
+def compute_reference_cardinalities(
+    *,
+    work_dir: Path,
+    query_dir: Path,
+    output_path: Path | None,
+    container_name: str,
+    database: str,
+    user: str,
+) -> Path:
+    manifest = load_build_manifest(work_dir)
+    queries: dict[str, dict[str, Any]] = {}
+    postgres_version = psql(container_name=container_name, database=database, user=user, sql="SHOW server_version").strip()
+    for path in query_files(query_dir):
+        sql = strip_query_semicolon(path.read_text(encoding="utf-8"))
+        row_count = int(
+            psql(
+                container_name=container_name,
+                database=database,
+                user=user,
+                sql=f"SELECT count(*) FROM ({sql}) AS benchbox_q",
+            ).strip()
+        )
+        first_row_json = psql(
+            container_name=container_name,
+            database=database,
+            user=user,
+            sql=f"SELECT row_to_json(benchbox_q)::text FROM ({sql}) AS benchbox_q ORDER BY 1 LIMIT 1",
+        ).strip()
+        first_row_sha256 = hashlib.sha256(first_row_json.encode("utf-8")).hexdigest() if first_row_json else None
+        underlying_count = int(
+            psql(
+                container_name=container_name,
+                database=database,
+                user=user,
+                sql=underlying_count_sql(sql, query_id=path.stem),
+            ).strip()
+        )
+        queries[path.stem] = {
+            "row_count": row_count,
+            "underlying_row_count": underlying_count,
+            "first_row_sha256": first_row_sha256,
+        }
+        print(f"cardinality {path.stem}: rows={row_count} underlying={underlying_count}", flush=True)
+
+    if len(queries) != EXPECTED_QUERY_COUNT:
+        raise JoinOrderBuildError(f"Expected {EXPECTED_QUERY_COUNT} cardinalities, computed {len(queries)}")
+
+    out = output_path or repo_root() / "_project" / "joinorder" / "reference_cardinalities.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "postgres_version": postgres_version,
+        "dataset_version": DATASET_VERSION,
+        "manifest_hash": manifest.get("data_manifest", {}).get("manifest_hash"),
+        "data_archive_hash": manifest.get("data_manifest", {}).get("data_archive_hash"),
+        "gregrahn_commit": manifest.get("query_import", {}).get("gregrahn_commit", GREGRAHN_COMMIT),
+        "queries": dict(sorted(queries.items(), key=lambda item: query_sort_key(item[0]))),
+    }
+    out.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    write_build_manifest(work_dir, {"reference_cardinalities": {"path": str(out), "query_count": len(queries)}})
+    return out
+
+
+def write_cardinality_cross_check(*, work_dir: Path, cardinalities_path: Path, output_path: Path | None = None) -> Path:
+    out = output_path or repo_root() / "_project" / "joinorder" / "cardinality-cross-check.md"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    cardinalities = json.loads(cardinalities_path.read_text(encoding="utf-8"))
+    query_count = len(cardinalities.get("queries", {}))
+    out.write_text(
+        "\n".join(
+            [
+                "# JoinOrder Cardinality Cross-check",
+                "",
+                "The Leis et al. 2015 JOB paper and the commonly mirrored JOB companion materials publish optimizer",
+                "error distributions and the canonical query text, but not a complete stable table of per-query",
+                "answer-set cardinalities for all 113 aggregate queries.",
+                "",
+                "BenchBox therefore treats the PostgreSQL run captured in",
+                "`_project/joinorder/reference_cardinalities.json` as the authoritative oracle for this dataset",
+                "build. The oracle is tied to the Harvard Dataverse pg_dump SHA256, the gregrahn query commit,",
+                "the data manifest hash, and PostgreSQL version recorded in that JSON file.",
+                "",
+                f"Computed oracle coverage: {query_count}/113 queries.",
+                "",
+                "Traceable published per-query row counts found: none.",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    write_build_manifest(work_dir, {"cardinality_cross_check": {"path": str(out), "traceable_counts": 0}})
+    return out
+
+
+def write_data_license_template(work_dir: Path) -> Path:
+    path = work_dir / "package" / "DATA-LICENSE.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "\n".join(
+            [
+                "# JoinOrder IMDb 2013 Dataset License Notice",
+                "",
+                "Dataset provenance: Harvard Dataverse DOI 10.7910/DVN/2QYZBT, May 2013 IMDb list-file",
+                "snapshot parsed with imdbpy into the 21-table JOB relational schema and converted by BenchBox",
+                "to Parquet for benchmark reproducibility.",
+                "",
+                "Information courtesy of IMDb (https://www.imdb.com). Used with permission.",
+                "",
+                "Scope: this derivative archive is provided for research and database optimizer benchmarking.",
+                "",
+                "BenchBox redistributes a derivative form of this dataset as a convenience for benchmark",
+                "reproducibility. BenchBox makes no claim of ownership over the underlying IMDb data and",
+                "will honor takedown requests.",
+                "",
+                "Takedown contact: finalized by the cutover TODO before the release is published.",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
+def write_checksums(table_files: Sequence[TableFile], output_path: Path) -> Path:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        "".join(f"{entry.sha256}  {entry.path.name}\n" for entry in sorted(table_files, key=lambda f: f.table)),
+        encoding="utf-8",
+    )
+    return output_path
+
+
+def add_tar_entry(tar: tarfile.TarFile, path: Path, arcname: str) -> None:
+    info = tar.gettarinfo(str(path), arcname=arcname)
+    info.uid = 0
+    info.gid = 0
+    info.uname = ""
+    info.gname = ""
+    info.mtime = 0
+    with path.open("rb") as handle:
+        tar.addfile(info, handle)
+
+
+def create_tar_zst(entries: Sequence[tuple[Path, str]], output_path: Path) -> Path:
+    try:
+        import zstandard as zstd
+    except ImportError as exc:
+        raise JoinOrderBuildError("zstandard is required in _project/scripts to package JoinOrder data") from exc
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = output_path.with_suffix(output_path.suffix + ".tmp")
+    compressor = zstd.ZstdCompressor(level=19, threads=0)
+    with tmp_path.open("wb") as raw:
+        with compressor.stream_writer(raw) as compressed:
+            with tarfile.open(fileobj=compressed, mode="w|") as tar:
+                for path, arcname in sorted(entries, key=lambda item: item[1]):
+                    add_tar_entry(tar, path, arcname)
+    tmp_path.replace(output_path)
+    return output_path
+
+
+def package_archive(*, work_dir: Path, manifest_path: Path, cardinalities_path: Path) -> tuple[Path, Path]:
+    table_files = load_table_files_from_manifest(work_dir, "parquet")
+    package_dir = work_dir / "package"
+    checksums_path = write_checksums(table_files, package_dir / "checksums.txt")
+    license_path = write_data_license_template(work_dir)
+    package_manifest = package_dir / "data_manifest.toml"
+    shutil.copyfile(manifest_path, package_manifest)
+    package_cardinalities = package_dir / "reference_cardinalities.json"
+    shutil.copyfile(cardinalities_path, package_cardinalities)
+
+    entries: list[tuple[Path, str]] = [(entry.path, entry.path.name) for entry in table_files]
+    entries.extend(
+        [
+            (package_manifest, "data_manifest.toml"),
+            (license_path, "DATA-LICENSE.md"),
+            (checksums_path, "checksums.txt"),
+            (package_cardinalities, "reference_cardinalities.json"),
+        ]
+    )
+    archive_path = work_dir / "archive" / ARCHIVE_NAME
+    create_tar_zst(entries, archive_path)
+    archive_sha = sha256_file(archive_path)
+    sha_path = archive_path.with_name(ARCHIVE_SHA_NAME)
+    sha_path.write_text(f"{archive_sha}  {ARCHIVE_NAME}\n", encoding="utf-8")
+    write_build_manifest(
+        work_dir,
+        {
+            "archive": {
+                "path": str(archive_path),
+                "sha256_path": str(sha_path),
+                "sha256": archive_sha,
+                "bytes": archive_path.stat().st_size,
+                "packaged_at": utc_now_iso(),
+            }
+        },
+    )
+    return archive_path, sha_path
+
+
+def load_queries_for_duckdb(con: Any, fixture_dir: Path) -> None:
+    for table in TABLE_NAMES:
+        con.execute(
+            f"CREATE OR REPLACE VIEW {quote_ident(table)} AS "
+            f"SELECT * FROM read_parquet({duckdb_literal(fixture_dir / f'{table}.parquet')})"
+        )
+
+
+def collect_initial_tiny_ids(
+    *,
+    query_dir: Path,
+    container_name: str,
+    database: str,
+    user: str,
+    sample_per_table: int,
+) -> dict[str, set[int]]:
+    ids: dict[str, set[int]] = {table: set() for table in TABLE_NAMES}
+    for table in TABLE_NAMES:
+        rows = psql_json_rows(
+            container_name=container_name,
+            database=database,
+            user=user,
+            sql=f"SELECT id FROM public.{quote_ident(table)} ORDER BY id LIMIT {sample_per_table}",
+        )
+        ids[table].update(int(row["id"]) for row in rows)
+
+    for path in query_files(query_dir):
+        sql = path.read_text(encoding="utf-8")
+        rows = psql_json_rows(
+            container_name=container_name,
+            database=database,
+            user=user,
+            sql=alias_id_sql(sql, query_id=path.stem, limit=3),
+        )
+        if not rows:
+            if path.stem in KNOWN_ZERO_UNDERLYING_QUERIES:
+                continue
+            raise JoinOrderBuildError(f"Query {path.stem} produced no rows for tiny fixture sampling")
+        if path.stem in KNOWN_ZERO_UNDERLYING_QUERIES:
+            raise JoinOrderBuildError(f"Known-zero query {path.stem} produced rows for tiny fixture sampling")
+        aliases = {alias.alias: alias.table for alias in query_aliases(sql, query_id=path.stem)}
+        for row in rows:
+            for key, value in row.items():
+                if value is None or not key.endswith("__id"):
+                    continue
+                alias = key[: -len("__id")]
+                table = aliases[alias]
+                ids[table].add(int(value))
+    return ids
+
+
+def close_tiny_ids_over_foreign_keys(
+    *,
+    ids: dict[str, set[int]],
+    foreign_keys: Sequence[ForeignKey],
+    container_name: str,
+    database: str,
+    user: str,
+) -> None:
+    changed = True
+    while changed:
+        changed = False
+        for fk in foreign_keys:
+            child_ids = sorted(ids.get(fk.child_table, set()))
+            if not child_ids or fk.parent_column != "id":
+                continue
+            child_id_sql = ", ".join(str(value) for value in child_ids)
+            rows = psql_json_rows(
+                container_name=container_name,
+                database=database,
+                user=user,
+                sql=(
+                    f"SELECT DISTINCT {quote_ident(fk.child_column)} AS parent_id "
+                    f"FROM public.{quote_ident(fk.child_table)} "
+                    f"WHERE id IN ({child_id_sql}) AND {quote_ident(fk.child_column)} IS NOT NULL"
+                ),
+            )
+            before = len(ids[fk.parent_table])
+            ids[fk.parent_table].update(int(row["parent_id"]) for row in rows if row["parent_id"] is not None)
+            changed = changed or len(ids[fk.parent_table]) != before
+
+
+def export_tiny_fixture(
+    *,
+    work_dir: Path,
+    query_dir: Path,
+    output_dir: Path,
+    schema: Mapping[str, Sequence[ColumnSchema]],
+    container_name: str,
+    database: str,
+    user: str,
+    sample_per_table: int = 50,
+) -> Path:
+    try:
+        import duckdb
+    except ImportError as exc:
+        raise JoinOrderBuildError("duckdb is required in _project/scripts to generate tiny fixture") from exc
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    tiny_csv_dir = work_dir / "tiny-csv"
+    ids = collect_initial_tiny_ids(
+        query_dir=query_dir,
+        container_name=container_name,
+        database=database,
+        user=user,
+        sample_per_table=sample_per_table,
+    )
+    close_tiny_ids_over_foreign_keys(
+        ids=ids,
+        foreign_keys=postgres_foreign_keys(container_name=container_name, database=database, user=user),
+        container_name=container_name,
+        database=database,
+        user=user,
+    )
+
+    table_files: list[TableFile] = []
+    con = duckdb.connect()
+    try:
+        for table in TABLE_NAMES:
+            table_ids = sorted(ids[table])
+            if not table_ids:
+                raise JoinOrderBuildError(f"Tiny fixture selected zero rows for {table}")
+            sql_where = f"id IN ({', '.join(str(value) for value in table_ids)})"
+            csv_path = tiny_csv_dir / f"{table}.csv"
+            parquet_path = output_dir / f"{table}.parquet"
+            copy_table_to_csv(
+                container_name=container_name,
+                database=database,
+                user=user,
+                table=table,
+                destination=csv_path,
+                sql_where=sql_where,
+            )
+            select_list = ", ".join(duckdb_cast_expression(column) for column in schema[table])
+            con.execute(
+                f"""
+                COPY (
+                  SELECT {select_list}
+                  FROM read_csv_auto({duckdb_literal(csv_path)}, header=true, all_varchar=true, sample_size=-1)
+                )
+                TO {duckdb_literal(parquet_path)}
+                (FORMAT 'parquet', COMPRESSION 'zstd', ROW_GROUP_SIZE 100000)
+                """
+            )
+            row_count = con.execute(
+                f"SELECT count(*) FROM read_parquet({duckdb_literal(parquet_path)})"
+            ).fetchone()[0]
+            sha256, _md5, size = hash_file(parquet_path)
+            table_files.append(TableFile(table=table, path=parquet_path, sha256=sha256, bytes=size, row_count=row_count))
+        load_queries_for_duckdb(con, output_dir)
+        tiny_cardinalities: dict[str, dict[str, Any]] = {}
+        for path in query_files(query_dir):
+            sql = strip_query_semicolon(path.read_text(encoding="utf-8"))
+            duckdb_sql = duckdb_compatible_query_sql(sql)
+            underlying = con.execute(duckdb_compatible_query_sql(underlying_count_sql(sql, query_id=path.stem))).fetchone()[0]
+            failure = underlying_count_failure(path.stem, int(underlying))
+            if failure is not None:
+                raise JoinOrderBuildError(
+                    f"Tiny fixture predicate contract failed for query {path.stem}: {failure['reason']}"
+                )
+            row_count = con.execute(f"SELECT count(*) FROM ({duckdb_sql}) AS benchbox_q").fetchone()[0]
+            first_row = con.execute(f"SELECT * FROM ({duckdb_sql}) AS benchbox_q LIMIT 1").fetchone()
+            first_row_json = json.dumps(first_row, default=str, ensure_ascii=False) if first_row else ""
+            tiny_cardinalities[path.stem] = {
+                "row_count": int(row_count),
+                "underlying_row_count": int(underlying),
+                "first_row_sha256": hashlib.sha256(str(first_row_json).encode("utf-8")).hexdigest()
+                if first_row_json
+                else None,
+            }
+    finally:
+        con.close()
+
+    manifest_path = output_dir / "tiny_manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "dataset_version": f"{DATASET_VERSION}-tiny",
+                "source_dataset_version": DATASET_VERSION,
+                "table_rows": {entry.table: entry.row_count for entry in table_files},
+                "table_sha256": {entry.table: entry.sha256 for entry in table_files},
+                "generated_at": utc_now_iso(),
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    cardinalities_path = repo_root() / "_project" / "joinorder" / "tiny_reference_cardinalities.json"
+    cardinalities_path.parent.mkdir(parents=True, exist_ok=True)
+    cardinalities_path.write_text(
+        json.dumps(
+            {
+                "postgres_version": DEFAULT_POSTGRES_IMAGE.removeprefix("postgres:"),
+                "dataset_version": f"{DATASET_VERSION}-tiny",
+                "manifest_hash": None,
+                "data_archive_hash": aggregate_table_hash(table_files),
+                "gregrahn_commit": GREGRAHN_COMMIT,
+                "queries": dict(sorted(tiny_cardinalities.items(), key=lambda item: query_sort_key(item[0]))),
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    write_build_manifest(
+        work_dir,
+        {
+            "tiny_fixture": {
+                "fixture_dir": str(output_dir),
+                "manifest": str(manifest_path),
+                "cardinalities": str(cardinalities_path),
+                "table_rows": {entry.table: entry.row_count for entry in table_files},
+                "generated_at": utc_now_iso(),
+            }
+        },
+    )
+    return output_dir
+
+
+def verify_tiny_fixture(*, fixture_dir: Path, query_dir: Path, cardinalities_path: Path) -> None:
+    try:
+        import duckdb
+    except ImportError as exc:
+        raise JoinOrderBuildError("duckdb is required in _project/scripts to verify tiny fixture") from exc
+
+    con = duckdb.connect()
+    try:
+        load_queries_for_duckdb(con, fixture_dir)
+        cardinalities = json.loads(cardinalities_path.read_text(encoding="utf-8"))
+        for path in query_files(query_dir):
+            sql = strip_query_semicolon(path.read_text(encoding="utf-8"))
+            underlying = int(
+                con.execute(duckdb_compatible_query_sql(underlying_count_sql(sql, query_id=path.stem))).fetchone()[0]
+            )
+            expected = int(cardinalities["queries"][path.stem]["underlying_row_count"])
+            failure = underlying_count_failure(path.stem, underlying)
+            if underlying != expected or failure is not None:
+                raise JoinOrderBuildError(
+                    f"Tiny fixture cardinality mismatch for {path.stem}: expected {expected}, got {underlying}"
+                )
+    finally:
+        con.close()
+
+
+def write_release_notes(*, work_dir: Path, archive_path: Path, archive_sha_path: Path) -> Path:
+    table_files = load_table_files_from_manifest(work_dir, "parquet")
+    notes_path = repo_root() / "_project" / "joinorder" / "release-notes.md"
+    notes_path.parent.mkdir(parents=True, exist_ok=True)
+    rows = "\n".join(f"- `{entry.table}`: {entry.row_count:,} rows, sha256 `{entry.sha256}`" for entry in table_files)
+    archive_sha = archive_sha_path.read_text(encoding="utf-8").split()[0]
+    notes_path.write_text(
+        "\n".join(
+            [
+                "# JoinOrder canonical IMDb 2013 dataset (v1)",
+                "",
+                f"- Source: Harvard Dataverse DOI {SOURCE_DOI}, file `imdb_pg11`.",
+                "- Snapshot: May 2013 IMDb list-file data parsed into the JOB 21-table schema.",
+                "- Attribution: Information courtesy of IMDb (https://www.imdb.com). Used with permission.",
+                "- Scope: research and database optimizer benchmarking.",
+                "- BenchBox redistribution disclaimer and takedown commitment are included in DATA-LICENSE.md.",
+                f"- Archive: `{archive_path.name}` sha256 `{archive_sha}`.",
+                "",
+                "## Tables",
+                "",
+                rows,
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return notes_path
+
+
+def stage_draft_release(*, work_dir: Path, archive_path: Path, archive_sha_path: Path, notes_path: Path) -> None:
+    view = run_command(["gh", "release", "view", GITHUB_RELEASE_TAG, "--json", "isDraft"], check=False)
+    if view.returncode != 0:
+        stream_command(
+            [
+                "gh",
+                "release",
+                "create",
+                GITHUB_RELEASE_TAG,
+                "--draft",
+                "--title",
+                "JoinOrder canonical IMDb 2013 dataset (v1)",
+                "--notes-file",
+                str(notes_path),
+                str(archive_path),
+                str(archive_sha_path),
+            ]
+        )
+    else:
+        stream_command(
+            [
+                "gh",
+                "release",
+                "edit",
+                GITHUB_RELEASE_TAG,
+                "--draft=true",
+                "--title",
+                "JoinOrder canonical IMDb 2013 dataset (v1)",
+                "--notes-file",
+                str(notes_path),
+            ]
+        )
+        stream_command(["gh", "release", "upload", GITHUB_RELEASE_TAG, "--clobber", str(archive_path), str(archive_sha_path)])
+    write_build_manifest(
+        work_dir,
+        {
+            "github_release": {
+                "tag": GITHUB_RELEASE_TAG,
+                "draft": True,
+                "archive": str(archive_path),
+                "archive_sha256": str(archive_sha_path),
+                "staged_at": utc_now_iso(),
+            }
+        },
+    )
+
+
+def write_runtime_manifest(*, work_dir: Path, schema: Mapping[str, Sequence[ColumnSchema]]) -> Path:
+    table_files = load_table_files_from_manifest(work_dir, "parquet")
+    archive = load_build_manifest(work_dir).get("archive", {})
+    archive_sha = str(archive.get("sha256") or "")
+    if not archive_sha:
+        raise JoinOrderBuildError("Archive sha256 missing; run package before write-runtime-manifest")
+    output_path = repo_root() / "benchbox" / "core" / "joinorder" / "data_manifest.toml"
+    render_data_manifest(
+        work_dir=work_dir,
+        schema=schema,
+        table_files=table_files,
+        url=github_release_asset_url(),
+        archive_sha256=archive_sha,
+        output_path=output_path,
+    )
+    write_build_manifest(
+        work_dir,
+        {
+            "runtime_manifest": {
+                "path": str(output_path),
+                "manifest_hash": compute_manifest_hash(output_path),
+                "archive_sha256": archive_sha,
+                "written_at": utc_now_iso(),
+            }
+        },
+    )
+    return output_path
 
 
 def format_restore_failures(validation: RestoreValidation) -> str:
@@ -710,6 +2322,24 @@ def add_restore_args(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def add_existing_postgres_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--container-name", required=True, help="Running PostgreSQL container with restored IMDb data.")
+    parser.add_argument("--database", default=DEFAULT_POSTGRES_DB, help="PostgreSQL database name.")
+    parser.add_argument("--user", default=DEFAULT_POSTGRES_USER, help="PostgreSQL user.")
+
+
+def add_query_dir_arg(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--queries",
+        default=None,
+        help="Canonical JOB query directory. Defaults to _project/joinorder/build-inputs/queries.",
+    )
+
+
+def query_dir_from_arg(raw: str | None) -> Path:
+    return Path(raw).expanduser().resolve() if raw else repo_root() / "_project" / "joinorder" / "build-inputs" / "queries"
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -730,6 +2360,72 @@ def build_parser() -> argparse.ArgumentParser:
     add_common_args(w4)
     w4.add_argument("--force-download", action="store_true", help="Re-download before restoring.")
     add_restore_args(w4)
+
+    extract = subparsers.add_parser("extract-csv", help="w5: Extract all restored PostgreSQL tables to CSV.")
+    add_common_args(extract)
+    add_existing_postgres_args(extract)
+
+    convert = subparsers.add_parser("convert-parquet", help="w6: Convert extracted CSV files to zstd Parquet.")
+    add_common_args(convert)
+    add_existing_postgres_args(convert)
+
+    manifest = subparsers.add_parser("assemble-manifest", help="w7: Assemble data_manifest.toml provenance.")
+    add_common_args(manifest)
+    add_existing_postgres_args(manifest)
+
+    encoding = subparsers.add_parser("encoding-gate", help="w8: Verify UTF-8 round trip from Postgres to Parquet.")
+    add_common_args(encoding)
+    add_existing_postgres_args(encoding)
+    encoding.add_argument("--sample-size", type=int, default=100)
+
+    predicate = subparsers.add_parser("predicate-gate", help="w9: Verify canonical predicate oracle.")
+    add_common_args(predicate)
+    add_existing_postgres_args(predicate)
+    add_query_dir_arg(predicate)
+
+    import_queries = subparsers.add_parser("import-queries", help="w10: Import canonical gregrahn JOB SQL files.")
+    add_common_args(import_queries)
+    import_queries.add_argument("--destination", default=None)
+
+    cardinalities = subparsers.add_parser("cardinalities", help="w11: Compute PostgreSQL oracle cardinalities.")
+    add_common_args(cardinalities)
+    add_existing_postgres_args(cardinalities)
+    add_query_dir_arg(cardinalities)
+    cardinalities.add_argument("--output", default=None)
+
+    cross_check = subparsers.add_parser("cross-check", help="w12: Write published-cardinality cross-check report.")
+    add_common_args(cross_check)
+    cross_check.add_argument("--cardinalities", default=None)
+    cross_check.add_argument("--output", default=None)
+
+    package = subparsers.add_parser("package", help="w13: Package Parquets, manifest, license, checksums, cardinalities.")
+    add_common_args(package)
+    package.add_argument("--manifest", default=None)
+    package.add_argument("--cardinalities", default=None)
+
+    tiny = subparsers.add_parser("tiny-fixture", help="w14: Generate tiny fixture preserving predicate oracle.")
+    add_common_args(tiny)
+    add_existing_postgres_args(tiny)
+    add_query_dir_arg(tiny)
+    tiny.add_argument("--fixture", default=None)
+    tiny.add_argument("--sample-per-table", type=int, default=50)
+
+    verify_tiny = subparsers.add_parser("verify-tiny-fixture", help="Verify tiny fixture against canonical queries.")
+    verify_tiny.add_argument("--fixture", required=True)
+    add_query_dir_arg(verify_tiny)
+    verify_tiny.add_argument("--cardinalities", required=True)
+
+    release = subparsers.add_parser("stage-release", help="w15: Stage DRAFT GitHub Release with archive assets.")
+    add_common_args(release)
+
+    runtime_manifest = subparsers.add_parser("write-runtime-manifest", help="w16: Write joinorder data_manifest.toml.")
+    add_common_args(runtime_manifest)
+    add_existing_postgres_args(runtime_manifest)
+
+    foundation = subparsers.add_parser("foundation", help="Run w5-w16 after restoring PostgreSQL from the cached pg_dump.")
+    add_common_args(foundation)
+    foundation.add_argument("--force-download", action="store_true", help="Re-download before restoring.")
+    add_restore_args(foundation)
 
     return parser
 
@@ -759,14 +2455,267 @@ def run_restore(args: argparse.Namespace) -> int:
     return 0
 
 
+def run_extract_csv(args: argparse.Namespace) -> int:
+    work_dir = work_dir_from_arg(args.work_dir)
+    files = extract_csv_files(
+        work_dir=work_dir,
+        container_name=args.container_name,
+        database=args.database,
+        user=args.user,
+    )
+    print(f"Extracted {len(files)} CSV files to {work_dir / 'csv'}")
+    return 0
+
+
+def run_convert_parquet(args: argparse.Namespace) -> int:
+    work_dir = work_dir_from_arg(args.work_dir)
+    schema = postgres_schema(container_name=args.container_name, database=args.database, user=args.user)
+    files = convert_csv_to_parquet(work_dir=work_dir, schema=schema)
+    print(f"Converted {len(files)} Parquet files to {work_dir / 'parquet'}")
+    return 0
+
+
+def run_assemble_manifest(args: argparse.Namespace) -> int:
+    work_dir = work_dir_from_arg(args.work_dir)
+    schema = postgres_schema(container_name=args.container_name, database=args.database, user=args.user)
+    table_files = load_table_files_from_manifest(work_dir, "parquet")
+    manifest_path = assemble_manifest(work_dir=work_dir, schema=schema, table_files=table_files)
+    print(f"Assembled manifest: {manifest_path}")
+    return 0
+
+
+def run_encoding_gate(args: argparse.Namespace) -> int:
+    work_dir = work_dir_from_arg(args.work_dir)
+    result = validate_encoding_round_trip(
+        work_dir=work_dir,
+        query_sample_size=args.sample_size,
+        container_name=args.container_name,
+        database=args.database,
+        user=args.user,
+    )
+    print(f"Encoding round-trip gate passed for {len(result['samples'])} sampled column groups")
+    return 0
+
+
+def run_predicate_gate(args: argparse.Namespace) -> int:
+    work_dir = work_dir_from_arg(args.work_dir)
+    report = validate_predicate_domain(
+        work_dir=work_dir,
+        query_dir=query_dir_from_arg(args.queries),
+        container_name=args.container_name,
+        database=args.database,
+        user=args.user,
+    )
+    print(
+        "Predicate-domain gate passed for "
+        f"{len(report['query_underlying_row_counts'])} queries "
+        f"({len(report['known_zero_underlying_queries'])} canonical known-zero underlying predicates)"
+    )
+    return 0
+
+
+def run_import_queries(args: argparse.Namespace) -> int:
+    work_dir = work_dir_from_arg(args.work_dir)
+    destination = Path(args.destination).expanduser().resolve() if args.destination else None
+    dest_dir = import_canonical_queries(work_dir=work_dir, destination=destination)
+    print(f"Imported {len(query_files(dest_dir))} canonical queries to {dest_dir}")
+    return 0
+
+
+def run_cardinalities(args: argparse.Namespace) -> int:
+    work_dir = work_dir_from_arg(args.work_dir)
+    output = Path(args.output).expanduser().resolve() if args.output else None
+    out = compute_reference_cardinalities(
+        work_dir=work_dir,
+        query_dir=query_dir_from_arg(args.queries),
+        output_path=output,
+        container_name=args.container_name,
+        database=args.database,
+        user=args.user,
+    )
+    print(f"Wrote reference cardinalities: {out}")
+    return 0
+
+
+def run_cross_check(args: argparse.Namespace) -> int:
+    work_dir = work_dir_from_arg(args.work_dir)
+    cardinalities = (
+        Path(args.cardinalities).expanduser().resolve()
+        if args.cardinalities
+        else repo_root() / "_project" / "joinorder" / "reference_cardinalities.json"
+    )
+    output = Path(args.output).expanduser().resolve() if args.output else None
+    out = write_cardinality_cross_check(work_dir=work_dir, cardinalities_path=cardinalities, output_path=output)
+    print(f"Wrote cardinality cross-check report: {out}")
+    return 0
+
+
+def run_package(args: argparse.Namespace) -> int:
+    work_dir = work_dir_from_arg(args.work_dir)
+    manifest_path = Path(args.manifest).expanduser().resolve() if args.manifest else work_dir / "manifest" / "data_manifest.toml"
+    cardinalities = (
+        Path(args.cardinalities).expanduser().resolve()
+        if args.cardinalities
+        else repo_root() / "_project" / "joinorder" / "reference_cardinalities.json"
+    )
+    archive_path, sha_path = package_archive(work_dir=work_dir, manifest_path=manifest_path, cardinalities_path=cardinalities)
+    print(f"Packaged archive: {archive_path}")
+    print(f"Archive sha256:   {sha_path}")
+    return 0
+
+
+def run_tiny_fixture(args: argparse.Namespace) -> int:
+    work_dir = work_dir_from_arg(args.work_dir)
+    schema = postgres_schema(container_name=args.container_name, database=args.database, user=args.user)
+    fixture_dir = (
+        Path(args.fixture).expanduser().resolve()
+        if args.fixture
+        else repo_root() / "tests" / "fixtures" / "joinorder_canonical_tiny"
+    )
+    export_tiny_fixture(
+        work_dir=work_dir,
+        query_dir=query_dir_from_arg(args.queries),
+        output_dir=fixture_dir,
+        schema=schema,
+        container_name=args.container_name,
+        database=args.database,
+        user=args.user,
+        sample_per_table=args.sample_per_table,
+    )
+    print(f"Wrote tiny fixture: {fixture_dir}")
+    return 0
+
+
+def run_verify_tiny_fixture(args: argparse.Namespace) -> int:
+    verify_tiny_fixture(
+        fixture_dir=Path(args.fixture).expanduser().resolve(),
+        query_dir=query_dir_from_arg(args.queries),
+        cardinalities_path=Path(args.cardinalities).expanduser().resolve(),
+    )
+    print("Tiny fixture verified: all 113 query predicate cardinalities validated")
+    return 0
+
+
+def run_stage_release(args: argparse.Namespace) -> int:
+    work_dir = work_dir_from_arg(args.work_dir)
+    archive = load_build_manifest(work_dir).get("archive", {})
+    archive_path = Path(str(archive.get("path", work_dir / "archive" / ARCHIVE_NAME)))
+    sha_path = Path(str(archive.get("sha256_path", work_dir / "archive" / ARCHIVE_SHA_NAME)))
+    notes_path = write_release_notes(work_dir=work_dir, archive_path=archive_path, archive_sha_path=sha_path)
+    stage_draft_release(work_dir=work_dir, archive_path=archive_path, archive_sha_path=sha_path, notes_path=notes_path)
+    print(f"Draft release staged: {GITHUB_RELEASE_TAG}")
+    return 0
+
+
+def run_write_runtime_manifest(args: argparse.Namespace) -> int:
+    work_dir = work_dir_from_arg(args.work_dir)
+    schema = postgres_schema(container_name=args.container_name, database=args.database, user=args.user)
+    out = write_runtime_manifest(work_dir=work_dir, schema=schema)
+    print(f"Wrote runtime manifest: {out}")
+    return 0
+
+
+def run_foundation(args: argparse.Namespace) -> int:
+    work_dir = work_dir_from_arg(args.work_dir)
+    artifact = download_pgdump(work_dir, force=bool(args.force_download))
+    print_source_summary(artifact, build_manifest_path(work_dir))
+    actual_container_name = args.container_name or default_container_name()
+    validation = restore_pgdump(
+        artifact,
+        work_dir=work_dir,
+        postgres_image=args.postgres_image,
+        container_name=actual_container_name,
+        database=args.database,
+        user=args.user,
+        keep_container=True,
+        replace_existing=not bool(args.no_replace_container),
+    )
+    print_restore_summary(validation, build_manifest_path(work_dir))
+    try:
+        schema = postgres_schema(container_name=actual_container_name, database=args.database, user=args.user)
+        parquet_files = extract_and_convert_parquet_streaming(
+            work_dir=work_dir,
+            schema=schema,
+            container_name=actual_container_name,
+            database=args.database,
+            user=args.user,
+        )
+        manifest_path = assemble_manifest(work_dir=work_dir, schema=schema, table_files=parquet_files)
+        query_dir = import_canonical_queries(work_dir=work_dir)
+        validate_encoding_round_trip(
+            work_dir=work_dir,
+            query_sample_size=100,
+            container_name=actual_container_name,
+            database=args.database,
+            user=args.user,
+        )
+        validate_predicate_domain(
+            work_dir=work_dir,
+            query_dir=query_dir,
+            container_name=actual_container_name,
+            database=args.database,
+            user=args.user,
+        )
+        cardinalities = compute_reference_cardinalities(
+            work_dir=work_dir,
+            query_dir=query_dir,
+            output_path=None,
+            container_name=actual_container_name,
+            database=args.database,
+            user=args.user,
+        )
+        write_cardinality_cross_check(work_dir=work_dir, cardinalities_path=cardinalities)
+        archive_path, sha_path = package_archive(
+            work_dir=work_dir,
+            manifest_path=manifest_path,
+            cardinalities_path=cardinalities,
+        )
+        # The runtime manifest can only contain the tarball sha after packaging.
+        write_runtime_manifest(work_dir=work_dir, schema=schema)
+        export_tiny_fixture(
+            work_dir=work_dir,
+            query_dir=query_dir,
+            output_dir=repo_root() / "tests" / "fixtures" / "joinorder_canonical_tiny",
+            schema=schema,
+            container_name=actual_container_name,
+            database=args.database,
+            user=args.user,
+        )
+        notes = write_release_notes(work_dir=work_dir, archive_path=archive_path, archive_sha_path=sha_path)
+        stage_draft_release(work_dir=work_dir, archive_path=archive_path, archive_sha_path=sha_path, notes_path=notes)
+    finally:
+        if not args.keep_container:
+            remove_container(actual_container_name)
+    print(f"Foundation w5-w16 complete. Manifest: {build_manifest_path(work_dir)}")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    handlers = {
+        "download-pgdump": run_download,
+        "restore-postgres": run_restore,
+        "w4": run_restore,
+        "extract-csv": run_extract_csv,
+        "convert-parquet": run_convert_parquet,
+        "assemble-manifest": run_assemble_manifest,
+        "encoding-gate": run_encoding_gate,
+        "predicate-gate": run_predicate_gate,
+        "import-queries": run_import_queries,
+        "cardinalities": run_cardinalities,
+        "cross-check": run_cross_check,
+        "package": run_package,
+        "tiny-fixture": run_tiny_fixture,
+        "verify-tiny-fixture": run_verify_tiny_fixture,
+        "stage-release": run_stage_release,
+        "write-runtime-manifest": run_write_runtime_manifest,
+        "foundation": run_foundation,
+    }
     try:
-        if args.command == "download-pgdump":
-            return run_download(args)
-        if args.command in {"restore-postgres", "w4"}:
-            return run_restore(args)
+        handler = handlers.get(args.command)
+        if handler is not None:
+            return handler(args)
     except KeyboardInterrupt:
         print("Interrupted", file=sys.stderr)
         return 130
