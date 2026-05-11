@@ -1,0 +1,206 @@
+id: results-explorer-metric-formatting-contract
+title: "Centralize Results Explorer metric formatting for precision, units, and mode-specific labels"
+worktree: results-explorer-followup-todo-review
+priority: High
+status: Not Started
+category: User Experience
+
+description: |
+  The latest review found large power scores rendered with noisy decimals and
+  several places where unit/mode copy can become misleading. This is a broader
+  formatting contract gap: latency, power score, rank, speedup, cost, coverage,
+  and tail metrics are formatted independently across tables, charts, compare
+  summaries, and receipts.
+
+  This TODO creates one metric-formatting contract so values are precise enough
+  to compare, compact enough to scan, and labelled consistently with the active
+  mode.
+
+deps:
+  needs:
+  - results-explorer-comparison-eligibility-contract-repair
+
+work:
+- id: w0
+  summary: "Inventory metric values, labels, and units across routes"
+  status: pending
+  notes: |
+    Capture the current formatting for:
+      - leaderboard table cells and headers;
+      - benchmark matrix metric columns;
+      - platform detail table metrics;
+      - Query Workbench table columns and exports;
+      - Compare decision summary, cards, charts, and receipt;
+      - chart axes, legends, and footnotes.
+    Record examples for large power scores, small millisecond values, seconds,
+    speedups, ranks, coverage fractions, cost, and missing values in
+    `_project/verification-logs/results-explorer-metric-formatting-contract/w0.log`.
+
+- id: w1
+  summary: "Define metric format rules by semantic metric type"
+  needs: [w0]
+  status: pending
+  notes: |
+    Define rules for:
+      - latency/display timing: ms under 1000, seconds above threshold, no
+        unsupported precision;
+      - power score: compact integers or significant figures for large values,
+        no gratuitous decimals;
+      - speedup/ratio: fixed or significant precision such as `1.59x`;
+      - ranks: integer ordinal or integer rank only;
+      - coverage: `covered/total` with explicit denominator;
+      - cost: currency precision based on magnitude;
+      - missing values: `No run`, `Unavailable`, `Unranked`, or em dash only
+        when each state matches the evidence contract.
+    Decision gate: every visible numeric format must have a semantic metric
+    type, not just a component-local formatter.
+
+- id: w2
+  summary: "Implement shared metric formatter helpers"
+  needs: [w1]
+  status: pending
+  notes: |
+    Add or extend shared helpers that accept metric type, value, unit,
+    comparison direction, and display context. The helper should return value
+    text, unit text when separate, accessible text, and sortable raw value when
+    needed. Avoid changing raw data values or export semantics unless the
+    export explicitly promises visible-formatted values.
+
+- id: w3
+  summary: "Apply metric formatting across tables, charts, and compare surfaces"
+  needs: [w2]
+  status: pending
+  notes: |
+    Replace ad hoc numeric formatting in Leaderboards, Benchmark detail,
+    Platform detail, Query Workbench, Compare, chart footnotes, and receipt
+    summaries. Headers must match the rendered values: do not show `higher is
+    better` above latency cells, and do not render decimals on large power
+    scores unless the contract requires them.
+
+- id: w4
+  summary: "Add tests for precision, labels, missing states, and exports"
+  needs: [w3]
+  status: pending
+  notes: |
+    Add tests asserting:
+      - large power scores do not show unnecessary decimals;
+      - latency cells and axes display the correct unit and precision;
+      - speedup ratios keep meaningful precision;
+      - coverage denominators match scope rules;
+      - missing/unranked states use the correct copy;
+      - formatted text does not alter raw numeric sort order;
+      - export copy remains documented and consistent.
+
+- id: w5
+  summary: "Browser-check metric formatting on high-risk routes"
+  needs: [w4]
+  status: pending
+  notes: |
+    In a browser, verify `/results/`, one TPC-H benchmark page, one AMPLab
+    benchmark page, one platform page, Query Workbench, and Compare. Decision
+    gate: do not complete if any large numeric score still shows gratuitous
+    decimals, if a header contradicts cell units/direction, or if sorting uses
+    formatted strings instead of raw values.
+
+prior_art:
+- "results-explorer/src/utils.ts currently provides fmtScore, fmtScoreExact, fmtTime, and fmtGeomean."
+- "results-explorer/src/lib/queryLabels.ts formats Query Workbench visible cells and labels."
+- "results-explorer/src/lib/costDisplay.ts formats cost values and scope text."
+- "results-explorer/src/lib/compareSummary.ts formats speedup and decision summary metrics."
+- "results-explorer/src/components/MetaLeaderboard.tsx, QueryHeatmap.tsx, DistributionBox.tsx, and SparklineTable.tsx format high-risk table/chart values."
+- "results-explorer/src/pages/Query.tsx controls visible column labels and CSV/JSON export messaging."
+
+must_preserve:
+- "Formatting changes must not alter raw values stored in DuckDB."
+- "Numeric sort and comparison logic must use raw numbers, not formatted strings."
+- "Exports must remain explicit about whether they use raw values or visible columns."
+- "Metric direction labels must match the values currently rendered."
+
+approach: |
+  Build a metric-type formatter contract first, then replace ad hoc component
+  formatting. Keep raw values separate from display strings so precision
+  cleanup cannot corrupt sorting, ranking, or compare math.
+
+anti_patterns:
+- "DO NOT fix a single large-number example with a one-off `.toFixed(0)`."
+- "DO NOT infer units from column labels when the read model already carries metric metadata."
+- "DO NOT round values before ranking or comparison."
+- "DO NOT use an em dash for every non-value state when `No run`, `Unranked`, or `Unavailable` carry different meanings."
+
+verification:
+- description: "Metric formatter tests pass"
+  command: "cd results-explorer && npm test -- --run src/__tests__/utils.test.ts src/lib/__tests__/metricFormatters.test.ts src/lib/__tests__/queryLabels.test.ts src/lib/__tests__/costDisplay.test.ts"
+  expected_output: "all metric formatter tests pass"
+- description: "Route/component tests covering formatted values pass"
+  command: "cd results-explorer && npm test -- --run src/components/__tests__/MetaLeaderboard.test.tsx src/pages/__tests__/BenchmarkIndex.test.tsx src/pages/__tests__/PlatformIndex.test.tsx src/pages/__tests__/Query.test.tsx src/pages/__tests__/Compare.test.tsx"
+  expected_output: "all targeted tests pass"
+- description: "Browser evidence confirms metric formatting"
+  command: "rg -n \"power score|latency|speedup|coverage|gratuitous decimals|PASS|FAIL\" _project/verification-logs/results-explorer-metric-formatting-contract/"
+  expected_output: "logs include pass/fail evidence for metric formatting on high-risk routes"
+
+scope_limit:
+  only_modify:
+  - "results-explorer/src/utils.ts"
+  - "results-explorer/src/__tests__/utils.test.ts"
+  - "results-explorer/src/lib/metricFormatters.ts"
+  - "results-explorer/src/lib/__tests__/metricFormatters.test.ts"
+  - "results-explorer/src/lib/queryLabels.ts"
+  - "results-explorer/src/lib/__tests__/queryLabels.test.ts"
+  - "results-explorer/src/lib/costDisplay.ts"
+  - "results-explorer/src/lib/__tests__/costDisplay.test.ts"
+  - "results-explorer/src/lib/compareSummary.ts"
+  - "results-explorer/src/lib/__tests__/compareSummary.test.ts"
+  - "results-explorer/src/components/MetaLeaderboard.tsx"
+  - "results-explorer/src/components/ChartPanel.tsx"
+  - "results-explorer/src/components/CompareSummary.tsx"
+  - "results-explorer/src/components/CostScatter.tsx"
+  - "results-explorer/src/components/CDFChart.tsx"
+  - "results-explorer/src/components/DistributionBox.tsx"
+  - "results-explorer/src/components/NormalizedSpeedupChart.tsx"
+  - "results-explorer/src/components/PercentileLadder.tsx"
+  - "results-explorer/src/components/PowerBar.tsx"
+  - "results-explorer/src/components/QueryDiffTable.tsx"
+  - "results-explorer/src/components/QueryHeatmap.tsx"
+  - "results-explorer/src/components/QueryHistogram.tsx"
+  - "results-explorer/src/components/QueryTimingChart.tsx"
+  - "results-explorer/src/components/RankTable.tsx"
+  - "results-explorer/src/components/SparklineTable.tsx"
+  - "results-explorer/src/components/StackedPhase.tsx"
+  - "results-explorer/src/components/TimeSeries.tsx"
+  - "results-explorer/src/pages/Home.tsx"
+  - "results-explorer/src/pages/BenchmarkIndex.tsx"
+  - "results-explorer/src/pages/PlatformIndex.tsx"
+  - "results-explorer/src/pages/Query.tsx"
+  - "results-explorer/src/pages/Compare.tsx"
+  - "results-explorer/src/pages/ResultDetail.tsx"
+  - "results-explorer/src/pages/__tests__/"
+  - "results-explorer/src/components/__tests__/"
+  - "_project/verification-logs/results-explorer-metric-formatting-contract/"
+  do_not_modify:
+  - "benchbox/core/explorer_pipeline/"
+  - "results-explorer/public/data/"
+
+success_metrics:
+- "Large power scores render without noisy decimals while preserving raw sort/comparison values."
+- "Every metric header, unit, direction label, and cell value agrees."
+- "Formatting rules are centralized by metric type and tested with edge cases."
+- "Browser evidence covers leaderboard, benchmark, platform, query, and compare surfaces."
+
+metadata:
+  tags:
+  - results-explorer
+  - metrics
+  - formatting
+  - units
+  estimated_effort: "Medium (1-2 days)"
+  created_date: "2026-05-11"
+
+impact:
+  business_value: |
+    Improves trust in benchmark claims by making values readable and labelled
+    correctly.
+  user_impact: |
+    Users can compare metrics quickly without questioning whether a value is a
+    latency, power score, rank, speedup, or missing state.
+  technical_debt: |
+    Removes scattered number formatting from Results Explorer components.
