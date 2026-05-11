@@ -427,6 +427,28 @@ describe("Compare", () => {
     expect(getByTestId("compare-builder-status").textContent).toContain("1 incompatible row hidden");
   });
 
+  it("compare picker disables non-comparable candidates before launch", async () => {
+    setupUrl([]);
+    vi.mocked(listResults).mockResolvedValue([
+      makeResultRow({ result_id: "r1", platform: "DuckDB", platform_id: "duckdb" }),
+      makeResultRow({
+        result_id: "r2",
+        platform: "SQLite",
+        platform_id: "sqlite",
+        comparison_exclusion_reason: "insufficient_valid_timings",
+      }),
+    ]);
+    const { getByTestId } = render(<Compare />);
+    await waitFor(() => expect(getByTestId("compare-builder-row-r1")).toBeTruthy());
+
+    const blocked = within(getByTestId("compare-builder-row-r2")).getByRole("checkbox") as HTMLInputElement;
+    expect(blocked.disabled).toBe(true);
+    expect(blocked.title).toContain("Result does not have enough valid query timings");
+
+    blocked.click();
+    expect((getByTestId("compare-builder-launch") as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it("compare picker uses disambiguated aria-labels for same-platform rows", async () => {
     setupUrl([]);
     vi.mocked(listResults).mockResolvedValue([
@@ -584,10 +606,41 @@ describe("Compare", () => {
     const summary = screen.getByRole("heading", { name: "Decision Summary" }).closest("section");
     const queryDiff = screen.getByRole("heading", { name: "Query-Level Diff" }).closest("section");
     expect(summary).toHaveTextContent("Claims suppressed");
+    expect(summary).toHaveTextContent("Insufficient comparable query evidence");
     expect(summary).toHaveTextContent("Selected runs do not share at least two valid query timings");
     expect(queryDiff).toHaveTextContent("3 comparisons");
     expect(queryDiff).toHaveTextContent("Winner claims are suppressed because Selected runs do not share at least two valid query timings");
     expect(queryDiff).toHaveTextContent("Missing");
+  });
+
+  it("links compare warning counts to the Comparability Receipt and names warning classes", async () => {
+    vi.mocked(getDetailResult).mockImplementation((id) =>
+      id === "r1"
+        ? Promise.resolve(DUCKDB)
+        : Promise.resolve(
+            makeResult({
+              result_id: "r2",
+              platform: "SQLite",
+              platform_id: "sqlite",
+              run_date: "2026-04-03",
+              platform_version: "3.45",
+              power_score: 300,
+              display_timings: SQLITE.display_timings,
+            }),
+          ),
+    );
+
+    render(<Compare />);
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Decision Summary" })).toBeTruthy());
+
+    const guardrails = screen.getByRole("region", { name: "Compare guardrails" });
+    const warningLink = screen.getByTestId("compare-warning-link") as HTMLAnchorElement;
+    const receipt = screen.getByRole("region", { name: "Comparability receipt" });
+    expect(warningLink.getAttribute("href")).toBe("#comparability-receipt");
+    expect(receipt.getAttribute("id")).toBe("comparability-receipt");
+    expect(guardrails.textContent).toContain("Warning classes:");
+    expect(guardrails.textContent).toContain("Date window");
+    expect(guardrails.textContent).toContain("Platform version");
   });
 
   it("summary card speedup and query diff ratio are consistent for 2-platform fixture", async () => {

@@ -58,6 +58,7 @@ describe("ComparabilityReceipt", () => {
     render(<ComparabilityReceipt results={[makeDetail(), makeDetail({ result_id: "r2", platform: "SQLite" })]} />);
 
     const receipt = screen.getByRole("region", { name: "Comparability receipt" });
+    expect(receipt.getAttribute("id")).toBe("comparability-receipt");
     expect(within(receipt).getByText("No differences")).toBeTruthy();
     expect(receipt).toHaveTextContent("Benchmark");
     expect(receipt).toHaveTextContent("TPC-H");

@@ -33,7 +33,7 @@ import { QueryDiffTable } from "@/components/QueryDiffTable";
 import { modeLabel, testTypeLabel } from "@/components/MethodologyDisclosure";
 import { vsSlowestRatio } from "@/lib/chartMath";
 import { buildCompareDecisionSummary } from "@/lib/compareSummary";
-import { isValidTimingValue } from "@/lib/displayEligibility";
+import { formatTimingExclusion, isValidTimingValue } from "@/lib/displayEligibility";
 import { paletteColor } from "@/lib/chartTheme";
 import { ChartPanel } from "@/components/ChartPanel";
 import { Select } from "@/components/Select";
@@ -219,7 +219,9 @@ export function Compare({ url }: CompareProps) {
   const scaleFactor = results[0]?.scale_factor ?? 0;
   const severeMismatchReason = severeCohortMismatchReason(results);
   const comparabilityFields = buildComparabilityFields(results);
-  const comparabilityWarningCount = comparabilityFields.filter((field) => field.status === "diff").length;
+  const comparabilityWarnings = comparabilityFields.filter((field) => field.status === "diff");
+  const comparabilityWarningCount = comparabilityWarnings.length;
+  const comparabilityWarningLabels = comparabilityWarnings.slice(0, 3).map((field) => field.label);
   const mixedBenchmark = new Set(results.map((result) => result.benchmark)).size > 1;
   const benchmarkLabel = mixedBenchmark ? "Mixed Benchmark" : humanizeBenchmark(benchmark);
   const scaleFactorLabel = new Set(results.map((result) => result.scale_factor)).size > 1
@@ -351,7 +353,12 @@ export function Compare({ url }: CompareProps) {
         </div>
       </section>
 
-      <CompareGuardrailSummary warningCount={comparabilityWarningCount} severeMismatchReason={severeMismatchReason} />
+      <CompareGuardrailSummary
+        warningCount={comparabilityWarningCount}
+        warningLabels={comparabilityWarningLabels}
+        claimSuppressed={decisionSummary.claimSuppressed}
+        suppressionReason={decisionSummary.claimSuppressionReason}
+      />
       <CompareSummary summary={decisionSummary} />
       {results.length > 1 && (
         <div class="panel mb-4 flex flex-wrap items-center justify-between gap-3 px-3 py-2 shadow-sm">
@@ -493,29 +500,46 @@ export function Compare({ url }: CompareProps) {
 
 function CompareGuardrailSummary({
   warningCount,
-  severeMismatchReason,
+  warningLabels,
+  claimSuppressed,
+  suppressionReason,
 }: {
   warningCount: number;
-  severeMismatchReason: string | null;
+  warningLabels: string[];
+  claimSuppressed: boolean;
+  suppressionReason: string | null;
 }) {
-  const hasSevereMismatch = severeMismatchReason !== null;
+  const warningText =
+    warningLabels.length > 0
+      ? `Warning classes: ${warningLabels.join(", ")}${warningCount > warningLabels.length ? `, +${warningCount - warningLabels.length} more` : ""}.`
+      : null;
   return (
     <section aria-label="Compare guardrails" class="mb-4 panel-elevated p-4">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)]">Comparability guardrails</h2>
           <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">
-            {hasSevereMismatch
-              ? `Winner claims are suppressed because ${severeMismatchReason}.`
+            {claimSuppressed
+              ? `Winner claims are suppressed because ${suppressionReason ?? "selected runs are not comparable"}.`
               : "Selected runs share the same benchmark, scale, and phase for winner claims."}
           </p>
+          {warningText && (
+            <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">
+              {warningText} <a href="#comparability-receipt">Review receipt</a>.
+            </p>
+          )}
         </div>
-        <StatusBadge
-          role="comparison"
-          tone={hasSevereMismatch || warningCount > 0 ? "warning" : "success"}
-        >
-          {hasSevereMismatch ? "Claims suppressed" : warningCount > 0 ? `${warningCount} warnings` : "Comparable"}
-        </StatusBadge>
+        {warningCount > 0 ? (
+          <a href="#comparability-receipt" class="no-underline" data-testid="compare-warning-link">
+            <StatusBadge role="comparison" tone="warning">
+              {warningCount} warnings
+            </StatusBadge>
+          </a>
+        ) : (
+          <StatusBadge role="comparison" tone={claimSuppressed ? "warning" : "success"}>
+            {claimSuppressed ? "Claims suppressed" : "Comparable"}
+          </StatusBadge>
+        )}
       </div>
     </section>
   );
@@ -649,12 +673,18 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
     return compareCohortMismatches(row, cohortSignature).length === 0;
   }
 
+  function comparisonExclusionReason(row: ResultRow): string | null {
+    const reason = row.comparison_exclusion_reason;
+    if (typeof reason !== "string" || reason.length === 0) return null;
+    return formatTimingExclusion(reason, "Result is not comparable.");
+  }
+
   function toggleSelection(row: ResultRow) {
     setSelectedIds((current) => {
       const next = new Set(current);
       if (next.has(row.result_id)) {
         next.delete(row.result_id);
-      } else if (next.size < MAX_COMPARE_SELECTIONS && isCompatible(row)) {
+      } else if (next.size < MAX_COMPARE_SELECTIONS && isCompatible(row) && comparisonExclusionReason(row) === null) {
         next.add(row.result_id);
       }
       return next;
@@ -666,7 +696,9 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
   }
 
   const selectedCount = selectedIds.size;
-  const canLaunch = selectedCount >= 2 && selectedCount <= MAX_COMPARE_SELECTIONS;
+  const selectedRowsForLaunch = candidates?.filter((row) => selectedIds.has(row.result_id)) ?? [];
+  const selectedHasComparisonExclusion = selectedRowsForLaunch.some((row) => comparisonExclusionReason(row) !== null);
+  const canLaunch = selectedCount >= 2 && selectedCount <= MAX_COMPARE_SELECTIONS && !selectedHasComparisonExclusion;
 
   function launch() {
     if (!canLaunch) return;
@@ -815,7 +847,10 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
             {filteredRows.map((row) => {
               const isSelected = selectedIds.has(row.result_id);
               const compatible = isCompatible(row);
-              const disabledReason = !compatible
+              const comparisonExclusion = comparisonExclusionReason(row);
+              const disabledReason = comparisonExclusion !== null
+                ? comparisonExclusion
+                : !compatible
                 ? `Different cohort from selection (${cohortLock?.benchmark}/SF${cohortLock?.scale_factor}${cohortLock?.test_type ? `/${cohortLock.test_type}` : ""})`
                 : selectedCount >= MAX_COMPARE_SELECTIONS && !isSelected
                 ? `Up to ${MAX_COMPARE_SELECTIONS} runs can be compared`

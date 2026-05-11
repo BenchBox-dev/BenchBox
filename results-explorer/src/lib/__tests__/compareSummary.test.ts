@@ -163,7 +163,7 @@ describe("buildCompareDecisionSummary", () => {
 
     expect(summary.claimSuppressed).toBe(true);
     expect(summary.winner).toBeNull();
-    expect(summary.headline).toContain("Not directly comparable");
+    expect(summary.headline).toContain("Insufficient comparable query evidence");
     expect(summary.queryRecord).toMatchObject({
       totalQueries: 3,
       comparableQueries: 0,
@@ -216,6 +216,7 @@ describe("buildCompareDecisionSummary", () => {
 
     expect(summary.claimSuppressed).toBe(true);
     expect(summary.winner).toBeNull();
+    expect(summary.headline).toContain("Insufficient comparable query evidence");
     expect(summary.headline).toContain("Winner language is suppressed");
     expect(summary.headline).not.toContain("faster by geomean");
     expect(summary.percentiles[0]).toMatchObject({ p50: 10, p90: 10, p99: 10 });
