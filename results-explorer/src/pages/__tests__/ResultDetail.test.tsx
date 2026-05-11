@@ -170,6 +170,16 @@ describe("ResultDetail - median-first contract", () => {
     expect(receipt).toHaveTextContent("Download bundle");
   });
 
+  it("preserves exact power score precision in the canonical result summary", async () => {
+    vi.mocked(getDetailResult).mockResolvedValue(makeDetail({ power_score: 3000.42 }));
+
+    render(<ResultDetail resultId="r1" />);
+    await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
+
+    const summary = screen.getByRole("region", { name: "Result summary" });
+    expect(summary).toHaveTextContent("3,000.42");
+  });
+
   it("links captured execution plans only when plans_published is true", async () => {
     vi.mocked(getDetailResult).mockResolvedValue(
       makeDetail({ has_plans: true, plans_published: true }),

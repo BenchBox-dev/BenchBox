@@ -40,6 +40,10 @@ export function isKnownBenchmark(benchmark: string): boolean {
 }
 
 export function fmtScore(score: number | null | undefined): string {
+  return fmtScoreExact(score);
+}
+
+export function fmtScoreCompact(score: number | null | undefined): string {
   if (score == null) return "-";
   const abs = Math.abs(score);
   const maximumFractionDigits = abs >= 1000 ? 0 : abs >= 100 ? 1 : abs >= 10 ? 2 : 3;

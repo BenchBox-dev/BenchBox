@@ -8,7 +8,7 @@ import type {
 } from "@/types";
 import type { ResultRow } from "@/lib/duckdbQueries";
 import { getMetaLeaderboardData, listResults } from "@/lib/duckdbQueries";
-import { BENCHMARK_LABELS, humanizeBenchmark, fmtScore, fmtScoreExact, fmtGeomean, errMsg } from "@/utils";
+import { BENCHMARK_LABELS, humanizeBenchmark, fmtScoreCompact, fmtScoreExact, fmtGeomean, errMsg } from "@/utils";
 import { formatBenchmarkLabel } from "@/lib/displayLabels";
 import { MetaLeaderboardSkeleton, SkeletonBlock } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
@@ -937,7 +937,7 @@ function RecentRow({ entry, showCost }: { entry: ResultRow; showCost: boolean })
         class="table-td font-mono"
         title={entry.power_score != null ? `Exact power score: ${fmtScoreExact(entry.power_score)}` : undefined}
       >
-        {fmtScore(entry.power_score)}
+        {fmtScoreCompact(entry.power_score)}
       </td>
       <td class="table-td font-mono">{fmtGeomean(entry.geomean_ms)}</td>
       {showCost && <td class="table-td font-mono text-[var(--bb-data-fg-muted)]">{normalizedCostLabel(entry)}</td>}
