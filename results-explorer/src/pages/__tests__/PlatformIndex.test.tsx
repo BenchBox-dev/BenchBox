@@ -124,6 +124,43 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(getRowOrder(container)).toEqual(["r-tpch-fast", "r-ssb-mid", "r-tpch-slow", "r-null-geo"]);
   });
 
+  it("keeps legacy display-name URLs working when no platform ID matches", async () => {
+    vi.mocked(getPlatformIndexRows).mockResolvedValue(
+      ROWS.map((row) => ({ ...row, platform_id: "duckdb-main" })),
+    );
+
+    const { container } = render(<PlatformIndex platform="DuckDB" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    expect(screen.queryByText(/No results found for platform/i)).toBeNull();
+    expect(getRowOrder(container)).toEqual(["r-tpch-fast", "r-ssb-mid", "r-tpch-slow", "r-null-geo"]);
+  });
+
+  it("does not merge distinct platform IDs that share a display name", async () => {
+    vi.mocked(getPlatformIndexRows).mockResolvedValue([
+      makeRow({
+        result_id: "r-datafusion-current",
+        short_id: "dfcurr01",
+        platform_id: "datafusion",
+        platform: "DataFusion",
+        geomean_ms: 10,
+      }),
+      makeRow({
+        result_id: "r-datafusion-44",
+        short_id: "dfold044",
+        platform_id: "datafusion-44",
+        platform: "DataFusion",
+        geomean_ms: 20,
+      }),
+      makeRow({ result_id: "r-duckdb", short_id: "duck0001" }),
+    ]);
+
+    const { container } = render(<PlatformIndex platform="datafusion" />);
+    await waitFor(() => expect(screen.getByText("DataFusion Results")).toBeTruthy());
+
+    expect(getRowOrder(container)).toEqual(["r-datafusion-current"]);
+  });
+
   it("renders a Platform switcher that routes to a sibling without preserving tuning", async () => {
     const preactRouter = await import("preact-router");
     const routeMock = vi.mocked(preactRouter.route);
