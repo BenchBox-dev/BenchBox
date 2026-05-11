@@ -14,6 +14,7 @@ import {
 } from "@/lib/compareCohort";
 import { buildCompareUrl, compareIdForRow, displayCompareId, MAX_COMPARE_SELECTIONS } from "@/lib/resultLinks";
 import { formatTimingExclusion } from "@/lib/displayEligibility";
+import { formatCount, formatSelectedCount } from "@/lib/copyFormatters";
 import { humanizeBenchmark, fmtScore, fmtGeomean, errMsg } from "@/utils";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
@@ -172,8 +173,14 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     // Cost stays small in the committed corpus; the query projects only the table
     // columns plus cohort metadata needed to avoid mixed-cohort trend charts.
     getPlatformIndexRows()
-      .then((r) => {
-        if (!cancelled) setRows(r);
+      .then(async (r) => {
+        if (cancelled) return;
+        if (r.length > 0) {
+          setRows(r);
+          return;
+        }
+        const retried = await getPlatformIndexRows();
+        if (!cancelled) setRows(retried);
       })
       .catch((err: unknown) => {
         if (!cancelled) setError(errMsg(err));
@@ -207,6 +214,16 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
 
   if (error) return <ErrorMessage message={error} />;
   if (!rows) return <LoadingSpinner message="Loading results..." />;
+  if (rows.length === 0) {
+    return (
+      <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <Breadcrumb crumbs={[{ label: "Results", href: "/results/" }]} />
+        <p class="mt-6 text-[var(--bb-data-fg-muted)]">
+          No published platform results are available in this snapshot.
+        </p>
+      </div>
+    );
+  }
 
   // Match by platform_id (URL slug) - platform_id is stable and URL-safe.
   // Fall back to matching by display name for backward compatibility with any
@@ -599,7 +616,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
             <span>
               Showing {visiblePlatformResults.length.toLocaleString()} of {platformResults.length.toLocaleString()} results
             </span>
-            {selected.size > 0 && <span>{selected.size.toLocaleString()} selected for compare</span>}
+            {selected.size > 0 && <span>{formatSelectedCount(selected.size)} for compare</span>}
           </div>
           <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-2 text-xs text-[var(--bb-data-fg-muted)]">
             <span>Rows are labelled by comparable cohort: benchmark, scale, phase, and primary metric.</span>
@@ -713,7 +730,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
           <div class="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div class="min-w-0 flex-1">
               <div class="text-sm text-[var(--bb-data-fg-primary)]">
-                <strong>{selected.size}</strong> results selected for compare
+                <strong>{formatCount(selected.size, "result")}</strong> selected for compare
               </div>
               <div
                 class="mt-2 flex max-h-32 flex-wrap gap-2 overflow-y-auto pr-1"

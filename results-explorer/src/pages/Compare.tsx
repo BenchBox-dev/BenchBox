@@ -34,6 +34,14 @@ import { modeLabel, testTypeLabel } from "@/components/MethodologyDisclosure";
 import { vsSlowestRatio } from "@/lib/chartMath";
 import { buildCompareDecisionSummary } from "@/lib/compareSummary";
 import { formatTimingExclusion, isValidTimingValue } from "@/lib/displayEligibility";
+import {
+  ensureSentence,
+  formatCandidateCount,
+  formatCount,
+  formatSelectedCount,
+  formatWarningCount,
+  removeDuplicatedTerminalPunctuation,
+} from "@/lib/copyFormatters";
 import { paletteColor } from "@/lib/chartTheme";
 import { ChartPanel } from "@/components/ChartPanel";
 import { Select } from "@/components/Select";
@@ -511,7 +519,15 @@ function CompareGuardrailSummary({
 }) {
   const warningText =
     warningLabels.length > 0
-      ? `Warning classes: ${warningLabels.join(", ")}${warningCount > warningLabels.length ? `, +${warningCount - warningLabels.length} more` : ""}.`
+      ? removeDuplicatedTerminalPunctuation(
+          ensureSentence(
+            `Warning classes: ${warningLabels.join(", ")}${
+              warningCount > warningLabels.length
+                ? `, +${formatCount(warningCount - warningLabels.length, "more", "more")}`
+                : ""
+            }`,
+          ),
+        )
       : null;
   return (
     <section aria-label="Compare guardrails" class="mb-4 panel-elevated p-4">
@@ -532,7 +548,7 @@ function CompareGuardrailSummary({
         {warningCount > 0 ? (
           <a href="#comparability-receipt" class="no-underline" data-testid="compare-warning-link">
             <StatusBadge role="comparison" tone="warning">
-              {warningCount} warnings
+              {formatWarningCount(warningCount)}
             </StatusBadge>
           </a>
         ) : (
@@ -790,10 +806,16 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
       <div class="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm">
         <p class="text-[var(--bb-data-fg-muted)]" data-testid="compare-builder-status">
           {selectedCount === 0
-            ? `${filteredRows.length} candidate${filteredRows.length === 1 ? "" : "s"}. Select at least 2 to launch a comparison.`
+            ? `${formatCandidateCount(filteredRows.length)}. Select at least 2 to launch a comparison.`
             : selectedCount < 2
             ? `1 selected. Select 1 more compatible run to launch.${hiddenIncompatibleSuffix(incompatibleHiddenCount)}`
-            : `${selectedCount} selected. ${cohortLock ? `Cohort: ${humanizeBenchmark(cohortLock.benchmark)} · SF ${cohortLock.scale_factor}${cohortLock.test_type ? ` · ${cohortLock.test_type}` : ""}` : ""}`}
+            : `${formatSelectedCount(selectedCount)}. ${
+                cohortLock
+                  ? `Cohort: ${humanizeBenchmark(cohortLock.benchmark)} · SF ${cohortLock.scale_factor}${
+                      cohortLock.test_type ? ` · ${cohortLock.test_type}` : ""
+                    }`
+                  : ""
+              }`}
         </p>
         <div class="flex gap-2">
           <button
@@ -811,7 +833,7 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
             disabled={!canLaunch}
             data-testid="compare-builder-launch"
           >
-            Compare {selectedCount} run{selectedCount === 1 ? "" : "s"}
+            Compare {formatCount(selectedCount, "run")}
           </button>
         </div>
       </div>

@@ -802,8 +802,12 @@ export async function getPlatformIndexRows(platformId?: string): Promise<Platfor
   return memoizedSnapshotQuery(
     `platform-index:${platformId ?? "*"}`,
     () => loadPlatformIndexRows(platformId),
-    { cacheResult: (rows) => rows.length > 0 },
+    { cacheResult: hasPlatformIndexData },
   );
+}
+
+function hasPlatformIndexData(rows: PlatformIndexRowRow[]): boolean {
+  return rows.length > 0;
 }
 
 function loadPlatformIndexRows(platformId?: string): Promise<PlatformIndexRowRow[]> {

@@ -643,6 +643,33 @@ describe("Compare", () => {
     expect(guardrails.textContent).toContain("Platform version");
   });
 
+  it("uses singular warning copy for one compare guardrail warning", async () => {
+    vi.mocked(getDetailResult).mockImplementation((id) =>
+      id === "r1"
+        ? Promise.resolve(DUCKDB)
+        : Promise.resolve(
+            makeResult({
+              result_id: "r2",
+              platform: "SQLite",
+              platform_id: "sqlite",
+              platform_version: "3.45",
+              power_score: 300,
+              display_timings: SQLITE.display_timings,
+            }),
+          ),
+    );
+
+    render(<Compare />);
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Decision Summary" })).toBeTruthy());
+
+    const guardrails = screen.getByRole("region", { name: "Compare guardrails" });
+    const receipt = screen.getByRole("region", { name: "Comparability receipt" });
+    expect(guardrails).toHaveTextContent("1 warning");
+    expect(guardrails).not.toHaveTextContent("1 warnings");
+    expect(receipt).toHaveTextContent("1 warning");
+    expect(receipt).not.toHaveTextContent("1 warnings");
+  });
+
   it("summary card speedup and query diff ratio are consistent for 2-platform fixture", async () => {
     // DUCKDB Q1=10ms, Q2=20ms; SQLITE Q1=100ms, Q2=200ms -> per-query ratio = 10.00x for both
     // DuckDB summary card: power_score 3000 vs worst 300 → 10.00x
