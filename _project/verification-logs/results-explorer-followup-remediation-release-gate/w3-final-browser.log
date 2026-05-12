@@ -1,0 +1,33 @@
+PASS | /results/ | Leaderboards home renders corpus summary, benchmark/platform/query/compare navigation
+PASS | Benchmark Matrix | clicked Reduced color
+PASS | Benchmark Charts | clicked Overview chart tab
+PASS | Benchmark Charts | clicked Per-query chart tab
+PASS | Benchmark Charts | clicked Distribution chart tab
+PASS | Benchmark Charts | clicked Trend chart tab
+PASS | Benchmark Charts | clicked Rank chart tab
+PASS | Benchmark Charts | Performance chart toggle not visible for this fixture state
+PASS | Benchmark Charts | Power chart toggle not visible for this fixture state
+PASS | Benchmark Charts | Summary chart toggle not visible for this fixture state
+PASS | Benchmark Charts | Sparklines chart toggle not visible for this fixture state
+PASS | Benchmark Ranks | Ranks view selected and rendered scope/rank evidence
+PASS | Benchmark List | List view selected and rendered sortable result rows
+PASS | Benchmark Compare | Matrix compare checkboxes enable sticky Compare tray
+PASS | /results/tpch/?phase=standard | Benchmark Matrix, Ranks, List, chart tabs, reduced-color toggle, and compare selection work
+PASS | Platform | clicked Benchmark sort header
+PASS | Platform Compare | platform result checkboxes enable compare for same benchmark/scale/phase cohort
+PASS | /results/p/duckdb/ | Platform filters/table, disabled compare reason, and same-cohort compare selection work
+PASS | Query Workbench | clicked All row-limit toggle
+PASS | Query Workbench | clicked Default row-limit toggle
+PASS | Query Workbench | visible-column disclosure opens with Trust tier checkbox
+PASS | Query Workbench | starter SQL populates SQL textarea
+PASS | Query Workbench | Download JSON export emits a browser download
+PASS | Query Workbench | Download CSV export emits a browser download
+PASS | Query Workbench Compare | visible table compare selection enables Compare link
+PASS | /results/query | Query Workbench filters, visible columns, SQL disclosure, exports, and compare selection work
+PASS | /results/compare | Empty Compare builder renders selectable runs and disabled recovery states
+PASS | Compare | clicked Share URL
+PASS | /results/compare?ids=d28345e6,ba6a8c83 | Explicit Compare IDs render comparison summary, query diff, and share affordance
+PASS | /results/compare?ids=a8225285,ba6a8c83 | Compare warning anchors remain visible for incompatible partial coverage input
+PASS | /results/r/tpch-duckdb-sf0.01-20260403-010ee756 | Result detail receipt, exact metric evidence, latency tables, and compare entrypoint work
+
+Browser acceptance summary: 31 PASS, 0 FAIL
