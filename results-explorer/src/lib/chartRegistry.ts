@@ -17,6 +17,13 @@
  */
 
 import type { BenchmarkSummary, DetailResult, PlatformRow } from "@/types";
+import {
+  isRankable,
+  isTimingDisplayable,
+  isValidTimingValue,
+  platformTimingValue,
+  type ChartDatasetEligibilityClass,
+} from "@/lib/displayEligibility";
 
 /**
  * Narrow shape consumed by historical/trend charts (TimeSeries, summary_box).
@@ -77,6 +84,8 @@ export interface ChartRegistryEntry {
   description: string;
   /** Analytical question this chart answers in Explorer navigation. */
   questionGroup: ChartQuestionGroupId;
+  /** Dataset eligibility class enforced before rendering chart data points. */
+  eligibilityClass: ChartDatasetEligibilityClass;
   requires: DataRequirements;
   /** Python CLI equivalent chart type name (always === id). */
   cli_equivalent: string;
@@ -136,6 +145,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     shortTitle: "Performance",
     description: "Bar chart comparing total runtime across platforms",
     questionGroup: "overview",
+    eligibilityClass: "display_safe",
     requires: { requiresSummary: true },
     cli_equivalent: "performance_bar",
   },
@@ -145,6 +155,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     shortTitle: "Power",
     description: "Bar chart comparing TPC Power@Size metric across platforms (higher is better)",
     questionGroup: "overview",
+    eligibilityClass: "rank_safe",
     requires: { requiresSummary: true, requiresPowerScore: true },
     cli_equivalent: "power_bar",
   },
@@ -154,6 +165,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     shortTitle: "Box Plot",
     description: "Box plot showing query execution time distribution",
     questionGroup: "distribution",
+    eligibilityClass: "display_safe",
     requires: { requiresSummary: true, requiresQueryTimings: true },
     cli_equivalent: "distribution_box",
   },
@@ -163,6 +175,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     shortTitle: "Heatmap",
     description: "Heatmap comparing per-query execution times across platforms",
     questionGroup: "per_query",
+    eligibilityClass: "display_safe",
     requires: { requiresSummary: true, requiresQueryTimings: true },
     cli_equivalent: "query_heatmap",
   },
@@ -173,6 +186,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     description:
       "Vertical bar histogram showing latency per query (auto-splits for >33 queries)",
     questionGroup: "per_query",
+    eligibilityClass: "display_safe",
     requires: { requiresSummary: true, requiresQueryTimings: true },
     cli_equivalent: "query_histogram",
   },
@@ -182,6 +196,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     shortTitle: "Cost",
     description: "Scatter plot of normalized cost vs performance with cost-status empty states",
     questionGroup: "cost",
+    eligibilityClass: "cost_safe",
     // Adding `requiresCostData` makes the chart unavailable when no platform
     // in the cohort has normalized_cost_usd. Without this gate the Cost tab
     // would render an empty selectable panel and force the user to discover
@@ -196,6 +211,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     shortTitle: "Trend",
     description: "Line chart showing performance trends over time",
     questionGroup: "trend",
+    eligibilityClass: "trend_safe",
     requires: { requiresHistorical: true },
     cli_equivalent: "time_series",
   },
@@ -206,6 +222,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     description:
       "Paired side-by-side bars comparing two runs per query with % change annotations",
     questionGroup: "per_query",
+    eligibilityClass: "compare_safe",
     requires: { requiresTwoResults: true },
     cli_equivalent: "comparison_bar",
   },
@@ -216,6 +233,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     description:
       "Centered-zero chart showing regression/improvement distribution sorted by magnitude",
     questionGroup: "per_query",
+    eligibilityClass: "compare_safe",
     requires: { requiresTwoResults: true },
     cli_equivalent: "diverging_bar",
   },
@@ -226,6 +244,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     description:
       "Bordered panel with aggregate stats (geo mean, total time, improved/regressed counts)",
     questionGroup: "overview",
+    eligibilityClass: "provenance_only",
     requires: {},
     cli_equivalent: "summary_box",
   },
@@ -235,6 +254,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     shortTitle: "Percentiles",
     description: "Percentile ladder chart (P50/P90/P95/P99) across platforms",
     questionGroup: "distribution",
+    eligibilityClass: "display_safe",
     requires: { requiresSummary: true, requiresPercentileStats: true },
     cli_equivalent: "percentile_ladder",
   },
@@ -244,6 +264,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     shortTitle: "Speedup",
     description: "Normalized speedup chart relative to a selected baseline platform",
     questionGroup: "per_query",
+    eligibilityClass: "compare_safe",
     requires: { requiresTwoResults: true },
     cli_equivalent: "normalized_speedup",
   },
@@ -253,6 +274,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     shortTitle: "Phases",
     description: "Stacked phase breakdown chart across benchmark execution phases",
     questionGroup: "overview",
+    eligibilityClass: "display_safe",
     requires: { requiresSummary: true, requiresPhaseDurations: true },
     cli_equivalent: "stacked_phase",
   },
@@ -262,6 +284,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     shortTitle: "Sparklines",
     description: "Compact sparkline table of key metrics across platforms",
     questionGroup: "overview",
+    eligibilityClass: "display_safe",
     requires: { requiresSummary: true },
     cli_equivalent: "sparkline_table",
   },
@@ -271,6 +294,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     shortTitle: "CDF",
     description: "Cumulative distribution chart of per-query execution latency",
     questionGroup: "distribution",
+    eligibilityClass: "display_safe",
     requires: { requiresSummary: true, requiresQueryTimings: true },
     cli_equivalent: "cdf_chart",
   },
@@ -280,6 +304,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     shortTitle: "Ranks",
     description: "Per-query platform ranking table (1st=fastest)",
     questionGroup: "rank",
+    eligibilityClass: "rank_safe",
     requires: { requiresSummary: true, requiresQueryTimings: true },
     cli_equivalent: "rank_table",
   },
@@ -453,18 +478,24 @@ function getChartCapabilities(context: ChartContext): ChartCapabilities {
       summary?.platforms.some(
         (platform) => platform.cost_status === "normalized" && platform.normalized_cost_usd != null,
       ) ?? false,
-    hasPowerScore: summary?.platforms.some((platform) => platform.power_score !== null) ?? false,
+    hasPowerScore:
+      summary?.platforms.some((platform) => isRankable(platform) && isValidTimingValue(platform.power_score)) ?? false,
     hasPhaseDurations:
       summary?.platforms.some(
-        (platform) => platform.phase_durations !== null && Object.keys(platform.phase_durations).length > 0,
+        (platform) =>
+          isTimingDisplayable(platform) &&
+          platform.phase_durations !== null &&
+          Object.keys(platform.phase_durations).length > 0,
       ) ?? false,
     hasHistorical: historical.length >= 2,
     hasQueryTimings:
-      (summary?.platforms.some((platform) =>
-        Object.values(platform.timings).some((v) => v !== null && v > 0),
+      (summary?.platforms.some(
+        (platform) =>
+          isTimingDisplayable(platform) &&
+          summary.query_ids.some((queryId) => platformTimingValue(platform, queryId) !== null),
       ) ?? false),
     hasPercentileStats:
-      summary?.platforms.some((platform) => platform.percentile_stats !== null) ?? false,
+      summary?.platforms.some((platform) => isTimingDisplayable(platform) && platform.percentile_stats !== null) ?? false,
   };
 }
 

@@ -82,6 +82,27 @@ describe("chartRegistry parity with chart_types.py", () => {
     }
   });
 
+  it("declares an eligibility class for every chart dataset", () => {
+    expect(Object.fromEntries(CHART_REGISTRY.map((entry) => [entry.id, entry.eligibilityClass]))).toStrictEqual({
+      performance_bar: "display_safe",
+      power_bar: "rank_safe",
+      distribution_box: "display_safe",
+      query_heatmap: "display_safe",
+      query_histogram: "display_safe",
+      cost_scatter: "cost_safe",
+      time_series: "trend_safe",
+      comparison_bar: "compare_safe",
+      diverging_bar: "compare_safe",
+      summary_box: "provenance_only",
+      percentile_ladder: "display_safe",
+      normalized_speedup: "compare_safe",
+      stacked_phase: "display_safe",
+      sparkline_table: "display_safe",
+      cdf_chart: "display_safe",
+      rank_table: "rank_safe",
+    });
+  });
+
   it("groups charts by Explorer analytical question without changing registry order", () => {
     const grouped = groupChartsByQuestion(CHART_REGISTRY);
 

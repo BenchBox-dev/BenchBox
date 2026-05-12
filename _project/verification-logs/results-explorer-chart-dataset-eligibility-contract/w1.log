@@ -1,0 +1,32 @@
+Chart dataset eligibility classes:
+- display_safe: charts that analyze display timings or timing-derived summary values. Row must have display_exclusion_reason IS NULL, and per-query cells must use timing_eligibility/is_valid_display_timing.
+- rank_safe: charts that make rank or primary-metric competitor claims. Row must have ranking_exclusion_reason IS NULL.
+- compare_safe: charts that compare selected runs against a baseline. Row must have comparison_exclusion_reason IS NULL, and per-query cells must be valid display timings.
+- cost_safe: charts that compare normalized cost. Row must have cost_status='normalized' and finite normalized_cost_usd.
+- trend_safe: time-axis charts. Row must have a finite trend metric and enough points per platform; current BenchmarkIndex already feeds only display-safe historical rows.
+- provenance_only: charts that disclose submitted-row counts or context without treating excluded rows as normal analytical points.
+
+Chart-to-class matrix:
+- performance_bar: display_safe. Source: BenchmarkSummary.platforms[].display_geomean_ms.
+- power_bar: rank_safe. Source: BenchmarkSummary.platforms[].power_score.
+- distribution_box: display_safe. Source: BenchmarkSummary.platforms[].timings through timing_eligibility.
+- query_heatmap: display_safe. Source: BenchmarkSummary.platforms[].timings through timing_eligibility.
+- query_histogram: display_safe. Source: BenchmarkSummary.platforms[].timings through timing_eligibility.
+- cost_scatter: cost_safe. Source: BenchmarkSummary.platforms[].normalized_cost_usd with cost_status='normalized'.
+- time_series: trend_safe. Source: ChartHistoricalEntry[] from display-safe historical rows.
+- comparison_bar: compare_safe. Source: compare DetailResult.display_timings through timing_eligibility.
+- diverging_bar: compare_safe. Source: compare DetailResult.display_timings through timing_eligibility.
+- summary_box: provenance_only. Source: selected/cohort counts plus rank-safe best metric selection inside the component.
+- percentile_ladder: display_safe. Source: BenchmarkSummary.platforms[].percentile_stats.
+- normalized_speedup: compare_safe. Source: compare DetailResult.display_timings through timing_eligibility.
+- stacked_phase: display_safe. Source: BenchmarkSummary.platforms[].phase_durations shown only for display-safe rows.
+- sparkline_table: display_safe. Source: timing-derived geomean/P99 plus rank-safe/cost-safe cells.
+- cdf_chart: display_safe. Source: BenchmarkSummary.platforms[].timings through timing_eligibility.
+- rank_table: rank_safe. Source: per-query platform rankings through timing_eligibility.
+
+Empty/excluded behavior:
+- If a chart class has zero eligible rows, render a chart-level empty state naming the missing eligibility class and dominant exclusion reasons.
+- If only some rows are excluded, render the chart from eligible rows and show a compact excluded-data summary below the chart.
+- Preserve submitted rows outside the chart path through table receipts/disclosures rather than plotting them as normal analytical points.
+
+Decision: PASS. Code changes may proceed using this matrix.

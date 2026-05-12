@@ -329,6 +329,25 @@ describe("QueryHistogram", () => {
     expect(container.querySelectorAll("rect").length).toBeGreaterThan(0);
   });
 
+  it("uses timing eligibility instead of raw positive timings", () => {
+    const summary = makeSummary({
+      query_ids: ["Q1"],
+      platforms: [
+        makePlatform({
+          timings: { Q1: 10 },
+          timing_eligibility: {
+            Q1: { is_valid_display_timing: false, timing_exclusion_reason: "zero_timing" },
+          },
+        }),
+      ],
+    });
+    const { container } = render(<QueryHistogram summary={summary} />);
+
+    expect(container.querySelector("svg")).not.toBeNull();
+    expect(container.querySelectorAll("rect")).toHaveLength(0);
+    expect(container.textContent).toContain("Exact zero timing is excluded from display evidence.");
+  });
+
   it("uses a mobile-safe responsive width instead of forcing horizontal overflow", () => {
     const { container } = render(<QueryHistogram summary={makeSummary()} />);
     const svg = container.querySelector("svg");
@@ -393,6 +412,19 @@ describe("PowerBar", () => {
     expect(highIdx).toBeGreaterThanOrEqual(0);
     expect(highIdx).toBeLessThan(midIdx);
     expect(midIdx).toBeLessThan(lowIdx);
+  });
+
+  it("excludes power scores from rows that are not rank-safe", () => {
+    const summary = makeSummary({
+      platforms: [
+        makePlatform({ result_id: "r1", platform: "Community High", power_score: 9000, ranking_exclusion_reason: "trust_not_rankable" }),
+        makePlatform({ result_id: "r2", platform: "Rankable Low", power_score: 1000 }),
+      ],
+    });
+    const { container } = render(<PowerBar summary={summary} />);
+
+    expect(container.textContent).not.toContain("Community High");
+    expect(container.textContent).toContain("Rankable Low");
   });
 });
 

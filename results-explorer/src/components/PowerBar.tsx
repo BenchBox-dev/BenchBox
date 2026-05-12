@@ -12,6 +12,7 @@
 import type { BenchmarkSummary } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
 import { paletteColor } from "@/lib/chartTheme";
+import { isRankable } from "@/lib/displayEligibility";
 import { formatRunIdentityLabelsForCohort, preserveUniqueAfterTruncation } from "@/lib/runIdentity";
 
 const LABEL_W = 160;
@@ -42,7 +43,7 @@ export function PowerBar({ summary }: Props) {
       displayLabel: displayLabels[i] ?? p.platform,
       fullLabel: cohortLabels[i]?.full ?? p.platform,
     }))
-    .filter((p) => p.power_score !== null && p.power_score > 0)
+    .filter((p) => isRankable(p) && p.power_score !== null && p.power_score > 0)
     .sort((a, b) => (b.power_score ?? 0) - (a.power_score ?? 0));
 
   if (rows.length === 0) {

@@ -1,0 +1,12 @@
+
+> results-explorer@0.1.0 test
+> vitest run --run src/__tests__/chartRegistry.meta.test.ts src/__tests__/chartRegistry.parity.test.ts src/components/__tests__/ChartPanel.test.tsx src/components/__tests__/charts.smoke.test.tsx
+
+
+ RUN  v4.1.4 /Users/joe/Developer/BenchBox.pool-03/results-explorer
+
+
+ Test Files  4 passed (4)
+      Tests  62 passed (62)
+   Start at  21:11:41
+   Duration  3.47s (transform 601ms, setup 1.38s, import 1.62s, tests 519ms, environment 7.76s)

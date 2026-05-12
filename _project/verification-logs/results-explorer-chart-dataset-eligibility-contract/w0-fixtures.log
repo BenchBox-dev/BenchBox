@@ -1,0 +1,59 @@
+
+> results-explorer@0.1.0 test:e2e:fixtures
+> node scripts/generate-browser-fixtures.mjs && node scripts/verify-browser-fixtures.mjs
+
+[generate-browser-fixtures] sourceRoot=/Users/joe/Developer/BenchBox.pool-03/results-explorer/test-fixtures/source
+[generate-browser-fixtures] genRoot=/Users/joe/Developer/BenchBox.pool-03/results-explorer/test-fixtures/.generated
+[generate-browser-fixtures] validated explorer build contract 4 (benchbox explorer build)
+[generate-browser-fixtures] copied 4 source bundle(s)
+[generate-browser-fixtures] wrote variant community/tpch-duckdb-sf0.01-20260403-community.json
+[generate-browser-fixtures] wrote variant tuned/tpch-duckdb-sf0.01-20260403-tuned.json
+[generate-browser-fixtures] wrote variant sf01/tpch-duckdb-sf0.1-20260403-scale.json
+[generate-browser-fixtures] wrote variant partial-query/tpch-datafusion-partial-sf0.01-20260403-query-gap.json
+[generate-browser-fixtures] wrote variant environment/aws-cloud/tpch-fixture-aws-sf0.01-20260403-environment.json
+[generate-browser-fixtures] wrote variant environment/gcp-serverless/tpch-fixture-gcp-sf0.01-20260403-environment.json
+[generate-browser-fixtures] wrote variant environment/container-local/tpch-fixture-container-sf0.01-20260403-environment.json
+[generate-browser-fixtures] uv run -- benchbox explorer build --data-dir /Users/joe/Developer/BenchBox.pool-03/results-explorer/test-fixtures/.generated/source --output /Users/joe/Developer/BenchBox.pool-03/results-explorer/test-fixtures/.generated/data (cwd=/Users/joe/Developer/BenchBox.pool-03)
+Explorer build
+  Data dir:
+/Users/joe/Developer/BenchBox.pool-03/results-explorer/test-fixtures/.generated/
+source
+  Output dir:
+/Users/joe/Developer/BenchBox.pool-03/results-explorer/test-fixtures/.generated/
+data
+  Trust label: maintainer-run
+  Visibility:  public-curated
+
+Done. Processed 11 result(s) across 3 cohort(s) →
+/Users/joe/Developer/BenchBox.pool-03/results-explorer/test-fixtures/.generated/
+data
+[generate-browser-fixtures] generated /Users/joe/Developer/BenchBox.pool-03/results-explorer/test-fixtures/.generated/data/results.duckdb
+[verify-browser-fixtures] environment coverage OK {"environment_values":{"deployment_class":["cloud","local"],"cloud_provider":["aws","gcp"],"cloud_region":["us-central1","us-east-1"],"instance_or_warehouse":["container-cpu-10","m6i.large","serverless-slots-4"],"storage_format":["duckdb_native","parquet"]},"cloud_rows":2,"container_rows":1,"runtime_types":["dataframe_process","docker_container","local_process","managed_cloud","serverless"]}
+[verify-browser-fixtures] OK {"platforms_per_cohort":[["tpch",0.01,7],["tpch",0.1,1],["star_schema",0.01,1]],"benchmarks":["star_schema","tpch"],"trust_labels":["community-submission","maintainer-run"],"environment_values":{"deployment_class":["cloud","local"],"cloud_provider":["aws","gcp"],"cloud_region":["us-central1","us-east-1"],"instance_or_warehouse":["container-cpu-10","m6i.large","serverless-slots-4"],"storage_format":["duckdb_native","parquet"]},"cloud_rows":[["tpch-fixture-aws-sql-sf0.01-20260403-e73da6ce","Fixture AWS SQL","aws","us-east-1","m6i.large","parquet","community-submission"],["tpch-fixture-gcp-serverless-sf0.01-20260403-fb7f77e8","Fixture GCP Serverless","gcp","us-central1","serverless-slots-4","parquet","community-submission"]],"container_rows":[["tpch-fixture-container-sql-sf0.01-20260403-06c0f5d9","Fixture Container SQL","local","container-cpu-10","duckdb_native","maintainer-run"]]}
+[generate-browser-fixtures] sourceRoot=/Users/joe/Developer/BenchBox.pool-03/results-explorer/test-fixtures/source
+[generate-browser-fixtures] genRoot=/Users/joe/Developer/BenchBox.pool-03/results-explorer/test-fixtures/.generated
+[generate-browser-fixtures] validated explorer build contract 4 (benchbox explorer build)
+[generate-browser-fixtures] copied 4 source bundle(s)
+[generate-browser-fixtures] wrote variant community/tpch-duckdb-sf0.01-20260403-community.json
+[generate-browser-fixtures] wrote variant tuned/tpch-duckdb-sf0.01-20260403-tuned.json
+[generate-browser-fixtures] wrote variant sf01/tpch-duckdb-sf0.1-20260403-scale.json
+[generate-browser-fixtures] wrote variant partial-query/tpch-datafusion-partial-sf0.01-20260403-query-gap.json
+[generate-browser-fixtures] wrote variant environment/aws-cloud/tpch-fixture-aws-sf0.01-20260403-environment.json
+[generate-browser-fixtures] wrote variant environment/gcp-serverless/tpch-fixture-gcp-sf0.01-20260403-environment.json
+[generate-browser-fixtures] wrote variant environment/container-local/tpch-fixture-container-sf0.01-20260403-environment.json
+[generate-browser-fixtures] uv run -- benchbox explorer build --data-dir /Users/joe/Developer/BenchBox.pool-03/results-explorer/test-fixtures/.generated/source --output /Users/joe/Developer/BenchBox.pool-03/results-explorer/test-fixtures/.generated/data (cwd=/Users/joe/Developer/BenchBox.pool-03)
+Explorer build
+  Data dir:
+/Users/joe/Developer/BenchBox.pool-03/results-explorer/test-fixtures/.generated/
+source
+  Output dir:
+/Users/joe/Developer/BenchBox.pool-03/results-explorer/test-fixtures/.generated/
+data
+  Trust label: maintainer-run
+  Visibility:  public-curated
+
+Done. Processed 11 result(s) across 3 cohort(s) →
+/Users/joe/Developer/BenchBox.pool-03/results-explorer/test-fixtures/.generated/
+data
+[generate-browser-fixtures] generated /Users/joe/Developer/BenchBox.pool-03/results-explorer/test-fixtures/.generated/data/results.duckdb
+[verify-browser-fixtures] determinism OK {"allowlist":{"data/results.duckdb":"DuckDB file bytes include nondeterministic container metadata; logical table digest is compared instead."}}
