@@ -1,5 +1,6 @@
 import type { DetailResult } from "@/types";
 import { isValidTimingValue, timingValueForQuery } from "@/lib/displayEligibility";
+import { formatSpeedup } from "@/lib/metricFormatters";
 import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
 import { fmtMs } from "@/utils";
 import { StatusBadge, type StatusTone } from "@/components/StatusBadge";
@@ -84,7 +85,7 @@ export function QueryDiffTable({ results, baselineIndex = 0, suppressionReason =
                 <td class="table-td">{row.candidatePlatform}</td>
                 <td class="table-td font-mono">{formatMsCell(row.baselineMs)}</td>
                 <td class="table-td font-mono">{formatMsCell(row.candidateMs)}</td>
-                <td class="table-td font-mono">{row.ratio !== null ? `${row.ratio.toFixed(2)}x` : "-"}</td>
+                <td class="table-td font-mono">{row.ratio !== null ? formatSpeedup(row.ratio).valueText : "-"}</td>
                 <td class="table-td font-mono">{formatDelta(row.deltaMs)}</td>
                 <td class="table-td">
                   <StatusBadge role="comparison" tone={statusTone(row.status)}>{statusLabel(row.status)}</StatusBadge>

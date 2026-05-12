@@ -13,6 +13,7 @@ import { useElementSize } from "@/lib/useElementSize";
 import { timeSeriesColor } from "@/lib/chartTheme";
 import { buildLogLatencyScale, computeECDFPoints, logLatencyFraction, logLatencyTicks } from "@/lib/chartMath";
 import { formatTimingExclusion, isTimingDisplayable, platformTimingValue } from "@/lib/displayEligibility";
+import { formatLatencyMs } from "@/lib/metricFormatters";
 import { formatRunIdentityLabelsForCohort, preserveUniqueAfterTruncation } from "@/lib/runIdentity";
 
 const Y_TICKS_PCT = [0, 25, 50, 75, 100];
@@ -111,7 +112,7 @@ export function CDFChart({ summary }: Props) {
               <g key={ms}>
                 <line x1={x} y1={0} x2={x} y2={4} stroke="#9ca3af" strokeWidth={1} />
                 <text x={x} y={16} textAnchor="middle" style={{ fontSize: "10px", fill: "#6b7280" }}>
-                  {ms >= 1000 ? `${ms / 1000}s` : `${ms}ms`}
+                  {formatLatencyMs(ms, { subMillisecond: "compact" }).valueText}
                 </text>
               </g>
             );

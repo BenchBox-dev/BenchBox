@@ -11,6 +11,7 @@
 import type { BenchmarkSummary } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
 import { PHASE_COLORS } from "@/lib/chartTheme";
+import { formatDurationSeconds } from "@/lib/metricFormatters";
 import { formatRunIdentityLabelsForCohort, preserveUniqueAfterTruncation } from "@/lib/runIdentity";
 
 // Phase display names (bundle phase name → human-readable)
@@ -140,7 +141,7 @@ export function StackedPhase({ summary }: Props) {
                     fill={PHASE_COLORS[phase] ?? "#94a3b8"}
                     rx={1}
                   >
-                    <title>{`${PHASE_LABELS[phase] ?? phase}: ${dur.toFixed(1)}s`}</title>
+                    <title>{`${PHASE_LABELS[phase] ?? phase}: ${formatDurationSeconds(dur).valueText}`}</title>
                   </rect>
                 );
               })}
@@ -150,7 +151,7 @@ export function StackedPhase({ summary }: Props) {
                 y={midY + 4}
                 style={{ fontSize: "10px", fill: "#6b7280" }}
               >
-                {total >= 60 ? `${(total / 60).toFixed(1)}m` : `${total.toFixed(1)}s`}
+                {formatDurationSeconds(total).valueText}
               </text>
 
               {ri < rows.length - 1 && (

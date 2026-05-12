@@ -23,7 +23,8 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import type { BenchmarkSummary, PlatformRow, SortDirection, SortState } from "@/types";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
-import { fmtMs as formatDurationMs, fmtScore, fmtGeomean } from "@/utils";
+import { fmtMs as formatDurationMs, fmtGeomean } from "@/utils";
+import { formatLatencyMs, formatPowerScore, formatSpeedup } from "@/lib/metricFormatters";
 import { queryDisplayLabel, sortQueryIds } from "@/lib/queryLabels";
 import { compareSelectionLabel } from "@/lib/compareCohort";
 import {
@@ -109,8 +110,7 @@ interface QueryHeatmapProps {
 const MOBILE_OUTLIER_LIMIT = 3;
 
 function fmtQueryMs(ms: number): string {
-  if (ms > 0 && ms < 1) return "<1 ms";
-  return formatDurationMs(ms);
+  return formatLatencyMs(ms, { subMillisecond: "compact" }).valueText;
 }
 
 function CompareDisabledReason({ id, copy }: { id?: string; copy: CompareExclusionReasonCopy }) {
@@ -175,7 +175,7 @@ export function QueryHeatmap({
 
   function fmtPrimary(val: number | null): string {
     if (val === null) return "-";
-    return primaryMetric === "power_score" ? fmtScore(val) : fmtGeomean(val);
+    return primaryMetric === "power_score" ? formatPowerScore(val).valueText : fmtGeomean(val);
   }
 
   function compareNullableNumber(a: number | null, b: number | null, direction: SortDirection): number {
@@ -319,12 +319,12 @@ export function QueryHeatmap({
   // Single-platform: suppress heat coloring (no relative comparison to show).
   const suppressHeat = sorted.length < 2;
 
-  const primaryLabel = primaryMetric === "power_score" ? "Power Score" : "Geomean";
-  const primaryDirectionLabel = primaryMetric === "power_score" ? "higher is better" : "lower is faster";
+  const primaryLabel = primaryMetric === "power_score" ? "Power score" : "Geomean latency";
+  const primaryDirectionLabel = primaryMetric === "power_score" ? "higher is better" : "lower is better";
   // The legend heading describes what the *cells* show, not the cohort's
-  // primary score metric. Heatmap cells are always per-query latency in
-  // milliseconds, regardless of whether the primary score column is
-  // power_score or display_geomean_ms. Earlier copy ("Power Score:
+  // primary score metric. Heatmap cells are always per-query latency values,
+  // regardless of whether the primary score column is power_score or
+  // display_geomean_ms. Earlier copy ("Power Score:
   // higher is better") contradicted the rendered data on tpch-style
   // cohorts. The primary score column keeps its own column header
   // explanation (`primaryLabel`/`primaryDirectionLabel`) below.
@@ -408,7 +408,7 @@ export function QueryHeatmap({
             aria-sort={ariaSort("geomean")}
             title="Geometric mean of per-query display times"
           >
-            {renderHeaderSortControl("Geomean", "geomean", {
+            {renderHeaderSortControl("Geomean latency", "geomean", {
               className:
                 "table-th block w-full cursor-pointer select-none border-0 bg-transparent text-left text-[var(--bb-data-fg-subtle)]",
               pageSticky,
@@ -452,7 +452,7 @@ export function QueryHeatmap({
         data-testid="query-heatmap-legend"
       >
         <div class="font-semibold text-[var(--bb-data-fg-primary)]">
-          Per-query latency (ms): lower is better
+          Per-query latency: lower is better
         </div>
         <div class="mt-1">
           {heatmapMeaning} <strong>&lt;1 ms</strong> means a positive sub-millisecond timing; exact zero timings are{" "}
@@ -545,7 +545,7 @@ export function QueryHeatmap({
                 <ValidationBadge validationStatus={row.validation_status} showMissing />
                 {showGeomeanCol && (
                   <span class="rounded-full bg-[var(--bb-surface-app)] px-2 py-0.5 font-mono text-xs text-[var(--bb-data-fg-muted)]">
-                    Geomean {fmtGeomean(validPrimaryMetricValue(row, "display_geomean_ms"))}
+                    Geomean latency {fmtGeomean(validPrimaryMetricValue(row, "display_geomean_ms"))}
                   </span>
                 )}
               </div>
@@ -750,7 +750,7 @@ export function QueryHeatmap({
                         ? ratio !== null
                           ? ratio <= 1.005
                             ? `${fmtQueryMs(ms)}, fastest in column`
-                            : `${fmtQueryMs(ms)}, ${ratio.toFixed(1)}× fastest in column`
+                            : `${fmtQueryMs(ms)}, ${formatSpeedup(ratio, { unit: "×" }).valueText} fastest in column`
                           : fmtQueryMs(ms)
                         : isExcludedTiming
                           ? `${formatDurationMs(rawMs)}, excluded: ${excludedReason}`
@@ -835,5 +835,5 @@ function queryOutliers(
 function queryRatioLabel(ratio: number | null): string {
   if (ratio === null) return "No cohort baseline";
   if (ratio <= 1.005) return "Fastest in cohort";
-  return `${ratio.toFixed(1)}× fastest`;
+  return `${formatSpeedup(ratio, { unit: "×" }).valueText} fastest`;
 }

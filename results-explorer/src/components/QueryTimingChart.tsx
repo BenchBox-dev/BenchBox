@@ -4,6 +4,7 @@
  */
 
 import { paletteColor } from "@/lib/chartTheme";
+import { formatLatencyMs, formatPlainNumber } from "@/lib/metricFormatters";
 import { useElementSize } from "@/lib/useElementSize";
 
 interface Bar {
@@ -39,8 +40,8 @@ export function QueryTimingChart({ bars, unit = "ms", height = 220 }: QueryTimin
   const yStep = maxValue / yTicks;
 
   function formatValue(v: number): string {
-    if (v >= 1000) return `${(v / 1000).toFixed(1)}s`;
-    return `${Math.round(v)}${unit}`;
+    if (unit === "ms") return formatLatencyMs(v, { subMillisecond: "compact" }).valueText;
+    return `${formatPlainNumber(v).valueText}${unit}`;
   }
 
   return (
@@ -151,8 +152,8 @@ export function GroupedQueryChart({ groups, unit = "ms", height = 260 }: Grouped
   const yStep = maxValue / yTicks;
 
   function formatValue(v: number): string {
-    if (v >= 1000) return `${(v / 1000).toFixed(1)}s`;
-    return `${Math.round(v)}${unit}`;
+    if (unit === "ms") return formatLatencyMs(v, { subMillisecond: "compact" }).valueText;
+    return `${formatPlainNumber(v).valueText}${unit}`;
   }
 
   return (

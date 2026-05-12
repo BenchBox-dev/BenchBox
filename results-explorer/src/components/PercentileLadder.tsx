@@ -14,6 +14,7 @@ import type { PercentileStats } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
 import { paletteColor } from "@/lib/chartTheme";
 import { buildLogLatencyScale, logLatencyFraction, logLatencyTicks } from "@/lib/chartMath";
+import { formatLatencyMs } from "@/lib/metricFormatters";
 import { truncateRunIdentityLabel } from "@/lib/runIdentity";
 
 // Neutral gray for opacity-only legend swatches (shows opacity levels, not platform identity).
@@ -150,9 +151,7 @@ export function PercentileLadder({ rows }: Props) {
                 class="text-[10px] fill-[var(--bb-data-fg-muted)] font-mono"
                 style={{ fontSize: "10px" }}
               >
-                {row.percentile_stats.p50 >= 1000
-                  ? `${(row.percentile_stats.p50 / 1000).toFixed(1)}s`
-                  : `${row.percentile_stats.p50.toFixed(1)}ms`}
+                {formatLatencyMs(row.percentile_stats.p50).valueText}
               </text>
 
               {/* Separator line */}
@@ -178,7 +177,7 @@ export function PercentileLadder({ rows }: Props) {
                   class="text-[10px] fill-[var(--bb-data-fg-subtle)] font-mono"
                   style={{ fontSize: "10px" }}
                 >
-                  {ms >= 1000 ? `${ms / 1000}s` : `${ms}ms`}
+                  {formatLatencyMs(ms, { subMillisecond: "compact" }).valueText}
                 </text>
               </g>
             );

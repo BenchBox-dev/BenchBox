@@ -13,6 +13,7 @@ import type { BenchmarkSummary } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
 import { paletteColor } from "@/lib/chartTheme";
 import { isRankable } from "@/lib/displayEligibility";
+import { formatPowerScore } from "@/lib/metricFormatters";
 import { formatRunIdentityLabelsForCohort, preserveUniqueAfterTruncation } from "@/lib/runIdentity";
 
 const LABEL_W = 160;
@@ -76,10 +77,10 @@ export function PowerBar({ summary }: Props) {
                 {row.displayLabel}
               </text>
               <rect x={LABEL_W} y={midY - barH / 2} width={Math.max(2, barW)} height={barH} fill={color} rx={2}>
-                <title>{`${row.fullLabel}: ${row.power_score!.toLocaleString(undefined, { maximumFractionDigits: 0 })} QphH`}</title>
+                <title>{`${row.fullLabel}: ${formatPowerScore(row.power_score).valueText} QphH`}</title>
               </rect>
               <text x={LABEL_W + barW + 6} y={midY + 4} style={{ fontSize: "11px", fill: "#374151" }}>
-                {row.power_score!.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                {formatPowerScore(row.power_score).valueText}
               </text>
               {ri < rows.length - 1 && (
                 <line x1={0} y1={y + ROW_H} x2={w} y2={y + ROW_H} stroke="#e5e7eb" strokeWidth={1} />
@@ -98,7 +99,7 @@ export function PowerBar({ summary }: Props) {
               <g key={f}>
                 <line x1={x} y1={0} x2={x} y2={4} stroke="#9ca3af" strokeWidth={1} />
                 <text x={x} y={16} textAnchor="middle" style={{ fontSize: "10px", fill: "#6b7280" }}>
-                  {val > 0 ? val.toLocaleString(undefined, { maximumFractionDigits: 0 }) : "0"}
+                  {val > 0 ? formatPowerScore(val).valueText : "0"}
                 </text>
               </g>
             );

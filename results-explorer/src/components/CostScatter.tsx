@@ -15,6 +15,7 @@ import type { BenchmarkSummary, PlatformRow } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
 import { paletteColor } from "@/lib/chartTheme";
 import { costModelDisclosure, normalizedCostValue } from "@/lib/costDisplay";
+import { formatLatencyMs, formatPowerScore, formatUsd } from "@/lib/metricFormatters";
 
 const AXIS_W = 54;
 const AXIS_H = 32;
@@ -103,7 +104,8 @@ export function CostScatter({ summary }: Props) {
     return PADDING_TOP + CHART_H * (1 - pos);
   }
 
-  const metricLabel = metric === "power_score" ? "Power@Size (↑ better)" : "Geomean ms (↓ better)";
+  const metricLabel =
+    metric === "power_score" ? "Power score (higher is better)" : "Geomean latency (lower is better)";
   const modelDisclosure = costModelDisclosure(summary.platforms);
 
   return (
@@ -122,10 +124,8 @@ export function CostScatter({ summary }: Props) {
           const val = higherIsBetter ? yMax - f * yRange : yMin + f * yRange;
           const label =
             metric === "power_score"
-              ? val.toLocaleString(undefined, { maximumFractionDigits: 0 })
-              : val >= 1000
-                ? `${(val / 1000).toFixed(1)}s`
-                : `${val.toFixed(0)}ms`;
+              ? formatPowerScore(val).valueText
+              : formatLatencyMs(val, { subMillisecond: "compact" }).valueText;
           return (
             <g key={f}>
               <line
@@ -158,7 +158,9 @@ export function CostScatter({ summary }: Props) {
             <g key={p.result_id}>
               <circle cx={cx} cy={cy} r={7} fill={p.color} fillOpacity={0.85}>
                 <title>
-                  {`${p.platform}: normalized $${p.cost.toFixed(2)} / ${p.perf.toFixed(1)} (${p.modelVersion ?? "model unknown"}${regionLabel ? `, ${regionLabel}` : ""})`}
+                  {`${p.platform}: normalized ${formatUsd(p.cost).valueText} / ${
+                    metric === "power_score" ? formatPowerScore(p.perf).valueText : formatLatencyMs(p.perf).valueText
+                  } (${p.modelVersion ?? "model unknown"}${regionLabel ? `, ${regionLabel}` : ""})`}
                 </title>
               </circle>
               <text
@@ -211,7 +213,7 @@ export function CostScatter({ summary }: Props) {
                 textAnchor="middle"
                 style={{ fontSize: "10px", fill: "#6b7280" }}
               >
-                ${cost.toFixed(2)}
+                {formatUsd(cost).valueText}
               </text>
             </g>
           );

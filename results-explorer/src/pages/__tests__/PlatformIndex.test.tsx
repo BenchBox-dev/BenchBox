@@ -419,7 +419,7 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(guidance.textContent).toContain("Select two or more DuckDB results");
     expect((screen.getByRole("button", { name: "Select 2 comparable results" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByTestId("platform-table-scroll-hint").textContent).toContain("Scroll table");
-    expect(screen.getAllByText(/geomean latency, ms \(lower is faster\)/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Geomean latency \(lower is better\)/).length).toBeGreaterThan(0);
   });
 
   it("clicking the Geomean header twice flips ascending → descending (nulls still last)", async () => {
@@ -438,12 +438,12 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(order.slice(1)).toEqual(["r-tpch-fast", "r-tpch-slow", "r-null-geo"]);
   });
 
-  it("clicking Power Score puts nulls last in both directions", async () => {
+  it("clicking Power score puts nulls last in both directions", async () => {
     const { container } = render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
-    fireEvent.click(screen.getByRole("button", { name: /Power Score/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Power score/ }));
     expect(getRowOrder(container).slice(-1)[0]).toBe("r-null-geo");
-    fireEvent.click(screen.getByRole("button", { name: /Power Score/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Power score/ }));
     expect(getRowOrder(container).slice(-1)[0]).toBe("r-null-geo");
   });
 
@@ -720,9 +720,9 @@ describe("PlatformIndex - sortable table headers", () => {
 
     const tpchTrend = screen.getByTestId("trend-cohort-tpch-sf0.1-power-display_geomean_ms");
     const ssbTrend = screen.getByTestId("trend-cohort-star_schema-sf0.1-power-display_geomean_ms");
-    expect(screen.getAllByRole("img", { name: "Geomean ms trend over time" })).toHaveLength(2);
-    expect(screen.getByText(/TPC-H · SF 0\.1 · power · geomean latency/)).toBeTruthy();
-    expect(screen.getByText(/SSB · SF 0\.1 · power · geomean latency/)).toBeTruthy();
+    expect(screen.getAllByRole("img", { name: "Geomean latency trend over time" })).toHaveLength(2);
+    expect(screen.getByText(/TPC-H · SF 0\.1 · power · Geomean latency/)).toBeTruthy();
+    expect(screen.getByText(/SSB · SF 0\.1 · power · Geomean latency/)).toBeTruthy();
     expect(tpchTrend.querySelector('[data-result-id="r-tpch-a"]')).toBeTruthy();
     expect(tpchTrend.querySelector('[data-result-id="r-tpch-c"]')).toBeTruthy();
     expect(tpchTrend.querySelector('[data-result-id="r-ssb-a"]')).toBeNull();
@@ -740,9 +740,9 @@ describe("PlatformIndex - sortable table headers", () => {
     render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
 
-    expect(screen.queryByRole("img", { name: "Geomean ms trend over time" })).toBeNull();
+    expect(screen.queryByRole("img", { name: "Geomean latency trend over time" })).toBeNull();
     const sparse = screen.getByTestId("trend-sparse-tpch-sf0.1-power-display_geomean_ms");
     expect(sparse.textContent).toContain("Limited observations: 2 published runs");
-    expect(sparse.textContent).toContain("geomean latency, ms (lower is faster)");
+    expect(sparse.textContent).toContain("Geomean latency (lower is better)");
   });
 });

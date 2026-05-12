@@ -31,6 +31,7 @@ import { STARTER_QUERY_CATEGORIES, starterQueriesByCategory, type StarterQueryCa
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { memoizedSnapshotQueryRows } from "@/lib/duckdbQueries";
 import { formatQueryCell, formatQueryColumnLabel, formatQueryFacetValue } from "@/lib/queryLabels";
+import { formatPlainNumber } from "@/lib/metricFormatters";
 import {
   formatBenchmarkLabel,
   formatCostStatus,
@@ -1115,7 +1116,7 @@ function formatDateWindowLabel(value: string): string {
 
 function formatCell(value: unknown): string {
   if (value === null || value === undefined || value === "") return "-";
-  if (typeof value === "number") return Number.isInteger(value) ? String(value) : value.toFixed(2);
+  if (typeof value === "number") return formatPlainNumber(value).valueText;
   return String(value);
 }
 

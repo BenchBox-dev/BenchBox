@@ -12,6 +12,7 @@
 import { useState } from "preact/hooks";
 import { speedupRatio } from "@/lib/chartMath";
 import { isValidTimingValue } from "@/lib/displayEligibility";
+import { formatSpeedup } from "@/lib/metricFormatters";
 import {
   FASTER_FILL,
   SLOWER_FILL,
@@ -146,7 +147,7 @@ export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props)
                 font-size="9"
                 fill="#9ca3af"
               >
-                {stop}×
+                {formatSpeedup(stop, { unit: "×" }).valueText}
               </text>
             </g>
           );
@@ -206,7 +207,7 @@ export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props)
                       fill={color}
                       text-anchor={isSlower ? "end" : "start"}
                     >
-                      {speedup.toFixed(2)}×
+                      {formatSpeedup(speedup, { unit: "×" }).valueText}
                     </text>
                   </g>
                 );

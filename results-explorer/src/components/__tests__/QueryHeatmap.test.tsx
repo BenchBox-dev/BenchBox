@@ -171,7 +171,7 @@ describe("QueryHeatmap rendering", () => {
   it("applies cumulative sticky-left offsets to the frozen header columns", () => {
     render(<QueryHeatmap summary={makeSummary()} />);
     const thead = matrixThead();
-    const primaryHeader = within(thead).getByRole("columnheader", { name: /^Power Score/ });
+    const primaryHeader = within(thead).getByRole("columnheader", { name: /^Power score/ });
     const platformHeader = within(thead).getByRole("columnheader", { name: /^Platform/ });
     expect(platformHeader.getAttribute("style")).toContain("left: 0rem");
     expect(platformHeader.className).toContain("sticky");
@@ -183,7 +183,7 @@ describe("QueryHeatmap rendering", () => {
     render(<QueryHeatmap summary={makeSummary()} selectedIds={new Set()} onSelectionChange={() => {}} />);
     const thead = matrixThead();
     const platformHeader = within(thead).getByRole("columnheader", { name: /^Platform/ });
-    const primaryHeader = within(thead).getByRole("columnheader", { name: /^Power Score/ });
+    const primaryHeader = within(thead).getByRole("columnheader", { name: /^Power score/ });
     expect(platformHeader.getAttribute("style")).toContain("left: 3rem");
     expect(primaryHeader.getAttribute("style")).toContain("left: 14rem");
   });
@@ -293,7 +293,7 @@ describe("QueryHeatmap rendering", () => {
     expect(fastest?.textContent).toBe("10 ms");
     expect(fastest?.getAttribute("aria-label")).toBe("10 ms, fastest in column");
     expect(slowest?.textContent).toBe("100 ms");
-    expect(slowest?.getAttribute("aria-label")).toBe("100 ms, 10.0× fastest in column");
+    expect(slowest?.getAttribute("aria-label")).toBe("100 ms, 10.00× fastest in column");
   });
 
   it("shows the metric/heatmap legend, excludes exact zeroes, and formats positive sub-millisecond timings", () => {
@@ -313,11 +313,11 @@ describe("QueryHeatmap rendering", () => {
 
     const legend = screen.getByTestId("query-heatmap-legend");
     // Per `results-explorer-chart-panel-scope-and-labeling` w4, the legend
-    // heading describes the cell metric (always per-query latency in ms),
+    // heading describes the cell metric (per-query latency with shared units),
     // not the cohort's primary score column. The primary score column
     // keeps its own metric/direction copy in the secondary line.
-    expect(legend.textContent).toContain("Per-query latency (ms): lower is better");
-    expect(legend.textContent).toContain("Power Score");
+    expect(legend.textContent).toContain("Per-query latency: lower is better");
+    expect(legend.textContent).toContain("Power score");
     expect(legend.textContent).toContain("higher is better");
     expect(legend.textContent).toContain("<1 ms");
     expect(legend.textContent).toContain("exact zero timings are");
@@ -377,12 +377,12 @@ describe("QueryHeatmap rendering", () => {
 
     const sqliteCard = screen.getByTestId("query-heatmap-mobile-card-r2");
     expect(sqliteCard.textContent).toContain("SQLite");
-    expect(sqliteCard.textContent).toContain("Power Score");
+    expect(sqliteCard.textContent).toContain("Power score");
     expect(sqliteCard.textContent).toContain("800");
     expect(sqliteCard.textContent).toContain("Query outliers");
     expect(sqliteCard.textContent).toContain("Q2");
     expect(sqliteCard.textContent).toContain("200 ms");
-    expect(sqliteCard.textContent).toContain("10.0× fastest");
+    expect(sqliteCard.textContent).toContain("10.00× fastest");
   });
 
   it("uses the same comparison selection ids from compact mobile cards", () => {

@@ -13,6 +13,7 @@ import { useElementSize } from "@/lib/useElementSize";
 import { paletteColor } from "@/lib/chartTheme";
 import { queryDisplayLabel, sortQueryIds } from "@/lib/queryLabels";
 import { formatTimingExclusion, platformTimingValue } from "@/lib/displayEligibility";
+import { formatLatencyMs } from "@/lib/metricFormatters";
 
 const MAX_PER_PANEL = 33;
 const BAR_GAP = 3;
@@ -26,9 +27,7 @@ interface Props {
 }
 
 function fmtMs(ms: number): string {
-  if (ms >= 10000) return `${(ms / 1000).toFixed(0)}s`;
-  if (ms >= 1000) return `${(ms / 1000).toFixed(1)}s`;
-  return `${Math.round(ms)}ms`;
+  return formatLatencyMs(ms, { subMillisecond: "compact" }).valueText;
 }
 
 export function QueryHistogram({ summary }: Props) {
@@ -133,7 +132,7 @@ export function QueryHistogram({ summary }: Props) {
                       fill={paletteColor(pi)}
                       fillOpacity={0.85}
                     >
-                      <title>{`${p.platform} · ${queryDisplayLabel(qid)}: ${ms.toFixed(1)}ms`}</title>
+                      <title>{`${p.platform} · ${queryDisplayLabel(qid)}: ${fmtMs(ms)}`}</title>
                     </rect>
                   );
                 })}

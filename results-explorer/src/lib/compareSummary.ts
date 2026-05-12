@@ -1,4 +1,5 @@
 import type { DetailResult } from "@/types";
+import { formatSpeedup } from "@/lib/metricFormatters";
 import {
   compareEvidenceSummary,
   isComparable,
@@ -295,5 +296,5 @@ function buildCostSummary(
 }
 
 export function formatRatio(value: number): string {
-  return `${value.toFixed(2)}x`;
+  return formatSpeedup(value).valueText;
 }

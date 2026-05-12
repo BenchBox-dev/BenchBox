@@ -287,11 +287,11 @@ describe("MetaLeaderboard", () => {
     expect(rowOrder()[0]).toContain("DuckDB");
   });
 
-  it("shows visible cohort phase, metric, unit, and direction labels", () => {
+  it("shows visible cohort phase, metric, and direction labels", () => {
     render(<MetaLeaderboard data={DATA} mode="times" onModeChange={vi.fn()} />);
 
     const header = screen.getByRole("columnheader", { name: /ClickBench SF0\.1/ });
-    expect(header.textContent).toContain("power · Geomean · ms · lower is faster");
+    expect(header.textContent).toContain("power · Geomean latency · lower is better");
   });
 
   it("does not focus the first leaderboard cell on initial render", () => {

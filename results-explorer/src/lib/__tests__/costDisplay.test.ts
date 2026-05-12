@@ -94,6 +94,7 @@ describe("costStatusLabel and normalizedCost helpers (unaffected by w1)", () => 
   it("returns the dollar value when normalized cost is finite", () => {
     expect(normalizedCostValue(makeRow({ cost_status: "normalized", normalized_cost_usd: 12.5 }))).toBe(12.5);
     expect(normalizedCostLabel(makeRow({ cost_status: "normalized", normalized_cost_usd: 12.5 }))).toBe("$12.50");
+    expect(normalizedCostLabel(makeRow({ cost_status: "normalized", normalized_cost_usd: 0.0049 }))).toBe("$0.0049");
   });
 
   it("falls back to status label when normalized cost is missing", () => {
