@@ -667,11 +667,18 @@ describe("Compare", () => {
     const guardrails = screen.getByRole("region", { name: "Compare guardrails" });
     const warningLink = screen.getByTestId("compare-warning-link") as HTMLAnchorElement;
     const receipt = screen.getByRole("region", { name: "Comparability receipt" });
-    expect(warningLink.getAttribute("href")).toBe("#comparability-receipt");
+    const warningTarget = screen.getByTestId("comparability-warning-target") as HTMLElement;
+    expect(warningLink.getAttribute("href")).toBe("#comparability-receipt-warnings");
+    expect(warningLink.getAttribute("aria-label")).toBe("2 warnings; review comparability receipt warnings");
     expect(receipt.getAttribute("id")).toBe("comparability-receipt");
+    expect(warningTarget.getAttribute("id")).toBe("comparability-receipt-warnings");
     expect(guardrails.textContent).toContain("Warning classes:");
     expect(guardrails.textContent).toContain("Date window");
     expect(guardrails.textContent).toContain("Platform version");
+
+    fireEvent.click(warningLink);
+    expect(document.activeElement).toBe(warningTarget);
+    expect(window.location.hash).toBe("#comparability-receipt-warnings");
   });
 
   it("uses singular warning copy for one compare guardrail warning", async () => {
@@ -699,6 +706,7 @@ describe("Compare", () => {
     expect(guardrails).not.toHaveTextContent("1 warnings");
     expect(receipt).toHaveTextContent("1 warning");
     expect(receipt).not.toHaveTextContent("1 warnings");
+    expect(screen.getByRole("link", { name: "1 warning; review comparability receipt warnings" })).toBeTruthy();
   });
 
   it("summary card speedup and query diff ratio are consistent for 2-platform fixture", async () => {

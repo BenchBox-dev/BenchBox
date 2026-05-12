@@ -10,6 +10,9 @@ interface ComparabilityReceiptProps {
 
 type ComparabilityStatus = "match" | "diff" | "missing";
 
+export const COMPARABILITY_RECEIPT_ID = "comparability-receipt";
+export const COMPARABILITY_WARNING_TARGET_ID = "comparability-receipt-warnings";
+
 export interface ComparabilityField {
   label: string;
   status: ComparabilityStatus;
@@ -21,10 +24,11 @@ export function ComparabilityReceipt({ results }: ComparabilityReceiptProps) {
   if (results.length === 0) return null;
 
   const fields = buildComparabilityFields(results);
-  const warningCount = fields.filter((field) => field.status === "diff").length;
+  const warningFields = comparabilityWarningFields(fields);
+  const warningCount = warningFields.length;
 
   return (
-    <section id="comparability-receipt" aria-label="Comparability receipt" class="panel-elevated mb-8 p-4">
+    <section id={COMPARABILITY_RECEIPT_ID} aria-label="Comparability receipt" class="panel-elevated mb-8 p-4">
       <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)]">Comparability Receipt</h2>
@@ -36,6 +40,25 @@ export function ComparabilityReceipt({ results }: ComparabilityReceiptProps) {
           {warningCount > 0 ? formatWarningCount(warningCount) : "No differences"}
         </StatusBadge>
       </div>
+
+      {warningCount > 0 && (
+        <section
+          id={COMPARABILITY_WARNING_TARGET_ID}
+          tabIndex={-1}
+          aria-label="Warning details"
+          class="mb-4 rounded-md border border-[var(--bb-tone-warning-border)] bg-[var(--bb-tone-warning-bg)] px-3 py-2 text-xs text-[var(--bb-tone-warning-fg)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-accent)]"
+          data-testid="comparability-warning-target"
+        >
+          <h3 class="font-semibold">{formatWarningCount(warningCount)}</h3>
+          <ul class="mt-1 list-disc space-y-1 pl-4">
+            {warningFields.map((field) => (
+              <li key={field.label}>
+                <span class="font-medium">{field.label}:</span> {field.summary}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {fields.map((field) => (
@@ -65,6 +88,10 @@ export function buildComparabilityFields(results: DetailResult[]): Comparability
     compareValues("Cost model", results, costModelSummary),
     compareValues("Cost scope", results, costScopeSummary),
   ];
+}
+
+export function comparabilityWarningFields(fields: readonly ComparabilityField[]): ComparabilityField[] {
+  return fields.filter((field) => field.status === "diff");
 }
 
 function ComparabilityFieldRow({ field }: { field: ComparabilityField }) {

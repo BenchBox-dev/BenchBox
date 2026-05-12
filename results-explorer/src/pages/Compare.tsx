@@ -1,3 +1,4 @@
+import type { JSX } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { route } from "preact-router";
 import type { RoutableProps } from "preact-router";
@@ -28,7 +29,13 @@ import { ErrorMessage } from "@/components/ErrorMessage";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { TrustBadge } from "@/components/TrustBadge";
 import { TuningBadge } from "@/components/TuningBadge";
-import { ComparabilityReceipt, buildComparabilityFields } from "@/components/ComparabilityReceipt";
+import {
+  COMPARABILITY_RECEIPT_ID,
+  COMPARABILITY_WARNING_TARGET_ID,
+  ComparabilityReceipt,
+  buildComparabilityFields,
+  comparabilityWarningFields,
+} from "@/components/ComparabilityReceipt";
 import { CompareSummary } from "@/components/CompareSummary";
 import { QueryDiffTable } from "@/components/QueryDiffTable";
 import { modeLabel, testTypeLabel } from "@/components/MethodologyDisclosure";
@@ -41,12 +48,11 @@ import {
   type CompareExclusionReasonCopy,
 } from "@/lib/compareExclusionReasons";
 import {
-  ensureSentence,
   formatCandidateCount,
   formatCount,
   formatSelectedCount,
+  formatWarningClassSummary,
   formatWarningCount,
-  removeDuplicatedTerminalPunctuation,
 } from "@/lib/copyFormatters";
 import { paletteColor } from "@/lib/chartTheme";
 import { ChartPanel } from "@/components/ChartPanel";
@@ -233,9 +239,9 @@ export function Compare({ url }: CompareProps) {
   const scaleFactor = results[0]?.scale_factor ?? 0;
   const severeMismatchReason = severeCohortMismatchReason(results);
   const comparabilityFields = buildComparabilityFields(results);
-  const comparabilityWarnings = comparabilityFields.filter((field) => field.status === "diff");
+  const comparabilityWarnings = comparabilityWarningFields(comparabilityFields);
   const comparabilityWarningCount = comparabilityWarnings.length;
-  const comparabilityWarningLabels = comparabilityWarnings.slice(0, 3).map((field) => field.label);
+  const comparabilityWarningLabels = comparabilityWarnings.map((field) => field.label);
   const mixedBenchmark = new Set(results.map((result) => result.benchmark)).size > 1;
   const benchmarkLabel = mixedBenchmark ? "Mixed Benchmark" : humanizeBenchmark(benchmark);
   const scaleFactorLabel = new Set(results.map((result) => result.scale_factor)).size > 1
@@ -523,18 +529,16 @@ function CompareGuardrailSummary({
   claimSuppressed: boolean;
   suppressionReason: string | null;
 }) {
-  const warningText =
-    warningLabels.length > 0
-      ? removeDuplicatedTerminalPunctuation(
-          ensureSentence(
-            `Warning classes: ${warningLabels.join(", ")}${
-              warningCount > warningLabels.length
-                ? `, +${formatCount(warningCount - warningLabels.length, "more", "more")}`
-                : ""
-            }`,
-          ),
-        )
-      : null;
+  const warningText = warningCount > 0 ? formatWarningClassSummary(warningCount, warningLabels) : null;
+  function focusWarningTarget(event: JSX.TargetedMouseEvent<HTMLAnchorElement>) {
+    const target =
+      document.getElementById(COMPARABILITY_WARNING_TARGET_ID) ?? document.getElementById(COMPARABILITY_RECEIPT_ID);
+    if (!target) return;
+    event.preventDefault();
+    target.scrollIntoView?.({ block: "start" });
+    target.focus({ preventScroll: true });
+    window.history.replaceState(null, "", `#${target.id}`);
+  }
   return (
     <section aria-label="Compare guardrails" class="mb-4 panel-elevated p-4">
       <div class="flex flex-wrap items-start justify-between gap-3">
@@ -547,12 +551,21 @@ function CompareGuardrailSummary({
           </p>
           {warningText && (
             <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">
-              {warningText} <a href="#comparability-receipt">Review receipt</a>.
+              {warningText}{" "}
+              <a href={`#${COMPARABILITY_WARNING_TARGET_ID}`} onClick={focusWarningTarget}>
+                Review receipt warnings
+              </a>.
             </p>
           )}
         </div>
         {warningCount > 0 ? (
-          <a href="#comparability-receipt" class="no-underline" data-testid="compare-warning-link">
+          <a
+            href={`#${COMPARABILITY_WARNING_TARGET_ID}`}
+            class="no-underline"
+            data-testid="compare-warning-link"
+            aria-label={`${formatWarningCount(warningCount)}; review comparability receipt warnings`}
+            onClick={focusWarningTarget}
+          >
             <StatusBadge role="comparison" tone="warning">
               {formatWarningCount(warningCount)}
             </StatusBadge>
