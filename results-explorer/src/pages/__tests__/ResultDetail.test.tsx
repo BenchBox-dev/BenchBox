@@ -97,8 +97,8 @@ describe("ResultDetail - median-first contract", () => {
     expect(screen.getByText("Query Timings (2)")).toBeTruthy();
     await waitFor(() => expect(document.title).toBe("TPC-H · DuckDB · SF0.1 · BenchBox Results"));
 
-    // The main table has "Median (ms)" column header (not "Duration (ms)")
-    expect(screen.getAllByText(/Median \(ms\)/i).length).toBeGreaterThan(0);
+    // The main table uses the display timing contract, not raw samples.
+    expect(screen.getAllByText(/Median latency/i).length).toBeGreaterThan(0);
 
     // Two data rows: Q1 and Q2 (one each from display_timings)
     const q1Cells = screen.getAllByText("Q1");
@@ -139,8 +139,8 @@ describe("ResultDetail - median-first contract", () => {
     // After expanding, it should appear
     fireEvent.click(expander);
 
-    // Now the raw Duration (ms) column is visible
-    expect(screen.getAllByText(/Duration \(ms\)/i).length).toBeGreaterThan(0);
+    // Now the raw Duration column is visible. Values carry their own shared units.
+    expect(screen.getAllByText(/^Duration/i).length).toBeGreaterThan(0);
   });
 
   it("(d) registry-driven chart panel uses display_timings-backed charts", async () => {

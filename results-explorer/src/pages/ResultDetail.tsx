@@ -3,7 +3,7 @@ import type { RoutableProps } from "preact-router";
 import type { DetailResult, QueryDisplayTiming, QueryTiming, SortState } from "@/types";
 import type { ChartContext } from "@/lib/chartRegistry";
 import { getDetailResult, getPrimaryMetricForBenchmark } from "@/lib/duckdbQueries";
-import { humanizeBenchmark, errMsg, fmtGeomean, fmtScore } from "@/utils";
+import { humanizeBenchmark, errMsg, fmtGeomean, fmtScoreExact } from "@/utils";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { Breadcrumb } from "@/components/Breadcrumb";
@@ -454,7 +454,7 @@ function ResultMetricCard({ label, value, helper }: { label: string; value: stri
 }
 
 function formatPrimaryMetric(detail: DetailResult, primaryMetric: PrimaryMetric) {
-  if (primaryMetric === "power_score") return fmtScore(detail.power_score);
+  if (primaryMetric === "power_score") return fmtScoreExact(detail.power_score);
   return fmtGeomean(detail.display_geomean_ms);
 }
 

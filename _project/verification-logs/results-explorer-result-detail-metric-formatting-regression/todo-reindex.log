@@ -1,0 +1,22 @@
+
+================================================================================
+TODO/DONE Index Generator
+================================================================================
+
+Scanning /Users/joe/Developer/BenchBox.release-gate/_project/TODO...
+Found 46 items
+  ✓ Generated /Users/joe/Developer/BenchBox.release-gate/_project/TODO/_indexes/master.yaml
+  ✓ Generated /Users/joe/Developer/BenchBox.release-gate/_project/TODO/_indexes/by-category.yaml
+  ✓ Generated /Users/joe/Developer/BenchBox.release-gate/_project/TODO/_indexes/by-priority.yaml
+  ✓ Generated /Users/joe/Developer/BenchBox.release-gate/_project/TODO/_indexes/by-status.yaml
+✅ Index generation complete for TODO/
+
+Scanning /Users/joe/Developer/BenchBox.release-gate/_project/DONE...
+Found 927 items
+  ✓ Generated /Users/joe/Developer/BenchBox.release-gate/_project/DONE/_indexes/master.yaml
+  ✓ Generated /Users/joe/Developer/BenchBox.release-gate/_project/DONE/_indexes/by-category.yaml
+  ✓ Generated /Users/joe/Developer/BenchBox.release-gate/_project/DONE/_indexes/by-priority.yaml
+  ✓ Generated /Users/joe/Developer/BenchBox.release-gate/_project/DONE/_indexes/by-status.yaml
+✅ Index generation complete for DONE/
+
+✅ All indexes generated successfully!
