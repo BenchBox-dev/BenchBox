@@ -3,6 +3,26 @@
 Pairs: 5
 Files: 10
 
+## Scale Factor Migration Decision
+
+Canonical `joinorder` accepts only `scale_factor=1.0`. Calls such as
+`JoinOrder(scale_factor=0.1)` and CLI runs such as `--benchmark joinorder
+--scale 0.1` intentionally hard-raise instead of warning and silently running
+at 1.0.
+
+Decision: no one-release warn-and-ignore shim.
+
+Rationale:
+
+- BenchBox 0.2.x is still beta, so preserving a misleading sub-scale contract is
+  less valuable than making the canonical data cutover explicit.
+- The old scalable synthetic generator remains available as
+  `joinorder_synthetic` for smoke-test data.
+- Silently coercing sub-scale values to 1.0 would hide a materially different
+  run: a full ~1.2 GB canonical archive download and 74M-row workload.
+- The public docs and error message point users at `joinorder_synthetic` when
+  they need synthetic scaled smoke data.
+
 ## joinorder_sf1_clickhouse_local_sql_20260505_203919_70acdc69.json
 
 - Result: `results-data/bundles/joinorder_sf1_clickhouse_local_sql_20260505_203919_70acdc69.json` -> `results-data/bundles/joinorder_synthetic_sf1_clickhouse_local_sql_20260505_203919_70acdc69.json`
