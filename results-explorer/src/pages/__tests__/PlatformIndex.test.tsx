@@ -369,10 +369,40 @@ describe("PlatformIndex - sortable table headers", () => {
     const blocked = screen.getByTestId("platform-compare-checkbox-r-not-comparable") as HTMLInputElement;
     expect(blocked.disabled).toBe(true);
     expect(blocked.title).toContain("Result does not have enough valid query timings");
+    const visibleReason = screen.getByTestId("platform-disabled-reason");
+    expect(visibleReason.textContent).toContain("Disabled reason: Insufficient valid timings");
+    expect(visibleReason.textContent).toContain("Choose a run with at least two valid query timings");
+    expect(blocked.getAttribute("aria-describedby")).toBe(visibleReason.id);
 
     fireEvent.click(blocked);
     expect(screen.queryByRole("link", { name: /Compare 1 selected/ })).toBeNull();
     expect(screen.getByTestId("platform-compare-guidance").textContent).toContain("Select two or more");
+  });
+
+  it("shows a platform zero-selectable recovery callout when filters expose only disabled rows", async () => {
+    vi.mocked(getPlatformIndexRows).mockResolvedValue([
+      makeRow({
+        result_id: "r-blocked-a",
+        short_id: "blocka01",
+        comparison_exclusion_reason: "insufficient_query_coverage",
+      }),
+      makeRow({
+        result_id: "r-blocked-b",
+        short_id: "blockb01",
+        comparison_exclusion_reason: "insufficient_query_coverage",
+      }),
+    ]);
+
+    render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    const callout = screen.getByTestId("platform-zero-selectable");
+    expect(callout.textContent).toContain("No selectable compare rows");
+    expect(callout.textContent).toContain("insufficient query coverage");
+    expect(within(callout).getByRole("button", { name: "Clear filters" })).toBeTruthy();
+    expect(screen.getAllByTestId("platform-disabled-reason")[0]?.textContent).toContain(
+      "Disabled reason: Insufficient query coverage",
+    );
   });
 
   it("hides the platform filter strip when the cohort has fewer than 25 rows", async () => {

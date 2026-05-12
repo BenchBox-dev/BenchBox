@@ -2,7 +2,8 @@ id: results-explorer-compare-disabled-recovery-states
 title: "Make disabled compare rows and zero-selection states explainable and recoverable"
 worktree: results-explorer-followup-todo-review
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-05-11"
 category: User Experience
 
 description: |
@@ -19,7 +20,7 @@ deps:
 work:
 - id: w0
   summary: "Inventory every disabled compare control and current reason source"
-  status: pending
+  status: done
   notes: |
     Inspect benchmark detail, platform detail, Query Workbench, Compare
     builder, and result-detail builder state on the checked git SHA after the
@@ -32,7 +33,7 @@ work:
 - id: w1
   summary: "Create a shared compare exclusion reason formatter"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     Add a small shared formatter that maps stable reason codes to:
       - short row text;
@@ -47,7 +48,7 @@ work:
 - id: w2
   summary: "Show visible disabled reasons in the Compare builder"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Add a compact reason column or inline muted reason next to disabled rows in
     `/results/compare`. The row must not rely on browser `title` as the only
@@ -58,7 +59,7 @@ work:
 - id: w3
   summary: "Show visible disabled reasons on benchmark, platform, and query pages"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     For each source page, disabled compare controls need an adjacent row status
     or an accessible details affordance. Disabled primary buttons must look
@@ -68,7 +69,7 @@ work:
 - id: w4
   summary: "Add zero-selection and mixed-selection tests"
   needs: [w2, w3]
-  status: pending
+  status: done
   notes: |
     Add tests for:
       - all rows disabled with visible reason summary;
@@ -80,7 +81,7 @@ work:
 - id: w5
   summary: "Browser-check recovery paths with filters"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     In a browser, intentionally filter to a zero-selectable state, confirm the
     callout appears, use the recovery action, and verify selectable rows return.
@@ -141,6 +142,14 @@ success_metrics:
 - "Every zero-selectable compare state has a page-level recovery path."
 - "Button copy distinguishes no selection, one selection, incompatible selection, and ready-to-compare."
 - "Reason copy is centralized and tested."
+
+implementation_notes:
+- "w0 evidence captured checked SHA, fixture snapshot checksum, route inventory, reason counts, disabled fixture rows, and zero-selectable cohorts in `_project/verification-logs/results-explorer-compare-disabled-recovery-states/w0.log`."
+- "Added `results-explorer/src/lib/compareExclusionReasons.ts` as the shared compare reason formatter with stable short copy, detailed text, recovery hints, and categories for timing, coverage, visibility, cohort, limit, and rank exclusions."
+- "Compare Builder, Platform detail, Query Workbench, and Benchmark matrix rows now expose visible `Disabled reason: ...` text and recovery hints, with disabled checkboxes wired to that text via `aria-describedby` while retaining hover titles as secondary help."
+- "Added zero-selectable callouts for Compare Builder, Platform detail, Query Workbench, and Benchmark matrix states. Recovery is explicit: clear filters where the page owns filters, or choose another cohort from the Compare builder on benchmark pages."
+- "Implementation intentionally touched `results-explorer/src/components/QueryHeatmap.tsx` although the original `scope_limit` omitted it, because BenchmarkIndex delegates benchmark compare row checkboxes to QueryHeatmap and cannot meet the row-level disabled-reason contract without that component change."
+- "w5 browser evidence in `_project/verification-logs/results-explorer-compare-disabled-recovery-states/w5.log` proves zero-selectable benchmark and Compare-builder states render visible reasons and that Clear filters restores selectable rows."
 
 metadata:
   tags:

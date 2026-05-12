@@ -13,7 +13,11 @@ import {
   compareSelectionLabel,
 } from "@/lib/compareCohort";
 import { buildCompareUrl, compareIdForRow, displayCompareId, MAX_COMPARE_SELECTIONS } from "@/lib/resultLinks";
-import { formatTimingExclusion } from "@/lib/displayEligibility";
+import {
+  describeCompareExclusionReason,
+  summarizeCompareExclusionReasons,
+  type CompareExclusionReasonCopy,
+} from "@/lib/compareExclusionReasons";
 import { formatCount, formatSelectedCount } from "@/lib/copyFormatters";
 import { humanizeBenchmark, fmtScore, fmtGeomean, errMsg } from "@/utils";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
@@ -370,9 +374,14 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   }
 
   function comparisonExclusionReason(row: PlatformIndexRowRow): string | undefined {
-    if (selected.has(row.result_id) || row.comparison_exclusion_reason === null) return undefined;
-    return formatTimingExclusion(row.comparison_exclusion_reason, "Result is not comparable.");
+    const reason = row.comparison_exclusion_reason;
+    if (selected.has(row.result_id) || typeof reason !== "string" || reason.length === 0) return undefined;
+    return reason;
   }
+  const zeroSelectable = platformResults.length > 0 && platformResults.every((row) => comparisonExclusionReason(row));
+  const zeroSelectableReasons = summarizeCompareExclusionReasons(
+    platformResults.map((row) => comparisonExclusionReason(row)),
+  );
 
   return (
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -604,6 +613,30 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
         </div>
       </section>
 
+      {zeroSelectable && (
+        <section
+          class="mb-4 rounded-lg border border-[var(--bb-tone-warning-border)] bg-[var(--bb-tone-warning-bg)] px-4 py-3 text-sm text-[var(--bb-tone-warning-fg)]"
+          data-testid="platform-zero-selectable"
+          aria-label="No selectable platform compare rows"
+        >
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 class="font-semibold">No selectable compare rows</h2>
+              <p class="mt-1">
+                {zeroSelectableReasons.length > 0
+                  ? `${zeroSelectableReasons[0]!.count} ${zeroSelectableReasons[0]!.copy.shortText.toLowerCase()} row${
+                      zeroSelectableReasons[0]!.count === 1 ? "" : "s"
+                    }. ${zeroSelectableReasons[0]!.copy.recoveryHint}`
+                  : "The current filters do not expose a comparable run. Clear filters or choose another cohort."}
+              </p>
+            </div>
+            <button type="button" class="btn btn-secondary shrink-0 text-sm" onClick={resetW5Filters}>
+              Clear filters
+            </button>
+          </div>
+        </section>
+      )}
+
       {platformResults.length === 0 ? (
         <p class="text-[var(--bb-data-fg-muted)]">
           {allPlatformResults.length > 0 && hasActivePlatformResultFacets(facets)
@@ -629,6 +662,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                 <th class="table-th w-8">
                   <span class="sr-only">Compare</span>
                 </th>
+                <th class="table-th">Compare state</th>
                 <th class="p-0" scope="col" aria-sort={ariaSort("benchmark")}>
                   <button
                     type="button"
@@ -878,6 +912,8 @@ interface PlatformRowProps {
 }
 
 function PlatformRow({ entry, checked, onToggle, disabledReason }: PlatformRowProps) {
+  const disabledCopy = describeCompareExclusionReason(disabledReason);
+  const reasonId = disabledCopy ? `platform-compare-reason-${entry.result_id}` : undefined;
   return (
     <tr class="hover:bg-[var(--bb-surface-data-muted)]" data-testid={entry.result_id}>
       <td class="table-td">
@@ -886,8 +922,9 @@ function PlatformRow({ entry, checked, onToggle, disabledReason }: PlatformRowPr
           checked={checked}
           onChange={onToggle}
           disabled={Boolean(disabledReason)}
-          title={disabledReason}
+          title={disabledCopy?.detailText ?? disabledReason}
           class="h-4 w-4 rounded border-[var(--bb-data-border-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+          aria-describedby={reasonId}
           aria-label={compareSelectionLabel({
             platform: entry.platform,
             benchmark: entry.benchmark,
@@ -898,6 +935,9 @@ function PlatformRow({ entry, checked, onToggle, disabledReason }: PlatformRowPr
           })}
           data-testid={`platform-compare-checkbox-${entry.result_id}`}
         />
+      </td>
+      <td class="table-td max-w-[16rem]">
+        <PlatformCompareReasonStatus id={reasonId} copy={disabledCopy} selected={checked} />
       </td>
       <td class="table-td font-medium">{humanizeBenchmark(entry.benchmark)}</td>
       <td class="table-td">SF {entry.scale_factor}</td>
@@ -921,5 +961,25 @@ function PlatformRow({ entry, checked, onToggle, disabledReason }: PlatformRowPr
         </a>
       </td>
     </tr>
+  );
+}
+
+function PlatformCompareReasonStatus({
+  id,
+  copy,
+  selected,
+}: {
+  id?: string;
+  copy: CompareExclusionReasonCopy | null;
+  selected: boolean;
+}) {
+  if (copy === null) {
+    return <span class="text-xs text-[var(--bb-data-fg-muted)]">{selected ? "Selected" : "Selectable"}</span>;
+  }
+  return (
+    <div id={id} class="text-xs text-[var(--bb-data-fg-muted)]" data-testid="platform-disabled-reason">
+      <span class="font-medium text-[var(--bb-tone-warning-fg)]">Disabled reason: {copy.shortText}</span>
+      <span class="block">{copy.recoveryHint}</span>
+    </div>
   );
 }
