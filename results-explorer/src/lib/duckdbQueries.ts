@@ -42,6 +42,7 @@ export interface ResultRow extends CostDeploymentFields {
   geomean_ms: number | null;
   display_geomean_ms: number | null;
   query_count: number;
+  logical_query_count?: number;
   has_display_timing: boolean;
   valid_query_count: number;
   missing_query_count: number;
@@ -124,6 +125,7 @@ export interface BenchmarkRankingRow extends CostDeploymentFields {
   run_date: string;
   is_ranking_eligible: boolean;
   has_display_timing: boolean;
+  logical_query_count?: number;
   valid_query_count: number;
   missing_query_count: number;
   zero_timing_count: number;
@@ -163,6 +165,7 @@ export interface PlatformIndexRowRow extends CostDeploymentFields {
   geomean_ms: number | null;
   display_geomean_ms: number | null;
   query_count: number;
+  logical_query_count?: number;
   has_display_timing: boolean;
   valid_query_count: number;
   missing_query_count: number;
@@ -199,6 +202,7 @@ export interface CohortMetadataRow {
   tuning_mode: string | null;
   trust_label: string;
   has_display_timing: boolean;
+  logical_query_count?: number;
   valid_query_count: number;
   missing_query_count: number;
   zero_timing_count: number;
@@ -250,6 +254,7 @@ const RESULT_COLUMNS = [
   "geomean_ms",
   "display_geomean_ms",
   "query_count",
+  "logical_query_count",
   "has_display_timing",
   "valid_query_count",
   "missing_query_count",
@@ -304,6 +309,7 @@ const RESULT_DETAIL_METRICS_COLUMNS = [
   "geomean_ms",
   "display_geomean_ms",
   "query_count",
+  "logical_query_count",
   "has_display_timing",
   "valid_query_count",
   "missing_query_count",
@@ -368,6 +374,7 @@ const COHORT_METADATA_COLUMNS = [
   "tuning_mode",
   "trust_label",
   "has_display_timing",
+  "logical_query_count",
   "valid_query_count",
   "missing_query_count",
   "zero_timing_count",
@@ -395,6 +402,7 @@ const BENCHMARK_RANKING_COLUMNS = [
   "br.run_date",
   "br.is_ranking_eligible",
   "br.has_display_timing",
+  "br.logical_query_count",
   "br.valid_query_count",
   "br.missing_query_count",
   "br.zero_timing_count",
@@ -559,6 +567,7 @@ export async function getDetailResult(resultId: string): Promise<DetailResult | 
     display_geomean_ms: wide.display_geomean_ms,
     power_score: wide.power_score,
     has_display_timing: wide.has_display_timing,
+    logical_query_count: wide.logical_query_count,
     valid_query_count: wide.valid_query_count,
     missing_query_count: wide.missing_query_count,
     zero_timing_count: wide.zero_timing_count,
@@ -742,6 +751,7 @@ async function loadBenchmarkSummaryFromDuckDB(
       run_date: row.run_date,
       is_ranking_eligible: row.is_ranking_eligible,
       has_display_timing: row.has_display_timing,
+      logical_query_count: row.logical_query_count,
       valid_query_count: row.valid_query_count,
       missing_query_count: row.missing_query_count,
       zero_timing_count: row.zero_timing_count,
@@ -792,8 +802,12 @@ export async function getPlatformIndexRows(platformId?: string): Promise<Platfor
   return memoizedSnapshotQuery(
     `platform-index:${platformId ?? "*"}`,
     () => loadPlatformIndexRows(platformId),
-    { cacheResult: (rows) => rows.length > 0 },
+    { cacheResult: hasPlatformIndexData },
   );
+}
+
+function hasPlatformIndexData(rows: PlatformIndexRowRow[]): boolean {
+  return rows.length > 0;
 }
 
 function loadPlatformIndexRows(platformId?: string): Promise<PlatformIndexRowRow[]> {
@@ -813,6 +827,7 @@ function loadPlatformIndexRows(platformId?: string): Promise<PlatformIndexRowRow
     " r.geomean_ms," +
     " r.display_geomean_ms," +
     " r.query_count," +
+    " r.logical_query_count," +
     " r.has_display_timing," +
     " r.valid_query_count," +
     " r.missing_query_count," +
@@ -945,6 +960,7 @@ async function loadMetaLeaderboardData(): Promise<MetaLeaderboard | null> {
       primary_metric: row.primary_metric,
       primary_order: row.primary_order,
       has_display_timing: row.has_display_timing,
+      logical_query_count: row.logical_query_count,
       valid_query_count: row.valid_query_count,
       missing_query_count: row.missing_query_count,
       zero_timing_count: row.zero_timing_count,
@@ -977,13 +993,20 @@ async function loadMetaLeaderboardData(): Promise<MetaLeaderboard | null> {
     };
   }
 
-  const platforms: MetaPlatform[] = platformRows.map((row) => ({
-    platform_id: row.platform_id,
-    platform: row.platform,
-    ranks: ranksByPlatform.get(row.platform_id) ?? {},
-    avg_rank: row.avg_rank,
-    n_cohorts: row.n_cohorts,
-  }));
+  const platformRowsById = new Map(platformRows.map((row) => [row.platform_id, row]));
+  const platformNamesById = new Map(cohortRows.map((row) => [row.platform_id, row.platform]));
+  const platformIds = new Set([...platformRowsById.keys(), ...platformNamesById.keys()]);
+  const platforms: MetaPlatform[] = [...platformIds].map((platformId) => {
+    const row = platformRowsById.get(platformId);
+    const ranks = ranksByPlatform.get(platformId) ?? {};
+    return {
+      platform_id: platformId,
+      platform: row?.platform ?? platformNamesById.get(platformId) ?? platformId,
+      ranks,
+      avg_rank: row?.avg_rank ?? null,
+      n_cohorts: row?.n_cohorts ?? Object.keys(ranks).length,
+    };
+  });
 
   return {
     // generated_at is not stored per-row in DuckDB; callers that need it can

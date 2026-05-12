@@ -27,6 +27,10 @@ import { fmtMs as formatDurationMs, fmtScore, fmtGeomean } from "@/utils";
 import { queryDisplayLabel, sortQueryIds } from "@/lib/queryLabels";
 import { compareSelectionLabel } from "@/lib/compareCohort";
 import {
+  describeCompareExclusionReason,
+  type CompareExclusionReasonCopy,
+} from "@/lib/compareExclusionReasons";
+import {
   formatTimingExclusion,
   isComparable,
   isRankable,
@@ -53,12 +57,17 @@ export { colorForCell, lightnessForCell };
 const STICKY_COL_REM = {
   checkbox: 3, // w-12
   platform: 11, // w-44
-  trust: 9, // w-36
   primary: 8, // w-32
   geomean: 8, // w-32
 } as const;
 
 type StickyColKey = keyof typeof STICKY_COL_REM;
+
+export const BENCHMARK_MATRIX_DENSITY_CONTRACT = {
+  maxCollapsedRowHeightPx: 72,
+  frozenColumns: ["selection", "platform identity", "primary metric", "secondary geomean"] as const,
+  secondaryMetadataAffordance: "Receipt and metadata",
+} as const;
 
 function cumulativeStickyLeft(
   options: { hasSelection: boolean; showGeomeanCol: boolean },
@@ -69,8 +78,6 @@ function cumulativeStickyLeft(
   if (options.hasSelection) offset += STICKY_COL_REM.checkbox;
   if (target === "platform") return offset;
   offset += STICKY_COL_REM.platform;
-  if (target === "trust") return offset;
-  offset += STICKY_COL_REM.trust;
   if (target === "primary") return offset;
   offset += STICKY_COL_REM.primary;
   if (target === "geomean") return offset;
@@ -104,6 +111,19 @@ const MOBILE_OUTLIER_LIMIT = 3;
 function fmtQueryMs(ms: number): string {
   if (ms > 0 && ms < 1) return "<1 ms";
   return formatDurationMs(ms);
+}
+
+function CompareDisabledReason({ id, copy }: { id?: string; copy: CompareExclusionReasonCopy }) {
+  return (
+    <div id={id} class="mt-1 text-xs text-[var(--bb-data-fg-muted)]" data-testid="query-heatmap-disabled-reason">
+      <span class="font-medium text-[var(--bb-tone-warning-fg)]">Disabled reason: {copy.shortText}</span>
+      <span class="block">{copy.recoveryHint}</span>
+    </div>
+  );
+}
+
+function formatPlatformVersion(version: string): string {
+  return version.startsWith("v") || version.startsWith("V") ? version : `v${version}`;
 }
 
 export function QueryHeatmap({
@@ -369,14 +389,6 @@ export function QueryHeatmap({
         <th
           role="columnheader"
           scope="col"
-          class="table-th sticky z-30 w-36 min-w-36 whitespace-nowrap bg-[var(--bb-surface-data-muted)]"
-          style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "trust"))}
-        >
-          Trust
-        </th>
-        <th
-          role="columnheader"
-          scope="col"
           aria-sort={ariaSort("primary")}
           class="sticky z-30 w-32 min-w-32 whitespace-nowrap bg-[var(--bb-surface-data-muted)] p-0"
           style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "primary"))}
@@ -459,6 +471,8 @@ export function QueryHeatmap({
           const isSelected = selectedIds?.has(rowKey(row)) ?? false;
           const comparable = isComparable(row);
           const comparisonExclusion = comparable ? null : formatTimingExclusion(row.comparison_exclusion_reason);
+          const comparisonCopy = describeCompareExclusionReason(row.comparison_exclusion_reason);
+          const comparisonReasonId = comparisonCopy ? `query-heatmap-mobile-compare-reason-${row.result_id}` : undefined;
           const rankingExclusion = isRankable(row) ? null : formatTimingExclusion(row.ranking_exclusion_reason);
           const outliers = queryOutliers(row, sortedQueryIds, colMins);
           return (
@@ -485,6 +499,7 @@ export function QueryHeatmap({
                       runDate: row.run_date,
                       resultId: row.result_id,
                     })}
+                    aria-describedby={comparisonReasonId}
                     title={comparisonExclusion ?? undefined}
                     class="mt-1 h-4 w-4 shrink-0 rounded border-[var(--bb-data-border-strong)]"
                   />
@@ -506,6 +521,9 @@ export function QueryHeatmap({
                   </div>
                   {row.platform_version && (
                     <div class="mt-0.5 text-xs text-[var(--bb-data-fg-subtle)]">{row.platform_version}</div>
+                  )}
+                  {hasSelection && comparisonCopy && (
+                    <CompareDisabledReason id={comparisonReasonId} copy={comparisonCopy} />
                   )}
                   <a
                     href={`/results/r/${row.result_id}#run-receipt`}
@@ -608,12 +626,15 @@ export function QueryHeatmap({
                 const isSelected = selectedIds?.has(rowKey(row)) ?? false;
                 const comparable = isComparable(row);
                 const comparisonExclusion = comparable ? null : formatTimingExclusion(row.comparison_exclusion_reason);
+                const comparisonCopy = describeCompareExclusionReason(row.comparison_exclusion_reason);
+                const comparisonReasonId = comparisonCopy ? `query-heatmap-compare-reason-${row.result_id}` : undefined;
                 const rankingExclusion = isRankable(row) ? null : formatTimingExclusion(row.ranking_exclusion_reason);
                 return (
                   <tr
                     key={row.result_id}
                     role="row"
                     data-testid={row.result_id}
+                    data-density-contract="benchmark-matrix-row"
                     class={`hover:bg-[var(--bb-surface-data-muted)] ${isSelected ? "bg-[var(--bb-tone-info-bg)]" : ""}`}
                   >
                   {hasSelection && (
@@ -637,6 +658,7 @@ export function QueryHeatmap({
                           runDate: row.run_date,
                           resultId: row.result_id,
                         })}
+                        aria-describedby={comparisonReasonId}
                         title={comparisonExclusion ?? undefined}
                         class="h-4 w-4 rounded border-[var(--bb-data-border-strong)]"
                       />
@@ -651,6 +673,11 @@ export function QueryHeatmap({
                   >
                     <div class="flex items-center gap-1">
                       <span class="font-medium text-[var(--bb-data-fg-primary)]">{row.platform}</span>
+                      {row.platform_version && (
+                        <span class="text-xs text-[var(--bb-data-fg-subtle)]">
+                          {formatPlatformVersion(row.platform_version)}
+                        </span>
+                      )}
                       {rankingExclusion && (
                         <span
                           role="img"
@@ -663,29 +690,24 @@ export function QueryHeatmap({
                         </span>
                       )}
                     </div>
-                    {row.platform_version && (
-                      <div class="mt-0.5 text-xs text-[var(--bb-data-fg-subtle)]">{row.platform_version}</div>
-                    )}
-                  </td>
-                  <td
-                    role="gridcell"
-                    class={`table-td sticky z-10 w-36 min-w-36 whitespace-nowrap ${
-                      isSelected ? "bg-[var(--bb-tone-info-bg)]" : "bg-[var(--bb-surface-data)]"
-                    }`}
-                    style={stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, "trust"))}
-                  >
-                    <div class="flex flex-col gap-0.5">
-                      <div class="flex flex-wrap gap-1">
+                    <details class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">
+                      <summary class="cursor-pointer font-medium text-[var(--bb-accent-hover)]">
+                        {BENCHMARK_MATRIX_DENSITY_CONTRACT.secondaryMetadataAffordance}
+                      </summary>
+                      <div class="mt-1 flex flex-wrap items-center gap-1">
                         <TrustBadge trustLabel={row.trust_label} compact />
                         <ValidationBadge validationStatus={row.validation_status} showMissing />
+                        <a
+                          href={`/results/r/${row.result_id}#run-receipt`}
+                          class="font-medium no-underline"
+                        >
+                          Receipt →
+                        </a>
                       </div>
-                      <a
-                        href={`/results/r/${row.result_id}#run-receipt`}
-                        class="text-xs font-medium no-underline"
-                      >
-                        Receipt →
-                      </a>
-                    </div>
+                    </details>
+                    {hasSelection && comparisonCopy && (
+                      <CompareDisabledReason id={comparisonReasonId} copy={comparisonCopy} />
+                    )}
                   </td>
                   <td
                     role="gridcell"

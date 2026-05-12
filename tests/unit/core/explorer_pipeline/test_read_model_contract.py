@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import copy
 import json
+import math
 from pathlib import Path
 
 import pytest
@@ -234,6 +235,32 @@ class TestDisplayGeomean:
 
 
 class TestTimingEligibilityContract:
+    def _write_bundle(self, tmp_path: Path, data: dict, name: str = "b.json") -> Path:
+        bundle_path = tmp_path / name
+        bundle_path.write_text(json.dumps(data), encoding="utf-8")
+        return bundle_path
+
+    def _repeated_query_bundle(self, benchmark: str, logical_queries: int, samples_per_query: int) -> dict:
+        bundle = copy.deepcopy(MINIMAL_BUNDLE)
+        bundle["benchmark"]["id"] = benchmark
+        bundle["summary"]["queries"] = {
+            "total": logical_queries * samples_per_query,
+            "passed": logical_queries * samples_per_query,
+            "failed": 0,
+        }
+        bundle["queries"] = [
+            {
+                "id": str(query_id),
+                "ms": float(10 + query_id),
+                "run_type": "measurement",
+                "status": "SUCCESS",
+                "iter": iteration,
+            }
+            for iteration in range(1, samples_per_query + 1)
+            for query_id in range(1, logical_queries + 1)
+        ]
+        return bundle
+
     def test_zero_timings_are_auditable_but_not_valid_display_evidence(self) -> None:
         contract = timing_eligibility(
             [
@@ -273,6 +300,74 @@ class TestTimingEligibilityContract:
         assert one_query.comparison_exclusion_reason == "insufficient_valid_queries"
         assert low_coverage.comparison_exclusion_reason == "insufficient_query_coverage"
         assert enough_coverage.comparison_exclusion_reason is None
+
+    def test_repeated_tpch_raw_samples_use_logical_query_denominator(self, tmp_path: Path) -> None:
+        bundle = self._repeated_query_bundle("tpch", logical_queries=22, samples_per_query=3)
+        entry = BundleTransformer().to_manifest_entry(self._write_bundle(tmp_path, bundle))
+
+        assert entry.query_count == 66
+        assert entry.logical_query_count == 22
+        assert entry.valid_query_count == 22
+        assert entry.missing_query_count == 0
+        assert entry.comparison_exclusion_reason is None
+
+    def test_repeated_ssb_raw_samples_use_logical_query_denominator(self, tmp_path: Path) -> None:
+        bundle = self._repeated_query_bundle("ssb", logical_queries=13, samples_per_query=3)
+        entry = BundleTransformer().to_manifest_entry(self._write_bundle(tmp_path, bundle))
+
+        assert entry.query_count == 39
+        assert entry.logical_query_count == 13
+        assert entry.valid_query_count == 13
+        assert entry.missing_query_count == 0
+        assert entry.comparison_exclusion_reason is None
+
+    def test_partial_unknown_query_set_still_uses_summary_denominator(self, tmp_path: Path) -> None:
+        bundle = copy.deepcopy(MINIMAL_BUNDLE)
+        bundle["benchmark"]["id"] = "custom"
+        bundle["summary"]["queries"] = {"total": 5, "passed": 1, "failed": 0}
+        bundle["queries"] = [{"id": "Q1", "ms": 1.0, "run_type": "measurement", "status": "SUCCESS"}]
+
+        entry = BundleTransformer().to_manifest_entry(self._write_bundle(tmp_path, bundle))
+
+        assert entry.query_count == 5
+        assert entry.logical_query_count == 5
+        assert entry.valid_query_count == 1
+        assert entry.missing_query_count == 4
+        assert entry.comparison_exclusion_reason == "insufficient_valid_queries"
+
+    def test_invalid_display_timings_are_not_comparable(self) -> None:
+        contract = timing_eligibility(
+            [
+                QueryDisplayTiming(query_id="Q1", display_ms=0.0, sample_count=3),
+                QueryDisplayTiming(query_id="Q2", display_ms=-1.0, sample_count=3),
+                QueryDisplayTiming(query_id="Q3", display_ms=math.nan, sample_count=3),
+            ],
+            logical_query_count=3,
+        )
+
+        assert contract.has_display_timing is False
+        assert contract.valid_query_count == 0
+        assert contract.logical_query_count == 3
+        assert contract.comparison_exclusion_reason == "no_valid_display_timing"
+
+    def test_no_query_records_are_not_comparable(self) -> None:
+        contract = timing_eligibility([], logical_query_count=0)
+
+        assert contract.valid_query_count == 0
+        assert contract.logical_query_count == 0
+        assert contract.display_exclusion_reason == "no_queries"
+        assert contract.comparison_exclusion_reason == "no_queries"
+
+    def test_trust_excluded_row_can_still_be_timing_comparable(self, tmp_path: Path) -> None:
+        bundle = self._repeated_query_bundle("tpch", logical_queries=22, samples_per_query=3)
+        entry = BundleTransformer().to_manifest_entry(
+            self._write_bundle(tmp_path, bundle),
+            trust_label="community-submission",
+            visibility="public-self-reported",
+        )
+
+        assert entry.comparison_exclusion_reason is None
+        assert entry.ranking_exclusion_reason == "visibility_not_rankable"
 
     def test_transformer_writes_timing_eligibility_fields(self, tmp_path: Path) -> None:
         bundle = copy.deepcopy(MINIMAL_BUNDLE)

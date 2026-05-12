@@ -1,0 +1,25 @@
+Results Explorer leaderboard rank evidence w1 display contract
+
+git_sha: d699aaf2a4d7b23b98fc49036e1555d7df310bee
+source_evidence: _project/verification-logs/results-explorer-leaderboard-rank-evidence-semantics/w0.log
+
+Contract:
+1. Missing run
+   Predicate: no rank entry and no cohort_metadata/result row for the platform/cohort pair.
+   UI: copy `No run`; no result link; no receipt link; no trust badge; no validation badge; no heatmap shade.
+   Rationale: absence of evidence should not imply a submission, provenance, validation, or audit receipt.
+
+2. Published but unranked
+   Predicate: cohort_metadata/result row exists but no rank entry exists for the platform/cohort pair.
+   UI: copy `Excluded` when an explicit ranking or cohort exclusion reason exists, otherwise `Unranked`; show the human-readable reason; show a receipt link only to the real result id; trust/validation badges may render because provenance exists.
+   Rationale: submitted evidence must remain auditable, but it must not be labelled as missing or shaded/scored as ranked.
+
+3. Ranked
+   Predicate: rank entry exists for the platform/cohort pair.
+   UI: render the existing times/ranks/speedup value, heatmap shade, receipt link, and compact trust/validation metadata.
+   Rationale: preserve the existing ranked leaderboard ordering and metric display.
+
+4. Rank chart
+   Predicate: at least one platform/query cell is rankable and has a valid timing before rendering a normal rank matrix.
+   UI: if no rankable cells exist, render an explanatory rank chart empty state with dominant exclusion reasons and submitted-evidence counts; do not render an all-dash table.
+   Rationale: a normal matrix whose every cell is `-` reads like authoritative ranking evidence even when the cohort is fully excluded.

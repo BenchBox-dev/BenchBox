@@ -25,7 +25,11 @@ import { CDFChart } from "@/components/CDFChart";
 import { RankTable } from "@/components/RankTable";
 import { fmtGeomean, fmtScore } from "@/utils";
 import { paletteColor } from "@/lib/chartTheme";
-import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
+import {
+  formatRunIdentitiesForCohort,
+  formatRunIdentityLabelsForCohort,
+  preserveUniqueAfterTruncation,
+} from "@/lib/runIdentity";
 import {
   buildLatencyBarScale,
   latencyScaleFraction,
@@ -460,12 +464,18 @@ function renderChart(
 function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
   const [containerRef, { width: containerWidth }] = useElementSize();
   const width = Math.max(containerWidth, 400);
-  const cohortLabels = formatRunIdentitiesForCohort(
+  const cohortLabels = formatRunIdentityLabelsForCohort(
     summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
-    "chart",
+  );
+  const displayLabels = preserveUniqueAfterTruncation(
+    cohortLabels.map((label) => label.disambiguated),
+    22,
   );
   const labelByResultId = new Map(
-    summary.platforms.map((platform, index) => [platform.result_id, cohortLabels[index] ?? platform.platform]),
+    summary.platforms.map((platform, index) => [platform.result_id, displayLabels[index] ?? platform.platform]),
+  );
+  const fullLabelByResultId = new Map(
+    summary.platforms.map((platform, index) => [platform.result_id, cohortLabels[index]?.full ?? platform.platform]),
   );
   const rows = summary.platforms
     .filter((platform) => isTimingDisplayable(platform) && isValidTimingValue(platform.display_geomean_ms))
@@ -474,6 +484,7 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
       ...platform,
       color: paletteColor(index),
       displayLabel: labelByResultId.get(platform.result_id) ?? platform.platform,
+      fullLabel: fullLabelByResultId.get(platform.result_id) ?? platform.platform,
     }));
 
   if (rows.length === 0) {
@@ -535,7 +546,8 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
                 textAnchor="end"
                 style={{ fontSize: "11px", fill: "#374151" }}
               >
-                {row.displayLabel.length > 22 ? `${row.displayLabel.slice(0, 21)}…` : row.displayLabel}
+                <title>{row.fullLabel}</title>
+                {row.displayLabel}
               </text>
               <rect
                 x={labelWidth}
@@ -546,7 +558,7 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
                 opacity={0.85}
                 rx={2}
               >
-                <title>{`${row.displayLabel}: ${fmtGeomean(row.display_geomean_ms)}`}</title>
+                <title>{`${row.fullLabel}: ${fmtGeomean(row.display_geomean_ms)}`}</title>
               </rect>
               {valueLabelPlacement.placement === "gutter" && (
                 <line
@@ -708,6 +720,12 @@ function SummaryBoxPanel({
       const bv = validPrimaryMetricValue(b, primaryMetric) ?? (higherIsBetter ? -Infinity : Infinity);
       return higherIsBetter ? bv - av : av - bv;
     })[0] ?? null;
+  const summaryLabels = formatRunIdentityLabelsForCohort(
+    summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
+  );
+  const summaryLabelByResultId = new Map(
+    summary.platforms.map((platform, index) => [platform.result_id, summaryLabels[index]?.compact ?? platform.platform]),
+  );
 
   const sampleCount =
     context.kind === "detail"
@@ -730,7 +748,7 @@ function SummaryBoxPanel({
         }
         value={
           best
-            ? `${best.platform} · ${
+            ? `${summaryLabelByResultId.get(best.result_id) ?? best.platform} · ${
                 primaryMetric === "power_score" ? fmtScore(best.power_score) : fmtGeomean(best.display_geomean_ms)
               }${suppressWinnerClaims ? " (cohort mismatch — not comparable)" : ""}`
             : "-"

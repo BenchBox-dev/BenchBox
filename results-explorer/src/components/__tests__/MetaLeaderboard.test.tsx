@@ -416,6 +416,9 @@ describe("MetaLeaderboard", () => {
       name: /Polars has no published run for ClickBench SF0\.1\. Missing cohorts are not scored; coverage is shown separately\./,
     });
     expect(missingCell.getAttribute("title")).toContain("Missing cohorts are not scored");
+    expect(missingCell.querySelector("a")).toBeNull();
+    expect(missingCell.textContent).not.toContain("Maintainer");
+    expect(missingCell.textContent).not.toContain("exact");
   });
 
   it("formats avg_rank with 2 decimal places", () => {
@@ -470,13 +473,13 @@ describe("MetaLeaderboard", () => {
 
     const { container } = render(<MetaLeaderboard data={data} mode="times" onModeChange={vi.fn()} />);
 
-    expect(screen.getByText("Showing 200 of 205 ranked platforms across 1 leaderboard cohort")).toBeTruthy();
+    expect(screen.getByText("Showing 200 of 205 platforms across 1 leaderboard cohort")).toBeTruthy();
     expect(container.querySelectorAll("tbody tr")).toHaveLength(200);
     expect(screen.queryByText("Platform 204")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Show more platforms" }));
 
-    expect(screen.getByText("Showing 205 of 205 ranked platforms across 1 leaderboard cohort")).toBeTruthy();
+    expect(screen.getByText("Showing 205 of 205 platforms across 1 leaderboard cohort")).toBeTruthy();
     expect(container.querySelectorAll("tbody tr")).toHaveLength(205);
     expect(screen.getByText("Platform 204")).toBeTruthy();
   });
@@ -510,11 +513,7 @@ describe("MetaLeaderboard", () => {
     expect(routeMock).toHaveBeenLastCalledWith("/results/p/sqlite/");
   });
 
-  it("does not render a linked 'No run' cell when rank data is missing for a published result (finding #4)", () => {
-    // Reproduction shape from the audit: a result is in cohort.platforms
-    // (so resultMetadataById/receiptHref both resolve) but the platform's
-    // ranks map is missing the cohort entry. The cell must read "No run"
-    // and must NOT be wrapped in an <a>.
+  it("labels published but unranked evidence instead of treating it as missing", () => {
     const data: MetaLeaderboardData = {
       ...DATA,
       cohorts: [
@@ -524,6 +523,70 @@ describe("MetaLeaderboard", () => {
           benchmark: "tpch",
           label: "TPC-H SF0.1",
           href: "/results/tpch/",
+          primary_metric: "power_score",
+          primary_order: "desc" as const,
+          platforms: [
+            {
+              platform_id: "polars",
+              platform: "Polars",
+              result_id: "polars-tpch-r1",
+              rank: null,
+              metric_value: 9001,
+              speedup_vs_best: null,
+              primary_metric: "power_score",
+              primary_order: "desc" as const,
+              ...META_TIMING_ELIGIBLE,
+              ranking_exclusion_reason: "trust_not_rankable",
+            },
+          ],
+        },
+      ],
+      platforms: [
+        {
+          platform_id: "polars",
+          platform: "Polars",
+          ranks: {},
+          avg_rank: null,
+          n_cohorts: 0,
+        },
+      ],
+    };
+    render(
+      <MetaLeaderboard
+        data={data}
+        mode="times"
+        onModeChange={vi.fn()}
+        resultMetadataById={new Map([
+          ["polars-tpch-r1", { trust_label: "community-submission", validation_status: "passed" }],
+        ])}
+      />,
+    );
+
+    const cell = screen.getByRole("gridcell", {
+      name: /Polars has published evidence for TPC-H SF0\.1, but it is excluded: Trust policy excludes this result from ranking\./,
+    });
+    expect(cell.textContent).toContain("Excluded");
+    expect(cell.textContent).toContain("Trust policy excludes this result from ranking.");
+    expect(cell.textContent).not.toContain("No run");
+    expect((cell.querySelector("a") as HTMLAnchorElement | null)?.getAttribute("href")).toBe(
+      "/results/r/polars-tpch-r1#run-receipt",
+    );
+    expect(cell.textContent).toContain("Community");
+    expect(cell.textContent).toContain("passed");
+  });
+
+  it("recovers ranked cells from cohort evidence when the pivot map is stale", () => {
+    const data: MetaLeaderboardData = {
+      ...DATA,
+      cohorts: [
+        {
+          ...DATA.cohorts[0]!,
+          key: "tpch-sf0.1-power",
+          benchmark: "tpch",
+          label: "TPC-H SF0.1",
+          href: "/results/tpch/",
+          primary_metric: "power_score",
+          primary_order: "desc" as const,
           platforms: [
             {
               platform_id: "polars",
@@ -551,10 +614,13 @@ describe("MetaLeaderboard", () => {
     };
     render(<MetaLeaderboard data={data} mode="times" onModeChange={vi.fn()} />);
 
-    const cell = screen.getAllByRole("gridcell").find((el) => el.textContent?.includes("No run"));
-    expect(cell).toBeTruthy();
-    // Critical assertion: the "No run" text must not be inside an anchor.
-    const link = cell!.querySelector("a");
-    expect(link).toBeNull();
+    const cell = screen.getByRole("gridcell", {
+      name: "Polars times for TPC-H SF0.1: 9,001",
+    });
+    expect(cell.textContent).toContain("9,001");
+    expect(cell.textContent).not.toContain("No run");
+    expect((cell.querySelector("a") as HTMLAnchorElement | null)?.getAttribute("href")).toBe(
+      "/results/r/polars-tpch-r1#run-receipt",
+    );
   });
 });

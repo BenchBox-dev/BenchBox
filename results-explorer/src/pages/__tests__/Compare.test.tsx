@@ -444,9 +444,40 @@ describe("Compare", () => {
     const blocked = within(getByTestId("compare-builder-row-r2")).getByRole("checkbox") as HTMLInputElement;
     expect(blocked.disabled).toBe(true);
     expect(blocked.title).toContain("Result does not have enough valid query timings");
+    const visibleReason = within(getByTestId("compare-builder-row-r2")).getByTestId("compare-disabled-reason");
+    expect(visibleReason.textContent).toContain("Disabled reason: Insufficient valid timings");
+    expect(visibleReason.textContent).toContain("Choose a run with at least two valid query timings");
+    expect(blocked.getAttribute("aria-describedby")).toBe(visibleReason.id);
 
     blocked.click();
     expect((getByTestId("compare-builder-launch") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("compare picker shows a zero-selectable recovery callout when every filtered row is disabled", async () => {
+    setupUrl([]);
+    vi.mocked(listResults).mockResolvedValue([
+      makeResultRow({
+        result_id: "blocked-a",
+        platform: "DuckDB",
+        comparison_exclusion_reason: "insufficient_query_coverage",
+      }),
+      makeResultRow({
+        result_id: "blocked-b",
+        platform: "SQLite",
+        comparison_exclusion_reason: "insufficient_query_coverage",
+      }),
+    ]);
+
+    const { getByTestId } = render(<Compare />);
+    await waitFor(() => expect(getByTestId("compare-builder-row-blocked-a")).toBeTruthy());
+
+    const callout = getByTestId("compare-builder-zero-selectable");
+    expect(callout.textContent).toContain("No selectable compare rows");
+    expect(callout.textContent).toContain("insufficient query coverage");
+    expect(within(callout).getByRole("button", { name: "Clear filters" })).toBeTruthy();
+    expect(getByTestId("compare-builder-row-blocked-a").textContent).toContain(
+      "Disabled reason: Insufficient query coverage",
+    );
   });
 
   it("compare picker uses disambiguated aria-labels for same-platform rows", async () => {
@@ -641,6 +672,33 @@ describe("Compare", () => {
     expect(guardrails.textContent).toContain("Warning classes:");
     expect(guardrails.textContent).toContain("Date window");
     expect(guardrails.textContent).toContain("Platform version");
+  });
+
+  it("uses singular warning copy for one compare guardrail warning", async () => {
+    vi.mocked(getDetailResult).mockImplementation((id) =>
+      id === "r1"
+        ? Promise.resolve(DUCKDB)
+        : Promise.resolve(
+            makeResult({
+              result_id: "r2",
+              platform: "SQLite",
+              platform_id: "sqlite",
+              platform_version: "3.45",
+              power_score: 300,
+              display_timings: SQLITE.display_timings,
+            }),
+          ),
+    );
+
+    render(<Compare />);
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Decision Summary" })).toBeTruthy());
+
+    const guardrails = screen.getByRole("region", { name: "Compare guardrails" });
+    const receipt = screen.getByRole("region", { name: "Comparability receipt" });
+    expect(guardrails).toHaveTextContent("1 warning");
+    expect(guardrails).not.toHaveTextContent("1 warnings");
+    expect(receipt).toHaveTextContent("1 warning");
+    expect(receipt).not.toHaveTextContent("1 warnings");
   });
 
   it("summary card speedup and query diff ratio are consistent for 2-platform fixture", async () => {

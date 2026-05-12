@@ -1776,6 +1776,127 @@ def compute_reference_cardinalities(
     return out
 
 
+def verify_reference_results(
+    *,
+    work_dir: Path,
+    query_dir: Path,
+    reference_path: Path,
+    container_name: str,
+    database: str,
+    user: str,
+    expected_query_count: int | None = EXPECTED_QUERY_COUNT,
+) -> dict[str, Any]:
+    """Verify the committed PostgreSQL oracle against a restored source database.
+
+    The JOB queries are aggregate queries and should each produce exactly one
+    row. The stored ``first_row_sha256`` is therefore a compact full-result
+    oracle: it hashes PostgreSQL's ``row_to_json`` text for that aggregate row.
+    """
+    reference = json.loads(reference_path.read_text(encoding="utf-8"))
+    expected_queries = reference.get("queries")
+    if not isinstance(expected_queries, dict):
+        raise JoinOrderBuildError(f"{reference_path} must contain a 'queries' object")
+
+    paths = {path.stem: path for path in query_files(query_dir)}
+    failures: list[dict[str, Any]] = []
+    missing_queries = sorted(set(paths) - set(expected_queries), key=query_sort_key)
+    unexpected_queries = sorted(set(expected_queries) - set(paths), key=query_sort_key)
+
+    for query_id in missing_queries:
+        failures.append({"query_id": query_id, "kind": "missing_reference_query"})
+    for query_id in unexpected_queries:
+        failures.append({"query_id": query_id, "kind": "unexpected_reference_query"})
+    if expected_query_count is not None and len(paths) != expected_query_count:
+        failures.append(
+            {
+                "kind": "query_count",
+                "expected_query_count": expected_query_count,
+                "actual_query_count": len(paths),
+            }
+        )
+
+    postgres_version = psql(container_name=container_name, database=database, user=user, sql="SHOW server_version").strip()
+    verified: dict[str, dict[str, Any]] = {}
+
+    for query_id, path in sorted(paths.items(), key=lambda item: query_sort_key(item[0])):
+        expected = expected_queries.get(query_id)
+        if not isinstance(expected, dict):
+            continue
+        sql = strip_query_semicolon(path.read_text(encoding="utf-8"))
+        row_count = int(
+            psql(
+                container_name=container_name,
+                database=database,
+                user=user,
+                sql=f"SELECT count(*) FROM ({sql}) AS benchbox_q",
+            ).strip()
+        )
+        row_json = psql(
+            container_name=container_name,
+            database=database,
+            user=user,
+            sql=f"SELECT row_to_json(benchbox_q)::text FROM ({sql}) AS benchbox_q ORDER BY 1 LIMIT 1",
+        ).strip()
+        actual_hash = hashlib.sha256(row_json.encode("utf-8")).hexdigest() if row_json else None
+        underlying_count = int(
+            psql(
+                container_name=container_name,
+                database=database,
+                user=user,
+                sql=underlying_count_sql(sql, query_id=query_id),
+            ).strip()
+        )
+
+        verified[query_id] = {
+            "row_count": row_count,
+            "underlying_row_count": underlying_count,
+            "first_row_sha256": actual_hash,
+        }
+
+        checks = (
+            ("row_count", row_count),
+            ("underlying_row_count", underlying_count),
+            ("first_row_sha256", actual_hash),
+        )
+        for field, actual in checks:
+            expected_value = expected.get(field)
+            if actual != expected_value:
+                failures.append(
+                    {
+                        "query_id": query_id,
+                        "kind": field,
+                        "expected": expected_value,
+                        "actual": actual,
+                    }
+                )
+
+    report = {
+        "reference_path": str(reference_path),
+        "query_dir": str(query_dir),
+        "dataset_version": reference.get("dataset_version"),
+        "manifest_hash": reference.get("manifest_hash"),
+        "data_archive_hash": reference.get("data_archive_hash"),
+        "gregrahn_commit": reference.get("gregrahn_commit"),
+        "expected_postgres_version": reference.get("postgres_version"),
+        "actual_postgres_version": postgres_version,
+        "verified_query_count": len(verified),
+        "full_result_hashes_verified": sum(
+            1
+            for query_id, values in verified.items()
+            if values.get("first_row_sha256") == expected_queries.get(query_id, {}).get("first_row_sha256")
+        ),
+        "failures": failures,
+        "validated_at": utc_now_iso(),
+    }
+    write_build_manifest(work_dir, {"reference_result_verification": report})
+    if failures:
+        raise JoinOrderBuildError(
+            f"Reference result verification failed: {len(failures)} failure(s); "
+            f"see {build_manifest_path(work_dir)}:reference_result_verification"
+        )
+    return report
+
+
 def write_cardinality_cross_check(*, work_dir: Path, cardinalities_path: Path, output_path: Path | None = None) -> Path:
     out = output_path or repo_root() / "_project" / "joinorder" / "cardinality-cross-check.md"
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -2420,6 +2541,15 @@ def build_parser() -> argparse.ArgumentParser:
     add_query_dir_arg(cardinalities)
     cardinalities.add_argument("--output", default=None)
 
+    verify_reference = subparsers.add_parser(
+        "verify-reference-results",
+        help="Verify committed PostgreSQL full-result hashes against a restored source database.",
+    )
+    add_common_args(verify_reference)
+    add_existing_postgres_args(verify_reference)
+    add_query_dir_arg(verify_reference)
+    verify_reference.add_argument("--reference", default=None)
+
     cross_check = subparsers.add_parser("cross-check", help="w12: Write published-cardinality cross-check report.")
     add_common_args(cross_check)
     cross_check.add_argument("--cardinalities", default=None)
@@ -2561,6 +2691,28 @@ def run_cardinalities(args: argparse.Namespace) -> int:
         user=args.user,
     )
     print(f"Wrote reference cardinalities: {out}")
+    return 0
+
+
+def run_verify_reference_results(args: argparse.Namespace) -> int:
+    work_dir = work_dir_from_arg(args.work_dir)
+    reference = (
+        Path(args.reference).expanduser().resolve()
+        if args.reference
+        else repo_root() / "_project" / "joinorder" / "reference_cardinalities.json"
+    )
+    report = verify_reference_results(
+        work_dir=work_dir,
+        query_dir=query_dir_from_arg(args.queries),
+        reference_path=reference,
+        container_name=args.container_name,
+        database=args.database,
+        user=args.user,
+    )
+    print(
+        "Reference result verification passed: "
+        f"{report['full_result_hashes_verified']}/{report['verified_query_count']} aggregate row hashes matched"
+    )
     return 0
 
 
@@ -2731,6 +2883,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "predicate-gate": run_predicate_gate,
         "import-queries": run_import_queries,
         "cardinalities": run_cardinalities,
+        "verify-reference-results": run_verify_reference_results,
         "cross-check": run_cross_check,
         "package": run_package,
         "tiny-fixture": run_tiny_fixture,

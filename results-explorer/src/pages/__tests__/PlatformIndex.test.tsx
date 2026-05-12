@@ -143,6 +143,27 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(getRowOrder(container)).toEqual(["r-tpch-fast", "r-ssb-mid", "r-tpch-slow", "r-null-geo"]);
   });
 
+  it("retries a transient empty platform index before rendering a terminal empty state", async () => {
+    vi.mocked(getPlatformIndexRows).mockResolvedValueOnce([]).mockResolvedValueOnce(ROWS);
+
+    const { container } = render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    expect(getPlatformIndexRows).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText(/No results found for platform/i)).toBeNull();
+    expect(getRowOrder(container)).toEqual(["r-tpch-fast", "r-ssb-mid", "r-tpch-slow", "r-null-geo"]);
+  });
+
+  it("does not brand a genuinely empty snapshot as a missing lower-case platform", async () => {
+    vi.mocked(getPlatformIndexRows).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+    render(<PlatformIndex platform="polars" />);
+    await waitFor(() => expect(screen.getByText("No published platform results are available in this snapshot.")).toBeTruthy());
+
+    expect(screen.queryByText("polars Results")).toBeNull();
+    expect(screen.queryByText(/No results found for platform/i)).toBeNull();
+  });
+
   it("does not merge distinct platform IDs that share a display name", async () => {
     vi.mocked(getPlatformIndexRows).mockResolvedValue([
       makeRow({
@@ -348,10 +369,40 @@ describe("PlatformIndex - sortable table headers", () => {
     const blocked = screen.getByTestId("platform-compare-checkbox-r-not-comparable") as HTMLInputElement;
     expect(blocked.disabled).toBe(true);
     expect(blocked.title).toContain("Result does not have enough valid query timings");
+    const visibleReason = screen.getByTestId("platform-disabled-reason");
+    expect(visibleReason.textContent).toContain("Disabled reason: Insufficient valid timings");
+    expect(visibleReason.textContent).toContain("Choose a run with at least two valid query timings");
+    expect(blocked.getAttribute("aria-describedby")).toBe(visibleReason.id);
 
     fireEvent.click(blocked);
     expect(screen.queryByRole("link", { name: /Compare 1 selected/ })).toBeNull();
     expect(screen.getByTestId("platform-compare-guidance").textContent).toContain("Select two or more");
+  });
+
+  it("shows a platform zero-selectable recovery callout when filters expose only disabled rows", async () => {
+    vi.mocked(getPlatformIndexRows).mockResolvedValue([
+      makeRow({
+        result_id: "r-blocked-a",
+        short_id: "blocka01",
+        comparison_exclusion_reason: "insufficient_query_coverage",
+      }),
+      makeRow({
+        result_id: "r-blocked-b",
+        short_id: "blockb01",
+        comparison_exclusion_reason: "insufficient_query_coverage",
+      }),
+    ]);
+
+    render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    const callout = screen.getByTestId("platform-zero-selectable");
+    expect(callout.textContent).toContain("No selectable compare rows");
+    expect(callout.textContent).toContain("insufficient query coverage");
+    expect(within(callout).getByRole("button", { name: "Clear filters" })).toBeTruthy();
+    expect(screen.getAllByTestId("platform-disabled-reason")[0]?.textContent).toContain(
+      "Disabled reason: Insufficient query coverage",
+    );
   });
 
   it("hides the platform filter strip when the cohort has fewer than 25 rows", async () => {

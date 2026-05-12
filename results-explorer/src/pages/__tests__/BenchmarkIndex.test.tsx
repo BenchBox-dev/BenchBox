@@ -426,6 +426,9 @@ describe("BenchmarkIndex", () => {
       expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
     });
 
+    for (const details of screen.getAllByText("Receipt and metadata")) {
+      fireEvent.click(details);
+    }
     const receiptLinks = screen.getAllByRole("link", { name: "Receipt →" }) as HTMLAnchorElement[];
     expect(receiptLinks[0]?.getAttribute("href")).toBe("/results/r/r1#run-receipt");
     expect(screen.getAllByText("exact").length).toBeGreaterThan(0);
@@ -599,7 +602,34 @@ describe("BenchmarkIndex", () => {
     for (const sqliteCheckbox of sqliteCheckboxes) {
       expect(sqliteCheckbox.disabled).toBe(true);
       expect(sqliteCheckbox.title).toContain("Result does not have enough valid query timings");
+      const describedBy = sqliteCheckbox.getAttribute("aria-describedby");
+      expect(describedBy).toBeTruthy();
+      expect(document.getElementById(describedBy!)?.textContent).toContain(
+        "Disabled reason: Insufficient valid timings",
+      );
     }
+  });
+
+  it("shows a benchmark zero-selectable recovery callout when all matrix rows are disabled", async () => {
+    const blockedRankings = RANKING_ROWS.map((row) => ({
+      ...row,
+      comparison_exclusion_reason: "insufficient_query_coverage",
+    }));
+    vi.mocked(queryRows).mockImplementation(defaultImpl(RESULT_ROWS, blockedRankings, CELL_ROWS));
+
+    render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => expect(screen.getByTestId("benchmark-zero-selectable")).toBeTruthy());
+
+    const callout = screen.getByTestId("benchmark-zero-selectable");
+    expect(callout.textContent).toContain("No selectable compare rows");
+    expect(callout.textContent).toContain("insufficient query coverage");
+    expect(within(callout).getByRole("link", { name: "Choose another cohort" })).toHaveAttribute(
+      "href",
+      "/results/compare",
+    );
+    expect(screen.getAllByTestId("query-heatmap-disabled-reason")[0]?.textContent).toContain(
+      "Disabled reason: Insufficient query coverage",
+    );
   });
 
   it("restores benchmark URL facets without letting cohort facets block option recovery", async () => {
@@ -708,6 +738,19 @@ describe("BenchmarkIndex", () => {
       expect(screen.getByRole("button", { name: /maintainer/i })).toBeTruthy();
       expect(screen.getByRole("button", { name: /community/i })).toBeTruthy();
     });
+    expect(screen.getByRole("button", { name: /maintainer/i }).className).toContain("--bb-tone-info-bg");
+    expect(screen.getByRole("button", { name: /maintainer/i }).className).not.toContain("--bb-bg-elevated");
+  });
+
+  it("keeps active matrix controls on the light data surface contract", async () => {
+    render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => screen.getAllByText("DuckDB"));
+
+    const reducedColor = screen.getByRole("button", { name: "Reduced color" });
+    fireEvent.click(reducedColor);
+
+    expect(reducedColor.className).toContain("--bb-tone-info-bg");
+    expect(reducedColor.className).not.toContain("--bb-bg-elevated");
   });
 
   it("deselecting community chip hides community rows without extra fetch", async () => {

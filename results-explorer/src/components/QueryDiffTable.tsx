@@ -1,5 +1,6 @@
 import type { DetailResult } from "@/types";
 import { isValidTimingValue, timingValueForQuery } from "@/lib/displayEligibility";
+import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
 import { fmtMs } from "@/utils";
 import { StatusBadge, type StatusTone } from "@/components/StatusBadge";
 import { TableScrollHint } from "@/components/TableScrollHint";
@@ -27,7 +28,19 @@ export function QueryDiffTable({ results, baselineIndex = 0, suppressionReason =
   if (results.length < 2) return null;
   const normalizedBaselineIndex = normalizeBaselineIndex(results, baselineIndex);
   const baseline = results[normalizedBaselineIndex]!;
-  const rows = buildQueryDiffRows(results, normalizedBaselineIndex);
+  const runLabels = formatRunIdentitiesForCohort(
+    results.map((result) => ({
+      result_id: result.result_id,
+      platform: result.platform,
+      platform_version: result.platform_version,
+      driver_version: result.driver_version,
+      run_date: result.run_date,
+      scale_factor: result.scale_factor,
+      trust_label: result.trust_label,
+    })),
+    "table",
+  );
+  const rows = buildQueryDiffRows(results, normalizedBaselineIndex, runLabels);
 
   return (
     <section class="card mb-8" aria-labelledby="query-diff-title">
@@ -37,7 +50,7 @@ export function QueryDiffTable({ results, baselineIndex = 0, suppressionReason =
             Query-Level Diff
           </h2>
           <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">
-            Baseline: <span class="font-medium text-[var(--bb-data-fg-primary)]">{baseline.platform}</span>. Negative deltas mean the
+            Baseline: <span class="font-medium text-[var(--bb-data-fg-primary)]">{runLabels[normalizedBaselineIndex] ?? baseline.platform}</span>. Negative deltas mean the
             candidate is faster than baseline.
           </p>
         </div>
@@ -85,24 +98,30 @@ export function QueryDiffTable({ results, baselineIndex = 0, suppressionReason =
   );
 }
 
-export function buildQueryDiffRows(results: DetailResult[], baselineIndex = 0): QueryDiffRow[] {
+export function buildQueryDiffRows(
+  results: DetailResult[],
+  baselineIndex = 0,
+  runLabels?: readonly string[],
+): QueryDiffRow[] {
   if (results.length < 2) return [];
   const normalizedBaselineIndex = normalizeBaselineIndex(results, baselineIndex);
   const baseline = results[normalizedBaselineIndex]!;
-  const candidates = results.filter((_, index) => index !== normalizedBaselineIndex);
+  const candidates = results
+    .map((result, index) => ({ result, index }))
+    .filter(({ index }) => index !== normalizedBaselineIndex);
   const queryIds = [
     ...new Set(results.flatMap((result) => result.display_timings.map((timing) => timing.query_id))),
   ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
   return queryIds.flatMap((queryId) => {
     const baselineMs = displayMsForQuery(baseline, queryId);
-    return candidates.map((candidate) => {
+    return candidates.map(({ result: candidate, index }) => {
       const candidateMs = displayMsForQuery(candidate, queryId);
       const deltaMs = baselineMs !== null && candidateMs !== null ? candidateMs - baselineMs : null;
       return {
         queryId,
         candidateResultId: candidate.result_id,
-        candidatePlatform: candidate.platform,
+        candidatePlatform: runLabels?.[index] ?? candidate.platform,
         baselineMs,
         candidateMs,
         ratio: isValidTimingValue(baselineMs) && isValidTimingValue(candidateMs) ? candidateMs / baselineMs : null,

@@ -44,7 +44,11 @@ import {
   markExplorerPerformance,
   measureExplorerPerformance,
 } from "@/lib/performanceMarks";
-import { formatTimingExclusion } from "@/lib/displayEligibility";
+import {
+  describeCompareExclusionReason,
+  summarizeCompareExclusionReasons,
+  type CompareExclusionReasonCopy,
+} from "@/lib/compareExclusionReasons";
 
 const EMPTY_STRING_ARRAY: string[] = [];
 
@@ -614,7 +618,7 @@ export function Query(_: RoutableProps) {
   function comparisonExclusionReason(row: ResultRow): string | undefined {
     const reason = row.comparison_exclusion_reason;
     if (typeof reason !== "string" || reason.length === 0) return undefined;
-    return formatTimingExclusion(reason, "Result is not comparable.");
+    return reason;
   }
 
   return (
@@ -710,11 +714,17 @@ export function Query(_: RoutableProps) {
                     if (compareSelectedIds.has(id)) return undefined;
                     return compareCohortLockReason(row, compareCohortSignature);
                   };
-                  const selectedCompareIds = [...compareSelectedIds]
-                    .map((id) => {
-                      const row = rowsByResultId.get(id);
-                      return row ? compareIdForRow(row as Parameters<typeof compareIdForRow>[0]) : id;
-                    });
+                  const zeroSelectable =
+                    compareSelectedIds.size === 0 &&
+                    visibleRows.length > 0 &&
+                    visibleRows.every((row) => comparisonExclusionReason(row) !== undefined);
+                  const zeroSelectableReasons = summarizeCompareExclusionReasons(
+                    visibleRows.map((row) => comparisonExclusionReason(row)),
+                  );
+                  const selectedCompareIds = [...compareSelectedIds].map((id) => {
+                    const row = rowsByResultId.get(id);
+                    return row ? compareIdForRow(row as Parameters<typeof compareIdForRow>[0]) : id;
+                  });
                   const compareUrl = compareSelectedIds.size >= 2 ? buildCompareUrl(selectedCompareIds) : null;
                   return (
                     <>
@@ -723,15 +733,13 @@ export function Query(_: RoutableProps) {
                         data-testid="query-compare-tray"
                       >
                         <span>
-                          {compareSelectedIds.size === 0 ? (
-                            "Select two or more rows to compare. The first pick locks the cohort."
-                          ) : compareSelectedIds.size === 1 ? (
-                            `1 result selected — pick a compatible second row to enable Compare.${hiddenIncompatibleSuffix(compareIncompatibleHiddenCount)}`
-                          ) : compareSelectedIds.size >= MAX_COMPARE_SELECTIONS ? (
-                            `${compareSelectedIds.size} results selected (maximum).`
-                          ) : (
-                            `${compareSelectedIds.size} results selected.`
-                          )}
+                          {compareSelectedIds.size === 0
+                            ? "Select two or more rows to compare. The first pick locks the cohort."
+                            : compareSelectedIds.size === 1
+                              ? `1 result selected — pick a compatible second row to enable Compare.${hiddenIncompatibleSuffix(compareIncompatibleHiddenCount)}`
+                              : compareSelectedIds.size >= MAX_COMPARE_SELECTIONS
+                                ? `${compareSelectedIds.size} results selected (maximum).`
+                                : `${compareSelectedIds.size} results selected.`}
                         </span>
                         <span class="flex items-center gap-2">
                           {compareCohortSignature !== null && (
@@ -781,6 +789,29 @@ export function Query(_: RoutableProps) {
                           )}
                         </span>
                       </div>
+                      {zeroSelectable && (
+                        <section
+                          class="border-b border-[var(--bb-tone-warning-border)] bg-[var(--bb-tone-warning-bg)] px-4 py-3 text-sm text-[var(--bb-tone-warning-fg)]"
+                          data-testid="query-zero-selectable"
+                          aria-label="No selectable query compare rows"
+                        >
+                          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                              <h2 class="font-semibold">No selectable compare rows</h2>
+                              <p class="mt-1">
+                                {zeroSelectableReasons.length > 0
+                                  ? `${zeroSelectableReasons[0]!.count} ${zeroSelectableReasons[0]!.copy.shortText.toLowerCase()} row${
+                                      zeroSelectableReasons[0]!.count === 1 ? "" : "s"
+                                    }. ${zeroSelectableReasons[0]!.copy.recoveryHint}`
+                                  : "The current filters do not expose a comparable run. Clear filters or choose another cohort."}
+                              </p>
+                            </div>
+                            <button type="button" class="btn btn-secondary shrink-0 text-sm" onClick={resetQueryFilters}>
+                              Clear filters
+                            </button>
+                          </div>
+                        </section>
+                      )}
                       <div class="overflow-x-auto">
                         <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">
                           <thead class="bg-[var(--bb-surface-data-muted)]">
@@ -791,6 +822,7 @@ export function Query(_: RoutableProps) {
                               >
                                 <span class="sr-only">Compare</span>
                               </th>
+                              <th class="table-th">Compare state</th>
                               {visibleColumns.map((column) => {
                                 const isActive = sort.column === column;
                                 const arrow = isActive ? (sort.direction === "asc" ? " ↑" : " ↓") : "";
@@ -800,12 +832,7 @@ export function Query(_: RoutableProps) {
                                     : "descending"
                                   : "none";
                                 return (
-                                  <th
-                                    key={column}
-                                    scope="col"
-                                    aria-sort={ariaSort}
-                                    class="p-0"
-                                  >
+                                  <th key={column} scope="col" aria-sort={ariaSort} class="p-0">
                                     <button
                                       type="button"
                                       class="table-th block w-full cursor-pointer select-none border-0 bg-transparent text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--bb-accent)]"
@@ -829,6 +856,8 @@ export function Query(_: RoutableProps) {
                                 (!isSelected && compareSelectedIds.size >= MAX_COMPARE_SELECTIONS
                                   ? `Up to ${MAX_COMPARE_SELECTIONS} runs can be compared.`
                                   : undefined);
+                              const disabledCopy = describeCompareExclusionReason(reason);
+                              const reasonId = disabledCopy ? `query-compare-reason-${id}` : undefined;
                               return (
                                 <tr key={id} class="hover:bg-[var(--bb-surface-data-muted)]">
                                   <td class="table-td sticky left-0 z-10 bg-[var(--bb-surface-data)]">
@@ -836,7 +865,8 @@ export function Query(_: RoutableProps) {
                                       type="checkbox"
                                       checked={isSelected}
                                       disabled={Boolean(reason)}
-                                      title={reason}
+                                      title={disabledCopy?.detailText ?? reason}
+                                      aria-describedby={reasonId}
                                       onChange={() => toggleCompareSelection(row)}
                                       class="h-4 w-4 rounded border-[var(--bb-data-border-strong)] disabled:cursor-not-allowed disabled:opacity-50"
                                       aria-label={compareSelectionLabel({
@@ -849,6 +879,9 @@ export function Query(_: RoutableProps) {
                                       })}
                                       data-testid={`query-compare-checkbox-${id}`}
                                     />
+                                  </td>
+                                  <td class="table-td max-w-[16rem]">
+                                    <QueryCompareReasonStatus id={reasonId} copy={disabledCopy} selected={isSelected} />
                                   </td>
                                   {visibleColumns.map((column) => (
                                     <td key={column} class="table-td">
@@ -1107,6 +1140,26 @@ function formatQueryRowCell(column: string, value: unknown): string {
     if (column === "benchmark") return formatBenchmarkLabel(value);
   }
   return formatQueryCell(column, value);
+}
+
+function QueryCompareReasonStatus({
+  id,
+  copy,
+  selected,
+}: {
+  id?: string;
+  copy: CompareExclusionReasonCopy | null;
+  selected: boolean;
+}) {
+  if (copy === null) {
+    return <span class="text-xs text-[var(--bb-data-fg-muted)]">{selected ? "Selected" : "Selectable"}</span>;
+  }
+  return (
+    <div id={id} class="text-xs text-[var(--bb-data-fg-muted)]" data-testid="query-disabled-reason">
+      <span class="font-medium text-[var(--bb-tone-warning-fg)]">Disabled reason: {copy.shortText}</span>
+      <span class="block">{copy.recoveryHint}</span>
+    </div>
+  );
 }
 
 function buildQueryFacetCountQueries(

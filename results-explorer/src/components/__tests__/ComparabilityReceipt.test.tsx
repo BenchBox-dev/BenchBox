@@ -129,6 +129,31 @@ describe("ComparabilityReceipt", () => {
     expect(fields.find((field) => field.label === "Query scope")?.status).toBe("diff");
   });
 
+  it("uses singular count copy for one warning and one query", () => {
+    const duckdb = makeDetail({
+      display_timings: [
+        { query_id: "Q1", display_ms: 10, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+      ],
+    });
+    const sqlite = makeDetail({
+      result_id: "r2",
+      platform: "SQLite",
+      platform_id: "sqlite",
+      platform_version: "3.45",
+      display_timings: [
+        { query_id: "Q1", display_ms: 15, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+      ],
+    });
+
+    render(<ComparabilityReceipt results={[duckdb, sqlite]} />);
+
+    const receipt = screen.getByRole("region", { name: "Comparability receipt" });
+    expect(within(receipt).getByText("1 warning")).toBeTruthy();
+    expect(receipt).not.toHaveTextContent("1 warnings");
+    expect(receipt).toHaveTextContent("1 query");
+    expect(receipt).not.toHaveTextContent("1 queries");
+  });
+
   it("flags benchmark and scale differences as explicit warning fields", () => {
     const fields = buildComparabilityFields([
       makeDetail(),

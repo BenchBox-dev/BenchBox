@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   formatRunIdentitiesForCohort,
+  formatRunIdentityLabelsForCohort,
   formatRunIdentity,
+  preserveUniqueAfterTruncation,
+  truncateRunIdentityLabel,
   type RunIdentitySource,
 } from "@/lib/runIdentity";
 
@@ -164,6 +167,26 @@ describe("formatRunIdentitiesForCohort", () => {
     expect(labels[1]).not.toContain("tpch-spark");
   });
 
+  it("ignores non-hex short_id prefixes and preserves the trailing result-id token", () => {
+    const cohort = [
+      source({
+        result_id: "tpch-datafusion-sf0.01-20260506-51d39a73",
+        short_id: "tpch-dat",
+        platform: "DataFusion",
+      }),
+      source({
+        result_id: "tpch-datafusion-sf0.01-20260505-77daf86d",
+        short_id: "tpch-dat",
+        platform: "DataFusion",
+      }),
+    ];
+
+    expect(formatRunIdentitiesForCohort(cohort, "chart")).toEqual([
+      "DataFusion 51d39a73",
+      "DataFusion 77daf86d",
+    ]);
+  });
+
   it("uses the trailing result_id token when 8-char prefixes collide", () => {
     // BenchBox result_ids usually share their benchmark/platform/date prefix;
     // the content hash lives at the end and is the compact distinguishing token.
@@ -206,5 +229,67 @@ describe("formatRunIdentitiesForCohort", () => {
     const labels = formatRunIdentitiesForCohort(cohort, "table");
     expect(labels[0]).toContain("·");
     expect(labels[1]).toContain("·");
+  });
+
+  it("returns compact, full, and accessible identity labels for chart callers", () => {
+    const cohort = [
+      source({
+        result_id: "tpch-datafusion-sf0.01-20260506-3b8bbc42",
+        short_id: "3b8bbc42",
+        platform: "DataFusion",
+        driver_version: "53.0.0",
+        run_date: "2026-05-06T12:00:00Z",
+        scale_factor: 0.01,
+        trust_label: "maintainer-run",
+      }),
+      source({
+        result_id: "tpch-datafusion-sf0.01-20260507-deadbeef",
+        short_id: "deadbeef",
+        platform: "DataFusion",
+        driver_version: "53.0.0",
+        run_date: "2026-05-07T12:00:00Z",
+        scale_factor: 0.01,
+        trust_label: "maintainer-run",
+      }),
+    ];
+    const labels = formatRunIdentityLabelsForCohort(cohort);
+
+    expect(labels[0]?.compact).toBe("DataFusion 2026-05-06");
+    expect(labels[1]?.compact).toBe("DataFusion 2026-05-07");
+    expect(labels[0]?.full).toContain("v53.0.0");
+    expect(labels[0]?.full).toContain("SF 0.01");
+    expect(labels[0]?.full).toContain("maintainer-run");
+    expect(labels[0]?.full).toContain("3b8bbc42");
+    expect(labels[0]?.ariaLabel).toBe(labels[0]?.full);
+  });
+
+  it("suffix-truncates run labels so dates or short IDs remain visible", () => {
+    expect(truncateRunIdentityLabel("DataFusion v53.0.0 2026-05-06", 20)).toBe(
+      "DataFusi… 2026-05-06",
+    );
+    expect(truncateRunIdentityLabel("DataFusion v53.0.0 3b8bbc42", 20)).toBe(
+      "DataFusion… 3b8bbc42",
+    );
+  });
+
+  it("keeps truncated chart labels unique without expanding to full width", () => {
+    const labels = preserveUniqueAfterTruncation(
+      [
+        "DataFusion v53.0.0 2026-05-06 3b8bbc42",
+        "DataFusion v53.0.0 2026-05-07 deadbeef",
+        "DataFusion v53.0.0 2026-05-08 cafefeed",
+        "DataFusion v53.0.0 2026-05-09 feedface",
+      ],
+      20,
+    );
+
+    expect(new Set(labels).size).toBe(labels.length);
+    expect(labels.every((label) => label.length <= 20)).toBe(true);
+    expect(labels).toEqual([
+      "DataFusion… 3b8bbc42",
+      "DataFusion… deadbeef",
+      "DataFusion… cafefeed",
+      "DataFusion… feedface",
+    ]);
   });
 });

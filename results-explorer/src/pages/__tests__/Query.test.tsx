@@ -297,10 +297,38 @@ describe("Query", () => {
     const blocked = screen.getByTestId("query-compare-checkbox-r2") as HTMLInputElement;
     expect(blocked.disabled).toBe(true);
     expect(blocked.title).toContain("Result does not have enough valid query timings");
+    const visibleReason = screen.getByTestId("query-disabled-reason");
+    expect(visibleReason.textContent).toContain("Disabled reason: Insufficient valid timings");
+    expect(visibleReason.textContent).toContain("Choose a run with at least two valid query timings");
+    expect(blocked.getAttribute("aria-describedby")).toBe(visibleReason.id);
 
     fireEvent.click(blocked);
     expect(screen.getByTestId("query-compare-tray").textContent).toContain("Select two or more rows");
     expect(screen.getByTestId("query-compare-launch-disabled")).toBeTruthy();
+  });
+
+  it("shows a Query Workbench zero-selectable recovery callout when every visible row is disabled", async () => {
+    resultRows = [
+      {
+        ...BASE_ROWS[0]!,
+        comparison_exclusion_reason: "insufficient_query_coverage",
+      },
+      {
+        ...BASE_ROWS[1]!,
+        comparison_exclusion_reason: "insufficient_query_coverage",
+      },
+    ];
+
+    render(<Query />);
+    await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
+
+    const callout = screen.getByTestId("query-zero-selectable");
+    expect(callout.textContent).toContain("No selectable compare rows");
+    expect(callout.textContent).toContain("insufficient query coverage");
+    expect(within(callout).getByRole("button", { name: "Clear filters" })).toBeTruthy();
+    expect(screen.getAllByTestId("query-disabled-reason")[0]?.textContent).toContain(
+      "Disabled reason: Insufficient query coverage",
+    );
   });
 
   it("query workbench hides incompatible rows by default and surfaces the hidden count", async () => {

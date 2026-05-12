@@ -14,6 +14,7 @@ import { humanizeBenchmark, errMsg, fmtGeomean } from "@/utils";
 import { formatBenchmarkLabel } from "@/lib/displayLabels";
 import { buildCompareUrl, MAX_COMPARE_SELECTIONS } from "@/lib/resultLinks";
 import {
+  compareCohortLockReason,
   compareCohortMismatches,
   compareCohortPartition,
   compareCohortSignatureForRow,
@@ -33,7 +34,20 @@ import { QueryDiffTable } from "@/components/QueryDiffTable";
 import { modeLabel, testTypeLabel } from "@/components/MethodologyDisclosure";
 import { vsSlowestRatio } from "@/lib/chartMath";
 import { buildCompareDecisionSummary } from "@/lib/compareSummary";
-import { formatTimingExclusion, isValidTimingValue } from "@/lib/displayEligibility";
+import { isValidTimingValue } from "@/lib/displayEligibility";
+import {
+  describeCompareExclusionReason,
+  summarizeCompareExclusionReasons,
+  type CompareExclusionReasonCopy,
+} from "@/lib/compareExclusionReasons";
+import {
+  ensureSentence,
+  formatCandidateCount,
+  formatCount,
+  formatSelectedCount,
+  formatWarningCount,
+  removeDuplicatedTerminalPunctuation,
+} from "@/lib/copyFormatters";
 import { paletteColor } from "@/lib/chartTheme";
 import { ChartPanel } from "@/components/ChartPanel";
 import { Select } from "@/components/Select";
@@ -511,7 +525,15 @@ function CompareGuardrailSummary({
 }) {
   const warningText =
     warningLabels.length > 0
-      ? `Warning classes: ${warningLabels.join(", ")}${warningCount > warningLabels.length ? `, +${warningCount - warningLabels.length} more` : ""}.`
+      ? removeDuplicatedTerminalPunctuation(
+          ensureSentence(
+            `Warning classes: ${warningLabels.join(", ")}${
+              warningCount > warningLabels.length
+                ? `, +${formatCount(warningCount - warningLabels.length, "more", "more")}`
+                : ""
+            }`,
+          ),
+        )
       : null;
   return (
     <section aria-label="Compare guardrails" class="mb-4 panel-elevated p-4">
@@ -532,7 +554,7 @@ function CompareGuardrailSummary({
         {warningCount > 0 ? (
           <a href="#comparability-receipt" class="no-underline" data-testid="compare-warning-link">
             <StatusBadge role="comparison" tone="warning">
-              {warningCount} warnings
+              {formatWarningCount(warningCount)}
             </StatusBadge>
           </a>
         ) : (
@@ -645,14 +667,16 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
     return Array.from(new Set(filtered.map((row) => row.test_type ?? ""))).filter(Boolean).sort();
   }, [candidates, benchmarkFilter, scaleFilter]);
 
+  function matchesBuilderFilters(row: ResultRow): boolean {
+    if (benchmarkFilter && row.benchmark !== benchmarkFilter) return false;
+    if (scaleFilter && String(row.scale_factor) !== scaleFilter) return false;
+    if (phaseFilter && (row.test_type ?? "") !== phaseFilter) return false;
+    return true;
+  }
+
   const userFilteredRows = useMemo(() => {
     if (candidates === null) return [];
-    return candidates.filter((row) => {
-      if (benchmarkFilter && row.benchmark !== benchmarkFilter) return false;
-      if (scaleFilter && String(row.scale_factor) !== scaleFilter) return false;
-      if (phaseFilter && (row.test_type ?? "") !== phaseFilter) return false;
-      return true;
-    });
+    return candidates.filter(matchesBuilderFilters);
   }, [candidates, benchmarkFilter, scaleFilter, phaseFilter]);
 
   // Partition by compatibility against the locked cohort. Compatible rows
@@ -663,12 +687,25 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
     [userFilteredRows, cohortSignature],
   );
   const incompatibleHiddenCount = cohortSignature !== null && compatibleOnly ? partitioned.incompatible.length : 0;
-  const filteredRows = useMemo(
-    () =>
+  const selectedRowsForDisplay = useMemo(
+    () => candidates?.filter((row) => selectedIds.has(row.result_id)) ?? [],
+    [candidates, selectedIds],
+  );
+  const filteredRows = useMemo(() => {
+    const visibleCandidates =
       cohortSignature !== null && compatibleOnly
         ? partitioned.compatible
-        : [...partitioned.compatible, ...partitioned.incompatible],
-    [cohortSignature, compatibleOnly, partitioned],
+        : [...partitioned.compatible, ...partitioned.incompatible];
+    if (selectedRowsForDisplay.length === 0) return visibleCandidates;
+    const selectedResultIds = new Set(selectedRowsForDisplay.map((row) => row.result_id));
+    return [...selectedRowsForDisplay, ...visibleCandidates.filter((row) => !selectedResultIds.has(row.result_id))];
+  }, [cohortSignature, compatibleOnly, partitioned, selectedRowsForDisplay]);
+  const selectableFilteredRows = filteredRows.filter(
+    (row) => isCompatible(row) && comparisonExclusionReason(row) === null,
+  );
+  const zeroSelectable = candidates !== null && filteredRows.length > 0 && selectableFilteredRows.length === 0;
+  const zeroSelectableReasons = summarizeCompareExclusionReasons(
+    filteredRows.map((row) => comparisonExclusionReason(row) ?? compareCohortLockReason(row, cohortSignature)),
   );
 
   function isCompatible(row: ResultRow): boolean {
@@ -679,7 +716,7 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
   function comparisonExclusionReason(row: ResultRow): string | null {
     const reason = row.comparison_exclusion_reason;
     if (typeof reason !== "string" || reason.length === 0) return null;
-    return formatTimingExclusion(reason, "Result is not comparable.");
+    return reason;
   }
 
   function toggleSelection(row: ResultRow) {
@@ -696,6 +733,12 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
 
   function clearSelection() {
     setSelectedIds(new Set());
+  }
+
+  function clearFilters() {
+    setBenchmarkFilter("");
+    setScaleFilter("");
+    setPhaseFilter("");
   }
 
   const selectedCount = selectedIds.size;
@@ -793,10 +836,16 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
       <div class="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm">
         <p class="text-[var(--bb-data-fg-muted)]" data-testid="compare-builder-status">
           {selectedCount === 0
-            ? `${filteredRows.length} candidate${filteredRows.length === 1 ? "" : "s"}. Select at least 2 to launch a comparison.`
+            ? `${formatCandidateCount(filteredRows.length)}. Select at least 2 to launch a comparison.`
             : selectedCount < 2
             ? `1 selected. Select 1 more compatible run to launch.${hiddenIncompatibleSuffix(incompatibleHiddenCount)}`
-            : `${selectedCount} selected. ${cohortLock ? `Cohort: ${humanizeBenchmark(cohortLock.benchmark)} · SF ${cohortLock.scale_factor}${cohortLock.test_type ? ` · ${cohortLock.test_type}` : ""}` : ""}`}
+            : `${formatSelectedCount(selectedCount)}. ${
+                cohortLock
+                  ? `Cohort: ${humanizeBenchmark(cohortLock.benchmark)} · SF ${cohortLock.scale_factor}${
+                      cohortLock.test_type ? ` · ${cohortLock.test_type}` : ""
+                    }`
+                  : ""
+              }`}
         </p>
         <div class="flex gap-2">
           <button
@@ -814,10 +863,34 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
             disabled={!canLaunch}
             data-testid="compare-builder-launch"
           >
-            Compare {selectedCount} run{selectedCount === 1 ? "" : "s"}
+            Compare {formatCount(selectedCount, "run")}
           </button>
         </div>
       </div>
+
+      {zeroSelectable && (
+        <section
+          class="mb-4 rounded-lg border border-[var(--bb-tone-warning-border)] bg-[var(--bb-tone-warning-bg)] px-4 py-3 text-sm text-[var(--bb-tone-warning-fg)]"
+          data-testid="compare-builder-zero-selectable"
+          aria-label="No selectable compare rows"
+        >
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 class="font-semibold">No selectable compare rows</h2>
+              <p class="mt-1">
+                {zeroSelectableReasons.length > 0
+                  ? `${zeroSelectableReasons[0]!.count} ${zeroSelectableReasons[0]!.copy.shortText.toLowerCase()} row${
+                      zeroSelectableReasons[0]!.count === 1 ? "" : "s"
+                    }. ${zeroSelectableReasons[0]!.copy.recoveryHint}`
+                  : "The current filters do not expose a comparable run. Clear filters or choose another cohort."}
+              </p>
+            </div>
+            <button type="button" class="btn btn-secondary shrink-0 text-sm" onClick={clearFilters}>
+              Clear filters
+            </button>
+          </div>
+        </section>
+      )}
 
       <div class="overflow-x-auto rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
         <table class="min-w-full divide-y divide-[var(--bb-data-border)] text-sm">
@@ -830,19 +903,20 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
               <th scope="col" class="table-th text-left">Phase</th>
               <th scope="col" class="table-th text-left">Run date</th>
               <th scope="col" class="table-th text-left">Trust</th>
+              <th scope="col" class="table-th text-left">Compare state</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-[var(--bb-data-border)]">
             {candidates === null && (
               <tr>
-                <td colSpan={7} class="px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
+                <td colSpan={8} class="px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
                   Loading candidate runs...
                 </td>
               </tr>
             )}
             {candidates !== null && filteredRows.length === 0 && (
               <tr>
-                <td colSpan={7} class="px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
+                <td colSpan={8} class="px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
                   No candidates match the current filters.
                 </td>
               </tr>
@@ -859,6 +933,9 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
                 ? `Up to ${MAX_COMPARE_SELECTIONS} runs can be compared`
                 : "";
               const isPinned = row.result_id === pinnedId;
+              const disabledCopy = describeCompareExclusionReason(disabledReason);
+              const reasonId = disabledCopy ? `compare-builder-reason-${row.result_id}` : undefined;
+              const selectedOutsideFilters = isSelected && !matchesBuilderFilters(row);
               return (
                 <tr
                   key={row.result_id}
@@ -880,7 +957,8 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
                         runDate: row.run_date,
                         resultId: row.result_id,
                       })}
-                      title={disabledReason || undefined}
+                      aria-describedby={reasonId}
+                      title={disabledCopy?.detailText ?? (disabledReason || undefined)}
                       onChange={() => toggleSelection(row)}
                       class="h-4 w-4 rounded border-[var(--bb-data-border-strong)]"
                     />
@@ -890,6 +968,9 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
                       {row.platform}
                       {isPinned && (
                         <span class="ml-2 text-xs text-[var(--bb-data-fg-subtle)]">(from result detail)</span>
+                      )}
+                      {selectedOutsideFilters && (
+                        <span class="ml-2 text-xs text-[var(--bb-data-fg-subtle)]">(selected outside filters)</span>
                       )}
                     </div>
                     {row.platform_version && (
@@ -901,12 +982,43 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
                   <td class="table-td">{row.test_type ?? "-"}</td>
                   <td class="table-td">{row.run_date.slice(0, 10)}</td>
                   <td class="table-td"><TrustBadge trustLabel={row.trust_label} compact /></td>
+                  <td class="table-td max-w-[16rem]">
+                    <CompareReasonStatus
+                      id={reasonId}
+                      copy={disabledCopy}
+                      selected={isSelected}
+                    />
+                  </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+function CompareReasonStatus({
+  id,
+  copy,
+  selected,
+}: {
+  id?: string;
+  copy: CompareExclusionReasonCopy | null;
+  selected: boolean;
+}) {
+  if (copy === null) {
+    return (
+      <span class="text-xs text-[var(--bb-data-fg-muted)]">
+        {selected ? "Selected" : "Selectable"}
+      </span>
+    );
+  }
+  return (
+    <div id={id} class="text-xs text-[var(--bb-data-fg-muted)]" data-testid="compare-disabled-reason">
+      <span class="font-medium text-[var(--bb-tone-warning-fg)]">Disabled reason: {copy.shortText}</span>
+      <span class="block">{copy.recoveryHint}</span>
     </div>
   );
 }

@@ -11,4 +11,10 @@ the data manifest hash, and PostgreSQL version recorded in that JSON file.
 
 Computed oracle coverage: 113/113 queries.
 
+Each JOB query is an aggregate query that returns one row. The stored `first_row_sha256` value is
+therefore a full aggregate-result oracle: it hashes PostgreSQL's `row_to_json(...)::text` output for
+that row. Re-run `make joinorder-verify-reference-results JOINORDER_POSTGRES_CONTAINER=<container>`
+against a restored PostgreSQL source to compare all 113 row counts, underlying row counts, and full
+aggregate row hashes against the committed oracle.
+
 Traceable published per-query row counts found: none.

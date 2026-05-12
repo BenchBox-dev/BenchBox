@@ -1,7 +1,7 @@
 ---
 id: 2026-04-30-114723-queue-dwell-contract
 date: 2026-04-30
-status: actionable
+status: merged-to-todo
 finding_kind: assumption
 review_context: "L2 merge-loop audit / dev-loop simplification planning (2026-04-30)"
 related_paths:
@@ -9,7 +9,7 @@ related_paths:
   - CLAUDE.md
   - Makefile
 suggested_sweep: "Measure branch dwell time before considering a queue; update agent docs if expected dwell changes."
-todo_id: null
+todo_id: dev-loop-queue-acceptance-criteria-from-blind-spots
 ---
 
 # Queue dwell time changes the agent contract
@@ -40,3 +40,4 @@ Agents can walk away after auto-merge only because the current dwell time is sho
   next-steps; revisit when Step 5 publishes measurements.
 - 2026-05-06: actionable — 2026-05-06 sweep: make dev-loop-metrics still present; Step 5 Blocked, no published P50/P95 dwell numbers — agent walk-away contract in CLAUDE.md still load-bearing
 - 2026-05-08: actionable — sweep: `make dev-loop-metrics` still defined (Makefile:959); Step 5 still calendar-blocked through ~2026-05-30; CLAUDE.md walk-away contract (commit→push→PR auth, no polling) intact — carry forward dwell-target acceptance criteria
+- 2026-05-11: promoted to TODO `dev-loop-queue-acceptance-criteria-from-blind-spots`

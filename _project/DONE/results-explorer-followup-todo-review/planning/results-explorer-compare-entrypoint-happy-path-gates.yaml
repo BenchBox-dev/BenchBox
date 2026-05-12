@@ -2,7 +2,8 @@ id: results-explorer-compare-entrypoint-happy-path-gates
 title: "Gate every Results Explorer compare entrypoint with browser happy paths"
 worktree: results-explorer-followup-todo-review
 priority: Critical
-status: Not Started
+status: Completed
+completed_date: "2026-05-11"
 category: Testing and Quality Assurance
 
 description: |
@@ -19,7 +20,7 @@ deps:
 work:
 - id: w0
   summary: "Define canonical compare fixtures from the regenerated snapshot"
-  status: pending
+  status: done
   notes: |
     Query the regenerated snapshot for at least two stable comparable cohorts
     and capture the checked git SHA, snapshot file path/checksum, SQL used, and
@@ -36,7 +37,7 @@ work:
 - id: w1
   summary: "Prove benchmark detail selection completes a comparison"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     From `/results/<benchmark>/`, select two eligible rows, confirm the primary
     compare button enables, click it, and verify the compare page renders:
@@ -50,7 +51,7 @@ work:
 - id: w2
   summary: "Prove platform detail selection completes a comparison"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     From `/results/p/<platform>/`, filter or scroll to two comparable rows from
     the same cohort, select them, click Compare, and verify the same completion
@@ -60,7 +61,7 @@ work:
 - id: w3
   summary: "Prove Query Workbench selection completes a comparison"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     Use Query Workbench filters to surface a comparable cohort, select two
     eligible rows, verify the `Compare` action enables, click it, and confirm
@@ -71,7 +72,7 @@ work:
 - id: w4
   summary: "Prove result-detail Compare this result can add a compatible second row"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     Open a result detail page for a compare-eligible run, click `Compare this
     result`, verify the builder opens with that run pinned, select a compatible
@@ -82,7 +83,7 @@ work:
 - id: w5
   summary: "Prove empty Compare builder can start and complete a comparison"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     Open `/results/compare` without IDs, use the in-page builder to choose a
     benchmark/scale/cohort, select two rows, and complete a comparison. The page
@@ -92,7 +93,7 @@ work:
 - id: w6
   summary: "Add automated browser coverage for all five compare paths"
   needs: [w1, w2, w3, w4, w5]
-  status: pending
+  status: done
   notes: |
     Add or extend Playwright/browser-use acceptance tests for the five paths
     above. Tests should assert visible enabled controls, final route state,
@@ -154,6 +155,13 @@ success_metrics:
 - "Benchmark detail, platform detail, Query Workbench, result detail, and empty Compare builder all complete compare flows."
 - "Each completed compare route is reloadable and shareable."
 - "Browser tests fail if any entrypoint regresses to a dead button or URL-editing instruction."
+
+implementation_notes:
+- "w0 regenerated browser fixtures and captured checked SHA, snapshot path/checksum, SQL, selected result IDs, short IDs, platforms, cohort contracts, metrics, and expected compare URL pattern in `_project/verification-logs/results-explorer-compare-entrypoint-happy-path-gates/w0.log`."
+- "Added `results-explorer/e2e/routes/compare-entrypoints.spec.ts` with dedicated Chromium browser flows for benchmark detail, platform detail, Query Workbench, result detail, and empty Compare builder entrypoints."
+- "Each browser flow verifies the completed Compare route, breadcrumb, selected run links/cards, Decision Summary, Charts panel, Comparability Receipt, and Share URL. The Query Workbench flow reloads the generated share URL."
+- "Fixed `results-explorer/src/pages/Compare.tsx` so selected/pinned builder rows remain visible even when active filters would otherwise hide them, with explicit `(selected outside filters)` copy."
+- "w1-w6 browser evidence is captured in `_project/verification-logs/results-explorer-compare-entrypoint-happy-path-gates/w1-w6.log`."
 
 metadata:
   tags:

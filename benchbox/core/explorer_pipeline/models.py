@@ -11,7 +11,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from benchbox.core.cost.models import NormalizedCost
 from benchbox.core.cost.pricing import PRICING_VERSION
@@ -102,6 +102,10 @@ class ManifestEntry(BaseModel):
     geomean_ms: float | None = None
     display_geomean_ms: float | None = None
     query_count: int
+    # Logical benchmark query denominator used by display/comparison
+    # eligibility. ``query_count`` remains the raw bundle summary count and can
+    # include repeated samples.
+    logical_query_count: int = 0
     has_display_timing: bool = False
     valid_query_count: int = 0
     missing_query_count: int = 0
@@ -128,6 +132,12 @@ class ManifestEntry(BaseModel):
     storage_format: str | None = None
     compliance_class: str | None = None
 
+    @model_validator(mode="after")
+    def _default_logical_query_count(self) -> ManifestEntry:
+        if self.logical_query_count == 0 and self.query_count > 0:
+            self.logical_query_count = self.query_count
+        return self
+
 
 class QueryTiming(BaseModel):
     """Per-query timing stored in the browser detail read model."""
@@ -153,6 +163,7 @@ class TimingEligibility:
     """Display-timing eligibility counts and row-level exclusion reasons."""
 
     has_display_timing: bool
+    logical_query_count: int
     valid_query_count: int
     missing_query_count: int
     zero_timing_count: int
@@ -179,13 +190,25 @@ def timing_exclusion_reason(display_ms: float | None) -> str | None:
     return "non_positive_timing"
 
 
-def timing_eligibility(display_timings: list[QueryDisplayTiming], query_count: int) -> TimingEligibility:
+def timing_eligibility(
+    display_timings: list[QueryDisplayTiming],
+    logical_query_count: int | None = None,
+    *,
+    query_count: int | None = None,
+) -> TimingEligibility:
     """Compute the canonical row-level timing eligibility contract.
 
     Exact zero timings remain auditable but do not count as valid display
     evidence. Missing count includes emitted NULL/invalid timings plus query
-    slots declared by the bundle summary that have no display-timing row.
+    slots in the logical benchmark query denominator that have no
+    display-timing row. Raw repeated execution samples must not be passed as
+    ``logical_query_count``.
     """
+    if logical_query_count is None:
+        if query_count is None:
+            raise TypeError("timing_eligibility requires logical_query_count")
+        logical_query_count = query_count
+
     valid_query_count = 0
     missing_query_count = 0
     zero_timing_count = 0
@@ -201,21 +224,23 @@ def timing_eligibility(display_timings: list[QueryDisplayTiming], query_count: i
         else:
             missing_query_count += 1
 
-    missing_query_count += max(int(query_count) - len(seen_query_ids), 0)
+    logical_count = int(logical_query_count)
+    missing_query_count += max(logical_count - len(seen_query_ids), 0)
     has_display_timing = valid_query_count > 0
     display_reason = _display_exclusion_reason(
-        query_count=int(query_count),
+        query_count=logical_count,
         valid_query_count=valid_query_count,
         missing_query_count=missing_query_count,
         zero_timing_count=zero_timing_count,
     )
     comparison_reason = _comparison_exclusion_reason(
-        query_count=int(query_count),
+        query_count=logical_count,
         valid_query_count=valid_query_count,
         display_exclusion_reason=display_reason,
     )
     return TimingEligibility(
         has_display_timing=has_display_timing,
+        logical_query_count=logical_count,
         valid_query_count=valid_query_count,
         missing_query_count=missing_query_count,
         zero_timing_count=zero_timing_count,
@@ -273,6 +298,7 @@ class DetailResult(BaseModel):
     power_score: float | None
     has_display_timing: bool = False
     valid_query_count: int = 0
+    logical_query_count: int = 0
     missing_query_count: int = 0
     zero_timing_count: int = 0
     display_exclusion_reason: str | None = None
@@ -476,6 +502,7 @@ class PlatformRow(BaseModel):
     run_date: str
     is_ranking_eligible: bool
     has_display_timing: bool = False
+    logical_query_count: int = 0
     valid_query_count: int = 0
     missing_query_count: int = 0
     zero_timing_count: int = 0

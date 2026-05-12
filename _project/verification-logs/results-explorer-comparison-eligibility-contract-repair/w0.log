@@ -1,0 +1,34 @@
+checked_sha=af1c3d0b14ffe8b7cdf16674f4cb7888a757677f
+snapshot=results-explorer/public/data/results.duckdb
+9ca0588a764ca77764c4e7719873b01032848496db5ebfac88445287ccd4fbbf  results-explorer/public/data/results.duckdb
+
+SQL evidence: total/displayable/comparable/ranking rows
+-- summary counts
+total_result_rows	displayable_rows	compare_eligible_rows	ranking_eligible_rows
+525	371	0	12
+
+-- comparison exclusion reasons
+reason	rows
+insufficient_query_coverage	360
+no_queries	146
+insufficient_valid_queries	11
+missing_timings	4
+no_valid_display_timing	4
+
+-- sample tpch raw-vs-logical query count rows
+result_id	benchmark	platform	query_count	valid_query_count	missing_query_count	comparison_exclusion_reason
+tpch-datafusion-sf0.01-20260403-2feccca0	tpch	DataFusion	88	22	66	insufficient_query_coverage
+tpch-duckdb-sf0.01-20260403-5105c9d1	tpch	DuckDB	88	22	66	insufficient_query_coverage
+tpch-polars-sf0.01-20260403-ef163f67	tpch	Polars	88	22	66	insufficient_query_coverage
+tpch-cedardb-sf0.01-20260506-4a489673	tpch	CedarDB	66	22	44	insufficient_query_coverage
+tpch-cedardb-sf0.1-20260506-b68a0b0e	tpch	CedarDB	66	22	44	insufficient_query_coverage
+tpch-cedardb-sf1.0-20260506-074c518c	tpch	CedarDB	66	22	44	insufficient_query_coverage
+tpch-clickhouse-local-sf0.01-20260505-6a0c8cfc	tpch	ClickHouse Local	66	22	44	insufficient_query_coverage
+tpch-clickhouse-local-sf0.1-20260505-faa41246	tpch	ClickHouse Local	66	22	44	insufficient_query_coverage
+tpch-clickhouse-local-sf1.0-20260505-8843cc1a	tpch	ClickHouse Local	66	22	44	insufficient_query_coverage
+tpch-datafusion-sf0.01-20260502-ea408762	tpch	DataFusion	66	22	44	insufficient_query_coverage
+tpch-datafusion-sf0.01-20260502-eabb7b14	tpch	DataFusion	66	22	44	insufficient_query_coverage
+tpch-datafusion-sf0.01-20260505-77daf86d	tpch	DataFusion	66	22	44	insufficient_query_coverage
+
+-- cohorts with 2+ compare eligible rows
+benchmark	scale_factor	eligible_rows

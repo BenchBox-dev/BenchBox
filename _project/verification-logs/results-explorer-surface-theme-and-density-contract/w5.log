@@ -1,0 +1,26 @@
+PASS theme contract /results/ light workspace body=rgb(245, 246, 248)
+PASS theme contract /results/ dark global chrome header=rgb(13, 17, 23)
+PASS theme contract /results/ light data panels
+PASS theme contract /results/tpch/ light workspace body=rgb(245, 246, 248)
+PASS theme contract /results/tpch/ dark global chrome header=rgb(13, 17, 23)
+PASS theme contract /results/tpch/ light data panels
+PASS theme contract /results/p/duckdb/ light workspace body=rgb(245, 246, 248)
+PASS theme contract /results/p/duckdb/ dark global chrome header=rgb(13, 17, 23)
+PASS theme contract /results/p/duckdb/ light data panels
+PASS theme contract /results/query light workspace body=rgb(245, 246, 248)
+PASS theme contract /results/query dark global chrome header=rgb(13, 17, 23)
+PASS theme contract /results/query light data panels
+PASS theme contract /results/compare light workspace body=rgb(245, 246, 248)
+PASS theme contract /results/compare dark global chrome header=rgb(13, 17, 23)
+PASS theme contract /results/compare light data panels
+PASS theme contract /results/r/tpch-duckdb-sf0.01-20260403-7fe93365 light workspace body=rgb(245, 246, 248)
+PASS theme contract /results/r/tpch-duckdb-sf0.01-20260403-7fe93365 dark global chrome header=rgb(13, 17, 23)
+PASS theme contract /results/r/tpch-duckdb-sf0.01-20260403-7fe93365 light data panels
+PASS row height max=65 budget<=72
+PASS benchmark matrix frozen Trust column removed
+PASS sticky frozen cells include selection/platform/primary/geomean:  | Polarsv1.37.1Receipt and metadataMaintainerpassedReceipt → | 11,637 | 3 ms
+PASS receipt metadata affordances=3
+PASS sticky alignment after horizontal scroll=0
+PASS receipt reachable after metadata affordance opens visible=3
+PASS active reduced-color control uses light data tone
+PASS narrow viewport matrix cards=4 receipt links=6

@@ -1,8 +1,15 @@
 import type { JSX } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { route } from "preact-router";
-import type { MetaCohort, MetaLeaderboard as MetaLeaderboardData, MetaPlatform, MetaRank } from "@/types";
+import type {
+  MetaCohort,
+  MetaCohortPlatform,
+  MetaLeaderboard as MetaLeaderboardData,
+  MetaPlatform,
+  MetaRank,
+} from "@/types";
 import { colorForCell, lightnessForCell } from "@/lib/chartMath";
+import { formatTimingExclusion } from "@/lib/displayEligibility";
 import { fmtGeomean, fmtScoreCompact, fmtScoreExact } from "@/utils";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 import { SegmentedControl } from "@/components/SegmentedControl";
@@ -31,6 +38,11 @@ interface MetaLeaderboardProps {
   platformHref?: (platformId: string) => string;
   resultMetadataById?: ReadonlyMap<string, MetaResultMetadata>;
 }
+
+type MetaLeaderboardCellState =
+  | { kind: "missing" }
+  | { kind: "unranked"; result: MetaCohortPlatform; label: "Excluded" | "Unranked"; reason: string }
+  | { kind: "ranked"; rank: MetaRank; result?: MetaCohortPlatform };
 
 const MODE_LABELS: Record<MetaLeaderboardMode, string> = {
   times: "Times",
@@ -74,7 +86,11 @@ export function MetaLeaderboard({
     const mins = new Map<string, number | null>();
     for (const cohort of cohorts) {
       const values = platforms
-        .map((platform) => cellShadeMetric(platform.ranks[cohort.key], mode, cohort))
+        .map((platform) => {
+          const result = findCohortPlatform(cohort, platform.platform_id);
+          const state = metaLeaderboardCellState(platform.ranks[cohort.key], result, cohort);
+          return state.kind === "ranked" ? cellShadeMetric(state.rank, mode, cohort) : null;
+        })
         .filter((value): value is number => value !== null);
       mins.set(cohort.key, values.length > 0 ? Math.min(...values) : null);
     }
@@ -220,14 +236,15 @@ export function MetaLeaderboard({
 
       <div class="mb-2 flex flex-wrap items-baseline justify-between gap-3">
         <p class="text-sm text-[var(--bb-data-fg-muted)]">
-          Showing {visiblePlatforms.length.toLocaleString()} of {sortedPlatforms.length.toLocaleString()} ranked platforms across{" "}
+          Showing {visiblePlatforms.length.toLocaleString()} of {sortedPlatforms.length.toLocaleString()} platforms across{" "}
           {cohorts.length.toLocaleString()} leaderboard {cohorts.length === 1 ? "cohort" : "cohorts"}
         </p>
         <p id="meta-leaderboard-legend" class="text-xs text-[var(--bb-data-fg-subtle)]">
           {mode === "times" && "Heat: darker = faster within each cohort. "}
           {mode === "ranks" && "Heat: darker = better rank within cohort. "}
           {mode === "speedup" && "Heat: darker = closer to cohort best (≥1.00x). Values < 1.00x are slower than baseline. "}
-          <span class="italic">No run</span> = platform did not publish for this cohort (not scored).
+          <span class="italic">No run</span> = no published evidence. <span class="font-medium">Excluded</span> or{" "}
+          <span class="font-medium">Unranked</span> = published evidence that is not scored.
         </p>
       </div>
 
@@ -304,17 +321,24 @@ export function MetaLeaderboard({
                   </td>
                   {cohorts.map((cohort, colIdx) => {
                     const rank = platform.ranks[cohort.key];
-                    const missing = rank === undefined;
-                    const shadeMetric = cellShadeMetric(rank, mode, cohort);
+                    const result = findCohortPlatform(cohort, platform.platform_id);
+                    const cellState = metaLeaderboardCellState(rank, result, cohort);
+                    const missing = cellState.kind === "missing";
+                    const unranked = cellState.kind === "unranked";
+                    const shadeMetric = cellState.kind === "ranked" ? cellShadeMetric(cellState.rank, mode, cohort) : null;
                     const minInCol = columnMins.get(cohort.key) ?? null;
                     const hue = shadeMetric !== null ? colorForCell(shadeMetric, minInCol) : null;
                     const lightness = shadeMetric !== null ? lightnessForCell(shadeMetric, minInCol) : null;
                     const active = focusPos.row === rowIdx && focusPos.col === colIdx;
-                    const text = describeCell(platform, cohort, rank, mode);
-                    const title = cellTitle(platform, cohort, rank, mode);
-                    const result = cohort.platforms?.find((row) => row.platform_id === platform.platform_id);
-                    const metadata = result ? resultMetadataById?.get(result.result_id) : undefined;
-                    const receiptHref = result ? `/results/r/${result.result_id}#run-receipt` : null;
+                    const text = describeCell(platform, cohort, cellState, mode);
+                    const title = cellTitle(platform, cohort, cellState, mode);
+                    const receiptState = cellState.kind !== "missing" ? cellState : null;
+                    const metadata = receiptState?.result
+                      ? resultMetadataById?.get(receiptState.result.result_id)
+                      : undefined;
+                    const receiptHref = receiptState?.result
+                      ? `/results/r/${receiptState.result.result_id}#run-receipt`
+                      : null;
                     const cellStyle: JSX.CSSProperties | undefined =
                       hue !== null
                         ? ({
@@ -334,6 +358,8 @@ export function MetaLeaderboard({
                           hue !== null ? "meta-heatmap-cell" : ""
                         } ${
                           missing ? "bg-[var(--bb-surface-data-muted)] text-[var(--bb-data-fg-subtle)] italic" : ""
+                        } ${
+                          unranked ? "bg-[var(--bb-surface-data-muted)] text-[var(--bb-data-fg-muted)]" : ""
                         }`}
                         style={cellStyle}
                         tabIndex={active ? 0 : -1}
@@ -344,21 +370,17 @@ export function MetaLeaderboard({
                         }}
                         onKeyDown={(event) => handleCellKey(event, rowIdx, colIdx)}
                       >
-                        {receiptHref && rank ? (
-                          // Only wrap the cell value in a link when there is
-                          // a rank entry — otherwise we would emit a linked
-                          // "No run" cell whose href contradicts the missing
-                          // text (audit finding #4 / 2026-05-09).
+                        {receiptHref && receiptState ? (
                           <a
                             href={receiptHref}
                             class="font-mono no-underline hover:text-[var(--bb-accent-hover)]"
                             onClick={(event) => event.stopPropagation()}
-                            title={receiptLinkTitle(rank, cohort)}
+                            title={receiptLinkTitle(receiptState, cohort)}
                           >
-                            {renderCellValue(rank, cohort, mode)}
+                            {renderCellValue(cellState, cohort, mode)}
                           </a>
                         ) : (
-                          renderCellValue(rank, cohort, mode)
+                          renderCellValue(cellState, cohort, mode)
                         )}
                         {metadata && (
                           <div class="mt-0.5 flex flex-wrap justify-center gap-1">
@@ -459,28 +481,83 @@ function exactMetricTitle(rank: MetaRank | undefined, cohort: MetaCohort): strin
   return null;
 }
 
+function findCohortPlatform(cohort: MetaCohort, platformId: string): MetaCohortPlatform | undefined {
+  const rows = cohort.platforms?.filter((row) => row.platform_id === platformId);
+  if (!rows || rows.length === 0) return undefined;
+  return rows.find((row) => row.rank !== null) ?? rows[0];
+}
+
+function metaLeaderboardCellState(
+  rank: MetaRank | undefined,
+  result: MetaCohortPlatform | undefined,
+  cohort: MetaCohort,
+): MetaLeaderboardCellState {
+  const rankSource = rank ?? rankFromResult(result, cohort);
+  if (rankSource) return { kind: "ranked", rank: rankSource, result };
+  if (result) {
+    const exclusionReason =
+      result.ranking_exclusion_reason ??
+      cohort.cohort_ranking_exclusion_reason ??
+      result.display_exclusion_reason ??
+      result.comparison_exclusion_reason ??
+      null;
+    return {
+      kind: "unranked",
+      result,
+      label: exclusionReason ? "Excluded" : "Unranked",
+      reason: formatTimingExclusion(exclusionReason, "Published evidence is not rankable."),
+    };
+  }
+  return { kind: "missing" };
+}
+
+function rankFromResult(result: MetaCohortPlatform | undefined, cohort: MetaCohort): MetaRank | undefined {
+  if (!result || result.rank === null) return undefined;
+  return {
+    rank: result.rank,
+    total: cohort.cohort_ranked_count,
+    metric_value: result.metric_value,
+    speedup_vs_best: result.speedup_vs_best,
+  };
+}
+
 function cellTitle(
   platform: MetaPlatform,
   cohort: MetaCohort,
-  rank: MetaRank | undefined,
+  state: MetaLeaderboardCellState,
   mode: MetaLeaderboardMode,
 ): string | undefined {
-  if (!rank) return MISSING_COHORT_TITLE;
-  const exact = exactMetricTitle(rank, cohort);
+  if (state.kind === "missing") return MISSING_COHORT_TITLE;
+  if (state.kind === "unranked") {
+    return `${platform.platform} has published evidence for ${cohort.label}, but it is ${state.label.toLowerCase()}: ${state.reason}`;
+  }
+  const exact = exactMetricTitle(state.rank, cohort);
   return exact ? `${platform.platform} ${MODE_LABELS[mode].toLowerCase()} for ${cohort.label}. ${exact}` : undefined;
 }
 
-function receiptLinkTitle(rank: MetaRank, cohort: MetaCohort): string {
-  const exact = exactMetricTitle(rank, cohort);
+function receiptLinkTitle(state: Exclude<MetaLeaderboardCellState, { kind: "missing" }>, cohort: MetaCohort): string {
+  if (state.kind === "unranked") {
+    return `Open result receipt. ${state.label}: ${state.reason}`;
+  }
+  const exact = exactMetricTitle(state.rank, cohort);
   return exact ? `Open result receipt. ${exact}` : "Open result receipt";
 }
 
 function renderCellValue(
-  rank: MetaRank | undefined,
+  state: MetaLeaderboardCellState,
   cohort: MetaCohort,
   mode: MetaLeaderboardMode,
 ) {
-  if (!rank) return <span class="text-[var(--bb-data-fg-subtle)]">No run</span>;
+  if (state.kind === "missing") return <span class="text-[var(--bb-data-fg-subtle)]">No run</span>;
+  if (state.kind === "unranked") {
+    return (
+      <span class="inline-flex max-w-36 flex-col items-center gap-0.5 whitespace-normal text-center leading-tight">
+        <span class="font-semibold text-[var(--bb-tone-warning-fg)]">{state.label}</span>
+        <span class="text-[10px] font-normal text-[var(--bb-data-fg-subtle)]">{state.reason}</span>
+      </span>
+    );
+  }
+  const rank = state.rank;
   const text = cellText(rank, cohort, mode);
   if (mode === "ranks") {
     return (
@@ -512,12 +589,16 @@ function cellShadeMetric(
 function describeCell(
   platform: MetaPlatform,
   cohort: MetaCohort,
-  rank: MetaRank | undefined,
+  state: MetaLeaderboardCellState,
   mode: MetaLeaderboardMode,
 ): string {
-  if (!rank) {
+  if (state.kind === "missing") {
     return `${platform.platform} has no published run for ${cohort.label}. ${COVERAGE_POLICY_COPY}`;
   }
+  if (state.kind === "unranked") {
+    return `${platform.platform} has published evidence for ${cohort.label}, but it is ${state.label.toLowerCase()}: ${state.reason}`;
+  }
+  const rank = state.rank;
   const text = cellText(rank, cohort, mode);
   return `${platform.platform} ${MODE_LABELS[mode].toLowerCase()} for ${cohort.label}: ${text}`;
 }

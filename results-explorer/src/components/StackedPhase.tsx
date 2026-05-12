@@ -11,7 +11,7 @@
 import type { BenchmarkSummary } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
 import { PHASE_COLORS } from "@/lib/chartTheme";
-import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
+import { formatRunIdentityLabelsForCohort, preserveUniqueAfterTruncation } from "@/lib/runIdentity";
 
 // Phase display names (bundle phase name → human-readable)
 const PHASE_LABELS: Record<string, string> = {
@@ -47,12 +47,18 @@ export function StackedPhase({ summary }: Props) {
   const [containerRef, { width: containerWidth }] = useElementSize();
   const w = Math.max(containerWidth, 400);
 
-  const cohortLabels = formatRunIdentitiesForCohort(
+  const cohortLabels = formatRunIdentityLabelsForCohort(
     summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
-    "chart",
+  );
+  const displayLabels = preserveUniqueAfterTruncation(
+    cohortLabels.map((label) => label.disambiguated),
+    22,
   );
   const rowLabelByResultId = new Map(
-    summary.platforms.map((platform, index) => [platform.result_id, cohortLabels[index] ?? platform.platform]),
+    summary.platforms.map((platform, index) => [platform.result_id, displayLabels[index] ?? platform.platform]),
+  );
+  const fullLabelByResultId = new Map(
+    summary.platforms.map((platform, index) => [platform.result_id, cohortLabels[index]?.full ?? platform.platform]),
   );
   const rows = summary.platforms.filter(
     (p) => p.phase_durations && Object.keys(p.phase_durations).length > 0,
@@ -114,10 +120,8 @@ export function StackedPhase({ summary }: Props) {
                 textAnchor="end"
                 style={{ fontSize: "11px", fill: "#374151" }}
               >
-                {(() => {
-                  const label = rowLabelByResultId.get(row.result_id) ?? row.platform;
-                  return label.length > 22 ? `${label.slice(0, 21)}…` : label;
-                })()}
+                <title>{fullLabelByResultId.get(row.result_id) ?? row.platform}</title>
+                {rowLabelByResultId.get(row.result_id) ?? row.platform}
               </text>
 
               {allPhases.map((phase) => {
