@@ -14,6 +14,7 @@
 import type { ChartHistoricalEntry } from "@/lib/chartRegistry";
 import { useElementSize } from "@/lib/useElementSize";
 import { timeSeriesColor } from "@/lib/chartTheme";
+import { formatLatencyMs, formatPowerScore } from "@/lib/metricFormatters";
 import { formatRunIdentityLabelsForCohort, type RunIdentitySource } from "@/lib/runIdentity";
 
 const LABEL_W = 58;
@@ -145,7 +146,7 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
     return PADDING_TOP + CHART_H * (1 - pos);
   }
 
-  const metricLabel = metric === "power_score" ? "Power@Size" : "Geomean ms";
+  const metricLabel = metric === "power_score" ? "Power score" : "Geomean latency";
   const yTicks = [yMin, (yMin + yMax) / 2, yMax];
 
   // Show at most 7 x-axis labels when there are many dates
@@ -166,10 +167,8 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
           const y = yFor(val);
           const label =
             metric === "power_score"
-              ? val.toLocaleString(undefined, { maximumFractionDigits: 0 })
-              : val >= 1000
-                ? `${(val / 1000).toFixed(1)}s`
-                : `${val.toFixed(0)}ms`;
+              ? formatPowerScore(val).valueText
+              : formatLatencyMs(val, { subMillisecond: "compact" }).valueText;
           return (
             <g key={val}>
               <line
@@ -212,7 +211,11 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
                   r={3}
                   fill={s.color}
                 >
-                  <title>{`${s.fullLabel}: ${p.date} = ${p.value.toFixed(1)}`}</title>
+                  <title>
+                    {`${s.fullLabel}: ${p.date} = ${
+                      metric === "power_score" ? formatPowerScore(p.value).valueText : formatLatencyMs(p.value).valueText
+                    }`}
+                  </title>
                 </circle>
               ))}
             </g>

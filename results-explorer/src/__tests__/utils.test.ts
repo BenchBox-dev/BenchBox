@@ -12,9 +12,9 @@ describe("isKnownBenchmark", () => {
 });
 
 describe("score formatting", () => {
-  it("preserves exact power scores in the shared formatter", () => {
-    expect(fmtScore(3000.42)).toBe("3,000.42");
-    expect(fmtScore(1520.99)).toBe("1,520.99");
+  it("uses compact power scores for dense shared displays", () => {
+    expect(fmtScore(3000.42)).toBe("3,000");
+    expect(fmtScore(1520.99)).toBe("1,521");
   });
 
   it("removes noisy decimals from large power scores for compact displays", () => {

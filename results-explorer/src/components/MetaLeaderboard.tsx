@@ -10,6 +10,7 @@ import type {
 } from "@/types";
 import { colorForCell, lightnessForCell } from "@/lib/chartMath";
 import { formatTimingExclusion } from "@/lib/displayEligibility";
+import { formatAverageRank, formatCoverage, formatRank, formatSpeedup } from "@/lib/metricFormatters";
 import { fmtGeomean, fmtScoreCompact, fmtScoreExact } from "@/utils";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 import { SegmentedControl } from "@/components/SegmentedControl";
@@ -225,7 +226,11 @@ export function MetaLeaderboard({
               onChange={onModeChange}
               size="sm"
               options={[
-                { value: "times", label: "Times", title: "Native metric values per cohort (lower is faster for ms; higher is better for power)" },
+                {
+                  value: "times",
+                  label: "Times",
+                  title: "Native metric values per cohort (lower is better for latency; higher is better for power)",
+                },
                 { value: "ranks", label: "Ranks", title: "Rank within each cohort (1 is best)" },
                 { value: "speedup", label: "Speedup", title: "Relative to cohort best (1.00x is best; below 1.00x is worse)" },
               ]}
@@ -315,7 +320,7 @@ export function MetaLeaderboard({
                         class="rounded border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--bb-data-fg-muted)]"
                         title={`Covered cohorts in the current leaderboard view. ${COVERAGE_POLICY_COPY}`}
                       >
-                        {platform.n_cohorts}/{cohorts.length} cohorts
+                        {formatCoverage(platform.n_cohorts, cohorts.length, { unitLabel: "cohorts" }).valueText}
                       </span>
                     </div>
                   </td>
@@ -393,13 +398,13 @@ export function MetaLeaderboard({
                   })}
                   <td
                     class="table-td py-2 text-center font-mono font-semibold text-[var(--bb-data-fg-primary)]"
-                    title={`${AVG_RANK_LABEL}: ${platform.n_cohorts}/${cohorts.length}. ${COVERAGE_POLICY_COPY}`}
+                    title={`${AVG_RANK_LABEL}: ${formatCoverage(platform.n_cohorts, cohorts.length).valueText}. ${COVERAGE_POLICY_COPY}`}
                   >
                     {platform.avg_rank !== null ? (
                       <>
-                        {platform.avg_rank.toFixed(1)}
+                        {formatAverageRank(platform.avg_rank).valueText}
                         <span class="mt-1 block text-[11px] font-normal text-[var(--bb-data-fg-muted)]">
-                          over {platform.n_cohorts}/{cohorts.length}
+                          over {formatCoverage(platform.n_cohorts, cohorts.length).valueText}
                         </span>
                       </>
                     ) : (
@@ -454,19 +459,19 @@ export function MetaLeaderboard({
  */
 function cohortMetricSublabel(cohort: MetaCohort): string {
   const metric = cohort.primary_metric;
-  const direction = cohort.primary_order === "desc" ? "higher is better" : "lower is faster";
+  const direction = cohort.primary_order === "desc" ? "higher is better" : "lower is better";
   if (metric === "power_score") return `${cohort.phase} · Power score · ${direction}`;
-  if (metric === "display_geomean_ms") return `${cohort.phase} · Geomean · ms · ${direction}`;
-  if (metric === "geomean_ms") return `${cohort.phase} · Geomean · ms · ${direction}`;
-  if (metric === "total_duration_s") return `${cohort.phase} · Total · s · ${direction}`;
+  if (metric === "display_geomean_ms") return `${cohort.phase} · Geomean latency · ${direction}`;
+  if (metric === "geomean_ms") return `${cohort.phase} · Geomean latency · ${direction}`;
+  if (metric === "total_duration_s") return `${cohort.phase} · Total duration · ${direction}`;
   return `${cohort.phase} · ${metric} · ${direction}`;
 }
 
 function cellText(rank: MetaRank, cohort: MetaCohort, mode: MetaLeaderboardMode): string {
-  if (mode === "ranks") return `${rank.rank}/${rank.total}`;
+  if (mode === "ranks") return formatRank(rank.rank, rank.total).valueText;
   if (mode === "speedup") {
     return rank.speedup_vs_best !== null && rank.speedup_vs_best !== undefined
-      ? `${rank.speedup_vs_best.toFixed(2)}x`
+      ? formatSpeedup(rank.speedup_vs_best).valueText
       : "-";
   }
   if (rank.metric_value === null || rank.metric_value === undefined) return "-";

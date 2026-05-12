@@ -500,12 +500,12 @@ export function Home(_: RoutableProps) {
                     <th class="table-th">Platform</th>
                     <th class="table-th">Scale</th>
                     <th class="table-th">Date</th>
-                    <th class="table-th">Power Score</th>
+                    <th class="table-th">Power score</th>
                     <th
                       class="table-th"
                       title="Geometric mean of per-query execution times (measurement runs only). Lower is faster."
                     >
-                      Geomean (ms)
+                      Geomean latency
                     </th>
                     {showRecentCost && (
                       <th

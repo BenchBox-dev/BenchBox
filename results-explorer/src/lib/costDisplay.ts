@@ -1,4 +1,5 @@
 import type { CostDeploymentFields } from "@/types";
+import { formatUsd } from "@/lib/metricFormatters";
 
 export function normalizedCostValue(row: CostDeploymentFields): number | null {
   if (row.cost_status !== "normalized") return null;
@@ -9,7 +10,7 @@ export function normalizedCostValue(row: CostDeploymentFields): number | null {
 
 export function normalizedCostLabel(row: CostDeploymentFields): string {
   const value = normalizedCostValue(row);
-  if (value !== null) return `$${value.toFixed(2)}`;
+  if (value !== null) return formatUsd(value).valueText;
   return costStatusLabel(row);
 }
 

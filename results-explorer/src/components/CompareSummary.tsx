@@ -1,6 +1,7 @@
 import type { ComponentChildren } from "preact";
 import type { CompareDecisionSummary } from "@/lib/compareSummary";
 import { formatRatio } from "@/lib/compareSummary";
+import { formatUsd } from "@/lib/metricFormatters";
 import { fmtGeomean, fmtMs, fmtScore } from "@/utils";
 import { StatusBadge } from "@/components/StatusBadge";
 
@@ -138,7 +139,7 @@ function formatCostSummary(cost: NonNullable<CompareDecisionSummary["cost"]>) {
     return `${cost.normalizedResultCount} selected run(s) have normalized cost; winner cost is unavailable.`;
   }
   const bestText = cost.winnerIsBestCostPerformance ? "best" : "not best";
-  return `winner cost $${cost.winnerCostUsd.toFixed(2)}; ${formatRatio(
+  return `winner cost ${formatUsd(cost.winnerCostUsd).valueText}; ${formatRatio(
     cost.winnerCostPerformanceRatioVsWorst,
   )} cost/performance vs worst normalized row (${bestText}).`;
 }

@@ -1,0 +1,52 @@
+results-explorer-metric-formatting-contract w0 inventory
+date: 2026-05-12
+branch: fix/results-explorer-metric-formatting-contract
+base: d542cd6bb fix(explorer): clarify leaderboard scope filters (#367)
+
+Current formatter spread:
+- results-explorer/src/utils.ts: fmtScore, fmtScoreCompact, fmtScoreExact, fmtMs, fmtGeomean.
+- results-explorer/src/lib/queryLabels.ts: Query Workbench labels, missing states, total_duration_s, cost_usd, normalized_cost_usd, and generic number fallback.
+- results-explorer/src/lib/costDisplay.ts: normalized cost label and cost model/scope copy.
+- results-explorer/src/lib/compareSummary.ts: formatRatio for winner headlines and compare cards.
+- results-explorer/src/components/MetaLeaderboard.tsx: rank cells, speedup cells, coverage badges, avg rank, cohort metric headers.
+- results-explorer/src/components/QueryHeatmap.tsx: benchmark matrix primary metric cells, geomean cells, per-query latency cells, ratio/outlier labels.
+- results-explorer/src/components/QueryHistogram.tsx, DistributionBox.tsx, CDFChart.tsx, PercentileLadder.tsx, TimeSeries.tsx: chart axes/tooltips use local ms/seconds formatting.
+- results-explorer/src/components/PowerBar.tsx: power chart axis/value labels use inline locale formatting.
+- results-explorer/src/components/CostScatter.tsx: cost axis/tooltips and metric axis labels use inline toFixed/locale formatting.
+- results-explorer/src/pages/BenchmarkIndex.tsx, PlatformIndex.tsx, Query.tsx, Compare.tsx, ResultDetail.tsx: route tables/cards mix shared utils and local toFixed calls.
+
+Observed high-risk examples before changes:
+- Large power scores:
+  - Home recent rows use fmtScoreCompact with exact tooltip: acceptable scan behavior.
+  - Platform detail table uses fmtScore, which currently delegates to exact score text. Large scores can keep decimals in dense table cells.
+  - QueryHeatmap primary column uses fmtScore for power_score, also exact in dense matrix cells.
+  - Compare cards use r.powerScore.toLocaleString(), preserving any decimals and bypassing the shared score helpers.
+  - PowerBar uses maximumFractionDigits: 0 locally, which is acceptable but component-local.
+- Latency and seconds:
+  - utils fmtMs rounds all values under 10000 ms to whole ms, so sub-ms values can render as 0 ms outside QueryHeatmap.
+  - QueryHeatmap has a local "<1 ms" path for positive sub-ms cells.
+  - QueryHistogram has local "1000ms -> 1.0s" / "10000ms -> 10s" formatting with no space before units.
+  - Compare cards use totalDurationS.toFixed(2) + "s", with no space and no semantic formatter.
+  - Result detail timings use toFixed(1) for display_ms/duration_ms table cells.
+- Speedups and ratios:
+  - compareSummary.formatRatio returns value.toFixed(2) + "x".
+  - MetaLeaderboard speedup cells use toFixed(2) + "x".
+  - QueryDiffTable ratios use toFixed(2) + "x".
+  - NormalizedSpeedupChart uses toFixed(2) + "×"; QueryHeatmap ratio labels use toFixed(1) + "× fastest".
+- Ranks and coverage:
+  - MetaLeaderboard rank cells render rank/total locally.
+  - Avg rank renders toFixed(1).
+  - Coverage badges render n_cohorts/cohorts.length locally and correctly disclose the denominator, but not through a shared coverage formatter.
+- Cost:
+  - costDisplay normalizedCostLabel and Query Workbench cost cells use "$" + toFixed(2).
+  - CostScatter axes/tooltips use cost.toFixed(2).
+  - CompareSummary cost/performance uses "$" + toFixed(2) and formatRatio.
+- Missing states:
+  - Query Workbench distinguishes No power score, No timing recorded, No duration recorded, No cost recorded, and Not recorded.
+  - MetaLeaderboard distinguishes No run, Excluded, Unranked, and No score.
+  - Several chart/table cells still use "-" for non-value states, which is acceptable only where the compact control already has surrounding context.
+
+Contract required by w1:
+- Each visible numeric formatter should map to a semantic type: power_score, latency_ms, duration_s, speedup, rank, average_rank, coverage, cost_usd, or plain_number.
+- Shared helpers must keep raw numeric values separate from display strings and return sortValue for callers that need it.
+- Dense table/axis contexts should use compact but unit-correct values; exact power score remains available through explicit exact helper/tooltips.

@@ -2,7 +2,8 @@ id: results-explorer-metric-formatting-contract
 title: "Centralize Results Explorer metric formatting for precision, units, and mode-specific labels"
 worktree: results-explorer-followup-todo-review
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-05-12"
 category: User Experience
 
 description: |
@@ -23,7 +24,7 @@ deps:
 work:
 - id: w0
   summary: "Inventory metric values, labels, and units across routes"
-  status: pending
+  status: done
   notes: |
     Capture the current formatting for:
       - leaderboard table cells and headers;
@@ -39,7 +40,7 @@ work:
 - id: w1
   summary: "Define metric format rules by semantic metric type"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     Define rules for:
       - latency/display timing: ms under 1000, seconds above threshold, no
@@ -58,7 +59,7 @@ work:
 - id: w2
   summary: "Implement shared metric formatter helpers"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Add or extend shared helpers that accept metric type, value, unit,
     comparison direction, and display context. The helper should return value
@@ -69,7 +70,7 @@ work:
 - id: w3
   summary: "Apply metric formatting across tables, charts, and compare surfaces"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Replace ad hoc numeric formatting in Leaderboards, Benchmark detail,
     Platform detail, Query Workbench, Compare, chart footnotes, and receipt
@@ -80,7 +81,7 @@ work:
 - id: w4
   summary: "Add tests for precision, labels, missing states, and exports"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Add tests asserting:
       - large power scores do not show unnecessary decimals;
@@ -94,7 +95,7 @@ work:
 - id: w5
   summary: "Browser-check metric formatting on high-risk routes"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     In a browser, verify `/results/`, one TPC-H benchmark page, one AMPLab
     benchmark page, one platform page, Query Workbench, and Compare. Decision

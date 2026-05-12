@@ -603,8 +603,8 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
   const ticks = latencyScaleTicks(scale);
   const scaleLabel =
     scale.mode === "log"
-      ? "Geomean query time (log scale) - lower is faster"
-      : "Geomean query time (median-of-passing) - lower is faster";
+      ? "Geomean query time (log scale) - lower is better"
+      : "Geomean query time (median-of-passing) - lower is better";
 
   return (
     <div ref={containerRef} class="w-full overflow-x-auto">

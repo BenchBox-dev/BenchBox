@@ -971,7 +971,7 @@ function ListTable({
               onSort={toggleSort}
             />
             <ListSortHeader
-              label="Power Score"
+              label="Power score"
               sortKey="power_score"
               ariaSort={ariaSort}
               sortArrow={sortArrow}
@@ -989,7 +989,7 @@ function ListTable({
                 class="table-th block w-full cursor-pointer select-none border-0 bg-transparent text-left"
                 onClick={() => toggleSort("display_geomean_ms")}
               >
-                Geomean (ms){sortArrow("display_geomean_ms")}
+                Geomean latency{sortArrow("display_geomean_ms")}
                 {sortAnnouncement("display_geomean_ms")}
               </button>
             </th>

@@ -79,7 +79,7 @@ function platformRowsForRequest(rows: PlatformIndexRowRow[], platform: string): 
 }
 
 function trendMetricDescription(metric: TrendMetric): string {
-  return metric === "power_score" ? "power score (higher is better)" : "geomean latency, ms (lower is faster)";
+  return metric === "power_score" ? "Power score (higher is better)" : "Geomean latency (lower is better)";
 }
 
 function primaryMetricContract(metric: string): string {
@@ -701,7 +701,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                     class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
                     onClick={() => toggleSort("power_score")}
                   >
-                    Power Score{sortArrow("power_score")}
+                    Power score{sortArrow("power_score")}
                     {ariaSortAnnouncement("power_score")}
                   </button>
                 </th>
@@ -716,7 +716,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                     class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
                     onClick={() => toggleSort("geomean_ms")}
                   >
-                    Geomean (ms){sortArrow("geomean_ms")}
+                    Geomean latency{sortArrow("geomean_ms")}
                     {ariaSortAnnouncement("geomean_ms")}
                   </button>
                 </th>

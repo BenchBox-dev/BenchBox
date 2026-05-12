@@ -12,6 +12,7 @@ import type { BenchmarkSummary } from "@/types";
 import { paletteColor } from "@/lib/chartTheme";
 import { costModelDisclosure, costStatusLabel, normalizedCostValue } from "@/lib/costDisplay";
 import { isRankable, isTimingDisplayable, isValidTimingValue } from "@/lib/displayEligibility";
+import { formatLatencyMs, formatPowerScore, formatUsd } from "@/lib/metricFormatters";
 import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
 
 interface Props {
@@ -19,15 +20,11 @@ interface Props {
 }
 
 function fmtMs(ms: number | null): string {
-  if (ms === null) return "-";
-  if (ms >= 10000) return `${(ms / 1000).toFixed(0)}s`;
-  if (ms >= 1000) return `${(ms / 1000).toFixed(2)}s`;
-  return `${ms.toFixed(0)}ms`;
+  return formatLatencyMs(ms, { missingText: "-", subMillisecond: "compact" }).valueText;
 }
 
 function fmtScore(s: number | null): string {
-  if (s === null) return "-";
-  return s.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  return formatPowerScore(s, { missingText: "-" }).valueText;
 }
 
 // Inline bar: MAX_BAR_PX pixels = full-width bar.
@@ -164,7 +161,7 @@ export function SparklineTable({ summary }: Props) {
                 {/* Cost */}
                 {showCost && (
                   <td class="px-2 py-1.5 text-right font-mono text-[var(--bb-data-fg-muted)]">
-                    {normalizedCostValue(p) !== null ? `$${normalizedCostValue(p)!.toFixed(2)}` : costStatusLabel(p)}
+                    {normalizedCostValue(p) !== null ? formatUsd(normalizedCostValue(p)).valueText : costStatusLabel(p)}
                   </td>
                 )}
               </tr>

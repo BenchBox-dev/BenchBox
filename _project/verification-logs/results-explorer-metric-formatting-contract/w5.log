@@ -1,0 +1,23 @@
+home power score header: PASS - Recent Results header uses Power score
+home latency header: PASS - Recent Results header avoids fixed ms-only copy
+home gratuitous decimals: PASS - no visible large comma-formatted power score with decimals
+home coverage denominator: PASS - coverage copy includes an explicit denominator or coverage label
+tpch route loaded: PASS - TPC-H benchmark page rendered
+tpch power score header: PASS - benchmark table/matrix labels power score
+tpch latency header: PASS - benchmark route labels latency with semantic copy
+tpch gratuitous decimals: PASS - TPC-H visible power scores are compact
+amplab route checked: PASS - AMPLab benchmark route is not a 404/not-found route
+amplab latency copy: PASS - AMPLab route exposes latency or empty-state copy
+platform route loaded: PASS - platform page rendered at /results/p/duckdb/
+platform power score header: PASS - platform table uses Power score header
+platform latency header: PASS - platform table uses semantic latency header
+platform gratuitous decimals: PASS - platform visible power scores are compact
+query workbench loaded: PASS - Query Workbench route rendered
+query power score label: PASS - Query Workbench column label includes direction
+query latency label: PASS - Query Workbench latency label includes direction
+query export copy: PASS - export copy remains explicit about visible columns
+compare route loaded: PASS - Compare route loaded with tpch-polars-sf0.01-20260403-a62d0d72,tpch-duckdb-sf0.01-20260403-010ee756
+compare metric label: PASS - Compare route labels the active primary metric
+compare speedup precision: PASS - Compare route uses two-decimal speedup/correct suppression state
+compare gratuitous decimals: PASS - Compare visible power scores are compact
+visited routes: /results/, /results/tpch/?phase=standard, /results/amplab/, /results/p/duckdb/, /results/query, /results/compare?ids=d28345e6%2Cba6a8c83

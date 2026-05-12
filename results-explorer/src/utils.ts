@@ -2,6 +2,8 @@
 // Shared display utilities
 // ---------------------------------------------------------------------------
 
+import { formatLatencyMs, formatPowerScore, formatPowerScoreExact } from "./lib/metricFormatters";
+
 export const BENCHMARK_LABELS: Record<string, string> = {
   ai_primitives: "AI Primitives",
   amplab: "AMPLab",
@@ -40,31 +42,20 @@ export function isKnownBenchmark(benchmark: string): boolean {
 }
 
 export function fmtScore(score: number | null | undefined): string {
-  return fmtScoreExact(score);
+  return formatPowerScore(score).valueText;
 }
 
 export function fmtScoreCompact(score: number | null | undefined): string {
-  if (score == null) return "-";
-  const abs = Math.abs(score);
-  const maximumFractionDigits = abs >= 1000 ? 0 : abs >= 100 ? 1 : abs >= 10 ? 2 : 3;
-  return score.toLocaleString(undefined, {
-    minimumFractionDigits: 0,
-    maximumFractionDigits,
-  });
+  return formatPowerScore(score).valueText;
 }
 
 export function fmtScoreExact(score: number | null | undefined): string {
-  if (score == null) return "-";
-  return score.toLocaleString(undefined, {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 12,
-  });
+  return formatPowerScoreExact(score).valueText;
 }
 
 /** Format a millisecond value for display. */
 export function fmtMs(ms: number): string {
-  if (ms >= 10_000) return `${(ms / 1000).toFixed(2)} s`;
-  return `${ms.toFixed(0)} ms`;
+  return formatLatencyMs(ms).valueText;
 }
 
 /** Format a geomean_ms value, returning "N/A" for null/undefined. */

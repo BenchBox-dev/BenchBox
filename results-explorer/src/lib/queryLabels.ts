@@ -1,5 +1,12 @@
 import { formatFacetDisplayValue } from "@/lib/facetDisplay";
-import { fmtGeomean, fmtScore, humanizeBenchmark } from "@/utils";
+import {
+  formatDurationSeconds,
+  formatLatencyMs,
+  formatPlainNumber,
+  formatPowerScore,
+  formatUsd,
+} from "@/lib/metricFormatters";
+import { humanizeBenchmark } from "@/utils";
 
 const QUERY_ID_COLLATOR = new Intl.Collator(undefined, {
   numeric: true,
@@ -44,10 +51,10 @@ const QUERY_COLUMN_LABELS: Record<string, string> = {
   platform: "Platform",
   scale_factor: "Scale",
   run_date: "Run date",
-  power_score: "Power score (higher better)",
+  power_score: "Power score (higher is better)",
   total_duration_s: "Total duration",
-  geomean_ms: "Geomean latency (lower better)",
-  display_geomean_ms: "Display geomean (lower better)",
+  geomean_ms: "Geomean latency (lower is better)",
+  display_geomean_ms: "Display geomean (lower is better)",
   query_count: "Queries",
   trust_label: "Trust tier",
   visibility: "Visibility",
@@ -93,16 +100,16 @@ export function formatQueryCell(column: string, value: unknown): string {
     return "Not recorded";
   }
   if (column === "run_date") return formatRunDate(value);
-  if (column === "power_score") return typeof value === "number" ? fmtScore(value) : String(value);
+  if (column === "power_score") return typeof value === "number" ? formatPowerScore(value).valueText : String(value);
   if (column === "geomean_ms" || column === "display_geomean_ms") {
-    return typeof value === "number" ? fmtGeomean(value) : String(value);
+    return typeof value === "number" ? formatLatencyMs(value).valueText : String(value);
   }
   if (column === "total_duration_s") {
     const seconds = typeof value === "number" ? value : Number(value);
-    return Number.isFinite(seconds) ? formatSeconds(seconds) : String(value);
+    return Number.isFinite(seconds) ? formatDurationSeconds(seconds).valueText : String(value);
   }
   if (column === "cost_usd" || column === "normalized_cost_usd") {
-    return typeof value === "number" ? `$${value.toFixed(2)}` : String(value);
+    return typeof value === "number" ? formatUsd(value).valueText : String(value);
   }
   if (typeof value === "string") return formatQueryFacetValue(column, value);
   if (column === "scale_factor") return `SF ${value}`;
@@ -114,16 +121,8 @@ function formatRunDate(value: unknown): string {
   return text.length >= 10 ? text.slice(0, 10) : text;
 }
 
-function formatSeconds(seconds: number): string {
-  const hasFraction = !Number.isInteger(seconds);
-  return `${seconds.toLocaleString(undefined, {
-    minimumFractionDigits: hasFraction ? 2 : 0,
-    maximumFractionDigits: 2,
-  })} s`;
-}
-
 function formatPlainCell(value: unknown): string {
   if (value === null || value === undefined || value === "") return "-";
-  if (typeof value === "number") return Number.isInteger(value) ? String(value) : value.toFixed(2);
+  if (typeof value === "number") return formatPlainNumber(value).valueText;
   return String(value);
 }

@@ -16,6 +16,7 @@ import { RunReceipt, planDownloadUrl } from "@/components/RunReceipt";
 import { ChartPanel } from "@/components/ChartPanel";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { formatTrustLabel, formatValidationStatus } from "@/lib/displayLabels";
+import { formatDurationSeconds, formatLatencyMs } from "@/lib/metricFormatters";
 
 interface ResultDetailProps extends RoutableProps {
   resultId?: string;
@@ -262,7 +263,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
           />
           <ResultMetricCard
             label="Wall-clock total"
-            value={`${detail.total_duration_s.toFixed(2)} s`}
+            value={formatDurationSeconds(detail.total_duration_s).valueText}
             helper="Run duration"
           />
         </div>
@@ -361,7 +362,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
                         class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
                         onClick={() => toggleSort("display_ms")}
                       >
-                        Median (ms){sortArrow("display_ms")}
+                        Median latency{sortArrow("display_ms")}
                       </button>
                     </th>
                     <th class="p-0" scope="col">
@@ -411,7 +412,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
                           onClick={() => toggleRawSort("duration_ms")}
                           onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && toggleRawSort("duration_ms")}
                         >
-                          Duration (ms){rawSortArrow("duration_ms")}
+                          Duration{rawSortArrow("duration_ms")}
                         </th>
                         <th
                           class="table-th cursor-pointer select-none"
@@ -471,7 +472,7 @@ function MedianRow({ timing }: { timing: QueryDisplayTiming }) {
     <tr class="hover:bg-[var(--bb-surface-data-muted)]">
       <td class="table-td font-mono font-medium">{timing.query_id}</td>
       <td class="table-td font-mono">
-        {timing.display_ms !== null ? timing.display_ms.toFixed(1) : "-"}
+        {formatLatencyMs(timing.display_ms, { missingText: "-" }).valueText}
       </td>
       <td class="table-td font-mono">{timing.sample_count}</td>
     </tr>
@@ -484,7 +485,7 @@ function QueryRow({ query }: { query: QueryTiming }) {
   return (
     <tr class="hover:bg-[var(--bb-surface-data-muted)]">
       <td class="table-td font-mono font-medium">{query.query_id}</td>
-      <td class="table-td font-mono">{query.duration_ms.toFixed(1)}</td>
+      <td class="table-td font-mono">{formatLatencyMs(query.duration_ms).valueText}</td>
       <td class="table-td">
         <StatusBadge role="validation" tone={tone}>{query.status}</StatusBadge>
       </td>

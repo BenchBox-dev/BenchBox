@@ -217,7 +217,7 @@ describe("ChartPanel", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Trend" }));
 
     expect(screen.getByRole("tab", { name: "Trend" }).getAttribute("aria-selected")).toBe("true");
-    expect(screen.getByRole("img", { name: "Geomean ms trend over time" })).toBeTruthy();
+    expect(screen.getByRole("img", { name: "Geomean latency trend over time" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Sparkline Table" })).toBeNull();
   });
 
@@ -332,7 +332,7 @@ describe("ChartPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Performance Bar" }));
 
     expect(screen.getByRole("img", { name: "Geomean performance comparison (log scale)" })).toBeTruthy();
-    expect(screen.getByText("Geomean query time (log scale) - lower is faster")).toBeTruthy();
+    expect(screen.getByText("Geomean query time (log scale) - lower is better")).toBeTruthy();
 
     const widths = Array.from(
       container.querySelectorAll('svg[aria-label="Geomean performance comparison (log scale)"] rect'),
@@ -364,12 +364,12 @@ describe("ChartPanel", () => {
     expect(valueLabels.map((label) => label.getAttribute("data-value-placement"))).toContain("outside");
     expect(valueLabels.map((label) => label.getAttribute("data-value-placement"))).toContain("inside");
     expect(
-      valueLabels.find((label) => label.textContent === "1000 ms")?.getAttribute("data-value-placement"),
+      valueLabels.find((label) => label.textContent === "1 s")?.getAttribute("data-value-placement"),
     ).toBe("inside");
 
     const tooltips = Array.from(container.querySelectorAll("rect title")).map((title) => title.textContent);
     expect(tooltips.some((tooltip) => tooltip?.includes("FastDB") && tooltip.includes("10 ms"))).toBe(true);
-    expect(tooltips.some((tooltip) => tooltip?.includes("SlowDB") && tooltip.includes("1000 ms"))).toBe(true);
+    expect(tooltips.some((tooltip) => tooltip?.includes("SlowDB") && tooltip.includes("1 s"))).toBe(true);
   });
 
   it("hides the Cost tab when no cohort row carries normalized cost data", () => {

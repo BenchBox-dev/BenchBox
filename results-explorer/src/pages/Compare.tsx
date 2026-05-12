@@ -41,6 +41,7 @@ import { QueryDiffTable } from "@/components/QueryDiffTable";
 import { modeLabel, testTypeLabel } from "@/components/MethodologyDisclosure";
 import { vsSlowestRatio } from "@/lib/chartMath";
 import { buildCompareDecisionSummary } from "@/lib/compareSummary";
+import { formatDurationSeconds, formatPowerScore, formatSpeedup } from "@/lib/metricFormatters";
 import { isValidTimingValue } from "@/lib/displayEligibility";
 import {
   describeCompareExclusionReason,
@@ -456,7 +457,7 @@ export function Compare({ url }: CompareProps) {
                   <dd class="font-mono font-medium">
                     {primaryMetric === "power_score"
                       ? r.powerScore !== null
-                        ? r.powerScore.toLocaleString()
+                        ? formatPowerScore(r.powerScore).valueText
                         : "-"
                       : fmtGeomean(r.displayGeomeanMs)}
                   </dd>
@@ -470,13 +471,15 @@ export function Compare({ url }: CompareProps) {
                 {r.totalDurationS !== null && (
                   <div class="flex justify-between">
                     <dt class="text-[var(--bb-data-fg-muted)]">Wall-clock total</dt>
-                    <dd class="font-mono text-[var(--bb-data-fg-primary)]">{r.totalDurationS.toFixed(2)}s</dd>
+                    <dd class="font-mono text-[var(--bb-data-fg-primary)]">
+                      {formatDurationSeconds(r.totalDurationS).valueText}
+                    </dd>
                   </div>
                 )}
                 {showPrimaryClaims && speedup !== null && (
                   <div class="flex justify-between">
                     <dt class="text-[var(--bb-data-fg-muted)]">{vsLabel}</dt>
-                    <dd class="font-mono">{speedup.toFixed(2)}x</dd>
+                    <dd class="font-mono">{formatSpeedup(speedup).valueText}</dd>
                   </div>
                 )}
                 {r.executionMode && (
