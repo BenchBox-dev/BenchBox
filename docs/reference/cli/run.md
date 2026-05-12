@@ -118,8 +118,8 @@ benchbox run [OPTIONS]
   | `flightdata` | `end_year` | latest | Last year of flight data to include |
   | `flightdata` | `seed` | - | Random seed for reproducibility |
   | `flightdata` | `force_regenerate` | - | Force data regeneration (`true`/`false`) |
-  | `joinorder` | `queries_dir` | - | Directory containing custom query files |
-  | `joinorder` | `force_regenerate` | - | Force data regeneration (`true`/`false`) |
+  | `joinorder` | `queries_dir` | - | Directory containing custom query files; defaults to the embedded 113 canonical JOB queries |
+  | `joinorder` | `force_regenerate` | - | Clear and refetch verified canonical data (`true`/`false`); `joinorder` still requires `--scale 1` |
   | `tpcdi` | `enable_parallel` | `false` | Enable parallel processing for ETL |
   | `tpcdi` | `max_workers` | - | Maximum number of parallel workers |
   | `tpcds_obt` | `dimension_mode` | `full` | OBT dimension mode: `full`, `minimal` |

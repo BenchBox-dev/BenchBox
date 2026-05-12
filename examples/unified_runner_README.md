@@ -158,16 +158,13 @@ python unified_runner.py --platform duckdb --benchmark h2odb --scale 0.1 --phase
 
 ```bash
 # Power test (complex multi-way joins)
-python unified_runner.py --platform duckdb --benchmark joinorder --scale 0.01 --phases power
-
-# Larger IMDB dataset
-python unified_runner.py --platform duckdb --benchmark joinorder --scale 0.1 --phases power
+python unified_runner.py --platform duckdb --benchmark joinorder --scale 1 --phases power
 ```
 
 **Scale Factor Guide:**
-- `0.01` = Tiny IMDB subset (< 1 min)
-- `0.1` = Small IMDB subset (1-5 min)
-- `1.0` = Full IMDB dataset (10-30 min)
+- `1.0` is the only supported public `joinorder` scale.
+- First use downloads and verifies the canonical IMDb 2013 JOB Parquet package.
+- Use the internal `joinorder_synthetic` benchmark only for synthetic loader or schema smoke tests.
 
 ---
 

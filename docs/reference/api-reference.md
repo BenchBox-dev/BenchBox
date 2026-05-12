@@ -216,7 +216,7 @@ join_queries = primitives.get_queries_by_category("join")
 - **AMPLab**: Big data benchmark
 - **H2ODB**: Data science benchmark
 - **ClickBench**: Analytical benchmark
-- **JoinOrder**: Join order optimization benchmark
+- **JoinOrder**: Canonical IMDb 2013 JOB benchmark for join-order optimization, fixed at `scale_factor=1.0`
 - **TPCDI**: Data integration benchmark
 - **WritePrimitives**: Write operation benchmark (INSERT, UPDATE, DELETE, MERGE, etc.)
 - **TPCHavoc**: TPC-H syntax variants
@@ -235,6 +235,9 @@ All benchmarks accept these parameters:
 | -------------- | ---------------- | ------- | ----------------------- |
 | `scale_factor` | `float`          | `1.0`   | Dataset size multiplier |
 | `output_dir`   | `Optional[Path]` | `None`  | Data output directory   |
+
+`JoinOrder` is the fixed-size exception: the public benchmark accepts only
+`scale_factor=1.0` because it uses the canonical IMDb 2013 JOB dataset.
 
 ### Scale Factor Guidelines
 

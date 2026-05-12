@@ -54,7 +54,7 @@ BenchBox includes three influential academic benchmarks:
      - Big data analytics, comparing SQL engines at scale
    * - **Join Order Benchmark (JOB)**
      - Leis et al., TU Munich
-     - Query optimizer join ordering, cardinality estimation
+     - Query optimizer join ordering and cardinality estimation on canonical IMDb 2013 data
 
 From Research to Practice
 ~~~~~~~~~~~~~~~~~~~~~~~~~

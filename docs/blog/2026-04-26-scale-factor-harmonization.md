@@ -16,6 +16,11 @@ meta_description: "Why BenchBox v0.2.1 retunes 7 adjustable benchmarks so --scal
 
 **TL;DR**: BenchBox v0.2.1 retunes 7 benchmarks with adjustable scale factors so that SF=1 produces roughly 1 GB of uncompressed CSV. CoffeeShop dropped from 6 GB to about 1 GB at SF=1; AMPLab grew from 450 MB to about 1.1 GB; H2ODB grew from 100 MB to about 1 GB. Spec-defined and fixed-size benchmarks (TPC-H, TPC-DS, SSB, ClickBench, DataVault) are unchanged.
 
+> Current behavior note: the public `joinorder` benchmark now uses the fixed
+> canonical IMDb 2013 JOB dataset at `--scale 1` only. The scalable synthetic
+> JoinOrder generator discussed below was moved to the internal
+> `joinorder_synthetic` benchmark for smoke tests.
+
 ![Before and after: SF=1 data sizes per benchmark. CoffeeShop drops from 6 GB to 1 GB; H2ODB and NYC Taxi grow from ~100 MB to ~1 GB.](./images/sf1_before_after.png)
 
 ---
@@ -98,6 +103,11 @@ CoffeeShop was the largest outlier. Its previous default made a "run the OLAP be
 - New SF=1: ~14.7M rows across the same 21 tables, ~1 GB
 
 JoinOrder's value as a benchmark depends on the cross-table cardinality ratios (the relative sizes of the joined tables). Reducing each table by the same factor preserves the join behavior the benchmark is designed to exercise.
+
+Current BenchBox releases no longer expose this scaled synthetic data as the
+public `joinorder` benchmark. Public `joinorder` uses the canonical IMDb 2013
+JOB data package at `--scale 1`; synthetic scaled data remains internal as
+`joinorder_synthetic`.
 
 ### AMPLab (+150%)
 
