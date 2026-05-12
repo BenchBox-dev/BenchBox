@@ -1,0 +1,78 @@
+snapshot_path: results-explorer/test-fixtures/.generated/data/results.duckdb
+snapshot_size_bytes: 6565888
+
+## Compare eligibility
+compare eligible rows: PASS - 10 compare-eligible display row(s)
+cohorts with 2+ comparable rows: PASS - 1 cohort(s): [('tpch', 0.01, 9)]
+comparison_exclusion_reasons:
+- eligible: 10
+- insufficient_query_coverage: 1
+
+## Leaderboard/rank states
+- published_unranked: 3
+- ranked: 6
+unranked evidence has reason: PASS - 0 ambiguous unranked row(s)
+ranked rows lack exclusion reason: PASS - 0 ranked row(s) carry exclusion reasons
+
+## Scope counts
+benchmarks=2 platforms=7 public_results=11 rankable_benchmark_scales=3 unlabeled_tuning_rows=10
+public snapshot has benchmark/platform scope: PASS - benchmarks=2, platforms=7, rows=11
+tuning_modes:
+- tuned: 1
+- unlabeled: 10
+
+## Chart dataset eligibility
+matrix_valid_cells: 225
+matrix_excluded_cells_with_reason: 8
+matrix_excluded_cells_without_reason: 0
+power_bar_rows: 10
+latency_chart_rows: 11
+speedup_rows: 8
+matrix has valid timing cells: PASS - 225 valid cells
+excluded matrix cells explain reason: PASS - 0 excluded cells lack reason
+chart metric datasets are nonempty: PASS - power=10 latency=11
+
+## Duplicate chart label pressure
+- duplicate platform cohort requiring run identity disambiguation: ('tpch', 0.01, 'standard', 'DuckDB', 2)
+
+## Metric-formatting samples
+large_power_scores:
+- ('tpch-polars-sf0.01-20260403-a62d0d72', 'Polars', 11636.652993864305)
+- ('tpch-duckdb-sf0.01-20260403-b6d2e142', 'DuckDB', 3184.897098661065)
+- ('tpch-duckdb-sf0.1-20260403-f88815c2', 'DuckDB', 3184.897098661065)
+- ('tpch-duckdb-sf0.01-20260403-010ee756', 'DuckDB', 3184.897098661065)
+- ('tpch-duckdb-sf0.01-20260403-a5eff54e', 'DuckDB', 3184.897098661065)
+latency_samples_ms:
+- ('tpch-datafusion-partial-sf0.01-20260403-e8b109d3', 'DataFusion Partial', 13.500783240290673)
+- ('tpch-datafusion-sf0.01-20260403-a6bb8a70', 'DataFusion', 13.477607371183202)
+- ('tpch-duckdb-sf0.01-20260403-b6d2e142', 'DuckDB', 11.335852721901425)
+- ('tpch-duckdb-sf0.1-20260403-f88815c2', 'DuckDB', 11.335852721901425)
+- ('tpch-duckdb-sf0.01-20260403-010ee756', 'DuckDB', 11.335852721901425)
+coverage_samples:
+- ('star_schema-duckdb-sf0.01-20260403-3cdeede0', 13, 6, 0, 7)
+- ('tpch-datafusion-partial-sf0.01-20260403-e8b109d3', 21, 21, 0, 0)
+- ('tpch-datafusion-sf0.01-20260403-a6bb8a70', 22, 22, 0, 0)
+- ('tpch-duckdb-sf0.01-20260403-010ee756', 22, 22, 0, 0)
+- ('tpch-duckdb-sf0.01-20260403-a5eff54e', 22, 22, 0, 0)
+speedup_samples:
+- ('star_schema', 0.01, None, 'DuckDB', 1.0, 1.0)
+- ('tpch', 0.01, None, 'DataFusion', 0.2233595060730592, 1.0)
+- ('tpch', 0.01, None, 'DataFusion Partial', 0.2233595060730592, 1.0)
+- ('tpch', 0.01, None, 'DuckDB', 0.2736952885284433, 1.2253576905695682)
+- ('tpch', 0.01, 'tuned', 'DuckDB', 0.2736952885284433, 1.2253576905695682)
+
+## Compare warning/receipt anchors
+compare_warning_input_counts:
+- insufficient_query_coverage: 1
+receipt_anchor_targets_sample:
+- ('star_schema-duckdb-sf0.01-20260403-3cdeede0', '/results/data/bundles/star_schema-duckdb-sf0.01-20260403-3cdeede0.json', False, False, 'unavailable')
+- ('tpch-datafusion-partial-sf0.01-20260403-e8b109d3', '/results/data/bundles/tpch-datafusion-partial-sf0.01-20260403-e8b109d3.json', False, False, 'unavailable')
+- ('tpch-datafusion-sf0.01-20260403-a6bb8a70', '/results/data/bundles/tpch-datafusion-sf0.01-20260403-a6bb8a70.json', False, False, 'unavailable')
+- ('tpch-duckdb-sf0.01-20260403-010ee756', '/results/data/bundles/tpch-duckdb-sf0.01-20260403-010ee756.json', False, False, 'unavailable')
+- ('tpch-duckdb-sf0.01-20260403-a5eff54e', '/results/data/bundles/tpch-duckdb-sf0.01-20260403-a5eff54e.json', False, False, 'unavailable')
+- ('tpch-duckdb-sf0.01-20260403-b6d2e142', '/results/data/bundles/tpch-duckdb-sf0.01-20260403-b6d2e142.json', False, False, 'unavailable')
+- ('tpch-duckdb-sf0.1-20260403-f88815c2', '/results/data/bundles/tpch-duckdb-sf0.1-20260403-f88815c2.json', False, False, 'unavailable')
+- ('tpch-fixture-aws-sql-sf0.01-20260403-e73da6ce', '/results/data/bundles/tpch-fixture-aws-sql-sf0.01-20260403-e73da6ce.json', False, False, 'unavailable')
+receipt targets exist: PASS - 8 sampled result rows
+
+overall: PASS

@@ -1,0 +1,1165 @@
+command: dependency TODO audit on current branch
+checked_sha: 2c65387c3637f19bfaca6ddc1ef0afb8ee804489
+checked_at_utc: 2026-05-12T13:17:27Z
+
+===== _project/DONE/results-explorer-followup-todo-review/planning/results-explorer-comparison-eligibility-contract-repair.yaml =====
+
+====================================================================================================
+Repair Results Explorer comparison eligibility at the read-model contract
+====================================================================================================
+
+Priority:  Critical
+Status:    Completed
+Worktree:  results-explorer-followup-todo-review
+Category:  Core Functionality
+File:      _project/DONE/results-explorer-followup-todo-review/planning/results-explorer-comparison-eligibility-contract-repair.yaml
+
+Description:
+----------------------------------------------------------------------------------------------------
+The post-remediation evaluation found a P0 regression: the Results Explorer
+exposes compare entrypoints, but every public result row is non-comparable.
+A fresh snapshot reported 525 total results, 0 comparable rows, and 371
+displayable rows. The dominant exclusion reason was
+`insufficient_query_coverage`, including normal TPC-H rows that have 22 valid
+logical query timings but 66 or 88 raw execution samples.
+
+The suspected root cause is that backend eligibility compares
+`valid_query_count` against `summary.queries.total`, where `total` can be raw
+samples/repetitions rather than the logical benchmark query count. This TODO
+repairs the data contract so comparison eligibility is based on valid
+display timings over the logical comparable query scope, not raw sample count.
+
+
+Implementation Guardrails:
+----------------------------------------------------------------------------------------------------
+  Must Preserve:
+    - Do not relax comparison eligibility by ignoring missing logical queries.
+    - Do not make invalid zero/negative/NaN timings compare-safe.
+    - Do not conflate validation cleanliness, ranking eligibility, and comparison eligibility.
+    - Do not remove excluded rows from provenance, receipt, or result-detail surfaces.
+    - Do not add frontend-only eligibility derivations that can drift from the DuckDB snapshot.
+
+  Approach:
+    Fix the read-model contract first, then regenerate the snapshot and add
+    invariant tests. Only after the backend contract proves that comparable rows
+    exist should frontend entrypoint work proceed.
+
+  Anti-Patterns:
+    - DO NOT special-case TPC-H by name; the fix must apply to any benchmark with repeated raw samples.
+    - DO NOT lower the threshold until rows become comparable; use the policy denominator and fail if data genuinely lacks evidence.
+    - DO NOT hide the zero-comparable state with UI copy; the product needs actual compare-safe rows.
+    - DO NOT change result validation semantics to make compare work; add or correct eligibility semantics instead.
+
+  Verification:
+    - Backend eligibility and snapshot tests pass
+      Command: uv run -- python -m pytest tests/unit/core/explorer_pipeline -k 'eligibility or read_model or duckdb or transformer' --tb=short
+      Expected: all targeted tests pass
+    - Snapshot invariants pass against the regenerated DuckDB file
+      Command: uv run -- python _project/scripts/results_explorer_snapshot_invariants.py results-explorer/public/data/results.duckdb
+      Expected: exit 0 with nonzero comparable rows and no contradictory eligibility states
+    - SQL evidence proves comparable rows exist
+      Command: rg -n "compare-eligible rows|TPC-H|SSB|insufficient_query_coverage" _project/verification-logs/results-explorer-comparison-eligibility-contract-repair/w5.log
+      Expected: w5 log includes nonzero compare-eligible row counts and at least two eligible cohorts
+
+  Scope Limit:
+    Only modify:
+      - benchbox/core/explorer_pipeline/models.py
+      - benchbox/core/explorer_pipeline/transformer.py
+      - benchbox/core/explorer_pipeline/duckdb_builder.py
+      - docs/development/browser-duckdb-schema.sql
+      - _project/scripts/results_explorer_snapshot_invariants.py
+      - tests/unit/core/explorer_pipeline/
+      - results-explorer/src/types.ts
+      - results-explorer/src/db.ts
+      - results-explorer/src/lib/duckdbQueries.ts
+      - _project/verification-logs/results-explorer-comparison-eligibility-contract-repair/
+    Do not modify:
+      - results-explorer/src/pages/
+      - results-explorer/src/components/
+      - benchmark_runs/
+
+Metadata:
+----------------------------------------------------------------------------------------------------
+tags: ['results-explorer', 'compare', 'duckdb', 'eligibility', 'read-model']
+estimated_effort: Medium (2-3 days)
+created_date: 2026-05-11
+
+Impact:
+----------------------------------------------------------------------------------------------------
+business_value:
+  Restores the central Results Explorer compare workflow and prevents the
+site from advertising comparison controls that cannot ever complete.
+
+user_impact:
+  Database engineers can select real comparable runs without understanding
+raw URL IDs or internal query-count fields.
+
+technical_debt:
+  Replaces a brittle inferred eligibility rule with an explicit, tested data
+contract.
+
+
+====================================================================================================
+
+
+===== _project/DONE/results-explorer-followup-todo-review/planning/results-explorer-compare-entrypoint-happy-path-gates.yaml =====
+
+====================================================================================================
+Gate every Results Explorer compare entrypoint with browser happy paths
+====================================================================================================
+
+Priority:  Critical
+Status:    Completed
+Worktree:  results-explorer-followup-todo-review
+Category:  Testing and Quality Assurance
+File:      _project/DONE/results-explorer-followup-todo-review/planning/results-explorer-compare-entrypoint-happy-path-gates.yaml
+
+Description:
+----------------------------------------------------------------------------------------------------
+Compare controls now exist across the Results Explorer, but the latest review
+found that none of the visible entrypoints can complete because every row is
+disabled. After eligibility is repaired, each entrypoint needs a real browser
+acceptance path that proves the user can discover, select, and complete a
+comparison without editing the URL.
+
+
+Implementation Guardrails:
+----------------------------------------------------------------------------------------------------
+  Must Preserve:
+    - Compare URLs with explicit IDs remain shareable and reloadable.
+    - Users do not need to edit query parameters manually.
+    - Existing filters and sort controls remain usable while selections are active.
+    - Ineligible rows remain blocked from selection after the eligibility repair.
+
+  Approach:
+    Treat compare as a user journey, not a per-page button check. Build fixtures
+    from the generated snapshot, run each path in a browser, then codify the
+    paths as regression tests.
+
+  Anti-Patterns:
+    - DO NOT mark this complete because unit tests pass; every visible entrypoint needs browser proof.
+    - DO NOT use hard-coded stale result IDs without first deriving them from the current snapshot.
+    - DO NOT skip Query Workbench because it is powered by DuckDB; it is one of the advertised compare entrypoints.
+    - DO NOT rely on URL editing as a fallback path.
+
+  Verification:
+    - Compare entrypoint browser suite passes
+      Command: cd results-explorer && npm run test:e2e:fixtures && npm run build && npm run test:e2e -- --project=chromium --grep "compare entrypoint"
+      Expected: all compare entrypoint tests pass
+    - Frontend unit tests still pass for compare pages
+      Command: cd results-explorer && npm test -- --run src/pages/__tests__/BenchmarkIndex.test.tsx src/pages/__tests__/PlatformIndex.test.tsx src/pages/__tests__/Query.test.tsx src/pages/__tests__/ResultDetail.test.tsx src/pages/__tests__/Compare.test.tsx
+      Expected: all targeted tests pass
+    - Manual evidence log exists for the checked SHA
+      Command: rg -n "benchmark detail|platform detail|Query Workbench|Compare this result|empty Compare builder|PASS|FAIL" _project/verification-logs/results-explorer-compare-entrypoint-happy-path-gates/
+      Expected: logs include pass/fail evidence for all five entrypoints
+
+  Scope Limit:
+    Only modify:
+      - results-explorer/src/pages/BenchmarkIndex.tsx
+      - results-explorer/src/pages/PlatformIndex.tsx
+      - results-explorer/src/pages/Query.tsx
+      - results-explorer/src/pages/ResultDetail.tsx
+      - results-explorer/src/pages/Compare.tsx
+      - results-explorer/src/lib/duckdbQueries.ts
+      - results-explorer/e2e/
+      - results-explorer/src/pages/__tests__/
+      - _project/verification-logs/results-explorer-compare-entrypoint-happy-path-gates/
+    Do not modify:
+      - benchbox/core/explorer_pipeline/
+      - docs/development/browser-duckdb-schema.sql
+
+Metadata:
+----------------------------------------------------------------------------------------------------
+tags: ['results-explorer', 'compare', 'browser-test', 'release-gate']
+estimated_effort: Medium (2-3 days)
+created_date: 2026-05-11
+
+Impact:
+----------------------------------------------------------------------------------------------------
+business_value:
+  Converts the compare feature from exposed controls into a tested,
+end-to-end user workflow.
+
+user_impact:
+  Analysts can start comparison from wherever they discover a relevant run.
+
+technical_debt:
+  Adds route-level regression coverage for a workflow that previously broke
+through several independent pages.
+
+
+====================================================================================================
+
+
+===== _project/DONE/results-explorer-followup-todo-review/planning/results-explorer-compare-disabled-recovery-states.yaml =====
+
+====================================================================================================
+Make disabled compare rows and zero-selection states explainable and recoverable
+====================================================================================================
+
+Priority:  High
+Status:    Completed
+Worktree:  results-explorer-followup-todo-review
+Category:  User Experience
+File:      _project/DONE/results-explorer-followup-todo-review/planning/results-explorer-compare-disabled-recovery-states.yaml
+
+Description:
+----------------------------------------------------------------------------------------------------
+The compare builder and source pages currently expose disabled row checkboxes
+with the reason hidden in `title` text or not visible at all. When no rows are
+selectable, the user sees controls but no recovery path. This TODO adds
+visible, keyboard-accessible reason and recovery states for every page that
+contains compare selection.
+
+
+Implementation Guardrails:
+----------------------------------------------------------------------------------------------------
+  Must Preserve:
+    - Ineligible rows remain unselectable.
+    - Reason text must be visible without mouse hover and available to screen readers.
+    - Reason formatting must use stable reason codes, not ad hoc string matching.
+    - Recovery actions must not silently broaden filters without user action.
+
+  Approach:
+    Centralize reason copy first, then add compact row-level display and
+    page-level zero-state recovery on each compare surface.
+
+  Anti-Patterns:
+    - DO NOT use only the checkbox `title` attribute for important reasons.
+    - DO NOT make disabled controls visually indistinguishable from enabled controls.
+    - DO NOT show generic `not comparable` copy when the row has a specific machine-readable reason.
+    - DO NOT provide a recovery action that changes selected rows without making the change visible.
+
+  Verification:
+    - Disabled compare reason tests pass
+      Command: cd results-explorer && npm test -- --run src/pages/__tests__/Compare.test.tsx src/pages/__tests__/BenchmarkIndex.test.tsx src/pages/__tests__/PlatformIndex.test.tsx src/pages/__tests__/Query.test.tsx
+      Expected: all targeted tests pass
+    - Accessibility checks cover visible reasons
+      Command: cd results-explorer && npm test -- --run src/pages/__tests__/Compare.a11y.test.tsx src/pages/__tests__/BenchmarkIndex.a11y.test.tsx src/pages/__tests__/PlatformIndex.a11y.test.tsx src/pages/__tests__/Query.a11y.test.tsx
+      Expected: focused accessibility tests for visible disabled reasons pass
+    - Browser recovery evidence exists
+      Command: rg -n "zero-selectable|disabled reason|clear filters|PASS|FAIL" _project/verification-logs/results-explorer-compare-disabled-recovery-states/
+      Expected: logs include browser evidence for zero-selection recovery
+
+  Scope Limit:
+    Only modify:
+      - results-explorer/src/lib/displayEligibility.ts
+      - results-explorer/src/lib/compareExclusionReasons.ts
+      - results-explorer/src/pages/Compare.tsx
+      - results-explorer/src/pages/BenchmarkIndex.tsx
+      - results-explorer/src/pages/PlatformIndex.tsx
+      - results-explorer/src/pages/Query.tsx
+      - results-explorer/src/pages/__tests__/
+      - results-explorer/src/components/__tests__/
+      - _project/verification-logs/results-explorer-compare-disabled-recovery-states/
+    Do not modify:
+      - benchbox/core/explorer_pipeline/
+      - results-explorer/public/data/
+
+Metadata:
+----------------------------------------------------------------------------------------------------
+tags: ['results-explorer', 'compare', 'accessibility', 'recovery-state']
+estimated_effort: Medium (1-2 days)
+created_date: 2026-05-11
+
+Impact:
+----------------------------------------------------------------------------------------------------
+business_value:
+  Reduces support and trust issues when real data is excluded from comparison.
+
+user_impact:
+  Users understand why a run cannot be compared and what to do next.
+
+technical_debt:
+  Removes duplicated, inconsistent exclusion copy from individual pages.
+
+
+====================================================================================================
+
+
+===== _project/DONE/results-explorer-followup-todo-review/planning/results-explorer-leaderboard-rank-evidence-semantics.yaml =====
+
+====================================================================================================
+Separate missing, unranked, and ranked evidence in leaderboards and rank charts
+====================================================================================================
+
+Priority:  High
+Status:    Completed
+Worktree:  results-explorer-followup-todo-review
+Category:  Core Functionality
+File:      _project/DONE/results-explorer-followup-todo-review/planning/results-explorer-leaderboard-rank-evidence-semantics.yaml
+
+Description:
+----------------------------------------------------------------------------------------------------
+The latest review found that leaderboard cells can say `No run` while still
+rendering trust/validation badges, and rank charts can show large all-dash
+matrices for cohorts where rows are present but not rankable. This exposes a
+deeper semantic bug: the UI conflates missing evidence, published-but-
+unranked evidence, and ranked evidence.
+
+
+Implementation Guardrails:
+----------------------------------------------------------------------------------------------------
+  Must Preserve:
+    - True missing runs stay visually lightweight and do not imply submission evidence.
+    - Published but unranked runs remain discoverable for provenance.
+    - Ranked cohorts keep existing rank ordering and metric display.
+    - The same result/cohort state renders consistently across leaderboard, rank chart, and detail pages.
+
+  Approach:
+    Treat missing/unranked/ranked as first-class display states. Add data
+    invariants, then update components and charts to consume the explicit state.
+
+  Anti-Patterns:
+    - DO NOT show trust or validation badges inside a `No run` cell.
+    - DO NOT hide unranked submitted evidence entirely; users need to audit why it was excluded.
+    - DO NOT render a rank chart when no row has a rankable value.
+    - DO NOT infer missing state from `rank == null` alone.
+
+  Verification:
+    - Leaderboard and rank component tests pass
+      Command: cd results-explorer && npm test -- --run src/components/__tests__/MetaLeaderboard.test.tsx src/components/__tests__/ChartPanel.test.tsx src/components/__tests__/charts.smoke.test.tsx
+      Expected: all targeted tests pass
+    - Snapshot cell-state invariants pass
+      Command: uv run -- python _project/scripts/results_explorer_snapshot_invariants.py results-explorer/public/data/results.duckdb
+      Expected: exit 0 and no `No run` cells have badge/link metadata
+    - Browser evidence covers both missing and unranked states
+      Command: rg -n "No run|Unranked|Excluded|rank chart|PASS|FAIL" _project/verification-logs/results-explorer-leaderboard-rank-evidence-semantics/
+      Expected: logs include pass/fail evidence for leaderboard and rank chart states
+
+  Scope Limit:
+    Only modify:
+      - results-explorer/src/components/MetaLeaderboard.tsx
+      - results-explorer/src/components/RankTable.tsx
+      - results-explorer/src/components/ChartPanel.tsx
+      - results-explorer/src/lib/duckdbQueries.ts
+      - results-explorer/src/lib/displayEligibility.ts
+      - results-explorer/src/components/__tests__/
+      - _project/scripts/results_explorer_snapshot_invariants.py
+      - _project/verification-logs/results-explorer-leaderboard-rank-evidence-semantics/
+    Do not modify:
+      - benchbox/core/results/
+      - benchmark_runs/
+
+Metadata:
+----------------------------------------------------------------------------------------------------
+tags: ['results-explorer', 'leaderboard', 'rank', 'evidence']
+estimated_effort: Medium (1-2 days)
+created_date: 2026-05-11
+
+Impact:
+----------------------------------------------------------------------------------------------------
+business_value:
+  Prevents public rankings from implying that missing, excluded, and valid
+evidence are interchangeable.
+
+user_impact:
+  Analysts can distinguish absent coverage from submitted-but-unranked
+results.
+
+technical_debt:
+  Establishes a shared cell-state contract instead of scattered rank-null
+checks.
+
+
+====================================================================================================
+
+
+===== _project/DONE/results-explorer-followup-todo-review/planning/results-explorer-leaderboard-scope-filter-contract.yaml =====
+
+====================================================================================================
+Make Results Explorer leaderboard scope, filter availability, and tuning labels explicit
+====================================================================================================
+
+Priority:  High
+Status:    Completed
+Worktree:  results-explorer-followup-todo-review
+Category:  User Experience
+File:      _project/DONE/results-explorer-followup-todo-review/planning/results-explorer-leaderboard-scope-filter-contract.yaml
+
+Description:
+----------------------------------------------------------------------------------------------------
+The latest review raised unresolved UI questions on the Leaderboards page:
+only SSB and TPC-H appear in the benchmark filter, only four platforms render
+in the cross-benchmark table, and the tuning filter shows `All tuning`
+without explaining whether tuning labels are absent, hidden, or collapsed.
+These are not just copy issues. They reveal a scope contract gap between the
+corpus, the rankable leaderboard subset, the public-coverage subset, and the
+filter controls.
+
+This TODO makes the homepage leaderboard scope auditable and explicit. Users
+should understand why an option is present, absent, disabled, or counted, and
+the UI should not silently imply that the whole corpus is represented when it
+is only showing rankable/public-coverage cohorts.
+
+
+Implementation Guardrails:
+----------------------------------------------------------------------------------------------------
+  Must Preserve:
+    - Do not broaden the leaderboard to unrankable or non-public cohorts just to make filters look complete.
+    - Do not hide the distinction between full corpus, public result corpus, and leaderboard-eligible subset.
+    - Do not remove existing benchmark, scale, phase, trust, tuning, date, or deployment filters.
+    - Counts shown in the UI must be derivable from the current snapshot.
+
+  Approach:
+    Treat filter options as evidence states, not static lists. First identify the
+    denominator and inclusion rule from the snapshot, then update filter copy and
+    option states so the visible UI can explain its scope.
+
+  Anti-Patterns:
+    - DO NOT add a generic `limited data` note without naming which denominator is limited.
+    - DO NOT silently omit unavailable benchmarks or platforms when the UI claims `All benchmarks` or `All public coverage`.
+    - DO NOT use tuning labels as free-form display strings without normalizing empty and unknown values.
+    - DO NOT make disabled options look selectable.
+
+  Verification:
+    - Leaderboard scope and filter tests pass
+      Command: cd results-explorer && npm test -- --run src/components/__tests__/MetaLeaderboard.test.tsx src/pages/__tests__/Home.test.tsx
+      Expected: all targeted tests pass
+    - Snapshot scope/count invariants pass
+      Command: uv run -- python _project/scripts/results_explorer_snapshot_invariants.py results-explorer/public/data/results.duckdb
+      Expected: exit 0 with consistent leaderboard scope, platform, benchmark, and tuning counts
+    - Browser evidence confirms scope questions are answered
+      Command: rg -n "benchmark options|platform scope|public coverage|tuning|PASS|FAIL" _project/verification-logs/results-explorer-leaderboard-scope-filter-contract/
+      Expected: logs include pass/fail evidence for benchmark, platform, public-coverage, and tuning explanations
+
+  Scope Limit:
+    Only modify:
+      - results-explorer/src/components/MetaLeaderboard.tsx
+      - results-explorer/src/pages/Home.tsx
+      - results-explorer/src/lib/duckdbQueries.ts
+      - results-explorer/src/lib/copyFormatters.ts
+      - results-explorer/src/lib/facetDisplay.ts
+      - results-explorer/src/lib/displayLabels.ts
+      - results-explorer/src/components/__tests__/MetaLeaderboard.test.tsx
+      - results-explorer/src/components/__tests__/MetaLeaderboard.a11y.test.tsx
+      - results-explorer/src/pages/__tests__/Home.test.tsx
+      - results-explorer/src/lib/__tests__/duckdbQueries.test.ts
+      - results-explorer/src/lib/__tests__/facetDisplay.test.ts
+      - _project/scripts/results_explorer_snapshot_invariants.py
+      - _project/verification-logs/results-explorer-leaderboard-scope-filter-contract/
+    Do not modify:
+      - benchbox/core/results/
+      - benchmark_runs/
+
+Metadata:
+----------------------------------------------------------------------------------------------------
+tags: ['results-explorer', 'leaderboard', 'filters', 'scope', 'tuning']
+estimated_effort: Medium (1-2 days)
+created_date: 2026-05-11
+
+Impact:
+----------------------------------------------------------------------------------------------------
+business_value:
+  Prevents users from mistaking a scoped leaderboard subset for complete
+corpus coverage.
+
+user_impact:
+  Analysts can tell whether missing benchmarks or platforms are unavailable,
+filtered out, unrankable, or outside the current public-coverage view.
+
+technical_debt:
+  Turns homepage filter availability into a tested data contract instead of
+hard-coded option behavior.
+
+
+====================================================================================================
+
+
+===== _project/DONE/results-explorer-followup-todo-review/planning/results-explorer-chart-run-identity-label-contract.yaml =====
+
+====================================================================================================
+Normalize chart run identity labels without duplicate or unreadable names
+====================================================================================================
+
+Priority:  High
+Status:    Completed
+Worktree:  results-explorer-followup-todo-review
+Category:  User Experience
+File:      _project/DONE/results-explorer-followup-todo-review/planning/results-explorer-chart-run-identity-label-contract.yaml
+
+Description:
+----------------------------------------------------------------------------------------------------
+Run identity disambiguation improved, but chart labels still duplicate or
+become unreadably long. Per-query legends can repeat platform names, and box
+plot/rank labels can truncate different runs to indistinguishable prefixes.
+This TODO introduces one label contract for charts: labels are compact when
+unique, disambiguated when needed, and never collapse two result IDs into the
+same visible label.
+
+
+Implementation Guardrails:
+----------------------------------------------------------------------------------------------------
+  Must Preserve:
+    - Labels stay compact when there is only one run per platform.
+    - Full identity remains available without making every row or legend overly long.
+    - Chart dimensions do not expand unpredictably because of long labels.
+    - Existing color assignments remain stable after label changes.
+
+  Approach:
+    Start with a formatter and tests, then replace component-level ad hoc label
+    assembly. Use cohort context to decide when a platform name is sufficient.
+
+  Anti-Patterns:
+    - DO NOT truncate from the end when the short ID or date is the only distinguishing token.
+    - DO NOT hard-code special handling for DataFusion or Polars; duplicates can happen for any platform.
+    - DO NOT make each chart invent a different label format.
+    - DO NOT solve duplicate labels by showing every metadata field all the time.
+
+  Verification:
+    - Run identity formatter and chart tests pass
+      Command: cd results-explorer && npm test -- --run src/lib/__tests__/runIdentity.test.ts src/components/__tests__/ChartPanel.test.tsx src/components/__tests__/charts.smoke.test.tsx
+      Expected: all targeted tests pass
+    - Frontend typecheck passes
+      Command: cd results-explorer && npm run typecheck
+      Expected: exit 0
+    - Browser evidence confirms no duplicate chart labels
+      Command: rg -n "Per-query|Box Plot|Rank|Sparklines|duplicate label|PASS|FAIL" _project/verification-logs/results-explorer-chart-run-identity-label-contract/
+      Expected: logs include pass/fail evidence for chart label uniqueness
+
+  Scope Limit:
+    Only modify:
+      - results-explorer/src/lib/runIdentity.ts
+      - results-explorer/src/lib/__tests__/runIdentity.test.ts
+      - results-explorer/src/components/RunIdentity.tsx
+      - results-explorer/src/components/ChartPanel.tsx
+      - results-explorer/src/components/RankTable.tsx
+      - results-explorer/src/components/DistributionBox.tsx
+      - results-explorer/src/components/CDFChart.tsx
+      - results-explorer/src/components/PercentileLadder.tsx
+      - results-explorer/src/components/PowerBar.tsx
+      - results-explorer/src/components/StackedPhase.tsx
+      - results-explorer/src/components/SparklineTable.tsx
+      - results-explorer/src/components/TimeSeries.tsx
+      - results-explorer/src/components/NormalizedSpeedupChart.tsx
+      - results-explorer/src/components/QueryDiffTable.tsx
+      - results-explorer/src/components/__tests__/
+      - results-explorer/src/pages/BenchmarkIndex.tsx
+      - results-explorer/src/pages/Compare.tsx
+      - _project/verification-logs/results-explorer-chart-run-identity-label-contract/
+    Do not modify:
+      - benchbox/core/explorer_pipeline/
+      - results-explorer/public/data/
+
+Metadata:
+----------------------------------------------------------------------------------------------------
+tags: ['results-explorer', 'charts', 'run-identity', 'labels']
+estimated_effort: Medium (1-2 days)
+created_date: 2026-05-11
+
+Impact:
+----------------------------------------------------------------------------------------------------
+business_value:
+  Makes charts trustworthy when multiple submissions exist for the same
+platform.
+
+user_impact:
+  Users can tell which run won, lost, or was excluded without guessing from
+color or row position.
+
+technical_debt:
+  Consolidates run-label logic behind one tested formatter.
+
+
+====================================================================================================
+
+
+===== _project/DONE/results-explorer-followup-todo-review/planning/results-explorer-chart-dataset-eligibility-contract.yaml =====
+
+====================================================================================================
+Apply eligibility and evidence contracts to every Results Explorer chart dataset
+====================================================================================================
+
+Priority:  High
+Status:    Completed
+Worktree:  results-explorer-followup-todo-review
+Category:  Core Functionality
+File:      _project/DONE/results-explorer-followup-todo-review/planning/results-explorer-chart-dataset-eligibility-contract.yaml
+
+Description:
+----------------------------------------------------------------------------------------------------
+Earlier TODOs cover comparison eligibility and rank-chart empty states, but
+the UI review also found obviously broken AMPLab results included in
+distribution and chart views. That needs a chart-wide dataset contract, not a
+rank-only fix. Every chart should declare whether it consumes display-safe,
+rank-safe, compare-safe, or provenance-only rows, and it should show an empty
+or excluded-data state when the required evidence is absent.
+
+
+Implementation Guardrails:
+----------------------------------------------------------------------------------------------------
+  Must Preserve:
+    - Excluded submitted rows remain auditable through receipt/provenance paths.
+    - Charts must not contradict table row eligibility for the same cohort.
+    - Chart filtering must use read-model eligibility fields, not inferred display strings.
+    - Normal high-evidence cohorts should keep existing chart functionality and interactivity.
+
+  Approach:
+    Build a chart-to-eligibility matrix, then route all chart datasets through the
+    matrix. The goal is not to hide bad data; it is to keep invalid evidence out
+    of analytical charts while giving users a visible explanation of what was
+    excluded.
+
+  Anti-Patterns:
+    - DO NOT fix only the AMPLab screenshot path; all chart families need an eligibility class.
+    - DO NOT render a one-pixel or all-dash chart as an empty state.
+    - DO NOT filter invalid rows silently without exposing exclusion counts.
+    - DO NOT duplicate eligibility predicates inside chart components.
+
+  Verification:
+    - Chart eligibility tests pass
+      Command: cd results-explorer && npm test -- --run src/__tests__/chartRegistry.meta.test.ts src/__tests__/chartRegistry.parity.test.ts src/components/__tests__/ChartPanel.test.tsx src/components/__tests__/charts.smoke.test.tsx
+      Expected: all targeted tests pass
+    - Frontend typecheck and build pass
+      Command: cd results-explorer && npm run typecheck && npm run build
+      Expected: both commands exit 0
+    - Browser evidence covers every chart tab and subtab
+      Command: rg -n "Overview|Per-query|Distribution|Cost|Trend|Rank|excluded|empty state|PASS|FAIL" _project/verification-logs/results-explorer-chart-dataset-eligibility-contract/
+      Expected: logs include chart-tab evidence for normal and low-evidence cohorts
+
+  Scope Limit:
+    Only modify:
+      - results-explorer/src/lib/chartRegistry.ts
+      - results-explorer/src/lib/displayEligibility.ts
+      - results-explorer/src/lib/duckdbQueries.ts
+      - results-explorer/src/components/ChartPanel.tsx
+      - results-explorer/src/components/CDFChart.tsx
+      - results-explorer/src/components/CostScatter.tsx
+      - results-explorer/src/components/DistributionBox.tsx
+      - results-explorer/src/components/NormalizedSpeedupChart.tsx
+      - results-explorer/src/components/PercentileLadder.tsx
+      - results-explorer/src/components/PowerBar.tsx
+      - results-explorer/src/components/QueryDiffTable.tsx
+      - results-explorer/src/components/QueryHeatmap.tsx
+      - results-explorer/src/components/QueryHistogram.tsx
+      - results-explorer/src/components/QueryTimingChart.tsx
+      - results-explorer/src/components/RankTable.tsx
+      - results-explorer/src/components/SparklineTable.tsx
+      - results-explorer/src/components/StackedPhase.tsx
+      - results-explorer/src/components/TimeSeries.tsx
+      - results-explorer/src/components/__tests__/ChartPanel.test.tsx
+      - results-explorer/src/components/__tests__/DistributionBox.test.tsx
+      - results-explorer/src/components/__tests__/NormalizedSpeedupChart.test.tsx
+      - results-explorer/src/components/__tests__/QueryDiffTable.test.tsx
+      - results-explorer/src/components/__tests__/QueryHeatmap.test.tsx
+      - results-explorer/src/components/__tests__/RankTable.test.tsx
+      - results-explorer/src/components/__tests__/charts.smoke.test.tsx
+      - results-explorer/src/__tests__/chartRegistry.meta.test.ts
+      - results-explorer/src/__tests__/chartRegistry.parity.test.ts
+      - _project/verification-logs/results-explorer-chart-dataset-eligibility-contract/
+    Do not modify:
+      - benchbox/core/results/
+      - benchmark_runs/
+
+Metadata:
+----------------------------------------------------------------------------------------------------
+tags: ['results-explorer', 'charts', 'eligibility', 'evidence']
+estimated_effort: Medium-Large (2-3 days)
+created_date: 2026-05-11
+
+Impact:
+----------------------------------------------------------------------------------------------------
+business_value:
+  Prevents analytical charts from making claims from invalid or insufficient
+evidence.
+
+user_impact:
+  Users see clear empty/excluded states instead of misleading chart artifacts.
+
+technical_debt:
+  Centralizes chart dataset eligibility and removes per-chart implicit
+filtering rules.
+
+
+====================================================================================================
+
+
+===== _project/DONE/results-explorer-followup-todo-review/planning/results-explorer-metric-formatting-contract.yaml =====
+
+====================================================================================================
+Centralize Results Explorer metric formatting for precision, units, and mode-specific labels
+====================================================================================================
+
+Priority:  High
+Status:    Completed
+Worktree:  results-explorer-followup-todo-review
+Category:  User Experience
+File:      _project/DONE/results-explorer-followup-todo-review/planning/results-explorer-metric-formatting-contract.yaml
+
+Description:
+----------------------------------------------------------------------------------------------------
+The latest review found large power scores rendered with noisy decimals and
+several places where unit/mode copy can become misleading. This is a broader
+formatting contract gap: latency, power score, rank, speedup, cost, coverage,
+and tail metrics are formatted independently across tables, charts, compare
+summaries, and receipts.
+
+This TODO creates one metric-formatting contract so values are precise enough
+to compare, compact enough to scan, and labelled consistently with the active
+mode.
+
+
+Implementation Guardrails:
+----------------------------------------------------------------------------------------------------
+  Must Preserve:
+    - Formatting changes must not alter raw values stored in DuckDB.
+    - Numeric sort and comparison logic must use raw numbers, not formatted strings.
+    - Exports must remain explicit about whether they use raw values or visible columns.
+    - Metric direction labels must match the values currently rendered.
+
+  Approach:
+    Build a metric-type formatter contract first, then replace ad hoc component
+    formatting. Keep raw values separate from display strings so precision
+    cleanup cannot corrupt sorting, ranking, or compare math.
+
+  Anti-Patterns:
+    - DO NOT fix a single large-number example with a one-off `.toFixed(0)`.
+    - DO NOT infer units from column labels when the read model already carries metric metadata.
+    - DO NOT round values before ranking or comparison.
+    - DO NOT use an em dash for every non-value state when `No run`, `Unranked`, or `Unavailable` carry different meanings.
+
+  Verification:
+    - Metric formatter tests pass
+      Command: cd results-explorer && npm test -- --run src/__tests__/utils.test.ts src/lib/__tests__/metricFormatters.test.ts src/lib/__tests__/queryLabels.test.ts src/lib/__tests__/costDisplay.test.ts
+      Expected: all metric formatter tests pass
+    - Route/component tests covering formatted values pass
+      Command: cd results-explorer && npm test -- --run src/components/__tests__/MetaLeaderboard.test.tsx src/pages/__tests__/BenchmarkIndex.test.tsx src/pages/__tests__/PlatformIndex.test.tsx src/pages/__tests__/Query.test.tsx src/pages/__tests__/Compare.test.tsx
+      Expected: all targeted tests pass
+    - Browser evidence confirms metric formatting
+      Command: rg -n "power score|latency|speedup|coverage|gratuitous decimals|PASS|FAIL" _project/verification-logs/results-explorer-metric-formatting-contract/
+      Expected: logs include pass/fail evidence for metric formatting on high-risk routes
+
+  Scope Limit:
+    Only modify:
+      - results-explorer/src/utils.ts
+      - results-explorer/src/__tests__/utils.test.ts
+      - results-explorer/src/lib/metricFormatters.ts
+      - results-explorer/src/lib/__tests__/metricFormatters.test.ts
+      - results-explorer/src/lib/queryLabels.ts
+      - results-explorer/src/lib/__tests__/queryLabels.test.ts
+      - results-explorer/src/lib/costDisplay.ts
+      - results-explorer/src/lib/__tests__/costDisplay.test.ts
+      - results-explorer/src/lib/compareSummary.ts
+      - results-explorer/src/lib/__tests__/compareSummary.test.ts
+      - results-explorer/src/components/MetaLeaderboard.tsx
+      - results-explorer/src/components/ChartPanel.tsx
+      - results-explorer/src/components/CompareSummary.tsx
+      - results-explorer/src/components/CostScatter.tsx
+      - results-explorer/src/components/CDFChart.tsx
+      - results-explorer/src/components/DistributionBox.tsx
+      - results-explorer/src/components/NormalizedSpeedupChart.tsx
+      - results-explorer/src/components/PercentileLadder.tsx
+      - results-explorer/src/components/PowerBar.tsx
+      - results-explorer/src/components/QueryDiffTable.tsx
+      - results-explorer/src/components/QueryHeatmap.tsx
+      - results-explorer/src/components/QueryHistogram.tsx
+      - results-explorer/src/components/QueryTimingChart.tsx
+      - results-explorer/src/components/RankTable.tsx
+      - results-explorer/src/components/SparklineTable.tsx
+      - results-explorer/src/components/StackedPhase.tsx
+      - results-explorer/src/components/TimeSeries.tsx
+      - results-explorer/src/pages/Home.tsx
+      - results-explorer/src/pages/BenchmarkIndex.tsx
+      - results-explorer/src/pages/PlatformIndex.tsx
+      - results-explorer/src/pages/Query.tsx
+      - results-explorer/src/pages/Compare.tsx
+      - results-explorer/src/pages/ResultDetail.tsx
+      - results-explorer/src/pages/__tests__/
+      - results-explorer/src/components/__tests__/
+      - _project/verification-logs/results-explorer-metric-formatting-contract/
+    Do not modify:
+      - benchbox/core/explorer_pipeline/
+      - results-explorer/public/data/
+
+Metadata:
+----------------------------------------------------------------------------------------------------
+tags: ['results-explorer', 'metrics', 'formatting', 'units']
+estimated_effort: Medium (1-2 days)
+created_date: 2026-05-11
+
+Impact:
+----------------------------------------------------------------------------------------------------
+business_value:
+  Improves trust in benchmark claims by making values readable and labelled
+correctly.
+
+user_impact:
+  Users can compare metrics quickly without questioning whether a value is a
+latency, power score, rank, speedup, or missing state.
+
+technical_debt:
+  Removes scattered number formatting from Results Explorer components.
+
+
+====================================================================================================
+
+
+===== _project/DONE/results-explorer-followup-todo-review/planning/results-explorer-compare-warning-affordance-contract.yaml =====
+
+====================================================================================================
+Make Compare warning counts actionable, localized, and consistent
+====================================================================================================
+
+Priority:  High
+Status:    Completed
+Worktree:  results-explorer-followup-todo-review
+Category:  User Experience
+File:      _project/DONE/results-explorer-followup-todo-review/planning/results-explorer-compare-warning-affordance-contract.yaml
+
+Description:
+----------------------------------------------------------------------------------------------------
+Compare guardrail badges can look like buttons without being clickable, and
+warning counts do not reliably show users where the actual warnings live.
+Copy issues such as `1 warnings` and duplicated punctuation point to the same
+deeper issue: warning state is not represented as a structured UI contract.
+
+This TODO makes warning counts actionable when they imply action, passive
+when they are only labels, and consistent across guardrails, decision
+summaries, receipts, shareable URLs, and browser reloads.
+
+
+Implementation Guardrails:
+----------------------------------------------------------------------------------------------------
+  Must Preserve:
+    - Shareable Compare URLs continue to reload selected IDs and warning state.
+    - Warning links must not change selected runs or baseline state.
+    - Blocking incompatibilities remain visually distinct from non-blocking warnings.
+    - Keyboard and screen-reader users can reach the warning details.
+
+  Approach:
+    Treat warnings as structured state with reason codes, counts, severity, and
+    target anchors. Then render interactive controls only when they actually move
+    the user to the warning evidence.
+
+  Anti-Patterns:
+    - DO NOT style passive status pills like buttons.
+    - DO NOT show a warning count without a way to inspect the warnings.
+    - DO NOT duplicate pluralization and punctuation in separate components.
+    - DO NOT make warning links depend on transient scroll position or unmounted receipt content.
+
+  Verification:
+    - Compare warning tests pass
+      Command: cd results-explorer && npm test -- --run src/pages/__tests__/Compare.test.tsx src/components/__tests__/ComparabilityReceipt.test.tsx src/lib/__tests__/compareSummary.test.ts
+      Expected: all targeted tests pass
+    - Accessibility tests cover warning affordances
+      Command: cd results-explorer && npm test -- --run src/pages/__tests__/Compare.a11y.test.tsx src/components/__tests__/ComparabilityReceipt.a11y.test.tsx
+      Expected: Compare-specific accessibility tests pass
+    - Browser evidence confirms warning counts are actionable
+      Command: rg -n "0 warnings|1 warning|warnings|receipt|focus|passive label|PASS|FAIL" _project/verification-logs/results-explorer-compare-warning-affordance-contract/
+      Expected: logs include pass/fail evidence for zero, one, and multiple warning states
+
+  Scope Limit:
+    Only modify:
+      - results-explorer/src/pages/Compare.tsx
+      - results-explorer/src/components/ComparabilityReceipt.tsx
+      - results-explorer/src/lib/compareSummary.ts
+      - results-explorer/src/lib/copyFormatters.ts
+      - results-explorer/src/pages/__tests__/Compare.test.tsx
+      - results-explorer/src/pages/__tests__/Compare.a11y.test.tsx
+      - results-explorer/src/components/__tests__/ComparabilityReceipt.test.tsx
+      - results-explorer/src/components/__tests__/ComparabilityReceipt.a11y.test.tsx
+      - results-explorer/src/lib/__tests__/compareSummary.test.ts
+      - _project/verification-logs/results-explorer-compare-warning-affordance-contract/
+    Do not modify:
+      - benchbox/core/explorer_pipeline/
+      - results-explorer/public/data/
+
+Metadata:
+----------------------------------------------------------------------------------------------------
+tags: ['results-explorer', 'compare', 'warnings', 'accessibility']
+estimated_effort: Medium (1-2 days)
+created_date: 2026-05-11
+
+Impact:
+----------------------------------------------------------------------------------------------------
+business_value:
+  Makes compare guardrails auditable instead of decorative.
+
+user_impact:
+  Users can understand and inspect warnings before trusting comparison
+claims.
+
+technical_debt:
+  Replaces scattered warning-count copy with a structured warning UI
+contract.
+
+
+====================================================================================================
+
+
+===== _project/DONE/results-explorer-followup-todo-review/planning/results-explorer-surface-theme-and-density-contract.yaml =====
+
+====================================================================================================
+Define and enforce Results Explorer theme and dense-table surface contracts
+====================================================================================================
+
+Priority:  Medium
+Status:    Completed
+Worktree:  results-explorer-followup-todo-review
+Category:  User Experience
+File:      _project/DONE/results-explorer-followup-todo-review/planning/results-explorer-surface-theme-and-density-contract.yaml
+
+Description:
+----------------------------------------------------------------------------------------------------
+The latest review still found mixed theme surfaces and density traps: dark
+chrome over light analytical bodies without an explicit design contract, and
+benchmark matrices whose frozen region remains tall because platform,
+version, trust, validation, and receipt details compete for primary row
+space. This TODO sets small, enforceable UI contracts rather than one-off CSS
+fixes.
+
+
+Implementation Guardrails:
+----------------------------------------------------------------------------------------------------
+  Must Preserve:
+    - Receipt and provenance access remain available from matrix rows.
+    - Theme changes do not reduce contrast below WCAG AA for table text and controls.
+    - Dense rows remain readable and keyboard navigable.
+    - Sticky headers and frozen columns remain aligned during horizontal scroll.
+
+  Approach:
+    Make the contract explicit first, then enforce it route by route. Treat row
+    density as information architecture: primary cells stay primary, secondary
+    provenance moves into a compact affordance.
+
+  Anti-Patterns:
+    - DO NOT chase isolated colors without deciding the overall surface contract.
+    - DO NOT remove trust or receipt data to gain density; move it to a lower-priority affordance.
+    - DO NOT fix row height by shrinking text below usable size.
+    - DO NOT accept screenshots only at one scroll position; sticky alignment must be checked after horizontal scroll.
+
+  Verification:
+    - Frontend tests covering benchmark matrix and route layout pass
+      Command: cd results-explorer && npm test -- --run src/pages/__tests__/BenchmarkIndex.test.tsx src/components/__tests__/QueryHeatmap.test.tsx
+      Expected: all targeted tests pass
+    - Frontend build and typecheck pass
+      Command: cd results-explorer && npm run typecheck && npm run build
+      Expected: both commands exit 0
+    - Browser evidence confirms theme and density contracts
+      Command: rg -n "theme contract|row height|sticky alignment|receipt|PASS|FAIL" _project/verification-logs/results-explorer-surface-theme-and-density-contract/
+      Expected: logs include route and benchmark matrix evidence
+
+  Scope Limit:
+    Only modify:
+      - results-explorer/src/index.css
+      - results-explorer/src/App.tsx
+      - results-explorer/src/pages/
+      - results-explorer/src/components/QueryHeatmap.tsx
+      - results-explorer/src/components/RunIdentity.tsx
+      - results-explorer/src/components/RunReceipt.tsx
+      - results-explorer/src/components/__tests__/
+      - results-explorer/src/pages/__tests__/
+      - _project/verification-logs/results-explorer-surface-theme-and-density-contract/
+    Do not modify:
+      - benchbox/core/explorer_pipeline/
+      - results-explorer/public/data/
+
+Metadata:
+----------------------------------------------------------------------------------------------------
+tags: ['results-explorer', 'theme', 'density', 'benchmark-matrix']
+estimated_effort: Medium (2 days)
+created_date: 2026-05-11
+
+Impact:
+----------------------------------------------------------------------------------------------------
+business_value:
+  Improves perceived polish and information throughput without changing the
+site architecture.
+
+user_impact:
+  Analysts can scan benchmark matrices faster and avoid context-switching
+caused by inconsistent visual surfaces.
+
+technical_debt:
+  Turns theme and density preferences into testable contracts instead of
+screenshot-specific fixes.
+
+
+====================================================================================================
+
+
+===== _project/DONE/results-explorer-followup-todo-review/planning/results-explorer-direct-route-and-copy-hardening.yaml =====
+
+====================================================================================================
+Harden direct route loading and shared Results Explorer microcopy
+====================================================================================================
+
+Priority:  Medium
+Status:    Completed
+Worktree:  results-explorer-followup-todo-review
+Category:  Reliability
+File:      _project/DONE/results-explorer-followup-todo-review/planning/results-explorer-direct-route-and-copy-hardening.yaml
+
+Description:
+----------------------------------------------------------------------------------------------------
+The review found an intermittent direct-route failure on `/results/p/polars/`
+where the page briefly rendered as `polars Results` with `No results found`,
+plus several copy defects such as `1 warnings` pluralization and duplicated
+punctuation in guardrail text. This TODO adds direct-route regression tests
+and centralizes small but trust-eroding microcopy states.
+
+
+Implementation Guardrails:
+----------------------------------------------------------------------------------------------------
+  Must Preserve:
+    - Legitimate empty filtered states still render as empty states with reset actions.
+    - Direct URLs remain static-export friendly and do not require server-side routing.
+    - Microcopy changes do not alter eligibility or ranking semantics.
+    - Passive badges are visually distinct from buttons unless they are interactive.
+
+  Approach:
+    First prove whether the route failure is reproducible, then add route-state
+    tests that cover both hard reload and in-app navigation. In parallel,
+    centralize the small copy rules that repeatedly surface in compare UI.
+
+  Anti-Patterns:
+    - DO NOT fix direct route failures by adding arbitrary timeouts.
+    - DO NOT cache empty arrays before the route has enough data to know the platform is genuinely empty.
+    - DO NOT leave count/pluralization copy embedded separately in each component.
+    - DO NOT style passive status pills like clickable buttons.
+
+  Verification:
+    - Direct-route tests pass
+      Command: cd results-explorer && npm run test:e2e:fixtures && npm run build && npm run test:e2e -- --project=chromium --grep "direct route"
+      Expected: all direct-route tests pass
+    - Microcopy unit tests pass
+      Command: cd results-explorer && npm test -- --run src/lib/__tests__/copyFormatters.test.ts src/pages/__tests__/Compare.test.tsx src/components/__tests__/ComparabilityReceipt.test.tsx
+      Expected: all targeted tests pass
+    - Browser evidence confirms no false empty states or bad pluralization
+      Command: rg -n "Polars Results|No results found|1 warning|warnings|coverage\.\.|PASS|FAIL" _project/verification-logs/results-explorer-direct-route-and-copy-hardening/
+      Expected: logs include route and copy pass/fail evidence
+
+  Scope Limit:
+    Only modify:
+      - results-explorer/src/lib/duckdbQueries.ts
+      - results-explorer/src/lib/copyFormatters.ts
+      - results-explorer/src/pages/PlatformIndex.tsx
+      - results-explorer/src/pages/Compare.tsx
+      - results-explorer/src/components/ComparabilityReceipt.tsx
+      - results-explorer/src/lib/__tests__/
+      - results-explorer/src/pages/__tests__/
+      - results-explorer/src/components/__tests__/
+      - results-explorer/e2e/
+      - _project/verification-logs/results-explorer-direct-route-and-copy-hardening/
+    Do not modify:
+      - benchbox/core/explorer_pipeline/
+      - results-explorer/public/data/
+
+Metadata:
+----------------------------------------------------------------------------------------------------
+tags: ['results-explorer', 'routing', 'copy', 'reliability']
+estimated_effort: Small-Medium (1-2 days)
+created_date: 2026-05-11
+
+Impact:
+----------------------------------------------------------------------------------------------------
+business_value:
+  Prevents direct links and shared compare URLs from appearing broken or
+careless.
+
+user_impact:
+  Users can trust shared links and understand guardrail copy without
+guessing which badges are actionable.
+
+technical_debt:
+  Centralizes route-state and microcopy edge cases that previously regressed
+across components.
+
+
+====================================================================================================
+
+
+===== _project/DONE/results-explorer-followup-todo-review/planning/results-explorer-result-detail-metric-formatting-regression.yaml =====
+
+====================================================================================================
+Restore Result Detail metric-formatting precision and unit contract after shared formatter rollout
+====================================================================================================
+
+Priority:  Critical
+Status:    Completed
+Worktree:  results-explorer-followup-todo-review
+Category:  User Experience
+File:      _project/DONE/results-explorer-followup-todo-review/planning/results-explorer-result-detail-metric-formatting-regression.yaml
+
+Description:
+----------------------------------------------------------------------------------------------------
+The follow-up remediation release gate caught a post-merge regression in the
+full Results Explorer frontend suite. `ResultDetail.test.tsx` now fails after
+the shared metric-formatting rollout because the canonical result summary no
+longer exposes exact power-score precision, and the median/raw duration table
+contract no longer matches the rendered labels.
+
+This is a release-blocking evidence issue, not just stale tests: Result
+Detail is the route where users inspect an individual benchmark receipt, so
+compact leaderboard/table formatting must not erase exact score evidence or
+make raw timing units ambiguous.
+
+
+Implementation Guardrails:
+----------------------------------------------------------------------------------------------------
+  Must Preserve:
+    - Leaderboard, benchmark, platform, query, and compare surfaces must keep compact large power-score formatting.
+    - Result Detail must preserve exact score evidence for receipt-level inspection.
+    - Timing headers must match the rendered timing unit contract.
+    - Raw sort/comparison values must remain numeric and unrounded.
+
+  Approach:
+    Treat Result Detail as a detail/receipt surface, not a dense leaderboard
+    surface. Preserve compact shared formatting where it improves scanning, but
+    expose exact power-score evidence where users inspect a single result.
+
+  Anti-Patterns:
+    - DO NOT globally revert `fmtScore` to exact formatting.
+    - DO NOT silence the failing tests without deciding the detail-route contract.
+    - DO NOT add source changes outside Result Detail, shared formatter helpers, or focused tests unless reproduction proves the issue is shared.
+
+  Verification:
+    - Result Detail formatter regression tests pass
+      Command: cd results-explorer && npm test -- --run src/pages/__tests__/ResultDetail.test.tsx
+      Expected: ResultDetail tests pass
+    - Full Results Explorer frontend suite passes
+      Command: cd results-explorer && npm test -- --run
+      Expected: all frontend tests pass
+    - Typecheck and build pass
+      Command: cd results-explorer && npm run typecheck && npm run build
+      Expected: both commands exit 0
+
+  Scope Limit:
+    Only modify:
+      - results-explorer/src/pages/ResultDetail.tsx
+      - results-explorer/src/pages/__tests__/ResultDetail.test.tsx
+      - results-explorer/src/lib/metricFormatters.ts
+      - results-explorer/src/lib/__tests__/metricFormatters.test.ts
+      - results-explorer/src/utils.ts
+      - results-explorer/src/__tests__/utils.test.ts
+      - _project/verification-logs/results-explorer-result-detail-metric-formatting-regression/
+      - _project/TODO/results-explorer-followup-todo-review/planning/results-explorer-result-detail-metric-formatting-regression.yaml
+    Do not modify:
+      - benchbox/
+      - results-explorer/public/data/
+
+Metadata:
+----------------------------------------------------------------------------------------------------
+tags: ['results-explorer', 'result-detail', 'metrics', 'release-blocker']
+estimated_effort: Small (under 0.5 day)
+created_date: 2026-05-12
+
+Impact:
+----------------------------------------------------------------------------------------------------
+business_value:
+  Restores trust in detail-route evidence before declaring the remediation
+batch complete.
+
+user_impact:
+  Users inspecting a single result can see exact score evidence and
+unambiguous timing units.
+
+technical_debt:
+  Clarifies the distinction between compact dense-table formatting and
+receipt-level exact evidence.
+
+
+====================================================================================================
+
+
+PASS dependency TODO audit: all dependency files resolved from _project/DONE.

@@ -1,0 +1,5 @@
+uv run --no-project -- python _project/scripts/audit_sha_check.py \
+		--target-ref "origin/develop" \
+		 \
+		"_project/audits/results-explorer-followup-remediation-release-gate-2026-05-12.md"
+OK _project/audits/results-explorer-followup-remediation-release-gate-2026-05-12.md: develop_sha=2c65387c3637f19bfaca6ddc1ef0afb8ee804489 target_ref=origin/develop
