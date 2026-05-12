@@ -2,7 +2,7 @@ id: joinorder-redistribution-license-adr
 title: "JoinOrder canonical data redistribution: review IMDb / Dataverse terms, produce an ADR, reconcile DATA-LICENSE.md"
 worktree: main
 priority: High
-status: Not Started
+status: Blocked
 category: Documentation
 
 description: |
@@ -82,32 +82,32 @@ context_sections:
 work:
   - id: w1
     summary: "Gather and summarize the governing terms: IMDb data terms, Dataverse deposit license/ToU, JOB paper + gregrahn repo statements, current BenchBox framing"
-    status: pending
+    status: done
     notes: |
       Produce a short evidence digest (in the eventual ADR's appendix): for each
       source, the URL, the retrieval date, and the verbatim clause(s) that bear
-      on redistribution / commercial use / attribution. Do not paraphrase the
-      operative clauses -- quote them.
+      on redistribution / commercial use / attribution. Done in
+      `_project/decisions/joinorder-canonical-data-licensing-2026-05-12.md`.
 
   - id: w2
     summary: "Write the ADR: determination + rationale + (if needed) remediation options and recommendation"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Output: `_project/decisions/joinorder-canonical-data-licensing-2026-05-12.md`
       (the `_project/decisions/` directory exists; the
       `joinorder-scale-stress-licensing-<date>.md` naming/shape convention is
       documented in `_project/TODO/main/planning/joinorder-scale-stress-decision-framework.yaml`
       -- mirror its structure). Link the ADR from
-      `_project/joinorder/migration-plan.md`. The ADR must state: the question,
-      the terms reviewed (w1 digest), the determination (permitted / conditional
-      / not-clear), the rationale, and -- only if conditional or not-clear --
-      the remediation options with a recommendation.
+      `_project/joinorder/migration-plan.md`. Done: determination is "not
+      clearly permitted"; recommended remediation is to fetch `imdb_pg11`
+      directly from Dataverse and convert/verify locally, unless written
+      permission or a BYO-data path is chosen.
 
   - id: w3
     summary: "Reconcile DATA-LICENSE.md and the user-facing attribution with the ADR conclusion"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Update `benchbox/core/joinorder/DATA-LICENSE.md` and the "License And
       Attribution" section of `docs/benchmarks/join-order.md` so they cite the
@@ -120,7 +120,7 @@ work:
   - id: w4
     summary: "If the ADR concludes 'not clearly permitted': file the implementing/remediation TODO and flag the release blocker"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Conditional. If w2 lands on PERMITTED or PERMITTED-UNDER-CONDITIONS-already-
       met, this work unit is a no-op (mark done with a note). If it lands on NOT
@@ -128,6 +128,9 @@ work:
       recommended remediation (e.g. `joinorder-data-fetch-from-dataverse`),
       mark this TODO `blocked` pending that decision, and notify the user that
       canonical `joinorder` has a release-blocking licensing question.
+      Done: filed
+      `_project/TODO/main/planning/joinorder-data-fetch-from-dataverse-remediation.yaml`;
+      this TODO remains Blocked because the remediation is release-blocking.
 
 prior_art:
   - "_project/decisions/ (directory exists; the joinorder-scale-stress-licensing-<date>.md naming/shape convention is documented in _project/TODO/main/planning/joinorder-scale-stress-decision-framework.yaml) — put the Step-1 licensing ADR here, same shape"
@@ -184,7 +187,7 @@ metadata:
     - step1-followup
   estimated_effort: Small
   created_date: "2026-05-12"
-  last_updated: "2026-05-12T00:00:00"
+  last_updated: "2026-05-12T13:45:00"
 
 impact:
   business_value: |

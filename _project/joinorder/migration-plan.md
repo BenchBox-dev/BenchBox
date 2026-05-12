@@ -1,5 +1,13 @@
 # JoinOrder Bundle Migration Plan
 
+## Licensing ADR
+
+- Canonical data redistribution decision:
+  `_project/decisions/joinorder-canonical-data-licensing-2026-05-12.md`
+- Status: not clearly permitted for BenchBox-hosted redistribution; follow-up
+  remediation is tracked in
+  `_project/TODO/main/planning/joinorder-data-fetch-from-dataverse-remediation.yaml`.
+
 Pairs: 5
 Files: 10
 
