@@ -1,14 +1,14 @@
 ---
 id: 2026-04-30-114724-post-merge-safety-tension
 date: 2026-04-30
-status: actionable
+status: merged-to-todo
 finding_kind: framework-gap
 review_context: "L2 merge-loop audit / dev-loop simplification planning (2026-04-30)"
 related_paths:
   - .github/workflows/develop-post-merge.yml
   - .github/workflows/auto-merge-on-open.yml
 suggested_sweep: "During Step 4, decide whether post-merge auto-revert replaces or complements any queue-like safety mechanism."
-todo_id: null
+todo_id: dev-loop-queue-acceptance-criteria-from-blind-spots
 ---
 
 # Post-merge safety net tension was unresolved
@@ -40,3 +40,4 @@ If the post-merge workflow is the real protection layer, adding a queue may dupl
   load-bearing by inertia, not enforcement. Carry forward.
 - 2026-05-06: actionable — 2026-05-06 sweep: develop-post-merge.yml safety-net workflow still shipped; Step 5 Blocked — 'no queue without pre-merge ordering evidence' rule remains load-bearing by inertia
 - 2026-05-08: actionable — sweep: .github/workflows/develop-post-merge.yml still present; Step 5 calendar-blocked through ~2026-05-30; revert-PR/incident:develop-red flow intact — `no queue without Step 5 pre-merge ordering evidence` rule still load-bearing by inertia
+- 2026-05-11: promoted to TODO `dev-loop-queue-acceptance-criteria-from-blind-spots`

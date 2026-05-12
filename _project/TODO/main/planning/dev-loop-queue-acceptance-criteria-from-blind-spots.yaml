@@ -6,9 +6,11 @@ status: Blocked
 category: Process and Workflow
 
 description: |
-  The 2026-04-30 L2 merge-loop audit produced four still-actionable
-  blind-spot findings that all gate any future steward-queue
-  implementation:
+  The 2026-04-30 L2 merge-loop audit produced four blind-spot findings
+  that all gate any future steward-queue implementation. They were
+  promoted to `merged-to-todo` -> this TODO on 2026-05-11, so the
+  blind-spot log records that they are integrated into a planned item
+  rather than sitting in the `actionable` re-triage queue:
 
     - 2026-04-30-114721-global-test-lock-cpu-protection — keep the
       global lock default until measurement shows concurrent xdist
@@ -27,7 +29,8 @@ description: |
   `dev-loop-step-5-measurement-window` — a 30-day measurement window
   that started 2026-04-30 and closes ~2026-05-30. Until Step 5
   publishes its decision record, none of these findings are
-  individually actionable.
+  individually actionable, which is exactly why they belong to one
+  handoff TODO instead of four `actionable` log entries.
 
   This TODO does NOT pre-build the queue (that anti-pattern is
   explicit in Step 5's `do_not_modify` list). It exists to ensure
@@ -37,8 +40,9 @@ description: |
 
   If Step 5 returns DO NOT BUILD or REASSESS, this TODO closes as
   superseded with a one-line note pointing to the Step 5 decision
-  record; the four blind-spots themselves move to `actioned` in the
-  same close-out.
+  record; the four blind-spots stay `merged-to-todo` pointing here
+  (this TODO's DONE record carries the outcome) — no further
+  status flip is needed.
 
 deps:
   needs:
@@ -51,8 +55,12 @@ context_sections:
       - _project/blind-spots/2026-04-30-114722-queue-single-point-failure.md
       - _project/blind-spots/2026-04-30-114723-queue-dwell-contract.md
       - _project/blind-spots/2026-04-30-114724-post-merge-safety-tension.md
-    All four sweep-verified 2026-05-08; all four still load-bearing
-    by inertia (Step 5 calendar-blocked, dev-loop architecture intact).
+    Sweep history: re-verified actionable on 2026-05-02, -05, -06, -08;
+    on 2026-05-11 promoted to `merged-to-todo` with
+    `todo_id: dev-loop-queue-acceptance-criteria-from-blind-spots`
+    (still load-bearing by inertia — Step 5 calendar-blocked, dev-loop
+    architecture intact — but now tracked here instead of re-triaged
+    each sweep).
   "Why a single TODO, not four": |
     These findings share one trigger (Step 5 outcome) and one
     consumer (Step 6 queue spec). Splitting them into four TODOs
@@ -70,9 +78,11 @@ work:
       `_project/decisions/dev-loop-measurement-<window-end>.md` with a
       BUILD QUEUE / DO NOT BUILD / REASSESS verdict.
         - BUILD QUEUE -> proceed to w2.
-        - DO NOT BUILD -> mark all four blind-spots `actioned` with a
-          triage-log line citing the Step 5 decision SHA, then close
-          this TODO as completed-via-supersede.
+        - DO NOT BUILD -> close this TODO as completed-via-supersede
+          with a one-line note citing the Step 5 decision SHA. The
+          four blind-spots stay `merged-to-todo` -> this TODO; the
+          DONE record is their disposition. (Optionally append a
+          one-line triage entry to each pointing at the decision SHA.)
         - REASSESS -> stay Blocked; let Step 5's REASSESS path drive
           the next iteration.
 
@@ -106,20 +116,24 @@ work:
           Cites: 2026-04-30-114724-post-merge-safety-tension.
 
   - id: w3
-    summary: "Promote the four blind-spots to merged-to-todo with the right TODO IDs"
+    summary: "Re-point the four blind-spots' todo_id to Step 6 (BUILD QUEUE path only)"
     needs: [w2]
     status: pending
     notes: |
-      For each of the four 2026-04-30 blind-spots run:
+      The four blind-spots are already `merged-to-todo` ->
+      `dev-loop-queue-acceptance-criteria-from-blind-spots` (promoted
+      2026-05-11). On the BUILD QUEUE path, once w2 has folded the
+      guardrails into Step 6, re-run the promote action so the link
+      points at the queue spec that now owns them:
         `uv run --project _project/scripts -- python _project/scripts/sweep_blind_spots.py triage <id> --action promote --todo-id dev-loop-step-6-queue-decision-gate`
-      The promote action sets `status: merged-to-todo` and fills
-      `todo_id`. The triage-log entry should cite Step 5's decision
-      SHA and this TODO's id as the merge path.
+      The triage-log entry should cite Step 5's decision SHA and name
+      this TODO as the prior merge path. On any non-BUILD path this
+      work unit is a no-op — leave todo_id pointing here.
 
 must_preserve:
   - "dev-loop-step-5-measurement-window's calendar-gated Blocked status — this TODO must not push Step 5 to publish early."
   - "The 'do not pre-build the queue during measurement' anti-pattern in Step 5."
-  - "All four blind-spots' historical record — promotion to merged-to-todo is the only mutation; triage log entries are append-only."
+  - "All four blind-spots' historical record — the only mutations are the `status`/`todo_id` frontmatter line and append-only triage-log entries; the `## Finding` / `## Why this matters` body text is immutable."
 
 approach: |
   This is a watcher-and-handoff TODO, not an implementation TODO. The
@@ -134,7 +148,7 @@ approach: |
 anti_patterns:
   - "DO NOT pre-author a steward-queue implementation TODO 'just in case' — because that primes the Step 5 decision and violates the Step 5 anti-pattern list — wait for the verdict."
   - "DO NOT collapse the four guardrails into a single bullet on Step 6 — because each one cites a specific blind-spot and a specific failure mode — keep them as four named acceptance criteria so reviewers can trace each one back to its source."
-  - "DO NOT promote the blind-spots to merged-to-todo before Step 6 is unblocked — because the todo_id field would point at a still-Blocked TODO, leaving the link load-bearing on something that may itself never ship."
+  - "DO NOT re-point the blind-spots' todo_id at dev-loop-step-6-queue-decision-gate before w2 has actually folded the guardrails into it — because Step 6 may resolve as DO NOT BUILD and never carry them — leave todo_id on this TODO until the queue spec demonstrably owns them."
 
 verification:
   - description: "Step 5 decision record exists before this TODO begins w2"
@@ -161,8 +175,8 @@ scope_limit:
     - "Makefile"
 
 success_metrics:
-  - "All four 2026-04-30 blind-spots transition to either `actioned` (DO NOT BUILD path) or `merged-to-todo` (BUILD QUEUE path) within one week of Step 5 publishing its decision record."
-  - "If BUILD QUEUE: dev-loop-step-6-queue-decision-gate.yaml names each of the four guardrails in its acceptance criteria, with the blind-spot id as the citation."
+  - "The four 2026-04-30 blind-spots show `status: merged-to-todo` with `todo_id` pointing at a real, live TODO (this one until Step 6 owns them) — never back at `actionable`/`open`."
+  - "If BUILD QUEUE: dev-loop-step-6-queue-decision-gate.yaml names each of the four guardrails in its acceptance criteria, with the blind-spot id as the citation, and the blind-spots' todo_id is re-pointed there."
   - "No queue implementation TODO is authored before this TODO's w2 lands."
 
 metadata:
@@ -181,7 +195,9 @@ impact:
     tension) actually shape the queue spec — instead of getting lost
     between blind-spot capture and queue implementation.
   technical_debt: |
-    Closes the open loop where four blind-spots have been re-verified
-    as actionable for >7 days but cannot promote independently because
-    they all share one upstream gate. Centralizes the handoff in one
-    place.
+    Closes the open loop where four blind-spots kept getting
+    re-verified as `actionable` every sweep (2026-05-02 through -08)
+    even though they were already destined for one place: they now
+    sit `merged-to-todo` -> this handoff TODO, so the sweep report
+    stops re-surfacing them and the queue-spec inheritance is the
+    single remaining action.
