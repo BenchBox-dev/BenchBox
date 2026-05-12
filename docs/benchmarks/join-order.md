@@ -39,9 +39,12 @@ not treat its current re-hosted Parquet release asset as cleared for broad
 redistribution until the remediation tracked from
 `_project/decisions/joinorder-canonical-data-licensing-2026-05-12.md` lands.
 
-The benchmark accepts only `--scale 1`. The old uniformly-random data generator
-has been renamed to the internal `joinorder_synthetic` benchmark for loader and
-schema smoke tests; it is not a substitute for JOB cardinality testing.
+The benchmark accepts only `--scale 1`. There is currently no public small,
+comparable JOB workload; the decision is recorded in
+`_project/decisions/joinorder-small-workload-2026-05-12.md`. The old
+uniformly-random data generator has been renamed to the internal
+`joinorder_synthetic` benchmark for loader and schema smoke tests; it is not a
+substitute for JOB cardinality testing.
 
 ## First Run
 
@@ -108,6 +111,11 @@ implementations. The remaining 100 canonical query IDs are registered as
 `NotImplementedError` stubs that point to the Track-2 DataFrame coverage TODO.
 Default DataFrame query selection exposes only the implemented 13 until that
 follow-up work lands.
+
+DataFrame `joinorder` results are partial by definition until Track 2 translates
+the remaining queries. Result export preserves the skip summary, and the Results
+Explorer treats a 13-of-113 DataFrame run as insufficient query coverage for
+comparison and ranking rather than as a complete canonical JOB result.
 
 ## License And Attribution
 

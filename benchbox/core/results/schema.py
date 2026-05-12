@@ -56,7 +56,7 @@ CANONICAL_KEY_ORDER = [
     "errors",
 ]
 
-QUERY_KEY_ORDER = ["id", "ms", "rows", "iter", "stream", "run_type", "status"]
+QUERY_KEY_ORDER = ["id", "ms", "rows", "iter", "stream", "run_type", "status", "dataframe_skip_summary"]
 CONFIG_KEY_ORDER = [
     "compression",
     "seed",
@@ -413,6 +413,8 @@ def _build_query_results_section(
         entry["stream"] = stream_id
         entry["run_type"] = run_type
         entry["status"] = status
+        if qr.get("dataframe_skip_summary"):
+            entry["dataframe_skip_summary"] = qr["dataframe_skip_summary"]
 
         queries_list.append(order_dict(entry, QUERY_KEY_ORDER))
 

@@ -126,3 +126,35 @@ def test_build_result_payload_run_type_contract_and_compat_fallback() -> None:
     assert queries["1"]["run_type"] == "warmup"
     # Missing run_type uses compatibility fallback.
     assert queries["2"]["run_type"] == "warmup"
+
+
+def test_build_result_payload_preserves_dataframe_skip_summary() -> None:
+    result = _result_with_queries(
+        [
+            {
+                "query_id": "DF_SKIP_SUMMARY",
+                "status": "SUCCESS",
+                "execution_time_seconds": 0.0,
+                "rows_returned": 100,
+                "iteration": 0,
+                "stream_id": 0,
+                "run_type": "summary",
+                "dataframe_skip_summary": {
+                    "executed_total": 13,
+                    "skipped_total": 100,
+                    "executed_by_category": {},
+                    "skipped_by_category": {},
+                },
+            }
+        ],
+        execution_id="run_df_skip_summary",
+    )
+
+    payload = build_result_payload(result)
+
+    assert payload["queries"][0]["dataframe_skip_summary"] == {
+        "executed_total": 13,
+        "skipped_total": 100,
+        "executed_by_category": {},
+        "skipped_by_category": {},
+    }

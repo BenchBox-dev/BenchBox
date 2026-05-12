@@ -104,7 +104,7 @@ def _query_row_failed(query: Any) -> bool:
     if not isinstance(query, dict):
         return False
     run_type = str(query.get("run_type") or "measurement").lower()
-    if run_type == "warmup":
+    if run_type != "measurement":
         return False
     status = query.get("status")
     return status is not None and str(status).upper() != "SUCCESS"
