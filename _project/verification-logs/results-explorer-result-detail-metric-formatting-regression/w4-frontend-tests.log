@@ -1,0 +1,24 @@
+
+> results-explorer@0.1.0 test
+> vitest run --run
+
+
+ RUN  v4.1.4 /Users/joe/Developer/BenchBox.release-gate/results-explorer
+
+(node:4246) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:4240) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:4248) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:4382) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:4381) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:4542) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  63 passed (63)
+      Tests  687 passed (687)
+   Start at  08:48:43
+   Duration  11.85s (transform 3.87s, setup 3.89s, import 12.03s, tests 26.89s, environment 47.91s)

@@ -1,0 +1,26 @@
+checked_sha: aec7c4e77
+focused_reproduction: w0.log
+
+failures:
+- ResultDetail default timing table expected "Median (ms)" but the product now
+  renders "Median latency".
+  classification: stale test against the shared dynamic-unit contract.
+  rationale: displayed timing values are formatted with the shared latency
+  formatter and carry their own ms/s unit text, so the semantic header is more
+  accurate than a fixed "(ms)" header.
+- ResultDetail expanded raw samples table expected "Duration (ms)" but the
+  product now renders "Duration".
+  classification: stale test against the shared dynamic-unit contract.
+  rationale: raw duration cells are also formatted with the shared latency
+  formatter and carry their own ms/s unit text.
+- ResultDetail canonical summary expected exact "3,000.42" but rendered compact
+  "3,000".
+  classification: product-contract defect.
+  rationale: Result Detail is a receipt/detail surface where exact score
+  evidence should be visible; compact dense-table formatting should not erase
+  detail-route precision.
+
+resolution:
+- Result Detail primary power score now uses exact score formatting.
+- Focused tests now assert semantic duration headers while keeping the exact
+  result-summary score assertion.

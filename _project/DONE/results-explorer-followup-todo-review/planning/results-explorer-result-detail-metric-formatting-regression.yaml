@@ -2,7 +2,8 @@ id: results-explorer-result-detail-metric-formatting-regression
 title: "Restore Result Detail metric-formatting precision and unit contract after shared formatter rollout"
 worktree: results-explorer-followup-todo-review
 priority: Critical
-status: Not Started
+status: Completed
+completed_date: "2026-05-12"
 category: User Experience
 
 description: |
@@ -24,7 +25,7 @@ deps:
 work:
 - id: w0
   summary: "Reproduce and classify the Result Detail formatter failures"
-  status: pending
+  status: done
   notes: |
     Rerun `cd results-explorer && npm test -- --run src/pages/__tests__/ResultDetail.test.tsx`
     on the checked post-metric-formatting tree. Capture the failure output in
@@ -35,7 +36,7 @@ work:
 - id: w1
   summary: "Restore exact result-summary score evidence without reintroducing noisy dense-table decimals"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     Result Detail should expose exact power-score precision in the canonical
     result summary or an equally explicit detail-only affordance. Do not revert
@@ -45,7 +46,7 @@ work:
 - id: w2
   summary: "Align median/raw duration labels with the displayed timing units"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     The default median table and expanded raw-query table must have headers that
     agree with their values. If values use dynamic `ms`/`s` formatting, use
@@ -55,7 +56,7 @@ work:
 - id: w3
   summary: "Update focused tests for exact precision and unit-label behavior"
   needs: [w1, w2]
-  status: pending
+  status: done
   notes: |
     Update or add Result Detail tests so they fail on missing exact score
     evidence, stale unit labels, or a regression back to noisy dense-table
@@ -64,7 +65,7 @@ work:
 - id: w4
   summary: "Rerun release-gate automated checks affected by the fix"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Rerun:
       - `cd results-explorer && npm test -- --run src/pages/__tests__/ResultDetail.test.tsx`;
