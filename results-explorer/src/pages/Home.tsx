@@ -280,7 +280,9 @@ export function Home(_: RoutableProps) {
     .slice(0, 5);
   const showRecentCost = recent.some((result) => normalizedCostValue(result) !== null);
   const leaderboardCohortCount = metaLeaderboard?.cohorts.length ?? 0;
-  const leaderboardPlatformCount = metaLeaderboard?.platforms.length ?? 0;
+  const fullLeaderboardPlatformCount = metaLeaderboard?.platforms.length ?? 0;
+  const rankedLeaderboardPlatformCount =
+    metaLeaderboard?.platforms.filter((platform) => platform.n_cohorts > 0).length ?? 0;
   const visibleLeaderboardCohortCount = filteredMetaLeaderboard?.cohorts.length ?? 0;
   const visibleLeaderboardPlatformCount = filteredMetaLeaderboard?.platforms.length ?? 0;
   const leaderboardBenchmarkSet = new Set(benchmarkOptions);
@@ -291,7 +293,7 @@ export function Home(_: RoutableProps) {
     ),
   );
   const publicPlatformIdsOutsideLeaderboard = platformIds.filter((platformId) => !leaderboardEvidencePlatformIds.has(platformId));
-  const leaderboardEvidencePlatformCount = leaderboardEvidencePlatformIds.size || leaderboardPlatformCount;
+  const leaderboardEvidencePlatformCount = leaderboardEvidencePlatformIds.size || fullLeaderboardPlatformCount;
   const visibleRankedLeaderboardPlatformCount =
     filteredMetaLeaderboard?.platforms.filter((platform) => platform.n_cohorts > 0).length ?? 0;
   const tuningSummary = summarizeTuningModes(results);
@@ -393,7 +395,8 @@ export function Home(_: RoutableProps) {
                 publicBenchmarksOutsideLeaderboard={publicBenchmarksOutsideLeaderboard}
                 publicPlatformCount={platformIds.length}
                 leaderboardEvidencePlatformCount={leaderboardEvidencePlatformCount}
-                rankedLeaderboardPlatformCount={leaderboardPlatformCount}
+                fullLeaderboardPlatformCount={fullLeaderboardPlatformCount}
+                rankedLeaderboardPlatformCount={rankedLeaderboardPlatformCount}
                 visibleLeaderboardPlatformCount={visibleLeaderboardPlatformCount}
                 visibleRankedLeaderboardPlatformCount={visibleRankedLeaderboardPlatformCount}
                 publicPlatformIdsOutsideLeaderboard={publicPlatformIdsOutsideLeaderboard.length}
@@ -747,6 +750,7 @@ function LeaderboardScopeSummary({
   publicBenchmarksOutsideLeaderboard,
   publicPlatformCount,
   leaderboardEvidencePlatformCount,
+  fullLeaderboardPlatformCount,
   rankedLeaderboardPlatformCount,
   visibleLeaderboardPlatformCount,
   visibleRankedLeaderboardPlatformCount,
@@ -758,6 +762,7 @@ function LeaderboardScopeSummary({
   publicBenchmarksOutsideLeaderboard: string[];
   publicPlatformCount: number;
   leaderboardEvidencePlatformCount: number;
+  fullLeaderboardPlatformCount: number;
   rankedLeaderboardPlatformCount: number;
   visibleLeaderboardPlatformCount: number;
   visibleRankedLeaderboardPlatformCount: number;
@@ -772,6 +777,14 @@ function LeaderboardScopeSummary({
     publicPlatformIdsOutsideLeaderboard > 0
       ? `${publicPlatformIdsOutsideLeaderboard.toLocaleString()} public platform ${plural(publicPlatformIdsOutsideLeaderboard, "ID is", "IDs are")} outside the current leaderboard scope.`
       : "Every public platform ID has evidence in the leaderboard scope.";
+  const visiblePublishedUnrankedPlatformCount = Math.max(
+    0,
+    visibleLeaderboardPlatformCount - visibleRankedLeaderboardPlatformCount,
+  );
+  const fullPublishedUnrankedPlatformCount = Math.max(
+    0,
+    fullLeaderboardPlatformCount - rankedLeaderboardPlatformCount,
+  );
 
   return (
     <div class="mt-3 space-y-1 border-t border-[var(--bb-border-default)] pt-3 text-xs text-[var(--bb-fg-muted)]">
@@ -784,9 +797,12 @@ function LeaderboardScopeSummary({
         Table scope is {visibleLeaderboardPlatformCount.toLocaleString()} of{" "}
         {leaderboardEvidencePlatformCount.toLocaleString()} leaderboard-scope platforms visible now;{" "}
         {visibleRankedLeaderboardPlatformCount.toLocaleString()} ranked,{" "}
-        {Math.max(0, visibleLeaderboardPlatformCount - visibleRankedLeaderboardPlatformCount).toLocaleString()} published
-        unranked. Full leaderboard scope has {rankedLeaderboardPlatformCount.toLocaleString()} ranked platform{" "}
-        {plural(rankedLeaderboardPlatformCount, "ID", "IDs")}. Public coverage has {publicPlatformCount.toLocaleString()} platform{" "}
+        {visiblePublishedUnrankedPlatformCount.toLocaleString()} published unranked. Full leaderboard scope has{" "}
+        {fullLeaderboardPlatformCount.toLocaleString()} platform{" "}
+        {plural(fullLeaderboardPlatformCount, "ID", "IDs")} with published leaderboard evidence:{" "}
+        {rankedLeaderboardPlatformCount.toLocaleString()} ranked and{" "}
+        {fullPublishedUnrankedPlatformCount.toLocaleString()} published unranked. Public coverage has{" "}
+        {publicPlatformCount.toLocaleString()} platform{" "}
         {plural(publicPlatformCount, "ID", "IDs")}. {publicOnlyPlatformCopy}
       </p>
       <p>
