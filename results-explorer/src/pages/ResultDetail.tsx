@@ -3,7 +3,7 @@ import type { RoutableProps } from "preact-router";
 import type { DetailResult, QueryDisplayTiming, QueryTiming, SortState } from "@/types";
 import type { ChartContext } from "@/lib/chartRegistry";
 import { getDetailResult, getPrimaryMetricForBenchmark } from "@/lib/duckdbQueries";
-import { humanizeBenchmark, errMsg, fmtGeomean, fmtScoreExact } from "@/utils";
+import { humanizeBenchmark, errMsg, fmtGeomean, fmtScoreCompact, fmtScoreExact } from "@/utils";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { Breadcrumb } from "@/components/Breadcrumb";
@@ -200,6 +200,10 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
   const plansUrl = planDownloadUrl(detail);
   const primaryMetricDirection = primaryMetric === "power_score" ? "higher is better" : "lower is better";
   const primaryMetricName = primaryMetric === "power_score" ? "Power score" : "Geomean query time";
+  const primaryMetricExactTitle =
+    primaryMetric === "power_score" && detail.power_score !== null && detail.power_score !== undefined
+      ? `Exact power score: ${fmtScoreExact(detail.power_score)}`
+      : undefined;
 
   return (
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -250,6 +254,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
             label={`Primary metric · ${primaryMetricDirection}`}
             value={formatPrimaryMetric(detail, primaryMetric)}
             helper={primaryMetricName}
+            valueTitle={primaryMetricExactTitle}
           />
           <ResultMetricCard
             label="Scale / phase"
@@ -443,18 +448,34 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
   );
 }
 
-function ResultMetricCard({ label, value, helper }: { label: string; value: string; helper: string }) {
+function ResultMetricCard({
+  label,
+  value,
+  helper,
+  valueTitle,
+}: {
+  label: string;
+  value: string;
+  helper: string;
+  valueTitle?: string;
+}) {
   return (
     <div class="rounded-lg panel-muted px-4 py-3">
       <div class="text-xs font-semibold uppercase tracking-wide text-[var(--bb-data-fg-subtle)]">{label}</div>
-      <div class="mt-1 font-mono text-lg font-semibold text-[var(--bb-data-fg-primary)]">{value}</div>
+      <div
+        class="mt-1 font-mono text-lg font-semibold text-[var(--bb-data-fg-primary)]"
+        title={valueTitle}
+        aria-label={valueTitle ? `${value}. ${valueTitle}` : undefined}
+      >
+        {value}
+      </div>
       <div class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">{helper}</div>
     </div>
   );
 }
 
 function formatPrimaryMetric(detail: DetailResult, primaryMetric: PrimaryMetric) {
-  if (primaryMetric === "power_score") return fmtScoreExact(detail.power_score);
+  if (primaryMetric === "power_score") return fmtScoreCompact(detail.power_score);
   return fmtGeomean(detail.display_geomean_ms);
 }
 
