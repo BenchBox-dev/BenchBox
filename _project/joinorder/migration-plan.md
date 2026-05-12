@@ -31,6 +31,15 @@ Rationale:
 - The public docs and error message point users at `joinorder_synthetic` when
   they need synthetic scaled smoke data.
 
+## Provenance And Rebuild Attestation
+
+- Canonical data attestation:
+  `_project/joinorder/provenance-attestation.md`
+- Status: Dataverse source checksum and conversion fidelity are verified.
+  Byte-identical rebuild is not established; the determinism decision is tracked
+  in
+  `_project/TODO/main/planning/joinorder-parquet-rebuild-determinism-decision.yaml`.
+
 ## joinorder_sf1_clickhouse_local_sql_20260505_203919_70acdc69.json
 
 - Result: `results-data/bundles/joinorder_sf1_clickhouse_local_sql_20260505_203919_70acdc69.json` -> `results-data/bundles/joinorder_synthetic_sf1_clickhouse_local_sql_20260505_203919_70acdc69.json`
