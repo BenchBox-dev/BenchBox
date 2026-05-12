@@ -83,7 +83,7 @@ Planned platform and benchmark additions, including DataFrame support expansion 
 - **Purpose**: Query optimizer join order evaluation
 - **Queries**: 113 complex multi-table join queries
 - **Schema**: 21 tables modeling IMDB movie database
-- **Scale**: Complex join patterns with realistic cardinalities
+- **Scale**: Fixed at `--scale 1` using canonical IMDb 2013 JOB data
 - **Use Cases**: Query optimizer testing, join algorithm evaluation, cardinality estimation
 
 ### Industry Benchmarks
@@ -331,7 +331,7 @@ benchbox-experimental
 #### **Memory-Intensive Workloads**
 - [H2ODB](h2odb.md) groupby operations
 - [TPC-DS](tpc-ds.md) with window functions
-- Large-scale [Join Order Benchmark](join-order.md)
+- Canonical [Join Order Benchmark](join-order.md) at fixed `--scale 1`
 
 ## Common Patterns
 
@@ -356,7 +356,7 @@ from benchbox import TPCH, TPCDS, JoinOrder
 benchmarks = {
     "tpch": TPCH(scale_factor=1.0),
     "tpcds": TPCDS(scale_factor=1.0),
-    "joinorder": JoinOrder(scale_factor=0.1)
+    "joinorder": JoinOrder(scale_factor=1.0)
 }
 
 # Run full suite
@@ -406,7 +406,7 @@ for query_id in regression_queries:
 | TPC-H      | ~1 GB     | ~2 GB          | ~4 GB       |
 | TPC-DS     | ~3 GB     | ~6 GB          | ~12 GB      |
 | SSB        | ~600 MB   | ~1 GB          | ~2 GB       |
-| Join Order | ~1 GB     | ~2 GB          | ~4 GB       |
+| Join Order | 74M rows  | engine-specific | engine-specific |
 | Primitives | ~1 GB     | ~2 GB          | ~4 GB       |
 
 ## Integration Examples

@@ -343,7 +343,7 @@ See [Platform Documentation](../docs/platforms/index.md) for detailed setup guid
 - **TPC-H Havoc**: Via [`unified_runner.py`](unified_runner.py) with `--benchmark tpchavoc` - Query optimizer stress testing
 - **AMPLab Big Data Benchmark**: Via [`unified_runner.py`](unified_runner.py) with `--benchmark amplab`
 - **H2O.ai Database Benchmark**: Via [`unified_runner.py`](unified_runner.py) with `--benchmark h2odb`
-- **Join Order Benchmark**: Via [`unified_runner.py`](unified_runner.py) with `--benchmark joinorder`
+- **Join Order Benchmark**: Via [`unified_runner.py`](unified_runner.py) with `--benchmark joinorder --scale 1`
 - **Read Primitives**: Via [`unified_runner.py`](unified_runner.py) with `--benchmark read_primitives`
 - **Write Primitives**: Via [`unified_runner.py`](unified_runner.py) with `--benchmark write_primitives`
 - **Transaction Primitives**: Via [`unified_runner.py`](unified_runner.py) with `--benchmark transaction_primitives`

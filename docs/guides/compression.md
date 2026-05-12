@@ -126,12 +126,16 @@ benchbox run --platform duckdb --benchmark tpch --compression zstd:15
 Compression is available across all BenchBox data generators. The following generators use the `CompressionMixin` for streaming compression during data generation:
 
 - **TPC-H, TPC-DS, SSB** - Compression supported since v0.1.2
-- **CoffeeShop, Join Order, AMPLab, H2O.db** - Compression supported since v0.1.2
+- **CoffeeShop, AMPLab, H2O.db** - Compression supported since v0.1.2
 - **TSBS DevOps** - Compression support added in v0.2.1
 - **FlightData** - Compression support added in v0.2.1
 - **NYC Taxi** (Yellow, Green, and HVFHV downloaders) - Compression support added in v0.2.1
 
 All generators that support compression write a `_datagen_manifest.json` with compression metadata and per-table row counts.
+
+`joinorder` is fixed-size canonical data rather than a generated CSV workload:
+BenchBox downloads a compressed, manifest-verified Parquet package for
+`joinorder-imdb-2013-v1` and accepts only `--scale 1`.
 
 ## Integration with Data Generators
 

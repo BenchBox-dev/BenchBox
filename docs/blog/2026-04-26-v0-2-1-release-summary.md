@@ -16,6 +16,11 @@ meta_description: "BenchBox v0.2.1 adds six new platform adapters, Vector Search
 
 **TL;DR**: New platforms: Apache Doris, CedarDB, StarRocks, SingleStore, QuestDB, and Apache Gluten + Velox. New benchmarks: Vector Search (recall@k + latency across 6 kNN/ANN queries) and FlightData (20 aviation analytics queries). NYC Taxi expands to four trip-record types. Scale factor changes to harmonize the meaning of SF=1 data sizes across 7 benchmarks.
 
+> Current behavior note: the public `joinorder` benchmark now uses the fixed
+> canonical IMDb 2013 JOB dataset at `--scale 1` only. The scalable synthetic
+> JoinOrder behavior described for v0.2.1 was moved to the internal
+> `joinorder_synthetic` benchmark for smoke tests.
+
 ![Horizontal bar chart titled 'BenchBox v0.2.1 by the numbers' showing net-new additions: 7 harmonized scale factors, 6 platform adapters, 5 DataFrame benchmarks, 2 new benchmarks](./images/v021_release_scope.png)
 
 ---

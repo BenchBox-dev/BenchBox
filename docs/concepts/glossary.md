@@ -98,7 +98,7 @@ Comprehensive reference for benchmarking, database, and BenchBox-specific termin
 ## J
 
 **JoinOrder Benchmark**
-: Real-world benchmark based on IMDB data, testing join query optimization with complex multi-table queries.
+: Real-world JOB benchmark based on canonical IMDb 2013 data, testing cardinality estimation and join-order optimization with 113 complex multi-table queries. BenchBox's public `joinorder` benchmark runs at `scale_factor=1.0` only.
 
 ## M
 
