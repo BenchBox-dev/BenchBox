@@ -1742,6 +1742,9 @@ def compute_reference_cardinalities(
             user=user,
             sql=f"SELECT row_to_json(benchbox_q)::text FROM ({sql}) AS benchbox_q ORDER BY 1 LIMIT 1",
         ).strip()
+        # Canonical JOB queries are single-row MIN(...) aggregates, so hashing
+        # that first row is a compact full-result oracle. Raw-row or multi-row
+        # variants need a full-result hash instead.
         first_row_sha256 = hashlib.sha256(first_row_json.encode("utf-8")).hexdigest() if first_row_json else None
         underlying_count = int(
             psql(
