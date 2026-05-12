@@ -426,6 +426,9 @@ describe("BenchmarkIndex", () => {
       expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
     });
 
+    for (const details of screen.getAllByText("Receipt and metadata")) {
+      fireEvent.click(details);
+    }
     const receiptLinks = screen.getAllByRole("link", { name: "Receipt →" }) as HTMLAnchorElement[];
     expect(receiptLinks[0]?.getAttribute("href")).toBe("/results/r/r1#run-receipt");
     expect(screen.getAllByText("exact").length).toBeGreaterThan(0);
@@ -735,6 +738,19 @@ describe("BenchmarkIndex", () => {
       expect(screen.getByRole("button", { name: /maintainer/i })).toBeTruthy();
       expect(screen.getByRole("button", { name: /community/i })).toBeTruthy();
     });
+    expect(screen.getByRole("button", { name: /maintainer/i }).className).toContain("--bb-tone-info-bg");
+    expect(screen.getByRole("button", { name: /maintainer/i }).className).not.toContain("--bb-bg-elevated");
+  });
+
+  it("keeps active matrix controls on the light data surface contract", async () => {
+    render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => screen.getAllByText("DuckDB"));
+
+    const reducedColor = screen.getByRole("button", { name: "Reduced color" });
+    fireEvent.click(reducedColor);
+
+    expect(reducedColor.className).toContain("--bb-tone-info-bg");
+    expect(reducedColor.className).not.toContain("--bb-bg-elevated");
   });
 
   it("deselecting community chip hides community rows without extra fetch", async () => {

@@ -534,7 +534,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
                       key={tier}
                       class={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
                         active
-                          ? "bg-[var(--bb-bg-elevated)] text-[var(--bb-fg-primary)]"
+                          ? "bg-[var(--bb-tone-info-bg)] text-[var(--bb-tone-info-fg)]"
                           : "bg-[var(--bb-surface-app)] text-[var(--bb-data-fg-subtle)] hover:bg-[var(--bb-data-border)]"
                       }`}
                       aria-pressed={active}
@@ -582,7 +582,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
             <button
               class={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
                 highContrast
-                  ? "border-[var(--bb-bg-elevated)] bg-[var(--bb-bg-elevated)] text-[var(--bb-fg-primary)]"
+                  ? "border-[var(--bb-accent-hover)] bg-[var(--bb-tone-info-bg)] text-[var(--bb-tone-info-fg)]"
                   : "border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] text-[var(--bb-data-fg-muted)] hover:bg-[var(--bb-surface-data-muted)]"
               }`}
               onClick={() => setHighContrast((v) => !v)}

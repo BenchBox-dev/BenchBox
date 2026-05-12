@@ -22,7 +22,11 @@
         --bb-code-bg: #161b22;
         --bb-code-fg: #f0f6fc;
 
-        /* Light analytical surfaces (dense data panels). See
+        /* Surface contract: Results Explorer uses dark global chrome
+           (`surface-hero`, header, footer) around a light analytical
+           workspace (`body`, panels, tables, charts, controls). Route-level
+           data UI should use --bb-surface-data* and --bb-data-fg-* tokens,
+           reserving --bb-bg-* / --bb-fg-* for global chrome. See
            _project/analysis/results-explorer-theme-inventory-2026-05-07.md
            for the surface-model decision. */
         --bb-surface-app: #f5f6f8;
