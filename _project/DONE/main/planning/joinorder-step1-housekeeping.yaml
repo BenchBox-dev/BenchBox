@@ -2,8 +2,9 @@ id: joinorder-step1-housekeeping
 title: "JoinOrder Step 1 housekeeping: dead CSV attrs, stale CLI estimates, surface enforcement, force_regenerate guard, reference-format note, migration-shim decision"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
 category: Core Functionality
+completed_date: "2026-05-12"
 
 description: |
   Follow-up to the merged canonical-JOB foundation (issue #289 Step 1; PRs #332,
@@ -76,6 +77,16 @@ description: |
   (or a small shim). Nothing here changes the canonical data or the
   scale_factor=1.0-only contract.
 
+completion_notes:
+  completed_by: "fix/joinorder-step1-housekeeping"
+  completed_date: "2026-05-12"
+  notes:
+    - "w1/w2 and the CLI filtering portion of w3 landed in PR #374; this TODO revalidated them on current develop."
+    - "w3 documentation now defines internal benchmarks as hidden from CLI discovery, MCP, result publisher discovery, and explorer, while explicit IDs remain runnable."
+    - "w4 force_regenerate help now states the full ~1.2 GB archive is re-downloaded; the data_fetch audit found a shared-destination concurrent download race and filed data-fetch-concurrent-download-race."
+    - "w5 comments that first_row_sha256 is a compact full-result oracle only because canonical JOB queries are single-row aggregates."
+    - "w6 records the no-shim decision for scale_factor != 1.0 in _project/joinorder/migration-plan.md."
+
 context_sections:
   "Why these are separate from the big TODOs": |
     `joinorder-canonical-data-assurance` is about the dataset's integrity;
@@ -97,7 +108,7 @@ context_sections:
 work:
   - id: w1
     summary: "Item 1: remove dead csv_delimiter/csv_null_marker class attrs + the stale generator/resolve_csv_dialect comment from JoinOrderBenchmark, after confirming no loader reads them for the canonical class"
-    status: pending
+    status: done
     notes: |
       Grep `resolve_csv_dialect`, `csv_null_marker`, `csv_delimiter` across
       benchbox/ to confirm the canonical `JoinOrderBenchmark` (Parquet-archive
@@ -109,7 +120,7 @@ work:
 
   - id: w2
     summary: "Item 2: update benchbox/cli/benchmarks.py memory/time estimates for the ~5 GB / 74M-row canonical joinorder; add joinorder_synthetic entries; reconcile with the registry's estimated_time_range"
-    status: pending
+    status: done
     notes: |
       Set `_estimate_memory_usage["joinorder"]` and `_estimate_execution_time["joinorder"]`
       to values consistent with the canonical dataset (the blog says ~5 GB
@@ -122,7 +133,7 @@ work:
 
   - id: w3
     summary: "Item 3: decide + implement whether the interactive `benchbox` CLI wizard honors surface=internal; document the definition of 'surface' near get_benchmark_surface"
-    status: pending
+    status: done
     notes: |
       Decision (small): (i) filter the wizard -- have `BenchmarkManager._get_available_benchmarks()`
       drop `surface != "public"` entries (and/or strip them from the per-category
@@ -137,7 +148,7 @@ work:
 
   - id: w4
     summary: "Item 4: add a size/cost note to the joinorder force_regenerate CLI help; audit data_fetch for concurrent-download safety; file the race as a separate TODO if unhandled"
-    status: pending
+    status: done
     notes: |
       (a) In the `BenchmarkOptionSpec(name="force_regenerate", ...)` registration
       at the bottom of `benchbox/core/joinorder/benchmark.py`, extend the `help`
@@ -154,7 +165,7 @@ work:
 
   - id: w5
     summary: "Item 5: comment in build_joinorder_data.py that the reference-cardinalities format (first_row_sha256 + row_count) assumes single-row aggregate query results"
-    status: pending
+    status: done
     notes: |
       Add a comment near the reference-cardinalities generation in
       `_project/scripts/build_joinorder_data.py` (and a one-line note in
@@ -166,7 +177,7 @@ work:
 
   - id: w6
     summary: "Item 6: record the migration-shim decision in _project/joinorder/migration-plan.md (default: no shim, beta-acceptable); or implement a one-release warn-and-ignore shim if decided otherwise"
-    status: pending
+    status: done
     notes: |
       Default: write in `_project/joinorder/migration-plan.md` that
       `JoinOrder(scale_factor != 1.0)` raising `ValueError` with no deprecation
@@ -223,7 +234,7 @@ verification:
     command: "grep -A8 'def get_benchmark_surface' benchbox/core/benchmark_registry.py; uv run -- python -m pytest tests/unit -k 'surface or benchmark_registry or benchmark_manager' -q"
     expected_output: "get_benchmark_surface docstring states which surfaces 'internal' hides from; tests assert the chosen CLI-wizard behavior"
   - description: "force_regenerate help notes the download size; data_fetch concurrency audited"
-    command: "uv run -- benchbox run --benchmark joinorder --help 2>&1 | grep -i 'force.regenerate' ; grep -rn 'part\\|os.replace\\|lock\\|atomic' benchbox/core/data_fetch/ | head"
+    command: "uv run -- benchbox run --help-topic benchmarks 2>&1 | grep -i 'force_regenerate.*1.2 GB' ; grep -rn 'part\\|os.replace\\|lock\\|atomic' benchbox/core/data_fetch/ | head"
     expected_output: "force_regenerate help mentions re-downloading the ~1.2 GB archive; the data_fetch audit conclusion (safe / race-filed-as-TODO) is recorded"
   - description: "Reference-format assumption is commented; migration-shim decision recorded"
     command: "grep -i 'aggregate\\|first.row\\|single.row' _project/scripts/build_joinorder_data.py; grep -i 'scale_factor\\|breaking\\|shim\\|deprecat' _project/joinorder/migration-plan.md"
