@@ -1,0 +1,140 @@
+id: uat-explorer-smoke-external-corpus
+title: "UAT: make Results Explorer smoke tests validate external UAT corpora"
+worktree: uat-enabled-platforms-remediation
+priority: High
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  The 2026-05-12 enabled-platform UAT `explorer_smoke` phase failed after the
+  Results Explorer build and fixture generation succeeded. `playwright_smoke.log`
+  shows 2/9 tests passed and 7 route assertions failed. The failed route tests
+  expected fixture-specific headings and facets such as DuckDB/TPC-H content,
+  while the corrected UAT artifact corpus only had clean LakeSail result bundles.
+
+  UAT Explorer smoke should prove the packaged external corpus can be loaded and
+  navigated. It should not fail merely because a coverage run does not contain
+  the same benchmark/platform ids as the frontend developer fixture corpus.
+
+deps:
+  needs:
+    - uat-matrix-compatibility-policy
+
+work:
+  - id: w0
+    summary: "Revalidate Explorer smoke failure against current UAT corpus"
+    status: pending
+    notes: |
+      Re-run or inspect `playwright_smoke.log` and the generated fixture corpus
+      from the UAT artifact directory. Record which ids exist and which tests
+      hard-code absent ids. Do not commit screenshots, Playwright reports, or
+      raw browser artifacts.
+
+  - id: w1
+    summary: "Split fixed fixture route tests from external-corpus UAT smoke"
+    needs: [w0]
+    status: pending
+    notes: |
+      Preserve route tests that validate the known development fixture corpus.
+      Add a UAT smoke mode that derives benchmark, platform, query, and result
+      ids from the packaged external corpus and asserts the app renders those
+      routes.
+
+  - id: w2
+    summary: "Add corpus-contract checks before launching Playwright"
+    needs: [w1]
+    status: pending
+    notes: |
+      The UAT phase should fail with a clear packaging/corpus message if no
+      result bundles are present or required metadata is missing. Do not bury
+      corpus defects inside route assertion timeouts.
+
+  - id: w3
+    summary: "Update UAT Explorer smoke docs and CI commands"
+    needs: [w2]
+    status: pending
+    notes: |
+      Document the difference between developer fixture route regression tests
+      and UAT external-corpus smoke, including where Playwright artifacts live
+      and what evidence may be committed.
+
+deferred:
+  - summary: "Redesign Results Explorer route hierarchy"
+    reason: "The UAT failure is smoke-test corpus coupling, not a product navigation redesign."
+
+prior_art:
+  - "tests/uat/phases/explorer_smoke.py -- UAT phase that builds fixtures and invokes Playwright smoke"
+  - "tests/uat/test_explorer_smoke.py -- existing Python-side smoke phase coverage"
+  - "results-explorer/e2e/routes/benchmark-index.spec.ts -- failed hard-coded benchmark route assertion"
+  - "results-explorer/e2e/routes/platform-index.spec.ts -- failed hard-coded platform route assertion"
+  - "results-explorer/e2e/routes/compare.spec.ts -- failed fixture-dependent compare assertion"
+  - "results-explorer/e2e/routes/result-detail.spec.ts -- failed fixture-dependent detail assertion"
+  - "results-explorer/e2e/support/fixtures.ts -- fixture lookup helper used by failing route tests"
+  - "/Users/joe/Developer/benchmark_runs/logs/uat_enabled_today_platforms_20260512/playwright_smoke.log -- observed 2/9 pass, 7 route failures"
+
+must_preserve:
+  - "Developer fixture route tests still verify the known frontend fixture corpus"
+  - "UAT external-corpus smoke validates real packaged result bundles from the UAT run"
+  - "Playwright screenshots/reports remain outside git unless they are intentional docs assets"
+
+approach: |
+  Keep fixture tests deterministic, but add a separate UAT smoke contract that
+  discovers ids from the generated external corpus. Validate the corpus before
+  browser launch so route failures point to UI behavior rather than missing data.
+
+anti_patterns:
+  - "DO NOT weaken route assertions to only test that the app shell loads"
+  - "DO NOT hard-code DuckDB/TPC-H expectations into UAT external-corpus smoke"
+  - "DO NOT commit Playwright report directories, screenshots, or generated browser artifacts"
+
+verification:
+  - description: "Python UAT Explorer smoke coverage passes"
+    command: "uv run -- python -m pytest tests/uat/test_explorer_smoke.py -m fast -q"
+    expected_output: "passes with corpus-contract and dynamic-id smoke cases"
+  - description: "Frontend fixture route tests still pass"
+    command: "cd results-explorer && npm run test:e2e:fixtures && npm run build && npx playwright test --grep @smoke --project chromium"
+    expected_output: "passes against the standard fixture corpus"
+  - description: "External-corpus smoke passes against a UAT result directory"
+    command: "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-sweep CONFIG=tests/uat/configs/uat-explorer-external-corpus-smoke.yaml"
+    expected_output: "Explorer smoke derives ids from the packaged corpus and passes without hard-coded DuckDB/TPC-H assumptions"
+
+scope_limit:
+  only_modify:
+    - "tests/uat/phases/explorer_smoke.py"
+    - "tests/uat/test_explorer_smoke.py"
+    - "results-explorer/e2e/"
+    - "results-explorer/package.json"
+    - "docs/operations/uat-framework.md"
+  do_not_modify:
+    - "benchmark_runs/"
+    - "results-explorer/dist/"
+    - "results-explorer/playwright-report/"
+    - "results-explorer/test-results/"
+
+metadata:
+  owners:
+    - joeharris76
+  tags:
+    - uat
+    - results-explorer
+    - playwright
+    - smoke
+  estimated_effort: Medium
+  created_date: "2026-05-12"
+  last_updated: "2026-05-12T00:00:00"
+
+impact:
+  business_value: |
+    Keeps UAT frontend smoke focused on whether packaged results are browsable,
+    not whether a particular fixture corpus happened to be present.
+  user_impact: |
+    Maintainers can trust Explorer smoke failures to identify packaging or UI
+    issues in the actual UAT output.
+  technical_debt: |
+    Separates frontend fixture regression coverage from UAT external-corpus
+    validation.
+
+success_metrics:
+  - "UAT Explorer smoke passes with any non-empty valid result corpus"
+  - "Fixture route tests still catch regressions against the canonical frontend fixtures"
+  - "Corpus packaging errors fail before Playwright route assertions"
