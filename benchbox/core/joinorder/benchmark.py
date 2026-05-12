@@ -392,7 +392,10 @@ BenchmarkHookRegistry.register_option_specs(
     BenchmarkOptionSpec(
         name="force_regenerate",
         parser=lambda v: v.strip().lower() in ("true", "1", "yes"),
-        help="Refresh the canonical IMDb 2013 archive cache and re-verify Parquet files",
+        help=(
+            "Refresh the canonical IMDb 2013 cache by deleting, re-downloading "
+            "the full ~1.2 GB archive, extracting it, and re-verifying Parquet files"
+        ),
         aliases=("force-regenerate",),
     ),
 )

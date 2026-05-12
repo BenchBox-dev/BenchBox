@@ -309,6 +309,14 @@ class TestRealBenchmarkSpecs:
         assert "dimensions" in specs
         assert specs["dimensions"].default == 128
 
+    def test_joinorder_force_regenerate_documents_download_cost(self):
+        from benchbox.core.joinorder.benchmark import JoinOrderBenchmark  # noqa: F401
+
+        specs = BenchmarkHookRegistry.list_option_specs("joinorder")
+        help_text = specs["force_regenerate"].help
+        assert "re-downloading" in help_text
+        assert "~1.2 GB" in help_text
+
     def test_benchmarks_without_specs_still_work(self):
         """Benchmarks with no registered specs should not raise on empty parse."""
         # tpch has no registered specs - parsing with no options should be fine
