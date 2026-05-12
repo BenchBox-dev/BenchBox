@@ -39,6 +39,20 @@ REQUIRED_COLUMNS: dict[str, set[str]] = {
         "power_score",
         "display_geomean_ms",
     },
+    "cohort_metadata": {
+        "cohort_key",
+        "platform_id",
+        "result_id",
+        "platform_count",
+        "cohort_ranked_count",
+        "cohort_ranking_exclusion_reason",
+        "rank",
+        "metric_value",
+        "has_display_timing",
+        "display_exclusion_reason",
+        "comparison_exclusion_reason",
+        "ranking_exclusion_reason",
+    },
 }
 
 
@@ -169,6 +183,43 @@ def check_snapshot(db_path: Path) -> list[str]:
                 SELECT COUNT(*)
                 FROM benchmark_rankings
                 WHERE total_in_cohort != cohort_ranked_count
+                """,
+            ),
+            (
+                "published unranked leaderboard evidence must expose an exclusion reason",
+                """
+                SELECT COUNT(*)
+                FROM cohort_metadata
+                WHERE platform_count >= 2
+                  AND rank IS NULL
+                  AND result_id IS NOT NULL
+                  AND COALESCE(
+                    ranking_exclusion_reason,
+                    cohort_ranking_exclusion_reason,
+                    display_exclusion_reason,
+                    comparison_exclusion_reason
+                  ) IS NULL
+                """,
+            ),
+            (
+                "ranked leaderboard evidence must not carry a ranking exclusion reason",
+                """
+                SELECT COUNT(*)
+                FROM cohort_metadata
+                WHERE platform_count >= 2
+                  AND rank IS NOT NULL
+                  AND ranking_exclusion_reason IS NOT NULL
+                """,
+            ),
+            (
+                "unranked leaderboard evidence with metrics must not be indistinguishable from missing evidence",
+                """
+                SELECT COUNT(*)
+                FROM cohort_metadata
+                WHERE platform_count >= 2
+                  AND rank IS NULL
+                  AND metric_value IS NOT NULL
+                  AND COALESCE(ranking_exclusion_reason, cohort_ranking_exclusion_reason) IS NULL
                 """,
             ),
         ]

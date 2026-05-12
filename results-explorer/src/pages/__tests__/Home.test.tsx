@@ -424,7 +424,7 @@ describe("Home", () => {
     expect(within(summary).getByText("public result bundles")).toBeTruthy();
     expect(within(summary).getByText("platforms with public results")).toBeTruthy();
     expect(within(summary).getByText("leaderboard cohorts")).toBeTruthy();
-    expect(within(summary).getByText("2 visible; 2/2 ranked platforms")).toBeTruthy();
+    expect(within(summary).getByText("2 visible; 2/2 platforms")).toBeTruthy();
     expect(within(summary).queryByText(/^Benchmarks$/)).toBeNull();
   });
 
@@ -432,7 +432,7 @@ describe("Home", () => {
     render(<Home />);
     await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
 
-    expect(screen.getByText("Showing 2 of 2 ranked platforms across 2 leaderboard cohorts")).toBeTruthy();
+    expect(screen.getByText("Showing 2 of 2 platforms across 2 leaderboard cohorts")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Browse Public Benchmark Results" })).toBeTruthy();
     expect(
       screen.getByText("2 public benchmark set(s). Leaderboard filters above only include 2 rankable cohort(s)."),

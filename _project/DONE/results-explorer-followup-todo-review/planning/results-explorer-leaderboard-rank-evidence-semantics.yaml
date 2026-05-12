@@ -2,7 +2,8 @@ id: results-explorer-leaderboard-rank-evidence-semantics
 title: "Separate missing, unranked, and ranked evidence in leaderboards and rank charts"
 worktree: results-explorer-followup-todo-review
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-05-11"
 category: Core Functionality
 
 description: |
@@ -19,7 +20,7 @@ deps:
 work:
 - id: w0
   summary: "Capture the current missing/unranked/ranked state matrix"
-  status: pending
+  status: done
   notes: |
     Query `meta_leaderboard`, `cohort_metadata`, `benchmark_rankings`, and any
     chart source tables on the checked git SHA and current snapshot. Capture
@@ -34,7 +35,7 @@ work:
 - id: w1
   summary: "Define the display contract for missing, unranked, and ranked states"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     Document exact UI states:
       - Missing run: no metric, no result link, no trust badges, copy `No run`;
@@ -47,7 +48,7 @@ work:
 - id: w2
   summary: "Update cross-benchmark leaderboard cells to honor the state contract"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Update the meta leaderboard so `No run` cells never render trust or
     validation badges. If a result exists but is unranked, show explicit
@@ -57,7 +58,7 @@ work:
 - id: w3
   summary: "Update rank charts to avoid authoritative all-dash matrices"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Rank charts should require rankable cells before rendering a rank matrix.
     If every row is unranked/excluded, show an empty state with the dominant
@@ -68,7 +69,7 @@ work:
 - id: w4
   summary: "Add invariant and component tests for contradictory evidence states"
   needs: [w2, w3]
-  status: pending
+  status: done
   notes: |
     Add tests that fail when:
       - `No run` renders badges or links;
@@ -79,7 +80,7 @@ work:
 - id: w5
   summary: "Browser-check leaderboard and rank chart semantics"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     In the browser, check `/results/`, one benchmark rank tab with unranked
     rows, and one normal ranked benchmark. Capture screenshots or text logs.
@@ -89,7 +90,8 @@ work:
 
 prior_art:
 - "results-explorer/src/components/MetaLeaderboard.tsx renders cross-benchmark cells and badge metadata."
-- "results-explorer/src/components/RankTable.tsx and results-explorer/src/components/ChartPanel.tsx own benchmark rank-chart rendering."
+- "results-explorer/src/components/RankTable.tsx and results-explorer/src/components/ChartPanel.tsx own benchmark rank-chart
+  rendering."
 - "results-explorer/src/lib/duckdbQueries.ts provides meta leaderboard and chart rows."
 - "_project/scripts/results_explorer_snapshot_invariants.py should include contradictory cell-state checks."
 
@@ -111,7 +113,8 @@ anti_patterns:
 
 verification:
 - description: "Leaderboard and rank component tests pass"
-  command: "cd results-explorer && npm test -- --run src/components/__tests__/MetaLeaderboard.test.tsx src/components/__tests__/ChartPanel.test.tsx src/components/__tests__/charts.smoke.test.tsx"
+  command: "cd results-explorer && npm test -- --run src/components/__tests__/MetaLeaderboard.test.tsx src/components/__tests__/ChartPanel.test.tsx
+    src/components/__tests__/charts.smoke.test.tsx"
   expected_output: "all targeted tests pass"
 - description: "Snapshot cell-state invariants pass"
   command: "uv run -- python _project/scripts/results_explorer_snapshot_invariants.py results-explorer/public/data/results.duckdb"
@@ -139,6 +142,12 @@ success_metrics:
 - "Published but unranked cells are explicitly labelled and explain why they are excluded."
 - "All-unrankable rank charts show an explanatory empty state instead of a normal matrix."
 - "Leaderboard and rank chart tests share the same display-state fixtures."
+
+implementation_notes:
+- "w0 evidence captured at _project/verification-logs/results-explorer-leaderboard-rank-evidence-semantics/w0.log on d699aaf2a: generated fixture snapshot had 3 published unranked metric rows, all explained by trust_not_rankable, and 6 ranked rows."
+- "w1 display contract captured in _project/verification-logs/results-explorer-leaderboard-rank-evidence-semantics/w1.log before component edits."
+- "The home page meta-leaderboard filter path was added to the effective implementation scope after browser evidence showed unranked-only platform rows were otherwise filtered out before MetaLeaderboard could render `Excluded` cells."
+- "w5 browser evidence captured at _project/verification-logs/results-explorer-leaderboard-rank-evidence-semantics/w5.log: `/results/` showed receipt-linked `Excluded` cells and no linked/badged `No run` cells; `/results/tpch/?view=ranks` showed ordinal ranks plus excluded-column provenance markers."
 
 metadata:
   tags:

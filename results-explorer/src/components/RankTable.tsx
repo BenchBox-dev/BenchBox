@@ -10,7 +10,7 @@
 // Python reference: textcharts.rank_table.RankTable
 // ---------------------------------------------------------------------------
 
-import type { BenchmarkSummary } from "@/types";
+import type { BenchmarkSummary, PlatformRow } from "@/types";
 import { paletteColor } from "@/lib/chartTheme";
 import { computeRankTable } from "@/lib/chartMath";
 import { formatTimingExclusion, isRankable, platformTimingValue } from "@/lib/displayEligibility";
@@ -37,6 +37,11 @@ export function RankTable({ summary }: Props) {
   const { platforms, query_ids } = summary;
   if (platforms.length === 0 || query_ids.length === 0) return null;
   const sortedQueryIds = sortQueryIds(query_ids);
+  const rankableCellCount = countRankableTimingCells(platforms, sortedQueryIds);
+
+  if (rankableCellCount === 0) {
+    return <RankTableEmptyState summary={summary} queryIds={sortedQueryIds} />;
+  }
 
   const ranks = computeRankTable(
     sortedQueryIds,
@@ -83,13 +88,15 @@ export function RankTable({ summary }: Props) {
   // header cells. The tooltip variant remains attached for hover
   // recovery in either case.
   const displayedHeaders = preserveUniqueAfterTruncation(headerIdentities, 16);
+  const excludedPlatformCount = platforms.filter((platform) => !isRankable(platform)).length;
 
   return (
-    <div class="w-full overflow-x-auto">
-      <table
-        class="text-xs border-collapse min-w-full"
-        aria-label="Per-query platform rankings (1st = fastest)"
-      >
+    <div>
+      <div class="w-full overflow-x-auto">
+        <table
+          class="text-xs border-collapse min-w-full"
+          aria-label="Per-query platform rankings (1st = fastest)"
+        >
         <thead>
           <tr>
             <th class="text-left px-2 py-1.5 border-b border-[var(--bb-data-border)] text-[var(--bb-data-fg-muted)] font-normal sticky left-0 bg-[var(--bb-surface-data)] min-w-[4rem]">
@@ -161,7 +168,68 @@ export function RankTable({ summary }: Props) {
             ))}
           </tr>
         </tfoot>
-      </table>
+        </table>
+      </div>
+      {excludedPlatformCount > 0 && (
+        <p class="mt-2 text-[11px] text-[var(--bb-data-fg-subtle)]">
+          Excluded columns are marked with * and are shown for provenance, not as rankable competitors.
+        </p>
+      )}
     </div>
   );
+}
+
+function countRankableTimingCells(platforms: readonly PlatformRow[], queryIds: readonly string[]): number {
+  return platforms.reduce((total, platform) => {
+    if (!isRankable(platform)) return total;
+    return total + queryIds.filter((queryId) => platformTimingValue(platform, queryId) !== null).length;
+  }, 0);
+}
+
+function RankTableEmptyState({ summary, queryIds }: { summary: BenchmarkSummary; queryIds: readonly string[] }) {
+  const reasons = summarizeRankChartReasons(summary.platforms, queryIds);
+  return (
+    <div
+      role="status"
+      aria-label="Rank chart unavailable"
+      class="rounded-md border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-3 text-sm"
+    >
+      <p class="font-semibold text-[var(--bb-data-fg-primary)]">Rank chart unavailable</p>
+      <p class="mt-1 text-[var(--bb-data-fg-muted)]">
+        No rankable timing cells are available for this cohort. Submitted evidence is Excluded or lacks valid timing,
+        so a normal rank matrix would be all dashes.
+      </p>
+      {reasons.length > 0 && (
+        <ul class="mt-2 space-y-1 text-xs text-[var(--bb-data-fg-muted)]">
+          {reasons.slice(0, 3).map(({ reason, count }) => (
+            <li key={reason}>
+              {count} {count === 1 ? "result" : "results"}: {reason}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function summarizeRankChartReasons(
+  platforms: readonly PlatformRow[],
+  queryIds: readonly string[],
+): { reason: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const platform of platforms) {
+    const reason = rankChartReason(platform, queryIds);
+    counts.set(reason, (counts.get(reason) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([reason, count]) => ({ reason, count }))
+    .sort((a, b) => b.count - a.count || a.reason.localeCompare(b.reason));
+}
+
+function rankChartReason(platform: PlatformRow, queryIds: readonly string[]): string {
+  if (!isRankable(platform)) return formatTimingExclusion(platform.ranking_exclusion_reason);
+  const hasValidTiming = queryIds.some((queryId) => platformTimingValue(platform, queryId) !== null);
+  return hasValidTiming
+    ? "Result has rankable timing evidence."
+    : formatTimingExclusion("no_valid_display_timing", "No valid display timing is available.");
 }

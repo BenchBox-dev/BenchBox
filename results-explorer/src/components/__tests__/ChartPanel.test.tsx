@@ -531,6 +531,36 @@ describe("ChartPanel", () => {
     expect(screen.queryByRole("button", { name: "Sparkline Table" })).toBeNull();
   });
 
+  it("shows a rank-chart empty state when every submitted row is unrankable", () => {
+    render(
+      <ChartPanel
+        context={{
+          kind: "summary",
+          summary: makeSummary({
+            platforms: [
+              makePlatformRow({
+                result_id: "row-1",
+                platform: "Community DuckDB",
+                ranking_exclusion_reason: "trust_not_rankable",
+              }),
+              makePlatformRow({
+                result_id: "row-2",
+                platform: "Failed SQLite",
+                ranking_exclusion_reason: "validation_not_clean",
+              }),
+            ],
+          }),
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Rank" }));
+
+    expect(screen.getByRole("status", { name: "Rank chart unavailable" })).toBeTruthy();
+    expect(screen.queryByRole("table", { name: "Per-query platform rankings (1st = fastest)" })).toBeNull();
+    expect(screen.getByText(/Submitted evidence is Excluded/)).toBeTruthy();
+  });
+
   it("uses winner language by default in the summary box", () => {
     render(
       <ChartPanel
