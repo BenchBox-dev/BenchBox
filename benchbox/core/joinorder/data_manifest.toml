@@ -1,7 +1,10 @@
 dataset_version = "joinorder-imdb-2013-v1"
-manifest_hash = "84ce9d695e1cfe03d5da9b5b4fb57ee2a2e57896efdc3707edc3508dfb012306"
+# Hash of this manifest's stable content, excluding transport-only archive_sha256.
+manifest_hash = "e4cf6afc9bbe16ee112e8ba83f56a4494fc1d092093f4be6ead0c9a462eafd56"
+# Logical dataset hash: aggregate sha256 over the per-table Parquet sha256 values.
 data_archive_hash = "7b7eb976378402cfe34ee5bb8ee885d1e2f1d4a2e3bb7dcac30c40fe1aa74bfa"
 url = "https://github.com/joeharris76/BenchBox/releases/download/data%2Fjoinorder-imdb-2013-v1/joinorder-imdb-2013-v1.tar.zst"
+# Transport archive hash: sha256 of the downloadable .tar.zst file.
 archive_sha256 = "669c97ce7e9e7498c7ce0cad018153aa93a9b8eefff0f77e436d690f64ebc5fd"
 license_file = "DATA-LICENSE.md"
 

@@ -2,7 +2,7 @@
   "data_archive_hash": "7b7eb976378402cfe34ee5bb8ee885d1e2f1d4a2e3bb7dcac30c40fe1aa74bfa",
   "dataset_version": "joinorder-imdb-2013-v1",
   "gregrahn_commit": "a39603662e023e449cb2121997a5034df9e02ebf",
-  "manifest_hash": "84ce9d695e1cfe03d5da9b5b4fb57ee2a2e57896efdc3707edc3508dfb012306",
+  "manifest_hash": "e4cf6afc9bbe16ee112e8ba83f56a4494fc1d092093f4be6ead0c9a462eafd56",
   "postgres_version": "16.2 (Debian 16.2-1.pgdg120+2)",
   "queries": {
     "10a": {

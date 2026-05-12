@@ -36,15 +36,6 @@ class JoinOrderBenchmark(BaseBenchmark):
     available as the internal ``joinorder_synthetic`` benchmark.
     """
 
-    # CSV dialect for resolve_csv_dialect path (b) — used when manifest metadata is absent
-    # (e.g. data cached before the generator wrote manifests).  Manifest-annotated data
-    # (path a) will carry the same values; this class attribute is the safe fallback so
-    # existing cached datasets load correctly without regeneration.
-    # csv_null_marker="" tells SingleStore/PostgreSQL that empty CSV fields mean NULL,
-    # which is required for nullable integer columns (imdb_id, episode_of_id, etc.)
-    # that produce lines like "1,Comedy Adventure,,4,1957,,,,,,,".
-    csv_delimiter = ","
-    csv_null_marker = ""
     data_manifest_path = Path(__file__).with_name("data_manifest.toml")
 
     def __init__(

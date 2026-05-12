@@ -286,7 +286,7 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "scale_options": [1.0],
         "min_scale": 1.0,
         "complexity": "High",
-        "estimated_time_range": (10, 30),
+        "estimated_time_range": (30, 90),
         "supports_dataframe": True,
         "surface": "public",
         "data_source": "canonical",

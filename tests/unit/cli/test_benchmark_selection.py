@@ -82,11 +82,23 @@ class TestBenchmarkFiltering:
         assert len(results) == 0
 
     def test_filter_no_filters_returns_all(self):
-        """Test that no filters returns all benchmarks."""
+        """Test that no filters returns all public benchmarks."""
         manager = BenchmarkManager()
 
         results = manager._filter_benchmarks()
-        assert len(results) == len(manager.benchmarks)
+        assert len(results) == len(manager._get_public_benchmarks())
+        assert "joinorder_synthetic" in manager.benchmarks
+        assert "joinorder_synthetic" not in results
+
+    def test_filter_academic_excludes_internal_benchmarks(self):
+        """Academic filtering should hide internal synthetic compatibility surfaces."""
+        manager = BenchmarkManager()
+
+        results = manager._filter_benchmarks(category="Academic")
+
+        assert "joinorder" in results
+        assert "ssb" in results
+        assert "joinorder_synthetic" not in results
 
 
 class TestBenchmarkDisplay:
@@ -102,15 +114,16 @@ class TestBenchmarkDisplay:
         assert mock_console.print.called
 
     def test_display_all_benchmarks_structure(self):
-        """Test that display returns all benchmarks with proper structure."""
+        """Test that display returns all public benchmarks with proper structure."""
         manager = BenchmarkManager()
 
         # Capture display output
         with patch("benchbox.cli.benchmarks.console"):
             displayed = manager._display_all_benchmarks()
 
-        # Should return all benchmarks
-        assert len(displayed) == len(manager.benchmarks)
+        # Should return all public benchmarks
+        assert len(displayed) == len(manager._get_public_benchmarks())
+        assert "joinorder_synthetic" not in displayed
 
         # Check structure of returned data
         for bench_id, bench_info in displayed.items():
@@ -190,9 +203,12 @@ class TestBenchmarkPreview:
     def test_show_sample_queries_renders_loaded_queries(self):
         """Sample query preview should render heading and SQL snippets."""
         manager = BenchmarkManager()
+        seen_scale = None
 
         class StubBenchmark:
             def __init__(self, scale_factor):
+                nonlocal seen_scale
+                seen_scale = scale_factor
                 self.scale_factor = scale_factor
                 self.queries = {
                     "Q1": "SELECT 1",
@@ -203,11 +219,12 @@ class TestBenchmarkPreview:
             patch("benchbox.core.benchmark_loader.get_benchmark_class", return_value=StubBenchmark),
             patch("benchbox.cli.benchmarks.console") as mock_console,
         ):
-            manager._show_sample_queries("tpch", limit=1)
+            manager._show_sample_queries("joinorder", limit=1)
 
         printed = [str(call.args[0]) for call in mock_console.print.call_args_list if call.args]
         assert any("Sample Queries" in item for item in printed)
         assert any("Query Q1:" in item for item in printed)
+        assert seen_scale == manager.benchmarks["joinorder"]["default_scale"]
 
     def test_show_sample_queries_without_queries_warns(self):
         """Benchmarks without a queries mapping should emit a warning."""
@@ -368,8 +385,8 @@ class TestBenchmarkSelectionEdgeCases:
         manager = BenchmarkManager()
 
         results = manager._filter_benchmarks(search_term="")
-        # Empty string should return all benchmarks
-        assert len(results) == len(manager.benchmarks)
+        # Empty string should return all public benchmarks.
+        assert len(results) == len(manager._get_public_benchmarks())
 
     def test_filter_with_whitespace(self):
         """Test filtering with whitespace-only search."""
