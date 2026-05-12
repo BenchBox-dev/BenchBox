@@ -236,7 +236,7 @@ export function MetaLeaderboard({
 
       <div class="mb-2 flex flex-wrap items-baseline justify-between gap-3">
         <p class="text-sm text-[var(--bb-data-fg-muted)]">
-          Showing {visiblePlatforms.length.toLocaleString()} of {sortedPlatforms.length.toLocaleString()} platforms across{" "}
+          Showing {visiblePlatforms.length.toLocaleString()} of {sortedPlatforms.length.toLocaleString()} leaderboard-scope platforms across{" "}
           {cohorts.length.toLocaleString()} leaderboard {cohorts.length === 1 ? "cohort" : "cohorts"}
         </p>
         <p id="meta-leaderboard-legend" class="text-xs text-[var(--bb-data-fg-subtle)]">
