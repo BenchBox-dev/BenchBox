@@ -601,6 +601,174 @@ def test_aggregate_table_hash_is_deterministic_independent_of_input_order(tmp_pa
     assert build_joinorder_data.aggregate_table_hash([a, b]) == build_joinorder_data.aggregate_table_hash([b, a])
 
 
+def _title_schema() -> list:
+    return [
+        build_joinorder_data.ColumnSchema(
+            table="title",
+            name="id",
+            postgres_type="integer",
+            udt_name="int4",
+            ordinal_position=1,
+            is_nullable=False,
+        ),
+        build_joinorder_data.ColumnSchema(
+            table="title",
+            name="title",
+            postgres_type="character varying",
+            udt_name="varchar",
+            ordinal_position=2,
+            is_nullable=True,
+        ),
+        build_joinorder_data.ColumnSchema(
+            table="title",
+            name="production_year",
+            postgres_type="integer",
+            udt_name="int4",
+            ordinal_position=3,
+            is_nullable=True,
+        ),
+    ]
+
+
+def test_copy_table_to_csv_orders_full_table_by_id(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    captured: list[list[str]] = []
+
+    class Result:
+        returncode = 0
+        stderr = b""
+
+    def fake_run(args: list[str], **_kwargs) -> Result:
+        captured.append(args)
+        return Result()
+
+    monkeypatch.setattr(build_joinorder_data.subprocess, "run", fake_run)
+
+    build_joinorder_data.copy_table_to_csv(
+        container_name="pg",
+        database="imdb",
+        user="postgres",
+        table="title",
+        destination=tmp_path / "title.csv",
+    )
+
+    assert any('COPY (SELECT * FROM public."title" ORDER BY "id") TO STDOUT' in arg for arg in captured[0])
+
+
+def test_logical_table_hash_matches_csv_and_parquet_despite_file_order(tmp_path: Path) -> None:
+    duckdb = pytest.importorskip("duckdb")
+    columns = _title_schema()
+    csv_path = tmp_path / "title.csv"
+    parquet_path = tmp_path / "title.parquet"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "id,title,production_year",
+                '1,"À bout de souffle",1960',
+                "2,\\N,\\N",
+                '3,"Heat",1995',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    con = duckdb.connect()
+    try:
+        con.execute("CREATE TABLE title(id INTEGER, title VARCHAR, production_year INTEGER)")
+        con.execute("INSERT INTO title VALUES (3, 'Heat', 1995), (1, 'À bout de souffle', 1960), (2, NULL, NULL)")
+        con.execute(f"COPY title TO {build_joinorder_data.duckdb_literal(parquet_path)} (FORMAT 'parquet')")
+        csv_hash = build_joinorder_data.logical_table_hash_from_csv(csv_path, columns)
+        parquet_hash = build_joinorder_data.logical_table_hash_from_parquet(
+            con=con,
+            parquet_path=parquet_path,
+            table="title",
+            columns=columns,
+        )
+    finally:
+        con.close()
+
+    assert csv_hash == parquet_hash
+    assert build_joinorder_data.aggregate_logical_content_hash(
+        [csv_hash]
+    ) == build_joinorder_data.aggregate_logical_content_hash([parquet_hash])
+
+
+def test_logical_table_hash_rejects_unsorted_csv(tmp_path: Path) -> None:
+    csv_path = tmp_path / "title.csv"
+    csv_path.write_text(
+        "\n".join(["id,title,production_year", '2,"Second",2002', '1,"First",2001', ""]),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(build_joinorder_data.JoinOrderBuildError, match="strictly ordered by id"):
+        build_joinorder_data.logical_table_hash_from_csv(csv_path, _title_schema())
+
+
+def test_verify_logical_content_hashes_writes_manifest_section(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    duckdb = pytest.importorskip("duckdb")
+    work_dir = tmp_path
+    csv_dir = work_dir / "csv"
+    parquet_dir = work_dir / "parquet"
+    csv_dir.mkdir()
+    parquet_dir.mkdir()
+    (csv_dir / "title.csv").write_text(
+        "\n".join(["id,title,production_year", '1,"First",2001', '2,"Second",2002', ""]),
+        encoding="utf-8",
+    )
+    con = duckdb.connect()
+    try:
+        con.execute("CREATE TABLE title(id INTEGER, title VARCHAR, production_year INTEGER)")
+        con.execute("INSERT INTO title VALUES (2, 'Second', 2002), (1, 'First', 2001)")
+        con.execute(
+            f"COPY title TO {build_joinorder_data.duckdb_literal(parquet_dir / 'title.parquet')} (FORMAT 'parquet')"
+        )
+    finally:
+        con.close()
+    monkeypatch.setattr(build_joinorder_data, "TABLE_NAMES", ["title"])
+
+    report = build_joinorder_data.verify_logical_content_hashes(work_dir=work_dir, schema={"title": _title_schema()})
+    manifest = json.loads((work_dir / build_joinorder_data.BUILD_MANIFEST_NAME).read_text(encoding="utf-8"))
+
+    assert report.failures == []
+    assert manifest["logical_content"]["logical_content_rebuild"] == "PASS"
+    assert manifest["logical_content"]["tables"][0]["status"] == "PASS"
+
+
+def test_streaming_conversion_verifies_logical_content_before_deleting_csv(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    pytest.importorskip("duckdb")
+    work_dir = tmp_path
+
+    def fake_copy_table_to_csv(**kwargs) -> None:
+        destination = Path(kwargs["destination"])
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(
+            "\n".join(["id,title,production_year", '1,"First",2001', '2,"Second",2002', ""]),
+            encoding="utf-8",
+        )
+
+    monkeypatch.setattr(build_joinorder_data, "TABLE_NAMES", ["title"])
+    monkeypatch.setitem(build_joinorder_data.EXPECTED_ROW_COUNTS, "title", 2)
+    monkeypatch.setattr(build_joinorder_data, "copy_table_to_csv", fake_copy_table_to_csv)
+    monkeypatch.setattr(build_joinorder_data, "verify_csv_utf8_fidelity_for_table", lambda **_kwargs: {})
+
+    parquet_files, logical_report = build_joinorder_data.extract_and_convert_parquet_streaming(
+        work_dir=work_dir,
+        schema={"title": _title_schema()},
+        container_name="pg",
+        database="imdb",
+        user="postgres",
+    )
+    manifest = json.loads((work_dir / build_joinorder_data.BUILD_MANIFEST_NAME).read_text(encoding="utf-8"))
+
+    assert len(parquet_files) == 1
+    assert not (work_dir / "csv" / "title.csv").exists()
+    assert (work_dir / "parquet" / "title.parquet").exists()
+    assert logical_report.failures == []
+    assert manifest["logical_content"]["logical_content_rebuild"] == "PASS"
+
+
 def test_render_data_manifest_writes_self_consistent_hash(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(build_joinorder_data, "git_head_sha", lambda: "abc123")
     schema = {

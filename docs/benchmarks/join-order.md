@@ -24,13 +24,15 @@ that the restored source has 21 tables and 74,190,187 rows, and that the
 Postgres-to-Parquet conversion fidelity check passes for row counts,
 null/empty-string preservation, integer ranges, and UTF-8 samples.
 
-Byte-identical rebuild reproducibility is not currently established. A
-2026-05-12 rebuild check produced different archive hashes across two local
-rebuilds, with byte-hash drift in `cast_info.parquet`; the follow-up decision is
-tracked in
-`_project/TODO/main/planning/joinorder-parquet-rebuild-determinism-decision.yaml`.
-The downloaded published archive is still verified by its pinned
-`archive_sha256` and per-table hashes.
+BenchBox does not define JoinOrder source recovery as byte-identical
+Parquet/archive reproduction. A 2026-05-12 rebuild check produced different
+archive hashes across two local rebuilds, with byte-hash drift in
+`cast_info.parquet`, while conversion-fidelity checks passed. The rebuild
+contract is therefore logical table-content equivalence: maintainer rebuilds
+export PostgreSQL rows in `id` order, read rebuilt Parquet rows in `id` order,
+and compare versioned typed row-content hashes before packaging. The downloaded
+published archive is still verified by its pinned `archive_sha256` and
+per-table Parquet file hashes.
 
 Licensing status is separate from integrity status. The Dataverse record
 declares the deposit as `CC0 1.0`, but IMDb's current dataset terms and the JOB
@@ -61,7 +63,7 @@ The manifest hash fields have separate roles:
 - `archive_sha256`: sha256 of the downloadable `.tar.zst`, consumed by the
   downloader before extraction.
 - `data_archive_hash`: aggregate sha256 over sorted per-table Parquet hashes,
-  used to identify the extracted canonical table set in result metadata.
+  used to identify the extracted canonical Parquet file set in result metadata.
 - `manifest_hash`: sha256 of the stable manifest content with transport-only
   fields excluded, consumed by manifest parsing before runtime use.
 

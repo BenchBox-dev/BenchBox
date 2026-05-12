@@ -8,10 +8,10 @@ Schema (from _project/design/joinorder-step1-foundations.md
                           manifest_hash and archive_sha256 fields
                           excluded — bumps on logical data or metadata
                           corrections, not transport-wrapper changes>"
-    data_archive_hash  = "<aggregate sha256 over per-table file hashes
-                          in deterministic table order; this is the
-                          logical data identity copied into result
-                          bundles>"
+    data_archive_hash  = "<aggregate sha256 over per-table Parquet file
+                          hashes in deterministic table order; this
+                          identifies the extracted canonical file set
+                          copied into result bundles>"
     url                = "https://github.com/.../release/.../archive.tar.zst"
     archive_sha256     = "<sha256 the downloader uses to verify the
                           freshly-pulled tarball; distinct from
@@ -38,8 +38,8 @@ The manifest_hash is computed externally (build-pipeline) and pinned
 in the file. At runtime, callers verify the manifest_hash field
 matches a sha256 of the file contents with top-level `manifest_hash`
 and `archive_sha256` removed from the hash input — that bootstraps
-logical manifest tamper detection without making the hash circular
-with the tarball's transport checksum.
+manifest tamper detection without making the hash circular with the
+tarball's transport checksum.
 
 This module only PARSES + VALIDATES the manifest; it does not fetch
 or verify the data files. That's manager.py's job.
