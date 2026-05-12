@@ -647,10 +647,11 @@ def validate_scale_factor(
 def get_benchmark_surface(benchmark_id: str) -> str:
     """Return the registry-declared surface visibility for a benchmark.
 
-    "public" (default) means the benchmark is visible to result-publisher
-    discovery, MCP listings, and the result-explorer surface. "internal"
-    means the benchmark is hidden from those public surfaces but remains
-    runnable; result bundles publish locally.
+    "public" (default) means the benchmark is visible to public discovery
+    surfaces: CLI listing/filter/category selection, MCP listings, result
+    publisher discovery, and the result explorer. "internal" means those
+    discovery surfaces hide the benchmark, but explicit callers can still run
+    it by ID; result bundles publish locally.
 
     Returns "public" for unregistered benchmarks (defensive default).
     """
