@@ -1,0 +1,293 @@
+id: joinorder-step1-housekeeping
+title: "JoinOrder Step 1 housekeeping: dead CSV attrs, stale CLI estimates, surface enforcement, force_regenerate guard, reference-format note, migration-shim decision"
+worktree: main
+priority: Medium
+status: Not Started
+category: Core Functionality
+
+description: |
+  Follow-up to the merged canonical-JOB foundation (issue #289 Step 1; PRs #332,
+  #339, #341, #350, #369). The post-merge code review + blind-spot audit
+  collected six small, low-risk, independently-revertible cleanups and minor
+  decisions that don't belong in the bigger follow-up TODOs
+  (`joinorder-canonical-data-assurance`, `joinorder-redistribution-license-adr`,
+  `joinorder-accessibility-and-comparability` -- all independent of this one):
+
+    1. `benchbox/core/joinorder/benchmark.py` (~lines 38-47): `JoinOrderBenchmark`
+       still carries `csv_delimiter = ","` / `csv_null_marker = ""` class
+       attributes and a comment about "data cached before the generator wrote
+       manifests" / `resolve_csv_dialect` path (a)/(b). The canonical path
+       fetches a pre-built Parquet archive -- there is no generator and no CSV.
+       This is dead/misleading code. Remove it (after confirming no loader path
+       reads those attrs for the canonical class).
+
+    2. `benchbox/cli/benchmarks.py`: `_estimate_memory_usage["joinorder"] = 0.5`
+       (GB) and `_estimate_execution_time["joinorder"] = (10, 30)` predate the
+       ~5 GB / 74M-row canonical dataset; there are no `joinorder_synthetic`
+       entries (it silently falls back to 1.0 GB / generic). The registry says
+       `estimated_time_range: (10, 30)` for joinorder too -- reconcile. Update
+       the estimates to reflect the canonical dataset and add `joinorder_synthetic`
+       entries.
+
+    3. The `surface: "internal"` contract is only half-enforced. MCP discovery
+       (`mcp/tools/discovery.py`), MCP resources, and the explorer honor
+       `get_benchmark_surface(...) != "public"` and hide `joinorder_synthetic`.
+       The interactive `benchbox` CLI wizard does NOT: `BenchmarkManager._get_available_benchmarks()`
+       returns `get_all_benchmarks()` unfiltered and `BENCHMARK_ORDER["Academic"]`
+       lists `joinorder_synthetic`, so a user picking "Academic" sees "JoinOrder
+       Synthetic" as a selectable option. Decide: either (i) filter the wizard
+       by surface so `joinorder_synthetic` is hidden there too, or (ii) define
+       "internal" as "hidden from MCP/explorer/programmatic discovery only,
+       still interactively runnable" -- and either way document the definition
+       next to `get_benchmark_surface` in `benchbox/core/benchmark_registry.py`.
+
+    4. `force_regenerate` on `joinorder` now means "delete and re-download ~1.2 GB
+       + re-extract", not "regenerate a 700 KB synthetic dataset". (a) Add a
+       size/cost note to the CLI help for the `force_regenerate` option (it's
+       registered via `BenchmarkHookRegistry.register_option_specs("joinorder", ...)`
+       at the bottom of `benchbox/core/joinorder/benchmark.py`). (b) Verify
+       `benchbox/core/data_fetch/` handles concurrent downloads safely -- two
+       processes both deciding the archive is absent and both writing the
+       `*.part` file -> race / corruption. If `fetch_data` already uses an
+       atomic rename + a lockfile, note that; if not, file the race as its own
+       finding/TODO (do not fix it here -- out of scope, just surface it).
+
+    5. `_project/joinorder/reference_cardinalities.json` (and the tiny variant)
+       use a `first_row_sha256 + row_count + underlying_row_count` format. This
+       only works because all 113 JOB queries are single-row `MIN(...)`
+       aggregates (so first-row == full result). Add a comment to the generating
+       code in `_project/scripts/build_joinorder_data.py` (and a one-line note
+       in the JSON-adjacent docs if there's a README) stating this assumption,
+       so a future non-aggregate / raw-rows query variant isn't silently
+       mis-validated.
+
+    6. `JoinOrder(scale_factor=0.1)` now hard-raises `ValueError`. Saved configs,
+       notebooks, `unified_runner` invocations passing a sub-scale break with no
+       deprecation window. Decide and RECORD: either (i) "no shim -- a hard
+       raise is acceptable for the 0.2.x beta" (likely; just write it in
+       `_project/joinorder/migration-plan.md` with the rationale), or (ii)
+       implement a one-release warn-and-ignore shim (`scale_factor < 1` -> emit
+       a deprecation warning, proceed at 1.0). Default to (i) unless the user
+       wants the shim.
+
+  Each item is independent; do them as separate work units / commits. Items 1
+  and 2 are pure code cleanup; 3 has a small decision; 4a is a help-text tweak
+  and 4b is a read-only audit-or-file; 5 is a comment; 6 is a recorded decision
+  (or a small shim). Nothing here changes the canonical data or the
+  scale_factor=1.0-only contract.
+
+context_sections:
+  "Why these are separate from the big TODOs": |
+    `joinorder-canonical-data-assurance` is about the dataset's integrity;
+    `joinorder-redistribution-license-adr` is a legal determination;
+    `joinorder-accessibility-and-comparability` is about a small workload + a
+    comparability hazard. These six are leftover lint -- low risk, low effort,
+    no decision gates except items 3 and 6 (both small). Keeping them out of the
+    big TODOs keeps those focused.
+  "Confirming item 1 is safe": |
+    `csv_delimiter` / `csv_null_marker` and `resolve_csv_dialect` are used by
+    the CSV-loading path in `benchbox/platforms/base/data_loading.py` (or
+    similar) for benchmarks that ship CSV. The canonical `JoinOrderBenchmark`
+    ships Parquet via `generate_data()` -> `fetch_data`. Grep for
+    `resolve_csv_dialect` and `csv_null_marker` to confirm nothing dispatches on
+    those attrs *for the canonical joinorder class* before deleting them. (The
+    internal `joinorder_synthetic` benchmark may legitimately still need CSV
+    dialect attrs -- those stay; this item is only about the canonical class.)
+
+work:
+  - id: w1
+    summary: "Item 1: remove dead csv_delimiter/csv_null_marker class attrs + the stale generator/resolve_csv_dialect comment from JoinOrderBenchmark, after confirming no loader reads them for the canonical class"
+    status: pending
+    notes: |
+      Grep `resolve_csv_dialect`, `csv_null_marker`, `csv_delimiter` across
+      benchbox/ to confirm the canonical `JoinOrderBenchmark` (Parquet-archive
+      path) never has those attrs consulted. Remove the two class attributes and
+      the multi-line comment block above them (benchbox/core/joinorder/benchmark.py
+      ~lines 38-47). Run the joinorder unit tests + a `benchbox run --benchmark
+      joinorder --scale 1 --validate-only` (or the lightest available smoke) to
+      confirm the fetch/load path is unaffected.
+
+  - id: w2
+    summary: "Item 2: update benchbox/cli/benchmarks.py memory/time estimates for the ~5 GB / 74M-row canonical joinorder; add joinorder_synthetic entries; reconcile with the registry's estimated_time_range"
+    status: pending
+    notes: |
+      Set `_estimate_memory_usage["joinorder"]` and `_estimate_execution_time["joinorder"]`
+      to values consistent with the canonical dataset (the blog says ~5 GB
+      uncompressed; the archive is ~1.2 GB compressed; 74M rows across 21 tables
+      -- pick estimates that don't mislead, e.g. several GB working set, tens of
+      minutes). Add `joinorder_synthetic` entries (small -- it's the old
+      synthetic generator). If `BENCHMARK_METADATA["joinorder"]["estimated_time_range"]`
+      disagrees with the CLI table, make them consistent (prefer the registry as
+      source of truth if the CLI can read it; otherwise mirror the value).
+
+  - id: w3
+    summary: "Item 3: decide + implement whether the interactive `benchbox` CLI wizard honors surface=internal; document the definition of 'surface' near get_benchmark_surface"
+    status: pending
+    notes: |
+      Decision (small): (i) filter the wizard -- have `BenchmarkManager._get_available_benchmarks()`
+      drop `surface != "public"` entries (and/or strip them from the per-category
+      lists), so `joinorder_synthetic` is hidden interactively too -- it stays
+      runnable via `--benchmark joinorder_synthetic`; OR (ii) keep it visible and
+      define "internal" as "excluded from MCP/explorer/programmatic discovery
+      only". Implement the chosen behavior. EITHER WAY, expand the docstring of
+      `get_benchmark_surface` in `benchbox/core/benchmark_registry.py` to state
+      exactly which surfaces "internal" hides from. If (i): make sure
+      `benchbox list` / non-interactive listings are consistent with the wizard.
+      Add/adjust a test asserting the chosen behavior.
+
+  - id: w4
+    summary: "Item 4: add a size/cost note to the joinorder force_regenerate CLI help; audit data_fetch for concurrent-download safety; file the race as a separate TODO if unhandled"
+    status: pending
+    notes: |
+      (a) In the `BenchmarkOptionSpec(name="force_regenerate", ...)` registration
+      at the bottom of `benchbox/core/joinorder/benchmark.py`, extend the `help`
+      string to note it re-downloads the full ~1.2 GB canonical archive.
+      (b) Read `benchbox/core/data_fetch/` (`fetch_data`, the download +
+      `.part` handling): does it download to a temp/`.part` path and atomically
+      rename on completion? does it guard against two concurrent downloaders
+      (lockfile, or os.replace being atomic + a partial-file check + checksum
+      re-verify on read)? If it's already safe, add a one-line note here and
+      done. If there's a real race -> do NOT fix it in this TODO; file a new
+      TODO (`joinorder-data-fetch-concurrent-download-race` or a generic
+      `data-fetch-concurrent-download-race` since it affects every real-data
+      benchmark) and reference it from here.
+
+  - id: w5
+    summary: "Item 5: comment in build_joinorder_data.py that the reference-cardinalities format (first_row_sha256 + row_count) assumes single-row aggregate query results"
+    status: pending
+    notes: |
+      Add a comment near the reference-cardinalities generation in
+      `_project/scripts/build_joinorder_data.py` (and a one-line note in
+      `_project/joinorder/`'s README/docs if one covers the JSON files): the
+      format records the first row's sha256, which equals the full result only
+      because all 113 canonical JOB queries are single-row `MIN(...)` aggregates;
+      a non-aggregate or raw-rows query variant would need a full-result hash.
+      Comment/doc only -- no code or data change.
+
+  - id: w6
+    summary: "Item 6: record the migration-shim decision in _project/joinorder/migration-plan.md (default: no shim, beta-acceptable); or implement a one-release warn-and-ignore shim if decided otherwise"
+    status: pending
+    notes: |
+      Default: write in `_project/joinorder/migration-plan.md` that
+      `JoinOrder(scale_factor != 1.0)` raising `ValueError` with no deprecation
+      window is an accepted breaking change for the 0.2.x beta, with the
+      rationale (beta; the synthetic generator moved to `joinorder_synthetic`;
+      docs/blog updated). If the user instead wants a shim: in
+      `benchbox/core/joinorder/benchmark.py` (and `benchbox/joinorder.py`),
+      accept `scale_factor < 1.0` for one release with a `DeprecationWarning`
+      that says it's ignored and the run proceeds at 1.0; add a test for the
+      warning. Pick the recorded-decision path unless told otherwise.
+
+deferred:
+  - summary: "Fixing the data_fetch concurrent-download race (if w4 finds one)"
+    reason: "Out of scope for housekeeping; affects every real-data benchmark, not just joinorder -- w4 only audits and files it"
+  - summary: "Removing csv dialect attrs from the internal joinorder_synthetic benchmark"
+    reason: "joinorder_synthetic legitimately ships CSV-loaded synthetic data and may need the dialect attrs; item 1 is the canonical class only"
+
+prior_art:
+  - "benchbox/core/benchmark_registry.py:get_benchmark_surface + list_public_benchmark_ids — existing surface machinery honored by MCP/explorer; item 3 either extends the CLI wizard to honor it or documents its scope"
+  - "benchbox/core/data_fetch/ (fetch_data, manifest verification, ExtractionRequiredError) — existing download/extract/verify path; item 4 audits its concurrency story rather than adding a new one"
+  - "benchbox/cli/benchmark_hooks.py:BenchmarkHookRegistry.register_option_specs — existing per-benchmark CLI option mechanism; item 4a edits the existing joinorder force_regenerate spec"
+  - "_project/joinorder/migration-plan.md — existing joinorder migration doc; item 6 records the scale_factor breaking-change decision there"
+
+must_preserve:
+  - "benchbox run --benchmark joinorder --scale 1 keeps fetching/verifying the canonical Parquet archive exactly as today (item 1 must not change the load path)"
+  - "joinorder_synthetic stays runnable via --benchmark joinorder_synthetic regardless of item 3's outcome (it's hidden from some surfaces, not removed)"
+  - "The internal joinorder_synthetic benchmark's CSV dialect attributes stay (item 1 is the canonical class only)"
+  - "scale_factor=1.0-only contract on canonical joinorder is unchanged (item 6 either documents the breaking change or adds a deprecation shim that still proceeds at 1.0)"
+  - "Existing joinorder + benchmark-registry + CLI tests keep passing"
+
+approach: |
+  Six independent slices, one commit each. Do the pure-cleanup ones (w1, w2, w5)
+  first -- lowest risk. w3 and w6 have a small decision baked in (default
+  documented; surface to the user only if ambiguous). w4 is split: 4a is a
+  trivial help-text edit; 4b is a read-only audit that either ends in "it's
+  fine" or files a separate TODO. Grep before deleting in w1. Read
+  benchmark_registry.py's surface helpers before w3 and data_fetch before w4.
+
+anti_patterns:
+  - "DO NOT delete csv_delimiter/csv_null_marker without grepping resolve_csv_dialect / csv_null_marker first — because a loader path might dispatch on them — confirm the canonical class never has them consulted"
+  - "DO NOT remove the CSV dialect attrs from joinorder_synthetic — because it ships CSV synthetic data — item 1 is the canonical JoinOrderBenchmark only"
+  - "DO NOT fix the data_fetch concurrent-download race in this TODO — because it affects every real-data benchmark and is out of housekeeping scope — audit and file it as its own TODO"
+  - "DO NOT change the scale_factor=1.0-only contract or default_scale — because that's the point of canonical joinorder — item 6 is a doc decision or a non-breaking deprecation shim, not a relaxation"
+  - "DO NOT bundle these six into one commit — because they're independent and independently revertible — one slice, one commit"
+
+verification:
+  - description: "Dead CSV attrs/comment removed; load path unaffected"
+    command: "grep -n 'csv_null_marker\\|csv_delimiter\\|resolve_csv_dialect' benchbox/core/joinorder/benchmark.py || echo REMOVED; uv run -- python -m pytest tests/unit/core/joinorder tests/unit/core/test_joinorder_benchmark.py -q"
+    expected_output: "REMOVED from the canonical class; joinorder unit tests pass"
+  - description: "CLI estimates updated for canonical joinorder; joinorder_synthetic entries present"
+    command: "uv run -- python -c \"from benchbox.cli.benchmarks import BenchmarkManager as B; m=B(); print(m._estimate_memory_usage('joinorder',1.0), m._estimate_execution_time('joinorder',1.0), m._estimate_memory_usage('joinorder_synthetic',1.0))\""
+    expected_output: "joinorder estimate reflects a multi-GB / tens-of-minutes canonical run; joinorder_synthetic returns a small dedicated estimate, not the generic 1.0 fallback"
+  - description: "surface='internal' behavior is decided, implemented, and documented"
+    command: "grep -A8 'def get_benchmark_surface' benchbox/core/benchmark_registry.py; uv run -- python -m pytest tests/unit -k 'surface or benchmark_registry or benchmark_manager' -q"
+    expected_output: "get_benchmark_surface docstring states which surfaces 'internal' hides from; tests assert the chosen CLI-wizard behavior"
+  - description: "force_regenerate help notes the download size; data_fetch concurrency audited"
+    command: "uv run -- benchbox run --benchmark joinorder --help 2>&1 | grep -i 'force.regenerate' ; grep -rn 'part\\|os.replace\\|lock\\|atomic' benchbox/core/data_fetch/ | head"
+    expected_output: "force_regenerate help mentions re-downloading the ~1.2 GB archive; the data_fetch audit conclusion (safe / race-filed-as-TODO) is recorded"
+  - description: "Reference-format assumption is commented; migration-shim decision recorded"
+    command: "grep -i 'aggregate\\|first.row\\|single.row' _project/scripts/build_joinorder_data.py; grep -i 'scale_factor\\|breaking\\|shim\\|deprecat' _project/joinorder/migration-plan.md"
+    expected_output: "build_joinorder_data.py comments the single-row-aggregate assumption; migration-plan.md records the scale_factor!=1.0 breaking-change decision (no shim) or the shim is implemented + tested"
+  - description: "Docs build clean if any help/docs changed"
+    command: "make docs-validate"
+    expected_output: "passes"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/joinorder/benchmark.py"
+    - "benchbox/joinorder.py"
+    - "benchbox/cli/benchmarks.py"
+    - "benchbox/core/benchmark_registry.py"
+    - "_project/scripts/build_joinorder_data.py"
+    - "_project/joinorder/migration-plan.md"
+    - "tests/unit/core/joinorder/"
+    - "tests/unit/core/test_joinorder_benchmark.py"
+    - "tests/unit/"
+  do_not_modify:
+    - "benchbox/core/joinorder/queries.py"
+    - "benchbox/core/joinorder/dataframe_queries.py"
+    - "benchbox/core/joinorder/data_manifest.toml"
+    - "benchbox/core/joinorder_synthetic/"
+    - "benchbox/core/data_fetch/"
+
+metadata:
+  owners:
+    - joeharris76
+  tags:
+    - joinorder
+    - issue-289
+    - cleanup
+    - step1-followup
+  estimated_effort: Small
+  created_date: "2026-05-12"
+  last_updated: "2026-05-12T00:00:00"
+
+impact:
+  business_value: |
+    Removes misleading dead code and stale estimates, makes the surface=internal
+    contract coherent, and records the scale_factor breaking-change decision --
+    small debts that otherwise linger and confuse the next contributor.
+  user_impact: |
+    Accurate CLI memory/time estimates for the now-large joinorder run; a
+    coherent story for whether joinorder_synthetic shows up in the wizard; a
+    clear migration note for anyone whose scripts passed a sub-scale.
+  technical_debt: |
+    Clears six small post-cutover loose ends; surfaces (without fixing) the
+    data_fetch concurrent-download race for proper triage.
+
+success_metrics:
+  - "csv_delimiter/csv_null_marker and the stale generator comment are gone from the canonical JoinOrderBenchmark, with no load-path regression"
+  - "benchbox/cli/benchmarks.py memory/time estimates for joinorder reflect the canonical dataset and joinorder_synthetic has its own entries"
+  - "The interactive CLI wizard's handling of surface=internal is decided, implemented, tested, and the meaning of 'internal' is documented at get_benchmark_surface"
+  - "force_regenerate CLI help notes the download size; the data_fetch concurrency story is recorded (safe, or filed as a TODO)"
+  - "The reference-cardinalities single-row-aggregate assumption is commented in the generator; the scale_factor!=1.0 breaking-change decision is recorded in migration-plan.md (or a deprecation shim is implemented + tested)"
+
+open_questions:
+  - question: "Should the interactive `benchbox` CLI wizard hide surface=internal benchmarks (filter joinorder_synthetic), or is 'internal' defined as MCP/explorer-only?"
+    gating: false
+    affects: ["w3"]
+    default: "Filter the wizard (option i) -- it matches MCP/explorer behavior and keeps the surface contract simple; joinorder_synthetic stays runnable by explicit --benchmark"
+  - question: "Add a one-release warn-and-ignore deprecation shim for JoinOrder(scale_factor < 1), or just record the hard-raise as accepted for the beta?"
+    gating: false
+    affects: ["w6"]
+    default: "Record the hard-raise as accepted (no shim) -- 0.2.x is beta and the alternative path (joinorder_synthetic) is documented"
