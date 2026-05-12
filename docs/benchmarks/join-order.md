@@ -34,10 +34,10 @@ The downloaded published archive is still verified by its pinned
 
 Licensing status is separate from integrity status. The Dataverse record
 declares the deposit as `CC0 1.0`, but IMDb's current dataset terms and the JOB
-paper frame the underlying IMDb data as non-commercial. BenchBox therefore does
-not treat its current re-hosted Parquet release asset as cleared for broad
-redistribution until the remediation tracked from
-`_project/decisions/joinorder-canonical-data-licensing-2026-05-12.md` lands.
+paper frame the underlying IMDb data as non-commercial. BenchBox records the
+current re-hosted Parquet release asset as an accepted project-owner
+redistribution risk, keeps it as the default fast path, and does not treat it as
+BenchBox-cleared for broad commercial redistribution.
 
 The benchmark accepts only `--scale 1`. There is currently no public small,
 comparable JOB workload; the decision is recorded in
@@ -140,7 +140,9 @@ Information courtesy of IMDb (https://www.imdb.com). Used with permission.
 Use this dataset for research, database systems evaluation, and query optimizer
 benchmarking. It is not intended for republication as a general-purpose movie
 database, and BenchBox does not treat the current converted archive as
-BenchBox-cleared for commercial redistribution.
+BenchBox-cleared for broad commercial redistribution. Optional follow-up work may
+seek explicit permission or add an advanced direct-Dataverse/BYO path, but the
+default user experience remains the verified BenchBox-hosted Parquet archive.
 
 ## References
 
