@@ -1,0 +1,2 @@
+Browser acceptance skipped: w2 automated frontend suite failed, so release gate stopped before w3 per decision gate.
+Blocking evidence: see w2-frontend-tests.log and w2-frontend-failure-summary.log.
