@@ -1,14 +1,14 @@
 ---
 id: 2026-04-30-114722-queue-single-point-failure
 date: 2026-04-30
-status: actionable
+status: merged-to-todo
 finding_kind: scope-creep
 review_context: "L2 merge-loop audit / dev-loop simplification planning (2026-04-30)"
 related_paths:
   - Makefile
   - .github/workflows/auto-merge-on-open.yml
 suggested_sweep: "Before any queue TODO is promoted, identify queue steward failure modes and fallback commands."
-todo_id: null
+todo_id: dev-loop-queue-acceptance-criteria-from-blind-spots
 ---
 
 # Queue steward can become a single point of failure
@@ -40,3 +40,4 @@ Replacing decentralized auto-merge with a queue can make one local process or wo
   BUILD QUEUE.
 - 2026-05-06: actionable — 2026-05-06 sweep: decentralized auto-merge live (auto-merge-on-open.yml + develop-post-merge.yml present); dev-loop-step-6-queue-decision-gate still Blocked on Step 5 — failure-mode-analysis remains the gate before any steward TODO
 - 2026-05-08: actionable — sweep: auto-merge-on-open.yml + develop-post-merge.yml still shipped; dev-loop-step-6-queue-decision-gate still Blocked (waiting on Step 5 measurement window through ~2026-05-30) — failure-mode-analysis pre-condition stands
+- 2026-05-11: promoted to TODO `dev-loop-queue-acceptance-criteria-from-blind-spots`

@@ -1,7 +1,7 @@
 ---
 id: 2026-05-07-211858-release-readiness-against-pre-merge-tree
 date: 2026-05-07
-status: actionable
+status: actioned
 finding_kind: framework-gap
 review_context: "PR #269 review (results-explorer-retheme-audit-followups) → PR #271 (results-explorer-retheme-postmerge-tokenize)"
 related_paths:
@@ -124,3 +124,4 @@ Step #1 is already tracked by TODO
 
 - 2026-05-08: actionable — Re-verified 2026-05-08: PR #271 (274a4a11e) closed the immediate token regression but next steps #2 (capture/develop-SHA gate), #3 (generalize SHA stamp to all _project/audits/ reports), and #4 (re-run release-final capture against post-#271 develop tip) remain. Next step #1 already tracked by TODO results-explorer-token-scan-ci-gate.
 - 2026-05-08: actionable — commits: implementation branch `chore/explorer-audit-sha-gate` closes the generalized develop-SHA gate path via TODO `audit-develop-sha-stamping-and-ci-gate`; post-#271 recapture remains tracked separately by TODO `results-explorer-retheme-recapture-against-post-271-develop`.
+- 2026-05-11: actioned — 2026-05-11 sweep: all four next-steps landed — TODOs results-explorer-token-scan-ci-gate, audit-develop-sha-stamping-and-ci-gate (make audit-sha-check + audit_sha_check.py shipped; develop_sha: present in recent _project/audits/*.md), and results-explorer-retheme-recapture-against-post-271-develop all Completed. Generalized develop-SHA-stamp gate covers all _project/audits/ reports. No residual work.
