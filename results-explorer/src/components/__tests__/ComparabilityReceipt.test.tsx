@@ -1,7 +1,12 @@
 import { render, screen, within } from "@testing-library/preact";
 import { describe, expect, it } from "vitest";
 import type { DetailResult } from "@/types";
-import { buildComparabilityFields, ComparabilityReceipt } from "@/components/ComparabilityReceipt";
+import {
+  COMPARABILITY_WARNING_TARGET_ID,
+  buildComparabilityFields,
+  comparabilityWarningFields,
+  ComparabilityReceipt,
+} from "@/components/ComparabilityReceipt";
 
 function makeDetail(overrides: Partial<DetailResult> = {}): DetailResult {
   return {
@@ -101,7 +106,12 @@ describe("ComparabilityReceipt", () => {
     render(<ComparabilityReceipt results={[duckdb, sqlite]} />);
 
     const receipt = screen.getByRole("region", { name: "Comparability receipt" });
-    expect(within(receipt).getByText("4 warnings")).toBeTruthy();
+    expect(within(receipt).getAllByText("4 warnings")).toHaveLength(2);
+    const warningTarget = screen.getByTestId("comparability-warning-target");
+    expect(warningTarget.getAttribute("id")).toBe(COMPARABILITY_WARNING_TARGET_ID);
+    expect(warningTarget.getAttribute("tabindex")).toBe("-1");
+    expect(warningTarget).toHaveTextContent("Driver version");
+    expect(warningTarget).toHaveTextContent("Date window");
     expect(receipt).toHaveTextContent("Driver version");
     expect(receipt).toHaveTextContent("DuckDB: 1.0; SQLite: 2.0");
     expect(receipt).toHaveTextContent("Date window");
@@ -127,6 +137,7 @@ describe("ComparabilityReceipt", () => {
 
     expect(fields.find((field) => field.label === "Phase")?.status).toBe("diff");
     expect(fields.find((field) => field.label === "Query scope")?.status).toBe("diff");
+    expect(comparabilityWarningFields(fields).map((field) => field.label)).toEqual(["Phase", "Query scope"]);
   });
 
   it("uses singular count copy for one warning and one query", () => {
@@ -148,7 +159,7 @@ describe("ComparabilityReceipt", () => {
     render(<ComparabilityReceipt results={[duckdb, sqlite]} />);
 
     const receipt = screen.getByRole("region", { name: "Comparability receipt" });
-    expect(within(receipt).getByText("1 warning")).toBeTruthy();
+    expect(within(receipt).getAllByText("1 warning")).toHaveLength(2);
     expect(receipt).not.toHaveTextContent("1 warnings");
     expect(receipt).toHaveTextContent("1 query");
     expect(receipt).not.toHaveTextContent("1 queries");

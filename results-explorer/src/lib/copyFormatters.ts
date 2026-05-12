@@ -7,6 +7,17 @@ export function formatWarningCount(count: number): string {
   return formatCount(count, "warning");
 }
 
+export function formatWarningClassSummary(count: number, labels: readonly string[], maxLabels = 3): string {
+  if (count <= 0) return "No warnings";
+  const visibleLabels = labels.slice(0, maxLabels);
+  if (visibleLabels.length === 0) return formatWarningCount(count);
+  const extraCount = Math.max(0, count - visibleLabels.length);
+  const extraText = extraCount > 0 ? `, +${formatCount(extraCount, "more", "more")}` : "";
+  return removeDuplicatedTerminalPunctuation(
+    ensureSentence(`Warning classes: ${visibleLabels.join(", ")}${extraText}`),
+  );
+}
+
 export function formatCandidateCount(count: number): string {
   return formatCount(count, "candidate");
 }

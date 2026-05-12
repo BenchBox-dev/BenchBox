@@ -1,0 +1,12 @@
+
+> results-explorer@0.1.0 test
+> vitest run --run src/pages/__tests__/Compare.test.tsx src/components/__tests__/ComparabilityReceipt.test.tsx src/lib/__tests__/compareSummary.test.ts
+
+
+ RUN  v4.1.4 /Users/joe/Developer/BenchBox.release-gate/results-explorer
+
+
+ Test Files  3 passed (3)
+      Tests  46 passed (46)
+   Start at  20:37:40
+   Duration  2.10s (transform 425ms, setup 198ms, import 679ms, tests 766ms, environment 1.89s)
