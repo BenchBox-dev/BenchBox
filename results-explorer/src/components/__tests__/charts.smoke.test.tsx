@@ -269,6 +269,32 @@ describe("RankTable", () => {
     );
     expect(labels).toStrictEqual(["Q1", "Q2", "Q10"]);
   });
+
+  it("shows an empty state instead of an all-dash matrix when every row is excluded", () => {
+    const summary = makeSummary({
+      platforms: [
+        makePlatform({
+          result_id: "r1",
+          platform_id: "duckdb",
+          platform: "DuckDB",
+          ranking_exclusion_reason: "trust_not_rankable",
+        }),
+        makePlatform({
+          result_id: "r2",
+          platform_id: "sqlite",
+          platform: "SQLite",
+          ranking_exclusion_reason: "validation_not_clean",
+        }),
+      ],
+    });
+    const { container } = render(<RankTable summary={summary} />);
+
+    expect(container.querySelector("table")).toBeNull();
+    expect(container.textContent).toContain("Rank chart unavailable");
+    expect(container.textContent).toContain("Submitted evidence is Excluded");
+    expect(container.textContent).toContain("Trust policy excludes this result from ranking.");
+    expect(container.textContent).toContain("Validation status excludes this result from ranking.");
+  });
 });
 
 // ---------------------------------------------------------------------------

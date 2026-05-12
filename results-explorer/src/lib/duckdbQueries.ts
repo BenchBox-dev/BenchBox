@@ -993,13 +993,20 @@ async function loadMetaLeaderboardData(): Promise<MetaLeaderboard | null> {
     };
   }
 
-  const platforms: MetaPlatform[] = platformRows.map((row) => ({
-    platform_id: row.platform_id,
-    platform: row.platform,
-    ranks: ranksByPlatform.get(row.platform_id) ?? {},
-    avg_rank: row.avg_rank,
-    n_cohorts: row.n_cohorts,
-  }));
+  const platformRowsById = new Map(platformRows.map((row) => [row.platform_id, row]));
+  const platformNamesById = new Map(cohortRows.map((row) => [row.platform_id, row.platform]));
+  const platformIds = new Set([...platformRowsById.keys(), ...platformNamesById.keys()]);
+  const platforms: MetaPlatform[] = [...platformIds].map((platformId) => {
+    const row = platformRowsById.get(platformId);
+    const ranks = ranksByPlatform.get(platformId) ?? {};
+    return {
+      platform_id: platformId,
+      platform: row?.platform ?? platformNamesById.get(platformId) ?? platformId,
+      ranks,
+      avg_rank: row?.avg_rank ?? null,
+      n_cohorts: row?.n_cohorts ?? Object.keys(ranks).length,
+    };
+  });
 
   return {
     // generated_at is not stored per-row in DuckDB; callers that need it can

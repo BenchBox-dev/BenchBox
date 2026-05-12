@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { RoutableProps } from "preact-router";
 import type {
   MetaCohort,
+  MetaCohortPlatform,
   MetaLeaderboard as MetaLeaderboardData,
   MetaPlatform,
   MetaRank,
@@ -147,12 +148,14 @@ export function Home(_: RoutableProps) {
   );
 
   const cohortPlatformIndex = useMemo(() => {
-    const index = new Map<string, Map<string, string>>();
+    const index = new Map<string, Map<string, MetaCohortPlatform[]>>();
     if (!metaLeaderboard) return index;
     for (const cohort of metaLeaderboard.cohorts) {
-      const inner = new Map<string, string>();
+      const inner = new Map<string, MetaCohortPlatform[]>();
       for (const row of cohort.platforms ?? []) {
-        inner.set(row.platform_id, row.result_id);
+        const rows = inner.get(row.platform_id) ?? [];
+        rows.push(row);
+        inner.set(row.platform_id, rows);
       }
       index.set(cohort.key, inner);
     }
@@ -162,26 +165,34 @@ export function Home(_: RoutableProps) {
   const filteredMetaLeaderboard = useMemo(() => {
     if (!metaLeaderboard) return null;
 
-    const visibleCohorts = metaLeaderboard.cohorts.filter((cohort) => {
+    const visibleCohorts = metaLeaderboard.cohorts.map((cohort) => ({
+      ...cohort,
+      platforms: (cohort.platforms ?? []).filter((row) => {
+        const result = resultById.get(row.result_id);
+        return result !== undefined && matchesFacetRow(result, facets);
+      }),
+    })).filter((cohort) => {
       if (benchmarkFilters.length > 0 && !benchmarkFilters.includes(cohort.benchmark)) return false;
       if (scaleFilters.length > 0 && !scaleFilters.includes(String(cohort.scale_factor))) return false;
       if (phaseFilter !== "all" && cohort.phase !== phaseFilter) return false;
 
-      return (cohort.platforms ?? []).some((row) => {
-        const result = resultById.get(row.result_id);
-        return result !== undefined && matchesFacetRow(result, facets);
-      });
+      return (cohort.platforms ?? []).length > 0;
     });
 
     const visibleCohortKeys = new Set(visibleCohorts.map((cohort) => cohort.key));
+    const visibleEvidencePlatformIds = new Set(
+      visibleCohorts.flatMap((cohort) => (cohort.platforms ?? []).map((row) => row.platform_id)),
+    );
     const platforms = metaLeaderboard.platforms
       .map((platform) => {
         const ranks = Object.fromEntries(
           Object.entries(platform.ranks).filter(([cohortKey]) => {
             if (!visibleCohortKeys.has(cohortKey)) return false;
-            const resultId = cohortPlatformIndex.get(cohortKey)?.get(platform.platform_id);
-            const result = resultId ? resultById.get(resultId) : undefined;
-            return result !== undefined && matchesFacetRow(result, facets);
+            const rows = cohortPlatformIndex.get(cohortKey)?.get(platform.platform_id) ?? [];
+            return rows.some((row) => {
+              const result = resultById.get(row.result_id);
+              return row.rank !== null && result !== undefined && matchesFacetRow(result, facets);
+            });
           }),
         ) as Record<string, MetaRank>;
 
@@ -197,7 +208,7 @@ export function Home(_: RoutableProps) {
           n_cohorts: rankValues.length,
         } satisfies MetaPlatform;
       })
-      .filter((platform) => platform.n_cohorts > 0)
+      .filter((platform) => platform.n_cohorts > 0 || visibleEvidencePlatformIds.has(platform.platform_id))
       .sort((a, b) => {
         if (a.avg_rank === null && b.avg_rank === null) return 0;
         if (a.avg_rank === null) return 1;
@@ -431,7 +442,7 @@ export function Home(_: RoutableProps) {
           <StatCard
             value={leaderboardCohortCount}
             label="leaderboard cohorts"
-            detail={`${visibleLeaderboardCohortCount} visible; ${visibleLeaderboardPlatformCount}/${leaderboardPlatformCount} ranked platforms`}
+            detail={`${visibleLeaderboardCohortCount} visible; ${visibleLeaderboardPlatformCount}/${leaderboardPlatformCount} platforms`}
           />
         </section>
 
