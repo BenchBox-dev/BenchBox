@@ -1,0 +1,204 @@
+id: results-explorer-public-run-identity-and-receipt-reachability
+title: "Close Results Explorer public run identity and receipt reachability gaps"
+worktree: results-explorer-contract-followup
+priority: High
+status: Not Started
+category: User Experience
+
+description: |
+  The post-remediation review found that Results Explorer now has better
+  duplicate-name disambiguation, but it still leaks conflicting run identities
+  and removes receipt/detail reachability from high-use benchmark views.
+
+  Benchmark Matrix and Ranks views can show the runs a user wants to inspect,
+  but those rows no longer expose a result-detail or receipt affordance. Compare
+  selection trays also display compact compare IDs such as `d28345e6` while row
+  labels and result-detail routes show different public result IDs such as
+  `a62d0d72`. This makes the same run appear to have two identities.
+
+  This TODO defines a single public run-identity contract, separates URL
+  transport IDs from visible IDs, and restores compact detail/receipt reachability
+  in Matrix and Ranks without reintroducing tall frozen rows.
+
+deps:
+  needs: []
+
+work:
+- id: w0
+  summary: "Revalidate identity and receipt gaps on current develop"
+  status: pending
+  notes: |
+    On the checked SHA, capture evidence for:
+      - `/results/amplab/?scale=0.01&view=matrix` result-detail or receipt link
+        count inside the Matrix table;
+      - `/results/amplab/?scale=0.01&view=ranks` result-detail or receipt link
+        count inside the Ranks table;
+      - `/results/amplab/?scale=0.01&view=list` result-detail or receipt link
+        count inside the List table;
+      - selected compare tray labels after selecting AMPLab rows from Matrix,
+        Ranks, List, Platform detail, Query Workbench, and result detail;
+      - the public ID shown in the selected tray compared with the ID in the
+        row label, result-detail route, and receipt link.
+    Store the compact findings in
+    `_project/verification-logs/results-explorer-public-run-identity-and-receipt-reachability/w0.md`.
+    Decision gate: if the current UI already exposes one consistent public
+    identity and detail/receipt links from Matrix and Ranks, close this TODO
+    with evidence instead of changing code.
+
+- id: w1
+  summary: "Define the public run identity contract before editing UI components"
+  needs: [w0]
+  status: pending
+  notes: |
+    Adopt an explicit contract for every result-bearing surface:
+      - `result_id` is the canonical public result identity and result-detail
+        route target;
+      - `short_id` may be accepted as an input alias in compare URLs, but it
+        must not be shown as the visible run identity unless it is clearly
+        labelled as a URL token and paired with the public result ID;
+      - compact spaces may show a stable public token derived from `result_id`,
+        but the same token must appear in row labels, selected trays, detail
+        links, chart titles, and receipt affordances;
+      - platform name, version, run date, trust tier, source, and public ID are
+        separate fields and must not be concatenated into an unparseable label.
+    Record the decision in the implementation PR description or a small
+    verification note. Decision gate: do not patch `compareIdForRow` or any
+    component until this contract is written down.
+
+- id: w2
+  summary: "Introduce a shared result-link and visible-identity helper"
+  needs: [w1]
+  status: pending
+  notes: |
+    Extend the existing result-link/run-identity helpers so every component can
+    request:
+      - compare URL ID;
+      - result-detail href;
+      - receipt href or receipt anchor when available;
+      - visible public ID token;
+      - accessible full identity string;
+      - compact row action label.
+    Keep URL alias handling separate from display identity. Existing compare
+    URLs using `short_id` should continue to resolve if the backend/read model
+    supports them, but visible labels should use the public identity contract
+    from w1.
+
+- id: w3
+  summary: "Restore Matrix and Ranks detail/receipt access without row bloat"
+  needs: [w2]
+  status: pending
+  notes: |
+    Add a compact row action to Matrix and Ranks rows, such as a `Details`
+    text link, receipt icon link with an accessible label, or an actions column
+    that remains aligned with frozen columns. The affordance must:
+      - be reachable by keyboard;
+      - expose the target result ID in accessible text;
+      - not force trust badges, platform version, receipt text, and selection
+        controls into a tall stacked cell;
+      - preserve existing horizontal scroll and sticky-header alignment.
+
+- id: w4
+  summary: "Separate compare-selection origin from platform/run identity"
+  needs: [w2]
+  status: pending
+  notes: |
+    Remove labels such as `Polars(from result detail)` from platform identity
+    text. If the UI needs to show where a selection came from, render it as a
+    distinct status chip or helper text outside the platform/run identity. The
+    selected tray, row checkbox labels, compare summary, and baseline selector
+    must all use the same visible run-identity contract.
+
+- id: w5
+  summary: "Add identity/link regression tests and browser evidence"
+  needs: [w3, w4]
+  status: pending
+  notes: |
+    Add tests that fail when:
+      - Matrix or Ranks has no reachable detail/receipt affordance for a run;
+      - the selected tray displays a compare URL token that does not match the
+        public row/detail identity;
+      - selection-origin text is concatenated into platform identity;
+      - result-detail and compare routes accept the same ID aliases but render
+        the canonical public ID consistently.
+    Browser-check Matrix, Ranks, List, Platform detail, Query Workbench, result
+    detail, and Compare.
+
+prior_art:
+- "results-explorer/src/lib/resultLinks.ts currently returns `short_id || result_id` for compare URLs and display tokens."
+- "results-explorer/src/lib/runIdentity.ts centralizes natural run labels but does not own compare URL aliases."
+- "results-explorer/src/pages/BenchmarkIndex.tsx renders Matrix, Ranks, List, compare selection, and row labels."
+- "results-explorer/src/pages/PlatformIndex.tsx renders platform compare rows and selected tray labels."
+- "results-explorer/src/pages/Query.tsx renders Query Workbench compare selection."
+- "results-explorer/src/pages/Compare.tsx renders compare builder, selected cards, summary, and baseline controls."
+- "results-explorer/src/pages/ResultDetail.tsx is the canonical result-detail surface."
+
+must_preserve:
+- "Existing shareable compare URLs must continue to resolve for supported ID aliases."
+- "Run identity disambiguation must remain concise in tables and complete in titles/aria labels."
+- "Matrix and Ranks density improvements must not be undone by stacking receipt text, trust badges, version, and source in one cell."
+- "Selection controls must remain keyboard reachable and screen-reader labelled."
+
+approach: |
+  Treat run identity as a contract shared by routing, comparison, receipts, and
+  labels. Add one helper boundary for result links and visible identity, then
+  wire the existing surfaces through it instead of adding component-local ID
+  formatting.
+
+anti_patterns:
+- "DO NOT fix the mismatch by hiding all IDs from selected trays."
+- "DO NOT show `short_id` in one surface and `result_id` in another without a visible relationship between them."
+- "DO NOT restore receipt reachability by reintroducing a wide frozen receipt column."
+- "DO NOT concatenate source/origin markers directly into platform names."
+
+verification:
+- description: "Identity helper and run-identity unit tests pass"
+  command: "cd results-explorer && npm test -- --run src/lib/__tests__/runIdentity.test.ts src/lib/__tests__/resultLinks.test.ts"
+  expected_output: "all identity/link unit tests pass"
+- description: "Benchmark, platform, query, result detail, and compare component tests pass"
+  command: "cd results-explorer && npm test -- --run src/pages/__tests__/BenchmarkIndex.test.tsx src/pages/__tests__/PlatformIndex.test.tsx src/pages/__tests__/Query.test.tsx src/pages/__tests__/ResultDetail.test.tsx src/pages/__tests__/Compare.test.tsx"
+  expected_output: "all targeted route tests pass"
+- description: "Browser evidence confirms consistent IDs and Matrix/Ranks detail access"
+  command: "rg -n \"PASS|FAIL|Matrix|Ranks|selected tray|public ID|receipt|detail\" _project/verification-logs/results-explorer-public-run-identity-and-receipt-reachability/"
+  expected_output: "verification log includes route-level pass/fail evidence"
+
+scope_limit:
+  only_modify:
+  - "results-explorer/src/lib/resultLinks.ts"
+  - "results-explorer/src/lib/__tests__/resultLinks.test.ts"
+  - "results-explorer/src/lib/runIdentity.ts"
+  - "results-explorer/src/lib/__tests__/runIdentity.test.ts"
+  - "results-explorer/src/pages/BenchmarkIndex.tsx"
+  - "results-explorer/src/pages/PlatformIndex.tsx"
+  - "results-explorer/src/pages/Query.tsx"
+  - "results-explorer/src/pages/Compare.tsx"
+  - "results-explorer/src/pages/ResultDetail.tsx"
+  - "results-explorer/src/pages/__tests__/"
+  - "_project/verification-logs/results-explorer-public-run-identity-and-receipt-reachability/"
+  do_not_modify:
+  - "results-explorer/public/data/"
+  - "benchbox/core/explorer_pipeline/"
+
+success_metrics:
+- "Matrix and Ranks each expose a keyboard-reachable detail or receipt affordance for visible runs."
+- "The same public run identity is shown in rows, selected trays, detail routes, chart titles, and receipts."
+- "Compare URLs can remain compact without leaking conflicting IDs into visible labels."
+- "Selection-origin context is visually and semantically separate from platform/run identity."
+
+metadata:
+  tags:
+  - results-explorer
+  - run-identity
+  - compare
+  - receipts
+  estimated_effort: "Medium (1-2 days)"
+  created_date: "2026-05-12"
+
+impact:
+  business_value: |
+    Restores traceability from ranked results to their evidence while avoiding
+    identity mismatches that undermine trust in benchmark comparisons.
+  user_impact: |
+    Users can inspect receipts and compare selected runs without wondering
+    whether a row, tray, chart point, and detail page refer to the same result.
+  technical_debt: |
+    Replaces local ID formatting with a single routing/display contract.
