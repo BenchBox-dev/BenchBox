@@ -477,10 +477,10 @@ describe("Home", () => {
     await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
 
     expect(screen.getByText("Showing 2 of 2 leaderboard-scope platforms across 2 leaderboard cohorts")).toBeTruthy();
-    expect(screen.getByText(/Benchmark options cover 2 of 3 public coverage benchmark sets/)).toBeTruthy();
+    expect(screen.getAllByText(/Benchmark options cover 2 of 3 public coverage benchmark sets/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/SSB/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/1 public platform ID is outside the current leaderboard scope/)).toBeTruthy();
-    expect(screen.getByText(/1 of 4 public results is not labelled for tuning/)).toBeTruthy();
+    expect(screen.getAllByText(/1 public platform ID is outside the current leaderboard scope/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/1 of 4 public results is not labelled for tuning/).length).toBeGreaterThan(0);
     expect(screen.getByRole("heading", { name: "Browse Public Benchmark Results" })).toBeTruthy();
     expect(
       screen.getByText("3 public benchmark set(s). Leaderboard filters above include 2 leaderboard-scope cohort(s)."),
@@ -555,9 +555,12 @@ describe("Home", () => {
     const dataSurface = screen.getByTestId("home-data-surface");
 
     expect(hero.className).toContain("surface-hero");
+    expect(hero).toHaveAttribute("data-surface", "hero");
     expect(selector.className).toContain("bg-[var(--bb-bg-panel)]");
     expect(dataSurface.className).toContain("surface-app");
+    expect(dataSurface).toHaveAttribute("data-surface", "app");
     expect(dataSurface.contains(selector)).toBe(false);
+    expect(screen.getByTestId("leaderboard-scope-summary-mobile")).toBeTruthy();
   });
 
   it("keeps the leaderboard region before secondary workflow and recent-result sections", async () => {
