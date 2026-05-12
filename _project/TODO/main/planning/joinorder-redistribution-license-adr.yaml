@@ -1,0 +1,211 @@
+id: joinorder-redistribution-license-adr
+title: "JoinOrder canonical data redistribution: review IMDb / Dataverse terms, produce an ADR, reconcile DATA-LICENSE.md"
+worktree: main
+priority: High
+status: Not Started
+category: Documentation
+
+description: |
+  Follow-up to the merged canonical-JOB foundation (issue #289 Step 1). The
+  blind-spot audit flagged a redistribution-liability question that the earlier
+  synthetic generator specifically avoided:
+
+  The public `joinorder` benchmark now downloads a Parquet conversion of the
+  2013 IMDb snapshot from a BenchBox-hosted GitHub release asset
+  (`releases/download/data%2Fjoinorder-imdb-2013-v1/joinorder-imdb-2013-v1.tar.zst`,
+  pinned in `benchbox/core/joinorder/data_manifest.toml`). BenchBox is
+  documented and marketed for commercial cloud-warehouse benchmarking. The
+  "Information courtesy of IMDb (https://www.imdb.com). Used with permission."
+  attribution traces to permission granted to the JOB paper authors / for the
+  academic 2013 snapshot deposited on Harvard Dataverse (DOI 10.7910/DVN/2QYZBT)
+  under that deposit's terms. It is not currently established that BenchBox
+  re-hosting and redistributing that data, via a benchmarking tool used in
+  commercial contexts, is within IMDb's data terms or the Dataverse deposit's
+  license -- as opposed to BenchBox piggybacking on a permission that does not
+  extend to it.
+
+  This is a small, standalone TODO whose output is a decision record, not code
+  (except a possible `DATA-LICENSE.md` correction). It is RELEASE-RELEVANT: if
+  the review concludes re-hosting is not clearly permitted, the archive-fetch
+  design itself may have to change (e.g. fetch directly from Dataverse, drop the
+  re-host, or restrict usage), which is a release blocker -- do not leave that
+  unresolved or silently shipped.
+
+  Independent of `joinorder-canonical-data-assurance` (data integrity),
+  `joinorder-accessibility-and-comparability`, and `joinorder-step1-housekeeping`.
+  `joinorder-scale-stress-decision-framework` establishes a
+  `_project/decisions/joinorder-scale-stress-licensing-<date>.md` convention for
+  the Step-2 (scale-stress) licensing question; this TODO is the Step-1 /
+  canonical-data counterpart -- put its ADR in the same `_project/decisions/`
+  directory with the same decision-doc shape.
+
+context_sections:
+  "What to review": |
+    1. IMDb's published data-use terms (the non-commercial / personal-and-
+       non-commercial license that governs the datasets the JOB snapshot was
+       derived from; note IMDb has historically distinguished its "non-
+       commercial licensing" datasets from commercial licensing).
+    2. The Harvard Dataverse deposit terms for DOI 10.7910/DVN/2QYZBT
+       ("imdb_pg11" and siblings) -- the dataset's stated license / terms of
+       use / waiver, and any "how to cite" / redistribution conditions.
+    3. The JOB paper's own statements about data provenance and redistribution
+       ("How Good Are Query Optimizers, Really?", Leis et al., VLDB 2015) and
+       the gregrahn/join-order-benchmark repo's README/LICENSE for how *they*
+       framed redistribution.
+    4. How BenchBox currently frames it: `benchbox/core/joinorder/DATA-LICENSE.md`,
+       `docs/benchmarks/join-order.md` "License And Attribution", and the
+       repository LICENSE (MIT for code -- which does not cover the data).
+  "Possible outcomes": |
+    - CLEARLY PERMITTED: record why (e.g. Dataverse deposit is under an open
+      license that permits redistribution with attribution; IMDb terms are
+      satisfied by the attribution string). Tighten DATA-LICENSE.md to cite the
+      specific clauses. Done.
+    - PERMITTED ONLY UNDER CONDITIONS: e.g. attribution + non-commercial use
+      note + no republication as a general movie DB. Record the conditions, make
+      sure they are surfaced (DATA-LICENSE.md, the data-fetch path's first-run
+      message, docs), and decide whether BenchBox's "commercial benchmarking"
+      positioning conflicts.
+    - NOT CLEARLY PERMITTED: this is a release blocker. Document remediation
+      options -- (a) stop re-hosting; have the data-fetch path pull `imdb_pg11`
+      from Dataverse directly and convert client-side (heavier first run, but no
+      BenchBox redistribution); (b) keep the re-host but gate it behind an
+      explicit user acknowledgement of IMDb's terms; (c) seek written permission;
+      (d) drop canonical `joinorder` to "bring your own Dataverse download".
+      Recommend one and file the implementing TODO.
+  "Why this is not over-lawyering": |
+    The previous design (uniformly-random synthetic data) existed in part so
+    BenchBox never hosted IMDb-derived data. Step 1 reversed that. Taking on
+    redistribution should be a recorded, reviewed decision -- even if the
+    conclusion is "fine, same as Dataverse" -- because right now it is an
+    implicit side effect of the cutover.
+
+work:
+  - id: w1
+    summary: "Gather and summarize the governing terms: IMDb data terms, Dataverse deposit license/ToU, JOB paper + gregrahn repo statements, current BenchBox framing"
+    status: pending
+    notes: |
+      Produce a short evidence digest (in the eventual ADR's appendix): for each
+      source, the URL, the retrieval date, and the verbatim clause(s) that bear
+      on redistribution / commercial use / attribution. Do not paraphrase the
+      operative clauses -- quote them.
+
+  - id: w2
+    summary: "Write the ADR: determination + rationale + (if needed) remediation options and recommendation"
+    needs: [w1]
+    status: pending
+    notes: |
+      Output: `_project/decisions/joinorder-canonical-data-licensing-2026-05-12.md`
+      (the `_project/decisions/` directory exists; the
+      `joinorder-scale-stress-licensing-<date>.md` naming/shape convention is
+      documented in `_project/TODO/main/planning/joinorder-scale-stress-decision-framework.yaml`
+      -- mirror its structure). Link the ADR from
+      `_project/joinorder/migration-plan.md`. The ADR must state: the question,
+      the terms reviewed (w1 digest), the determination (permitted / conditional
+      / not-clear), the rationale, and -- only if conditional or not-clear --
+      the remediation options with a recommendation.
+
+  - id: w3
+    summary: "Reconcile DATA-LICENSE.md and the user-facing attribution with the ADR conclusion"
+    needs: [w2]
+    status: pending
+    notes: |
+      Update `benchbox/core/joinorder/DATA-LICENSE.md` and the "License And
+      Attribution" section of `docs/benchmarks/join-order.md` so they cite the
+      specific governing terms and any conditions the ADR identified (instead of
+      the current generic "Used with permission" line). If the data-fetch
+      first-run path should surface a terms acknowledgement, note that as a
+      follow-up requirement (or file it as a TODO) rather than implementing it
+      here. Run `make docs-validate`.
+
+  - id: w4
+    summary: "If the ADR concludes 'not clearly permitted': file the implementing/remediation TODO and flag the release blocker"
+    needs: [w2]
+    status: pending
+    notes: |
+      Conditional. If w2 lands on PERMITTED or PERMITTED-UNDER-CONDITIONS-already-
+      met, this work unit is a no-op (mark done with a note). If it lands on NOT
+      CLEARLY PERMITTED or CONDITIONS-NOT-MET, create a new TODO for the
+      recommended remediation (e.g. `joinorder-data-fetch-from-dataverse`),
+      mark this TODO `blocked` pending that decision, and notify the user that
+      canonical `joinorder` has a release-blocking licensing question.
+
+prior_art:
+  - "_project/decisions/ (directory exists; the joinorder-scale-stress-licensing-<date>.md naming/shape convention is documented in _project/TODO/main/planning/joinorder-scale-stress-decision-framework.yaml) — put the Step-1 licensing ADR here, same shape"
+  - "benchbox/core/joinorder/DATA-LICENSE.md + docs/benchmarks/join-order.md 'License And Attribution' — existing data-licensing surfaces; reconcile (don't duplicate) with the ADR conclusion"
+  - "benchbox/core/joinorder/data_manifest.toml `url` field (the GitHub release asset) — the artifact whose redistribution is in question; if remediation is 'fetch from Dataverse', this is what changes"
+
+must_preserve:
+  - "If the conclusion is 'permitted', no functional change — the data-fetch path and manifest URL stay as-is"
+  - "DATA-LICENSE.md keeps the IMDb attribution string ('Information courtesy of IMDb ... Used with permission.') — refine the surrounding context, do not drop the attribution"
+
+approach: |
+  This is a research-then-write task: w1 collects the operative clauses
+  verbatim, w2 makes the call and records it in the same place/shape as the
+  existing scale-stress licensing decision doc, w3 reconciles the user-facing
+  files, w4 escalates if the call is negative. No platform code, no data
+  changes. If at any point the conclusion is uncertain, escalate to the user
+  rather than guessing — this is a liability question, not an engineering one.
+
+anti_patterns:
+  - "DO NOT conclude 'it's probably fine' without quoting the governing clauses — because the whole point is a recorded, evidence-backed determination — quote IMDb's terms and the Dataverse license verbatim in the ADR"
+  - "DO NOT change benchbox/core/joinorder/data_manifest.toml `url` or the data-fetch path in this TODO — because changing where the data comes from is the remediation TODO's job, gated on the ADR conclusion"
+  - "DO NOT silently ship a 'not clearly permitted' conclusion — because that is a release blocker — mark this TODO blocked and notify the user"
+
+verification:
+  - description: "The ADR exists in _project/decisions/ and states a determination with quoted governing terms"
+    command: "ls _project/decisions/joinorder-canonical-data-licensing-*.md && grep -il 'imdb\\|dataverse' _project/decisions/joinorder-canonical-data-licensing-*.md"
+    expected_output: "an ADR file exists; it quotes IMDb's data terms and the Dataverse deposit license and states permitted / conditional / not-clear"
+  - description: "DATA-LICENSE.md and join-order.md reflect the ADR conclusion"
+    command: "grep -i 'dataverse\\|10.7910\\|non-commercial\\|redistribut' benchbox/core/joinorder/DATA-LICENSE.md docs/benchmarks/join-order.md && make docs-validate"
+    expected_output: "both cite the specific governing terms / conditions identified by the ADR; docs-validate passes"
+  - description: "If conclusion is negative, a remediation TODO exists and this TODO is blocked"
+    command: "uv run _project/scripts/todo_cli.py list --worktree=main | grep -i 'dataverse\\|redistribut' || echo 'no remediation TODO (conclusion was positive)'"
+    expected_output: "either a remediation TODO is listed and this item is blocked, or the conclusion was positive and no remediation TODO is needed"
+
+scope_limit:
+  only_modify:
+    - "_project/decisions/"
+    - "_project/joinorder/"
+    - "benchbox/core/joinorder/DATA-LICENSE.md"
+    - "docs/benchmarks/join-order.md"
+  do_not_modify:
+    - "benchbox/core/joinorder/data_manifest.toml"
+    - "benchbox/core/joinorder/benchmark.py"
+    - "benchbox/joinorder.py"
+
+metadata:
+  owners:
+    - joeharris76
+  tags:
+    - joinorder
+    - issue-289
+    - licensing
+    - legal
+    - step1-followup
+  estimated_effort: Small
+  created_date: "2026-05-12"
+  last_updated: "2026-05-12T00:00:00"
+
+impact:
+  business_value: |
+    Turns an implicit redistribution liability (taken on as a side effect of the
+    canonical cutover) into a recorded, reviewed decision. Surfaces any release
+    blocker now rather than after a complaint.
+  user_impact: |
+    Users get clear, accurate licensing terms for the IMDb-derived data they
+    download, and confidence that BenchBox's distribution of it is legitimate.
+  technical_debt: |
+    Replaces a generic "Used with permission" line with citation of the actual
+    governing terms; documents the rationale so the debate doesn't recur.
+
+success_metrics:
+  - "An ADR exists recording the determination on whether BenchBox may re-host/redistribute the imdb_pg11-derived Parquet archive, with the governing IMDb + Dataverse terms quoted"
+  - "DATA-LICENSE.md and docs/benchmarks/join-order.md cite the specific terms/conditions the ADR identified"
+  - "If the conclusion is negative or conditional-not-met, a remediation TODO is filed and the release blocker is flagged to the user"
+
+open_questions:
+  - question: "Does the Harvard Dataverse deposit for DOI 10.7910/DVN/2QYZBT carry an open license that permits redistribution with attribution, or only a terms-of-use that restricts it?"
+    gating: true
+    affects: ["w2 success_metric: ADR determination"]
+    default: "Treat as restrictive until the deposit's stated license proves otherwise; the safe remediation is fetch-from-Dataverse rather than BenchBox re-host"
+  - "Does IMDb's data-use license distinguish 'used in a tool that is also used commercially' from 'commercial use of the data itself', and which side of that line does BenchBox fall on?"
