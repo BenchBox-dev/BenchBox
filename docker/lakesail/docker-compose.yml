@@ -1,0 +1,31 @@
+name: benchbox-lakesail
+
+# Host-run BenchBox uses Spark Connect to ask the Sail server to read files by
+# absolute path. Mount BENCHBOX_DATA_DIR at the same absolute path inside the
+# container so those paths resolve server-side. BenchBox creates LakeSail CSV
+# compatibility symlinks under that same data directory.
+
+services:
+  lakesail-connect:
+    image: benchbox-lakesail:${LAKESAIL_IMAGE_TAG:-dev}
+    build:
+      context: ../..
+      dockerfile: docker/lakesail/Dockerfile
+      args:
+        PYSAIL_VERSION: ${PYSAIL_VERSION:-0.6.2}
+        PYSPARK_CLIENT_VERSION: ${PYSPARK_CLIENT_VERSION:-4.1.1}
+    command: ["spark", "server", "--ip", "0.0.0.0", "--port", "50051"]
+    ports:
+      - "${SPARK_CONNECT_PORT:-50051}:50051"
+    environment:
+      RUST_LOG: ${RUST_LOG:-info}
+    volumes:
+      - "${BENCHBOX_DATA_DIR:-${PWD}/benchmark_runs}:${BENCHBOX_DATA_DIR:-${PWD}/benchmark_runs}:ro"
+    tmpfs:
+      - /tmp:size=2g
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import socket; s=socket.socket(); s.settimeout(2); s.connect(('localhost', 50051)); s.close()"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 30s

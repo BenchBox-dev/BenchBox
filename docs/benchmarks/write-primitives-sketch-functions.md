@@ -25,8 +25,9 @@ between PR #114 morning and the audit later that day. CPC, REQ, KLL,
 and HLL families still load. The four ops above remain in
 `benchbox/core/write_primitives/catalog/operations.yaml` per
 `scope_limit` on the source TODO; CI's
-`extension-smoke.yml` workflow goes red whenever a planned-on family
-is missing from a fresh install. See
+`extension-smoke.yml` workflow reports this reviewed `2e38607` state as
+known drift and goes red for any new missing family, affected extension
+version, or non-missing-function error from a fresh install. See
 [ADR: DuckDB datasketches vendoring vs HLL fallback](../development/adr/adr-duckdb-datasketches-vendoring.md)
 for the long-term path.
 

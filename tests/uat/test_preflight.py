@@ -47,7 +47,7 @@ def test_local_platforms_check_attempts_automated_platform_then_succeeds(tmp_pat
     assert any("recovered" in warning for warning in result.warnings)
 
 
-def test_local_platforms_check_aborts_document_only_platform(tmp_path: Path, monkeypatch):
+def test_local_platforms_check_aborts_non_automated_platform(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(preflight, "free_space_gib", lambda path: 100.0)
     monkeypatch.setattr(preflight, "docker_reachable", lambda: True)
     monkeypatch.setattr(preflight, "host_load_1m", lambda: 0.5)
@@ -55,12 +55,12 @@ def test_local_platforms_check_aborts_document_only_platform(tmp_path: Path, mon
     result = preflight.run_preflight(
         free_space_path=tmp_path,
         local_platforms_check=True,
-        requested_platforms=("lakesail",),
+        requested_platforms=("spark",),
         reachability_checker=lambda platform: False,
     )
 
     assert result.aborted is True
-    assert "lakesail" in (result.abort_reason or "")
+    assert "spark" in (result.abort_reason or "")
     assert "no automated UAT bring-up" in (result.abort_reason or "")
 
 
@@ -81,14 +81,15 @@ def test_local_platforms_check_default_checker_probes_lakesail(tmp_path: Path, m
         free_space_path=tmp_path,
         local_platforms_check=True,
         requested_platforms=("lakesail",),
+        bring_up_runner=lambda platform: 0,
     )
 
     assert result.aborted is True
-    assert probe_calls == [("localhost", 50051)]
+    assert probe_calls == [("localhost", 50051), ("localhost", 50051)]
     assert result.local_platforms_checked == ("lakesail",)
-    assert result.local_platforms_attempted == ()
+    assert result.local_platforms_attempted == ("lakesail",)
     assert "lakesail" in (result.abort_reason or "")
-    assert "no automated UAT bring-up" in (result.abort_reason or "")
+    assert "remains unreachable" in (result.abort_reason or "")
 
 
 def test_preflight_config_accepts_local_platforms_check():
@@ -152,7 +153,13 @@ def test_make_platform_filter_does_not_trip_bring_up_validation():
     assert "unknown platform" not in completed.stderr
 
 
-def test_uat_bring_up_velox_passes_benchmark_runs_dir_env(tmp_path: Path, monkeypatch, capsys):
+@pytest.mark.parametrize("platform", ["lakesail", "velox"])
+def test_uat_bring_up_path_mirrored_platforms_pass_benchmark_runs_dir_env(
+    platform: str,
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+):
     module = _load_bring_up_module()
     captured: dict[str, dict[str, str]] = {}
 
@@ -164,7 +171,7 @@ def test_uat_bring_up_velox_passes_benchmark_runs_dir_env(tmp_path: Path, monkey
 
     monkeypatch.setattr(module.docker_assets, "run_docker_command", fake_run_docker_command)
 
-    rc = module.main(["--platform", "velox", "--benchmark-runs-dir", str(tmp_path), "--dry-run"])
+    rc = module.main(["--platform", platform, "--benchmark-runs-dir", str(tmp_path), "--dry-run"])
 
     assert rc == 0
     assert captured["env"] == {"BENCHBOX_DATA_DIR": str(tmp_path)}

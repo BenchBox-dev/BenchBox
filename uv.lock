@@ -569,7 +569,7 @@ influxdb = [
     { name = "pyarrow" },
 ]
 lakesail = [
-    { name = "pyspark" },
+    { name = "pyspark", extra = ["connect"] },
 ]
 mcp = [
     { name = "mcp" },
@@ -831,10 +831,10 @@ requires-dist = [
     { name = "pyspark", marker = "extra == 'dataframe-expression-family'", specifier = ">=3.5.0" },
     { name = "pyspark", marker = "extra == 'dataframe-pyspark'", specifier = ">=3.5.0" },
     { name = "pyspark", marker = "extra == 'dev'", specifier = ">=3.5.0" },
-    { name = "pyspark", marker = "extra == 'lakesail'", specifier = ">=3.5.0" },
     { name = "pyspark", marker = "extra == 'pyspark'", specifier = ">=3.5.0" },
     { name = "pyspark", marker = "extra == 'spark'", specifier = ">=4.0.1" },
     { name = "pyspark", extras = ["connect"], marker = "extra == 'all'", specifier = ">=3.5.0" },
+    { name = "pyspark", extras = ["connect"], marker = "extra == 'lakesail'", specifier = ">=3.5.0" },
     { name = "pyspark", extras = ["connect"], marker = "extra == 'velox'", specifier = ">=3.5.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "pytest-benchmark", marker = "extra == 'dev'", specifier = ">=4.0.0" },

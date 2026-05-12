@@ -118,29 +118,30 @@ _DOCKER_PLATFORM_SPECS: dict[str, DockerPlatformSpec] = {
         compose_files=(_repo_path("docker/influxdb/docker-compose.yml"),),
         tcp_probe_label=matrix.PLATFORM_PORTS.get("influxdb"),
     ),
+    "lakesail": DockerPlatformSpec(
+        platform="lakesail",
+        compose_files=(_repo_path("docker/lakesail/docker-compose.yml"),),
+        services=("lakesail-connect",),
+        tcp_probe_label=matrix.PLATFORM_PORTS.get("lakesail"),
+        notes="Start only lakesail-connect for host-run UAT; BENCHBOX_DATA_DIR is set to the sweep output root.",
+    ),
     "pg-duckdb": DockerPlatformSpec(
         platform="pg-duckdb",
         compose_files=(_repo_path("docker/postgres-extensions/docker-compose.pg-duckdb.yaml"),),
-        fixed_container_names=("benchbox-pg-duckdb",),
-        managed_start_allowed=False,
         tcp_probe_label=matrix.PLATFORM_PORTS.get("pg-duckdb"),
-        notes="Compose declares a fixed container_name; keep external-only until that is removed or overridden.",
+        notes="PostgreSQL-family stack on localhost:5432; run sequentially with other PG-family platforms.",
     ),
     "pg-mooncake": DockerPlatformSpec(
         platform="pg-mooncake",
         compose_files=(_repo_path("docker/postgres-extensions/docker-compose.pg-mooncake.yaml"),),
-        fixed_container_names=("benchbox-pg-mooncake",),
-        managed_start_allowed=False,
         tcp_probe_label=matrix.PLATFORM_PORTS.get("pg-mooncake"),
-        notes="Compose declares a fixed container_name; keep external-only until that is removed or overridden.",
+        notes="PostgreSQL-family stack on localhost:5432; run sequentially with other PG-family platforms.",
     ),
     "timescaledb": DockerPlatformSpec(
         platform="timescaledb",
         compose_files=(_repo_path("docker/postgres-extensions/docker-compose.timescaledb.yaml"),),
-        fixed_container_names=("benchbox-timescaledb",),
-        managed_start_allowed=False,
         tcp_probe_label=matrix.PLATFORM_PORTS.get("timescaledb"),
-        notes="Compose declares a fixed container_name; keep external-only until that is removed or overridden.",
+        notes="PostgreSQL-family stack on localhost:5432; run sequentially with other PG-family platforms.",
     ),
     "questdb": DockerPlatformSpec(
         platform="questdb",
@@ -262,7 +263,7 @@ def compose_environment(
     benchmark_runs_dir: Path | str | None = None,
 ) -> dict[str, str]:
     """Return environment overrides needed by a compose spec."""
-    if spec.platform != "velox" or benchmark_runs_dir is None:
+    if spec.platform not in {"lakesail", "velox"} or benchmark_runs_dir is None:
         return {}
     return {"BENCHBOX_DATA_DIR": str(Path(benchmark_runs_dir).expanduser())}
 

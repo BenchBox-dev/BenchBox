@@ -14,7 +14,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from tests.uat import docker_assets, matrix  # noqa: E402
 
-DOCUMENT_ONLY_PLATFORMS = frozenset({"lakesail", "pg-duckdb", "pg-mooncake", "timescaledb"})
+DOCUMENT_ONLY_PLATFORMS = frozenset()
 
 
 def automated_platforms() -> tuple[str, ...]:

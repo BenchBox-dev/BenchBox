@@ -349,8 +349,8 @@ Native-code engines that accept Spark SQL / DataFrame workloads without running 
 
 ```bash
 # LakeSail (uses standard PySpark client via Spark Connect)
-uv add pyspark pyarrow
-# Start a Sail server separately (see LakeSail docs), then:
+uv add benchbox --extra lakesail
+make uat-bring-up PLATFORM=lakesail
 benchbox run --platform lakesail --benchmark tpch --scale 1.0
 
 # Velox (pulls pyspark[connect]>=3.5.0; requires the Gluten bundle jar)

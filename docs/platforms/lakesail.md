@@ -21,11 +21,11 @@ LakeSail Sail is a Rust-based, drop-in replacement for Apache Spark built on Dat
 ## Quick Start
 
 ```bash
-# Install PySpark client (LakeSail uses the standard PySpark package)
-uv add pyspark pyarrow
+# Install the Spark Connect-capable PySpark client
+uv add benchbox --extra lakesail
 
-# Start your LakeSail Sail server (see LakeSail documentation)
-# Default endpoint: sc://localhost:50051
+# Start a local Docker-backed Sail Spark Connect server
+make uat-bring-up PLATFORM=lakesail
 
 # Check client and endpoint readiness without starting a server
 benchbox platforms check lakesail-df
@@ -44,6 +44,11 @@ LakeSail Sail connects through the Spark Connect protocol. No additional authent
 reachability; they do not instantiate the adapter or start a Sail server. SQL mode can auto-start a local `pysail`
 server when `pysail` is installed and the endpoint is unreachable, but DataFrame mode requires an already-running
 endpoint.
+
+For UAT and host-run local smoke tests, BenchBox includes `docker/lakesail/docker-compose.yml`. The compose service
+builds a `benchbox-lakesail` image from the public PySail package and starts `sail spark server` on
+`sc://localhost:50051`. Like other Spark Connect backends, the server reads files by absolute path; the compose
+workflow mounts `BENCHBOX_DATA_DIR` at the same absolute path inside the container.
 
 ### Configuration Methods
 
@@ -293,12 +298,12 @@ Failed to connect to LakeSail Sail: Connection refused
 ### PySpark Not Installed
 
 ```
-PySpark not installed. Install with: uv add pyspark pyarrow
+PySpark not installed. Install with: uv add benchbox --extra lakesail
 ```
 
 **Solutions:**
-1. Install the PySpark client: `uv add pyspark pyarrow`
-2. LakeSail uses the standard PySpark package -- no special client needed
+1. Install the Spark Connect-capable PySpark client: `uv add benchbox --extra lakesail`
+2. LakeSail uses the standard PySpark API through Spark Connect; no LakeSail-specific client is needed in BenchBox.
 
 ### Database Creation Failed
 

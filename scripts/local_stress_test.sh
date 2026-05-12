@@ -124,8 +124,8 @@ fi
 
 # ---- Platform lists ----
 # Each platform appears in exactly one list. Speed based on OLAP benchmark execution time.
-FAST_NATIVE=( duckdb datafusion lakesail clickhouse-local )
-FAST_DOCKER=( clickhouse-server cedardb starrocks )
+FAST_NATIVE=( duckdb datafusion clickhouse-local )
+FAST_DOCKER=( lakesail clickhouse-server cedardb starrocks )
 SLOW_NATIVE=( sqlite spark )
 SLOW_DOCKER=( postgresql presto trino databend doris influxdb pg-duckdb pg-mooncake timescaledb questdb singlestore velox )
 DF_PLATFORMS=( polars-df pandas-df modin-df pyspark-df dask-df datafusion-df )
@@ -549,6 +549,7 @@ done
 get_platform_uv_extra() {
   case "$1" in
     clickhouse-local) echo "clickhouse-local" ;;
+    lakesail)         echo "lakesail" ;;
     singlestore)      echo "singlestore" ;;
     influxdb)         echo "influxdb" ;;
     *)                echo "" ;;

@@ -105,11 +105,11 @@ use global prune commands. The current managed-start contract is:
 - `cleanup.docker_platform_switch: volumes`: the storage-saving mode;
   generates `down -v --remove-orphans` for the UAT-owned project only.
 
-Compose files with fixed `container_name` values are not project-scoped;
-managed startup rejects those platforms until the compose file is changed
-or a safe override is added. Today that affects `pg-duckdb`,
-`pg-mooncake`, and `timescaledb`. Keep fast tests for this mapping in
-sync with `matrix.PLATFORM_GROUPS["docker"]`.
+Compose files must remain project-scoped for managed startup. Do not add
+fixed `container_name` values to UAT-managed compose files; they bypass
+the `docker compose -p <uat-owned-project>` namespace and can collide
+with other local runs. Keep fast tests for this mapping in sync with
+`matrix.PLATFORM_GROUPS["docker"]`.
 
 Interrupted-run recovery is explicit:
 
