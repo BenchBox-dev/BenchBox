@@ -356,7 +356,19 @@ def test_execute_runner_exception_still_tears_down_managed_docker(tmp_path):
     assert actions == ["up", "down"]
 
 
-def test_execute_fixed_container_name_platform_aborts_before_docker_command(tmp_path):
+def test_execute_fixed_container_name_platform_aborts_before_docker_command(tmp_path, monkeypatch):
+    pg_duckdb_spec = docker_assets.docker_platform_spec("pg-duckdb")
+    monkeypatch.setitem(
+        docker_assets._DOCKER_PLATFORM_SPECS,
+        "pg-duckdb",
+        docker_assets.DockerPlatformSpec(
+            platform=pg_duckdb_spec.platform,
+            compose_files=pg_duckdb_spec.compose_files,
+            fixed_container_names=("benchbox-pg-duckdb",),
+            tcp_probe_label=pg_duckdb_spec.tcp_probe_label,
+            notes=pg_duckdb_spec.notes,
+        ),
+    )
     cfg = validate_config(
         {
             "name": "fixed name",
@@ -379,7 +391,7 @@ def test_execute_fixed_container_name_platform_aborts_before_docker_command(tmp_
     )
 
     assert outcome.aborted is True
-    assert "cannot be UAT-managed" in (outcome.abort_reason or "")
+    assert "fixed container_name" in (outcome.abort_reason or "")
     assert outcome.docker_events == ()
 
 

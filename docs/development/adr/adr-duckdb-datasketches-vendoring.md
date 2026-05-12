@@ -5,8 +5,10 @@
 Accepted (2026-05-06). Path: **smoke + monitor**, do not vendor.
 
 **Maintenance protocol**: Re-review if `extension-smoke.yml` catches
-family drift more than once per quarter, or if the upstream
-community-extensions repo formally drops a family BenchBox depends on.
+new family drift more than once per quarter, if the upstream extension
+version changes while `theta` / `frequent_items` are still absent, or if
+the upstream community-extensions repo formally drops a family BenchBox
+depends on.
 
 ## Date
 
@@ -27,6 +29,10 @@ pipeline upstream is owned by duckdb-community-extensions, not BenchBox.
 CI workflow now probe one representative function per family on every
 relevant primitive/script/workflow/dependency PR plus a daily cron, so
 future drift is caught at PR or within 24h rather than at benchmark time.
+The current `2e38607` missing-family state is an explicit known-drift
+allowance, not a permanent blanket exemption: new missing families, a
+different extension version with the same missing families, or a
+different error shape still fails the smoke.
 
 ## Options Considered
 
@@ -62,18 +68,20 @@ HLL.
 
 ### C. Smoke + monitor (chosen)
 
-Keep `INSTALL ... FROM community`. Run the daily smoke. If a family
+Keep `INSTALL ... FROM community`. Run the daily smoke. If a new family
 disappears, the smoke fires, and we file an issue against
 duckdb-community-extensions. If the upstream fix lands fast (the
 2026-05-02 audit suggests builds change daily), that is sufficient. If
 it does not, escalate to A (vendor) or B (drop) per the maintenance
-trigger.
+trigger. The reviewed `2e38607` `theta` / `frequent_items` gap remains
+visible in CI output as known drift without blocking unrelated PRs.
 
 - Pro: zero artifact weight; routes regressions upstream where they can
   be fixed for everyone.
 - Pro: matches BenchBox's existing posture for community extensions.
-- Con: a benchmark run during a drift window will still fail; the
-  smoke catches it but does not heal it.
+- Con: a benchmark run during the reviewed `2e38607` drift window will
+  still fail for `theta` and `frequent_items`; the smoke records that
+  state but does not heal it.
 - Con: relies on upstream responsiveness. The issue filed under w4
   is the durability test for this assumption.
 
@@ -96,6 +104,9 @@ upstream extension stability" in
 - Releases cut during a drift window will exclude `theta` and
   `frequent_items` results for DuckDB until the smoke goes green
   again. Other engines' sketch coverage is unaffected.
+- Known `2e38607` `theta` / `frequent_items` drift is non-blocking for
+  unrelated PRs; any new missing family, new affected extension
+  version, or non-missing-function error remains merge-blocking.
 - If we ever need to revisit, the smoke output (with extension version
   printed on every run) doubles as the longitudinal evidence.
 
@@ -112,6 +123,9 @@ req: OK
 kll: OK
 hll: OK
 ```
+
+The CI smoke now reports the two `2e38607` failures as `KNOWN-DRIFT`
+and exits zero only for that reviewed version/error combination.
 
 Suggested issue title: "datasketches community build drops theta and
 frequent_items families".

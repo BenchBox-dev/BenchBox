@@ -87,9 +87,10 @@ setting cannot silently become a no-op.
 
 Use `tests/uat/configs/stress-docker-managed.yaml` as the starting point
 for storage-constrained smoke sweeps. It intentionally starts with the
-`docker-fast` group because the PostgreSQL-extension compose files still
-declare fixed `container_name` values and are rejected for UAT-managed
-startup until those files gain safe project-scoped names or overrides.
+`docker-fast` group for quick smoke coverage; switch to the broader
+`docker` group when you want every Docker-backed platform, including the
+PostgreSQL-family stacks that share localhost port 5432 but run
+sequentially under UAT-managed lifecycle control.
 Inspect a UAT-owned stack with:
 
 ```bash

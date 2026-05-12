@@ -577,7 +577,7 @@ DEPENDENCY_GROUPS: dict[str, DependencyInfo] = {
     "lakesail": DependencyInfo(
         name="lakesail",
         description="LakeSail Sail Spark-compatible engine (uses PySpark Spark Connect client)",
-        packages=["pyspark"],
+        packages=["pyspark", "grpcio", "grpcio-status"],
         install_command="uv add benchbox --extra lakesail",
         use_cases=["Spark-compatible SQL", "High-performance analytics", "DataFusion-based"],
         platforms=["LakeSail Sail"],
@@ -585,7 +585,7 @@ DEPENDENCY_GROUPS: dict[str, DependencyInfo] = {
     "velox": DependencyInfo(
         name="velox",
         description="Apache Gluten + Velox Spark acceleration (native C++ engine via Gluten plugin)",
-        packages=["pyspark"],
+        packages=["pyspark", "grpcio", "grpcio-status"],
         install_command="uv add benchbox --extra velox",
         use_cases=[
             "Spark-compatible SQL",
@@ -662,6 +662,8 @@ DEPENDENCY_GROUPS: dict[str, DependencyInfo] = {
             "pyodbc",
             "pyathena",
             "pyspark",
+            "grpcio",
+            "grpcio-status",
             "boto3",
             "cloudpathlib",
             # Fabric Warehouse (Azure)
@@ -795,6 +797,8 @@ PACKAGE_IMPORT_NAMES: dict[str, str] = {
     "snowflake-connector-python": "snowflake.connector",
     "snowflake-snowpark-python": "snowflake.snowpark",
     "presto-python-client": "prestodb",
+    "grpcio": "grpc",
+    "grpcio-status": "grpc_status",
     # These packages have import names that match the package name with hyphens replaced by underscores
     # (documented here for completeness, but handled by fallback logic):
     # "redshift-connector": "redshift_connector",

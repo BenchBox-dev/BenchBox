@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 import pytest
 
@@ -40,11 +41,19 @@ def test_compose_down_commands_are_project_scoped_and_targeted():
         assert any("docker/postgresql/docker-compose.yml" in part for part in argv)
 
 
-def test_compose_up_command_includes_wait_timeout_and_velox_service():
-    spec = docker_assets.docker_platform_spec("velox")
-    argv = docker_assets.compose_up_command(spec, "benchbox-uat-smoke-velox", start_timeout_s=42)
-    assert argv[:4] == ["docker", "compose", "-p", "benchbox-uat-smoke-velox"]
-    assert argv[-5:] == ["-d", "--wait", "--wait-timeout", "42", "velox-connect"]
+@pytest.mark.parametrize(
+    ("platform", "service"),
+    [
+        ("lakesail", "lakesail-connect"),
+        ("velox", "velox-connect"),
+    ],
+)
+def test_compose_up_command_includes_wait_timeout_and_scoped_service(platform, service):
+    spec = docker_assets.docker_platform_spec(platform)
+    project = f"benchbox-uat-smoke-{platform}"
+    argv = docker_assets.compose_up_command(spec, project, start_timeout_s=42)
+    assert argv[:4] == ["docker", "compose", "-p", project]
+    assert argv[-5:] == ["-d", "--wait", "--wait-timeout", "42", service]
 
 
 def test_compose_project_name_sanitizes_and_bounds_length():
@@ -62,10 +71,21 @@ def test_compose_project_name_sanitizes_and_bounds_length():
     )
 
 
-def test_fixed_container_name_platforms_are_rejected_for_managed_start():
-    spec = docker_assets.docker_platform_spec("pg-duckdb")
-    assert spec.fixed_container_names == ("benchbox-pg-duckdb",)
-    with pytest.raises(docker_assets.DockerAssetError, match="cannot be UAT-managed"):
+def test_matrix_docker_specs_are_project_scoped_for_managed_start():
+    for platform in matrix.PLATFORM_GROUPS["docker"]:
+        spec = docker_assets.docker_platform_spec(platform)
+        assert spec.managed_start_allowed is True
+        assert spec.fixed_container_names == ()
+        docker_assets.validate_managed_start_allowed(spec, "fail")
+
+
+def test_fixed_container_name_specs_are_rejected_for_managed_start():
+    spec = docker_assets.DockerPlatformSpec(
+        platform="fixed-name",
+        compose_files=(Path("docker-compose.yml"),),
+        fixed_container_names=("benchbox-fixed",),
+    )
+    with pytest.raises(docker_assets.DockerAssetError, match="fixed container_name"):
         docker_assets.validate_managed_start_allowed(spec, "fail")
 
 
@@ -82,7 +102,8 @@ def test_run_docker_command_refuses_global_prune():
     assert "forbidden" in (result.error or "")
 
 
-def test_velox_compose_environment_points_at_benchmark_runs_dir(tmp_path):
-    spec = docker_assets.docker_platform_spec("velox")
+@pytest.mark.parametrize("platform", ["lakesail", "velox"])
+def test_path_mirrored_compose_environment_points_at_benchmark_runs_dir(platform, tmp_path):
+    spec = docker_assets.docker_platform_spec(platform)
     env = docker_assets.compose_environment(spec, benchmark_runs_dir=tmp_path / "runs")
     assert env == {"BENCHBOX_DATA_DIR": str(tmp_path / "runs")}

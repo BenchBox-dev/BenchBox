@@ -172,6 +172,23 @@ class SparkDataLoadMixin:
             link.symlink_to(resolved_path)
         return link
 
+    def _csv_compat_temp_dir_parent(self, data_dir: Path) -> Path | None:
+        """Return a temp-dir parent visible to remote Spark servers when possible."""
+        if not self._requires_csv_extension:
+            return None
+
+        try:
+            parent = Path(data_dir).expanduser().resolve()
+            parent.mkdir(parents=True, exist_ok=True)
+            return parent
+        except OSError as exc:
+            logger.debug(
+                "Could not create CSV compatibility temp dir under data dir %s; falling back to system temp: %s",
+                data_dir,
+                exc,
+            )
+            return None
+
     @staticmethod
     def _detect_spark_table_format(path: Path) -> str | None:
         """Detect directory-based Spark table formats from on-disk markers."""
@@ -229,9 +246,13 @@ class SparkDataLoadMixin:
 
             self.log_verbose(f"Data source type: {data_source.source_type}")
 
-            # Temp dir for CSV-extension symlinks (LakeSail); created after
-            # resolver validation so it's always cleaned up by the context manager.
-            with tempfile.TemporaryDirectory(prefix="benchbox_csv_") as csv_tmp_name:
+            # Temp dir for CSV-extension symlinks (LakeSail); created under
+            # data_dir when possible so Docker-backed Spark Connect servers can
+            # resolve the same host paths through a path-mirrored data mount.
+            with tempfile.TemporaryDirectory(
+                prefix="benchbox_csv_",
+                dir=self._csv_compat_temp_dir_parent(Path(data_dir)),
+            ) as csv_tmp_name:
                 csv_tmp_dir = Path(csv_tmp_name)
 
                 for table_name, file_paths in data_source.tables.items():

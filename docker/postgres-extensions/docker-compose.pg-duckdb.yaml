@@ -16,7 +16,6 @@
 services:
   pg-duckdb:
     image: pgduckdb/pgduckdb:18-v1.1.1
-    container_name: benchbox-pg-duckdb
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: benchbox

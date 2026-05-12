@@ -126,7 +126,7 @@ def run_preflight(
     remain execute-phase `skipped_unreachable` cells. When
     `local_platforms_check` is true, requested platforms are probed before the
     sweep starts. Automated platforms get one `make uat-bring-up` attempt;
-    document-only platforms abort with an operator-facing message.
+    non-automated platforms abort with an operator-facing message.
     """
     free_gib = free_space_gib(free_space_path)
     docker_ok = docker_reachable()

@@ -1,9 +1,8 @@
 # TEMPLATE — copy and edit for storage-constrained Docker UAT sweeps.
 #
 # Starts UAT-owned Docker compose projects for the docker-fast platform set and
-# tears each project down with volumes at the platform switch. It intentionally
-# avoids PostgreSQL-extension platforms whose compose files currently declare
-# fixed container_name values.
+# tears each project down with volumes at the platform switch. Switch to the
+# broader docker group when you need every Docker-backed platform.
 
 name: "stress-docker-managed"
 description: "Storage-constrained Docker stress preset with UAT-owned compose lifecycle"

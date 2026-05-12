@@ -85,6 +85,7 @@ PLATFORM_CLI_FLAGS: dict[str, list[str]] = {
 # `get_platform_uv_extra` in scripts/local_stress_test.sh:548-555.
 PLATFORM_UV_EXTRA: dict[str, str] = {
     "clickhouse-local": "clickhouse-local",
+    "lakesail": "lakesail",
     "singlestore": "singlestore",
     "influxdb": "influxdb",
 }
@@ -93,10 +94,10 @@ PLATFORM_UV_EXTRA: dict[str, str] = {
 FAST_NATIVE_PLATFORMS: tuple[str, ...] = (
     "duckdb",
     "datafusion",
-    "lakesail",
     "clickhouse-local",
 )
 FAST_DOCKER_PLATFORMS: tuple[str, ...] = (
+    "lakesail",
     "clickhouse-server",
     "cedardb",
     "starrocks",
