@@ -435,6 +435,39 @@ describe("BenchmarkIndex", () => {
     expect(screen.getAllByText("loose").length).toBeGreaterThan(0);
   });
 
+  it("matrix and ranks views expose canonical public detail and receipt links", async () => {
+    render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => expect(screen.getByTestId("matrix-result-links")).toBeTruthy());
+
+    const matrixLinks = screen.getByTestId("matrix-result-links");
+    expect(within(matrixLinks).getByText("Public ID r1")).toBeTruthy();
+    expect(
+      within(matrixLinks).getByRole("link", {
+        name: "Open details for DuckDB public ID r1 from 2026-04-01",
+      }),
+    ).toHaveAttribute("href", "/results/r/r1");
+    expect(
+      within(matrixLinks).getByRole("link", {
+        name: "Open receipt for DuckDB public ID r1 from 2026-04-01",
+      }),
+    ).toHaveAttribute("href", "/results/r/r1#run-receipt");
+
+    fireEvent.click(screen.getByText("Ranks"));
+    await waitFor(() => expect(screen.getByTestId("ranks-result-links")).toBeTruthy());
+
+    const rankLinks = screen.getByTestId("ranks-result-links");
+    expect(
+      within(rankLinks).getByRole("link", {
+        name: "Open details for SQLite public ID r2 from 2026-04-01",
+      }),
+    ).toHaveAttribute("href", "/results/r/r2");
+    expect(
+      within(rankLinks).getByRole("link", {
+        name: "Open receipt for SQLite public ID r2 from 2026-04-01",
+      }),
+    ).toHaveAttribute("href", "/results/r/r2#run-receipt");
+  });
+
   it("shows persistent compare guidance before any rows are selected", async () => {
     render(<BenchmarkIndex benchmark="tpch" />);
     await waitFor(() => expect(screen.getByTestId("benchmark-compare-guidance")).toBeTruthy());
@@ -495,7 +528,7 @@ describe("BenchmarkIndex", () => {
     expect(screen.getByTestId("benchmark-context-note").textContent).toContain("Star Schema Benchmark (SSB)");
   });
 
-  it("compare tray shows selected metadata and links with short IDs", async () => {
+  it("compare tray shows selected metadata and public IDs while compare URLs keep short aliases", async () => {
     (window as Window & { __benchboxCompareSelectionTest?: boolean }).__benchboxCompareSelectionTest = true;
     render(<BenchmarkIndex benchmark="tpch" />);
     await waitFor(() => expect(screen.getByRole("button", { name: "Select fixture compare rows" })).toBeTruthy());
@@ -510,7 +543,7 @@ describe("BenchmarkIndex", () => {
     expect(duckRow.textContent).toContain("SF 0.1");
     expect(duckRow.textContent).toContain("power");
     expect(duckRow.textContent).toContain("2026-04-01");
-    expect(duckRow.textContent).toContain("ID aaaaaaaa");
+    expect(duckRow.textContent).toContain("Public ID r1");
     expect(sqliteRow.textContent).toContain("SQLite");
 
     const compareLink = screen.getByRole("link", { name: /Compare 2 selected/ }) as HTMLAnchorElement;
@@ -555,10 +588,11 @@ describe("BenchmarkIndex", () => {
     expect(excluded.textContent).toContain("Excluded runs (1)");
     expect(within(excluded).getByTestId("excluded-run-r3")).toHaveTextContent("NoTimingDB");
     expect(within(excluded).getByTestId("excluded-run-r3")).toHaveTextContent("No valid display timing is available");
-    expect(within(excluded).getByRole("link", { name: "Receipt →" })).toHaveAttribute(
-      "href",
-      "/results/r/r3#run-receipt",
-    );
+    expect(
+      within(excluded).getByRole("link", {
+        name: "Open receipt for NoTimingDB public ID r3 from 2026-04-01",
+      }),
+    ).toHaveAttribute("href", "/results/r/r3#run-receipt");
   });
 
   it("preserves direct rank URLs but gates all-unrankable cohorts", async () => {

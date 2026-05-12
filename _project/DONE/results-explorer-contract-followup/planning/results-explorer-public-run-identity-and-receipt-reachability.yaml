@@ -2,7 +2,8 @@ id: results-explorer-public-run-identity-and-receipt-reachability
 title: "Close Results Explorer public run identity and receipt reachability gaps"
 worktree: results-explorer-contract-followup
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-05-12"
 category: User Experience
 
 description: |
@@ -26,7 +27,7 @@ deps:
 work:
 - id: w0
   summary: "Revalidate identity and receipt gaps on current develop"
-  status: pending
+  status: done
   notes: |
     On the checked SHA, capture evidence for:
       - `/results/amplab/?scale=0.01&view=matrix` result-detail or receipt link
@@ -48,7 +49,7 @@ work:
 - id: w1
   summary: "Define the public run identity contract before editing UI components"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     Adopt an explicit contract for every result-bearing surface:
       - `result_id` is the canonical public result identity and result-detail
@@ -68,7 +69,7 @@ work:
 - id: w2
   summary: "Introduce a shared result-link and visible-identity helper"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Extend the existing result-link/run-identity helpers so every component can
     request:
@@ -86,7 +87,7 @@ work:
 - id: w3
   summary: "Restore Matrix and Ranks detail/receipt access without row bloat"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Add a compact row action to Matrix and Ranks rows, such as a `Details`
     text link, receipt icon link with an accessible label, or an actions column
@@ -100,7 +101,7 @@ work:
 - id: w4
   summary: "Separate compare-selection origin from platform/run identity"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Remove labels such as `Polars(from result detail)` from platform identity
     text. If the UI needs to show where a selection came from, render it as a
@@ -111,7 +112,7 @@ work:
 - id: w5
   summary: "Add identity/link regression tests and browser evidence"
   needs: [w3, w4]
-  status: pending
+  status: done
   notes: |
     Add tests that fail when:
       - Matrix or Ranks has no reachable detail/receipt affordance for a run;
@@ -135,7 +136,8 @@ prior_art:
 must_preserve:
 - "Existing shareable compare URLs must continue to resolve for supported ID aliases."
 - "Run identity disambiguation must remain concise in tables and complete in titles/aria labels."
-- "Matrix and Ranks density improvements must not be undone by stacking receipt text, trust badges, version, and source in one cell."
+- "Matrix and Ranks density improvements must not be undone by stacking receipt text, trust badges, version, and source in
+  one cell."
 - "Selection controls must remain keyboard reachable and screen-reader labelled."
 
 approach: |
@@ -155,7 +157,8 @@ verification:
   command: "cd results-explorer && npm test -- --run src/lib/__tests__/runIdentity.test.ts src/lib/__tests__/resultLinks.test.ts"
   expected_output: "all identity/link unit tests pass"
 - description: "Benchmark, platform, query, result detail, and compare component tests pass"
-  command: "cd results-explorer && npm test -- --run src/pages/__tests__/BenchmarkIndex.test.tsx src/pages/__tests__/PlatformIndex.test.tsx src/pages/__tests__/Query.test.tsx src/pages/__tests__/ResultDetail.test.tsx src/pages/__tests__/Compare.test.tsx"
+  command: "cd results-explorer && npm test -- --run src/pages/__tests__/BenchmarkIndex.test.tsx src/pages/__tests__/PlatformIndex.test.tsx
+    src/pages/__tests__/Query.test.tsx src/pages/__tests__/ResultDetail.test.tsx src/pages/__tests__/Compare.test.tsx"
   expected_output: "all targeted route tests pass"
 - description: "Browser evidence confirms consistent IDs and Matrix/Ranks detail access"
   command: "rg -n \"PASS|FAIL|Matrix|Ranks|selected tray|public ID|receipt|detail\" _project/verification-logs/results-explorer-public-run-identity-and-receipt-reachability/"

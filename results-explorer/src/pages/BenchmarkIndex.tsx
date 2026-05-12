@@ -8,7 +8,14 @@ import { getBenchmarkSummaryFromDuckDB, listResults } from "@/lib/duckdbQueries"
 import { BENCHMARK_LABELS, humanizeBenchmark, isKnownBenchmark, fmtScore, fmtGeomean, errMsg, complianceLabel } from "@/utils";
 import { facetsToWhereClause, useFacetState, type FacetKey, type FacetState } from "@/lib/facetModel";
 import { hasActiveFacets, matchesFacetRow, singleFacetValue } from "@/lib/facetMatching";
-import { buildCompareUrl, compareIdForRow, displayCompareId } from "@/lib/resultLinks";
+import {
+  buildCompareUrl,
+  compareIdForRow,
+  resultDetailHref,
+  resultIdentityAriaLabel,
+  resultReceiptHref,
+  visibleResultIdForRow,
+} from "@/lib/resultLinks";
 import { stringSerde, useUrlState } from "@/lib/useUrlState";
 import {
   formatCohortExclusion,
@@ -704,6 +711,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
           ) : (
             <div class="card">
               <RankTable summary={analysisSummary ?? filteredSummary} />
+              <BenchmarkResultLinks summary={analysisSummary ?? filteredSummary} viewMode="ranks" />
             </div>
           )}
         </>
@@ -713,6 +721,8 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
       {viewMode === "list" && (
         <ListTable benchmark={benchmark} results={results} scaleFactor={effectiveSf} facets={facets} />
       )}
+
+      {viewMode === "matrix" && analysisSummary && <BenchmarkResultLinks summary={analysisSummary} viewMode="matrix" />}
 
       {viewMode !== "list" && <ExcludedRunsDisclosure rows={excludedRows} />}
 
@@ -760,7 +770,9 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
                       <span>{cohortPhase}</span>
                       <span>{row.run_date}</span>
                       <TrustBadge trustLabel={row.trust_label} compact />
-                      <span class="font-mono text-[var(--bb-data-fg-muted)]">ID {displayCompareId(id)}</span>
+                      <span class="font-mono text-[var(--bb-data-fg-muted)]">
+                        Public ID {visibleResultIdForRow(row)}
+                      </span>
                     </div>
                   );
                 })}
@@ -782,6 +794,50 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
         </div>
       )}
     </div>
+  );
+}
+
+function BenchmarkResultLinks({ summary, viewMode }: { summary: BenchmarkSummary; viewMode: "matrix" | "ranks" }) {
+  if (summary.platforms.length === 0) return null;
+  const label = viewMode === "matrix" ? "Matrix result links" : "Ranks result links";
+
+  return (
+    <section
+      class="mt-4 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm shadow-sm"
+      aria-label={label}
+      data-testid={`${viewMode}-result-links`}
+    >
+      <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h2 class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">Result links</h2>
+        <p class="text-xs text-[var(--bb-data-fg-muted)]">Public IDs use the canonical result identity.</p>
+      </div>
+      <ul class="grid gap-2 sm:grid-cols-2" role="list">
+        {summary.platforms.map((row) => (
+          <li
+            key={row.result_id}
+            class="flex flex-wrap items-center gap-2 rounded-md bg-[var(--bb-surface-data-muted)] px-2 py-1.5 text-xs"
+            data-testid={`${viewMode}-result-link-${row.result_id}`}
+          >
+            <span class="font-medium text-[var(--bb-data-fg-primary)]">{row.platform}</span>
+            <span class="font-mono text-[var(--bb-data-fg-muted)]">Public ID {visibleResultIdForRow(row)}</span>
+            <a
+              href={resultDetailHref(row)}
+              aria-label={resultIdentityAriaLabel(row, "details")}
+              class="font-medium no-underline"
+            >
+              Details
+            </a>
+            <a
+              href={resultReceiptHref(row)}
+              aria-label={resultIdentityAriaLabel(row, "receipt")}
+              class="font-medium no-underline"
+            >
+              Receipt
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -840,7 +896,11 @@ function ExcludedRunsDisclosure({ rows }: { rows: PlatformRow[] }) {
                   {formatTimingExclusion(row.display_exclusion_reason, "Display timing is unavailable.")}
                 </td>
                 <td class="table-td">
-                  <a href={`/results/r/${row.result_id}#run-receipt`} class="text-xs font-medium no-underline">
+                  <a
+                    href={resultReceiptHref(row)}
+                    aria-label={resultIdentityAriaLabel(row, "receipt")}
+                    class="text-xs font-medium no-underline"
+                  >
                     Receipt →
                   </a>
                 </td>
@@ -1053,7 +1113,11 @@ function BenchmarkRow({ entry }: { entry: ResultRow }) {
         </div>
       </td>
       <td class="table-td text-right">
-        <a href={`/results/r/${entry.result_id}#run-receipt`} class="text-xs font-medium no-underline">
+        <a
+          href={resultReceiptHref(entry)}
+          aria-label={resultIdentityAriaLabel(entry, "receipt")}
+          class="text-xs font-medium no-underline"
+        >
           Receipt →
         </a>
       </td>
