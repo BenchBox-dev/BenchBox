@@ -17,6 +17,21 @@ join-order planning behavior across many-table SQL queries.
 `imdb_pg11` archive, DOI `10.7910/DVN/2QYZBT`, restored into PostgreSQL and
 converted to 21 Parquet tables for repeatable benchmark execution.
 
+The provenance attestation lives at
+`_project/joinorder/provenance-attestation.md`. It records that the
+Dataverse-published MD5 for file id `3590041` matches the cached source pg_dump,
+that the restored source has 21 tables and 74,190,187 rows, and that the
+Postgres-to-Parquet conversion fidelity check passes for row counts,
+null/empty-string preservation, integer ranges, and UTF-8 samples.
+
+Byte-identical rebuild reproducibility is not currently established. A
+2026-05-12 rebuild check produced different archive hashes across two local
+rebuilds, with byte-hash drift in `cast_info.parquet`; the follow-up decision is
+tracked in
+`_project/TODO/main/planning/joinorder-parquet-rebuild-determinism-decision.yaml`.
+The downloaded published archive is still verified by its pinned
+`archive_sha256` and per-table hashes.
+
 Licensing status is separate from integrity status. The Dataverse record
 declares the deposit as `CC0 1.0`, but IMDb's current dataset terms and the JOB
 paper frame the underlying IMDb data as non-commercial. BenchBox therefore does
@@ -37,6 +52,15 @@ uv run -- benchbox run --platform duckdb --benchmark joinorder --scale 1
 On first use BenchBox downloads the compressed archive, verifies the archive
 hash, extracts the 21 Parquet files, and verifies table-level hashes and row
 counts from `benchbox/core/joinorder/data_manifest.toml`.
+
+The manifest hash fields have separate roles:
+
+- `archive_sha256`: sha256 of the downloadable `.tar.zst`, consumed by the
+  downloader before extraction.
+- `data_archive_hash`: aggregate sha256 over sorted per-table Parquet hashes,
+  used to identify the extracted canonical table set in result metadata.
+- `manifest_hash`: sha256 of the stable manifest content with transport-only
+  fields excluded, consumed by manifest parsing before runtime use.
 
 Subsequent runs reuse the verified data under:
 

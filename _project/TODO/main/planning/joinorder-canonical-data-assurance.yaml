@@ -2,7 +2,7 @@ id: joinorder-canonical-data-assurance
 title: "JoinOrder canonical data assurance: external checksum attestation, deterministic rebuild, conversion fidelity, manifest hash naming"
 worktree: main
 priority: High
-status: Not Started
+status: Blocked
 category: Testing and Quality Assurance
 
 description: |
@@ -108,7 +108,7 @@ context_sections:
 work:
   - id: w0
     summary: "Re-validate + snapshot the current canonical-data evidence to _project/verification-logs/joinorder-canonical-data-assurance/w0.log before any change"
-    status: pending
+    status: done
     notes: |
       Capture (so a later reviewer can see the pre-work baseline):
         - the `[provenance]` block + all per-table `sha256`/`row_count` from
@@ -119,13 +119,14 @@ work:
           tests -- the durable, re-runnable stand-in for the ephemeral
           "113/113 matched" log);
         - `ls -la /Users/joe/Developer/benchmark_runs/logs/joinorder_postgres_oracle_*/ 2>/dev/null || echo '(oracle log dir not present)'`.
-      Write all of it to `_project/verification-logs/joinorder-canonical-data-assurance/w0.log`.
-      No code/data changes.
+      Done: `_project/verification-logs/joinorder-canonical-data-assurance/w0.log`
+      records the manifest provenance, row-count sum 74,190,187, 252 passing
+      joinorder/build-script tests, and the oracle log directory.
 
   - id: w1
     summary: "Phase 1: cross-check Dataverse-published checksums against the pinned pg_dump hashes; record attestation or escalate"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Retrieve the checksums Harvard Dataverse publishes for dataset DOI
       10.7910/DVN/2QYZBT, file id 3590041 (`imdb_pg11`). Dataverse exposes
@@ -156,11 +157,15 @@ work:
       explicitly and treat the curl-captured md5/sha256 in the build log as the
       best-available anchor -- but flag it as a weaker guarantee in the
       attestation doc and in `open_questions`.
+      Done: Dataverse publishes MD5
+      `df3e976b235288005cb410cea09a115f` for file id 3590041; it matches the
+      local cached pg_dump, whose pinned SHA256 is
+      `1390a764ee76d03d80fd6743ec7a6e5f22493411967582e4f1ecc2e282c1a59c`.
 
   - id: w2
     summary: "Phase 2: deterministic-rebuild check -- build the archive twice, diff bytes vs committed archive_sha256; record proof or trigger Gate B"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       ANNOUNCE BEFORE RUNNING: this re-downloads the ~1.2 GB Dataverse pg_dump
       and runs a Postgres restore in Docker; expect ~10-20 min per build, two
@@ -198,11 +203,20 @@ work:
       `_project/joinorder/release-notes.md` to state the ACTUAL guarantee
       ("rebuild reproduces the byte-identical archive" vs "rebuild reproduces
       logically-equivalent tables verified by per-table content hash").
+      Done with Gate B triggered: run1 archive
+      `e24bc0f1a12ab7619942da4b985d2eae809686b0d986005334bada93692e0a49`,
+      run2 archive
+      `adf28547f5c2b90884a0e2564cdf8a42b9a1c16192461dcc02a78677e21fa952`,
+      committed archive
+      `669c97ce7e9e7498c7ce0cad018153aa93a9b8eefff0f77e436d690f64ebc5fd`.
+      `cast_info.parquet` differed between run1 and run2, so this TODO is
+      Blocked pending
+      `_project/TODO/main/planning/joinorder-parquet-rebuild-determinism-decision.yaml`.
 
   - id: w3
     summary: "Phase 3: conversion-fidelity validation for columns outside the 113-query workload (NULL/empty, int width, UTF-8); wire into the oracle harness"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Add a check (a new `build_joinorder_data.py` subcommand, e.g.
       `verify-conversion-fidelity`, or a sibling helper) that runs against the
@@ -234,11 +248,15 @@ work:
       Acceptance: the new check runs in the oracle flow and passes; the
       tiny-fixture variant is in `make test-fast`. GATE: if it surfaces a real
       mismatch -> STOP, escalate (the Parquet conversion is lossy).
+      Done: `verify-conversion-fidelity` passed against the restored Postgres
+      source and rebuilt Parquet with 21 row-count checks, 37 null/empty checks,
+      59 integer-width checks, and 4 UTF-8 column groups. A tiny-fixture fast
+      regression covers null preservation and integer-width safety.
 
   - id: w4
     summary: "Phase 4: clarify hash-field naming in data_manifest.toml + docs (archive_sha256 vs data_archive_hash vs manifest_hash); no behavior change"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Read `build_joinorder_data.py` to determine precisely what each field is
       the hash OF, then add inline `#` comments above each of `manifest_hash`,
@@ -249,6 +267,9 @@ work:
       `docs/benchmarks/join-order.md` near the "Data Source" / "First Run"
       sections. No code or value changes -- comments and docs only. Run
       `make docs-validate` and the joinorder unit tests after.
+      Done: the existing inline manifest comments are preserved and the
+      user-facing docs now spell out each field's consumer and hash input
+      without changing manifest hash values.
 
 deferred:
   - summary: "Cross-engine result equivalence (DuckDB-on-full-data == Postgres-on-full-data 113 hashes)"
@@ -332,7 +353,7 @@ metadata:
     - step1-followup
   estimated_effort: Medium
   created_date: "2026-05-12"
-  last_updated: "2026-05-12T00:00:00"
+  last_updated: "2026-05-12T14:45:00"
 
 impact:
   business_value: |

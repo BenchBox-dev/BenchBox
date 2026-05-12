@@ -68,6 +68,25 @@ STRING_SAMPLE_COLUMNS: dict[str, str] = {
     "movie_companies": "note",
 }
 
+UTF8_FIDELITY_SAMPLE_COLUMNS: dict[str, str] = {
+    "aka_title": "title",
+    "char_name": "name",
+    "name": "name",
+    "title": "title",
+}
+
+DUCKDB_INTEGER_RANGES: dict[str, tuple[int, int]] = {
+    "TINYINT": (-(2**7), 2**7 - 1),
+    "SMALLINT": (-(2**15), 2**15 - 1),
+    "INTEGER": (-(2**31), 2**31 - 1),
+    "BIGINT": (-(2**63), 2**63 - 1),
+    "HUGEINT": (-(2**127), 2**127 - 1),
+    "UTINYINT": (0, 2**8 - 1),
+    "USMALLINT": (0, 2**16 - 1),
+    "UINTEGER": (0, 2**32 - 1),
+    "UBIGINT": (0, 2**64 - 1),
+}
+
 KNOWN_ZERO_UNDERLYING_QUERIES = frozenset({"2c", "5a", "5b", "10b", "32a"})
 
 CANONICAL_NULL_COUNTS: dict[tuple[str, str], tuple[int, int]] = {
@@ -430,6 +449,28 @@ def postgres_type_to_duckdb(postgres_type: str, udt_name: str) -> str:
     if "timestamp" in normalized:
         return "TIMESTAMP"
     return "VARCHAR"
+
+
+def is_postgres_string_column(column: ColumnSchema) -> bool:
+    normalized = column.postgres_type.lower()
+    udt = column.udt_name.lower()
+    return normalized in {"character varying", "character", "text"} or udt in {"varchar", "bpchar", "text"}
+
+
+def is_postgres_integer_column(column: ColumnSchema) -> bool:
+    normalized = column.postgres_type.lower()
+    udt = column.udt_name.lower()
+    return normalized in {"smallint", "integer", "bigint"} or udt in {"int2", "int4", "int8"}
+
+
+def duckdb_integer_type_can_store_range(duckdb_type: str, min_value: int | None, max_value: int | None) -> bool:
+    if min_value is None or max_value is None:
+        return True
+    normalized = duckdb_type.upper().split("(", 1)[0].strip()
+    allowed = DUCKDB_INTEGER_RANGES.get(normalized)
+    if allowed is None:
+        return False
+    return allowed[0] <= min_value and max_value <= allowed[1]
 
 
 def format_toml_string(value: str) -> str:
@@ -1714,6 +1755,184 @@ def validate_encoding_round_trip(
     return results
 
 
+def duckdb_parquet_schema(con: Any, parquet_path: Path) -> dict[str, str]:
+    rows = con.execute(f"DESCRIBE SELECT * FROM read_parquet({duckdb_literal(parquet_path)})").fetchall()
+    return {str(row[0]): str(row[1]) for row in rows}
+
+
+def validate_conversion_fidelity(
+    *,
+    work_dir: Path,
+    container_name: str,
+    database: str,
+    user: str,
+    utf8_sample_size: int = 100,
+) -> dict[str, Any]:
+    try:
+        import duckdb
+    except ImportError as exc:
+        raise JoinOrderBuildError("duckdb is required in _project/scripts for conversion fidelity validation") from exc
+
+    parquet_dir = work_dir / "parquet"
+    if not parquet_dir.exists():
+        raise JoinOrderBuildError(f"Parquet directory missing: {parquet_dir}")
+
+    schema = postgres_schema(container_name=container_name, database=database, user=user)
+    row_count_checks: dict[str, dict[str, int]] = {}
+    string_checks: dict[str, dict[str, Any]] = {}
+    integer_checks: dict[str, dict[str, Any]] = {}
+    utf8_checks: dict[str, dict[str, Any]] = {}
+    failures: list[str] = []
+
+    con = duckdb.connect()
+    try:
+        for table in TABLE_NAMES:
+            parquet_path = parquet_dir / f"{table}.parquet"
+            if not parquet_path.exists():
+                failures.append(f"{table}: missing Parquet file {parquet_path}")
+                continue
+
+            parquet_schema = duckdb_parquet_schema(con, parquet_path)
+            pg_row = psql_json_rows(
+                container_name=container_name,
+                database=database,
+                user=user,
+                sql=f"SELECT count(*)::bigint AS row_count FROM public.{quote_ident(table)}",
+            )[0]
+            parquet_row_count = int(
+                con.execute(f"SELECT count(*) FROM read_parquet({duckdb_literal(parquet_path)})").fetchone()[0]
+            )
+            postgres_row_count = int(pg_row["row_count"])
+            expected_row_count = EXPECTED_ROW_COUNTS[table]
+            row_count_checks[table] = {
+                "postgres_row_count": postgres_row_count,
+                "parquet_row_count": parquet_row_count,
+                "expected_row_count": expected_row_count,
+            }
+            if postgres_row_count != parquet_row_count or parquet_row_count != expected_row_count:
+                failures.append(
+                    f"{table}: row count mismatch postgres={postgres_row_count} "
+                    f"parquet={parquet_row_count} expected={expected_row_count}"
+                )
+
+            for column in schema[table]:
+                if is_postgres_string_column(column) and column.is_nullable:
+                    pg_counts = psql_json_rows(
+                        container_name=container_name,
+                        database=database,
+                        user=user,
+                        sql=(
+                            "SELECT "
+                            f"count(*) FILTER (WHERE {quote_ident(column.name)} IS NULL)::bigint AS null_count, "
+                            f"count(*) FILTER (WHERE {quote_ident(column.name)} = '')::bigint AS empty_count "
+                            f"FROM public.{quote_ident(table)}"
+                        ),
+                    )[0]
+                    parquet_counts = con.execute(
+                        "SELECT "
+                        f"count(*) FILTER (WHERE {quote_ident(column.name)} IS NULL) AS null_count, "
+                        f"count(*) FILTER (WHERE {quote_ident(column.name)} = '') AS empty_count "
+                        f"FROM read_parquet({duckdb_literal(parquet_path)})"
+                    ).fetchone()
+                    key = f"{table}.{column.name}"
+                    check = {
+                        "postgres_null_count": int(pg_counts["null_count"]),
+                        "postgres_empty_count": int(pg_counts["empty_count"]),
+                        "parquet_null_count": int(parquet_counts[0]),
+                        "parquet_empty_count": int(parquet_counts[1]),
+                    }
+                    string_checks[key] = check
+                    if (
+                        check["postgres_null_count"] != check["parquet_null_count"]
+                        or check["postgres_empty_count"] != check["parquet_empty_count"]
+                    ):
+                        failures.append(f"{key}: null/empty string mismatch {check}")
+
+                if is_postgres_integer_column(column):
+                    pg_range = psql_json_rows(
+                        container_name=container_name,
+                        database=database,
+                        user=user,
+                        sql=(
+                            f"SELECT min({quote_ident(column.name)})::bigint AS min_value, "
+                            f"max({quote_ident(column.name)})::bigint AS max_value "
+                            f"FROM public.{quote_ident(table)}"
+                        ),
+                    )[0]
+                    parquet_range = con.execute(
+                        f"SELECT min({quote_ident(column.name)}) AS min_value, "
+                        f"max({quote_ident(column.name)}) AS max_value "
+                        f"FROM read_parquet({duckdb_literal(parquet_path)})"
+                    ).fetchone()
+                    pg_min = int(pg_range["min_value"]) if pg_range["min_value"] is not None else None
+                    pg_max = int(pg_range["max_value"]) if pg_range["max_value"] is not None else None
+                    parquet_min = int(parquet_range[0]) if parquet_range[0] is not None else None
+                    parquet_max = int(parquet_range[1]) if parquet_range[1] is not None else None
+                    parquet_type = parquet_schema.get(column.name, "")
+                    key = f"{table}.{column.name}"
+                    check = {
+                        "postgres_min": pg_min,
+                        "postgres_max": pg_max,
+                        "parquet_min": parquet_min,
+                        "parquet_max": parquet_max,
+                        "parquet_type": parquet_type,
+                    }
+                    integer_checks[key] = check
+                    if pg_min != parquet_min or pg_max != parquet_max:
+                        failures.append(f"{key}: integer min/max mismatch {check}")
+                    if not duckdb_integer_type_can_store_range(parquet_type, pg_min, pg_max):
+                        failures.append(f"{key}: Parquet type {parquet_type!r} cannot represent postgres range")
+
+            utf8_column = UTF8_FIDELITY_SAMPLE_COLUMNS.get(table)
+            if utf8_column is not None:
+                rows = psql_json_rows(
+                    container_name=container_name,
+                    database=database,
+                    user=user,
+                    sql=(
+                        f"SELECT id, encode(convert_to({quote_ident(utf8_column)}, 'UTF8'), 'hex') AS utf8_hex "
+                        f"FROM public.{quote_ident(table)} "
+                        f"WHERE {quote_ident(utf8_column)} IS NOT NULL "
+                        f"AND {quote_ident(utf8_column)} ~ '[^ -~]' "
+                        f"ORDER BY id LIMIT {utf8_sample_size}"
+                    ),
+                )
+                key = f"{table}.{utf8_column}"
+                utf8_checks[key] = {"sample_count": len(rows)}
+                if not rows:
+                    failures.append(f"{key}: no non-ASCII UTF-8 samples found")
+                for row in rows:
+                    parquet_value = con.execute(
+                        f"SELECT {quote_ident(utf8_column)} "
+                        f"FROM read_parquet({duckdb_literal(parquet_path)}) WHERE id = ?",
+                        [int(row["id"])],
+                    ).fetchone()
+                    if parquet_value is None:
+                        failures.append(f"{key}: sample id={row['id']} missing from Parquet")
+                        continue
+                    actual_hex = parquet_value[0].encode("utf-8").hex() if parquet_value[0] is not None else ""
+                    if actual_hex != row["utf8_hex"]:
+                        failures.append(
+                            f"{key}: UTF-8 drift for id={row['id']} postgres={row['utf8_hex']} parquet={actual_hex}"
+                        )
+    finally:
+        con.close()
+
+    report = {
+        "validated_at": utc_now_iso(),
+        "parquet_dir": str(parquet_dir),
+        "row_count_checks": row_count_checks,
+        "string_null_empty_checks": string_checks,
+        "integer_width_checks": integer_checks,
+        "utf8_round_trip_checks": utf8_checks,
+        "failures": failures,
+    }
+    write_build_manifest(work_dir, {"conversion_fidelity": report})
+    if failures:
+        raise JoinOrderBuildError(f"Conversion fidelity validation failed with {len(failures)} issue(s): {failures[:5]}")
+    return report
+
+
 def compute_reference_cardinalities(
     *,
     work_dir: Path,
@@ -2553,6 +2772,22 @@ def build_parser() -> argparse.ArgumentParser:
     add_query_dir_arg(verify_reference)
     verify_reference.add_argument("--reference", default=None)
 
+    fidelity = subparsers.add_parser(
+        "verify-conversion-fidelity",
+        help="Verify Postgres-to-Parquet row-count, null/empty, integer-width, and UTF-8 fidelity.",
+    )
+    add_common_args(fidelity)
+    add_existing_postgres_args(fidelity)
+    fidelity.add_argument("--utf8-sample-size", type=int, default=100)
+
+    rebuild_local = subparsers.add_parser(
+        "rebuild-local",
+        help="Rebuild the Parquet archive from an existing restored PostgreSQL container without staging a release.",
+    )
+    add_common_args(rebuild_local)
+    add_existing_postgres_args(rebuild_local)
+    rebuild_local.add_argument("--cardinalities", default=None)
+
     cross_check = subparsers.add_parser("cross-check", help="w12: Write published-cardinality cross-check report.")
     add_common_args(cross_check)
     cross_check.add_argument("--cardinalities", default=None)
@@ -2716,6 +2951,51 @@ def run_verify_reference_results(args: argparse.Namespace) -> int:
         "Reference result verification passed: "
         f"{report['full_result_hashes_verified']}/{report['verified_query_count']} aggregate row hashes matched"
     )
+    return 0
+
+
+def run_verify_conversion_fidelity(args: argparse.Namespace) -> int:
+    work_dir = work_dir_from_arg(args.work_dir)
+    report = validate_conversion_fidelity(
+        work_dir=work_dir,
+        container_name=args.container_name,
+        database=args.database,
+        user=args.user,
+        utf8_sample_size=args.utf8_sample_size,
+    )
+    print(
+        "Conversion fidelity verification passed: "
+        f"{len(report['row_count_checks'])} row-count checks, "
+        f"{len(report['string_null_empty_checks'])} null/empty checks, "
+        f"{len(report['integer_width_checks'])} integer-width checks, "
+        f"{len(report['utf8_round_trip_checks'])} UTF-8 column groups"
+    )
+    return 0
+
+
+def run_rebuild_local(args: argparse.Namespace) -> int:
+    work_dir = work_dir_from_arg(args.work_dir)
+    schema = postgres_schema(container_name=args.container_name, database=args.database, user=args.user)
+    parquet_files = extract_and_convert_parquet_streaming(
+        work_dir=work_dir,
+        schema=schema,
+        container_name=args.container_name,
+        database=args.database,
+        user=args.user,
+    )
+    manifest_path = assemble_manifest(work_dir=work_dir, schema=schema, table_files=parquet_files)
+    cardinalities = (
+        Path(args.cardinalities).expanduser().resolve()
+        if args.cardinalities
+        else repo_root() / "_project" / "joinorder" / "reference_cardinalities.json"
+    )
+    archive_path, sha_path = package_archive(
+        work_dir=work_dir,
+        manifest_path=manifest_path,
+        cardinalities_path=cardinalities,
+    )
+    print(f"Local rebuild archive: {archive_path}")
+    print(f"Local rebuild sha256: {sha_path.read_text(encoding='utf-8').split()[0]}")
     return 0
 
 
@@ -2887,6 +3167,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         "import-queries": run_import_queries,
         "cardinalities": run_cardinalities,
         "verify-reference-results": run_verify_reference_results,
+        "verify-conversion-fidelity": run_verify_conversion_fidelity,
+        "rebuild-local": run_rebuild_local,
         "cross-check": run_cross_check,
         "package": run_package,
         "tiny-fixture": run_tiny_fixture,

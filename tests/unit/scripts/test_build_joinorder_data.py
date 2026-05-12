@@ -142,6 +142,25 @@ def test_validate_pgdump_file_requires_custom_format_magic(tmp_path: Path) -> No
         build_joinorder_data.validate_pgdump_file(dump_path, dataverse_file)
 
 
+@pytest.mark.parametrize(
+    ("duckdb_type", "minimum", "maximum", "expected"),
+    [
+        ("INTEGER", -2_147_483_648, 2_147_483_647, True),
+        ("INTEGER", 0, 2_147_483_648, False),
+        ("BIGINT", 0, 2_147_483_648, True),
+        ("VARCHAR", 0, 1, False),
+        ("BIGINT", None, None, True),
+    ],
+)
+def test_duckdb_integer_type_can_store_range(
+    duckdb_type: str,
+    minimum: int | None,
+    maximum: int | None,
+    expected: bool,
+) -> None:
+    assert build_joinorder_data.duckdb_integer_type_can_store_range(duckdb_type, minimum, maximum) is expected
+
+
 def test_write_build_manifest_records_source_sha256(tmp_path: Path) -> None:
     dataverse_file = build_joinorder_data.DataverseFile(
         file_id=3590041,

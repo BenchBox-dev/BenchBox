@@ -6,6 +6,13 @@
 - Scope: research and database optimizer benchmarking.
 - BenchBox redistribution disclaimer and takedown commitment are included in DATA-LICENSE.md.
 - Archive: `joinorder-imdb-2013-v1.tar.zst` sha256 `669c97ce7e9e7498c7ce0cad018153aa93a9b8eefff0f77e436d690f64ebc5fd`.
+- Provenance attestation: `_project/joinorder/provenance-attestation.md`.
+- Rebuild guarantee: the published archive is transport-hash verified, and the
+  Dataverse source checksum plus conversion fidelity are attested. A 2026-05-12
+  rebuild check did not reproduce byte-identical Parquet/archive bytes; do not
+  claim byte-identical rebuild reproducibility until
+  `_project/TODO/main/planning/joinorder-parquet-rebuild-determinism-decision.yaml`
+  is resolved.
 
 ## Tables
 
