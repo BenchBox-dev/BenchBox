@@ -249,7 +249,7 @@ dataframe-polars = [
     "polars>=1.35.2",
 ]
 pyspark = ["pyspark>=3.5.0"]
-lakesail = ["pyspark>=3.5.0"]
+lakesail = ["pyspark[connect]>=3.5.0"]
 velox = ["pyspark[connect]>=3.5.0"]
 dataframe-pyspark = [
     "pyspark>=3.5.0",

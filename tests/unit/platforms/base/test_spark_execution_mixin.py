@@ -308,6 +308,37 @@ def test_load_data_spark_no_cache_negative_row_delta_warns(tmp_path: Path) -> No
     )
 
 
+def test_load_data_spark_csv_compat_temp_dir_lives_under_data_dir(tmp_path: Path) -> None:
+    """CSV compatibility links must be inside data_dir for path-mirrored Spark Connect containers."""
+    adapter = _CsvExtAdapter()
+    spark = MagicMock()
+    spark.table.side_effect = RuntimeError("table not found")
+    source_path = tmp_path / "orders.tbl.zst"
+    source_path.write_bytes(b"x")
+    csv_df = _make_dataframe(["id"])
+    spark.read.option.return_value = spark.read
+
+    def _csv(path: str):
+        csv_path = Path(path)
+        assert tmp_path in csv_path.parents
+        assert csv_path.name == "orders.csv.zst"
+        assert csv_path.is_symlink()
+        assert csv_path.resolve() == source_path.resolve()
+        return csv_df
+
+    spark.read.csv.side_effect = _csv
+
+    with patch("benchbox.platforms.base.data_loading.DataSourceResolver.resolve") as mock_resolve:
+        mock_resolve.return_value = SimpleNamespace(
+            source_type="benchmark_tables",
+            tables={"orders": [source_path]},
+            table_metadata={},
+        )
+        stats, _, _ = adapter._load_data_spark(MagicMock(), tmp_path, spark)
+
+    assert stats["orders"] == 5
+
+
 def test_row_count_escapes_backticks_in_table_name() -> None:
     """Backticks in table names are doubled to prevent SQL injection."""
     spark = MagicMock()

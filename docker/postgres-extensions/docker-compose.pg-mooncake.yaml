@@ -20,7 +20,6 @@
 services:
   pg-mooncake:
     image: mooncakelabs/pg_mooncake:latest
-    container_name: benchbox-pg-mooncake
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: benchbox
