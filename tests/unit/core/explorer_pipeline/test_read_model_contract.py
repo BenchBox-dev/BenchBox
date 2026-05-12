@@ -335,6 +335,49 @@ class TestTimingEligibilityContract:
         assert entry.missing_query_count == 4
         assert entry.comparison_exclusion_reason == "insufficient_valid_queries"
 
+    def test_dataframe_skip_summary_sets_partial_logical_denominator(self, tmp_path: Path) -> None:
+        bundle = copy.deepcopy(MINIMAL_BUNDLE)
+        bundle["benchmark"]["id"] = "joinorder"
+        bundle["summary"]["queries"] = {"total": 13, "passed": 13, "failed": 0}
+        bundle["queries"] = [
+            {"id": f"{query_id}a", "ms": 10.0, "run_type": "measurement", "status": "SUCCESS"}
+            for query_id in range(1, 14)
+        ]
+        bundle["queries"].extend(
+            {
+                "id": f"skipped_{idx}",
+                "ms": 0.0,
+                "run_type": "metadata",
+                "status": "SKIPPED",
+            }
+            for idx in range(100)
+        )
+        bundle["queries"].append(
+            {
+                "id": "DF_SKIP_SUMMARY",
+                "ms": 0.0,
+                "run_type": "summary",
+                "status": "SUCCESS",
+                "dataframe_skip_summary": {
+                    "executed_total": 13,
+                    "skipped_total": 100,
+                    "executed_by_category": {},
+                    "skipped_by_category": {},
+                },
+            }
+        )
+
+        entry = BundleTransformer().to_manifest_entry(self._write_bundle(tmp_path, bundle))
+
+        assert entry.failed_query_count == 0
+        assert entry.query_count == 13
+        assert entry.logical_query_count == 113
+        assert entry.valid_query_count == 13
+        assert entry.missing_query_count == 100
+        assert entry.comparison_exclusion_reason == "insufficient_query_coverage"
+        assert entry.ranking_exclusion_reason == "insufficient_query_coverage"
+        assert is_ranking_eligible(entry) is False
+
     def test_invalid_display_timings_are_not_comparable(self) -> None:
         contract = timing_eligibility(
             [

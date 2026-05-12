@@ -2,8 +2,9 @@ id: joinorder-accessibility-and-comparability
 title: "JoinOrder accessibility (reachable small JOB workload) and partial-mode comparability (DataFrame 13-of-113 runs)"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
 category: Core Functionality
+completed_date: "2026-05-12"
 
 description: |
   Follow-up to the merged canonical-JOB foundation (issue #289 Step 1). The
@@ -91,7 +92,7 @@ context_sections:
 work:
   - id: w0
     summary: "Snapshot the current accessibility/coverage state to _project/verification-logs/joinorder-accessibility-and-comparability/w0.log before any change"
-    status: pending
+    status: done
     notes: |
       Capture (the durable baseline for the facts this TODO cites):
         - `uv run -- python -c "from benchbox.core.benchmark_registry import BENCHMARK_METADATA as m; import json; print(json.dumps({k: m['joinorder'][k] for k in ('default_scale','scale_options','min_scale','num_queries','surface')}))"`
@@ -101,11 +102,14 @@ work:
         - the merge state of PRs #361/#363/#367/#370 (`gh pr view <N> --json state,mergedAt` each) so the "reuse the explorer comparability machinery" premise is recorded.
       Write to `_project/verification-logs/joinorder-accessibility-and-comparability/w0.log`.
       No code changes.
+      Done: `_project/verification-logs/joinorder-accessibility-and-comparability/w0.log`
+      records `scale_options == [1.0]`, DataFrame registry coverage
+      113 registered / 100 untranslated, and PRs #361/#363/#367/#370 merged.
 
   - id: w1
     summary: "Phase 1 decision gate: choose how (if at all) to provide a reachable small JOB workload; record an ADR"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Lay out the options and put the decision to the user (AskUserQuestion):
         (a) BUILD "JOB-LIGHT": a sampled-but-correlated subset selectable as a
@@ -130,11 +134,15 @@ work:
       by `joinorder-scale-stress-decision-framework`). w2/w3 below are
       option-(a)/(b)-only; if (c) wins, w2/w3 collapse to "update docs + close"
       and Phase 2/3 (the comparability work) still proceed independently.
+      Done: option (c) selected in
+      `_project/decisions/joinorder-small-workload-2026-05-12.md`. Public
+      `joinorder` remains `--scale 1` only; the tiny fixture is not promoted
+      while the IMDb-derived data redistribution remediation remains open.
 
   - id: w2
     summary: "Phase 1 build (option a/b only): implement the small selectable scale -- subset build, archive+manifest, reference cardinalities, scale_options, benchmark mapping"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Only if w1 chose (a) or (b). Reuse the `joinorder_canonical_tiny` build
       logic if it's coherent; otherwise add a deterministic subset extractor to
@@ -145,11 +153,13 @@ work:
       cardinalities. Keep `default_scale` at 1.0 (canonical stays the default).
       ANNOUNCE any heavy build step (it touches the full dataset to derive the
       subset).
+      Done: no-op because w1 selected option (c). `scale_options` stays `[1.0]`
+      and no new archive/manifest/reference-cardinality artifact is added.
 
   - id: w3
     summary: "Phase 1 tests + docs (option a/b only): all 113 queries run on the subset; docs describe the small scale and its 'not comparable to --scale 1' status"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Add a test (fast tier) that runs all 113 canonical queries against the
       subset via DuckDB and checks they return the expected shape vs the new
@@ -160,11 +170,14 @@ work:
       for (quick iteration / CI), and that results at it are NOT comparable to
       `--scale 1` (and are marked partial/unranked -- see Phase 2/3). Run
       `make docs-validate` + the joinorder unit tests.
+      Done: no-op for small-scale implementation because w1 selected option
+      (c). `docs/benchmarks/join-order.md` now states there is no public small,
+      comparable JOB workload and links the ADR.
 
   - id: w4
     summary: "Phase 2 verification spike: does a joinorder --mode dataframe run get marked partial (13/113, 100 skipped) in result metadata / leaderboard / explorer / compare?"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Run (or inspect, if a heavy run is impractical -- use the tiny fixture or
       a dry-run) `benchbox run --benchmark joinorder --mode dataframe` and
@@ -178,11 +191,14 @@ work:
       GATE: if partiality IS clearly surfaced end-to-end -> record the evidence,
       mark w5 a no-op, done. If there is ANY surface where a 13/113 joinorder
       DataFrame run looks complete/comparable -> w5.
+      Done: `_project/verification-logs/joinorder-accessibility-and-comparability/w4.log`
+      records a gap. Schema-v2 export dropped `dataframe_skip_summary`, causing
+      the explorer to infer 13 logical queries instead of 113.
 
   - id: w5
     summary: "Phase 3 (conditional on w4): mark partial joinorder DataFrame runs and guard comparison against complete runs; tests"
     needs: [w4]
-    status: pending
+    status: done
     notes: |
       Only if w4 found a gap. Add result-metadata + explorer/compare signalling
       that the run executed N/113 queries with a named skip list, reusing the
@@ -192,6 +208,11 @@ work:
       explorer/compare behavior. Cross-reference `track2-joinorder-dataframe-coverage`
       (which removes the gap entirely once translations land) so this is
       understood as the interim guard.
+      Done: schema-v2 result export preserves `dataframe_skip_summary`; the
+      explorer transformer uses executed+skipped as the logical query
+      denominator; metadata/summary skipped rows no longer count as failures;
+      ranking exclusion reuses the existing comparison exclusion reason. Tests
+      cover the 13-of-113 JoinOrder DataFrame case.
 
 deferred:
   - summary: "Actually translating the 100 stub DataFrame queries"

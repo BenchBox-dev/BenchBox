@@ -345,6 +345,7 @@ def is_ranking_eligible(entry: ManifestEntry) -> bool:
         and entry.trust_label in RANKING_ELIGIBLE_TRUST_LABELS
         and entry.failed_query_count == 0
         and not validation_status_is_non_clean(entry.validation_status)
+        and entry.comparison_exclusion_reason is None
     )
 
 
@@ -358,6 +359,8 @@ def ranking_exclusion_reason(entry: ManifestEntry, primary_metric: str | None = 
         return "failed_queries"
     if validation_status_is_non_clean(entry.validation_status):
         return "validation_not_clean"
+    if entry.comparison_exclusion_reason is not None:
+        return entry.comparison_exclusion_reason
 
     metric = primary_metric or get_ranking_config(entry.benchmark).primary_metric
     value = entry.power_score if metric == "power_score" else entry.display_geomean_ms

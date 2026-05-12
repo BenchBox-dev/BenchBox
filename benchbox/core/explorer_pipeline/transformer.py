@@ -628,6 +628,10 @@ def _logical_query_count(data: dict[str, Any], display_timings: list[QueryDispla
     benchmark runs it can be 3x/4x the logical benchmark query count, while
     ``display_timings`` has one row per logical query ID.
     """
+    dataframe_skip_total = _dataframe_skip_logical_query_count(data)
+    if dataframe_skip_total is not None:
+        return dataframe_skip_total
+
     raw_query_count = _summary_query_count(data)
     observed_query_count = len({timing.query_id for timing in display_timings if timing.query_id})
     if observed_query_count <= 0:
@@ -644,6 +648,44 @@ def _logical_query_count(data: dict[str, Any], display_timings: list[QueryDispla
         return observed_query_count
 
     return raw_query_count
+
+
+def _dataframe_skip_logical_query_count(data: dict[str, Any]) -> int | None:
+    """Return executed+skipped logical query count for DataFrame partial runs."""
+    raw_queries = data.get("queries", [])
+    if not isinstance(raw_queries, list):
+        return None
+
+    best_total: int | None = None
+    for query in raw_queries:
+        if not isinstance(query, dict):
+            continue
+        summary = query.get("dataframe_skip_summary")
+        if not isinstance(summary, dict):
+            continue
+        executed = _int_or_none(summary.get("executed_total"))
+        skipped = _int_or_none(summary.get("skipped_total"))
+        if executed is None or skipped is None:
+            continue
+        total = executed + skipped
+        if total > 0 and (best_total is None or total > best_total):
+            best_total = total
+    return best_total
+
+
+def _int_or_none(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return None
+    return None
 
 
 class BundleTransformer:
