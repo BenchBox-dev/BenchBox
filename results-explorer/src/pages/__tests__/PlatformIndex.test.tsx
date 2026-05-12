@@ -595,16 +595,18 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(ssb.querySelector('[data-result-id="r-tpch-a"]')).toBeNull();
   });
 
-  it("shows receipt links and validation status for each platform result", async () => {
+  it("shows public-ID receipt links and validation status for each platform result", async () => {
     render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
 
-    const receiptLinks = screen.getAllByRole("link", { name: "Receipt →" }) as HTMLAnchorElement[];
+    const receiptLinks = screen.getAllByRole("link", {
+      name: /Open receipt for DuckDB public ID/,
+    }) as HTMLAnchorElement[];
     expect(receiptLinks[0]?.getAttribute("href")).toBe("/results/r/r-tpch-fast#run-receipt");
     expect(screen.getAllByText("exact").length).toBeGreaterThan(0);
   });
 
-  it("compare tray shows selected metadata and uses short IDs in the compare URL", async () => {
+  it("compare tray shows public IDs while the compare URL keeps short aliases", async () => {
     render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
 
@@ -618,7 +620,7 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(tpchRow.textContent).toContain("SF 0.1");
     expect(tpchRow.textContent).toContain("power");
     expect(tpchRow.textContent).toContain("2026-04-03");
-    expect(tpchRow.textContent).toContain("ID aaaabbbb");
+    expect(tpchRow.textContent).toContain("Public ID r-tpch-fast");
     expect(ssbRow.textContent).toContain("SSB");
     expect(screen.getByTestId("platform-compare-guidance").textContent).toContain("differ by benchmark");
 
