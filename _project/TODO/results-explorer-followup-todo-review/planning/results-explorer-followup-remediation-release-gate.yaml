@@ -2,7 +2,7 @@ id: results-explorer-followup-remediation-release-gate
 title: "Gate the Results Explorer follow-up remediation with snapshot, browser, and TODO-state evidence"
 worktree: results-explorer-followup-todo-review
 priority: Critical
-status: Not Started
+status: Blocked
 category: Testing and Quality Assurance
 
 description: |
@@ -26,11 +26,18 @@ deps:
   - results-explorer-compare-warning-affordance-contract
   - results-explorer-surface-theme-and-density-contract
   - results-explorer-direct-route-and-copy-hardening
+  - results-explorer-result-detail-metric-formatting-regression
+
+blockers:
+- date: "2026-05-12"
+  work: [w2, w3, w4, w5]
+  reason: "`cd results-explorer && npm test -- --run` fails in `src/pages/__tests__/ResultDetail.test.tsx` after the metric-formatting remediation: exact power-score precision is no longer visible in the result summary, and median/raw duration header expectations no longer match the rendered copy."
+  unblock: "Complete `results-explorer-result-detail-metric-formatting-regression`, rerun the release-gate automated frontend suite, then resume browser acceptance and closure."
 
 work:
 - id: w0
   summary: "Confirm dependency TODOs are complete with verification evidence"
-  status: pending
+  status: done
   notes: |
     Run `todo_cli.py show` or equivalent for each dependency on the checked git
     SHA and verify every work unit is done, every verification item has output,
@@ -42,7 +49,7 @@ work:
 - id: w1
   summary: "Run regenerated snapshot invariants and compare SQL smoke"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     Regenerate or confirm the current Results Explorer DuckDB snapshot, then
     run snapshot invariants plus SQL that reports:
@@ -64,7 +71,7 @@ work:
 - id: w2
   summary: "Run automated backend and frontend suites"
   needs: [w1]
-  status: pending
+  status: in_progress
   notes: |
     Run the targeted backend explorer pipeline tests, Results Explorer unit
     tests, typecheck, build, and e2e/browser tests introduced by dependent
