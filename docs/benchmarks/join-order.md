@@ -17,6 +17,13 @@ join-order planning behavior across many-table SQL queries.
 `imdb_pg11` archive, DOI `10.7910/DVN/2QYZBT`, restored into PostgreSQL and
 converted to 21 Parquet tables for repeatable benchmark execution.
 
+Licensing status is separate from integrity status. The Dataverse record
+declares the deposit as `CC0 1.0`, but IMDb's current dataset terms and the JOB
+paper frame the underlying IMDb data as non-commercial. BenchBox therefore does
+not treat its current re-hosted Parquet release asset as cleared for broad
+redistribution until the remediation tracked from
+`_project/decisions/joinorder-canonical-data-licensing-2026-05-12.md` lands.
+
 The benchmark accepts only `--scale 1`. The old uniformly-random data generator
 has been renamed to the internal `joinorder_synthetic` benchmark for loader and
 schema smoke tests; it is not a substitute for JOB cardinality testing.
@@ -86,6 +93,12 @@ Dataset provenance and redistribution notes live in:
 benchbox/core/joinorder/DATA-LICENSE.md
 ```
 
+Decision record:
+
+```text
+_project/decisions/joinorder-canonical-data-licensing-2026-05-12.md
+```
+
 IMDb attribution:
 
 ```text
@@ -94,7 +107,8 @@ Information courtesy of IMDb (https://www.imdb.com). Used with permission.
 
 Use this dataset for research, database systems evaluation, and query optimizer
 benchmarking. It is not intended for republication as a general-purpose movie
-database.
+database, and BenchBox does not treat the current converted archive as
+BenchBox-cleared for commercial redistribution.
 
 ## References
 
