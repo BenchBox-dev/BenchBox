@@ -1,0 +1,94 @@
+checked_sha: 7305ab6f03d2
+fixture_snapshot: results-explorer/test-fixtures/.generated/data/results.duckdb
+fixture_generation_log: _project/verification-logs/results-explorer-chart-dataset-eligibility-contract/w0-fixtures.log
+
+Inventory scope:
+- Benchmark Overview: performance_bar, power_bar, summary_box, stacked_phase, sparkline_table.
+- Benchmark Per-query: query_heatmap, query_histogram.
+- Benchmark Distribution: distribution_box, percentile_ladder, cdf_chart.
+- Cost: cost_scatter.
+- Trend: time_series.
+- Rank: rank_table.
+- Compare Overview/Per-query/Distribution/Rank: ChartPanel compare context plus QueryDiffTable.
+
+Source contracts found:
+- getBenchmarkSummaryFromDuckDB() composes BenchmarkSummary from benchmark_rankings, benchmark_matrix_cells, result_phase_durations, and joined results cost/deployment fields.
+- getDetailResult() composes DetailResult from result_detail_metrics, query_display_timings, and query_executions.
+- ChartPanel renders registry entries from CHART_REGISTRY and synthetic BenchmarkSummary values for detail/compare routes.
+- displayEligibility.ts already exposes row-level predicates for display, comparison, ranking, and per-query timing cells.
+
+Current risk inventory:
+- Chart availability is capability-based, not eligibility-class based. A chart may be selectable because some raw timing/cost/score field exists even when rows are excluded by display/rank/compare contracts.
+- QueryHistogram reads raw PlatformRow.timings and treats non-positive values as missing, but it does not consult timing_eligibility before scaling/rendering bars.
+- PowerBar filters positive power_score only, so rank-excluded power scores can still render as normal analytical bars.
+- DistributionBox/CDFChart already filter display_exclusion_reason and platformTimingValue(); RankTable already uses ranking_exclusion_reason and has an all-excluded empty state.
+- Compare ChartPanel builds chart summaries from every selected result; compare-specific charts need a compare-safe dataset boundary before rendering.
+
+SQL: cohort-level eligibility counts
+SELECT benchmark, scale_factor, COALESCE(test_type, 'power') AS phase,
+       COUNT(*) AS rows,
+       COUNT(*) FILTER (WHERE display_exclusion_reason IS NULL) AS display_safe,
+       COUNT(*) FILTER (WHERE ranking_exclusion_reason IS NULL) AS rank_safe,
+       COUNT(*) FILTER (WHERE comparison_exclusion_reason IS NULL) AS compare_safe,
+       COUNT(*) FILTER (WHERE normalized_cost_usd IS NOT NULL AND cost_status='normalized') AS cost_safe
+FROM results
+GROUP BY 1,2,3
+ORDER BY 1,2,3;
+
+benchmark,scale_factor,phase,rows,display_safe,rank_safe,compare_safe,cost_safe
+star_schema,0.01,standard,1,1,1,0,0
+tpch,0.01,standard,9,9,6,9,0
+tpch,0.1,standard,1,1,1,1,0
+
+SQL: benchmark summary source tables and per-cell validity
+SELECT br.benchmark, br.scale_factor, br.phase,
+       COUNT(DISTINCT br.result_id) AS ranking_rows,
+       COUNT(DISTINCT bmc.result_id) AS matrix_results,
+       COUNT(*) FILTER (WHERE bmc.display_ms IS NOT NULL) AS matrix_cells_with_display_ms,
+       COUNT(*) FILTER (WHERE bmc.is_valid_display_timing) AS valid_display_cells,
+       COUNT(*) FILTER (WHERE NOT bmc.is_valid_display_timing) AS excluded_display_cells
+FROM benchmark_rankings br
+LEFT JOIN benchmark_matrix_cells bmc USING (benchmark, scale_factor, phase, result_id)
+GROUP BY 1,2,3
+ORDER BY 1,2,3;
+
+benchmark,scale_factor,phase,ranking_rows,matrix_results,matrix_cells_with_display_ms,valid_display_cells,excluded_display_cells
+star_schema,0.01,standard,1,1,13,6,7
+tpch,0.01,standard,9,9,197,197,1
+tpch,0.1,standard,1,1,22,22,0
+
+SQL: sample row exclusions
+SELECT result_id, benchmark, scale_factor, COALESCE(test_type, 'power') AS phase,
+       platform_id, display_exclusion_reason, ranking_exclusion_reason,
+       comparison_exclusion_reason, has_display_timing, valid_query_count,
+       missing_query_count, zero_timing_count, display_geomean_ms, power_score
+FROM results
+WHERE display_exclusion_reason IS NOT NULL
+   OR ranking_exclusion_reason IS NOT NULL
+   OR comparison_exclusion_reason IS NOT NULL
+ORDER BY benchmark, scale_factor, platform_id, result_id
+LIMIT 20;
+
+result_id,benchmark,scale_factor,phase,platform_id,display_exclusion_reason,ranking_exclusion_reason,comparison_exclusion_reason,has_display_timing,valid_query_count,missing_query_count,zero_timing_count,display_geomean_ms,power_score
+star_schema-duckdb-sf0.01-20260403-3cdeede0,star_schema,0.01,standard,duckdb,NULL,NULL,insufficient_query_coverage,true,6,0,7,0.8908987181403393,NULL
+tpch-duckdb-sf0.01-20260403-b6d2e142,tpch,0.01,standard,duckdb,NULL,trust_not_rankable,NULL,true,22,0,0,11.335852721901425,3184.897098661065
+tpch-fixture-aws-sql-sf0.01-20260403-e73da6ce,tpch,0.01,standard,fixture-aws-sql,NULL,trust_not_rankable,NULL,true,22,0,0,11.335852721901425,3184.897098661065
+tpch-fixture-gcp-serverless-sf0.01-20260403-fb7f77e8,tpch,0.01,standard,fixture-gcp-serverless,NULL,trust_not_rankable,NULL,true,22,0,0,11.335852721901425,3184.897098661065
+
+SQL: invalid per-query timing cells
+SELECT result_id, query_id, display_ms, sample_count, is_valid_display_timing, timing_exclusion_reason
+FROM query_display_timings
+WHERE NOT is_valid_display_timing OR display_ms IS NULL OR display_ms <= 0
+ORDER BY result_id, query_id
+LIMIT 30;
+
+result_id,query_id,display_ms,sample_count,is_valid_display_timing,timing_exclusion_reason
+star_schema-duckdb-sf0.01-20260403-3cdeede0,1.1,0.0,4,false,zero_timing
+star_schema-duckdb-sf0.01-20260403-3cdeede0,1.2,0.0,4,false,zero_timing
+star_schema-duckdb-sf0.01-20260403-3cdeede0,1.3,0.0,4,false,zero_timing
+star_schema-duckdb-sf0.01-20260403-3cdeede0,2.1,0.0,4,false,zero_timing
+star_schema-duckdb-sf0.01-20260403-3cdeede0,2.2,0.0,4,false,zero_timing
+star_schema-duckdb-sf0.01-20260403-3cdeede0,2.3,0.0,4,false,zero_timing
+star_schema-duckdb-sf0.01-20260403-3cdeede0,3.4,0.0,4,false,zero_timing
+
+Decision: PASS. The code has enough durable eligibility fields to define chart dataset classes without inferring from display strings.

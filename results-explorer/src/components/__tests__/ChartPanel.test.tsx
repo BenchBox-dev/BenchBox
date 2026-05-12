@@ -556,9 +556,43 @@ describe("ChartPanel", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Rank" }));
 
-    expect(screen.getByRole("status", { name: "Rank chart unavailable" })).toBeTruthy();
+    expect(screen.getByRole("status", { name: "Rank Table unavailable" })).toBeTruthy();
     expect(screen.queryByRole("table", { name: "Per-query platform rankings (1st = fastest)" })).toBeNull();
-    expect(screen.getByText(/Submitted evidence is Excluded/)).toBeTruthy();
+    expect(screen.getByText("No rankable rows")).toBeTruthy();
+    expect(screen.getByText(/Trust policy excludes this result from ranking/)).toBeTruthy();
+    expect(screen.getByText(/Validation status excludes this result from ranking/)).toBeTruthy();
+  });
+
+  it("filters rank-unsafe rows out of power charts and discloses the exclusion", () => {
+    render(
+      <ChartPanel
+        context={{
+          kind: "summary",
+          summary: makeSummary({
+            ranking: { primary_metric: "power_score", secondary_metric: "display_geomean_ms", primary_order: "desc" },
+            platforms: [
+              makePlatformRow({
+                result_id: "community-high",
+                platform: "Community High",
+                power_score: 9000,
+                ranking_exclusion_reason: "trust_not_rankable",
+              }),
+              makePlatformRow({
+                result_id: "rankable-low",
+                platform: "Rankable Low",
+                power_score: 1000,
+              }),
+            ],
+          }),
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Power@Size Bar" }));
+
+    expect(screen.getByText("Rankable Low")).toBeTruthy();
+    expect(screen.queryByText("Community High")).toBeNull();
+    expect(screen.getByText(/1 row excluded from this chart's rankable rows dataset/)).toBeTruthy();
   });
 
   it("uses winner language by default in the summary box", () => {

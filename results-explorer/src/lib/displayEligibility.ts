@@ -10,6 +10,13 @@ import type {
 export type EligibilityRow = DetailResult | PlatformRow | MetaCohortPlatform;
 export type PrimaryMetricRow = DetailResult | PlatformRow;
 export type PrimaryMetric = "power_score" | "display_geomean_ms";
+export type ChartDatasetEligibilityClass =
+  | "display_safe"
+  | "rank_safe"
+  | "compare_safe"
+  | "cost_safe"
+  | "trend_safe"
+  | "provenance_only";
 
 export interface CompareEvidenceSummary {
   comparable: boolean;
@@ -88,6 +95,109 @@ export function isComparable(row: EligibilityRow): boolean {
 
 export function isRankable(row: EligibilityRow): boolean {
   return row.ranking_exclusion_reason === null;
+}
+
+export function isNormalizedCostSafe(row: PlatformRow): boolean {
+  return row.cost_status === "normalized" && Number.isFinite(row.normalized_cost_usd);
+}
+
+export function isChartDatasetEligible(row: PlatformRow, eligibilityClass: ChartDatasetEligibilityClass): boolean {
+  switch (eligibilityClass) {
+    case "display_safe":
+      return isTimingDisplayable(row);
+    case "rank_safe":
+      return isRankable(row);
+    case "compare_safe":
+      return isComparable(row);
+    case "cost_safe":
+      return isNormalizedCostSafe(row);
+    case "trend_safe":
+    case "provenance_only":
+      return true;
+  }
+}
+
+export function filterSummaryForChartDataset(
+  summary: BenchmarkSummary,
+  eligibilityClass: ChartDatasetEligibilityClass,
+): BenchmarkSummary {
+  if (eligibilityClass === "provenance_only" || eligibilityClass === "trend_safe") return summary;
+  if (eligibilityClass === "compare_safe" && summary.platforms.some((platform) => !isComparable(platform))) {
+    return { ...summary, platforms: [] };
+  }
+  return {
+    ...summary,
+    platforms: summary.platforms.filter((platform) => isChartDatasetEligible(platform, eligibilityClass)),
+  };
+}
+
+export function chartDatasetClassLabel(eligibilityClass: ChartDatasetEligibilityClass): string {
+  switch (eligibilityClass) {
+    case "display_safe":
+      return "valid display timings";
+    case "rank_safe":
+      return "rankable rows";
+    case "compare_safe":
+      return "comparable selected runs";
+    case "cost_safe":
+      return "normalized cost rows";
+    case "trend_safe":
+      return "trend-safe rows";
+    case "provenance_only":
+      return "submitted evidence";
+  }
+}
+
+export function chartDatasetEmptyTitle(eligibilityClass: ChartDatasetEligibilityClass): string {
+  switch (eligibilityClass) {
+    case "display_safe":
+      return "No valid display timings";
+    case "rank_safe":
+      return "No rankable rows";
+    case "compare_safe":
+      return "No comparable query evidence";
+    case "cost_safe":
+      return "No normalized cost data";
+    case "trend_safe":
+      return "Not enough trend evidence";
+    case "provenance_only":
+      return "No submitted evidence";
+  }
+}
+
+export function chartDatasetExclusionReason(
+  row: PlatformRow,
+  eligibilityClass: ChartDatasetEligibilityClass,
+): string | null {
+  if (isChartDatasetEligible(row, eligibilityClass)) return null;
+  switch (eligibilityClass) {
+    case "display_safe":
+      return formatTimingExclusion(row.display_exclusion_reason, "Display timing is unavailable.");
+    case "rank_safe":
+      return formatTimingExclusion(row.ranking_exclusion_reason, "Result is not rankable.");
+    case "compare_safe":
+      return formatTimingExclusion(row.comparison_exclusion_reason, "Result is not comparable.");
+    case "cost_safe":
+      return normalizedCostExclusionReason(row);
+    case "trend_safe":
+    case "provenance_only":
+      return null;
+  }
+}
+
+export function summarizeChartDatasetExclusions(
+  platforms: readonly PlatformRow[],
+  eligibilityClass: ChartDatasetEligibilityClass,
+): { reason: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const platform of platforms) {
+    const reason = chartDatasetExclusionReason(platform, eligibilityClass);
+    if (reason === null) continue;
+    counts.set(reason, (counts.get(reason) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([reason, count]) => ({ reason, count }))
+    .sort((a, b) => b.count - a.count || a.reason.localeCompare(b.reason));
 }
 
 export function primaryMetricValue(row: PrimaryMetricRow, metric: PrimaryMetric): number | null {
@@ -188,4 +298,11 @@ function exclusionReason(input: EligibilityRow | QueryDisplayTiming | string | n
 function humanizeReason(reason: string): string {
   const text = reason.replace(/_/g, " ");
   return `${text.charAt(0).toUpperCase()}${text.slice(1)}.`;
+}
+
+function normalizedCostExclusionReason(row: PlatformRow): string {
+  if (row.cost_status === "not_applicable_local") return "Local rows do not have normalized cloud cost.";
+  if (row.cost_status === "unavailable") return "Normalized cost metadata is unavailable.";
+  if (row.cost_status === null || row.cost_status === undefined) return "Cost status is not recorded.";
+  return "No finite normalized cost value is available.";
 }

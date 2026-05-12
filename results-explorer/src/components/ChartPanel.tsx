@@ -36,11 +36,16 @@ import {
   latencyScaleTicks,
 } from "@/lib/chartMath";
 import {
+  chartDatasetClassLabel,
+  chartDatasetEmptyTitle,
+  filterSummaryForChartDataset,
   isRankable,
   isTimingDisplayable,
   isValidTimingValue,
   platformTimingValue,
+  summarizeChartDatasetExclusions,
   validPrimaryMetricValue,
+  type ChartDatasetEligibilityClass,
 } from "@/lib/displayEligibility";
 
 interface ChartPanelProps {
@@ -97,16 +102,6 @@ export function ChartPanel({
           : [],
     [context],
   );
-  const summaryPlatformChartLabels = useMemo(
-    () =>
-      summary
-        ? formatRunIdentitiesForCohort(
-            summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
-            "chart",
-          )
-        : [],
-    [summary],
-  );
   const summaryPlatformSelectLabels = useMemo(
     () =>
       summary
@@ -117,30 +112,6 @@ export function ChartPanel({
         : [],
     [summary],
   );
-  const compareRows = useMemo(() => {
-    if (context.kind !== "compare" || !summary) return [];
-    return summary.query_ids.map((queryId) => ({
-      queryId,
-      timings: summary.platforms.map((platform) => {
-        const ms = platformTimingValue(platform, queryId);
-        return ms !== null ? { ms, status: "pass" as const } : null;
-      }),
-    }));
-  }, [context, summary]);
-  const compareGroups = useMemo(() => {
-    if (context.kind !== "compare" || !summary) return [];
-    return summary.query_ids.map((queryId) => ({
-      queryId,
-      values: summary.platforms.map((platform, index) => {
-        const timing = platformTimingValue(platform, queryId);
-        return {
-          label: summaryPlatformChartLabels[index] ?? platform.platform,
-          value: timing ?? null,
-          color: paletteColor(index),
-        };
-      }),
-    }));
-  }, [context, summary, summaryPlatformChartLabels]);
   const preferredId = useMemo(() => preferredChartId(context, charts), [context, charts]);
   const [activeId, setActiveId] = useState<string>(preferredId);
   const [localBaselineIdx, setLocalBaselineIdx] = useState(0);
@@ -161,17 +132,64 @@ export function ChartPanel({
     if (!isBaselineControlled) setLocalBaselineIdx(0);
   }, [context, isBaselineControlled]);
 
-  if (charts.length === 0) return null;
-
-  const activeChart = charts.find((chart) => chart.id === activeId) ?? charts[0]!;
+  const activeChart = charts.find((chart) => chart.id === activeId) ?? charts[0] ?? null;
   const activeGroup =
-    chartGroups.find((group) => group.charts.some((chart) => chart.id === activeChart.id)) ??
-    chartGroups[0]!;
-  const activeGroupCharts = activeGroup.charts;
+    activeChart !== null
+      ? (chartGroups.find((group) => group.charts.some((chart) => chart.id === activeChart.id)) ??
+        chartGroups[0] ??
+        null)
+      : null;
+  const activeGroupCharts = activeGroup?.charts ?? [];
+  const activeEligibilityClass = activeChart?.eligibilityClass ?? "provenance_only";
   const showBaseline =
     !isBaselineControlled &&
     context.kind === "compare" &&
-    (activeId === "normalized_speedup" || activeId === "diverging_bar");
+    (activeChart?.id === "normalized_speedup" || activeChart?.id === "diverging_bar");
+  const chartSummary = useMemo(
+    () => (summary ? filterSummaryForChartDataset(summary, activeEligibilityClass) : null),
+    [activeEligibilityClass, summary],
+  );
+  const chartPlatformLabels = useMemo(
+    () =>
+      chartSummary
+        ? formatRunIdentitiesForCohort(
+            chartSummary.platforms.map((platform) => ({ ...platform, scale_factor: chartSummary.scale_factor })),
+            "chart",
+          )
+        : [],
+    [chartSummary],
+  );
+  const compareRows = useMemo(() => {
+    if (context.kind !== "compare" || !chartSummary) return [];
+    return chartSummary.query_ids.map((queryId) => ({
+      queryId,
+      timings: chartSummary.platforms.map((platform) => {
+        const ms = platformTimingValue(platform, queryId);
+        return ms !== null ? { ms, status: "pass" as const } : null;
+      }),
+    }));
+  }, [chartSummary, context]);
+  const compareGroups = useMemo(() => {
+    if (context.kind !== "compare" || !chartSummary) return [];
+    return chartSummary.query_ids.map((queryId) => ({
+      queryId,
+      values: chartSummary.platforms.map((platform, index) => {
+        const timing = platformTimingValue(platform, queryId);
+        return {
+          label: chartPlatformLabels[index] ?? platform.platform,
+          value: timing ?? null,
+          color: paletteColor(index),
+        };
+      }),
+    }));
+  }, [chartPlatformLabels, chartSummary, context]);
+  const chartExclusionSummary = useMemo(
+    () => (summary ? summarizeChartDatasetExclusions(summary.platforms, activeEligibilityClass) : []),
+    [activeEligibilityClass, summary],
+  );
+  const chartDatasetEmpty = shouldShowChartDatasetEmpty(activeEligibilityClass, summary, chartSummary);
+
+  if (activeChart === null || activeGroup === null) return null;
 
   const selectGroup = (group: (typeof chartGroups)[number]) => {
     const nextChart =
@@ -265,17 +283,31 @@ export function ChartPanel({
       </div>
 
       <div id="chart-panel-chart" role="tabpanel" aria-label={`${activeGroup.label} chart`} data-chart-container>
-        {renderChart(activeChart, {
-          context,
-          summary,
-          historical,
-          compareRows,
-          compareGroups,
-          baselineIdx,
-          platformLabels: summaryPlatformChartLabels,
-          suppressWinnerClaims,
-          suppressionReason,
-        })}
+        {chartDatasetEmpty ? (
+          <ChartDatasetEmptyState chart={activeChart} summary={summary!} />
+        ) : (
+          <>
+            {renderChart(activeChart, {
+              context,
+              summary: chartSummary,
+              historical,
+              compareRows,
+              compareGroups,
+              baselineIdx,
+              platformLabels: chartPlatformLabels,
+              suppressWinnerClaims,
+              suppressionReason,
+            })}
+            {summary && chartSummary && chartSummary.platforms.length > 0 && chartExclusionSummary.length > 0 && (
+              <ChartDatasetExclusionSummary
+                eligibilityClass={activeChart.eligibilityClass}
+                originalCount={summary.platforms.length}
+                renderedCount={chartSummary.platforms.length}
+                reasons={chartExclusionSummary}
+              />
+            )}
+          </>
+        )}
       </div>
     </section>
   );
@@ -287,6 +319,69 @@ function chartButtonLabel(chart: ChartRegistryEntry): string {
 
 function normalizeBaselineIndex(platformCount: number, baselineIndex: number) {
   return baselineIndex >= 0 && baselineIndex < platformCount ? baselineIndex : 0;
+}
+
+function shouldShowChartDatasetEmpty(
+  eligibilityClass: ChartDatasetEligibilityClass,
+  summary: BenchmarkSummary | null,
+  chartSummary: BenchmarkSummary | null,
+): boolean {
+  if (eligibilityClass === "provenance_only" || eligibilityClass === "trend_safe") return false;
+  return Boolean(summary && chartSummary && summary.platforms.length > 0 && chartSummary.platforms.length === 0);
+}
+
+function ChartDatasetEmptyState({
+  chart,
+  summary,
+}: {
+  chart: ChartRegistryEntry;
+  summary: BenchmarkSummary;
+}) {
+  const reasons = summarizeChartDatasetExclusions(summary.platforms, chart.eligibilityClass);
+  return (
+    <div
+      role="status"
+      aria-label={`${chart.title} unavailable`}
+      class="rounded-md border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-3 text-sm"
+    >
+      <p class="font-semibold text-[var(--bb-data-fg-primary)]">{chartDatasetEmptyTitle(chart.eligibilityClass)}</p>
+      <p class="mt-1 text-[var(--bb-data-fg-muted)]">
+        This chart requires {chartDatasetClassLabel(chart.eligibilityClass)}. Submitted rows remain visible in the
+        table or receipt, but they are not plotted as normal chart data.
+      </p>
+      {reasons.length > 0 && (
+        <ul class="mt-2 space-y-1 text-xs text-[var(--bb-data-fg-muted)]">
+          {reasons.slice(0, 3).map(({ reason, count }) => (
+            <li key={reason}>
+              {count} {count === 1 ? "row" : "rows"}: {reason}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function ChartDatasetExclusionSummary({
+  eligibilityClass,
+  originalCount,
+  renderedCount,
+  reasons,
+}: {
+  eligibilityClass: ChartDatasetEligibilityClass;
+  originalCount: number;
+  renderedCount: number;
+  reasons: { reason: string; count: number }[];
+}) {
+  if (renderedCount >= originalCount) return null;
+  const excludedCount = originalCount - renderedCount;
+  const topReason = reasons[0]?.reason ?? chartDatasetClassLabel(eligibilityClass);
+  return (
+    <p class="mt-2 text-[11px] text-[var(--bb-data-fg-subtle)]">
+      {excludedCount} {excludedCount === 1 ? "row" : "rows"} excluded from this chart's{" "}
+      {chartDatasetClassLabel(eligibilityClass)} dataset: {topReason}
+    </p>
+  );
 }
 
 function preferredChartId(

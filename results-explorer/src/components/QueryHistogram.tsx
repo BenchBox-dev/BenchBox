@@ -12,6 +12,7 @@ import type { BenchmarkSummary } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
 import { paletteColor } from "@/lib/chartTheme";
 import { queryDisplayLabel, sortQueryIds } from "@/lib/queryLabels";
+import { formatTimingExclusion, platformTimingValue } from "@/lib/displayEligibility";
 
 const MAX_PER_PANEL = 33;
 const BAR_GAP = 3;
@@ -50,8 +51,7 @@ export function QueryHistogram({ summary }: Props) {
     // distinct from a genuine fast-but-present result.
     const allMs = platforms.flatMap((p) =>
       qids.map((qid) => {
-        const v = p.timings[qid];
-        return v !== null && v !== undefined && v > 0 ? v : 0;
+        return platformTimingValue(p, qid) ?? 0;
       }),
     );
     const maxMs = Math.max(...allMs, 1);
@@ -98,10 +98,13 @@ export function QueryHistogram({ summary }: Props) {
               <g key={qid}>
                 {platforms.map((p, pi) => {
                   const raw = p.timings[qid];
-                  const missing = raw === null || raw === undefined || raw <= 0;
-                  const ms = missing ? 0 : raw;
+                  const ms = platformTimingValue(p, qid);
+                  const missing = ms === null;
                   const barH = missing ? 0 : Math.max(1, (ms / maxMs) * CHART_H);
                   if (missing) {
+                    const reason = formatTimingExclusion(
+                      p.timing_eligibility[qid]?.timing_exclusion_reason ?? (raw === 0 ? "zero_timing" : "missing_timing"),
+                    );
                     // Render a 2px dash at the x-axis so "missing" reads
                     // as distinct from "fast but present".
                     return (
@@ -116,7 +119,7 @@ export function QueryHistogram({ summary }: Props) {
                         strokeDasharray="2,1"
                         opacity={0.5}
                       >
-                        <title>{`${p.platform} · ${queryDisplayLabel(qid)}: no result`}</title>
+                        <title>{`${p.platform} · ${queryDisplayLabel(qid)}: ${reason}`}</title>
                       </line>
                     );
                   }

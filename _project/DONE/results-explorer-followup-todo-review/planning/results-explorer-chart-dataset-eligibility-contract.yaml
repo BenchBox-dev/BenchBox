@@ -2,7 +2,8 @@ id: results-explorer-chart-dataset-eligibility-contract
 title: "Apply eligibility and evidence contracts to every Results Explorer chart dataset"
 worktree: results-explorer-followup-todo-review
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-05-12"
 category: Core Functionality
 
 description: |
@@ -22,7 +23,7 @@ deps:
 work:
 - id: w0
   summary: "Inventory chart data sources and eligibility assumptions"
-  status: pending
+  status: done
   notes: |
     For each chart/subtab, document the source query/table and current row
     filters:
@@ -40,7 +41,7 @@ work:
 - id: w1
   summary: "Define chart dataset eligibility classes"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     Define eligibility classes for charts:
       - display-safe timing chart;
@@ -57,7 +58,7 @@ work:
 - id: w2
   summary: "Filter chart queries through the required eligibility class"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Update chart query helpers and component inputs so each chart receives only
     rows matching its declared eligibility class. Preserve excluded rows in a
@@ -68,7 +69,7 @@ work:
 - id: w3
   summary: "Add chart empty states and excluded-data summaries"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     For every chart class, add an empty state that names the missing evidence,
     such as `No rankable rows for this cohort`, `No valid display timings`, or
@@ -80,7 +81,7 @@ work:
 - id: w4
   summary: "Add fixtures and tests for broken-result chart exclusion"
   needs: [w2, w3]
-  status: pending
+  status: done
   notes: |
     Add tests using AMPLab-like data with missing timings, zero timings, and
     unranked submissions. Assert:
@@ -94,7 +95,7 @@ work:
 - id: w5
   summary: "Browser-check chart subtabs across benchmark and compare routes"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     In a browser, inspect every benchmark chart tab/subtab and Compare chart
     tab using at least one normal cohort and one broken/low-evidence cohort.
@@ -106,7 +107,8 @@ work:
 prior_art:
 - "results-explorer/src/lib/chartRegistry.ts maps chart tabs and datasets."
 - "results-explorer/src/components/ChartPanel.tsx owns benchmark chart layout and tab switching."
-- "results-explorer/src/components/QueryHeatmap.tsx, DistributionBox.tsx, PercentileLadder.tsx, CDFChart.tsx, CostScatter.tsx, TimeSeries.tsx, and RankTable.tsx render chart families that need class-specific empty states."
+- "results-explorer/src/components/QueryHeatmap.tsx, DistributionBox.tsx, PercentileLadder.tsx, CDFChart.tsx, CostScatter.tsx,
+  TimeSeries.tsx, and RankTable.tsx render chart families that need class-specific empty states."
 - "results-explorer/src/lib/duckdbQueries.ts provides chart rows and should apply eligibility filters."
 - "results-explorer/src/lib/displayEligibility.ts or equivalent should supply shared eligibility predicates."
 
@@ -178,6 +180,13 @@ success_metrics:
 - "Broken/no-timing rows no longer appear as normal chart data points."
 - "Low-evidence chart states explain what was excluded and why."
 - "Benchmark and Compare charts agree with table eligibility for the same rows."
+
+implementation_notes:
+- "w0 inventory captured in _project/verification-logs/results-explorer-chart-dataset-eligibility-contract/w0.log and fixture generation captured in w0-fixtures.log."
+- "w1 matrix captured in _project/verification-logs/results-explorer-chart-dataset-eligibility-contract/w1.log with explicit display-safe, rank-safe, compare-safe, cost-safe, trend-safe, and provenance-only chart classes."
+- "Every registry entry now declares an eligibilityClass, and ChartPanel filters active chart summaries through that class before rendering datasets."
+- "Rank, power, per-query histogram, compare, and cost/trend/provenance chart families now either receive class-safe rows or render/explain an excluded-data/empty state instead of plotting invalid evidence as normal chart data."
+- "Focused tests, typecheck, build, and browser evidence were captured under _project/verification-logs/results-explorer-chart-dataset-eligibility-contract/."
 
 metadata:
   tags:
