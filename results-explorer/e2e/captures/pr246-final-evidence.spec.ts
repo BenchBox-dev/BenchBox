@@ -11,6 +11,7 @@ import { appendFileSync, mkdirSync, writeFileSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { expect, test, type Page } from "@playwright/test";
+import { assertEvidenceCaptureMatchesDevelop } from "../../src/lib/evidenceGit";
 import { waitForDataLoaded, waitForShell } from "../support/fixtures";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -151,6 +152,10 @@ function resolveDevelopSha(): string {
   return execFileSync("git", ["rev-parse", "origin/develop"], { cwd: REPO_ROOT, encoding: "utf8" }).trim();
 }
 
+function resolveHeadSha(): string {
+  return execFileSync("git", ["rev-parse", "HEAD"], { cwd: REPO_ROOT, encoding: "utf8" }).trim();
+}
+
 function logEvent(message: string): void {
   appendFileSync(LOG, `${message}\n`);
 }
@@ -162,7 +167,9 @@ test.describe("@pr246-capture final evidence gate", () => {
   test("captures every PR #246 baseline screenshot after remediation", async ({ browser }) => {
     mkdirSync(OUT, { recursive: true });
     const developSha = resolveDevelopSha();
-    writeFileSync(LOG, `# PR #246 final evidence log ${TODAY}\n# develop_sha: ${developSha}\n`);
+    const headSha = resolveHeadSha();
+    assertEvidenceCaptureMatchesDevelop({ developSha, headSha });
+    writeFileSync(LOG, `# PR #246 final evidence log ${TODAY}\n# develop_sha: ${developSha}\n# head_sha: ${headSha}\n`);
     const captured: Array<{
       baseline: string;
       after: string;
@@ -237,6 +244,7 @@ test.describe("@pr246-capture final evidence gate", () => {
         {
           captured_at: new Date().toISOString(),
           develop_sha: developSha,
+          head_sha: headSha,
           baseline_audit: "_project/audits/results-explorer-hierarchy-usability-data-audit-20260507.md",
           screenshot_dir: path.relative(REPO_ROOT, OUT),
           console_network_log: path.relative(REPO_ROOT, LOG),

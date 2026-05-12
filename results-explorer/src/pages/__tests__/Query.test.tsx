@@ -359,6 +359,32 @@ describe("Query", () => {
     expect(screen.getByTestId("query-compare-tray").textContent).toContain("1 incompatible row hidden");
   });
 
+  it("bases Query pagination on rows displayed by the compare cohort filter", async () => {
+    resultRows = [
+      { ...BASE_ROWS[0]!, result_id: "r1", platform: "DuckDB compatible" },
+      ...Array.from({ length: 200 }, (_, index) => ({
+        ...BASE_ROWS[0]!,
+        result_id: `hidden-${index}`,
+        platform: `Hidden ${index}`,
+        run_date: `2026-04-${String(16 - (index % 15)).padStart(2, "0")}T12:00:00Z`,
+        test_type: "throughput",
+        primary_metric: "power_score",
+      })),
+    ];
+
+    render(<Query />);
+    await waitFor(() => expect(screen.getAllByText("DuckDB compatible").length).toBeGreaterThan(0));
+    expect(screen.getByRole("button", { name: "Show more results" })).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("query-compare-checkbox-r1"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("query-compare-tray").textContent).toContain("200 incompatible rows hidden"),
+    );
+    expect(screen.getByText("Showing 1 of 1 displayed rows")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Show more results" })).toBeNull();
+  });
+
   it("query workbench checkbox aria-labels disambiguate same-platform rows", async () => {
     resultRows = [
       {

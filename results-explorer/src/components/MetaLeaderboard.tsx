@@ -10,7 +10,7 @@ import type {
 } from "@/types";
 import { colorForCell, lightnessForCell } from "@/lib/chartMath";
 import { formatTimingExclusion } from "@/lib/displayEligibility";
-import { fmtGeomean, fmtScore, fmtScoreExact } from "@/utils";
+import { fmtGeomean, fmtScoreCompact, fmtScoreExact } from "@/utils";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { TableScrollHint } from "@/components/TableScrollHint";
@@ -470,7 +470,7 @@ function cellText(rank: MetaRank, cohort: MetaCohort, mode: MetaLeaderboardMode)
       : "-";
   }
   if (rank.metric_value === null || rank.metric_value === undefined) return "-";
-  return cohort.primary_order === "desc" ? fmtScore(rank.metric_value) : fmtGeomean(rank.metric_value);
+  return cohort.primary_order === "desc" ? fmtScoreCompact(rank.metric_value) : fmtGeomean(rank.metric_value);
 }
 
 function exactMetricTitle(rank: MetaRank | undefined, cohort: MetaCohort): string | null {

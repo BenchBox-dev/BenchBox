@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import hashlib
 import importlib.util
 import json
@@ -31,6 +32,22 @@ def _load_script():
 
 
 build_joinorder_data = _load_script()
+
+
+def test_utc_now_iso_uses_python310_compatible_timezone(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakeDatetime:
+        @staticmethod
+        def now(tz: dt.tzinfo) -> dt.datetime:
+            assert tz is dt.timezone.utc
+            return dt.datetime(2026, 5, 11, 3, 22, 11, 123456, tzinfo=tz)
+
+    class FakeDatetimeModule:
+        datetime = FakeDatetime
+        timezone = dt.timezone
+
+    monkeypatch.setattr(build_joinorder_data, "dt", FakeDatetimeModule)
+
+    assert build_joinorder_data.utc_now_iso() == "2026-05-11T03:22:11Z"
 
 
 def _metadata(files: list[dict]) -> dict:
@@ -179,6 +196,59 @@ def test_download_pgdump_recovers_invalid_cached_file(monkeypatch: pytest.Monkey
     assert not destination.with_name("imdb_pg11.part").exists()
     assert artifact.path == destination
     assert artifact.sha256 == hashlib.sha256(valid_payload).hexdigest()
+
+
+def test_start_postgres_container_sets_postgres_user_for_custom_role(monkeypatch: pytest.MonkeyPatch) -> None:
+    stream_calls = []
+    wait_calls = []
+    removed = []
+
+    def fake_stream_command(args, *, check: bool = True) -> None:
+        assert check is True
+        stream_calls.append(args)
+
+    def fake_wait_for_postgres(
+        *,
+        container_name: str,
+        database: str,
+        user: str,
+        timeout_seconds: int = 90,
+    ) -> None:
+        wait_calls.append(
+            {
+                "container_name": container_name,
+                "database": database,
+                "user": user,
+                "timeout_seconds": timeout_seconds,
+            }
+        )
+
+    monkeypatch.setattr(build_joinorder_data, "stream_command", fake_stream_command)
+    monkeypatch.setattr(build_joinorder_data, "wait_for_postgres", fake_wait_for_postgres)
+    monkeypatch.setattr(build_joinorder_data, "remove_container", lambda container_name: removed.append(container_name))
+
+    build_joinorder_data.start_postgres_container(
+        container_name="job-pg",
+        image="postgres:16.2",
+        database="imdb",
+        user="benchbox",
+        replace_existing=True,
+    )
+
+    assert removed == ["job-pg"]
+    assert len(stream_calls) == 1
+    command = stream_calls[0]
+    assert "POSTGRES_DB=imdb" in command
+    assert "POSTGRES_USER=benchbox" in command
+    assert command.index("POSTGRES_USER=benchbox") < command.index("postgres:16.2")
+    assert wait_calls == [
+        {
+            "container_name": "job-pg",
+            "database": "imdb",
+            "user": "benchbox",
+            "timeout_seconds": 90,
+        }
+    ]
 
 
 def test_query_aliases_and_underlying_count_sql_parse_flat_job_query() -> None:
@@ -448,6 +518,61 @@ def test_verify_reference_results_rejects_full_result_hash_drift(
             "query_id": "1a",
         }
     ]
+
+
+def test_verify_tiny_fixture_rejects_incomplete_query_directory(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    query_dir = tmp_path / "queries"
+    query_dir.mkdir()
+    (query_dir / "1a.sql").write_text("SELECT MIN(t.id) FROM title AS t WHERE t.id > 0;", encoding="utf-8")
+    cardinalities_path = tmp_path / "tiny_reference_cardinalities.json"
+    cardinalities_path.write_text(
+        json.dumps(
+            {
+                "queries": {
+                    f"{index}a": {"underlying_row_count": 1}
+                    for index in range(1, build_joinorder_data.EXPECTED_QUERY_COUNT + 1)
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    class FakeResult:
+        def fetchone(self) -> tuple[int]:
+            return (1,)
+
+    class FakeConnection:
+        def execute(self, *_args, **_kwargs) -> FakeResult:
+            return FakeResult()
+
+        def close(self) -> None:
+            return None
+
+    class FakeDuckDB:
+        @staticmethod
+        def connect() -> FakeConnection:
+            return FakeConnection()
+
+    loaded_fixture = False
+
+    def fake_load_queries_for_duckdb(*_args, **_kwargs) -> None:
+        nonlocal loaded_fixture
+        loaded_fixture = True
+
+    monkeypatch.setitem(sys.modules, "duckdb", FakeDuckDB)
+    monkeypatch.setattr(build_joinorder_data, "load_queries_for_duckdb", fake_load_queries_for_duckdb)
+
+    with pytest.raises(build_joinorder_data.JoinOrderBuildError, match="Expected 113 canonical query files"):
+        build_joinorder_data.verify_tiny_fixture(
+            fixture_dir=tmp_path / "fixture",
+            query_dir=query_dir,
+            cardinalities_path=cardinalities_path,
+        )
+
+    assert loaded_fixture is False
 
 
 def test_aggregate_table_hash_is_deterministic_independent_of_input_order(tmp_path: Path) -> None:

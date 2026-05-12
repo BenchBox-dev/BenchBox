@@ -96,13 +96,15 @@ def test_enumerate_honours_scale_options():
     raw = {
         "platforms": {"include": ["duckdb"]},
         "benchmarks": {"include": ["tpch"]},
-        "scales": {"rungs": [0.01, 0.1, 1.0, 100.0]},
+        "scales": {"rungs": [0.01, 0.1, 1.0, 50.0, 100.0]},
     }
     cells = enum_phase.enumerate_cells(raw)
     scales = {c.scale for c in cells}
-    # tpch scale_options=[0.01, 0.1, 1.0, 10.0] → 100.0 dropped.
-    assert 100.0 not in scales
-    assert {0.01, 0.1, 1.0}.issubset(scales)
+    # tpch scale_options = development subscales + official TPC ladder
+    # (PR #332 review follow-up): 0.01, 0.1, 1.0, 10.0, 30.0, 100.0, 300.0…
+    # so 100.0 stays, but non-canonical 50.0 is dropped.
+    assert 50.0 not in scales
+    assert {0.01, 0.1, 1.0, 100.0}.issubset(scales)
 
 
 def test_enumerate_override_replaces_rungs():

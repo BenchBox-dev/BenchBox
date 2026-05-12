@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fmtScore, fmtScoreExact, isKnownBenchmark } from "@/utils";
+import { fmtScore, fmtScoreCompact, fmtScoreExact, isKnownBenchmark } from "@/utils";
 
 describe("isKnownBenchmark", () => {
   it("matches only explicit benchmark labels", () => {
@@ -12,9 +12,14 @@ describe("isKnownBenchmark", () => {
 });
 
 describe("score formatting", () => {
-  it("removes noisy decimals from large power scores", () => {
-    expect(fmtScore(3000.42)).toBe("3,000");
-    expect(fmtScore(1520.99)).toBe("1,521");
+  it("preserves exact power scores in the shared formatter", () => {
+    expect(fmtScore(3000.42)).toBe("3,000.42");
+    expect(fmtScore(1520.99)).toBe("1,520.99");
+  });
+
+  it("removes noisy decimals from large power scores for compact displays", () => {
+    expect(fmtScoreCompact(3000.42)).toBe("3,000");
+    expect(fmtScoreCompact(1520.99)).toBe("1,521");
   });
 
   it("keeps exact score text available for tooltips and details", () => {

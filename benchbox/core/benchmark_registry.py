@@ -74,6 +74,19 @@ CORE_BENCHMARK_CLASS_NAMES: dict[str, str] = {
     bid: _CORE_CLASS_NAME_OVERRIDES.get(bid, f"{name}Benchmark") for bid, name in BENCHMARK_CLASS_NAMES.items()
 }
 
+TPC_OFFICIAL_SCALE_OPTIONS: tuple[float, ...] = (
+    1.0,
+    10.0,
+    30.0,
+    100.0,
+    300.0,
+    1000.0,
+    3000.0,
+    10000.0,
+    30000.0,
+    100000.0,
+)
+
 
 # Complete benchmark metadata - the single source of truth
 # All metadata fields are documented here for consistency
@@ -86,7 +99,7 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "query_description": "22 analytical queries",
         "supports_streams": True,
         "default_scale": 0.01,
-        "scale_options": [0.01, 0.1, 1.0, 10.0],
+        "scale_options": [0.01, 0.1, *TPC_OFFICIAL_SCALE_OPTIONS],
         "min_scale": 0.01,
         "complexity": "Medium",
         "estimated_time_range": (2, 10),  # minutes
@@ -584,7 +597,8 @@ def validate_scale_factor(
        scales), require ``scale_factor`` to be one of those values. This
        is the primary gate — single-element lists like joinorder's
        ``[1.0]`` reject everything else, multi-element lists like
-       tpch's ``[0.01, 0.1, 1.0, 10.0]`` reject any non-canonical SF.
+       tpch's development subscales plus official TPC scale ladder reject
+       any non-canonical SF.
     3. Otherwise fall back to the legacy ``min_scale`` key, which only
        enforces a lower bound.
 

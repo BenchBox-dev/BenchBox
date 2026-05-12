@@ -217,6 +217,8 @@ export function Query(_: RoutableProps) {
     return [...compareRowPartition.compatible, ...compareRowPartition.incompatible];
   }, [compareCohortSignature, compareCompatibleOnly, compareRowPartition, rows]);
   const visibleRows = reorderedRows.slice(0, visibleResultLimit);
+  const displayedResultTotal = reorderedRows.length;
+  const displayedResultLabel = compareIncompatibleHiddenCount > 0 ? "displayed rows" : "returned rows";
   const visibleSqlRows = sqlRows.slice(0, visibleSqlLimit);
 
   useEffect(() => {
@@ -699,7 +701,8 @@ export function Query(_: RoutableProps) {
               <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
                 <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
                   <span>
-                    Showing {visibleRows.length.toLocaleString()} of {rows.length.toLocaleString()} returned rows
+                    Showing {visibleRows.length.toLocaleString()} of {displayedResultTotal.toLocaleString()}{" "}
+                    {displayedResultLabel}
                   </span>
                   <span>Query limit: {rowLimitMode === "all" ? "all" : DEFAULT_ROW_LIMIT.toLocaleString()}</span>
                   <TableScrollHint testId="query-results-scroll-hint" wrapperClassName={null} />
@@ -899,7 +902,7 @@ export function Query(_: RoutableProps) {
                     </>
                   );
                 })()}
-                {visibleRows.length < rows.length && (
+                {visibleRows.length < displayedResultTotal && (
                   <div class="border-t border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-3 text-center">
                     <button
                       type="button"

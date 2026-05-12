@@ -85,7 +85,7 @@ describe("Layout", () => {
     expect(within(explorerNav).getByRole("link", { name: "Leaderboards" })).not.toHaveAttribute("aria-current");
   });
 
-  it("ExplorerNavLink and GlobalNavLink expose explicit focus-visible outline classes (PR #246 VH-1 follow-up)", () => {
+  it("hero header nav links use the on-dark focus-visible outline token", () => {
     renderAt("/results/");
     const explorerNav = screen.getByRole("navigation", { name: "Results Explorer" });
     const globalNav = screen.getByRole("navigation", { name: "BenchBox" });
@@ -96,7 +96,8 @@ describe("Layout", () => {
     ]) {
       const cls = link.getAttribute("class") ?? "";
       expect(cls).toMatch(/focus-visible:outline\b/);
-      expect(cls).toMatch(/focus-visible:outline-\[var\(--bb-focus-ring\)\]/);
+      expect(cls).toMatch(/focus-visible:outline-\[var\(--bb-focus-ring-on-dark\)\]/);
+      expect(cls).not.toMatch(/focus-visible:outline-\[var\(--bb-focus-ring\)\]/);
     }
   });
 });

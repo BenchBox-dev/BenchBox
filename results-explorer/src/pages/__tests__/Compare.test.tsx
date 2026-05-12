@@ -932,6 +932,44 @@ describe("Compare", () => {
     );
   });
 
+  it("suppresses winner claims for direct compare URLs with mixed phases", async () => {
+    const powerRun = makeResult({
+      result_id: "r1",
+      platform: "DuckDB",
+      platform_id: "duckdb",
+      test_type: "power",
+    });
+    const throughputRun = makeResult({
+      result_id: "r2",
+      platform: "SQLite",
+      platform_id: "sqlite",
+      power_score: 300,
+      display_timings: SQLITE.display_timings,
+      test_type: "throughput",
+    });
+    vi.mocked(getDetailResult).mockImplementation((id) =>
+      id === "r1" ? Promise.resolve(powerRun) : Promise.resolve(throughputRun),
+    );
+
+    render(<Compare />);
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Decision Summary" })).toBeTruthy();
+    });
+
+    const guardrails = screen.getByRole("region", { name: "Compare guardrails" });
+    const receipt = screen.getByRole("region", { name: "Comparability receipt" });
+    const summary = screen.getByRole("heading", { name: "Decision Summary" }).closest("section");
+    const queryDiff = screen.getByRole("heading", { name: "Query-Level Diff" }).closest("section");
+    expect(guardrails).toHaveTextContent("Winner claims are suppressed because phases differ.");
+    expect(receipt).toHaveTextContent("Phase");
+    expect(receipt).toHaveTextContent("DuckDB: power; SQLite: throughput");
+    expect(summary).toHaveTextContent("Not directly comparable: phases differ.");
+    expect(summary).toHaveTextContent("Claims suppressed");
+    expect(summary).not.toHaveTextContent("DuckDB leads by");
+    expect(screen.queryByText("vs worst")).toBeNull();
+    expect(queryDiff).toHaveTextContent("Winner claims are suppressed because phases differ");
+  });
+
   it("keeps the detailed comparability receipt after decision and chart evidence", async () => {
     render(<Compare />);
     await waitFor(() => {

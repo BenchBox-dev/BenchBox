@@ -22,7 +22,7 @@ MAX_LINES_DEFAULT = 1_200
 ALLOWLIST = {
     Path(
         "benchbox/cli/commands/run.py"
-    ): 2_760,  # CLI tuning + query subset + validation + visualization + help + compression + interactive wizard + post-run charts + driver_version/auto_install options + --publish flag + --benchmark-option + --iterations + explicit utf-8 encoding + run() McCabe 285 → <18 extraction helpers
+    ): 2_780,  # CLI tuning + query subset + validation + visualization + help + compression + interactive wizard + post-run charts + driver_version/auto_install options + --publish flag + --benchmark-option + --iterations + explicit utf-8 encoding + run() McCabe 285 → <18 extraction helpers + benchmark-aware --scale defaulting (PR #351 review follow-up)
     Path("benchbox/core/tpcds/benchmark/runner.py"): 2_120,  # orchestrates all benchmark phases
     Path("benchbox/core/tpcdi/generator/data.py"): 1_600,  # generator coordination remains complex
 }

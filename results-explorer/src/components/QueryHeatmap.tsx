@@ -731,6 +731,7 @@ export function QueryHeatmap({
                   )}
                   {sortedQueryIds.map((qid, colIdx) => {
                     const rawMs = row.timings[qid] ?? null;
+                    const timingExclusionReason = row.timing_eligibility[qid]?.timing_exclusion_reason ?? null;
                     const ms = platformTimingValue(row, qid);
                     const minInCol = colMins[qid] ?? null;
                     const hue = suppressHeat ? null : colorForCell(ms, minInCol);
@@ -739,9 +740,11 @@ export function QueryHeatmap({
                       ms !== null && minInCol !== null && minInCol > 0 ? ms / minInCol : null;
                     const isExcludedTiming = rawMs !== null && ms === null;
                     const excludedReason =
-                      rawMs === 0
-                        ? formatTimingExclusion("zero_timing")
-                        : "Timing is excluded from display evidence.";
+                      timingExclusionReason !== null
+                        ? formatTimingExclusion(timingExclusionReason)
+                        : rawMs === 0
+                          ? formatTimingExclusion("zero_timing")
+                          : "Timing is excluded from display evidence.";
                     const ariaLabel =
                       ms !== null
                         ? ratio !== null

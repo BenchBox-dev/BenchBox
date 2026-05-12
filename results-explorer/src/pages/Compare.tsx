@@ -575,6 +575,9 @@ function severeCohortMismatchReason(results: DetailResult[]) {
   if (new Set(results.map((result) => result.scale_factor)).size > 1) {
     reasons.push("scale factors differ");
   }
+  if (new Set(results.map((result) => result.test_type ?? "")).size > 1) {
+    reasons.push("phases differ");
+  }
   return reasons.length > 0 ? reasons.join(" and ") : null;
 }
 

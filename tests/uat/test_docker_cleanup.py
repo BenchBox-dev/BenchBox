@@ -15,7 +15,7 @@ def _jsonl(*rows: dict[str, object]) -> str:
     return "\n".join(json.dumps(row) for row in rows) + ("\n" if rows else "")
 
 
-def _fake_inventory_runner(calls: list[tuple[str, ...]]):
+def _fake_inventory_runner(calls: list[tuple[str, ...]], *, duplicate_uat_image: bool = False):
     def fake_runner(argv, **kwargs):
         argv_tuple = tuple(argv)
         calls.append(argv_tuple)
@@ -111,25 +111,38 @@ def _fake_inventory_runner(calls: list[tuple[str, ...]]):
                 "",
             )
         if argv_tuple[:4] == ("docker", "image", "ls", "--no-trunc"):
-            return docker_assets.DockerCommandResult(
-                argv_tuple,
-                0,
-                _jsonl(
+            rows = [
+                {
+                    "ID": "sha256:uat-image-id",
+                    "Repository": "benchbox-uat-local",
+                    "Tag": "latest",
+                    "CreatedAt": "2026-05-10 12:03:00 -0400 EDT",
+                    "Size": "900MB",
+                },
+            ]
+            if duplicate_uat_image:
+                rows.append(
                     {
                         "ID": "sha256:uat-image-id",
                         "Repository": "benchbox-uat-local",
-                        "Tag": "latest",
-                        "CreatedAt": "2026-05-10 12:03:00 -0400 EDT",
+                        "Tag": "dev",
+                        "CreatedAt": "2026-05-10 12:04:00 -0400 EDT",
                         "Size": "900MB",
-                    },
-                    {
-                        "ID": "sha256:external-image-id",
-                        "Repository": "starrocks/allin1-ubuntu",
-                        "Tag": "3.5.16",
-                        "CreatedAt": "2026-04-30 09:00:00 -0400 EDT",
-                        "Size": "5.14GB",
-                    },
-                ),
+                    }
+                )
+            rows.append(
+                {
+                    "ID": "sha256:external-image-id",
+                    "Repository": "starrocks/allin1-ubuntu",
+                    "Tag": "3.5.16",
+                    "CreatedAt": "2026-04-30 09:00:00 -0400 EDT",
+                    "Size": "5.14GB",
+                }
+            )
+            return docker_assets.DockerCommandResult(
+                argv_tuple,
+                0,
+                _jsonl(*rows),
                 "",
             )
         if argv_tuple[:3] == ("docker", "image", "inspect"):
@@ -216,3 +229,21 @@ def test_apply_removes_only_uat_owned_resources():
     ]
     assert all(command.status == "ok" for command in report.cleanup_commands)
     assert "external-container-id" not in " ".join(" ".join(call) for call in cleanup_calls)
+
+
+def test_apply_deduplicates_multitagged_uat_image_cleanup_id():
+    calls: list[tuple[str, ...]] = []
+    report = docker_cleanup.recover_abandoned_uat_docker_usage(
+        apply=True,
+        runner=_fake_inventory_runner(calls, duplicate_uat_image=True),
+    )
+
+    assert {r.display_name for r in report.uat_owned if r.kind == "image"} == {
+        "benchbox-uat-local:dev",
+        "benchbox-uat-local:latest",
+    }
+    image_cleanup_commands = [
+        command.argv for command in report.cleanup_commands if command.argv[:3] == ("docker", "image", "rm")
+    ]
+    assert image_cleanup_commands == [("docker", "image", "rm", "sha256:uat-image-id")]
+    assert [call for call in calls if call[:3] == ("docker", "image", "rm")] == image_cleanup_commands
