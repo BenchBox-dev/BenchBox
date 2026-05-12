@@ -1,0 +1,16 @@
+
+> results-explorer@0.1.0 test
+> vitest run --run src/components/__tests__/MetaLeaderboard.test.tsx src/pages/__tests__/Home.test.tsx
+
+
+ RUN  v4.1.4 /Users/joe/Developer/BenchBox.pool-01/results-explorer
+
+(node:43413) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:43414) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  2 passed (2)
+      Tests  41 passed (41)
+   Start at  21:26:15
+   Duration  955ms (transform 212ms, setup 61ms, import 291ms, tests 672ms, environment 472ms)

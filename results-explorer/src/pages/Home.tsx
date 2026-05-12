@@ -41,6 +41,14 @@ import {
 } from "@/lib/performanceMarks";
 
 const SUPPORTED_BENCHMARK_COUNT = new Set(Object.values(BENCHMARK_LABELS)).size;
+const UNLABELLED_TUNING_VALUE = "untuned";
+
+interface TuningModeSummary {
+  labelledOptions: string[];
+  unlabelledCount: number;
+  labelledCount: number;
+  totalCount: number;
+}
 
 export function Home(_: RoutableProps) {
   useDocumentTitle("Results · BenchBox");
@@ -266,10 +274,6 @@ export function Home(_: RoutableProps) {
   const phaseOptions = metaLeaderboard
     ? [...new Set(metaLeaderboard.cohorts.map((cohort) => cohort.phase))].sort()
     : [];
-  const tuningOptions = [
-    "all",
-    ...[...new Set(results.map((result) => result.tuning_mode).filter((value): value is string => value !== null))].sort(),
-  ];
   const trustOptions = ["all", ...[...new Set(results.map((result) => result.trust_label))].sort()];
   const recent = [...results]
     .sort((a, b) => b.run_date.localeCompare(a.run_date))
@@ -279,6 +283,23 @@ export function Home(_: RoutableProps) {
   const leaderboardPlatformCount = metaLeaderboard?.platforms.length ?? 0;
   const visibleLeaderboardCohortCount = filteredMetaLeaderboard?.cohorts.length ?? 0;
   const visibleLeaderboardPlatformCount = filteredMetaLeaderboard?.platforms.length ?? 0;
+  const leaderboardBenchmarkSet = new Set(benchmarkOptions);
+  const publicBenchmarksOutsideLeaderboard = benchmarks.filter((benchmark) => !leaderboardBenchmarkSet.has(benchmark));
+  const leaderboardEvidencePlatformIds = new Set(
+    (metaLeaderboard?.cohorts ?? []).flatMap((cohort) =>
+      (cohort.platforms ?? []).map((platform) => platform.platform_id),
+    ),
+  );
+  const publicPlatformIdsOutsideLeaderboard = platformIds.filter((platformId) => !leaderboardEvidencePlatformIds.has(platformId));
+  const leaderboardEvidencePlatformCount = leaderboardEvidencePlatformIds.size || leaderboardPlatformCount;
+  const visibleRankedLeaderboardPlatformCount =
+    filteredMetaLeaderboard?.platforms.filter((platform) => platform.n_cohorts > 0).length ?? 0;
+  const tuningSummary = summarizeTuningModes(results);
+  const tuningOptions = [
+    "all",
+    ...(tuningSummary.unlabelledCount > 0 ? [UNLABELLED_TUNING_VALUE] : []),
+    ...tuningSummary.labelledOptions,
+  ];
 
   function buildCohortHref(cohort: MetaCohort): string {
     const params = new URLSearchParams();
@@ -341,6 +362,7 @@ export function Home(_: RoutableProps) {
                     )
                   }
                   format={(value) => formatBenchmarkLabel(value)}
+                  description={benchmarkFilterDescription(publicBenchmarksOutsideLeaderboard)}
                 />
                 <MultiSelectFilter
                   label="Cohort scale"
@@ -365,6 +387,19 @@ export function Home(_: RoutableProps) {
                 <CoverageSummary />
               </div>
 
+              <LeaderboardScopeSummary
+                publicBenchmarkCount={benchmarks.length}
+                leaderboardBenchmarkCount={benchmarkOptions.length}
+                publicBenchmarksOutsideLeaderboard={publicBenchmarksOutsideLeaderboard}
+                publicPlatformCount={platformIds.length}
+                leaderboardEvidencePlatformCount={leaderboardEvidencePlatformCount}
+                rankedLeaderboardPlatformCount={leaderboardPlatformCount}
+                visibleLeaderboardPlatformCount={visibleLeaderboardPlatformCount}
+                visibleRankedLeaderboardPlatformCount={visibleRankedLeaderboardPlatformCount}
+                publicPlatformIdsOutsideLeaderboard={publicPlatformIdsOutsideLeaderboard.length}
+                tuningSummary={tuningSummary}
+              />
+
               <details class="mt-3 border-t border-[var(--bb-border-default)] pt-3">
                 <summary class="cursor-pointer text-sm font-medium text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg-primary)]">
                   Advanced filters
@@ -375,7 +410,9 @@ export function Home(_: RoutableProps) {
                     options={tuningOptions}
                     current={tuningFilter}
                     onSelect={(value) => setFacet("tuning_mode", value === "all" ? [] : [value])}
-                    format={(value) => (value === "all" ? "All tuning" : value)}
+                    format={(value) => formatTuningModeOption(value)}
+                    optionTitle={(value) => tuningModeOptionTitle(value, tuningSummary)}
+                    description={tuningFilterDescription(tuningSummary)}
                   />
                   <SingleFilterGroup
                     label="Trust"
@@ -442,7 +479,7 @@ export function Home(_: RoutableProps) {
           <StatCard
             value={leaderboardCohortCount}
             label="leaderboard cohorts"
-            detail={`${visibleLeaderboardCohortCount} visible; ${visibleLeaderboardPlatformCount}/${leaderboardPlatformCount} platforms`}
+            detail={`${visibleLeaderboardCohortCount} visible; ${visibleLeaderboardPlatformCount}/${leaderboardEvidencePlatformCount} leaderboard-scope platforms`}
           />
         </section>
 
@@ -494,7 +531,7 @@ export function Home(_: RoutableProps) {
         <div class="grid grid-cols-1 gap-8 sm:grid-cols-2">
           <BrowseSection
             title="Browse Public Benchmark Results"
-            description={`${benchmarks.length.toLocaleString()} public benchmark set(s). Leaderboard filters above only include ${leaderboardCohortCount.toLocaleString()} rankable cohort(s).`}
+            description={`${benchmarks.length.toLocaleString()} public benchmark set(s). Leaderboard filters above include ${leaderboardCohortCount.toLocaleString()} leaderboard-scope cohort(s).`}
             items={benchmarks}
             hrefFn={(benchmark) => `/results/${benchmark}/`}
             labelFn={formatBenchmarkLabel}
@@ -704,6 +741,65 @@ function CoverageEmptyState({
   );
 }
 
+function LeaderboardScopeSummary({
+  publicBenchmarkCount,
+  leaderboardBenchmarkCount,
+  publicBenchmarksOutsideLeaderboard,
+  publicPlatformCount,
+  leaderboardEvidencePlatformCount,
+  rankedLeaderboardPlatformCount,
+  visibleLeaderboardPlatformCount,
+  visibleRankedLeaderboardPlatformCount,
+  publicPlatformIdsOutsideLeaderboard,
+  tuningSummary,
+}: {
+  publicBenchmarkCount: number;
+  leaderboardBenchmarkCount: number;
+  publicBenchmarksOutsideLeaderboard: string[];
+  publicPlatformCount: number;
+  leaderboardEvidencePlatformCount: number;
+  rankedLeaderboardPlatformCount: number;
+  visibleLeaderboardPlatformCount: number;
+  visibleRankedLeaderboardPlatformCount: number;
+  publicPlatformIdsOutsideLeaderboard: number;
+  tuningSummary: TuningModeSummary;
+}) {
+  const hiddenBenchmarkCopy =
+    publicBenchmarksOutsideLeaderboard.length > 0
+      ? `${publicBenchmarksOutsideLeaderboard.length.toLocaleString()} public benchmark ${plural(publicBenchmarksOutsideLeaderboard.length, "has", "have")} results but no leaderboard-scope cohort: ${publicBenchmarksOutsideLeaderboard.map(formatBenchmarkLabel).join(", ")}.`
+      : "Every public benchmark with results has a leaderboard-scope cohort.";
+  const publicOnlyPlatformCopy =
+    publicPlatformIdsOutsideLeaderboard > 0
+      ? `${publicPlatformIdsOutsideLeaderboard.toLocaleString()} public platform ${plural(publicPlatformIdsOutsideLeaderboard, "ID is", "IDs are")} outside the current leaderboard scope.`
+      : "Every public platform ID has evidence in the leaderboard scope.";
+
+  return (
+    <div class="mt-3 space-y-1 border-t border-[var(--bb-border-default)] pt-3 text-xs text-[var(--bb-fg-muted)]">
+      <p>
+        Benchmark options cover {leaderboardBenchmarkCount.toLocaleString()} of{" "}
+        {publicBenchmarkCount.toLocaleString()} public coverage benchmark {plural(publicBenchmarkCount, "set", "sets")}.{" "}
+        {hiddenBenchmarkCopy}
+      </p>
+      <p>
+        Table scope is {visibleLeaderboardPlatformCount.toLocaleString()} of{" "}
+        {leaderboardEvidencePlatformCount.toLocaleString()} leaderboard-scope platforms visible now;{" "}
+        {visibleRankedLeaderboardPlatformCount.toLocaleString()} ranked,{" "}
+        {Math.max(0, visibleLeaderboardPlatformCount - visibleRankedLeaderboardPlatformCount).toLocaleString()} published
+        unranked. Full leaderboard scope has {rankedLeaderboardPlatformCount.toLocaleString()} ranked platform{" "}
+        {plural(rankedLeaderboardPlatformCount, "ID", "IDs")}. Public coverage has {publicPlatformCount.toLocaleString()} platform{" "}
+        {plural(publicPlatformCount, "ID", "IDs")}. {publicOnlyPlatformCopy}
+      </p>
+      <p>
+        Tuning metadata: {tuningSummary.labelledCount.toLocaleString()}{" "}
+        {plural(tuningSummary.labelledCount, "labelled result", "labelled results")} across{" "}
+        {tuningSummary.labelledOptions.length.toLocaleString()}{" "}
+        {plural(tuningSummary.labelledOptions.length, "label", "labels")};{" "}
+        {tuningSummary.unlabelledCount.toLocaleString()} not labelled.
+      </p>
+    </div>
+  );
+}
+
 function summarizeSelection(
   values: string[],
   allLabel: string,
@@ -746,7 +842,62 @@ function formatFacetValue(
 ): string {
   if (key === "benchmark") return humanizeBenchmark(value);
   if (key === "platform") return platformIdToName.get(value) ?? value;
+  if (key === "tuning_mode" && value === UNLABELLED_TUNING_VALUE) return "not labelled";
   return formatFacetDisplayValue(key, value);
+}
+
+function summarizeTuningModes(results: readonly ResultRow[]): TuningModeSummary {
+  const labelled = new Map<string, number>();
+  let unlabelledCount = 0;
+  for (const result of results) {
+    const value = result.tuning_mode?.trim();
+    if (value) {
+      labelled.set(value, (labelled.get(value) ?? 0) + 1);
+    } else {
+      unlabelledCount += 1;
+    }
+  }
+  const labelledOptions = [...labelled.keys()].sort();
+  const labelledCount = [...labelled.values()].reduce((sum, count) => sum + count, 0);
+  return {
+    labelledOptions,
+    unlabelledCount,
+    labelledCount,
+    totalCount: results.length,
+  };
+}
+
+function benchmarkFilterDescription(publicBenchmarksOutsideLeaderboard: readonly string[]): string {
+  if (publicBenchmarksOutsideLeaderboard.length === 0) {
+    return "Only benchmarks with leaderboard-scope cohorts appear here.";
+  }
+  return `${publicBenchmarksOutsideLeaderboard.length.toLocaleString()} public benchmark ${plural(publicBenchmarksOutsideLeaderboard.length, "has", "have")} results but no leaderboard-scope cohort: ${publicBenchmarksOutsideLeaderboard.map(formatBenchmarkLabel).join(", ")}.`;
+}
+
+function formatTuningModeOption(value: string): string {
+  if (value === "all") return "All tuning labels";
+  if (value === UNLABELLED_TUNING_VALUE) return "Not labelled";
+  return formatFacetDisplayValue("tuning_mode", value);
+}
+
+function tuningModeOptionTitle(value: string, summary: TuningModeSummary): string {
+  if (value === "all") return "Include labelled and not-labelled tuning metadata.";
+  if (value === UNLABELLED_TUNING_VALUE) {
+    return `${summary.unlabelledCount.toLocaleString()} public result ${plural(summary.unlabelledCount, "has", "have")} no tuning label.`;
+  }
+  return `Filter to tuning label: ${formatFacetDisplayValue("tuning_mode", value)}.`;
+}
+
+function tuningFilterDescription(summary: TuningModeSummary): string {
+  if (summary.unlabelledCount === 0) return "All public results in this view have tuning labels.";
+  if (summary.labelledOptions.length === 0) {
+    return `${summary.unlabelledCount.toLocaleString()} public result ${plural(summary.unlabelledCount, "has", "have")} no tuning label.`;
+  }
+  return `${summary.unlabelledCount.toLocaleString()} of ${summary.totalCount.toLocaleString()} public ${plural(summary.totalCount, "result", "results")} ${plural(summary.unlabelledCount, "is", "are")} not labelled for tuning.`;
+}
+
+function plural(count: number, singular: string, pluralValue: string): string {
+  return count === 1 ? singular : pluralValue;
 }
 
 function StatCard({
@@ -774,6 +925,7 @@ function MultiSelectFilter({
   current,
   onSelect,
   format,
+  description,
 }: {
   label: string;
   allLabel: string;
@@ -781,6 +933,7 @@ function MultiSelectFilter({
   current: string[];
   onSelect: (value: string) => void;
   format: (value: string) => string;
+  description?: string;
 }) {
   if (options.length === 0) return null;
   const value = current.length === 0 ? "all" : current.length === 1 ? current[0] : "__multiple";
@@ -789,6 +942,7 @@ function MultiSelectFilter({
     <label class="block">
       <span class="mb-2 block text-xs font-semibold uppercase tracking-wide text-[var(--bb-fg-muted)]">{label}</span>
       <select
+        aria-label={label}
         class="h-9 w-full rounded-md border border-[var(--bb-border-default)] bg-[var(--bb-bg-primary)] px-3 text-sm font-medium text-[var(--bb-fg-primary)]"
         value={value}
         onChange={(event) => onSelect((event.currentTarget as HTMLSelectElement).value)}
@@ -805,6 +959,7 @@ function MultiSelectFilter({
           </option>
         ))}
       </select>
+      {description && <p class="mt-1 text-[11px] leading-snug text-[var(--bb-fg-muted)]">{description}</p>}
     </label>
   );
 }
@@ -827,6 +982,7 @@ function SelectFilter({
     <label class="block">
       <span class="mb-2 block text-xs font-semibold uppercase tracking-wide text-[var(--bb-fg-muted)]">{label}</span>
       <select
+        aria-label={label}
         class="h-9 w-full rounded-md border border-[var(--bb-border-default)] bg-[var(--bb-bg-primary)] px-3 text-sm font-medium text-[var(--bb-fg-primary)]"
         value={current}
         onChange={(event) => onSelect((event.currentTarget as HTMLSelectElement).value)}
@@ -901,12 +1057,16 @@ function SingleFilterGroup({
   current,
   onSelect,
   format,
+  optionTitle,
+  description,
 }: {
   label: string;
   options: string[];
   current: string;
   onSelect: (value: string) => void;
   format: (value: string) => string;
+  optionTitle?: (value: string) => string;
+  description?: string;
 }) {
   if (options.length === 0) return null;
   return (
@@ -925,12 +1085,14 @@ function SingleFilterGroup({
               }`}
               onClick={() => onSelect(value)}
               aria-pressed={active}
+              title={optionTitle?.(value)}
             >
               {format(value)}
             </button>
           );
         })}
       </div>
+      {description && <p class="mt-1 text-[11px] leading-snug text-[var(--bb-fg-muted)]">{description}</p>}
     </div>
   );
 }

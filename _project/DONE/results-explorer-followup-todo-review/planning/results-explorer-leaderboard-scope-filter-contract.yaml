@@ -2,7 +2,8 @@ id: results-explorer-leaderboard-scope-filter-contract
 title: "Make Results Explorer leaderboard scope, filter availability, and tuning labels explicit"
 worktree: results-explorer-followup-todo-review
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-05-12"
 category: User Experience
 
 description: |
@@ -26,7 +27,7 @@ deps:
 work:
 - id: w0
   summary: "Rebind leaderboard scope evidence on the checked snapshot"
-  status: pending
+  status: done
   notes: |
     Query the current DuckDB snapshot on the checked git SHA and capture:
       - total benchmark count in the corpus;
@@ -45,7 +46,7 @@ work:
 - id: w1
   summary: "Define filter option states and scope copy"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     Define a small homepage contract for each filter family:
       - visible selectable option;
@@ -61,7 +62,7 @@ work:
 - id: w2
   summary: "Update benchmark and platform filters to expose availability"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Update the Leaderboards filters so users can see whether SSB/TPC-H are the
     only eligible leaderboard cohorts or merely the currently selected subset.
@@ -74,7 +75,7 @@ work:
 - id: w3
   summary: "Add explicit tuning-mode labels and unknown handling"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Replace ambiguous `All tuning` with copy that distinguishes all tuning
     modes from unknown/unlabelled tuning metadata. If tuning labels are absent
@@ -85,7 +86,7 @@ work:
 - id: w4
   summary: "Add tests for leaderboard scope counts and filter states"
   needs: [w2, w3]
-  status: pending
+  status: done
   notes: |
     Add tests for:
       - full corpus contains more benchmarks/platforms than leaderboard scope;
@@ -102,7 +103,7 @@ work:
 - id: w5
   summary: "Browser-check the Leaderboards page answers the scope questions"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     In a browser at standard desktop width, verify the Leaderboards page
     answers:
@@ -172,6 +173,13 @@ success_metrics:
 - "Platform counts name the correct denominator and do not imply full-corpus coverage when showing a subset."
 - "Tuning controls distinguish labelled, all, and unavailable/unknown tuning metadata."
 - "Browser evidence shows the page answers the previously annotated scope questions without external context."
+
+implementation_notes:
+- "w0 snapshot evidence captured at _project/verification-logs/results-explorer-leaderboard-scope-filter-contract/w0.log using results-explorer/test-fixtures/.generated/data/results.duckdb because this worktree does not carry results-explorer/public/data/results.duckdb."
+- "w1 contract captured at _project/verification-logs/results-explorer-leaderboard-scope-filter-contract/w1.log with public-coverage, leaderboard-cohort, leaderboard-table, benchmark option, platform scope, and tuning label states."
+- "Home now shows benchmark options against public coverage counts, names public benchmarks outside leaderboard scope, names leaderboard-scope platform denominators, and explains ranked vs published-unranked platform counts."
+- "Tuning controls now use All tuning labels, Not labelled, and concrete tuning labels, with the existing untuned facet sentinel preserving null tuning filtering."
+- "Tests cover a public-only benchmark/platform fixture and the final browser check confirms benchmark options, platform scope, public coverage, and tuning explanations."
 
 metadata:
   tags:

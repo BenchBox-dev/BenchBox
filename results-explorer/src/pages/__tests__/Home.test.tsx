@@ -156,6 +156,46 @@ const RESULT_ROWS = [
     has_tuning: true,
     bundle_download_url: "",
   },
+  {
+    result_id: "r4",
+    benchmark: "star_schema",
+    scale_factor: 1,
+    platform: "Postgres",
+    platform_id: "postgres",
+    driver_version: null,
+    run_date: "2026-04-15T12:00:00Z",
+    power_score: null,
+    total_duration_s: 42,
+    geomean_ms: 21,
+    display_geomean_ms: 21,
+    query_count: 13,
+    ...TIMING_ELIGIBLE,
+    trust_label: "maintainer-run",
+    visibility: "public-curated",
+    platform_version: null,
+    execution_mode: "sql",
+    tuning_mode: null,
+    tuning_hash: null,
+    test_type: "power",
+    validation_status: "exact",
+    cost_usd: null,
+    normalized_cost_usd: null,
+    cost_status: "not_applicable_local",
+    cost_scope: null,
+    cost_model_version: null,
+    deployment_class: "local",
+    cloud_provider: null,
+    cloud_region: null,
+    instance_or_warehouse: null,
+    warehouse_size: null,
+    storage_format: null,
+    compliance_class: null,
+    is_ranking_eligible: true,
+    has_plans: false,
+    plans_published: false,
+    has_tuning: false,
+    bundle_download_url: "",
+  },
 ];
 
 /** Per-platform summary rows - shape mirrors `bench.meta_leaderboard`. */
@@ -412,6 +452,10 @@ describe("Home", () => {
     expect(within(selector).getByLabelText("Cohort phase")).toBeTruthy();
     expect(within(selector).getByText("Leaderboard scope")).toBeTruthy();
     expect(within(selector).getByText("Ranked cohort filters")).toBeTruthy();
+
+    fireEvent.click(screen.getByText("Advanced filters"));
+    expect(within(selector).getByRole("button", { name: "All tuning labels" })).toBeTruthy();
+    expect(within(selector).getByRole("button", { name: "Not labelled" })).toBeTruthy();
   });
 
   it("distinguishes supported benchmark coverage from published public corpus counts", async () => {
@@ -420,11 +464,11 @@ describe("Home", () => {
 
     const summary = screen.getByRole("region", { name: "Corpus summary" });
     expect(within(summary).getByText("supported benchmarks")).toBeTruthy();
-    expect(within(summary).getByText("2 with public results")).toBeTruthy();
+    expect(within(summary).getByText("3 with public results")).toBeTruthy();
     expect(within(summary).getByText("public result bundles")).toBeTruthy();
     expect(within(summary).getByText("platforms with public results")).toBeTruthy();
     expect(within(summary).getByText("leaderboard cohorts")).toBeTruthy();
-    expect(within(summary).getByText("2 visible; 2/2 platforms")).toBeTruthy();
+    expect(within(summary).getByText("2 visible; 2/2 leaderboard-scope platforms")).toBeTruthy();
     expect(within(summary).queryByText(/^Benchmarks$/)).toBeNull();
   });
 
@@ -432,10 +476,14 @@ describe("Home", () => {
     render(<Home />);
     await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
 
-    expect(screen.getByText("Showing 2 of 2 platforms across 2 leaderboard cohorts")).toBeTruthy();
+    expect(screen.getByText("Showing 2 of 2 leaderboard-scope platforms across 2 leaderboard cohorts")).toBeTruthy();
+    expect(screen.getByText(/Benchmark options cover 2 of 3 public coverage benchmark sets/)).toBeTruthy();
+    expect(screen.getAllByText(/SSB/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/1 public platform ID is outside the current leaderboard scope/)).toBeTruthy();
+    expect(screen.getByText(/1 of 4 public results is not labelled for tuning/)).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Browse Public Benchmark Results" })).toBeTruthy();
     expect(
-      screen.getByText("2 public benchmark set(s). Leaderboard filters above only include 2 rankable cohort(s)."),
+      screen.getByText("3 public benchmark set(s). Leaderboard filters above include 2 leaderboard-scope cohort(s)."),
     ).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Browse Public Platform Results" })).toBeTruthy();
   });

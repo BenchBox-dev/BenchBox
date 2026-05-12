@@ -473,13 +473,13 @@ describe("MetaLeaderboard", () => {
 
     const { container } = render(<MetaLeaderboard data={data} mode="times" onModeChange={vi.fn()} />);
 
-    expect(screen.getByText("Showing 200 of 205 platforms across 1 leaderboard cohort")).toBeTruthy();
+    expect(screen.getByText("Showing 200 of 205 leaderboard-scope platforms across 1 leaderboard cohort")).toBeTruthy();
     expect(container.querySelectorAll("tbody tr")).toHaveLength(200);
     expect(screen.queryByText("Platform 204")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Show more platforms" }));
 
-    expect(screen.getByText("Showing 205 of 205 platforms across 1 leaderboard cohort")).toBeTruthy();
+    expect(screen.getByText("Showing 205 of 205 leaderboard-scope platforms across 1 leaderboard cohort")).toBeTruthy();
     expect(container.querySelectorAll("tbody tr")).toHaveLength(205);
     expect(screen.getByText("Platform 204")).toBeTruthy();
   });
