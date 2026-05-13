@@ -214,6 +214,48 @@ def test_orchestrator_uses_output_root_for_preflight_execute_and_cleanup(tmp_pat
     assert captured["free_space_checks_enabled"] is True
 
 
+def test_orchestrator_cells_jsonl_marks_timed_out_cells(tmp_path: Path):
+    cfg = validate_config(
+        {
+            "name": "timeout-smoke",
+            "phases": ["execute"],
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+        }
+    )
+    timed_out_cell = CellResult(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.01,
+        status="timed-out",
+        exit_code=124,
+        elapsed_s=1.0,
+        log_path=tmp_path / "cell.log",
+        result_path=None,
+    )
+    fake_execute = type(
+        "ExecuteOutcome",
+        (),
+        {
+            "results": (timed_out_cell,),
+            "pruned": (),
+            "skipped_unreachable": (),
+            "aborted": False,
+            "abort_reason": None,
+        },
+    )()
+
+    with patch.object(orchestrator.exec_phase, "run_execute", return_value=fake_execute):
+        result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
+
+    assert result.phase_exit_codes["execute"] == 1
+    cells = [json.loads(line) for line in (tmp_path / "logs" / "cells.jsonl").read_text().splitlines()]
+    assert cells[0]["status"] == "timed-out"
+    assert cells[0]["timed_out"] is True
+    assert cells[0]["exit_code"] == 124
+
+
 def test_resume_manifest_written_on_disk_floor_abort(tmp_path: Path):
     cfg = validate_config(
         {

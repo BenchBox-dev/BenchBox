@@ -164,6 +164,8 @@ def run_cell(
             stderr=log_fh,
             env=env,
         )
+        if timeout_result.timed_out:
+            log_fh.write(f"# UAT_TIMEOUT timeout_s={timeout_s} exit_code={timeout_result.exit_code}\n")
 
     log_text = log_path.read_text(encoding="utf-8", errors="replace")
     result_path_str = extract_result_path(log_text) if timeout_result.exit_code == 0 else None

@@ -280,6 +280,7 @@ def run_sweep(  # noqa: C901
                                 "benchmark": cell.benchmark,
                                 "scale": cell.scale,
                                 "status": cell.status,
+                                "timed_out": cell.status == "timed-out",
                                 "exit_code": cell.exit_code,
                                 "elapsed_s": cell.elapsed_s,
                                 "log_path": str(cell.log_path),

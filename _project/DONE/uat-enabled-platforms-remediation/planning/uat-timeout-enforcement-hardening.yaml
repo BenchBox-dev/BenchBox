@@ -2,7 +2,7 @@ id: uat-timeout-enforcement-hardening
 title: "UAT: harden per-cell timeout enforcement for process trees"
 worktree: uat-enabled-platforms-remediation
 priority: High
-status: Not Started
+status: Completed
 category: Testing and Quality Assurance
 
 description: |
@@ -20,39 +20,56 @@ description: |
 work:
   - id: w0
     summary: "Reproduce timeout behavior with a benchbox-like process tree"
-    status: pending
+    status: done
     notes: |
       Build a local synthetic command that mimics `uv run -- benchbox` spawning
       descendants and sleeping beyond a tiny timeout. Record a compact summary
       of process tree, command, exit status, and whether descendants survived.
 
+      Completed with fast regression coverage in
+      `tests/uat/test_timeouts.py`: a parent process spawns a sleeping
+      grandchild, the wrapper times out at 1s, returns exit 124, and the child
+      PID is gone before the assertion completes.
+
   - id: w1
     summary: "Add process-tree timeout regression tests"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Extend timeout/runner tests beyond a one-process `time.sleep`. Cover a
       child that spawns a grandchild, a command that writes output, and the
       `run_cell()` status mapping. Tests must be deterministic and fast.
 
+      Added process-tree, noisy-pipe, and `run_cell()` timeout marker tests.
+      The timeout/runner verification command passed: 21 tests.
+
   - id: w2
     summary: "Harden timeout kill and reporting semantics"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Ensure timeout handling terminates the process group or process tree,
       escalates if needed, drains output safely, and returns a stable timeout
       code/status that matrix and report phases classify as timed out rather
       than failed or missing.
 
+      `run_with_timeout()` now uses `communicate(timeout=...)` so stdout/stderr
+      pipes are drained while the timeout is enforced. Timeout classification
+      remains stable at exit 124 with `timed_out=True`, and `run_cell()` writes
+      a compact `UAT_TIMEOUT` marker into the cell log.
+
   - id: w3
     summary: "Expose timeout accounting in matrix and report outputs"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Make timed-out cells visible in `cells.jsonl`, `matrix_summary.tsv`, and
       reports. Include enough command/status context to debug future timeouts
       without committing raw logs.
+
+      `cells.jsonl` now includes a boolean `timed_out` field. Existing report
+      output already counted timed-out cells separately; the synthetic timeout
+      smoke confirmed `failed=0 timed_out=1`.
 
 deferred:
   - summary: "Global runtime scheduler redesign"
@@ -88,6 +105,13 @@ verification:
   - description: "Targeted UAT timeout smoke records a timed-out cell"
     command: "BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs make uat-sweep CONFIG=tests/uat/configs/uat-synthetic-timeout-smoke.yaml"
     expected_output: "`cells.jsonl` and `matrix_summary.tsv` mark the synthetic cell as timed out with no surviving child process"
+    actual_output: |
+      Expected nonzero sweep exit because the execute phase contained a timed
+      out cell. Run directory:
+      `/Users/joe/Developer/benchmark_runs/logs/uat_synthetic_timeout_smoke_20260512`.
+      `cells.jsonl` recorded `status: timed-out`, `timed_out: true`, and
+      `exit_code: 124`. `matrix_summary.tsv` recorded
+      `rows=1 passed=0 failed=0 timed_out=1`.
   - description: "Existing UAT matrix coverage still passes"
     command: "uv run -- python -m pytest tests/uat/test_matrix.py tests/uat/test_phases.py -m fast -q"
     expected_output: "passes"
@@ -96,11 +120,14 @@ scope_limit:
   only_modify:
     - "tests/uat/timeouts.py"
     - "tests/uat/runner.py"
+    - "tests/uat/orchestrator.py"
     - "tests/uat/phases/execute.py"
     - "tests/uat/phases/report.py"
     - "tests/uat/test_timeouts.py"
     - "tests/uat/test_runner.py"
     - "tests/uat/test_phases.py"
+    - "tests/uat/test_orchestrator.py"
+    - "tests/uat/configs/"
     - "docs/operations/uat-framework.md"
   do_not_modify:
     - "benchbox/platforms/"

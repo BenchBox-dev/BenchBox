@@ -189,6 +189,7 @@ def test_run_cell_marks_timeout(tmp_path: Path):
         result = runner.run_cell("duckdb", "tpch", 0.01, timeout_s=1, log_dir=tmp_path)
     assert result.status == "timed-out"
     assert result.exit_code == 124  # EXIT_TIMEOUT
+    assert "UAT_TIMEOUT timeout_s=1 exit_code=124" in result.log_path.read_text()
 
 
 def test_default_log_dir_honours_benchbox_output_dir(monkeypatch, tmp_path: Path):
