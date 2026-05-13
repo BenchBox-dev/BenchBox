@@ -490,25 +490,76 @@ describe("TimeSeries", () => {
     expect(container.querySelector("path")).not.toBeNull();
   });
 
-  it("uses unique data-result-id per circle when two runs share a run_date", () => {
-    // Pre-w6 behaviour: each <circle> used `key={p.date}`, so two runs on
-    // the same date for the same platform collided. Preact still mounted
-    // both circles but reconciliation broke and a duplicate-key warning
-    // fired (in dev mode only). The structural check below is the true
-    // regression guard: it asserts each circle's data-result-id is
-    // unique across the rendered set, which is independent of Preact's
-    // dev-mode warning channel and survives production tree-shaking.
+  it("uses point-specific result identity in titles and aria labels", () => {
     const entries = [
-      makeEntry({ result_id: "r1", run_date: "2026-04-03", display_geomean_ms: 15 }),
-      makeEntry({ result_id: "r2", run_date: "2026-04-03", display_geomean_ms: 12 }),
-      makeEntry({ result_id: "r3", run_date: "2026-04-04", display_geomean_ms: 10 }),
+      makeEntry({ result_id: "tpch-duckdb-sf0.01-20260401-1111aaaa", run_date: "2026-04-01", display_geomean_ms: 15 }),
+      makeEntry({ result_id: "tpch-duckdb-sf0.01-20260402-2222bbbb", run_date: "2026-04-02", display_geomean_ms: 10 }),
     ];
     const { container } = render(<TimeSeries entries={entries} />);
-    const ids = Array.from(container.querySelectorAll("[data-result-id]")).map(
-      (el) => el.getAttribute("data-result-id") ?? "",
-    );
-    expect(ids.length).toBe(3);
-    expect(new Set(ids).size).toBe(ids.length);
+    const points = Array.from(container.querySelectorAll("circle[data-result-id]"));
+
+    expect(points).toHaveLength(2);
+    expect(points[0]?.querySelector("title")?.textContent).toContain("1111aaaa");
+    expect(points[0]?.getAttribute("aria-label")).toContain("1111aaaa");
+    expect(points[0]?.querySelector("title")?.textContent).not.toContain("2222bbbb");
+    expect(points[1]?.querySelector("title")?.textContent).toContain("2222bbbb");
+    expect(points[1]?.getAttribute("aria-label")).toContain("2222bbbb");
+    expect(points[1]?.querySelector("title")?.textContent).not.toContain("1111aaaa");
+  });
+
+  it("suppresses trend lines and links runs when same-platform points share a date", () => {
+    const entries = [
+      makeEntry({ result_id: "tpch-duckdb-sf0.01-20260403-1111aaaa", run_date: "2026-04-03", display_geomean_ms: 15 }),
+      makeEntry({ result_id: "tpch-duckdb-sf0.01-20260403-2222bbbb", run_date: "2026-04-03", display_geomean_ms: 12 }),
+      makeEntry({ result_id: "tpch-duckdb-sf0.01-20260404-3333cccc", run_date: "2026-04-04", display_geomean_ms: 10 }),
+    ];
+    const { container } = render(<TimeSeries entries={entries} />);
+    const state = container.querySelector('[data-testid="time-series-duplicate-day"]');
+
+    expect(container.querySelector("svg")).toBeNull();
+    expect(state?.textContent).toContain("Trend line hidden");
+    expect(state?.textContent).toContain("same-day runs");
+    expect(state?.querySelectorAll("[data-result-id]")).toHaveLength(2);
+    expect(state?.querySelector('a[href="/results/r/tpch-duckdb-sf0.01-20260403-1111aaaa"]')).toBeTruthy();
+    expect(state?.querySelector('a[href="/results/r/tpch-duckdb-sf0.01-20260403-2222bbbb#run-receipt"]')).toBeTruthy();
+  });
+
+  it("keeps point titles unique when platform display names repeat", () => {
+    const entries = [
+      makeEntry({
+        result_id: "tpch-datafusion-sf0.01-20260401-1111aaaa",
+        platform: "DataFusion",
+        platform_id: "datafusion",
+        run_date: "2026-04-01",
+        display_geomean_ms: 15,
+      }),
+      makeEntry({
+        result_id: "tpch-datafusion-sf0.01-20260402-2222bbbb",
+        platform: "DataFusion",
+        platform_id: "datafusion",
+        run_date: "2026-04-02",
+        display_geomean_ms: 12,
+      }),
+      makeEntry({
+        result_id: "tpch-datafusion-44-sf0.01-20260401-3333cccc",
+        platform: "DataFusion",
+        platform_id: "datafusion-44",
+        run_date: "2026-04-01",
+        display_geomean_ms: 16,
+      }),
+      makeEntry({
+        result_id: "tpch-datafusion-44-sf0.01-20260402-4444dddd",
+        platform: "DataFusion",
+        platform_id: "datafusion-44",
+        run_date: "2026-04-02",
+        display_geomean_ms: 13,
+      }),
+    ];
+    const { container } = render(<TimeSeries entries={entries} />);
+    const titles = Array.from(container.querySelectorAll("circle title")).map((title) => title.textContent ?? "");
+
+    expect(titles).toHaveLength(4);
+    expect(new Set(titles).size).toBe(titles.length);
   });
 
   it("dedupes duplicate result_id entries before plotting", () => {
