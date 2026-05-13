@@ -2,7 +2,7 @@ id: uat-enabled-platforms-full-sweep-release-gate
 title: "UAT: rerun enabled-platform full sweep and publish compact release-gate summary"
 worktree: uat-enabled-platforms-remediation
 priority: Critical
-status: Not Started
+status: Blocked
 category: Testing and Quality Assurance
 
 description: |
@@ -28,45 +28,59 @@ deps:
 work:
   - id: w0
     summary: "Prepare the final enabled-platform UAT config and run directory"
-    status: pending
+    status: done
     notes: |
-      Use the documented long-running UAT flow with
-      `BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs`. Announce the command,
-      max runtime, log path, and stop condition before launch. Keep raw logs and
-      browser artifacts under the run root, not in git.
+      Added `tests/uat/configs/uat-enabled-platforms-full.yaml` and ran with
+      `BENCHBOX_OUTPUT_DIR=/Users/joe/Developer/benchmark_runs`. Raw logs and
+      browser artifacts remained under the run root.
 
   - id: w1
     summary: "Run the full enabled-platform sweep sequentially"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
-      Run all non-compatibility-blocked benchmarks for `lakesail`, `pg-duckdb`,
-      `pg-mooncake`, and `timescaledb` with Docker managed sequentially. Do not
-      use early-stop behavior that prevents coverage accounting.
+      Ran all non-compatibility-blocked benchmarks for `lakesail`,
+      `pg-duckdb`, `pg-mooncake`, and `timescaledb` with Docker managed
+      sequentially and early-stop disabled. Docker lifecycle was clean.
 
   - id: w2
     summary: "Validate result integrity, packaging, reports, and Explorer smoke"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      Check `command-status.json`, `matrix_summary.tsv`,
-      `validator_rollup.tsv`, `uat_lifecycle.log`, package/report outputs, and
-      `playwright_smoke.log`. Confirm Docker lifecycle is clean and no timed-out
-      cell is misclassified.
+      Checked `matrix_summary.tsv`, `validator_rollup.tsv`,
+      `uat_lifecycle.log`, package output, and `playwright_smoke.log`.
+      Explorer external-corpus smoke passed. Matrix accounting reported
+      88 candidates, 84 executed, 4 compatibility-pruned, 33 passed,
+      50 failed, and 1 timed out. The timed-out cell was
+      `timescaledb/tpchavoc` at the configured 600s timeout.
 
   - id: w3
     summary: "Commit a compact durable UAT summary"
     needs: [w2]
+    status: done
+    notes: |
+      Added `_project/audits/uat-enabled-platforms-full-release-gate-2026-05-13.md`
+      with command, checked SHA, run path, counts, compatibility-pruned cells,
+      validator rollup summary, and remaining failures. No raw logs,
+      screenshots, browser reports, or generated binary evidence were committed.
+
+  - id: w4
+    summary: "Remediate remaining PG extension and TimescaleDB red cells"
+    needs: [w3]
     status: pending
     notes: |
-      Add a concise markdown summary under `_project/audits/` or update this
-      TODO with command, git SHA, run path, counts, compatibility-pruned cells,
-      failures if any, and validator rollup. Do not commit raw logs,
-      screenshots, browser reports, or generated binary evidence.
+      The release gate is blocked, not complete. Follow-up must cluster the
+      PG extension `missing_manifest` failures and TimescaleDB query failures
+      from `/Users/joe/Developer/benchmark_runs/logs/uat_enabled_platforms_full_20260513/`
+      and either fix each runtime/query/load failure or add evidence-backed
+      compatibility rules.
 
 deferred:
   - summary: "Run cloud/live platform UAT"
     reason: "The requested enabled platforms are local Docker-managed platforms; cloud/live sweeps require separate approval."
+  - summary: "Cut release after green enabled-platform gate"
+    reason: "The 2026-05-13 full gate is blocked by 50 failed cells and one timeout."
 
 prior_art:
   - "docs/operations/uat-framework.md -- long-running UAT command, logging, and cleanup expectations"
