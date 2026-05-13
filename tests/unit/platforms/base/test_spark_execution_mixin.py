@@ -100,6 +100,24 @@ def test_load_data_spark_parquet_path_unchanged(tmp_path: Path) -> None:
     spark.read.format.assert_not_called()
 
 
+def test_load_data_spark_preserves_mixed_case_table_names(tmp_path: Path) -> None:
+    adapter = _DummySparkAdapter()
+    spark = MagicMock()
+    parquet_path = tmp_path / "DimCustomer.parquet"
+    parquet_path.write_bytes(b"PAR1")
+    spark.read.parquet.return_value = _make_dataframe(["id"])
+
+    with patch("benchbox.platforms.base.data_loading.DataSourceResolver.resolve") as mock_resolve:
+        mock_resolve.return_value = SimpleNamespace(
+            source_type="benchmark_tables", tables={"DimCustomer": [parquet_path]}
+        )
+        stats, _, _ = adapter._load_data_spark(MagicMock(), tmp_path, spark)
+
+    assert stats["DimCustomer"] == 5
+    spark.table.assert_called_with("DimCustomer")
+    spark.read.parquet.return_value.write.mode.return_value.insertInto.assert_called_once_with("DimCustomer")
+
+
 def test_load_data_spark_passes_platform_name_to_resolver(tmp_path: Path) -> None:
     """DataSourceResolver receives adapter.platform_name directly (not via getattr fallback)."""
     adapter = _DummySparkAdapter()

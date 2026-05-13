@@ -104,6 +104,11 @@ class SparkDataLoadMixin:
             logger.debug("Row count unavailable for table '%s'; assuming 0: %s", table_name, exc)
             return 0
 
+    @staticmethod
+    def _spark_physical_table_name(table_name: str) -> str:
+        """Return the table identifier used for Spark catalog operations."""
+        return table_name if any(char.isupper() for char in table_name) else table_name.lower()
+
     @classmethod
     def _csv_extension_suffix(cls, compression: str | None) -> str:
         """Return the filename suffix needed for a compressed CSV symlink."""
@@ -270,7 +275,7 @@ class SparkDataLoadMixin:
 
                     if not valid_files:
                         self.logger.warning(f"Skipping {table_name} - no valid data files")
-                        table_stats[table_name.lower()] = 0
+                        table_stats[self._spark_physical_table_name(table_name)] = 0
                         continue
 
                     chunk_info = f" from {len(valid_files)} file(s)" if len(valid_files) > 1 else ""
@@ -278,13 +283,13 @@ class SparkDataLoadMixin:
 
                     try:
                         load_start = mono_time()
-                        table_name_lower = table_name.lower()
+                        physical_table_name = self._spark_physical_table_name(table_name)
                         total_rows_loaded = 0
                         table_start_row_count = (
-                            self._safe_row_count(spark, table_name_lower) if not self._df_caching_supported else 0
+                            self._safe_row_count(spark, physical_table_name) if not self._df_caching_supported else 0
                         )
 
-                        table_schema = self._get_table_schema(spark, table_name_lower)
+                        table_schema = self._get_table_schema(spark, physical_table_name)
                         format_info = detect_file_format(valid_files)
 
                         for file_idx, raw_path in enumerate(valid_files, start=1):
@@ -336,40 +341,41 @@ class SparkDataLoadMixin:
                                 # Cache lets count() and insertInto() share one scan.
                                 df.cache()
                                 row_count = df.count()
-                                df.write.mode("append").insertInto(table_name_lower)
+                                df.write.mode("append").insertInto(physical_table_name)
                                 df.unpersist()
                             else:
                                 # Platforms where df.cache() is a no-op (e.g. LakeSail/
                                 # Spark Connect): write the chunk and defer row counting
                                 # until every file has been appended.
-                                df.write.mode("append").insertInto(table_name_lower)
-                                self.log_verbose(f"Wrote chunk {file_idx}/{len(valid_files)} for {table_name_lower}")
+                                df.write.mode("append").insertInto(physical_table_name)
+                                self.log_verbose(f"Wrote chunk {file_idx}/{len(valid_files)} for {physical_table_name}")
                                 continue
                             total_rows_loaded += row_count
 
                         if not self._df_caching_supported:
-                            table_end_row_count = self._row_count(spark, table_name_lower)
+                            table_end_row_count = self._row_count(spark, physical_table_name)
                             row_delta = table_end_row_count - table_start_row_count
                             if row_delta < 0:
                                 self.logger.warning(
                                     "Negative row delta for %s (%d -> %d); reporting 0",
-                                    table_name_lower,
+                                    physical_table_name,
                                     table_start_row_count,
                                     table_end_row_count,
                                 )
                             total_rows_loaded = max(0, row_delta)
 
-                        table_stats[table_name_lower] = total_rows_loaded
+                        table_stats[physical_table_name] = total_rows_loaded
 
                         load_time = elapsed_seconds(load_start)
-                        per_table_timings[table_name_lower] = {"total_ms": load_time * 1000}
+                        per_table_timings[physical_table_name] = {"total_ms": load_time * 1000}
                         self.logger.info(
-                            f"Loaded {total_rows_loaded:,} rows into {table_name_lower}{chunk_info} in {load_time:.2f}s"
+                            f"Loaded {total_rows_loaded:,} rows into {physical_table_name}{chunk_info} "
+                            f"in {load_time:.2f}s"
                         )
 
                     except Exception as e:
                         self.logger.error(f"Failed to load {table_name}: {e}")
-                        table_stats[table_name.lower()] = 0
+                        table_stats[self._spark_physical_table_name(table_name)] = 0
 
             total_time = elapsed_seconds(start_time)
             total_rows = sum(table_stats.values())
