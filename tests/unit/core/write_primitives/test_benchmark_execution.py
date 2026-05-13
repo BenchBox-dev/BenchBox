@@ -1487,6 +1487,8 @@ def test_get_create_tables_sql_returns_sql_string(fast_bench):
     sql = fast_bench.get_create_tables_sql()
     assert isinstance(sql, str)
     assert "CREATE TABLE" in sql.upper()
+    assert "CREATE TABLE orders_stage" in sql
+    assert "CREATE TABLE lineitem_stage" in sql
 
 
 # ---------------------------------------------------------------------------

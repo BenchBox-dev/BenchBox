@@ -6,7 +6,7 @@ import re
 from typing import Any, Callable
 
 from benchbox.core.connection import DatabaseConnection
-from benchbox.core.tpch.schema import get_create_all_tables_sql as get_tpch_ddl
+from benchbox.core.tpch.schema import get_create_all_tables_sql as get_tpch_ddl, get_table as get_tpch_table
 
 
 def quote_identifier(identifier: str) -> str:
@@ -72,6 +72,15 @@ def build_tpch_staging_tables_sql(
     return f"""{tpch_ddl}
 
 -- ============================================================
+-- Generated staging load tables
+-- ============================================================
+-- These tables receive generator-emitted orders_stage.tbl and
+-- lineitem_stage.tbl files during the generic load phase.
+-- ============================================================
+
+{_get_generated_stage_load_tables_sql()}
+
+-- ============================================================
 -- {staging_heading}
 -- ============================================================
 -- These tables are created empty and populated via setup()
@@ -79,3 +88,15 @@ def build_tpch_staging_tables_sql(
 -- ============================================================
 
 {staging_ddl}"""
+
+
+def _get_generated_stage_load_tables_sql() -> str:
+    """Return CREATE TABLE SQL for generator-emitted primitive staging files."""
+    statements = []
+    for source_name, stage_name in (("orders", "orders_stage"), ("lineitem", "lineitem_stage")):
+        source_sql = get_tpch_table(source_name).get_create_table_sql(
+            enable_primary_keys=False,
+            enable_foreign_keys=False,
+        )
+        statements.append(source_sql.replace(f"CREATE TABLE {source_name} (", f"CREATE TABLE {stage_name} (", 1))
+    return "\n\n".join(statements)
