@@ -92,6 +92,24 @@ def test_enumerate_filters_dataframe_against_sql_only():
     assert "tpch" in benches
 
 
+def test_enumerate_records_compatibility_pruned_cells():
+    raw = {
+        "platforms": {"include": ["polars-df"]},
+        "benchmarks": {"include": ["vector_search", "tpch"]},
+        "scales": {"rungs": [0.01, 0.1]},
+    }
+
+    result = enum_phase.enumerate_cells_with_pruning(raw)
+
+    assert {c.benchmark for c in result.cells} == {"tpch"}
+    assert len(result.compatibility_pruned) == 2
+    pruned = result.compatibility_pruned[0]
+    assert pruned.platform == "polars-df"
+    assert pruned.benchmark == "vector_search"
+    assert pruned.rule_id == "uat.compat.dataframe.sql_only_benchmark"
+    assert result.candidate_count == len(result.cells) + len(result.compatibility_pruned)
+
+
 def test_enumerate_honours_scale_options():
     raw = {
         "platforms": {"include": ["duckdb"]},
@@ -464,6 +482,29 @@ def test_execute_passes_config_extra_args_to_runner(tmp_path):
     )
     assert seen["extra_args"] == ("--tuning", "tuned")
     assert seen["benchmark_runs_dir"] == Path("~/Developer/benchmark_runs").expanduser()
+
+
+def test_execute_outcome_carries_compatibility_pruned_cells(tmp_path):
+    matrix.reset_reachability_cache()
+    cfg = validate_config(
+        {
+            "name": "compat",
+            "platforms": {"include": ["polars-df"]},
+            "benchmarks": {"include": ["vector_search", "tpch"]},
+            "scales": {"rungs": [0.01]},
+        }
+    )
+
+    outcome = exec_phase.run_execute(
+        cfg,
+        log_dir=tmp_path,
+        databases_root=tmp_path / "databases",
+        runner=_stub_runner_factory({0.01: 1.0}, {0.01: True}),
+    )
+
+    assert len(outcome.results) == 1
+    assert len(outcome.compatibility_pruned) == 1
+    assert outcome.compatibility_pruned[0].rule_id == "uat.compat.dataframe.sql_only_benchmark"
 
 
 def test_execute_downgrades_passed_cell_with_query_failure_result(tmp_path):

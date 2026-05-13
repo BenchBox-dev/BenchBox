@@ -193,6 +193,19 @@ non-zero if fewer than `N` (platform, benchmark) pairs passed AND
 validator-cleaned every rung. Default null (off) — convention is the
 primary enforcement, tooling teeth are opt-in.
 
+## Compatibility Pruning
+
+UAT compatibility pruning is explicit policy, not an implicit skip. Rules live
+in `tests/uat/compatibility.py` and carry a `rule_id`, `status`, reason, and
+source evidence. Runtime SQL rewrite rules stay in `benchbox/sql_compat/`;
+UAT rules only explain why a platform/benchmark cell is not attempted.
+
+When a rule blocks a cell, the execute phase records it in
+`compatibility_pruned.jsonl` with the rule metadata. The report footer includes
+candidate, executed, compatibility-pruned, early-stop-pruned, passed, failed,
+and timed-out counts. Early-stop pruning is separate from compatibility
+pruning and must not be treated as a pass or a compatibility exclusion.
+
 ## Frozen vs editable configs
 
 Files under `tests/uat/configs/` are either FROZEN historical replays
