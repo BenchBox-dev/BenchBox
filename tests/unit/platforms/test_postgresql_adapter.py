@@ -528,6 +528,27 @@ class TestPostgreSQLDataLoading:
         assert stats["orders"] == 2
         assert mock_cursor.copy.called
 
+    def test_load_data_preserves_dat_trailing_empty_fields(self, postgres_stubs, tmp_path):
+        """.dat files can encode trailing NULL columns with trailing delimiters."""
+        mock_conn = Mock()
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = (1,)
+        mock_conn.cursor.return_value = mock_cursor
+        copy_cm = self._install_copy_context(mock_cursor)
+
+        dat_file = tmp_path / "catalog_page.dat"
+        dat_file.write_text("160|AAAAAAAAAKAAAAAA|2450997|||||\n")
+
+        class Benchmark:
+            tables = {"catalog_page": dat_file}
+
+        adapter = PostgreSQLAdapter(schema="public")
+
+        stats, _, _ = adapter.load_data(Benchmark(), mock_conn, tmp_path)
+
+        assert stats["catalog_page"] == 1
+        assert any(call.args[0].endswith("|||||\n") for call in copy_cm.write.call_args_list)
+
     def test_load_data_accepts_list_of_chunks(self, postgres_stubs, tmp_path):
         """Multi-chunk tables (list[Path]) must load every chunk without a TypeError."""
         mock_conn = Mock()

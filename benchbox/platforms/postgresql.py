@@ -546,7 +546,7 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
                     break
 
                 dialect = resolve_csv_dialect(data_source, table_name, data_file, benchmark)
-                strip_trailing_delim = get_data_extension(data_file) in (".tbl", ".dat")
+                strip_trailing_delim = get_data_extension(data_file) == ".tbl"
                 try:
                     with prepare_local_load_file(
                         data_file, dialect=dialect, strip_trailing_delim=strip_trailing_delim
