@@ -180,3 +180,12 @@ def test_get_query_and_execute_query(tmp_path: Path) -> None:
     results = benchmark.execute_query(3, cursor)
     assert results == [("ok",)]
     assert cursor.executed is not None
+
+
+def test_spark_dialect_translates_space_containing_aliases() -> None:
+    benchmark = TPCDSOBTBenchmark(scale_factor=1.0)
+
+    query = benchmark.get_queries(dialect="spark")["16"]
+
+    assert 'AS "order count"' not in query
+    assert "AS `order count`" in query
