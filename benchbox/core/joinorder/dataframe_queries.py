@@ -1,7 +1,8 @@
 """Canonical JoinOrder Benchmark DataFrame queries for Expression and Pandas families.
 
-Implements the 13 previously translated JoinOrder queries and registers
-NotImplementedError stubs for the remaining canonical SQL query IDs.
+Implements all 113 canonical JoinOrder query IDs. The original 13 queries keep
+their hand-written translations; the remaining canonical SQL queries use the
+restricted JOB SQL-to-DataFrame translator in this module.
 
 The canonical JoinOrder Benchmark is based on "How Good Are Query Optimizers, Really?"
 (VLDB 2015) and uses the 21-table IMDb 2013 schema. The key translation
@@ -22,122 +23,420 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import pandas as pd
+from sqlglot import exp, parse_one
 
 from benchbox.core.dataframe.context import DataFrameContext
 from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory, QueryRegistry
+from benchbox.core.joinorder.queries import CANONICAL_JOINORDER_QUERIES, JoinOrderQueryManager
+from benchbox.core.joinorder.schema import JoinOrderSchema
 
-IMPLEMENTED_DATAFRAME_QUERY_IDS = ["1a", "1b", "2a", "3a", "4a", "5a", "6a", "7a", "8a", "9a", "10a", "11a", "12a"]
-UNTRANSLATED_DATAFRAME_QUERY_IDS = [
-    "1c",
-    "1d",
-    "2b",
-    "2c",
-    "2d",
-    "3b",
-    "3c",
-    "4b",
-    "4c",
-    "5b",
-    "5c",
-    "6b",
-    "6c",
-    "6d",
-    "6e",
-    "6f",
-    "7b",
-    "7c",
-    "8b",
-    "8c",
-    "8d",
-    "9b",
-    "9c",
-    "9d",
-    "10b",
-    "10c",
-    "11b",
-    "11c",
-    "11d",
-    "12b",
-    "12c",
-    "13a",
-    "13b",
-    "13c",
-    "13d",
-    "14a",
-    "14b",
-    "14c",
-    "15a",
-    "15b",
-    "15c",
-    "15d",
-    "16a",
-    "16b",
-    "16c",
-    "16d",
-    "17a",
-    "17b",
-    "17c",
-    "17d",
-    "17e",
-    "17f",
-    "18a",
-    "18b",
-    "18c",
-    "19a",
-    "19b",
-    "19c",
-    "19d",
-    "20a",
-    "20b",
-    "20c",
-    "21a",
-    "21b",
-    "21c",
-    "22a",
-    "22b",
-    "22c",
-    "22d",
-    "23a",
-    "23b",
-    "23c",
-    "24a",
-    "24b",
-    "25a",
-    "25b",
-    "25c",
-    "26a",
-    "26b",
-    "26c",
-    "27a",
-    "27b",
-    "27c",
-    "28a",
-    "28b",
-    "28c",
-    "29a",
-    "29b",
-    "29c",
-    "30a",
-    "30b",
-    "30c",
-    "31a",
-    "31b",
-    "31c",
-    "32a",
-    "32b",
-    "33a",
-    "33b",
-    "33c",
-]
+IMPLEMENTED_DATAFRAME_QUERY_IDS = list(CANONICAL_JOINORDER_QUERIES)
+UNTRANSLATED_DATAFRAME_QUERY_IDS: list[str] = []
+_HAND_TRANSLATED_DATAFRAME_QUERY_IDS = {
+    "1a",
+    "1b",
+    "2a",
+    "3a",
+    "4a",
+    "5a",
+    "6a",
+    "7a",
+    "8a",
+    "9a",
+    "10a",
+    "11a",
+    "12a",
+}
 _TRACK2_TODO = "_project/TODO/main/planning/track2-joinorder-dataframe-coverage.yaml"
+_QUERY_MANAGER = JoinOrderQueryManager()
+
+
+def _schema_columns() -> dict[str, list[str]]:
+    schema = JoinOrderSchema()
+    tables = schema._tables  # noqa: SLF001 - internal benchmark module consuming its schema definition.
+    return {
+        table: [column_def.split()[0] for column_def in table_def["columns"]] for table, table_def in tables.items()
+    }
+
+
+_TABLE_COLUMNS = _schema_columns()
 
 
 def _raise_untranslated_dataframe_query(query_id: str) -> None:
     raise NotImplementedError(
         f"DataFrame translation for query {query_id} not yet available. Track-2 TODO: {_TRACK2_TODO}"
+    )
+
+
+def _qualified(alias: str, column: str) -> str:
+    return f"{alias}__{column}"
+
+
+def _join_key(alias: str, column: str, predicate_index: int) -> str:
+    return f"{_qualified(alias, column)}__join_key_{predicate_index}"
+
+
+def _column_ref(node: exp.Expression) -> tuple[str, str]:
+    if not isinstance(node, exp.Column) or not node.table:
+        raise NotImplementedError(f"Unsupported JoinOrder DataFrame SQL column expression: {node}")
+    return str(node.table), node.name
+
+
+def _literal_value(node: exp.Expression) -> Any:
+    if isinstance(node, exp.Null):
+        return None
+    if not isinstance(node, exp.Literal):
+        raise NotImplementedError(f"Unsupported JoinOrder DataFrame SQL literal expression: {node}")
+    if node.is_string:
+        return str(node.this)
+    raw = str(node.this)
+    return int(raw) if raw.isdigit() else float(raw)
+
+
+def _like_pattern_to_regex(pattern: str) -> str:
+    parts: list[str] = ["^"]
+    for char in pattern:
+        if char == "%":
+            parts.append(".*")
+        elif char == "_":
+            parts.append(".")
+        else:
+            parts.append(re.escape(char))
+    parts.append("$")
+    return "".join(parts)
+
+
+def _flatten_and(node: exp.Expression) -> list[exp.Expression]:
+    if isinstance(node, exp.And):
+        return _flatten_and(node.this) + _flatten_and(node.expression)
+    if isinstance(node, exp.Paren):
+        return _flatten_and(node.this)
+    return [node]
+
+
+def _aliases_in(node: exp.Expression) -> set[str]:
+    return {str(column.table) for column in node.find_all(exp.Column) if column.table}
+
+
+def _is_join_equality(node: exp.Expression) -> bool:
+    if not isinstance(node, exp.EQ):
+        return False
+    left = node.this
+    right = node.expression
+    return isinstance(left, exp.Column) and isinstance(right, exp.Column) and str(left.table) != str(right.table)
+
+
+def _sql_tables(tree: exp.Select) -> list[tuple[str, str]]:
+    tables: list[tuple[str, str]] = []
+    from_expr = tree.args.get("from_")
+    if from_expr is not None and isinstance(from_expr.this, exp.Table):
+        table = from_expr.this
+        tables.append((table.alias_or_name, table.name))
+    for join in tree.args.get("joins") or []:
+        if isinstance(join.this, exp.Table):
+            table = join.this
+            tables.append((table.alias_or_name, table.name))
+    if not tables:
+        raise NotImplementedError("JoinOrder DataFrame SQL query has no FROM tables")
+    return tables
+
+
+def _select_min_columns(tree: exp.Select) -> list[tuple[str, str, str]]:
+    columns: list[tuple[str, str, str]] = []
+    for select_expr in tree.expressions:
+        if not isinstance(select_expr, exp.Alias) or not isinstance(select_expr.this, exp.Min):
+            raise NotImplementedError(f"JoinOrder DataFrame only supports MIN(...) projections: {select_expr}")
+        alias, column = _column_ref(select_expr.this.this)
+        columns.append((alias, column, select_expr.alias))
+    return columns
+
+
+def _expr_value(ctx: DataFrameContext, node: exp.Expression) -> Any:
+    if isinstance(node, exp.Column):
+        alias, column = _column_ref(node)
+        return ctx.col(_qualified(alias, column))
+    return ctx.lit(_literal_value(node))
+
+
+def _expression_condition(ctx: DataFrameContext, node: exp.Expression) -> Any:
+    if isinstance(node, exp.Paren):
+        return _expression_condition(ctx, node.this)
+    if isinstance(node, exp.And):
+        return _expression_condition(ctx, node.this) & _expression_condition(ctx, node.expression)
+    if isinstance(node, exp.Or):
+        return _expression_condition(ctx, node.this) | _expression_condition(ctx, node.expression)
+    if isinstance(node, exp.Not):
+        return ~_expression_condition(ctx, node.this)
+    if isinstance(node, exp.EQ):
+        return _expr_value(ctx, node.this) == _expr_value(ctx, node.expression)
+    if isinstance(node, exp.NEQ):
+        return _expr_value(ctx, node.this) != _expr_value(ctx, node.expression)
+    if isinstance(node, exp.GT):
+        return _expr_value(ctx, node.this) > _expr_value(ctx, node.expression)
+    if isinstance(node, exp.GTE):
+        return _expr_value(ctx, node.this) >= _expr_value(ctx, node.expression)
+    if isinstance(node, exp.LT):
+        return _expr_value(ctx, node.this) < _expr_value(ctx, node.expression)
+    if isinstance(node, exp.Between):
+        return _expr_value(ctx, node.this).is_between(
+            _expr_value(ctx, node.args["low"]), _expr_value(ctx, node.args["high"])
+        )
+    if isinstance(node, exp.In):
+        return _expr_value(ctx, node.this).is_in([_literal_value(value) for value in node.expressions])
+    if isinstance(node, exp.Like):
+        return _expr_value(ctx, node.this).str.contains(_like_pattern_to_regex(_literal_value(node.expression)))
+    if isinstance(node, exp.Is):
+        expr = _expr_value(ctx, node.this)
+        return expr.is_null() if isinstance(node.expression, exp.Null) else expr == _expr_value(ctx, node.expression)
+    raise NotImplementedError(f"Unsupported JoinOrder DataFrame SQL predicate: {node}")
+
+
+def _prefixed_expression_frame(
+    ctx: DataFrameContext,
+    table_name: str,
+    alias: str,
+    predicates: list[exp.Expression],
+    join_key_columns: list[tuple[str, int]],
+) -> Any:
+    frame = ctx.get_table(table_name)
+    frame = frame.select(
+        [ctx.col(column).alias(_qualified(alias, column)) for column in _TABLE_COLUMNS[table_name]]
+        + [ctx.col(column).alias(_join_key(alias, column, index)) for column, index in join_key_columns]
+    )
+    for predicate in predicates:
+        frame = frame.filter(_expression_condition(ctx, predicate))
+    return frame
+
+
+def _execute_joinorder_expression_query(ctx: DataFrameContext, query_id: str) -> Any:
+    tree = parse_one(_QUERY_MANAGER.get_query(query_id), read="duckdb")
+    tables = _sql_tables(tree)
+    predicates = _flatten_and(tree.args["where"].this)
+    join_predicates = [predicate for predicate in predicates if _is_join_equality(predicate)]
+    join_key_columns: dict[str, list[tuple[str, int]]] = {alias: [] for alias, _table in tables}
+    for index, predicate in enumerate(join_predicates):
+        left_alias, left_column = _column_ref(predicate.this)
+        right_alias, right_column = _column_ref(predicate.expression)
+        join_key_columns[left_alias].append((left_column, index))
+        join_key_columns[right_alias].append((right_column, index))
+    local_predicates = {
+        alias: [
+            predicate
+            for predicate in predicates
+            if not _is_join_equality(predicate) and _aliases_in(predicate) == {alias}
+        ]
+        for alias, _table in tables
+    }
+    frames = {
+        alias: _prefixed_expression_frame(ctx, table_name, alias, local_predicates[alias], join_key_columns[alias])
+        for alias, table_name in tables
+    }
+
+    joined_aliases = {tables[0][0]}
+    result = frames[tables[0][0]]
+    remaining_aliases = {alias for alias, _table in tables[1:]}
+    used_join_predicates: set[int] = set()
+
+    while remaining_aliases:
+        for predicate_index, predicate in enumerate(join_predicates):
+            left_alias, left_column = _column_ref(predicate.this)
+            right_alias, right_column = _column_ref(predicate.expression)
+            if left_alias in joined_aliases and right_alias in remaining_aliases:
+                result = result.join(
+                    frames[right_alias],
+                    left_on=_join_key(left_alias, left_column, predicate_index),
+                    right_on=_join_key(right_alias, right_column, predicate_index),
+                )
+                joined_aliases.add(right_alias)
+                remaining_aliases.remove(right_alias)
+                used_join_predicates.add(id(predicate))
+                break
+            if right_alias in joined_aliases and left_alias in remaining_aliases:
+                result = result.join(
+                    frames[left_alias],
+                    left_on=_join_key(right_alias, right_column, predicate_index),
+                    right_on=_join_key(left_alias, left_column, predicate_index),
+                )
+                joined_aliases.add(left_alias)
+                remaining_aliases.remove(left_alias)
+                used_join_predicates.add(id(predicate))
+                break
+        else:
+            alias = remaining_aliases.pop()
+            result = result.join(frames[alias], how="cross")
+            joined_aliases.add(alias)
+
+    for predicate in predicates:
+        if id(predicate) not in used_join_predicates:
+            result = result.filter(_expression_condition(ctx, predicate))
+
+    return result.select(
+        [
+            ctx.col(_qualified(alias, column)).min().alias(output_alias)
+            for alias, column, output_alias in _select_min_columns(tree)
+        ]
+    )
+
+
+def _native_pandas_frame(frame: Any) -> Any:
+    return frame.native if hasattr(frame, "native") else frame
+
+
+def _pandas_value(frame: pd.DataFrame, node: exp.Expression) -> Any:
+    if isinstance(node, exp.Column):
+        alias, column = _column_ref(node)
+        return frame[_qualified(alias, column)]
+    return _literal_value(node)
+
+
+def _pandas_not_null_mask(*values: Any) -> Any:
+    mask = True
+    for value in values:
+        if hasattr(value, "notna"):
+            mask = mask & value.notna()
+    return mask
+
+
+def _pandas_sql_compare(left: Any, right: Any, operator: Any) -> Any:
+    return operator(left, right) & _pandas_not_null_mask(left, right)
+
+
+def _pandas_condition(frame: pd.DataFrame, node: exp.Expression) -> Any:
+    if isinstance(node, exp.Paren):
+        return _pandas_condition(frame, node.this)
+    if isinstance(node, exp.And):
+        return _pandas_condition(frame, node.this) & _pandas_condition(frame, node.expression)
+    if isinstance(node, exp.Or):
+        return _pandas_condition(frame, node.this) | _pandas_condition(frame, node.expression)
+    if isinstance(node, exp.Not):
+        return ~_pandas_condition(frame, node.this)
+    if isinstance(node, exp.EQ):
+        return _pandas_sql_compare(
+            _pandas_value(frame, node.this), _pandas_value(frame, node.expression), lambda a, b: a == b
+        )
+    if isinstance(node, exp.NEQ):
+        return _pandas_sql_compare(
+            _pandas_value(frame, node.this), _pandas_value(frame, node.expression), lambda a, b: a != b
+        )
+    if isinstance(node, exp.GT):
+        return _pandas_sql_compare(
+            _pandas_value(frame, node.this), _pandas_value(frame, node.expression), lambda a, b: a > b
+        )
+    if isinstance(node, exp.GTE):
+        return _pandas_sql_compare(
+            _pandas_value(frame, node.this), _pandas_value(frame, node.expression), lambda a, b: a >= b
+        )
+    if isinstance(node, exp.LT):
+        return _pandas_sql_compare(
+            _pandas_value(frame, node.this), _pandas_value(frame, node.expression), lambda a, b: a < b
+        )
+    if isinstance(node, exp.Between):
+        return _pandas_value(frame, node.this).between(
+            _literal_value(node.args["low"]), _literal_value(node.args["high"])
+        )
+    if isinstance(node, exp.In):
+        return _pandas_value(frame, node.this).isin([_literal_value(value) for value in node.expressions])
+    if isinstance(node, exp.Like):
+        return (
+            _pandas_value(frame, node.this)
+            .astype("string")
+            .str.contains(_like_pattern_to_regex(_literal_value(node.expression)), regex=True, na=pd.NA)
+        )
+    if isinstance(node, exp.Is):
+        value = _pandas_value(frame, node.this)
+        return value.isna() if isinstance(node.expression, exp.Null) else value == _pandas_value(frame, node.expression)
+    raise NotImplementedError(f"Unsupported JoinOrder DataFrame SQL predicate: {node}")
+
+
+def _filter_pandas(frame: pd.DataFrame, predicate: exp.Expression) -> pd.DataFrame:
+    return frame[_pandas_condition(frame, predicate).fillna(False)]
+
+
+def _prefixed_pandas_frame(
+    ctx: DataFrameContext, table_name: str, alias: str, predicates: list[exp.Expression]
+) -> pd.DataFrame:
+    frame = _native_pandas_frame(ctx.get_table(table_name))
+    frame = frame.rename(columns={column: _qualified(alias, column) for column in _TABLE_COLUMNS[table_name]})
+    for predicate in predicates:
+        frame = _filter_pandas(frame, predicate)
+    return frame
+
+
+def _empty_safe_min(frame: pd.DataFrame, column: str) -> Any:
+    if frame.empty:
+        return None
+    value = frame[column].min()
+    return None if pd.isna(value) else value
+
+
+def _execute_joinorder_pandas_query(ctx: DataFrameContext, query_id: str) -> pd.DataFrame:
+    tree = parse_one(_QUERY_MANAGER.get_query(query_id), read="duckdb")
+    tables = _sql_tables(tree)
+    predicates = _flatten_and(tree.args["where"].this)
+    join_predicates = [predicate for predicate in predicates if _is_join_equality(predicate)]
+    local_predicates = {
+        alias: [
+            predicate
+            for predicate in predicates
+            if not _is_join_equality(predicate) and _aliases_in(predicate) == {alias}
+        ]
+        for alias, _table in tables
+    }
+    frames = {
+        alias: _prefixed_pandas_frame(ctx, table_name, alias, local_predicates[alias]) for alias, table_name in tables
+    }
+
+    joined_aliases = {tables[0][0]}
+    result = frames[tables[0][0]]
+    remaining_aliases = {alias for alias, _table in tables[1:]}
+    used_join_predicates: set[int] = set()
+
+    while remaining_aliases:
+        for predicate in join_predicates:
+            left_alias, left_column = _column_ref(predicate.this)
+            right_alias, right_column = _column_ref(predicate.expression)
+            if left_alias in joined_aliases and right_alias in remaining_aliases:
+                result = result.merge(
+                    frames[right_alias],
+                    left_on=_qualified(left_alias, left_column),
+                    right_on=_qualified(right_alias, right_column),
+                    how="inner",
+                )
+                joined_aliases.add(right_alias)
+                remaining_aliases.remove(right_alias)
+                used_join_predicates.add(id(predicate))
+                break
+            if right_alias in joined_aliases and left_alias in remaining_aliases:
+                result = result.merge(
+                    frames[left_alias],
+                    left_on=_qualified(right_alias, right_column),
+                    right_on=_qualified(left_alias, left_column),
+                    how="inner",
+                )
+                joined_aliases.add(left_alias)
+                remaining_aliases.remove(left_alias)
+                used_join_predicates.add(id(predicate))
+                break
+        else:
+            alias = remaining_aliases.pop()
+            result = result.merge(frames[alias], how="cross")
+            joined_aliases.add(alias)
+
+    for predicate in predicates:
+        if id(predicate) not in used_join_predicates:
+            result = _filter_pandas(result, predicate)
+
+    return pd.DataFrame(
+        [
+            {
+                output_alias: _empty_safe_min(result, _qualified(alias, column))
+                for alias, column, output_alias in _select_min_columns(tree)
+            }
+        ]
     )
 
 
@@ -2117,6 +2416,31 @@ def q33c_pandas_impl(ctx: DataFrameContext) -> Any:
     _raise_untranslated_dataframe_query("33c")
 
 
+def _make_generated_expression_impl(query_id: str) -> Any:
+    def _impl(ctx: DataFrameContext) -> Any:
+        return _execute_joinorder_expression_query(ctx, query_id)
+
+    _impl.__name__ = f"q{query_id}_expression_impl"
+    _impl.__doc__ = f"{query_id}: generated canonical JoinOrder DataFrame translation."
+    return _impl
+
+
+def _make_generated_pandas_impl(query_id: str) -> Any:
+    def _impl(ctx: DataFrameContext) -> Any:
+        return _execute_joinorder_pandas_query(ctx, query_id)
+
+    _impl.__name__ = f"q{query_id}_pandas_impl"
+    _impl.__doc__ = f"{query_id}: generated canonical JoinOrder pandas translation."
+    return _impl
+
+
+for _query_id in CANONICAL_JOINORDER_QUERIES:
+    if _query_id in _HAND_TRANSLATED_DATAFRAME_QUERY_IDS:
+        continue
+    globals()[f"q{_query_id}_expression_impl"] = _make_generated_expression_impl(_query_id)
+    globals()[f"q{_query_id}_pandas_impl"] = _make_generated_pandas_impl(_query_id)
+
+
 # ===========================================================================
 # Registry
 # ===========================================================================
@@ -3031,15 +3355,15 @@ _QUERIES = [
 ]
 
 for _query in _QUERIES:
+    if _query.query_id not in _HAND_TRANSLATED_DATAFRAME_QUERY_IDS:
+        _query.description = f"Canonical JoinOrder SQL query {_query.query_id}; generated DataFrame translation"
     JOINORDER_DATAFRAME_QUERIES.register(_query)
 
 
 def get_dataframe_queries() -> QueryRegistry:
     """Get the canonical JoinOrder DataFrame query registry.
 
-    The registry contains all 113 canonical query IDs. Only
-    IMPLEMENTED_DATAFRAME_QUERY_IDS are selected by default by the benchmark;
-    the remaining functions raise NotImplementedError with the Track-2 TODO.
+    The registry contains DataFrame implementations for all 113 canonical query IDs.
     """
     return JOINORDER_DATAFRAME_QUERIES
 
@@ -3050,5 +3374,5 @@ def get_implemented_dataframe_query_ids() -> list[str]:
 
 
 def get_untranslated_dataframe_query_ids() -> list[str]:
-    """Return canonical query IDs that are registered as Track-2 stubs."""
+    """Return canonical query IDs that are not available in DataFrame mode."""
     return list(UNTRANSLATED_DATAFRAME_QUERY_IDS)

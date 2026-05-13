@@ -23,9 +23,9 @@ context_sections:
     - `_project/TODO/main/planning/joinorder-datafusion-dialect.yaml` excludes
       DataFusion SQL from canonical JoinOrder support until Parquet table
       registration preserves canonical column names.
-    - `_project/TODO/main/planning/track2-joinorder-dataframe-coverage.yaml`
-      excludes DataFrame platforms from 113-query canonical support until the
-      remaining 100 query translations exist.
+    - `_project/DONE/main/planning/track2-joinorder-dataframe-coverage.yaml`
+      cleared the prior DataFrame platform exclusion by adding translations for
+      the remaining 100 canonical query IDs.
     - `_project/TODO/main/planning/joinorder-spark-dialect.yaml` excludes
       Spark SQL until canonical q33c passes.
     - `_project/TODO/main/planning/joinorder-sqlite-performance.yaml` excludes
