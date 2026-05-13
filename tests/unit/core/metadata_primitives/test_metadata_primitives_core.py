@@ -93,6 +93,13 @@ class TestMetadataCatalogLoader:
                 assert isinstance(dialect, str)
                 assert len(dialect) > 0
 
+    def test_large_catalog_column_count_guards_empty_catalog_division(self):
+        """Column-count query should not divide by zero when no catalog tables exist."""
+        query = load_metadata_catalog().queries["large_catalog_column_count"]
+
+        assert "NULLIF(COUNT(DISTINCT table_name), 0)" in query.sql
+        assert "nullIf(uniq(table), 0)" in query.variants["clickhouse"]
+
 
 @pytest.mark.unit
 class TestMetadataPrimitivesQueryManager:

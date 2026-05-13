@@ -95,6 +95,12 @@ work:
       while removing the pg-duckdb stack, so further live reruns should start
       after Docker is healthy.
 
+      After Docker Desktop was restarted and the stale container removed,
+      targeted `pg-duckdb/metadata_primitives` passed with the guarded
+      `large_catalog_column_count` query, and targeted `pg-duckdb/tpcdi`
+      passed with PostgreSQL query rendering for date arithmetic, boolean
+      comparisons, and alias references.
+
       Remaining PG extension and TimescaleDB failures still need per-log
       clustering from
       `/Users/joe/Developer/benchmark_runs/logs/uat_enabled_platforms_full_20260513/`

@@ -117,6 +117,14 @@ TimescaleDB cells. The most visible signatures from this run:
   `/Users/joe/Developer/benchmark_runs/logs/uat_pg_duckdb_fixcheck_20260513d/pg-duckdb_tpcds_obt_1.0_20260513_132611.log`.
   Docker Desktop then reported a project-scoped remove failure against
   containerd metadata; the container could not be removed cleanly in-session.
+- `metadata_primitives`: `large_catalog_column_count` divided by zero when no
+  generated catalog tables existed. Fixed by guarding the average denominator
+  with `NULLIF` / `nullIf`. Targeted `pg-duckdb/metadata_primitives` passed:
+  `/Users/joe/Developer/benchmark_runs/logs/uat_pg_duckdb_fixcheck_20260513e/pg-duckdb_metadata_primitives_1.0_20260513_155557.log`.
+- `tpcdi`: PostgreSQL-family query rendering now rewrites SQLite `JULIANDAY`
+  date arithmetic, boolean-to-integer comparisons, and PostgreSQL-invalid alias
+  references in `A5`, `AQ10`, and `EQ7`. Targeted `pg-duckdb/tpcdi` passed:
+  `/Users/joe/Developer/benchmark_runs/logs/uat_pg_duckdb_fixcheck_20260513f/pg-duckdb_tpcdi_0.01_20260513_155734.log`.
 - Remaining PG extension and TimescaleDB cells still need per-log clustering
   before they can be fixed or converted to evidence-backed compatibility rules.
 

@@ -77,6 +77,10 @@ _DOUBLE_COUNT_RE = re.compile(
     r"SELECT\s+COUNT\s*\(\s*\*\s*\)\s+AS\s+\w+\s+(FROM\s+[^)]+)\)\s*\)",
     re.IGNORECASE,
 )
+_POSTGRES_BOOLEAN_NUMBER_RE = re.compile(
+    r"(?P<column>\b(?:IsCurrent|TT_IS_SELL|HolidayFlag)\b)\s*=\s*(?P<value>[01])",
+    re.IGNORECASE,
+)
 
 
 class TPCDIBenchmark(BaseBenchmark):
@@ -336,9 +340,37 @@ class TPCDIBenchmark(BaseBenchmark):
                     else:
                         translated_queries[query_id] = variant_sql
 
+            if d in {"postgres", "postgresql"}:
+                translated_queries = {
+                    query_id: self._apply_postgres_query_overrides(query_id, query_sql)
+                    for query_id, query_sql in translated_queries.items()
+                }
+
             return translated_queries
 
         return queries
+
+    def _apply_postgres_query_overrides(self, query_id: str, query_sql: str) -> str:
+        """Apply PostgreSQL-specific TPC-DI query rewrites after SQLGlot rendering."""
+        if query_id == "A5":
+            return query_sql.replace(
+                "HAVING customer_count > 10",
+                "HAVING COUNT(DISTINCT c.SK_CustomerID) > 10",
+            )
+        if query_id == "AQ10":
+            return query_sql.replace(
+                "ORDER BY CASE risk_profile WHEN 'HIGH RISK' THEN 1 WHEN 'CONCENTRATION RISK' THEN 2 "
+                "WHEN 'WASH SALE RISK' THEN 3 WHEN 'DAY TRADING RISK' THEN 4 ELSE 5 END, total_trade_value DESC",
+                "ORDER BY 15, total_trade_value DESC",
+            )
+        if query_id == "EQ7":
+            from benchbox.sql_compat.rules.query_source.tpcdi_variants import STARROCKS_EQ7_SQL
+
+            return _POSTGRES_BOOLEAN_NUMBER_RE.sub(
+                lambda m: f"{m.group('column')} IS {'TRUE' if m.group('value') == '1' else 'FALSE'}",
+                STARROCKS_EQ7_SQL,
+            )
+        return query_sql
 
     def get_platform_skip_queries(self, platform_name: str) -> list[str]:
         """Return platform-specific TPC-DI queries excluded by compatibility policy."""
@@ -360,7 +392,7 @@ class TPCDIBenchmark(BaseBenchmark):
         from benchbox.utils.dialect_utils import translate_sql_query
 
         # Apply platform-specific pre-processing before SQLGlot translation
-        if target_dialect == "duckdb":
+        if target_dialect in {"duckdb", "postgres", "postgresql"}:
             query_text = _DATE_INTERVAL_RE.sub(
                 lambda m: f"(CURRENT_DATE - INTERVAL '{m.group(1)} days')",
                 query_text,
@@ -419,6 +451,12 @@ class TPCDIBenchmark(BaseBenchmark):
                 query_text,
             )
             query_text = _DATE_NOW_RE.sub("CURDATE()", query_text)
+
+        elif target_dialect in {"postgres", "postgresql"}:
+            query_text = _POSTGRES_BOOLEAN_NUMBER_RE.sub(
+                lambda m: f"{m.group('column')} IS {'TRUE' if m.group('value') == '1' else 'FALSE'}",
+                query_text,
+            )
 
         return query_text
 
