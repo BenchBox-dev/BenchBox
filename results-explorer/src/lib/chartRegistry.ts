@@ -18,7 +18,6 @@
 
 import type { BenchmarkSummary, DetailResult, PlatformRow } from "@/types";
 import {
-  isRankable,
   isTimingDisplayable,
   isValidTimingValue,
   platformTimingValue,
@@ -478,8 +477,7 @@ function getChartCapabilities(context: ChartContext): ChartCapabilities {
       summary?.platforms.some(
         (platform) => platform.cost_status === "normalized" && platform.normalized_cost_usd != null,
       ) ?? false,
-    hasPowerScore:
-      summary?.platforms.some((platform) => isRankable(platform) && isValidTimingValue(platform.power_score)) ?? false,
+    hasPowerScore: summary?.platforms.some((platform) => isValidTimingValue(platform.power_score)) ?? false,
     hasPhaseDurations:
       summary?.platforms.some(
         (platform) =>
