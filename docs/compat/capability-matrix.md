@@ -4,7 +4,7 @@
 
 Every rule registered in `benchbox.sql_compat` is listed below. The registry is the authoritative source of compatibility policy; this document is regenerated from it. See [adr-sql-compat-phase-aware-pipeline.md](../development/adr/adr-sql-compat-phase-aware-pipeline.md) for the design.
 
-**Total registered rules:** 203
+**Total registered rules:** 274
 
 **Platforms covered:** 28
 
@@ -22,10 +22,10 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | firebolt | - | - | - | - | 1 | - | 1 |
 | lakesail | 4 | 6 | - | - | 1 | 69 | 80 |
 | mysql | - | 1 | - | - | - | - | 1 |
-| pg-duckdb | 3 | - | - | - | - | - | 3 |
+| pg-duckdb | 3 | - | - | - | - | 4 | 7 |
 | pg-mooncake | 3 | - | - | - | - | - | 3 |
 | pg_mooncake | - | - | - | - | 1 | - | 1 |
-| postgres | - | - | - | 1 | - | - | 1 |
+| postgres | - | - | - | 1 | - | 67 | 68 |
 | postgresql | - | 6 | - | 1 | 1 | - | 8 |
 | presto | - | - | - | 2 | 1 | - | 3 |
 | questdb | 1 | - | - | - | 1 | - | 2 |
@@ -226,6 +226,10 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | benchmark_gate | benchmark=ai_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.pg-duckdb.ai_primitives.unsupported` |
 | benchmark_gate | benchmark=read_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.pg-duckdb.read_primitives.duckdb_intrinsics` |
 | benchmark_gate | benchmark=vector_search | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.pg-duckdb.vector_search.no_vector_type` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_isolation_repeatable_read | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-duckdb.transaction_primitives.transaction_isolation_repeatable_read` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_isolation_serializable | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-duckdb.transaction_primitives.transaction_isolation_serializable` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_savepoint_deep_nesting | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-duckdb.transaction_primitives.transaction_savepoint_deep_nesting` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_savepoint_nested | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-duckdb.transaction_primitives.transaction_savepoint_nested` |
 
 ### pg-mooncake
 
@@ -246,6 +250,73 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | phase | scope | action | support | failure mode | rule_id |
 |---|---|---|---|---|---|
 | schema_emit | benchmark=nyctaxi | rewrite_ddl | REWRITTEN | UNSUPPORTED_FEATURE | `schema_emit.postgres.nyctaxi.all.range_partition_ddl` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_append_mode | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_append_mode` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_column_subset | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_column_subset` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_csv_large_bzip2 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_csv_large_bzip2` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_csv_large_gzip | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_csv_large_gzip` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_csv_large_uncompressed | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_csv_large_uncompressed` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_csv_large_zstd | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_csv_large_zstd` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_csv_medium_bzip2 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_csv_medium_bzip2` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_csv_medium_gzip | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_csv_medium_gzip` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_csv_medium_uncompressed | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_csv_medium_uncompressed` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_csv_medium_zstd | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_csv_medium_zstd` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_csv_small_bzip2 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_csv_small_bzip2` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_csv_small_gzip | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_csv_small_gzip` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_csv_small_uncompressed | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_csv_small_uncompressed` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_csv_small_zstd | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_csv_small_zstd` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_date_format_custom | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_date_format_custom` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_delimited_custom | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_delimited_custom` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_encoding_utf8 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_encoding_utf8` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_error_handling_skip_bad_rows | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_error_handling_skip_bad_rows` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_null_handling | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_null_handling` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_parallel_multi_file | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_parallel_multi_file` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_parquet_large_gzip | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_parquet_large_gzip` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_parquet_large_snappy | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_parquet_large_snappy` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_parquet_large_uncompressed | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_parquet_large_uncompressed` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_parquet_large_zstd | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_parquet_large_zstd` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_parquet_medium_gzip | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_parquet_medium_gzip` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_parquet_medium_snappy | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_parquet_medium_snappy` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_parquet_medium_uncompressed | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_parquet_medium_uncompressed` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_parquet_medium_zstd | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_parquet_medium_zstd` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_parquet_small_gzip | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_parquet_small_gzip` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_parquet_small_snappy | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_parquet_small_snappy` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_parquet_small_uncompressed | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_parquet_small_uncompressed` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_parquet_small_zstd | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_parquet_small_zstd` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_quoted_fields | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_quoted_fields` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_replace_mode | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_replace_mode` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_upsert_mode | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_upsert_mode` |
+| execution_filter | benchmark=write_primitives, query=bulk_load_with_transformation | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.bulk_load_with_transformation` |
+| execution_filter | benchmark=write_primitives, query=merge_conditional_update | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.merge_conditional_update` |
+| execution_filter | benchmark=write_primitives, query=merge_error_handling | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.merge_error_handling` |
+| execution_filter | benchmark=write_primitives, query=merge_no_overlap_all_insert | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.merge_no_overlap_all_insert` |
+| execution_filter | benchmark=write_primitives, query=merge_overlap_10pct | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.merge_overlap_10pct` |
+| execution_filter | benchmark=write_primitives, query=merge_overlap_50pct | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.merge_overlap_50pct` |
+| execution_filter | benchmark=write_primitives, query=merge_overlap_90pct | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.merge_overlap_90pct` |
+| execution_filter | benchmark=write_primitives, query=merge_returning_clause | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.merge_returning_clause` |
+| execution_filter | benchmark=write_primitives, query=merge_simple_upsert_small | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.merge_simple_upsert_small` |
+| execution_filter | benchmark=write_primitives, query=merge_upsert_with_delete | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.merge_upsert_with_delete` |
+| execution_filter | benchmark=write_primitives, query=sketch_cpc_create_persistent_table | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.sketch_cpc_create_persistent_table` |
+| execution_filter | benchmark=write_primitives, query=sketch_cpc_drop_persistent_table | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.sketch_cpc_drop_persistent_table` |
+| execution_filter | benchmark=write_primitives, query=sketch_cpc_insert_per_partition | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.sketch_cpc_insert_per_partition` |
+| execution_filter | benchmark=write_primitives, query=sketch_cpc_query_union_merge | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.sketch_cpc_query_union_merge` |
+| execution_filter | benchmark=write_primitives, query=sketch_ddl_create_persistent_table | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.sketch_ddl_create_persistent_table` |
+| execution_filter | benchmark=write_primitives, query=sketch_drop_persistent_table | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.sketch_drop_persistent_table` |
+| execution_filter | benchmark=write_primitives, query=sketch_insert_kll_per_partition | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.sketch_insert_kll_per_partition` |
+| execution_filter | benchmark=write_primitives, query=sketch_insert_theta_per_partition | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.sketch_insert_theta_per_partition` |
+| execution_filter | benchmark=write_primitives, query=sketch_insert_topk_per_shard | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.sketch_insert_topk_per_shard` |
+| execution_filter | benchmark=write_primitives, query=sketch_query_kll_quantiles_merge | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.sketch_query_kll_quantiles_merge` |
+| execution_filter | benchmark=write_primitives, query=sketch_query_kll_quantiles_merge_k100 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.sketch_query_kll_quantiles_merge_k100` |
+| execution_filter | benchmark=write_primitives, query=sketch_query_kll_quantiles_merge_k1000 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.sketch_query_kll_quantiles_merge_k1000` |
+| execution_filter | benchmark=write_primitives, query=sketch_query_theta_union_merge | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.sketch_query_theta_union_merge` |
+| execution_filter | benchmark=write_primitives, query=sketch_query_theta_union_merge_lgk10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.sketch_query_theta_union_merge_lgk10` |
+| execution_filter | benchmark=write_primitives, query=sketch_query_theta_union_merge_lgk14 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.sketch_query_theta_union_merge_lgk14` |
+| execution_filter | benchmark=write_primitives, query=sketch_query_topk_combine | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.sketch_query_topk_combine` |
+| execution_filter | benchmark=write_primitives, query=sketch_query_topk_combine_lgmm10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.sketch_query_topk_combine_lgmm10` |
+| execution_filter | benchmark=write_primitives, query=sketch_query_topk_combine_lgmm8 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.sketch_query_topk_combine_lgmm8` |
+| execution_filter | benchmark=write_primitives, query=sketch_req_create_persistent_table | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.sketch_req_create_persistent_table` |
+| execution_filter | benchmark=write_primitives, query=sketch_req_drop_persistent_table | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.sketch_req_drop_persistent_table` |
+| execution_filter | benchmark=write_primitives, query=sketch_req_insert_per_partition | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.sketch_req_insert_per_partition` |
+| execution_filter | benchmark=write_primitives, query=sketch_req_query_quantile_merge | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.postgres.write_primitives.sketch_req_query_quantile_merge` |
 
 ### postgresql
 

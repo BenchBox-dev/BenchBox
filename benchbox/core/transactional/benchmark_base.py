@@ -9,6 +9,7 @@ to implement their spec-specific ``execute_operation``, ``setup``,
 
 from __future__ import annotations
 
+import re
 from abc import abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Generic, Optional, TypeVar, Union
@@ -26,6 +27,13 @@ from benchbox.utils.cloud_storage import create_path_handler
 
 PathLike = Union[Path, "CloudPath", "DatabricksPath"]
 ResultT = TypeVar("ResultT")
+_POSTGRES_SERIES_DIALECTS = frozenset({"postgres", "postgresql"})
+_UNNEST_GENERATE_SERIES_RE = re.compile(r"unnest\(\s*generate_series\((?P<args>[^()]*)\)\s*\)", re.IGNORECASE)
+_SET_THEN_BEGIN_ISOLATION_RE = re.compile(
+    r"SET\s+TRANSACTION\s+ISOLATION\s+LEVEL\s+(?P<level>REPEATABLE\s+READ|SERIALIZABLE|READ\s+COMMITTED)\s*;\s*"
+    r"BEGIN\s+TRANSACTION\s*;",
+    re.IGNORECASE,
+)
 
 
 class TransactionalBenchmarkBase(BaseBenchmark, OperationExecutor, Generic[ResultT]):
@@ -295,9 +303,25 @@ class TransactionalBenchmarkBase(BaseBenchmark, OperationExecutor, Generic[Resul
                 self.setup(connection, force=False, dialect=platform_key or "standard")
                 self.log_verbose("Setup completed successfully")
             except Exception as e:
+                self._rollback_connection_after_error(connection)
                 raise RuntimeError(f"Failed to initialize staging tables before executing '{operation_id}': {e}") from e
 
         return operation, platform_key, sql_override
+
+    def _rewrite_transactional_sql_for_platform(self, sql: str, platform_key: str | None) -> str:
+        """Apply narrow transactional catalog rewrites for the active SQL dialect."""
+        if (platform_key or "").lower() not in _POSTGRES_SERIES_DIALECTS:
+            return sql
+        sql = _UNNEST_GENERATE_SERIES_RE.sub(r"generate_series(\g<args>)", sql)
+        return _SET_THEN_BEGIN_ISOLATION_RE.sub(r"BEGIN TRANSACTION ISOLATION LEVEL \g<level>;", sql)
+
+    def _rollback_connection_after_error(self, connection: DatabaseConnection) -> None:
+        """Clear aborted transaction state on drivers that require explicit rollback after errors."""
+        try:
+            if hasattr(connection, "rollback"):
+                connection.rollback()
+        except Exception as exc:
+            self.log_verbose(f"Warning: rollback after operation error failed: {exc}")
 
     # ------------------------------------------------------------------
     # run_benchmark (identical across both families)

@@ -36,8 +36,14 @@ from benchbox.core.write_primitives.schema import (
     get_all_staging_tables_sql,
     get_create_table_sql,
 )
+from benchbox.sql_compat.rules.execution_filter.postgres_write_primitives import (
+    POSTGRES_WRITE_PRIMITIVES_CATEGORY_SKIPS,
+    POSTGRES_WRITE_PRIMITIVES_OPERATION_SKIPS,
+)
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
+
+_POSTGRES_OPERATION_SKIP_DIALECTS = frozenset({"postgres", "postgresql"})
 
 
 def _pk_lock_bypass_required(dialect: str) -> bool:
@@ -372,6 +378,19 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 f"Operation '{operation.id}' is DataFrame aggregate-state only and is unsupported on "
                 f"platform '{platform_label}'."
             )
+
+        if (platform_key or "").lower() in _POSTGRES_OPERATION_SKIP_DIALECTS:
+            category = getattr(operation, "category", "")
+            if category in POSTGRES_WRITE_PRIMITIVES_CATEGORY_SKIPS:
+                return None, (
+                    f"Operation '{operation.id}' is skipped on PostgreSQL-family platforms: "
+                    f"{POSTGRES_WRITE_PRIMITIVES_CATEGORY_SKIPS[category]}"
+                )
+            if operation.id in POSTGRES_WRITE_PRIMITIVES_OPERATION_SKIPS:
+                return None, (
+                    f"Operation '{operation.id}' is skipped on PostgreSQL-family platforms: "
+                    f"{POSTGRES_WRITE_PRIMITIVES_OPERATION_SKIPS[operation.id]}"
+                )
 
         effective_sql = operation.write_sql
 
@@ -902,13 +921,14 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                     cleanup_duration_ms=0.0,
                     cleanup_success=True,
                     status="SKIPPED",
-                    error=skip_reason,
+                    skip_reason=skip_reason,
                 )
 
             # Execute write SQL (with placeholder replacement)
             self.log_verbose(f"Executing write operation: {operation_id}")
             if effective_sql is None:
                 raise RuntimeError(f"No executable SQL resolved for operation '{operation_id}'")
+            effective_sql = self._rewrite_transactional_sql_for_platform(effective_sql, platform_key)
             write_sql = self._replace_placeholders(effective_sql)
             write_start = time.perf_counter()
             write_result = connection.execute(write_sql)
@@ -941,6 +961,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             )
 
         except Exception as e:
+            self._rollback_connection_after_error(connection)
             error_msg = f"Operation {operation_id} failed: {str(e)}"
             self.log_verbose(error_msg)
 

@@ -359,6 +359,50 @@ class TestExecuteOperation:
         assert result.validation_passed is True
         mock_conn.execute.assert_not_called()
 
+    def test_execute_operation_skips_postgres_bulk_load_operation(self, wp_benchmark, monkeypatch):
+        """PostgreSQL-family operation execution cannot use server-side file COPY from host paths."""
+        mock_conn = Mock()
+        mock_conn.execute = Mock()
+        monkeypatch.setattr(wp_benchmark, "is_setup", lambda conn: True)
+
+        result = wp_benchmark.execute_operation("bulk_load_csv_small_uncompressed", mock_conn, platform_key="postgres")
+
+        assert result.status == "SKIPPED"
+        assert result.success is True
+        assert result.error is None
+        assert "server-side file COPY" in (result.skip_reason or "")
+        mock_conn.execute.assert_not_called()
+
+    def test_execute_operation_skips_postgres_sketch_operation(self, wp_benchmark, monkeypatch):
+        """PostgreSQL-family engines do not accept DuckDB DataSketches INSTALL statements."""
+        mock_conn = Mock()
+        mock_conn.execute = Mock()
+        monkeypatch.setattr(wp_benchmark, "is_setup", lambda conn: True)
+
+        result = wp_benchmark.execute_operation(
+            "sketch_ddl_create_persistent_table", mock_conn, platform_key="postgres"
+        )
+
+        assert result.status == "SKIPPED"
+        assert result.success is True
+        assert result.error is None
+        assert "DataSketches" in (result.skip_reason or "")
+        mock_conn.execute.assert_not_called()
+
+    def test_execute_operation_skips_postgres_merge_shorthand(self, wp_benchmark, monkeypatch):
+        """DuckDB MERGE INSERT shorthand is not accepted by PostgreSQL-family engines."""
+        mock_conn = Mock()
+        mock_conn.execute = Mock()
+        monkeypatch.setattr(wp_benchmark, "is_setup", lambda conn: True)
+
+        result = wp_benchmark.execute_operation("merge_simple_upsert_small", mock_conn, platform_key="postgres")
+
+        assert result.status == "SKIPPED"
+        assert result.success is True
+        assert result.error is None
+        assert "MERGE" in (result.skip_reason or "")
+        mock_conn.execute.assert_not_called()
+
     def test_execute_operation_uses_platform_override_when_available(self, wp_benchmark, monkeypatch):
         """Platform override SQL should be used instead of base write_sql."""
         operation = wp_benchmark.get_operation("insert_on_conflict_ignore")
@@ -386,6 +430,43 @@ class TestExecuteOperation:
 
         assert result.status == "SUCCESS"
         assert any("INSERT OR IGNORE" in sql for sql in sql_calls)
+
+    def test_execute_operation_rolls_back_after_failed_write(self, wp_benchmark, monkeypatch):
+        """Drivers such as psycopg require rollback before the connection can be reused after an error."""
+        mock_conn = Mock()
+        mock_conn.execute.side_effect = RuntimeError("COPY failed")
+        mock_conn.rollback = Mock()
+        monkeypatch.setattr(wp_benchmark, "is_setup", lambda conn: True)
+
+        result = wp_benchmark.execute_operation("insert_single_row", mock_conn)
+
+        assert result.status == "FAILED"
+        mock_conn.rollback.assert_called_once()
+
+    def test_execute_operation_rewrites_generate_series_for_postgres(self, wp_benchmark, monkeypatch):
+        """PostgreSQL-family engines do not accept DuckDB's unnest(generate_series(...)) form."""
+
+        class _Result:
+            rowcount = 100
+
+            def fetchall(self):
+                return [(100,)]
+
+        sql_calls: list[str] = []
+
+        def _execute(sql):
+            sql_calls.append(sql)
+            return _Result()
+
+        mock_conn = Mock()
+        mock_conn.execute = _execute
+        monkeypatch.setattr(wp_benchmark, "is_setup", lambda conn: True)
+
+        result = wp_benchmark.execute_operation("insert_batch_values_100", mock_conn, platform_key="postgres")
+
+        assert result.status == "SUCCESS"
+        assert "FROM (SELECT generate_series(0, 99) AS n) t" in sql_calls[0]
+        assert "unnest(generate_series" not in sql_calls[0]
 
 
 class TestRunBenchmark:

@@ -26,8 +26,8 @@ def validation_status_is_non_clean(value: Any) -> bool:
 def result_failed_query_count(result: Any) -> int:
     """Return a conservative failed-query count from a BenchmarkResults-like object."""
     failed = _int_or_none(getattr(result, "failed_queries", None))
-    if failed is not None and failed > 0:
-        return failed
+    if failed is not None:
+        return max(failed, 0)
 
     total = _int_or_none(getattr(result, "total_queries", None))
     successful = _int_or_none(getattr(result, "successful_queries", None))
@@ -66,8 +66,9 @@ def bundle_failed_query_count(data: dict[str, Any]) -> int:
 
             total = _int_or_none(queries.get("total"))
             passed = _int_or_none(queries.get("passed"))
-            if total is not None and passed is not None and total > passed:
-                return max(total - passed, 0)
+            skipped = _int_or_none(queries.get("skipped")) or 0
+            if total is not None and passed is not None and total > passed + skipped:
+                return max(total - passed - skipped, 0)
 
     query_rows = data.get("queries")
     if isinstance(query_rows, list):
@@ -107,7 +108,7 @@ def _query_row_failed(query: Any) -> bool:
     if run_type != "measurement":
         return False
     status = query.get("status")
-    return status is not None and str(status).upper() != "SUCCESS"
+    return status is not None and str(status).upper() not in {"SUCCESS", "SKIPPED"}
 
 
 def _int_or_none(value: Any) -> int | None:

@@ -101,6 +101,21 @@ work:
       passed with PostgreSQL query rendering for date arithmetic, boolean
       comparisons, and alias references.
 
+      This pass also fixed PostgreSQL-family primitive operation handling.
+      `write_primitives` now rewrites DuckDB `unnest(generate_series(...))`,
+      rolls back failed operation attempts, exports `SKIPPED` operations without
+      counting them as failures, and has registry-backed execution filters for
+      server-side bulk-load operations, DuckDB DataSketches operations, and
+      PostgreSQL-incompatible MERGE variants. Targeted
+      `pg-duckdb/write_primitives` passed and was submittable:
+      `/Users/joe/Developer/benchmark_runs/logs/uat_pg_duckdb_fixcheck_20260513l/pg-duckdb_write_primitives_0.01_20260513_161717.log`.
+      `transaction_primitives` now rewrites PostgreSQL transaction isolation
+      starts, fixes the repeat-run cleanup for `transaction_commit_large`, and
+      has pg_duckdb-specific execution filters for SAVEPOINT and non-default
+      isolation gaps. Targeted `pg-duckdb/transaction_primitives` passed and
+      was submittable:
+      `/Users/joe/Developer/benchmark_runs/logs/uat_pg_duckdb_fixcheck_20260513n/pg-duckdb_transaction_primitives_0.01_20260513_162215.log`.
+
       Remaining PG extension and TimescaleDB failures still need per-log
       clustering from
       `/Users/joe/Developer/benchmark_runs/logs/uat_enabled_platforms_full_20260513/`

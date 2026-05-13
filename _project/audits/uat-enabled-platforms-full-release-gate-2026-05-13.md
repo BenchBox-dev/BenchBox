@@ -125,6 +125,23 @@ TimescaleDB cells. The most visible signatures from this run:
   date arithmetic, boolean-to-integer comparisons, and PostgreSQL-invalid alias
   references in `A5`, `AQ10`, and `EQ7`. Targeted `pg-duckdb/tpcdi` passed:
   `/Users/joe/Developer/benchmark_runs/logs/uat_pg_duckdb_fixcheck_20260513f/pg-duckdb_tpcdi_0.01_20260513_155734.log`.
+- `write_primitives`: PostgreSQL-family operation execution now rewrites
+  DuckDB `unnest(generate_series(...))` to PostgreSQL `generate_series(...)`,
+  rolls back failed operation attempts so one unsupported query does not poison
+  the connection, exports skipped operation rows without counting them as
+  failures, and has registry-backed execution filters for the server-side
+  bulk-load path, DuckDB DataSketches SQL, and PostgreSQL-incompatible MERGE
+  variants. Targeted `pg-duckdb/write_primitives` passed with 64 executed
+  operations and 67 compatibility skips:
+  `/Users/joe/Developer/benchmark_runs/logs/uat_pg_duckdb_fixcheck_20260513l/pg-duckdb_write_primitives_0.01_20260513_161717.log`.
+- `transaction_primitives`: PostgreSQL-family operation execution now rewrites
+  `unnest(generate_series(...))`, rewrites isolation-level transaction starts
+  to PostgreSQL `BEGIN TRANSACTION ISOLATION LEVEL ...`, fixes
+  `transaction_commit_large` cleanup to be repeatable across warmup/measurement
+  runs, and has pg_duckdb-specific execution filters for SAVEPOINT and
+  non-default isolation-level gaps. Targeted `pg-duckdb/transaction_primitives`
+  passed with 19 executed operations and 4 compatibility skips:
+  `/Users/joe/Developer/benchmark_runs/logs/uat_pg_duckdb_fixcheck_20260513n/pg-duckdb_transaction_primitives_0.01_20260513_162215.log`.
 - Remaining PG extension and TimescaleDB cells still need per-log clustering
   before they can be fixed or converted to evidence-backed compatibility rules.
 
