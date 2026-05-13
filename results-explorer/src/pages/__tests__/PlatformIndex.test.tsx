@@ -733,18 +733,80 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(ssbTrend.querySelector('[data-result-id="r-tpch-a"]')).toBeNull();
   });
 
-  it("replaces one- and two-observation trends with sparse-data states", async () => {
+  it("suppresses duplicate same-day trend charts and links the underlying runs", async () => {
+    vi.mocked(getPlatformIndexRows).mockResolvedValue([
+      makeRow({
+        result_id: "tpch-duckdb-sf0.01-20260403-1111aaaa",
+        benchmark: "tpch",
+        scale_factor: 0.01,
+        run_date: "2026-04-03",
+        geomean_ms: 10,
+        display_geomean_ms: 10,
+        phase: "standard",
+        primary_metric: "display_geomean_ms",
+      }),
+      makeRow({
+        result_id: "tpch-duckdb-sf0.01-20260403-2222bbbb",
+        benchmark: "tpch",
+        scale_factor: 0.01,
+        run_date: "2026-04-03",
+        geomean_ms: 12,
+        display_geomean_ms: 12,
+        phase: "standard",
+        primary_metric: "display_geomean_ms",
+      }),
+      makeRow({
+        result_id: "tpch-duckdb-sf0.01-20260404-3333cccc",
+        benchmark: "tpch",
+        scale_factor: 0.01,
+        run_date: "2026-04-04",
+        geomean_ms: 11,
+        display_geomean_ms: 11,
+        phase: "standard",
+        primary_metric: "display_geomean_ms",
+      }),
+    ]);
+
+    render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    const trend = screen.getByTestId("trend-cohort-tpch-sf0.01-standard-display_geomean_ms");
+    const duplicateState = within(trend).getByTestId("time-series-duplicate-day");
+    expect(screen.queryByRole("img", { name: "Geomean latency trend over time" })).toBeNull();
+    expect(duplicateState.textContent).toContain("Trend line hidden");
+    expect(duplicateState.textContent).toContain("same-day runs");
+    expect(duplicateState.textContent).toContain("Public ID 1111aaaa");
+    expect(duplicateState.textContent).toContain("Public ID 2222bbbb");
+    expect(duplicateState.querySelector('a[href="/results/r/tpch-duckdb-sf0.01-20260403-1111aaaa"]')).toBeTruthy();
+    expect(
+      duplicateState.querySelector('a[href="/results/r/tpch-duckdb-sf0.01-20260403-2222bbbb#run-receipt"]'),
+    ).toBeTruthy();
+  });
+
+  it("replaces one- and two-observation trends with grammatical sparse-data states", async () => {
     vi.mocked(getPlatformIndexRows).mockResolvedValue([
       makeRow({ result_id: "r-tpch-a", benchmark: "tpch", run_date: "2026-04-01", geomean_ms: 10 }),
       makeRow({ result_id: "r-tpch-b", benchmark: "tpch", run_date: "2026-04-02", geomean_ms: 12 }),
+      makeRow({
+        result_id: "r-ssb-a",
+        benchmark: "star_schema",
+        scale_factor: 0.01,
+        run_date: "2026-04-01",
+        geomean_ms: 20,
+        display_geomean_ms: 20,
+      }),
     ]);
 
     render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
 
     expect(screen.queryByRole("img", { name: "Geomean latency trend over time" })).toBeNull();
-    const sparse = screen.getByTestId("trend-sparse-tpch-sf0.1-power-display_geomean_ms");
-    expect(sparse.textContent).toContain("Limited observations: 2 published runs");
-    expect(sparse.textContent).toContain("Geomean latency (lower is better)");
+    const plural = screen.getByTestId("trend-sparse-tpch-sf0.1-power-display_geomean_ms");
+    const singular = screen.getByTestId("trend-sparse-star_schema-sf0.01-power-display_geomean_ms");
+    expect(plural.textContent).toContain("Limited observations: 2 published runs in this comparable cohort.");
+    expect(singular.textContent).toContain("Limited observations: 1 published run in this comparable cohort.");
+    expect(plural.textContent).not.toContain("runin");
+    expect(singular.textContent).not.toContain("runin");
+    expect(plural.textContent).toContain("Geomean latency (lower is better)");
   });
 });

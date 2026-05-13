@@ -846,8 +846,9 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                 >
                   <h3 class="text-sm font-medium text-[var(--bb-data-fg-primary)]">{cohort.label}</h3>
                   <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">
-                    Limited observations: {cohort.observationCount} published {cohort.observationCount === 1 ? "run" : "runs"}
-                    in this comparable cohort. Trend chart hidden until at least {MIN_TREND_OBSERVATIONS} observations exist.
+                    {`Limited observations: ${cohort.observationCount} published ${
+                      cohort.observationCount === 1 ? "run" : "runs"
+                    } in this comparable cohort. Trend chart hidden until at least ${MIN_TREND_OBSERVATIONS} observations exist.`}
                   </p>
                   <p class="mt-1 text-xs text-[var(--bb-data-fg-subtle)]">Metric: {cohort.metricDescription}.</p>
                 </section>
