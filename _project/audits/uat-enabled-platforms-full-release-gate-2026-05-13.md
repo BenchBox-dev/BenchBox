@@ -1,3 +1,7 @@
+---
+develop_sha: 3b351c000321dc80d9bdd3a9730db59a09f0d046
+---
+
 # UAT Enabled Platforms Full Release Gate - 2026-05-13
 
 ## Command
