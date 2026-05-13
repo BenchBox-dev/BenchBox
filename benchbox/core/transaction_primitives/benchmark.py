@@ -30,6 +30,9 @@ from benchbox.core.transactional.benchmark_base import TransactionalBenchmarkBas
 from benchbox.sql_compat.rules.execution_filter.pg_duckdb_transaction_primitives import (
     PG_DUCKDB_TRANSACTION_PRIMITIVES_OPERATION_SKIPS,
 )
+from benchbox.sql_compat.rules.execution_filter.timescaledb_transaction_primitives import (
+    TIMESCALEDB_TRANSACTION_PRIMITIVES_OPERATION_SKIPS,
+)
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
 
@@ -664,11 +667,13 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
         platform_name = str(kwargs.get("platform_name") or "").lower()
 
         try:
-            if platform_name == "pg_duckdb" and operation_id in PG_DUCKDB_TRANSACTION_PRIMITIVES_OPERATION_SKIPS:
-                skip_reason = (
-                    f"Operation '{operation_id}' is skipped on pg_duckdb: "
-                    f"{PG_DUCKDB_TRANSACTION_PRIMITIVES_OPERATION_SKIPS[operation_id]}"
-                )
+            platform_operation_skips = {
+                "pg_duckdb": PG_DUCKDB_TRANSACTION_PRIMITIVES_OPERATION_SKIPS,
+                "timescaledb": TIMESCALEDB_TRANSACTION_PRIMITIVES_OPERATION_SKIPS,
+            }
+            if operation_id in platform_operation_skips.get(platform_name, {}):
+                skip_details = platform_operation_skips[platform_name][operation_id]
+                skip_reason = f"Operation '{operation_id}' is skipped on {platform_name}: {skip_details}"
                 self.log_verbose(f"Skipping operation {operation_id}: {skip_reason}")
                 return OperationResult(
                     operation_id=operation_id,

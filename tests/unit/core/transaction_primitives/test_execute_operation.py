@@ -292,6 +292,27 @@ class TestSkippedStatus:
         assert "SAVEPOINT is not supported" in (result.skip_reason or "")
         conn.execute.assert_not_called()
 
+    def test_returns_skipped_for_timescaledb_non_default_isolation_gap(self, tmp_path: Path):
+        bench = _make_benchmark(tmp_path)
+        bench.operations_manager.get_operation.return_value = _make_operation(
+            id="transaction_isolation_serializable",
+            write_sql="SET TRANSACTION ISOLATION LEVEL SERIALIZABLE; BEGIN TRANSACTION; COMMIT;",
+        )
+        conn = _make_connection()
+
+        result = bench.execute_operation(
+            "transaction_isolation_serializable",
+            conn,
+            platform_key="postgres",
+            platform_name="timescaledb",
+        )
+
+        assert result.status == "SKIPPED"
+        assert result.success is True
+        assert result.error is None
+        assert "TimescaleDB" in (result.skip_reason or "")
+        conn.execute.assert_not_called()
+
     def test_skipped_result_has_skip_reason_field(self, tmp_path: Path):
         """The skip_reason field carries the human-readable skip reason; error stays None."""
         bench = _make_benchmark(tmp_path)

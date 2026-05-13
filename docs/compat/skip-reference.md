@@ -4,7 +4,7 @@
 
 Rules the registry applies to queries, benchmarks, and DDL statements. Split into two sections based on whether the outcome is user-visible in result counts. Each entry names the platform, the scope the rule applies to, the registered reason, and the rule_id you can grep for in `benchbox/sql_compat/rules/`.
 
-**Total rules:** 185
+**Total rules:** 187
 
 **Platforms with rules:** 17
 
@@ -209,6 +209,8 @@ Queries or benchmarks that are **omitted from the result set** - either because 
 | BLOCKED | benchmark=ai_primitives | benchmark_gate | AI primitives is an LLM/tooling benchmark, not a PostgreSQL-family SQL engine workload. The 2026-05-13 enabled-platform UAT run failed before schema creation with `argument should be a str or an os.PathLike object` on pg-duckdb, pg-mooncake, and TimescaleDB. | `benchmark_gate.timescaledb.ai_primitives.unsupported` |
 | BLOCKED | benchmark=read_primitives | benchmark_gate | Read primitives currently includes a DuckDB-heavy SQL primitive catalog without PostgreSQL-family variants for approximate aggregates, arg_min/arg_max, GROUP BY ALL, ORDER BY ALL, ASOF JOIN, UNPIVOT, struct/map/list intrinsics, and related functions. The 2026-05-13 enabled-platform UAT run showed repeated unsupported-function and syntax failures across pg-duckdb, pg-mooncake, and TimescaleDB. | `benchmark_gate.timescaledb.read_primitives.duckdb_intrinsics` |
 | BLOCKED | benchmark=vector_search | benchmark_gate | Vector search requires a VECTOR column type and vector-distance operators. The 2026-05-13 enabled-platform UAT run failed during schema creation with `type "vector" does not exist` on pg-duckdb, pg-mooncake, and TimescaleDB. | `benchmark_gate.timescaledb.vector_search.no_vector_type` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_isolation_repeatable_read | execution_filter | TimescaleDB rejects non-default transaction isolation changes once the benchmark operation wrapper has already executed statements on the connection. | `execution_filter.timescaledb.transaction_primitives.transaction_isolation_repeatable_read` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_isolation_serializable | execution_filter | TimescaleDB rejects non-default transaction isolation changes once the benchmark operation wrapper has already executed statements on the connection. | `execution_filter.timescaledb.transaction_primitives.transaction_isolation_serializable` |
 
 ## Runs with caveats
 

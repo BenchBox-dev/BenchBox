@@ -4,7 +4,7 @@
 
 Every rule registered in `benchbox.sql_compat` is listed below. The registry is the authoritative source of compatibility policy; this document is regenerated from it. See [adr-sql-compat-phase-aware-pipeline.md](../development/adr/adr-sql-compat-phase-aware-pipeline.md) for the design.
 
-**Total registered rules:** 276
+**Total registered rules:** 278
 
 **Platforms covered:** 28
 
@@ -36,7 +36,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | starrocks | - | 14 | 1 | 2 | 1 | - | 18 |
 | synapse | - | - | - | - | 1 | - | 1 |
 | timescale | - | - | - | 3 | - | - | 3 |
-| timescaledb | 3 | - | - | - | - | - | 3 |
+| timescaledb | 3 | - | - | - | - | 2 | 5 |
 | trino | - | - | - | 2 | 1 | - | 3 |
 | tsql | - | - | - | 2 | - | - | 2 |
 | velox | - | - | - | - | 1 | - | 1 |
@@ -437,6 +437,8 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | benchmark_gate | benchmark=ai_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.timescaledb.ai_primitives.unsupported` |
 | benchmark_gate | benchmark=read_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.timescaledb.read_primitives.duckdb_intrinsics` |
 | benchmark_gate | benchmark=vector_search | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.timescaledb.vector_search.no_vector_type` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_isolation_repeatable_read | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.timescaledb.transaction_primitives.transaction_isolation_repeatable_read` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_isolation_serializable | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.timescaledb.transaction_primitives.transaction_isolation_serializable` |
 
 ### trino
 

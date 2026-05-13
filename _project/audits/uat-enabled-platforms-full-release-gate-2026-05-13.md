@@ -176,6 +176,21 @@ TimescaleDB cells. The most visible signatures from this run:
   `/Users/joe/Developer/benchmark_runs/logs/uat_pg_mooncake_fixcheck_20260513_write_primitives_retry.log`
   and
   `/Users/joe/Developer/benchmark_runs/logs/uat_pg_mooncake_fixcheck_20260513_transaction_primitives.log`.
+- `timescaledb/amplab`, `timescaledb/clickbench`, `timescaledb/tpcdi`, and
+  `timescaledb/write_primitives`: targeted reruns passed after the shared
+  PostgreSQL-family SQL/data-loading and primitive operation fixes:
+  `/Users/joe/Developer/benchmark_runs/logs/uat_timescaledb_fixcheck_20260513_amplab.log`,
+  `/Users/joe/Developer/benchmark_runs/logs/uat_timescaledb_fixcheck_20260513_clickbench.log`,
+  `/Users/joe/Developer/benchmark_runs/logs/uat_timescaledb_fixcheck_20260513_tpcdi.log`,
+  and
+  `/Users/joe/Developer/benchmark_runs/logs/uat_timescaledb_fixcheck_20260513_write_primitives.log`.
+- `timescaledb/transaction_primitives`: targeted rerun exposed only
+  `transaction_isolation_repeatable_read` and
+  `transaction_isolation_serializable` failures with `SET TRANSACTION ISOLATION
+  LEVEL must be called before any query`. Added TimescaleDB-specific execution
+  filters for those two operations; retry passed with 21 executed operations and
+  2 compatibility skips:
+  `/Users/joe/Developer/benchmark_runs/logs/uat_timescaledb_fixcheck_20260513_transaction_primitives_retry.log`.
 - Remaining PG extension and TimescaleDB cells still need per-log clustering
   before they can be fixed or converted to evidence-backed compatibility rules.
 
