@@ -6,7 +6,7 @@ const SHORT_DATAFUSION = "5e6c5eba";
 const SHORT_DUCKDB_TUNED = "009ee9fd";
 
 async function visibleRowCount(page: Page): Promise<number> {
-  return page.locator("main table tbody tr").count();
+  return page.locator("main table tbody tr[data-testid]").count();
 }
 
 async function expectNoFalsePlatformEmpty(page: Page) {
@@ -20,17 +20,17 @@ test.describe("direct route parity", () => {
     await page.goto("/results/p/polars/");
     await waitForShell(page);
     await expect(page.getByRole("heading", { name: /^Polars Results$/ })).toBeVisible({ timeout: 20_000 });
-    await expect(page.locator("main table tbody tr")).toHaveCount(1);
+    await expect(page.locator("main table tbody tr[data-testid]")).toHaveCount(1);
     await expectNoFalsePlatformEmpty(page);
 
     await page.reload();
     await expect(page.getByRole("heading", { name: /^Polars Results$/ })).toBeVisible({ timeout: 20_000 });
-    await expect(page.locator("main table tbody tr")).toHaveCount(1);
+    await expect(page.locator("main table tbody tr[data-testid]")).toHaveCount(1);
     await expectNoFalsePlatformEmpty(page);
 
     await page.goto("/results/p/duckdb/");
     await expect(page.getByRole("heading", { name: /^DuckDB Results$/ })).toBeVisible({ timeout: 20_000 });
-    await expect(page.locator("main table tbody tr")).toHaveCount(5);
+    await expect(page.locator("main table tbody tr[data-testid]")).toHaveCount(5);
     await expectNoFalsePlatformEmpty(page);
   });
 
@@ -45,7 +45,7 @@ test.describe("direct route parity", () => {
     await page.getByTestId("platform-switcher").selectOption("polars");
     await expect(page).toHaveURL(/\/results\/p\/polars\//);
     await expect(page.getByRole("heading", { name: /^Polars Results$/ })).toBeVisible({ timeout: 20_000 });
-    await expect(page.locator("main table tbody tr")).toHaveCount(directPolarsRows);
+    await expect(page.locator("main table tbody tr[data-testid]")).toHaveCount(directPolarsRows);
     await expectNoFalsePlatformEmpty(page);
   });
 

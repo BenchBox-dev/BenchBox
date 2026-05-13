@@ -25,8 +25,15 @@ function parseScale(cellText: string): number {
   return Number(cellText.match(/[\d.]+/)?.[0] ?? Number.NaN);
 }
 
-function platformLabel(cellText: string): string {
-  return cellText.match(/^[A-Za-z][A-Za-z -]*/)?.[0].trim() ?? cellText;
+async function platformCellLabels(rows: Locator, columnIndex: number): Promise<string[]> {
+  return rows.evaluateAll(
+    (elements, index) =>
+      elements.map((row) => {
+        const cell = row.children.item(index);
+        return cell?.querySelector(".font-medium")?.textContent?.trim() ?? cell?.textContent?.trim() ?? "";
+      }),
+    columnIndex,
+  );
 }
 
 test.describe("Index sortable headers", () => {
@@ -66,7 +73,10 @@ test.describe("Index sortable headers", () => {
     await platformHeader.getByRole("button", { name: /Platform/ }).click();
 
     await expect(platformHeader).toHaveAttribute("aria-sort", "ascending");
-    const platforms = (await columnTexts(rows, 1)).map(platformLabel);
+    // QueryHeatmap sorts by the platform display name, while the cell also
+    // carries version and receipt metadata. Read the visible platform label
+    // element instead of sorting the whole cell text.
+    const platforms = await platformCellLabels(rows, 1);
     expect(platforms).toEqual([...platforms].sort((a, b) => a.localeCompare(b)));
   });
 
@@ -84,7 +94,7 @@ test.describe("Index sortable headers", () => {
     await platformHeader.getByRole("button", { name: /Platform/ }).click();
 
     await expect(platformHeader).toHaveAttribute("aria-sort", "ascending");
-    const platforms = (await columnTexts(rows, 0)).map(platformLabel);
+    const platforms = await platformCellLabels(rows, 0);
     expect(platforms).toEqual([...platforms].sort((a, b) => a.localeCompare(b)));
   });
 });
