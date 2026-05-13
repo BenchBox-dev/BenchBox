@@ -20,6 +20,7 @@ import statistics
 from collections.abc import Mapping
 from dataclasses import asdict, is_dataclass
 from datetime import datetime
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from benchbox.core.results.builder import normalize_benchmark_id
@@ -491,7 +492,30 @@ def _build_benchmark_section(result: BenchmarkResults) -> dict[str, Any]:
     compliance_class = getattr(result, "compliance_class", None)
     if compliance_class is not None:
         section["compliance_class"] = compliance_class
+    section.update(_dataset_identity_fields(result.benchmark_id))
     return section
+
+
+def _dataset_identity_fields(benchmark_id: str) -> dict[str, str]:
+    """Return canonical dataset identity fields for data-manifest benchmarks."""
+    try:
+        from benchbox.core.benchmark_registry import get_benchmark_metadata
+        from benchbox.core.data_fetch import load_manifest
+
+        metadata = get_benchmark_metadata(benchmark_id) or {}
+        manifest_rel = metadata.get("data_manifest")
+        if not manifest_rel:
+            return {}
+        repo_root = Path(__file__).resolve().parents[3]
+        manifest = load_manifest(repo_root / str(manifest_rel))
+    except Exception as exc:  # pragma: no cover - identity is best-effort for export
+        logger.warning("Unable to load dataset identity for %s: %s", benchmark_id, exc)
+        return {}
+    return {
+        "dataset_version": manifest.dataset_version,
+        "manifest_hash": manifest.manifest_hash,
+        "data_archive_hash": manifest.data_archive_hash,
+    }
 
 
 def _build_platform_section(result: BenchmarkResults, driver_metadata: dict[str, Any]) -> dict[str, Any]:
