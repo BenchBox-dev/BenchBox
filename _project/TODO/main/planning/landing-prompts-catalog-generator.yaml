@@ -1,0 +1,213 @@
+id: landing-prompts-catalog-generator
+title: "Build the generated catalog contract for the /prompts/ landing route"
+worktree: main
+priority: High
+status: Not Started
+category: Product and Documentation
+
+description: |
+  Implement the data-generation and validation layer for the `/prompts/`
+  landing route after `landing-prompts-decision-gates` resolves the product
+  gates.
+
+  The generator must keep the marketing prompt builder aligned with existing
+  BenchBox runtime metadata without adding a new public CLI or MCP surface.
+  It should fan out from registry/platform/benchmark metadata, validate command
+  shapes against existing Click command definitions where practical, and emit
+  a deterministic include file for the static page.
+
+  MVP must not publish a standalone `recipes.json` endpoint. The generator
+  emits `landing/prompts/catalog.generated.js` (a `window.__BENCHBOX_PROMPT_CATALOG__ = {...};`
+  assignment) that the static route loads via a `<script>` tag. This is page
+  implementation detail, not a public API.
+
+deps:
+  needs:
+    - landing-prompts-decision-gates
+
+work:
+  - id: w1
+    summary: "Read the landing prompts decision record and confirm implementation boundaries"
+    status: pending
+    notes: |
+      Before coding, read `_project/decisions/landing-prompts-route.md`.
+      Confirm chosen public label, default agent, default surface, analytics
+      posture, cloud safety policy, generic-agent semantics, and JSON/API
+      posture. If the decision record is missing or incomplete, stop and
+      return to `landing-prompts-decision-gates`.
+
+  - id: w2
+    summary: "Design the minimal catalog schema with registry-backed keys"
+    needs: [w1]
+    status: pending
+    notes: |
+      Define a compact catalog structure that stores registry keys internally:
+      agents, surfaces, goals, deployment modes, platforms, benchmarks, scale
+      options, warnings, command templates, and MCP references. Use
+      `local`, `self-hosted`, and `managed` internally. UI labels may be
+      friendlier.
+
+  - id: w3
+    summary: "Implement scripts/generate_landing_quickstarts.py"
+    needs: [w2]
+    status: pending
+    notes: |
+      The generator lives at root `scripts/generate_landing_quickstarts.py`
+      and runs in the main project environment (so it can `import benchbox`):
+      `uv run -- python scripts/generate_landing_quickstarts.py ...`. The
+      `_project/scripts/` env does NOT contain benchbox; do not use
+      `--project _project/scripts` for this script.
+
+      It should read a small source file at `landing/prompts/catalog.yaml`,
+      import `PlatformRegistry` and `BENCHMARK_METADATA`, inspect existing
+      CLI/MCP anchors, and emit a single deterministic include file at
+      `landing/prompts/catalog.generated.js` that assigns
+      `window.__BENCHBOX_PROMPT_CATALOG__ = {...};`. The static-route page
+      will load this include via a `<script>` tag. Do NOT write to
+      `landing/prompts/index.html`; the static-route TODO owns that file.
+      Do NOT emit a separate fetchable JSON file (see anti_patterns).
+
+      Support `--write` (regenerate the include), `--check` (fail nonzero if
+      regeneration would change the file), and `--validate-only` (validate
+      source YAML without writing).
+
+      The source YAML should describe patterns and curated marketing choices,
+      not enumerate every derived platform recipe by hand.
+
+  - id: w4
+    summary: "Validate platform, benchmark, deployment, CLI, and MCP references"
+    needs: [w3]
+    status: pending
+    notes: |
+      Add validation that fails when:
+      - a platform ID is not in `PlatformRegistry`
+      - a benchmark ID is not in `BENCHMARK_METADATA`
+      - a deployment mode is not `local`, `self-hosted`, or `managed`
+      - a DataFrame recipe selects a SQL-only platform
+      - a SQL recipe selects a DataFrame-only platform without deliberate mode handling
+      - a compare recipe lacks repeated `-p/--platform` arguments
+      - an MCP recipe references a non-existent MCP prompt or tool
+      - a managed cloud recipe lacks dry-run-first and no-secret warnings
+
+  - id: w5
+    summary: "Add focused generator and catalog tests"
+    needs: [w4]
+    status: pending
+    notes: |
+      Add `tests/unit/landing/test_landing_quickstarts.py` with explicit
+      `pytest.mark.fast` and `pytest.mark.unit`. Tests must cover deterministic
+      regeneration, registry coverage or explicit exclusions, command parsing
+      where practical, MCP reference validation, and cloud safety assertions.
+
+  - id: w6
+    summary: "Add a make target or documented command for stale generated catalog detection"
+    needs: [w5]
+    status: pending
+    notes: |
+      Prefer a small Make target `prompt-quickstarts-check` that invokes
+      `uv run -- python scripts/generate_landing_quickstarts.py --check`,
+      following the convention of other generator/check targets in `Makefile`
+      (e.g. `scripts/check_complexity.py`, `scripts/check_example_syntax.py`).
+      If a Make target is not added, document the exact invocation in
+      `AGENTS.md` and the launch-gates TODO so CI can call it directly.
+
+deferred:
+  - summary: "Publish a documented prompt catalog JSON API"
+    reason: "MVP should avoid adding an unversioned public API. If this becomes a product requirement, create a separate versioned API decision."
+  - summary: "Generate CLI/MCP prompt content by adding public runtime commands"
+    reason: "Out of scope; generator validates and references existing surfaces instead."
+
+prior_art:
+  - "benchbox/core/platform_registry.py:PlatformRegistry.get_all_platform_metadata — reuse as platform source of truth"
+  - "benchbox/core/benchmark_registry.py:BENCHMARK_METADATA — reuse as benchmark source of truth"
+  - "benchbox/cli/commands/run.py:Click run command options — validate emitted run command shape"
+  - "benchbox/cli/commands/compare.py:dual-mode compare command — validate repeated `-p` for platform comparison"
+  - "benchbox/mcp/prompts/registry.py:existing MCP prompt registration — reference existing prompt names where useful"
+  - "benchbox/mcp/tools/benchmark.py:run_benchmark tool schema — validate MCP tool guidance"
+  - "scripts/generate_changelog_entry.py:existing root generator pattern — match invocation style `uv run -- python scripts/...` (NOT `--project _project/scripts`)"
+  - "scripts/check_example_syntax.py:existing --check style root script — reuse CLI shape and exit semantics"
+
+must_preserve:
+  - "No new public CLI commands are introduced."
+  - "No new public MCP tools are introduced."
+  - "No standalone `landing/prompts/recipes.json` or equivalent stable JSON endpoint is shipped for MVP."
+  - "Existing platform and benchmark registries remain the source of truth; catalog YAML is not allowed to duplicate canonical metadata."
+  - "Existing root landing page and results explorer build paths continue to work."
+
+approach: |
+  Keep the generator small and deterministic. Use registry metadata for facts,
+  YAML only for curated marketing choices and explicit exclusions, and tests
+  for cross-surface drift. Treat the browser catalog as generated page data
+  (`catalog.generated.js`), not as a public API.
+
+anti_patterns:
+  - "DO NOT hand-maintain platform capability lists in YAML - because they will drift from `PlatformRegistry` - derive capabilities from the registry and use YAML only for overrides/exclusions."
+  - "DO NOT emit a fetchable `recipes.json` in MVP - because third parties can treat it as an API - emit `catalog.generated.js` as a page implementation include instead."
+  - "DO NOT copy MCP prompt bodies into catalog data - because `benchbox/mcp/prompts/registry.py` already owns MCP guidance - reference existing prompt/tool names and arguments."
+  - "DO NOT use `Server` as an internal deployment value - because it is not a registry literal - use `self-hosted` and map to a friendly label."
+  - "DO NOT make cloud recipes live-run-first - because managed runs can consume money or fail on credentials - make dry-run/setup-first behavior mandatory."
+  - "DO NOT invoke the generator with `uv run --project _project/scripts -- ...` - because that env lacks `benchbox` and the script imports `PlatformRegistry`/`BENCHMARK_METADATA` - always use `uv run -- python scripts/generate_landing_quickstarts.py`."
+
+verification:
+  - description: "Generator check reports generated catalog is current"
+    command: "uv run -- python scripts/generate_landing_quickstarts.py --check"
+    expected_output: "exit 0"
+  - description: "Generated include file exists with the expected assignment"
+    command: "test -f landing/prompts/catalog.generated.js && rg -n 'window.__BENCHBOX_PROMPT_CATALOG__' landing/prompts/catalog.generated.js"
+    expected_output: "exit 0; assignment present"
+  - description: "Focused catalog tests pass"
+    command: "uv run -- python -m pytest tests/unit/landing/test_landing_quickstarts.py -q"
+    expected_output: "all tests pass"
+  - description: "No standalone recipes JSON file was added"
+    command: "! test -f landing/prompts/recipes.json"
+    expected_output: "exit 0"
+
+scope_limit:
+  only_modify:
+    - "landing/prompts/catalog.yaml"
+    - "landing/prompts/catalog.generated.js"
+    - "scripts/generate_landing_quickstarts.py"
+    - "tests/unit/landing/"
+    - "Makefile"
+  do_not_modify:
+    - "landing/prompts/index.html"
+    - "landing/prompts/prompts.js"
+    - "landing/prompts/prompts.css"
+    - ".github/workflows/docs.yml"
+    - "benchbox/cli/commands/"
+    - "benchbox/mcp/tools/"
+    - "benchbox/mcp/prompts/"
+    - "results-explorer/"
+
+metadata:
+  tags:
+    - landing
+    - prompts
+    - agents
+    - generator
+    - drift-prevention
+  estimated_effort: "Medium"
+  created_date: "2026-05-13"
+
+impact:
+  business_value: |
+    Enables a marketing prompt builder without turning it into a new supported
+    BenchBox runtime surface.
+  user_impact: |
+    Keeps copied prompts aligned with actual platforms, benchmarks, CLI flags,
+    and MCP capabilities.
+  technical_debt: |
+    Adds a deterministic validation layer so future platform/CLI/MCP changes
+    fail visibly when they affect the landing prompt builder.
+
+success_metrics:
+  - "Catalog generation is deterministic and checkable in CI."
+  - "Every MVP platform is derived from registry metadata or explicitly excluded with a reason."
+  - "Managed cloud recipes fail validation unless they include dependency/status checks, dry-run-first behavior, and no-secret guidance."
+  - "Compare recipes fail validation unless platform comparison is unambiguous."
+
+open_questions:
+  - question: "Should the generator add a Make target or remain a documented script command only?"
+    gating: false
+    affects: ["w6"]
+    default: "Prefer a Make target `prompt-quickstarts-check` to match existing generator/check conventions."
