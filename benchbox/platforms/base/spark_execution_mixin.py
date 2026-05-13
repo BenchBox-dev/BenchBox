@@ -423,11 +423,16 @@ class SparkDataLoadMixin:
         from pyspark.sql import functions as spark_funcs
 
         df_cols = set(df.columns)
-        exprs = [
-            spark_funcs.col(field.name).cast(field.dataType).alias(field.name)
-            for field in schema.fields
-            if field.name in df_cols
-        ]
+        exprs = []
+        for field in schema.fields:
+            if field.name not in df_cols:
+                continue
+            source_col = spark_funcs.col(field.name)
+            if getattr(field.dataType, "typeName", lambda: None)() == "array":
+                array_schema = getattr(field.dataType, "simpleString", lambda: "array<string>")()
+                exprs.append(spark_funcs.from_json(source_col.cast("string"), array_schema).alias(field.name))
+            else:
+                exprs.append(source_col.cast(field.dataType).alias(field.name))
         if exprs:
             df = df.select(*exprs)
         return df

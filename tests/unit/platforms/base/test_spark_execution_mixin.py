@@ -118,6 +118,35 @@ def test_load_data_spark_preserves_mixed_case_table_names(tmp_path: Path) -> Non
     spark.read.parquet.return_value.write.mode.return_value.insertInto.assert_called_once_with("DimCustomer")
 
 
+def test_cast_dataframe_to_schema_parses_array_columns() -> None:
+    adapter = _DummySparkAdapter()
+    df = _make_dataframe(["id", "embedding"])
+    fields = [
+        SimpleNamespace(name="id", dataType=SimpleNamespace(typeName=lambda: "integer")),
+        SimpleNamespace(
+            name="embedding",
+            dataType=SimpleNamespace(typeName=lambda: "array", simpleString=lambda: "array<float>"),
+        ),
+    ]
+    schema = SimpleNamespace(fields=fields)
+
+    with (
+        patch("pyspark.sql.functions.col") as mock_col,
+        patch("pyspark.sql.functions.from_json") as mock_from_json,
+    ):
+        id_expr = MagicMock()
+        array_col = MagicMock()
+        mock_col.side_effect = [id_expr, array_col]
+        id_expr.cast.return_value.alias.return_value = "id_expr"
+        array_col.cast.return_value = "array_as_string"
+        mock_from_json.return_value.alias.return_value = "array_expr"
+
+        adapter._cast_dataframe_to_schema(df, schema)
+
+    mock_from_json.assert_called_once_with("array_as_string", "array<float>")
+    df.select.assert_called_once_with("id_expr", "array_expr")
+
+
 def test_load_data_spark_passes_platform_name_to_resolver(tmp_path: Path) -> None:
     """DataSourceResolver receives adapter.platform_name directly (not via getattr fallback)."""
     adapter = _DummySparkAdapter()
