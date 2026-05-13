@@ -883,8 +883,8 @@ function summarizeTuningModes(results: readonly ResultRow[]): TuningModeSummary 
   const labelled = new Map<string, number>();
   let unlabelledCount = 0;
   for (const result of results) {
-    const value = result.tuning_mode?.trim();
-    if (value) {
+    const value = result.tuning_mode;
+    if (value !== null && value !== undefined && value.trim() !== "") {
       labelled.set(value, (labelled.get(value) ?? 0) + 1);
     } else {
       unlabelledCount += 1;
