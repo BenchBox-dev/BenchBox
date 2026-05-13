@@ -174,14 +174,12 @@ class FlightDataBenchmark(BaseBenchmark):
         """Get all benchmark queries.
 
         Args:
-            dialect: SQL dialect (ignored - flight data queries use standard SQL only)
+            dialect: Optional SQL dialect for query rendering.
 
         Returns:
             Dictionary mapping query keys to parameterized SQL strings
         """
-        if dialect is not None:
-            self.logger.debug("Flight data queries use standard SQL; dialect %r ignored", dialect)
-        return self.query_manager.get_queries()
+        return self.query_manager.get_queries(dialect=dialect)
 
     def get_query(
         self,

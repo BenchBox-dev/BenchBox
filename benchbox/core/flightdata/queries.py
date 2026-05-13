@@ -16,6 +16,8 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+import sqlglot
+
 # Query definitions: 20 OLAP queries across 5 categories
 QUERIES: dict[str, dict[str, Any]] = {
     # ==== On-Time Performance (5 queries) ====
@@ -592,12 +594,18 @@ class FlightDataQueryManager:
         self.start_date = start_date
         self.end_date = end_date
 
-    def get_query(self, query_key: str, params: Optional[dict[str, Any]] = None) -> str:
+    def get_query(
+        self,
+        query_key: str,
+        params: Optional[dict[str, Any]] = None,
+        dialect: str | None = None,
+    ) -> str:
         """Get parameterized SQL for a specific query.
 
         Args:
             query_key: Query identifier (e.g., "ontime-by-carrier")
             params: Optional parameter overrides
+            dialect: Optional target SQL dialect.
 
         Returns:
             Parameterized SQL string
@@ -626,19 +634,23 @@ class FlightDataQueryManager:
             effective_params.update(params)
 
         try:
-            return sql.format(**effective_params)
+            rendered = sql.format(**effective_params)
         except KeyError as exc:
             raise ValueError(
                 f"Query {query_key!r} requires parameter {exc} not found in: {list(effective_params)}"
             ) from exc
 
-    def get_queries(self) -> dict[str, str]:
+        if dialect in {"postgres", "postgresql"}:
+            return sqlglot.transpile(rendered, read="duckdb", write="postgres", identify=True)[0]
+        return rendered
+
+    def get_queries(self, dialect: str | None = None) -> dict[str, str]:
         """Get all queries with applied date parameters.
 
         Returns:
             Dictionary mapping query keys to parameterized SQL strings
         """
-        return {key: self.get_query(key) for key in QUERIES}
+        return {key: self.get_query(key, dialect=dialect) for key in QUERIES}
 
     def get_query_count(self) -> int:
         """Get number of queries."""
