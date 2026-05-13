@@ -84,6 +84,29 @@ Benchmarks that **run end-to-end** but with documented internal gaps - either an
 | INFORMATIONAL | benchmark=transaction_primitives | schema_emit | Workload runs; PRIMARY KEY uniqueness is not enforced on spark - lock table bypass required to prevent concurrent double-population | `schema_emit.spark.transaction_primitives.pk_not_enforced` |
 | INFORMATIONAL | benchmark=write_primitives | schema_emit | Workload runs; PRIMARY KEY uniqueness is not enforced on spark - lock table bypass required to prevent concurrent double-population | `schema_emit.spark.write_primitives.pk_not_enforced` |
 
+### lakesail
+
+| support | scope | phase | reason | rule_id |
+|---|---|---|---|---|
+| SKIPPED | benchmark=read_primitives, query=approx_top_k_lineitem | execution_filter | Sail rejects `APPROX_TOP_K` with `unknown function: APPROX_TOP_K` in UAT sweep `lakesail_read_primitives_0.01_20260512_235223.log` | `execution_filter.lakesail.read_primitives.approx_top_k_lineitem` |
+| SKIPPED | benchmark=read_primitives, query=window_moving_frame | execution_filter | Sail rejects the interval RANGE window frame with an invalid argument error in UAT sweep `lakesail_read_primitives_0.01_20260512_235223.log` | `execution_filter.lakesail.read_primitives.window_moving_frame` |
+| SKIPPED | benchmark=read_primitives, query=json_extract_nested | execution_filter | Sail lacks `JSON_VALID`; UAT reports `unknown function: JSON_VALID` | `execution_filter.lakesail.read_primitives.json_extract_nested` |
+| SKIPPED | benchmark=read_primitives, query=json_aggregates | execution_filter | Sail parser rejects the JSON object syntax with `found :` in UAT | `execution_filter.lakesail.read_primitives.json_aggregates` |
+| SKIPPED | benchmark=read_primitives, query=fulltext_simple_search | execution_filter | Sail parser rejects MySQL full-text `MATCH ... AGAINST` syntax | `execution_filter.lakesail.read_primitives.fulltext_simple_search` |
+| SKIPPED | benchmark=read_primitives, query=fulltext_boolean_search | execution_filter | Sail parser rejects MySQL full-text boolean search syntax | `execution_filter.lakesail.read_primitives.fulltext_boolean_search` |
+| SKIPPED | benchmark=read_primitives, query=fulltext_phrase_search | execution_filter | Sail parser rejects MySQL full-text phrase search syntax | `execution_filter.lakesail.read_primitives.fulltext_phrase_search` |
+| SKIPPED | benchmark=read_primitives, query=approx_quantiles_array | execution_filter | Sail returns a Spark Connect metadata/resource error for array approximate quantiles in UAT | `execution_filter.lakesail.read_primitives.approx_quantiles_array` |
+| SKIPPED | benchmark=read_primitives, query=optimizer_scalar_subquery_flattening | execution_filter | Sail planner reports `Ambiguous reference to unqualified field __always_true` | `execution_filter.lakesail.read_primitives.optimizer_scalar_subquery_flattening` |
+| SKIPPED | benchmark=read_primitives, query=groupby_all_simple | execution_filter | Sail treats `GROUP BY ALL` as an unresolved `ALL` attribute | `execution_filter.lakesail.read_primitives.groupby_all_simple` |
+| SKIPPED | benchmark=read_primitives, query=groupby_all_complex | execution_filter | Sail treats `GROUP BY ALL` as an unresolved `ALL` attribute | `execution_filter.lakesail.read_primitives.groupby_all_complex` |
+| SKIPPED | benchmark=read_primitives, query=orderby_all_simple | execution_filter | Sail treats `ORDER BY ALL` as an unresolved sort expression | `execution_filter.lakesail.read_primitives.orderby_all_simple` |
+| SKIPPED | benchmark=read_primitives, query=orderby_all_desc | execution_filter | Sail treats `ORDER BY ALL DESC` as an unresolved sort expression | `execution_filter.lakesail.read_primitives.orderby_all_desc` |
+| SKIPPED | benchmark=read_primitives, query=list_transform | execution_filter | Sail rejects the lambda function form used by the list primitive | `execution_filter.lakesail.read_primitives.list_transform` |
+| SKIPPED | benchmark=read_primitives, query=list_filter | execution_filter | Sail rejects the lambda function form used by the list primitive | `execution_filter.lakesail.read_primitives.list_filter` |
+| SKIPPED | benchmark=read_primitives, query=list_reduce | execution_filter | Sail rejects the lambda function form used by the list primitive | `execution_filter.lakesail.read_primitives.list_reduce` |
+| SKIPPED | benchmark=read_primitives, query=asof_join_basic | execution_filter | Sail parser rejects `ASOF JOIN` syntax | `execution_filter.lakesail.read_primitives.asof_join_basic` |
+| SKIPPED | benchmark=read_primitives, query=pivot_basic | execution_filter | Sail parser rejects the PIVOT query form emitted by the catalog | `execution_filter.lakesail.read_primitives.pivot_basic` |
+
 ### starrocks
 
 | support | scope | phase | reason | rule_id |

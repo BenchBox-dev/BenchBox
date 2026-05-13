@@ -130,6 +130,24 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | phase | scope | action | support | failure mode | rule_id |
 |---|---|---|---|---|---|
 | ddl_optimize | platform-wide | rewrite_ddl | REWRITTEN | SYNTAX_ERROR | `ddl_optimize.lakesail.all.optimize_table_definition` |
+| execution_filter | benchmark=read_primitives, query=approx_top_k_lineitem | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.approx_top_k_lineitem` |
+| execution_filter | benchmark=read_primitives, query=window_moving_frame | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.window_moving_frame` |
+| execution_filter | benchmark=read_primitives, query=json_extract_nested | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.json_extract_nested` |
+| execution_filter | benchmark=read_primitives, query=json_aggregates | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.json_aggregates` |
+| execution_filter | benchmark=read_primitives, query=fulltext_simple_search | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.fulltext_simple_search` |
+| execution_filter | benchmark=read_primitives, query=fulltext_boolean_search | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.fulltext_boolean_search` |
+| execution_filter | benchmark=read_primitives, query=fulltext_phrase_search | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.fulltext_phrase_search` |
+| execution_filter | benchmark=read_primitives, query=approx_quantiles_array | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.approx_quantiles_array` |
+| execution_filter | benchmark=read_primitives, query=optimizer_scalar_subquery_flattening | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.optimizer_scalar_subquery_flattening` |
+| execution_filter | benchmark=read_primitives, query=groupby_all_simple | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.groupby_all_simple` |
+| execution_filter | benchmark=read_primitives, query=groupby_all_complex | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.groupby_all_complex` |
+| execution_filter | benchmark=read_primitives, query=orderby_all_simple | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.orderby_all_simple` |
+| execution_filter | benchmark=read_primitives, query=orderby_all_desc | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.orderby_all_desc` |
+| execution_filter | benchmark=read_primitives, query=list_transform | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.list_transform` |
+| execution_filter | benchmark=read_primitives, query=list_filter | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.list_filter` |
+| execution_filter | benchmark=read_primitives, query=list_reduce | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.list_reduce` |
+| execution_filter | benchmark=read_primitives, query=asof_join_basic | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.asof_join_basic` |
+| execution_filter | benchmark=read_primitives, query=pivot_basic | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.pivot_basic` |
 
 ### mysql
 
