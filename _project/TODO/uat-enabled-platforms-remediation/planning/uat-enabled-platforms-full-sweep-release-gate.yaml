@@ -116,6 +116,15 @@ work:
       was submittable:
       `/Users/joe/Developer/benchmark_runs/logs/uat_pg_duckdb_fixcheck_20260513n/pg-duckdb_transaction_primitives_0.01_20260513_162215.log`.
 
+      A fresh `pg-mooncake/amplab` rerun after Docker recovery no longer
+      reproduced the sweep's `max_wal_senders` promotion failure, but exposed
+      the next pg_mooncake execution blocker: intermittent `DuckDB execution is
+      not supported inside functions` errors after previous mirror-table scans.
+      `PgMooncakeAdapter.execute_query` now closes query transaction boundaries
+      around each benchmark SELECT and retries that exact transient error once.
+      Targeted `pg-mooncake/amplab` passed and was submittable:
+      `/Users/joe/Developer/benchmark_runs/logs/uat_pg_mooncake_fixcheck_20260513_amplab_retry.log`.
+
       Remaining PG extension and TimescaleDB failures still need per-log
       clustering from
       `/Users/joe/Developer/benchmark_runs/logs/uat_enabled_platforms_full_20260513/`

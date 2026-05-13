@@ -146,6 +146,13 @@ TimescaleDB cells. The most visible signatures from this run:
   non-default isolation-level gaps. Targeted `pg-duckdb/transaction_primitives`
   passed with 19 executed operations and 4 compatibility skips:
   `/Users/joe/Developer/benchmark_runs/logs/uat_pg_duckdb_fixcheck_20260513n/pg-duckdb_transaction_primitives_0.01_20260513_162215.log`.
+- `pg-mooncake/amplab`: fresh rerun after Docker recovery no longer reproduced
+  the sweep's `max_wal_senders` promotion failure, but intermittently failed
+  measured query execution with `DuckDB execution is not supported inside
+  functions`. Fixed by closing pg_mooncake query transaction boundaries before
+  and after each benchmark SELECT, with a one-shot retry for that exact
+  pg_mooncake transient error. Targeted `pg-mooncake/amplab` passed:
+  `/Users/joe/Developer/benchmark_runs/logs/uat_pg_mooncake_fixcheck_20260513_amplab_retry.log`.
 - Remaining PG extension and TimescaleDB cells still need per-log clustering
   before they can be fixed or converted to evidence-backed compatibility rules.
 
