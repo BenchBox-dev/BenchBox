@@ -4,7 +4,7 @@
 
 Every rule registered in `benchbox.sql_compat` is listed below. The registry is the authoritative source of compatibility policy; this document is regenerated from it. See [adr-sql-compat-phase-aware-pipeline.md](../development/adr/adr-sql-compat-phase-aware-pipeline.md) for the design.
 
-**Total registered rules:** 121
+**Total registered rules:** 122
 
 **Platforms covered:** 25
 
@@ -20,7 +20,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | doris | - | 7 | - | 2 | 1 | 10 |
 | fabric_dw | - | - | - | - | 1 | 1 |
 | firebolt | - | - | - | - | 1 | 1 |
-| lakesail | - | 6 | - | - | 1 | 7 |
+| lakesail | 1 | 6 | - | - | 1 | 8 |
 | mysql | - | 1 | - | - | - | 1 |
 | pg_mooncake | - | - | - | - | 1 | 1 |
 | postgres | - | - | - | 1 | - | 1 |
@@ -129,6 +129,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 
 | phase | scope | action | support | failure mode | rule_id |
 |---|---|---|---|---|---|
+| benchmark_gate | benchmark=ai_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.lakesail.ai_primitives.unsupported` |
 | query_source | benchmark=vector_search, query=Q1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `query_source.lakesail.vector_search.q1_unsupported` |
 | query_source | benchmark=vector_search, query=Q2 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `query_source.lakesail.vector_search.q2_unsupported` |
 | query_source | benchmark=vector_search, query=Q3 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `query_source.lakesail.vector_search.q3_unsupported` |

@@ -4,7 +4,7 @@
 
 Rules the registry applies to queries, benchmarks, and DDL statements. Split into two sections based on whether the outcome is user-visible in result counts. Each entry names the platform, the scope the rule applies to, the registered reason, and the rule_id you can grep for in `benchbox/sql_compat/rules/`.
 
-**Total rules:** 30
+**Total rules:** 31
 
 **Platforms with rules:** 13
 
@@ -16,6 +16,7 @@ Queries or benchmarks that are **omitted from the result set** - either because 
 
 | support | scope | phase | reason | rule_id |
 |---|---|---|---|---|
+| BLOCKED | benchmark=ai_primitives | benchmark_gate | AI primitives requires LLM/tool execution APIs and has no SQL schema contract for LakeSail/Sail. | `benchmark_gate.lakesail.ai_primitives.unsupported` |
 | SKIPPED_QUERY | benchmark=vector_search, query=Q1 | query_source | LakeSail/Sail has no native vector-distance functions for this benchmark and rejects Spark SQL lambda fallback expressions. | `query_source.lakesail.vector_search.q1_unsupported` |
 | SKIPPED_QUERY | benchmark=vector_search, query=Q2 | query_source | LakeSail/Sail has no native vector-distance functions for this benchmark and rejects Spark SQL lambda fallback expressions. | `query_source.lakesail.vector_search.q2_unsupported` |
 | SKIPPED_QUERY | benchmark=vector_search, query=Q3 | query_source | LakeSail/Sail has no native vector-distance functions for this benchmark and rejects Spark SQL lambda fallback expressions. | `query_source.lakesail.vector_search.q3_unsupported` |

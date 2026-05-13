@@ -1805,6 +1805,7 @@ class PlatformRegistry:
 
         # unsupported_benchmarks is computed from registry benchmark_gate rules;
         # the hardcoded dict in metadata is the legacy source and is ignored post-w16.
+        import benchbox.sql_compat.rules.benchmark_gate.lakesail_gate  # noqa: F401
         import benchbox.sql_compat.rules.benchmark_gate.questdb_gate  # noqa: F401
         from benchbox.sql_compat.actions import CompatAction
         from benchbox.sql_compat.context import Phase
