@@ -289,6 +289,33 @@ class TestBenchmarkWithActualCatalog:
         assert "fulltext_boolean_search" not in queries
         assert "fulltext_phrase_search" not in queries
 
+    def test_lakesail_platform_skips_uat_unsupported_queries(self):
+        """LakeSail skips only the read primitives proven unsupported by UAT evidence."""
+        benchmark = ReadPrimitivesBenchmark()
+
+        skipped = set(benchmark.get_platform_skip_queries("LakeSail"))
+
+        assert {
+            "approx_top_k_lineitem",
+            "window_moving_frame",
+            "json_extract_nested",
+            "json_aggregates",
+            "fulltext_simple_search",
+            "fulltext_boolean_search",
+            "fulltext_phrase_search",
+            "approx_quantiles_array",
+            "optimizer_scalar_subquery_flattening",
+            "groupby_all_simple",
+            "groupby_all_complex",
+            "orderby_all_simple",
+            "orderby_all_desc",
+            "list_transform",
+            "list_filter",
+            "list_reduce",
+            "asof_join_basic",
+            "pivot_basic",
+        }.issubset(skipped)
+
     def test_clickhouse_keeps_timeout_only_query_available(self):
         """Timeout-only ClickHouse queries should remain runnable unless truly unsupported."""
         benchmark = ReadPrimitivesBenchmark()

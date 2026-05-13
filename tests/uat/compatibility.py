@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from benchbox.core.platform_registry import PlatformRegistry
 from tests.uat.matrix import DATAFRAME_PLATFORMS, KNOWN_SQL_ONLY_BENCHMARKS, BenchmarkInfo
 
 
@@ -32,6 +33,16 @@ def compatibility_rule_for(platform: str, benchmark: str, info: BenchmarkInfo) -
     """Return the rule that blocks a platform/benchmark pair, if any."""
     if platform in DATAFRAME_PLATFORMS and _is_sql_only_benchmark(benchmark, info):
         return DATAFRAME_SQL_ONLY_RULE
+    caps = PlatformRegistry.get_platform_capabilities(platform)
+    unsupported_benchmarks = getattr(caps, "unsupported_benchmarks", {}) if caps else {}
+    reason = unsupported_benchmarks.get(benchmark)
+    if reason:
+        return CompatibilityRule(
+            rule_id=f"uat.compat.{platform}.{benchmark}.benchmark_gate",
+            status="blocked",
+            reason=reason,
+            evidence="benchbox.sql_compat benchmark_gate registry via PlatformRegistry.unsupported_benchmarks",
+        )
     return None
 
 

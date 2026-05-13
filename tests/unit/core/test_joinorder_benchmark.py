@@ -9,6 +9,7 @@ import pytest
 from benchbox.core.benchmark_loader import get_benchmark_instance
 from benchbox.core.errors import ScaleFactorNotSupportedError
 from benchbox.core.joinorder.benchmark import JoinOrderBenchmark
+from benchbox.core.joinorder.schema import JoinOrderSchema
 from benchbox.core.joinorder_synthetic.benchmark import JoinOrderSyntheticBenchmark
 from benchbox.core.schemas import BenchmarkConfig, SystemProfile
 
@@ -176,6 +177,17 @@ def test_joinorder_get_query_rejects_params(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="don't accept parameters"):
         benchmark.get_query("1a", params={"seed": 1})
+
+
+def test_canonical_joinorder_schema_omits_foreign_keys_by_default() -> None:
+    """Canonical IMDb data has dangling references; FK constraints are opt-in."""
+    schema = JoinOrderSchema()
+
+    sql = schema.get_create_tables_sql("postgres")
+    sql_with_fks = schema.get_create_tables_sql("postgres", include_foreign_keys=True)
+
+    assert "FOREIGN KEY" not in sql
+    assert "FOREIGN KEY" in sql_with_fks
 
 
 def test_joinorder_load_queries_from_directory_replaces_query_manager(tmp_path: Path) -> None:

@@ -32,11 +32,11 @@ class TPCDSOBT(BaseBenchmark):
 
     def get_queries(self, dialect: Optional[str] = None, base_dialect: Optional[str] = None) -> dict[str, str]:
         """Return all OBT queries (translation hook reserved for future dialect support)."""
-        return self._impl.get_all_queries()
+        return self._impl.get_queries(dialect=dialect)
 
     def get_query(self, query_id: Union[int, str], **kwargs: Any) -> str:
         """Return a single OBT query."""
-        return self._impl.get_query(query_id)
+        return self._impl.get_query(query_id, **kwargs)
 
     def get_schema(self) -> dict[str, Any]:
         """Return schema metadata for the single OBT table."""

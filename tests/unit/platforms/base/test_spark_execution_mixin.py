@@ -100,6 +100,53 @@ def test_load_data_spark_parquet_path_unchanged(tmp_path: Path) -> None:
     spark.read.format.assert_not_called()
 
 
+def test_load_data_spark_preserves_mixed_case_table_names(tmp_path: Path) -> None:
+    adapter = _DummySparkAdapter()
+    spark = MagicMock()
+    parquet_path = tmp_path / "DimCustomer.parquet"
+    parquet_path.write_bytes(b"PAR1")
+    spark.read.parquet.return_value = _make_dataframe(["id"])
+
+    with patch("benchbox.platforms.base.data_loading.DataSourceResolver.resolve") as mock_resolve:
+        mock_resolve.return_value = SimpleNamespace(
+            source_type="benchmark_tables", tables={"DimCustomer": [parquet_path]}
+        )
+        stats, _, _ = adapter._load_data_spark(MagicMock(), tmp_path, spark)
+
+    assert stats["DimCustomer"] == 5
+    spark.table.assert_called_with("DimCustomer")
+    spark.read.parquet.return_value.write.mode.return_value.insertInto.assert_called_once_with("DimCustomer")
+
+
+def test_cast_dataframe_to_schema_parses_array_columns() -> None:
+    adapter = _DummySparkAdapter()
+    df = _make_dataframe(["id", "embedding"])
+    fields = [
+        SimpleNamespace(name="id", dataType=SimpleNamespace(typeName=lambda: "integer")),
+        SimpleNamespace(
+            name="embedding",
+            dataType=SimpleNamespace(typeName=lambda: "array", simpleString=lambda: "array<float>"),
+        ),
+    ]
+    schema = SimpleNamespace(fields=fields)
+
+    with (
+        patch("pyspark.sql.functions.col") as mock_col,
+        patch("pyspark.sql.functions.from_json") as mock_from_json,
+    ):
+        id_expr = MagicMock()
+        array_col = MagicMock()
+        mock_col.side_effect = [id_expr, array_col]
+        id_expr.cast.return_value.alias.return_value = "id_expr"
+        array_col.cast.return_value = "array_as_string"
+        mock_from_json.return_value.alias.return_value = "array_expr"
+
+        adapter._cast_dataframe_to_schema(df, schema)
+
+    mock_from_json.assert_called_once_with("array_as_string", "array<float>")
+    df.select.assert_called_once_with("id_expr", "array_expr")
+
+
 def test_load_data_spark_passes_platform_name_to_resolver(tmp_path: Path) -> None:
     """DataSourceResolver receives adapter.platform_name directly (not via getattr fallback)."""
     adapter = _DummySparkAdapter()
@@ -152,6 +199,20 @@ def test_load_data_spark_propagates_resolver_error_without_cleanup_failure(tmp_p
 
         with pytest.raises(RuntimeError, match="resolver failed"):
             adapter._load_data_spark(MagicMock(), tmp_path, spark)
+
+
+def test_load_data_spark_skips_declared_no_data_benchmark(tmp_path: Path) -> None:
+    adapter = _DummySparkAdapter()
+    benchmark = MagicMock()
+    benchmark.get_data_source_benchmark.return_value = None
+
+    with patch("benchbox.platforms.base.data_loading.DataSourceResolver.resolve") as mock_resolve:
+        mock_resolve.return_value = SimpleNamespace(source_type="benchmark_tables", tables={})
+        stats, _, timings = adapter._load_data_spark(benchmark, tmp_path, MagicMock())
+
+    assert stats == {}
+    assert timings == {}
+    adapter.logger.info.assert_called_with("Benchmark declares no data source; skipping Spark data load")
 
 
 # -- _csv_compat_path tests --
@@ -309,7 +370,7 @@ def test_load_data_spark_no_cache_negative_row_delta_warns(tmp_path: Path) -> No
 
 
 def test_load_data_spark_csv_compat_temp_dir_lives_under_data_dir(tmp_path: Path) -> None:
-    """CSV compatibility links must be inside data_dir for path-mirrored Spark Connect containers."""
+    """CSV compatibility directories must be inside data_dir for path-mirrored Spark Connect containers."""
     adapter = _CsvExtAdapter()
     spark = MagicMock()
     spark.table.side_effect = RuntimeError("table not found")
@@ -322,8 +383,10 @@ def test_load_data_spark_csv_compat_temp_dir_lives_under_data_dir(tmp_path: Path
         csv_path = Path(path)
         assert tmp_path in csv_path.parents
         assert csv_path.name == "orders.csv.zst"
-        assert csv_path.is_symlink()
-        assert csv_path.resolve() == source_path.resolve()
+        assert csv_path.is_dir()
+        compat_file = csv_path / "orders.csv.zst"
+        assert compat_file.exists()
+        assert compat_file.samefile(source_path)
         return csv_df
 
     spark.read.csv.side_effect = _csv
@@ -376,8 +439,8 @@ def test_csv_compat_path_symlinks_dat_zst_to_csv_zst(tmp_path: Path) -> None:
     result = adapter._csv_compat_path(dat, link_dir)
 
     assert result.name == "orders.csv.zst"
-    assert result.is_symlink()
-    assert result.resolve() == dat.resolve()
+    assert result.is_dir()
+    assert (result / "orders.csv.zst").samefile(dat)
 
 
 def test_csv_compat_path_symlinks_tbl_to_csv(tmp_path: Path) -> None:
@@ -390,25 +453,38 @@ def test_csv_compat_path_symlinks_tbl_to_csv(tmp_path: Path) -> None:
     result = adapter._csv_compat_path(tbl, link_dir)
 
     assert result.name == "customer.csv"
-    assert result.is_symlink()
+    assert result.is_dir()
+    assert (result / "customer.csv").samefile(tbl)
 
 
 def test_csv_compat_path_preserves_csv_extension(tmp_path: Path) -> None:
-    """Files already named .csv should be returned as-is."""
+    """Files already named .csv still get a directory wrapper for Sail."""
     adapter = _CsvExtAdapter()
     csv = tmp_path / "orders.csv"
     csv.write_bytes(b"x")
+    link_dir = tmp_path / "links"
+    link_dir.mkdir()
 
-    assert adapter._csv_compat_path(csv, tmp_path) == csv
+    result = adapter._csv_compat_path(csv, link_dir)
+
+    assert result.name == "orders.csv"
+    assert result.is_dir()
+    assert (result / "orders.csv").samefile(csv)
 
 
 def test_csv_compat_path_preserves_csv_zst_extension(tmp_path: Path) -> None:
-    """Files already named .csv.zst should be returned as-is."""
+    """Files already named .csv.zst still get a directory wrapper for Sail."""
     adapter = _CsvExtAdapter()
     csv_zst = tmp_path / "orders.csv.zst"
     csv_zst.write_bytes(b"x")
+    link_dir = tmp_path / "links"
+    link_dir.mkdir()
 
-    assert adapter._csv_compat_path(csv_zst, tmp_path) == csv_zst
+    result = adapter._csv_compat_path(csv_zst, link_dir)
+
+    assert result.name == "orders.csv.zst"
+    assert result.is_dir()
+    assert (result / "orders.csv.zst").samefile(csv_zst)
 
 
 def test_csv_compat_path_xz_extension(tmp_path: Path) -> None:
@@ -422,8 +498,8 @@ def test_csv_compat_path_xz_extension(tmp_path: Path) -> None:
     result = adapter._csv_compat_path(dat_xz, link_dir)
 
     assert result.name == "orders.csv.xz"
-    assert result.is_symlink()
-    assert result.resolve() == dat_xz.resolve()
+    assert result.is_dir()
+    assert (result / "orders.csv.xz").samefile(dat_xz)
 
 
 def test_csv_compat_path_multipart_tpch_chunks_get_unique_names(tmp_path: Path) -> None:
@@ -443,8 +519,8 @@ def test_csv_compat_path_multipart_tpch_chunks_get_unique_names(tmp_path: Path) 
     assert result1.name == "customer.1.csv.zst"
     assert result2.name == "customer.2.csv.zst"
     assert result1.name != result2.name, "chunk symlinks must be distinct"
-    assert result1.is_symlink() and result1.resolve() == chunk1.resolve()
-    assert result2.is_symlink() and result2.resolve() == chunk2.resolve()
+    assert result1.is_dir() and (result1 / "customer.1.csv.zst").samefile(chunk1)
+    assert result2.is_dir() and (result2 / "customer.2.csv.zst").samefile(chunk2)
 
 
 def test_csv_compat_path_rejects_unknown_compression(tmp_path: Path) -> None:
@@ -461,18 +537,20 @@ def test_csv_compat_path_rejects_unknown_compression(tmp_path: Path) -> None:
 
 
 def test_csv_compat_path_warns_on_symlink_collision(tmp_path: Path, caplog) -> None:
-    """When a symlink already exists pointing to a different file, emit a warning."""
+    """When a compatibility file already points to a different file, emit a warning."""
     import logging
 
     adapter = _CsvExtAdapter()
     link_dir = tmp_path / "links"
     link_dir.mkdir()
 
-    # Create first file and its symlink
+    # Create first file and its compatibility hardlink.
     dat1 = tmp_path / "orders.dat"
     dat1.write_bytes(b"first")
-    link = link_dir / "orders.csv"
-    link.symlink_to(dat1.resolve())
+    compat_dir = link_dir / "orders.csv"
+    compat_dir.mkdir()
+    link = compat_dir / "orders.csv"
+    link.hardlink_to(dat1.resolve())
 
     # Create second file with same stem but different content/path
     dat2_dir = tmp_path / "other"
@@ -483,9 +561,24 @@ def test_csv_compat_path_warns_on_symlink_collision(tmp_path: Path, caplog) -> N
     with caplog.at_level(logging.WARNING, logger="benchbox.platforms.base.spark_execution_mixin"):
         result = adapter._csv_compat_path(dat2, link_dir)
 
-    # Should return existing link (even though it points to dat1)
-    assert result == link
-    assert "Symlink collision" in caplog.text
+    # Should return existing compatibility directory (even though it points to dat1)
+    assert result == compat_dir
+    assert "CSV compatibility path collision" in caplog.text
+
+
+def test_csv_compat_path_wraps_plain_csv_for_sail_directory_scan(tmp_path: Path) -> None:
+    """Sail appends a slash to CSV paths, so plain .csv inputs need a directory wrapper."""
+    adapter = _CsvExtAdapter()
+    csv = tmp_path / "customer.csv"
+    csv.write_bytes(b"x")
+    link_dir = tmp_path / "links"
+    link_dir.mkdir()
+
+    result = adapter._csv_compat_path(csv, link_dir)
+
+    assert result.is_dir()
+    assert result.name == "customer.csv"
+    assert (result / "customer.csv").samefile(csv)
 
 
 # -- SparkQueryExecutionMixin tests --

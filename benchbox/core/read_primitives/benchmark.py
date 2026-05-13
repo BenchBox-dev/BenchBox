@@ -713,7 +713,30 @@ class ReadPrimitivesBenchmark(TranslatableQueryMixin, DataGenerationMixin, BaseB
         if name == "lakesail":
             # LakeSail/Sail hangs indefinitely on LEFT JOINs with an empty
             # build side - a known Sail bug with empty-relation optimization.
-            return ["empty_build_join"]
+            return [
+                "empty_build_join",
+                # Sail 0.3.x / Spark Connect rejects or lacks these optional
+                # modern SQL primitives; the UAT failure signatures are
+                # captured in docs/compat/skip-reference.md.
+                "approx_top_k_lineitem",
+                "window_moving_frame",
+                "json_extract_nested",
+                "json_aggregates",
+                "fulltext_simple_search",
+                "fulltext_boolean_search",
+                "fulltext_phrase_search",
+                "approx_quantiles_array",
+                "optimizer_scalar_subquery_flattening",
+                "groupby_all_simple",
+                "groupby_all_complex",
+                "orderby_all_simple",
+                "orderby_all_desc",
+                "list_transform",
+                "list_filter",
+                "list_reduce",
+                "asof_join_basic",
+                "pivot_basic",
+            ]
         return []
 
     def get_df_platform_skip_queries(self, platform_name: str) -> list[str]:

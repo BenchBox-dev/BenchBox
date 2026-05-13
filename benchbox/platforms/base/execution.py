@@ -1272,6 +1272,7 @@ class TestDriversMixin:
         """Execute a benchmark operation (INSERT/UPDATE/DELETE) and return result dict."""
         op_kwargs: dict[str, Any] = {}
         op_kwargs["platform_key"] = self.get_target_dialect()
+        op_kwargs["platform_name"] = self.platform_name
 
         if hasattr(self, "preprocess_operation_sql") and hasattr(benchmark, "get_operation"):
             operation = benchmark.get_operation(str(query_id))
@@ -1306,7 +1307,7 @@ class TestDriversMixin:
             error_preview = error_msg[:80] + "..." if len(error_msg) > 80 else error_msg
             console.print(f"[red]❌ Query {index}/{total}: {query_id} FAILED - {error_preview}[/red]")
         elif status == "SKIPPED":
-            skip_reason = result.get("error", "Operation not supported on this platform")
+            skip_reason = result.get("skip_reason") or result.get("error") or "Operation not supported on this platform"
             reason_preview = skip_reason[:80] + "..." if len(skip_reason) > 80 else skip_reason
             console.print(f"[yellow]⏭️ Query {index}/{total}: {query_id} SKIPPED - {reason_preview}[/yellow]")
         else:

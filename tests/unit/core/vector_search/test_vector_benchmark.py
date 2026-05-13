@@ -301,11 +301,29 @@ class TestVectorSearchQueryManager:
 
         mgr = VectorSearchQueryManager()
         dialects = mgr.supported_dialects()
+        assert "spark" in dialects
         assert "starrocks" in dialects
         assert "doris" in dialects
         assert "postgresql" in dialects
         assert "clickhouse" in dialects
         assert "snowflake" in dialects
+
+    def test_spark_queries_use_array_functions(self):
+        from benchbox.core.vector_search.queries import VectorSearchQueryManager
+
+        mgr = VectorSearchQueryManager()
+        queries = mgr.get_all_queries(dialect="spark")
+        assert set(queries) == set(ALL_QUERY_IDS)
+        assert all("array_cosine_similarity" not in sql for sql in queries.values())
+        assert "zip_with" in queries["Q1"]
+        assert "aggregate" in queries["Q1"]
+        assert "sqrt" in queries["Q2"]
+
+    def test_lakesail_vector_queries_are_skipped(self):
+        from benchbox.core.vector_search.queries import VectorSearchQueryManager
+
+        mgr = VectorSearchQueryManager()
+        assert mgr.get_all_queries(dialect="lakesail") == {}
 
     def test_q3_has_category_filter(self):
         from benchbox.core.vector_search.queries import VectorSearchQueryManager
@@ -372,6 +390,12 @@ class TestVectorSearchSchema:
 
         assert get_embedding_type("doris", 128) == "ARRAY<FLOAT>"
 
+    def test_spark_family_embedding_type(self):
+        from benchbox.core.vector_search.schema import get_embedding_type
+
+        assert get_embedding_type("lakesail", 128) == "ARRAY<FLOAT>"
+        assert get_embedding_type("spark", 768) == "ARRAY<FLOAT>"
+
     def test_get_create_table_sql_vectors(self):
         from benchbox.core.vector_search.schema import get_create_table_sql
 
@@ -398,6 +422,13 @@ class TestVectorSearchSchema:
         from benchbox.core.vector_search.schema import get_create_table_sql
 
         sql = get_create_table_sql("vectors", dialect="doris", dimensions=128)
+        assert "ARRAY<FLOAT>" in sql
+        assert "[128]" not in sql
+
+    def test_get_create_table_sql_lakesail_uses_unsized_array(self):
+        from benchbox.core.vector_search.schema import get_create_table_sql
+
+        sql = get_create_table_sql("vectors", dialect="lakesail", dimensions=128)
         assert "ARRAY<FLOAT>" in sql
         assert "[128]" not in sql
 

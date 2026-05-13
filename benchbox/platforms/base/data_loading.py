@@ -138,15 +138,16 @@ class CsvDialect:
     in SingleStore's LOAD DATA, NULL in PostgreSQL COPY).  It does NOT gate
     trailing-delimiter stripping.
 
-    Trailing-delimiter stripping is controlled by file extension, not by
-    null_marker.  Both TPC-H dbgen (.tbl) and TPC-DS dsdgen (.dat) emit a
-    spurious trailing pipe after every record; all CSV files do not.  Adapters
-    must use ``get_data_extension(data_file) in (".tbl", ".dat")`` and pass that
-    result as ``strip_trailing_delim`` to prepare_local_load_file() — never
-    derive it from ``null_marker is not None``, and never use
-    ``data_file.suffix.lower()`` which breaks for compressed inputs like
-    ``lineitem.tbl.zst``.  A .csv file with null_marker="" (e.g. JoinOrder) has
-    meaningful trailing commas that represent NULL fields and must not be stripped.
+    Trailing-delimiter stripping is controlled by file extension and loader
+    semantics, not by ``null_marker``.  TPC-H dbgen ``.tbl`` emits a spurious
+    trailing pipe after every record; some TPC-DS ``.dat`` rows use trailing
+    pipes to represent nullable final columns and must keep them when a fixed
+    column-count loader such as PostgreSQL COPY is used.  Adapters must use
+    ``get_data_extension(data_file)`` to make that decision — never derive it
+    from ``null_marker is not None``, and never use ``data_file.suffix.lower()``
+    which breaks for compressed inputs like ``lineitem.tbl.zst``.  A .csv file
+    with null_marker="" (e.g. JoinOrder) has meaningful trailing commas that
+    represent NULL fields and must not be stripped.
     """
 
     delimiter: str

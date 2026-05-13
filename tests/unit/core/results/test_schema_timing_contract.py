@@ -158,3 +158,32 @@ def test_build_result_payload_preserves_dataframe_skip_summary() -> None:
         "executed_by_category": {},
         "skipped_by_category": {},
     }
+
+
+def test_build_result_payload_counts_skipped_queries_separately() -> None:
+    result = _result_with_queries(
+        [
+            {
+                "query_id": "Q1",
+                "status": "SUCCESS",
+                "execution_time_seconds": 0.1,
+                "iteration": 1,
+                "stream_id": 0,
+                "run_type": "measurement",
+            },
+            {
+                "query_id": "Q2",
+                "status": "SKIPPED",
+                "execution_time_seconds": 0.0,
+                "iteration": 1,
+                "stream_id": 0,
+                "run_type": "measurement",
+            },
+        ],
+        execution_id="run_skipped_queries",
+    )
+
+    payload = build_result_payload(result)
+
+    assert payload["summary"]["queries"] == {"total": 2, "passed": 1, "failed": 0, "skipped": 1}
+    assert "errors" not in payload

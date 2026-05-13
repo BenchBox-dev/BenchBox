@@ -130,8 +130,17 @@ in order:
 
 1. `npm ci` — clean install of Explorer JS dependencies.
 2. `npm run build` — full Explorer production build.
-3. `npx playwright test --grep @smoke --project <browser>` — the actual
-   smoke run, against the staged data dir.
+3. `npx playwright test --grep @uat-external-corpus --project <browser>` —
+   the UAT smoke run, against the staged data dir.
+
+The UAT smoke is intentionally separate from the Results Explorer developer
+fixture route suite. Before launching Playwright, it validates that the
+packaged corpus has at least one result bundle with `run`, `benchmark`,
+`scale_factor`, and `platform` metadata, then writes the compact contract to
+`explorer_corpus_contract.json` under the UAT log directory. The browser test
+discovers benchmark, platform, result, and query evidence from the mounted
+corpus, so a valid LakeSail-only or otherwise narrow UAT run is not coupled to
+the deterministic DuckDB/TPC-H fixture IDs.
 
 Steps 1 and 2 are not cached locally, so a single `make uat-explorer-smoke`
 invocation pays the full npm cost every time. The CI workflow caches
@@ -140,6 +149,10 @@ you are iterating on a UAT change unrelated to the Explorer browser smoke,
 prefer running the targeted test (`uv run -- python -m pytest
 tests/uat/test_explorer_smoke.py -m fast`) and reserve
 `make uat-explorer-smoke` for end-to-end validation.
+
+The fixed developer fixture route regressions still run from
+`results-explorer/` with `npm run test:e2e:fixtures && npm run build &&
+npx playwright test --grep @smoke --project chromium`.
 
 ## Disk-budget estimate and resume manifests
 

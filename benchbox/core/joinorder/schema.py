@@ -290,7 +290,13 @@ class JoinOrderSchema:
             "Pure column-type translation - no engine/layout policy."
         ),
     )
-    def get_create_table_sql(self, table_name: str, dialect: str = "sqlite") -> str:
+    def get_create_table_sql(
+        self,
+        table_name: str,
+        dialect: str = "sqlite",
+        *,
+        include_foreign_keys: bool = False,
+    ) -> str:
         """Generate CREATE TABLE SQL for a specific table.
 
         Args:
@@ -315,15 +321,16 @@ class JoinOrderSchema:
         sql = f"CREATE TABLE {table_name} (\n"
         sql += ",\n".join(f"    {col}" for col in columns)
 
-        # Add foreign keys if supported
-        if dialect in ["postgres", "mysql"] and "foreign_keys" in table:
+        # The canonical IMDb dataset contains dangling references, so foreign
+        # keys are opt-in metadata rather than default load-time constraints.
+        if include_foreign_keys and dialect in ["postgres", "mysql"] and "foreign_keys" in table:
             for fk in table["foreign_keys"]:
                 sql += f",\n    {fk}"
 
         sql += "\n);"
         return sql
 
-    def get_create_tables_sql(self, dialect: str = "sqlite") -> str:
+    def get_create_tables_sql(self, dialect: str = "sqlite", *, include_foreign_keys: bool = False) -> str:
         """Generate CREATE TABLE SQL for all tables.
 
         Args:
@@ -362,7 +369,9 @@ class JoinOrderSchema:
 
         sql_statements = []
         for table_name in table_order:
-            sql_statements.append(self.get_create_table_sql(table_name, dialect))
+            sql_statements.append(
+                self.get_create_table_sql(table_name, dialect, include_foreign_keys=include_foreign_keys)
+            )
 
         return "\n\n".join(sql_statements)
 

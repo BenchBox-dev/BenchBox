@@ -281,9 +281,12 @@ def build_result_payload(result: BenchmarkResults) -> dict[str, Any]:
     measurement_queries = [q for q in queries_list if q.get("run_type") == "measurement"]
     total_queries = len(measurement_queries)
     successful_queries = len([q for q in measurement_queries if q.get("status") == "SUCCESS"])
-    failed_count = total_queries - successful_queries
+    skipped_queries = len([q for q in measurement_queries if q.get("status") == "SKIPPED"])
+    failed_count = total_queries - successful_queries - skipped_queries
 
-    summary = _build_summary_section(result, query_times_ms, total_queries, successful_queries, failed_count)
+    summary = _build_summary_section(
+        result, query_times_ms, total_queries, successful_queries, failed_count, skipped_queries
+    )
     run = _build_run_section(result, query_times_ms, iterations_set, streams_set)
     benchmark = _build_benchmark_section(result)
     driver_metadata = _collect_driver_metadata(result)
@@ -391,7 +394,7 @@ def _build_query_results_section(
         if status == "SUCCESS":
             if exec_time_ms is not None and run_type == "measurement":
                 query_times_ms.append(exec_time_ms)
-        else:
+        elif status != "SKIPPED":
             error_entry = {
                 "phase": "query",
                 "query_id": str(query_id),
@@ -428,6 +431,7 @@ def _build_summary_section(
     total_queries: int,
     successful_queries: int,
     failed_count: int,
+    skipped_queries: int = 0,
 ) -> dict[str, Any]:
     """Build the summary block of the payload."""
     timing_stats = _compute_timing_stats(query_times_ms)
@@ -440,6 +444,8 @@ def _build_summary_section(
         },
         "timing": timing_stats,
     }
+    if skipped_queries:
+        summary["queries"]["skipped"] = skipped_queries
 
     if result.total_rows_loaded or result.data_loading_time:
         data_stats: dict[str, Any] = {}

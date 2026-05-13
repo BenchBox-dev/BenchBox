@@ -28,6 +28,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import logging
+import shutil
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -103,6 +104,11 @@ class SparkDataLoadMixin:
             logger.debug("Row count unavailable for table '%s'; assuming 0: %s", table_name, exc)
             return 0
 
+    @staticmethod
+    def _spark_physical_table_name(table_name: str) -> str:
+        """Return the table identifier used for Spark catalog operations."""
+        return table_name if any(char.isupper() for char in table_name) else table_name.lower()
+
     @classmethod
     def _csv_extension_suffix(cls, compression: str | None) -> str:
         """Return the filename suffix needed for a compressed CSV symlink."""
@@ -118,8 +124,8 @@ class SparkDataLoadMixin:
         """Return a path the CSV reader can open.
 
         When ``_requires_csv_extension`` is True, files whose data-format
-        extension is not ``.csv`` (e.g. ``.dat``, ``.tbl``) are symlinked
-        into *temp_dir* with a ``.csv`` (+ compression) extension.
+        extension is not ``.csv`` (e.g. ``.dat``, ``.tbl``) are linked
+        under *temp_dir* with a ``.csv`` (+ compression) extension.
         The original file is left untouched.
         """
         if not self._requires_csv_extension:
@@ -131,46 +137,55 @@ class SparkDataLoadMixin:
         compression = detect_compression(file_path) if compression is None else compression
         base_path = strip_compression_suffix(file_path)
 
-        if base_path.suffix.lower() == ".csv":
-            return file_path
-
         # Build a .csv name preserving the table stem and any trailing chunk
         # suffixes (e.g. ".1" in customer.tbl.1.zst), but replacing the data
         # format extension (.tbl, .dat) with .csv.
         #   customer.tbl.zst   → customer.csv.zst
         #   customer.tbl.1.zst → customer.1.csv.zst   (unique per chunk)
         #   orders.dat.xz      → orders.csv.xz
-        p = base_path
-        trailing: list[str] = []
-        while p.suffix and p.suffix.lower() not in DATA_FORMAT_EXTENSIONS:
-            trailing.insert(0, p.suffix)
-            p = p.with_suffix("")
-        new_name = p.stem + "".join(trailing) + ".csv" + self._csv_extension_suffix(compression)
+        if base_path.suffix.lower() == ".csv":
+            new_name = base_path.name + self._csv_extension_suffix(compression)
+        else:
+            p = base_path
+            trailing: list[str] = []
+            while p.suffix and p.suffix.lower() not in DATA_FORMAT_EXTENSIONS:
+                trailing.insert(0, p.suffix)
+                p = p.with_suffix("")
+            new_name = p.stem + "".join(trailing) + ".csv" + self._csv_extension_suffix(compression)
 
-        link = temp_dir / new_name
+        # Sail's CSV reader currently normalizes a file path to a directory
+        # path (the error shows a trailing slash) before scanning for files.
+        # Return a directory containing exactly one CSV-named hardlink/symlink
+        # so both Spark's file reader and Sail's directory scanner work.
+        compat_dir = temp_dir / new_name
+        compat_dir.mkdir(exist_ok=True)
+        link = compat_dir / new_name
         resolved_path = file_path.resolve()
         # Chunked files get unique symlink names because trailing chunk suffixes
         # (e.g. ".1" in customer.tbl.1.zst) are preserved in the symlink name.
         # If a link already exists but points elsewhere, warn - loading would
         # silently use stale data.
         if link.exists() or link.is_symlink():
-            existing_target = None
-            if link.is_symlink():
-                try:
-                    existing_target = link.resolve()
-                except FileNotFoundError:
-                    existing_target = None
+            try:
+                points_to_source = link.samefile(resolved_path)
+            except OSError:
+                points_to_source = False
 
-            if not link.is_symlink() or existing_target != resolved_path:
+            if not points_to_source:
                 logger.warning(
-                    "Symlink collision: %s already exists%s, expected %s",
+                    "CSV compatibility path collision: %s already exists, expected %s",
                     link,
-                    f" -> {existing_target}" if existing_target is not None else "",
                     resolved_path,
                 )
         else:
-            link.symlink_to(resolved_path)
-        return link
+            try:
+                link.hardlink_to(resolved_path)
+            except OSError:
+                try:
+                    link.symlink_to(resolved_path)
+                except OSError:
+                    shutil.copy2(resolved_path, link)
+        return compat_dir
 
     def _csv_compat_temp_dir_parent(self, data_dir: Path) -> Path | None:
         """Return a temp-dir parent visible to remote Spark servers when possible."""
@@ -240,6 +255,9 @@ class SparkDataLoadMixin:
             data_source = resolver.resolve(benchmark, Path(data_dir))
 
             if not data_source or not data_source.tables:
+                if getattr(benchmark, "get_data_source_benchmark", lambda: object())() is None:
+                    self.logger.info("Benchmark declares no data source; skipping Spark data load")
+                    return table_stats, elapsed_seconds(start_time), per_table_timings
                 raise ValueError(
                     f"No data files found in {data_dir}. Ensure benchmark.generate_data() was called first."
                 )
@@ -260,7 +278,7 @@ class SparkDataLoadMixin:
 
                     if not valid_files:
                         self.logger.warning(f"Skipping {table_name} - no valid data files")
-                        table_stats[table_name.lower()] = 0
+                        table_stats[self._spark_physical_table_name(table_name)] = 0
                         continue
 
                     chunk_info = f" from {len(valid_files)} file(s)" if len(valid_files) > 1 else ""
@@ -268,13 +286,13 @@ class SparkDataLoadMixin:
 
                     try:
                         load_start = mono_time()
-                        table_name_lower = table_name.lower()
+                        physical_table_name = self._spark_physical_table_name(table_name)
                         total_rows_loaded = 0
                         table_start_row_count = (
-                            self._safe_row_count(spark, table_name_lower) if not self._df_caching_supported else 0
+                            self._safe_row_count(spark, physical_table_name) if not self._df_caching_supported else 0
                         )
 
-                        table_schema = self._get_table_schema(spark, table_name_lower)
+                        table_schema = self._get_table_schema(spark, physical_table_name)
                         format_info = detect_file_format(valid_files)
 
                         for file_idx, raw_path in enumerate(valid_files, start=1):
@@ -326,40 +344,41 @@ class SparkDataLoadMixin:
                                 # Cache lets count() and insertInto() share one scan.
                                 df.cache()
                                 row_count = df.count()
-                                df.write.mode("append").insertInto(table_name_lower)
+                                df.write.mode("append").insertInto(physical_table_name)
                                 df.unpersist()
                             else:
                                 # Platforms where df.cache() is a no-op (e.g. LakeSail/
                                 # Spark Connect): write the chunk and defer row counting
                                 # until every file has been appended.
-                                df.write.mode("append").insertInto(table_name_lower)
-                                self.log_verbose(f"Wrote chunk {file_idx}/{len(valid_files)} for {table_name_lower}")
+                                df.write.mode("append").insertInto(physical_table_name)
+                                self.log_verbose(f"Wrote chunk {file_idx}/{len(valid_files)} for {physical_table_name}")
                                 continue
                             total_rows_loaded += row_count
 
                         if not self._df_caching_supported:
-                            table_end_row_count = self._row_count(spark, table_name_lower)
+                            table_end_row_count = self._row_count(spark, physical_table_name)
                             row_delta = table_end_row_count - table_start_row_count
                             if row_delta < 0:
                                 self.logger.warning(
                                     "Negative row delta for %s (%d -> %d); reporting 0",
-                                    table_name_lower,
+                                    physical_table_name,
                                     table_start_row_count,
                                     table_end_row_count,
                                 )
                             total_rows_loaded = max(0, row_delta)
 
-                        table_stats[table_name_lower] = total_rows_loaded
+                        table_stats[physical_table_name] = total_rows_loaded
 
                         load_time = elapsed_seconds(load_start)
-                        per_table_timings[table_name_lower] = {"total_ms": load_time * 1000}
+                        per_table_timings[physical_table_name] = {"total_ms": load_time * 1000}
                         self.logger.info(
-                            f"Loaded {total_rows_loaded:,} rows into {table_name_lower}{chunk_info} in {load_time:.2f}s"
+                            f"Loaded {total_rows_loaded:,} rows into {physical_table_name}{chunk_info} "
+                            f"in {load_time:.2f}s"
                         )
 
                     except Exception as e:
                         self.logger.error(f"Failed to load {table_name}: {e}")
-                        table_stats[table_name.lower()] = 0
+                        table_stats[self._spark_physical_table_name(table_name)] = 0
 
             total_time = elapsed_seconds(start_time)
             total_rows = sum(table_stats.values())
@@ -407,11 +426,16 @@ class SparkDataLoadMixin:
         from pyspark.sql import functions as spark_funcs
 
         df_cols = set(df.columns)
-        exprs = [
-            spark_funcs.col(field.name).cast(field.dataType).alias(field.name)
-            for field in schema.fields
-            if field.name in df_cols
-        ]
+        exprs = []
+        for field in schema.fields:
+            if field.name not in df_cols:
+                continue
+            source_col = spark_funcs.col(field.name)
+            if getattr(field.dataType, "typeName", lambda: None)() == "array":
+                array_schema = getattr(field.dataType, "simpleString", lambda: "array<string>")()
+                exprs.append(spark_funcs.from_json(source_col.cast("string"), array_schema).alias(field.name))
+            else:
+                exprs.append(source_col.cast(field.dataType).alias(field.name))
         if exprs:
             df = df.select(*exprs)
         return df

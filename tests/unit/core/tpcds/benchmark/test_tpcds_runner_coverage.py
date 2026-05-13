@@ -75,6 +75,14 @@ def test_normalize_interval_syntax(tpcds_benchmark):
     assert "- INTERVAL 30 DAY" in normalized
 
 
+def test_spark_q90_rewrite_guards_zero_denominator(tpcds_benchmark):
+    query = "SELECT CAST(`amc` AS DECIMAL(15, 4)) / CAST(`pmc` AS DECIMAL(15, 4)) AS `am_pm_ratio` FROM counts"
+
+    rewritten = tpcds_benchmark._apply_target_dialect_overrides(90, query, "spark")
+
+    assert "/ NULLIF(CAST(`pmc` AS DECIMAL(15, 4)), 0)" in rewritten
+
+
 def test_fix_query58_ambiguity(tpcds_benchmark):
     query = (
         "WITH ss_items AS (SELECT 1 AS item_id), cs_items AS (SELECT 1 AS item_id), "

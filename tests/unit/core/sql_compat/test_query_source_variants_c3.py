@@ -1,8 +1,9 @@
 """Parity tests for W12 query_source variant rules - Vector Search.
 
 Verifies that:
-1. vector_search_variants.py registers exactly 32 rules:
-     30 unversioned SELECT_VARIANT (5 platforms × 6 query IDs)
+1. vector_search_variants.py registers exactly 44 rules:
+     36 unversioned SELECT_VARIANT (6 platforms × 6 query IDs)
+   +  6 LakeSail SKIP_QUERY rules
    +  2 version-gated StarRocks Q2 rules (SKIP_QUERY <3.2 + SELECT_VARIANT ≥3.2)
 2. Each unversioned rule has SELECT_VARIANT action and a SelectVariantPayload.
 3. StarRocks Q2 version gating fires correctly:
@@ -36,18 +37,18 @@ from benchbox.sql_compat.registry import REGISTRY
 
 
 def test_vector_search_rule_registration_count():
-    """32 query_source rules for vector_search: 30 unversioned + 2 versioned for StarRocks Q2."""
+    """44 query_source rules for vector_search."""
     rules = [
         (key, entry)
         for key, entry in REGISTRY.all_rules()
         if key[0] is Phase.QUERY_SOURCE and key[2] == "vector_search"
     ]
-    assert len(rules) == 32, f"Expected 32 vector_search rules, got {len(rules)}: {[e.rule_id for _, e in rules]}"
+    assert len(rules) == 44, f"Expected 44 vector_search rules, got {len(rules)}: {[e.rule_id for _, e in rules]}"
 
 
 def test_vector_search_all_platforms_registered():
     """Each supported platform has 6 rules registered."""
-    for platform in ("starrocks", "doris", "postgresql", "clickhouse", "snowflake"):
+    for platform in ("spark", "lakesail", "starrocks", "doris", "postgresql", "clickhouse", "snowflake"):
         rules = [
             (key, entry)
             for key, entry in REGISTRY.all_rules()
@@ -84,6 +85,9 @@ def test_vector_search_all_platforms_registered():
         # Snowflake
         ("snowflake", "Q1", "VECTOR_COSINE_SIMILARITY"),
         ("snowflake", "Q2", "VECTOR_L2_DISTANCE"),
+        # Spark
+        ("spark", "Q1", "zip_with"),
+        ("spark", "Q2", "aggregate"),
     ],
 )
 def test_vector_search_rule_action_and_payload(platform: str, query_id: str, expected_snippet: str):
@@ -101,6 +105,23 @@ def test_vector_search_rule_action_and_payload(platform: str, query_id: str, exp
     assert decision.action is CompatAction.SELECT_VARIANT
     assert isinstance(decision.payload, SelectVariantPayload)
     assert expected_snippet in decision.payload.variant_sql
+
+
+def test_vector_search_lakesail_rules_skip_queries():
+    ctx = CompatibilityContext(
+        platform="lakesail",
+        platform_version=None,
+        benchmark="vector_search",
+        query_id="Q1",
+        phase=Phase.QUERY_SOURCE,
+        mode="sql",
+        dialect="lakesail",
+    )
+    decision = REGISTRY.resolve(ctx)
+    assert decision is not None
+    assert decision.action is CompatAction.SKIP_QUERY
+    assert isinstance(decision.payload, SkipQueryPayload)
+    assert "lambda fallback" in decision.payload.reason
 
 
 # ---------------------------------------------------------------------------

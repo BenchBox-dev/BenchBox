@@ -2,7 +2,7 @@ id: uat-enabled-platforms-full-sweep-release-gate
 title: "UAT: rerun enabled-platform full sweep and publish compact release-gate summary"
 worktree: uat-enabled-platforms-remediation
 priority: Critical
-status: Not Started
+status: Blocked
 category: Testing and Quality Assurance
 
 description: |
@@ -28,45 +28,143 @@ deps:
 work:
   - id: w0
     summary: "Prepare the final enabled-platform UAT config and run directory"
-    status: pending
+    status: done
     notes: |
-      Use the documented long-running UAT flow with
-      `BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs`. Announce the command,
-      max runtime, log path, and stop condition before launch. Keep raw logs and
-      browser artifacts under the run root, not in git.
+      Added `tests/uat/configs/uat-enabled-platforms-full.yaml` and ran with
+      `BENCHBOX_OUTPUT_DIR=/Users/joe/Developer/benchmark_runs`. Raw logs and
+      browser artifacts remained under the run root.
 
   - id: w1
     summary: "Run the full enabled-platform sweep sequentially"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
-      Run all non-compatibility-blocked benchmarks for `lakesail`, `pg-duckdb`,
-      `pg-mooncake`, and `timescaledb` with Docker managed sequentially. Do not
-      use early-stop behavior that prevents coverage accounting.
+      Ran all non-compatibility-blocked benchmarks for `lakesail`,
+      `pg-duckdb`, `pg-mooncake`, and `timescaledb` with Docker managed
+      sequentially and early-stop disabled. Docker lifecycle was clean.
 
   - id: w2
     summary: "Validate result integrity, packaging, reports, and Explorer smoke"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      Check `command-status.json`, `matrix_summary.tsv`,
-      `validator_rollup.tsv`, `uat_lifecycle.log`, package/report outputs, and
-      `playwright_smoke.log`. Confirm Docker lifecycle is clean and no timed-out
-      cell is misclassified.
+      Checked `matrix_summary.tsv`, `validator_rollup.tsv`,
+      `uat_lifecycle.log`, package output, and `playwright_smoke.log`.
+      Explorer external-corpus smoke passed. Matrix accounting reported
+      88 candidates, 84 executed, 4 compatibility-pruned, 33 passed,
+      50 failed, and 1 timed out. The timed-out cell was
+      `timescaledb/tpchavoc` at the configured 600s timeout.
 
   - id: w3
     summary: "Commit a compact durable UAT summary"
     needs: [w2]
+    status: done
+    notes: |
+      Added `_project/audits/uat-enabled-platforms-full-release-gate-2026-05-13.md`
+      with command, checked SHA, run path, counts, compatibility-pruned cells,
+      validator rollup summary, and remaining failures. No raw logs,
+      screenshots, browser reports, or generated binary evidence were committed.
+
+  - id: w4
+    summary: "Remediate remaining PG extension and TimescaleDB red cells"
+    needs: [w3]
     status: pending
     notes: |
-      Add a concise markdown summary under `_project/audits/` or update this
-      TODO with command, git SHA, run path, counts, compatibility-pruned cells,
-      failures if any, and validator rollup. Do not commit raw logs,
-      screenshots, browser reports, or generated binary evidence.
+      The release gate is blocked, not complete. This pass added
+      evidence-backed benchmark gates for PostgreSQL-family
+      `ai_primitives`, `read_primitives`, and `vector_search`; fixed
+      `flightdata` PostgreSQL ROUND rendering; fixed `datavault` interval
+      substitution; and fixed PostgreSQL COPY handling for TPC-DS `.dat`
+      trailing nullable fields.
+
+      Targeted pg-duckdb UAT evidence under
+      `/Users/joe/Developer/benchmark_runs/logs/uat_pg_duckdb_fixcheck_20260513/`:
+      `flightdata` and `datavault` now pass and are submittable.
+      `tpcds` now passes load validation but remains PARTIAL with
+      Q36/Q70/Q86/Q90 failed.
+
+      A follow-up pass fixed AMPLab HAVING aliases and PostgreSQL CSV
+      empty-string preservation for ClickBench; targeted `pg-duckdb/amplab`
+      and `pg-duckdb/clickbench` now pass. PostgreSQL-family Parquet loading
+      now streams Parquet through COPY, and canonical JoinOrder omits FK
+      constraints by default because the IMDb dataset has dangling references.
+      Targeted `pg-duckdb/joinorder` now reaches query execution but timed out
+      at 600s. Targeted `pg-duckdb/tpcds_obt` no longer hits temp-file disk
+      exhaustion, but failed after the preceding timeout with a closed socket.
+      Docker Desktop reported a project-scoped containerd metadata I/O error
+      while removing the pg-duckdb stack, so further live reruns should start
+      after Docker is healthy.
+
+      After Docker Desktop was restarted and the stale container removed,
+      targeted `pg-duckdb/metadata_primitives` passed with the guarded
+      `large_catalog_column_count` query, and targeted `pg-duckdb/tpcdi`
+      passed with PostgreSQL query rendering for date arithmetic, boolean
+      comparisons, and alias references.
+
+      This pass also fixed PostgreSQL-family primitive operation handling.
+      `write_primitives` now rewrites DuckDB `unnest(generate_series(...))`,
+      rolls back failed operation attempts, exports `SKIPPED` operations without
+      counting them as failures, and has registry-backed execution filters for
+      server-side bulk-load operations, DuckDB DataSketches operations, and
+      PostgreSQL-incompatible MERGE variants. Targeted
+      `pg-duckdb/write_primitives` passed and was submittable:
+      `/Users/joe/Developer/benchmark_runs/logs/uat_pg_duckdb_fixcheck_20260513l/pg-duckdb_write_primitives_0.01_20260513_161717.log`.
+      `transaction_primitives` now rewrites PostgreSQL transaction isolation
+      starts, fixes the repeat-run cleanup for `transaction_commit_large`, and
+      has pg_duckdb-specific execution filters for SAVEPOINT and non-default
+      isolation gaps. Targeted `pg-duckdb/transaction_primitives` passed and
+      was submittable:
+      `/Users/joe/Developer/benchmark_runs/logs/uat_pg_duckdb_fixcheck_20260513n/pg-duckdb_transaction_primitives_0.01_20260513_162215.log`.
+
+      A fresh `pg-mooncake/amplab` rerun after Docker recovery no longer
+      reproduced the sweep's `max_wal_senders` promotion failure, but exposed
+      the next pg_mooncake execution blocker: intermittent `DuckDB execution is
+      not supported inside functions` errors after previous mirror-table scans.
+      `PgMooncakeAdapter.execute_query` now closes query transaction boundaries
+      around each benchmark SELECT and retries that exact transient error once.
+      Targeted `pg-mooncake/amplab` passed and was submittable:
+      `/Users/joe/Developer/benchmark_runs/logs/uat_pg_mooncake_fixcheck_20260513_amplab_retry.log`.
+
+      The same pg_mooncake transaction-boundary fix, plus prior PostgreSQL-family
+      SQL/data-loading fixes, cleared targeted `pg-mooncake/h2odb`,
+      `pg-mooncake/coffeeshop`, `pg-mooncake/ssb`, `pg-mooncake/clickbench`,
+      and `pg-mooncake/tpcdi`.
+
+      The Docker pg_mooncake stack now starts PostgreSQL with
+      `max_wal_senders=128`, `max_replication_slots=128`, and
+      `wal_level=logical` to prevent multi-cell UAT promotion from exhausting
+      the default 10 replication sender slots. After that provisioning fix,
+      `pg-mooncake/write_primitives` reached execution but failed setup against
+      mooncake mirror tables with `DuckDB does not support modififying Postgres
+      tables`; `pg-mooncake/transaction_primitives` failed in the same TPC-H
+      corpus promotion/write path with Moonlink duplicate replication
+      registration. Added pg-mooncake-only benchmark gates for both write-heavy
+      primitive benchmarks.
+
+      Targeted `timescaledb/amplab`, `timescaledb/clickbench`,
+      `timescaledb/tpcdi`, and `timescaledb/write_primitives` now pass after
+      the shared PostgreSQL-family SQL/data-loading and primitive operation
+      fixes. Targeted `timescaledb/transaction_primitives` then exposed only
+      the two non-default isolation operations failing with `SET TRANSACTION
+      ISOLATION LEVEL must be called before any query`; added TimescaleDB
+      execution filters for those two operations and the retry passed with
+      21 executed operations and 2 compatibility skips.
+
+      Targeted `timescaledb/tpcds` now clears schema creation, `.dat` load, and
+      table validation. It remains PARTIAL on query execution with Q36, Q70,
+      and Q86 failing on the `lochierarchy` alias in `ORDER BY`, plus Q90
+      failing with division by zero.
+
+      Remaining PG extension and TimescaleDB failures still need per-log
+      clustering from
+      `/Users/joe/Developer/benchmark_runs/logs/uat_enabled_platforms_full_20260513/`
+      and either fixes or evidence-backed compatibility rules.
 
 deferred:
   - summary: "Run cloud/live platform UAT"
     reason: "The requested enabled platforms are local Docker-managed platforms; cloud/live sweeps require separate approval."
+  - summary: "Cut release after green enabled-platform gate"
+    reason: "The 2026-05-13 full gate is blocked by 50 failed cells and one timeout."
 
 prior_art:
   - "docs/operations/uat-framework.md -- long-running UAT command, logging, and cleanup expectations"

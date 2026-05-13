@@ -296,6 +296,64 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
             return f"{self.schema}.{table_name}"
         return table_name
 
+    def execute_query(
+        self,
+        connection: Any,
+        query: str,
+        query_id: str,
+        benchmark_type: str | None = None,
+        scale_factor: float | None = None,
+        validate_row_count: bool = True,
+        stream_id: int | None = None,
+    ) -> dict[str, Any]:
+        """Execute one benchmark query outside lingering pg_mooncake transactions.
+
+        pg_mooncake routes mirror-table scans through DuckDB and can reject a
+        later scan with "DuckDB execution is not supported inside functions"
+        when the previous DB-API SELECT left a transaction open. Close the
+        transaction boundary around each benchmark query and retry that
+        pg_mooncake-specific transient error once after rollback.
+        """
+        self._close_mooncake_query_transaction(connection, action="commit", phase="before query")
+        result = super().execute_query(
+            connection,
+            query,
+            query_id,
+            benchmark_type=benchmark_type,
+            scale_factor=scale_factor,
+            validate_row_count=validate_row_count,
+            stream_id=stream_id,
+        )
+        if self._is_duckdb_inside_function_error(result):
+            self._close_mooncake_query_transaction(connection, action="rollback", phase="after DuckDB function error")
+            self.log_verbose(f"Retrying pg_mooncake query {query_id} after closing transaction")
+            result = super().execute_query(
+                connection,
+                query,
+                query_id,
+                benchmark_type=benchmark_type,
+                scale_factor=scale_factor,
+                validate_row_count=validate_row_count,
+                stream_id=stream_id,
+            )
+
+        self._close_mooncake_query_transaction(connection, action="commit", phase="after query")
+        return result
+
+    def _close_mooncake_query_transaction(self, connection: Any, *, action: str, phase: str) -> None:
+        closer = getattr(connection, action, None)
+        if not callable(closer):
+            return
+        try:
+            closer()
+        except Exception as exc:
+            self.logger.debug("Failed to %s pg_mooncake transaction %s: %s", action, phase, exc)
+
+    def _is_duckdb_inside_function_error(self, result: dict[str, Any]) -> bool:
+        if result.get("status") != "FAILED":
+            return False
+        return "DuckDB execution is not supported inside functions" in str(result.get("error", ""))
+
     def _get_existing_tables(self, connection: Any) -> list[str]:
         """Return tables and end the catalog transaction before mooncake reads.
 

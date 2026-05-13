@@ -114,8 +114,15 @@ class TestClickBenchCSVLoading:
         for column in HITS_TABLE["columns"]:
             assert column["nullable"] is False, f"Column {column['name']} should be NOT NULL"
 
-        # This validates that the schema correctly expects no NULL values,
-        # which is why preserving empty strings (not converting to NULL) is critical
+    def test_spark_schema_omits_not_null_constraints(self):
+        """Spark-family readers surface empty ClickBench fields as NULL at scan time."""
+        from benchbox.core.clickbench.schema import get_create_table_sql
+
+        spark_sql = get_create_table_sql(dialect="spark")
+        duckdb_sql = get_create_table_sql(dialect="duckdb")
+
+        assert " NOT NULL" not in spark_sql
+        assert " NOT NULL" in duckdb_sql
 
     def test_clickbench_query_patterns(self):
         """Test that ClickBench queries use empty string filtering patterns."""

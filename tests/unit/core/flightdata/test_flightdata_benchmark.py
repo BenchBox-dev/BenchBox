@@ -124,6 +124,14 @@ class TestQueries:
             assert "{start_date}" not in sql, f"Query {key!r} has unfilled {{start_date}}"
             assert "{end_date}" not in sql, f"Query {key!r} has unfilled {{end_date}}"
 
+    def test_postgres_queries_cast_round_arguments_to_numeric(self):
+        """PostgreSQL needs ROUND(double precision, integer) inputs cast to numeric."""
+        queries = self.bm.get_queries(dialect="postgres")
+
+        assert len(queries) == 20
+        assert 'ROUND(CAST(AVG("f"."dep_delay") AS DECIMAL), 2)' in queries["delay-by-airport"]
+        assert 'ROUND(AVG("f"."dep_delay"), 2)' not in queries["delay-by-airport"]
+
     def test_query_categories(self):
         """Should have all expected categories."""
         categories = self.bm.query_manager.get_categories()

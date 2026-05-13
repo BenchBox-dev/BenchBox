@@ -420,6 +420,49 @@ class TestPgMooncakeLoadPromotion:
 class TestPgMooncakeValidationCatalog:
     """Tests for pg_mooncake catalog reads used by validation."""
 
+    def test_execute_query_commits_around_mooncake_scan(self, pg_mooncake_stubs):
+        adapter = PgMooncakeAdapter()
+        conn = Mock()
+        expected = {"query_id": "1", "status": "SUCCESS"}
+
+        with patch.object(postgresql_module.PostgreSQLAdapter, "execute_query", return_value=expected) as parent:
+            result = adapter.execute_query(conn, "SELECT * FROM rankings", "1")
+
+        assert result == expected
+        parent.assert_called_once_with(
+            conn,
+            "SELECT * FROM rankings",
+            "1",
+            benchmark_type=None,
+            scale_factor=None,
+            validate_row_count=True,
+            stream_id=None,
+        )
+        assert conn.commit.call_count == 2
+        conn.rollback.assert_not_called()
+
+    def test_execute_query_retries_duckdb_function_transaction_error(self, pg_mooncake_stubs):
+        adapter = PgMooncakeAdapter()
+        conn = Mock()
+        failed = {
+            "query_id": "1",
+            "status": "FAILED",
+            "error": "DuckDB execution is not supported inside functions",
+        }
+        expected = {"query_id": "1", "status": "SUCCESS"}
+
+        with patch.object(
+            postgresql_module.PostgreSQLAdapter,
+            "execute_query",
+            side_effect=[failed, expected],
+        ) as parent:
+            result = adapter.execute_query(conn, "SELECT * FROM rankings", "1")
+
+        assert result == expected
+        assert parent.call_count == 2
+        conn.rollback.assert_called_once()
+        assert conn.commit.call_count == 2
+
     def test_get_existing_tables_commits_catalog_transaction(self, pg_mooncake_stubs):
         adapter = PgMooncakeAdapter()
         conn = Mock()

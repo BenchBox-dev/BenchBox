@@ -310,6 +310,9 @@ class TPCDSBenchmark(BaseBenchmark):
 
     def _apply_target_dialect_overrides(self, query_id: int, query: str, target_dialect: str) -> str:
         """Apply benchmark-local overrides after dialect translation."""
+        if query_id == 90 and target_dialect.lower() in {"spark", "lakesail"}:
+            return self._rewrite_spark_q90_zero_denominator(query)
+
         if "clickhouse" not in target_dialect.lower():
             return query
 
@@ -318,6 +321,17 @@ class TPCDSBenchmark(BaseBenchmark):
         if query_id == 66:
             return self._rewrite_clickhouse_q66(query)
         return query
+
+    @staticmethod
+    def _rewrite_spark_q90_zero_denominator(query: str) -> str:
+        """Guard Q90's PM count denominator for ANSI Spark-compatible engines."""
+        return re.sub(
+            r"/\s+CAST\(`pmc`\s+AS\s+DECIMAL\(15,\s*4\)\)",
+            "/ NULLIF(CAST(`pmc` AS DECIMAL(15, 4)), 0)",
+            query,
+            count=1,
+            flags=re.IGNORECASE,
+        )
 
     def _rewrite_clickhouse_monthly_avg_query(self, query_id: int, query: str) -> str:
         """Rewrite Q47/Q57 to avoid AVG(SUM(...)) OVER (...) under the new analyzer."""
