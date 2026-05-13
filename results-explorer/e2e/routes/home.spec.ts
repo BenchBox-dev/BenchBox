@@ -17,11 +17,30 @@ test.describe("Home", () => {
       "supported benchmarks",
       "public result bundles",
       "platforms with public results",
-      "PR-validated corpus",
+      "leaderboard cohorts",
     ]) {
       await expect(summary.getByText(label, { exact: true })).toBeVisible();
     }
+    await expect(summary.getByText("PR-validated corpus", { exact: true })).toHaveCount(0);
     await expect(summary.getByText("Benchmarks", { exact: true })).toHaveCount(0);
+  });
+
+  test("documents the mixed home theme contract", async ({ page }) => {
+    await page.goto("/results/");
+    await waitForDataLoaded(page, /Recent Results/i);
+
+    const hero = page.getByTestId("home-hero-filter-band");
+    const dataSurface = page.getByTestId("home-data-surface");
+    await expect(hero).toHaveAttribute("data-surface", "hero");
+    await expect(dataSurface).toHaveAttribute("data-surface", "app");
+
+    const [heroBg, dataBg] = await Promise.all([
+      hero.evaluate((element) => getComputedStyle(element).backgroundColor),
+      dataSurface.evaluate((element) => getComputedStyle(element).backgroundColor),
+    ]);
+    expect(heroBg).not.toBe(dataBg);
+    expect(heroBg).toBe("rgb(13, 17, 23)");
+    expect(dataBg).toBe("rgb(245, 246, 248)");
   });
 
   test("browse-by-benchmark link deep-links to the benchmark index under /results/", async ({
