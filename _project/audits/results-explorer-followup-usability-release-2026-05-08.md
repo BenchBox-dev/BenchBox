@@ -24,15 +24,15 @@ shipped via PRs #299, #300, #303, #304, #305, #307, #309, #310, and
 #311. Release-gate w3 was translated into a Playwright capture spec
 at `results-explorer/e2e/captures/followup-usability-release.spec.ts`
 and run locally — 8/8 specs pass. Release-gate w4 screenshots were
-captured into `_project/audits/results-explorer-followup-usability-release-2026-05-08-screenshots/`
-during that run. The decision below is now **APPROVED**.
+captured during that run but are no longer retained in git. The decision below
+is now **APPROVED**.
 
 This matrix is the closure record for the 2026-05-08 Results Explorer
 follow-up review (chat-only, never committed to `_project/audits/`).
-Each defect was rebound against develop tip in the implementing TODO's
-w0 log and tracked through to the merging PR. The "w0 source line"
-column references the canonical `_project/verification-logs/<id>/w0.log`
-artifact, not the original chat numbering.
+Each defect was rebound against develop tip in the implementing TODO's w0
+evidence and tracked through to the merging PR. Historical w0 source labels
+refer to raw logs that are no longer retained in git; the durable record is the
+summary in this audit and the associated TODO/DONE entries.
 
 Priority mapping (per item 8 YAML, `approach`):
 Critical→P0, High→P1, Medium-High→P2, Medium→P3, Low→P4.
@@ -119,8 +119,8 @@ Closeout 2026-05-09: a Playwright capture spec at
 exercises the eight primary surfaces below as a CI regression gate
 (tagged `@followup-usability`). Run locally on the current branch
 with `FOLLOWUP_USABILITY_CAPTURE=1`; 8/8 specs pass and screenshots
-land in
-`_project/audits/results-explorer-followup-usability-release-2026-05-08-screenshots/`:
+land in local or CI artifacts. Raw PNGs are no longer retained in git; the
+durable coverage index is:
 
 | Slug | Verifies |
 |---|---|
@@ -148,9 +148,8 @@ Routes to walk and the observed states each landing PR delivered are:
 
 Screenshots were captured in the 2026-05-09 gate closeout run via
 the Playwright spec above with `FOLLOWUP_USABILITY_CAPTURE=1`. The
-table at the top of this section maps slug → verified surface; the
-PNGs sit in
-`_project/audits/results-explorer-followup-usability-release-2026-05-08-screenshots/`.
+table at the top of this section maps slug to verified surface. Raw PNGs are no
+longer retained in git.
 
 ## TODO graph (w5)
 
@@ -178,9 +177,8 @@ revision are now resolved:
 1. Release-gate w3 (Browser-drive) — Playwright capture spec at
    `results-explorer/e2e/captures/followup-usability-release.spec.ts`,
    8/8 specs passing locally on the closeout branch, tagged for CI.
-2. Release-gate w4 (Screenshots) — captured into
-   `_project/audits/results-explorer-followup-usability-release-2026-05-08-screenshots/`
-   via the spec above with `FOLLOWUP_USABILITY_CAPTURE=1`.
+2. Release-gate w4 (Screenshots) — captured via the spec above with
+   `FOLLOWUP_USABILITY_CAPTURE=1`; raw PNGs are no longer retained in git.
 3. Deferred P1 slices — shipped as a series of focused PRs:
    PR #299 (query-workbench w4), PR #300 (chart-panel w1+w2),
    PR #303 (navigation w2+w3+w4), PR #304 (table-sticky w2+w3),

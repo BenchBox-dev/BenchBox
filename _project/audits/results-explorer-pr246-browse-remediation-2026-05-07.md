@@ -9,8 +9,8 @@ TODO: `results-explorer-pr246-browse-platform-evidence-remediation`
 ## Baseline consulted
 
 - PR #246 audit: `_project/audits/results-explorer-hierarchy-usability-data-audit-20260507.md`
-- Baseline screenshots: `_project/audits/screenshots/results-explorer-hierarchy-usability-data-audit-20260507/`
-- w0 evidence durability log: `_project/verification-logs/results-explorer-pr246-browse-platform-evidence-remediation/w0.log`
+- Baseline visual evidence: route/viewport findings summarized in the PR #246 audit.
+- w0 evidence: compact facts retained in this report; raw log no longer retained in git.
 
 ## Remediation summary
 
@@ -24,9 +24,8 @@ TODO: `results-explorer-pr246-browse-platform-evidence-remediation`
 
 Captured with `PR246_BROWSE_CAPTURE=1 npx playwright test --project=chromium e2e/captures/pr246-browse-remediation.spec.ts`.
 
-Output directory: `_project/audits/screenshots/results-explorer-pr246-browse-remediation-2026-05-07/`
-
-Manifest: `_project/audits/screenshots/results-explorer-pr246-browse-remediation-2026-05-07/screenshot-manifest.json`
+Raw screenshot directory and manifest are no longer retained in git; the
+durable route/viewport coverage is summarized below.
 
 Coverage:
 

@@ -17,12 +17,21 @@ cloud tests without explicit approval.
 
 ## Output Discipline
 
-Broad commands are final gates. Long output is an artifact, not chat.
+Broad commands are final gates. Long output is an artifact, not chat, and
+temporary evidence is not source.
 
 - Path lists before content; targeted hunks before whole files.
 - Commands likely to emit >100 lines (preflight, full suites, Docker pulls,
   large diffs, `gh pr view --json body,files`): redirect to `/tmp/<slug>.log`;
   report command, status, counts, failure tail. UAT logs use the run root below.
+- Do not commit raw stdout logs, browser reports, screenshots, or generated
+  binary evidence. Summarize the durable facts in markdown/TODOs and keep raw
+  captures in `/tmp`, CI artifacts, or `BENCHBOX_OUTPUT_DIR`.
+- Visual QA may cite route, viewport, checked SHA, and screenshot filenames, but
+  full screenshot batches stay out of git unless they are product docs/blog
+  assets with a durable reader-facing purpose.
+- Any intentionally committed binary or raw evidence file must state its
+  durable consumer, size, and why a compact text summary is insufficient.
 - Verification ladder: read TODO `verification:`; run the narrowest listed or
   targeted check that proves the change; fast suite once pre-commit;
   `make pr-preflight` once pre-`pr-open`.

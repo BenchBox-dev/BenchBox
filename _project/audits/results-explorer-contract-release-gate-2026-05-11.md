@@ -27,13 +27,13 @@ from the 2026-05-10 follow-up review still reproduces.
 
 | Evidence | Command | Result |
 |---|---|---|
-| Dependency TODO state | `uv run --project _project/scripts -- python _project/scripts/todo_cli.py show <DONE item>` for all five dependencies | PASS, captured in `_project/verification-logs/results-explorer-contract-release-gate/w0.log` |
-| Snapshot invariants | `uv run -- python _project/scripts/results_explorer_snapshot_invariants.py results-explorer/public/data/results.duckdb` | PASS, captured in `_project/verification-logs/results-explorer-contract-release-gate/w1.log` |
+| Dependency TODO state | `uv run --project _project/scripts -- python _project/scripts/todo_cli.py show <DONE item>` for all five dependencies | PASS, summary retained in this audit |
+| Snapshot invariants | `uv run -- python _project/scripts/results_explorer_snapshot_invariants.py results-explorer/public/data/results.duckdb` | PASS, summary retained in this audit |
 | Frontend tests | `cd results-explorer && npm test -- --run` | PASS, 641 tests passed |
 | Frontend typecheck | `cd results-explorer && npm run typecheck` | PASS |
 | Frontend build | `cd results-explorer && npm run build` | PASS |
 | Pipeline/read-model tests | `uv run -- python -m pytest tests -k 'explorer_pipeline or browser_duckdb or results_explorer' --tb=short` | PASS, 243 tests passed with 5 existing marker warnings |
-| Browser acceptance | Playwright Chromium probe against `node scripts/serve-browser-tests.mjs --port 4337 --host 127.0.0.1 --fixture-dir public/data` | PASS, captured in `_project/verification-logs/results-explorer-contract-release-gate/w3.log` |
+| Browser acceptance | Playwright Chromium probe against `node scripts/serve-browser-tests.mjs --port 4337 --host 127.0.0.1 --fixture-dir public/data` | PASS, route observations retained below |
 
 ## Routes Checked
 

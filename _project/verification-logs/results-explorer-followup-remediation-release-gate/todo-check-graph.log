@@ -1,6 +1,0 @@
-
-Graph validation passed:
-  No inter-item dependency cycles
-  No work-unit cycles
-  No dangling references
-  47 items checked

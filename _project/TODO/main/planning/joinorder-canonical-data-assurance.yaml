@@ -107,7 +107,7 @@ context_sections:
 
 work:
   - id: w0
-    summary: "Re-validate + snapshot the current canonical-data evidence to _project/verification-logs/joinorder-canonical-data-assurance/w0.log before any change"
+    summary: "Re-validate and summarize the current canonical-data evidence before any change"
     status: done
     notes: |
       Capture (so a later reviewer can see the pre-work baseline):
@@ -119,9 +119,13 @@ work:
           tests -- the durable, re-runnable stand-in for the ephemeral
           "113/113 matched" log);
         - `ls -la /Users/joe/Developer/benchmark_runs/logs/joinorder_postgres_oracle_*/ 2>/dev/null || echo '(oracle log dir not present)'`.
-      Done: `_project/verification-logs/joinorder-canonical-data-assurance/w0.log`
-      records the manifest provenance, row-count sum 74,190,187, 252 passing
-      joinorder/build-script tests, and the oracle log directory.
+      Keep raw output in `/tmp`, CI artifacts, or `BENCHBOX_OUTPUT_DIR`; commit
+      only a compact summary with command, checked SHA, PASS/FAIL, checksums,
+      and key counts in the TODO, attestation, or `_project/joinorder/`.
+      No code/data changes.
+      Done: compact summary records the manifest provenance, row-count sum
+      74,190,187, 252 passing joinorder/build-script tests, and the oracle log
+      directory.
 
   - id: w1
     summary: "Phase 1: cross-check Dataverse-published checksums against the pinned pg_dump hashes; record attestation or escalate"
@@ -328,7 +332,6 @@ scope_limit:
     - "_project/joinorder/provenance-attestation.md"
     - "_project/joinorder/migration-plan.md"
     - "_project/joinorder/release-notes.md"
-    - "_project/verification-logs/joinorder-canonical-data-assurance/"
     - "benchbox/core/joinorder/data_manifest.toml"
     - "docs/benchmarks/join-order.md"
     - "tests/unit/core/joinorder/"

@@ -35,7 +35,7 @@ develop_sha: 175a98d3bbdb8bcc074583e46a2d5e86ebcacafe
       none
     network: |
       none
-    screenshot: _project/audits/screenshots/s1.4-chromium-147.png
+    screenshot: not retained in git; original filename s1.4-chromium-147.png
   severity: minor
   notes: |
     Layout and route content changed, but document.title did not.
@@ -62,7 +62,7 @@ develop_sha: 175a98d3bbdb8bcc074583e46a2d5e86ebcacafe
       none
     network: |
       none
-    screenshot: _project/audits/screenshots/debug-home-chromium-147.png
+    screenshot: not retained in git; original filename debug-home-chromium-147.png
   severity: major
   notes: |
     Firefox spot-check also timed out on the initial Home leaderboard wait before the server was warmed.
@@ -89,7 +89,7 @@ develop_sha: 175a98d3bbdb8bcc074583e46a2d5e86ebcacafe
       none
     network: |
       none
-    screenshot: _project/audits/screenshots/s2.2-chromium-147.png
+    screenshot: not retained in git; original filename s2.2-chromium-147.png
   severity: minor
   notes: |
     The in-page explainer says smaller values are worse, so the test-plan expectation may be stale.
@@ -110,7 +110,7 @@ develop_sha: 175a98d3bbdb8bcc074583e46a2d5e86ebcacafe
       none
     network: |
       none
-    screenshot: _project/audits/screenshots/s2.3-chromium-147.png
+    screenshot: not retained in git; original filename s2.3-chromium-147.png
   severity: nit
   notes: |
     The UI treats "all selected" and "no explicit filter" as equivalent.
@@ -170,7 +170,7 @@ develop_sha: 175a98d3bbdb8bcc074583e46a2d5e86ebcacafe
       none
     network: |
       none
-    screenshot: _project/audits/screenshots/s3.1-chromium-147.png
+    screenshot: not retained in git; original filename s3.1-chromium-147.png
   severity: nit
   notes: |
     This matches the plan note that view mode is not currently URL-synced.
@@ -218,7 +218,7 @@ develop_sha: 175a98d3bbdb8bcc074583e46a2d5e86ebcacafe
       none
     network: |
       none
-    screenshot: _project/audits/screenshots/s3.4-chromium-147.png
+    screenshot: not retained in git; original filename s3.4-chromium-147.png
   severity: minor
   notes: |
     This is a corpus coverage gap for the requested control test.
@@ -239,7 +239,7 @@ develop_sha: 175a98d3bbdb8bcc074583e46a2d5e86ebcacafe
       none
     network: |
       none
-    screenshot: _project/audits/screenshots/s3.5-chromium-147.png
+    screenshot: not retained in git; original filename s3.5-chromium-147.png
   severity: nit
   notes: |
     Manual behavior passed; system preference auto-activation remains unverified.
@@ -287,7 +287,7 @@ develop_sha: 175a98d3bbdb8bcc074583e46a2d5e86ebcacafe
       none
     network: |
       none
-    screenshot: _project/audits/screenshots/s3.8-chromium-147.png
+    screenshot: not retained in git; original filename s3.8-chromium-147.png
   severity: major
   notes: |
     Same root behavior as S3.3.
@@ -320,7 +320,7 @@ develop_sha: 175a98d3bbdb8bcc074583e46a2d5e86ebcacafe
       none
     network: |
       none
-    screenshot: _project/audits/screenshots/s4.3-chromium-147.png
+    screenshot: not retained in git; original filename s4.3-chromium-147.png
   severity: major
   notes: |
     This re-tests pass-1 bug B1.
@@ -348,7 +348,7 @@ develop_sha: 175a98d3bbdb8bcc074583e46a2d5e86ebcacafe
       warning: Encountered two children with the same key attribute: 2026-04-04. Keys should be unique.
     network: |
       none
-    screenshot: _project/audits/screenshots/s4.5-chromium-147.png
+    screenshot: not retained in git; original filename s4.5-chromium-147.png
   severity: minor
   notes: |
     This re-tests pass-1 bug B4.
@@ -621,7 +621,7 @@ develop_sha: 175a98d3bbdb8bcc074583e46a2d5e86ebcacafe
       none
     network: |
       none
-    screenshot: _project/audits/screenshots/debug-home-chromium-147.png
+    screenshot: not retained in git; original filename debug-home-chromium-147.png
   severity: major
   notes: |
     The Vite server had been restarted immediately before this observation.
@@ -654,7 +654,7 @@ develop_sha: 175a98d3bbdb8bcc074583e46a2d5e86ebcacafe
       none
     network: |
       none
-    screenshot: _project/audits/screenshots/s4.3-chromium-147.png
+    screenshot: not retained in git; original filename s4.3-chromium-147.png
   severity: major
   notes: |
     Same current state as pass-1.
@@ -703,7 +703,7 @@ develop_sha: 175a98d3bbdb8bcc074583e46a2d5e86ebcacafe
       warning: Encountered two children with the same key attribute: 2026-04-04. Keys should be unique.
     network: |
       none
-    screenshot: _project/audits/screenshots/s4.5-chromium-147.png
+    screenshot: not retained in git; original filename s4.5-chromium-147.png
   severity: minor
   notes: |
     Same current state as pass-1.

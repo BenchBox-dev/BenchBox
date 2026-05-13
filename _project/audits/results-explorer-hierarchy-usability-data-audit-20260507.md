@@ -50,10 +50,11 @@ Viewports:
 
 Screenshots captured:
 
-- Directory: `_project/audits/screenshots/results-explorer-hierarchy-usability-data-audit-20260507/`
-- Controlled screenshot manifest: `screenshot-manifest.json`
+- Raw captures were produced during the audit but are no longer retained in git
+  under the artifact-hygiene policy.
+- Controlled screenshot manifest: `screenshot-manifest.json` (not retained)
 - Controlled screenshots: 38
-- Browser Use full-page screenshot: `browser-use-home-live-fullpage.png`
+- Browser Use full-page screenshot: `browser-use-home-live-fullpage.png` (not retained)
 
 Additional focused captures:
 

@@ -1,10 +1,11 @@
 # Results Explorer Display Contract Policy
 
 Date: 2026-05-11
-Source evidence: `_project/verification-logs/results-explorer-display-contract-policy-gate/w0.log`
+Source evidence: compact summary retained in this analysis; raw w0 log no
+longer retained in git.
 Checked SHA: `66f207ee03182dbff4b3e5bc368d2c9be282a9b5`
 Evidence corpus: read-only generated Results Explorer snapshot from the
-primary checkout public data directory, pinned in `w0.log` by SHA256
+primary checkout public data directory, pinned by SHA256
 `7cb861d6cd43f98979b5647813c8c4cbacf2eee05beee0d91152f9df241b05b7`.
 
 ## Decision

@@ -22,12 +22,12 @@ responses on the checked routes.
 
 | Evidence | Command | Result |
 |---|---|---|
-| Dependency TODO state | `uv run --project _project/scripts -- python _project/scripts/todo_cli.py show <DONE item>` for each dependent TODO | PASS, all five dependencies are `Completed` with all work units `done`; captured in `_project/verification-logs/results-explorer-post-completion-release-gate/w0.log` |
+| Dependency TODO state | `uv run --project _project/scripts -- python _project/scripts/todo_cli.py show <DONE item>` for each dependent TODO | PASS, all five dependencies are `Completed` with all work units `done`; summary retained in this audit |
 | Unit tests | `cd results-explorer && npm test -- --run` | PASS, 617 tests passed |
 | Typecheck | `cd results-explorer && npm run typecheck` | PASS |
 | Build | `cd results-explorer && npm run build` | PASS |
 | Full-corpus Explorer data | `uv run -- benchbox explorer build --data-dir results-data --output ~/Developer/benchmark_runs/results_explorer_release_gate_20260510/data` | PASS, 525 results across 57 cohorts |
-| Browser acceptance | Playwright Chromium probe against `results-explorer/scripts/serve-browser-tests.mjs --fixture-dir ~/Developer/benchmark_runs/results_explorer_release_gate_20260510/data` | PASS, captured in `_project/verification-logs/results-explorer-post-completion-release-gate/w2.log` |
+| Browser acceptance | Playwright Chromium probe against `results-explorer/scripts/serve-browser-tests.mjs --fixture-dir ~/Developer/benchmark_runs/results_explorer_release_gate_20260510/data` | PASS, route observations retained below |
 
 ## Routes Checked
 

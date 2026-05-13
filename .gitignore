@@ -179,6 +179,20 @@ _project/TODO/_indexes/
 _project/DONE/_indexes/
 _project/blind-spots/_indexes/
 
+# Ephemeral review/audit evidence. Commit durable markdown summaries instead.
+# benchbox-ignore-lint: allow-next-line tracked
+_project/audits/screenshots/
+# benchbox-ignore-lint: allow-next-line tracked
+_project/audits/**/*.png
+_project/audits/**/*.jpg
+_project/audits/**/*.jpeg
+_project/audits/**/*.webp
+_project/audits/**/*.gif
+# benchbox-ignore-lint: allow-next-line tracked
+_project/verification-logs/*/
+_project/verification-logs/*.log
+_project/verification-logs/*.out
+
 # uv lockfile for the _project/scripts tooling project. Generated on first
 # `uv run --project _project/scripts ...` and was repeatedly leaving fresh
 # pool worktrees "dirty", blocking `make worktree-release`.

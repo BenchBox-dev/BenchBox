@@ -62,10 +62,9 @@ below.
 ## Acceptance contract
 
 Each TODO carries a `w0` work unit that re-validates its findings on the
-current develop tip and writes stdout to
-`_project/verification-logs/<id>/w0.log`. Implementation work is gated on
-that log; the release-gate TODO consumes the per-item logs plus a fresh
-browser pass to produce
+current develop tip. Raw output is temporary evidence; implementation work is
+gated on the compact summary in the TODO/DONE entry plus a fresh browser pass
+to produce
 `_project/audits/results-explorer-post-completion-release-gate-<gate-date>.md`.
 
 If a finding here no longer reproduces on a future develop tip, the

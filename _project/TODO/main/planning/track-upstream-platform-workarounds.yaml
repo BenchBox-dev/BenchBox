@@ -61,9 +61,9 @@ work:
         - The `TODO(chdb-tuple-dataframe)` marker still exists in
           benchbox/platforms/clickhouse/client.py:_arrow_to_dataframe
           (i.e., upstream fix hasn't already landed in our pin).
-      Capture stdout under
-      _project/verification-logs/track-upstream-platform-workarounds/w0.log
-      and commit. If the SIGABRT no longer reproduces, the rest of
+      Capture raw stdout under `/tmp/track-upstream-platform-workarounds-w0.log`
+      or a CI artifact, then commit only a compact summary with command,
+      checked version/SHA, PASS/FAIL, and key lines. If the SIGABRT no longer reproduces, the rest of
       this TODO collapses to "remove the workaround" instead of "file
       upstream."
 

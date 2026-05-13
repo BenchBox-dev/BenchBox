@@ -36,8 +36,8 @@ work:
   notes: |
     Run `todo_cli.py show` or equivalent for each dependency on the checked git
     SHA and verify every work unit is done, every verification item has output,
-    and no dependency remains in `_project/TODO`. Capture the dependency state in
-    `_project/verification-logs/results-explorer-followup-remediation-release-gate/w0.log`.
+    and no dependency remains in `_project/TODO`. Capture raw output outside
+    git and summarize the dependency state in the release-gate audit.
     Decision gate: if any dependency lacks evidence, stop and return it to the
     implementation owner.
 
@@ -153,8 +153,8 @@ verification:
   command: "cd results-explorer && npm test -- --run && npm run typecheck && npm run build"
   expected_output: "all frontend checks pass"
 - description: "Browser acceptance evidence exists"
-  command: "rg -n \"Leaderboards|Benchmark|Platform|Query Workbench|Compare|Result detail|PASS|FAIL\" _project/verification-logs/results-explorer-followup-remediation-release-gate/w3-final-browser.log"
-  expected_output: "logs include route acceptance evidence"
+  command: "rg -n \"Leaderboards|Benchmark|Platform|Query Workbench|Compare|Result detail|PASS|FAIL\" _project/audits/results-explorer-followup-remediation-release-gate-*.md"
+  expected_output: "audit includes route acceptance evidence"
 
 scope_limit:
   only_modify:
@@ -172,7 +172,6 @@ scope_limit:
   - "_project/TODO/results-explorer-followup-todo-review/planning/results-explorer-followup-remediation-release-gate.yaml"
   - "_project/DONE/results-explorer-followup-todo-review/planning/"
   - "_project/audits/results-explorer-followup-remediation-release-gate-*.md"
-  - "_project/verification-logs/results-explorer-followup-remediation-release-gate/"
   do_not_modify:
   - "results-explorer/src/"
   - "benchbox/"
