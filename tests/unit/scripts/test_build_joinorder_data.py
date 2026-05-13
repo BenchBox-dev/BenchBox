@@ -732,6 +732,53 @@ def test_logical_table_hash_matches_csv_and_parquet_despite_file_order(tmp_path:
     ) == build_joinorder_data.aggregate_logical_content_hash([parquet_hash])
 
 
+def test_logical_table_hash_preserves_quoted_csv_null_literal(tmp_path: Path) -> None:
+    duckdb = pytest.importorskip("duckdb")
+    columns = _title_schema()
+    csv_path = tmp_path / "title.csv"
+    literal_parquet_path = tmp_path / "title_literal.parquet"
+    null_parquet_path = tmp_path / "title_null.parquet"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "id,title,production_year",
+                '1,"\\N",2001',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    con = duckdb.connect()
+    try:
+        con.execute("CREATE TABLE title_literal(id INTEGER, title VARCHAR, production_year INTEGER)")
+        con.execute("INSERT INTO title_literal VALUES (1, ?, 2001)", [build_joinorder_data.CSV_NULL])
+        con.execute(
+            f"COPY title_literal TO {build_joinorder_data.duckdb_literal(literal_parquet_path)} (FORMAT 'parquet')"
+        )
+        con.execute("CREATE TABLE title_null(id INTEGER, title VARCHAR, production_year INTEGER)")
+        con.execute("INSERT INTO title_null VALUES (1, NULL, 2001)")
+        con.execute(f"COPY title_null TO {build_joinorder_data.duckdb_literal(null_parquet_path)} (FORMAT 'parquet')")
+        csv_hash = build_joinorder_data.logical_table_hash_from_csv(csv_path, columns)
+        literal_hash = build_joinorder_data.logical_table_hash_from_parquet(
+            con=con,
+            parquet_path=literal_parquet_path,
+            table="title",
+            columns=columns,
+        )
+        null_hash = build_joinorder_data.logical_table_hash_from_parquet(
+            con=con,
+            parquet_path=null_parquet_path,
+            table="title",
+            columns=columns,
+        )
+    finally:
+        con.close()
+
+    assert csv_hash == literal_hash
+    assert csv_hash != null_hash
+
+
 def test_logical_table_hash_rejects_unsorted_csv(tmp_path: Path) -> None:
     csv_path = tmp_path / "title.csv"
     csv_path.write_text(
