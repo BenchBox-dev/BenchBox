@@ -50,6 +50,20 @@ compatibility registry rules:
 - `lakesail/transaction_primitives`
 - `lakesail/ai_primitives`
 
+Follow-up remediation added registry-backed benchmark gates for three
+PostgreSQL-family structural gaps, so the next enumeration should prune 13
+cells total: the four LakeSail cells above plus these nine cells:
+
+- `pg-duckdb/ai_primitives`
+- `pg-duckdb/read_primitives`
+- `pg-duckdb/vector_search`
+- `pg-mooncake/ai_primitives`
+- `pg-mooncake/read_primitives`
+- `pg-mooncake/vector_search`
+- `timescaledb/ai_primitives`
+- `timescaledb/read_primitives`
+- `timescaledb/vector_search`
+
 ## Validation And Explorer
 
 `validator_rollup.tsv` was emitted. LakeSail validation was clean for all
@@ -71,11 +85,19 @@ TimescaleDB cells. The most visible signatures from this run:
 
 - `timescaledb/tpchavoc`: timed out at 600s after repeated 15s Q20 variants;
   earlier in the cell, `17_v4` also failed with missing `dual`.
-- `timescaledb/datavault`: partial result, 3 failed query executions; query 1
-  fails on `DATE '1998-12-01' - 90` syntax.
-- PG extension failures mostly produced no result bundle and show
-  `missing_manifest` in matrix accounting. The failing cells need per-log
-  clustering before they can be fixed or converted to evidence-backed
-  compatibility rules.
+- `datavault`: query 1 failed on `INTERVAL 90 DAY` syntax. Fixed by rendering
+  `INTERVAL '90 days'`; targeted `pg-duckdb/datavault` UAT passed at
+  `/Users/joe/Developer/benchmark_runs/logs/uat_pg_duckdb_fixcheck_20260513/pg-duckdb_datavault_0.01_20260513_125018.log`.
+- `flightdata`: PostgreSQL-family engines rejected `ROUND(double precision,
+  integer)`. Fixed by dialect-rendering FlightData `ROUND()` inputs as numeric;
+  targeted `pg-duckdb/flightdata` UAT passed at
+  `/Users/joe/Developer/benchmark_runs/logs/uat_pg_duckdb_fixcheck_20260513/pg-duckdb_flightdata_0.01_20260513_125001.log`.
+- `tpcds`: PostgreSQL COPY was stripping trailing fields from TPC-DS `.dat`
+  files, causing empty tables and validation failure. Fixed by preserving `.dat`
+  trailing delimiters. Targeted `pg-duckdb/tpcds` now passes load validation and
+  executes 99/103 queries, but remains PARTIAL with Q36/Q70/Q86/Q90 failed:
+  `/Users/joe/Developer/benchmark_runs/logs/uat_pg_duckdb_fixcheck_20260513/pg-duckdb_tpcds_0.01_20260513_125030.log`.
+- Remaining PG extension and TimescaleDB cells still need per-log clustering
+  before they can be fixed or converted to evidence-backed compatibility rules.
 
 No raw UAT logs, result bundles, screenshots, or browser reports are committed.

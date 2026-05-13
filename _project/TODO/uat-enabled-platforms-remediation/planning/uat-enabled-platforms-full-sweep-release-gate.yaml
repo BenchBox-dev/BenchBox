@@ -70,11 +70,23 @@ work:
     needs: [w3]
     status: pending
     notes: |
-      The release gate is blocked, not complete. Follow-up must cluster the
-      PG extension `missing_manifest` failures and TimescaleDB query failures
-      from `/Users/joe/Developer/benchmark_runs/logs/uat_enabled_platforms_full_20260513/`
-      and either fix each runtime/query/load failure or add evidence-backed
-      compatibility rules.
+      The release gate is blocked, not complete. This pass added
+      evidence-backed benchmark gates for PostgreSQL-family
+      `ai_primitives`, `read_primitives`, and `vector_search`; fixed
+      `flightdata` PostgreSQL ROUND rendering; fixed `datavault` interval
+      substitution; and fixed PostgreSQL COPY handling for TPC-DS `.dat`
+      trailing nullable fields.
+
+      Targeted pg-duckdb UAT evidence under
+      `/Users/joe/Developer/benchmark_runs/logs/uat_pg_duckdb_fixcheck_20260513/`:
+      `flightdata` and `datavault` now pass and are submittable.
+      `tpcds` now passes load validation but remains PARTIAL with
+      Q36/Q70/Q86/Q90 failed.
+
+      Remaining PG extension and TimescaleDB failures still need per-log
+      clustering from
+      `/Users/joe/Developer/benchmark_runs/logs/uat_enabled_platforms_full_20260513/`
+      and either fixes or evidence-backed compatibility rules.
 
 deferred:
   - summary: "Run cloud/live platform UAT"
