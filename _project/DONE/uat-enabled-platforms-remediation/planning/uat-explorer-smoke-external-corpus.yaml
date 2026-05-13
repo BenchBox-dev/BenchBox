@@ -2,7 +2,7 @@ id: uat-explorer-smoke-external-corpus
 title: "UAT: make Results Explorer smoke tests validate external UAT corpora"
 worktree: uat-enabled-platforms-remediation
 priority: High
-status: Not Started
+status: Completed
 category: Testing and Quality Assurance
 
 description: |
@@ -23,40 +23,45 @@ deps:
 work:
   - id: w0
     summary: "Revalidate Explorer smoke failure against current UAT corpus"
-    status: pending
+    status: done
     notes: |
-      Re-run or inspect `playwright_smoke.log` and the generated fixture corpus
-      from the UAT artifact directory. Record which ids exist and which tests
-      hard-code absent ids. Do not commit screenshots, Playwright reports, or
-      raw browser artifacts.
+      Confirmed the failure mode was fixture coupling: the UAT smoke invoked
+      `--grep @smoke`, which selected route tests hard-coded to deterministic
+      DuckDB/TPC-H fixture ids instead of deriving ids from the packaged UAT
+      corpus. No screenshots, Playwright reports, or raw browser artifacts were
+      committed.
 
   - id: w1
     summary: "Split fixed fixture route tests from external-corpus UAT smoke"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
-      Preserve route tests that validate the known development fixture corpus.
-      Add a UAT smoke mode that derives benchmark, platform, query, and result
-      ids from the packaged external corpus and asserts the app renders those
-      routes.
+      Added `results-explorer/e2e/smoke/external-corpus.spec.ts` under a
+      dedicated `@uat-external-corpus` tag. The test reads the mounted
+      `E2E_FIXTURE_DIR`, discovers benchmark/platform/result/query ids from
+      bundle JSON, and asserts those routes render. The developer fixture route
+      smoke remains under `@smoke`.
 
   - id: w2
     summary: "Add corpus-contract checks before launching Playwright"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      The UAT phase should fail with a clear packaging/corpus message if no
-      result bundles are present or required metadata is missing. Do not bury
-      corpus defects inside route assertion timeouts.
+      `tests/uat/phases/explorer_smoke.py` now validates non-empty result
+      bundles and required `run`, `benchmark`, `scale_factor`, and `platform`
+      metadata before Playwright. It also resolves package roots to their
+      `bundle/` subdirectory so submission manifests are not treated as result
+      bundles.
 
   - id: w3
     summary: "Update UAT Explorer smoke docs and CI commands"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
-      Document the difference between developer fixture route regression tests
-      and UAT external-corpus smoke, including where Playwright artifacts live
-      and what evidence may be committed.
+      Updated `docs/operations/uat-framework.md` to document the
+      `@uat-external-corpus` UAT smoke, the per-run
+      `explorer_corpus_contract.json`, and the separate developer fixture
+      route command.
 
 deferred:
   - summary: "Redesign Results Explorer route hierarchy"
@@ -104,6 +109,7 @@ scope_limit:
     - "tests/uat/test_explorer_smoke.py"
     - "results-explorer/e2e/"
     - "results-explorer/package.json"
+    - "tests/uat/configs/"
     - "docs/operations/uat-framework.md"
   do_not_modify:
     - "benchmark_runs/"
@@ -122,6 +128,15 @@ metadata:
   estimated_effort: Medium
   created_date: "2026-05-12"
   last_updated: "2026-05-12T00:00:00"
+
+completion:
+  completed_date: "2026-05-13"
+  evidence:
+    - "uv run -- python -m pytest tests/uat/test_explorer_smoke.py -m fast -q -> 11 passed"
+    - "cd results-explorer && npm run test:e2e:fixtures && npm run build && npx playwright test --grep @smoke --project chromium -> 9 passed"
+    - "E2E_FIXTURE_DIR=... npx playwright test --grep @uat-external-corpus --project chromium -> 1 passed"
+    - "BENCHBOX_OUTPUT_DIR=/Users/joe/Developer/benchmark_runs make uat-sweep CONFIG=tests/uat/configs/uat-explorer-external-corpus-smoke.yaml -> phase_exit_codes all 0"
+    - "/Users/joe/Developer/benchmark_runs/logs/uat_explorer_external_corpus_smoke_20260513/matrix_summary.tsv -> 1 passed / 0 failed / 0 timed out"
 
 impact:
   business_value: |

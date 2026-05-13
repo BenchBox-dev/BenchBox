@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -10,6 +11,23 @@ import pytest
 from tests.uat.phases import explorer_smoke
 
 pytestmark = pytest.mark.fast
+
+
+def write_bundle(bundles_dir: Path) -> Path:
+    bundles_dir.mkdir(parents=True, exist_ok=True)
+    path = bundles_dir / "tpch-duckdb-sf0.01-20260403-010ee756.json"
+    path.write_text(
+        json.dumps(
+            {
+                "run": {"id": "010ee756"},
+                "benchmark": {"id": "tpch", "name": "TPC-H", "scale_factor": 0.01},
+                "platform": {"name": "DuckDB"},
+                "queries": [{"id": "Q1", "status": "SUCCESS"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path
 
 
 def test_skipped_when_node_missing(tmp_path: Path):
@@ -36,6 +54,8 @@ def test_runs_builds_fixtures_then_playwright_smoke(tmp_path: Path):
     env_by_invocation: list[dict[str, str] | None] = []
     output_dir = tmp_path / "out"
     fixture_dir = tmp_path / "fixture-data"
+    bundles_dir = tmp_path / "b"
+    write_bundle(bundles_dir)
 
     def fake_runner(argv, stdout=None, stderr=None, check=False, cwd=None, env=None):
         invocations.append(argv)
@@ -51,7 +71,7 @@ def test_runs_builds_fixtures_then_playwright_smoke(tmp_path: Path):
         patch.object(explorer_smoke, "_find_free_local_port", return_value=45678),
     ):
         result = explorer_smoke.run_explorer_smoke(
-            bundles_dir=tmp_path / "b",
+            bundles_dir=bundles_dir,
             output_dir=output_dir,
             log_dir=tmp_path / "logs",
             playwright_browsers=("chromium",),
@@ -60,25 +80,28 @@ def test_runs_builds_fixtures_then_playwright_smoke(tmp_path: Path):
         )
     assert result.skipped is False
     assert result.exit_code() == 0
-    assert len(invocations) == 5
+    assert len(invocations) == 4
     assert invocations[0][:3] == ["benchbox", "explorer", "build"]
     assert "--data-dir" in invocations[0]
     assert invocations[1] == ["npm", "ci"]
-    assert invocations[2] == ["npm", "run", "test:e2e:fixtures"]
-    assert invocations[3] == ["npm", "run", "build"]
-    assert invocations[4][:4] == ["npx", "playwright", "test", "--grep"]
-    assert "@smoke" in invocations[4]
-    assert "--project" in invocations[4]
-    assert "chromium" in invocations[4]
+    assert invocations[2] == ["npm", "run", "build"]
+    assert invocations[3][:4] == ["npx", "playwright", "test", "--grep"]
+    assert explorer_smoke.EXTERNAL_CORPUS_SMOKE_TAG in invocations[3]
+    assert "--project" in invocations[3]
+    assert "chromium" in invocations[3]
     assert all(cwd == explorer_smoke.EXPLORER_DIR for cwd in cwd_by_invocation[1:])
     assert env_by_invocation[-1] is not None
     assert env_by_invocation[-1]["E2E_FIXTURE_DIR"] == str(fixture_dir)
     assert env_by_invocation[-1]["E2E_PORT"] == "45678"
     assert (fixture_dir / "results.duckdb").read_text(encoding="utf-8") == "fixture"
+    contract = (tmp_path / "logs" / "explorer_corpus_contract.json").read_text(encoding="utf-8")
+    assert '"bundles": 1' in contract
 
 
 def test_short_circuits_on_build_failure(tmp_path: Path):
     invocations: list[list[str]] = []
+    bundles_dir = tmp_path / "b"
+    write_bundle(bundles_dir)
 
     def fake_runner(argv, stdout=None, stderr=None, check=False, cwd=None, env=None):
         invocations.append(argv)
@@ -86,7 +109,7 @@ def test_short_circuits_on_build_failure(tmp_path: Path):
 
     with patch.object(explorer_smoke, "has_node", return_value=True):
         result = explorer_smoke.run_explorer_smoke(
-            bundles_dir=tmp_path / "b",
+            bundles_dir=bundles_dir,
             output_dir=tmp_path / "out",
             log_dir=tmp_path / "logs",
             runner=fake_runner,
@@ -123,6 +146,8 @@ def test_default_fixture_dir_is_per_run_and_passed_to_playwright(tmp_path: Path)
     env_by_invocation: list[dict[str, str] | None] = []
     output_dir = tmp_path / "out"
     log_dir = tmp_path / "logs"
+    bundles_dir = tmp_path / "b"
+    write_bundle(bundles_dir)
 
     def fake_runner(argv, stdout=None, stderr=None, check=False, cwd=None, env=None):
         invocations.append(argv)
@@ -137,7 +162,7 @@ def test_default_fixture_dir_is_per_run_and_passed_to_playwright(tmp_path: Path)
         patch.object(explorer_smoke, "_find_free_local_port", return_value=45679),
     ):
         explorer_smoke.run_explorer_smoke(
-            bundles_dir=tmp_path / "b",
+            bundles_dir=bundles_dir,
             output_dir=output_dir,
             log_dir=log_dir,
             runner=fake_runner,
@@ -154,6 +179,8 @@ def test_default_fixture_dir_is_per_run_and_passed_to_playwright(tmp_path: Path)
 
 def test_requested_browser_projects_are_not_silently_dropped(tmp_path: Path):
     invocations: list[list[str]] = []
+    bundles_dir = tmp_path / "b"
+    write_bundle(bundles_dir)
 
     def fake_runner(argv, stdout=None, stderr=None, check=False, cwd=None, env=None):
         invocations.append(argv)
@@ -161,7 +188,7 @@ def test_requested_browser_projects_are_not_silently_dropped(tmp_path: Path):
 
     with patch.object(explorer_smoke, "has_node", return_value=True):
         explorer_smoke.run_explorer_smoke(
-            bundles_dir=tmp_path / "b",
+            bundles_dir=bundles_dir,
             output_dir=tmp_path / "out",
             log_dir=tmp_path / "logs",
             playwright_browsers=("chromium", "firefox"),
@@ -172,3 +199,28 @@ def test_requested_browser_projects_are_not_silently_dropped(tmp_path: Path):
     assert playwright.count("--project") == 2
     assert "chromium" in playwright
     assert "firefox" in playwright
+
+
+def test_external_corpus_contract_fails_before_playwright_for_empty_bundles(tmp_path: Path):
+    with patch.object(explorer_smoke, "has_node", return_value=True):
+        with pytest.raises(RuntimeError, match="no result bundles"):
+            explorer_smoke.run_explorer_smoke(
+                bundles_dir=tmp_path / "empty",
+                output_dir=tmp_path / "out",
+                log_dir=tmp_path / "logs",
+                runner=Mock(),
+            )
+
+
+def test_package_root_resolves_to_bundle_subdirectory(tmp_path: Path):
+    package_root = tmp_path / "submission"
+    bundle_dir = package_root / "bundle"
+    write_bundle(bundle_dir)
+    (package_root / "tpch.manifest.json").write_text('{"kind": "submission-manifest"}', encoding="utf-8")
+
+    contract = explorer_smoke._validate_external_corpus(
+        bundles_dir=explorer_smoke._resolve_bundles_dir(package_root),
+    )
+
+    assert contract["bundles"] == 1
+    assert contract["benchmarks"] == ["tpch"]

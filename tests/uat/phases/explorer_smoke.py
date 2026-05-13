@@ -8,6 +8,7 @@ Playwright remains the single browser-test runner.
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import socket
@@ -17,6 +18,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 EXPLORER_DIR = REPO_ROOT / "results-explorer"
+EXTERNAL_CORPUS_SMOKE_TAG = "@uat-external-corpus"
 
 
 @dataclass(frozen=True)
@@ -61,7 +63,7 @@ def build_argv(
 
 def playwright_argv(playwright_browsers: tuple[str, ...] = ("chromium",)) -> list[str]:
     """Return the direct Playwright smoke argv for the requested browser projects."""
-    argv = ["npx", "playwright", "test", "--grep", "@smoke"]
+    argv = ["npx", "playwright", "test", "--grep", EXTERNAL_CORPUS_SMOKE_TAG]
     for browser in playwright_browsers:
         argv.extend(["--project", browser])
     return argv
@@ -97,7 +99,13 @@ def run_explorer_smoke(
 
     build_log = log_dir / "explorer_build.log"
     smoke_log = log_dir / "playwright_smoke.log"
-    data_dir = _prepare_data_dir(bundles_dir=bundles_dir, log_dir=log_dir)
+    resolved_bundles_dir = _resolve_bundles_dir(bundles_dir)
+    contract = _validate_external_corpus(bundles_dir=resolved_bundles_dir)
+    (log_dir / "explorer_corpus_contract.json").write_text(
+        json.dumps(contract, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    data_dir = _prepare_data_dir(bundles_dir=resolved_bundles_dir, log_dir=log_dir)
     explorer_build_argv = build_argv(data_dir=data_dir, output_dir=output_dir, build_extra_args=build_extra_args)
 
     with build_log.open("w", encoding="utf-8") as fh:
@@ -142,6 +150,17 @@ def _prepare_data_dir(*, bundles_dir: Path, log_dir: Path) -> Path:
         linked_bundles.unlink()
     linked_bundles.symlink_to(bundles_dir, target_is_directory=True)
     return data_dir
+
+
+def _resolve_bundles_dir(path: Path) -> Path:
+    """Accept either DATA_DIR/bundles, a bare bundles dir, or a package root."""
+    if path.name == "bundles":
+        return path
+    if (path / "bundle").is_dir():
+        return path / "bundle"
+    if (path / "bundles").is_dir():
+        return path / "bundles"
+    return path
 
 
 def _default_playwright_fixture_dir(*, log_dir: Path) -> Path:
@@ -189,7 +208,6 @@ def _run_browser_smoke(
     env.setdefault("E2E_PORT", str(_find_free_local_port()))
     commands = (
         ["npm", "ci"],
-        ["npm", "run", "test:e2e:fixtures"],
         ["npm", "run", "build"],
         playwright_argv(playwright_browsers),
     )
@@ -208,6 +226,62 @@ def _absolute_path(path: Path) -> Path:
     if expanded.is_absolute():
         return expanded
     return Path.cwd() / expanded
+
+
+def _validate_external_corpus(*, bundles_dir: Path) -> dict[str, object]:
+    """Fail early when UAT hands Explorer smoke an empty or malformed corpus."""
+    bundle_files = sorted(
+        path
+        for path in bundles_dir.rglob("*.json")
+        if not path.name.endswith(".manifest.json") and not path.name.endswith(".plans.json")
+    )
+    if not bundle_files:
+        raise RuntimeError(f"Explorer smoke corpus has no result bundles: {bundles_dir}")
+
+    benchmarks: set[str] = set()
+    platforms: set[str] = set()
+    query_count = 0
+    checked = 0
+    errors: list[str] = []
+    for path in bundle_files:
+        try:
+            bundle = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            errors.append(f"{path}: invalid JSON ({exc})")
+            continue
+        checked += 1
+        benchmark = bundle.get("benchmark") if isinstance(bundle, dict) else None
+        platform = bundle.get("platform") if isinstance(bundle, dict) else None
+        run = bundle.get("run") if isinstance(bundle, dict) else None
+        benchmark_id = benchmark.get("id") if isinstance(benchmark, dict) else None
+        scale_factor = benchmark.get("scale_factor") if isinstance(benchmark, dict) else None
+        platform_name = platform.get("name") if isinstance(platform, dict) else None
+        run_id = run.get("id") if isinstance(run, dict) else None
+        if not benchmark_id:
+            errors.append(f"{path}: missing benchmark.id")
+        else:
+            benchmarks.add(str(benchmark_id))
+        if scale_factor is None:
+            errors.append(f"{path}: missing benchmark.scale_factor")
+        if not platform_name:
+            errors.append(f"{path}: missing platform.name")
+        else:
+            platforms.add(str(platform_name))
+        if not run_id:
+            errors.append(f"{path}: missing run.id")
+        queries = bundle.get("queries") if isinstance(bundle, dict) else None
+        if isinstance(queries, list):
+            query_count += len(queries)
+
+    if errors:
+        raise RuntimeError("Explorer smoke corpus contract failed:\n  - " + "\n  - ".join(errors[:20]))
+    return {
+        "bundles": len(bundle_files),
+        "checked_bundles": checked,
+        "benchmarks": sorted(benchmarks),
+        "platforms": sorted(platforms),
+        "queries": query_count,
+    }
 
 
 def _find_free_local_port() -> int:
