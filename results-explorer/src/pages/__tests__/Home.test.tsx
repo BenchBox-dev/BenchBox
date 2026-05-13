@@ -784,6 +784,39 @@ describe("Home", () => {
     expect(cohortLink.getAttribute("href")).toContain("phase=power");
     expect(cohortLink.getAttribute("href")).toContain("tuning=auto");
   });
+
+  it("keeps raw tuning option values when display labels are trimmed", async () => {
+    const resultRows = RESULT_ROWS.map((row) =>
+      row.result_id === "r2" ? { ...row, tuning_mode: " auto " } : row,
+    );
+    const cohortRows = COHORT_ROWS.map((row) =>
+      row.result_id === "r2" ? { ...row, tuning_mode: " auto " } : row,
+    );
+    vi.mocked(queryRows).mockImplementation(async (sql: string) => {
+      const s = String(sql).replace(/\s+/g, " ").trim();
+      if (s.includes("FROM bench.results")) return resultRows;
+      if (s.startsWith("SELECT platform_id, platform, avg_rank, n_cohorts FROM bench.meta_leaderboard")) {
+        return META_LEADERBOARD_ROWS;
+      }
+      if (s.includes("FROM bench.cohort_metadata")) return cohortRows;
+      return [];
+    });
+
+    render(<Home />);
+    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+
+    const grid = screen.getByRole("grid", { name: "Cross-benchmark leaderboard" });
+    fireEvent.click(screen.getByText("Advanced filters"));
+    fireEvent.click(screen.getByRole("button", { name: "auto" }));
+
+    await waitFor(() => {
+      expect(within(grid).queryByText("DuckDB")).toBeNull();
+    });
+    expect(within(grid).getByText("SQLite")).toBeTruthy();
+
+    const cohortLink = within(grid).getByRole("link", { name: /^ClickBench SF0.1/ }) as HTMLAnchorElement;
+    expect(cohortLink.getAttribute("href")).toContain("tuning=+auto+");
+  });
 });
 
 describe("toggleFacetValue (w13)", () => {

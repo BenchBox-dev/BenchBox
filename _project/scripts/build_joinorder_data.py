@@ -33,7 +33,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -226,6 +226,12 @@ class LogicalTableHash:
     table: str
     row_count: int
     sha256: str
+
+
+@dataclasses.dataclass(frozen=True)
+class CsvLogicalValue:
+    value: str
+    quoted: bool
 
 
 @dataclasses.dataclass(frozen=True)
@@ -469,8 +475,10 @@ def canonical_logical_value(value: Any, column: ColumnSchema) -> tuple[str, byte
 
     if value is None:
         return ("N", b"")
-    if isinstance(value, str) and value == CSV_NULL:
-        return ("N", b"")
+    if isinstance(value, CsvLogicalValue):
+        if value.value == CSV_NULL and not value.quoted:
+            return ("N", b"")
+        value = value.value
     if is_integer_schema(column):
         return ("I", str(int(value)).encode("ascii"))
     return ("S", str(value).encode("utf-8"))
@@ -485,6 +493,90 @@ def update_logical_row_hash(hasher: Any, columns: Sequence[ColumnSchema], row_va
         tag, payload = canonical_logical_value(value, column)
         update_sized_hash_part(hasher, tag, payload)
     hasher.update(b"}\n")
+
+
+def parse_postgres_csv_record(record: str) -> list[CsvLogicalValue]:
+    """Parse one PostgreSQL COPY CSV record while preserving field quotedness."""
+
+    fields: list[CsvLogicalValue] = []
+    field: list[str] = []
+    quoted = False
+    in_quotes = False
+    at_field_start = True
+    index = 0
+    while index < len(record):
+        char = record[index]
+        if in_quotes:
+            if char == '"':
+                if index + 1 < len(record) and record[index + 1] == '"':
+                    field.append('"')
+                    index += 2
+                    continue
+                in_quotes = False
+            else:
+                field.append(char)
+            index += 1
+            continue
+
+        if at_field_start and char == '"':
+            quoted = True
+            in_quotes = True
+            at_field_start = False
+        elif char == ",":
+            fields.append(CsvLogicalValue("".join(field), quoted))
+            field = []
+            quoted = False
+            at_field_start = True
+        else:
+            field.append(char)
+            at_field_start = False
+        index += 1
+
+    if in_quotes:
+        raise JoinOrderBuildError("CSV record ended inside a quoted field")
+    fields.append(CsvLogicalValue("".join(field), quoted))
+    return fields
+
+
+def iter_postgres_csv_records(path: Path) -> Iterator[list[CsvLogicalValue]]:
+    """Yield PostgreSQL COPY CSV records with quoted-field metadata."""
+
+    record_parts: list[str] = []
+    in_quotes = False
+    at_field_start = True
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        for line in handle:
+            record_parts.append(line)
+            index = 0
+            while index < len(line):
+                char = line[index]
+                if in_quotes:
+                    if char == '"':
+                        if index + 1 < len(line) and line[index + 1] == '"':
+                            index += 2
+                            continue
+                        in_quotes = False
+                    index += 1
+                    continue
+                if at_field_start and char == '"':
+                    in_quotes = True
+                    at_field_start = False
+                elif char == ",":
+                    at_field_start = True
+                elif char not in "\r\n":
+                    at_field_start = False
+                index += 1
+            if not in_quotes:
+                record = "".join(record_parts)
+                if record.endswith("\n"):
+                    record = record[:-1]
+                if record.endswith("\r"):
+                    record = record[:-1]
+                yield parse_postgres_csv_record(record)
+                record_parts = []
+                at_field_start = True
+        if record_parts:
+            raise JoinOrderBuildError(f"CSV file {path} ended inside a quoted record")
 
 
 def logical_content_report_from_hashes(
@@ -547,19 +639,24 @@ def logical_table_hash_from_csv(csv_path: Path, columns: Sequence[ColumnSchema])
     column_names = [column.name for column in columns]
     last_id: int | None = None
     row_count = 0
-    with csv_path.open("r", encoding="utf-8", newline="") as handle:
-        reader = csv.DictReader(handle)
-        if reader.fieldnames != column_names:
-            raise JoinOrderBuildError(
-                f"CSV header mismatch for {csv_path}: expected {column_names}, got {reader.fieldnames}"
-            )
-        for row in reader:
-            row_id = int(row["id"])
-            if last_id is not None and row_id <= last_id:
-                raise JoinOrderBuildError(f"CSV rows for {columns[0].table} are not strictly ordered by id")
-            last_id = row_id
-            update_logical_row_hash(hasher, columns, [row[column.name] for column in columns])
-            row_count += 1
+    records = iter_postgres_csv_records(csv_path)
+    try:
+        header = next(records)
+    except StopIteration as exc:
+        raise JoinOrderBuildError(f"CSV file {csv_path} is empty") from exc
+    fieldnames = [field.value for field in header]
+    if fieldnames != column_names:
+        raise JoinOrderBuildError(f"CSV header mismatch for {csv_path}: expected {column_names}, got {fieldnames}")
+    for row in records:
+        if len(row) != len(columns):
+            raise JoinOrderBuildError(f"CSV row for {columns[0].table} has {len(row)} values for {len(columns)} columns")
+        row_values = dict(zip(column_names, row, strict=True))
+        row_id = int(row_values["id"].value)
+        if last_id is not None and row_id <= last_id:
+            raise JoinOrderBuildError(f"CSV rows for {columns[0].table} are not strictly ordered by id")
+        last_id = row_id
+        update_logical_row_hash(hasher, columns, [row_values[column.name] for column in columns])
+        row_count += 1
     return LogicalTableHash(table=columns[0].table, row_count=row_count, sha256=hasher.hexdigest())
 
 
@@ -2277,7 +2374,16 @@ def verify_reference_results(
 
     for query_id, path in sorted(paths.items(), key=lambda item: query_sort_key(item[0])):
         expected = expected_queries.get(query_id)
+        if expected is None:
+            continue
         if not isinstance(expected, dict):
+            failures.append(
+                {
+                    "query_id": query_id,
+                    "kind": "malformed_reference_query",
+                    "actual_type": type(expected).__name__,
+                }
+            )
             continue
         sql = strip_query_semicolon(path.read_text(encoding="utf-8"))
         row_count = int(

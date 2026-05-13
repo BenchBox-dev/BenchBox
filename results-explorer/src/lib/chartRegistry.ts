@@ -18,10 +18,8 @@
 
 import type { BenchmarkSummary, DetailResult, PlatformRow } from "@/types";
 import {
-  isRankable,
   isTimingDisplayable,
   isValidTimingValue,
-  platformTimingValue,
   type ChartDatasetEligibilityClass,
 } from "@/lib/displayEligibility";
 
@@ -478,8 +476,7 @@ function getChartCapabilities(context: ChartContext): ChartCapabilities {
       summary?.platforms.some(
         (platform) => platform.cost_status === "normalized" && platform.normalized_cost_usd != null,
       ) ?? false,
-    hasPowerScore:
-      summary?.platforms.some((platform) => isRankable(platform) && isValidTimingValue(platform.power_score)) ?? false,
+    hasPowerScore: summary?.platforms.some((platform) => isValidTimingValue(platform.power_score)) ?? false,
     hasPhaseDurations:
       summary?.platforms.some(
         (platform) =>
@@ -491,8 +488,7 @@ function getChartCapabilities(context: ChartContext): ChartCapabilities {
     hasQueryTimings:
       (summary?.platforms.some(
         (platform) =>
-          isTimingDisplayable(platform) &&
-          summary.query_ids.some((queryId) => platformTimingValue(platform, queryId) !== null),
+          summary.query_ids.some((queryId) => Object.prototype.hasOwnProperty.call(platform.timings, queryId)),
       ) ?? false),
     hasPercentileStats:
       summary?.platforms.some((platform) => isTimingDisplayable(platform) && platform.percentile_stats !== null) ?? false,

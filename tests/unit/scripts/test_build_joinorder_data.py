@@ -539,6 +539,78 @@ def test_verify_reference_results_rejects_full_result_hash_drift(
     ]
 
 
+def test_verify_reference_results_rejects_malformed_query_entry(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    query_dir = tmp_path / "queries"
+    query_dir.mkdir()
+    (query_dir / "1a.sql").write_text("SELECT MIN(t.id) AS v FROM title AS t WHERE t.id > 0;", encoding="utf-8")
+    reference_path = tmp_path / "reference_cardinalities.json"
+    reference_path.write_text(json.dumps({"queries": {"1a": "merge-conflict-artifact"}}), encoding="utf-8")
+
+    def fake_psql(*, container_name: str, database: str, user: str, sql: str) -> str:
+        if sql == "SHOW server_version":
+            return "16.2\n"
+        raise AssertionError(sql)
+
+    monkeypatch.setattr(build_joinorder_data, "psql", fake_psql)
+
+    with pytest.raises(build_joinorder_data.JoinOrderBuildError, match="Reference result verification failed"):
+        build_joinorder_data.verify_reference_results(
+            work_dir=tmp_path,
+            query_dir=query_dir,
+            reference_path=reference_path,
+            container_name="pg",
+            database="imdb",
+            user="postgres",
+            expected_query_count=None,
+        )
+
+    manifest = json.loads((tmp_path / build_joinorder_data.BUILD_MANIFEST_NAME).read_text(encoding="utf-8"))
+    failures = manifest["reference_result_verification"]["failures"]
+    assert failures == [
+        {
+            "actual_type": "str",
+            "kind": "malformed_reference_query",
+            "query_id": "1a",
+        }
+    ]
+
+
+def test_verify_reference_results_does_not_double_count_missing_query(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    query_dir = tmp_path / "queries"
+    query_dir.mkdir()
+    (query_dir / "1a.sql").write_text("SELECT MIN(t.id) AS v FROM title AS t WHERE t.id > 0;", encoding="utf-8")
+    reference_path = tmp_path / "reference_cardinalities.json"
+    reference_path.write_text(json.dumps({"queries": {}}), encoding="utf-8")
+
+    def fake_psql(*, container_name: str, database: str, user: str, sql: str) -> str:
+        if sql == "SHOW server_version":
+            return "16.2\n"
+        raise AssertionError(sql)
+
+    monkeypatch.setattr(build_joinorder_data, "psql", fake_psql)
+
+    with pytest.raises(build_joinorder_data.JoinOrderBuildError, match="Reference result verification failed"):
+        build_joinorder_data.verify_reference_results(
+            work_dir=tmp_path,
+            query_dir=query_dir,
+            reference_path=reference_path,
+            container_name="pg",
+            database="imdb",
+            user="postgres",
+            expected_query_count=None,
+        )
+
+    manifest = json.loads((tmp_path / build_joinorder_data.BUILD_MANIFEST_NAME).read_text(encoding="utf-8"))
+    failures = manifest["reference_result_verification"]["failures"]
+    assert failures == [{"kind": "missing_reference_query", "query_id": "1a"}]
+
+
 def test_verify_tiny_fixture_rejects_incomplete_query_directory(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -691,6 +763,53 @@ def test_logical_table_hash_matches_csv_and_parquet_despite_file_order(tmp_path:
     assert build_joinorder_data.aggregate_logical_content_hash(
         [csv_hash]
     ) == build_joinorder_data.aggregate_logical_content_hash([parquet_hash])
+
+
+def test_logical_table_hash_preserves_quoted_csv_null_literal(tmp_path: Path) -> None:
+    duckdb = pytest.importorskip("duckdb")
+    columns = _title_schema()
+    csv_path = tmp_path / "title.csv"
+    literal_parquet_path = tmp_path / "title_literal.parquet"
+    null_parquet_path = tmp_path / "title_null.parquet"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "id,title,production_year",
+                '1,"\\N",2001',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    con = duckdb.connect()
+    try:
+        con.execute("CREATE TABLE title_literal(id INTEGER, title VARCHAR, production_year INTEGER)")
+        con.execute("INSERT INTO title_literal VALUES (1, ?, 2001)", [build_joinorder_data.CSV_NULL])
+        con.execute(
+            f"COPY title_literal TO {build_joinorder_data.duckdb_literal(literal_parquet_path)} (FORMAT 'parquet')"
+        )
+        con.execute("CREATE TABLE title_null(id INTEGER, title VARCHAR, production_year INTEGER)")
+        con.execute("INSERT INTO title_null VALUES (1, NULL, 2001)")
+        con.execute(f"COPY title_null TO {build_joinorder_data.duckdb_literal(null_parquet_path)} (FORMAT 'parquet')")
+        csv_hash = build_joinorder_data.logical_table_hash_from_csv(csv_path, columns)
+        literal_hash = build_joinorder_data.logical_table_hash_from_parquet(
+            con=con,
+            parquet_path=literal_parquet_path,
+            table="title",
+            columns=columns,
+        )
+        null_hash = build_joinorder_data.logical_table_hash_from_parquet(
+            con=con,
+            parquet_path=null_parquet_path,
+            table="title",
+            columns=columns,
+        )
+    finally:
+        con.close()
+
+    assert csv_hash == literal_hash
+    assert csv_hash != null_hash
 
 
 def test_logical_table_hash_rejects_unsorted_csv(tmp_path: Path) -> None:

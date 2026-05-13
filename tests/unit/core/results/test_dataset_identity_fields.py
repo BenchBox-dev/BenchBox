@@ -6,6 +6,7 @@ import pytest
 
 from benchbox.core.data_fetch import load_manifest
 from benchbox.core.results.builder import BenchmarkInfoInput, PlatformInfoInput, ResultBuilder
+from benchbox.core.results.loader import reconstruct_benchmark_results
 from benchbox.core.results.query_normalizer import normalize_query_result
 from benchbox.core.results.schema import build_result_payload
 
@@ -54,3 +55,17 @@ def test_generated_benchmark_payload_omits_dataset_identity() -> None:
     assert "dataset_version" not in payload["benchmark"]
     assert "manifest_hash" not in payload["benchmark"]
     assert "data_archive_hash" not in payload["benchmark"]
+
+
+def test_reexport_preserves_captured_dataset_identity() -> None:
+    payload = build_result_payload(_result("joinorder"))
+    payload["benchmark"]["dataset_version"] = "joinorder-imdb-2013-v0"
+    payload["benchmark"]["manifest_hash"] = "old-manifest-hash"
+    payload["benchmark"]["data_archive_hash"] = "old-archive-hash"
+
+    reconstructed = reconstruct_benchmark_results(payload)
+    reexported = build_result_payload(reconstructed)
+
+    assert reexported["benchmark"]["dataset_version"] == "joinorder-imdb-2013-v0"
+    assert reexported["benchmark"]["manifest_hash"] == "old-manifest-hash"
+    assert reexported["benchmark"]["data_archive_hash"] == "old-archive-hash"

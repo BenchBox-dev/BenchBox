@@ -563,6 +563,84 @@ describe("ChartPanel", () => {
     expect(screen.getByText(/Validation status excludes this result from ranking/)).toBeTruthy();
   });
 
+  it("keeps per-query charts selectable when every timing row is display-excluded", () => {
+    render(
+      <ChartPanel
+        context={{
+          kind: "summary",
+          summary: makeSummary({
+            platforms: [
+              makePlatformRow({
+                result_id: "row-1",
+                platform: "Zero DuckDB",
+                has_display_timing: false,
+                valid_query_count: 0,
+                zero_timing_count: 2,
+                display_exclusion_reason: "zero_timings_only",
+                display_geomean_ms: null,
+                sample_geomean_ms: null,
+                timings: { Q1: 0, Q2: 0 },
+              }),
+              makePlatformRow({
+                result_id: "row-2",
+                platform: "Invalid SQLite",
+                has_display_timing: false,
+                valid_query_count: 0,
+                zero_timing_count: 2,
+                display_exclusion_reason: "zero_timings_only",
+                display_geomean_ms: null,
+                sample_geomean_ms: null,
+                timings: { Q1: 0, Q2: 0 },
+              }),
+            ],
+          }),
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Per-query" }));
+
+    expect(screen.getByRole("button", { name: "Query Heatmap" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Query Histogram" })).toBeTruthy();
+    expect(screen.getByRole("status", { name: "Query Heatmap unavailable" })).toBeTruthy();
+    expect(screen.getByText("No valid display timings")).toBeTruthy();
+    expect(screen.getByText(/Only exact zero timings are available/)).toBeTruthy();
+  });
+
+  it("keeps the power chart selectable when every power row is unrankable", () => {
+    render(
+      <ChartPanel
+        context={{
+          kind: "summary",
+          summary: makeSummary({
+            ranking: { primary_metric: "power_score", secondary_metric: "display_geomean_ms", primary_order: "desc" },
+            platforms: [
+              makePlatformRow({
+                result_id: "community-high",
+                platform: "Community High",
+                power_score: 9000,
+                ranking_exclusion_reason: "trust_not_rankable",
+              }),
+              makePlatformRow({
+                result_id: "failed-low",
+                platform: "Failed Low",
+                power_score: 1000,
+                ranking_exclusion_reason: "validation_not_clean",
+              }),
+            ],
+          }),
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Power@Size Bar" }));
+
+    expect(screen.getByRole("status", { name: "Power@Size Bar unavailable" })).toBeTruthy();
+    expect(screen.getByText("No rankable rows")).toBeTruthy();
+    expect(screen.getByText(/Trust policy excludes this result from ranking/)).toBeTruthy();
+    expect(screen.getByText(/Validation status excludes this result from ranking/)).toBeTruthy();
+  });
+
   it("filters rank-unsafe rows out of power charts and discloses the exclusion", () => {
     render(
       <ChartPanel
