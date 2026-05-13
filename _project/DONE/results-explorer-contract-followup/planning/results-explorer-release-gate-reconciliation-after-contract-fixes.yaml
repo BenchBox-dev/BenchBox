@@ -2,7 +2,8 @@ id: results-explorer-release-gate-reconciliation-after-contract-fixes
 title: "Reconcile Results Explorer release gates after contract-level fixes"
 worktree: results-explorer-contract-followup
 priority: Critical
-status: Blocked
+status: Completed
+completed_date: "2026-05-13"
 category: Testing and Quality Assurance
 
 description: |
@@ -26,16 +27,10 @@ deps:
   - results-explorer-metric-display-precision-and-scope-copy
   - results-explorer-home-theme-and-responsive-density-contract
 
-blockers:
-- date: "2026-05-12"
-  work: [w1, w2, w3, w4, w5]
-  reason: "Contract TODOs that define expected identity, trend, metric/scope, and home/theme behavior must land before the release gate can classify e2e failures as stale tests or product bugs."
-  unblock: "Complete all dependency TODOs and rerun the release gate from the same checked SHA."
-
 work:
 - id: w0
   summary: "Reproduce and classify every current release-gate failure"
-  status: pending
+  status: done
   notes: |
     Run the Results Explorer build, unit tests, and Chromium e2e gate on the
     checked SHA. For each failure, record:
@@ -54,7 +49,7 @@ work:
 - id: w1
   summary: "Route product defects through dependency TODOs before changing tests"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     For failures classified as product bugs, stop the gate and return the issue
     to the relevant dependency TODO or create a focused follow-up if no
@@ -70,7 +65,7 @@ work:
 - id: w2
   summary: "Update stale tests to assert documented product contracts"
   needs: [w0, w1]
-  status: pending
+  status: done
   notes: |
     For failures classified as stale tests, update selectors and assertions to
     match the documented contract. Examples:
@@ -88,7 +83,7 @@ work:
 - id: w3
   summary: "Add missing contract regression tests for new issues"
   needs: [w1, w2]
-  status: pending
+  status: done
   notes: |
     Add or extend tests for:
       - public run identity consistency across row, tray, detail, chart, and
@@ -102,7 +97,7 @@ work:
 - id: w4
   summary: "Run the full Results Explorer release gate"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Run the same release-gate commands used for the failing review. Capture
     command status, counts, and failure tails under
@@ -114,7 +109,7 @@ work:
 - id: w5
   summary: "Perform browser acceptance on every Results Explorer route"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     Restart the local dev server and manually/browser-automate:
       - Leaderboards filters, sorting, comparison entrypoint, theme, mobile
@@ -137,7 +132,7 @@ work:
 - id: w6
   summary: "Write the final closure artifact"
   needs: [w5]
-  status: pending
+  status: done
   notes: |
     Write a compact audit artifact at
     `_project/audits/results-explorer-release-gate-reconciliation-after-contract-fixes-<date>.md`
@@ -148,8 +143,10 @@ work:
 
 prior_art:
 - "results-explorer/e2e/ contains the failing Chromium e2e gate."
-- "results-explorer/src/pages/__tests__/ and results-explorer/src/components/__tests__/ contain route and component expectations that may be stale."
-- "_project/DONE/results-explorer-followup-todo-review/planning/results-explorer-followup-remediation-release-gate.yaml captured the previous release gate structure."
+- "results-explorer/src/pages/__tests__/ and results-explorer/src/components/__tests__/ contain route and component expectations
+  that may be stale."
+- "_project/DONE/results-explorer-followup-todo-review/planning/results-explorer-followup-remediation-release-gate.yaml captured
+  the previous release gate structure."
 - "The dependency TODOs in this worktree define the new identity, trend, metric/scope, and home/theme contracts."
 
 must_preserve:
@@ -180,7 +177,8 @@ verification:
   command: "cd results-explorer && npx playwright test --project=chromium"
   expected_output: "Chromium e2e has zero unexpected failures"
 - description: "Release-gate evidence is captured"
-  command: "rg -n \"PASS|FAIL|classification|browser acceptance|remaining defects\" _project/verification-logs/results-explorer-release-gate-reconciliation-after-contract-fixes/ _project/audits/"
+  command: "rg -n \"PASS|FAIL|classification|browser acceptance|remaining defects\" _project/verification-logs/results-explorer-release-gate-reconciliation-after-contract-fixes/
+    _project/audits/"
   expected_output: "logs and audit artifact record the final gate outcome"
 
 scope_limit:
@@ -197,7 +195,8 @@ scope_limit:
   - "benchbox/core/explorer_pipeline/"
 
 success_metrics:
-- "Every previously failing e2e assertion is classified and resolved as either fixed product behavior or an updated contract test."
+- "Every previously failing e2e assertion is classified and resolved as either fixed product behavior or an updated contract
+  test."
 - "Chromium e2e, build, and targeted unit/component tests pass."
 - "Browser acceptance covers every Results Explorer page and visible control."
 - "Remaining issues, if any, are P2/P3 with explicit follow-up TODOs."

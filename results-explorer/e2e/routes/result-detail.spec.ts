@@ -28,7 +28,7 @@ test.describe("ResultDetail", () => {
     await page.goto(`/results/r/${TPCH_DUCKDB_ID}`);
     await waitForDataLoaded(page, /Query Timings/);
 
-    const header = page.getByRole("columnheader", { name: /Median \(ms\)/ });
+    const header = page.getByRole("columnheader", { name: /Median latency/ });
     // First click sorts ascending; second click flips to descending. We
     // assert on the arrow indicator because row-order comparison is noisy
     // across browsers.

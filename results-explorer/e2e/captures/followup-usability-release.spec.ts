@@ -173,7 +173,7 @@ test.describe("@followup-usability release-gate route walk", () => {
   });
 
   test("Benchmark detail exposes a sibling switcher and the heatmap header is sticky-top", async ({ page }) => {
-    await page.goto("/results/tpch/?phase=power");
+    await page.goto("/results/tpch/?sf=0.01&phase=standard");
     await waitForShell(page);
     await waitForDataLoaded(page, /TPC-H Results/);
 
@@ -189,9 +189,11 @@ test.describe("@followup-usability release-gate route walk", () => {
 
     const firstHeatmapRow = page.locator("tbody tr[data-testid]").first();
     await expect(firstHeatmapRow).toBeVisible();
-    const cells = firstHeatmapRow.locator('td[role="gridcell"]');
-    await expect(cells.nth(1).getByRole("link", { name: /Receipt/ })).toHaveCount(0);
-    await expect(cells.nth(2).getByRole("link", { name: /Receipt/ })).toBeVisible();
+    // Matrix reachability now lives behind the compact per-row
+    // "Receipt and metadata" disclosure so the dense timing cells stay
+    // scannable. Open the disclosure before asserting receipt links.
+    await firstHeatmapRow.locator("summary", { hasText: /Receipt and metadata/ }).click();
+    await expect(firstHeatmapRow.getByRole("link", { name: /Receipt/ }).first()).toBeVisible();
 
     await maybeCapture(page, "benchmark-detail-switcher-and-sticky-header");
   });
@@ -205,12 +207,14 @@ test.describe("@followup-usability release-gate route walk", () => {
     await expect(switcher).toBeVisible();
 
     const compareCheckboxes = page.locator('input[data-testid^="platform-compare-checkbox-"]');
-    await expect(compareCheckboxes.first()).toBeVisible();
+    const enabledCompareCheckboxes = page.locator('input[data-testid^="platform-compare-checkbox-"]:not(:disabled)');
+    await expect(enabledCompareCheckboxes.first()).toBeVisible();
     expect(await compareCheckboxes.count()).toBeGreaterThan(1);
-    await compareCheckboxes.first().click();
-    expect(await countDisabled(compareCheckboxes)).toBeGreaterThan(0);
-    await compareCheckboxes.first().click();
-    expect(await countDisabled(compareCheckboxes)).toBe(0);
+    const baselineDisabledCount = await countDisabled(compareCheckboxes);
+    await enabledCompareCheckboxes.first().check();
+    expect(await countDisabled(compareCheckboxes)).toBeGreaterThan(baselineDisabledCount);
+    await enabledCompareCheckboxes.first().uncheck();
+    expect(await countDisabled(compareCheckboxes)).toBe(baselineDisabledCount);
 
     // The filter strip only renders when allPlatformResults.length >= 25.
     // The committed audit corpus exceeds that threshold; the small browser
