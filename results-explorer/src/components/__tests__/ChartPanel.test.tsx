@@ -563,6 +563,50 @@ describe("ChartPanel", () => {
     expect(screen.getByText(/Validation status excludes this result from ranking/)).toBeTruthy();
   });
 
+  it("keeps per-query charts selectable when every timing row is display-excluded", () => {
+    render(
+      <ChartPanel
+        context={{
+          kind: "summary",
+          summary: makeSummary({
+            platforms: [
+              makePlatformRow({
+                result_id: "row-1",
+                platform: "Zero DuckDB",
+                has_display_timing: false,
+                valid_query_count: 0,
+                zero_timing_count: 2,
+                display_exclusion_reason: "zero_timings_only",
+                display_geomean_ms: null,
+                sample_geomean_ms: null,
+                timings: { Q1: 0, Q2: 0 },
+              }),
+              makePlatformRow({
+                result_id: "row-2",
+                platform: "Invalid SQLite",
+                has_display_timing: false,
+                valid_query_count: 0,
+                zero_timing_count: 2,
+                display_exclusion_reason: "zero_timings_only",
+                display_geomean_ms: null,
+                sample_geomean_ms: null,
+                timings: { Q1: 0, Q2: 0 },
+              }),
+            ],
+          }),
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Per-query" }));
+
+    expect(screen.getByRole("button", { name: "Query Heatmap" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Query Histogram" })).toBeTruthy();
+    expect(screen.getByRole("status", { name: "Query Heatmap unavailable" })).toBeTruthy();
+    expect(screen.getByText("No valid display timings")).toBeTruthy();
+    expect(screen.getByText(/Only exact zero timings are available/)).toBeTruthy();
+  });
+
   it("keeps the power chart selectable when every power row is unrankable", () => {
     render(
       <ChartPanel

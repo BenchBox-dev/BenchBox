@@ -20,7 +20,6 @@ import type { BenchmarkSummary, DetailResult, PlatformRow } from "@/types";
 import {
   isTimingDisplayable,
   isValidTimingValue,
-  platformTimingValue,
   type ChartDatasetEligibilityClass,
 } from "@/lib/displayEligibility";
 
@@ -489,8 +488,7 @@ function getChartCapabilities(context: ChartContext): ChartCapabilities {
     hasQueryTimings:
       (summary?.platforms.some(
         (platform) =>
-          isTimingDisplayable(platform) &&
-          summary.query_ids.some((queryId) => platformTimingValue(platform, queryId) !== null),
+          summary.query_ids.some((queryId) => Object.prototype.hasOwnProperty.call(platform.timings, queryId)),
       ) ?? false),
     hasPercentileStats:
       summary?.platforms.some((platform) => isTimingDisplayable(platform) && platform.percentile_stats !== null) ?? false,
