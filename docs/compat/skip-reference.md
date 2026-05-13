@@ -4,13 +4,24 @@
 
 Rules the registry applies to queries, benchmarks, and DDL statements. Split into two sections based on whether the outcome is user-visible in result counts. Each entry names the platform, the scope the rule applies to, the registered reason, and the rule_id you can grep for in `benchbox/sql_compat/rules/`.
 
-**Total rules:** 24
+**Total rules:** 30
 
-**Platforms with rules:** 12
+**Platforms with rules:** 13
 
 ## Will not run
 
 Queries or benchmarks that are **omitted from the result set** - either because the benchmark is refused at preflight (BLOCKED) or a specific query is excluded from execution (SKIPPED_QUERY). Users see these as missing entries in result counts.
+
+### lakesail
+
+| support | scope | phase | reason | rule_id |
+|---|---|---|---|---|
+| SKIPPED_QUERY | benchmark=vector_search, query=Q1 | query_source | LakeSail/Sail has no native vector-distance functions for this benchmark and rejects Spark SQL lambda fallback expressions. | `query_source.lakesail.vector_search.q1_unsupported` |
+| SKIPPED_QUERY | benchmark=vector_search, query=Q2 | query_source | LakeSail/Sail has no native vector-distance functions for this benchmark and rejects Spark SQL lambda fallback expressions. | `query_source.lakesail.vector_search.q2_unsupported` |
+| SKIPPED_QUERY | benchmark=vector_search, query=Q3 | query_source | LakeSail/Sail has no native vector-distance functions for this benchmark and rejects Spark SQL lambda fallback expressions. | `query_source.lakesail.vector_search.q3_unsupported` |
+| SKIPPED_QUERY | benchmark=vector_search, query=Q4 | query_source | LakeSail/Sail has no native vector-distance functions for this benchmark and rejects Spark SQL lambda fallback expressions. | `query_source.lakesail.vector_search.q4_unsupported` |
+| SKIPPED_QUERY | benchmark=vector_search, query=Q5 | query_source | LakeSail/Sail has no native vector-distance functions for this benchmark and rejects Spark SQL lambda fallback expressions. | `query_source.lakesail.vector_search.q5_unsupported` |
+| SKIPPED_QUERY | benchmark=vector_search, query=Q6 | query_source | LakeSail/Sail has no native vector-distance functions for this benchmark and rejects Spark SQL lambda fallback expressions. | `query_source.lakesail.vector_search.q6_unsupported` |
 
 ### questdb
 

@@ -30,6 +30,7 @@ _P = Phase.QUERY_SOURCE
 _B = "vector_search"
 
 _REASONS: dict[str, str] = {
+    "spark": "Spark SQL uses higher-order array functions for exact vector search; DuckDB array_* functions are not available",
     "starrocks": "StarRocks uses cosine_similarity / l2_distance; DuckDB array_* functions are not available",
     "doris": "Doris uses cosine_distance / l2_distance on ARRAY<FLOAT>; DuckDB array_* functions are not available",
     "postgresql": "PostgreSQL + pgvector uses <=> and <-> operators; DuckDB array_* functions are not available",
@@ -58,6 +59,35 @@ for _platform, _reason in _REASONS.items():
             benchmark=_B,
             query_id=_qid,
         )
+
+# LakeSail/Sail lacks the DuckDB array_* vector functions and currently also
+# rejects Spark SQL lambda functions, so the Spark higher-order-array fallback
+# cannot run there.
+for _qid in ("Q1", "Q2", "Q3", "Q4", "Q5", "Q6"):
+    REGISTRY.register(
+        CompatibilityDecision(
+            rule_id=f"query_source.lakesail.vector_search.{_qid.lower()}_unsupported",
+            action=CompatAction.SKIP_QUERY,
+            support_level=SupportLevel.SKIPPED_QUERY,
+            failure_mode=FailureMode.UNSUPPORTED_FEATURE,
+            payload=SkipQueryPayload(
+                reason=(
+                    "LakeSail/Sail rejects DuckDB array_cosine_similarity/array_distance and the Spark "
+                    "higher-order array lambda fallback; targeted UAT on 2026-05-13 failed with "
+                    "'unknown function: array_cosine_similarity' and then 'lambda function'."
+                ),
+                query_id=_qid,
+            ),
+            reason=(
+                "LakeSail/Sail has no native vector-distance functions for this benchmark and rejects "
+                "Spark SQL lambda fallback expressions."
+            ),
+        ),
+        _P,
+        "lakesail",
+        benchmark=_B,
+        query_id=_qid,
+    )
 
 # ---------------------------------------------------------------------------
 # Version-gated rules: StarRocks Q2 (l2_distance requires ≥3.2)

@@ -118,6 +118,19 @@ class TestLakeSailAdapter:
         adapter = LakeSailAdapter()
         assert adapter.get_target_dialect() == "spark"
 
+    def test_vector_search_queries_use_lakesail_compat_key(self, mock_pyspark):
+        """Vector search needs LakeSail-specific skips, not generic Spark variants."""
+        from benchbox.platforms.lakesail import LakeSailAdapter
+
+        adapter = LakeSailAdapter()
+        benchmark = MagicMock()
+        benchmark.get_queries.return_value = {}
+
+        queries = adapter._get_dialect_queries(benchmark, "vector_search", connection=None)
+
+        assert queries == {}
+        benchmark.get_queries.assert_called_once_with(dialect="lakesail", platform_version=None)
+
     def test_platform_info(self, mock_pyspark):
         """Test platform info collection."""
         from benchbox.platforms.lakesail import LakeSailAdapter

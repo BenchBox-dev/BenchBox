@@ -301,7 +301,6 @@ class TestVectorSearchQueryManager:
 
         mgr = VectorSearchQueryManager()
         dialects = mgr.supported_dialects()
-        assert "lakesail" in dialects
         assert "spark" in dialects
         assert "starrocks" in dialects
         assert "doris" in dialects
@@ -309,16 +308,22 @@ class TestVectorSearchQueryManager:
         assert "clickhouse" in dialects
         assert "snowflake" in dialects
 
-    def test_lakesail_queries_use_spark_array_functions(self):
+    def test_spark_queries_use_array_functions(self):
         from benchbox.core.vector_search.queries import VectorSearchQueryManager
 
         mgr = VectorSearchQueryManager()
-        queries = mgr.get_all_queries(dialect="lakesail")
+        queries = mgr.get_all_queries(dialect="spark")
         assert set(queries) == set(ALL_QUERY_IDS)
         assert all("array_cosine_similarity" not in sql for sql in queries.values())
         assert "zip_with" in queries["Q1"]
         assert "aggregate" in queries["Q1"]
         assert "sqrt" in queries["Q2"]
+
+    def test_lakesail_vector_queries_are_skipped(self):
+        from benchbox.core.vector_search.queries import VectorSearchQueryManager
+
+        mgr = VectorSearchQueryManager()
+        assert mgr.get_all_queries(dialect="lakesail") == {}
 
     def test_q3_has_category_filter(self):
         from benchbox.core.vector_search.queries import VectorSearchQueryManager

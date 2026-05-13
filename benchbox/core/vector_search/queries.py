@@ -443,7 +443,7 @@ LIMIT 20
     },
 }
 
-for _spark_alias in ("lakesail", "pyspark", "velox", "databricks"):
+for _spark_alias in ("pyspark", "velox", "databricks"):
     QUERY_VARIANTS[_spark_alias] = QUERY_VARIANTS["spark"]
 
 
