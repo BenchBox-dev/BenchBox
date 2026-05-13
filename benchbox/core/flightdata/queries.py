@@ -17,6 +17,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 import sqlglot
+from sqlglot import exp
 
 # Query definitions: 20 OLAP queries across 5 categories
 QUERIES: dict[str, dict[str, Any]] = {
@@ -641,7 +642,7 @@ class FlightDataQueryManager:
             ) from exc
 
         if dialect in {"postgres", "postgresql"}:
-            return sqlglot.transpile(rendered, read="duckdb", write="postgres", identify=True)[0]
+            return _render_postgres_query(rendered)
         return rendered
 
     def get_queries(self, dialect: str | None = None) -> dict[str, str]:
@@ -690,3 +691,16 @@ class FlightDataQueryManager:
             "category": q["category"],
             "key": query_key,
         }
+
+
+def _render_postgres_query(sql: str) -> str:
+    """Render FlightData SQL for PostgreSQL-family engines."""
+    tree = sqlglot.parse_one(sql, read="duckdb")
+
+    def cast_round_input(node: exp.Expression) -> exp.Expression:
+        if isinstance(node, exp.Round):
+            node = node.copy()
+            node.set("this", exp.cast(node.this.copy(), "DECIMAL"))
+        return node
+
+    return tree.transform(cast_round_input).sql(dialect="postgres", identify=True)
