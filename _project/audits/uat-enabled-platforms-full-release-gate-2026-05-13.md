@@ -153,6 +153,29 @@ TimescaleDB cells. The most visible signatures from this run:
   and after each benchmark SELECT, with a one-shot retry for that exact
   pg_mooncake transient error. Targeted `pg-mooncake/amplab` passed:
   `/Users/joe/Developer/benchmark_runs/logs/uat_pg_mooncake_fixcheck_20260513_amplab_retry.log`.
+- `pg-mooncake/h2odb`, `pg-mooncake/coffeeshop`, `pg-mooncake/ssb`,
+  `pg-mooncake/clickbench`, and `pg-mooncake/tpcdi`: targeted reruns passed
+  after the pg_mooncake transaction-boundary fix and prior PostgreSQL-family
+  SQL/data-loading fixes:
+  `/Users/joe/Developer/benchmark_runs/logs/uat_pg_mooncake_fixcheck_20260513_h2odb.log`,
+  `/Users/joe/Developer/benchmark_runs/logs/uat_pg_mooncake_fixcheck_20260513_coffeeshop.log`,
+  `/Users/joe/Developer/benchmark_runs/logs/uat_pg_mooncake_fixcheck_20260513_ssb.log`,
+  `/Users/joe/Developer/benchmark_runs/logs/uat_pg_mooncake_fixcheck_20260513_clickbench.log`,
+  and
+  `/Users/joe/Developer/benchmark_runs/logs/uat_pg_mooncake_fixcheck_20260513_tpcdi.log`.
+- `pg-mooncake/write_primitives` and `pg-mooncake/transaction_primitives`:
+  the Docker pg_mooncake stack now starts PostgreSQL with
+  `max_wal_senders=128`, `max_replication_slots=128`, and `wal_level=logical`
+  so multi-cell UAT promotion does not exhaust the default sender limit.
+  After that provisioning fix, `write_primitives` reached execution but failed
+  setup against mooncake mirror tables with `DuckDB does not support
+  modififying Postgres tables`; `transaction_primitives` failed in the same
+  TPC-H corpus promotion/write path with Moonlink duplicate replication
+  registration. Added pg-mooncake-only benchmark gates for both write-heavy
+  primitive benchmarks:
+  `/Users/joe/Developer/benchmark_runs/logs/uat_pg_mooncake_fixcheck_20260513_write_primitives_retry.log`
+  and
+  `/Users/joe/Developer/benchmark_runs/logs/uat_pg_mooncake_fixcheck_20260513_transaction_primitives.log`.
 - Remaining PG extension and TimescaleDB cells still need per-log clustering
   before they can be fixed or converted to evidence-backed compatibility rules.
 

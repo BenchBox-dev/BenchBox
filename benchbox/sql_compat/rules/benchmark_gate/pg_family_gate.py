@@ -39,6 +39,29 @@ def _register_pg_family_gate(
         )
 
 
+def _register_pg_mooncake_gate(
+    *,
+    benchmark: str,
+    rule_suffix: str,
+    reason: str,
+    payload_reason: str | None = None,
+    failure_mode: FailureMode = FailureMode.UNSUPPORTED_FEATURE,
+) -> None:
+    REGISTRY.register(
+        CompatibilityDecision(
+            rule_id=f"benchmark_gate.pg-mooncake.{benchmark}.{rule_suffix}",
+            action=CompatAction.BLOCK_BENCHMARK,
+            support_level=SupportLevel.BLOCKED,
+            failure_mode=failure_mode,
+            payload=BlockBenchmarkPayload(reason=payload_reason or reason),
+            reason=reason,
+        ),
+        Phase.BENCHMARK_GATE,
+        "pg-mooncake",
+        benchmark=benchmark,
+    )
+
+
 _register_pg_family_gate(
     benchmark="ai_primitives",
     rule_suffix="unsupported",
@@ -68,5 +91,27 @@ _register_pg_family_gate(
         "UNPIVOT, struct/map/list intrinsics, and related functions. The 2026-05-13 enabled-platform "
         "UAT run showed repeated unsupported-function and syntax failures across pg-duckdb, "
         "pg-mooncake, and TimescaleDB."
+    ),
+)
+
+_register_pg_mooncake_gate(
+    benchmark="write_primitives",
+    rule_suffix="moonlink_read_only_mirrors",
+    reason=(
+        "pg_mooncake benchmark tables are promoted to mooncake mirrors for analytical execution, and those "
+        "mirrors do not support the write_primitives setup/write contract. Targeted UAT on 2026-05-13 "
+        "reached execution after raising replication sender limits, then failed setup with "
+        "`DuckDB does not support modififying Postgres tables`."
+    ),
+)
+
+_register_pg_mooncake_gate(
+    benchmark="transaction_primitives",
+    rule_suffix="moonlink_read_only_mirrors",
+    reason=(
+        "pg_mooncake benchmark tables are promoted to mooncake mirrors for analytical execution, but "
+        "transaction_primitives requires repeated transactional writes against the TPC-H corpus. Targeted "
+        "UAT on 2026-05-13 failed in the same promotion/write path, including Moonlink duplicate replication "
+        "registration after the write_primitives attempt."
     ),
 )

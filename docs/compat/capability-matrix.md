@@ -4,7 +4,7 @@
 
 Every rule registered in `benchbox.sql_compat` is listed below. The registry is the authoritative source of compatibility policy; this document is regenerated from it. See [adr-sql-compat-phase-aware-pipeline.md](../development/adr/adr-sql-compat-phase-aware-pipeline.md) for the design.
 
-**Total registered rules:** 274
+**Total registered rules:** 276
 
 **Platforms covered:** 28
 
@@ -23,7 +23,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | lakesail | 4 | 6 | - | - | 1 | 69 | 80 |
 | mysql | - | 1 | - | - | - | - | 1 |
 | pg-duckdb | 3 | - | - | - | - | 4 | 7 |
-| pg-mooncake | 3 | - | - | - | - | - | 3 |
+| pg-mooncake | 5 | - | - | - | - | - | 5 |
 | pg_mooncake | - | - | - | - | 1 | - | 1 |
 | postgres | - | - | - | 1 | - | 67 | 68 |
 | postgresql | - | 6 | - | 1 | 1 | - | 8 |
@@ -237,7 +237,9 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 |---|---|---|---|---|---|
 | benchmark_gate | benchmark=ai_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.pg-mooncake.ai_primitives.unsupported` |
 | benchmark_gate | benchmark=read_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.pg-mooncake.read_primitives.duckdb_intrinsics` |
+| benchmark_gate | benchmark=transaction_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.pg-mooncake.transaction_primitives.moonlink_read_only_mirrors` |
 | benchmark_gate | benchmark=vector_search | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.pg-mooncake.vector_search.no_vector_type` |
+| benchmark_gate | benchmark=write_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.pg-mooncake.write_primitives.moonlink_read_only_mirrors` |
 
 ### pg_mooncake
 

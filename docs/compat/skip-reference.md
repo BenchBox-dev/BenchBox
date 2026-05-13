@@ -4,7 +4,7 @@
 
 Rules the registry applies to queries, benchmarks, and DDL statements. Split into two sections based on whether the outcome is user-visible in result counts. Each entry names the platform, the scope the rule applies to, the registered reason, and the rule_id you can grep for in `benchbox/sql_compat/rules/`.
 
-**Total rules:** 183
+**Total rules:** 185
 
 **Platforms with rules:** 17
 
@@ -114,7 +114,9 @@ Queries or benchmarks that are **omitted from the result set** - either because 
 |---|---|---|---|---|
 | BLOCKED | benchmark=ai_primitives | benchmark_gate | AI primitives is an LLM/tooling benchmark, not a PostgreSQL-family SQL engine workload. The 2026-05-13 enabled-platform UAT run failed before schema creation with `argument should be a str or an os.PathLike object` on pg-duckdb, pg-mooncake, and TimescaleDB. | `benchmark_gate.pg-mooncake.ai_primitives.unsupported` |
 | BLOCKED | benchmark=read_primitives | benchmark_gate | Read primitives currently includes a DuckDB-heavy SQL primitive catalog without PostgreSQL-family variants for approximate aggregates, arg_min/arg_max, GROUP BY ALL, ORDER BY ALL, ASOF JOIN, UNPIVOT, struct/map/list intrinsics, and related functions. The 2026-05-13 enabled-platform UAT run showed repeated unsupported-function and syntax failures across pg-duckdb, pg-mooncake, and TimescaleDB. | `benchmark_gate.pg-mooncake.read_primitives.duckdb_intrinsics` |
+| BLOCKED | benchmark=transaction_primitives | benchmark_gate | pg_mooncake benchmark tables are promoted to mooncake mirrors for analytical execution, but transaction_primitives requires repeated transactional writes against the TPC-H corpus. Targeted UAT on 2026-05-13 failed in the same promotion/write path, including Moonlink duplicate replication registration after the write_primitives attempt. | `benchmark_gate.pg-mooncake.transaction_primitives.moonlink_read_only_mirrors` |
 | BLOCKED | benchmark=vector_search | benchmark_gate | Vector search requires a VECTOR column type and vector-distance operators. The 2026-05-13 enabled-platform UAT run failed during schema creation with `type "vector" does not exist` on pg-duckdb, pg-mooncake, and TimescaleDB. | `benchmark_gate.pg-mooncake.vector_search.no_vector_type` |
+| BLOCKED | benchmark=write_primitives | benchmark_gate | pg_mooncake benchmark tables are promoted to mooncake mirrors for analytical execution, and those mirrors do not support the write_primitives setup/write contract. Targeted UAT on 2026-05-13 reached execution after raising replication sender limits, then failed setup with `DuckDB does not support modififying Postgres tables`. | `benchmark_gate.pg-mooncake.write_primitives.moonlink_read_only_mirrors` |
 
 ### postgres
 

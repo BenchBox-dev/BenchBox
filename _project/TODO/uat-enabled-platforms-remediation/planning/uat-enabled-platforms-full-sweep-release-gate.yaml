@@ -125,6 +125,22 @@ work:
       Targeted `pg-mooncake/amplab` passed and was submittable:
       `/Users/joe/Developer/benchmark_runs/logs/uat_pg_mooncake_fixcheck_20260513_amplab_retry.log`.
 
+      The same pg_mooncake transaction-boundary fix, plus prior PostgreSQL-family
+      SQL/data-loading fixes, cleared targeted `pg-mooncake/h2odb`,
+      `pg-mooncake/coffeeshop`, `pg-mooncake/ssb`, `pg-mooncake/clickbench`,
+      and `pg-mooncake/tpcdi`.
+
+      The Docker pg_mooncake stack now starts PostgreSQL with
+      `max_wal_senders=128`, `max_replication_slots=128`, and
+      `wal_level=logical` to prevent multi-cell UAT promotion from exhausting
+      the default 10 replication sender slots. After that provisioning fix,
+      `pg-mooncake/write_primitives` reached execution but failed setup against
+      mooncake mirror tables with `DuckDB does not support modififying Postgres
+      tables`; `pg-mooncake/transaction_primitives` failed in the same TPC-H
+      corpus promotion/write path with Moonlink duplicate replication
+      registration. Added pg-mooncake-only benchmark gates for both write-heavy
+      primitive benchmarks.
+
       Remaining PG extension and TimescaleDB failures still need per-log
       clustering from
       `/Users/joe/Developer/benchmark_runs/logs/uat_enabled_platforms_full_20260513/`
