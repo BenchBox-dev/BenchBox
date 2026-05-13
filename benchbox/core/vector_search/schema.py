@@ -60,6 +60,12 @@ _EMBEDDING_TYPE_MAP: dict[str, str] = {
     # StarRocks / Doris: ARRAY<FLOAT> without dimension (sized arrays unsupported)
     "starrocks": "ARRAY<FLOAT>",
     "doris": "ARRAY<FLOAT>",
+    # Spark-family engines support arrays but not fixed-size array type syntax.
+    "spark": "ARRAY<FLOAT>",
+    "lakesail": "ARRAY<FLOAT>",
+    "pyspark": "ARRAY<FLOAT>",
+    "velox": "ARRAY<FLOAT>",
+    "databricks": "ARRAY<FLOAT>",
     # SingleStore: native VECTOR type (SingleStore 8.5+)
     "mysql": "VECTOR({dim}, F32)",
     # Default/fallback: use DuckDB syntax for OLAP databases

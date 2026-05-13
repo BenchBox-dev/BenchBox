@@ -372,6 +372,12 @@ class TestVectorSearchSchema:
 
         assert get_embedding_type("doris", 128) == "ARRAY<FLOAT>"
 
+    def test_spark_family_embedding_type(self):
+        from benchbox.core.vector_search.schema import get_embedding_type
+
+        assert get_embedding_type("lakesail", 128) == "ARRAY<FLOAT>"
+        assert get_embedding_type("spark", 768) == "ARRAY<FLOAT>"
+
     def test_get_create_table_sql_vectors(self):
         from benchbox.core.vector_search.schema import get_create_table_sql
 
@@ -398,6 +404,13 @@ class TestVectorSearchSchema:
         from benchbox.core.vector_search.schema import get_create_table_sql
 
         sql = get_create_table_sql("vectors", dialect="doris", dimensions=128)
+        assert "ARRAY<FLOAT>" in sql
+        assert "[128]" not in sql
+
+    def test_get_create_table_sql_lakesail_uses_unsized_array(self):
+        from benchbox.core.vector_search.schema import get_create_table_sql
+
+        sql = get_create_table_sql("vectors", dialect="lakesail", dimensions=128)
         assert "ARRAY<FLOAT>" in sql
         assert "[128]" not in sql
 
