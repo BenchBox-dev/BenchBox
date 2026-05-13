@@ -130,6 +130,30 @@ def test_enumerate_records_registry_benchmark_gates():
     assert pruned_by_benchmark["metadata_primitives"].evidence.startswith("benchbox.sql_compat benchmark_gate")
 
 
+def test_enumerate_records_pg_family_registry_benchmark_gates():
+    raw = {
+        "platforms": {"include": ["pg-duckdb", "pg-mooncake", "timescaledb"]},
+        "benchmarks": {"include": ["ai_primitives", "read_primitives", "vector_search", "tpch"]},
+        "scales": {"rungs": [0.01]},
+    }
+
+    result = enum_phase.enumerate_cells_with_pruning(raw)
+
+    assert {(c.platform, c.benchmark) for c in result.cells} == {
+        ("pg-duckdb", "tpch"),
+        ("pg-mooncake", "tpch"),
+        ("timescaledb", "tpch"),
+    }
+    assert len(result.compatibility_pruned) == 9
+    pruned = {(c.platform, c.benchmark): c for c in result.compatibility_pruned}
+    for platform in ("pg-duckdb", "pg-mooncake", "timescaledb"):
+        assert pruned[(platform, "ai_primitives")].rule_id == f"uat.compat.{platform}.ai_primitives.benchmark_gate"
+        assert pruned[(platform, "read_primitives")].rule_id == (
+            f"uat.compat.{platform}.read_primitives.benchmark_gate"
+        )
+        assert pruned[(platform, "vector_search")].rule_id == f"uat.compat.{platform}.vector_search.benchmark_gate"
+
+
 def test_enumerate_honours_scale_options():
     raw = {
         "platforms": {"include": ["duckdb"]},

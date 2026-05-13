@@ -4,9 +4,9 @@
 
 Rules the registry applies to queries, benchmarks, and DDL statements. Split into two sections based on whether the outcome is user-visible in result counts. Each entry names the platform, the scope the rule applies to, the registered reason, and the rule_id you can grep for in `benchbox/sql_compat/rules/`.
 
-**Total rules:** 103
+**Total rules:** 112
 
-**Platforms with rules:** 13
+**Platforms with rules:** 16
 
 ## Will not run
 
@@ -96,6 +96,22 @@ Queries or benchmarks that are **omitted from the result set** - either because 
 | SKIPPED_QUERY | benchmark=tpchavoc, query=8_v1 | execution_filter | Sail loses projected field names in this variant and cannot resolve the subquery field. | `execution_filter.lakesail.tpchavoc.8_v1` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=9_v1 | execution_filter | Sail loses qualified field names in this variant and cannot resolve `n2.n_name`. | `execution_filter.lakesail.tpchavoc.9_v1` |
 
+### pg-duckdb
+
+| support | scope | phase | reason | rule_id |
+|---|---|---|---|---|
+| BLOCKED | benchmark=ai_primitives | benchmark_gate | AI primitives is an LLM/tooling benchmark, not a PostgreSQL-family SQL engine workload. The 2026-05-13 enabled-platform UAT run failed before schema creation with `argument should be a str or an os.PathLike object` on pg-duckdb, pg-mooncake, and TimescaleDB. | `benchmark_gate.pg-duckdb.ai_primitives.unsupported` |
+| BLOCKED | benchmark=read_primitives | benchmark_gate | Read primitives currently includes a DuckDB-heavy SQL primitive catalog without PostgreSQL-family variants for approximate aggregates, arg_min/arg_max, GROUP BY ALL, ORDER BY ALL, ASOF JOIN, UNPIVOT, struct/map/list intrinsics, and related functions. The 2026-05-13 enabled-platform UAT run showed repeated unsupported-function and syntax failures across pg-duckdb, pg-mooncake, and TimescaleDB. | `benchmark_gate.pg-duckdb.read_primitives.duckdb_intrinsics` |
+| BLOCKED | benchmark=vector_search | benchmark_gate | Vector search requires a VECTOR column type and vector-distance operators. The 2026-05-13 enabled-platform UAT run failed during schema creation with `type "vector" does not exist` on pg-duckdb, pg-mooncake, and TimescaleDB. | `benchmark_gate.pg-duckdb.vector_search.no_vector_type` |
+
+### pg-mooncake
+
+| support | scope | phase | reason | rule_id |
+|---|---|---|---|---|
+| BLOCKED | benchmark=ai_primitives | benchmark_gate | AI primitives is an LLM/tooling benchmark, not a PostgreSQL-family SQL engine workload. The 2026-05-13 enabled-platform UAT run failed before schema creation with `argument should be a str or an os.PathLike object` on pg-duckdb, pg-mooncake, and TimescaleDB. | `benchmark_gate.pg-mooncake.ai_primitives.unsupported` |
+| BLOCKED | benchmark=read_primitives | benchmark_gate | Read primitives currently includes a DuckDB-heavy SQL primitive catalog without PostgreSQL-family variants for approximate aggregates, arg_min/arg_max, GROUP BY ALL, ORDER BY ALL, ASOF JOIN, UNPIVOT, struct/map/list intrinsics, and related functions. The 2026-05-13 enabled-platform UAT run showed repeated unsupported-function and syntax failures across pg-duckdb, pg-mooncake, and TimescaleDB. | `benchmark_gate.pg-mooncake.read_primitives.duckdb_intrinsics` |
+| BLOCKED | benchmark=vector_search | benchmark_gate | Vector search requires a VECTOR column type and vector-distance operators. The 2026-05-13 enabled-platform UAT run failed during schema creation with `type "vector" does not exist` on pg-duckdb, pg-mooncake, and TimescaleDB. | `benchmark_gate.pg-mooncake.vector_search.no_vector_type` |
+
 ### questdb
 
 | support | scope | phase | reason | rule_id |
@@ -107,6 +123,14 @@ Queries or benchmarks that are **omitted from the result set** - either because 
 | support | scope | phase | reason | rule_id |
 |---|---|---|---|---|
 | SKIPPED_QUERY | benchmark=vector_search, query=Q2 | query_source | StarRocks <3.2 does not support l2_distance - skip Q2 rather than fail at runtime | `query_source.starrocks.vector_search.q2_lt_32_skip` |
+
+### timescaledb
+
+| support | scope | phase | reason | rule_id |
+|---|---|---|---|---|
+| BLOCKED | benchmark=ai_primitives | benchmark_gate | AI primitives is an LLM/tooling benchmark, not a PostgreSQL-family SQL engine workload. The 2026-05-13 enabled-platform UAT run failed before schema creation with `argument should be a str or an os.PathLike object` on pg-duckdb, pg-mooncake, and TimescaleDB. | `benchmark_gate.timescaledb.ai_primitives.unsupported` |
+| BLOCKED | benchmark=read_primitives | benchmark_gate | Read primitives currently includes a DuckDB-heavy SQL primitive catalog without PostgreSQL-family variants for approximate aggregates, arg_min/arg_max, GROUP BY ALL, ORDER BY ALL, ASOF JOIN, UNPIVOT, struct/map/list intrinsics, and related functions. The 2026-05-13 enabled-platform UAT run showed repeated unsupported-function and syntax failures across pg-duckdb, pg-mooncake, and TimescaleDB. | `benchmark_gate.timescaledb.read_primitives.duckdb_intrinsics` |
+| BLOCKED | benchmark=vector_search | benchmark_gate | Vector search requires a VECTOR column type and vector-distance operators. The 2026-05-13 enabled-platform UAT run failed during schema creation with `type "vector" does not exist` on pg-duckdb, pg-mooncake, and TimescaleDB. | `benchmark_gate.timescaledb.vector_search.no_vector_type` |
 
 ## Runs with caveats
 

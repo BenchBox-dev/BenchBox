@@ -4,9 +4,9 @@
 
 Every rule registered in `benchbox.sql_compat` is listed below. The registry is the authoritative source of compatibility policy; this document is regenerated from it. See [adr-sql-compat-phase-aware-pipeline.md](../development/adr/adr-sql-compat-phase-aware-pipeline.md) for the design.
 
-**Total registered rules:** 194
+**Total registered rules:** 203
 
-**Platforms covered:** 25
+**Platforms covered:** 28
 
 ## Phase coverage by platform
 
@@ -22,6 +22,8 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | firebolt | - | - | - | - | 1 | - | 1 |
 | lakesail | 4 | 6 | - | - | 1 | 69 | 80 |
 | mysql | - | 1 | - | - | - | - | 1 |
+| pg-duckdb | 3 | - | - | - | - | - | 3 |
+| pg-mooncake | 3 | - | - | - | - | - | 3 |
 | pg_mooncake | - | - | - | - | 1 | - | 1 |
 | postgres | - | - | - | 1 | - | - | 1 |
 | postgresql | - | 6 | - | 1 | 1 | - | 8 |
@@ -34,6 +36,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | starrocks | - | 14 | 1 | 2 | 1 | - | 18 |
 | synapse | - | - | - | - | 1 | - | 1 |
 | timescale | - | - | - | 3 | - | - | 3 |
+| timescaledb | 3 | - | - | - | - | - | 3 |
 | trino | - | - | - | 2 | 1 | - | 3 |
 | tsql | - | - | - | 2 | - | - | 2 |
 | velox | - | - | - | - | 1 | - | 1 |
@@ -216,6 +219,22 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 |---|---|---|---|---|---|
 | query_source | benchmark=h2odb, query=Q9 | select_variant | REWRITTEN | SYNTAX_ERROR | `query_source.mysql.h2odb.q9_within_group_verbatim` |
 
+### pg-duckdb
+
+| phase | scope | action | support | failure mode | rule_id |
+|---|---|---|---|---|---|
+| benchmark_gate | benchmark=ai_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.pg-duckdb.ai_primitives.unsupported` |
+| benchmark_gate | benchmark=read_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.pg-duckdb.read_primitives.duckdb_intrinsics` |
+| benchmark_gate | benchmark=vector_search | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.pg-duckdb.vector_search.no_vector_type` |
+
+### pg-mooncake
+
+| phase | scope | action | support | failure mode | rule_id |
+|---|---|---|---|---|---|
+| benchmark_gate | benchmark=ai_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.pg-mooncake.ai_primitives.unsupported` |
+| benchmark_gate | benchmark=read_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.pg-mooncake.read_primitives.duckdb_intrinsics` |
+| benchmark_gate | benchmark=vector_search | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.pg-mooncake.vector_search.no_vector_type` |
+
 ### pg_mooncake
 
 | phase | scope | action | support | failure mode | rule_id |
@@ -337,6 +356,14 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | schema_emit | benchmark=nyctaxi | rewrite_ddl | REWRITTEN | UNSUPPORTED_FEATURE | `schema_emit.timescale.nyctaxi.all.range_partition_ddl` |
 | schema_emit | benchmark=tsbs_devops | rewrite_ddl | REWRITTEN | UNSUPPORTED_FEATURE | `schema_emit.timescale.tsbs_devops.all.hypertable_ddl` |
 | schema_emit | benchmark=tsbs_devops, query=tags | native | NATIVE | NONE | `schema_emit.timescale.tsbs_devops.tags.native_ddl` |
+
+### timescaledb
+
+| phase | scope | action | support | failure mode | rule_id |
+|---|---|---|---|---|---|
+| benchmark_gate | benchmark=ai_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.timescaledb.ai_primitives.unsupported` |
+| benchmark_gate | benchmark=read_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.timescaledb.read_primitives.duckdb_intrinsics` |
+| benchmark_gate | benchmark=vector_search | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.timescaledb.vector_search.no_vector_type` |
 
 ### trino
 
