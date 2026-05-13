@@ -220,6 +220,24 @@ class TableFile:
 
 
 @dataclasses.dataclass(frozen=True)
+class LogicalTableHash:
+    """Canonical row-content hash for one table."""
+
+    table: str
+    row_count: int
+    sha256: str
+
+
+@dataclasses.dataclass(frozen=True)
+class LogicalContentReport:
+    """CSV/Parquet logical content verification report."""
+
+    aggregate_hash: str
+    tables: list[dict[str, Any]]
+    failures: list[str]
+
+
+@dataclasses.dataclass(frozen=True)
 class QueryParts:
     """Simple SELECT/FROM/WHERE split for canonical flat JOB SQL."""
 
@@ -423,6 +441,154 @@ def aggregate_table_hash(table_files: Sequence[TableFile]) -> str:
 
     payload = "\n".join(f"{entry.table}:{entry.sha256}" for entry in sorted(table_files, key=lambda f: f.table))
     return hashlib.sha256((payload + "\n").encode("utf-8")).hexdigest()
+
+
+def aggregate_logical_content_hash(table_hashes: Sequence[LogicalTableHash]) -> str:
+    """Stable dataset hash over logical table-content hashes."""
+
+    payload = "\n".join(
+        f"{entry.table}:{entry.row_count}:{entry.sha256}" for entry in sorted(table_hashes, key=lambda f: f.table)
+    )
+    return hashlib.sha256((payload + "\n").encode("utf-8")).hexdigest()
+
+
+def is_integer_schema(column: ColumnSchema) -> bool:
+    return column.duckdb_type in DUCKDB_INTEGER_RANGES
+
+
+def update_sized_hash_part(hasher: Any, tag: str, payload: bytes) -> None:
+    hasher.update(tag.encode("ascii"))
+    hasher.update(str(len(payload)).encode("ascii"))
+    hasher.update(b":")
+    hasher.update(payload)
+    hasher.update(b";")
+
+
+def canonical_logical_value(value: Any, column: ColumnSchema) -> tuple[str, bytes]:
+    """Return a type-tagged value payload independent of CSV/Parquet encoding."""
+
+    if value is None:
+        return ("N", b"")
+    if isinstance(value, str) and value == CSV_NULL:
+        return ("N", b"")
+    if is_integer_schema(column):
+        return ("I", str(int(value)).encode("ascii"))
+    return ("S", str(value).encode("utf-8"))
+
+
+def update_logical_row_hash(hasher: Any, columns: Sequence[ColumnSchema], row_values: Sequence[Any]) -> None:
+    if len(row_values) != len(columns):
+        raise JoinOrderBuildError(f"Logical hash row has {len(row_values)} values for {len(columns)} columns")
+    hasher.update(b"row{")
+    for column, value in zip(columns, row_values, strict=True):
+        update_sized_hash_part(hasher, "C", column.name.encode("utf-8"))
+        tag, payload = canonical_logical_value(value, column)
+        update_sized_hash_part(hasher, tag, payload)
+    hasher.update(b"}\n")
+
+
+def logical_content_report_from_hashes(
+    *,
+    work_dir: Path,
+    table_reports: list[dict[str, Any]],
+    parquet_hashes: Sequence[LogicalTableHash],
+    failures: list[str],
+) -> LogicalContentReport:
+    aggregate_hash = aggregate_logical_content_hash(parquet_hashes)
+    report = LogicalContentReport(aggregate_hash=aggregate_hash, tables=table_reports, failures=failures)
+    write_build_manifest(
+        work_dir,
+        {
+            "logical_content": {
+                "verified_at": utc_now_iso(),
+                "hash_version": "joinorder-logical-content-v1",
+                "logical_content_rebuild": "PASS" if not failures else "FAIL",
+                "aggregate_hash": aggregate_hash,
+                "tables": table_reports,
+                "failures": failures,
+            }
+        },
+    )
+    if failures:
+        raise JoinOrderBuildError(f"Logical content validation failed with {len(failures)} issue(s): {failures[:5]}")
+    return report
+
+
+def logical_content_table_report(csv_hash: LogicalTableHash, parquet_hash: LogicalTableHash) -> tuple[dict[str, Any], list[str]]:
+    table_report = {
+        "table": parquet_hash.table,
+        "row_count": parquet_hash.row_count,
+        "csv_row_count": csv_hash.row_count,
+        "csv_logical_sha256": csv_hash.sha256,
+        "parquet_logical_sha256": parquet_hash.sha256,
+        "status": "PASS" if csv_hash == parquet_hash else "FAIL",
+    }
+    failures: list[str] = []
+    if csv_hash.row_count != parquet_hash.row_count:
+        failures.append(f"{parquet_hash.table}: row count mismatch csv={csv_hash.row_count} parquet={parquet_hash.row_count}")
+    if csv_hash.sha256 != parquet_hash.sha256:
+        failures.append(
+            f"{parquet_hash.table}: logical content hash mismatch csv={csv_hash.sha256} parquet={parquet_hash.sha256}"
+        )
+    return table_report, failures
+
+
+def logical_table_hash_from_csv(csv_path: Path, columns: Sequence[ColumnSchema]) -> LogicalTableHash:
+    """Hash canonical CSV rows in id order.
+
+    The CSV source is expected to come from `copy_table_to_csv`, which orders by
+    `id`; validating monotonic ids keeps this hash a source-content contract
+    rather than an accidental file-byte contract.
+    """
+
+    hasher = hashlib.sha256()
+    update_sized_hash_part(hasher, "V", b"joinorder-logical-content-v1")
+    update_sized_hash_part(hasher, "T", columns[0].table.encode("utf-8"))
+    column_names = [column.name for column in columns]
+    last_id: int | None = None
+    row_count = 0
+    with csv_path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        if reader.fieldnames != column_names:
+            raise JoinOrderBuildError(
+                f"CSV header mismatch for {csv_path}: expected {column_names}, got {reader.fieldnames}"
+            )
+        for row in reader:
+            row_id = int(row["id"])
+            if last_id is not None and row_id <= last_id:
+                raise JoinOrderBuildError(f"CSV rows for {columns[0].table} are not strictly ordered by id")
+            last_id = row_id
+            update_logical_row_hash(hasher, columns, [row[column.name] for column in columns])
+            row_count += 1
+    return LogicalTableHash(table=columns[0].table, row_count=row_count, sha256=hasher.hexdigest())
+
+
+def logical_table_hash_from_parquet(
+    *,
+    con: Any,
+    parquet_path: Path,
+    table: str,
+    columns: Sequence[ColumnSchema],
+    batch_size: int = 100_000,
+) -> LogicalTableHash:
+    """Hash canonical Parquet rows in id order, ignoring Parquet file layout."""
+
+    hasher = hashlib.sha256()
+    update_sized_hash_part(hasher, "V", b"joinorder-logical-content-v1")
+    update_sized_hash_part(hasher, "T", table.encode("utf-8"))
+    select_list = ", ".join(quote_ident(column.name) for column in columns)
+    cursor = con.execute(
+        f"SELECT {select_list} FROM read_parquet({duckdb_literal(parquet_path)}) ORDER BY {quote_ident('id')}"
+    )
+    row_count = 0
+    while True:
+        rows = cursor.fetchmany(batch_size)
+        if not rows:
+            break
+        for row in rows:
+            update_logical_row_hash(hasher, columns, row)
+            row_count += 1
+    return LogicalTableHash(table=table, row_count=row_count, sha256=hasher.hexdigest())
 
 
 def sql_literal(value: str) -> str:
@@ -970,9 +1136,10 @@ def copy_table_to_csv(
     sql_where: str | None = None,
 ) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
-    source = f"public.{quote_ident(table)}"
+    source = f"SELECT * FROM public.{quote_ident(table)}"
     if sql_where:
-        source = f"(SELECT * FROM {source} WHERE {sql_where} ORDER BY id)"
+        source = f"{source} WHERE {sql_where}"
+    source = f"({source} ORDER BY {quote_ident('id')})"
     copy_sql = (
         f"COPY {source} TO STDOUT WITH "
         "(FORMAT csv, ENCODING 'UTF8', HEADER true, QUOTE '\"', ESCAPE '\"', FORCE_QUOTE *, NULL '\\N')"
@@ -1235,7 +1402,7 @@ def extract_and_convert_parquet_streaming(
     container_name: str,
     database: str,
     user: str,
-) -> list[TableFile]:
+) -> tuple[list[TableFile], LogicalContentReport]:
     try:
         import duckdb
     except ImportError as exc:
@@ -1246,6 +1413,9 @@ def extract_and_convert_parquet_streaming(
     row_counts = load_build_manifest(work_dir).get("restore", {}).get("row_counts", EXPECTED_ROW_COUNTS)
     csv_files: list[TableFile] = []
     parquet_files: list[TableFile] = []
+    logical_table_reports: list[dict[str, Any]] = []
+    logical_parquet_hashes: list[LogicalTableHash] = []
+    logical_failures: list[str] = []
     utf8_samples: list[dict[str, Any]] = []
     forced_types: dict[str, dict[str, str]] = {}
     con = duckdb.connect()
@@ -1260,6 +1430,7 @@ def extract_and_convert_parquet_streaming(
                 table=table,
                 destination=csv_path,
             )
+            csv_logical_hash = logical_table_hash_from_csv(csv_path, schema[table])
             csv_sha, _md5, csv_size = hash_file(csv_path)
             csv_files.append(
                 TableFile(
@@ -1289,6 +1460,16 @@ def extract_and_convert_parquet_streaming(
                 table=table,
                 columns=schema[table],
             )
+            parquet_logical_hash = logical_table_hash_from_parquet(
+                con=con,
+                parquet_path=parquet_path,
+                table=table,
+                columns=schema[table],
+            )
+            logical_report, table_failures = logical_content_table_report(csv_logical_hash, parquet_logical_hash)
+            logical_table_reports.append(logical_report)
+            logical_parquet_hashes.append(parquet_logical_hash)
+            logical_failures.extend(table_failures)
             parquet_files.append(table_file)
             csv_path.unlink()
             print(
@@ -1318,7 +1499,13 @@ def extract_and_convert_parquet_streaming(
             },
         },
     )
-    return parquet_files
+    logical_content_report = logical_content_report_from_hashes(
+        work_dir=work_dir,
+        table_reports=logical_table_reports,
+        parquet_hashes=logical_parquet_hashes,
+        failures=logical_failures,
+    )
+    return parquet_files, logical_content_report
 
 
 def load_table_files_from_manifest(work_dir: Path, key: str) -> list[TableFile]:
@@ -1931,6 +2118,54 @@ def validate_conversion_fidelity(
     if failures:
         raise JoinOrderBuildError(f"Conversion fidelity validation failed with {len(failures)} issue(s): {failures[:5]}")
     return report
+
+
+def verify_logical_content_hashes(
+    *,
+    work_dir: Path,
+    schema: Mapping[str, Sequence[ColumnSchema]],
+) -> LogicalContentReport:
+    """Verify that canonical CSV source rows and Parquet rows are logically equal."""
+
+    try:
+        import duckdb
+    except ImportError as exc:
+        raise JoinOrderBuildError("duckdb is required in _project/scripts to verify logical content hashes") from exc
+
+    csv_dir = work_dir / "csv"
+    parquet_dir = work_dir / "parquet"
+    if not csv_dir.exists():
+        raise JoinOrderBuildError(f"CSV directory missing: {csv_dir}")
+    if not parquet_dir.exists():
+        raise JoinOrderBuildError(f"Parquet directory missing: {parquet_dir}")
+
+    table_reports: list[dict[str, Any]] = []
+    parquet_hashes: list[LogicalTableHash] = []
+    failures: list[str] = []
+    con = duckdb.connect()
+    try:
+        for table in TABLE_NAMES:
+            columns = list(schema[table])
+            csv_hash = logical_table_hash_from_csv(csv_dir / f"{table}.csv", columns)
+            parquet_hash = logical_table_hash_from_parquet(
+                con=con,
+                parquet_path=parquet_dir / f"{table}.parquet",
+                table=table,
+                columns=columns,
+            )
+            parquet_hashes.append(parquet_hash)
+            table_report, table_failures = logical_content_table_report(csv_hash, parquet_hash)
+            table_reports.append(table_report)
+            failures.extend(table_failures)
+    finally:
+        con.close()
+
+    return logical_content_report_from_hashes(
+        work_dir=work_dir,
+        table_reports=table_reports,
+        parquet_hashes=parquet_hashes,
+        failures=failures,
+    )
 
 
 def compute_reference_cardinalities(
@@ -2780,6 +3015,13 @@ def build_parser() -> argparse.ArgumentParser:
     add_existing_postgres_args(fidelity)
     fidelity.add_argument("--utf8-sample-size", type=int, default=100)
 
+    logical_content = subparsers.add_parser(
+        "verify-logical-content",
+        help="Verify canonical CSV rows and Parquet rows have identical logical content hashes.",
+    )
+    add_common_args(logical_content)
+    add_existing_postgres_args(logical_content)
+
     rebuild_local = subparsers.add_parser(
         "rebuild-local",
         help="Rebuild the Parquet archive from an existing restored PostgreSQL container without staging a release.",
@@ -2973,10 +3215,22 @@ def run_verify_conversion_fidelity(args: argparse.Namespace) -> int:
     return 0
 
 
+def run_verify_logical_content(args: argparse.Namespace) -> int:
+    work_dir = work_dir_from_arg(args.work_dir)
+    schema = postgres_schema(container_name=args.container_name, database=args.database, user=args.user)
+    report = verify_logical_content_hashes(work_dir=work_dir, schema=schema)
+    total_rows = sum(int(table["row_count"]) for table in report.tables)
+    print(
+        "logical_content_rebuild=PASS "
+        f"tables={len(report.tables)} rows={total_rows} aggregate_hash={report.aggregate_hash}"
+    )
+    return 0
+
+
 def run_rebuild_local(args: argparse.Namespace) -> int:
     work_dir = work_dir_from_arg(args.work_dir)
     schema = postgres_schema(container_name=args.container_name, database=args.database, user=args.user)
-    parquet_files = extract_and_convert_parquet_streaming(
+    parquet_files, logical_report = extract_and_convert_parquet_streaming(
         work_dir=work_dir,
         schema=schema,
         container_name=args.container_name,
@@ -2996,6 +3250,10 @@ def run_rebuild_local(args: argparse.Namespace) -> int:
     )
     print(f"Local rebuild archive: {archive_path}")
     print(f"Local rebuild sha256: {sha_path.read_text(encoding='utf-8').split()[0]}")
+    print(
+        "logical_content_rebuild=PASS "
+        f"tables={len(logical_report.tables)} aggregate_hash={logical_report.aggregate_hash}"
+    )
     return 0
 
 
@@ -3095,7 +3353,7 @@ def run_foundation(args: argparse.Namespace) -> int:
     print_restore_summary(validation, build_manifest_path(work_dir))
     try:
         schema = postgres_schema(container_name=actual_container_name, database=args.database, user=args.user)
-        parquet_files = extract_and_convert_parquet_streaming(
+        parquet_files, _logical_report = extract_and_convert_parquet_streaming(
             work_dir=work_dir,
             schema=schema,
             container_name=actual_container_name,
@@ -3168,6 +3426,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "cardinalities": run_cardinalities,
         "verify-reference-results": run_verify_reference_results,
         "verify-conversion-fidelity": run_verify_conversion_fidelity,
+        "verify-logical-content": run_verify_logical_content,
         "rebuild-local": run_rebuild_local,
         "cross-check": run_cross_check,
         "package": run_package,

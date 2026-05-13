@@ -2,8 +2,8 @@
 
 Date: 2026-05-12
 
-Status: Dataverse source attested; conversion fidelity verified; byte-identical
-rebuild not established.
+Status: Dataverse source attested; conversion fidelity verified; rebuild
+contract resolved as logical content equivalence.
 
 ## Source Checksum Attestation
 
@@ -80,8 +80,8 @@ Table byte-hash mismatches:
 
 Verdict: the rebuild is not byte-identical to the committed release artifact,
 and at least `cast_info.parquet` is not byte-deterministic between two local
-rebuilds. Do not claim byte-identical archive reproducibility until the
-follow-up decision is resolved.
+rebuilds. BenchBox therefore does not define JoinOrder source recovery as
+byte-identical Parquet/archive reproduction.
 
 ## Conversion Fidelity Check
 
@@ -103,6 +103,42 @@ Result:
 - 59 integer-width checks passed.
 - 4 UTF-8 column groups passed.
 
+## Logical Content Rebuild Contract
+
+The accepted rebuild contract is logical table-content equivalence, not
+byte-identical Parquet or tarball reproduction. This keeps the guarantee tied
+to benchmark semantics: table rows, column values, row counts, source
+provenance, and query-result validation. Parquet writer metadata, row-group
+layout, compression frames, dictionary encoding, tar member ordering, and
+archive timestamps can change bytes without changing the benchmark dataset.
+
+The build pipeline now enforces the logical contract by:
+
+- exporting every PostgreSQL table in `id` order;
+- reading each rebuilt Parquet table in `id` order;
+- hashing typed row values with a versioned `joinorder-logical-content-v1`
+  scheme that normalizes PostgreSQL CSV nulls and Parquet nulls to the same
+  value;
+- comparing CSV and Parquet logical hashes per table before packaging;
+- writing a `logical_content` section into `.benchbox_build_manifest.json`
+  with the aggregate logical hash, per-table hashes, row counts, and failures.
+
+Commands:
+
+```bash
+uv run -- python _project/scripts/build_joinorder_data.py verify-logical-content \
+  --work-dir <work-dir-with-retained-csv-and-parquet> \
+  --container-name <restored-postgres-container>
+
+uv run -- python _project/scripts/build_joinorder_data.py rebuild-local \
+  --work-dir <work-dir> \
+  --container-name <restored-postgres-container>
+```
+
+`rebuild-local` and `foundation` run the logical-content check automatically
+during streaming conversion, after each Parquet write and before CSV cleanup,
+then persist the aggregate result before manifest/archive assembly.
+
 ## Current Integrity Statement
 
 The current released archive is still protected by its pinned transport
@@ -110,7 +146,7 @@ The current released archive is still protected by its pinned transport
 manifest-level hashes. The external source pg_dump is now anchored to the
 Dataverse-published MD5 plus the pinned local SHA256.
 
-The unresolved gap is rebuild reproducibility: rebuilding from the same restored
-source does not currently reproduce byte-identical Parquet/archive artifacts.
-Follow-up TODO:
-`_project/TODO/main/planning/joinorder-parquet-rebuild-determinism-decision.yaml`.
+For source rebuilds, maintainers should verify conversion fidelity and
+logical-content equivalence. They should not refresh the published
+`archive_sha256`, per-table Parquet `sha256`, or reference cardinalities merely
+because a rebuilt Parquet writer produced different bytes.
