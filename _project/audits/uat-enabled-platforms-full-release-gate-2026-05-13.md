@@ -191,11 +191,12 @@ TimescaleDB cells. The most visible signatures from this run:
   filters for those two operations; retry passed with 21 executed operations and
   2 compatibility skips:
   `/Users/joe/Developer/benchmark_runs/logs/uat_timescaledb_fixcheck_20260513_transaction_primitives_retry.log`.
-- `timescaledb/tpcds`: targeted rerun now clears schema creation, `.dat` load,
-  and table validation. It remains PARTIAL on query execution with Q36, Q70,
-  and Q86 failing on the `lochierarchy` alias in `ORDER BY`, plus Q90 failing
-  with division by zero:
-  `/Users/joe/Developer/benchmark_runs/logs/uat_timescaledb_fixcheck_20260513_tpcds.log`.
+- `pg-duckdb/tpcds` and `timescaledb/tpcds`: PostgreSQL-family TPC-DS query
+  translation now repeats the rollup hierarchy expression in Q36/Q70/Q86
+  `ORDER BY` clauses and guards Q90's denominator. Targeted reruns passed with
+  412/412 successful query executions:
+  `/Users/joe/Developer/benchmark_runs/logs/uat_pg_duckdb_fixcheck_20260513_tpcds_retry.log`,
+  `/Users/joe/Developer/benchmark_runs/logs/uat_timescaledb_fixcheck_20260513_tpcds_retry.log`.
 - Remaining PG extension and TimescaleDB cells still need per-log clustering
   before they can be fixed or converted to evidence-backed compatibility rules.
 

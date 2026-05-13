@@ -80,8 +80,10 @@ work:
       Targeted pg-duckdb UAT evidence under
       `/Users/joe/Developer/benchmark_runs/logs/uat_pg_duckdb_fixcheck_20260513/`:
       `flightdata` and `datavault` now pass and are submittable.
-      `tpcds` now passes load validation but remains PARTIAL with
-      Q36/Q70/Q86/Q90 failed.
+      `tpcds` now passes load validation; a follow-up PostgreSQL-family TPC-DS
+      query rewrite cleared Q36/Q70/Q86/Q90, and targeted `pg-duckdb/tpcds`
+      passed with 412/412 successful query executions:
+      `/Users/joe/Developer/benchmark_runs/logs/uat_pg_duckdb_fixcheck_20260513_tpcds_retry.log`.
 
       A follow-up pass fixed AMPLab HAVING aliases and PostgreSQL CSV
       empty-string preservation for ClickBench; targeted `pg-duckdb/amplab`
@@ -150,10 +152,10 @@ work:
       execution filters for those two operations and the retry passed with
       21 executed operations and 2 compatibility skips.
 
-      Targeted `timescaledb/tpcds` now clears schema creation, `.dat` load, and
-      table validation. It remains PARTIAL on query execution with Q36, Q70,
-      and Q86 failing on the `lochierarchy` alias in `ORDER BY`, plus Q90
-      failing with division by zero.
+      Targeted `timescaledb/tpcds` now clears schema creation, `.dat` load,
+      table validation, and query execution after the PostgreSQL-family TPC-DS
+      query rewrite; the retry passed with 412/412 successful query executions:
+      `/Users/joe/Developer/benchmark_runs/logs/uat_timescaledb_fixcheck_20260513_tpcds_retry.log`.
 
       Remaining PG extension and TimescaleDB failures still need per-log
       clustering from
