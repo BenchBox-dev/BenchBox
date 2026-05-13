@@ -2278,6 +2278,13 @@ def verify_reference_results(
     for query_id, path in sorted(paths.items(), key=lambda item: query_sort_key(item[0])):
         expected = expected_queries.get(query_id)
         if not isinstance(expected, dict):
+            failures.append(
+                {
+                    "query_id": query_id,
+                    "kind": "malformed_reference_query",
+                    "actual_type": type(expected).__name__,
+                }
+            )
             continue
         sql = strip_query_semicolon(path.read_text(encoding="utf-8"))
         row_count = int(

@@ -539,6 +539,45 @@ def test_verify_reference_results_rejects_full_result_hash_drift(
     ]
 
 
+def test_verify_reference_results_rejects_malformed_query_entry(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    query_dir = tmp_path / "queries"
+    query_dir.mkdir()
+    (query_dir / "1a.sql").write_text("SELECT MIN(t.id) AS v FROM title AS t WHERE t.id > 0;", encoding="utf-8")
+    reference_path = tmp_path / "reference_cardinalities.json"
+    reference_path.write_text(json.dumps({"queries": {"1a": "merge-conflict-artifact"}}), encoding="utf-8")
+
+    def fake_psql(*, container_name: str, database: str, user: str, sql: str) -> str:
+        if sql == "SHOW server_version":
+            return "16.2\n"
+        raise AssertionError(sql)
+
+    monkeypatch.setattr(build_joinorder_data, "psql", fake_psql)
+
+    with pytest.raises(build_joinorder_data.JoinOrderBuildError, match="Reference result verification failed"):
+        build_joinorder_data.verify_reference_results(
+            work_dir=tmp_path,
+            query_dir=query_dir,
+            reference_path=reference_path,
+            container_name="pg",
+            database="imdb",
+            user="postgres",
+            expected_query_count=None,
+        )
+
+    manifest = json.loads((tmp_path / build_joinorder_data.BUILD_MANIFEST_NAME).read_text(encoding="utf-8"))
+    failures = manifest["reference_result_verification"]["failures"]
+    assert failures == [
+        {
+            "actual_type": "str",
+            "kind": "malformed_reference_query",
+            "query_id": "1a",
+        }
+    ]
+
+
 def test_verify_tiny_fixture_rejects_incomplete_query_directory(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
