@@ -4,39 +4,39 @@
 
 Every rule registered in `benchbox.sql_compat` is listed below. The registry is the authoritative source of compatibility policy; this document is regenerated from it. See [adr-sql-compat-phase-aware-pipeline.md](../development/adr/adr-sql-compat-phase-aware-pipeline.md) for the design.
 
-**Total registered rules:** 122
+**Total registered rules:** 194
 
 **Platforms covered:** 25
 
 ## Phase coverage by platform
 
-| platform | benchmark_gate | query_source | query_adapter | schema_emit | ddl_optimize | total |
-|---|---|---|---|---|---|---|
-| bigquery | - | - | - | 2 | - | 2 |
-| clickhouse | - | 13 | 3 | 4 | 1 | 21 |
-| databend | - | - | - | - | 1 | 1 |
-| databricks | - | - | - | 2 | 1 | 3 |
-| datafusion | - | - | 4 | 2 | - | 6 |
-| doris | - | 7 | - | 2 | 1 | 10 |
-| fabric_dw | - | - | - | - | 1 | 1 |
-| firebolt | - | - | - | - | 1 | 1 |
-| lakesail | 1 | 6 | - | - | 1 | 8 |
-| mysql | - | 1 | - | - | - | 1 |
-| pg_mooncake | - | - | - | - | 1 | 1 |
-| postgres | - | - | - | 1 | - | 1 |
-| postgresql | - | 6 | - | 1 | 1 | 8 |
-| presto | - | - | - | 2 | 1 | 3 |
-| questdb | 1 | - | - | - | 1 | 2 |
-| redshift | - | - | - | 2 | 1 | 3 |
-| singlestore | - | - | - | - | 4 | 4 |
-| snowflake | - | 6 | - | 2 | 1 | 9 |
-| spark | - | 6 | - | 2 | 1 | 9 |
-| starrocks | - | 14 | 1 | 2 | 1 | 18 |
-| synapse | - | - | - | - | 1 | 1 |
-| timescale | - | - | - | 3 | - | 3 |
-| trino | - | - | - | 2 | 1 | 3 |
-| tsql | - | - | - | 2 | - | 2 |
-| velox | - | - | - | - | 1 | 1 |
+| platform | benchmark_gate | query_source | query_adapter | schema_emit | ddl_optimize | execution_filter | total |
+|---|---|---|---|---|---|---|---|
+| bigquery | - | - | - | 2 | - | - | 2 |
+| clickhouse | - | 13 | 3 | 4 | 1 | - | 21 |
+| databend | - | - | - | - | 1 | - | 1 |
+| databricks | - | - | - | 2 | 1 | - | 3 |
+| datafusion | - | - | 4 | 2 | - | - | 6 |
+| doris | - | 7 | - | 2 | 1 | - | 10 |
+| fabric_dw | - | - | - | - | 1 | - | 1 |
+| firebolt | - | - | - | - | 1 | - | 1 |
+| lakesail | 4 | 6 | - | - | 1 | 69 | 80 |
+| mysql | - | 1 | - | - | - | - | 1 |
+| pg_mooncake | - | - | - | - | 1 | - | 1 |
+| postgres | - | - | - | 1 | - | - | 1 |
+| postgresql | - | 6 | - | 1 | 1 | - | 8 |
+| presto | - | - | - | 2 | 1 | - | 3 |
+| questdb | 1 | - | - | - | 1 | - | 2 |
+| redshift | - | - | - | 2 | 1 | - | 3 |
+| singlestore | - | - | - | - | 4 | - | 4 |
+| snowflake | - | 6 | - | 2 | 1 | - | 9 |
+| spark | - | 6 | - | 2 | 1 | - | 9 |
+| starrocks | - | 14 | 1 | 2 | 1 | - | 18 |
+| synapse | - | - | - | - | 1 | - | 1 |
+| timescale | - | - | - | 3 | - | - | 3 |
+| trino | - | - | - | 2 | 1 | - | 3 |
+| tsql | - | - | - | 2 | - | - | 2 |
+| velox | - | - | - | - | 1 | - | 1 |
 
 ## Rules by platform
 
@@ -130,6 +130,9 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | phase | scope | action | support | failure mode | rule_id |
 |---|---|---|---|---|---|
 | benchmark_gate | benchmark=ai_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.lakesail.ai_primitives.unsupported` |
+| benchmark_gate | benchmark=metadata_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.lakesail.metadata_primitives.unsupported` |
+| benchmark_gate | benchmark=transaction_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.lakesail.transaction_primitives.unsupported` |
+| benchmark_gate | benchmark=write_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.lakesail.write_primitives.unsupported` |
 | query_source | benchmark=vector_search, query=Q1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `query_source.lakesail.vector_search.q1_unsupported` |
 | query_source | benchmark=vector_search, query=Q2 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `query_source.lakesail.vector_search.q2_unsupported` |
 | query_source | benchmark=vector_search, query=Q3 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `query_source.lakesail.vector_search.q3_unsupported` |
@@ -137,25 +140,75 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | query_source | benchmark=vector_search, query=Q5 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `query_source.lakesail.vector_search.q5_unsupported` |
 | query_source | benchmark=vector_search, query=Q6 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `query_source.lakesail.vector_search.q6_unsupported` |
 | ddl_optimize | platform-wide | rewrite_ddl | REWRITTEN | SYNTAX_ERROR | `ddl_optimize.lakesail.all.optimize_table_definition` |
-| schema_emit | benchmark=clickbench | rewrite_ddl | REWRITTEN | UNSUPPORTED_FEATURE | `schema_emit.lakesail.clickbench.strip_not_null` |
-| execution_filter | benchmark=read_primitives, query=approx_top_k_lineitem | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.approx_top_k_lineitem` |
-| execution_filter | benchmark=read_primitives, query=window_moving_frame | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.window_moving_frame` |
-| execution_filter | benchmark=read_primitives, query=json_extract_nested | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.json_extract_nested` |
-| execution_filter | benchmark=read_primitives, query=json_aggregates | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.json_aggregates` |
-| execution_filter | benchmark=read_primitives, query=fulltext_simple_search | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.fulltext_simple_search` |
-| execution_filter | benchmark=read_primitives, query=fulltext_boolean_search | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.fulltext_boolean_search` |
-| execution_filter | benchmark=read_primitives, query=fulltext_phrase_search | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.fulltext_phrase_search` |
-| execution_filter | benchmark=read_primitives, query=approx_quantiles_array | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.approx_quantiles_array` |
-| execution_filter | benchmark=read_primitives, query=optimizer_scalar_subquery_flattening | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.optimizer_scalar_subquery_flattening` |
-| execution_filter | benchmark=read_primitives, query=groupby_all_simple | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.groupby_all_simple` |
-| execution_filter | benchmark=read_primitives, query=groupby_all_complex | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.groupby_all_complex` |
-| execution_filter | benchmark=read_primitives, query=orderby_all_simple | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.orderby_all_simple` |
-| execution_filter | benchmark=read_primitives, query=orderby_all_desc | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.orderby_all_desc` |
-| execution_filter | benchmark=read_primitives, query=list_transform | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.list_transform` |
-| execution_filter | benchmark=read_primitives, query=list_filter | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.list_filter` |
-| execution_filter | benchmark=read_primitives, query=list_reduce | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.list_reduce` |
-| execution_filter | benchmark=read_primitives, query=asof_join_basic | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.asof_join_basic` |
-| execution_filter | benchmark=read_primitives, query=pivot_basic | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.pivot_basic` |
+| execution_filter | benchmark=read_primitives, query=approx_quantiles_array | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.approx_quantiles_array` |
+| execution_filter | benchmark=read_primitives, query=approx_top_k_lineitem | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.approx_top_k_lineitem` |
+| execution_filter | benchmark=read_primitives, query=asof_join_basic | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.asof_join_basic` |
+| execution_filter | benchmark=read_primitives, query=fulltext_boolean_search | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.fulltext_boolean_search` |
+| execution_filter | benchmark=read_primitives, query=fulltext_phrase_search | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.fulltext_phrase_search` |
+| execution_filter | benchmark=read_primitives, query=fulltext_simple_search | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.fulltext_simple_search` |
+| execution_filter | benchmark=read_primitives, query=groupby_all_complex | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.groupby_all_complex` |
+| execution_filter | benchmark=read_primitives, query=groupby_all_simple | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.groupby_all_simple` |
+| execution_filter | benchmark=read_primitives, query=json_aggregates | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.json_aggregates` |
+| execution_filter | benchmark=read_primitives, query=json_extract_nested | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.json_extract_nested` |
+| execution_filter | benchmark=read_primitives, query=list_filter | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.list_filter` |
+| execution_filter | benchmark=read_primitives, query=list_reduce | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.list_reduce` |
+| execution_filter | benchmark=read_primitives, query=list_transform | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.list_transform` |
+| execution_filter | benchmark=read_primitives, query=optimizer_scalar_subquery_flattening | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.optimizer_scalar_subquery_flattening` |
+| execution_filter | benchmark=read_primitives, query=orderby_all_desc | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.orderby_all_desc` |
+| execution_filter | benchmark=read_primitives, query=orderby_all_simple | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.orderby_all_simple` |
+| execution_filter | benchmark=read_primitives, query=pivot_basic | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.pivot_basic` |
+| execution_filter | benchmark=read_primitives, query=window_moving_frame | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.window_moving_frame` |
+| execution_filter | benchmark=tpcdi, query=A1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpcdi.a1` |
+| execution_filter | benchmark=tpcdi, query=A2 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpcdi.a2` |
+| execution_filter | benchmark=tpcdi, query=A3 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpcdi.a3` |
+| execution_filter | benchmark=tpcdi, query=A5 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpcdi.a5` |
+| execution_filter | benchmark=tpcdi, query=AQ1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpcdi.aq1` |
+| execution_filter | benchmark=tpcdi, query=AQ10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpcdi.aq10` |
+| execution_filter | benchmark=tpcdi, query=AQ2 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpcdi.aq2` |
+| execution_filter | benchmark=tpcdi, query=AQ3 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpcdi.aq3` |
+| execution_filter | benchmark=tpcdi, query=AQ4 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpcdi.aq4` |
+| execution_filter | benchmark=tpcdi, query=AQ5 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpcdi.aq5` |
+| execution_filter | benchmark=tpcdi, query=AQ6 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpcdi.aq6` |
+| execution_filter | benchmark=tpcdi, query=AQ7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpcdi.aq7` |
+| execution_filter | benchmark=tpcdi, query=AQ8 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpcdi.aq8` |
+| execution_filter | benchmark=tpcdi, query=AQ9 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpcdi.aq9` |
+| execution_filter | benchmark=tpcdi, query=EQ4 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpcdi.eq4` |
+| execution_filter | benchmark=tpcdi, query=EQ5 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpcdi.eq5` |
+| execution_filter | benchmark=tpcdi, query=EQ7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpcdi.eq7` |
+| execution_filter | benchmark=tpcdi, query=V1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpcdi.v1` |
+| execution_filter | benchmark=tpcdi, query=V2 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpcdi.v2` |
+| execution_filter | benchmark=tpcdi, query=VQ10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpcdi.vq10` |
+| execution_filter | benchmark=tpcdi, query=VQ12 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpcdi.vq12` |
+| execution_filter | benchmark=tpcdi, query=VQ3 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpcdi.vq3` |
+| execution_filter | benchmark=tpcdi, query=VQ4 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpcdi.vq4` |
+| execution_filter | benchmark=tpcdi, query=VQ6 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpcdi.vq6` |
+| execution_filter | benchmark=tpcdi, query=VQ7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpcdi.vq7` |
+| execution_filter | benchmark=tpcdi, query=VQ8 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpcdi.vq8` |
+| execution_filter | benchmark=tpchavoc, query=10_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpchavoc.10_v1` |
+| execution_filter | benchmark=tpchavoc, query=11_v4 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpchavoc.11_v4` |
+| execution_filter | benchmark=tpchavoc, query=11_v9 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpchavoc.11_v9` |
+| execution_filter | benchmark=tpchavoc, query=12_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpchavoc.12_v1` |
+| execution_filter | benchmark=tpchavoc, query=14_v2 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpchavoc.14_v2` |
+| execution_filter | benchmark=tpchavoc, query=14_v8 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpchavoc.14_v8` |
+| execution_filter | benchmark=tpchavoc, query=16_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpchavoc.16_v1` |
+| execution_filter | benchmark=tpchavoc, query=16_v10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpchavoc.16_v10` |
+| execution_filter | benchmark=tpchavoc, query=16_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpchavoc.16_v7` |
+| execution_filter | benchmark=tpchavoc, query=17_v10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpchavoc.17_v10` |
+| execution_filter | benchmark=tpchavoc, query=17_v2 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpchavoc.17_v2` |
+| execution_filter | benchmark=tpchavoc, query=17_v4 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpchavoc.17_v4` |
+| execution_filter | benchmark=tpchavoc, query=17_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpchavoc.17_v7` |
+| execution_filter | benchmark=tpchavoc, query=1_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpchavoc.1_v7` |
+| execution_filter | benchmark=tpchavoc, query=1_v8 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpchavoc.1_v8` |
+| execution_filter | benchmark=tpchavoc, query=2_v5 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpchavoc.2_v5` |
+| execution_filter | benchmark=tpchavoc, query=2_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpchavoc.2_v7` |
+| execution_filter | benchmark=tpchavoc, query=3_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpchavoc.3_v1` |
+| execution_filter | benchmark=tpchavoc, query=4_v10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpchavoc.4_v10` |
+| execution_filter | benchmark=tpchavoc, query=4_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpchavoc.4_v7` |
+| execution_filter | benchmark=tpchavoc, query=5_v4 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpchavoc.5_v4` |
+| execution_filter | benchmark=tpchavoc, query=6_v2 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpchavoc.6_v2` |
+| execution_filter | benchmark=tpchavoc, query=7_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpchavoc.7_v1` |
+| execution_filter | benchmark=tpchavoc, query=8_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpchavoc.8_v1` |
+| execution_filter | benchmark=tpchavoc, query=9_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.tpchavoc.9_v1` |
 
 ### mysql
 
@@ -246,7 +299,6 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | query_source | benchmark=vector_search, query=Q6 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.spark.vector_search.q6_variant` |
 | schema_emit | benchmark=transaction_primitives | rewrite_ddl | INFORMATIONAL | SILENT_CORRUPTION | `schema_emit.spark.transaction_primitives.pk_not_enforced` |
 | schema_emit | benchmark=write_primitives | rewrite_ddl | INFORMATIONAL | SILENT_CORRUPTION | `schema_emit.spark.write_primitives.pk_not_enforced` |
-| schema_emit | benchmark=clickbench | rewrite_ddl | REWRITTEN | UNSUPPORTED_FEATURE | `schema_emit.spark.clickbench.strip_not_null` |
 | ddl_optimize | platform-wide | rewrite_ddl | REWRITTEN | SYNTAX_ERROR | `ddl_optimize.spark.all.optimize_table_definition` |
 
 ### starrocks

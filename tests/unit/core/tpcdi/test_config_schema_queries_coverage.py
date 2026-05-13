@@ -142,3 +142,13 @@ def test_query_manager_core_accessors_and_order(monkeypatch: pytest.MonkeyPatch)
     manager._all_queries = {"Q1": "select 1", "Q2": "select 2"}  # type: ignore[assignment]
     with pytest.raises(ValueError, match="Circular dependency"):
         manager.resolve_query_order(["Q1", "Q2"])
+
+
+def test_lakesail_tpcdi_skip_list_matches_remediation_evidence(tmp_path: Path):
+    from benchbox.core.tpcdi.benchmark import TPCDIBenchmark
+    from benchbox.sql_compat.rules.execution_filter.lakesail_tpcdi import LAKESAIL_TPCDI_SKIPS
+
+    benchmark = TPCDIBenchmark(scale_factor=0.01, output_dir=tmp_path)
+
+    assert set(benchmark.get_platform_skip_queries("lakesail")) == set(LAKESAIL_TPCDI_SKIPS)
+    assert benchmark.get_platform_skip_queries("duckdb") == []

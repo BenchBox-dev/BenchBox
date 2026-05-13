@@ -58,6 +58,7 @@ from benchbox.core.tpcdi.schema import (
     get_all_create_table_sql,
 )
 from benchbox.core.tpcdi.validation import DataQualityResult, TPCDIValidator
+from benchbox.sql_compat.rules.execution_filter.lakesail_tpcdi import LAKESAIL_TPCDI_SKIPS
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.printing import emit
 
@@ -338,6 +339,12 @@ class TPCDIBenchmark(BaseBenchmark):
             return translated_queries
 
         return queries
+
+    def get_platform_skip_queries(self, platform_name: str) -> list[str]:
+        """Return platform-specific TPC-DI queries excluded by compatibility policy."""
+        if platform_name.lower() == "lakesail":
+            return list(LAKESAIL_TPCDI_SKIPS)
+        return []
 
     def translate_query_text(self, query_text: str, target_dialect: str) -> str:
         """Translate a query from TPC-DI's source dialect to target dialect.

@@ -131,8 +131,8 @@ class TestLakeSailAdapter:
         assert queries == {}
         benchmark.get_queries.assert_called_once_with(dialect="lakesail", platform_version=None)
 
-    def test_ai_primitives_is_benchmark_gated(self, mock_pyspark):
-        """AI primitives has no LakeSail SQL schema contract."""
+    def test_unsupported_lakesail_benchmarks_are_gated(self, mock_pyspark):
+        """LakeSail benchmark gates are exposed through PlatformRegistry."""
         from benchbox.core.platform_registry import PlatformRegistry
 
         caps = PlatformRegistry.get_platform_capabilities("lakesail")
@@ -140,6 +140,10 @@ class TestLakeSailAdapter:
         assert caps is not None
         assert "ai_primitives" in caps.unsupported_benchmarks
         assert "get_create_tables_sql" in caps.unsupported_benchmarks["ai_primitives"]
+        assert "metadata_primitives" in caps.unsupported_benchmarks
+        assert "INFORMATION_SCHEMA" in caps.unsupported_benchmarks["metadata_primitives"]
+        assert "transaction_primitives" in caps.unsupported_benchmarks
+        assert "write_primitives" in caps.unsupported_benchmarks
 
     def test_platform_info(self, mock_pyspark):
         """Test platform info collection."""

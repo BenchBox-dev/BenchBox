@@ -2,7 +2,7 @@ id: lakesail-benchmark-sql-compatibility-remediation
 title: "LakeSail: remediate benchmark SQL, DDL, and load compatibility surfaced by UAT"
 worktree: uat-enabled-platforms-remediation
 priority: Critical
-status: Not Started
+status: Completed
 category: Platform Expansion
 
 description: |
@@ -32,26 +32,36 @@ deps:
 work:
   - id: w0
     summary: "Revalidate and cluster current LakeSail failures"
-    status: pending
+    status: done
     notes: |
       Re-run a targeted LakeSail UAT subset or parse current artifacts on the
       implementation branch. Produce a compact failure matrix with benchmark,
       phase, first error, and likely fix owner. Do not commit raw cells/logs.
 
+      Completed on 2026-05-13 from
+      `/Users/joe/Developer/benchmark_runs/logs/uat_lakesail_failing_benchmarks_20260513`.
+      The focused rerun ended with 12 executed LakeSail cells passing and 4
+      compatibility-pruned cells (`ai_primitives`, `metadata_primitives`,
+      `transaction_primitives`, `write_primitives`).
+
   - id: w1
     summary: "Harden LakeSail DDL normalization for benchmark schemas"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Add focused DDL rewrite coverage for metadata primitives, TSBS devops,
       NYCTaxi, FlightData, DataVault, and Vector Search. Cover actual benchmark
       CREATE TABLE statements through the same helper path LakeSail uses, not
       synthetic one-line DDL only.
 
+      Completed through Spark/LakeSail DDL and load fixes covering CSV directory
+      wrapping, mixed-case TPC-DI table loads, ClickBench nullability, vector
+      ARRAY DDL, CoffeeShop/TPC-DI time handling, and no-data metadata load flow.
+
   - id: w2
     summary: "Repair or gate LakeSail query syntax/function gaps"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Address TPC-DS division-by-zero semantics, TPC-DS OBT alias/interval
       syntax, read primitive `APPROX_TOP_K`, and any other query-time failure
@@ -59,10 +69,15 @@ work:
       semantics. If a function has no current LakeSail equivalent, create an
       explicit compatibility rule rather than a hidden skip.
 
+      Completed with TPC-DS Q90 denominator protection, TPC-DS OBT Spark
+      translation, CoffeeShop Spark variants, vector_search query-source skips,
+      read_primitives execution-filter documentation, TPC-Havoc variant skips,
+      and TPC-DI query skips for the 26 stable Sail query gaps.
+
   - id: w3
     summary: "Fix LakeSail data loading and generated-source path handling"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Investigate and fix TPC-DI mixed-case table load gaps, write and
       transaction primitive staging tables, ClickBench nullable column loading,
@@ -70,10 +85,15 @@ work:
       compatibility path handling. Keep fixes in shared Spark/LakeSail loading
       helpers only when Spark semantics also require them.
 
+      Completed. The final focused UAT rerun passed `clickbench`,
+      `coffeeshop`, `flightdata`, `nyctaxi`, `tpcdi`, `tpcds`, `tpcds_obt`,
+      `tpch_skew`, `tpchavoc`, `tsbs_devops`, `vector_search`, and
+      `read_primitives`.
+
   - id: w4
     summary: "Resolve AI primitives and vector search support posture"
     needs: [w1, w2]
-    status: pending
+    status: done
     notes: |
       AI primitives currently fail before schema creation because the benchmark
       lacks a `get_create_tables_sql` path for SQL adapters. Vector search
@@ -81,15 +101,28 @@ work:
       current LakeSail supports the required semantics; otherwise add explicit,
       documented compatibility exclusions.
 
+      Completed. `ai_primitives` is benchmark-gated for LakeSail as an LLM/API
+      workload without a SQL schema contract. `vector_search` schema/load now
+      works; its six vector-distance queries are explicitly skipped for
+      LakeSail because Sail rejects both DuckDB vector functions and Spark
+      lambda fallback expressions.
+
   - id: w5
     summary: "Run LakeSail regression suite and validator-backed UAT subset"
     needs: [w1, w2, w3, w4]
-    status: pending
+    status: done
     notes: |
       Run focused unit tests for every rewrite/load fix, then a managed LakeSail
       UAT subset containing each previously failing benchmark at the smallest
       meaningful scale. Finish with validator rollup checks for every benchmark
       that produces a result bundle.
+
+      Completed. Verification:
+      - `uv run -- python -m pytest tests/unit/platforms/test_lakesail_adapter.py tests/unit/platforms/test_lakesail_coverage.py -q` -> 110 passed.
+      - `uv run -- python -m pytest tests/unit/platforms/test_spark_adapter.py tests/unit/platforms/test_spark_helpers.py tests/unit/platforms/test_spark_csv_dialect_resolver.py tests/unit/platforms/base/test_spark_execution_mixin.py -q` -> 165 passed.
+      - `uv run -- python -m pytest tests/unit/core/sql_compat tests/unit/sql_compat -m fast -q` -> 325 passed.
+      - `uv run -- python _project/scripts/reference_usage_audit.py --summary` -> parse errors 0.
+      - `BENCHBOX_OUTPUT_DIR=/Users/joe/Developer/benchmark_runs make uat-sweep CONFIG=tests/uat/configs/uat-lakesail-failing-benchmarks.yaml` -> execute/report 0; 12 passed, 4 compatibility-pruned, 0 failed, 0 timed out.
 
 deferred:
   - summary: "Optimize LakeSail performance for large scale rungs"

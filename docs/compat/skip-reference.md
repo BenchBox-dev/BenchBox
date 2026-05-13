@@ -4,7 +4,7 @@
 
 Rules the registry applies to queries, benchmarks, and DDL statements. Split into two sections based on whether the outcome is user-visible in result counts. Each entry names the platform, the scope the rule applies to, the registered reason, and the rule_id you can grep for in `benchbox/sql_compat/rules/`.
 
-**Total rules:** 31
+**Total rules:** 103
 
 **Platforms with rules:** 13
 
@@ -17,12 +17,84 @@ Queries or benchmarks that are **omitted from the result set** - either because 
 | support | scope | phase | reason | rule_id |
 |---|---|---|---|---|
 | BLOCKED | benchmark=ai_primitives | benchmark_gate | AI primitives requires LLM/tool execution APIs and has no SQL schema contract for LakeSail/Sail. | `benchmark_gate.lakesail.ai_primitives.unsupported` |
+| BLOCKED | benchmark=metadata_primitives | benchmark_gate | LakeSail/Sail does not expose the INFORMATION_SCHEMA catalog contract required by metadata_primitives. | `benchmark_gate.lakesail.metadata_primitives.unsupported` |
+| BLOCKED | benchmark=transaction_primitives | benchmark_gate | LakeSail/Sail SQL mode does not expose the DBAPI transactional contract required by transaction_primitives. | `benchmark_gate.lakesail.transaction_primitives.unsupported` |
+| BLOCKED | benchmark=write_primitives | benchmark_gate | LakeSail/Sail SQL mode does not expose the SQL operation-executor contract required by write_primitives. | `benchmark_gate.lakesail.write_primitives.unsupported` |
 | SKIPPED_QUERY | benchmark=vector_search, query=Q1 | query_source | LakeSail/Sail has no native vector-distance functions for this benchmark and rejects Spark SQL lambda fallback expressions. | `query_source.lakesail.vector_search.q1_unsupported` |
 | SKIPPED_QUERY | benchmark=vector_search, query=Q2 | query_source | LakeSail/Sail has no native vector-distance functions for this benchmark and rejects Spark SQL lambda fallback expressions. | `query_source.lakesail.vector_search.q2_unsupported` |
 | SKIPPED_QUERY | benchmark=vector_search, query=Q3 | query_source | LakeSail/Sail has no native vector-distance functions for this benchmark and rejects Spark SQL lambda fallback expressions. | `query_source.lakesail.vector_search.q3_unsupported` |
 | SKIPPED_QUERY | benchmark=vector_search, query=Q4 | query_source | LakeSail/Sail has no native vector-distance functions for this benchmark and rejects Spark SQL lambda fallback expressions. | `query_source.lakesail.vector_search.q4_unsupported` |
 | SKIPPED_QUERY | benchmark=vector_search, query=Q5 | query_source | LakeSail/Sail has no native vector-distance functions for this benchmark and rejects Spark SQL lambda fallback expressions. | `query_source.lakesail.vector_search.q5_unsupported` |
 | SKIPPED_QUERY | benchmark=vector_search, query=Q6 | query_source | LakeSail/Sail has no native vector-distance functions for this benchmark and rejects Spark SQL lambda fallback expressions. | `query_source.lakesail.vector_search.q6_unsupported` |
+| SKIPPED_QUERY | benchmark=read_primitives, query=approx_quantiles_array | execution_filter | Sail returns a Spark Connect metadata/resource error for array approximate quantiles. | `execution_filter.lakesail.read_primitives.approx_quantiles_array` |
+| SKIPPED_QUERY | benchmark=read_primitives, query=approx_top_k_lineitem | execution_filter | Sail rejects `APPROX_TOP_K` with `unknown function: APPROX_TOP_K`. | `execution_filter.lakesail.read_primitives.approx_top_k_lineitem` |
+| SKIPPED_QUERY | benchmark=read_primitives, query=asof_join_basic | execution_filter | Sail parser rejects `ASOF JOIN` syntax. | `execution_filter.lakesail.read_primitives.asof_join_basic` |
+| SKIPPED_QUERY | benchmark=read_primitives, query=fulltext_boolean_search | execution_filter | Sail parser rejects MySQL full-text boolean search syntax. | `execution_filter.lakesail.read_primitives.fulltext_boolean_search` |
+| SKIPPED_QUERY | benchmark=read_primitives, query=fulltext_phrase_search | execution_filter | Sail parser rejects MySQL full-text phrase search syntax. | `execution_filter.lakesail.read_primitives.fulltext_phrase_search` |
+| SKIPPED_QUERY | benchmark=read_primitives, query=fulltext_simple_search | execution_filter | Sail parser rejects MySQL full-text `MATCH ... AGAINST` syntax. | `execution_filter.lakesail.read_primitives.fulltext_simple_search` |
+| SKIPPED_QUERY | benchmark=read_primitives, query=groupby_all_complex | execution_filter | Sail treats `GROUP BY ALL` as an unresolved `ALL` attribute. | `execution_filter.lakesail.read_primitives.groupby_all_complex` |
+| SKIPPED_QUERY | benchmark=read_primitives, query=groupby_all_simple | execution_filter | Sail treats `GROUP BY ALL` as an unresolved `ALL` attribute. | `execution_filter.lakesail.read_primitives.groupby_all_simple` |
+| SKIPPED_QUERY | benchmark=read_primitives, query=json_aggregates | execution_filter | Sail parser rejects the JSON object syntax with `found :`. | `execution_filter.lakesail.read_primitives.json_aggregates` |
+| SKIPPED_QUERY | benchmark=read_primitives, query=json_extract_nested | execution_filter | Sail lacks `JSON_VALID`; UAT reports `unknown function: JSON_VALID`. | `execution_filter.lakesail.read_primitives.json_extract_nested` |
+| SKIPPED_QUERY | benchmark=read_primitives, query=list_filter | execution_filter | Sail rejects the lambda function form used by the list primitive. | `execution_filter.lakesail.read_primitives.list_filter` |
+| SKIPPED_QUERY | benchmark=read_primitives, query=list_reduce | execution_filter | Sail rejects the lambda function form used by the list primitive. | `execution_filter.lakesail.read_primitives.list_reduce` |
+| SKIPPED_QUERY | benchmark=read_primitives, query=list_transform | execution_filter | Sail rejects the lambda function form used by the list primitive. | `execution_filter.lakesail.read_primitives.list_transform` |
+| SKIPPED_QUERY | benchmark=read_primitives, query=optimizer_scalar_subquery_flattening | execution_filter | Sail planner reports `Ambiguous reference to unqualified field __always_true`. | `execution_filter.lakesail.read_primitives.optimizer_scalar_subquery_flattening` |
+| SKIPPED_QUERY | benchmark=read_primitives, query=orderby_all_desc | execution_filter | Sail treats `ORDER BY ALL DESC` as an unresolved sort expression. | `execution_filter.lakesail.read_primitives.orderby_all_desc` |
+| SKIPPED_QUERY | benchmark=read_primitives, query=orderby_all_simple | execution_filter | Sail treats `ORDER BY ALL` as an unresolved sort expression. | `execution_filter.lakesail.read_primitives.orderby_all_simple` |
+| SKIPPED_QUERY | benchmark=read_primitives, query=pivot_basic | execution_filter | Sail parser rejects the PIVOT query form emitted by the catalog. | `execution_filter.lakesail.read_primitives.pivot_basic` |
+| SKIPPED_QUERY | benchmark=read_primitives, query=window_moving_frame | execution_filter | Sail rejects the interval RANGE window frame with an invalid argument error. | `execution_filter.lakesail.read_primitives.window_moving_frame` |
+| SKIPPED_QUERY | benchmark=tpcdi, query=A1 | execution_filter | Sail cannot infer a common comparison argument type for this TPC-DI analytical query. | `execution_filter.lakesail.tpcdi.a1` |
+| SKIPPED_QUERY | benchmark=tpcdi, query=A2 | execution_filter | Sail cannot infer a common comparison argument type for this TPC-DI analytical query. | `execution_filter.lakesail.tpcdi.a2` |
+| SKIPPED_QUERY | benchmark=tpcdi, query=A3 | execution_filter | Sail cannot infer a common comparison argument type for this TPC-DI analytical query. | `execution_filter.lakesail.tpcdi.a3` |
+| SKIPPED_QUERY | benchmark=tpcdi, query=A5 | execution_filter | Sail cannot infer a common comparison argument type for this TPC-DI analytical query. | `execution_filter.lakesail.tpcdi.a5` |
+| SKIPPED_QUERY | benchmark=tpcdi, query=AQ1 | execution_filter | Sail cannot infer a common comparison argument type for this TPC-DI analytical query. | `execution_filter.lakesail.tpcdi.aq1` |
+| SKIPPED_QUERY | benchmark=tpcdi, query=AQ10 | execution_filter | Sail lacks the `JULIANDAY` function used by this TPC-DI analytical query. | `execution_filter.lakesail.tpcdi.aq10` |
+| SKIPPED_QUERY | benchmark=tpcdi, query=AQ2 | execution_filter | Sail cannot infer a common comparison argument type for this TPC-DI analytical query. | `execution_filter.lakesail.tpcdi.aq2` |
+| SKIPPED_QUERY | benchmark=tpcdi, query=AQ3 | execution_filter | Sail cannot infer a common comparison argument type for this TPC-DI analytical query. | `execution_filter.lakesail.tpcdi.aq3` |
+| SKIPPED_QUERY | benchmark=tpcdi, query=AQ4 | execution_filter | Sail cannot infer a common comparison argument type for this TPC-DI analytical query. | `execution_filter.lakesail.tpcdi.aq4` |
+| SKIPPED_QUERY | benchmark=tpcdi, query=AQ5 | execution_filter | Sail cannot infer a common comparison argument type for this TPC-DI analytical query. | `execution_filter.lakesail.tpcdi.aq5` |
+| SKIPPED_QUERY | benchmark=tpcdi, query=AQ6 | execution_filter | Sail cannot infer a common comparison argument type for this TPC-DI analytical query. | `execution_filter.lakesail.tpcdi.aq6` |
+| SKIPPED_QUERY | benchmark=tpcdi, query=AQ7 | execution_filter | Sail lacks the `JULIANDAY` function used by this TPC-DI analytical query. | `execution_filter.lakesail.tpcdi.aq7` |
+| SKIPPED_QUERY | benchmark=tpcdi, query=AQ8 | execution_filter | Sail lacks the `JULIANDAY` function used by this TPC-DI analytical query. | `execution_filter.lakesail.tpcdi.aq8` |
+| SKIPPED_QUERY | benchmark=tpcdi, query=AQ9 | execution_filter | Sail cannot infer a common comparison argument type for this TPC-DI analytical query. | `execution_filter.lakesail.tpcdi.aq9` |
+| SKIPPED_QUERY | benchmark=tpcdi, query=EQ4 | execution_filter | Sail cannot infer a common comparison argument type for this TPC-DI ETL query. | `execution_filter.lakesail.tpcdi.eq4` |
+| SKIPPED_QUERY | benchmark=tpcdi, query=EQ5 | execution_filter | Sail cannot infer a common comparison argument type for this TPC-DI ETL query. | `execution_filter.lakesail.tpcdi.eq5` |
+| SKIPPED_QUERY | benchmark=tpcdi, query=EQ7 | execution_filter | Sail cannot resolve sibling derived-table score aliases in this TPC-DI ETL query. | `execution_filter.lakesail.tpcdi.eq7` |
+| SKIPPED_QUERY | benchmark=tpcdi, query=V1 | execution_filter | Sail cannot infer a common comparison argument type for this TPC-DI validation query. | `execution_filter.lakesail.tpcdi.v1` |
+| SKIPPED_QUERY | benchmark=tpcdi, query=V2 | execution_filter | Sail cannot infer a common comparison argument type for this TPC-DI validation query. | `execution_filter.lakesail.tpcdi.v2` |
+| SKIPPED_QUERY | benchmark=tpcdi, query=VQ10 | execution_filter | Sail cannot infer a common comparison argument type for this TPC-DI validation query. | `execution_filter.lakesail.tpcdi.vq10` |
+| SKIPPED_QUERY | benchmark=tpcdi, query=VQ12 | execution_filter | Sail cannot infer a common comparison argument type for this TPC-DI validation query. | `execution_filter.lakesail.tpcdi.vq12` |
+| SKIPPED_QUERY | benchmark=tpcdi, query=VQ3 | execution_filter | Sail cannot infer a common comparison argument type for this TPC-DI validation query. | `execution_filter.lakesail.tpcdi.vq3` |
+| SKIPPED_QUERY | benchmark=tpcdi, query=VQ4 | execution_filter | Sail cannot infer a common comparison argument type for this TPC-DI validation query. | `execution_filter.lakesail.tpcdi.vq4` |
+| SKIPPED_QUERY | benchmark=tpcdi, query=VQ6 | execution_filter | Sail cannot infer a common comparison argument type for this TPC-DI validation query. | `execution_filter.lakesail.tpcdi.vq6` |
+| SKIPPED_QUERY | benchmark=tpcdi, query=VQ7 | execution_filter | Sail cannot infer a common comparison argument type for this TPC-DI validation query. | `execution_filter.lakesail.tpcdi.vq7` |
+| SKIPPED_QUERY | benchmark=tpcdi, query=VQ8 | execution_filter | Sail cannot infer a common comparison argument type for this TPC-DI validation query. | `execution_filter.lakesail.tpcdi.vq8` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=10_v1 | execution_filter | Sail planner rejects this correlated scalar subquery placement. | `execution_filter.lakesail.tpchavoc.10_v1` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=11_v4 | execution_filter | Sail physical planning rejects the aggregate expression in this variant shape. | `execution_filter.lakesail.tpchavoc.11_v4` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=11_v9 | execution_filter | Sail planner reports `Unsupported predicate type`. | `execution_filter.lakesail.tpchavoc.11_v9` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=12_v1 | execution_filter | Sail reports an ambiguous `__always_true` field for the optimizer-flattening variant. | `execution_filter.lakesail.tpchavoc.12_v1` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=14_v2 | execution_filter | Sail parser rejects the generated empty subquery syntax. | `execution_filter.lakesail.tpchavoc.14_v2` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=14_v8 | execution_filter | Sail physical planning rejects EXISTS in this variant shape. | `execution_filter.lakesail.tpchavoc.14_v8` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=16_v1 | execution_filter | Sail planner rejects this correlated scalar subquery placement. | `execution_filter.lakesail.tpchavoc.16_v1` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=16_v10 | execution_filter | Sail reports duplicate unqualified field names for the DISTINCT CASE variant. | `execution_filter.lakesail.tpchavoc.16_v10` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=16_v7 | execution_filter | Sail reports duplicate unqualified field names for the DISTINCT/FILTER variant. | `execution_filter.lakesail.tpchavoc.16_v7` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=17_v10 | execution_filter | Sail physical planning rejects the scalar subquery expression. | `execution_filter.lakesail.tpchavoc.17_v10` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=17_v2 | execution_filter | Sail reports an ambiguous `l_partkey` attribute for the variant shape. | `execution_filter.lakesail.tpchavoc.17_v2` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=17_v4 | execution_filter | Sail has no `dual` table for this scalar-subquery variant. | `execution_filter.lakesail.tpchavoc.17_v4` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=17_v7 | execution_filter | Sail physical planning rejects the scalar subquery expression. | `execution_filter.lakesail.tpchavoc.17_v7` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=1_v7 | execution_filter | Sail rejects the LIST aggregate variant with `unknown function: LIST`. | `execution_filter.lakesail.tpchavoc.1_v7` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=1_v8 | execution_filter | Sail rejects the named-window variant with `named window`. | `execution_filter.lakesail.tpchavoc.1_v8` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=2_v5 | execution_filter | Sail reports an ambiguous `ps_partkey` attribute for the variant shape. | `execution_filter.lakesail.tpchavoc.2_v5` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=2_v7 | execution_filter | Sail rejects the nested MIN window expression as an invalid window function. | `execution_filter.lakesail.tpchavoc.2_v7` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=3_v1 | execution_filter | Sail planner rejects this correlated scalar subquery placement. | `execution_filter.lakesail.tpchavoc.3_v1` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=4_v10 | execution_filter | Sail physical planning rejects EXISTS in this variant shape. | `execution_filter.lakesail.tpchavoc.4_v10` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=4_v7 | execution_filter | Sail physical planning rejects EXISTS in this variant shape. | `execution_filter.lakesail.tpchavoc.4_v7` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=5_v4 | execution_filter | Sail physical planning rejects the aggregate expression in this variant shape. | `execution_filter.lakesail.tpchavoc.5_v4` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=6_v2 | execution_filter | Sail parser rejects the generated empty subquery syntax. | `execution_filter.lakesail.tpchavoc.6_v2` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=7_v1 | execution_filter | Sail loses qualified field names in this variant and cannot resolve `l2.l_shipdate`. | `execution_filter.lakesail.tpchavoc.7_v1` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=8_v1 | execution_filter | Sail loses projected field names in this variant and cannot resolve the subquery field. | `execution_filter.lakesail.tpchavoc.8_v1` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=9_v1 | execution_filter | Sail loses qualified field names in this variant and cannot resolve `n2.n_name`. | `execution_filter.lakesail.tpchavoc.9_v1` |
 
 ### questdb
 
@@ -95,31 +167,6 @@ Benchmarks that **run end-to-end** but with documented internal gaps - either an
 |---|---|---|---|---|
 | INFORMATIONAL | benchmark=transaction_primitives | schema_emit | Workload runs; PRIMARY KEY uniqueness is not enforced on spark - lock table bypass required to prevent concurrent double-population | `schema_emit.spark.transaction_primitives.pk_not_enforced` |
 | INFORMATIONAL | benchmark=write_primitives | schema_emit | Workload runs; PRIMARY KEY uniqueness is not enforced on spark - lock table bypass required to prevent concurrent double-population | `schema_emit.spark.write_primitives.pk_not_enforced` |
-| REWRITTEN | benchmark=clickbench | schema_emit | Spark-family readers can surface empty ClickBench CSV fields as NULL at scan time, so ClickBench omits NOT NULL constraints for Spark targets while preserving canonical query text | `schema_emit.spark.clickbench.strip_not_null` |
-
-### lakesail
-
-| support | scope | phase | reason | rule_id |
-|---|---|---|---|---|
-| REWRITTEN | benchmark=clickbench | schema_emit | Sail reports `Column ... is declared as non-nullable but contains null values` for ClickBench fields including MobilePhoneModel, SearchPhrase, and Referer; ClickBench omits NOT NULL constraints for LakeSail/Spark targets | `schema_emit.lakesail.clickbench.strip_not_null` |
-| SKIPPED | benchmark=read_primitives, query=approx_top_k_lineitem | execution_filter | Sail rejects `APPROX_TOP_K` with `unknown function: APPROX_TOP_K` in UAT sweep `lakesail_read_primitives_0.01_20260512_235223.log` | `execution_filter.lakesail.read_primitives.approx_top_k_lineitem` |
-| SKIPPED | benchmark=read_primitives, query=window_moving_frame | execution_filter | Sail rejects the interval RANGE window frame with an invalid argument error in UAT sweep `lakesail_read_primitives_0.01_20260512_235223.log` | `execution_filter.lakesail.read_primitives.window_moving_frame` |
-| SKIPPED | benchmark=read_primitives, query=json_extract_nested | execution_filter | Sail lacks `JSON_VALID`; UAT reports `unknown function: JSON_VALID` | `execution_filter.lakesail.read_primitives.json_extract_nested` |
-| SKIPPED | benchmark=read_primitives, query=json_aggregates | execution_filter | Sail parser rejects the JSON object syntax with `found :` in UAT | `execution_filter.lakesail.read_primitives.json_aggregates` |
-| SKIPPED | benchmark=read_primitives, query=fulltext_simple_search | execution_filter | Sail parser rejects MySQL full-text `MATCH ... AGAINST` syntax | `execution_filter.lakesail.read_primitives.fulltext_simple_search` |
-| SKIPPED | benchmark=read_primitives, query=fulltext_boolean_search | execution_filter | Sail parser rejects MySQL full-text boolean search syntax | `execution_filter.lakesail.read_primitives.fulltext_boolean_search` |
-| SKIPPED | benchmark=read_primitives, query=fulltext_phrase_search | execution_filter | Sail parser rejects MySQL full-text phrase search syntax | `execution_filter.lakesail.read_primitives.fulltext_phrase_search` |
-| SKIPPED | benchmark=read_primitives, query=approx_quantiles_array | execution_filter | Sail returns a Spark Connect metadata/resource error for array approximate quantiles in UAT | `execution_filter.lakesail.read_primitives.approx_quantiles_array` |
-| SKIPPED | benchmark=read_primitives, query=optimizer_scalar_subquery_flattening | execution_filter | Sail planner reports `Ambiguous reference to unqualified field __always_true` | `execution_filter.lakesail.read_primitives.optimizer_scalar_subquery_flattening` |
-| SKIPPED | benchmark=read_primitives, query=groupby_all_simple | execution_filter | Sail treats `GROUP BY ALL` as an unresolved `ALL` attribute | `execution_filter.lakesail.read_primitives.groupby_all_simple` |
-| SKIPPED | benchmark=read_primitives, query=groupby_all_complex | execution_filter | Sail treats `GROUP BY ALL` as an unresolved `ALL` attribute | `execution_filter.lakesail.read_primitives.groupby_all_complex` |
-| SKIPPED | benchmark=read_primitives, query=orderby_all_simple | execution_filter | Sail treats `ORDER BY ALL` as an unresolved sort expression | `execution_filter.lakesail.read_primitives.orderby_all_simple` |
-| SKIPPED | benchmark=read_primitives, query=orderby_all_desc | execution_filter | Sail treats `ORDER BY ALL DESC` as an unresolved sort expression | `execution_filter.lakesail.read_primitives.orderby_all_desc` |
-| SKIPPED | benchmark=read_primitives, query=list_transform | execution_filter | Sail rejects the lambda function form used by the list primitive | `execution_filter.lakesail.read_primitives.list_transform` |
-| SKIPPED | benchmark=read_primitives, query=list_filter | execution_filter | Sail rejects the lambda function form used by the list primitive | `execution_filter.lakesail.read_primitives.list_filter` |
-| SKIPPED | benchmark=read_primitives, query=list_reduce | execution_filter | Sail rejects the lambda function form used by the list primitive | `execution_filter.lakesail.read_primitives.list_reduce` |
-| SKIPPED | benchmark=read_primitives, query=asof_join_basic | execution_filter | Sail parser rejects `ASOF JOIN` syntax | `execution_filter.lakesail.read_primitives.asof_join_basic` |
-| SKIPPED | benchmark=read_primitives, query=pivot_basic | execution_filter | Sail parser rejects the PIVOT query form emitted by the catalog | `execution_filter.lakesail.read_primitives.pivot_basic` |
 
 ### starrocks
 
