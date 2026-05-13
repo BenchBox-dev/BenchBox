@@ -524,6 +524,40 @@ describe("TimeSeries", () => {
     expect(state?.querySelector('a[href="/results/r/tpch-duckdb-sf0.01-20260403-2222bbbb#run-receipt"]')).toBeTruthy();
   });
 
+  it("keeps unaffected platform trend lines when another platform has same-day duplicates", () => {
+    const entries = [
+      makeEntry({ result_id: "tpch-duckdb-sf0.01-20260403-1111aaaa", run_date: "2026-04-03", display_geomean_ms: 15 }),
+      makeEntry({ result_id: "tpch-duckdb-sf0.01-20260403-2222bbbb", run_date: "2026-04-03", display_geomean_ms: 12 }),
+      makeEntry({
+        result_id: "tpch-polars-sf0.01-20260403-3333cccc",
+        platform: "Polars",
+        platform_id: "polars",
+        run_date: "2026-04-03",
+        display_geomean_ms: 20,
+      }),
+      makeEntry({
+        result_id: "tpch-polars-sf0.01-20260404-4444dddd",
+        platform: "Polars",
+        platform_id: "polars",
+        run_date: "2026-04-04",
+        display_geomean_ms: 18,
+      }),
+    ];
+    const { container } = render(<TimeSeries entries={entries} />);
+    const duplicateState = container.querySelector('[data-testid="time-series-duplicate-day"]');
+    const plottedIds = Array.from(container.querySelectorAll("circle[data-result-id]")).map(
+      (el) => el.getAttribute("data-result-id"),
+    );
+
+    expect(duplicateState).not.toBeNull();
+    expect(container.querySelector("svg")).not.toBeNull();
+    expect(duplicateState?.querySelectorAll("[data-result-id]")).toHaveLength(2);
+    expect(plottedIds).toEqual([
+      "tpch-polars-sf0.01-20260403-3333cccc",
+      "tpch-polars-sf0.01-20260404-4444dddd",
+    ]);
+  });
+
   it("keeps point titles unique when platform display names repeat", () => {
     const entries = [
       makeEntry({

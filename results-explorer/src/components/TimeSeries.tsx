@@ -77,15 +77,9 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
   }
 
   const duplicateDayGroups = duplicateSameDayGroups(dedupedEntries, metric);
-  if (duplicateDayGroups.length > 0) {
-    return (
-      <DuplicateDayTrendState
-        groups={duplicateDayGroups}
-        metric={metric}
-        observationCount={countTrendableEntries(dedupedEntries, metric)}
-      />
-    );
-  }
+  const duplicateDayPlatformIds = new Set(
+    duplicateDayGroups.flatMap((group) => group.runs.map(({ entry }) => entry.platform_id)),
+  );
 
   // Group by platform_id, sort by run_date within each group
   const byPlatform = new Map<string, ChartHistoricalEntry[]>();
@@ -105,6 +99,7 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
   let colorIdx = 0;
   const seriesDescriptors: { pid: string; firstEntry: ChartHistoricalEntry; points: SeriesPoint[] }[] = [];
   for (const [pid, platformEntries] of byPlatform) {
+    if (duplicateDayPlatformIds.has(pid)) continue;
     const sorted = [...platformEntries].sort((a, b) => a.run_date.localeCompare(b.run_date));
     const trendable = sorted
       .map((entry) => {
@@ -148,6 +143,15 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
   }));
 
   if (allSeries.length === 0) {
+    if (duplicateDayGroups.length > 0) {
+      return (
+        <DuplicateDayTrendState
+          groups={duplicateDayGroups}
+          metric={metric}
+          observationCount={countTrendableEntries(dedupedEntries, metric)}
+        />
+      );
+    }
     return (
       <p class="text-sm text-[var(--bb-data-fg-subtle)] italic">
         Not enough historical data for a trend chart (need ≥2 runs per platform).
@@ -182,48 +186,58 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
 
   const metricLabel = metric === "power_score" ? "Power score" : "Geomean latency";
   const yTicks = [yMin, (yMin + yMax) / 2, yMax];
+  const duplicateDayState =
+    duplicateDayGroups.length > 0 ? (
+      <DuplicateDayTrendState
+        groups={duplicateDayGroups}
+        metric={metric}
+        observationCount={countTrendableEntries(dedupedEntries, metric)}
+      />
+    ) : null;
 
   // Show at most 7 x-axis labels when there are many dates
   const step = Math.ceil(allDates.length / 7);
   const shownDates = allDates.filter((_, i) => i % step === 0 || i === allDates.length - 1);
 
   return (
-    <div ref={containerRef} class="w-full overflow-x-auto">
-      <svg
-        class="bb-chart-svg"
-        width={w}
-        height={totalH}
-        role="img"
-        aria-label={`${metricLabel} trend over time`}
-      >
-        {/* Y-axis grid + labels */}
-        {yTicks.map((val) => {
-          const y = yFor(val);
-          const label =
-            metric === "power_score"
-              ? formatPowerScore(val).valueText
-              : formatLatencyMs(val, { subMillisecond: "compact" }).valueText;
-          return (
-            <g key={val}>
-              <line
-                x1={LABEL_W}
-                y1={y}
-                x2={w - PADDING_RIGHT}
-                y2={y}
-                stroke="#e5e7eb"
-                strokeWidth={1}
-              />
-              <text
-                x={LABEL_W - 4}
-                y={y + 4}
-                textAnchor="end"
-                style={{ fontSize: "9px", fill: "#9ca3af" }}
-              >
-                {label}
-              </text>
-            </g>
-          );
-        })}
+    <div class={duplicateDayState ? "space-y-3" : undefined}>
+      {duplicateDayState}
+      <div ref={containerRef} class="w-full overflow-x-auto">
+        <svg
+          class="bb-chart-svg"
+          width={w}
+          height={totalH}
+          role="img"
+          aria-label={`${metricLabel} trend over time`}
+        >
+          {/* Y-axis grid + labels */}
+          {yTicks.map((val) => {
+            const y = yFor(val);
+            const label =
+              metric === "power_score"
+                ? formatPowerScore(val).valueText
+                : formatLatencyMs(val, { subMillisecond: "compact" }).valueText;
+            return (
+              <g key={val}>
+                <line
+                  x1={LABEL_W}
+                  y1={y}
+                  x2={w - PADDING_RIGHT}
+                  y2={y}
+                  stroke="#e5e7eb"
+                  strokeWidth={1}
+                />
+                <text
+                  x={LABEL_W - 4}
+                  y={y + 4}
+                  textAnchor="end"
+                  style={{ fontSize: "9px", fill: "#9ca3af" }}
+                >
+                  {label}
+                </text>
+              </g>
+            );
+          })}
 
         {/* Series lines + dots */}
         {allSeries.map((s) => {
@@ -274,21 +288,22 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
             );
           })}
         </g>
-      </svg>
+        </svg>
 
-      {/* Legend */}
-      {allSeries.length > 1 && (
-        <div class="flex flex-wrap gap-4 text-xs text-[var(--bb-data-fg-muted)] mt-1">
-          {allSeries.map((s) => (
-            <span key={s.platformId} class="flex items-center gap-1.5">
-              <span class="inline-block w-5 border-t-2" style={{ borderColor: s.color }} />
-              <span title={s.fullLabel}>
-                {s.label}
+        {/* Legend */}
+        {allSeries.length > 1 && (
+          <div class="flex flex-wrap gap-4 text-xs text-[var(--bb-data-fg-muted)] mt-1">
+            {allSeries.map((s) => (
+              <span key={s.platformId} class="flex items-center gap-1.5">
+                <span class="inline-block w-5 border-t-2" style={{ borderColor: s.color }} />
+                <span title={s.fullLabel}>
+                  {s.label}
+                </span>
               </span>
-            </span>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
