@@ -243,6 +243,16 @@ def test_benchbox_run_argv_includes_platform_extras():
     assert "port=19030" in argv
 
 
+@pytest.mark.parametrize(
+    "platform",
+    ["pg-duckdb", "pg-mooncake", "timescaledb", "postgresql"],
+)
+def test_benchbox_run_argv_includes_local_managed_postgres_password(platform):
+    argv = matrix.benchbox_run_argv(platform, "tpch", 0.01)
+    assert "--platform-option" in argv
+    assert "password=benchbox" in argv
+
+
 def test_benchbox_run_argv_appends_extra_args():
     argv = matrix.benchbox_run_argv("duckdb", "tpch", 0.01, extra_args=["--tuning", "tuned"])
     assert argv[-2:] == ["--tuning", "tuned"]

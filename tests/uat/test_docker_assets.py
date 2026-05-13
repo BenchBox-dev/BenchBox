@@ -107,3 +107,13 @@ def test_path_mirrored_compose_environment_points_at_benchmark_runs_dir(platform
     spec = docker_assets.docker_platform_spec(platform)
     env = docker_assets.compose_environment(spec, benchmark_runs_dir=tmp_path / "runs")
     assert env == {"BENCHBOX_DATA_DIR": str(tmp_path / "runs")}
+
+
+@pytest.mark.parametrize("platform", ["postgresql", "pg-duckdb", "pg-mooncake", "timescaledb"])
+def test_local_managed_postgres_compose_password_matches_uat_argv(platform):
+    spec = docker_assets.docker_platform_spec(platform)
+    compose_text = "\n".join(path.read_text() for path in spec.compose_files)
+    argv = matrix.benchbox_run_argv(platform, "tpch", 0.01)
+
+    assert "POSTGRES_PASSWORD: benchbox" in compose_text
+    assert "password=benchbox" in argv

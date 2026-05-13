@@ -80,7 +80,7 @@ All PostgreSQL extensions follow the same adapter pattern:
 PostgreSQLAdapter (base)
 ├── TimescaleDBAdapter (hypertables, compression)
 ├── PgDuckDBAdapter (DuckDB execution, MotherDuck)
-└── PgMooncakeAdapter (columnstore DDL, S3 storage)
+└── PgMooncakeAdapter (heap-load plus mooncake mirrors, S3 storage)
 ```
 
 Each extension adapter inherits from `PostgreSQLAdapter` and overrides specific methods:
@@ -88,9 +88,9 @@ Each extension adapter inherits from `PostgreSQLAdapter` and overrides specific 
 | Method | PostgreSQL | pg_duckdb | pg_mooncake | TimescaleDB |
 |--------|-----------|-----------|-------------|-------------|
 | `create_connection()` | Standard | + extension verify, GUCs | + extension verify, bucket | + extension verify |
-| `create_schema()` | Standard DDL | Inherited | + USING columnstore | + create_hypertable() |
+| `create_schema()` | Standard DDL | Inherited | Standard heap DDL for COPY | + create_hypertable() |
 | `configure_for_benchmark()` | PG settings | + force_execution | Inherited | + compression |
-| `load_data()` | COPY | Inherited | Inherited | Inherited |
+| `load_data()` | COPY | Inherited | COPY, then `mooncake.create_table` mirrors | Inherited |
 | `get_target_dialect()` | postgres | postgres | postgres | postgres |
 
 ## Recommended Comparisons
@@ -137,7 +137,7 @@ benchbox run --platform postgresql --benchmark tsbs-devops --scale 1.0
 | Aspect | pg_duckdb | pg_mooncake |
 |--------|-----------|-------------|
 | **What changes** | Execution engine only | Storage format + execution engine |
-| **Table DDL** | Standard `CREATE TABLE` | `CREATE TABLE ... USING columnstore` |
+| **Load path** | Standard `CREATE TABLE` + COPY | Standard `CREATE TABLE` + COPY, then mooncake mirror promotion |
 | **Data format** | PostgreSQL heap (row-oriented) | Parquet (columnar) |
 | **Compression** | None (heap tables) | 5-20x columnar compression |
 | **Indexes** | B-tree available (but bypassed by DuckDB) | Not supported |
@@ -148,7 +148,7 @@ benchbox run --platform postgresql --benchmark tsbs-devops --scale 1.0
 ### When to Use Each
 
 - **pg_duckdb**: You have an existing PostgreSQL database and want faster analytical queries without changing schema or data format.
-- **pg_mooncake**: You want true columnar storage with maximum compression and analytical performance, and you can use the columnstore table type.
+- **pg_mooncake**: You want true columnar storage with maximum compression and analytical performance, and can use BenchBox's heap-load plus mirror-promotion path.
 - **TimescaleDB**: Your workload is time-series data with time-based partitioning and compression needs.
 - **Vanilla PostgreSQL**: You need a baseline comparison or your workload is OLTP-focused.
 

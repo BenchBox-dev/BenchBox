@@ -72,6 +72,16 @@ PLATFORM_EXTRA_OPTS: dict[str, list[str]] = {
     ],
 }
 
+# Platform → local managed Docker credentials appended only by the Python UAT
+# command builder. Keep this separate from PLATFORM_EXTRA_OPTS because that
+# mapping is a parity mirror of scripts/local_stress_test.sh.
+LOCAL_MANAGED_PLATFORM_EXTRA_OPTS: dict[str, list[str]] = {
+    "pg-duckdb": ["--platform-option", "password=benchbox"],
+    "pg-mooncake": ["--platform-option", "password=benchbox"],
+    "timescaledb": ["--platform-option", "password=benchbox"],
+    "postgresql": ["--platform-option", "password=benchbox"],
+}
+
 # Platform → extra benchbox CLI flags (not --platform-option). Mirrors
 # `get_platform_cli_flags` in scripts/local_stress_test.sh:187-192.
 # velox: Docker Desktop's 11.7 GB ceiling cannot fit 3xSF=1 TPC-H passes
@@ -415,5 +425,6 @@ def benchbox_run_argv(
         argv += ["--compression", compression]
     argv += PLATFORM_CLI_FLAGS.get(platform, [])
     argv += PLATFORM_EXTRA_OPTS.get(platform, [])
+    argv += LOCAL_MANAGED_PLATFORM_EXTRA_OPTS.get(platform, [])
     argv += list(extra_args)
     return argv

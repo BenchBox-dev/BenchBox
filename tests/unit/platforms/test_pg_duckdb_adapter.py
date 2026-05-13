@@ -465,6 +465,20 @@ class TestPgDuckDBConfigBuilder:
         assert config.max_parallel_workers_per_gather == 2
         assert config.force_execution is True
         assert config.postgres_scan_threads == 0
+
+    def test_platform_option_defaults_keep_numeric_types(self, pg_duckdb_stubs):
+        from benchbox.cli.platform_hooks import PlatformHookRegistry
+        from benchbox.platforms.pg_duckdb import _build_pg_duckdb_config
+
+        options = PlatformHookRegistry.parse_options("pg-duckdb", [])
+
+        assert options["port"] == 5432
+        assert options["force_execution"] is True
+        assert options["postgres_scan_threads"] == 0
+        adapter = PgDuckDBAdapter.from_config(options)
+        assert adapter.postgres_scan_threads == 0
+        assert adapter.compare_native is False
+        config = _build_pg_duckdb_config("pg-duckdb", options, {}, None)
         assert config.compare_native is False
         assert config.options["schema"] == "public"
 

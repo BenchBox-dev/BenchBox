@@ -875,7 +875,8 @@ try:
         PlatformOptionSpec(
             name="port",
             help="PostgreSQL server port",
-            default="5432",
+            parser=int,
+            default=5432,
         ),
         PlatformOptionSpec(
             name="database",
@@ -923,7 +924,8 @@ try:
         PlatformOptionSpec(
             name="port",
             help="TimescaleDB server port",
-            default="5432",
+            parser=int,
+            default=5432,
         ),
         PlatformOptionSpec(
             name="database",
@@ -1007,7 +1009,8 @@ try:
         PlatformOptionSpec(
             name="port",
             help="PostgreSQL server port",
-            default="5432",
+            parser=int,
+            default=5432,
         ),
         PlatformOptionSpec(
             name="database",
@@ -1062,13 +1065,13 @@ try:
             name="force_execution",
             help="Force DuckDB execution engine for all queries",
             parser=parse_bool,
-            default="true",
+            default=True,
         ),
         PlatformOptionSpec(
             name="postgres_scan_threads",
             help="Threads for parallel PostgreSQL table scanning (0 = auto)",
             parser=int,
-            default="0",
+            default=0,
         ),
         PlatformOptionSpec(
             name="compare_native",
@@ -1094,7 +1097,8 @@ try:
         PlatformOptionSpec(
             name="port",
             help="PostgreSQL server port",
-            default="5432",
+            parser=int,
+            default=5432,
         ),
         PlatformOptionSpec(
             name="database",

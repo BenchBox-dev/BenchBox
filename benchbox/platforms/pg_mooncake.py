@@ -1,7 +1,7 @@
 """pg_mooncake platform adapter for BenchBox benchmarking.
 
 Extends PostgreSQL adapter with pg_mooncake-specific functionality:
-- Columnstore table access method (USING columnstore) with Parquet/Iceberg storage
+- Mooncake table access method (USING mooncake) with Parquet/Iceberg storage
 - DuckDB-powered vectorized execution on columnar data
 - Object storage backend support (S3/GCS/Azure)
 
@@ -49,7 +49,7 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
     """pg_mooncake platform adapter with columnstore tables and DuckDB execution.
 
     Extends PostgreSQLAdapter with pg_mooncake-specific features:
-    - Columnstore table access method (USING columnstore)
+    - Mooncake table access method (USING mooncake)
     - DuckDB-powered vectorized execution on Parquet data
     - Object storage backend configuration (S3/GCS)
 
@@ -153,7 +153,7 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
             else:
                 # Try to create the extension
                 self.logger.info("pg_mooncake extension not found, attempting to create...")
-                cursor.execute("CREATE EXTENSION IF NOT EXISTS pg_mooncake")
+                cursor.execute("CREATE EXTENSION IF NOT EXISTS pg_mooncake CASCADE")
                 conn.commit()
                 cursor.execute("SELECT extversion FROM pg_extension WHERE extname = 'pg_mooncake'")
                 result = cursor.fetchone()
@@ -191,21 +191,22 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
         return conn
 
     def _transform_create_statement(self, stmt: str) -> str:
-        """Transform CREATE TABLE statements to use columnstore storage.
+        """Leave CREATE TABLE statements as heap tables for bulk loading.
 
-        The parent PostgreSQL create_schema method owns the public
-        ``(benchmark, connection) -> float`` contract and execution flow.
-        pg_mooncake only customizes CREATE TABLE DDL through this hook.
+        pg_mooncake 0.2.0 does not support PostgreSQL COPY directly into
+        mooncake access-method tables. BenchBox first loads ordinary heap
+        tables through the PostgreSQL parent path, then promotes each loaded
+        table into a mooncake mirror with the original benchmark table name.
         """
-        return self._add_columnstore_access_method(stmt)
+        return stmt
 
     def _add_columnstore_access_method(self, ddl_statement: str) -> str:
-        """Add USING columnstore to CREATE TABLE statements.
+        """Add USING mooncake to CREATE TABLE statements.
 
         Transforms:
             CREATE TABLE foo (col1 INT, col2 TEXT);
         Into:
-            CREATE TABLE foo (col1 INT, col2 TEXT) USING columnstore;
+            CREATE TABLE foo (col1 INT, col2 TEXT) USING mooncake;
 
         Only modifies CREATE TABLE statements. Other DDL (CREATE INDEX,
         ALTER TABLE, etc.) is passed through unchanged.
@@ -221,16 +222,116 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
         if not upper.startswith("CREATE TABLE"):
             return ddl_statement
 
-        # Don't double-add if already has USING columnstore
-        if "USING COLUMNSTORE" in upper:
+        # Don't double-add if already has the pg_mooncake access method.
+        if "USING MOONCAKE" in upper:
             return ddl_statement
 
-        # Find the closing parenthesis of the column definitions
-        # and insert USING columnstore before the semicolon
         if stripped.endswith(";"):
-            return stripped[:-1] + " USING columnstore;"
-        else:
-            return stripped + " USING columnstore"
+            return stripped[:-1] + " USING mooncake;"
+        return stripped + " USING mooncake"
+
+    def load_data(
+        self,
+        benchmark,
+        connection: Any,
+        data_dir: str | os.PathLike,
+    ) -> tuple[dict[str, int], float, None]:
+        """Load through PostgreSQL heap tables, then create mooncake mirrors."""
+        table_stats, loading_time, extra = super().load_data(benchmark, connection, data_dir)
+        loaded_tables = [table for table, rows in table_stats.items() if rows > 0]
+        if loaded_tables:
+            table_stats = self._promote_loaded_tables_to_mooncake(connection, loaded_tables, table_stats)
+        return table_stats, loading_time, extra
+
+    def _promote_loaded_tables_to_mooncake(
+        self,
+        connection: Any,
+        table_names: list[str],
+        table_stats: dict[str, int],
+    ) -> dict[str, int]:
+        """Rename loaded heap tables and expose mooncake mirrors under original names."""
+        if not self._validate_identifier(self.schema):
+            raise ValueError(f"Invalid pg_mooncake schema identifier: {self.schema}")
+
+        cursor = connection.cursor()
+        updated_stats = dict(table_stats)
+        try:
+            for table_name in table_names:
+                table_name_lower = table_name.lower()
+                if not self._validate_identifier(table_name_lower):
+                    self.logger.warning(f"Skipping mooncake mirror for invalid table identifier: {table_name}")
+                    continue
+
+                staging_table = self._mooncake_staging_table_name(table_name_lower)
+                qualified_table = self._qualified_identifier(table_name_lower)
+                source_name = self._mooncake_table_reference(staging_table)
+                target_name = self._mooncake_table_reference(table_name_lower)
+
+                cursor.execute(f'ALTER TABLE {qualified_table} RENAME TO "{staging_table}"')
+                connection.commit()
+                cursor.execute("CALL mooncake.create_table(%s, %s)", (target_name, source_name))
+                cursor.execute(f"SELECT COUNT(*) FROM {qualified_table}")
+                updated_stats[table_name_lower] = cursor.fetchone()[0]
+
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            cursor.close()
+        return updated_stats
+
+    def _mooncake_staging_table_name(self, table_name: str) -> str:
+        """Return a PostgreSQL-safe staging table name for a loaded heap table."""
+        suffix_budget = 63 - len("__bb_moon_src_")
+        return f"__bb_moon_src_{table_name[:suffix_budget]}"
+
+    def _qualified_identifier(self, table_name: str) -> str:
+        if self.schema != "public":
+            return f'"{self.schema}"."{table_name}"'
+        return f'"{table_name}"'
+
+    def _mooncake_table_reference(self, table_name: str) -> str:
+        if self.schema != "public":
+            return f"{self.schema}.{table_name}"
+        return table_name
+
+    def _get_existing_tables(self, connection: Any) -> list[str]:
+        """Return tables and end the catalog transaction before mooncake reads.
+
+        pg_mooncake 0.2.0 routes user-table reads through DuckDB. After a
+        PostgreSQL catalog query, the next mooncake table scan can fail with
+        "DuckDB execution is not supported inside functions" until the current
+        transaction is closed. Keep this workaround local to pg_mooncake.
+        """
+        cursor = connection.cursor()
+        should_commit = False
+        try:
+            cursor.execute(
+                """
+                SELECT c.relname
+                FROM pg_catalog.pg_class c
+                JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+                WHERE c.relkind = 'r'
+                  AND n.nspname = %s
+                ORDER BY c.relname
+                """,
+                (self.schema,),
+            )
+            tables = [row[0].lower() for row in cursor.fetchall()]
+            should_commit = True
+            return tables
+        except Exception as e:
+            self.logger.warning(f"Failed to get pg_mooncake tables: {e}")
+            connection.rollback()
+            return []
+        finally:
+            cursor.close()
+            if should_commit:
+                try:
+                    connection.commit()
+                except Exception as e:
+                    self.logger.debug(f"Failed to close pg_mooncake catalog transaction: {e}")
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
         """Get pg_mooncake platform information."""
