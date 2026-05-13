@@ -108,16 +108,16 @@ Passing any scale other than `1.0` raises a clear error pointing to
 
 ## DataFrame Mode
 
-The DataFrame registry preserves the existing 13 translated query
-implementations. The remaining 100 canonical query IDs are registered as
-`NotImplementedError` stubs that point to the Track-2 DataFrame coverage TODO.
-Default DataFrame query selection exposes only the implemented 13 until that
-follow-up work lands.
+The DataFrame registry exposes all 113 canonical query IDs. The original 13
+queries keep their hand-written expression-family and pandas-family
+translations; the rest use a restricted translator for the canonical JOB SQL
+shape: comma-join tables, WHERE predicates, equality joins, and top-level
+`MIN(...)` projections.
 
-DataFrame `joinorder` results are partial by definition until Track 2 translates
-the remaining queries. Result export preserves the skip summary, and the Results
-Explorer treats a 13-of-113 DataFrame run as insufficient query coverage for
-comparison and ranking rather than as a complete canonical JOB result.
+DataFrame `joinorder` still has a different benchmark interpretation from SQL
+`joinorder`: SQL mode stresses optimizer join ordering, while DataFrame mode
+executes an explicit join sequence and primarily measures multi-join execution
+through the DataFrame APIs.
 
 ## License And Attribution
 
@@ -160,6 +160,6 @@ benchbox/core/joinorder/
 |-- data_manifest.toml    # archive, table hash, schema, row-count manifest
 |-- DATA-LICENSE.md       # dataset provenance and redistribution notes
 |-- queries.py            # 113 canonical JOB SQL queries
-|-- dataframe_queries.py  # 13 implemented DataFrame queries + 100 stubs
+|-- dataframe_queries.py  # 113 DataFrame query implementations
 `-- schema.py             # 21-table JOB schema
 ```

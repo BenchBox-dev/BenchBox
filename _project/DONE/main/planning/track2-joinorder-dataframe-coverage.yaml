@@ -1,0 +1,76 @@
+id: track2-joinorder-dataframe-coverage
+title: "JoinOrder Track-2 DataFrame coverage for canonical 113 queries"
+worktree: main
+priority: Medium
+status: Completed
+completed_date: "2026-05-13"
+category: Core Functionality
+
+description: |
+  Cutover registered all 113 canonical JoinOrder SQL query IDs in the
+  DataFrame registry, but only the original 13 had expression-family and
+  pandas-family translations. The remaining 100 raised NotImplementedError
+  and pointed here.
+
+  Completed by preserving the original 13 hand-written translations and adding
+  a restricted canonical JOB SQL-to-DataFrame translator for the remaining
+  canonical query shape: comma-join tables, WHERE predicates, equality joins,
+  and top-level MIN(...) projections. The generated pandas-family and
+  expression-family paths are validated against DuckDB on the canonical tiny
+  fixture for all 100 formerly untranslated query IDs.
+
+work:
+  - id: w1
+    summary: "Translate remaining canonical JoinOrder query IDs for DataFrame mode"
+    status: done
+    notes: |
+      Added generated expression-family and pandas-family implementations for
+      the 100 query IDs that previously raised NotImplementedError. The
+      original 13 hand-written translations remain in place.
+
+  - id: w2
+    summary: "Validate generated DataFrame translations against DuckDB"
+    needs: [w1]
+    status: done
+    notes: |
+      `tests/unit/core/joinorder/test_dataframe_query_capabilities.py` now
+      compares every generated pandas-family and Polars expression-family query
+      against the canonical DuckDB SQL result on
+      `tests/fixtures/joinorder_canonical_tiny`.
+
+  - id: w3
+    summary: "Remove DataFrame skip policy for canonical JoinOrder"
+    needs: [w1]
+    status: done
+    notes: |
+      `get_untranslated_dataframe_query_ids()` now returns an empty list, so
+      default DataFrame selection includes all 113 canonical query IDs.
+
+verification:
+  - description: "JoinOrder DataFrame capability tests pass"
+    command: "uv run -- python -m pytest tests/unit/core/joinorder/test_dataframe_query_capabilities.py -q"
+    expected_output: "3 tests passed"
+  - description: "JoinOrder DataFrame query module lint passes"
+    command: "uv run -- ruff check benchbox/core/joinorder/dataframe_queries.py tests/unit/core/joinorder/test_dataframe_query_capabilities.py"
+    expected_output: "All checks passed"
+
+must_preserve:
+  - "Original 13 hand-written JoinOrder DataFrame translations remain available."
+  - "SQL-mode JoinOrder query text and execution path remain unchanged."
+  - "Generated translations stay restricted to the canonical JOB query shape."
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/joinorder/dataframe_queries.py"
+    - "benchbox/core/joinorder/benchmark.py"
+    - "tests/unit/core/joinorder/test_dataframe_query_capabilities.py"
+    - "docs/benchmarks/join-order.md"
+    - "_project/DONE/main/planning/track2-joinorder-dataframe-coverage.yaml"
+    - "_project/TODO/main/active/joinorder-canonical-corpus-uat-backfill.yaml"
+
+metadata:
+  tags:
+    - joinorder
+    - dataframe
+    - track2
+  created_date: "2026-05-11"

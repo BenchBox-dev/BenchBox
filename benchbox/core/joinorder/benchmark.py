@@ -348,8 +348,7 @@ class JoinOrderBenchmark(BaseBenchmark):
     def get_dataframe_queries(self) -> QueryRegistry:
         """Get DataFrame query implementations for JoinOrder.
 
-        Returns a registry containing all canonical query IDs. Thirteen have
-        DataFrame implementations; the rest are registered as Track-2 stubs.
+        Returns a registry containing all canonical query IDs.
 
         Returns:
             QueryRegistry for canonical JoinOrder DataFrame queries.
@@ -359,7 +358,7 @@ class JoinOrderBenchmark(BaseBenchmark):
         return get_dataframe_queries()
 
     def get_dataframe_skip_queries(self) -> list[str]:
-        """Skip canonical queries whose DataFrame translations are Track-2 stubs."""
+        """Return canonical queries unavailable in DataFrame mode."""
         from benchbox.core.joinorder.dataframe_queries import get_untranslated_dataframe_query_ids
 
         return get_untranslated_dataframe_query_ids()
