@@ -130,6 +130,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | phase | scope | action | support | failure mode | rule_id |
 |---|---|---|---|---|---|
 | ddl_optimize | platform-wide | rewrite_ddl | REWRITTEN | SYNTAX_ERROR | `ddl_optimize.lakesail.all.optimize_table_definition` |
+| schema_emit | benchmark=clickbench | rewrite_ddl | REWRITTEN | UNSUPPORTED_FEATURE | `schema_emit.lakesail.clickbench.strip_not_null` |
 | execution_filter | benchmark=read_primitives, query=approx_top_k_lineitem | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.approx_top_k_lineitem` |
 | execution_filter | benchmark=read_primitives, query=window_moving_frame | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.window_moving_frame` |
 | execution_filter | benchmark=read_primitives, query=json_extract_nested | skip_query | SKIPPED | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.json_extract_nested` |
@@ -232,6 +233,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 |---|---|---|---|---|---|
 | schema_emit | benchmark=transaction_primitives | rewrite_ddl | INFORMATIONAL | SILENT_CORRUPTION | `schema_emit.spark.transaction_primitives.pk_not_enforced` |
 | schema_emit | benchmark=write_primitives | rewrite_ddl | INFORMATIONAL | SILENT_CORRUPTION | `schema_emit.spark.write_primitives.pk_not_enforced` |
+| schema_emit | benchmark=clickbench | rewrite_ddl | REWRITTEN | UNSUPPORTED_FEATURE | `schema_emit.spark.clickbench.strip_not_null` |
 | ddl_optimize | platform-wide | rewrite_ddl | REWRITTEN | SYNTAX_ERROR | `ddl_optimize.spark.all.optimize_table_definition` |
 
 ### starrocks

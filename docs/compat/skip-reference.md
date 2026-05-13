@@ -83,11 +83,13 @@ Benchmarks that **run end-to-end** but with documented internal gaps - either an
 |---|---|---|---|---|
 | INFORMATIONAL | benchmark=transaction_primitives | schema_emit | Workload runs; PRIMARY KEY uniqueness is not enforced on spark - lock table bypass required to prevent concurrent double-population | `schema_emit.spark.transaction_primitives.pk_not_enforced` |
 | INFORMATIONAL | benchmark=write_primitives | schema_emit | Workload runs; PRIMARY KEY uniqueness is not enforced on spark - lock table bypass required to prevent concurrent double-population | `schema_emit.spark.write_primitives.pk_not_enforced` |
+| REWRITTEN | benchmark=clickbench | schema_emit | Spark-family readers can surface empty ClickBench CSV fields as NULL at scan time, so ClickBench omits NOT NULL constraints for Spark targets while preserving canonical query text | `schema_emit.spark.clickbench.strip_not_null` |
 
 ### lakesail
 
 | support | scope | phase | reason | rule_id |
 |---|---|---|---|---|
+| REWRITTEN | benchmark=clickbench | schema_emit | Sail reports `Column ... is declared as non-nullable but contains null values` for ClickBench fields including MobilePhoneModel, SearchPhrase, and Referer; ClickBench omits NOT NULL constraints for LakeSail/Spark targets | `schema_emit.lakesail.clickbench.strip_not_null` |
 | SKIPPED | benchmark=read_primitives, query=approx_top_k_lineitem | execution_filter | Sail rejects `APPROX_TOP_K` with `unknown function: APPROX_TOP_K` in UAT sweep `lakesail_read_primitives_0.01_20260512_235223.log` | `execution_filter.lakesail.read_primitives.approx_top_k_lineitem` |
 | SKIPPED | benchmark=read_primitives, query=window_moving_frame | execution_filter | Sail rejects the interval RANGE window frame with an invalid argument error in UAT sweep `lakesail_read_primitives_0.01_20260512_235223.log` | `execution_filter.lakesail.read_primitives.window_moving_frame` |
 | SKIPPED | benchmark=read_primitives, query=json_extract_nested | execution_filter | Sail lacks `JSON_VALID`; UAT reports `unknown function: JSON_VALID` | `execution_filter.lakesail.read_primitives.json_extract_nested` |
