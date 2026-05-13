@@ -28,6 +28,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import logging
+import shutil
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -118,8 +119,8 @@ class SparkDataLoadMixin:
         """Return a path the CSV reader can open.
 
         When ``_requires_csv_extension`` is True, files whose data-format
-        extension is not ``.csv`` (e.g. ``.dat``, ``.tbl``) are symlinked
-        into *temp_dir* with a ``.csv`` (+ compression) extension.
+        extension is not ``.csv`` (e.g. ``.dat``, ``.tbl``) are linked
+        under *temp_dir* with a ``.csv`` (+ compression) extension.
         The original file is left untouched.
         """
         if not self._requires_csv_extension:
@@ -131,46 +132,55 @@ class SparkDataLoadMixin:
         compression = detect_compression(file_path) if compression is None else compression
         base_path = strip_compression_suffix(file_path)
 
-        if base_path.suffix.lower() == ".csv":
-            return file_path
-
         # Build a .csv name preserving the table stem and any trailing chunk
         # suffixes (e.g. ".1" in customer.tbl.1.zst), but replacing the data
         # format extension (.tbl, .dat) with .csv.
         #   customer.tbl.zst   → customer.csv.zst
         #   customer.tbl.1.zst → customer.1.csv.zst   (unique per chunk)
         #   orders.dat.xz      → orders.csv.xz
-        p = base_path
-        trailing: list[str] = []
-        while p.suffix and p.suffix.lower() not in DATA_FORMAT_EXTENSIONS:
-            trailing.insert(0, p.suffix)
-            p = p.with_suffix("")
-        new_name = p.stem + "".join(trailing) + ".csv" + self._csv_extension_suffix(compression)
+        if base_path.suffix.lower() == ".csv":
+            new_name = base_path.name + self._csv_extension_suffix(compression)
+        else:
+            p = base_path
+            trailing: list[str] = []
+            while p.suffix and p.suffix.lower() not in DATA_FORMAT_EXTENSIONS:
+                trailing.insert(0, p.suffix)
+                p = p.with_suffix("")
+            new_name = p.stem + "".join(trailing) + ".csv" + self._csv_extension_suffix(compression)
 
-        link = temp_dir / new_name
+        # Sail's CSV reader currently normalizes a file path to a directory
+        # path (the error shows a trailing slash) before scanning for files.
+        # Return a directory containing exactly one CSV-named hardlink/symlink
+        # so both Spark's file reader and Sail's directory scanner work.
+        compat_dir = temp_dir / new_name
+        compat_dir.mkdir(exist_ok=True)
+        link = compat_dir / new_name
         resolved_path = file_path.resolve()
         # Chunked files get unique symlink names because trailing chunk suffixes
         # (e.g. ".1" in customer.tbl.1.zst) are preserved in the symlink name.
         # If a link already exists but points elsewhere, warn - loading would
         # silently use stale data.
         if link.exists() or link.is_symlink():
-            existing_target = None
-            if link.is_symlink():
-                try:
-                    existing_target = link.resolve()
-                except FileNotFoundError:
-                    existing_target = None
+            try:
+                points_to_source = link.samefile(resolved_path)
+            except OSError:
+                points_to_source = False
 
-            if not link.is_symlink() or existing_target != resolved_path:
+            if not points_to_source:
                 logger.warning(
-                    "Symlink collision: %s already exists%s, expected %s",
+                    "CSV compatibility path collision: %s already exists, expected %s",
                     link,
-                    f" -> {existing_target}" if existing_target is not None else "",
                     resolved_path,
                 )
         else:
-            link.symlink_to(resolved_path)
-        return link
+            try:
+                link.hardlink_to(resolved_path)
+            except OSError:
+                try:
+                    link.symlink_to(resolved_path)
+                except OSError:
+                    shutil.copy2(resolved_path, link)
+        return compat_dir
 
     def _csv_compat_temp_dir_parent(self, data_dir: Path) -> Path | None:
         """Return a temp-dir parent visible to remote Spark servers when possible."""
