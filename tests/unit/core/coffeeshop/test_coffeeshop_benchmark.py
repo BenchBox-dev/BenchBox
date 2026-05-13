@@ -73,6 +73,11 @@ class TestCoffeeShopBenchmarkGenerateData:
         with pytest.raises(ValueError):
             coffeeshop.generate_data(tables=["no_such_table"])
 
+    def test_spark_tm1_query_casts_string_order_time(self, coffeeshop):
+        query = coffeeshop.get_queries(dialect="spark")["TM1"]
+        assert "TO_TIMESTAMP(CONCAT('1970-01-01 ', ol.order_time))" in query
+        assert "EXTRACT(HOUR FROM `ol`.`order_time`)" not in query
+
 
 class TestCoffeeShopBenchmarkLoadAndRun:
     @pytest.fixture

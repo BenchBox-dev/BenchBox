@@ -74,6 +74,15 @@ TABLES: dict[str, dict] = {
     "order_lines": ORDER_LINES,
 }
 
+_SPARK_FAMILY_DIALECTS = {"spark", "lakesail", "pyspark", "velox", "databricks"}
+
+
+def _column_type_for_dialect(column: dict[str, Any], dialect: str) -> str:
+    column_type = cast(str, column["type"])
+    if column["name"] == "order_time" and dialect.lower() in _SPARK_FAMILY_DIALECTS:
+        return "STRING"
+    return column_type
+
 
 def get_create_table_sql(
     table_name: str,
@@ -89,7 +98,7 @@ def get_create_table_sql(
     columns: list[str] = []
 
     for column in cast(list[dict[str, Any]], table["columns"]):
-        column_sql = f"{column['name']} {column['type']}"
+        column_sql = f"{column['name']} {_column_type_for_dialect(column, dialect)}"
         if column.get("primary_key") and enable_primary_keys:
             column_sql += " PRIMARY KEY"
         columns.append(column_sql)
