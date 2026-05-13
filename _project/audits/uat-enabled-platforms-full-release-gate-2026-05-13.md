@@ -97,6 +97,26 @@ TimescaleDB cells. The most visible signatures from this run:
   trailing delimiters. Targeted `pg-duckdb/tpcds` now passes load validation and
   executes 99/103 queries, but remains PARTIAL with Q36/Q70/Q86/Q90 failed:
   `/Users/joe/Developer/benchmark_runs/logs/uat_pg_duckdb_fixcheck_20260513/pg-duckdb_tpcds_0.01_20260513_125030.log`.
+- `amplab`: PostgreSQL-family engines rejected AMPLab queries that referenced
+  SELECT aliases in HAVING (`visit_count`, `total_visits`). Fixed by repeating
+  the aggregate expressions in HAVING. Targeted `pg-duckdb/amplab` passed:
+  `/Users/joe/Developer/benchmark_runs/logs/uat_pg_duckdb_fixcheck_20260513b/pg-duckdb_amplab_0.01_20260513_130249.log`.
+- `clickbench`: PostgreSQL CSV COPY treated empty fields as NULL despite the
+  ClickBench dialect requiring empty-string preservation, causing NOT NULL load
+  failures on `Referer`. Fixed by emitting a non-empty NULL sentinel when
+  `csv_null_marker=None`. Targeted `pg-duckdb/clickbench` passed:
+  `/Users/joe/Developer/benchmark_runs/logs/uat_pg_duckdb_fixcheck_20260513b/pg-duckdb_clickbench_1.0_20260513_130253.log`.
+- `joinorder` / `tpcds_obt`: PostgreSQL COPY can now stream Parquet inputs
+  through PyArrow CSV batches instead of failing immediately with "Parquet is
+  not supported". JoinOrder also omits canonical IMDb foreign keys by default
+  because the dataset contains dangling references. Targeted `pg-duckdb/joinorder`
+  now reaches query execution but timed out at 600s:
+  `/Users/joe/Developer/benchmark_runs/logs/uat_pg_duckdb_fixcheck_20260513d/pg-duckdb_joinorder_1.0_20260513_131609.log`.
+  Targeted `pg-duckdb/tpcds_obt` no longer hit the temp-file disk exhaustion,
+  but failed after the previous timeout with a closed socket:
+  `/Users/joe/Developer/benchmark_runs/logs/uat_pg_duckdb_fixcheck_20260513d/pg-duckdb_tpcds_obt_1.0_20260513_132611.log`.
+  Docker Desktop then reported a project-scoped remove failure against
+  containerd metadata; the container could not be removed cleanly in-session.
 - Remaining PG extension and TimescaleDB cells still need per-log clustering
   before they can be fixed or converted to evidence-backed compatibility rules.
 

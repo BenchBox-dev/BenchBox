@@ -36,6 +36,7 @@ from ..utils.dependencies import (
 from ..utils.file_format import get_data_extension
 from .base import DriverIsolationCapability, PlatformAdapter, PsycopgConnectionMixin
 from .base.data_loading import (
+    CsvDialect,
     DataSourceResolver,
     normalize_table_paths,
     prepare_local_load_file,
@@ -50,6 +51,66 @@ try:
     import psycopg
 except ImportError:
     psycopg = None
+
+
+class _PostgresCopySink:
+    """File-like sink that lets PyArrow CSVWriter stream into psycopg COPY."""
+
+    closed = False
+
+    def __init__(self, copy: Any) -> None:
+        self._copy = copy
+
+    def writable(self) -> bool:
+        return True
+
+    def write(self, data: Any) -> int:
+        payload = data.to_pybytes() if hasattr(data, "to_pybytes") else data
+        self._copy.write(payload)
+        return len(payload)
+
+    def flush(self) -> None:
+        return None
+
+    def close(self) -> None:
+        self.closed = True
+
+
+def _write_parquet_to_copy(data_file: Path, copy: Any) -> None:
+    """Stream a Parquet file as CSV directly into PostgreSQL COPY."""
+    try:
+        import pyarrow.csv as arrow_csv
+        import pyarrow.parquet as pq
+    except ImportError as exc:  # pragma: no cover - pyarrow is a project dependency
+        raise RuntimeError("pyarrow is required to load Parquet files into PostgreSQL-family adapters") from exc
+
+    write_options = arrow_csv.WriteOptions(include_header=True, quoting_style="all_valid")
+    parquet_file = pq.ParquetFile(data_file)
+    with arrow_csv.CSVWriter(_PostgresCopySink(copy), parquet_file.schema_arrow, write_options=write_options) as writer:
+        for batch in parquet_file.iter_batches():
+            writer.write_batch(batch)
+
+
+def _postgres_copy_sql(
+    qualified_table: str,
+    dialect: CsvDialect,
+    *,
+    force_csv: bool = False,
+) -> str:
+    escaped_delim = dialect.delimiter.replace("'", "''")
+    if dialect.null_marker is not None and not force_csv:
+        escaped_null = dialect.null_marker.replace("'", "''")
+        return (
+            f"COPY {qualified_table} FROM STDIN WITH (FORMAT text, DELIMITER '{escaped_delim}', NULL '{escaped_null}')"
+        )
+
+    header_clause = ", HEADER true" if dialect.has_header else ""
+    null_marker = dialect.null_marker if dialect.null_marker is not None else "__BENCHBOX_NO_NULL__"
+    escaped_null = null_marker.replace("'", "''")
+    return (
+        f"COPY {qualified_table} FROM STDIN"
+        f" WITH (FORMAT csv, DELIMITER '{escaped_delim}', NULL '{escaped_null}'{header_clause})"
+    )
 
 
 def _add_postgres_compatible_arguments(
@@ -537,38 +598,32 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
 
             load_failed = False
             for data_file in data_files:
-                if get_data_extension(data_file) == ".parquet":
-                    self.logger.error(
-                        f"Cannot load {data_file.name}: Parquet is not supported by PostgreSQL COPY. "
-                        "For tpcds_obt use --benchmark-option output_format=dat to generate pipe-delimited data."
+                extension = get_data_extension(data_file)
+                if extension == ".parquet":
+                    dialect = CsvDialect(
+                        delimiter=",",
+                        has_header=True,
+                        null_marker="",
+                        normalize_booleans=False,
+                        quote='"',
                     )
-                    load_failed = True
-                    break
+                    force_csv = True
+                else:
+                    dialect = resolve_csv_dialect(data_source, table_name, data_file, benchmark)
+                    force_csv = False
 
-                dialect = resolve_csv_dialect(data_source, table_name, data_file, benchmark)
-                strip_trailing_delim = get_data_extension(data_file) == ".tbl"
                 try:
-                    with prepare_local_load_file(
-                        data_file, dialect=dialect, strip_trailing_delim=strip_trailing_delim
-                    ) as load_path:
-                        with open(load_path, encoding="utf-8") as f:
-                            escaped_delim = dialect.delimiter.replace("'", "''")
-                            if dialect.null_marker is not None:
-                                # TPC-style files: FORMAT text avoids CSV quote-parsing issues
-                                # with pipe delimiter (rejected by CedarDB and others under FORMAT csv).
-                                escaped_null = dialect.null_marker.replace("'", "''")
-                                with cursor.copy(
-                                    f"COPY {qualified_table} FROM STDIN"
-                                    f" WITH (FORMAT text, DELIMITER '{escaped_delim}', NULL '{escaped_null}')"
-                                ) as copy:
-                                    while chunk := f.read(65536):
-                                        copy.write(chunk)
-                            else:
-                                header_clause = ", HEADER true" if dialect.has_header else ""
-                                with cursor.copy(
-                                    f"COPY {qualified_table} FROM STDIN"
-                                    f" WITH (FORMAT csv, DELIMITER '{escaped_delim}'{header_clause})"
-                                ) as copy:
+                    copy_sql = _postgres_copy_sql(qualified_table, dialect, force_csv=force_csv)
+                    with cursor.copy(copy_sql) as copy:
+                        if extension == ".parquet":
+                            _write_parquet_to_copy(data_file, copy)
+                        else:
+                            with prepare_local_load_file(
+                                data_file,
+                                dialect=dialect,
+                                strip_trailing_delim=extension == ".tbl",
+                            ) as load_path:
+                                with open(load_path, encoding="utf-8") as f:
                                     while chunk := f.read(65536):
                                         copy.write(chunk)
                     connection.commit()

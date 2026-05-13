@@ -83,6 +83,18 @@ work:
       `tpcds` now passes load validation but remains PARTIAL with
       Q36/Q70/Q86/Q90 failed.
 
+      A follow-up pass fixed AMPLab HAVING aliases and PostgreSQL CSV
+      empty-string preservation for ClickBench; targeted `pg-duckdb/amplab`
+      and `pg-duckdb/clickbench` now pass. PostgreSQL-family Parquet loading
+      now streams Parquet through COPY, and canonical JoinOrder omits FK
+      constraints by default because the IMDb dataset has dangling references.
+      Targeted `pg-duckdb/joinorder` now reaches query execution but timed out
+      at 600s. Targeted `pg-duckdb/tpcds_obt` no longer hits temp-file disk
+      exhaustion, but failed after the preceding timeout with a closed socket.
+      Docker Desktop reported a project-scoped containerd metadata I/O error
+      while removing the pg-duckdb stack, so further live reruns should start
+      after Docker is healthy.
+
       Remaining PG extension and TimescaleDB failures still need per-log
       clustering from
       `/Users/joe/Developer/benchmark_runs/logs/uat_enabled_platforms_full_20260513/`

@@ -11,6 +11,8 @@ import argparse
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
+import pyarrow as pa
+import pyarrow.parquet as pq
 import pytest
 
 import benchbox.platforms.postgresql as postgresql_module
@@ -655,10 +657,12 @@ class TestPostgreSQLDataLoading:
         assert "FORMAT csv" in copy_sql
         assert "HEADER true" in copy_sql
 
-    def test_copy_sql_csv_no_header_omits_header_clause(self, postgres_stubs, tmp_path):
-        """csv_has_header=False in manifest metadata → no HEADER clause in COPY SQL.
+    def test_copy_sql_csv_no_header_preserves_empty_strings(self, postgres_stubs, tmp_path):
+        """csv_null_marker=None in manifest metadata → COPY uses a non-empty NULL sentinel.
 
         Proves the table_metadata → resolve_csv_dialect → COPY SQL pipeline end-to-end.
+        PostgreSQL CSV COPY defaults NULL to an empty unquoted field; BenchBox's
+        null_marker=None contract means empty fields must remain empty strings.
         """
         mock_conn = Mock()
         mock_cursor = MagicMock()
@@ -684,7 +688,34 @@ class TestPostgreSQLDataLoading:
         copy_sql = mock_cursor.copy.call_args.args[0]
         assert "FORMAT csv" in copy_sql
         assert "HEADER" not in copy_sql
-        assert "NULL" not in copy_sql
+        assert "NULL '__BENCHBOX_NO_NULL__'" in copy_sql
+
+    def test_load_data_converts_parquet_to_csv_copy(self, postgres_stubs, tmp_path):
+        """Parquet-backed benchmarks are converted to CSV before PostgreSQL COPY."""
+        mock_conn = Mock()
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = (2,)
+        mock_conn.cursor.return_value = mock_cursor
+        copy_cm = self._install_copy_context(mock_cursor)
+
+        parquet_file = tmp_path / "title.parquet"
+        table = pa.table({"id": [1, 2], "name": ["", None]})
+        pq.write_table(table, parquet_file)
+
+        class Benchmark:
+            tables = {"title": parquet_file}
+
+        adapter = PostgreSQLAdapter(schema="public")
+        stats, _, _ = adapter.load_data(Benchmark(), mock_conn, tmp_path)
+
+        assert stats["title"] == 2
+        copy_sql = mock_cursor.copy.call_args.args[0]
+        assert "FORMAT csv" in copy_sql
+        assert "HEADER true" in copy_sql
+        assert "NULL ''" in copy_sql
+        written = b"".join(call.args[0] for call in copy_cm.write.call_args_list).decode()
+        assert '"id","name"' in written
+        assert '"1",""' in written
 
 
 class TestPostgreSQLCreateDatabase:
