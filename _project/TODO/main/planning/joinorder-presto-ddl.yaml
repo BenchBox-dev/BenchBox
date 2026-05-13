@@ -1,0 +1,29 @@
+id: joinorder-presto-ddl
+title: "Canonical JoinOrder DDL failure on Presto"
+worktree: main
+priority: Medium
+status: Identified
+category: Platform Compatibility
+
+description: |
+  Canonical JoinOrder SF=1 UAT on Presto fails during schema creation before
+  data load or query execution because the canonical table DDL emits
+  `PRIMARY KEY`, which Presto rejects. Presto is excluded from canonical
+  JoinOrder SF=1 support until a proper DDL rewrite or schema path exists and
+  the full 113-query workload passes.
+
+  Evidence:
+    /Users/joe/Developer/benchmark_runs/logs/uat_joinorder_canonical_corpus_20260512/presto_joinorder_1.0_20260512_224026.log
+
+  Failure signature:
+    PrestoUserError(type=USER_ERROR, name=SYNTAX_ERROR, message="line 1:38:
+    mismatched input 'PRIMARY'. Expecting: ')', ','")
+
+work: []
+
+metadata:
+  tags:
+    - joinorder
+    - presto
+    - canonical-imdb-2013
+  created_date: "2026-05-12"
