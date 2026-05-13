@@ -166,7 +166,7 @@ class TestParameterSubstitution:
     def test_get_query_with_custom_params(self, query_manager):
         """Should substitute custom parameters."""
         query = query_manager.get_query(1, params={"delta": 30})
-        assert "30" in query
+        assert "INTERVAL '30 days'" in query
         assert ":delta" not in query
 
     def test_get_parameterized_query_returns_tuple(self, query_manager):
