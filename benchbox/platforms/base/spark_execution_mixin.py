@@ -255,6 +255,9 @@ class SparkDataLoadMixin:
             data_source = resolver.resolve(benchmark, Path(data_dir))
 
             if not data_source or not data_source.tables:
+                if getattr(benchmark, "get_data_source_benchmark", lambda: object())() is None:
+                    self.logger.info("Benchmark declares no data source; skipping Spark data load")
+                    return table_stats, elapsed_seconds(start_time), per_table_timings
                 raise ValueError(
                     f"No data files found in {data_dir}. Ensure benchmark.generate_data() was called first."
                 )

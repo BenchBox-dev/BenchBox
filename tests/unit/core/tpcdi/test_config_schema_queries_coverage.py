@@ -76,6 +76,8 @@ def test_schema_helpers_and_manager_paths(monkeypatch: pytest.MonkeyPatch):
     all_ddl = get_all_create_table_sql()
     assert "CREATE TABLE IF NOT EXISTS DimCustomer" in ddl
     assert "FactTrade" in all_ddl
+    assert "TimeValue STRING" in get_create_table_sql("DimTime", dialect="lakesail")
+    assert "TimeValue TIME" in get_create_table_sql("DimTime", dialect="duckdb")
 
     with pytest.raises(ValueError, match="Unknown table"):
         get_create_table_sql("Nope")

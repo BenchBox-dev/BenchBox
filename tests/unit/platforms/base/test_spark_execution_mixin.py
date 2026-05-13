@@ -201,6 +201,20 @@ def test_load_data_spark_propagates_resolver_error_without_cleanup_failure(tmp_p
             adapter._load_data_spark(MagicMock(), tmp_path, spark)
 
 
+def test_load_data_spark_skips_declared_no_data_benchmark(tmp_path: Path) -> None:
+    adapter = _DummySparkAdapter()
+    benchmark = MagicMock()
+    benchmark.get_data_source_benchmark.return_value = None
+
+    with patch("benchbox.platforms.base.data_loading.DataSourceResolver.resolve") as mock_resolve:
+        mock_resolve.return_value = SimpleNamespace(source_type="benchmark_tables", tables={})
+        stats, _, timings = adapter._load_data_spark(benchmark, tmp_path, MagicMock())
+
+    assert stats == {}
+    assert timings == {}
+    adapter.logger.info.assert_called_with("Benchmark declares no data source; skipping Spark data load")
+
+
 # -- _csv_compat_path tests --
 
 
