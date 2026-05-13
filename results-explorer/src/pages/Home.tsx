@@ -280,7 +280,9 @@ export function Home(_: RoutableProps) {
     .slice(0, 5);
   const showRecentCost = recent.some((result) => normalizedCostValue(result) !== null);
   const leaderboardCohortCount = metaLeaderboard?.cohorts.length ?? 0;
-  const leaderboardPlatformCount = metaLeaderboard?.platforms.length ?? 0;
+  const fullLeaderboardPlatformCount = metaLeaderboard?.platforms.length ?? 0;
+  const rankedLeaderboardPlatformCount =
+    metaLeaderboard?.platforms.filter((platform) => platform.n_cohorts > 0).length ?? 0;
   const visibleLeaderboardCohortCount = filteredMetaLeaderboard?.cohorts.length ?? 0;
   const visibleLeaderboardPlatformCount = filteredMetaLeaderboard?.platforms.length ?? 0;
   const leaderboardBenchmarkSet = new Set(benchmarkOptions);
@@ -291,7 +293,7 @@ export function Home(_: RoutableProps) {
     ),
   );
   const publicPlatformIdsOutsideLeaderboard = platformIds.filter((platformId) => !leaderboardEvidencePlatformIds.has(platformId));
-  const leaderboardEvidencePlatformCount = leaderboardEvidencePlatformIds.size || leaderboardPlatformCount;
+  const leaderboardEvidencePlatformCount = leaderboardEvidencePlatformIds.size || fullLeaderboardPlatformCount;
   const visibleRankedLeaderboardPlatformCount =
     filteredMetaLeaderboard?.platforms.filter((platform) => platform.n_cohorts > 0).length ?? 0;
   const tuningSummary = summarizeTuningModes(results);
@@ -317,6 +319,20 @@ export function Home(_: RoutableProps) {
     return `/results/p/${platformId}/${query ? `?${query}` : ""}`;
   }
 
+  const leaderboardScopeSummaryProps = {
+    publicBenchmarkCount: benchmarks.length,
+    leaderboardBenchmarkCount: benchmarkOptions.length,
+    publicBenchmarksOutsideLeaderboard,
+    publicPlatformCount: platformIds.length,
+    leaderboardEvidencePlatformCount,
+    fullLeaderboardPlatformCount,
+    rankedLeaderboardPlatformCount,
+    visibleLeaderboardPlatformCount,
+    visibleRankedLeaderboardPlatformCount,
+    publicPlatformIdsOutsideLeaderboard: publicPlatformIdsOutsideLeaderboard.length,
+    tuningSummary,
+  };
+
   return (
     <div>
       <section
@@ -324,10 +340,10 @@ export function Home(_: RoutableProps) {
         data-testid="home-hero-filter-band"
         data-surface="hero"
       >
-        <div class="mx-auto max-w-7xl px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
+        <div class="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-7 lg:px-8">
           <div class="max-w-4xl">
-            <h1 class="text-3xl font-bold sm:text-4xl">BenchBox Database Leaderboards</h1>
-            <p class="mt-3 max-w-3xl text-base text-[var(--bb-fg-muted)] sm:text-lg">
+            <h1 class="text-2xl font-bold sm:text-4xl">BenchBox Database Leaderboards</h1>
+            <p class="mt-2 max-w-3xl text-sm text-[var(--bb-fg-muted)] sm:mt-3 sm:text-lg">
               Reproducible OLAP benchmark rankings from rankable leaderboard cohorts, with public corpus browse below.
             </p>
           </div>
@@ -347,7 +363,7 @@ export function Home(_: RoutableProps) {
           {filteredMetaLeaderboard && (
             <section
               aria-label="Leaderboard cohort selector"
-              class="mt-4 rounded-lg border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] p-2 sm:mt-5 sm:p-3"
+              class="mt-3 rounded-lg border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] p-2 sm:mt-5 sm:p-3"
             >
               <div class="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <MultiSelectFilter
@@ -387,18 +403,18 @@ export function Home(_: RoutableProps) {
                 <CoverageSummary />
               </div>
 
-              <LeaderboardScopeSummary
-                publicBenchmarkCount={benchmarks.length}
-                leaderboardBenchmarkCount={benchmarkOptions.length}
-                publicBenchmarksOutsideLeaderboard={publicBenchmarksOutsideLeaderboard}
-                publicPlatformCount={platformIds.length}
-                leaderboardEvidencePlatformCount={leaderboardEvidencePlatformCount}
-                rankedLeaderboardPlatformCount={leaderboardPlatformCount}
-                visibleLeaderboardPlatformCount={visibleLeaderboardPlatformCount}
-                visibleRankedLeaderboardPlatformCount={visibleRankedLeaderboardPlatformCount}
-                publicPlatformIdsOutsideLeaderboard={publicPlatformIdsOutsideLeaderboard.length}
-                tuningSummary={tuningSummary}
-              />
+              <div class="hidden sm:block">
+                <LeaderboardScopeSummary {...leaderboardScopeSummaryProps} />
+              </div>
+              <details
+                class="mt-2 border-t border-[var(--bb-border-default)] pt-2 sm:hidden"
+                data-testid="leaderboard-scope-summary-mobile"
+              >
+                <summary class="cursor-pointer text-xs font-medium text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg-primary)]">
+                  Leaderboard scope details
+                </summary>
+                <LeaderboardScopeSummary {...leaderboardScopeSummaryProps} />
+              </details>
 
               <details class="mt-3 border-t border-[var(--bb-border-default)] pt-3">
                 <summary class="cursor-pointer text-sm font-medium text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg-primary)]">
@@ -435,7 +451,11 @@ export function Home(_: RoutableProps) {
         </div>
       </section>
 
-      <div class="surface-app mx-auto max-w-7xl px-4 py-5 sm:px-6 sm:py-8 lg:px-8" data-testid="home-data-surface">
+      <div
+        class="surface-app mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-8 lg:px-8"
+        data-testid="home-data-surface"
+        data-surface="app"
+      >
         {filteredMetaLeaderboard && (
           <MetaLeaderboard
             data={filteredMetaLeaderboard}
@@ -747,6 +767,7 @@ function LeaderboardScopeSummary({
   publicBenchmarksOutsideLeaderboard,
   publicPlatformCount,
   leaderboardEvidencePlatformCount,
+  fullLeaderboardPlatformCount,
   rankedLeaderboardPlatformCount,
   visibleLeaderboardPlatformCount,
   visibleRankedLeaderboardPlatformCount,
@@ -758,6 +779,7 @@ function LeaderboardScopeSummary({
   publicBenchmarksOutsideLeaderboard: string[];
   publicPlatformCount: number;
   leaderboardEvidencePlatformCount: number;
+  fullLeaderboardPlatformCount: number;
   rankedLeaderboardPlatformCount: number;
   visibleLeaderboardPlatformCount: number;
   visibleRankedLeaderboardPlatformCount: number;
@@ -772,6 +794,14 @@ function LeaderboardScopeSummary({
     publicPlatformIdsOutsideLeaderboard > 0
       ? `${publicPlatformIdsOutsideLeaderboard.toLocaleString()} public platform ${plural(publicPlatformIdsOutsideLeaderboard, "ID is", "IDs are")} outside the current leaderboard scope.`
       : "Every public platform ID has evidence in the leaderboard scope.";
+  const visiblePublishedUnrankedPlatformCount = Math.max(
+    0,
+    visibleLeaderboardPlatformCount - visibleRankedLeaderboardPlatformCount,
+  );
+  const fullPublishedUnrankedPlatformCount = Math.max(
+    0,
+    fullLeaderboardPlatformCount - rankedLeaderboardPlatformCount,
+  );
 
   return (
     <div class="mt-3 space-y-1 border-t border-[var(--bb-border-default)] pt-3 text-xs text-[var(--bb-fg-muted)]">
@@ -784,9 +814,12 @@ function LeaderboardScopeSummary({
         Table scope is {visibleLeaderboardPlatformCount.toLocaleString()} of{" "}
         {leaderboardEvidencePlatformCount.toLocaleString()} leaderboard-scope platforms visible now;{" "}
         {visibleRankedLeaderboardPlatformCount.toLocaleString()} ranked,{" "}
-        {Math.max(0, visibleLeaderboardPlatformCount - visibleRankedLeaderboardPlatformCount).toLocaleString()} published
-        unranked. Full leaderboard scope has {rankedLeaderboardPlatformCount.toLocaleString()} ranked platform{" "}
-        {plural(rankedLeaderboardPlatformCount, "ID", "IDs")}. Public coverage has {publicPlatformCount.toLocaleString()} platform{" "}
+        {visiblePublishedUnrankedPlatformCount.toLocaleString()} published unranked. Full leaderboard scope has{" "}
+        {fullLeaderboardPlatformCount.toLocaleString()} platform{" "}
+        {plural(fullLeaderboardPlatformCount, "ID", "IDs")} with published leaderboard evidence:{" "}
+        {rankedLeaderboardPlatformCount.toLocaleString()} ranked and{" "}
+        {fullPublishedUnrankedPlatformCount.toLocaleString()} published unranked. Public coverage has{" "}
+        {publicPlatformCount.toLocaleString()} platform{" "}
         {plural(publicPlatformCount, "ID", "IDs")}. {publicOnlyPlatformCopy}
       </p>
       <p>
@@ -959,7 +992,7 @@ function MultiSelectFilter({
           </option>
         ))}
       </select>
-      {description && <p class="mt-1 text-[11px] leading-snug text-[var(--bb-fg-muted)]">{description}</p>}
+      {description && <p class="mt-1 hidden text-[11px] leading-snug text-[var(--bb-fg-muted)] sm:block">{description}</p>}
     </label>
   );
 }

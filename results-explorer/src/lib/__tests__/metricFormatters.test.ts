@@ -16,7 +16,9 @@ describe("metric formatters", () => {
   it("formats large power scores compactly without losing exact tooltip text", () => {
     expect(formatPowerScore(3000.42).valueText).toBe("3,000");
     expect(formatPowerScore(1520.99).valueText).toBe("1,521");
+    expect(formatPowerScore(11636.652993864305).valueText).toBe("11,637");
     expect(formatPowerScoreExact(3000.42).valueText).toBe("3,000.42");
+    expect(formatPowerScoreExact(11636.652993864305).valueText).toBe("11,636.652993864305");
     expect(formatPowerScore(3000.42).sortValue).toBe(3000.42);
   });
 

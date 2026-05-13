@@ -2,7 +2,7 @@
 
 Date: 2026-05-12
 
-Status: No public small scale until licensing and data-delivery remediation land
+Status: No public small scale in Step 1; revisit through separate JOB-light design
 
 ## Question
 
@@ -22,8 +22,8 @@ It is not a small JOB substitute.
 
 | Option | Outcome | Rationale |
 |---|---|---|
-| Build JOB-light | Deferred | A useful correlated subset needs a deterministic transitive-closure builder, its own reference cardinalities, data-delivery path, and comparability labeling. That belongs after the canonical data-delivery remediation. |
-| Promote the tiny fixture | Rejected for now | The fixture is useful CI evidence, but making it a public runtime dataset broadens the same IMDb-derived redistribution surface already flagged in `_project/decisions/joinorder-canonical-data-licensing-2026-05-12.md`. It is also smoke-only, not measurement-grade JOB. |
+| Build JOB-light | Deferred | A useful correlated subset needs a deterministic transitive-closure builder, its own reference cardinalities, data-delivery path, and comparability labeling. That belongs in a separate Track-2 design, not the Step-1 canonical cutover. |
+| Promote the tiny fixture | Rejected for now | The fixture is useful CI evidence, but it is smoke-only, not measurement-grade JOB. Making it public would create a second user-facing IMDb-derived data contract without solving comparability. |
 | Document no small path | Selected | This keeps the public benchmark contract honest: canonical `joinorder` means full IMDb 2013 JOB at scale 1. Users who need lightweight unrelated smoke coverage can use the internal synthetic benchmark, but those results are not comparable to canonical JOB. |
 
 ## Consequences
@@ -38,8 +38,7 @@ It is not a small JOB substitute.
 
 ## Follow-Up
 
-A future small JOB design should wait until
-`_project/TODO/main/planning/joinorder-data-fetch-from-dataverse-remediation.yaml`
-settles the data-delivery model. At that point, revisit either a
-measurement-grade `JOB-light` subset or a smoke-only user-visible fixture with a
-clear `unofficial_subscale`/unranked result contract.
+A future small JOB design should be handled as separate Track-2 work after the
+canonical scale-1 path has stabilized. Revisit either a measurement-grade
+`JOB-light` subset or a smoke-only user-visible fixture with a clear
+`unofficial_subscale`/unranked result contract.

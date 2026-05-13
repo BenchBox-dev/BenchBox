@@ -2,7 +2,7 @@
 
 Date: 2026-05-12
 
-Status: Not clearly permitted; release-blocking remediation required
+Status: Accepted project-owner redistribution risk; optional hardening follow-up
 
 ## Question
 
@@ -18,8 +18,16 @@ Benchmark paper.
 ## Determination
 
 BenchBox should not treat re-hosting the converted IMDb-derived archive as
-clearly permitted without either written permission or a design change that
-avoids BenchBox redistribution.
+clearly permitted for broad commercial redistribution without either written
+permission or a design change that avoids BenchBox redistribution.
+
+BenchBox will nevertheless keep the current BenchBox-hosted Parquet archive as
+the default public `joinorder` data path for Step 1. This is an explicit
+project-owner risk acceptance, not a conclusion that the redistribution question
+is fully cleared. The product tradeoff is that direct Dataverse fetch plus local
+PostgreSQL restore/conversion is a much worse first-run experience for a
+12-year-old academic benchmark dataset, while the current archive preserves the
+one-command benchmark workflow and remains integrity-verified.
 
 The Dataverse record is favorable because the deposited pg_dump is published
 under CC0 1.0 and is unrestricted. That is not enough to clear the upstream IMDb
@@ -55,30 +63,32 @@ asset, the safe engineering conclusion is that this redistribution path is not
 clearly permitted.
 
 This ADR is not legal advice. It is an engineering release-risk decision based on
-published terms.
+published terms and the project owner's product/UX judgment.
 
-## Required Remediation
+## Accepted Path And Optional Remediation
 
-File and implement a follow-up before treating canonical `joinorder` as
-release-ready with BenchBox-hosted data:
+Keep the existing BenchBox-hosted Parquet archive as the default data path for
+canonical `joinorder`. The runtime manifest and first-run user experience remain
+unchanged by this ADR.
 
-1. Stop re-hosting the converted archive and fetch directly from Dataverse, then
-   convert/verify locally.
-2. Or seek written permission covering BenchBox's GitHub Release redistribution
-   and commercial-benchmarking context.
-3. Or gate the current data path behind explicit user-provided data / BYO
-   Dataverse download until permission is resolved.
+Optional hardening remains useful, but it is not a Step-1 release blocker:
 
-Preferred remediation: fetch `imdb_pg11` directly from Dataverse and convert
-client-side or cache locally under BenchBox's existing data directory. This keeps
-BenchBox from redistributing IMDb-derived data while preserving canonical source
-provenance.
+1. Seek written permission covering BenchBox's GitHub Release redistribution and
+   commercial-benchmarking context while retaining the current fast path.
+2. Add an explicit maintainer/advanced path that fetches `imdb_pg11` directly
+   from Dataverse and converts/verifies locally, without making that heavy path
+   the default first-run experience.
+3. Add a documented BYO Dataverse download path for users or environments that
+   require stricter redistribution separation.
 
 ## Consequences
 
 - `benchbox/core/joinorder/data_manifest.toml` is not changed by this ADR.
-- `DATA-LICENSE.md` and user-facing docs must stop implying that BenchBox's
-  re-hosting is clearly permitted.
+- `DATA-LICENSE.md` and user-facing docs must continue to disclose the
+  Dataverse DOI, IMDb attribution, upstream non-commercial framing, and the fact
+  that BenchBox is accepting residual redistribution risk rather than declaring
+  broad commercial redistribution cleared.
 - Follow-up TODO: `_project/TODO/main/planning/joinorder-data-fetch-from-dataverse-remediation.yaml`.
-- Canonical `joinorder` remains valuable and validated, but the release posture
-  must track the unresolved redistribution risk until remediation lands.
+- Canonical `joinorder` remains release-ready for Step 1 with the verified
+  BenchBox-hosted archive. Optional permission or Dataverse/BYO hardening can
+  proceed separately.

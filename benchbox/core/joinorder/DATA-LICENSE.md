@@ -20,15 +20,19 @@ Information courtesy of IMDb (https://www.imdb.com). Used with permission.
 ## Current Redistribution Posture
 
 BenchBox does not treat the current BenchBox-hosted Parquet release asset as
-clearly permitted for broad redistribution. The engineering decision record is:
+clearly permitted for broad commercial redistribution. The project-owner
+decision accepts the remaining redistribution risk for this 2013 academic
+benchmark dataset and keeps the verified BenchBox-hosted Parquet archive as the
+default data path because direct Dataverse restore/conversion would make first
+use substantially heavier. The engineering decision record is:
 
 ```text
 _project/decisions/joinorder-canonical-data-licensing-2026-05-12.md
 ```
 
-Until the release-blocking remediation lands, use this dataset only under the
-IMDb and Dataverse terms and do not treat BenchBox's converted archive as
-BenchBox-cleared for commercial redistribution or republication.
+Use this dataset only under the IMDb and Dataverse terms. Do not treat
+BenchBox's converted archive as BenchBox-cleared for broad commercial
+redistribution or republication.
 
 ## Scope
 
@@ -40,10 +44,11 @@ redistribution outside benchmark reproducibility.
 ## Redistribution Disclaimer
 
 BenchBox redistributes a derivative form of this dataset as a convenience for
-benchmark reproducibility, but that re-hosting is not treated as clearly
-permitted until the remediation TODO moves the data path away from BenchBox
-redistribution or obtains explicit permission. BenchBox makes no claim of
-ownership over the underlying IMDb data and will honor takedown requests.
+benchmark reproducibility. Optional follow-up work may seek explicit permission
+or add an advanced direct-Dataverse/BYO data path, but the default user
+experience remains the verified BenchBox-hosted Parquet archive. BenchBox makes
+no claim of ownership over the underlying IMDb data and will honor takedown
+requests.
 
 ## Takedown Contact
 

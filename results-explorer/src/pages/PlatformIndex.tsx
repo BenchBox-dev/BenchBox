@@ -12,7 +12,14 @@ import {
   compareCohortSummary,
   compareSelectionLabel,
 } from "@/lib/compareCohort";
-import { buildCompareUrl, compareIdForRow, displayCompareId, MAX_COMPARE_SELECTIONS } from "@/lib/resultLinks";
+import {
+  buildCompareUrl,
+  compareIdForRow,
+  resultIdentityAriaLabel,
+  resultReceiptHref,
+  visibleResultIdForRow,
+  MAX_COMPARE_SELECTIONS,
+} from "@/lib/resultLinks";
 import {
   describeCompareExclusionReason,
   summarizeCompareExclusionReasons,
@@ -772,7 +779,6 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                 aria-label="Selected compare results"
               >
                 {selectedRows.map((row) => {
-                  const id = compareIdForRow(row);
                   return (
                     <div
                       key={row.result_id}
@@ -786,7 +792,9 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                       <span>{row.phase}</span>
                       <span>{row.run_date}</span>
                       <TrustBadge trustLabel={row.trust_label} compact />
-                      <span class="font-mono text-[var(--bb-data-fg-muted)]">ID {displayCompareId(id)}</span>
+                      <span class="font-mono text-[var(--bb-data-fg-muted)]">
+                        Public ID {visibleResultIdForRow(row)}
+                      </span>
                     </div>
                   );
                 })}
@@ -838,8 +846,9 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                 >
                   <h3 class="text-sm font-medium text-[var(--bb-data-fg-primary)]">{cohort.label}</h3>
                   <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">
-                    Limited observations: {cohort.observationCount} published {cohort.observationCount === 1 ? "run" : "runs"}
-                    in this comparable cohort. Trend chart hidden until at least {MIN_TREND_OBSERVATIONS} observations exist.
+                    {`Limited observations: ${cohort.observationCount} published ${
+                      cohort.observationCount === 1 ? "run" : "runs"
+                    } in this comparable cohort. Trend chart hidden until at least ${MIN_TREND_OBSERVATIONS} observations exist.`}
                   </p>
                   <p class="mt-1 text-xs text-[var(--bb-data-fg-subtle)]">Metric: {cohort.metricDescription}.</p>
                 </section>
@@ -956,7 +965,11 @@ function PlatformRow({ entry, checked, onToggle, disabledReason }: PlatformRowPr
         </div>
       </td>
       <td class="table-td text-right">
-        <a href={`/results/r/${entry.result_id}#run-receipt`} class="text-xs font-medium no-underline">
+        <a
+          href={resultReceiptHref(entry)}
+          aria-label={resultIdentityAriaLabel(entry, "receipt")}
+          class="text-xs font-medium no-underline"
+        >
           Receipt →
         </a>
       </td>

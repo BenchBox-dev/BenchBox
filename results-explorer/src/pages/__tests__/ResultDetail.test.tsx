@@ -163,6 +163,7 @@ describe("ResultDetail - median-first contract", () => {
 
     expect(summary).toHaveTextContent("Primary metric · higher is better");
     expect(summary).toHaveTextContent("Power score");
+    expect(summary).toHaveTextContent("Public ID r1");
     expect(within(summary).getByRole("link", { name: "Compare this result" })).toBeTruthy();
     expect(summary.compareDocumentPosition(receipt) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(chartsHeading.compareDocumentPosition(receipt) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -170,14 +171,20 @@ describe("ResultDetail - median-first contract", () => {
     expect(receipt).toHaveTextContent("Download bundle");
   });
 
-  it("preserves exact power score precision in the canonical result summary", async () => {
-    vi.mocked(getDetailResult).mockResolvedValue(makeDetail({ power_score: 3000.42 }));
+  it("uses scan precision in the primary summary while keeping exact power score available", async () => {
+    vi.mocked(getDetailResult).mockResolvedValue(makeDetail({ power_score: 11636.652993864305 }));
 
     render(<ResultDetail resultId="r1" />);
     await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
 
     const summary = screen.getByRole("region", { name: "Result summary" });
-    expect(summary).toHaveTextContent("3,000.42");
+    const primaryMetric = within(summary).getByLabelText(
+      "11,637. Exact power score: 11,636.652993864305",
+    );
+
+    expect(primaryMetric).toHaveTextContent("11,637");
+    expect(primaryMetric).toHaveAttribute("title", "Exact power score: 11,636.652993864305");
+    expect(summary).not.toHaveTextContent("11,636.652993864305");
   });
 
   it("links captured execution plans only when plans_published is true", async () => {

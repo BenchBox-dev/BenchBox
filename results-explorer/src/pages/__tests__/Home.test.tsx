@@ -477,15 +477,73 @@ describe("Home", () => {
     await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
 
     expect(screen.getByText("Showing 2 of 2 leaderboard-scope platforms across 2 leaderboard cohorts")).toBeTruthy();
-    expect(screen.getByText(/Benchmark options cover 2 of 3 public coverage benchmark sets/)).toBeTruthy();
+    expect(screen.getAllByText(/Benchmark options cover 2 of 3 public coverage benchmark sets/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/SSB/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/1 public platform ID is outside the current leaderboard scope/)).toBeTruthy();
-    expect(screen.getByText(/1 of 4 public results is not labelled for tuning/)).toBeTruthy();
+    expect(screen.getAllByText(/1 public platform ID is outside the current leaderboard scope/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/1 of 4 public results is not labelled for tuning/).length).toBeGreaterThan(0);
     expect(screen.getByRole("heading", { name: "Browse Public Benchmark Results" })).toBeTruthy();
     expect(
       screen.getByText("3 public benchmark set(s). Leaderboard filters above include 2 leaderboard-scope cohort(s)."),
     ).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Browse Public Platform Results" })).toBeTruthy();
+  });
+
+  it("does not describe mixed ranked and unranked leaderboard evidence totals as ranked", async () => {
+    const resultRows = [
+      ...RESULT_ROWS,
+      {
+        ...RESULT_ROWS[0],
+        result_id: "r5",
+        platform: "Postgres",
+        platform_id: "postgres",
+        power_score: null,
+        has_display_timing: false,
+        valid_query_count: 0,
+        display_exclusion_reason: "missing_timing_context",
+        comparison_exclusion_reason: "missing_timing_context",
+        ranking_exclusion_reason: "missing_timing_context",
+        is_ranking_eligible: false,
+      },
+    ];
+    const cohortRows = [
+      ...COHORT_ROWS,
+      {
+        ...COHORT_ROWS[0],
+        platform_id: "postgres",
+        platform: "Postgres",
+        result_id: "r5",
+        rank: null,
+        metric_value: null,
+        speedup_vs_best: null,
+        has_display_timing: false,
+        valid_query_count: 0,
+        display_exclusion_reason: "missing_timing_context",
+        comparison_exclusion_reason: "missing_timing_context",
+        ranking_exclusion_reason: "missing_timing_context",
+      },
+    ];
+
+    vi.mocked(queryRows).mockImplementation(async (sql: string) => {
+      const s = String(sql).replace(/\s+/g, " ").trim();
+      if (s.includes("FROM bench.results")) return resultRows;
+      if (s.startsWith("SELECT platform_id, platform, avg_rank, n_cohorts FROM bench.meta_leaderboard")) {
+        return META_LEADERBOARD_ROWS;
+      }
+      if (s.includes("FROM bench.cohort_metadata")) return cohortRows;
+      return [];
+    });
+
+    render(<Home />);
+    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+
+    const selector = screen.getByRole("region", { name: "Leaderboard cohort selector" });
+    expect(selector.textContent).toContain(
+      "Table scope is 3 of 3 leaderboard-scope platforms visible now; 2 ranked, 1 published unranked.",
+    );
+    expect(selector.textContent).toContain(
+      "Full leaderboard scope has 3 platform IDs with published leaderboard evidence: 2 ranked and 1 published unranked.",
+    );
+    expect(selector.textContent).not.toContain("3 ranked platform IDs");
   });
 
   it("keeps the home filter band on the dark surface and data sections on the light surface", async () => {
@@ -497,9 +555,12 @@ describe("Home", () => {
     const dataSurface = screen.getByTestId("home-data-surface");
 
     expect(hero.className).toContain("surface-hero");
+    expect(hero).toHaveAttribute("data-surface", "hero");
     expect(selector.className).toContain("bg-[var(--bb-bg-panel)]");
     expect(dataSurface.className).toContain("surface-app");
+    expect(dataSurface).toHaveAttribute("data-surface", "app");
     expect(dataSurface.contains(selector)).toBe(false);
+    expect(screen.getByTestId("leaderboard-scope-summary-mobile")).toBeTruthy();
   });
 
   it("keeps the leaderboard region before secondary workflow and recent-result sections", async () => {

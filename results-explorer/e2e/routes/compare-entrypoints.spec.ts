@@ -84,7 +84,7 @@ test.describe("compare entrypoint happy paths", () => {
     const filters = page.getByRole("region", { name: "Filters" });
     await filters.getByLabel("Scale").selectOption("0.1");
     await expect(pinnedRow).toBeVisible();
-    await expect(pinnedRow).toContainText("(selected outside filters)");
+    await expect(pinnedRow).toContainText("selected outside filters");
     await filters.getByLabel("Scale").selectOption("");
 
     await checkRow(page.getByTestId(`compare-builder-row-${DATAFUSION.id}`));

@@ -2,7 +2,8 @@ id: results-explorer-trend-chart-point-identity-and-same-day-semantics
 title: "Fix trend chart point identity and same-day run semantics"
 worktree: results-explorer-contract-followup
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-05-12"
 category: Data Integrity
 
 description: |
@@ -25,7 +26,7 @@ deps:
 work:
 - id: w0
   summary: "Revalidate trend evidence and duplicate-day cohorts"
-  status: pending
+  status: done
   notes: |
     On the current snapshot, capture:
       - one platform detail trend route with duplicate same-day runs, such as
@@ -43,7 +44,7 @@ work:
 - id: w1
   summary: "Choose and document duplicate-day trend semantics"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     Decide how the UI treats multiple runs for the same platform/cohort/date
     before changing the chart. Acceptable outcomes include:
@@ -59,7 +60,7 @@ work:
 - id: w2
   summary: "Make trend point titles and accessibility text point-specific"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Update `TimeSeries` so each point title and accessible label is built from
     that point's result identity, date, and metric value, not from the first
@@ -70,7 +71,7 @@ work:
 - id: w3
   summary: "Implement the chosen duplicate-day display policy"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Apply the duplicate-day policy consistently on platform detail and any chart
     panel using `TimeSeries`. If aggregation is chosen, show the aggregation
@@ -82,7 +83,7 @@ work:
 - id: w4
   summary: "Fix sparse trend copy and empty-state grammar"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Fix the `1 published runin this comparable cohort` copy by making the space
     explicit and adding a regression test for singular and plural trend
@@ -91,7 +92,7 @@ work:
 - id: w5
   summary: "Add trend semantics tests and browser evidence"
   needs: [w2, w3, w4]
-  status: pending
+  status: done
   notes: |
     Add tests that cover:
       - point titles use the point's result ID, not the first series result ID;

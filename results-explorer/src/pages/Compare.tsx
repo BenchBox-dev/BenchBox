@@ -13,7 +13,7 @@ import {
 } from "@/lib/duckdbQueries";
 import { humanizeBenchmark, errMsg, fmtGeomean } from "@/utils";
 import { formatBenchmarkLabel } from "@/lib/displayLabels";
-import { buildCompareUrl, MAX_COMPARE_SELECTIONS } from "@/lib/resultLinks";
+import { buildCompareUrl, resultDetailHref, visibleResultIdForRow, MAX_COMPARE_SELECTIONS } from "@/lib/resultLinks";
 import {
   compareCohortLockReason,
   compareCohortMismatches,
@@ -313,6 +313,7 @@ export function Compare({ url }: CompareProps) {
 
   const rowData = results.map((r, idx) => ({
     resultId: r.result_id,
+    publicId: visibleResultIdForRow(r),
     label: cohortIdentities[idx]!,
     trustLabel: r.trust_label,
     runDate: r.run_date,
@@ -449,6 +450,7 @@ export function Compare({ url }: CompareProps) {
                 {r.runDate.slice(0, 10)}
                 {r.driverVersion && !r.label.includes(`v${r.driverVersion}`) && ` · v${r.driverVersion}`}
               </p>
+              <p class="mb-3 font-mono text-xs text-[var(--bb-data-fg-muted)]">Public ID {r.publicId}</p>
               <dl class="space-y-1 text-sm">
                 <div class="flex justify-between">
                   <dt class="text-[var(--bb-data-fg-muted)]">
@@ -496,7 +498,7 @@ export function Compare({ url }: CompareProps) {
                 )}
               </dl>
               <a
-                href={`/results/r/${r.resultId}`}
+                href={resultDetailHref(r.resultId)}
                 class="mt-3 block text-xs no-underline text-[var(--bb-data-fg-muted)] hover:text-[var(--bb-accent-hover)]"
               >
                 View detail →
@@ -980,13 +982,20 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
                     />
                   </td>
                   <td class="table-td">
-                    <div class="font-medium text-[var(--bb-data-fg-primary)]">
-                      {row.platform}
+                    <div class="font-medium text-[var(--bb-data-fg-primary)]">{row.platform}</div>
+                    <div class="mt-1 flex flex-wrap items-center gap-1.5">
+                      <span class="font-mono text-xs text-[var(--bb-data-fg-subtle)]">
+                        Public ID {visibleResultIdForRow(row)}
+                      </span>
                       {isPinned && (
-                        <span class="ml-2 text-xs text-[var(--bb-data-fg-subtle)]">(from result detail)</span>
+                        <span class="rounded-full bg-[var(--bb-surface-data-muted)] px-1.5 py-0.5 text-xs text-[var(--bb-data-fg-subtle)]">
+                          (from result detail)
+                        </span>
                       )}
                       {selectedOutsideFilters && (
-                        <span class="ml-2 text-xs text-[var(--bb-data-fg-subtle)]">(selected outside filters)</span>
+                        <span class="rounded-full bg-[var(--bb-surface-data-muted)] px-1.5 py-0.5 text-xs text-[var(--bb-data-fg-subtle)]">
+                          selected outside filters
+                        </span>
                       )}
                     </div>
                     {row.platform_version && (

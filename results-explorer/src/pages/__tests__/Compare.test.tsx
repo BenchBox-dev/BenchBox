@@ -196,10 +196,25 @@ describe("Compare", () => {
     setupUrl(["a556e716"]);
     vi.mocked(resolveShortId).mockResolvedValue("tpch-duckdb-sf0.01-20260403-7fe93365");
     vi.mocked(getDetailResult).mockResolvedValue(DUCKDB);
+    vi.mocked(listResults).mockResolvedValue([
+      makeResultRow({
+        result_id: "tpch-duckdb-sf0.01-20260403-7fe93365",
+        platform: "DuckDB",
+        platform_id: "duckdb",
+        run_date: "2026-04-03",
+      }),
+    ]);
 
     render(<Compare />);
 
     await waitFor(() => expect(screen.getByTestId("compare-builder")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByTestId("compare-builder-row-tpch-duckdb-sf0.01-20260403-7fe93365")).toBeTruthy(),
+    );
+    const pinnedRow = screen.getByTestId("compare-builder-row-tpch-duckdb-sf0.01-20260403-7fe93365");
+    expect(pinnedRow.textContent).toContain("Public ID 7fe93365");
+    expect(within(pinnedRow).getByText(/\(from result detail\)/)).toBeTruthy();
+    expect(pinnedRow.textContent).not.toContain("DuckDB(from result detail)");
     expect(getDetailResult).toHaveBeenCalledWith("tpch-duckdb-sf0.01-20260403-7fe93365");
     // The old behavior was a redirect to /results/r/<id>; that round-trip is
     // gone. The user must end up on a comparison surface, not the detail page

@@ -15,6 +15,12 @@ import type { ChartHistoricalEntry } from "@/lib/chartRegistry";
 import { useElementSize } from "@/lib/useElementSize";
 import { timeSeriesColor } from "@/lib/chartTheme";
 import { formatLatencyMs, formatPowerScore } from "@/lib/metricFormatters";
+import {
+  resultDetailHref,
+  resultIdentityAriaLabel,
+  resultReceiptHref,
+  visibleResultIdForRow,
+} from "@/lib/resultLinks";
 import { formatRunIdentityLabelsForCohort, type RunIdentitySource } from "@/lib/runIdentity";
 
 const LABEL_W = 58;
@@ -40,6 +46,8 @@ interface SeriesPoint {
   resultId: string;
   date: string;
   value: number;
+  title: string;
+  ariaLabel: string;
 }
 
 interface Series {
@@ -68,6 +76,17 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
     dedupedEntries.push(e);
   }
 
+  const duplicateDayGroups = duplicateSameDayGroups(dedupedEntries, metric);
+  if (duplicateDayGroups.length > 0) {
+    return (
+      <DuplicateDayTrendState
+        groups={duplicateDayGroups}
+        metric={metric}
+        observationCount={countTrendableEntries(dedupedEntries, metric)}
+      />
+    );
+  }
+
   // Group by platform_id, sort by run_date within each group
   const byPlatform = new Map<string, ChartHistoricalEntry[]>();
   for (const e of dedupedEntries) {
@@ -87,12 +106,27 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
   const seriesDescriptors: { pid: string; firstEntry: ChartHistoricalEntry; points: SeriesPoint[] }[] = [];
   for (const [pid, platformEntries] of byPlatform) {
     const sorted = [...platformEntries].sort((a, b) => a.run_date.localeCompare(b.run_date));
-    const points: SeriesPoint[] = sorted
-      .map((e) => {
-        const val = metric === "power_score" ? e.power_score : e.display_geomean_ms;
-        return val !== null ? { resultId: e.result_id, date: e.run_date, value: val } : null;
+    const trendable = sorted
+      .map((entry) => {
+        const value = trendValue(entry, metric);
+        return value !== null ? { entry, value } : null;
       })
-      .filter((p): p is SeriesPoint => p !== null);
+      .filter((point): point is { entry: ChartHistoricalEntry; value: number } => point !== null);
+    const pointLabels = formatRunIdentityLabelsForCohort(
+      trendable.map((point) => runIdentitySourceForEntry(point.entry)),
+    );
+    const points: SeriesPoint[] = trendable.map((point, index) => {
+      const identity = pointLabels[index]?.full ?? point.entry.platform;
+      const metricValue = formatMetricValue(point.value, metric);
+      const title = `${identity}: ${point.entry.run_date} = ${metricValue}`;
+      return {
+        resultId: point.entry.result_id,
+        date: point.entry.run_date,
+        value: point.value,
+        title,
+        ariaLabel: title,
+      };
+    });
     if (points.length >= 2 && sorted[0]) {
       seriesDescriptors.push({ pid, firstEntry: sorted[0], points });
     }
@@ -206,16 +240,14 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
                 <circle
                   key={p.resultId}
                   data-result-id={p.resultId}
+                  aria-label={p.ariaLabel}
+                  tabIndex={0}
                   cx={xFor(p.date)}
                   cy={yFor(p.value)}
                   r={3}
                   fill={s.color}
                 >
-                  <title>
-                    {`${s.fullLabel}: ${p.date} = ${
-                      metric === "power_score" ? formatPowerScore(p.value).valueText : formatLatencyMs(p.value).valueText
-                    }`}
-                  </title>
+                  <title>{p.title}</title>
                 </circle>
               ))}
             </g>
@@ -257,6 +289,127 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+interface DuplicateDayGroup {
+  platform: string;
+  date: string;
+  runs: { entry: ChartHistoricalEntry; value: number; title: string }[];
+}
+
+function runIdentitySourceForEntry(entry: ChartHistoricalEntry): RunIdentitySource {
+  return {
+    result_id: entry.result_id,
+    platform: entry.platform,
+    run_date: entry.run_date,
+    scale_factor: entry.scale_factor,
+  };
+}
+
+function trendValue(entry: ChartHistoricalEntry, metric: Props["primaryMetric"]): number | null {
+  return metric === "power_score" ? entry.power_score : entry.display_geomean_ms;
+}
+
+function formatMetricValue(value: number, metric: Props["primaryMetric"]): string {
+  return metric === "power_score" ? formatPowerScore(value).valueText : formatLatencyMs(value).valueText;
+}
+
+function countTrendableEntries(entries: ChartHistoricalEntry[], metric: Props["primaryMetric"]): number {
+  return entries.filter((entry) => trendValue(entry, metric) !== null).length;
+}
+
+function duplicateSameDayGroups(entries: ChartHistoricalEntry[], metric: Props["primaryMetric"]): DuplicateDayGroup[] {
+  const byPlatformDate = new Map<string, ChartHistoricalEntry[]>();
+  for (const entry of entries) {
+    if (trendValue(entry, metric) === null) continue;
+    const key = `${entry.platform_id}\u0000${entry.run_date}`;
+    const group = byPlatformDate.get(key) ?? [];
+    group.push(entry);
+    byPlatformDate.set(key, group);
+  }
+
+  return [...byPlatformDate.values()]
+    .filter((group) => group.length > 1)
+    .map((group) => {
+      const entriesForDay = [...group].sort((a, b) => a.result_id.localeCompare(b.result_id));
+      const labels = formatRunIdentityLabelsForCohort(entriesForDay.map(runIdentitySourceForEntry));
+      return {
+        platform: entriesForDay[0]!.platform,
+        date: entriesForDay[0]!.run_date,
+        runs: entriesForDay.map((entry, index) => {
+          const value = trendValue(entry, metric)!;
+          return {
+            entry,
+            value,
+            title: `${labels[index]?.full ?? entry.platform}: ${entry.run_date} = ${formatMetricValue(value, metric)}`,
+          };
+        }),
+      };
+    })
+    .sort((a, b) => a.date.localeCompare(b.date) || a.platform.localeCompare(b.platform));
+}
+
+function DuplicateDayTrendState({
+  groups,
+  metric,
+  observationCount,
+}: {
+  groups: DuplicateDayGroup[];
+  metric: Props["primaryMetric"];
+  observationCount: number;
+}) {
+  const duplicateRunCount = groups.reduce((count, group) => count + group.runs.length, 0);
+  const duplicateRunLabel = duplicateRunCount === 1 ? "same-day run" : "same-day runs";
+  const observationLabel = observationCount === 1 ? "observation remains" : "observations remain";
+  const message =
+    `Trend line hidden: ${duplicateRunCount} ${duplicateRunLabel} in this cohort do not carry time-of-day ordering. ` +
+    `${observationCount} ${observationLabel} in the cohort; duplicate same-day runs are listed below.`;
+  return (
+    <div
+      data-testid="time-series-duplicate-day"
+      class="rounded-lg border border-dashed border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-3 py-3"
+    >
+      <p class="text-sm text-[var(--bb-data-fg-muted)]">
+        {message}
+      </p>
+      <div class="mt-3 overflow-x-auto">
+        <table class="min-w-max text-left text-xs">
+          <thead class="text-[var(--bb-data-fg-muted)]">
+            <tr>
+              <th class="pr-4 pb-1 font-medium">Date</th>
+              <th class="pr-4 pb-1 font-medium">Platform</th>
+              <th class="pr-4 pb-1 font-medium">Public ID</th>
+              <th class="pr-4 pb-1 font-medium">{metric === "power_score" ? "Power score" : "Geomean latency"}</th>
+              <th class="pr-4 pb-1 font-medium">Details</th>
+              <th class="pb-1 font-medium">Receipt</th>
+            </tr>
+          </thead>
+          <tbody class="text-[var(--bb-data-fg-primary)]">
+            {groups.flatMap((group) =>
+              group.runs.map(({ entry, value, title }) => (
+                <tr key={entry.result_id} data-result-id={entry.result_id} title={title}>
+                  <td class="pr-4 py-1 font-mono text-[var(--bb-data-fg-muted)]">{group.date}</td>
+                  <td class="pr-4 py-1">{group.platform}</td>
+                  <td class="pr-4 py-1 font-mono">Public ID {visibleResultIdForRow(entry)}</td>
+                  <td class="pr-4 py-1 font-mono">{formatMetricValue(value, metric)}</td>
+                  <td class="pr-4 py-1">
+                    <a href={resultDetailHref(entry)} aria-label={resultIdentityAriaLabel(entry, "details")}>
+                      Details
+                    </a>
+                  </td>
+                  <td class="py-1">
+                    <a href={resultReceiptHref(entry)} aria-label={resultIdentityAriaLabel(entry, "receipt")}>
+                      Receipt
+                    </a>
+                  </td>
+                </tr>
+              )),
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

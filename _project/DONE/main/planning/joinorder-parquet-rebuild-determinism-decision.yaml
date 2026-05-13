@@ -1,0 +1,146 @@
+id: joinorder-parquet-rebuild-determinism-decision
+title: "JoinOrder canonical data rebuild determinism: choose byte-identical pinning or logical content-hash guarantee"
+worktree: main
+priority: Critical
+status: Completed
+completed_date: "2026-05-12"
+category: Testing and Quality Assurance
+
+description: |
+  Follow-up to `_project/joinorder/provenance-attestation.md` from the
+  `joinorder-canonical-data-assurance` TODO. The 2026-05-12 rebuild check
+  restored the canonical Dataverse pg_dump and rebuilt the Parquet archive
+  twice with `_project/scripts/build_joinorder_data.py rebuild-local`.
+
+  Result: the rebuild did not reproduce the committed `archive_sha256`, and the
+  two local rebuilds did not match each other. `cast_info.parquet` differed
+  between run 1 and run 2; `title.parquet` differed from the committed table
+  hash in both runs. The conversion-fidelity harness passed, so the observed
+  failure is byte-level rebuild determinism rather than a proven data-loss
+  defect.
+
+  The decision is now resolved: BenchBox does not claim byte-identical rebuild
+  reproducibility for canonical `joinorder`. Published downloads remain
+  protected by archive/table byte hashes, and source recovery is validated as
+  logical table-content equivalence.
+
+work:
+- id: w1
+  summary: "Choose the integrity model: byte-identical artifact rebuild or logical content-hash rebuild"
+  status: done
+  notes: |
+    Chose logical content equivalence. Byte-identical Parquet/archive rebuilds
+    require pinning writer layout, row groups, metadata, compression frames,
+    tar ordering, and timestamps without improving the benchmark guarantee.
+    JoinOrder correctness depends on table content, schema, provenance, and
+    query results.
+
+- id: w2
+  summary: "Implement the selected model in the build pipeline and manifest/docs"
+  needs: [w1]
+  status: done
+  notes: |
+    Added a versioned logical-content hash path to
+    `_project/scripts/build_joinorder_data.py`: PostgreSQL CSV extraction is
+    ordered by `id`, rebuilt Parquet is read ordered by `id`, typed row values
+    are normalized and hashed, and `verify-logical-content`, `rebuild-local`,
+    and `foundation` write/pass/fail the logical-content manifest section
+    before packaging. User docs and provenance notes now distinguish transport
+    artifact hashes from logical source-rebuild validation.
+
+- id: w3
+  summary: "Bind the decision to existing full-source evidence and targeted verifier tests"
+  needs: [w2]
+  status: done
+  notes: |
+    A fresh full restore/rebuild was intentionally not repeated for this
+    decision PR. Existing durable full-source evidence already proves the
+    Dataverse source checksum, restore row counts, and conversion fidelity; the
+    old byte-level rebuild outputs were cleaned. The new logical verifier is
+    covered by targeted tests that compare CSV and Parquet content despite
+    different file order, reject unsorted CSV sources, and assert manifest
+    recording.
+
+deferred:
+- summary: "Changing the public `joinorder` data URL"
+  reason: "Owned by the licensing remediation TODO if BenchBox stops re-hosting the archive."
+
+prior_art:
+- "_project/joinorder/provenance-attestation.md -- records the failed 2026-05-12 run1/run2 byte comparison"
+- "_project/scripts/build_joinorder_data.py:rebuild-local -- local-only rebuild command used for the failing check"
+- "benchbox/core/data_fetch/manifest.py -- documents and verifies manifest_hash, data_archive_hash, and archive_sha256 semantics"
+
+must_preserve:
+- "Do not change the 113 canonical query corpus to solve artifact determinism"
+- "Do not rewrite committed reference cardinalities unless a separate data mismatch is proven"
+- "Keep runtime download verification by `archive_sha256` for the current released archive until a replacement artifact is
+  deliberately published"
+
+approach: |
+  Treat this as a release decision, not a silent hash refresh. Keep the
+  published archive's transport verification intact, reject byte-identical
+  rebuild reproducibility as a requirement, and make maintainer rebuilds prove
+  logical CSV-vs-Parquet row-content equivalence before packaging.
+
+anti_patterns:
+- "DO NOT update table sha256 or archive_sha256 values merely to match a fresh rebuild"
+- "DO NOT keep saying the archive is byte-reproducible while `cast_info.parquet` is run-to-run nondeterministic"
+- "DO NOT drop the existing archive_sha256 transport verification; it still protects the published release asset"
+
+verification:
+- description: "The determinism decision is recorded and implemented"
+  command: "grep -i 'byte-identical\\|logical\\|content-hash\\|deterministic' _project/joinorder/provenance-attestation.md
+    docs/benchmarks/join-order.md"
+  expected_output: "docs state the selected rebuild guarantee"
+- description: "Logical content verifier behavior is covered"
+  command: "uv run -- python -m pytest tests/unit/scripts/test_build_joinorder_data.py -q"
+  expected_output: "tests covering ordered extraction, CSV/Parquet logical hash parity, unsorted CSV rejection, and manifest recording pass"
+
+scope_limit:
+  only_modify:
+  - "_project/scripts/build_joinorder_data.py"
+  - "_project/joinorder/provenance-attestation.md"
+  - "_project/joinorder/release-notes.md"
+  - "benchbox/core/joinorder/data_manifest.toml"
+  - "benchbox/core/data_fetch/"
+  - "docs/benchmarks/join-order.md"
+  - "tests/unit/core/joinorder/"
+  - "tests/unit/scripts/test_build_joinorder_data.py"
+  do_not_modify:
+  - "benchbox/core/joinorder/queries.py"
+  - "_project/joinorder/reference_cardinalities.json"
+  - "_project/joinorder/tiny_reference_cardinalities.json"
+
+metadata:
+  owners:
+  - joeharris76
+  tags:
+  - joinorder
+  - issue-289
+  - data-integrity
+  - reproducibility
+  estimated_effort: Medium
+  created_date: "2026-05-12"
+  last_updated: "2026-05-12T20:05:00"
+
+impact:
+  business_value: |
+    Prevents BenchBox from overstating canonical JoinOrder rebuild guarantees
+    and gives maintainers a clear path to resolve the release-risk gap.
+  user_impact: |
+    Users get an honest statement of whether they can rebuild the exact archive
+    bytes or only verify logically equivalent canonical tables.
+  technical_debt: |
+    Replaces an implicit byte-reproducibility assumption with a tested,
+    documented integrity model.
+
+success_metrics:
+- "The selected rebuild guarantee is documented in the attestation and user docs"
+- "The build pipeline has a versioned logical-content check for maintainer rebuilds"
+- "No manifest hashes are silently refreshed without a documented artifact decision"
+
+open_questions:
+- question: "Should JoinOrder rebuild recovery target byte-identical archive reproduction or logical content equivalence?"
+  gating: false
+  affects: ["w1", "w2", "w3"]
+  default: "Resolved: logical content equivalence, because the current Parquet writer path is byte-nondeterministic for at least `cast_info` and byte identity is not the benchmark contract."

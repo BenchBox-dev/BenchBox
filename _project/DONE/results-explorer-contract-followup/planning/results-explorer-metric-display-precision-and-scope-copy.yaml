@@ -2,7 +2,8 @@ id: results-explorer-metric-display-precision-and-scope-copy
 title: "Repair metric precision and leaderboard scope copy regressions"
 worktree: results-explorer-contract-followup
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-05-12"
 category: User Experience
 
 description: |
@@ -24,7 +25,7 @@ deps:
 work:
 - id: w0
   summary: "Revalidate precision and scope-copy examples"
-  status: pending
+  status: done
   notes: |
     Capture evidence from:
       - a result-detail page whose primary metric is a large power score;
@@ -39,7 +40,7 @@ work:
 - id: w1
   summary: "Define display precision tiers for scan, comparison, and audit contexts"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     Define explicit formatting rules:
       - scan contexts such as hero cards, leaderboard cells, chart labels, and
@@ -55,7 +56,7 @@ work:
 - id: w2
   summary: "Apply the precision contract to result detail without changing raw data"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Update result-detail primary metric display so large power scores use the
     same scan-readable formatting as other explorer surfaces. Provide exact
@@ -65,7 +66,7 @@ work:
 - id: w3
   summary: "Define and test leaderboard scope count semantics"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     Define separate names for:
       - ranked platform count;
@@ -80,7 +81,7 @@ work:
 - id: w4
   summary: "Add tests and browser evidence for precision and scope copy"
   needs: [w2, w3]
-  status: pending
+  status: done
   notes: |
     Add unit/component tests for:
       - result-detail power-score hero values do not show long exact decimals;
@@ -94,8 +95,10 @@ prior_art:
 - "results-explorer/src/lib/metricFormatters.ts centralizes semantic metric formatting."
 - "results-explorer/src/pages/ResultDetail.tsx currently uses exact score formatting for the primary metric."
 - "results-explorer/src/pages/Home.tsx computes and renders leaderboard ranked, unranked, and coverage copy."
-- "_project/DONE/results-explorer-followup-todo-review/planning/results-explorer-metric-formatting-contract.yaml established the broader metric formatting contract."
-- "_project/DONE/results-explorer-followup-todo-review/planning/results-explorer-leaderboard-scope-filter-contract.yaml established earlier leaderboard scope semantics."
+- "_project/DONE/results-explorer-followup-todo-review/planning/results-explorer-metric-formatting-contract.yaml established
+  the broader metric formatting contract."
+- "_project/DONE/results-explorer-followup-todo-review/planning/results-explorer-leaderboard-scope-filter-contract.yaml established
+  earlier leaderboard scope semantics."
 
 must_preserve:
 - "Raw metric values must remain unchanged in data, sorting, comparison math, and exports."
@@ -116,7 +119,8 @@ anti_patterns:
 
 verification:
 - description: "Metric formatting tests pass"
-  command: "cd results-explorer && npm test -- --run src/__tests__/utils.test.ts src/lib/__tests__/metricFormatters.test.ts src/pages/__tests__/ResultDetail.test.tsx"
+  command: "cd results-explorer && npm test -- --run src/__tests__/utils.test.ts src/lib/__tests__/metricFormatters.test.ts
+    src/pages/__tests__/ResultDetail.test.tsx"
   expected_output: "result-detail scan and exact precision tests pass"
 - description: "Home scope tests pass"
   command: "cd results-explorer && npm test -- --run src/pages/__tests__/Home.test.tsx src/components/__tests__/MetaLeaderboard.test.tsx"
