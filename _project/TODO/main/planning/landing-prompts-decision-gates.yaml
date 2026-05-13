@@ -1,0 +1,200 @@
+id: landing-prompts-decision-gates
+title: "Decide launch boundaries for the /prompts/ landing route"
+worktree: main
+priority: High
+status: Not Started
+category: Product and Documentation
+
+description: |
+  BenchBox plans to add a `/prompts/` landing route that converts casual
+  landing-page visitors into people who actually try the existing BenchBox
+  CLI or MCP surfaces with agents such as Codex and Claude Code.
+
+  The feature is explicitly a marketing/conversion surface, not a new
+  runtime BenchBox feature. It must not add a new `benchbox prompts ...`
+  command, new MCP prompt-rendering tools, or another public API surface.
+  The page should compose copy-paste prompts from known snippets and
+  validated metadata, while keeping the generated guidance aligned with
+  existing CLI and MCP capabilities.
+
+  This TODO is the mandatory decision gate before implementation. It
+  resolves the public label, default state, analytics posture, cloud safety
+  policy, generic-agent semantics, and JSON/API posture so downstream work
+  can stay narrow and testable.
+
+deps: {}
+
+work:
+  - id: w1
+    summary: "Verify current CLI, MCP, landing, and docs anchors before deciding"
+    status: pending
+    notes: |
+      Re-check the current files because the plan depends on live surfaces:
+      `landing/index.html`, `.github/workflows/docs.yml`,
+      `docs/_templates/page.html`, `benchbox/mcp/prompts/registry.py`,
+      `benchbox/mcp/tools/benchmark.py`, `benchbox/cli/commands/run.py`,
+      `benchbox/cli/commands/compare.py`, `benchbox/core/platform_registry.py`,
+      and `benchbox/core/benchmark_registry.py`.
+
+      Confirm whether MCP prompt names and compare CLI behavior still match
+      the adversarial review findings before documenting final decisions.
+
+  - id: w2
+    summary: "Write a decision record for public label, default state, and page location"
+    needs: [w1]
+    status: pending
+    notes: |
+      Create a compact `_project/decisions/` record that states:
+      - public label used in nav and page title
+      - default agent choice and rationale
+      - default surface choice and rationale
+      - why `/prompts/` remains on the landing surface instead of Sphinx
+      - why no new public CLI/MCP APIs are allowed in MVP
+
+      Current recommended defaults are not settled. Candidate default state:
+      `Codex + CLI + Test one local SQL platform + DuckDB + TPC-H + scale 0.01`.
+      The decision record may choose Claude Code instead, but must state why.
+
+  - id: w3
+    summary: "Define the cloud-visible MVP safety contract"
+    needs: [w1]
+    status: pending
+    notes: |
+      Cloud platforms must remain visible in MVP, but the decision record must
+      define hard safety behavior:
+      - use registry vocabulary internally: `local`, `self-hosted`, `managed`
+      - present managed platforms as "Managed cloud" in UI
+      - never make a live cloud run the primary copied command
+      - require dependency/status checks before dry-run
+      - require dry-run before any live run
+      - instruct agents not to ask for or accept pasted secrets in chat
+      - stop and summarize missing credentials/config before proceeding
+
+  - id: w4
+    summary: "Define generic-agent semantics and capability boundaries"
+    needs: [w1]
+    status: pending
+    notes: |
+      User requirement keeps Codex, Claude Code, and generic selectable. The
+      generic option must not imply every chatbot has shell, filesystem, or
+      MCP tool access. Decide whether to label it `Generic agent`,
+      `Generic / manual`, or another term, and define its output contract.
+
+      Safe default: generic output is a human-readable recipe with commands
+      and steps the user can execute manually, plus optional wording for an
+      agent that has shell access.
+
+  - id: w5
+    summary: "Choose analytics posture and launch/kill criteria"
+    needs: [w2, w3, w4]
+    status: pending
+    notes: |
+      Decide whether to wire a privacy-respecting analytics provider for the
+      marketing surface or explicitly defer analytics. If analytics are
+      deferred, record a revisit date and a qualitative fallback review plan.
+
+      Define minimum launch metrics or kill criteria such as prompt-copy
+      events, MCP-vs-CLI selection ratio, docs-click-throughs, and a date for
+      reevaluation.
+
+  - id: w6
+    summary: "Decision review gate before implementation TODOs move out of planning"
+    needs: [w5]
+    status: pending
+    notes: |
+      Review the decision record against the adversarial review findings:
+      existing MCP prompt overlap, compare CLI dual-mode, deployment
+      vocabulary, hidden JSON API risk, cloud safety, generic-agent ambiguity,
+      and conversion measurement. Implementation TODOs should not move to
+      active until this gate is complete.
+
+deferred:
+  - summary: "Add new public `benchbox prompts` CLI commands"
+    reason: "Out of scope because the feature is meant to drive use of existing CLI/MCP surfaces, not add another one."
+  - summary: "Add new MCP prompt-builder tools"
+    reason: "Out of scope for the same reason; MCP mode should reference existing MCP tools/prompts."
+  - summary: "Move the MVP into the results-explorer SPA"
+    reason: "Over-engineered for a lightweight marketing conversion page."
+
+prior_art:
+  - "landing/index.html:static landing surface and nav — reuse for public route placement and visual tone"
+  - ".github/workflows/docs.yml:landing/* copied to site root — reuse deployment path for `/prompts/`"
+  - "docs/_templates/page.html:site-wide docs nav — extend only after the public label is chosen"
+  - "benchbox/mcp/prompts/registry.py:existing MCP prompt names — reuse or reference rather than duplicating MCP semantics"
+  - "benchbox/core/platform_registry.py:DeploymentCapability.mode — reuse `local`, `self-hosted`, and `managed` vocabulary"
+
+must_preserve:
+  - "The plan does not authorize new public CLI commands or new public MCP tools."
+  - "The `/prompts/` route remains a landing conversion surface, not a replacement for reference docs."
+  - "Cloud platforms remain visible in MVP, but live cloud execution is never the primary copied action."
+  - "Existing root landing, docs, blog, and results links continue to work."
+
+approach: |
+  Start with facts from the current repo, then make product decisions in a
+  short `_project/decisions/` document. Treat this decision item as the
+  authorization boundary for the implementation chain. Downstream TODOs should
+  read the decision record first and must not reinterpret unresolved choices.
+
+anti_patterns:
+  - "DO NOT start implementing `landing/prompts/` before this decision item is complete - because unresolved defaults and cloud safety rules will leak into code - write and review the decision record first."
+  - "DO NOT define an internal `server` environment value - because the registry uses `self-hosted` and docs use deployment modes - use registry literals internally and friendly labels in UI."
+  - "DO NOT publish a standalone `recipes.json` in MVP - because that creates a hidden public API - inline generated catalog data unless a documented API decision is made."
+  - "DO NOT make analytics an afterthought - because this is a conversion feature - either wire measurement or record an explicit deferral with revisit criteria."
+
+verification:
+  - description: "Decision record exists and mentions all mandatory unresolved choices"
+    command: "test -f _project/decisions/landing-prompts-route.md && rg -n 'label|default agent|default surface|cloud|analytics|generic|API|MCP|CLI' _project/decisions/landing-prompts-route.md"
+    expected_output: "all required decision topics are present"
+  - description: "No new public CLI/MCP implementation files are modified by this decision-only TODO"
+    command: "git diff --name-only | rg '^(benchbox/cli/commands|benchbox/mcp/tools)'"
+    expected_output: "no matches for this TODO"
+
+scope_limit:
+  only_modify:
+    - "_project/decisions/"
+    - "_project/TODO/main/planning/"
+  do_not_modify:
+    - "benchbox/cli/"
+    - "benchbox/mcp/"
+    - "landing/prompts/"
+    - ".github/workflows/docs.yml"
+
+metadata:
+  tags:
+    - landing
+    - prompts
+    - agents
+    - decision-gate
+    - marketing
+  estimated_effort: "Small"
+  created_date: "2026-05-13"
+
+impact:
+  business_value: |
+    Prevents a marketing feature from accidentally becoming another supported
+    runtime surface or an unversioned public data API.
+  user_impact: |
+    Ensures the first copied prompt is honest, safe, and aligned with the
+    actual CLI/MCP behavior a new user will experience.
+  technical_debt: |
+    Converts ambiguous product choices into an explicit gate before code is
+    written, reducing churn and drift in the implementation TODOs.
+
+success_metrics:
+  - "A decision record exists before implementation TODOs are activated."
+  - "The decision record explicitly resolves public label, default agent, default surface, analytics posture, generic-agent semantics, cloud safety, and JSON/API posture."
+  - "Implementation TODOs can cite the decision record as their source of truth."
+
+open_questions:
+  - question: "What public label should appear in the nav and page title?"
+    gating: true
+    affects: ["w2", "landing-prompts-static-route"]
+    default: "Use `Prompts` internally until the decision record chooses final copy."
+  - question: "Should Codex or Claude Code be the default agent?"
+    gating: true
+    affects: ["w2", "landing-prompts-static-route"]
+    default: "Use the decision record's explicit rationale; do not infer from implementation preference."
+  - question: "Will analytics be wired for launch or explicitly deferred?"
+    gating: true
+    affects: ["w5", "landing-prompts-launch-gates"]
+    default: "If unresolved, do not launch publicly without an explicit deferral and revisit date."
