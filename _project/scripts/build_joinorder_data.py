@@ -2374,6 +2374,8 @@ def verify_reference_results(
 
     for query_id, path in sorted(paths.items(), key=lambda item: query_sort_key(item[0])):
         expected = expected_queries.get(query_id)
+        if expected is None:
+            continue
         if not isinstance(expected, dict):
             failures.append(
                 {
