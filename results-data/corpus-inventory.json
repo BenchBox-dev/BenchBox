@@ -1,6 +1,6 @@
 {
   "schema_version": "2.2",
-  "generated_at": "2026-05-11T18:11:50.816650+00:00",
+  "generated_at": "2026-05-13T02:51:35.549675+00:00",
   "bundles": [
     {
       "file": "ai_primitives_sf001_doris_sql_20260506_133640_6e90e5e7.json",
@@ -2449,6 +2449,42 @@
       "query_count": 30,
       "trust_label": "community-submission",
       "bundle_sha256": "9f7174cc782ee538c8bc2a11d816e5942b753e9e4b49e88fa5e7845fec45b5b3"
+    },
+    {
+      "file": "joinorder_sf1_clickhouse_local_sql_20260512_223843_3d5d76b6.json",
+      "benchmark": "joinorder",
+      "benchmark_name": "JoinOrderBenchmark",
+      "platform": "ClickHouse Local",
+      "platform_version": "unknown",
+      "scale_factor": 1.0,
+      "timestamp": "2026-05-12T22:38:43.847548",
+      "query_count": 339,
+      "trust_label": "community-submission",
+      "bundle_sha256": "205f3514747a6394269729501cfe80fa4717752deb39e25b82f90823486ed62c"
+    },
+    {
+      "file": "joinorder_sf1_duckdb_sql_20260512_202135_4bd91dc4.json",
+      "benchmark": "joinorder",
+      "benchmark_name": "JoinOrderBenchmark",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 1.0,
+      "timestamp": "2026-05-12T20:21:35.354716",
+      "query_count": 339,
+      "trust_label": "community-submission",
+      "bundle_sha256": "c03c8511ff5ba2971db955082b8ff264b7f8b3fd14db78017ebbc3607c5a883c"
+    },
+    {
+      "file": "joinorder_sf1_lakesail_sql_20260512_225022_528b8c08.json",
+      "benchmark": "joinorder",
+      "benchmark_name": "JoinOrderBenchmark",
+      "platform": "LakeSail",
+      "platform_version": "4.1.1",
+      "scale_factor": 1.0,
+      "timestamp": "2026-05-12T22:50:22.895687",
+      "query_count": 339,
+      "trust_label": "community-submission",
+      "bundle_sha256": "19bdde6910fbe187f1119db9d13d550c8856de9187f6480dce29d2307f7c80c3"
     },
     {
       "file": "metadata_primitives_sf1_datafusion_sql_20260502_182730_9bf19029.json",
@@ -6435,6 +6471,11 @@
       "Spark",
       "StarRocks"
     ],
+    "joinorder@sf1.0": [
+      "ClickHouse Local",
+      "DuckDB",
+      "LakeSail"
+    ],
     "metadata_primitives@sf1.0": [
       "DataFusion",
       "DuckDB",
@@ -6729,7 +6770,7 @@
     ]
   },
   "summary": {
-    "total_bundles": 520,
+    "total_bundles": 523,
     "by_benchmark": {
       "ai_primitives": 12,
       "amplab": 50,
@@ -6738,6 +6779,7 @@
       "datavault": 21,
       "flightdata": 17,
       "h2odb": 47,
+      "joinorder": 3,
       "metadata_primitives": 8,
       "nyctaxi": 29,
       "read_primitives": 18,
@@ -6756,10 +6798,11 @@
     "by_platform": {
       "Apache Doris": 19,
       "CedarDB": 3,
-      "ClickHouse Local": 36,
+      "ClickHouse Local": 37,
       "Dask": 21,
       "DataFusion": 99,
-      "DuckDB": 53,
+      "DuckDB": 54,
+      "LakeSail": 1,
       "Pandas": 23,
       "Polars": 70,
       "PostgreSQL": 17,
@@ -6770,7 +6813,7 @@
       "StarRocks": 40
     },
     "by_trust_label": {
-      "community-submission": 508,
+      "community-submission": 511,
       "maintainer-run": 12
     }
   }
