@@ -359,6 +359,10 @@ class BenchmarkResults:
     native_comparison: NativeComparison | None = None
     # Methodology/comparability classification (TPC-DS: "official", "unofficial_nonstandard", "unofficial_subscale")
     compliance_class: str | None = None
+    # Dataset identity captured at run/export time for manifest-backed benchmarks.
+    dataset_version: str | None = None
+    manifest_hash: str | None = None
+    data_archive_hash: str | None = None
 
     @property
     def benchmark_id(self) -> str:

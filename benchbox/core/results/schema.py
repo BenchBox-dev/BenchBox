@@ -492,12 +492,21 @@ def _build_benchmark_section(result: BenchmarkResults) -> dict[str, Any]:
     compliance_class = getattr(result, "compliance_class", None)
     if compliance_class is not None:
         section["compliance_class"] = compliance_class
-    section.update(_dataset_identity_fields(result.benchmark_id))
+    section.update(_dataset_identity_fields(result))
     return section
 
 
-def _dataset_identity_fields(benchmark_id: str) -> dict[str, str]:
+def _dataset_identity_fields(result: BenchmarkResults) -> dict[str, str]:
     """Return canonical dataset identity fields for data-manifest benchmarks."""
+    captured_identity = {
+        "dataset_version": getattr(result, "dataset_version", None),
+        "manifest_hash": getattr(result, "manifest_hash", None),
+        "data_archive_hash": getattr(result, "data_archive_hash", None),
+    }
+    if any(value is not None for value in captured_identity.values()):
+        return {key: str(value) for key, value in captured_identity.items() if value is not None}
+
+    benchmark_id = result.benchmark_id
     try:
         from benchbox.core.benchmark_registry import get_benchmark_metadata
         from benchbox.core.data_fetch import load_manifest
