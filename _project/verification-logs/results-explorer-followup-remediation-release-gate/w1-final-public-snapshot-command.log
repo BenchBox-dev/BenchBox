@@ -1,2 +1,0 @@
-command: uv run -- python _project/scripts/results_explorer_snapshot_invariants.py results-explorer/public/data/results.duckdb
-SKIP: results-explorer/public/data/results.duckdb is absent in this checked tree. Fixture snapshot used instead.

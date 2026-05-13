@@ -91,6 +91,9 @@ jobs:
           mapfile -t yaml_paths < .ci-paths/yaml.txt
           uv run -- pre-commit run check-yaml --files "${yaml_paths[@]}"
 
+      - name: Validate artifact hygiene
+        run: uv run -- python _project/scripts/artifact_hygiene_check.py --all-tracked
+
       - name: Validate markdown hygiene
         shell: bash
         run: |
@@ -166,6 +169,9 @@ jobs:
 
       - name: Validate test marker annotations
         run: make lint-markers
+
+      - name: Validate artifact hygiene
+        run: make artifact-hygiene
 
       - name: Timing policy (wall-clock allowlist)
         run: uv run -- python _project/scripts/timing_policy_check.py --strict

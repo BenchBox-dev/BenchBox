@@ -135,8 +135,10 @@ work:
       - mixed-scale Compare;
       - Query Workbench and mobile filter drawer.
 
-    Store after screenshots under a new dated `_project/audits/screenshots/`
-    directory and include a manifest.
+    Store raw after screenshots in CI artifacts, `/tmp`, or
+    `BENCHBOX_OUTPUT_DIR`, then summarize the route/viewport matrix, checked
+    SHA, PASS/FAIL result, and any relevant manifest counts in the final audit.
+    Do not commit the screenshot batch.
 
 - id: w4
   summary: "Perform finding-by-finding visual and interaction review"

@@ -26,10 +26,10 @@ fixed or deliberately re-scoped.
 | Evidence | Path |
 |---|---|
 | PR #246 baseline audit | `_project/audits/results-explorer-hierarchy-usability-data-audit-20260507.md` |
-| PR #246 baseline screenshots | `_project/audits/screenshots/results-explorer-hierarchy-usability-data-audit-20260507/` |
-| Final after screenshots | `_project/audits/screenshots/results-explorer-pr246-final-2026-05-10/` |
-| Final screenshot manifest | `_project/audits/screenshots/results-explorer-pr246-final-2026-05-10/screenshot-manifest.json` |
-| Final console/network log | `_project/audits/screenshots/results-explorer-pr246-final-2026-05-10/console-network-2026-05-10.log` |
+| PR #246 baseline visual evidence | Summarized in the baseline audit; raw screenshots no longer retained in git |
+| Final after visual evidence | Route/viewport matrix summarized below; raw screenshots no longer retained in git |
+| Final screenshot manifest | Manifest counts summarized below; raw manifest no longer retained in git |
+| Final console/network evidence | Summary retained below; raw log no longer retained in git |
 
 Console/network result: the log contains only the header and `develop_sha`
 lines. No console errors, console warnings, page errors, or HTTP >=400 responses

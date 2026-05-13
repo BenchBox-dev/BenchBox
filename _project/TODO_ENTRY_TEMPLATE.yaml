@@ -35,7 +35,10 @@ category: "<Core Functionality|Platform Expansion|Testing and Quality Assurance|
 # OPTIONAL w0 convention - evidence-durability gate.
 # When `description` cites upstream evidence (specific dependency version,
 # harness PASS, observed external behavior), lead with a `w0:` re-validate
-# work unit and capture stdout to `_project/verification-logs/<id>/w0.log`.
+# work unit. Capture stdout to an ignored local path or CI artifact, then
+# summarize the command, checked SHA/version, result, and key lines/counts in
+# the TODO/audit/PR body. Do not commit raw `_project/verification-logs/*.log`
+# transcripts unless they are deliberate small fixtures with a named consumer.
 # Reviewer enforcement: /todo review's freshness axis. See
 # _project/verification-logs/README.md for the convention; an applied
 # example lives at _project/TODO/main/planning/track-upstream-platform-workarounds.yaml.
@@ -44,9 +47,9 @@ category: "<Core Functionality|Platform Expansion|Testing and Quality Assurance|
 #     summary: "Re-validate cited evidence (e.g., upstream issue still open)"
 #     status: pending
 #     notes: |
-#       Run `<command>`; assert `<expected substring>`; capture stdout to
-#       _project/verification-logs/<todo-id>/w0.log so a reviewer landing
-#       this PR days later can replay it.
+#       Run `<command>`; assert `<expected substring>`; capture raw stdout to
+#       `/tmp/<todo-id>-w0.log`, CI artifacts, or `BENCHBOX_OUTPUT_DIR`, and
+#       record the replayable summary in this TODO.
 work:
   - id: w1
     summary: "<First work unit - no dependencies>"

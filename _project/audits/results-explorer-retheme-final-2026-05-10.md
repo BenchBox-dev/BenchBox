@@ -41,18 +41,17 @@ route-specific loaded landmarks before taking screenshots.
 | `/results/query` | OK | "matching result bundle" | clean |
 | `/results/clickbench/` (supported but empty corpus) | OK | "No published results yet" | clean |
 
-Cold-load evidence logged at
-`_project/audits/screenshots/results-explorer-retheme-final-2026-05-10/console-network-2026-05-10.log`.
-The log records every `console.error|warning`, every HTTP >=400 response, and
-every `pageerror` across 48 viewport-route loads (12 routes x 4 widths). The
-log file contains only its header and stamped SHA lines, so **zero console
-errors, warnings, page errors, or non-2xx responses** were observed during the
-cold-load matrix.
+Cold-load evidence recorded every `console.error|warning`, every HTTP >=400
+response, and every `pageerror` across 48 viewport-route loads (12 routes x 4
+widths). The raw log is no longer retained in git; the durable result is that
+**zero console errors, warnings, page errors, or non-2xx responses** were
+observed during the cold-load matrix.
 
 ## Screenshot index (w3)
 
-48 fullPage screenshots and one capture manifest are committed under
-`_project/audits/screenshots/results-explorer-retheme-final-2026-05-10/`:
+48 fullPage screenshots and one capture manifest were captured during review.
+Raw screenshots and manifests are no longer retained in git; the durable
+coverage index is:
 
 ```text
 home-{390,768,1280,1600}.png
@@ -69,19 +68,15 @@ query-{390,768,1280,1600}.png
 not-found-{390,768,1280,1600}.png
 ```
 
-Manifest:
-`_project/audits/screenshots/results-explorer-retheme-final-2026-05-10/capture-manifest-2026-05-10.json`.
-
 The capture spec (`results-explorer/e2e/captures/release-final.spec.ts`) is
 gated on `RETHEME_CAPTURE=1` so it does not run on every CI invocation; it can
 be replayed by future reviewers with a single environment variable.
 
 ## Console / network summary (w2)
 
-```text
-$ wc -l _project/audits/screenshots/results-explorer-retheme-final-2026-05-10/console-network-2026-05-10.log
-2  # header plus stamped develop_sha
-```
+Raw console/network transcripts are no longer retained in git. This audit keeps
+the durable result: zero console errors, warnings, page errors, or HTTP >=400
+responses in the cold-load matrix.
 
 ## Interaction QA summary (w4)
 

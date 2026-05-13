@@ -1,6 +1,0 @@
-# Compare warning affordance browser evidence
-checked_at: 2026-05-12T00:35:10.126Z
-one warning: PASS count=1 warning href=#comparability-receipt-warnings hash=#comparability-receipt-warnings focus=comparability-receipt-warnings receipt=visible
-multiple warnings: PASS count=2 warnings href=#comparability-receipt-warnings hash=#comparability-receipt-warnings focus=comparability-receipt-warnings receipt=visible
-reload: PASS warning target remains reachable at #comparability-receipt-warnings
-passive label: PASS computed summary badge is not a button (span)

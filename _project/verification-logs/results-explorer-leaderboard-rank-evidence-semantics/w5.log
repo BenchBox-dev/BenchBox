@@ -1,5 +1,0 @@
-PASS No run cells are free of receipt links and provenance badges :: 0 No run cells checked
-PASS Unranked leaderboard evidence renders as Excluded :: [{"text":"ExcludedTrust policy excludes this result from ranking.Communitypassed","links":1,"badges":0},{"text":"ExcludedTrust policy excludes this result from ranking.Communitypassed","links":1,"badges":0}]
-PASS Normal ranked benchmark rank tab shows ordinal ranks :: QueryPolarsDuckDB… 010ee756DuckDB… a5eff54eFixture…ner SQLDataFusionDataFus… PartialDuckDB… b6d2e142*Fixture AWS SQL*Fixt… Serverless*11st2nd2nd2nd5th5th---21st2nd2nd2nd5th5th---31st2nd2nd2nd5th5th---41st2nd2nd2nd5th5th---51st2nd2nd2nd5th5t
-PASS Benchmark rank tab separates unranked rows from ranked competitors :: 3 exclusion markers; note visible
-PASS Ranked TPCH cohort does not render all-unrankable empty state :: rank matrix remains visible because rankable cells exist

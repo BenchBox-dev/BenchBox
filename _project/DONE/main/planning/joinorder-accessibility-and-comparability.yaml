@@ -91,7 +91,7 @@ context_sections:
 
 work:
   - id: w0
-    summary: "Snapshot the current accessibility/coverage state to _project/verification-logs/joinorder-accessibility-and-comparability/w0.log before any change"
+    summary: "Snapshot the current accessibility/coverage state before any change"
     status: done
     notes: |
       Capture (the durable baseline for the facts this TODO cites):
@@ -100,11 +100,13 @@ work:
         - `uv run -- python -c "from benchbox.core.joinorder.dataframe_queries import get_dataframe_queries, get_untranslated_dataframe_query_ids; r=get_dataframe_queries(); print('registered', len(list(r.get_query_ids()))); print('untranslated', len(get_untranslated_dataframe_query_ids()))"`
           (expect registered 113, untranslated 100);
         - the merge state of PRs #361/#363/#367/#370 (`gh pr view <N> --json state,mergedAt` each) so the "reuse the explorer comparability machinery" premise is recorded.
-      Write to `_project/verification-logs/joinorder-accessibility-and-comparability/w0.log`.
+      Keep raw output in `/tmp`, CI artifacts, or `BENCHBOX_OUTPUT_DIR`; commit
+      only a compact summary with command, checked SHA, PASS/FAIL, and key
+      counts in the TODO, ADR, or `_project/joinorder/` evidence note.
       No code changes.
-      Done: `_project/verification-logs/joinorder-accessibility-and-comparability/w0.log`
-      records `scale_options == [1.0]`, DataFrame registry coverage
-      113 registered / 100 untranslated, and PRs #361/#363/#367/#370 merged.
+      Done: compact summary records `scale_options == [1.0]`, DataFrame
+      registry coverage 113 registered / 100 untranslated, and PRs
+      #361/#363/#367/#370 merged.
 
   - id: w1
     summary: "Phase 1 decision gate: choose how (if at all) to provide a reachable small JOB workload; record an ADR"
@@ -187,13 +189,13 @@ work:
       from PRs #363/#367)? Does `compare` / `analyze_results` warn when comparing
       it against a 113-query SQL run (the machinery from #361/#370)? Capture the
       findings (stdout / screenshots / file excerpts) to
-      `_project/verification-logs/joinorder-accessibility-and-comparability/w4.log`.
+      a compact committed summary under `_project/joinorder/`.
       GATE: if partiality IS clearly surfaced end-to-end -> record the evidence,
       mark w5 a no-op, done. If there is ANY surface where a 13/113 joinorder
       DataFrame run looks complete/comparable -> w5.
-      Done: `_project/verification-logs/joinorder-accessibility-and-comparability/w4.log`
-      records a gap. Schema-v2 export dropped `dataframe_skip_summary`, causing
-      the explorer to infer 13 logical queries instead of 113.
+      Done: compact summary records a gap. Schema-v2 export dropped
+      `dataframe_skip_summary`, causing the explorer to infer 13 logical
+      queries instead of 113.
 
   - id: w5
     summary: "Phase 3 (conditional on w4): mark partial joinorder DataFrame runs and guard comparison against complete runs; tests"
@@ -255,9 +257,9 @@ verification:
   - description: "If a small scale was added: it is in scale_options, resolves to the light archive, and all 113 queries run on it"
     command: "uv run -- python -c \"from benchbox.core.benchmark_registry import BENCHMARK_METADATA as m; print(m['joinorder']['scale_options'])\" && uv run -- python -m pytest tests/unit/core/joinorder -q"
     expected_output: "scale_options shows the new small value (or [1.0] unchanged if option (c) was chosen); joinorder unit tests pass including the new subset test"
-  - description: "Phase 2 verification log exists and states the partiality finding"
-    command: "ls _project/verification-logs/joinorder-accessibility-and-comparability/w4.log && grep -i 'partial\\|skip\\|unrank\\|113\\|comparab' _project/verification-logs/joinorder-accessibility-and-comparability/w4.log"
-    expected_output: "the log shows whether a joinorder --mode dataframe run is marked partial across result metadata / leaderboard / compare"
+  - description: "Phase 2 verification summary exists and states the partiality finding"
+    command: "grep -RiE 'partial|skip|unrank|113|comparab' _project/joinorder"
+    expected_output: "the summary shows whether a joinorder --mode dataframe run is marked partial across result metadata / leaderboard / compare"
   - description: "If a gap was found: partial joinorder DataFrame runs are marked and comparison-guarded; tests cover it"
     command: "uv run -- python -m pytest tests/unit/core/joinorder tests/unit -k 'joinorder and (partial or skip or comparab)' -q || echo 'no gap found / no Phase 3 needed'"
     expected_output: "either Phase 3 tests pass, or Phase 2 found no gap and Phase 3 was correctly skipped"
@@ -273,7 +275,6 @@ scope_limit:
     - "_project/scripts/build_joinorder_data.py"
     - "_project/joinorder/"
     - "_project/decisions/"
-    - "_project/verification-logs/joinorder-accessibility-and-comparability/"
     - "tests/unit/core/joinorder/"
     - "tests/fixtures/joinorder_canonical_tiny/"
     - "docs/benchmarks/join-order.md"

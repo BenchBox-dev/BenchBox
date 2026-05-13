@@ -46,7 +46,7 @@ Append one block per finding to a new file at `_project/audits/results-explorer-
       <paste any console output, or "none">
     network: |
       <paste any non-2xx responses with URL + status, or "none">
-    screenshot: <relative path under _project/audits/screenshots/, or "none">
+    screenshot: <local/CI artifact reference, filename label, or "none">
   severity: <blocker | major | minor | nit>   # only for F and Q; omit for P
   notes: |
     <anything else — repro flakiness, only-on-cold-load, etc.>

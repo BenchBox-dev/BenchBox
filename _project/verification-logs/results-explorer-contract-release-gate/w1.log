@@ -1,5 +1,0 @@
-# results-explorer-contract-release-gate w1 snapshot invariants
-checked_sha 651c5efd8e18833ee5f4abd0956934061db98521
-snapshot results-explorer/public/data/results.duckdb
-command: uv run -- python _project/scripts/results_explorer_snapshot_invariants.py results-explorer/public/data/results.duckdb
-Results Explorer snapshot invariants passed: results-explorer/public/data/results.duckdb

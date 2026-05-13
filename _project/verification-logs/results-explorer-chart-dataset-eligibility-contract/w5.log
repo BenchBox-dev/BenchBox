@@ -1,3 +1,0 @@
-normal benchmark Overview Per-query Distribution Rank excluded empty state PASS: PASS Power, Histogram, Box, CDF, Rank exercised; rank-safe exclusion copy visible
-low-evidence Benchmark invalid cells excluded empty state PASS: PASS 7 zero-timing title(s) found
-Compare chart tabs comparable partial PASS: PASS Compare speedup, distribution, and rank tabs exercised

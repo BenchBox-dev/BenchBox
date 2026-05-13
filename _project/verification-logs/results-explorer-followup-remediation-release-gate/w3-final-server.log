@@ -1,3 +1,0 @@
-[serve-browser-tests] dist=/Users/joe/Developer/BenchBox.release-gate/results-explorer/dist
-[serve-browser-tests] fixtures=/Users/joe/Developer/BenchBox.release-gate/results-explorer/test-fixtures/.generated/data
-[serve-browser-tests] listening on http://127.0.0.1:4353/results/

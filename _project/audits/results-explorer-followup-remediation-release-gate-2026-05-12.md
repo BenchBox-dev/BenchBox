@@ -42,11 +42,11 @@ Key counts:
 | `cd results-explorer && npm test -- --run` | PASS, 687 tests | `w2-final-frontend-tests-rerun.log` |
 | `cd results-explorer && npm run typecheck` | PASS | `w2-final-typecheck.log` |
 | `cd results-explorer && npm run build` | PASS | `w2-final-build.log` |
-| `make audit-sha-check FILE=_project/audits/results-explorer-followup-remediation-release-gate-2026-05-12.md AUDIT_SHA_TARGET_REF=origin/develop` | PASS | `w4-final-audit-sha-check.log` |
-| `rg -n "Leaderboards|Benchmark|Platform|Query Workbench|Compare|Result detail|PASS|FAIL" _project/verification-logs/results-explorer-followup-remediation-release-gate/w3-final-browser.log` | PASS | `w4-final-verification-grep.log` |
-| `uv run --project _project/scripts -- python _project/scripts/todo_cli.py reindex` | PASS | `w5-final-todo-reindex.log` |
-| `uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate` | PASS | `w5-final-todo-validate.log` |
-| `uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph` | PASS | `w5-final-todo-check-graph.log` |
+| `make audit-sha-check FILE=_project/audits/results-explorer-followup-remediation-release-gate-2026-05-12.md AUDIT_SHA_TARGET_REF=origin/develop` | PASS | summary retained here |
+| `rg -n "Leaderboards|Benchmark|Platform|Query Workbench|Compare|Result detail|PASS|FAIL" _project/audits/results-explorer-followup-remediation-release-gate-2026-05-12.md` | PASS | route matrix retained here |
+| `uv run --project _project/scripts -- python _project/scripts/todo_cli.py reindex` | PASS | summary retained here |
+| `uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate` | PASS | summary retained here |
+| `uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph` | PASS | summary retained here |
 
 ## Browser Acceptance
 
@@ -98,5 +98,5 @@ frontend suite plus browser route acceptance.
 
 The release gate passes. `results-explorer-followup-remediation-release-gate`
 has been moved to `_project/DONE`, TODO metadata has been reindexed, and the
-verification logs linked above are the final evidence for the follow-up
+compact evidence summarized above is the final retained record for the follow-up
 remediation batch.

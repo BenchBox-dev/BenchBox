@@ -22,7 +22,8 @@ TODO: `results-explorer-pr246-responsive-navigation-overflow-remediation`
 ## Evidence recapture
 
 - Capture spec: `results-explorer/e2e/captures/pr246-responsive-remediation.spec.ts`
-- Screenshot manifest: `_project/audits/screenshots/results-explorer-pr246-responsive-remediation-2026-05-07/screenshot-manifest.json`
+- Screenshot manifest: raw manifest no longer retained in git; route/viewport
+  coverage is summarized in this report.
 - Captured mobile/tablet routes: home, TPC-H benchmark, SSB benchmark, DuckDB platform, DataFusion platform, DuckDB result detail, DuckDB/DataFusion compare, Query workbench, Query filter drawer.
 
 ## Verification

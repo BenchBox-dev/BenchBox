@@ -38,8 +38,8 @@ results: 44 columns
   ... pricing_region VARCHAR
 ```
 
-The full reproduction log is committed at
-`_project/verification-logs/results-explorer-retheme-schema-cost-regression/w1.log`.
+The raw reproduction log is no longer retained in git; the durable schema
+evidence is summarized above.
 
 The audit was therefore captured against either an older snapshot
 (pre-`benchbox/core/explorer_pipeline/duckdb_builder.py`) or a deployment
