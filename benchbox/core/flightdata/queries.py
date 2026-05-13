@@ -19,6 +19,8 @@ from typing import Any, Optional
 import sqlglot
 from sqlglot import exp
 
+from benchbox.sql_compat.local_exemptions import compat_local
+
 # Query definitions: 20 OLAP queries across 5 categories
 QUERIES: dict[str, dict[str, Any]] = {
     # ==== On-Time Performance (5 queries) ====
@@ -595,6 +597,14 @@ class FlightDataQueryManager:
         self.start_date = start_date
         self.end_date = end_date
 
+    @compat_local(
+        kind="rendering",
+        platform_specific=True,
+        reason=(
+            "Renders FlightData SQL for PostgreSQL-family engines by casting ROUND inputs "
+            "to DECIMAL where PostgreSQL does not accept ROUND(double precision, integer)."
+        ),
+    )
     def get_query(
         self,
         query_key: str,
