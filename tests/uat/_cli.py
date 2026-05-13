@@ -461,6 +461,7 @@ def execute_main(argv: list[str] | None = None) -> int:
         "failed": sum(1 for r in outcome.results if r.status == "failed"),
         "timed_out": sum(1 for r in outcome.results if r.status == "timed-out"),
         "pruned": len(outcome.pruned),
+        "compatibility_pruned": len(getattr(outcome, "compatibility_pruned", ())),
         "skipped_unreachable": len(outcome.skipped_unreachable),
         "docker_events": len(outcome.docker_events),
         "aborted": outcome.aborted,

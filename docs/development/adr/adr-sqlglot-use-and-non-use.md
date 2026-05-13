@@ -125,7 +125,7 @@ Examples we ship per platform:
 - Doris: `TIME`->`VARCHAR(8)`; `STRING`->`VARCHAR(65533)`; `ARRAY[N]`->`ARRAY`; inject `DUPLICATE KEY` + `DISTRIBUTED BY HASH`
 - SingleStore: strip FK; `CREATE REFERENCE TABLE` for dimensions; inject `SHARD KEY` + `SORT KEY` (in order)
 - Databricks: `CREATE OR REPLACE TABLE ... USING DELTA TBLPROPERTIES(...)`
-- pg_mooncake: append `USING columnstore` (else silent fallback to row-store)
+- pg_mooncake: preserve heap DDL for COPY, then promote loaded tables into mooncake mirrors
 
 **Implementation**: 19 platform-specific modules under
 [`benchbox/sql_compat/rules/ddl_optimize/`](../../../benchbox/sql_compat/rules/ddl_optimize/),

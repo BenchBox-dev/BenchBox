@@ -39,13 +39,23 @@ def test_write_report_counts(tmp_path: Path):
         _cell("duckdb", "tpch", 0.1, status="failed"),
         _cell("duckdb", "tpch", 1.0, status="timed-out"),
     ]
-    summary = report.write_report(cells, output_path=tmp_path / "out.tsv")
+    summary = report.write_report(
+        cells,
+        output_path=tmp_path / "out.tsv",
+        compatibility_pruned_count=2,
+        early_stop_pruned_count=1,
+    )
     assert summary.rows == 3
+    assert summary.candidate_count == 6
+    assert summary.executed_count == 3
+    assert summary.compatibility_pruned_count == 2
+    assert summary.early_stop_pruned_count == 1
     assert summary.pass_count == 1
     assert summary.fail_count == 1
     assert summary.timeout_count == 1
     text = (tmp_path / "out.tsv").read_text()
     assert text.startswith(report.REPORT_HEADER)
+    assert "candidates=6 executed=3 compatibility_pruned=2 early_stop_pruned=1" in text
 
 
 def test_cross_scale_clean_counts_full_ladder():

@@ -12,7 +12,7 @@ import signal
 import subprocess
 import sys
 from dataclasses import dataclass
-from typing import Iterable, Mapping
+from typing import Any, Iterable, Mapping
 
 EXIT_TIMEOUT = 124  # POSIX coreutils convention: SIGTERM after timeout.
 
@@ -24,6 +24,8 @@ class TimeoutResult:
     exit_code: int
     timed_out: bool
     elapsed_s: float
+    stdout: Any = None
+    stderr: Any = None
 
 
 def run_with_timeout(
@@ -42,9 +44,9 @@ def run_with_timeout(
     SIGTERM, and 200 ms later SIGKILL — same kill ladder as the perl
     wrapper.
 
-    `stdout` and `stderr` accept anything `subprocess.Popen` would, but
-    callers that pass `subprocess.PIPE` are responsible for draining the
-    pipes; the wrapper does not buffer.
+    `stdout` and `stderr` accept anything `subprocess.Popen` would. When
+    callers pass `subprocess.PIPE`, this wrapper drains the pipes with
+    `communicate()` so a noisy child cannot block timeout enforcement.
     """
     import time
 
@@ -55,6 +57,8 @@ def run_with_timeout(
             exit_code=proc.returncode,
             timed_out=False,
             elapsed_s=time.monotonic() - start,
+            stdout=proc.stdout,
+            stderr=proc.stderr,
         )
 
     # New session so we can kill the whole process group; matches the
@@ -69,23 +73,28 @@ def run_with_timeout(
         preexec_fn=preexec,
     )
     try:
-        returncode = proc.wait(timeout=timeout_s)
+        out, err = proc.communicate(timeout=timeout_s)
         return TimeoutResult(
-            exit_code=returncode,
+            exit_code=proc.returncode,
             timed_out=False,
             elapsed_s=time.monotonic() - start,
+            stdout=out,
+            stderr=err,
         )
     except subprocess.TimeoutExpired:
         _kill_process_group(proc.pid)
         try:
-            proc.wait(timeout=1.0)
+            out, err = proc.communicate(timeout=1.0)
         except subprocess.TimeoutExpired:
-            # SIGKILL did not reap; let the caller see what they get.
-            pass
+            # SIGKILL did not reap or output could not drain; keep timeout
+            # classification stable and return without blocking the caller.
+            out, err = None, None
         return TimeoutResult(
             exit_code=EXIT_TIMEOUT,
             timed_out=True,
             elapsed_s=time.monotonic() - start,
+            stdout=out,
+            stderr=err,
         )
 
 

@@ -28,6 +28,10 @@ class ReportSummary:
     pass_count: int
     fail_count: int
     timeout_count: int
+    candidate_count: int
+    executed_count: int
+    compatibility_pruned_count: int
+    early_stop_pruned_count: int
     cross_scale_clean_pairs: int
     cross_scale_floor: int | None
     cross_scale_floor_breached: bool
@@ -95,10 +99,14 @@ def write_report(
     rungs: list[float] | None = None,
     cross_scale_floor: int | None = None,
     validator_status_by_path: dict[Path, str] | None = None,
+    compatibility_pruned_count: int = 0,
+    early_stop_pruned_count: int = 0,
 ) -> ReportSummary:
     """Write the matrix summary TSV; optionally enforce a cross-scale floor."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
     rows = list(cells)
+    executed_count = len(rows)
+    candidate_count = executed_count + compatibility_pruned_count + early_stop_pruned_count
 
     pass_count = sum(1 for r in rows if r.status == "passed")
     fail_count = sum(1 for r in rows if r.status == "failed")
@@ -113,7 +121,17 @@ def write_report(
                 else ""
             )
             fh.write(render_row(cell, validator_status=v) + "\n")
-        fh.write(f"# rows={len(rows)} passed={pass_count} failed={fail_count} timed_out={timeout_count}\n")
+        fh.write(
+            "# "
+            f"rows={len(rows)} "
+            f"candidates={candidate_count} "
+            f"executed={executed_count} "
+            f"compatibility_pruned={compatibility_pruned_count} "
+            f"early_stop_pruned={early_stop_pruned_count} "
+            f"passed={pass_count} "
+            f"failed={fail_count} "
+            f"timed_out={timeout_count}\n"
+        )
 
     if rungs:
         clean_pairs = cross_scale_clean_pair_count(rows, rungs, validator_status_by_path=validator_status_by_path)
@@ -128,6 +146,10 @@ def write_report(
         pass_count=pass_count,
         fail_count=fail_count,
         timeout_count=timeout_count,
+        candidate_count=candidate_count,
+        executed_count=executed_count,
+        compatibility_pruned_count=compatibility_pruned_count,
+        early_stop_pruned_count=early_stop_pruned_count,
         cross_scale_clean_pairs=clean_pairs,
         cross_scale_floor=cross_scale_floor,
         cross_scale_floor_breached=floor_breached,

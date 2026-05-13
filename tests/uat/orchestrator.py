@@ -20,7 +20,12 @@ from pathlib import Path
 from typing import Any
 
 from tests.uat.config import UATConfig, apply_stress_overrides, load_config
-from tests.uat.phases import execute as exec_phase, preflight as preflight_phase, report as report_phase
+from tests.uat.phases import (
+    enumerate as enumerate_phase,
+    execute as exec_phase,
+    preflight as preflight_phase,
+    report as report_phase,
+)
 from tests.uat.preflight_budget import cell_key
 from tests.uat.runner import CellResult
 
@@ -183,6 +188,7 @@ def run_sweep(  # noqa: C901
     resume_attempts = load_resume_attempts(resume_manifest)
 
     cells_jsonl = log_dir / "cells.jsonl"
+    compatibility_pruned_jsonl = log_dir / "compatibility_pruned.jsonl"
     execute_outcome = None
     validator_rollup_tsv: Path | None = None
     submissions_dir: Path | None = None
@@ -229,7 +235,7 @@ def run_sweep(  # noqa: C901
             # (unknown platform group, missing benchmark) fails here
             # rather than at execute or — under dry_run — never at all.
             try:
-                exec_phase.enumerate_cells(config.raw)
+                enumerate_phase.enumerate_cells(config.raw)
                 phase_exit_codes[phase] = 0
             except (ValueError, KeyError, TypeError) as exc:
                 phase_exit_codes[phase] = 2
@@ -280,10 +286,28 @@ def run_sweep(  # noqa: C901
                                 "benchmark": cell.benchmark,
                                 "scale": cell.scale,
                                 "status": cell.status,
+                                "timed_out": cell.status == "timed-out",
                                 "exit_code": cell.exit_code,
                                 "elapsed_s": cell.elapsed_s,
                                 "log_path": str(cell.log_path),
                                 "result_path": (str(cell.result_path) if cell.result_path else None),
+                            }
+                        )
+                        + "\n"
+                    )
+            with compatibility_pruned_jsonl.open("w", encoding="utf-8") as fh:
+                for cell in getattr(execute_outcome, "compatibility_pruned", ()):
+                    fh.write(
+                        json.dumps(
+                            {
+                                "platform": cell.platform,
+                                "benchmark": cell.benchmark,
+                                "scale": cell.scale,
+                                "status": "compatibility-pruned",
+                                "rule_id": cell.rule_id,
+                                "rule_status": cell.status,
+                                "reason": cell.reason,
+                                "evidence": cell.evidence,
                             }
                         )
                         + "\n"
@@ -375,6 +399,10 @@ def run_sweep(  # noqa: C901
                 rungs=[float(r) for r in rungs] if rungs else None,
                 cross_scale_floor=report_cfg.get("cross_scale_coverage_min_pairs"),
                 validator_status_by_path=validator_status_by_path,
+                compatibility_pruned_count=(
+                    len(getattr(execute_outcome, "compatibility_pruned", ())) if execute_outcome else 0
+                ),
+                early_stop_pruned_count=(len(getattr(execute_outcome, "pruned", ())) if execute_outcome else 0),
             )
             phase_exit_codes[phase] = summary.exit_code()
 

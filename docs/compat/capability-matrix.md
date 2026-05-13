@@ -141,7 +141,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 
 | phase | scope | action | support | failure mode | rule_id |
 |---|---|---|---|---|---|
-| ddl_optimize | platform-wide | rewrite_ddl | REWRITTEN | PERFORMANCE_REGRESSION | `ddl_optimize.pg_mooncake.all.add_columnstore_access_method` |
+| ddl_optimize | platform-wide | rewrite_ddl | REWRITTEN | PERFORMANCE_REGRESSION | `ddl_optimize.pg_mooncake.all.heap_load_then_mooncake_mirror` |
 
 ### postgres
 

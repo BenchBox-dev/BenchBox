@@ -28,7 +28,11 @@ from tests.uat.cleanup import SOURCE_REUSE_GRAPH, CellKey, can_prune, prune_data
 from tests.uat.config import UATConfig
 from tests.uat.ladder import LadderRung, plan_ladder
 from tests.uat.matrix import platform_is_reachable, reset_reachability_cache
-from tests.uat.phases.enumerate import Cell, enumerate_cells
+from tests.uat.phases.enumerate import (
+    Cell,
+    CompatibilityPrunedCell,
+    enumerate_cells_with_pruning,
+)
 from tests.uat.phases.preflight import free_space_gib as default_free_space_reader
 from tests.uat.runner import CellResult, classify_for_submit, run_cell, submit_state_is_cell_failure
 
@@ -53,6 +57,7 @@ class ExecuteOutcome:
     results: tuple[CellResult, ...]
     pruned: tuple[Cell, ...]
     skipped_unreachable: tuple[Cell, ...]
+    compatibility_pruned: tuple[CompatibilityPrunedCell, ...] = ()
     docker_events: tuple[DockerLifecycleEvent, ...] = ()
     aborted: bool = False
     abort_reason: str | None = None
@@ -107,7 +112,8 @@ def run_execute(
     if free_space_min_gib is None:
         free_space_min_gib = config.preflight.free_space_min_gib
 
-    cells = enumerate_cells(config.raw)
+    enumeration = enumerate_cells_with_pruning(config.raw)
+    cells = list(enumeration.cells)
     by_pb: dict[tuple[str, str], list[Cell]] = defaultdict(list)
     for cell in cells:
         by_pb[(cell.platform, cell.benchmark)].append(cell)
@@ -202,6 +208,7 @@ def run_execute(
         results=tuple(results),
         pruned=tuple(pruned),
         skipped_unreachable=tuple(skipped_unreachable),
+        compatibility_pruned=enumeration.compatibility_pruned,
         docker_events=tuple(docker_events),
         aborted=abort_reason is not None,
         abort_reason=abort_reason,
