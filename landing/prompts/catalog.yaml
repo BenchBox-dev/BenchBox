@@ -1,0 +1,139 @@
+# Source data for the /prompts/ landing route.
+#
+# This file is consumed by scripts/generate_landing_quickstarts.py, which
+# emits landing/prompts/catalog.generated.js. Do not hand-edit the .js
+# include; edit this YAML and re-run the generator.
+#
+# Validation rules (see scripts/generate_landing_quickstarts.py):
+# - every `platforms[].id` must exist in PlatformRegistry
+# - every `benchmarks[].id` must exist in BENCHMARK_METADATA
+# - `deployments[].id` and `platforms[].deployments[*]` must be in
+#   {local, self-hosted, managed}
+# - `mcp.run_tool`, `mcp.list_tool`, `mcp.prompts.*` must reference real
+#   MCP tools/prompts registered in benchbox/mcp/
+# - any platform with `deployments` containing `managed` must list
+#   `safety_terms` covering dependency-check, dry-run, and no-secrets
+# - the compare CLI template must include two `-p` flags
+
+defaults:
+  goal: test_one
+  agent: generic
+  surface: cli
+  interface: sql
+  deployment: local
+  platform: duckdb
+  benchmark: tpch
+  scale: 0.01
+
+agents:
+  - { id: generic, label: "Generic / manual" }
+  - { id: codex, label: "Codex" }
+  - { id: claude-code, label: "Claude Code" }
+
+surfaces:
+  - { id: cli, label: "CLI" }
+  - { id: mcp, label: "MCP" }
+
+goals:
+  - { id: test_one, label: "Test one platform" }
+  - { id: compare, label: "Compare platforms" }
+
+interfaces:
+  - { id: sql, label: "SQL" }
+  - { id: dataframe, label: "DataFrame" }
+
+deployments:
+  - { id: local, label: "Local" }
+  - { id: self-hosted, label: "Self-hosted" }
+  - { id: managed, label: "Managed cloud" }
+
+# Curated MVP platform subset. Add platforms here only when they have a
+# clear marketing story; everything else is implicitly excluded. Each
+# entry is validated against PlatformRegistry by the generator.
+platforms:
+  - id: duckdb
+    label: "DuckDB"
+    deployments: [local]
+    interfaces: [sql, dataframe]
+  - id: datafusion
+    label: "DataFusion"
+    deployments: [local]
+    interfaces: [sql, dataframe]
+  - id: polars
+    label: "Polars"
+    deployments: [local]
+    interfaces: [dataframe]
+  - id: clickhouse
+    label: "ClickHouse"
+    deployments: [local, self-hosted]
+    interfaces: [sql]
+  - id: postgresql
+    label: "PostgreSQL"
+    deployments: [self-hosted]
+    interfaces: [sql]
+  - id: motherduck
+    label: "MotherDuck"
+    deployments: [managed]
+    interfaces: [sql]
+    safety_terms:
+      dependency: "Run `benchbox check-dependencies motherduck` first."
+      dry_run: "Use `--dry-run` to inspect commands before any live run."
+      no_secrets: "Configure `MOTHERDUCK_TOKEN` in your shell env. Do NOT paste it in chat."
+  - id: clickhouse-cloud
+    label: "ClickHouse Cloud"
+    deployments: [managed]
+    interfaces: [sql]
+    safety_terms:
+      dependency: "Run `benchbox check-dependencies clickhouse-cloud` first."
+      dry_run: "Use `--dry-run` to inspect commands before any live run."
+      no_secrets: "Set `CLICKHOUSE_HOST/USER/PASSWORD` in your shell env. Do NOT paste credentials in chat."
+  - id: snowflake
+    label: "Snowflake"
+    deployments: [managed]
+    interfaces: [sql]
+    safety_terms:
+      dependency: "Run `benchbox check-dependencies snowflake` first."
+      dry_run: "Use `--dry-run` to inspect commands before any live run."
+      no_secrets: "Configure `SNOWFLAKE_ACCOUNT/USER/PASSWORD` (or key-pair) in your shell env. Do NOT paste credentials in chat."
+
+# Curated benchmark subset for MVP. Validator confirms IDs exist in
+# BENCHMARK_METADATA.
+benchmarks:
+  - id: tpch
+    label: "TPC-H"
+    interfaces: [sql, dataframe]
+  - id: tpcds
+    label: "TPC-DS"
+    interfaces: [sql, dataframe]
+  - id: clickbench
+    label: "ClickBench"
+    interfaces: [sql]
+  - id: ssb
+    label: "SSB"
+    interfaces: [sql]
+
+scales:
+  - 0.01
+  - 0.1
+  - 1.0
+  - 10.0
+
+# Command templates rendered into copyable blocks. Validator checks the
+# compare template uses two `-p` flags so the page never emits a malformed
+# compare command.
+templates:
+  cli:
+    test_one: "uv run benchbox run -p {platform} -b {benchmark} -s {scale}"
+    compare: "uv run benchbox compare -p {platform_a} -p {platform_b} -b {benchmark} -s {scale}"
+    dependency_check: "uv run benchbox check-dependencies {platform}"
+    dry_run: "uv run benchbox run -p {platform} -b {benchmark} -s {scale} --dry-run"
+
+# References to existing MCP surfaces. The generator validates each name
+# resolves to a real tool/prompt in benchbox/mcp/.
+mcp:
+  run_tool: run_benchmark
+  list_tool: list_available
+  prompts:
+    benchmark_run: benchmark_run
+    compare_platforms: compare_platforms
+    analyze_results: analyze_results

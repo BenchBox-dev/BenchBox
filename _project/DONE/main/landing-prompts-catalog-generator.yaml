@@ -2,7 +2,8 @@ id: landing-prompts-catalog-generator
 title: "Build the generated catalog contract for the /prompts/ landing route"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-05-13"
 category: Product and Documentation
 
 description: |
@@ -28,7 +29,7 @@ deps:
 work:
   - id: w1
     summary: "Read the landing prompts decision record and confirm implementation boundaries"
-    status: pending
+    status: done
     notes: |
       Before coding, read `_project/decisions/landing-prompts-route.md`.
       Confirm chosen public label, default agent, default surface, analytics
@@ -39,7 +40,7 @@ work:
   - id: w2
     summary: "Design the minimal catalog schema with registry-backed keys"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Define a compact catalog structure that stores registry keys internally:
       agents, surfaces, goals, deployment modes, platforms, benchmarks, scale
@@ -50,7 +51,7 @@ work:
   - id: w3
     summary: "Implement scripts/generate_landing_quickstarts.py"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       The generator lives at root `scripts/generate_landing_quickstarts.py`
       and runs in the main project environment (so it can `import benchbox`):
@@ -77,7 +78,7 @@ work:
   - id: w4
     summary: "Validate platform, benchmark, deployment, CLI, and MCP references"
     needs: [w3]
-    status: pending
+    status: done
     notes: |
       Add validation that fails when:
       - a platform ID is not in `PlatformRegistry`
@@ -92,7 +93,7 @@ work:
   - id: w5
     summary: "Add focused generator and catalog tests"
     needs: [w4]
-    status: pending
+    status: done
     notes: |
       Add `tests/unit/landing/test_landing_quickstarts.py` with explicit
       `pytest.mark.fast` and `pytest.mark.unit`. Tests must cover deterministic
@@ -102,7 +103,7 @@ work:
   - id: w6
     summary: "Add a make target or documented command for stale generated catalog detection"
     needs: [w5]
-    status: pending
+    status: done
     notes: |
       Prefer a small Make target `prompt-quickstarts-check` that invokes
       `uv run -- python scripts/generate_landing_quickstarts.py --check`,
