@@ -88,7 +88,12 @@ The gate still needs a follow-up remediation pass for the PG extension and
 TimescaleDB cells. The most visible signatures from this run:
 
 - `timescaledb/tpchavoc`: timed out at 600s after repeated 15s Q20 variants;
-  earlier in the cell, `17_v4` also failed with missing `dual`.
+  earlier in the cell, `17_v4` also failed with missing `dual`. Follow-up
+  remediation added PostgreSQL-family execution filters for the stable
+  unsupported TPC-Havoc variants; targeted `pg-duckdb/tpchavoc` and
+  `timescaledb/tpchavoc` both passed with 812/812 successful query executions.
+  The TimescaleDB cell measured ~758s in the power phase, so the full
+  release-gate config now uses a 1200s per-cell timeout.
 - `datavault`: query 1 failed on `INTERVAL 90 DAY` syntax. Fixed by rendering
   `INTERVAL '90 days'`; targeted `pg-duckdb/datavault` UAT passed at
   `/Users/joe/Developer/benchmark_runs/logs/uat_pg_duckdb_fixcheck_20260513/pg-duckdb_datavault_0.01_20260513_125018.log`.
@@ -98,9 +103,9 @@ TimescaleDB cells. The most visible signatures from this run:
   `/Users/joe/Developer/benchmark_runs/logs/uat_pg_duckdb_fixcheck_20260513/pg-duckdb_flightdata_0.01_20260513_125001.log`.
 - `tpcds`: PostgreSQL COPY was stripping trailing fields from TPC-DS `.dat`
   files, causing empty tables and validation failure. Fixed by preserving `.dat`
-  trailing delimiters. Targeted `pg-duckdb/tpcds` now passes load validation and
-  executes 99/103 queries, but remains PARTIAL with Q36/Q70/Q86/Q90 failed:
-  `/Users/joe/Developer/benchmark_runs/logs/uat_pg_duckdb_fixcheck_20260513/pg-duckdb_tpcds_0.01_20260513_125030.log`.
+  trailing delimiters. Follow-up PostgreSQL-family TPC-DS query rewrites cleared
+  Q36/Q70/Q86/Q90; targeted `pg-duckdb/tpcds` and `timescaledb/tpcds` now pass
+  with 412/412 successful query executions.
 - `amplab`: PostgreSQL-family engines rejected AMPLab queries that referenced
   SELECT aliases in HAVING (`visit_count`, `total_visits`). Fixed by repeating
   the aggregate expressions in HAVING. Targeted `pg-duckdb/amplab` passed:

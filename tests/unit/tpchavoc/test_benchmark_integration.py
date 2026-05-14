@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from benchbox.core.tpchavoc.benchmark import TPCHavocBenchmark
+from benchbox.sql_compat.rules.execution_filter.postgres_tpchavoc import POSTGRES_TPCHAVOC_SKIPS
 
 pytestmark = [
     pytest.mark.unit,
@@ -26,3 +27,14 @@ def test_benchmark_exposes_variant_helpers(tmp_path):
     assert len(all_variants) == 10
 
     assert benchmark.get_variant_description(2, 1)
+
+
+def test_postgres_family_platform_skips_unsupported_variants(tmp_path):
+    benchmark = TPCHavocBenchmark(output_dir=tmp_path)
+
+    assert set(benchmark.get_platform_skip_queries("pg-duckdb")) == set(POSTGRES_TPCHAVOC_SKIPS)
+    assert set(benchmark.get_platform_skip_queries("pg_duckdb")) == set(POSTGRES_TPCHAVOC_SKIPS)
+    assert set(benchmark.get_platform_skip_queries("pg-mooncake")) == set(POSTGRES_TPCHAVOC_SKIPS)
+    assert set(benchmark.get_platform_skip_queries("pg_mooncake")) == set(POSTGRES_TPCHAVOC_SKIPS)
+    assert set(benchmark.get_platform_skip_queries("timescaledb")) == set(POSTGRES_TPCHAVOC_SKIPS)
+    assert benchmark.get_platform_skip_queries("duckdb") == []
