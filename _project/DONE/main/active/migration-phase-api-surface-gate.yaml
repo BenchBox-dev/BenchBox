@@ -2,7 +2,8 @@ id: migration-phase-api-surface-gate
 title: "Retro audit Phase-4 API surface + add a surface-diff gate to remaining migration phases"
 worktree: migration-phase-api-surface-gate
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-05-14"
 category: Process
 
 description: |
@@ -35,17 +36,18 @@ description: |
   TODOs and can land in parallel.
 
 prior_art:
-  - "_project/TODO/main/active/single-repo-migration-phase-4-test-release-with-new-flow.yaml — current Phase-4 TODO; this surface gate retroactively applies to its scope."
-  - "_project/TODO/main/planning/single-repo-migration-phase-8-first-post-migration-release.yaml — needs the new exit gate added."
-  - "_project/TODO/main/planning/single-repo-migration-phase-9-decommission-archive.yaml — needs the new exit gate added."
-  - "_project/DONE/main/planning/single-repo-migration-phase-3-new-release-flow.yaml — closed phase; reference for plan format."
-  - "_project/audits/ — existing directory for audit artifacts; reuse for the Phase-4 retro inventory."
-  - "_project/specs/uat-framework.md — established multi-W spec format; reference for any spec updates."
+- "_project/TODO/main/active/single-repo-migration-phase-4-test-release-with-new-flow.yaml — current Phase-4 TODO; this surface
+  gate retroactively applies to its scope."
+- "_project/TODO/main/planning/single-repo-migration-phase-8-first-post-migration-release.yaml — needs the new exit gate added."
+- "_project/TODO/main/planning/single-repo-migration-phase-9-decommission-archive.yaml — needs the new exit gate added."
+- "_project/DONE/main/planning/single-repo-migration-phase-3-new-release-flow.yaml — closed phase; reference for plan format."
+- "_project/audits/ — existing directory for audit artifacts; reuse for the Phase-4 retro inventory."
+- "_project/specs/uat-framework.md — established multi-W spec format; reference for any spec updates."
 
 work:
 - id: w1
   summary: "Inventory every CLI surface introduced from `f9d08d38b` to HEAD"
-  status: pending
+  status: done
   notes: |
     Method:
       - `git log f9d08d38b..HEAD -- benchbox/cli/` for the post-migration window.
@@ -61,7 +63,7 @@ work:
 - id: w2
   summary: "Inventory every newly-public Python import surface in the same window"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Method:
       - `git diff f9d08d38b^ f9d08d38b --name-only -- 'benchbox/**/__init__.py'`
@@ -77,7 +79,7 @@ work:
 - id: w3
   summary: "File sibling TODOs for any unapproved surface uncovered"
   needs: [w1, w2]
-  status: pending
+  status: done
   notes: |
     Likely small. The explorer surface is already owned by
     `explorer-cli-surface-adr` + `explorer-cli-surface-migration`, so it
@@ -89,7 +91,7 @@ work:
 - id: w4
   summary: "Add an API-surface-diff exit gate to Phase 8 and Phase 9 plans"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     For each of:
       - `_project/TODO/main/planning/single-repo-migration-phase-8-first-post-migration-release.yaml`
@@ -111,7 +113,7 @@ work:
 - id: w5
   summary: "Codify the gate in a reusable place"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     Two reasonable hosts:
       - `_project/specs/migration-api-surface-gate.md` (new short spec).
@@ -123,7 +125,8 @@ work:
     surfaces.
 
 must_preserve:
-- "Phase 4's already-merged commits are not rewritten or reverted by this TODO. The audit is retrospective; remediation flows through other TODOs."
+- "Phase 4's already-merged commits are not rewritten or reverted by this TODO. The audit is retrospective; remediation flows
+  through other TODOs."
 - "Existing approved CLI surfaces remain as-is — this TODO classifies and gates, it does not remove."
 
 approach: |
@@ -134,9 +137,12 @@ approach: |
   w1/w2/w3 can be a single sitting.
 
 anti_patterns:
-- "DO NOT use this TODO to litigate which surfaces should be public — that's per-surface work owned by sibling TODOs. This TODO only classifies (approved / move / hide) and files the follow-ups."
-- "DO NOT create a parallel review tool or new CI lint for surface diffs. The gate is a checklist in the PR description; complexity here is unwarranted for two remaining phases."
-- "DO NOT extend the audit scope to all of `benchbox/` retroactively — bounded to the Phase-4 commit window so the work is finite."
+- "DO NOT use this TODO to litigate which surfaces should be public — that's per-surface work owned by sibling TODOs. This
+  TODO only classifies (approved / move / hide) and files the follow-ups."
+- "DO NOT create a parallel review tool or new CI lint for surface diffs. The gate is a checklist in the PR description; complexity
+  here is unwarranted for two remaining phases."
+- "DO NOT extend the audit scope to all of `benchbox/` retroactively — bounded to the Phase-4 commit window so the work is
+  finite."
 
 scope_limit:
   only_modify:
@@ -168,7 +174,8 @@ deferred:
 - summary: "Auto-generated API surface diff via a tool."
   reason: "Out of scope for the two remaining phases; revisit if a third bulk migration is anticipated."
 - summary: "Apply the same gate to non-migration PRs."
-  reason: "Most non-migration PRs are scoped and reviewed already; this gate exists to catch bulk-import smuggling, not normal feature work."
+  reason: "Most non-migration PRs are scoped and reviewed already; this gate exists to catch bulk-import smuggling, not normal
+    feature work."
 
 open_questions:
 - question: "Is there a Phase 5/6/7 commit window that should also be retro-audited?"

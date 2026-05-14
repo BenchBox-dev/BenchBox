@@ -60,6 +60,15 @@ work:
     once (Phase 4). Output should be reasonable. Spend a few minutes
     polishing the user-facing bullets.
 
+    The release PR body must include the API surface diff section from
+    `_project/specs/migration-api-surface-gate.md` before this work unit
+    can be marked done:
+      - New CLI commands
+      - New console_script entry points
+      - New public Python imports
+      - New file-system conventions
+      - Approval / ADR link for any non-empty entry
+
 - id: w5
   summary: "Tag the merge commit, push, watch release.yml"
   needs: [w4]
@@ -107,6 +116,12 @@ verification:
 - description: "No remaining references to deleted modules anywhere in the repo"
   command: "rg -l 'automate_release|prepare_release|benchbox-sync|benchbox\\.release\\.workflow' | wc -l"
   expected_output: "0 (or only this TODO file itself)"
+- description: "Release PR includes the migration API surface diff gate"
+  command: "gh pr view <release-pr> --json body --jq '.body' | grep -c '## API surface diff'"
+  expected_output: ">= 1"
+
+success_metrics:
+- "The release PR body includes an API surface diff section covering new CLI commands, console_script entry points, public Python imports, file-system conventions, and approval/ADR status for every non-empty entry."
 
 must_preserve:
 - The new release flow is the ONLY release flow now. There is no
