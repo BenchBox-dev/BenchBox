@@ -2,7 +2,8 @@ id: landing-prompts-decision-gates
 title: "Decide launch boundaries for the /prompts/ landing route"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-05-13"
 category: Product and Documentation
 
 description: |
@@ -27,7 +28,7 @@ deps: {}
 work:
   - id: w1
     summary: "Verify current CLI, MCP, landing, and docs anchors before deciding"
-    status: pending
+    status: done
     notes: |
       Re-check the current files because the plan depends on live surfaces:
       `landing/index.html`, `.github/workflows/docs.yml`,
@@ -42,7 +43,7 @@ work:
   - id: w2
     summary: "Write a decision record for public label, default state, and page location"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Create a compact `_project/decisions/landing-prompts-route.md` with the
       six required H2 section headings (see verification):
@@ -64,7 +65,7 @@ work:
   - id: w3
     summary: "Define the cloud-visible MVP safety contract"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Cloud platforms must remain visible in MVP, but the decision record must
       define hard safety behavior under the `## Cloud safety` heading:
@@ -79,7 +80,7 @@ work:
   - id: w4
     summary: "Define generic-agent semantics and capability boundaries"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       User requirement keeps Codex, Claude Code, and generic selectable. The
       generic option must not imply every chatbot has shell, filesystem, or
@@ -94,7 +95,7 @@ work:
   - id: w5
     summary: "Choose analytics posture (this TODO owns policy; launch-gates records final values)"
     needs: [w2, w3, w4]
-    status: pending
+    status: done
     notes: |
       Decide whether to wire a privacy-respecting analytics provider for the
       marketing surface or explicitly defer analytics. If analytics are
@@ -107,7 +108,7 @@ work:
   - id: w6
     summary: "Decision review gate before implementation TODOs move out of planning"
     needs: [w5]
-    status: pending
+    status: done
     notes: |
       Review the decision record against the known risk topics:
       - existing MCP prompt overlap with `benchbox/mcp/prompts/registry.py`
