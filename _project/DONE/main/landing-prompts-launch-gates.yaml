@@ -2,7 +2,8 @@ id: landing-prompts-launch-gates
 title: "Wire /prompts/ into docs, CI, accessibility checks, and launch measurement"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-05-13"
 category: Product and Documentation
 
 description: |
@@ -21,7 +22,7 @@ deps:
 work:
   - id: w1
     summary: "Add /prompts/ links to landing and docs navigation using the chosen public label"
-    status: pending
+    status: done
     notes: |
       Update `landing/index.html` and `docs/_templates/page.html` after the
       decision record chooses the public label. Keep nav concise. Add a root
@@ -30,7 +31,7 @@ work:
   - id: w2
     summary: "Wire generated catalog validation into docs CI"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Add the generator `--check` command to `.github/workflows/docs.yml` in a
       stage that already installs project dependencies. Prefer failing before
@@ -43,7 +44,7 @@ work:
   - id: w3
     summary: "Add launch smoke checks for routing, copy behavior, and mobile layout"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Add the narrowest practical smoke coverage. At minimum verify the page
       exists in assembled site output, selector state can render the default
@@ -56,7 +57,7 @@ work:
   - id: w4
     summary: "Implement analytics hooks or record an explicit analytics deferral"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Follow the decision record. If analytics are approved, instrument:
       page load, agent selection, surface selection, prompt copy, CLI command
@@ -68,7 +69,7 @@ work:
   - id: w5
     summary: "Run final docs build and prompt-specific verification"
     needs: [w3, w4]
-    status: pending
+    status: done
     notes: |
       Run the focused generator/tests first, then docs build. Do not run live
       cloud tests. Do not commit browser screenshots or raw stdout logs unless
@@ -77,7 +78,7 @@ work:
   - id: w6
     summary: "Record final launch values, known limits, and kill criteria"
     needs: [w5]
-    status: pending
+    status: done
     notes: |
       Following the policy set by `landing-prompts-decision-gates` w5, record
       the concrete launch values in a compact launch note or update to the

@@ -221,6 +221,13 @@ jobs:
       - name: Validate visualization screenshot sync
         run: uv run python scripts/validate_visualization_images.py
 
+      - name: Check /prompts/ catalog is fresh
+        # Fails if landing/prompts/catalog.generated.js is stale or invalid.
+        # Must use the main project env (not --project _project/scripts) so
+        # benchbox is importable; see landing-prompts-catalog-generator
+        # decision and anti_patterns.
+        run: uv run -- python scripts/generate_landing_quickstarts.py --check
+
       - name: Check for unsafe patch() string paths in tests
         run: uv run python scripts/check_patch_safety.py
 
