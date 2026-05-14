@@ -77,6 +77,12 @@ work:
     Record the decision in _project/decisions/single-repo-migration.md
     as the final entry.
 
+    If this phase opens a PR, the PR body must include the API surface
+    diff section from `_project/specs/migration-api-surface-gate.md`
+    before this work unit can be marked done. Use explicit `none` rows
+    when the phase introduces no commands, console scripts, public Python
+    imports, or file-system conventions.
+
 - id: w5
   summary: "Decide: delete the retired private clone, or keep it"
   needs: [w2]
@@ -103,6 +109,12 @@ verification:
 - description: "MIGRATION-NOTES.md removed if it existed"
   command: "test ! -f MIGRATION-NOTES.md && echo OK"
   expected_output: "OK"
+- description: "Any Phase 9 PR includes the migration API surface diff gate"
+  command: "gh pr view <phase-9-pr> --json body --jq '.body' | grep -c '## API surface diff'"
+  expected_output: ">= 1, or this TODO records that no PR was opened"
+
+success_metrics:
+- "Any Phase 9 PR body includes an API surface diff section, or the DONE item records why no PR was opened and therefore no PR-body gate applied."
 
 must_preserve:
 - All git history on the canonical joeharris76/BenchBox repo is
