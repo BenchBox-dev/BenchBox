@@ -667,6 +667,15 @@ docs-images:
 	@echo "Capturing visualization screenshots..."
 	@uv run -- python scripts/capture_chart_images.py
 
+# Regenerate the /prompts/ landing route catalog include from catalog.yaml.
+prompt-quickstarts-write:
+	@uv run -- python scripts/generate_landing_quickstarts.py --write
+
+# Fail if landing/prompts/catalog.generated.js is stale or invalid.
+# Wired into docs CI by `landing-prompts-launch-gates`.
+prompt-quickstarts-check:
+	@uv run -- python scripts/generate_landing_quickstarts.py --check
+
 # Run all documentation checks (build, linkcheck, validate)
 docs-check: docs-validate docs-linkcheck docs-build
 	@echo ""
