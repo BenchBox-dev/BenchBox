@@ -3,8 +3,9 @@
 window.__BENCHBOX_PROMPT_CATALOG__ = {
   "agents": [
     {
+      "hint": "Pi, OpenCode, Cline, Aider, …",
       "id": "generic",
-      "label": "Generic / manual"
+      "label": "Generic"
     },
     {
       "id": "codex",
@@ -54,7 +55,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
     "goal": "test_one",
     "interface": "sql",
     "platform": "duckdb",
-    "scale": 0.01,
+    "scale": "0.01",
     "surface": "cli"
   },
   "deployments": [
@@ -201,10 +202,10 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
     }
   ],
   "scales": [
-    0.01,
-    0.1,
-    1.0,
-    10.0
+    "0.01",
+    "0.1",
+    "1.0",
+    "10.0"
   ],
   "surfaces": [
     {

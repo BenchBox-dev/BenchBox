@@ -6,6 +6,16 @@
 `landing-prompts-catalog-generator`, `landing-prompts-static-route`,
 `landing-prompts-launch-gates`.
 
+## Correction (2026-05-14)
+
+The launch implementation conflated two separate ideas: a generic
+coding-agent option and a no-agent terminal recipe. That made the
+default selector label and output contract too broad. The follow-up PR
+for `landing-prompts-generic-semantics-and-layout-fixes` corrects the
+route so `generic` is a first-class coding-agent option for Pi,
+OpenCode, Cline, Aider, and similar agents, while the copyable agent
+prompt remains the primary artefact.
+
 ## Context
 
 BenchBox is adding a static `/prompts/` route on the landing surface
@@ -39,7 +49,7 @@ appears in `landing/prompts/index.html`.
 
 ## Default agent and surface
 
-- **Default agent:** `Generic / manual` (registry key: `generic`)
+- **Default agent:** `Generic` (registry key: `generic`)
 - **Default surface:** `CLI`
 - **Default goal:** `Test one platform`
 - **Default interface:** `SQL`
@@ -51,13 +61,11 @@ appears in `landing/prompts/index.html`.
 The page must render a coherent, copyable prompt for this default state
 without any user interaction.
 
-Rationale for `Generic / manual` over `Codex` or `Claude Code`: the
-default has to be safe for visitors who arrive without an MCP-capable
-agent. Defaulting to `Codex` or `Claude Code` would render copy that
-assumes shell or MCP access; that is fine when the user selects it
-explicitly, but a wrong default makes the first impression feel
-unworkable. Codex and Claude Code remain selectable and well-supported
-(see `## Generic-agent semantics`).
+Rationale for `Generic` over `Codex` or `Claude Code`: the default is a
+vendor-neutral coding-agent option that does not pre-bias toward OpenAI
+or Anthropic. Codex and Claude Code remain selectable and
+well-supported, while Generic covers other agents with shell or MCP
+capability (see `## Generic-agent semantics`).
 
 ## Cloud safety
 
@@ -90,30 +98,29 @@ fail validation when a managed-cloud recipe lacks the dependency-check
 
 ## Generic-agent semantics
 
-- **Selector label:** `Generic / manual`
+- **Selector label:** `Generic`
 - **Registry key:** `generic`
-- **Intent:** the option is correct both for visitors who only have a
-  generic chatbot (no shell, no MCP) and for visitors who want to run
-  BenchBox manually from a terminal.
+- **Hint:** `Pi, OpenCode, Cline, Aider, …`
+- **Intent:** any coding agent with shell or MCP capability that is not
+  one of the named Codex / Claude Code options.
 
 Output contract for `generic`:
 
-- The primary copyable block is a **human-readable recipe**: numbered
-  steps with shell commands the user can run themselves.
-- A second, optional block titled "If your agent has shell access" can
-  add an agent-targeted prompt that asks the agent to run the commands
-  end-to-end. This block is OFF by default; the recipe is the canonical
-  form.
-- The recipe MUST NOT assume the user has BenchBox installed; it must
-  start with the `uv add benchbox[<platform>]` step.
-- The recipe MUST NOT reference MCP tools — that is the `MCP` surface,
-  not the generic agent.
+- The page emits the same block shape as the named-agent options: one
+  primary copyable agent prompt, plus MCP server config only when the
+  `MCP` surface is selected.
+- Generic output uses vendor-neutral wording and does not name Codex or
+  Claude Code as the active agent.
+- The prompt MUST NOT assume BenchBox is installed; it must include the
+  `uv add benchbox[<platform>]` step before any run command.
+- There is no separate no-agent recipe mode on this route.
 
-When `Codex` or `Claude Code` is selected, the page emits agent-targeted
-prompt copy that names existing MCP tools/prompts (e.g. `run_benchmark`,
-`benchbox.run_benchmark`) where applicable. See
-`benchbox/mcp/prompts/registry.py` and `benchbox/mcp/tools/benchmark.py`
-for the canonical names; the generator validates against these.
+When `Codex`, `Claude Code`, or `Generic` with the MCP surface is
+selected, the page emits agent-targeted prompt copy that names existing
+MCP tools/prompts (e.g. `run_benchmark`, `benchbox.run_benchmark`) where
+applicable. See `benchbox/mcp/prompts/registry.py` and
+`benchbox/mcp/tools/benchmark.py` for the canonical names; the generator
+validates against these.
 
 ## Analytics posture
 
@@ -191,7 +198,7 @@ concrete state at launch.
   `Instruct a coding agent to use BenchBox`. Used verbatim in
   `landing/index.html` and `docs/_templates/page.html`.
 - **Default state on first load:** Goal=Test one platform,
-  Agent=Generic / manual, Surface=CLI, Interface=SQL, Deployment=Local,
+  Agent=Generic, Surface=CLI, Interface=SQL, Deployment=Local,
   Platform=duckdb, Benchmark=tpch, Scale=0.01.
 - **Analytics:** deferred. No analytics provider wired into
   `landing/prompts/` or root landing. **Revisit on 2026-08-13.** If

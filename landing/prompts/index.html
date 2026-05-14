@@ -6,8 +6,9 @@
         <title>Instruct a coding agent to use BenchBox</title>
         <meta
             name="description"
-            content="Build a copy-paste prompt that tells a coding agent (or you, from the CLI) how to run a BenchBox benchmark. Pick an agent, surface, platform, benchmark, and scale; copy the prompt."
+            content="Build a copy-paste prompt that tells a coding agent how to run a BenchBox benchmark. Pick an agent, surface, platform, benchmark, and scale; copy the prompt."
         />
+        <link rel="icon" href="data:," />
         <link rel="stylesheet" href="../style.css?v=5" />
         <link rel="stylesheet" href="prompts.css?v=1" />
     </head>
@@ -30,14 +31,15 @@
             <header class="prompts-header">
                 <h1>Instruct a coding agent to use BenchBox</h1>
                 <p class="prompts-lede">
-                    Pick an agent, surface, platform, benchmark, and scale. Copy the prompt into your agent (or run
-                    the commands yourself). Defaults to a safe local DuckDB + TPC-H quickstart.
+                    Pick an agent, surface, platform, benchmark, and scale. Copy the prompt into your coding agent.
+                    Defaults to a safe local DuckDB + TPC-H quickstart.
                 </p>
             </header>
 
             <noscript>
                 <div class="prompts-noscript">
-                    This builder is interactive and requires JavaScript. With JS disabled you can still get started:
+                    This builder is interactive and requires JavaScript. If JavaScript is disabled, here is the
+                    default quickstart:
                     <code>uv add 'benchbox[duckdb]' &amp;&amp; uv run benchbox run -p duckdb -b tpch -s 0.01</code>
                 </div>
             </noscript>
@@ -51,6 +53,7 @@
                     <label class="prompts-field">
                         <span>Agent</span>
                         <select id="sel-agent" name="agent"></select>
+                        <small class="prompts-field-hint" id="agent-hint" hidden></small>
                     </label>
                     <label class="prompts-field">
                         <span>Surface</span>
@@ -90,23 +93,15 @@
             <section class="prompts-output">
                 <div class="prompts-block" id="block-prompt" hidden>
                     <header>
-                        <h2>Agent prompt</h2>
+                        <h2>📋 Agent prompt</h2>
                         <button type="button" class="prompts-copy" data-copy-target="prompt-text">Copy</button>
                     </header>
                     <pre id="prompt-text"></pre>
                 </div>
 
-                <div class="prompts-block" id="block-cli" hidden>
-                    <header>
-                        <h2>CLI commands</h2>
-                        <button type="button" class="prompts-copy" data-copy-target="cli-text">Copy</button>
-                    </header>
-                    <pre id="cli-text"></pre>
-                </div>
-
                 <div class="prompts-block" id="block-mcp-setup" hidden>
                     <header>
-                        <h2>MCP server setup</h2>
+                        <h2>🔧 MCP server config</h2>
                         <button type="button" class="prompts-copy" data-copy-target="mcp-setup-text">Copy</button>
                     </header>
                     <p class="prompts-block-hint">
@@ -114,17 +109,6 @@
                         <code>~/.codex/config.toml</code> or <code>claude_desktop_config.json</code>):
                     </p>
                     <pre id="mcp-setup-text"></pre>
-                </div>
-
-                <div class="prompts-block" id="block-mcp-prompt" hidden>
-                    <header>
-                        <h2>MCP prompt</h2>
-                        <button type="button" class="prompts-copy" data-copy-target="mcp-prompt-text">Copy</button>
-                    </header>
-                    <p class="prompts-block-hint">
-                        Paste this into the agent after the MCP server is connected:
-                    </p>
-                    <pre id="mcp-prompt-text"></pre>
                 </div>
 
                 <div class="prompts-block prompts-block--warn" id="block-cloud-safety" hidden>
