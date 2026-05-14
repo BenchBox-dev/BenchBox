@@ -9,8 +9,21 @@
             content="Build a copy-paste prompt that tells a coding agent how to run a BenchBox benchmark. Pick a surface, platform, benchmark, and scale; copy the prompt."
         />
         <link rel="icon" href="data:," />
+        <script>
+            (function () {
+                try {
+                    var choice = localStorage.getItem("benchbox:theme") || "system";
+                    var dark = choice === "dark" || (choice === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+                    document.documentElement.dataset.bbThemeChoice = choice;
+                    document.documentElement.dataset.bbTheme = dark ? "dark" : "light";
+                    document.documentElement.dataset.theme = dark ? "dark" : "light";
+                    document.documentElement.style.colorScheme = dark ? "dark" : "light";
+                } catch (error) {}
+            })();
+        </script>
         <link rel="stylesheet" href="../shared/site-header.css?v=1" />
         <link rel="stylesheet" href="../style.css?v=5" />
+        <link rel="stylesheet" href="../shared/site-theme.css?v=1" />
         <link rel="stylesheet" href="prompts.css?v=1" />
     </head>
 
@@ -51,6 +64,14 @@
                     <a class="benchbox-site-header__cta" href="https://benchbox.dev/docs/usage/installation.html"
                         >Run benchmark</a
                     >
+                    <button
+                        class="benchbox-site-header__theme"
+                        type="button"
+                        aria-label="Theme: system. Activate to switch theme."
+                        data-benchbox-theme-toggle
+                    >
+                        System
+                    </button>
                 </nav>
             </div>
         </header>
@@ -145,6 +166,7 @@
             </section>
         </main>
 
+        <script src="../shared/site-theme.js"></script>
         <script src="../shared/site-header.js"></script>
         <script src="catalog.generated.js"></script>
         <script src="prompts.js"></script>

@@ -100,7 +100,7 @@ export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
           y1={0}
           x2={LABEL_W + (drawWidth - LABEL_W - PADDING) / 2}
           y2={totalHeight - AXIS_H}
-          stroke="#6b7280"
+          stroke="var(--bb-chart-axis)"
           stroke-width={1}
         />
         {/* Axis label */}
@@ -109,7 +109,7 @@ export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
           y={totalHeight - 4}
           text-anchor="middle"
           font-size="9"
-          fill="#9ca3af"
+          fill="var(--bb-chart-label-muted)"
         >
           baseline
         </text>
@@ -127,7 +127,7 @@ export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
                 y={rowHeight / 2 + 4}
                 text-anchor="end"
                 font-size="9"
-                fill="#6b7280"
+                fill="var(--bb-chart-axis)"
                 font-family="monospace"
               >
                 {queryId}

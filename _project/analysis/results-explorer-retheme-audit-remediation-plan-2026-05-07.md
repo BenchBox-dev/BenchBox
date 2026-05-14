@@ -4,6 +4,12 @@ Date: 2026-05-07
 Source audit target: `http://localhost:5173/results/`
 Scope: planning only. This document and the paired TODOs do not implement UI changes.
 
+> Supersession note (2026-05-14): the theme-model recommendation in this
+> historical remediation plan has been replaced by
+> `_project/analysis/benchbox-theme-contract.md`. Results Explorer now follows
+> the shared BenchBox `system` / `light` / `dark` product contract instead of a
+> dark-shell plus light-data-panels-only contract.
+
 ## Executive Plan
 
 The Results Explorer is not release-ready. The remediation should proceed in

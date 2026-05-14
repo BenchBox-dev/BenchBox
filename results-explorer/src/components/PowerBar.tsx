@@ -72,18 +72,18 @@ export function PowerBar({ summary }: Props) {
                 textAnchor="end"
                 aria-label={row.fullLabel}
                 title={row.fullLabel}
-                style={{ fontSize: "11px", fill: "#374151" }}
+                style={{ fontSize: "11px", fill: "var(--bb-chart-label)" }}
               >
                 {row.displayLabel}
               </text>
               <rect x={LABEL_W} y={midY - barH / 2} width={Math.max(2, barW)} height={barH} fill={color} rx={2}>
                 <title>{`${row.fullLabel}: ${formatPowerScore(row.power_score).valueText} QphH`}</title>
               </rect>
-              <text x={LABEL_W + barW + 6} y={midY + 4} style={{ fontSize: "11px", fill: "#374151" }}>
+              <text x={LABEL_W + barW + 6} y={midY + 4} style={{ fontSize: "11px", fill: "var(--bb-chart-label)" }}>
                 {formatPowerScore(row.power_score).valueText}
               </text>
               {ri < rows.length - 1 && (
-                <line x1={0} y1={y + ROW_H} x2={w} y2={y + ROW_H} stroke="#e5e7eb" strokeWidth={1} />
+                <line x1={0} y1={y + ROW_H} x2={w} y2={y + ROW_H} stroke="var(--bb-chart-grid)" strokeWidth={1} />
               )}
             </g>
           );
@@ -91,14 +91,14 @@ export function PowerBar({ summary }: Props) {
 
         {/* X-axis */}
         <g transform={`translate(0, ${PADDING_TOP + rows.length * ROW_H})`}>
-          <line x1={LABEL_W} y1={0} x2={LABEL_W + plotW} y2={0} stroke="#d1d5db" strokeWidth={1} />
+          <line x1={LABEL_W} y1={0} x2={LABEL_W + plotW} y2={0} stroke="var(--bb-chart-grid)" strokeWidth={1} />
           {[0, 0.25, 0.5, 0.75, 1].map((f) => {
             const x = LABEL_W + f * plotW;
             const val = f * maxScore;
             return (
               <g key={f}>
-                <line x1={x} y1={0} x2={x} y2={4} stroke="#9ca3af" strokeWidth={1} />
-                <text x={x} y={16} textAnchor="middle" style={{ fontSize: "10px", fill: "#6b7280" }}>
+                <line x1={x} y1={0} x2={x} y2={4} stroke="var(--bb-chart-label-muted)" strokeWidth={1} />
+                <text x={x} y={16} textAnchor="middle" style={{ fontSize: "10px", fill: "var(--bb-chart-axis)" }}>
                   {val > 0 ? formatPowerScore(val).valueText : "0"}
                 </text>
               </g>
@@ -108,7 +108,7 @@ export function PowerBar({ summary }: Props) {
             x={LABEL_W + plotW / 2}
             y={AXIS_H - 2}
             textAnchor="middle"
-            style={{ fontSize: "10px", fill: "#9ca3af" }}
+            style={{ fontSize: "10px", fill: "var(--bb-chart-label-muted)" }}
           >
             Power@Size (QphH) - higher is better
           </text>

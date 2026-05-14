@@ -1,5 +1,11 @@
 # Results Explorer Theme Inventory (2026-05-07)
 
+> Superseded on 2026-05-14 by
+> `_project/analysis/benchbox-theme-contract.md`. This file remains historical
+> evidence for the Results-only retheme foundation, but the active product
+> contract is now a user-selectable `system` / `light` / `dark` theme across
+> landing, docs/blog, and Results Explorer.
+
 Inventory and surface-model decision for
 `results-explorer-retheme-theme-system-foundation` (w1 + w2). Captures the
 state of `results-explorer/src` at branch

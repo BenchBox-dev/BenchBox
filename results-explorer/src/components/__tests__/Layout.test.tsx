@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/preact";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import Router, { route } from "preact-router";
 import { Layout } from "@/components/Layout";
 
@@ -27,6 +27,23 @@ function renderWithRouter(initialPath: string) {
 }
 
 describe("Layout", () => {
+  beforeEach(() => {
+    const storage = new Map<string, string>();
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      value: {
+        getItem: (key: string) => storage.get(key) ?? null,
+        setItem: (key: string, value: string) => {
+          storage.set(key, value);
+        },
+        removeItem: (key: string) => {
+          storage.delete(key);
+        },
+        clear: () => storage.clear(),
+      },
+    });
+  });
+
   it("renders the BenchBox global nav with Results active at the hosted root", () => {
     renderAt("/");
 
@@ -88,6 +105,31 @@ describe("Layout", () => {
     ]);
   });
 
+  it("cycles and persists the shared BenchBox theme preference", () => {
+    window.localStorage.removeItem("benchbox:theme");
+    renderAt("/results/");
+
+    const toggle = screen.getByRole("button", { name: /Theme: system/i });
+    expect(document.documentElement.dataset.bbThemeChoice).toBe("system");
+
+    fireEvent.click(toggle);
+    expect(document.documentElement.dataset.bbThemeChoice).toBe("light");
+    expect(document.documentElement.dataset.bbTheme).toBe("light");
+    expect(window.localStorage.getItem("benchbox:theme")).toBe("light");
+    expect(toggle).toHaveTextContent("Light");
+
+    fireEvent.click(toggle);
+    expect(document.documentElement.dataset.bbThemeChoice).toBe("dark");
+    expect(document.documentElement.dataset.bbTheme).toBe("dark");
+    expect(window.localStorage.getItem("benchbox:theme")).toBe("dark");
+    expect(toggle).toHaveTextContent("Dark");
+
+    fireEvent.click(toggle);
+    expect(document.documentElement.dataset.bbThemeChoice).toBe("system");
+    expect(window.localStorage.getItem("benchbox:theme")).toBeNull();
+    expect(toggle).toHaveTextContent("System");
+  });
+
   it("renders the Results Explorer subnav and marks the current explorer section", () => {
     renderAt("/results/query");
 
@@ -116,7 +158,7 @@ describe("Layout", () => {
     expect(within(explorerNav).getByRole("link", { name: "Leaderboards" })).not.toHaveAttribute("aria-current");
   });
 
-  it("hero header nav links use the on-dark focus-visible outline token", () => {
+  it("global and Results nav links use the theme-aware focus-visible outline token", () => {
     renderAt("/results/");
     const explorerNav = screen.getByRole("navigation", { name: "Results Explorer" });
     const globalNav = screen.getByRole("navigation", { name: "BenchBox" });
@@ -128,7 +170,6 @@ describe("Layout", () => {
       const cls = link.getAttribute("class") ?? "";
       expect(cls).toMatch(/focus-visible:outline\b/);
       expect(cls).toMatch(/focus-visible:outline-\[var\(--bb-focus-ring-on-dark\)\]/);
-      expect(cls).not.toMatch(/focus-visible:outline-\[var\(--bb-focus-ring\)\]/);
     }
   });
 });

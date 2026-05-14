@@ -133,14 +133,14 @@ export function CostScatter({ summary }: Props) {
                 y1={y}
                 x2={w - PADDING_RIGHT}
                 y2={y}
-                stroke="#f3f4f6"
+                stroke="var(--bb-chart-grid-muted)"
                 strokeWidth={1}
               />
               <text
                 x={AXIS_W - 4}
                 y={y + 4}
                 textAnchor="end"
-                style={{ fontSize: "9px", fill: "#9ca3af" }}
+                style={{ fontSize: "9px", fill: "var(--bb-chart-label-muted)" }}
               >
                 {label}
               </text>
@@ -167,7 +167,7 @@ export function CostScatter({ summary }: Props) {
                 x={cx}
                 y={cy - 11}
                 textAnchor="middle"
-                style={{ fontSize: "10px", fill: "#374151" }}
+                style={{ fontSize: "10px", fill: "var(--bb-chart-label)" }}
               >
                 {shortLabel}
               </text>
@@ -181,7 +181,7 @@ export function CostScatter({ summary }: Props) {
           y1={PADDING_TOP}
           x2={AXIS_W}
           y2={PADDING_TOP + CHART_H}
-          stroke="#d1d5db"
+          stroke="var(--bb-chart-grid)"
           strokeWidth={1}
         />
         <line
@@ -189,7 +189,7 @@ export function CostScatter({ summary }: Props) {
           y1={PADDING_TOP + CHART_H}
           x2={w - PADDING_RIGHT}
           y2={PADDING_TOP + CHART_H}
-          stroke="#d1d5db"
+          stroke="var(--bb-chart-grid)"
           strokeWidth={1}
         />
 
@@ -204,14 +204,14 @@ export function CostScatter({ summary }: Props) {
                 y1={PADDING_TOP + CHART_H}
                 x2={x}
                 y2={PADDING_TOP + CHART_H + 4}
-                stroke="#9ca3af"
+                stroke="var(--bb-chart-label-muted)"
                 strokeWidth={1}
               />
               <text
                 x={x}
                 y={PADDING_TOP + CHART_H + 16}
                 textAnchor="middle"
-                style={{ fontSize: "10px", fill: "#6b7280" }}
+                style={{ fontSize: "10px", fill: "var(--bb-chart-axis)" }}
               >
                 {formatUsd(cost).valueText}
               </text>
@@ -222,7 +222,7 @@ export function CostScatter({ summary }: Props) {
           x={AXIS_W + plotW / 2}
           y={PADDING_TOP + CHART_H + AXIS_H - 2}
           textAnchor="middle"
-          style={{ fontSize: "10px", fill: "#9ca3af" }}
+          style={{ fontSize: "10px", fill: "var(--bb-chart-label-muted)" }}
         >
           Normalized cost (USD)
         </text>
@@ -231,7 +231,7 @@ export function CostScatter({ summary }: Props) {
         <text
           x={0}
           y={0}
-          style={{ fontSize: "9px", fill: "#9ca3af" }}
+          style={{ fontSize: "9px", fill: "var(--bb-chart-label-muted)" }}
           transform={`rotate(-90) translate(${-(PADDING_TOP + CHART_H / 2)}, 11)`}
           textAnchor="middle"
         >

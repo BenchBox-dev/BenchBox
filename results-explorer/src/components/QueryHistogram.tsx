@@ -80,9 +80,9 @@ export function QueryHistogram({ summary }: Props) {
             const y = PADDING_TOP + (1 - f) * CHART_H;
             return (
               <g key={f}>
-                <line x1={AXIS_W} y1={y} x2={w} y2={y} stroke="#f3f4f6" strokeWidth={1} />
+                <line x1={AXIS_W} y1={y} x2={w} y2={y} stroke="var(--bb-chart-grid-muted)" strokeWidth={1} />
                 {f > 0 && (
-                  <text x={AXIS_W - 3} y={y + 3} textAnchor="end" style={{ fontSize: "9px", fill: "#9ca3af" }}>
+                  <text x={AXIS_W - 3} y={y + 3} textAnchor="end" style={{ fontSize: "9px", fill: "var(--bb-chart-label-muted)" }}>
                     {fmtMs(f * maxMs)}
                   </text>
                 )}
@@ -141,7 +141,7 @@ export function QueryHistogram({ summary }: Props) {
                   y={PADDING_TOP + CHART_H + 14}
                   textAnchor="middle"
                   data-query-label={qid}
-                  style={{ fontSize: "9px", fill: "#9ca3af" }}
+                  style={{ fontSize: "9px", fill: "var(--bb-chart-label-muted)" }}
                 >
                   {queryDisplayLabel(qid)}
                 </text>
@@ -150,13 +150,13 @@ export function QueryHistogram({ summary }: Props) {
           })}
 
           {/* Axes */}
-          <line x1={AXIS_W} y1={PADDING_TOP} x2={AXIS_W} y2={PADDING_TOP + CHART_H} stroke="#d1d5db" strokeWidth={1} />
+          <line x1={AXIS_W} y1={PADDING_TOP} x2={AXIS_W} y2={PADDING_TOP + CHART_H} stroke="var(--bb-chart-grid)" strokeWidth={1} />
           <line
             x1={AXIS_W}
             y1={PADDING_TOP + CHART_H}
             x2={w}
             y2={PADDING_TOP + CHART_H}
-            stroke="#d1d5db"
+            stroke="var(--bb-chart-grid)"
             strokeWidth={1}
           />
         </svg>

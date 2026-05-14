@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Fail when raw Tailwind palette literals appear under results-explorer/src.
+"""Fail when raw public-surface color literals appear under scanned paths.
 
 The Results Explorer retheme moves every public surface to CSS-variable
 tokens defined in results-explorer/src/index.css. This scan keeps the
-contract durable: a PR that reintroduces a raw text-/bg-/border-/...-
-gray-700 (or any palette/stop combination) breaks CI rather than ships
-silently.
+contract durable: a PR that reintroduces raw Tailwind palette classes,
+arbitrary color classes, SVG hex literals, or rgb()/rgba() literals breaks
+CI rather than ships silently.
 
 Allowlist mechanism: an inline marker on the same line as the literal,
 e.g. `// allow-explorer-token-literal: <reason>` for JS/TS/TSX or
@@ -70,10 +70,20 @@ LITERAL_RE = re.compile(
     r"-(?:" + "|".join(PALETTES) + r")"
     r"-(?:" + "|".join(STOPS) + r")\b"
 )
+ARBITRARY_COLOR_RE = re.compile(
+    r"\b(?:" + "|".join(UTILITIES) + r")-\[(?:#[^\]]+|rgba?\([^\]]+\)|hsla?\([^\]]+\))\]"
+)
+HEX_RE = re.compile(r"(?<![\w-])#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?\b")
+RGB_RE = re.compile(r"\brgba?\([^)]+\)")
 
 ALLOW_MARKER_RE = re.compile(r"allow-explorer-token-literal:\s*\S")
 
 DEFAULT_EXTENSIONS = (".tsx", ".ts", ".jsx", ".js", ".css", ".html")
+TOKEN_DEFINITION_FILES = {"index.css", "site-theme.css", "site-header.css"}
+
+
+def is_token_definition_line(path: Path, line: str) -> bool:
+    return path.name in TOKEN_DEFINITION_FILES and re.search(r"--[\w-]+\s*:", line)
 
 
 def iter_files(roots: Iterable[Path], extensions: tuple[str, ...]) -> Iterable[Path]:
@@ -83,6 +93,8 @@ def iter_files(roots: Iterable[Path], extensions: tuple[str, ...]) -> Iterable[P
                 yield root
             continue
         for path in sorted(root.rglob("*")):
+            if "__tests__" in path.parts:
+                continue
             if path.is_file() and path.suffix in extensions:
                 yield path
 
@@ -91,10 +103,17 @@ def scan_file(path: Path) -> list[tuple[int, str, list[str]]]:
     hits: list[tuple[int, str, list[str]]] = []
     text = path.read_text(encoding="utf-8")
     for lineno, line in enumerate(text.splitlines(), start=1):
-        matches = LITERAL_RE.findall(line)
+        matches = [
+            *LITERAL_RE.findall(line),
+            *ARBITRARY_COLOR_RE.findall(line),
+            *HEX_RE.findall(line),
+            *RGB_RE.findall(line),
+        ]
         if not matches:
             continue
         if ALLOW_MARKER_RE.search(line):
+            continue
+        if is_token_definition_line(path, line):
             continue
         hits.append((lineno, line.rstrip(), matches))
     return hits

@@ -136,7 +136,7 @@ export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props)
               <line
                 x1={x} y1={0}
                 x2={x} y2={totalHeight - AXIS_H}
-                stroke={stop === 1 ? "#6b7280" : "#e5e7eb"}
+                stroke={stop === 1 ? "var(--bb-chart-axis)" : "var(--bb-chart-grid)"}
                 stroke-width={stop === 1 ? 1.5 : 1}
                 stroke-dasharray={stop === 1 ? "none" : "3 3"}
               />
@@ -145,7 +145,7 @@ export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props)
                 y={totalHeight - 4}
                 text-anchor="middle"
                 font-size="9"
-                fill="#9ca3af"
+                fill="var(--bb-chart-label-muted)"
               >
                 {formatSpeedup(stop, { unit: "×" }).valueText}
               </text>
@@ -170,7 +170,7 @@ export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props)
                 y={rowHeight / 2 + 4}
                 text-anchor="end"
                 font-size="9"
-                fill="#6b7280"
+                fill="var(--bb-chart-axis)"
                 font-family="monospace"
               >
                 {queryId}
@@ -181,7 +181,7 @@ export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props)
                 const barY = BAR_GAP + si * (BAR_H + BAR_GAP);
                 if (speedup === null) {
                   return (
-                    <text key={si} x={centerX + 4} y={barY + BAR_H / 2 + 3} font-size="8" fill="#d1d5db">
+                    <text key={si} x={centerX + 4} y={barY + BAR_H / 2 + 3} font-size="8" fill="var(--bb-chart-grid)">
                       -
                     </text>
                   );

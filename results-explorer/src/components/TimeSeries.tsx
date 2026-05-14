@@ -224,14 +224,14 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
                   y1={y}
                   x2={w - PADDING_RIGHT}
                   y2={y}
-                  stroke="#e5e7eb"
+                  stroke="var(--bb-chart-grid)"
                   strokeWidth={1}
                 />
                 <text
                   x={LABEL_W - 4}
                   y={y + 4}
                   textAnchor="end"
-                  style={{ fontSize: "9px", fill: "#9ca3af" }}
+                  style={{ fontSize: "9px", fill: "var(--bb-chart-label-muted)" }}
                 >
                   {label}
                 </text>
@@ -270,17 +270,17 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
 
         {/* X-axis */}
         <g transform={`translate(0, ${PADDING_TOP + CHART_H})`}>
-          <line x1={LABEL_W} y1={0} x2={w - PADDING_RIGHT} y2={0} stroke="#d1d5db" strokeWidth={1} />
+          <line x1={LABEL_W} y1={0} x2={w - PADDING_RIGHT} y2={0} stroke="var(--bb-chart-grid)" strokeWidth={1} />
           {shownDates.map((date) => {
             const x = xFor(date);
             return (
               <g key={date}>
-                <line x1={x} y1={0} x2={x} y2={4} stroke="#9ca3af" strokeWidth={1} />
+                <line x1={x} y1={0} x2={x} y2={4} stroke="var(--bb-chart-label-muted)" strokeWidth={1} />
                 <text
                   x={x}
                   y={20}
                   textAnchor="middle"
-                  style={{ fontSize: "9px", fill: "#6b7280" }}
+                  style={{ fontSize: "9px", fill: "var(--bb-chart-axis)" }}
                 >
                   {date.slice(5)}
                 </text>

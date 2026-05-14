@@ -90,7 +90,7 @@ export function DistributionBox({ summary }: Props) {
           return (
             <g key={row.label}>
               {/* Platform label */}
-              <text x={LABEL_W - 6} y={midY + 4} textAnchor="end" style={{ fontSize: "11px", fill: "#374151" }}>
+              <text x={LABEL_W - 6} y={midY + 4} textAnchor="end" style={{ fontSize: "11px", fill: "var(--bb-chart-label)" }}>
                 <title>{row.fullLabel}</title>
                 {row.label}
               </text>
@@ -135,7 +135,7 @@ export function DistributionBox({ summary }: Props) {
 
               {/* Separator */}
               {ri < rows.length - 1 && (
-                <line x1={0} y1={y + ROW_H} x2={w} y2={y + ROW_H} stroke="#e5e7eb" strokeWidth={1} />
+                <line x1={0} y1={y + ROW_H} x2={w} y2={y + ROW_H} stroke="var(--bb-chart-grid)" strokeWidth={1} />
               )}
             </g>
           );
@@ -143,13 +143,13 @@ export function DistributionBox({ summary }: Props) {
 
         {/* X-axis */}
         <g transform={`translate(0, ${PADDING_TOP + rows.length * ROW_H})`}>
-          <line x1={LABEL_W} y1={0} x2={w - PADDING_RIGHT} y2={0} stroke="#d1d5db" strokeWidth={1} />
+          <line x1={LABEL_W} y1={0} x2={w - PADDING_RIGHT} y2={0} stroke="var(--bb-chart-grid)" strokeWidth={1} />
           {xTicks.map((ms) => {
             const x = xFor(ms);
             return (
               <g key={ms}>
-                <line x1={x} y1={0} x2={x} y2={4} stroke="#9ca3af" strokeWidth={1} />
-                <text x={x} y={16} textAnchor="middle" style={{ fontSize: "10px", fill: "#6b7280" }}>
+                <line x1={x} y1={0} x2={x} y2={4} stroke="var(--bb-chart-label-muted)" strokeWidth={1} />
+                <text x={x} y={16} textAnchor="middle" style={{ fontSize: "10px", fill: "var(--bb-chart-axis)" }}>
                   {formatLatencyMs(ms, { subMillisecond: "compact" }).valueText}
                 </text>
               </g>
