@@ -18,6 +18,8 @@ Landing changes requires explicit user authorization in a separate turn;
 this fires before any "auto-commit" or "file-first capture" mandate
 elsewhere.** Conversely, write work on a worktree ends at `make pr-open`,
 not at `git push` — `make pr-open` is in the pre-approved set.
+Default write-task close-out: implement → `code review` (fix every finding,
+incl. nits) → `make pr-open` (see AGENTS.md).
 TPC-DS SF<1 requires the patched dsdgen bundled with BenchBox.
 No `-o "addopts="` with pytest.
 **Efficiency**: long output → `/tmp/<slug>.log`, report summary + tail.
