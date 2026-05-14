@@ -1,0 +1,204 @@
+id: landing-prompts-launch-gates
+title: "Wire /prompts/ into docs, CI, accessibility checks, and launch measurement"
+worktree: main
+priority: High
+status: Not Started
+category: Product and Documentation
+
+description: |
+  Launch the `/prompts/` landing route responsibly after the decision,
+  generator, and static route TODOs are complete.
+
+  This item covers integration points that make the page discoverable and
+  maintainable: nav links, docs workflow checks, accessibility/mobile smoke
+  checks, analytics or explicit analytics deferral, and launch/kill criteria.
+  It should not expand the feature scope or add new runtime BenchBox surfaces.
+
+deps:
+  needs:
+    - landing-prompts-static-route
+
+work:
+  - id: w1
+    summary: "Add /prompts/ links to landing and docs navigation using the chosen public label"
+    status: pending
+    notes: |
+      Update `landing/index.html` and `docs/_templates/page.html` after the
+      decision record chooses the public label. Keep nav concise. Add a root
+      landing CTA near the MCP/agent section that drives users to `/prompts/`.
+
+  - id: w2
+    summary: "Wire generated catalog validation into docs CI"
+    needs: [w1]
+    status: pending
+    notes: |
+      Add the generator `--check` command to `.github/workflows/docs.yml` in a
+      stage that already installs project dependencies. Prefer failing before
+      site assembly. Use the same invocation as local:
+      `uv run -- python scripts/generate_landing_quickstarts.py --check`
+      (NOT `--project _project/scripts`, which lacks `benchbox`). If the
+      catalog-generator TODO added a `make prompt-quickstarts-check` target,
+      call that instead. Keep output compact; redirect noisy logs if needed.
+
+  - id: w3
+    summary: "Add launch smoke checks for routing, copy behavior, and mobile layout"
+    needs: [w2]
+    status: pending
+    notes: |
+      Add the narrowest practical smoke coverage. At minimum verify the page
+      exists in assembled site output, selector state can render the default
+      prompt, and mobile/desktop layouts avoid obvious overflow. For
+      accessibility, add a manual checklist file at
+      `landing/prompts/a11y-checklist.md` (focus order, label coverage,
+      `aria-live` copy feedback, color contrast, keyboard-only flow) and file
+      a follow-up TODO for automated a11y tooling if it is not added now.
+
+  - id: w4
+    summary: "Implement analytics hooks or record an explicit analytics deferral"
+    needs: [w1]
+    status: pending
+    notes: |
+      Follow the decision record. If analytics are approved, instrument:
+      page load, agent selection, surface selection, prompt copy, CLI command
+      copy, MCP setup copy, docs link click, and cloud platform selection.
+
+      If analytics are deferred, add a durable note to the decision record or
+      launch notes with revisit date, owner, and qualitative review plan.
+
+  - id: w5
+    summary: "Run final docs build and prompt-specific verification"
+    needs: [w3, w4]
+    status: pending
+    notes: |
+      Run the focused generator/tests first, then docs build. Do not run live
+      cloud tests. Do not commit browser screenshots or raw stdout logs unless
+      they are deliberate product docs assets.
+
+  - id: w6
+    summary: "Record final launch values, known limits, and kill criteria"
+    needs: [w5]
+    status: pending
+    notes: |
+      Following the policy set by `landing-prompts-decision-gates` w5, record
+      the concrete launch values in a compact launch note or update to the
+      decision record:
+      - final public label
+      - default state
+      - analytics or deferral status (with revisit date)
+      - cloud safety behavior
+      - known limitations
+      - kill criteria thresholds (prompt-copy events, MCP-vs-CLI selection
+        ratio, docs-click-throughs) and reevaluation date
+
+deferred:
+  - summary: "Automated cross-browser matrix for `/prompts/`"
+    reason: "MVP should start with focused smoke/a11y checks; full browser matrix can follow if the route becomes high traffic."
+  - summary: "A/B testing prompt copy"
+    reason: "Useful later, but premature before baseline copy/click measurement exists."
+  - summary: "Standalone public catalog API documentation"
+    reason: "Not applicable while catalog data is inline implementation detail."
+  - summary: "Automated a11y tooling (pa11y/axe)"
+    reason: "Filed as follow-up unless added during w3; manual checklist covers MVP."
+
+prior_art:
+  - ".github/workflows/docs.yml:docs build and landing assembly — extend with prompt catalog check"
+  - "landing/index.html:site-wide nav and MCP section — extend with `/prompts/` CTA"
+  - "docs/_templates/page.html:docs nav — extend after label decision"
+  - "docs/conf.py:custom CSS/JS wiring for docs — consider only for docs nav, not prompt page runtime"
+  - "tests/docs/test_sphinx_warnings.py:slow docs verification pattern — reuse for docs build expectations if needed"
+  - "results-explorer/docs and browser tests — reference for visual QA discipline, not as required MVP scope"
+
+must_preserve:
+  - "Docs build and GitHub Pages assembly continue to publish root landing, `/docs/`, `/blog/`, and `/results/`."
+  - "The docs workflow remains reasonably fast; prompt checks should fail early and emit compact output."
+  - "No live cloud platform tests are introduced by launch verification."
+  - "No raw screenshots, browser reports, or generated evidence blobs are committed without a durable reader-facing purpose."
+  - "Existing unrelated worktree changes are not reverted or staged as part of this TODO."
+
+approach: |
+  Treat launch integration as a release gate, not a place to expand product
+  scope. Make the route discoverable, wire stale-catalog checks into CI, verify
+  the page works at a basic level, and record how the team will judge whether
+  the marketing surface is worth maintaining.
+
+anti_patterns:
+  - "DO NOT add CI checks that depend on live cloud credentials - because this is a static marketing route - keep verification local/static."
+  - "DO NOT silently ship without analytics or an explicit analytics deferral - because this feature's value is conversion - make measurement posture visible."
+  - "DO NOT add `/prompts/` to docs nav with a temporary label after the decision record chooses a final label - because public nav copy is part of the launch contract - use the selected label consistently."
+  - "DO NOT commit screenshot batches or raw logs - because project artifact hygiene forbids durable raw evidence without a reader-facing consumer - summarize evidence instead."
+  - "DO NOT invoke the generator with `uv run --project _project/scripts -- ...` in CI - because that env lacks `benchbox` - use `uv run -- python scripts/generate_landing_quickstarts.py --check`."
+
+verification:
+  - description: "Generator check passes in the same form CI will run"
+    command: "uv run -- python scripts/generate_landing_quickstarts.py --check"
+    expected_output: "exit 0"
+  - description: "Focused prompt route tests pass"
+    command: "uv run -- python -m pytest tests/unit/landing/test_landing_quickstarts.py -q"
+    expected_output: "all tests pass"
+  - description: "Docs build succeeds"
+    command: "cd docs && uv run sphinx-build -b html --keep-going . _build/html"
+    expected_output: "build succeeds without new prompt-related warnings"
+  - description: "Docs workflow contains the prompt catalog check (and uses the correct uv form)"
+    command: "rg -n 'generate_landing_quickstarts.py --check|prompt-quickstarts-check' .github/workflows/docs.yml && ! rg -n '--project _project/scripts.*generate_landing_quickstarts' .github/workflows/docs.yml"
+    expected_output: "exit 0; check is present and uses main-project uv env"
+  - description: "Manual a11y checklist is present (or automated a11y tooling is wired)"
+    command: "test -f landing/prompts/a11y-checklist.md || rg -n 'pa11y|axe-core' .github/workflows/docs.yml"
+    expected_output: "exit 0; at least one a11y path exists"
+
+scope_limit:
+  only_modify:
+    - ".github/workflows/docs.yml"
+    - "landing/index.html"
+    - "landing/prompts/a11y-checklist.md"
+    - "docs/_templates/page.html"
+    - "docs/conf.py"
+    - "tests/unit/landing/"
+    - "_project/decisions/"
+  do_not_modify:
+    - "landing/prompts/index.html"
+    - "landing/prompts/prompts.js"
+    - "landing/prompts/prompts.css"
+    - "landing/prompts/catalog.generated.js"
+    - "landing/prompts/catalog.yaml"
+    - "scripts/generate_landing_quickstarts.py"
+    - "benchbox/cli/"
+    - "benchbox/mcp/"
+    - "benchbox/core/"
+    - "results-explorer/"
+
+metadata:
+  tags:
+    - landing
+    - prompts
+    - launch
+    - docs-ci
+    - analytics
+  estimated_effort: "Small to Medium"
+  created_date: "2026-05-13"
+
+impact:
+  business_value: |
+    Makes the prompt builder discoverable and gives the team enough evidence
+    to decide whether it improves conversion.
+  user_impact: |
+    Lets visitors find the agent prompt builder from the main landing and docs
+    navigation without searching.
+  technical_debt: |
+    Prevents stale generated catalog data from shipping and records launch
+    criteria before the page becomes unattended marketing surface area.
+
+success_metrics:
+  - "`/prompts/` is linked from root landing and docs nav with the chosen public label."
+  - "Docs CI fails if generated prompt catalog data is stale or invalid."
+  - "Launch notes record measurement posture, known limits, revisit date, and kill criteria."
+  - "No live cloud tests, new CLI commands, or new MCP tools are introduced."
+
+open_questions:
+  - question: "Should `/prompts/` be indexed for SEO?"
+    gating: true
+    affects: ["w6"]
+    default: "Allow indexing if public label and copy are final; otherwise use conservative metadata until launch review."
+  - question: "Should automated a11y checks be added now or filed as a follow-up?"
+    gating: false
+    affects: ["w3"]
+    default: "Do manual a11y checklist in MVP if adding tooling would broaden scope; file follow-up for automation."
