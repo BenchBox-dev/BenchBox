@@ -6,7 +6,7 @@
         <title>Instruct a coding agent to use BenchBox</title>
         <meta
             name="description"
-            content="Build a copy-paste prompt that tells a coding agent how to run a BenchBox benchmark. Pick an agent, surface, platform, benchmark, and scale; copy the prompt."
+            content="Build a copy-paste prompt that tells a coding agent how to run a BenchBox benchmark. Pick a surface, platform, benchmark, and scale; copy the prompt."
         />
         <link rel="icon" href="data:," />
         <link rel="stylesheet" href="../style.css?v=5" />
@@ -31,7 +31,7 @@
             <header class="prompts-header">
                 <h1>Instruct a coding agent to use BenchBox</h1>
                 <p class="prompts-lede">
-                    Pick an agent, surface, platform, benchmark, and scale. Copy the prompt into your coding agent.
+                    Pick a surface, platform, benchmark, and scale. Copy the prompt into your coding agent.
                     Defaults to a safe local DuckDB + TPC-H quickstart.
                 </p>
             </header>
@@ -49,11 +49,6 @@
                     <label class="prompts-field">
                         <span>Goal</span>
                         <select id="sel-goal" name="goal"></select>
-                    </label>
-                    <label class="prompts-field">
-                        <span>Agent</span>
-                        <select id="sel-agent" name="agent"></select>
-                        <small class="prompts-field-hint" id="agent-hint" hidden></small>
                     </label>
                     <label class="prompts-field">
                         <span>Surface</span>
