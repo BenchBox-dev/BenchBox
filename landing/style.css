@@ -65,62 +65,9 @@ section {
     padding: 0 var(--space-lg);
 }
 
-/* Navigation */
-.nav {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    background-color: rgba(13, 17, 23, 0.95);
-    backdrop-filter: blur(10px);
-    border-bottom: 1px solid var(--border-primary);
-    z-index: 1000;
-    padding: var(--space-md) 0;
-}
-
-.nav-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 var(--space-lg);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.nav-logo {
-    font-family: var(--font-mono);
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: var(--accent-primary);
-    text-decoration: none;
-}
-
-.nav-links {
-    display: flex;
-    gap: var(--space-xl);
-}
-
-.nav-links a {
-    color: var(--text-secondary);
-    text-decoration: none;
-    font-weight: 500;
-    transition: color 0.2s ease;
-}
-
-.nav-links a:hover {
-    color: var(--text-primary);
-}
-
-.nav-separator {
-    width: 1px;
-    height: 1.25rem;
-    background-color: var(--border-primary);
-    margin: 0 var(--space-sm);
-}
-
 /* Hero Section */
 .hero {
-    padding: calc(80px + var(--space-3xl)) 0 var(--space-3xl) 0;
+    padding: var(--space-3xl) 0;
     background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
     position: relative;
 }
@@ -711,18 +658,8 @@ section h2 {
 
 /* Responsive Design */
 @media (max-width: 768px) {
-    /* Mobile Navigation - hide page section links, keep main links */
-    .nav-links {
-        gap: var(--space-md);
-    }
-
-    .nav-links .nav-separator,
-    .nav-links a[href^="#"] {
-        display: none;
-    }
-
     .hero {
-        padding: calc(60px + var(--space-2xl)) 0 var(--space-2xl) 0;
+        padding: var(--space-2xl) 0;
     }
 
     .hero-layout {
@@ -863,23 +800,6 @@ section h2 {
 }
 
 @media (max-width: 480px) {
-    /* Very small screens - even more compact */
-    .nav-container {
-        padding: 0 var(--space-md);
-    }
-
-    .nav-logo {
-        font-size: 1.1rem;
-    }
-
-    .nav-links {
-        gap: var(--space-sm);
-    }
-
-    .nav-links a {
-        font-size: 0.875rem;
-    }
-
     .hero-title {
         font-size: 1.5rem;
     }
@@ -945,10 +865,6 @@ section h2 {
 
     .section-heading {
         font-size: 1rem;
-    }
-
-    .nav-links a {
-        font-size: 0.75rem;
     }
 
     .hero-image {

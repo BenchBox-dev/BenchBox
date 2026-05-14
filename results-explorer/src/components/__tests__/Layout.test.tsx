@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/preact";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/preact";
 import { describe, expect, it } from "vitest";
 import Router, { route } from "preact-router";
 import { Layout } from "@/components/Layout";
@@ -31,18 +31,28 @@ describe("Layout", () => {
     renderAt("/");
 
     const globalNav = screen.getByRole("navigation", { name: "BenchBox" });
-    expect(within(globalNav).getByRole("link", { name: "Docs" })).toHaveAttribute(
+    expect(within(globalNav).getAllByRole("link").map((link) => link.textContent)).toEqual([
+      "Home",
+      "Docs",
+      "Blog",
+      "Results",
+      "Instruct an agent",
+      "GitHub",
+      "Run benchmark",
+    ]);
+    expect(within(globalNav).getByRole("link", { name: "Home" })).toHaveAttribute("href", "https://benchbox.dev/");
+    expect(within(globalNav).getByRole("link", { name: "Docs" })).toHaveAttribute("href", "https://benchbox.dev/docs/");
+    expect(within(globalNav).getByRole("link", { name: "Blog" })).toHaveAttribute("href", "https://benchbox.dev/blog/");
+    expect(within(globalNav).getByRole("link", { name: "Instruct an agent" })).toHaveAttribute(
       "href",
-      "https://benchbox.dev/docs/",
-    );
-    expect(within(globalNav).getByRole("link", { name: "Blog" })).toHaveAttribute(
-      "href",
-      "https://benchbox.dev/blog/",
+      "https://benchbox.dev/prompts/",
     );
     expect(within(globalNav).getByRole("link", { name: "GitHub" })).toHaveAttribute(
       "href",
       "https://github.com/joeharris76/BenchBox",
     );
+    expect(within(globalNav).getByRole("link", { name: "GitHub" })).toHaveAttribute("target", "_blank");
+    expect(within(globalNav).getByRole("link", { name: "GitHub" })).toHaveAttribute("rel", "noopener");
     expect(within(globalNav).getByRole("link", { name: "Results" })).toHaveAttribute("aria-current", "page");
     expect(within(globalNav).getByRole("link", { name: "Run benchmark" })).toHaveAttribute(
       "href",
@@ -55,6 +65,27 @@ describe("Layout", () => {
 
     const globalNav = screen.getByRole("navigation", { name: "BenchBox" });
     expect(within(globalNav).getByRole("link", { name: "Results" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("uses a mobile disclosure without changing the global nav contract", () => {
+    renderAt("/results/");
+
+    const toggle = screen.getByRole("button", { name: "Toggle site navigation" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+
+    const globalNav = screen.getByRole("navigation", { name: "BenchBox" });
+    expect(within(globalNav).getAllByRole("link").map((link) => link.textContent)).toEqual([
+      "Home",
+      "Docs",
+      "Blog",
+      "Results",
+      "Instruct an agent",
+      "GitHub",
+      "Run benchmark",
+    ]);
   });
 
   it("renders the Results Explorer subnav and marks the current explorer section", () => {

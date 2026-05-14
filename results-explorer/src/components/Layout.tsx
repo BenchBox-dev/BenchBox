@@ -1,4 +1,5 @@
 import type { ComponentChildren } from "preact";
+import { useState } from "preact/hooks";
 import { getCurrentUrl, useRouter } from "preact-router";
 
 interface LayoutProps {
@@ -24,24 +25,52 @@ function Header() {
   const rawUrl = typeof window === "undefined" ? "/results/" : getCurrentUrl();
   const currentPath = rawUrl.split("?")[0]!.split("#")[0]!;
   const inResults = currentPath === "/" || currentPath === "/results" || currentPath.startsWith("/results/");
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <header class="surface-hero" data-surface="hero">
-      <div class="bg-[var(--bb-bg-primary)] text-[var(--bb-fg-primary)]">
-        <div class="mx-auto flex min-h-14 max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
-          <a href="https://benchbox.dev/" class="font-mono text-lg font-bold no-underline text-[var(--bb-accent)]">
+      <div class="sticky top-0 z-[1000] border-b border-[var(--bb-border-default)] bg-[rgba(13,17,23,0.95)] text-[var(--bb-fg-primary)] backdrop-blur">
+        <div class="mx-auto flex min-h-16 max-w-[1200px] flex-wrap items-center justify-between gap-4 px-4 sm:px-6">
+          <a href="https://benchbox.dev/" class="font-mono text-xl font-bold leading-none no-underline text-[var(--bb-accent)]">
             BenchBox
           </a>
-          <nav aria-label="BenchBox" class="flex flex-wrap items-center gap-4 text-sm">
+          <button
+            type="button"
+            aria-label="Toggle site navigation"
+            aria-controls="benchbox-site-header-nav"
+            aria-expanded={menuOpen ? "true" : "false"}
+            class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[var(--bb-border-default)] text-[var(--bb-fg-primary)] min-[901px]:hidden"
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            <span aria-hidden="true" class="flex h-4 w-4 flex-col items-center justify-center gap-1">
+              <span class={`${menuOpen ? "translate-y-[6px] rotate-45" : ""} block h-0.5 w-4 rounded bg-current`} />
+              <span class={`${menuOpen ? "opacity-0" : ""} block h-0.5 w-4 rounded bg-current`} />
+              <span class={`${menuOpen ? "-translate-y-[6px] -rotate-45" : ""} block h-0.5 w-4 rounded bg-current`} />
+            </span>
+          </button>
+          <nav
+            id="benchbox-site-header-nav"
+            aria-label="BenchBox"
+            class={`${menuOpen ? "flex" : "hidden"} w-full flex-col items-start gap-3 pb-4 text-[0.9375rem] min-[901px]:flex min-[901px]:w-auto min-[901px]:flex-row min-[901px]:items-center min-[901px]:justify-end min-[901px]:gap-6 min-[901px]:pb-0`}
+            onClick={(event) => {
+              if (event.target instanceof Element && event.target.closest("a")) {
+                setMenuOpen(false);
+              }
+            }}
+          >
+            <GlobalNavLink href="https://benchbox.dev/">Home</GlobalNavLink>
             <GlobalNavLink href="https://benchbox.dev/docs/">Docs</GlobalNavLink>
             <GlobalNavLink href="https://benchbox.dev/blog/">Blog</GlobalNavLink>
-            <GlobalNavLink href="/results/" active={inResults}>
+            <GlobalNavLink href="https://benchbox.dev/results/" active={inResults}>
               Results
             </GlobalNavLink>
-            <GlobalNavLink href="https://github.com/joeharris76/BenchBox">GitHub</GlobalNavLink>
+            <GlobalNavLink href="https://benchbox.dev/prompts/">Instruct an agent</GlobalNavLink>
+            <GlobalNavLink href="https://github.com/joeharris76/BenchBox" external>
+              GitHub
+            </GlobalNavLink>
             <a
               href="https://benchbox.dev/docs/usage/installation.html"
-              class="rounded-md bg-[var(--bb-accent)] px-3 py-1.5 text-sm font-semibold text-[var(--bb-fg-inverse)] no-underline hover:bg-[var(--bb-accent-hover)] hover:text-[var(--bb-fg-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--bb-focus-ring-on-dark)]"
+              class="inline-flex min-h-8 items-center justify-center whitespace-nowrap rounded bg-[var(--bb-accent)] px-3 py-1.5 font-bold text-[var(--bb-fg-inverse)] no-underline hover:bg-[var(--bb-accent-hover)] hover:text-[var(--bb-fg-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--bb-focus-ring-on-dark)]"
             >
               Run benchmark
             </a>
@@ -83,17 +112,21 @@ function Header() {
 function GlobalNavLink({
   href,
   active = false,
+  external = false,
   children,
 }: {
   href: string;
   active?: boolean;
+  external?: boolean;
   children: ComponentChildren;
 }) {
   return (
     <a
       href={href}
+      target={external ? "_blank" : undefined}
+      rel={external ? "noopener" : undefined}
       aria-current={active ? "page" : undefined}
-      class={`font-medium no-underline rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--bb-focus-ring-on-dark)] ${
+      class={`rounded-sm font-medium no-underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--bb-focus-ring-on-dark)] ${
         active ? "text-[var(--bb-fg-primary)]" : "text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg-primary)]"
       }`}
     >

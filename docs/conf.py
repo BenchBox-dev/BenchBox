@@ -167,7 +167,7 @@ if _linkcheck_ignore_file.exists():
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = "furo"
-html_static_path = ["_static"]
+html_static_path = ["_static", "../landing/shared"]
 
 # Furo theme options
 html_theme_options = {
@@ -191,11 +191,13 @@ html_theme_options = {
 
 # Custom CSS files
 html_css_files = [
+    "site-header.css",
     "custom.css",
 ]
 
 # Custom JavaScript files
 html_js_files = [
+    "site-header.js",
     "collapsible-nav.js",
 ]
 
