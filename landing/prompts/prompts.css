@@ -13,8 +13,8 @@
     position: absolute;
     inset: 0;
     background-image:
-        radial-gradient(circle at 20% 16%, color-mix(in srgb, var(--accent-primary) 12%, transparent) 0%, transparent 28%),
-        radial-gradient(circle at 82% 70%, color-mix(in srgb, var(--accent-secondary) 12%, transparent) 0%, transparent 28%);
+        radial-gradient(circle at 20% 16%, rgba(88, 166, 255, 0.1) 0%, transparent 28%),
+        radial-gradient(circle at 82% 70%, rgba(31, 111, 235, 0.1) 0%, transparent 28%);
     pointer-events: none;
     z-index: -1;
 }

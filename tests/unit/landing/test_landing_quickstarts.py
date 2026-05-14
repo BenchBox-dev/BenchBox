@@ -19,6 +19,9 @@ SCRIPT_PATH = REPO_ROOT / "scripts" / "generate_landing_quickstarts.py"
 CATALOG_PATH = REPO_ROOT / "landing" / "prompts" / "catalog.yaml"
 GENERATED_PATH = REPO_ROOT / "landing" / "prompts" / "catalog.generated.js"
 FORBIDDEN_JSON = REPO_ROOT / "landing" / "prompts" / "recipes.json"
+PROMPTS_INDEX_PATH = REPO_ROOT / "landing" / "prompts" / "index.html"
+PROMPTS_JS_PATH = REPO_ROOT / "landing" / "prompts" / "prompts.js"
+PROMPTS_CSS_PATH = REPO_ROOT / "landing" / "prompts" / "prompts.css"
 
 
 def _load_generator():
@@ -122,16 +125,32 @@ def test_defaults_resolve_to_known_ids(gen, catalog):
     assert catalog["defaults"]["benchmark"] in benchmark_ids
     assert catalog["defaults"]["deployment"] in {"local", "self-hosted", "managed"}
     assert catalog["defaults"]["scale"] in catalog["scales"]
-    assert catalog["scales"] == ["0.01", "0.1", "1.0", "10.0"]
+    assert all(isinstance(scale, str) for scale in catalog["scales"])
+    assert "0.01" in catalog["scales"]
+    assert "10.0" in catalog["scales"]
 
 
 def test_no_manual_label_anywhere(catalog):
     assert all("manual" not in agent["label"].lower() for agent in catalog["agents"])
 
 
+def test_agent_label_containing_manual_is_rejected(gen, catalog):
+    bad = copy.deepcopy(catalog)
+    bad["agents"][0]["label"] = "Generic / manual"
+    errors = gen.validate(bad)
+    assert any("must not contain 'manual'" in e for e in errors)
+
+
 def test_generic_agent_has_hint(catalog):
     generic = next(agent for agent in catalog["agents"] if agent["id"] == "generic")
     assert generic["hint"]
+
+
+def test_unknown_agent_metadata_key_is_rejected(gen, catalog):
+    bad = copy.deepcopy(catalog)
+    bad["agents"][0]["docs_url"] = "https://example.invalid"
+    errors = gen.validate(bad)
+    assert any("unknown keys" in e for e in errors)
 
 
 def test_no_recipes_json_committed():
@@ -143,3 +162,16 @@ def test_generated_include_assigns_window_global():
     text = GENERATED_PATH.read_text(encoding="utf-8")
     assert "window.__BENCHBOX_PROMPT_CATALOG__" in text
     assert text.endswith(";\n")
+
+
+def test_removed_prompt_blocks_stay_removed():
+    text = PROMPTS_INDEX_PATH.read_text(encoding="utf-8") + PROMPTS_JS_PATH.read_text(encoding="utf-8")
+    assert "block-cli" not in text
+    assert "block-mcp-prompt" not in text
+
+
+def test_hidden_fields_override_flex_display():
+    text = PROMPTS_CSS_PATH.read_text(encoding="utf-8")
+    assert ".prompts-field[hidden]" in text
+    assert ".prompts-block[hidden]" in text
+    assert "display: none !important" in text

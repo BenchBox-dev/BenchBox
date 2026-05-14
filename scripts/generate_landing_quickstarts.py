@@ -33,6 +33,7 @@ FORBIDDEN_JSON = REPO_ROOT / "landing" / "prompts" / "recipes.json"
 
 VALID_DEPLOYMENT_MODES = frozenset({"local", "self-hosted", "managed"})
 MANAGED_SAFETY_KEYS = frozenset({"dependency", "dry_run", "no_secrets"})
+VALID_AGENT_KEYS = frozenset({"id", "label", "hint"})
 
 
 def load_catalog(path: Path = SOURCE) -> dict[str, Any]:
@@ -132,6 +133,9 @@ def _validate_agents(catalog: dict[str, Any]) -> list[str]:
         if not isinstance(entry, dict):
             errors.append(f"agents[] entries must be mappings, got {type(entry).__name__}")
             continue
+        unknown_keys = set(entry) - VALID_AGENT_KEYS
+        if unknown_keys:
+            errors.append(f"agents[{entry.get('id')!r}] contains unknown keys: {sorted(unknown_keys)}")
         label = str(entry.get("label") or "")
         if "manual" in label.lower():
             errors.append(f"agents[{entry.get('id')!r}].label must not contain 'manual'")
