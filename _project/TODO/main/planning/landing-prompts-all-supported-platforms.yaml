@@ -19,6 +19,11 @@ description: |
     - The runtime platform registry reports 50 platform IDs, with 45
       SQL-capable and 19 DataFrame-capable platforms when checked via
       `PlatformRegistry.get_platform_capabilities()`.
+    - The registry currently includes at least one deployment capability
+      mode outside the prompt UI vocabulary (`remote` for Velox), and many
+      platforms rely on the registry's default-local fallback when no
+      deployment modes are defined. The implementation must audit and resolve
+      those cases rather than silently misclassifying them.
 
   The fix should not replace one manually-curated list with a longer
   manually-curated list. The prompt catalog must derive its platform list
@@ -105,6 +110,9 @@ work:
         - deployment modes from `deployment_modes[*].mode`;
         - fallback behavior for platforms with no deployment modes currently
           defined (`supports_deployment_mode()` treats them as local).
+        - any deployment capability mode outside the current prompt UI
+          vocabulary (`local`, `self-hosted`, `managed`), especially
+          `remote`.
 
       Produce an implementation table in code/tests, not a one-off chat
       table. If registry metadata is wrong for obvious cloud/server
@@ -116,6 +124,11 @@ work:
           `landing/prompts/catalog.yaml` with an explicit comment explaining
           why the prompt route needs a correction before the registry is
           fixed.
+
+      `remote` must not leak into `catalog.generated.js` unless the UI gains
+      a fourth Deployment option. For this TODO, default to mapping `remote`
+      to `self-hosted` only when the platform is user-managed/networked, and
+      document that mapping in generator code/tests.
 
   - id: w3
     summary: "Derive prompt platform entries from PlatformRegistry in the generator"
@@ -135,6 +148,10 @@ work:
       Keep `catalog.generated.js` as the static runtime payload. Do not
       fetch registry data in the browser, and do not introduce
       `landing/prompts/recipes.json`.
+
+      The generated prompt ids should use canonical PlatformRegistry ids, not
+      aliases from `PlatformRegistry.get_all_aliases()`. Aliases may remain
+      valid CLI input but should not duplicate dropdown entries.
 
   - id: w4
     summary: "Convert catalog.yaml platform data into overrides, not an inclusion list"
@@ -185,6 +202,10 @@ work:
           or DataFrame support;
         - every generated platform has a non-empty label, at least one
           interface, and at least one deployment;
+        - every generated deployment value is one of `local`,
+          `self-hosted`, or `managed`;
+        - any non-UI registry deployment mode such as `remote` has an
+          explicit generator mapping covered by test;
         - SQL filter pool contains all SQL-capable registry platforms for
           the selected deployment;
         - DataFrame filter pool contains all DataFrame-capable registry
@@ -228,6 +249,7 @@ must_preserve:
   - "Filters still exclude non-applicable platforms by interface and deployment."
   - "Default first-load state remains Generic + CLI + Test one platform + SQL + Local + duckdb + tpch + 0.01."
   - "URL parameter names remain pinned: goal, agent, surface, interface, deployment, platform, platformA, platformB, benchmark, scale."
+  - "Dropdown platform ids use canonical PlatformRegistry ids; aliases do not create duplicate prompt options."
   - "No new public CLI command, MCP prompt-rendering tool, browser fetch endpoint, or recipes.json file."
   - "Managed-cloud safety guidance remains visible and conservative."
   - "The prompt builder remains a static landing route backed by committed catalog.generated.js."
@@ -263,8 +285,8 @@ verification:
     command: "node --check landing/prompts/prompts.js"
     expected_output: "exit 0"
   - description: "No curated subset language remains in prompt catalog source"
-    command: "! rg -ni 'curated|MVP platform subset|implicitly excluded' landing/prompts/catalog.yaml scripts/generate_landing_quickstarts.py _project/decisions/landing-prompts-route.md"
-    expected_output: "exit 0; no subset language remains"
+    command: "! rg -ni 'MVP platform subset|implicitly excluded|source of truth for platform inclusion' landing/prompts/catalog.yaml scripts/generate_landing_quickstarts.py"
+    expected_output: "exit 0; no catalog/generator language permits a hand-curated inclusion subset"
   - description: "Forbidden public JSON catalog remains absent"
     command: "test ! -e landing/prompts/recipes.json"
     expected_output: "exit 0"
@@ -313,6 +335,7 @@ success_metrics:
   - "Generated `/prompts/` platform ids match every PlatformRegistry id with SQL or DataFrame support."
   - "Managed cloud + SQL dropdown includes all managed SQL-capable platforms, not only MotherDuck, ClickHouse Cloud, and Snowflake."
   - "Local + DataFrame dropdown includes all local DataFrame-capable platforms from the registry."
+  - "Generated deployment values are limited to the prompt UI vocabulary: local, self-hosted, managed."
   - "Adding a new PlatformRegistry platform with SQL or DataFrame support fails landing tests unless it appears in catalog.generated.js."
   - "Managed-platform prompts still include dependency/dry-run/no-secret guidance."
 
