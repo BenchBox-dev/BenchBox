@@ -31,16 +31,24 @@ def _read(path: str) -> str:
 def test_shared_static_header_assets_are_the_static_source_of_truth() -> None:
     css = _read("landing/shared/site-header.css")
     js = _read("landing/shared/site-header.js")
+    theme_css = _read("landing/shared/site-theme.css")
+    theme_js = _read("landing/shared/site-theme.js")
     landing = _read("landing/index.html")
     docs_conf = _read("docs/conf.py")
 
     assert "benchbox-site-header__nav" in css
     assert "data-benchbox-site-header-toggle" in js
+    assert "--bb-site-header-bg" in theme_css
+    assert "benchbox:theme" in theme_js
     assert "shared/site-header.css" in landing
     assert "shared/site-header.js" in landing
+    assert "shared/site-theme.css" in landing
+    assert "shared/site-theme.js" in landing
     assert '"../landing/shared"' in docs_conf
     assert '"site-header.css"' in docs_conf
     assert '"site-header.js"' in docs_conf
+    assert '"site-theme.css"' in docs_conf
+    assert '"site-theme.js"' in docs_conf
 
 
 @pytest.mark.parametrize(
@@ -63,6 +71,22 @@ def test_global_header_link_contract_is_identical_across_surfaces(path: str, sur
         positions.append(href_position)
 
     assert positions == sorted(positions), f"{surface} global header link order drifted"
+
+
+@pytest.mark.parametrize(
+    ("path", "surface"),
+    [
+        ("landing/index.html", "landing"),
+        ("landing/prompts/index.html", "prompts"),
+        ("docs/_templates/page.html", "docs"),
+        ("results-explorer/src/components/Layout.tsx", "results"),
+    ],
+)
+def test_global_header_exposes_single_shared_theme_control(path: str, surface: str) -> None:
+    source = _read(path)
+
+    assert "data-benchbox-theme-toggle" in source, f"{surface} missing shared theme toggle"
+    assert "Theme:" in source, f"{surface} missing accessible theme label"
 
 
 def test_results_secondary_nav_remains_separate_from_global_header() -> None:

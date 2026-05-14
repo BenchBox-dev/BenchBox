@@ -639,7 +639,7 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
                 x={labelWidth - 6}
                 y={midY + 4}
                 textAnchor="end"
-                style={{ fontSize: "11px", fill: "#374151" }}
+                style={{ fontSize: "11px", fill: "var(--bb-chart-label)" }}
               >
                 <title>{row.fullLabel}</title>
                 {row.displayLabel}
@@ -661,7 +661,7 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
                   y1={midY}
                   x2={valueLabelPlacement.x - 5}
                   y2={midY}
-                  stroke="#d1d5db"
+                  stroke="var(--bb-chart-grid)"
                   strokeWidth={1}
                   strokeDasharray="2 2"
                 />
@@ -681,7 +681,7 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
                   y1={y + rowHeight}
                   x2={width}
                   y2={y + rowHeight}
-                  stroke="#e5e7eb"
+                  stroke="var(--bb-chart-grid)"
                   strokeWidth={1}
                 />
               )}
@@ -695,7 +695,7 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
             y1={0}
             x2={labelWidth + plotWidth}
             y2={0}
-            stroke="#d1d5db"
+            stroke="var(--bb-chart-grid)"
             strokeWidth={1}
           />
           {ticks.map((value) => {
@@ -703,12 +703,12 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
             const x = labelWidth + fraction * plotWidth;
             return (
               <g key={value}>
-                <line x1={x} y1={0} x2={x} y2={4} stroke="#9ca3af" strokeWidth={1} />
+                <line x1={x} y1={0} x2={x} y2={4} stroke="var(--bb-chart-label-muted)" strokeWidth={1} />
                 <text
                   x={x}
                   y={16}
                   textAnchor="middle"
-                  style={{ fontSize: "10px", fill: "#6b7280" }}
+                  style={{ fontSize: "10px", fill: "var(--bb-chart-axis)" }}
                 >
                   {fmtGeomean(value)}
                 </text>
@@ -719,7 +719,7 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
             x={labelWidth + plotWidth / 2}
             y={axisHeight - 2}
             textAnchor="middle"
-            style={{ fontSize: "10px", fill: "#9ca3af" }}
+            style={{ fontSize: "10px", fill: "var(--bb-chart-label-muted)" }}
           >
             {scaleLabel}
           </text>
@@ -749,7 +749,7 @@ function placePerformanceValueLabel({
     return {
       x: outsideX,
       textAnchor: "start",
-      fill: "#374151",
+      fill: "var(--bb-chart-label)",
       placement: "outside",
     };
   }
@@ -759,7 +759,7 @@ function placePerformanceValueLabel({
     return {
       x: labelWidth + barWidth - labelGap,
       textAnchor: "end",
-      fill: "#ffffff",
+      fill: "var(--bb-chart-tooltip-bg)",
       placement: "inside",
     };
   }
@@ -767,7 +767,7 @@ function placePerformanceValueLabel({
   return {
     x: plotRight + labelGap,
     textAnchor: "start",
-    fill: "#374151",
+    fill: "var(--bb-chart-label)",
     placement: "gutter",
   };
 }

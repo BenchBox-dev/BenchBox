@@ -15,6 +15,7 @@ test.describe("Global header", () => {
       "href",
       "https://benchbox.dev/docs/usage/installation.html",
     );
+    await expect(page.getByRole("button", { name: /Theme: system/i })).toBeVisible();
 
     const explorerNav = page.getByRole("navigation", { name: "Results Explorer" });
     await expect(explorerNav.getByRole("link")).toHaveText(["Leaderboards", "Benchmarks", "Platforms", "Compare", "Query"]);
@@ -30,5 +31,17 @@ test.describe("Global header", () => {
     await toggle.click();
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
     await expect(page.getByRole("navigation", { name: "BenchBox" }).getByRole("link")).toHaveText(GLOBAL_LABELS);
+  });
+
+  test("@smoke persists the theme choice from the global header", async ({ page }) => {
+    await page.goto("/results/");
+    await waitForShell(page);
+
+    const themeToggle = page.getByRole("button", { name: /Theme: system/i });
+    await themeToggle.click();
+    await expect(page.locator("html")).toHaveAttribute("data-bb-theme-choice", "light");
+    await page.reload();
+    await waitForShell(page);
+    await expect(page.locator("html")).toHaveAttribute("data-bb-theme-choice", "light");
   });
 });

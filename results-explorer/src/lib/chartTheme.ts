@@ -12,11 +12,16 @@
 // Platform color palette - blue, emerald, amber, red
 // ---------------------------------------------------------------------------
 
-export const PALETTE = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444"] as const;
+export const PALETTE = [
+  "var(--bb-chart-cat-1)",
+  "var(--bb-chart-cat-2)",
+  "var(--bb-chart-cat-3)",
+  "var(--bb-chart-cat-4)",
+] as const;
 
 /** Return the palette color at `index`, wrapping with modulo. Never returns undefined. */
 export function paletteColor(index: number): string {
-  return PALETTE[index % PALETTE.length] ?? "#3b82f6";
+  return PALETTE[index % PALETTE.length] ?? "var(--bb-chart-cat-1)";
 }
 
 // ---------------------------------------------------------------------------
@@ -26,19 +31,19 @@ export function paletteColor(index: number): string {
 // ---------------------------------------------------------------------------
 
 export const TIME_SERIES_PALETTE = [
-  "#3b82f6", // blue-500
-  "#10b981", // emerald-500
-  "#f59e0b", // amber-500
-  "#ef4444", // red-500
-  "#8b5cf6", // violet-500
-  "#14b8a6", // teal-500
-  "#ec4899", // pink-500
-  "#6b7280", // gray-500
+  "var(--bb-chart-cat-1)",
+  "var(--bb-chart-cat-2)",
+  "var(--bb-chart-cat-3)",
+  "var(--bb-chart-cat-4)",
+  "var(--bb-chart-cat-5)",
+  "var(--bb-chart-cat-6)",
+  "var(--bb-chart-warning)",
+  "var(--bb-chart-axis)",
 ] as const;
 
 /** Time-series palette accessor. Wraps with modulo; never returns undefined. */
 export function timeSeriesColor(index: number): string {
-  return TIME_SERIES_PALETTE[index % TIME_SERIES_PALETTE.length] ?? "#3b82f6";
+  return TIME_SERIES_PALETTE[index % TIME_SERIES_PALETTE.length] ?? "var(--bb-chart-cat-1)";
 }
 
 // ---------------------------------------------------------------------------
@@ -70,17 +75,17 @@ export const DIVERGING_MAX_PCT = 300;
 // ---------------------------------------------------------------------------
 
 export const PHASE_COLORS: Record<string, string> = {
-  data_generation: "#d1d5db",
-  schema_creation: "#93c5fd",
-  data_loading: "#3b82f6",
-  validation: "#10b981",
-  power_test: "#f59e0b",
-  throughput_test: "#ef4444",
+  data_generation: "var(--bb-chart-grid)",
+  schema_creation: "var(--bb-chart-cat-1)",
+  data_loading: "var(--bb-chart-cat-3)",
+  validation: "var(--bb-chart-success)",
+  power_test: "var(--bb-chart-warning)",
+  throughput_test: "var(--bb-chart-danger)",
 };
 
 // ---------------------------------------------------------------------------
 // Semantic fill colors (faster / slower than baseline)
 // ---------------------------------------------------------------------------
 
-export const FASTER_FILL = "#22c55e"; // Tailwind green-500
-export const SLOWER_FILL = "#ef4444"; // Tailwind red-500
+export const FASTER_FILL = "var(--bb-chart-success)";
+export const SLOWER_FILL = "var(--bb-chart-danger)";

@@ -61,8 +61,8 @@ export function QueryTimingChart({ bars, unit = "ms", height = 220 }: QueryTimin
           const y = paddingTop + chartHeight - (chartHeight * i) / yTicks;
           return (
             <g key={i}>
-              <line x1={paddingLeft} y1={y} x2={viewWidth - paddingRight} y2={y} stroke="#e5e7eb" stroke-width="1" />
-              <text x={paddingLeft - 6} y={y + 4} text-anchor="end" font-size="10" fill="#9ca3af">
+              <line x1={paddingLeft} y1={y} x2={viewWidth - paddingRight} y2={y} stroke="var(--bb-chart-grid)" stroke-width="1" />
+              <text x={paddingLeft - 6} y={y + 4} text-anchor="end" font-size="10" fill="var(--bb-chart-label-muted)">
                 {formatValue(v)}
               </text>
             </g>
@@ -89,7 +89,7 @@ export function QueryTimingChart({ bars, unit = "ms", height = 220 }: QueryTimin
                 y={paddingTop + chartHeight + 14}
                 text-anchor="middle"
                 font-size="9"
-                fill="#6b7280"
+                fill="var(--bb-chart-axis)"
                 transform={`rotate(-45, ${x + barWidth / 2}, ${paddingTop + chartHeight + 14})`}
               >
                 {bar.label}
@@ -104,7 +104,7 @@ export function QueryTimingChart({ bars, unit = "ms", height = 220 }: QueryTimin
           y1={paddingTop + chartHeight}
           x2={viewWidth - paddingRight}
           y2={paddingTop + chartHeight}
-          stroke="#d1d5db"
+          stroke="var(--bb-chart-grid)"
           stroke-width="1"
         />
       </svg>
@@ -173,8 +173,8 @@ export function GroupedQueryChart({ groups, unit = "ms", height = 260 }: Grouped
           const y = paddingTop + chartHeight - (chartHeight * i) / yTicks;
           return (
             <g key={i}>
-              <line x1={paddingLeft} y1={y} x2={viewWidth - paddingRight} y2={y} stroke="#e5e7eb" stroke-width="1" />
-              <text x={paddingLeft - 6} y={y + 4} text-anchor="end" font-size="10" fill="#9ca3af">
+              <line x1={paddingLeft} y1={y} x2={viewWidth - paddingRight} y2={y} stroke="var(--bb-chart-grid)" stroke-width="1" />
+              <text x={paddingLeft - 6} y={y + 4} text-anchor="end" font-size="10" fill="var(--bb-chart-label-muted)">
                 {formatValue(v)}
               </text>
             </g>
@@ -230,7 +230,7 @@ export function GroupedQueryChart({ groups, unit = "ms", height = 260 }: Grouped
                 y={paddingTop + chartHeight + 14}
                 text-anchor="middle"
                 font-size="9"
-                fill="#6b7280"
+                fill="var(--bb-chart-axis)"
                 transform={`rotate(-45, ${groupX + groupWidth / 2}, ${paddingTop + chartHeight + 14})`}
               >
                 {group.queryId}
@@ -245,7 +245,7 @@ export function GroupedQueryChart({ groups, unit = "ms", height = 260 }: Grouped
           y1={paddingTop + chartHeight}
           x2={viewWidth - paddingRight}
           y2={paddingTop + chartHeight}
-          stroke="#d1d5db"
+          stroke="var(--bb-chart-grid)"
           stroke-width="1"
         />
       </svg>

@@ -119,7 +119,7 @@ export function StackedPhase({ summary }: Props) {
                 x={LABEL_W - 6}
                 y={midY + 4}
                 textAnchor="end"
-                style={{ fontSize: "11px", fill: "#374151" }}
+                style={{ fontSize: "11px", fill: "var(--bb-chart-label)" }}
               >
                 <title>{fullLabelByResultId.get(row.result_id) ?? row.platform}</title>
                 {rowLabelByResultId.get(row.result_id) ?? row.platform}
@@ -138,7 +138,7 @@ export function StackedPhase({ summary }: Props) {
                     y={midY - barH / 2}
                     width={Math.max(1, segW)}
                     height={barH}
-                    fill={PHASE_COLORS[phase] ?? "#94a3b8"}
+                    fill={PHASE_COLORS[phase] ?? "var(--bb-chart-axis)"}
                     rx={1}
                   >
                     <title>{`${PHASE_LABELS[phase] ?? phase}: ${formatDurationSeconds(dur).valueText}`}</title>
@@ -149,7 +149,7 @@ export function StackedPhase({ summary }: Props) {
               <text
                 x={xOffset + 5}
                 y={midY + 4}
-                style={{ fontSize: "10px", fill: "#6b7280" }}
+                style={{ fontSize: "10px", fill: "var(--bb-chart-axis)" }}
               >
                 {formatDurationSeconds(total).valueText}
               </text>
@@ -160,7 +160,7 @@ export function StackedPhase({ summary }: Props) {
                   y1={y + ROW_H}
                   x2={w - VALUE_TRAIL}
                   y2={y + ROW_H}
-                  stroke="#e5e7eb"
+                  stroke="var(--bb-chart-grid)"
                   strokeWidth={1}
                 />
               )}
@@ -173,7 +173,7 @@ export function StackedPhase({ summary }: Props) {
           y1={PADDING_TOP + rows.length * ROW_H}
           x2={LABEL_W + plotW}
           y2={PADDING_TOP + rows.length * ROW_H}
-          stroke="#d1d5db"
+          stroke="var(--bb-chart-grid)"
           strokeWidth={1}
         />
       </svg>
@@ -184,7 +184,7 @@ export function StackedPhase({ summary }: Props) {
           <span key={phase} class="flex items-center gap-1">
             <span
               class="inline-block w-3 h-3 rounded-sm"
-              style={{ backgroundColor: PHASE_COLORS[phase] ?? "#94a3b8" }}
+              style={{ backgroundColor: PHASE_COLORS[phase] ?? "var(--bb-chart-axis)" }}
             />
             {PHASE_LABELS[phase] ?? phase}
           </span>

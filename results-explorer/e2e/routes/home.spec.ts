@@ -25,7 +25,12 @@ test.describe("Home", () => {
     await expect(summary.getByText("Benchmarks", { exact: true })).toHaveCount(0);
   });
 
-  test("documents the mixed home theme contract", async ({ page }) => {
+  test("applies the selected BenchBox theme to hero and data surfaces", async ({ page }) => {
+    await page.addInitScript(() => {
+      if (!localStorage.getItem("benchbox:theme")) {
+        localStorage.setItem("benchbox:theme", "light");
+      }
+    });
     await page.goto("/results/");
     await waitForDataLoaded(page, /Recent Results/i);
 
@@ -34,13 +39,23 @@ test.describe("Home", () => {
     await expect(hero).toHaveAttribute("data-surface", "hero");
     await expect(dataSurface).toHaveAttribute("data-surface", "app");
 
-    const [heroBg, dataBg] = await Promise.all([
+    const [lightHeroBg, lightDataBg] = await Promise.all([
       hero.evaluate((element) => getComputedStyle(element).backgroundColor),
       dataSurface.evaluate((element) => getComputedStyle(element).backgroundColor),
     ]);
-    expect(heroBg).not.toBe(dataBg);
-    expect(heroBg).toBe("rgb(13, 17, 23)");
-    expect(dataBg).toBe("rgb(245, 246, 248)");
+    expect(lightHeroBg).toBe("rgb(255, 255, 255)");
+    expect(lightDataBg).toBe("rgb(245, 246, 248)");
+
+    await page.evaluate(() => localStorage.setItem("benchbox:theme", "dark"));
+    await page.reload();
+    await waitForDataLoaded(page, /Recent Results/i);
+
+    const [darkHeroBg, darkDataBg] = await Promise.all([
+      page.getByTestId("home-hero-filter-band").evaluate((element) => getComputedStyle(element).backgroundColor),
+      page.getByTestId("home-data-surface").evaluate((element) => getComputedStyle(element).backgroundColor),
+    ]);
+    expect(darkHeroBg).toBe("rgb(13, 17, 23)");
+    expect(darkDataBg).toBe("rgb(13, 17, 23)");
   });
 
   test("browse-by-benchmark link deep-links to the benchmark index under /results/", async ({

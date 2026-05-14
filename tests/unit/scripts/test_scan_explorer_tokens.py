@@ -38,6 +38,16 @@ def test_literal_re_skips_token_var() -> None:
     assert matches == []
 
 
+def test_arbitrary_color_re_matches_tailwind_escape_hatches() -> None:
+    assert scan.ARBITRARY_COLOR_RE.findall('<div class="text-[#374151]" />') == ["text-[#374151]"]
+    assert scan.ARBITRARY_COLOR_RE.findall('<div class="bg-[rgb(55,65,81)]" />') == ["bg-[rgb(55,65,81)]"]
+
+
+def test_hex_and_rgb_re_match_svg_and_inline_literals() -> None:
+    assert scan.HEX_RE.findall('<line stroke="#d1d5db" />') == ["#d1d5db"]
+    assert scan.RGB_RE.findall("background: rgba(13, 17, 23, 0.95)") == ["rgba(13, 17, 23, 0.95)"]
+
+
 def test_literal_re_word_boundary_does_not_match_partial() -> None:
     # Embedded inside a larger token must not match.
     assert scan.LITERAL_RE.findall("mytext-gray-700-foo") == []
@@ -120,6 +130,12 @@ def test_scan_file_reports_unallowlisted_hit(tmp_path: Path) -> None:
     assert lineno == 1
     assert "bg-blue-500" in matches
     assert "bg-blue-500" in line
+
+
+def test_scan_file_allows_token_definition_lines(tmp_path: Path) -> None:
+    target = tmp_path / "index.css"
+    target.write_text("        --bb-data-fg-primary: #0f172a;\n", encoding="utf-8")
+    assert scan.scan_file(target) == []
 
 
 def test_scan_file_skips_line_with_allow_marker(tmp_path: Path) -> None:

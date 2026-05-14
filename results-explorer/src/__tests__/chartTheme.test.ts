@@ -128,11 +128,11 @@ describe("chartTheme", () => {
     }
   });
 
-  it("PHASE_COLORS values are distinct hex strings", () => {
+  it("PHASE_COLORS values are distinct CSS variable tokens", () => {
     const values = Object.values(PHASE_COLORS);
     expect(new Set(values).size).toBe(values.length);
     for (const v of values) {
-      expect(v).toMatch(/^#[0-9a-f]{6}$/i);
+      expect(v).toMatch(/^var\(--bb-chart-[a-z0-9-]+\)$/);
     }
   });
 });

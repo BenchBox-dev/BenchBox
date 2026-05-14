@@ -1,10 +1,11 @@
 # Results Explorer — Token-Scan Gate
 
-The Results Explorer retheme moves every public surface onto CSS-variable
-tokens defined in `results-explorer/src/index.css`. This gate keeps the
-contract durable: a PR that reintroduces a raw Tailwind palette literal
-(`text-gray-700`, `bg-blue-500`, `border-red-300`, …) under
-`results-explorer/src/` breaks CI rather than ships silently.
+The Results Explorer retheme moves public surfaces onto CSS-variable tokens
+defined in `results-explorer/src/index.css` and the shared static theme at
+`landing/shared/site-theme.css`. This gate keeps the contract durable: a PR
+that reintroduces a raw Tailwind palette literal (`text-gray-700`,
+`bg-blue-500`, `border-red-300`, …), arbitrary color literal, SVG hex color,
+or raw `rgb()` / `rgba()` value breaks CI rather than ships silently.
 
 ## Why the gate exists
 
@@ -24,6 +25,7 @@ regressions break CI before they ship.
 
 ```bash
 make lint-explorer-tokens
+make lint-site-theme-tokens
 ```
 
 The scan is stdlib-only Python; no `uv sync` is required before it runs.
@@ -39,22 +41,28 @@ A regex match for any combination of:
   `sky`, `blue`, `indigo`, `violet`, `purple`, `fuchsia`, `pink`, `rose`
 - **stops** — `50`, `100`, `200`, `300`, `400`, `500`, `600`, `700`,
   `800`, `900`, `950`
+- **arbitrary color classes** — `text-[#374151]`,
+  `bg-[rgb(55,65,81)]`, `stroke-[rgba(...)]`
+- **raw color functions / SVG literals** — `#374151`, `#374151cc`,
+  `rgb(...)`, `rgba(...)`
 
 Files scanned: `*.tsx`, `*.ts`, `*.jsx`, `*.js`, `*.css`, `*.html` under
-`results-explorer/src/`.
+`results-explorer/src/` for `make lint-explorer-tokens`. The
+`make lint-site-theme-tokens` target runs the same scan over the static
+theme/header pages and docs adapter CSS:
+
+- `landing/shared/`
+- `landing/index.html`
+- `landing/prompts/index.html`
+- `docs/_templates/page.html`
+- `docs/_static/custom.css`
+- `results-explorer/src/components/Layout.tsx`
 
 ### Known coverage gaps
 
-The regex matches *named-palette* utilities only. The following do **not**
-trip the gate today:
+The scan now covers the previously documented arbitrary-value and raw SVG
+literal gaps. The following still do **not** trip the gate today:
 
-- **Arbitrary-value classes** — `text-[#374151]` (the literal hex
-  equivalent of `text-gray-700`), `bg-[rgb(55,65,81)]`, etc. A
-  contributor reaching for the hex equivalent of a token bypasses the
-  scan. The blind-spot scenario was named-palette literals (PR #271
-  retokenized `text-gray-700`-style classes), so this is acceptable for
-  the current contract; widen the regex to a `text-\[` shape if a
-  future incident shows arbitrary-value bypass in the wild.
 - **Concatenated classnames** — `"text-gray-" + n` or
   `` `text-${color}-700` `` are not matched (the regex needs a literal
   contiguous token).
@@ -154,8 +162,10 @@ The allowlist is the operational answer.
 
 ## Extending or removing the gate
 
-The scan lives at `_project/scripts/scan_explorer_tokens.py`. Edit the
-`UTILITIES`, `PALETTES`, and `STOPS` tuples to widen or narrow coverage.
-The Makefile target is `lint-explorer-tokens`. If a future ESLint/stylelint
-graduation lands (see TODO `results-explorer-token-scan-ci-gate`), retire
-this script in the same PR that wires the new rule into `npm run lint`.
+The scan lives at `_project/scripts/scan_explorer_tokens.py`. Edit
+`UTILITIES`, `PALETTES`, `STOPS`, `ARBITRARY_COLOR_RE`, `HEX_RE`, or
+`RGB_RE` to widen or narrow coverage. The Makefile targets are
+`lint-explorer-tokens` and `lint-site-theme-tokens`. If a future
+ESLint/stylelint graduation lands (see TODO
+`results-explorer-token-scan-ci-gate`), retire this script in the same PR
+that wires the new rule into `npm run lint`.

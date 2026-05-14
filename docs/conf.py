@@ -175,14 +175,22 @@ html_theme_options = {
     "navigation_with_keys": True,  # Enable keyboard navigation
     "top_of_page_buttons": ["edit", "view"],  # GitHub integration buttons
     "light_css_variables": {
-        "color-brand-primary": "#0088ff",  # Links and primary elements
-        "color-brand-content": "#0088ff",  # Content links
-        "color-highlight-on-target": "#ffc600",  # Highlighted elements
+        "color-brand-primary": "#2563eb",  # Links and primary elements
+        "color-brand-content": "#2563eb",  # Content links
+        "color-highlight-on-target": "#dbeafe",  # Highlighted elements
+        "color-background-primary": "#ffffff",
+        "color-background-secondary": "#f5f7fb",
+        "color-foreground-primary": "#0f172a",
+        "color-foreground-secondary": "#475569",
     },
     "dark_css_variables": {
-        "color-brand-primary": "#0088ff",  # Links in dark mode
-        "color-brand-content": "#0088ff",  # Content links in dark mode
-        "color-highlight-on-target": "#ffc600",  # Highlighted elements in dark mode
+        "color-brand-primary": "#58a6ff",  # Links in dark mode
+        "color-brand-content": "#58a6ff",  # Content links in dark mode
+        "color-highlight-on-target": "#1f6feb",  # Highlighted elements in dark mode
+        "color-background-primary": "#0d1117",
+        "color-background-secondary": "#161b22",
+        "color-foreground-primary": "#f0f6fc",
+        "color-foreground-secondary": "#c9d1d9",
     },
     "source_repository": "https://github.com/joeharris76/benchbox/",
     "source_branch": "main",
@@ -193,10 +201,12 @@ html_theme_options = {
 html_css_files = [
     "site-header.css",
     "custom.css",
+    "site-theme.css",
 ]
 
 # Custom JavaScript files
 html_js_files = [
+    "site-theme.js",
     "site-header.js",
     "collapsible-nav.js",
 ]

@@ -9,8 +9,8 @@ body::before {
     position: fixed;
     inset: 0;
     background-image:
-        radial-gradient(circle at 20% 16%, rgba(88, 166, 255, 0.1) 0%, transparent 28%),
-        radial-gradient(circle at 82% 70%, rgba(31, 111, 235, 0.1) 0%, transparent 28%);
+        radial-gradient(circle at 20% 16%, var(--hero-glow-primary) 0%, transparent 28%),
+        radial-gradient(circle at 82% 70%, var(--hero-glow-secondary) 0%, transparent 28%);
     pointer-events: none;
     z-index: 0;
 }
@@ -163,12 +163,12 @@ body::before {
 .prompts-copy:hover,
 .prompts-copy:focus-visible {
     background: var(--accent-secondary);
-    color: #fff;
+    color: var(--bb-site-header-cta-text);
     outline: none;
 }
 
 .prompts-block--warn {
-    border-color: #d29922;
+    border-color: var(--warning-color);
 }
 
 .prompts-block--warn h2::before {

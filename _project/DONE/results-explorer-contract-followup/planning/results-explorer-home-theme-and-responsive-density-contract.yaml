@@ -7,6 +7,13 @@ completed_date: "2026-05-12"
 category: User Experience
 
 description: |
+  Supersession note (2026-05-14): the mixed dark chrome plus light analytical
+  workspace decision recorded by this completed TODO was superseded by
+  `benchbox-light-dark-theme-system`. The active product contract is now a
+  shared `system` / `light` / `dark` theme choice across landing, docs/blog,
+  and Results Explorer. This DONE item remains historical evidence and should
+  not be rewritten as if it had made the later decision.
+
   The home leaderboard page now mixes dark chrome/filter controls with a light
   analytical workspace. The CSS documents that this is intentional, but review
   feedback and tests still treat it as a possible theme regression. The same

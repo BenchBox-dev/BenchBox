@@ -18,7 +18,7 @@ import { formatLatencyMs } from "@/lib/metricFormatters";
 import { truncateRunIdentityLabel } from "@/lib/runIdentity";
 
 // Neutral gray for opacity-only legend swatches (shows opacity levels, not platform identity).
-const LEGEND_SWATCH_COLOR = "#6b7280"; // Tailwind gray-500
+const LEGEND_SWATCH_COLOR = "var(--bb-chart-axis)";
 
 export interface PercentileStatsRow {
   /** Stable per-result identifier, used as the row's React key so that two
@@ -156,7 +156,7 @@ export function PercentileLadder({ rows }: Props) {
 
               {/* Separator line */}
               {ri < rows.length - 1 && (
-                <line x1={0} y1={y + ROW_H} x2={drawWidth} y2={y + ROW_H} stroke="#e5e7eb" strokeWidth={1} />
+                <line x1={0} y1={y + ROW_H} x2={drawWidth} y2={y + ROW_H} stroke="var(--bb-chart-grid)" strokeWidth={1} />
               )}
             </g>
           );
@@ -164,12 +164,12 @@ export function PercentileLadder({ rows }: Props) {
 
         {/* X-axis */}
         <g transform={`translate(0, ${PADDING_TOP + rows.length * ROW_H})`}>
-          <line x1={LABEL_W} y1={0} x2={drawWidth - 4} y2={0} stroke="#d1d5db" strokeWidth={1} />
+          <line x1={LABEL_W} y1={0} x2={drawWidth - 4} y2={0} stroke="var(--bb-chart-grid)" strokeWidth={1} />
           {axisTicks.map((ms) => {
             const x = xForMs(ms);
             return (
               <g key={ms}>
-                <line x1={x} y1={0} x2={x} y2={4} stroke="#9ca3af" strokeWidth={1} />
+                <line x1={x} y1={0} x2={x} y2={4} stroke="var(--bb-chart-label-muted)" strokeWidth={1} />
                 <text
                   x={x}
                   y={16}

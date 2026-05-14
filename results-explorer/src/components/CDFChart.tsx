@@ -77,8 +77,8 @@ export function CDFChart({ summary }: Props) {
           const y = yFor(pct);
           return (
             <g key={pct}>
-              <line x1={LABEL_W} y1={y} x2={w - PADDING_RIGHT} y2={y} stroke="#e5e7eb" strokeWidth={1} />
-              <text x={LABEL_W - 4} y={y + 4} textAnchor="end" style={{ fontSize: "10px", fill: "#9ca3af" }}>
+              <line x1={LABEL_W} y1={y} x2={w - PADDING_RIGHT} y2={y} stroke="var(--bb-chart-grid)" strokeWidth={1} />
+              <text x={LABEL_W - 4} y={y + 4} textAnchor="end" style={{ fontSize: "10px", fill: "var(--bb-chart-label-muted)" }}>
                 {pct}%
               </text>
             </g>
@@ -105,13 +105,13 @@ export function CDFChart({ summary }: Props) {
 
         {/* X-axis */}
         <g transform={`translate(0, ${PADDING_TOP + PLOT_H})`}>
-          <line x1={LABEL_W} y1={0} x2={w - PADDING_RIGHT} y2={0} stroke="#d1d5db" strokeWidth={1} />
+          <line x1={LABEL_W} y1={0} x2={w - PADDING_RIGHT} y2={0} stroke="var(--bb-chart-grid)" strokeWidth={1} />
           {xTicks.map((ms) => {
             const x = xFor(ms);
             return (
               <g key={ms}>
-                <line x1={x} y1={0} x2={x} y2={4} stroke="#9ca3af" strokeWidth={1} />
-                <text x={x} y={16} textAnchor="middle" style={{ fontSize: "10px", fill: "#6b7280" }}>
+                <line x1={x} y1={0} x2={x} y2={4} stroke="var(--bb-chart-label-muted)" strokeWidth={1} />
+                <text x={x} y={16} textAnchor="middle" style={{ fontSize: "10px", fill: "var(--bb-chart-axis)" }}>
                   {formatLatencyMs(ms, { subMillisecond: "compact" }).valueText}
                 </text>
               </g>
@@ -124,7 +124,7 @@ export function CDFChart({ summary }: Props) {
           {series.map((s, i) => (
             <g key={s.label} transform={`translate(${LABEL_W + i * 130}, 0)`}>
               <line x1={0} y1={6} x2={16} y2={6} stroke={s.color} strokeWidth={2} />
-              <text x={20} y={10} style={{ fontSize: "11px", fill: "#374151" }}>
+              <text x={20} y={10} style={{ fontSize: "11px", fill: "var(--bb-chart-label)" }}>
                 <title>{s.fullLabel}</title>
                 {s.label}
               </text>

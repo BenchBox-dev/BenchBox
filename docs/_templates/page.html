@@ -38,6 +38,12 @@
       <a class="benchbox-site-header__link" href="https://benchbox.dev/prompts/">Instruct an agent</a>
       <a class="benchbox-site-header__link" href="https://github.com/joeharris76/BenchBox" target="_blank" rel="noopener">GitHub</a>
       <a class="benchbox-site-header__cta" href="https://benchbox.dev/docs/usage/installation.html">Run benchmark</a>
+      <button
+        class="benchbox-site-header__theme"
+        type="button"
+        aria-label="Theme: system. Activate to switch theme."
+        data-benchbox-theme-toggle
+      >System</button>
     </nav>
   </div>
 </header>
@@ -47,6 +53,18 @@
 {# Add RSS/Atom feed link in head for blog pages #}
 {%- block extrahead %}
 {{ super() }}
+<script>
+(function () {
+  try {
+    var choice = localStorage.getItem("benchbox:theme") || "system";
+    var dark = choice === "dark" || (choice === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+    document.documentElement.dataset.bbThemeChoice = choice;
+    document.documentElement.dataset.bbTheme = dark ? "dark" : "light";
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+    document.documentElement.style.colorScheme = dark ? "dark" : "light";
+  } catch (error) {}
+})();
+</script>
 {% if feed_path %}
 <link
   rel="alternate"

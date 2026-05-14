@@ -15,8 +15,21 @@
             rel="stylesheet"
         />
 
+        <script>
+            (function () {
+                try {
+                    var choice = localStorage.getItem("benchbox:theme") || "system";
+                    var dark = choice === "dark" || (choice === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+                    document.documentElement.dataset.bbThemeChoice = choice;
+                    document.documentElement.dataset.bbTheme = dark ? "dark" : "light";
+                    document.documentElement.dataset.theme = dark ? "dark" : "light";
+                    document.documentElement.style.colorScheme = dark ? "dark" : "light";
+                } catch (error) {}
+            })();
+        </script>
         <link rel="stylesheet" href="shared/site-header.css?v=1" />
         <link rel="stylesheet" href="style.css?v=5" />
+        <link rel="stylesheet" href="shared/site-theme.css?v=1" />
     </head>
 
     <body>
@@ -55,6 +68,14 @@
                     <a class="benchbox-site-header__cta" href="https://benchbox.dev/docs/usage/installation.html"
                         >Run benchmark</a
                     >
+                    <button
+                        class="benchbox-site-header__theme"
+                        type="button"
+                        aria-label="Theme: system. Activate to switch theme."
+                        data-benchbox-theme-toggle
+                    >
+                        System
+                    </button>
                 </nav>
             </div>
         </header>
@@ -1092,6 +1113,7 @@ query = tpch.get_query(1)  # Q1: Pricing Summary Report</code></pre>
         <!-- Scripts -->
         <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+        <script src="shared/site-theme.js"></script>
         <script src="shared/site-header.js"></script>
         <script src="script.js"></script>
     </body>

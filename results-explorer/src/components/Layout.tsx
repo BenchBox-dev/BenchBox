@@ -1,6 +1,7 @@
 import type { ComponentChildren } from "preact";
 import { useState } from "preact/hooks";
 import { getCurrentUrl, useRouter } from "preact-router";
+import { nextThemeChoice, useThemeChoice } from "@/lib/theme";
 
 interface LayoutProps {
   children: ComponentChildren;
@@ -26,10 +27,11 @@ function Header() {
   const currentPath = rawUrl.split("?")[0]!.split("#")[0]!;
   const inResults = currentPath === "/" || currentPath === "/results" || currentPath.startsWith("/results/");
   const [menuOpen, setMenuOpen] = useState(false);
+  const { choice, setChoice } = useThemeChoice();
 
   return (
     <header class="surface-hero" data-surface="hero">
-      <div class="sticky top-0 z-[1000] border-b border-[var(--bb-border-default)] bg-[rgba(13,17,23,0.95)] text-[var(--bb-fg-primary)] backdrop-blur">
+      <div class="sticky top-0 z-[1000] border-b border-[var(--bb-border-default)] bg-[var(--bb-site-header-bg)] text-[var(--bb-fg-primary)] backdrop-blur">
         <div class="mx-auto flex min-h-16 max-w-[1200px] flex-wrap items-center justify-between gap-4 px-4 sm:px-6">
           <a href="https://benchbox.dev/" class="font-mono text-xl font-bold leading-none no-underline text-[var(--bb-accent)]">
             BenchBox
@@ -70,10 +72,19 @@ function Header() {
             </GlobalNavLink>
             <a
               href="https://benchbox.dev/docs/usage/installation.html"
-              class="inline-flex min-h-8 items-center justify-center whitespace-nowrap rounded bg-[var(--bb-accent)] px-3 py-1.5 font-bold text-[var(--bb-fg-inverse)] no-underline hover:bg-[var(--bb-accent-hover)] hover:text-[var(--bb-fg-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--bb-focus-ring-on-dark)]"
+              class="inline-flex min-h-8 items-center justify-center whitespace-nowrap rounded bg-[var(--bb-accent)] px-3 py-1.5 font-bold text-[var(--bb-fg-inverse)] no-underline hover:bg-[var(--bb-accent-hover)] hover:text-[var(--bb-fg-inverse)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--bb-focus-ring-on-dark)]"
             >
               Run benchmark
             </a>
+            <button
+              type="button"
+              aria-label={`Theme: ${choice}. Activate to switch theme.`}
+              data-benchbox-theme-toggle
+              class="min-h-8 rounded-md border border-[var(--bb-border-default)] bg-[var(--bb-site-header-control-bg)] px-3 py-1.5 text-sm font-semibold text-[var(--bb-fg-primary)] hover:bg-[var(--bb-site-header-control-hover-bg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--bb-focus-ring-on-dark)]"
+              onClick={() => setChoice(nextThemeChoice(choice))}
+            >
+              {themeLabel(choice)}
+            </button>
           </nav>
         </div>
       </div>
@@ -161,6 +172,10 @@ function ExplorerNavLink({
 
 function isBenchmarkPath(path: string): boolean {
   return /^\/results\/(?!compare\/?$|query\/?$|p\/|r\/)[^/]+\/?$/.test(path);
+}
+
+function themeLabel(choice: string): string {
+  return choice === "system" ? "System" : choice.charAt(0).toUpperCase() + choice.slice(1);
 }
 
 function Footer() {
