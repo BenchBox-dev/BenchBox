@@ -180,6 +180,47 @@ they are not pre-defined here because we have no baseline.
 - The page composes copy from registry/platform/benchmark metadata that
   already exists; it does not need a new runtime API to do that.
 
+## Launch status (recorded by launch-gates w6, 2026-05-13)
+
+The full chain (#400 decision, #401 catalog generator, #403 static page,
+this PR) has landed on `develop` with the values below. The decision
+record above remains the policy source of truth; this block records the
+concrete state at launch.
+
+- **Final public label:** nav `Instruct an agent`; page H1
+  `Instruct a coding agent to use BenchBox`. Used verbatim in
+  `landing/index.html` and `docs/_templates/page.html`.
+- **Default state on first load:** Goal=Test one platform,
+  Agent=Generic / manual, Surface=CLI, Interface=SQL, Deployment=Local,
+  Platform=duckdb, Benchmark=tpch, Scale=0.01.
+- **Analytics:** deferred. No analytics provider wired into
+  `landing/prompts/` or root landing. **Revisit on 2026-08-13.** If
+  re-evaluating, prefer self-hosted Plausible; fall back to GoatCounter.
+- **Cloud safety behaviour:** managed-cloud recipes start with a
+  `benchbox check-dependencies <platform>` block, then a `--dry-run`,
+  then a live command behind an explicit "After credentials are
+  configured outside this chat" comment. Catalog generator validates
+  that managed platforms declare safety_terms covering
+  dependency / dry-run / no-pasted-secrets, and fails CI if missing.
+- **Known limitations (MVP):**
+  - Curated platform subset (8 platforms, 4 benchmarks). Adding more
+    requires editing `landing/prompts/catalog.yaml` and re-running the
+    generator.
+  - No automated a11y tooling. Manual checklist at
+    `landing/prompts/a11y-checklist.md` is the gate.
+  - No qualitative feedback channel beyond GitHub issues; the deferral
+    window assumes informal signal is sufficient.
+- **Kill criteria (qualitative pending baseline):**
+  - At the 2026-08-13 revisit, if there is no organic signal (no
+    issues, no inbound feedback referencing `/prompts/`, no
+    measurable docs / blog traffic referring users to it) and the
+    landing surface has not changed direction, deprecate the route or
+    instrument it before continuing to ship updates.
+  - At any time: if a managed-cloud recipe ships without
+    dependency-check + dry-run-first + no-secrets warnings, treat that
+    as a hard regression (catalog-generator CI already gates this) and
+    block the affected PR.
+
 ## Review gate (decision-gates w6 checklist)
 
 The following risk topics have been addressed by the sections above:
