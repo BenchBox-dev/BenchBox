@@ -41,69 +41,11 @@ let initError: Error | null = null;
 
 type DuckDBConnection = Awaited<ReturnType<duckdb.AsyncDuckDB["connect"]>>;
 
-// Required column contract for the canonical `bench.results` table.
-//
-// The Results Explorer feature has not shipped with a legacy public snapshot,
-// so browser code should fail fast when the current read-model contract is
-// absent instead of tolerating partial schemas until a deeper query hits a
-// Binder Error. Keep this list aligned with the browser `bench.results`
-// contract exposed by `docs/development/browser-duckdb-schema.sql`.
-//
-// Builder source: `_project/scripts/explorer_pipeline/duckdb_builder.py`.
-const BENCH_RESULTS_REQUIRED_COLUMNS = [
-  "result_id",
-  "benchmark",
-  "scale_factor",
-  "platform",
-  "platform_id",
-  "driver_version",
-  "run_date",
-  "power_score",
-  "total_duration_s",
-  "geomean_ms",
-  "display_geomean_ms",
-  "query_count",
-  "logical_query_count",
-  "has_display_timing",
-  "valid_query_count",
-  "missing_query_count",
-  "zero_timing_count",
-  "display_exclusion_reason",
-  "comparison_exclusion_reason",
-  "ranking_exclusion_reason",
-  "trust_label",
-  "visibility",
-  "platform_version",
-  "execution_mode",
-  "tuning_mode",
-  "tuning_hash",
-  "test_type",
-  "validation_status",
-  "cost_usd",
-  "normalized_cost_usd",
-  "cost_model_version",
-  "cost_model_source",
-  "cost_scope",
-  "cost_status",
-  "billing_unit",
-  "pricing_region",
-  "deployment_class",
-  "cloud_provider",
-  "cloud_region",
-  "instance_or_warehouse",
-  "instance_type",
-  "warehouse_size",
-  "node_count",
-  "cluster_size",
-  "storage_format",
-  "storage_tier",
-  "compliance_class",
-  "is_ranking_eligible",
-  "has_plans",
-  "plans_published",
-  "has_tuning",
-  "bundle_download_url",
-] as const;
+// Keep this value aligned with
+// `_project/scripts/explorer_pipeline/contract.py::EXPLORER_READ_MODEL_VERSION`.
+// `results-explorer/src/lib/__tests__/db-remediation-pin.test.ts` pins the
+// browser constant against the live Python contract.
+const EXPECTED_READ_MODEL_VERSION = 1;
 
 // Required scans must be queryable AND non-empty for the snapshot to be
 // considered ready. Optional scans must be queryable (so we know the table
@@ -172,29 +114,44 @@ export async function _waitForSnapshotRowsForTest(
   return waitForSnapshotRows(conn);
 }
 
-// Exported for unit-test coverage of the bench.results column guard.
-export async function _verifyBenchResultsColumnsForTest(
+// Exported for unit-test coverage of the read-model version guard.
+export async function _verifyReadModelVersionForTest(
   conn: DuckDBConnection,
 ): Promise<void> {
-  return verifyBenchResultsColumns(conn);
+  return verifyReadModelVersion(conn);
 }
 
-export const _BENCH_RESULTS_REQUIRED_COLUMNS_FOR_TEST = BENCH_RESULTS_REQUIRED_COLUMNS;
+export const _EXPECTED_READ_MODEL_VERSION_FOR_TEST = EXPECTED_READ_MODEL_VERSION;
 
-async function verifyBenchResultsColumns(conn: DuckDBConnection): Promise<void> {
-  const result = await conn.query(
-    "SELECT column_name FROM information_schema.columns" +
-      " WHERE table_catalog = 'bench' AND table_name = 'results'",
-  );
-  const present = new Set<string>(
-    result.toArray().map((row) => String(row.toJSON().column_name ?? "")),
-  );
-  const missing = BENCH_RESULTS_REQUIRED_COLUMNS.filter((column) => !present.has(column));
-  if (missing.length === 0) return;
+async function verifyReadModelVersion(conn: DuckDBConnection): Promise<void> {
+  const found = await readSnapshotReadModelVersion(conn);
+  if (found < EXPECTED_READ_MODEL_VERSION) {
+    throwReadModelVersionError(found);
+  }
+  if (found > EXPECTED_READ_MODEL_VERSION) {
+    console.warn(
+      `DuckDB snapshot read-model v${found}; UI expects v${EXPECTED_READ_MODEL_VERSION}. ` +
+        "Proceeding with forward-compatible reads.",
+    );
+  }
+}
+
+async function readSnapshotReadModelVersion(conn: DuckDBConnection): Promise<number> {
+  try {
+    const result = await conn.query("SELECT read_model_version FROM bench.metadata LIMIT 1");
+    const row = result.toArray()[0]?.toJSON();
+    const version = Number(row?.read_model_version ?? 0);
+    return Number.isInteger(version) && version >= 0 ? version : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function throwReadModelVersionError(found: number): never {
   throw new Error(
-    `DuckDB snapshot 'bench.results' is missing required columns: ${missing.join(", ")}.` +
-      " Refresh the published snapshot or ask a maintainer to rebuild the Explorer data. Check the deployed" +
-      " results.duckdb file.",
+    `DuckDB snapshot read-model v${found}; UI requires v${EXPECTED_READ_MODEL_VERSION}. ` +
+      "Refresh the published snapshot or ask a maintainer to rebuild the Explorer data. Check the deployed " +
+      "results.duckdb file.",
   );
 }
 
@@ -282,9 +239,7 @@ export async function getDb(): Promise<duckdb.AsyncDuckDB> {
       // Run the same projection PlatformIndex uses so a cold HTTP-backed
       // snapshot is query-ready before the cached DB instance is exposed.
       await waitForSnapshotRows(conn);
-      // Convert "Binder Error in deep page query" into "DuckDB snapshot is
-      // missing column X" at init time. See `BENCH_RESULTS_REQUIRED_COLUMNS`.
-      await verifyBenchResultsColumns(conn);
+      await verifyReadModelVersion(conn);
     } finally {
       await conn.close();
     }

@@ -11,6 +11,7 @@ import math
 from pathlib import Path
 from typing import Any
 
+from _project.scripts.explorer_pipeline.contract import EXPLORER_READ_MODEL_VERSION
 from _project.scripts.explorer_pipeline.models import (
     BenchmarkSummary,
     DetailResult,
@@ -277,6 +278,7 @@ class DuckDBSnapshotBuilder:
         rows = [self._entry_to_tuple(e) for e in entries]
 
         with duckdb.connect(str(output_path)) as con:
+            self._create_metadata(con)
             con.execute(f"CREATE TABLE results ({col_defs})")
             if rows:
                 placeholders = ", ".join("?" * len(col_names))
@@ -327,6 +329,7 @@ class DuckDBSnapshotBuilder:
 
         with duckdb.connect(str(output_path)) as con:
             self._create_schema(con)
+            self._create_metadata(con)
             self._populate_supporting_tables(con, entries, details_map)
             self._populate_results(con, entries, details_map, prefix)
             self._populate_query_display_timings(con, entries, details_map)
@@ -660,6 +663,15 @@ class DuckDBSnapshotBuilder:
                 result_id  VARCHAR  NOT NULL UNIQUE
             )
         """)
+
+    def _create_metadata(self, con: Any) -> None:
+        """Create the one-row read-model metadata table consumed by the browser."""
+        con.execute("""
+            CREATE TABLE metadata (
+                read_model_version INTEGER NOT NULL
+            )
+        """)
+        con.execute("INSERT INTO metadata VALUES (?)", [EXPLORER_READ_MODEL_VERSION])
 
     # ------------------------------------------------------------------
     # Population helpers

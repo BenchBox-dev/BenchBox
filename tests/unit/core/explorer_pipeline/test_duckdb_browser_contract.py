@@ -1,6 +1,6 @@
 """DuckDB browser contract tests (G-1, G-10, G-11 exit gates).
 
-Verifies that build_full() produces the canonical 10-table schema defined in
+Verifies that build_full() produces the canonical browser schema defined in
 browser-duckdb-schema.sql and that all tables are populated with correct data.
 """
 
@@ -12,6 +12,7 @@ from pathlib import Path
 import duckdb
 import pytest
 
+from _project.scripts.explorer_pipeline.contract import EXPLORER_READ_MODEL_VERSION
 from _project.scripts.explorer_pipeline.pipeline import SUBMISSION_MANIFEST_SUFFIX, ExplorerPipeline
 from tests.unit.core.explorer_pipeline.conftest import MINIMAL_BUNDLE
 
@@ -197,6 +198,7 @@ class TestG1SchemaContract:
         },
         "meta_leaderboard": {"platform_id", "platform", "avg_rank", "n_cohorts"},
         "short_ids": {"short_id", "result_id"},
+        "metadata": {"read_model_version"},
     }
 
     EXPECTED_VIEWS = {
@@ -327,6 +329,11 @@ class TestG1SchemaContract:
             for name in self.EXPECTED_VIEWS:
                 count = con.execute(f"SELECT COUNT(*) FROM {name}").fetchone()[0]
                 assert isinstance(count, int), f"SELECT COUNT(*) FROM {name} did not return int"
+
+    def test_metadata_carries_read_model_version(self, db_path: Path) -> None:
+        with _connect(db_path) as con:
+            rows = con.execute("SELECT read_model_version FROM metadata").fetchall()
+        assert rows == [(EXPLORER_READ_MODEL_VERSION,)]
 
 
 # ---------------------------------------------------------------------------

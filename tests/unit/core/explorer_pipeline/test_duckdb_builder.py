@@ -7,6 +7,7 @@ from pathlib import Path
 import duckdb
 import pytest
 
+from _project.scripts.explorer_pipeline.contract import EXPLORER_READ_MODEL_VERSION
 from _project.scripts.explorer_pipeline.duckdb_builder import DuckDBSnapshotBuilder
 from _project.scripts.explorer_pipeline.models import ManifestEntry
 from benchbox.core.cost.models import DeploymentMetadata, NormalizedCost
@@ -41,6 +42,16 @@ class TestDuckDBSnapshotBuilder:
 
         assert out.exists()
         assert out.stat().st_size > 0
+
+    def test_writes_read_model_version_metadata(self, tmp_path: Path) -> None:
+        builder = DuckDBSnapshotBuilder()
+        out = tmp_path / "results.duckdb"
+        builder.build([_make_entry()], out)
+
+        with duckdb.connect(str(out), read_only=True) as con:
+            version = con.execute("SELECT read_model_version FROM metadata").fetchone()[0]
+
+        assert version == EXPLORER_READ_MODEL_VERSION
 
     def test_results_table_has_correct_columns(self, tmp_path: Path) -> None:
         builder = DuckDBSnapshotBuilder()
