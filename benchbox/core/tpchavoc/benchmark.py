@@ -20,6 +20,7 @@ from benchbox.core.tpch.benchmark import TPCHBenchmark
 from benchbox.core.tpchavoc.queries import TPCHavocQueryManager
 from benchbox.core.tpchavoc.validation import ResultValidator, ValidationReport
 from benchbox.sql_compat.rules.execution_filter.lakesail_tpchavoc import LAKESAIL_TPCHAVOC_SKIPS
+from benchbox.sql_compat.rules.execution_filter.postgres_tpchavoc import POSTGRES_TPCHAVOC_SKIPS
 
 
 class TPCHavocBenchmark(TPCHBenchmark):
@@ -117,8 +118,11 @@ class TPCHavocBenchmark(TPCHBenchmark):
 
     def get_platform_skip_queries(self, platform_name: str) -> list[str]:
         """Return platform-specific TPC-Havoc variants excluded by compatibility policy."""
-        if platform_name.lower() == "lakesail":
+        platform = platform_name.lower().replace("_", "-")
+        if platform == "lakesail":
             return list(LAKESAIL_TPCHAVOC_SKIPS)
+        if platform in {"pg-duckdb", "pg-mooncake", "timescaledb"}:
+            return list(POSTGRES_TPCHAVOC_SKIPS)
         return []
 
     def get_query(

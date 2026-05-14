@@ -157,6 +157,18 @@ work:
       query rewrite; the retry passed with 412/412 successful query executions:
       `/Users/joe/Developer/benchmark_runs/logs/uat_timescaledb_fixcheck_20260513_tpcds_retry.log`.
 
+      Added PostgreSQL-family TPC-Havoc execution filters for the 17 stable
+      unsupported variants observed in the full gate (`LIST()`, alias-in-HAVING
+      / WHERE, nested aggregate/window expressions, ambiguous unqualified keys,
+      and Oracle `dual`). Targeted `pg-duckdb/tpchavoc` passed with 812/812
+      successful query executions:
+      `/Users/joe/Developer/benchmark_runs/logs/uat_pg_duckdb_fixcheck_20260513_tpchavoc_skip_retry.log`.
+      Targeted `timescaledb/tpchavoc` also passed with 812/812 successful
+      query executions, but measured ~758s in the power phase; the full
+      release-gate config now uses a 1200s per-cell timeout so this
+      correctness-clean cell is not killed by the previous 600s budget:
+      `/Users/joe/Developer/benchmark_runs/logs/uat_timescaledb_fixcheck_20260513_tpchavoc_skip_retry.log`.
+
       Remaining PG extension and TimescaleDB failures still need per-log
       clustering from
       `/Users/joe/Developer/benchmark_runs/logs/uat_enabled_platforms_full_20260513/`
