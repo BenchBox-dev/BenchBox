@@ -186,6 +186,15 @@ class TestValidateBundle:
         assert vr.ok
         assert any("Unknown platform name" in w for w in vr.warnings)
 
+    @pytest.mark.parametrize("platform_name", ["pg_duckdb", "pg_mooncake"])
+    def test_current_pg_extension_platform_names_do_not_warn(self, platform_name: str):
+        data = _minimal_bundle()
+        data["platform"]["name"] = platform_name
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok
+        assert not any("Unknown platform name" in w for w in vr.warnings)
+
     def test_all_zero_timings_fails(self):
         data = _minimal_bundle()
         data["queries"] = [

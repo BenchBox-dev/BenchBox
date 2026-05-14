@@ -610,7 +610,7 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
                     force_csv = True
                 else:
                     dialect = resolve_csv_dialect(data_source, table_name, data_file, benchmark)
-                    force_csv = False
+                    force_csv = extension == ".csv" and dialect.has_header
 
                 try:
                     copy_sql = _postgres_copy_sql(qualified_table, dialect, force_csv=force_csv)

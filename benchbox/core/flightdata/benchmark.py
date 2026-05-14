@@ -134,6 +134,7 @@ class FlightDataBenchmark(BaseBenchmark):
 
         self.tables: dict[str, Path | list[Path]] = {}
         self.csv_has_header: bool = True
+        self.csv_null_marker: str = ""
 
     def generate_data(self) -> list[Union[str, Path]]:
         """Download or generate flight data files.

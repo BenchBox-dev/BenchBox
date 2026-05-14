@@ -4,7 +4,7 @@
 
 Every rule registered in `benchbox.sql_compat` is listed below. The registry is the authoritative source of compatibility policy; this document is regenerated from it. See [adr-sql-compat-phase-aware-pipeline.md](../development/adr/adr-sql-compat-phase-aware-pipeline.md) for the design.
 
-**Total registered rules:** 329
+**Total registered rules:** 338
 
 **Platforms covered:** 28
 
@@ -20,10 +20,10 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | doris | - | 7 | - | 2 | 1 | - | 10 |
 | fabric_dw | - | - | - | - | 1 | - | 1 |
 | firebolt | - | - | - | - | 1 | - | 1 |
-| lakesail | 4 | 6 | - | - | 1 | 69 | 80 |
+| lakesail | 5 | 6 | - | - | 1 | 69 | 81 |
 | mysql | - | 1 | - | - | - | - | 1 |
-| pg-duckdb | 3 | - | - | - | - | 21 | 24 |
-| pg-mooncake | 5 | - | - | - | - | 17 | 22 |
+| pg-duckdb | 5 | - | - | - | - | 21 | 26 |
+| pg-mooncake | 8 | - | - | - | - | 17 | 25 |
 | pg_mooncake | - | - | - | - | 1 | - | 1 |
 | postgres | - | - | - | 1 | - | 67 | 68 |
 | postgresql | - | 6 | - | 1 | 1 | - | 8 |
@@ -36,7 +36,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | starrocks | - | 14 | 1 | 2 | 1 | - | 18 |
 | synapse | - | - | - | - | 1 | - | 1 |
 | timescale | - | - | - | 3 | - | - | 3 |
-| timescaledb | 3 | - | - | - | - | 19 | 22 |
+| timescaledb | 6 | - | - | - | - | 19 | 25 |
 | trino | - | - | - | 2 | 1 | - | 3 |
 | tsql | - | - | - | 2 | - | - | 2 |
 | velox | - | - | - | - | 1 | - | 1 |
@@ -135,6 +135,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | benchmark_gate | benchmark=ai_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.lakesail.ai_primitives.unsupported` |
 | benchmark_gate | benchmark=metadata_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.lakesail.metadata_primitives.unsupported` |
 | benchmark_gate | benchmark=transaction_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.lakesail.transaction_primitives.unsupported` |
+| benchmark_gate | benchmark=vector_search | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.lakesail.vector_search.unsupported` |
 | benchmark_gate | benchmark=write_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.lakesail.write_primitives.unsupported` |
 | query_source | benchmark=vector_search, query=Q1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `query_source.lakesail.vector_search.q1_unsupported` |
 | query_source | benchmark=vector_search, query=Q2 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `query_source.lakesail.vector_search.q2_unsupported` |
@@ -224,7 +225,9 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | phase | scope | action | support | failure mode | rule_id |
 |---|---|---|---|---|---|
 | benchmark_gate | benchmark=ai_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.pg-duckdb.ai_primitives.unsupported` |
+| benchmark_gate | benchmark=joinorder | block_benchmark | BLOCKED | PERFORMANCE_REGRESSION | `benchmark_gate.pg-duckdb.joinorder.canonical_imdb_runtime_envelope` |
 | benchmark_gate | benchmark=read_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.pg-duckdb.read_primitives.duckdb_intrinsics` |
+| benchmark_gate | benchmark=tpcds_obt | block_benchmark | BLOCKED | PERFORMANCE_REGRESSION | `benchmark_gate.pg-duckdb.tpcds_obt.sf1_wide_obt_runtime_envelope` |
 | benchmark_gate | benchmark=vector_search | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.pg-duckdb.vector_search.no_vector_type` |
 | execution_filter | benchmark=tpchavoc, query=10_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-duckdb.tpchavoc.10_v7` |
 | execution_filter | benchmark=tpchavoc, query=10_v9 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-duckdb.tpchavoc.10_v9` |
@@ -253,7 +256,10 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | phase | scope | action | support | failure mode | rule_id |
 |---|---|---|---|---|---|
 | benchmark_gate | benchmark=ai_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.pg-mooncake.ai_primitives.unsupported` |
+| benchmark_gate | benchmark=joinorder | block_benchmark | BLOCKED | PERFORMANCE_REGRESSION | `benchmark_gate.pg-mooncake.joinorder.canonical_imdb_runtime_envelope` |
 | benchmark_gate | benchmark=read_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.pg-mooncake.read_primitives.duckdb_intrinsics` |
+| benchmark_gate | benchmark=tpcds | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.pg-mooncake.tpcds.moonlink_scan_plan_gaps` |
+| benchmark_gate | benchmark=tpcds_obt | block_benchmark | BLOCKED | PERFORMANCE_REGRESSION | `benchmark_gate.pg-mooncake.tpcds_obt.sf1_wide_obt_runtime_envelope` |
 | benchmark_gate | benchmark=transaction_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.pg-mooncake.transaction_primitives.moonlink_read_only_mirrors` |
 | benchmark_gate | benchmark=vector_search | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.pg-mooncake.vector_search.no_vector_type` |
 | benchmark_gate | benchmark=write_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.pg-mooncake.write_primitives.moonlink_read_only_mirrors` |
@@ -469,7 +475,10 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | phase | scope | action | support | failure mode | rule_id |
 |---|---|---|---|---|---|
 | benchmark_gate | benchmark=ai_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.timescaledb.ai_primitives.unsupported` |
+| benchmark_gate | benchmark=datavault | block_benchmark | BLOCKED | PERFORMANCE_REGRESSION | `benchmark_gate.timescaledb.datavault.query_runtime_envelope` |
+| benchmark_gate | benchmark=joinorder | block_benchmark | BLOCKED | PERFORMANCE_REGRESSION | `benchmark_gate.timescaledb.joinorder.canonical_imdb_runtime_envelope` |
 | benchmark_gate | benchmark=read_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.timescaledb.read_primitives.duckdb_intrinsics` |
+| benchmark_gate | benchmark=tpcds_obt | block_benchmark | BLOCKED | PERFORMANCE_REGRESSION | `benchmark_gate.timescaledb.tpcds_obt.sf1_wide_obt_runtime_envelope` |
 | benchmark_gate | benchmark=vector_search | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.timescaledb.vector_search.no_vector_type` |
 | execution_filter | benchmark=tpchavoc, query=10_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.timescaledb.tpchavoc.10_v7` |
 | execution_filter | benchmark=tpchavoc, query=10_v9 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.timescaledb.tpchavoc.10_v9` |
