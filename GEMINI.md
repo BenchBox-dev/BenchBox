@@ -6,6 +6,7 @@ This file provides guidance to Gemini when working with BenchBox.
 - **Single repo, single remote**: `origin` → `joeharris76/BenchBox`. Canonical clone: `/Users/joe/Developer/BenchBox`. There is no `private` / `public` remote; the pre-migration two-remote setup is retired (see `_project/decisions/single-repo-migration.md` for history).
 - **Branches**: `develop` is the long-lived dev branch; `main` is release-only. Dev PRs target `develop`, squash-merge.
 - **One-shot PR flow**: from a feature branch, `make pr-preflight && make pr-open`. Opens the PR vs `develop` with `gh pr create --fill` and enables auto-merge once CI is green. Walk away — don't poll.
+- **Default write-task close-out**: implement → `code review` (fix every finding, incl. nits) → `make pr-open`. Skip only if the user explicitly opts out (typo fix, already-reviewed change).
 - **Review protocol**: review, audit, research, compare, to-spec, security
   review, and L2 blind-spot audit actions are read-only plus local capture per
   the synced `SHARED/review-protocol` skill. Local capture does not authorize
