@@ -188,34 +188,12 @@
         ];
         $("mcp-setup-text").textContent = mcpTomlLines.join("\n");
 
-        var mcpToolName = catalog.mcp.run_tool;
-        var mcpPromptName = isCompare ? catalog.mcp.prompts.compare_platforms : catalog.mcp.prompts.benchmark_run;
-        var mcpPromptText;
-        if (isCompare) {
-            mcpPromptText = [
-                "Use the BenchBox MCP server to compare " + platformLabel(platformEntry) + " and " + platformLabel(platformBEntry) + ".",
-                "Steps:",
-                "  1. Call the `" + catalog.mcp.list_tool + "` tool to confirm both platforms are available.",
-                "  2. Use the `" + mcpPromptName + "` prompt with benchmark=" + state.benchmark + ", platforms=\"" + platform + "," + platformB + "\", scale_factor=" + state.scale + ".",
-                "  3. Run the `" + mcpToolName + "` tool for each platform with the same benchmark and scale.",
-                "  4. Summarise total runtime, per-query timing, and any failures.",
-                managed ? "  • Stop and ask the user if credentials or config for a managed platform are missing — do not request secrets in chat." : ""
-            ].filter(Boolean).join("\n");
+        // block-prompt text: shell-oriented agent prompt for CLI, MCP workflow prompt for MCP surface.
+        if (state.surface === "mcp") {
+            $("prompt-text").textContent = buildMcpPrompt(state, platform, platformB, platformEntry, platformBEntry, benchmarkEntry, managed);
         } else {
-            mcpPromptText = [
-                "Use the BenchBox MCP server to run " + (benchmarkEntry ? benchmarkEntry.label : state.benchmark) + " on " + platformLabel(platformEntry) + ".",
-                "Steps:",
-                "  1. Call the `" + catalog.mcp.list_tool + "` tool to confirm the platform is installed.",
-                "  2. Use the `" + mcpPromptName + "` prompt with platform=" + platform + ", benchmark=" + state.benchmark + ", scale_factor=" + state.scale + ".",
-                "  3. Run the `" + mcpToolName + "` tool with the same arguments.",
-                "  4. Summarise total runtime and any failures.",
-                managed ? "  • Stop and ask the user if credentials or config are missing — do not request secrets in chat." : ""
-            ].filter(Boolean).join("\n");
+            $("prompt-text").textContent = buildAgentPrompt(state, platform, platformB, platformEntry, platformBEntry, benchmarkEntry, cliCmd, dryRun, depCheck, depCheckB, managed);
         }
-
-        $("prompt-text").textContent = state.surface === "mcp"
-            ? mcpPromptText
-            : buildAgentPrompt(state, platform, platformB, platformEntry, platformBEntry, benchmarkEntry, cliCmd, dryRun, depCheck, depCheckB, managed);
 
         // Visibility rules:
         // - Agent prompt: always shown.
@@ -253,7 +231,33 @@
         if (!hint) return;
         var agent = findById(catalog.agents, state.agent);
         hint.textContent = agent && agent.hint ? agent.hint : "";
-        hint.hidden = !(state.agent === "generic" && hint.textContent);
+        hint.hidden = !hint.textContent;
+    }
+
+    function buildMcpPrompt(state, platform, platformB, platformEntry, platformBEntry, benchmarkEntry, managed) {
+        var isCompare = state.goal === "compare";
+        var mcpToolName = catalog.mcp.run_tool;
+        var mcpPromptName = isCompare ? catalog.mcp.prompts.compare_platforms : catalog.mcp.prompts.benchmark_run;
+        if (isCompare) {
+            return [
+                "Use the BenchBox MCP server to compare " + platformLabel(platformEntry) + " and " + platformLabel(platformBEntry) + ".",
+                "Steps:",
+                "  1. Call the `" + catalog.mcp.list_tool + "` tool to confirm both platforms are available.",
+                "  2. Use the `" + mcpPromptName + "` prompt with benchmark=" + state.benchmark + ", platforms=\"" + platform + "," + platformB + "\", scale_factor=" + state.scale + ".",
+                "  3. Run the `" + mcpToolName + "` tool for each platform with the same benchmark and scale.",
+                "  4. Summarise total runtime, per-query timing, and any failures.",
+                managed ? "  • Stop and ask the user if credentials or config for a managed platform are missing — do not request secrets in chat." : ""
+            ].filter(Boolean).join("\n");
+        }
+        return [
+            "Use the BenchBox MCP server to run " + (benchmarkEntry ? benchmarkEntry.label : state.benchmark) + " on " + platformLabel(platformEntry) + ".",
+            "Steps:",
+            "  1. Call the `" + catalog.mcp.list_tool + "` tool to confirm the platform is installed.",
+            "  2. Use the `" + mcpPromptName + "` prompt with platform=" + platform + ", benchmark=" + state.benchmark + ", scale_factor=" + state.scale + ".",
+            "  3. Run the `" + mcpToolName + "` tool with the same arguments.",
+            "  4. Summarise total runtime and any failures.",
+            managed ? "  • Stop and ask the user if credentials or config are missing — do not request secrets in chat." : ""
+        ].filter(Boolean).join("\n");
     }
 
     function buildAgentPrompt(state, platform, platformB, platformEntry, platformBEntry, benchmarkEntry, cliCmd, dryRun, depCheck, depCheckB, managed) {

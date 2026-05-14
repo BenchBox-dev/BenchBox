@@ -122,6 +122,17 @@ applicable. See `benchbox/mcp/prompts/registry.py` and
 `benchbox/mcp/tools/benchmark.py` for the canonical names; the generator
 validates against these.
 
+## Frontend compatibility posture
+
+The `/prompts/` route should stay on the same conservative CSS baseline
+as the root landing page. Reuse broadly-supported landing patterns such
+as literal `rgba(...)` radial gradients and ordinary attribute
+selectors; do not add advanced CSS features (for example `color-mix()`
+or `:has()`) without a graceful fallback and an explicit compatibility
+note. The route is a static conversion surface, so cosmetic background
+treatment must not depend on a feature newer than the navigation,
+layout, and form controls.
+
 ## Analytics posture
 
 **Analytics are deferred for MVP launch.**
