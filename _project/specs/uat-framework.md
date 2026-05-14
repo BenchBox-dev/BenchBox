@@ -104,7 +104,7 @@ tests/uat/
 │   ├── execute.py                 # iterates ladder, invokes runner per cell, applies cleanup
 │   ├── validate.py                # subprocess wrapper around scripts/uat_validator_rollup.py
 │   ├── package.py                 # invokes benchbox submit per submit_terminal_state
-│   ├── explorer_smoke.py          # benchbox explorer build + Playwright via results-explorer/scripts/serve-browser-tests.mjs
+│   ├── explorer_smoke.py          # uv run -- python _project/scripts/explorer_publish.py build + Playwright via results-explorer/scripts/serve-browser-tests.mjs
 │   └── report.py                  # TSV roll-up + cross-scale coverage assertion
 ├── orchestrator.py                # composes phases per YAML phases: list (uat-sweep entry point)
 ├── configs/                       # tracked YAML configs
@@ -130,7 +130,7 @@ tests/uat/
 | `phases/execute.py` | Sequential iteration over (platform, benchmark, rung); invokes runner+ladder+cleanup; owns Docker platform-boundary lifecycle | 220 |
 | `phases/validate.py` | `subprocess.run(["uv","run","--","python","scripts/uat_validator_rollup.py", ...])`; consume TSV | 60 |
 | `phases/package.py` | Read `submit_terminal_state`; invoke `benchbox submit --output` or `--service`; for `draft-pr`/`merged-to-published-results`, open PR vs `published-results` (auto-merge per state) | 130 |
-| `phases/explorer_smoke.py` | `benchbox explorer build` + `node results-explorer/scripts/serve-browser-tests.mjs` | 60 |
+| `phases/explorer_smoke.py` | `uv run -- python _project/scripts/explorer_publish.py build` + `node results-explorer/scripts/serve-browser-tests.mjs` | 60 |
 | `phases/report.py` | Read each phase's outputs; emit `matrix_summary.tsv`; cross-scale coverage check | 130 |
 | `orchestrator.py` | Walk YAML `phases:` list in order; surface phase failures; respect `dry_run:` toggle | 100 |
 
@@ -310,7 +310,7 @@ package:
 # Explorer smoke phase --------------------------------------------------
 explorer_smoke:
   build_args: []                       # optional, list[str]. Extra args
-                                       # to `benchbox explorer build`.
+                                       # to `uv run -- python _project/scripts/explorer_publish.py build`.
   playwright_browsers: ["chromium"]    # optional, list[str], default
                                        # ["chromium"]. Subset of
                                        # chromium, firefox, webkit.

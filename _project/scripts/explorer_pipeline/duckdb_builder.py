@@ -11,7 +11,7 @@ import math
 from pathlib import Path
 from typing import Any
 
-from benchbox.core.explorer_pipeline.models import (
+from _project.scripts.explorer_pipeline.models import (
     BenchmarkSummary,
     DetailResult,
     ManifestEntry,
@@ -23,7 +23,7 @@ from benchbox.core.explorer_pipeline.models import (
     timing_eligibility,
     timing_exclusion_reason,
 )
-from benchbox.core.explorer_pipeline.ranking import rank_platforms
+from _project.scripts.explorer_pipeline.ranking import rank_platforms
 
 logger = logging.getLogger(__name__)
 

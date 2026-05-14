@@ -12,7 +12,7 @@ from pathlib import Path
 import duckdb
 import pytest
 
-from benchbox.core.explorer_pipeline.pipeline import SUBMISSION_MANIFEST_SUFFIX, ExplorerPipeline
+from _project.scripts.explorer_pipeline.pipeline import SUBMISSION_MANIFEST_SUFFIX, ExplorerPipeline
 from tests.unit.core.explorer_pipeline.conftest import MINIMAL_BUNDLE
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
@@ -853,7 +853,7 @@ class TestBenchmarkRankingEligibility:
 
 class TestBenchmarkRankingSpeedupParity:
     def test_speedup_vs_best_matches_canonical(self, variant_db_path: Path) -> None:
-        from benchbox.core.explorer_pipeline.compare_math import speedup_vs_best
+        from _project.scripts.explorer_pipeline.compare_math import speedup_vs_best
 
         with _connect(variant_db_path) as con:
             rows = con.execute(
@@ -868,7 +868,7 @@ class TestBenchmarkRankingSpeedupParity:
             assert stored == pytest.approx(expected, abs=1e-9), f"{tuning}: stored={stored} != canonical={expected}"
 
     def test_speedup_vs_slowest_matches_canonical(self, variant_db_path: Path) -> None:
-        from benchbox.core.explorer_pipeline.compare_math import speedup_vs_slowest
+        from _project.scripts.explorer_pipeline.compare_math import speedup_vs_slowest
 
         with _connect(variant_db_path) as con:
             rows = con.execute(

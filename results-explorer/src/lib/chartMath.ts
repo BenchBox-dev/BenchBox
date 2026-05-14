@@ -211,14 +211,14 @@ export function lightnessForCell(ms: number | null, minInCol: number | null): st
 //     Always >= 1 for valid inputs.  Used by summary cards and the per-query
 //     breakdown table on the Compare page (both anchored to the slowest value).
 //     Python reference:
-//       benchbox.core.explorer_pipeline.compare_math.speedup_vs_slowest
+//       _project.scripts.explorer_pipeline.compare_math.speedup_vs_slowest
 //       (direction-aware variant invoked with higher_is_better=False).
 //
 //   speedupRatio(baselineMs, thisMs)   - "how do I compare to a chosen baseline?"
 //     Can be < 1 (slower) or > 1 (faster).  Used by NormalizedSpeedupChart
 //     where the user picks any result as the baseline.
 //     Python reference:
-//       benchbox.core.explorer_pipeline.compare_math.baseline_speedup_ratio
+//       _project.scripts.explorer_pipeline.compare_math.baseline_speedup_ratio
 //       (also matches benchbox/core/visualization/ascii/normalized_speedup.py).
 // ---------------------------------------------------------------------------
 
@@ -263,7 +263,7 @@ export function speedupRatio(baselineMs: number | null, thisMs: number | null): 
 // ---------------------------------------------------------------------------
 // Delta percent math
 // Python reference:
-//   benchbox.core.explorer_pipeline.compare_math.delta_pct
+//   _project.scripts.explorer_pipeline.compare_math.delta_pct
 //   (also matches benchbox/core/visualization/ascii/diverging_bar.py).
 // ---------------------------------------------------------------------------
 
@@ -308,7 +308,7 @@ export function sortByMagnitudeDesc<T extends { deltaPct: number }>(groups: [str
 // ---------------------------------------------------------------------------
 // Per-query spread (slowest / fastest within a set of results for one query)
 // Python reference:
-//   benchbox.core.explorer_pipeline.compare_math.per_query_speedup_spread
+//   _project.scripts.explorer_pipeline.compare_math.per_query_speedup_spread
 // ---------------------------------------------------------------------------
 
 /**

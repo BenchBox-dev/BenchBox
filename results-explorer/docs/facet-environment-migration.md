@@ -19,7 +19,7 @@ DuckDB columns:
 
 The fallback layer is upstream of the UI today:
 
-- `benchbox.core.explorer_pipeline.transformer._normalized_cost()` reads
+- `_project.scripts.explorer_pipeline.transformer._normalized_cost()` reads
   `normalized_cost` or emits explicit `cost_status="unavailable"` for old
   bundles.
 - `benchbox.core.cost.integration._extract_platform_config_from_results()`

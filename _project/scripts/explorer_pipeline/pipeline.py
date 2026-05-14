@@ -21,8 +21,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from benchbox.core.explorer_pipeline.duckdb_builder import DuckDBSnapshotBuilder
-from benchbox.core.explorer_pipeline.models import (
+from _project.scripts.explorer_pipeline.duckdb_builder import DuckDBSnapshotBuilder
+from _project.scripts.explorer_pipeline.models import (
     BenchmarkSummary,
     DetailResult,
     ManifestEntry,
@@ -30,8 +30,8 @@ from benchbox.core.explorer_pipeline.models import (
     get_ranking_config,
     is_ranking_eligible,
 )
-from benchbox.core.explorer_pipeline.ranking import RankedCohort, rank_platforms
-from benchbox.core.explorer_pipeline.transformer import (
+from _project.scripts.explorer_pipeline.ranking import RankedCohort, rank_platforms
+from _project.scripts.explorer_pipeline.transformer import (
     BundleTransformer,
     _platform_percentile_stats,
 )

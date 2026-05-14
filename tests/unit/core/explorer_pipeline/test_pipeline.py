@@ -10,13 +10,13 @@ from pathlib import Path
 import duckdb
 import pytest
 
-from benchbox.core.explorer_pipeline.pipeline import (
+from _project.scripts.explorer_pipeline.pipeline import (
     COMMUNITY_TRUST_LABEL,
     SUBMISSION_MANIFEST_FILENAME,
     ExplorerPipeline,
     _build_short_ids,
 )
-from benchbox.core.explorer_pipeline.transformer import BundleTransformer
+from _project.scripts.explorer_pipeline.transformer import BundleTransformer
 from tests.unit.core.explorer_pipeline.conftest import MINIMAL_BUNDLE
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
@@ -424,7 +424,7 @@ class TestExplorerPipelineRun:
         (bundles_dir / SUBMISSION_MANIFEST_FILENAME).write_text("{}", encoding="utf-8")
 
         output = tmp_path / "out"
-        with caplog.at_level(logging.DEBUG, logger="benchbox.core.explorer_pipeline.pipeline"):
+        with caplog.at_level(logging.DEBUG, logger="_project.scripts.explorer_pipeline.pipeline"):
             ExplorerPipeline().run(tmp_path / "data", output, trust_label="maintainer-run")
 
         assert any("Found submission manifest" in rec.message for rec in caplog.records)

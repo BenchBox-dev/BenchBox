@@ -259,7 +259,7 @@ export function planDownloadUrl(detail: DetailResult) {
   // Gate on the explicit publication signal, not source-side detection.
   // ``has_plans`` reflects "the source bundle had a *.plans.json sidecar",
   // but the explorer pipeline excludes plan sidecars from bundle discovery
-  // (benchbox/core/explorer_pipeline/pipeline.py:439), so plan files are
+  // (_project/scripts/explorer_pipeline/pipeline.py:439), so plan files are
   // never copied to the published bundles directory and this URL would 404.
   // Only render a link when the pipeline has actually published the file.
   if (!detail.plans_published) return null;

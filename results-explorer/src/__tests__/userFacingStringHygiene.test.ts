@@ -114,7 +114,7 @@ describe("user-facing string hygiene", () => {
       "// internal note: _project/bar.md (this is a comment, allowed)",
       "<p>See AGENTS.md</p>",
       "{/* JSX maintainer note: CLAUDE.md (this is a comment, allowed) */}",
-      'const ok = "regenerate via benchbox explorer build";',
+      'const ok = "ask a maintainer to rebuild the Explorer data";',
     ].join("\n");
     const findings = scanSource("synthetic.tsx", sample, ts.ScriptKind.TSX);
     expect(findings).toEqual([

@@ -7,10 +7,10 @@ from pathlib import Path
 import duckdb
 import pytest
 
+from _project.scripts.explorer_pipeline.duckdb_builder import DuckDBSnapshotBuilder
+from _project.scripts.explorer_pipeline.models import ManifestEntry
 from benchbox.core.cost.models import DeploymentMetadata, NormalizedCost
 from benchbox.core.cost.pricing import PRICING_VERSION
-from benchbox.core.explorer_pipeline.duckdb_builder import DuckDBSnapshotBuilder
-from benchbox.core.explorer_pipeline.models import ManifestEntry
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 

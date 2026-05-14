@@ -65,13 +65,13 @@ describe("verifyBenchResultsColumns guard", () => {
     ).rejects.toThrow(/is_ranking_eligible/);
   });
 
-  it("rejects mentioning the regenerator command for missing identity columns", async () => {
+  it("rejects with maintainer rebuild guidance for missing identity columns", async () => {
     const present = _BENCH_RESULTS_REQUIRED_COLUMNS_FOR_TEST.filter(
       (column) => column !== "result_id",
     );
     const conn = makeConn(present);
     await expect(
       _verifyBenchResultsColumnsForTest(conn as unknown as Parameters<typeof _verifyBenchResultsColumnsForTest>[0]),
-    ).rejects.toThrow(/benchbox explorer build/);
+    ).rejects.toThrow(/ask a maintainer to rebuild the Explorer data/);
   });
 });

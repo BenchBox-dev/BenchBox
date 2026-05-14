@@ -1,22 +1,27 @@
-"""CLI command group for the results explorer static build pipeline."""
+"""Maintainer entry point for publishing the Results Explorer read model."""
 
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import click
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 from benchbox.cli.shared import console
-from benchbox.core.explorer_pipeline.contract import EXPLORER_BUILD_CONTRACT
+from _project.scripts.explorer_pipeline.contract import EXPLORER_BUILD_CONTRACT
 
 
-@click.group("explorer")
-def explorer_group() -> None:
-    """Manage the results explorer static build pipeline."""
+@click.group()
+def explorer_publish() -> None:
+    """Manage the Results Explorer static build pipeline."""
 
 
-@explorer_group.command("build")
+@explorer_publish.command("build")
 @click.option(
     "--data-dir",
     required=True,
@@ -60,18 +65,18 @@ def explorer_build(
     Examples:
 
     \b
-      benchbox explorer build \\
+      uv run -- python _project/scripts/explorer_publish.py build \\
         --data-dir results-data/ \\
         --output results-explorer/public/data/
 
     \b
-      benchbox explorer build \\
+      uv run -- python _project/scripts/explorer_publish.py build \\
         --data-dir results-data/ \\
         --output results-explorer/public/data/ \\
         --trust-label community-submission \\
         --visibility public-self-reported
     """
-    from benchbox.core.explorer_pipeline.pipeline import ExplorerPipeline
+    from _project.scripts.explorer_pipeline.pipeline import ExplorerPipeline
 
     console.print("[bold]Explorer build[/bold]")
     console.print(f"  Data dir:    [cyan]{data_dir}[/cyan]")
@@ -98,11 +103,20 @@ def explorer_build(
         raise SystemExit(1) from exc
 
 
-@explorer_group.command("build-contract", hidden=True)
+@explorer_publish.command("build-contract", hidden=True)
 def explorer_build_contract() -> None:
     """Emit the stable contract metadata for explorer-build integrations."""
 
     click.echo(json.dumps(EXPLORER_BUILD_CONTRACT))
 
 
-__all__ = ["explorer_group"]
+def main() -> None:
+    """Script entry point."""
+    explorer_publish()
+
+
+if __name__ == "__main__":
+    main()
+
+
+__all__ = ["explorer_build", "explorer_build_contract", "explorer_publish", "main"]

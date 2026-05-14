@@ -6,8 +6,8 @@
  * Copies source bundles from `test-fixtures/source/bundles/` into
  * `test-fixtures/.generated/source/bundles/`, applies controlled
  * metadata variants (trust labels, compare-invalid cohorts), and then
- * runs `benchbox explorer build` to produce the per-run read model at
- * `test-fixtures/.generated/data/`.
+ * runs `uv run -- python _project/scripts/explorer_publish.py build` to
+ * produce the per-run read model at `test-fixtures/.generated/data/`.
  *
  * Never touches:
  *   - results-explorer/public/data/
@@ -478,15 +478,15 @@ const writeVariants = () => {
 };
 
 const runPipeline = (contract) => {
-  const args = ["run", "--", ...contract.commandArgs, "--data-dir", genSourceRoot, "--output", genDataDir];
-  log(`uv ${args.join(" ")} (cwd=${repoRoot})`);
-  const result = spawnSync("uv", args, {
+  const args = [...contract.commandArgs, "--data-dir", genSourceRoot, "--output", genDataDir];
+  log(`${args.join(" ")} (cwd=${repoRoot})`);
+  const result = spawnSync(args[0], args.slice(1), {
     cwd: repoRoot,
     stdio: "inherit",
     env: { ...process.env, PYTHONUNBUFFERED: "1" },
   });
   if (result.status !== 0) {
-    throw new Error(`benchbox explorer build failed (exit ${result.status})`);
+    throw new Error(`Explorer publish command failed (exit ${result.status})`);
   }
 };
 

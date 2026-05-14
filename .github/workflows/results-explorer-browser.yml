@@ -5,14 +5,14 @@ on:
     branches: [ main ]
     paths:
       - 'results-explorer/**'
-      - 'benchbox/core/explorer_pipeline/**'
+      - '_project/scripts/explorer_pipeline/**'
       - 'results-data/**'
       - '.github/workflows/results-explorer-browser.yml'
   pull_request:
     branches: [ main ]
     paths:
       - 'results-explorer/**'
-      - 'benchbox/core/explorer_pipeline/**'
+      - '_project/scripts/explorer_pipeline/**'
       - 'results-data/**'
       - '.github/workflows/results-explorer-browser.yml'
   workflow_dispatch:
