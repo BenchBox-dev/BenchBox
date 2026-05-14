@@ -100,9 +100,8 @@ jobs:
 
       - name: Build explorer data (static pipeline)
         if: hashFiles('results-explorer/package.json') != ''
-        run: uv run benchbox explorer build --data-dir results-data/ --output results-explorer/public/data/
+        run: uv run -- python _project/scripts/explorer_publish.py build --data-dir results-data/ --output results-explorer/public/data/
         # Note: results-data/bundles/ may be empty on first deploy; pipeline handles empty gracefully
-        # Note: requires `benchbox explorer` CLI subcommand (added in PR #46)
 
       - name: Build results-explorer
         if: hashFiles('results-explorer/package.json') != ''

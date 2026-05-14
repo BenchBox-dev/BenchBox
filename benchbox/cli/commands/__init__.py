@@ -19,7 +19,6 @@ from .convert import convert
 from .datagen import datagen
 from .df_tuning import df_tuning_group
 from .download_answers import download_answers
-from .explorer import explorer_group
 from .export import export
 from .metrics import metrics_group
 from .plan_history import plan_history
@@ -59,7 +58,6 @@ COMMANDS = (
     tuning_group,  # New unified tuning group
     create_sample_tuning,  # Deprecated: hidden, kept for backwards compatibility
     df_tuning_group,  # Deprecated: hidden, kept for backwards compatibility
-    explorer_group,
     export,
     submit,
     check_dependencies,
@@ -103,7 +101,6 @@ __all__ = [
     "tuning_group",
     "create_sample_tuning",
     "df_tuning_group",
-    "explorer_group",
     "export",
     "submit",
     "check_dependencies",

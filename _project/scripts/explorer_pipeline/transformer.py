@@ -16,7 +16,7 @@ from typing import Any, cast
 
 from benchbox.core.cost.models import CostScope, CostStatus, DeploymentMetadata, NormalizedCost
 from benchbox.core.cost.pricing import PRICING_VERSION
-from benchbox.core.explorer_pipeline.models import (
+from _project.scripts.explorer_pipeline.models import (
     DetailResult,
     ManifestEntry,
     PercentileStats,

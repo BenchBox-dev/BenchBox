@@ -2,7 +2,8 @@ id: explorer-cli-surface-migration
 title: "Execute the explorer-CLI-surface ADR and remove explorer from benchbox --help"
 worktree: explorer-cli-surface-migration
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-05-14"
 category: Refactoring
 
 description: |
@@ -30,21 +31,23 @@ deps:
   - explorer-cli-surface-adr
 
 prior_art:
-  - "benchbox/cli/commands/explorer.py — current location; remove and relocate per ADR."
-  - "benchbox/core/explorer_pipeline/ — pipeline package; relocation gated by ADR sub-question (a)."
-  - ".github/workflows/docs.yml:103-105 — CI invocation + the wrong PR #46 attribution comment; update invocation, delete the comment."
-  - "results-explorer/scripts/generate-browser-fixtures.mjs:489 — Node-side caller; update spawn invocation."
-  - "results-explorer/scripts/explorer-build-contract.mjs:17 — EXPECTED_COMMAND constant; update to the new invocation."
-  - "results-explorer/src/db.ts:196 — frontend remediation string; update to the new invocation and pin to it via test."
-  - "docs/development/browser-test-architecture.md:35,119,130 — developer docs referencing the old command."
-  - "docs/operations/results-phase-2-runbook.md:109 — runbook references the old command."
-  - "tests/uat/.../explorer_smoke.py + Makefile target `uat-explorer-smoke` (line ~1612) — UAT phase invocation."
-  - "tests/unit/cli/test_explorer_build_contract.py — existing contract tests; if the CLI moves out of benchbox/cli/, this test file moves with it or is replaced."
+- "benchbox/cli/commands/explorer.py — current location; remove and relocate per ADR."
+- "benchbox/core/explorer_pipeline/ — pipeline package; relocation gated by ADR sub-question (a)."
+- ".github/workflows/docs.yml:103-105 — CI invocation + the wrong PR #46 attribution comment; update invocation, delete the
+  comment."
+- "results-explorer/scripts/generate-browser-fixtures.mjs:489 — Node-side caller; update spawn invocation."
+- "results-explorer/scripts/explorer-build-contract.mjs:17 — EXPECTED_COMMAND constant; update to the new invocation."
+- "results-explorer/src/db.ts:196 — frontend remediation string; update to the new invocation and pin to it via test."
+- "docs/development/browser-test-architecture.md:35,119,130 — developer docs referencing the old command."
+- "docs/operations/results-phase-2-runbook.md:109 — runbook references the old command."
+- "tests/uat/.../explorer_smoke.py + Makefile target `uat-explorer-smoke` (line ~1612) — UAT phase invocation."
+- "tests/unit/cli/test_explorer_build_contract.py — existing contract tests; if the CLI moves out of benchbox/cli/, this test
+  file moves with it or is replaced."
 
 work:
 - id: w1
   summary: "Re-confirm the ADR is merged and read its inventories"
-  status: pending
+  status: done
   notes: |
     Read `docs/development/adr/adr-explorer-cli-surface.md` end-to-end.
     If the inventories of call sites and pipeline imports already exist
@@ -54,7 +57,7 @@ work:
 - id: w2
   summary: "Relocate the CLI entry point per ADR"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Move `benchbox/cli/commands/explorer.py` to the ADR's chosen
     destination. Update:
@@ -68,7 +71,7 @@ work:
 - id: w3
   summary: "Relocate `benchbox/core/explorer_pipeline/` if the ADR requires it"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Gated by ADR sub-question (a). If "yes": move the package + its tests
     under `tests/unit/core/explorer_pipeline/` to the ADR's destination.
@@ -80,7 +83,7 @@ work:
 - id: w4
   summary: "Update every call site identified in the ADR inventory"
   needs: [w2, w3]
-  status: pending
+  status: done
   notes: |
     Process each of the call sites from the ADR's w1 inventory. Specifically:
       - `.github/workflows/docs.yml:103` — replace invocation; DELETE the
@@ -100,7 +103,7 @@ work:
 - id: w5
   summary: "Add a regression test pinning the frontend remediation string"
   needs: [w4]
-  status: pending
+  status: done
   notes: |
     The current failure mode: `results-explorer/src/db.ts:196` embeds the
     string `'benchbox explorer build'`. If the CLI is renamed, nothing
@@ -120,7 +123,7 @@ work:
 - id: w6
   summary: "Run the full verification matrix and open the PR"
   needs: [w5]
-  status: pending
+  status: done
   notes: |
     Local verification:
       - `uv run benchbox --help | grep -c explorer` → 0
@@ -134,7 +137,8 @@ work:
     references the merged ADR and lists each call site touched.
 
 must_preserve:
-- "CI explorer-build step in `.github/workflows/docs.yml` continues to produce a valid `results-explorer/public/data/results.duckdb` (only the invocation changes)."
+- "CI explorer-build step in `.github/workflows/docs.yml` continues to produce a valid `results-explorer/public/data/results.duckdb`
+  (only the invocation changes)."
 - "Browser-fixture generator continues to produce byte-identical fixture sets (verified by `verify-browser-fixtures.mjs`)."
 - "UAT `make uat-explorer-smoke` continues to pass with the new invocation."
 - "Output contract (schema of `results.duckdb` and copied bundles) is unchanged by this TODO."
@@ -152,9 +156,12 @@ approach: |
 
 anti_patterns:
 - "DO NOT change the snapshot's output contract or column schema — that work is owned by TODO `explorer-read-model-schema-versioning`."
-- "DO NOT fix the stale-snapshot dev-DX wall in this PR — that's TODO `explorer-dev-snapshot-dx`. Mixing them makes review harder and entangles the rename with behavioral change."
-- "DO NOT keep `benchbox explorer` as a permanent alias unless the ADR explicitly chose option (b) with a deprecation shim. A bare `pass`-through alias defeats the whole point."
-- "DO NOT update historical audit docs that record commands actually run at the time. Only the active runbook and developer docs need updates; history can read 'we ran benchbox explorer build on 2026-05-10'."
+- "DO NOT fix the stale-snapshot dev-DX wall in this PR — that's TODO `explorer-dev-snapshot-dx`. Mixing them makes review
+  harder and entangles the rename with behavioral change."
+- "DO NOT keep `benchbox explorer` as a permanent alias unless the ADR explicitly chose option (b) with a deprecation shim.
+  A bare `pass`-through alias defeats the whole point."
+- "DO NOT update historical audit docs that record commands actually run at the time. Only the active runbook and developer
+  docs need updates; history can read 'we ran benchbox explorer build on 2026-05-10'."
 
 scope_limit:
   only_modify:

@@ -31,8 +31,9 @@ considered binding.
   `ATTACH ... (READ_ONLY)`, and has no JSON fallback - any attach failure
   surfaces to the user.
 - The DuckDB snapshot is produced by
-  `benchbox/core/explorer_pipeline/pipeline.py` via
-  `benchbox explorer build --data-dir <bundles> --output <dist-data>`.
+  `_project/scripts/explorer_pipeline/pipeline.py` via
+  `uv run -- python _project/scripts/explorer_publish.py build
+  --data-dir <bundles> --output <dist-data>`.
 - Unit and component coverage lives under `results-explorer/src/__tests__/`,
   `results-explorer/src/components/__tests__/`,
   `results-explorer/src/lib/__tests__/`, and
@@ -116,9 +117,9 @@ touched.
   test time.
 - `results-data/bundles/` is the public curated source - same prohibition.
 - The pipeline already has a supported data-in / data-out shape:
-  `benchbox explorer build --data-dir <in> --output <out>` reads bundles
-  from any directory and writes `results.duckdb` plus copied bundle downloads
-  to any directory. We do not need a new seam;
+  `uv run -- python _project/scripts/explorer_publish.py build --data-dir <in>
+  --output <out>` reads bundles from any directory and writes `results.duckdb`
+  plus copied bundle downloads to any directory. We do not need a new seam;
   we need a thin fixture generator that:
   1. Copies canonical schema-v2 bundles (and companion `.plans.json`
      / `.tuning.json` / `<result>.manifest.json` sidecars) from a small
@@ -127,7 +128,8 @@ touched.
   2. Applies controlled metadata mutations in memory per variant
      (trust label, tuning mode, sidecar presence, compare-invalid
      mismatches).
-  3. Runs `benchbox explorer build` against the staging dir, writing into
+  3. Runs `uv run -- python _project/scripts/explorer_publish.py build`
+     against the staging dir, writing into
      `results-explorer/test-fixtures/.generated/data/`.
 - Mutating metadata in an ephemeral staging copy - rather than via the
   published corpus - means the generator can produce compare-invalid
@@ -157,7 +159,7 @@ touched.
 - `results-explorer/test-fixtures/.generated/` is gitignored.
   `results-explorer/test-results/` (Playwright artifacts) is also
   gitignored.
-- A small Python glue module under `benchbox/core/explorer_pipeline/` is
+- A small Python glue module under `_project/scripts/explorer_pipeline/` is
   permitted if a test-only metadata mutator is needed, but the first slice
   prefers a pure-fixture approach where the committed source bundles
   already encode each variant and the fixture generator just re-runs the

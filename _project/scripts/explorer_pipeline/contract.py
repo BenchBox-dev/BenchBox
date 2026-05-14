@@ -6,7 +6,7 @@ EXPLORER_BUILD_CONTRACT_VERSION = "4"
 
 EXPLORER_BUILD_CONTRACT = {
     "version": EXPLORER_BUILD_CONTRACT_VERSION,
-    "command": "benchbox explorer build",
+    "command": "uv run -- python _project/scripts/explorer_publish.py build",
     "flags": [
         "--data-dir",
         "--output",

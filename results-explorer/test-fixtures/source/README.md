@@ -4,7 +4,8 @@ Deterministic input corpus for the results-explorer browser-functional
 test suite. The generator script
 `results-explorer/scripts/generate-browser-fixtures.mjs` copies files
 from here into `../.generated/source/`, applies controlled metadata
-variants, and then runs `benchbox explorer build` to produce
+variants, and then runs
+`uv run -- python _project/scripts/explorer_publish.py build` to produce
 `../.generated/data/results.duckdb` plus the companion bundle copies.
 
 The curated public corpus under `results-explorer/public/data/` and the

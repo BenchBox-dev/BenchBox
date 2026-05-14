@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from benchbox.core.explorer_pipeline.models import (
+from _project.scripts.explorer_pipeline.models import (
     RANKING_ELIGIBLE_TRUST_LABELS,
     RANKING_ELIGIBLE_VISIBILITIES,
     ManifestEntry,
@@ -33,7 +33,7 @@ from benchbox.core.explorer_pipeline.models import (
     select_canonical_row,
     timing_eligibility,
 )
-from benchbox.core.explorer_pipeline.transformer import (
+from _project.scripts.explorer_pipeline.transformer import (
     BundleTransformer,
     _query_display_ms,
 )

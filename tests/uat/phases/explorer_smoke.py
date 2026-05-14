@@ -19,6 +19,14 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 EXPLORER_DIR = REPO_ROOT / "results-explorer"
 EXTERNAL_CORPUS_SMOKE_TAG = "@uat-external-corpus"
+EXPLORER_BUILD_ARGV = (
+    "uv",
+    "run",
+    "--",
+    "python",
+    "_project/scripts/explorer_publish.py",
+    "build",
+)
 
 
 @dataclass(frozen=True)
@@ -48,11 +56,9 @@ def build_argv(
     output_dir: Path | str = EXPLORER_DIR / "public" / "data",
     build_extra_args: tuple[str, ...] = (),
 ) -> list[str]:
-    """Return the current `benchbox explorer build` argv."""
+    """Return the current Explorer publisher argv."""
     return [
-        "benchbox",
-        "explorer",
-        "build",
+        *EXPLORER_BUILD_ARGV,
         "--data-dir",
         str(data_dir),
         "--output",

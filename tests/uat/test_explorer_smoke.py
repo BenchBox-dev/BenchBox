@@ -61,7 +61,7 @@ def test_runs_builds_fixtures_then_playwright_smoke(tmp_path: Path):
         invocations.append(argv)
         cwd_by_invocation.append(cwd)
         env_by_invocation.append(env)
-        if argv[:3] == ["benchbox", "explorer", "build"]:
+        if argv[:6] == list(explorer_smoke.EXPLORER_BUILD_ARGV):
             output_dir.mkdir(parents=True)
             (output_dir / "results.duckdb").write_text("fixture", encoding="utf-8")
         return Mock(returncode=0, args=argv)
@@ -81,7 +81,7 @@ def test_runs_builds_fixtures_then_playwright_smoke(tmp_path: Path):
     assert result.skipped is False
     assert result.exit_code() == 0
     assert len(invocations) == 4
-    assert invocations[0][:3] == ["benchbox", "explorer", "build"]
+    assert invocations[0][:6] == list(explorer_smoke.EXPLORER_BUILD_ARGV)
     assert "--data-dir" in invocations[0]
     assert invocations[1] == ["npm", "ci"]
     assert invocations[2] == ["npm", "run", "build"]
@@ -152,7 +152,7 @@ def test_default_fixture_dir_is_per_run_and_passed_to_playwright(tmp_path: Path)
     def fake_runner(argv, stdout=None, stderr=None, check=False, cwd=None, env=None):
         invocations.append(argv)
         env_by_invocation.append(env)
-        if argv[:3] == ["benchbox", "explorer", "build"]:
+        if argv[:6] == list(explorer_smoke.EXPLORER_BUILD_ARGV):
             output_dir.mkdir(parents=True)
             (output_dir / "results.duckdb").write_text("fixture", encoding="utf-8")
         return Mock(returncode=0, args=argv)

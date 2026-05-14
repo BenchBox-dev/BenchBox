@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from benchbox.core.explorer_pipeline.models import BenchmarkSummary, PlatformRow, RankingConfig
-from benchbox.core.explorer_pipeline.pipeline import _build_meta_leaderboard
+from _project.scripts.explorer_pipeline.models import BenchmarkSummary, PlatformRow, RankingConfig
+from _project.scripts.explorer_pipeline.pipeline import _build_meta_leaderboard
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 

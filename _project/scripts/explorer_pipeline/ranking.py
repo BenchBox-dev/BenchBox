@@ -5,8 +5,8 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from benchbox.core.explorer_pipeline.compare_math import speedup_vs_best, speedup_vs_slowest
-from benchbox.core.explorer_pipeline.models import BenchmarkSummary, PlatformRow
+from _project.scripts.explorer_pipeline.compare_math import speedup_vs_best, speedup_vs_slowest
+from _project.scripts.explorer_pipeline.models import BenchmarkSummary, PlatformRow
 
 
 @dataclass(frozen=True)

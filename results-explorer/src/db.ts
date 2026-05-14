@@ -49,7 +49,7 @@ type DuckDBConnection = Awaited<ReturnType<duckdb.AsyncDuckDB["connect"]>>;
 // Binder Error. Keep this list aligned with the browser `bench.results`
 // contract exposed by `docs/development/browser-duckdb-schema.sql`.
 //
-// Builder source: `benchbox/core/explorer_pipeline/duckdb_builder.py`.
+// Builder source: `_project/scripts/explorer_pipeline/duckdb_builder.py`.
 const BENCH_RESULTS_REQUIRED_COLUMNS = [
   "result_id",
   "benchmark",
@@ -193,7 +193,7 @@ async function verifyBenchResultsColumns(conn: DuckDBConnection): Promise<void> 
   if (missing.length === 0) return;
   throw new Error(
     `DuckDB snapshot 'bench.results' is missing required columns: ${missing.join(", ")}.` +
-      " Regenerate the snapshot via 'benchbox explorer build' or check the deployed" +
+      " Refresh the published snapshot or ask a maintainer to rebuild the Explorer data. Check the deployed" +
       " results.duckdb file.",
   );
 }

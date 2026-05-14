@@ -77,7 +77,7 @@ export interface DetailResult extends CostDeploymentFields {
   // sidecar to the published bundles directory. ``has_plans`` reflects only
   // source-side detection and is unsafe to use as a download-link gate
   // because the pipeline excludes plan sidecars from bundle discovery
-  // (see benchbox/core/explorer_pipeline/pipeline.py). Optional so older
+  // (see _project/scripts/explorer_pipeline/pipeline.py). Optional so older
   // SQL paths that don't yet emit this field default to undefined → falsy.
   plans_published?: boolean | null;
   has_tuning: boolean;

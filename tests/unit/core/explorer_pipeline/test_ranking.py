@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from benchbox.core.explorer_pipeline.models import BenchmarkSummary, PlatformRow, RankingConfig
-from benchbox.core.explorer_pipeline.ranking import rank_platforms
+from _project.scripts.explorer_pipeline.models import BenchmarkSummary, PlatformRow, RankingConfig
+from _project.scripts.explorer_pipeline.ranking import rank_platforms
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 

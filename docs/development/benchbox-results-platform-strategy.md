@@ -270,7 +270,7 @@ custom benchmarks). For **TPC-H and TPC-DS**, the canonical metric is
 `power_score` as defined by the TPC specification - users arriving from
 published TPC results expect to see that number. The explorer pipeline
 exposes a per-family `RANKING_METRIC_BY_FAMILY` registry
-(`benchbox/core/explorer_pipeline/models.py`) that selects the primary
+(`_project/scripts/explorer_pipeline/models.py`) that selects the primary
 metric per benchmark family and serializes the choice into each
 `BenchmarkSummary` artifact's `ranking` field - no ranking logic lives in
 TypeScript. `geomean_ms` / `display_geomean_ms` remains as the universal
@@ -767,7 +767,7 @@ that must be locked before any code changes in W2-W7.*
 ### Definition of Terms
 
 - **Canonical Python reference computation** - the pipeline's own Python implementation
-  inside `benchbox/core/explorer_pipeline/` plus read-only imports from
+  inside `_project/scripts/explorer_pipeline/` plus read-only imports from
   `benchbox/core/results/`. TypeScript code, pre-calculated CLI JSON artifacts, and
   bridge artifacts are **never** a reference source.
 
@@ -848,23 +848,23 @@ every user-visible metric as `raw_copy` (source-fidelity contract) or `derived`
 
 | Metric | Python reference |
 |--------|-----------------|
-| `display_ms` per query | `benchbox.core.explorer_pipeline.transformer._query_display_ms` |
-| `display_geomean_ms` | `benchbox.core.explorer_pipeline.transformer._display_geomean_ms` |
-| `geomean_ms` | `benchbox.core.explorer_pipeline.transformer._geomean_ms` |
-| `compliance_class` | `benchbox.core.explorer_pipeline.transformer._compliance_class` |
-| `is_ranking_eligible` | `benchbox.core.explorer_pipeline.models.is_ranking_eligible` |
-| `platform_id` | `benchbox.core.explorer_pipeline.models._platform_id` |
-| `tuning_hash` | `benchbox.core.explorer_pipeline.transformer._tuning_hash` |
-| `short_id` | `benchbox.core.explorer_pipeline.pipeline._build_short_ids` |
-| `rank` (cohort) | `benchbox.core.explorer_pipeline.pipeline._build_benchmark_summaries` |
-| `rank`, `metric_value`, `speedup_vs_best`, `avg_rank`, `n_cohorts` (meta) | `benchbox.core.explorer_pipeline.pipeline._build_meta_leaderboard` |
-| `percentile_p50/p90/p95/p99` | `benchbox.core.explorer_pipeline.transformer._platform_percentile_stats` |
+| `display_ms` per query | `_project.scripts.explorer_pipeline.transformer._query_display_ms` |
+| `display_geomean_ms` | `_project.scripts.explorer_pipeline.transformer._display_geomean_ms` |
+| `geomean_ms` | `_project.scripts.explorer_pipeline.transformer._geomean_ms` |
+| `compliance_class` | `_project.scripts.explorer_pipeline.transformer._compliance_class` |
+| `is_ranking_eligible` | `_project.scripts.explorer_pipeline.models.is_ranking_eligible` |
+| `platform_id` | `_project.scripts.explorer_pipeline.models._platform_id` |
+| `tuning_hash` | `_project.scripts.explorer_pipeline.transformer._tuning_hash` |
+| `short_id` | `_project.scripts.explorer_pipeline.pipeline._build_short_ids` |
+| `rank` (cohort) | `_project.scripts.explorer_pipeline.pipeline._build_benchmark_summaries` |
+| `rank`, `metric_value`, `speedup_vs_best`, `avg_rank`, `n_cohorts` (meta) | `_project.scripts.explorer_pipeline.pipeline._build_meta_leaderboard` |
+| `percentile_p50/p90/p95/p99` | `_project.scripts.explorer_pipeline.transformer._platform_percentile_stats` |
 
 **Derived metrics currently TS-only - must be ported to Python in W2:**
 
 | TS source | Function | Target in W2 |
 |-----------|----------|--------------|
-| `chartMath.ts: computeRankTable` | Per-query rank across platforms in a cohort | Port into `benchbox/core/explorer_pipeline/` and materialize into `benchmark_matrix_cells` or a companion rank table |
+| `chartMath.ts: computeRankTable` | Per-query rank across platforms in a cohort | Port into `_project/scripts/explorer_pipeline/` and materialize into `benchmark_matrix_cells` or a companion rank table |
 | `chartMath.ts: perQuerySpeedup` | `slowest_ms / fastest_ms` spread | Not persisted; computed as SQL window function `MAX/MIN` in the Compare DuckDB query - no Python porting needed |
 | `chartMath.ts: vsSlowestRatio` | `slowest_ms / this_ms` per result per query | Computed from DuckDB query_display_timings/results at read time; the legacy comparison artifact path has been removed |
 | `chartMath.ts: colorForCell`, `lightnessForCell` | Heatmap color from timing ratio | Presentation-only (CSS hue/lightness from `display_ms`). No metric value. Stays TS-side. |

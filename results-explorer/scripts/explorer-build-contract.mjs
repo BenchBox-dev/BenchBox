@@ -14,9 +14,10 @@ const REMOVED_LEGACY_OUTPUTS = [
   "short_ids.json",
   "results_schema.json",
 ];
-const EXPECTED_COMMAND = "benchbox explorer build";
+export const EXPECTED_COMMAND = "uv run -- python _project/scripts/explorer_publish.py build";
 const ALIGNMENT_HINT =
-  "Update results-explorer/scripts/explorer-build-contract.mjs or benchbox/core/explorer_pipeline/contract.py to re-align.";
+  "Update results-explorer/scripts/explorer-build-contract.mjs or " +
+  "_project/scripts/explorer_pipeline/contract.py to re-align.";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const repoRoot = resolve(here, "..", "..");
@@ -27,7 +28,7 @@ function formatSpawnError(result) {
 }
 
 export function readExplorerBuildContract() {
-  const result = spawnSync("uv", ["run", "--", "benchbox", "explorer", "build-contract"], {
+  const result = spawnSync("uv", ["run", "--", "python", "_project/scripts/explorer_publish.py", "build-contract"], {
     cwd: repoRoot,
     encoding: "utf8",
     env: { ...process.env, PYTHONUNBUFFERED: "1" },
@@ -35,7 +36,8 @@ export function readExplorerBuildContract() {
 
   if (result.status !== 0) {
     throw new Error(
-      "Could not read the explorer build contract via `benchbox explorer build-contract`. " +
+      "Could not read the explorer build contract via " +
+      "`uv run -- python _project/scripts/explorer_publish.py build-contract`. " +
         `uv exited ${result.status ?? "unknown"}.${formatSpawnError(result)}`,
     );
   }

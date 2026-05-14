@@ -2,7 +2,7 @@
 
 These are the reference formulas that both the DuckDB pipeline populate step
 and any runtime SQL window-function computation must agree with. Kept here
-(under ``benchbox/core/explorer_pipeline/``) so the registry in
+(under ``_project/scripts/explorer_pipeline/``) so the registry in
 ``_project/planning/visible_metrics.yaml`` can reference them as the
 canonical_ref for derived speedup / delta columns. TypeScript is NEVER the
 oracle for these semantics - any future TS renderer that needs the same value

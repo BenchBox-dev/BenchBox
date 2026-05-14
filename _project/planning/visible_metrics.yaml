@@ -6,11 +6,11 @@
 #
 #   raw_copy  → assert DuckDB column == committed bundle field verbatim
 #   derived   → assert DuckDB-backed read-path value == canonical Python
-#               reference computation (benchbox.core.explorer_pipeline.*),
+#               reference computation (_project.scripts.explorer_pipeline.*),
 #               within the `tolerance` declared per metric
 #
 # "Canonical Python reference computation" means the pipeline's own Python
-# implementation under benchbox/core/explorer_pipeline/ (plus read-only
+# implementation under _project/scripts/explorer_pipeline/ (plus read-only
 # imports from benchbox/core/results/). TypeScript code is NEVER a reference
 # oracle. Pre-calculated CLI JSON artifacts and bridge artifacts are NEVER
 # a reference oracle.
@@ -63,7 +63,7 @@ metrics:
   - table: results
     column: platform_id
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.models._platform_id"
+    canonical_ref: "_project.scripts.explorer_pipeline.models._platform_id"
     tolerance: 0
     display_surfaces: [home, platform_index, benchmark_index, compare, result_detail, query]
     notes: "Provenance-stripped, lowercased slug derived from platform.name"
@@ -96,7 +96,7 @@ metrics:
   - table: results
     column: geomean_ms
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.transformer._geomean_ms"
+    canonical_ref: "_project.scripts.explorer_pipeline.transformer._geomean_ms"
     tolerance: 1.0e-9
     display_surfaces: [home, platform_index, query]
     notes: "Geometric mean of measurement-run ms values across all queries in the bundle"
@@ -104,7 +104,7 @@ metrics:
   - table: results
     column: display_geomean_ms
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.transformer._display_geomean_ms"
+    canonical_ref: "_project.scripts.explorer_pipeline.transformer._display_geomean_ms"
     tolerance: 1.0e-9
     display_surfaces: [home, platform_index, benchmark_index, compare, result_detail, query]
     notes: >
@@ -151,7 +151,7 @@ metrics:
   - table: results
     column: tuning_hash
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.transformer._tuning_hash"
+    canonical_ref: "_project.scripts.explorer_pipeline.transformer._tuning_hash"
     tolerance: 0
     display_surfaces: [query]
     notes: "SHA-256[:8] of {mode, tuning_config} JSON; null when no tuning info present"
@@ -171,7 +171,7 @@ metrics:
   - table: results
     column: cost_usd
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.transformer._cost_usd_alias"
+    canonical_ref: "_project.scripts.explorer_pipeline.transformer._cost_usd_alias"
     tolerance: 1.0e-9
     display_surfaces: [benchmark_index, query]
     notes: "Deprecated compute-only alias derived from normalized cost; null outside normalized compute-only cost."
@@ -179,7 +179,7 @@ metrics:
   - table: results
     column: normalized_cost_usd
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.transformer._normalized_cost"
+    canonical_ref: "_project.scripts.explorer_pipeline.transformer._normalized_cost"
     tolerance: 1.0e-9
     display_surfaces: [benchmark_index, result_detail, query]
     notes: "BenchBox-normalized USD cost; null when cost_status is unavailable."
@@ -187,28 +187,28 @@ metrics:
   - table: results
     column: cost_model_version
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.transformer._normalized_cost"
+    canonical_ref: "_project.scripts.explorer_pipeline.transformer._normalized_cost"
     tolerance: 0
     display_surfaces: [benchmark_index, result_detail, query]
 
   - table: results
     column: cost_model_source
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.transformer._normalized_cost"
+    canonical_ref: "_project.scripts.explorer_pipeline.transformer._normalized_cost"
     tolerance: 0
     display_surfaces: [result_detail, query]
 
   - table: results
     column: cost_scope
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.transformer._normalized_cost"
+    canonical_ref: "_project.scripts.explorer_pipeline.transformer._normalized_cost"
     tolerance: 0
     display_surfaces: [benchmark_index, result_detail, query]
 
   - table: results
     column: cost_status
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.transformer._normalized_cost"
+    canonical_ref: "_project.scripts.explorer_pipeline.transformer._normalized_cost"
     tolerance: 0
     display_surfaces: [benchmark_index, result_detail, query]
     notes: "Explicit status: normalized, not_applicable_local, or unavailable."
@@ -216,77 +216,77 @@ metrics:
   - table: results
     column: billing_unit
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.transformer._normalized_cost"
+    canonical_ref: "_project.scripts.explorer_pipeline.transformer._normalized_cost"
     tolerance: 0
     display_surfaces: [result_detail, query]
 
   - table: results
     column: pricing_region
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.transformer._normalized_cost"
+    canonical_ref: "_project.scripts.explorer_pipeline.transformer._normalized_cost"
     tolerance: 0
     display_surfaces: [result_detail, query]
 
   - table: results
     column: cloud_provider
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.transformer._normalized_cost"
+    canonical_ref: "_project.scripts.explorer_pipeline.transformer._normalized_cost"
     tolerance: 0
     display_surfaces: [benchmark_index, result_detail, query]
 
   - table: results
     column: cloud_region
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.transformer._normalized_cost"
+    canonical_ref: "_project.scripts.explorer_pipeline.transformer._normalized_cost"
     tolerance: 0
     display_surfaces: [benchmark_index, result_detail, query]
 
   - table: results
     column: instance_type
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.transformer._normalized_cost"
+    canonical_ref: "_project.scripts.explorer_pipeline.transformer._normalized_cost"
     tolerance: 0
     display_surfaces: [benchmark_index, result_detail, query]
 
   - table: results
     column: warehouse_size
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.transformer._normalized_cost"
+    canonical_ref: "_project.scripts.explorer_pipeline.transformer._normalized_cost"
     tolerance: 0
     display_surfaces: [benchmark_index, result_detail, query]
 
   - table: results
     column: node_count
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.transformer._normalized_cost"
+    canonical_ref: "_project.scripts.explorer_pipeline.transformer._normalized_cost"
     tolerance: 0
     display_surfaces: [benchmark_index, result_detail, query]
 
   - table: results
     column: cluster_size
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.transformer._normalized_cost"
+    canonical_ref: "_project.scripts.explorer_pipeline.transformer._normalized_cost"
     tolerance: 0
     display_surfaces: [benchmark_index, result_detail, query]
 
   - table: results
     column: storage_format
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.transformer._normalized_cost"
+    canonical_ref: "_project.scripts.explorer_pipeline.transformer._normalized_cost"
     tolerance: 0
     display_surfaces: [benchmark_index, result_detail, query]
 
   - table: results
     column: storage_tier
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.transformer._normalized_cost"
+    canonical_ref: "_project.scripts.explorer_pipeline.transformer._normalized_cost"
     tolerance: 0
     display_surfaces: [benchmark_index, result_detail, query]
 
   - table: results
     column: compliance_class
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.transformer._compliance_class"
+    canonical_ref: "_project.scripts.explorer_pipeline.transformer._compliance_class"
     tolerance: 0
     display_surfaces: [benchmark_index]
     notes: "Enum: official | unofficial_subscale | unofficial_nonstandard | null"
@@ -294,7 +294,7 @@ metrics:
   - table: results
     column: is_ranking_eligible
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.models.is_ranking_eligible"
+    canonical_ref: "_project.scripts.explorer_pipeline.models.is_ranking_eligible"
     tolerance: 0
     display_surfaces: [benchmark_index, benchmark_rankings]
     notes: "True when visibility in RANKING_ELIGIBLE_VISIBILITIES and trust_label in RANKING_ELIGIBLE_TRUST_LABELS"
@@ -314,7 +314,7 @@ metrics:
   - table: results
     column: bundle_download_url
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.pipeline.ExplorerPipeline.run (bundle_url_prefix)"
+    canonical_ref: "_project.scripts.explorer_pipeline.pipeline.ExplorerPipeline.run (bundle_url_prefix)"
     tolerance: 0
     display_surfaces: [result_detail]
     notes: "Constructed as {bundle_url_prefix}/{result_id}.json"
@@ -326,7 +326,7 @@ metrics:
   - table: query_display_timings
     column: display_ms
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.transformer._query_display_ms"
+    canonical_ref: "_project.scripts.explorer_pipeline.transformer._query_display_ms"
     tolerance: 1.0e-9
     display_surfaces: [result_detail, benchmark_index, compare]
     notes: >
@@ -336,7 +336,7 @@ metrics:
   - table: query_display_timings
     column: sample_count
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.transformer._query_display_ms (second return value)"
+    canonical_ref: "_project.scripts.explorer_pipeline.transformer._query_display_ms (second return value)"
     tolerance: 0
     display_surfaces: [result_detail]
     notes: "Number of passing measurement runs that contributed to display_ms"
@@ -382,7 +382,7 @@ metrics:
   - table: benchmark_matrix_cells
     column: display_ms
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.transformer._query_display_ms"
+    canonical_ref: "_project.scripts.explorer_pipeline.transformer._query_display_ms"
     tolerance: 1.0e-9
     display_surfaces: [benchmark_index]
     notes: >
@@ -397,7 +397,7 @@ metrics:
   - table: benchmark_rankings
     column: rank
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.pipeline._build_benchmark_summaries"
+    canonical_ref: "_project.scripts.explorer_pipeline.pipeline._build_benchmark_summaries"
     tolerance: 0
     display_surfaces: [benchmark_index]
     notes: "1-based rank within (benchmark, scale_factor, phase) cohort by primary_metric"
@@ -405,7 +405,7 @@ metrics:
   - table: benchmark_rankings
     column: short_id
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.pipeline._build_short_ids"
+    canonical_ref: "_project.scripts.explorer_pipeline.pipeline._build_short_ids"
     tolerance: 0
     display_surfaces: [compare]
     notes: "sha256(result_id)[:N] where N is minimum prefix length for corpus-wide uniqueness"
@@ -413,35 +413,35 @@ metrics:
   - table: benchmark_rankings
     column: percentile_p50
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.transformer._platform_percentile_stats"
+    canonical_ref: "_project.scripts.explorer_pipeline.transformer._platform_percentile_stats"
     tolerance: 1.0e-9
     display_surfaces: [benchmark_index]
 
   - table: benchmark_rankings
     column: percentile_p90
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.transformer._platform_percentile_stats"
+    canonical_ref: "_project.scripts.explorer_pipeline.transformer._platform_percentile_stats"
     tolerance: 1.0e-9
     display_surfaces: [benchmark_index]
 
   - table: benchmark_rankings
     column: percentile_p95
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.transformer._platform_percentile_stats"
+    canonical_ref: "_project.scripts.explorer_pipeline.transformer._platform_percentile_stats"
     tolerance: 1.0e-9
     display_surfaces: [benchmark_index]
 
   - table: benchmark_rankings
     column: percentile_p99
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.transformer._platform_percentile_stats"
+    canonical_ref: "_project.scripts.explorer_pipeline.transformer._platform_percentile_stats"
     tolerance: 1.0e-9
     display_surfaces: [benchmark_index]
 
   - table: benchmark_rankings
     column: speedup_vs_best
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.compare_math.speedup_vs_best"
+    canonical_ref: "_project.scripts.explorer_pipeline.compare_math.speedup_vs_best"
     tolerance: 1.0e-9
     display_surfaces: [benchmark_index, compare]
     notes: "∈ (0, 1] - best row in cohort = 1.0, worse rows < 1.0; direction-aware on primary_metric"
@@ -449,7 +449,7 @@ metrics:
   - table: benchmark_rankings
     column: speedup_vs_slowest_in_cohort
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.compare_math.speedup_vs_slowest"
+    canonical_ref: "_project.scripts.explorer_pipeline.compare_math.speedup_vs_slowest"
     tolerance: 1.0e-9
     display_surfaces: [benchmark_index, compare]
     notes: "≥ 1.0 - slowest row in cohort = 1.0, better rows > 1.0; direction-aware on primary_metric"
@@ -466,7 +466,7 @@ metrics:
   - table: cohort_metadata
     column: rank
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.pipeline._build_meta_leaderboard"
+    canonical_ref: "_project.scripts.explorer_pipeline.pipeline._build_meta_leaderboard"
     tolerance: 0
     display_surfaces: [home]
     notes: "1-based rank within cohort by primary_metric; per result_id (variant), not per platform_id; null when metric_value is null"
@@ -474,7 +474,7 @@ metrics:
   - table: cohort_metadata
     column: metric_value
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.pipeline._build_meta_leaderboard"
+    canonical_ref: "_project.scripts.explorer_pipeline.pipeline._build_meta_leaderboard"
     tolerance: 1.0e-9
     display_surfaces: [home]
     notes: "power_score for power_score cohorts; display_geomean_ms otherwise; per result_id (variant)"
@@ -482,7 +482,7 @@ metrics:
   - table: cohort_metadata
     column: speedup_vs_best
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.pipeline._build_meta_leaderboard"
+    canonical_ref: "_project.scripts.explorer_pipeline.pipeline._build_meta_leaderboard"
     tolerance: 1.0e-9
     display_surfaces: [home]
     notes: >
@@ -493,7 +493,7 @@ metrics:
   - table: cohort_metadata
     column: short_id
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.pipeline._build_short_ids"
+    canonical_ref: "_project.scripts.explorer_pipeline.pipeline._build_short_ids"
     tolerance: 0
     display_surfaces: [home]
     notes: "sha256(result_id) prefix for compact URLs; threaded through to cohort rows so Home can link variants without joining short_ids"
@@ -521,7 +521,7 @@ metrics:
   - table: meta_leaderboard
     column: avg_rank
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.pipeline._build_meta_leaderboard"
+    canonical_ref: "_project.scripts.explorer_pipeline.pipeline._build_meta_leaderboard"
     tolerance: 1.0e-2
     display_surfaces: [home]
     notes: >
@@ -532,7 +532,7 @@ metrics:
   - table: meta_leaderboard
     column: n_cohorts
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.pipeline._build_meta_leaderboard"
+    canonical_ref: "_project.scripts.explorer_pipeline.pipeline._build_meta_leaderboard"
     tolerance: 0
     display_surfaces: [home]
     notes: "Count of cohorts in which this platform has a non-null rank"
@@ -544,7 +544,7 @@ metrics:
   - table: short_ids
     column: short_id
     kind: derived
-    canonical_ref: "benchbox.core.explorer_pipeline.pipeline._build_short_ids"
+    canonical_ref: "_project.scripts.explorer_pipeline.pipeline._build_short_ids"
     tolerance: 0
     display_surfaces: [compare]
     notes: >
