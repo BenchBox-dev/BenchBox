@@ -2,7 +2,8 @@ id: landing-prompts-static-route
 title: "Implement the static /prompts/ landing route and prompt builder UI"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-05-13"
 category: Product and Documentation
 
 description: |
@@ -31,7 +32,7 @@ deps:
 work:
   - id: w1
     summary: "Create the /prompts/ static page shell using landing visual conventions"
-    status: pending
+    status: done
     notes: |
       Add `landing/prompts/index.html`, `landing/prompts/prompts.js`, and
       `landing/prompts/prompts.css`. The page must include
@@ -44,7 +45,7 @@ work:
   - id: w2
     summary: "Render the selector controls from generated catalog data"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Controls:
       - Goal: Test one platform / Compare platforms
@@ -63,7 +64,7 @@ work:
   - id: w3
     summary: "Implement state normalization, filtering, and URL deep links"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Normalize invalid combinations when controls change:
       - replace a platform that no longer matches current filters
@@ -80,7 +81,7 @@ work:
   - id: w4
     summary: "Render CLI, MCP, and generic/manual prompt outputs with safety notes"
     needs: [w3]
-    status: pending
+    status: done
     notes: |
       CLI mode emits dependency/status checks, dry-run commands, and live-run
       commands only where safe. MCP mode renders TWO copyable blocks: (a) the
@@ -99,7 +100,7 @@ work:
   - id: w5
     summary: "Add accessible copy interactions and fallback behavior"
     needs: [w4]
-    status: pending
+    status: done
     notes: |
       Copy buttons should work for the main prompt, CLI command block, and MCP
       setup block. Add clear focus states, labels, `aria-live` copy feedback,
@@ -108,7 +109,7 @@ work:
   - id: w6
     summary: "Verify desktop/mobile layout and text overflow"
     needs: [w5]
-    status: pending
+    status: done
     notes: |
       Check at least mobile narrow, tablet, and desktop viewports. The form and
       copied prompt must not overflow or overlap. Long platform names and cloud

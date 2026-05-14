@@ -1,0 +1,163 @@
+/* Page-specific styles for /prompts/ — reuses ../style.css variables. */
+
+.prompts-main {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: var(--space-xl) var(--space-lg) var(--space-3xl);
+}
+
+.prompts-header h1 {
+    font-size: clamp(1.5rem, 3vw, 2.25rem);
+    margin-bottom: var(--space-sm);
+}
+
+.prompts-lede {
+    color: var(--text-secondary);
+    margin-bottom: var(--space-xl);
+    max-width: 60ch;
+}
+
+.prompts-noscript {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+    margin-bottom: var(--space-lg);
+}
+
+.prompts-form {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+    margin-bottom: var(--space-xl);
+}
+
+.prompts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--space-md);
+}
+
+.prompts-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.prompts-field > span {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.prompts-field select {
+    appearance: none;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-sm);
+    padding: var(--space-sm) var(--space-md);
+    font: inherit;
+    cursor: pointer;
+}
+
+.prompts-field select:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
+}
+
+.prompts-output {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+}
+
+.prompts-block {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-md);
+    padding: var(--space-md) var(--space-lg) var(--space-lg);
+}
+
+.prompts-block header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-sm);
+}
+
+.prompts-block h2 {
+    font-size: 1.05rem;
+    margin: 0;
+}
+
+.prompts-block-hint {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    margin-bottom: var(--space-sm);
+}
+
+.prompts-block pre {
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
+    border-radius: var(--radius-sm);
+    padding: var(--space-md);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    max-width: 100%;
+}
+
+.prompts-copy {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-sm);
+    padding: var(--space-xs) var(--space-md);
+    font: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.prompts-copy:hover,
+.prompts-copy:focus-visible {
+    background: var(--accent-secondary);
+    color: #fff;
+    outline: none;
+}
+
+.prompts-block--warn {
+    border-color: #d29922;
+}
+
+.prompts-block--warn h2::before {
+    content: "⚠ ";
+}
+
+.prompts-block--warn ul {
+    color: var(--text-secondary);
+    padding-left: var(--space-lg);
+    font-size: 0.9rem;
+}
+
+.prompts-aria {
+    position: absolute;
+    left: -10000px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+}
+
+@media (max-width: 540px) {
+    .prompts-main {
+        padding: var(--space-md);
+    }
+    .prompts-grid {
+        grid-template-columns: 1fr;
+    }
+}

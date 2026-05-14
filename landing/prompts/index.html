@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Instruct a coding agent to use BenchBox</title>
+        <meta
+            name="description"
+            content="Build a copy-paste prompt that tells a coding agent (or you, from the CLI) how to run a BenchBox benchmark. Pick an agent, surface, platform, benchmark, and scale; copy the prompt."
+        />
+        <link rel="stylesheet" href="../style.css?v=5" />
+        <link rel="stylesheet" href="prompts.css?v=1" />
+    </head>
+
+    <body>
+        <nav class="nav">
+            <div class="nav-container">
+                <a href="https://benchbox.dev/" class="nav-logo">BenchBox</a>
+                <div class="nav-links">
+                    <a href="https://benchbox.dev/">Home</a>
+                    <a href="https://benchbox.dev/docs/">Docs</a>
+                    <a href="https://benchbox.dev/blog/">Blog</a>
+                    <a href="https://benchbox.dev/results/">Results</a>
+                    <a href="https://github.com/joeharris76/benchbox" target="_blank" rel="noopener">GitHub</a>
+                </div>
+            </div>
+        </nav>
+
+        <main class="prompts-main">
+            <header class="prompts-header">
+                <h1>Instruct a coding agent to use BenchBox</h1>
+                <p class="prompts-lede">
+                    Pick an agent, surface, platform, benchmark, and scale. Copy the prompt into your agent (or run
+                    the commands yourself). Defaults to a safe local DuckDB + TPC-H quickstart.
+                </p>
+            </header>
+
+            <noscript>
+                <div class="prompts-noscript">
+                    This builder is interactive and requires JavaScript. With JS disabled you can still get started:
+                    <code>uv add 'benchbox[duckdb]' &amp;&amp; uv run benchbox run -p duckdb -b tpch -s 0.01</code>
+                </div>
+            </noscript>
+
+            <form class="prompts-form" id="prompts-form" aria-label="Prompt builder">
+                <div class="prompts-grid">
+                    <label class="prompts-field">
+                        <span>Goal</span>
+                        <select id="sel-goal" name="goal"></select>
+                    </label>
+                    <label class="prompts-field">
+                        <span>Agent</span>
+                        <select id="sel-agent" name="agent"></select>
+                    </label>
+                    <label class="prompts-field">
+                        <span>Surface</span>
+                        <select id="sel-surface" name="surface"></select>
+                    </label>
+                    <label class="prompts-field">
+                        <span>Interface</span>
+                        <select id="sel-interface" name="interface"></select>
+                    </label>
+                    <label class="prompts-field">
+                        <span>Deployment</span>
+                        <select id="sel-deployment" name="deployment"></select>
+                    </label>
+                    <label class="prompts-field" data-mode="test_one">
+                        <span>Platform</span>
+                        <select id="sel-platform" name="platform"></select>
+                    </label>
+                    <label class="prompts-field" data-mode="compare" hidden>
+                        <span>Platform A</span>
+                        <select id="sel-platformA" name="platformA"></select>
+                    </label>
+                    <label class="prompts-field" data-mode="compare" hidden>
+                        <span>Platform B</span>
+                        <select id="sel-platformB" name="platformB"></select>
+                    </label>
+                    <label class="prompts-field">
+                        <span>Benchmark</span>
+                        <select id="sel-benchmark" name="benchmark"></select>
+                    </label>
+                    <label class="prompts-field">
+                        <span>Scale</span>
+                        <select id="sel-scale" name="scale"></select>
+                    </label>
+                </div>
+            </form>
+
+            <section class="prompts-output">
+                <div class="prompts-block" id="block-prompt" hidden>
+                    <header>
+                        <h2>Agent prompt</h2>
+                        <button type="button" class="prompts-copy" data-copy-target="prompt-text">Copy</button>
+                    </header>
+                    <pre id="prompt-text"></pre>
+                </div>
+
+                <div class="prompts-block" id="block-cli" hidden>
+                    <header>
+                        <h2>CLI commands</h2>
+                        <button type="button" class="prompts-copy" data-copy-target="cli-text">Copy</button>
+                    </header>
+                    <pre id="cli-text"></pre>
+                </div>
+
+                <div class="prompts-block" id="block-mcp-setup" hidden>
+                    <header>
+                        <h2>MCP server setup</h2>
+                        <button type="button" class="prompts-copy" data-copy-target="mcp-setup-text">Copy</button>
+                    </header>
+                    <p class="prompts-block-hint">
+                        Add this entry to your agent's MCP config (e.g.
+                        <code>~/.codex/config.toml</code> or <code>claude_desktop_config.json</code>):
+                    </p>
+                    <pre id="mcp-setup-text"></pre>
+                </div>
+
+                <div class="prompts-block" id="block-mcp-prompt" hidden>
+                    <header>
+                        <h2>MCP prompt</h2>
+                        <button type="button" class="prompts-copy" data-copy-target="mcp-prompt-text">Copy</button>
+                    </header>
+                    <p class="prompts-block-hint">
+                        Paste this into the agent after the MCP server is connected:
+                    </p>
+                    <pre id="mcp-prompt-text"></pre>
+                </div>
+
+                <div class="prompts-block prompts-block--warn" id="block-cloud-safety" hidden>
+                    <header>
+                        <h2>Managed cloud safety</h2>
+                    </header>
+                    <ul id="cloud-safety-list"></ul>
+                </div>
+
+                <div role="status" aria-live="polite" class="prompts-aria" id="copy-status"></div>
+            </section>
+        </main>
+
+        <script src="catalog.generated.js"></script>
+        <script src="prompts.js"></script>
+    </body>
+</html>
