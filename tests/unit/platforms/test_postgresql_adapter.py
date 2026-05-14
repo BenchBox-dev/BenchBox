@@ -657,6 +657,34 @@ class TestPostgreSQLDataLoading:
         assert "FORMAT csv" in copy_sql
         assert "HEADER true" in copy_sql
 
+    def test_copy_sql_csv_with_empty_null_marker_stays_csv(self, postgres_stubs, tmp_path):
+        """Comma CSV with empty=NULL must still use CSV mode so headers and quoting work."""
+        mock_conn = Mock()
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = (1,)
+        mock_conn.cursor.return_value = mock_cursor
+        self._install_copy_context(mock_cursor)
+
+        csv_file = tmp_path / "flights.csv"
+        csv_file.write_text("flight_id,carrier_delay\n1,\n")
+
+        fake_ds = DataSource(
+            source_type="manifest_v2",
+            tables={"flights": csv_file},
+            table_metadata={"flights": {"csv_has_header": True, "csv_delimiter": ",", "csv_null_marker": ""}},
+        )
+
+        adapter = PostgreSQLAdapter(schema="public")
+        with patch("benchbox.platforms.postgresql.DataSourceResolver") as mock_resolver_cls:
+            mock_resolver_cls.return_value.resolve.return_value = fake_ds
+            adapter.load_data(Mock(), mock_conn, tmp_path)
+
+        assert mock_cursor.copy.called, "cursor.copy() was not called"
+        copy_sql = mock_cursor.copy.call_args.args[0]
+        assert "FORMAT csv" in copy_sql
+        assert "HEADER true" in copy_sql
+        assert "NULL ''" in copy_sql
+
     def test_copy_sql_csv_no_header_preserves_empty_strings(self, postgres_stubs, tmp_path):
         """csv_null_marker=None in manifest metadata → COPY uses a non-empty NULL sentinel.
 

@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from benchbox.core.flightdata.benchmark import FlightDataBenchmark
 from benchbox.platforms.base.data_loading import CsvDialect, DataSource, resolve_csv_dialect
 from tests.unit.platforms.csv_dialect_test_helpers import (
     benchmark_stub as _benchmark_stub,
@@ -148,6 +149,20 @@ def test_benchmark_attribute_csv_null_marker_empty_string(caplog: pytest.LogCapt
     assert dialect.null_marker == ""  # must be '' not None
     assert dialect.delimiter == ","
     assert caplog.records  # path (b) always warns
+
+
+def test_flightdata_declares_empty_csv_fields_as_null(caplog: pytest.LogCaptureFixture, tmp_path: Path) -> None:
+    """FlightData CSV files use empty fields for nullable delay metrics."""
+    ds = _make_data_source()
+    benchmark = FlightDataBenchmark(scale_factor=0.01, output_dir=tmp_path)
+
+    with caplog.at_level(logging.WARNING):
+        dialect = resolve_csv_dialect(ds, "flights", Path("flights.csv"), benchmark)
+
+    assert dialect.delimiter == ","
+    assert dialect.has_header is True
+    assert dialect.null_marker == ""
+    assert caplog.records
 
 
 # ---------------------------------------------------------------------------

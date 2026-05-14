@@ -113,27 +113,39 @@ def test_enumerate_records_compatibility_pruned_cells():
 def test_enumerate_records_registry_benchmark_gates():
     raw = {
         "platforms": {"include": ["lakesail"]},
-        "benchmarks": {"include": ["ai_primitives", "metadata_primitives", "tpch"]},
+        "benchmarks": {"include": ["ai_primitives", "metadata_primitives", "vector_search", "tpch"]},
         "scales": {"rungs": [0.01]},
     }
 
     result = enum_phase.enumerate_cells_with_pruning(raw)
 
     assert {c.benchmark for c in result.cells} == {"tpch"}
-    assert len(result.compatibility_pruned) == 2
+    assert len(result.compatibility_pruned) == 3
     pruned_by_benchmark = {c.benchmark: c for c in result.compatibility_pruned}
     assert pruned_by_benchmark["ai_primitives"].platform == "lakesail"
     assert pruned_by_benchmark["ai_primitives"].rule_id == "uat.compat.lakesail.ai_primitives.benchmark_gate"
     assert pruned_by_benchmark["metadata_primitives"].rule_id == (
         "uat.compat.lakesail.metadata_primitives.benchmark_gate"
     )
+    assert pruned_by_benchmark["vector_search"].rule_id == "uat.compat.lakesail.vector_search.benchmark_gate"
     assert pruned_by_benchmark["metadata_primitives"].evidence.startswith("benchbox.sql_compat benchmark_gate")
 
 
 def test_enumerate_records_pg_family_registry_benchmark_gates():
     raw = {
         "platforms": {"include": ["pg-duckdb", "pg-mooncake", "timescaledb"]},
-        "benchmarks": {"include": ["ai_primitives", "read_primitives", "vector_search", "tpch"]},
+        "benchmarks": {
+            "include": [
+                "ai_primitives",
+                "datavault",
+                "joinorder",
+                "read_primitives",
+                "tpcds",
+                "tpcds_obt",
+                "vector_search",
+                "tpch",
+            ]
+        },
         "scales": {"rungs": [0.01]},
     }
 
@@ -141,16 +153,24 @@ def test_enumerate_records_pg_family_registry_benchmark_gates():
 
     assert {(c.platform, c.benchmark) for c in result.cells} == {
         ("pg-duckdb", "tpch"),
+        ("pg-duckdb", "datavault"),
+        ("pg-duckdb", "tpcds"),
         ("pg-mooncake", "tpch"),
+        ("pg-mooncake", "datavault"),
         ("timescaledb", "tpch"),
+        ("timescaledb", "tpcds"),
     }
-    assert len(result.compatibility_pruned) == 9
+    assert len(result.compatibility_pruned) == 17
     pruned = {(c.platform, c.benchmark): c for c in result.compatibility_pruned}
+    assert pruned[("pg-mooncake", "tpcds")].rule_id == "uat.compat.pg-mooncake.tpcds.benchmark_gate"
+    assert pruned[("timescaledb", "datavault")].rule_id == "uat.compat.timescaledb.datavault.benchmark_gate"
     for platform in ("pg-duckdb", "pg-mooncake", "timescaledb"):
         assert pruned[(platform, "ai_primitives")].rule_id == f"uat.compat.{platform}.ai_primitives.benchmark_gate"
+        assert pruned[(platform, "joinorder")].rule_id == f"uat.compat.{platform}.joinorder.benchmark_gate"
         assert pruned[(platform, "read_primitives")].rule_id == (
             f"uat.compat.{platform}.read_primitives.benchmark_gate"
         )
+        assert pruned[(platform, "tpcds_obt")].rule_id == f"uat.compat.{platform}.tpcds_obt.benchmark_gate"
         assert pruned[(platform, "vector_search")].rule_id == f"uat.compat.{platform}.vector_search.benchmark_gate"
 
 

@@ -95,3 +95,27 @@ REGISTRY.register(
     "lakesail",
     benchmark="write_primitives",
 )
+
+REGISTRY.register(
+    CompatibilityDecision(
+        rule_id="benchmark_gate.lakesail.vector_search.unsupported",
+        action=CompatAction.BLOCK_BENCHMARK,
+        support_level=SupportLevel.BLOCKED,
+        failure_mode=FailureMode.UNSUPPORTED_FEATURE,
+        payload=BlockBenchmarkPayload(
+            reason=(
+                "LakeSail/Sail has no native vector-distance functions for the vector_search benchmark, and "
+                "the Spark SQL lambda fallback expressions are rejected by Sail. The 2026-05-14 full UAT gate "
+                "loaded 10,100 vector_search rows, but executed zero queries because all six query_source "
+                "variants were compatibility-skipped; this must be accounted as a benchmark-level capability "
+                "block rather than a zero-query pass."
+            )
+        ),
+        reason=(
+            "LakeSail/Sail does not currently expose the vector-distance query contract required by vector_search."
+        ),
+    ),
+    Phase.BENCHMARK_GATE,
+    "lakesail",
+    benchmark="vector_search",
+)
