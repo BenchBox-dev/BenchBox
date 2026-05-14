@@ -50,14 +50,14 @@ describe("read-model version guard", () => {
     ).rejects.not.toThrow(/is missing required columns/);
   });
 
-  it("rejects an older read-model version with a humane remediation message", async () => {
+  it("rejects an older read-model version with a humane dev remediation message", async () => {
     const conn = makeConn(0);
     await expect(
       _verifyReadModelVersionForTest(conn as unknown as Parameters<typeof _verifyReadModelVersionForTest>[0]),
     ).rejects.toThrow(/read-model v0; UI requires v1/);
     await expect(
       _verifyReadModelVersionForTest(conn as unknown as Parameters<typeof _verifyReadModelVersionForTest>[0]),
-    ).rejects.toThrow(/ask a maintainer to rebuild the Explorer data/);
+    ).rejects.toThrow(/npm run dev:snapshot/);
   });
 
   it("resolves when the snapshot version matches the UI contract", async () => {

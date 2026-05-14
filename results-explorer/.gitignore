@@ -2,6 +2,7 @@ node_modules/
 dist/
 .vite/
 *.local
+public/data/
 
 # Browser-functional test artifacts
 # See docs/development/browser-test-architecture.md

@@ -34,6 +34,11 @@ considered binding.
   `_project/scripts/explorer_pipeline/pipeline.py` via
   `uv run -- python _project/scripts/explorer_publish.py build
   --data-dir <bundles> --output <dist-data>`.
+- Local `npm run dev` first runs `npm run dev:snapshot`, which rebuilds
+  `results-explorer/public/data/results.duckdb` when the local snapshot is
+  missing or older than `results-data/bundles/` or the Explorer publish
+  pipeline. Set `EXPLORER_SKIP_PREDEV=1` only when intentionally testing a
+  missing or stale snapshot error path.
 - Unit and component coverage lives under `results-explorer/src/__tests__/`,
   `results-explorer/src/components/__tests__/`,
   `results-explorer/src/lib/__tests__/`, and
