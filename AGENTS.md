@@ -129,7 +129,8 @@ Do not use `git add -A`; stage explicit paths only. Repo `origin` is
 release. Dev PRs target `develop`, squash-merge, linear history. `develop` is
 PR-gated; do not direct-push routine work.
 
-Standard one-shot flow from a feature branch:
+Push-to-PR gate (the implement-to-PR ritual is in "Default write-task
+close-out" below):
 
 ```bash
 make pr-preflight
@@ -156,6 +157,13 @@ over global `/commit-push-pr`.
 
 Release flow is `make release-cut VERSION=X.Y.Z` then
 `make release-finalize VERSION=X.Y.Z`; see `docs/operations/release-guide.md`.
+
+## Default write-task close-out
+
+After implementing, self-review with the `code` skill's `review` action and
+fix every finding — issues, considerations, AND nits — before `make pr-open`.
+The review-fix loop is part of "implement", not optional polish; skip only
+when the user explicitly opts out (typo fix, already-reviewed change).
 
 ## Planning & TODOs
 
