@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev:snapshot": "node scripts/ensure-dev-snapshot.mjs",
+    "predev": "npm run dev:snapshot",
     "dev": "vite",
     "build": "vite build",
     "typecheck": "tsc --noEmit",

@@ -148,10 +148,12 @@ async function readSnapshotReadModelVersion(conn: DuckDBConnection): Promise<num
 }
 
 function throwReadModelVersionError(found: number): never {
+  const remediation = import.meta.env.DEV
+    ? "Restart npm run dev or run npm run dev:snapshot to rebuild the local Explorer data."
+    : "Refresh the published snapshot or ask a maintainer to rebuild the Explorer data.";
   throw new Error(
     `DuckDB snapshot read-model v${found}; UI requires v${EXPECTED_READ_MODEL_VERSION}. ` +
-      "Refresh the published snapshot or ask a maintainer to rebuild the Explorer data. Check the deployed " +
-      "results.duckdb file.",
+      `${remediation} Check the deployed results.duckdb file.`,
   );
 }
 
