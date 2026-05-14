@@ -15,33 +15,49 @@
             rel="stylesheet"
         />
 
+        <link rel="stylesheet" href="shared/site-header.css?v=1" />
         <link rel="stylesheet" href="style.css?v=5" />
     </head>
 
     <body>
-        <!-- Navigation -->
-        <nav class="nav">
-            <div class="nav-container">
-                <a href="https://benchbox.dev/" class="nav-logo">BenchBox</a>
-                <div class="nav-links">
-                    <!-- Site-wide links (same as docs/blog) -->
-                    <a href="https://benchbox.dev/">Home</a>
-                    <a href="https://benchbox.dev/docs/">Docs</a>
-                    <a href="https://benchbox.dev/blog/">Blog</a>
-                    <a href="https://benchbox.dev/results/">Results</a>
-                    <a href="https://benchbox.dev/prompts/">Instruct an agent</a>
-                    <a href="https://github.com/joeharris76/benchbox" target="_blank" rel="noopener">GitHub</a>
-                    <!-- Page section links (landing page only) -->
-                    <span class="nav-separator"></span>
-                    <a href="#features">Features</a>
-                    <a href="#benchmarks">Benchmarks</a>
-                    <a href="#platforms">Platforms</a>
-                    <a href="#formats">Formats</a>
-                    <a href="#mcp">MCP</a>
-                    <a href="#install">Install</a>
-                </div>
+        <!-- Global site header -->
+        <header class="benchbox-site-header" data-benchbox-site-header data-scrolled="false">
+            <div class="benchbox-site-header__container">
+                <a href="https://benchbox.dev/" class="benchbox-site-header__logo">BenchBox</a>
+                <button
+                    class="benchbox-site-header__toggle"
+                    type="button"
+                    aria-label="Toggle site navigation"
+                    aria-controls="benchbox-site-header-nav"
+                    aria-expanded="false"
+                    data-benchbox-site-header-toggle
+                >
+                    <span class="benchbox-site-header__toggle-lines" aria-hidden="true"></span>
+                </button>
+                <nav
+                    id="benchbox-site-header-nav"
+                    class="benchbox-site-header__nav"
+                    aria-label="BenchBox"
+                    data-benchbox-site-header-nav
+                >
+                    <a class="benchbox-site-header__link" href="https://benchbox.dev/" aria-current="page">Home</a>
+                    <a class="benchbox-site-header__link" href="https://benchbox.dev/docs/">Docs</a>
+                    <a class="benchbox-site-header__link" href="https://benchbox.dev/blog/">Blog</a>
+                    <a class="benchbox-site-header__link" href="https://benchbox.dev/results/">Results</a>
+                    <a class="benchbox-site-header__link" href="https://benchbox.dev/prompts/">Instruct an agent</a>
+                    <a
+                        class="benchbox-site-header__link"
+                        href="https://github.com/joeharris76/BenchBox"
+                        target="_blank"
+                        rel="noopener"
+                        >GitHub</a
+                    >
+                    <a class="benchbox-site-header__cta" href="https://benchbox.dev/docs/usage/installation.html"
+                        >Run benchmark</a
+                    >
+                </nav>
             </div>
-        </nav>
+        </header>
 
         <!-- Hero Section -->
         <section class="hero">
@@ -1076,6 +1092,7 @@ query = tpch.get_query(1)  # Q1: Pricing Summary Report</code></pre>
         <!-- Scripts -->
         <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+        <script src="shared/site-header.js"></script>
         <script src="script.js"></script>
     </body>
 </html>

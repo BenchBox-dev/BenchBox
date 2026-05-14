@@ -11,19 +11,36 @@
 
 {# Add site-wide navigation bar #}
 {%- block body %}
-<nav class="benchbox-site-nav" role="navigation" aria-label="Site navigation">
-  <div class="benchbox-site-nav-container">
-    <a href="https://benchbox.dev/" class="benchbox-site-nav-logo">BenchBox</a>
-    <div class="benchbox-site-nav-links">
-      <a href="https://benchbox.dev/">Home</a>
-      <a href="https://benchbox.dev/docs/">Docs</a>
-      <a href="https://benchbox.dev/blog/">Blog</a>
-      <a href="https://benchbox.dev/results/">Results</a>
-      <a href="https://benchbox.dev/prompts/">Instruct an agent</a>
-      <a href="https://github.com/joeharris76/benchbox" target="_blank" rel="noopener">GitHub</a>
-    </div>
+{% set is_blog_page = pagename == "blog/index" or pagename.startswith("blog/") %}
+<header class="benchbox-site-header" data-benchbox-site-header data-scrolled="false">
+  <div class="benchbox-site-header__container">
+    <a href="https://benchbox.dev/" class="benchbox-site-header__logo">BenchBox</a>
+    <button
+      class="benchbox-site-header__toggle"
+      type="button"
+      aria-label="Toggle site navigation"
+      aria-controls="benchbox-site-header-nav"
+      aria-expanded="false"
+      data-benchbox-site-header-toggle
+    >
+      <span class="benchbox-site-header__toggle-lines" aria-hidden="true"></span>
+    </button>
+    <nav
+      id="benchbox-site-header-nav"
+      class="benchbox-site-header__nav"
+      aria-label="BenchBox"
+      data-benchbox-site-header-nav
+    >
+      <a class="benchbox-site-header__link" href="https://benchbox.dev/">Home</a>
+      <a class="benchbox-site-header__link" href="https://benchbox.dev/docs/"{% if not is_blog_page %} aria-current="page"{% endif %}>Docs</a>
+      <a class="benchbox-site-header__link" href="https://benchbox.dev/blog/"{% if is_blog_page %} aria-current="page"{% endif %}>Blog</a>
+      <a class="benchbox-site-header__link" href="https://benchbox.dev/results/">Results</a>
+      <a class="benchbox-site-header__link" href="https://benchbox.dev/prompts/">Instruct an agent</a>
+      <a class="benchbox-site-header__link" href="https://github.com/joeharris76/BenchBox" target="_blank" rel="noopener">GitHub</a>
+      <a class="benchbox-site-header__cta" href="https://benchbox.dev/docs/usage/installation.html">Run benchmark</a>
+    </nav>
   </div>
-</nav>
+</header>
 {{ super() }}
 {%- endblock body %}
 

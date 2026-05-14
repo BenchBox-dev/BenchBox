@@ -3,7 +3,7 @@
 .prompts-main {
     max-width: 960px;
     margin: 0 auto;
-    padding: calc(80px + var(--space-xl)) var(--space-lg) var(--space-3xl);
+    padding: var(--space-xl) var(--space-lg) var(--space-3xl);
     position: relative;
     isolation: isolate;
 }
@@ -187,7 +187,7 @@
 
 @media (max-width: 540px) {
     .prompts-main {
-        padding: calc(80px + var(--space-md)) var(--space-md) var(--space-md);
+        padding: var(--space-md);
     }
     .prompts-grid {
         grid-template-columns: 1fr;

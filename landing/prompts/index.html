@@ -9,23 +9,51 @@
             content="Build a copy-paste prompt that tells a coding agent how to run a BenchBox benchmark. Pick an agent, surface, platform, benchmark, and scale; copy the prompt."
         />
         <link rel="icon" href="data:," />
+        <link rel="stylesheet" href="../shared/site-header.css?v=1" />
         <link rel="stylesheet" href="../style.css?v=5" />
         <link rel="stylesheet" href="prompts.css?v=1" />
     </head>
 
     <body>
-        <nav class="nav">
-            <div class="nav-container">
-                <a href="https://benchbox.dev/" class="nav-logo">BenchBox</a>
-                <div class="nav-links">
-                    <a href="https://benchbox.dev/">Home</a>
-                    <a href="https://benchbox.dev/docs/">Docs</a>
-                    <a href="https://benchbox.dev/blog/">Blog</a>
-                    <a href="https://benchbox.dev/results/">Results</a>
-                    <a href="https://github.com/joeharris76/benchbox" target="_blank" rel="noopener">GitHub</a>
-                </div>
+        <header class="benchbox-site-header" data-benchbox-site-header data-scrolled="false">
+            <div class="benchbox-site-header__container">
+                <a href="https://benchbox.dev/" class="benchbox-site-header__logo">BenchBox</a>
+                <button
+                    class="benchbox-site-header__toggle"
+                    type="button"
+                    aria-label="Toggle site navigation"
+                    aria-controls="benchbox-site-header-nav"
+                    aria-expanded="false"
+                    data-benchbox-site-header-toggle
+                >
+                    <span class="benchbox-site-header__toggle-lines" aria-hidden="true"></span>
+                </button>
+                <nav
+                    id="benchbox-site-header-nav"
+                    class="benchbox-site-header__nav"
+                    aria-label="BenchBox"
+                    data-benchbox-site-header-nav
+                >
+                    <a class="benchbox-site-header__link" href="https://benchbox.dev/">Home</a>
+                    <a class="benchbox-site-header__link" href="https://benchbox.dev/docs/">Docs</a>
+                    <a class="benchbox-site-header__link" href="https://benchbox.dev/blog/">Blog</a>
+                    <a class="benchbox-site-header__link" href="https://benchbox.dev/results/">Results</a>
+                    <a class="benchbox-site-header__link" href="https://benchbox.dev/prompts/" aria-current="page"
+                        >Instruct an agent</a
+                    >
+                    <a
+                        class="benchbox-site-header__link"
+                        href="https://github.com/joeharris76/BenchBox"
+                        target="_blank"
+                        rel="noopener"
+                        >GitHub</a
+                    >
+                    <a class="benchbox-site-header__cta" href="https://benchbox.dev/docs/usage/installation.html"
+                        >Run benchmark</a
+                    >
+                </nav>
             </div>
-        </nav>
+        </header>
 
         <main class="prompts-main">
             <header class="prompts-header">
@@ -122,6 +150,7 @@
             </section>
         </main>
 
+        <script src="../shared/site-header.js"></script>
         <script src="catalog.generated.js"></script>
         <script src="prompts.js"></script>
     </body>
