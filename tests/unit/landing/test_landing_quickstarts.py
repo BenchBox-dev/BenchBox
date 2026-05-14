@@ -121,6 +121,17 @@ def test_defaults_resolve_to_known_ids(gen, catalog):
     assert catalog["defaults"]["platform"] in platform_ids
     assert catalog["defaults"]["benchmark"] in benchmark_ids
     assert catalog["defaults"]["deployment"] in {"local", "self-hosted", "managed"}
+    assert catalog["defaults"]["scale"] in catalog["scales"]
+    assert catalog["scales"] == ["0.01", "0.1", "1.0", "10.0"]
+
+
+def test_no_manual_label_anywhere(catalog):
+    assert all("manual" not in agent["label"].lower() for agent in catalog["agents"])
+
+
+def test_generic_agent_has_hint(catalog):
+    generic = next(agent for agent in catalog["agents"] if agent["id"] == "generic")
+    assert generic["hint"]
 
 
 def test_no_recipes_json_committed():

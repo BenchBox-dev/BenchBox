@@ -126,6 +126,18 @@ def _validate_mcp(catalog: dict[str, Any], known_tools: frozenset[str], known_pr
     return errors
 
 
+def _validate_agents(catalog: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    for entry in catalog.get("agents") or []:
+        if not isinstance(entry, dict):
+            errors.append(f"agents[] entries must be mappings, got {type(entry).__name__}")
+            continue
+        label = str(entry.get("label") or "")
+        if "manual" in label.lower():
+            errors.append(f"agents[{entry.get('id')!r}].label must not contain 'manual'")
+    return errors
+
+
 def validate(catalog: dict[str, Any]) -> list[str]:
     """Return a list of validation error messages; empty means valid."""
     errors: list[str] = []
@@ -151,6 +163,7 @@ def validate(catalog: dict[str, Any]) -> list[str]:
             errors.append(f"deployments[{did!r}]: must be in {sorted(VALID_DEPLOYMENT_MODES)}")
 
     errors.extend(_validate_defaults(catalog, platform_ids, benchmark_ids))
+    errors.extend(_validate_agents(catalog))
     errors.extend(_validate_mcp(catalog, known_tools, known_prompts))
 
     compare_tpl = ((catalog.get("templates") or {}).get("cli") or {}).get("compare") or ""
