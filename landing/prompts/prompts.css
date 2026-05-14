@@ -1,22 +1,26 @@
 /* Page-specific styles for /prompts/ — reuses ../style.css variables. */
 
-.prompts-main {
-    max-width: 960px;
-    margin: 0 auto;
-    padding: var(--space-xl) var(--space-lg) var(--space-3xl);
+body {
     position: relative;
-    isolation: isolate;
 }
 
-.prompts-main::before {
+body::before {
     content: '';
-    position: absolute;
+    position: fixed;
     inset: 0;
     background-image:
         radial-gradient(circle at 20% 16%, rgba(88, 166, 255, 0.1) 0%, transparent 28%),
         radial-gradient(circle at 82% 70%, rgba(31, 111, 235, 0.1) 0%, transparent 28%);
     pointer-events: none;
-    z-index: -1;
+    z-index: 0;
+}
+
+.prompts-main {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: var(--space-xl) var(--space-lg) var(--space-3xl);
+    position: relative;
+    z-index: 1;
 }
 
 .prompts-header,

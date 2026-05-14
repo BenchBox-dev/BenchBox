@@ -2,13 +2,13 @@
  *
  * Reads `window.__BENCHBOX_PROMPT_CATALOG__` (set by catalog.generated.js),
  * syncs selection state to URL query parameters, filters platform options
- * by selected interface + deployment, and renders agent / MCP output
+ * by selected interface + deployment, and renders prompt / MCP output
  * blocks. No framework — plain vanilla JS so the page stays a static
  * deploy under `landing/`.
  *
- * URL parameters (pinned by `landing-prompts-static-route` w3):
- *   goal, agent, surface, interface, deployment, platform, platformA,
- *   platformB, benchmark, scale.
+ * URL parameters:
+ *   goal, surface, interface, deployment, platform, platformA, platformB,
+ *   benchmark, scale.
  */
 (function () {
     "use strict";
@@ -22,7 +22,7 @@
     var $ = function (id) { return document.getElementById(id); };
     var qs = function (s) { return document.querySelectorAll(s); };
 
-    var SELECTORS = ["goal", "agent", "surface", "interface", "deployment", "platform", "platformA", "platformB", "benchmark", "scale"];
+    var SELECTORS = ["goal", "surface", "interface", "deployment", "platform", "platformA", "platformB", "benchmark", "scale"];
     var COPY_LABELS = {
         "prompt-text": "agent prompt",
         "mcp-setup-text": "MCP server config"
@@ -95,7 +95,7 @@
     function normaliseState(raw) {
         var defaults = catalog.defaults;
         var state = {};
-        ["goal", "agent", "surface", "interface", "deployment", "benchmark"].forEach(function (k) {
+        ["goal", "surface", "interface", "deployment", "benchmark"].forEach(function (k) {
             state[k] = raw[k] || defaults[k];
         });
         var scaleStr = String(raw.scale || defaults.scale);
@@ -147,13 +147,11 @@
 
     function renderSelectors(state) {
         fillSelect($("sel-goal"), catalog.goals, state.goal);
-        fillSelect($("sel-agent"), catalog.agents, state.agent);
         fillSelect($("sel-surface"), catalog.surfaces, state.surface);
         fillSelect($("sel-interface"), catalog.interfaces, state["interface"]);
         fillSelect($("sel-deployment"), catalog.deployments, state.deployment);
         fillSelect($("sel-benchmark"), benchmarksForInterface(state["interface"]), state.benchmark);
         fillSelect($("sel-scale"), catalog.scales.map(function (s) { return { id: String(s), label: String(s) }; }), state.scale);
-        syncAgentHint(state);
 
         var pool = platformsForFilters(state["interface"], state.deployment);
 
@@ -172,7 +170,7 @@
     }
 
     function renderOutput(state) {
-        // Decide which output blocks to show by agent + surface
+        // Decide which output blocks to show by surface
         var isCompare = state.goal === "compare";
         var platform = isCompare ? state.platformA : state.platform;
         var platformB = isCompare ? state.platformB : null;
@@ -215,15 +213,13 @@
 
         var safetyList = $("cloud-safety-list");
         safetyList.innerHTML = "";
-        if (managed && platformEntry && platformEntry.safety_terms) {
-            ["dependency", "dry_run", "no_secrets"].forEach(function (k) {
-                if (platformEntry.safety_terms[k]) {
-                    var li = document.createElement("li");
-                    li.textContent = platformEntry.safety_terms[k];
-                    safetyList.appendChild(li);
-                }
+        if (managed) {
+            safetyTexts([platformEntry, platformBEntry], "no_secrets").forEach(function (text) {
+                var li = document.createElement("li");
+                li.textContent = text;
+                safetyList.appendChild(li);
             });
-            $("block-cloud-safety").hidden = false;
+            $("block-cloud-safety").hidden = safetyList.children.length === 0;
         } else {
             $("block-cloud-safety").hidden = true;
         }
@@ -237,12 +233,24 @@
         });
     }
 
-    function syncAgentHint(state) {
-        var hint = $("agent-hint");
-        if (!hint) return;
-        var agent = findById(catalog.agents, state.agent);
-        hint.textContent = agent && agent.hint ? agent.hint : "";
-        hint.hidden = !hint.textContent;
+    function safetyTexts(entries, key) {
+        var texts = [];
+        entries.forEach(function (entry) {
+            if (!entry || !entry.safety_terms || !entry.safety_terms[key]) return;
+            if (texts.indexOf(entry.safety_terms[key]) === -1) texts.push(entry.safety_terms[key]);
+        });
+        return texts;
+    }
+
+    function appendManagedSafetyLines(lines, entries) {
+        var checks = safetyTexts(entries, "dependency");
+        var dryRuns = safetyTexts(entries, "dry_run");
+        if (checks.length === 0 && dryRuns.length === 0) return;
+        lines.push("");
+        lines.push("Managed cloud safety:");
+        checks.concat(dryRuns).forEach(function (text) {
+            lines.push("  • " + text);
+        });
     }
 
     function buildMcpPrompt(state, platform, platformB, platformEntry, platformBEntry, benchmarkEntry, managed) {
@@ -250,39 +258,34 @@
         var mcpToolName = catalog.mcp.run_tool;
         var mcpPromptName = isCompare ? catalog.mcp.prompts.compare_platforms : catalog.mcp.prompts.benchmark_run;
         if (isCompare) {
-            return [
+            var compareLines = [
                 "Use the BenchBox MCP server to compare " + platformLabel(platformEntry) + " and " + platformLabel(platformBEntry) + ".",
                 "Steps:",
                 "  1. Call the `" + catalog.mcp.list_tool + "` tool to confirm both platforms are available.",
                 "  2. Use the `" + mcpPromptName + "` prompt with benchmark=" + state.benchmark + ", platforms=\"" + platform + "," + platformB + "\", scale_factor=" + state.scale + ".",
                 "  3. Run the `" + mcpToolName + "` tool for each platform with the same benchmark and scale.",
-                "  4. Summarise total runtime, per-query timing, and any failures.",
-                managed ? "  • Stop and ask the user if credentials or config for a managed platform are missing — do not request secrets in chat." : ""
-            ].filter(Boolean).join("\n");
+                "  4. Summarise total runtime, per-query timing, and any failures."
+            ];
+            if (managed) appendManagedSafetyLines(compareLines, [platformEntry, platformBEntry]);
+            compareLines.push(managed ? "  • Stop and ask the user if credentials or config for a managed platform are missing — do not request secrets in chat." : "");
+            return compareLines.filter(Boolean).join("\n");
         }
-        return [
+        var lines = [
             "Use the BenchBox MCP server to run " + (benchmarkEntry ? benchmarkEntry.label : state.benchmark) + " on " + platformLabel(platformEntry) + ".",
             "Steps:",
             "  1. Call the `" + catalog.mcp.list_tool + "` tool to confirm the platform is installed.",
             "  2. Use the `" + mcpPromptName + "` prompt with platform=" + platform + ", benchmark=" + state.benchmark + ", scale_factor=" + state.scale + ".",
             "  3. Run the `" + mcpToolName + "` tool with the same arguments.",
-            "  4. Summarise total runtime and any failures.",
-            managed ? "  • Stop and ask the user if credentials or config are missing — do not request secrets in chat." : ""
-        ].filter(Boolean).join("\n");
+            "  4. Summarise total runtime and any failures."
+        ];
+        if (managed) appendManagedSafetyLines(lines, [platformEntry]);
+        lines.push(managed ? "  • Stop and ask the user if credentials or config are missing — do not request secrets in chat." : "");
+        return lines.filter(Boolean).join("\n");
     }
 
     function buildAgentPrompt(state, platform, platformB, platformEntry, platformBEntry, benchmarkEntry, cliCmd, dryRun, depCheck, depCheckB, managed) {
         var pretty = benchmarkEntry ? benchmarkEntry.label : state.benchmark;
-        var agentLine;
-        if (state.agent === "codex") {
-            agentLine = "You are Codex with shell access. Help me run a BenchBox benchmark end-to-end.";
-        } else if (state.agent === "claude-code") {
-            agentLine = "You are Claude Code with shell access. Help me run a BenchBox benchmark end-to-end.";
-        } else {
-            agentLine = "You are a coding agent (e.g. Pi, OpenCode, Cline, Aider) with shell access. Help me run a BenchBox benchmark end-to-end.";
-        }
-
-        var lines = [agentLine, ""];
+        var lines = ["You are a coding agent with shell access. Help me run a BenchBox benchmark end-to-end.", ""];
         if (state.goal === "compare") {
             lines.push("Goal: compare " + platformLabel(platformEntry) + " and " + platformLabel(platformBEntry) + " on " + pretty + " at scale factor " + state.scale + " (" + state["interface"].toUpperCase() + " interface, " + state.deployment + " deployment).");
         } else {
@@ -306,7 +309,6 @@
     function readStateFromForm() {
         return {
             goal: $("sel-goal").value,
-            agent: $("sel-agent").value,
             surface: $("sel-surface").value,
             "interface": $("sel-interface").value,
             deployment: $("sel-deployment").value,

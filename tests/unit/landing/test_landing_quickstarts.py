@@ -130,27 +130,23 @@ def test_defaults_resolve_to_known_ids(gen, catalog):
     assert "10.0" in catalog["scales"]
 
 
-def test_no_manual_label_anywhere(catalog):
-    assert all("manual" not in agent["label"].lower() for agent in catalog["agents"])
+def test_agent_catalog_is_removed(catalog):
+    assert "agents" not in catalog
+    assert "agent" not in catalog["defaults"]
 
 
-def test_agent_label_containing_manual_is_rejected(gen, catalog):
+def test_agent_catalog_is_rejected(gen, catalog):
     bad = copy.deepcopy(catalog)
-    bad["agents"][0]["label"] = "Generic / manual"
+    bad["agents"] = [{"id": "codex", "label": "Codex"}]
     errors = gen.validate(bad)
-    assert any("must not contain 'manual'" in e for e in errors)
+    assert any("agents[] is no longer supported" in e for e in errors)
 
 
-def test_generic_agent_has_hint(catalog):
-    generic = next(agent for agent in catalog["agents"] if agent["id"] == "generic")
-    assert generic["hint"]
-
-
-def test_unknown_agent_metadata_key_is_rejected(gen, catalog):
+def test_agent_default_is_rejected(gen, catalog):
     bad = copy.deepcopy(catalog)
-    bad["agents"][0]["docs_url"] = "https://example.invalid"
+    bad["defaults"]["agent"] = "codex"
     errors = gen.validate(bad)
-    assert any("unknown keys" in e for e in errors)
+    assert any("defaults.agent is no longer supported" in e for e in errors)
 
 
 def test_no_recipes_json_committed():
@@ -175,3 +171,36 @@ def test_hidden_fields_override_flex_display():
     assert ".prompts-field[hidden]" in text
     assert ".prompts-block[hidden]" in text
     assert "display: none !important" in text
+
+
+def test_agent_field_stays_removed_from_route():
+    text = PROMPTS_INDEX_PATH.read_text(encoding="utf-8") + PROMPTS_JS_PATH.read_text(encoding="utf-8")
+    assert "sel-agent" not in text
+    assert 'name="agent"' not in text
+    assert "state.agent" not in text
+    assert "catalog.agents" not in text
+    assert '["goal", "agent"' not in text
+
+
+def test_managed_warning_box_is_credentials_only():
+    text = PROMPTS_JS_PATH.read_text(encoding="utf-8")
+    safety_block = text[text.index('var safetyList = $("cloud-safety-list")') : text.index("function platformLabel")]
+    assert '"no_secrets"' in safety_block
+    assert '"dependency"' not in safety_block
+    assert '"dry_run"' not in safety_block
+
+
+def test_prompt_includes_managed_dependency_and_dry_run_safety():
+    text = PROMPTS_JS_PATH.read_text(encoding="utf-8")
+    assert "Check dependencies:" in text
+    assert "Dry run first:" in text
+    assert 'safetyTexts(entries, "dependency")' in text
+    assert 'safetyTexts(entries, "dry_run")' in text
+    assert "appendManagedSafetyLines(lines" in text
+
+
+def test_prompts_background_is_full_page():
+    text = PROMPTS_CSS_PATH.read_text(encoding="utf-8")
+    assert "body::before" in text
+    assert ".prompts-main::before" not in text
+    assert "position: fixed" in text

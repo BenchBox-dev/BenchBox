@@ -17,18 +17,12 @@
 
 defaults:
   goal: test_one
-  agent: generic
   surface: cli
   interface: sql
   deployment: local
   platform: duckdb
   benchmark: tpch
   scale: "0.01"
-
-agents:
-  - { id: generic, label: "Generic", hint: "Pi, OpenCode, Cline, Aider, …" }
-  - { id: codex, label: "Codex" }
-  - { id: claude-code, label: "Claude Code" }
 
 surfaces:
   - { id: cli, label: "CLI" }

@@ -20,9 +20,8 @@ you decide to add it.
 ## Screen reader (VoiceOver on macOS or NVDA on Windows)
 
 - [ ] Page H1 is announced as "Instruct a coding agent to use BenchBox".
-- [ ] Each `<select>` is announced with its label (Goal, Agent, Surface,
-      Interface, Deployment, Platform / Platform A / Platform B,
-      Benchmark, Scale).
+- [ ] Each `<select>` is announced with its label (Goal, Surface, Interface,
+      Deployment, Platform / Platform A / Platform B, Benchmark, Scale).
 - [ ] After clicking a copy button, the `aria-live` region at
       `#copy-status` announces "Copied <block-name>".
 - [ ] When goal switches between "Test one platform" and

@@ -33,7 +33,6 @@ FORBIDDEN_JSON = REPO_ROOT / "landing" / "prompts" / "recipes.json"
 
 VALID_DEPLOYMENT_MODES = frozenset({"local", "self-hosted", "managed"})
 MANAGED_SAFETY_KEYS = frozenset({"dependency", "dry_run", "no_secrets"})
-VALID_AGENT_KEYS = frozenset({"id", "label", "hint"})
 
 
 def load_catalog(path: Path = SOURCE) -> dict[str, Any]:
@@ -127,18 +126,12 @@ def _validate_mcp(catalog: dict[str, Any], known_tools: frozenset[str], known_pr
     return errors
 
 
-def _validate_agents(catalog: dict[str, Any]) -> list[str]:
+def _validate_agent_removed(catalog: dict[str, Any]) -> list[str]:
     errors: list[str] = []
-    for entry in catalog.get("agents") or []:
-        if not isinstance(entry, dict):
-            errors.append(f"agents[] entries must be mappings, got {type(entry).__name__}")
-            continue
-        unknown_keys = set(entry) - VALID_AGENT_KEYS
-        if unknown_keys:
-            errors.append(f"agents[{entry.get('id')!r}] contains unknown keys: {sorted(unknown_keys)}")
-        label = str(entry.get("label") or "")
-        if "manual" in label.lower():
-            errors.append(f"agents[{entry.get('id')!r}].label must not contain 'manual'")
+    if "agents" in catalog:
+        errors.append("agents[] is no longer supported; /prompts/ uses agent-agnostic copy")
+    if "agent" in (catalog.get("defaults") or {}):
+        errors.append("defaults.agent is no longer supported; /prompts/ uses agent-agnostic copy")
     return errors
 
 
@@ -167,7 +160,7 @@ def validate(catalog: dict[str, Any]) -> list[str]:
             errors.append(f"deployments[{did!r}]: must be in {sorted(VALID_DEPLOYMENT_MODES)}")
 
     errors.extend(_validate_defaults(catalog, platform_ids, benchmark_ids))
-    errors.extend(_validate_agents(catalog))
+    errors.extend(_validate_agent_removed(catalog))
     errors.extend(_validate_mcp(catalog, known_tools, known_prompts))
 
     compare_tpl = ((catalog.get("templates") or {}).get("cli") or {}).get("compare") or ""
