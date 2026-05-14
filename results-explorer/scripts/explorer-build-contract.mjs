@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const EXPECTED_CONTRACT_VERSION = "4";
+export const EXPECTED_READ_MODEL_VERSION = 1;
 const REQUIRED_FLAGS = ["--data-dir", "--output", "--trust-label", "--visibility"];
 const REQUIRED_OUTPUTS = ["results.duckdb", "bundles/{result_id}.json"];
 const REMOVED_LEGACY_OUTPUTS = [
@@ -63,6 +64,13 @@ export function readExplorerBuildContract() {
   if (contract.command !== EXPECTED_COMMAND) {
     throw new Error(
       `Explorer build contract command ${EXPECTED_COMMAND} expected, got ${contract.command}. ` +
+        ALIGNMENT_HINT,
+    );
+  }
+
+  if (contract.read_model_version !== EXPECTED_READ_MODEL_VERSION) {
+    throw new Error(
+      `Explorer read-model version ${EXPECTED_READ_MODEL_VERSION} expected, got ${contract.read_model_version}. ` +
         ALIGNMENT_HINT,
     );
   }

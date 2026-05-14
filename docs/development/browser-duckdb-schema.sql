@@ -1,5 +1,5 @@
 -- browser-duckdb-schema.sql
--- Frozen DuckDB DDL for the ten canonical browser metric tables and views.
+-- Frozen DuckDB DDL for the canonical browser metric tables and views.
 --
 -- Originating TODO: explorer-canonical-browser-duckdb-read-model (W1 deliverable)
 -- Locked: 2026-04-18
@@ -9,6 +9,16 @@
 --   - Views project only bare column references (G-11 compliance).
 --   - No arithmetic, aggregation, CASE, or window functions in view projections.
 --   - ATTACH ... (READ_ONLY) is enforced at the browser layer; DDL never runs in-browser.
+--   - If the column set of `results` changes, bump
+--     EXPLORER_READ_MODEL_VERSION in `_project/scripts/explorer_pipeline/contract.py`.
+
+-- ---------------------------------------------------------------------------
+-- Metadata table (required by browser read-model version guard)
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS metadata (
+    read_model_version INTEGER NOT NULL
+);
 
 -- ---------------------------------------------------------------------------
 -- Supporting tables (required by result_detail_metrics view)

@@ -1,0 +1,80 @@
+/**
+ * Verifies the snapshot read-model version guard. The guard converts stale
+ * or pre-version snapshots from a deep Binder Error into an actionable
+ * init-time failure naming the found and required versions.
+ */
+
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  _EXPECTED_READ_MODEL_VERSION_FOR_TEST,
+  _verifyReadModelVersionForTest,
+} from "@/db";
+
+interface QueryResult {
+  toArray(): { toJSON(): { read_model_version?: number } }[];
+}
+
+interface FakeConn {
+  query(sql: string): Promise<QueryResult>;
+}
+
+function makeConn(version: number | null): FakeConn {
+  return {
+    async query(_sql: string): Promise<QueryResult> {
+      if (version === null) {
+        throw new Error("Catalog Error: Table with name metadata does not exist");
+      }
+      return {
+        toArray: () => [
+          {
+            toJSON: () => ({ read_model_version: version }),
+          },
+        ],
+      };
+    },
+  };
+}
+
+describe("read-model version guard", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("rejects a missing metadata table as stale v0", async () => {
+    const conn = makeConn(null);
+    await expect(
+      _verifyReadModelVersionForTest(conn as unknown as Parameters<typeof _verifyReadModelVersionForTest>[0]),
+    ).rejects.toThrow(/read-model v0; UI requires v1/);
+    await expect(
+      _verifyReadModelVersionForTest(conn as unknown as Parameters<typeof _verifyReadModelVersionForTest>[0]),
+    ).rejects.not.toThrow(/is missing required columns/);
+  });
+
+  it("rejects an older read-model version with a humane remediation message", async () => {
+    const conn = makeConn(0);
+    await expect(
+      _verifyReadModelVersionForTest(conn as unknown as Parameters<typeof _verifyReadModelVersionForTest>[0]),
+    ).rejects.toThrow(/read-model v0; UI requires v1/);
+    await expect(
+      _verifyReadModelVersionForTest(conn as unknown as Parameters<typeof _verifyReadModelVersionForTest>[0]),
+    ).rejects.toThrow(/ask a maintainer to rebuild the Explorer data/);
+  });
+
+  it("resolves when the snapshot version matches the UI contract", async () => {
+    const conn = makeConn(_EXPECTED_READ_MODEL_VERSION_FOR_TEST);
+    await expect(
+      _verifyReadModelVersionForTest(conn as unknown as Parameters<typeof _verifyReadModelVersionForTest>[0]),
+    ).resolves.toBeUndefined();
+  });
+
+  it("warns but proceeds when the snapshot version is newer than the UI contract", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const conn = makeConn(_EXPECTED_READ_MODEL_VERSION_FOR_TEST + 1);
+
+    await expect(
+      _verifyReadModelVersionForTest(conn as unknown as Parameters<typeof _verifyReadModelVersionForTest>[0]),
+    ).resolves.toBeUndefined();
+
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("Proceeding with forward-compatible reads"));
+  });
+});

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 EXPLORER_BUILD_CONTRACT_VERSION = "4"
+EXPLORER_READ_MODEL_VERSION = 1
 
 EXPLORER_BUILD_CONTRACT = {
     "version": EXPLORER_BUILD_CONTRACT_VERSION,
+    "read_model_version": EXPLORER_READ_MODEL_VERSION,
     "command": "uv run -- python _project/scripts/explorer_publish.py build",
     "flags": [
         "--data-dir",
@@ -33,4 +35,5 @@ EXPLORER_BUILD_CONTRACT = {
 __all__ = [
     "EXPLORER_BUILD_CONTRACT",
     "EXPLORER_BUILD_CONTRACT_VERSION",
+    "EXPLORER_READ_MODEL_VERSION",
 ]

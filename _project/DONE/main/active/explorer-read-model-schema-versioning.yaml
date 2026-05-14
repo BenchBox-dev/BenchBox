@@ -2,7 +2,8 @@ id: explorer-read-model-schema-versioning
 title: "Version the explorer read-model and replace the 51-column required-set drift detector"
 worktree: explorer-read-model-schema-versioning
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-05-14"
 category: Correctness
 
 description: |
@@ -35,18 +36,20 @@ deps:
   - explorer-cli-surface-migration
 
 prior_art:
-  - "benchbox/core/explorer_pipeline/contract.py — existing `EXPLORER_BUILD_CONTRACT` versioning the output shape; EXTEND with a `read_model_version` field rather than introducing a parallel mechanism."
-  - "benchbox/core/explorer_pipeline/duckdb_builder.py — writes the duckdb snapshot; the place to emit a `schema_version` scalar/table."
-  - "results-explorer/scripts/explorer-build-contract.mjs:7 (REQUIRED_OUTPUTS) and the contract-fetching helper — established pattern for the Node side reading contract values; reuse."
-  - "results-explorer/src/db.ts:53-106 (BENCH_RESULTS_REQUIRED_COLUMNS) — the 51-name list to remove."
-  - "results-explorer/src/db.ts:184-199 (verifyBenchResultsColumns) — the function to replace with a version check."
-  - "tests/unit/cli/test_explorer_build_contract.py — existing contract test pattern to extend."
-  - "results-explorer/src/components/__tests__/ — vitest convention for the frontend version-mismatch test."
+- "benchbox/core/explorer_pipeline/contract.py — existing `EXPLORER_BUILD_CONTRACT` versioning the output shape; EXTEND with
+  a `read_model_version` field rather than introducing a parallel mechanism."
+- "benchbox/core/explorer_pipeline/duckdb_builder.py — writes the duckdb snapshot; the place to emit a `schema_version` scalar/table."
+- "results-explorer/scripts/explorer-build-contract.mjs:7 (REQUIRED_OUTPUTS) and the contract-fetching helper — established
+  pattern for the Node side reading contract values; reuse."
+- "results-explorer/src/db.ts:53-106 (BENCH_RESULTS_REQUIRED_COLUMNS) — the 51-name list to remove."
+- "results-explorer/src/db.ts:184-199 (verifyBenchResultsColumns) — the function to replace with a version check."
+- "tests/unit/cli/test_explorer_build_contract.py — existing contract test pattern to extend."
+- "results-explorer/src/components/__tests__/ — vitest convention for the frontend version-mismatch test."
 
 work:
 - id: w1
   summary: "Add `read_model_version` to the build contract and the duckdb snapshot"
-  status: pending
+  status: done
   notes: |
     In `benchbox/core/explorer_pipeline/contract.py`, add a
     `read_model_version: int` field (start at 1 to represent the current
@@ -68,7 +71,7 @@ work:
 - id: w2
   summary: "Replace the frontend column-diff guard with a version check"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     In `results-explorer/src/db.ts`:
       - Add a `EXPECTED_READ_MODEL_VERSION` constant sourced from the
@@ -91,7 +94,7 @@ work:
 - id: w3
   summary: "Tests: version-mismatch error path + same-version pass path"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Frontend vitest under `results-explorer/src/lib/__tests__/`:
       - Build a tiny in-memory DuckDB with `bench.metadata.read_model_version = 0` → expect humane error containing "v0" and "v1".
@@ -109,7 +112,7 @@ work:
 - id: w4
   summary: "Add a CONTRIBUTING line gating column-set bumps on version bumps"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     In `CONTRIBUTING.md` (or `docs/development/browser-duckdb-schema.sql`
     header if that's where backend schema lives): one-line note —
@@ -124,7 +127,8 @@ work:
 must_preserve:
 - "Existing snapshots produced before this TODO continue to fail informatively (as 'v0 missing or stale')."
 - "The build contract continues to validate via `EXPLORER_BUILD_CONTRACT`; this TODO extends it, does not replace it."
-- "Browser-fixture generator continues to work — only the column-list guard goes away; readiness scans for individual tables stay."
+- "Browser-fixture generator continues to work — only the column-list guard goes away; readiness scans for individual tables
+  stay."
 - "Production CI rebuild does not change behavior — the new version is emitted by the same publish entry point."
 
 approach: |
@@ -137,10 +141,14 @@ approach: |
   because the tests assert against the live code. Then CONTRIBUTING (w4).
 
 anti_patterns:
-- "DO NOT keep a fallback to the 51-column diff guard 'just in case' — the version check is the contract; the column list is the old contract."
-- "DO NOT version-stamp individual columns or use a semver string. A monotonically-increasing integer is sufficient and simple; semver invites premature bikeshedding."
-- "DO NOT couple this to the dev-DX TODO. The dev-DX TODO is about *when* this error fires; this TODO is about *what shape* the error takes when it fires. Either order of landing is fine."
-- "DO NOT silently auto-rebuild on version mismatch — the user (or CI) must opt in to a rebuild. Auto-rebuild on an outdated snapshot risks long startup pauses and obscures real schema-drift bugs."
+- "DO NOT keep a fallback to the 51-column diff guard 'just in case' — the version check is the contract; the column list
+  is the old contract."
+- "DO NOT version-stamp individual columns or use a semver string. A monotonically-increasing integer is sufficient and simple;
+  semver invites premature bikeshedding."
+- "DO NOT couple this to the dev-DX TODO. The dev-DX TODO is about *when* this error fires; this TODO is about *what shape*
+  the error takes when it fires. Either order of landing is fine."
+- "DO NOT silently auto-rebuild on version mismatch — the user (or CI) must opt in to a rebuild. Auto-rebuild on an outdated
+  snapshot risks long startup pauses and obscures real schema-drift bugs."
 
 scope_limit:
   only_modify:
@@ -166,7 +174,8 @@ verification:
   expected_output: "exit 0"
 - description: "Old (pre-version) snapshot raises the humane v0/v1 error, not a column diff."
   command: "cd results-explorer && npm test -- --run 'read-model-version-mismatch'"
-  expected_output: "test exits 0 and the asserted error string contains 'read-model v' and 'requires v', and does NOT contain the literal 'is missing required columns'"
+  expected_output: "test exits 0 and the asserted error string contains 'read-model v' and 'requires v', and does NOT contain
+    the literal 'is missing required columns'"
 - description: "The 51-column constant has been removed."
   command: "grep -c 'BENCH_RESULTS_REQUIRED_COLUMNS' results-explorer/src/db.ts"
   expected_output: "0"
@@ -178,7 +187,8 @@ success_metrics:
 
 deferred:
 - summary: "Pre-commit lint enforcing version bump on column change."
-  reason: "Nice-to-have; the CONTRIBUTING note + PR-review discipline is the v1 gate. File a follow-up TODO only if column-bumps land without version-bumps in practice."
+  reason: "Nice-to-have; the CONTRIBUTING note + PR-review discipline is the v1 gate. File a follow-up TODO only if column-bumps
+    land without version-bumps in practice."
 
 impact: |
   Eliminates the recurring 9-column-diff failure mode. Reduces the
