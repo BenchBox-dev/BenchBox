@@ -100,7 +100,18 @@
         });
         var scaleStr = String(raw.scale || defaults.scale);
         var scaleIds = catalog.scales.map(function (s) { return String(s); });
-        state.scale = scaleIds.indexOf(scaleStr) !== -1 ? scaleStr : String(defaults.scale);
+        var scaleIdx = scaleIds.indexOf(scaleStr);
+        if (scaleIdx === -1) {
+            // Match legacy numeric aliases (e.g. "1" -> "1.0") so bookmarked
+            // URLs from before string-id normalisation still resolve.
+            var scaleNum = parseFloat(scaleStr);
+            if (isFinite(scaleNum)) {
+                for (var i = 0; i < scaleIds.length; i++) {
+                    if (parseFloat(scaleIds[i]) === scaleNum) { scaleIdx = i; break; }
+                }
+            }
+        }
+        state.scale = scaleIdx !== -1 ? scaleIds[scaleIdx] : String(defaults.scale);
 
         // benchmark must support selected interface
         if (!benchmarksForInterface(state["interface"]).some(function (b) { return b.id === state.benchmark; })) {
