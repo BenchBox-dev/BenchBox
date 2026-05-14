@@ -2,7 +2,8 @@ id: explorer-cli-surface-adr
 title: "ADR: pick a destination for the explorer publish toolchain"
 worktree: explorer-cli-surface-adr
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-05-14"
 category: Architecture
 
 description: |
@@ -69,17 +70,22 @@ description: |
        or similar, not to a CLI they shouldn't be running.
 
 prior_art:
-  - "benchbox/cli/commands/explorer.py — current Click subgroup; supersede or relocate per ADR."
-  - "benchbox/core/explorer_pipeline/ — 7-file core package (contract.py, duckdb_builder.py, models.py, pipeline.py, ranking.py, transformer.py, compare_math.py); reuse intact, only the housing changes."
-  - "benchbox/cli/commands/__init__.py:22 — registration site for `explorer_group`; reuse the registration pattern (or its absence) for whatever replaces it."
-  - "results-explorer/scripts/explorer-build-contract.mjs — Node-side consumer that calls `benchbox explorer build-contract` to fetch the output contract; reference for how an external script binds to the entry point."
-  - "_project/scripts/ — existing in-tree maintainer scripts directory (validate_todo.py, generate_indexes.py, etc.); candidate destination for option 3, reuse layout if chosen."
-  - "docs/development/adr/ — existing ADR location with TEMPLATE-results-data-extraction.md as the structural reference; reuse format."
+- "benchbox/cli/commands/explorer.py — current Click subgroup; supersede or relocate per ADR."
+- "benchbox/core/explorer_pipeline/ — 7-file core package (contract.py, duckdb_builder.py, models.py, pipeline.py, ranking.py,
+  transformer.py, compare_math.py); reuse intact, only the housing changes."
+- "benchbox/cli/commands/__init__.py:22 — registration site for `explorer_group`; reuse the registration pattern (or its absence)
+  for whatever replaces it."
+- "results-explorer/scripts/explorer-build-contract.mjs — Node-side consumer that calls `benchbox explorer build-contract`
+  to fetch the output contract; reference for how an external script binds to the entry point."
+- "_project/scripts/ — existing in-tree maintainer scripts directory (validate_todo.py, generate_indexes.py, etc.); candidate
+  destination for option 3, reuse layout if chosen."
+- "docs/development/adr/ — existing ADR location with TEMPLATE-results-data-extraction.md as the structural reference; reuse
+  format."
 
 work:
 - id: w0
   summary: "Re-validate provenance evidence and pin it in the ADR"
-  status: pending
+  status: done
   notes: |
     Before writing the ADR proper, re-run the provenance probes that this
     TODO's description cites and commit the resulting facts as a
@@ -110,7 +116,7 @@ work:
 - id: w1
   summary: "Inventory every call site of the current CLI surface"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     Grep targets (run from repo root):
       - `git grep -n "benchbox explorer build\|benchbox explorer build-contract"`
@@ -136,7 +142,7 @@ work:
 - id: w2
   summary: "Inventory imports of `benchbox.core.explorer_pipeline.*` from outside the package"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     The decision on sub-question (a) (does the pipeline also move?) turns
     on how leaky the package's public import surface is.
@@ -150,7 +156,7 @@ work:
 - id: w3
   summary: "Draft the ADR with a 4-option decision matrix"
   needs: [w1, w2]
-  status: pending
+  status: done
   notes: |
     Path: `docs/development/adr/adr-explorer-cli-surface.md`.
 
@@ -169,14 +175,15 @@ work:
 - id: w4
   summary: "Land the ADR on develop"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Open a PR with only the ADR (no code moves). On merge, this TODO is
     Completed and `explorer-cli-surface-migration` is unblocked.
 
 must_preserve:
 - "No code is moved or renamed in this TODO. ADR-only."
-- "Existing CI builds, browser-fixture generation, and UAT explorer-smoke must continue to work unchanged; this TODO does not touch them."
+- "Existing CI builds, browser-fixture generation, and UAT explorer-smoke must continue to work unchanged; this TODO does
+  not touch them."
 - "`benchbox --help` output is unchanged in this TODO."
 
 approach: |
@@ -188,8 +195,10 @@ approach: |
   complete; the migration-cost numbers are load-bearing.
 
 anti_patterns:
-- "DO NOT relocate any code in this TODO — moving code without the locked decision creates churn and re-litigates the choice in the migration PR. Defer all moves to `explorer-cli-surface-migration`."
-- "DO NOT make this ADR conditional on Phase 8/9 migration work — the explorer surface should be decided independently of the remaining migration phases (which TODO `migration-phase-api-surface-gate` handles separately)."
+- "DO NOT relocate any code in this TODO — moving code without the locked decision creates churn and re-litigates the choice
+  in the migration PR. Defer all moves to `explorer-cli-surface-migration`."
+- "DO NOT make this ADR conditional on Phase 8/9 migration work — the explorer surface should be decided independently of
+  the remaining migration phases (which TODO `migration-phase-api-surface-gate` handles separately)."
 
 scope_limit:
   only_modify:
