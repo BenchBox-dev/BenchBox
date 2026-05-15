@@ -402,6 +402,59 @@ def test_execute_unmanaged_docker_keeps_skip_probe_without_commands(tmp_path):
     assert any(event.action == "manage" and event.status == "disabled" for event in outcome.docker_events)
 
 
+@pytest.mark.parametrize(
+    ("docker_manage_platforms", "expected_local_managed"),
+    [(False, False), (True, True)],
+)
+def test_execute_scopes_local_managed_platform_options_to_managed_docker(
+    docker_manage_platforms: bool,
+    expected_local_managed: bool,
+    tmp_path,
+):
+    matrix.reset_reachability_cache()
+    cfg = validate_config(
+        {
+            "name": "docker scope",
+            "platforms": {"include": ["postgresql"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "cleanup": {
+                "docker_manage_platforms": docker_manage_platforms,
+                "docker_platform_switch": "volumes" if docker_manage_platforms else "off",
+            },
+        }
+    )
+    seen: dict[str, bool] = {}
+
+    def fake_docker(argv, **kwargs):
+        return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
+
+    def recording_runner(platform, benchmark, scale, **kwargs):
+        seen["local_managed_platform"] = kwargs["local_managed_platform"]
+        return CellResult(
+            platform=platform,
+            benchmark=benchmark,
+            scale=scale,
+            status="passed",
+            exit_code=0,
+            elapsed_s=1.0,
+            log_path=tmp_path / "postgresql.log",
+            result_path=None,
+        )
+
+    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=recording_runner,
+            docker_runner=fake_docker,
+        )
+
+    assert outcome.aborted is False
+    assert seen["local_managed_platform"] is expected_local_managed
+
+
 def test_execute_runner_exception_still_tears_down_managed_docker(tmp_path):
     matrix.reset_reachability_cache()
     cfg = validate_config(

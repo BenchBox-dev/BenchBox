@@ -148,6 +148,27 @@ def test_run_cell_sets_benchbox_output_dir_for_subprocess(tmp_path: Path):
     assert "BENCHBOX_OUTPUT_DIR=" in result.log_path.read_text()
 
 
+@pytest.mark.parametrize("local_managed_platform", [False, True])
+def test_run_cell_forwards_local_managed_platform_scope(local_managed_platform: bool, tmp_path: Path):
+    captured = {}
+
+    def fake_benchbox_run_argv(*args, **kwargs):
+        captured["local_managed_platform"] = kwargs["local_managed_platform"]
+        return [sys.executable, "-c", "print('unused')"]
+
+    with patch.object(runner, "benchbox_run_argv", side_effect=fake_benchbox_run_argv):
+        runner.run_cell(
+            "postgresql",
+            "tpch",
+            0.01,
+            timeout_s=10,
+            log_dir=tmp_path,
+            local_managed_platform=local_managed_platform,
+        )
+
+    assert captured["local_managed_platform"] is local_managed_platform
+
+
 def test_run_cell_defaults_benchbox_output_dir_to_shared(monkeypatch, tmp_path: Path):
     monkeypatch.delenv("BENCHBOX_OUTPUT_DIR", raising=False)
     fake_argv = [sys.executable, "-c", "print('unused')"]

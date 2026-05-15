@@ -466,6 +466,8 @@ def _run_platform_benchmark(
             phases=config.execute.phases_arg,
             compression=config.execute.compression,
             extra_args=config.execute.extra_args,
+            local_managed_platform=config.cleanup.docker_manage_platforms
+            and docker_assets.is_docker_platform(cell.platform),
             log_dir=log_dir,
             benchmark_runs_dir=benchmark_runs_dir,
         )

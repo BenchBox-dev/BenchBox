@@ -131,6 +131,7 @@ def run_cell(
     log_dir: Path | str | None = None,
     benchmark_runs_dir: Path | str | None = None,
     extra_args=(),
+    local_managed_platform: bool = False,
     now: _dt.datetime | None = None,
 ) -> CellResult:
     """Run a single cell end-to-end and return the cell result.
@@ -149,6 +150,7 @@ def run_cell(
         phases=phases,
         compression=compression,
         extra_args=("--output", str(runs_dir / "datagen"), *extra_args),
+        local_managed_platform=local_managed_platform,
     )
 
     with log_path.open("w", encoding="utf-8") as log_fh:
