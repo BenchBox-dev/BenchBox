@@ -377,7 +377,7 @@ class TestPgMooncakeLoadPromotion:
         assert ("CALL mooncake.create_table(%s, %s)", ("lineitem", "__bb_moon_src_lineitem")) in executed
         assert ('SELECT COUNT(*) FROM "lineitem"',) in executed
         assert all("empty" not in str(args) for args in executed)
-        assert conn.commit.call_count == 3
+        conn.commit.assert_called_once()
         cursor.close.assert_called_once()
 
     def test_load_data_rolls_back_on_promotion_failure(self, pg_mooncake_stubs, tmp_path):
@@ -397,6 +397,35 @@ class TestPgMooncakeLoadPromotion:
         ):
             adapter.load_data(Mock(), conn, tmp_path)
 
+        conn.rollback.assert_called_once()
+        cursor.close.assert_called_once()
+
+    def test_load_data_keeps_rename_and_mirror_creation_atomic(self, pg_mooncake_stubs, tmp_path):
+        adapter = PgMooncakeAdapter()
+        conn = Mock()
+        cursor = Mock()
+        cursor.execute.side_effect = [
+            None,
+            RuntimeError("mirror creation failed"),
+        ]
+        conn.cursor.return_value = cursor
+
+        with (
+            patch.object(
+                postgresql_module.PostgreSQLAdapter,
+                "load_data",
+                return_value=({"orders": 2}, 1.25, None),
+            ),
+            pytest.raises(RuntimeError, match="mirror creation failed"),
+        ):
+            adapter.load_data(Mock(), conn, tmp_path)
+
+        executed = [call.args for call in cursor.execute.call_args_list]
+        assert executed == [
+            ('ALTER TABLE "orders" RENAME TO "__bb_moon_src_orders"',),
+            ("CALL mooncake.create_table(%s, %s)", ("orders", "__bb_moon_src_orders")),
+        ]
+        conn.commit.assert_not_called()
         conn.rollback.assert_called_once()
         cursor.close.assert_called_once()
 

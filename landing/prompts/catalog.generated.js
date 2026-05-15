@@ -573,9 +573,6 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
-      "credential_deployments": [
-        "self-hosted"
-      ],
       "dependency_check_command": "uv run benchbox check-deps --platform lakesail",
       "dependency_check_platform": "lakesail",
       "deployments": [
@@ -588,12 +585,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
         "sql",
         "dataframe"
       ],
-      "label": "LakeSail Sail",
-      "safety_terms": {
-        "dependency": "Check platform SDK and connector dependencies before any live run.",
-        "dry_run": "Use a dry run to inspect commands before any live run.",
-        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
-      }
+      "label": "LakeSail Sail"
     },
     {
       "deployments": [
@@ -876,6 +868,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "dependency_check_command": "uv run benchbox check-deps --platform spark",
       "dependency_check_platform": "spark",
       "deployments": [
+        "local",
         "self-hosted"
       ],
       "id": "spark",
@@ -1027,9 +1020,6 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
-      "credential_deployments": [
-        "self-hosted"
-      ],
       "dependency_check_command": "uv run benchbox check-deps --platform velox",
       "dependency_check_platform": "velox",
       "deployments": [
@@ -1041,12 +1031,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "interfaces": [
         "sql"
       ],
-      "label": "Apache Gluten + Velox",
-      "safety_terms": {
-        "dependency": "Check platform SDK and connector dependencies before any live run.",
-        "dry_run": "Use a dry run to inspect commands before any live run.",
-        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
-      }
+      "label": "Apache Gluten + Velox"
     }
   ],
   "scales": [

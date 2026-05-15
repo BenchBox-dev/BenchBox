@@ -239,7 +239,7 @@ def _validate_external_corpus(*, bundles_dir: Path) -> dict[str, object]:
     bundle_files = sorted(
         path
         for path in bundles_dir.rglob("*.json")
-        if not path.name.endswith(".manifest.json") and not path.name.endswith(".plans.json")
+        if not path.name.endswith((".manifest.json", ".plans.json", ".tuning.json"))
     )
     if not bundle_files:
         raise RuntimeError(f"Explorer smoke corpus has no result bundles: {bundles_dir}")

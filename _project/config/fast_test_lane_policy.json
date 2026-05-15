@@ -1,7 +1,7 @@
 {
   "enabled": true,
-  "max_fast_tests": 22510,
-  "_ceiling_note": "Bumped 13200 -> 22000 on 2026-04-13 to reflect grown fast-lane (20,184 collected). Bumped 22000 -> 22100 on 2026-05-10 for joinorder-canonical-foundation Phase-1 (data_fetch + scale-factor + surface-field tests; 22038 collected). Bumped 22100 -> 22400 on 2026-05-11 for joinorder-canonical-cutover canonical SQL/DataFrame, MCP, publishing, and corpus-inventory guards; 22317 collected. Bumped 22400 -> 22500 on 2026-05-13 for UAT enabled-platform remediation coverage; pr-preflight collected 22419. Bumped 22500 -> 22510 on 2026-05-15 after rebasing onto develop at 36ab01058; pr-preflight collected 22501 before this branch's new public theme contract tests, which are medium-marked to avoid fast-lane growth. Ratchet down if the lane contracts; never raise without justification.",
+  "max_fast_tests": 22530,
+  "_ceiling_note": "Bumped 13200 -> 22000 on 2026-04-13 to reflect grown fast-lane (20,184 collected). Bumped 22000 -> 22100 on 2026-05-10 for joinorder-canonical-foundation Phase-1 (data_fetch + scale-factor + surface-field tests; 22038 collected). Bumped 22100 -> 22400 on 2026-05-11 for joinorder-canonical-cutover canonical SQL/DataFrame, MCP, publishing, and corpus-inventory guards; 22317 collected. Bumped 22400 -> 22500 on 2026-05-13 for UAT enabled-platform remediation coverage; pr-preflight collected 22419. Bumped 22500 -> 22510 on 2026-05-15 after rebasing onto develop at 36ab01058; pr-preflight collected 22501 before this branch's new public theme contract tests, which are medium-marked to avoid fast-lane growth. Bumped 22510 -> 22530 on 2026-05-14 for pr-review-followup batch coverage (joinorder dataframe family, pg_mooncake adapter, landing quickstart validation, explorer read-model retry); pr-preflight collected 22520. Ratchet down if the lane contracts; never raise without justification.",
   "forbidden_marker_expressions": [
     "resource_heavy",
     "stress",

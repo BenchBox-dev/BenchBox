@@ -146,17 +146,27 @@ async function verifyReadModelVersion(conn: DuckDBConnection): Promise<void> {
 }
 
 async function readSnapshotReadModelVersion(conn: DuckDBConnection): Promise<number> {
-  try {
-    const result = await conn.query("SELECT read_model_version FROM bench.metadata LIMIT 1");
-    const row = result.toArray()[0]?.toJSON();
-    const version = Number(row?.read_model_version ?? 0);
-    return Number.isInteger(version) && version >= 0 ? version : 0;
-  } catch (error: unknown) {
-    if (isMissingReadModelMetadataError(error)) {
-      return 0;
+  let lastError: unknown = null;
+  for (let attempt = 1; attempt <= SNAPSHOT_READY_ATTEMPTS; attempt += 1) {
+    try {
+      const result = await conn.query("SELECT read_model_version FROM bench.metadata LIMIT 1");
+      const row = result.toArray()[0]?.toJSON();
+      const version = Number(row?.read_model_version ?? 0);
+      return Number.isInteger(version) && version >= 0 ? version : 0;
+    } catch (error: unknown) {
+      if (isMissingReadModelMetadataError(error)) {
+        return 0;
+      }
+      lastError = error;
+      if (!isTransientDuckDbSnapshotError(error)) {
+        throw error;
+      }
+      await sleep(SNAPSHOT_READY_DELAY_MS * attempt);
     }
-    throw error;
   }
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("DuckDB snapshot read-model version did not become query-ready");
 }
 
 function isMissingReadModelMetadataError(error: unknown): boolean {

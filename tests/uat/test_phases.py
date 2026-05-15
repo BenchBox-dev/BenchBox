@@ -131,7 +131,9 @@ def test_enumerate_records_registry_benchmark_gates():
     assert pruned_by_benchmark["metadata_primitives"].evidence.startswith("benchbox.sql_compat benchmark_gate")
 
 
-def test_enumerate_records_pg_family_registry_benchmark_gates():
+def test_enumerate_records_pg_family_compatibility_pruning():
+    from benchbox.core.platform_registry import PlatformRegistry
+
     raw = {
         "platforms": {"include": ["pg-duckdb", "pg-mooncake", "timescaledb"]},
         "benchmarks": {
@@ -163,15 +165,28 @@ def test_enumerate_records_pg_family_registry_benchmark_gates():
     assert len(result.compatibility_pruned) == 17
     pruned = {(c.platform, c.benchmark): c for c in result.compatibility_pruned}
     assert pruned[("pg-mooncake", "tpcds")].rule_id == "uat.compat.pg-mooncake.tpcds.benchmark_gate"
-    assert pruned[("timescaledb", "datavault")].rule_id == "uat.compat.timescaledb.datavault.benchmark_gate"
+    assert pruned[("timescaledb", "datavault")].rule_id == (
+        "uat.compat.timescaledb.datavault.release_gate_runtime_envelope"
+    )
     for platform in ("pg-duckdb", "pg-mooncake", "timescaledb"):
+        caps = PlatformRegistry.get_platform_capabilities(platform)
+        assert caps is not None
+        assert "joinorder" not in caps.unsupported_benchmarks
+        assert "tpcds_obt" not in caps.unsupported_benchmarks
         assert pruned[(platform, "ai_primitives")].rule_id == f"uat.compat.{platform}.ai_primitives.benchmark_gate"
-        assert pruned[(platform, "joinorder")].rule_id == f"uat.compat.{platform}.joinorder.benchmark_gate"
+        assert pruned[(platform, "joinorder")].rule_id == (
+            f"uat.compat.{platform}.joinorder.release_gate_runtime_envelope"
+        )
         assert pruned[(platform, "read_primitives")].rule_id == (
             f"uat.compat.{platform}.read_primitives.benchmark_gate"
         )
-        assert pruned[(platform, "tpcds_obt")].rule_id == f"uat.compat.{platform}.tpcds_obt.benchmark_gate"
+        assert pruned[(platform, "tpcds_obt")].rule_id == (
+            f"uat.compat.{platform}.tpcds_obt.release_gate_runtime_envelope"
+        )
         assert pruned[(platform, "vector_search")].rule_id == f"uat.compat.{platform}.vector_search.benchmark_gate"
+    timescaledb_caps = PlatformRegistry.get_platform_capabilities("timescaledb")
+    assert timescaledb_caps is not None
+    assert "datavault" not in timescaledb_caps.unsupported_benchmarks
 
 
 def test_enumerate_honours_scale_options():
@@ -400,6 +415,59 @@ def test_execute_unmanaged_docker_keeps_skip_probe_without_commands(tmp_path):
     assert len(outcome.results) == 0
     assert len(outcome.skipped_unreachable) == 1
     assert any(event.action == "manage" and event.status == "disabled" for event in outcome.docker_events)
+
+
+@pytest.mark.parametrize(
+    ("docker_manage_platforms", "expected_local_managed"),
+    [(False, False), (True, True)],
+)
+def test_execute_scopes_local_managed_platform_options_to_managed_docker(
+    docker_manage_platforms: bool,
+    expected_local_managed: bool,
+    tmp_path,
+):
+    matrix.reset_reachability_cache()
+    cfg = validate_config(
+        {
+            "name": "docker scope",
+            "platforms": {"include": ["postgresql"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "cleanup": {
+                "docker_manage_platforms": docker_manage_platforms,
+                "docker_platform_switch": "volumes" if docker_manage_platforms else "off",
+            },
+        }
+    )
+    seen: dict[str, bool] = {}
+
+    def fake_docker(argv, **kwargs):
+        return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
+
+    def recording_runner(platform, benchmark, scale, **kwargs):
+        seen["local_managed_platform"] = kwargs["local_managed_platform"]
+        return CellResult(
+            platform=platform,
+            benchmark=benchmark,
+            scale=scale,
+            status="passed",
+            exit_code=0,
+            elapsed_s=1.0,
+            log_path=tmp_path / "postgresql.log",
+            result_path=None,
+        )
+
+    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=recording_runner,
+            docker_runner=fake_docker,
+        )
+
+    assert outcome.aborted is False
+    assert seen["local_managed_platform"] is expected_local_managed
 
 
 def test_execute_runner_exception_still_tears_down_managed_docker(tmp_path):

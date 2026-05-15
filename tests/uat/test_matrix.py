@@ -247,8 +247,17 @@ def test_benchbox_run_argv_includes_platform_extras():
     "platform",
     ["pg-duckdb", "pg-mooncake", "timescaledb", "postgresql"],
 )
-def test_benchbox_run_argv_includes_local_managed_postgres_password(platform):
+def test_benchbox_run_argv_defaults_to_external_postgres_credentials(platform):
     argv = matrix.benchbox_run_argv(platform, "tpch", 0.01)
+    assert "password=benchbox" not in argv
+
+
+@pytest.mark.parametrize(
+    "platform",
+    ["pg-duckdb", "pg-mooncake", "timescaledb", "postgresql"],
+)
+def test_benchbox_run_argv_includes_local_managed_postgres_password_when_requested(platform):
+    argv = matrix.benchbox_run_argv(platform, "tpch", 0.01, local_managed_platform=True)
     assert "--platform-option" in argv
     assert "password=benchbox" in argv
 

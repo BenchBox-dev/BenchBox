@@ -99,7 +99,7 @@ deferred:
 
 prior_art:
 - "tests/uat/matrix.py:45-73 -- existing `PLATFORM_EXTRA_OPTS`; Singlestore already passes `password=benchbox` for local UAT"
-- "tests/uat/matrix.py:385-419 -- `benchbox_run_argv()` appends platform options into every cell command"
+- "tests/uat/matrix.py:385-419 -- `benchbox_run_argv()` appends local managed Docker platform options only when explicitly requested"
 - "docker/postgres-extensions/docker-compose.pg-duckdb.yaml:19-22 -- local service sets `POSTGRES_PASSWORD=benchbox`"
 - "docker/postgres-extensions/docker-compose.pg-mooncake.yaml:23-26 -- local service sets `POSTGRES_PASSWORD=benchbox`"
 - "docker/postgres-extensions/docker-compose.timescaledb.yaml:22-25 -- local service sets `POSTGRES_PASSWORD=benchbox`"
@@ -132,7 +132,7 @@ verification:
   expected_output: "passes and includes assertions for pg-duckdb, pg-mooncake, and timescaledb password propagation"
 - description: "Generated UAT argv includes local password for PostgreSQL-extension platforms"
   command: "uv run -- python - <<'PY'\nfrom tests.uat.matrix import benchbox_run_argv\nfor platform in ['pg-duckdb', 'pg-mooncake',
-    'timescaledb']:\n    argv = benchbox_run_argv(platform, 'tpch', 0.01, extra_args=[])\n    print(platform, 'password=benchbox'
+    'timescaledb']:\n    argv = benchbox_run_argv(platform, 'tpch', 0.01, extra_args=[], local_managed_platform=True)\n    print(platform, 'password=benchbox'
     in argv)\nPY"
   expected_output: "Each platform prints True"
 - description: "Managed smoke reaches past authentication"

@@ -117,32 +117,6 @@ _register_pg_family_gate(
     ),
 )
 
-_register_pg_family_gate(
-    benchmark="joinorder",
-    rule_suffix="canonical_imdb_runtime_envelope",
-    failure_mode=FailureMode.PERFORMANCE_REGRESSION,
-    reason=(
-        "Canonical JoinOrder uses the full IMDb 2013 dataset at scale 1.0 only. A targeted 2026-05-14 "
-        "pg-duckdb UAT rerun loaded and validated the dataset, then timed out at the 1200s release-gate "
-        "budget on warm-up query 7a after the first 23 queries completed. The benchmark has no smaller "
-        "public scale; use joinorder_synthetic for PostgreSQL-family smoke coverage."
-    ),
-)
-
-_register_pg_family_gate(
-    benchmark="tpcds_obt",
-    rule_suffix="sf1_wide_obt_runtime_envelope",
-    failure_mode=FailureMode.PERFORMANCE_REGRESSION,
-    reason=(
-        "TPC-DS OBT is currently scale-1.0-only and materializes a very wide sales/returns table. A targeted "
-        "2026-05-14 pg-duckdb UAT rerun with delimited output loaded and validated the table, but query 1 "
-        "took 5:14, query 2 failed on PostgreSQL round(double precision, integer), and query 4 timed out at "
-        "the 2400s diagnostic budget. The parquet path also requires PostgreSQL-family loader fallbacks. "
-        "Until the benchmark has a subscale or PostgreSQL-family OBT query rewrites, it is outside the local "
-        "enabled-platform release-gate envelope."
-    ),
-)
-
 _register_pg_mooncake_gate(
     benchmark="tpcds",
     rule_suffix="moonlink_scan_plan_gaps",
@@ -175,17 +149,5 @@ _register_pg_mooncake_gate(
         "transaction_primitives requires repeated transactional writes against the TPC-H corpus. Targeted "
         "UAT on 2026-05-13 failed in the same promotion/write path, including Moonlink duplicate replication "
         "registration after the write_primitives attempt."
-    ),
-)
-
-_register_timescaledb_gate(
-    benchmark="datavault",
-    rule_suffix="query_runtime_envelope",
-    failure_mode=FailureMode.PERFORMANCE_REGRESSION,
-    reason=(
-        "TimescaleDB loaded and row-count validated DataVault SF 0.01 in the 2026-05-14 full UAT gate, "
-        "but timed out at the 1200s release-gate budget during warm-up query 17 after query 5 alone took "
-        "2:26.8. LakeSail, pg-duckdb, and pg-mooncake cleared the same DataVault cell, so this is a "
-        "TimescaleDB-specific runtime envelope failure for the current release gate."
     ),
 )
