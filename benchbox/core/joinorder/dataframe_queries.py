@@ -366,10 +366,10 @@ def _prefixed_pandas_frame(
     return frame
 
 
-def _empty_safe_min(frame: pd.DataFrame, column: str) -> Any:
-    if frame.empty:
-        return None
+def _empty_safe_min(frame: Any, column: str) -> Any:
     value = frame[column].min()
+    if hasattr(value, "compute"):
+        value = value.compute()
     return None if pd.isna(value) else value
 
 

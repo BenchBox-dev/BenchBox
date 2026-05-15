@@ -26,6 +26,11 @@ except ImportError:
     POLARS_AVAILABLE = False
     pl = None  # type: ignore[assignment]
 
+try:
+    from benchbox.platforms.dataframe.dask_df import DASK_AVAILABLE, DaskDataFrameAdapter
+except ImportError:
+    DASK_AVAILABLE = False
+
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
@@ -107,6 +112,26 @@ def test_generated_pandas_queries_match_tiny_duckdb_oracle(
             actual.where(pd.notna(actual), None).iloc[0].to_dict()
             == expected.where(pd.notna(expected), None).iloc[0].to_dict()
         ), query_id
+
+
+def test_generated_pandas_query_aggregation_supports_lazy_dask_frame(duckdb_conn: Any) -> None:
+    if not DASK_AVAILABLE:
+        pytest.skip("Dask not installed")
+
+    adapter = DaskDataFrameAdapter(use_distributed=False)
+    ctx = adapter.create_context()
+    for parquet_path in sorted(TINY_FIXTURE.glob("*.parquet")):
+        ctx.register_table(parquet_path.stem, adapter.read_parquet(parquet_path))
+
+    query = get_dataframe_queries().get_or_raise("1c")
+    actual = query.pandas_impl(ctx)
+    expected = duckdb_conn.execute(JoinOrderQueryManager().get_query("1c")).fetchdf()
+
+    assert list(actual.columns) == list(expected.columns)
+    assert len(actual) == len(expected) == 1
+    actual_row = actual.where(pd.notna(actual), None).iloc[0].to_dict()
+    expected_row = expected.where(pd.notna(expected), None).iloc[0].to_dict()
+    assert actual_row == expected_row
 
 
 def test_generated_expression_queries_match_tiny_duckdb_oracle(
