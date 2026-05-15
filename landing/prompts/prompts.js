@@ -177,17 +177,18 @@
         var platformEntry = findById(catalog.platforms, platform);
         var platformBEntry = isCompare ? findById(catalog.platforms, platformB) : null;
         var benchmarkEntry = findById(catalog.benchmarks, state.benchmark);
-        var managed = state.deployment === "managed";
+        var selectedEntries = [platformEntry, platformBEntry];
+        var needsCredentials = safetyTexts(selectedEntries, "no_secrets", state.deployment).length > 0;
 
+        var modeFlag = state["interface"] === "dataframe" ? " --mode dataframe" : "";
+        var compareTypeFlag = state["interface"] === "dataframe" ? " --type dataframe" : "";
         var cliCmd = isCompare
-            ? renderTemplate(catalog.templates.cli.compare, { platform_a: platform, platform_b: platformB, benchmark: state.benchmark, scale: state.scale })
-            : renderTemplate(catalog.templates.cli.test_one, { platform: platform, benchmark: state.benchmark, scale: state.scale });
+            ? renderTemplate(catalog.templates.cli.compare, { platform_a: platform, platform_b: platformB, benchmark: state.benchmark, scale: state.scale }) + compareTypeFlag
+            : renderTemplate(catalog.templates.cli.test_one, { platform: platform, benchmark: state.benchmark, scale: state.scale }) + modeFlag;
 
         var depCheck = renderTemplate(catalog.templates.cli.dependency_check, { platform: platform });
         var depCheckB = isCompare ? renderTemplate(catalog.templates.cli.dependency_check, { platform: platformB }) : null;
-        var dryRun = isCompare
-            ? cliCmd + " --dry-run"
-            : renderTemplate(catalog.templates.cli.dry_run, { platform: platform, benchmark: state.benchmark, scale: state.scale });
+        var dryRun = cliCmd + " --dry-run";
 
         // MCP setup block
         var mcpTomlLines = [
@@ -199,22 +200,22 @@
 
         // block-prompt text: shell-oriented agent prompt for CLI, MCP workflow prompt for MCP surface.
         if (state.surface === "mcp") {
-            $("prompt-text").textContent = buildMcpPrompt(state, platform, platformB, platformEntry, platformBEntry, benchmarkEntry, managed);
+            $("prompt-text").textContent = buildMcpPrompt(state, platform, platformB, platformEntry, platformBEntry, benchmarkEntry, needsCredentials);
         } else {
-            $("prompt-text").textContent = buildAgentPrompt(state, platform, platformB, platformEntry, platformBEntry, benchmarkEntry, cliCmd, dryRun, depCheck, depCheckB, managed);
+            $("prompt-text").textContent = buildAgentPrompt(state, platform, platformB, platformEntry, platformBEntry, benchmarkEntry, cliCmd, dryRun, depCheck, depCheckB, needsCredentials);
         }
 
         // Visibility rules:
         // - Agent prompt: always shown.
         // - MCP setup: shown for surface=MCP.
-        // - Cloud safety: shown for deployment=managed.
+        // - Credential safety: shown when selected deployment needs connection secrets.
         $("block-prompt").hidden = false;
         $("block-mcp-setup").hidden = state.surface !== "mcp";
 
         var safetyList = $("cloud-safety-list");
         safetyList.innerHTML = "";
-        if (managed) {
-            safetyTexts([platformEntry, platformBEntry], "no_secrets").forEach(function (text) {
+        if (needsCredentials) {
+            safetyTexts(selectedEntries, "no_secrets", state.deployment).forEach(function (text) {
                 var li = document.createElement("li");
                 li.textContent = text;
                 safetyList.appendChild(li);
@@ -233,27 +234,37 @@
         });
     }
 
-    function safetyTexts(entries, key) {
+    function safetyTexts(entries, key, deployment) {
         var texts = [];
         entries.forEach(function (entry) {
             if (!entry || !entry.safety_terms || !entry.safety_terms[key]) return;
+            if (deployment && entry.credential_deployments && entry.credential_deployments.indexOf(deployment) === -1) return;
             if (texts.indexOf(entry.safety_terms[key]) === -1) texts.push(entry.safety_terms[key]);
         });
         return texts;
     }
 
-    function appendManagedSafetyLines(lines, entries) {
-        var checks = safetyTexts(entries, "dependency");
-        var dryRuns = safetyTexts(entries, "dry_run");
+    function appendDeploymentSafetyLines(lines, entries, deployment) {
+        var checks = safetyTexts(entries, "dependency", deployment);
+        var dryRuns = safetyTexts(entries, "dry_run", deployment);
         if (checks.length === 0 && dryRuns.length === 0) return;
         lines.push("");
-        lines.push("Managed cloud safety:");
+        lines.push("Deployment safety:");
         checks.concat(dryRuns).forEach(function (text) {
             lines.push("  • " + text);
         });
     }
 
-    function buildMcpPrompt(state, platform, platformB, platformEntry, platformBEntry, benchmarkEntry, managed) {
+    function installCommands(entries) {
+        var commands = [];
+        entries.forEach(function (entry) {
+            if (!entry || !entry.install_command) return;
+            if (commands.indexOf(entry.install_command) === -1) commands.push(entry.install_command);
+        });
+        return commands;
+    }
+
+    function buildMcpPrompt(state, platform, platformB, platformEntry, platformBEntry, benchmarkEntry, needsCredentials) {
         var isCompare = state.goal === "compare";
         var mcpToolName = catalog.mcp.run_tool;
         var mcpPromptName = isCompare ? catalog.mcp.prompts.compare_platforms : catalog.mcp.prompts.benchmark_run;
@@ -266,8 +277,8 @@
                 "  3. Run the `" + mcpToolName + "` tool for each platform with the same benchmark and scale.",
                 "  4. Summarise total runtime, per-query timing, and any failures."
             ];
-            if (managed) appendManagedSafetyLines(compareLines, [platformEntry, platformBEntry]);
-            compareLines.push(managed ? "  • Stop and ask the user if credentials or config for a managed platform are missing — do not request secrets in chat." : "");
+            if (needsCredentials) appendDeploymentSafetyLines(compareLines, [platformEntry, platformBEntry], state.deployment);
+            compareLines.push(needsCredentials ? "  • Stop and ask the user if credentials or config are missing — do not request secrets in chat." : "");
             return compareLines.filter(Boolean).join("\n");
         }
         var lines = [
@@ -278,14 +289,14 @@
             "  3. Run the `" + mcpToolName + "` tool with the same arguments.",
             "  4. Summarise total runtime and any failures."
         ];
-        if (managed) appendManagedSafetyLines(lines, [platformEntry]);
-        lines.push(managed ? "  • Stop and ask the user if credentials or config are missing — do not request secrets in chat." : "");
+        if (needsCredentials) appendDeploymentSafetyLines(lines, [platformEntry], state.deployment);
+        lines.push(needsCredentials ? "  • Stop and ask the user if credentials or config are missing — do not request secrets in chat." : "");
         return lines.filter(Boolean).join("\n");
     }
 
-    function buildAgentPrompt(state, platform, platformB, platformEntry, platformBEntry, benchmarkEntry, cliCmd, dryRun, depCheck, depCheckB, managed) {
+    function buildAgentPrompt(state, platform, platformB, platformEntry, platformBEntry, benchmarkEntry, cliCmd, dryRun, depCheck, depCheckB, needsCredentials) {
         var pretty = benchmarkEntry ? benchmarkEntry.label : state.benchmark;
-        var lines = ["You are a coding agent with shell access. Help me run a BenchBox benchmark end-to-end.", ""];
+        var lines = [];
         if (state.goal === "compare") {
             lines.push("Goal: compare " + platformLabel(platformEntry) + " and " + platformLabel(platformBEntry) + " on " + pretty + " at scale factor " + state.scale + " (" + state["interface"].toUpperCase() + " interface, " + state.deployment + " deployment).");
         } else {
@@ -293,16 +304,17 @@
         }
         lines.push("");
         lines.push("Steps:");
-        lines.push("  1. Install: `uv add 'benchbox[" + platform + "]'" + (platformB ? " 'benchbox[" + platformB + "]'" : "") + "`.");
+        var installs = installCommands([platformEntry, platformBEntry]);
+        lines.push("  1. Install dependencies: `" + installs.join("` and `") + "`.");
         lines.push("  2. Check dependencies: `" + depCheck + "`" + (depCheckB ? " and `" + depCheckB + "`" : "") + ". Stop and report if anything is missing.");
         lines.push("  3. Dry run first: `" + dryRun + "`. Inspect the plan.");
-        if (managed) {
-            lines.push("  4. Make sure managed-platform credentials are configured outside this conversation (env vars, config files). Do NOT ask me to paste secrets here.");
+        if (needsCredentials) {
+            lines.push("  4. Make sure platform connection credentials/config are set outside this conversation (env vars, config files). Do NOT ask me to paste secrets here.");
             lines.push("  5. Once credentials are confirmed, run live: `" + cliCmd + "`.");
         } else {
             lines.push("  4. Run live: `" + cliCmd + "`.");
         }
-        lines.push("  " + (managed ? "6" : "5") + ". Summarise the result: total runtime, per-query timing, and any failures.");
+        lines.push("  " + (needsCredentials ? "6" : "5") + ". Summarise the result: total runtime, per-query timing, and any failures.");
         return lines.join("\n");
     }
 

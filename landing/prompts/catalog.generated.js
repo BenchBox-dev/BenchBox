@@ -87,78 +87,111 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
   },
   "platforms": [
     {
-      "deployments": [
-        "local"
+      "credential_deployments": [
+        "managed"
       ],
-      "id": "duckdb",
+      "deployments": [
+        "managed"
+      ],
+      "id": "athena",
+      "install_command": "uv add pyathena boto3",
+      "interfaces": [
+        "sql"
+      ],
+      "label": "Amazon Athena",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies athena` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "credential_deployments": [
+        "managed"
+      ],
+      "deployments": [
+        "managed"
+      ],
+      "id": "athena-spark",
+      "install_command": "uv add boto3",
       "interfaces": [
         "sql",
         "dataframe"
       ],
-      "label": "DuckDB"
+      "label": "Amazon Athena for Apache Spark",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies athena-spark` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
     },
     {
+      "credential_deployments": [
+        "managed"
+      ],
       "deployments": [
-        "local"
+        "managed"
       ],
-      "id": "datafusion",
+      "id": "bigquery",
+      "install_command": "uv add google-cloud-bigquery google-cloud-storage",
       "interfaces": [
-        "sql",
-        "dataframe"
+        "sql"
       ],
-      "label": "DataFusion"
+      "label": "Google BigQuery",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies bigquery` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
     },
     {
+      "credential_deployments": [
+        "self-hosted"
+      ],
       "deployments": [
-        "local"
+        "self-hosted"
       ],
-      "id": "polars",
+      "id": "cedardb",
+      "install_command": "uv add 'psycopg[binary]'",
       "interfaces": [
-        "dataframe"
+        "sql"
       ],
-      "label": "Polars"
+      "label": "CedarDB",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies cedardb` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
     },
     {
+      "credential_deployments": [
+        "self-hosted"
+      ],
       "deployments": [
         "local",
         "self-hosted"
       ],
       "id": "clickhouse",
+      "install_command": "uv add clickhouse-driver",
       "interfaces": [
         "sql"
       ],
-      "label": "ClickHouse"
-    },
-    {
-      "deployments": [
-        "self-hosted"
-      ],
-      "id": "postgresql",
-      "interfaces": [
-        "sql"
-      ],
-      "label": "PostgreSQL"
-    },
-    {
-      "deployments": [
-        "managed"
-      ],
-      "id": "motherduck",
-      "interfaces": [
-        "sql"
-      ],
-      "label": "MotherDuck",
+      "label": "ClickHouse",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies motherduck` first.",
+        "dependency": "Run `benchbox check-dependencies clickhouse` first.",
         "dry_run": "Use `--dry-run` to inspect commands before any live run.",
-        "no_secrets": "Configure `MOTHERDUCK_TOKEN` in your shell env. Do NOT paste it in chat."
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
     {
+      "credential_deployments": [
+        "managed"
+      ],
       "deployments": [
         "managed"
       ],
       "id": "clickhouse-cloud",
+      "install_command": "uv add benchbox --extra clickhouse-cloud",
       "interfaces": [
         "sql"
       ],
@@ -166,14 +199,592 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "safety_terms": {
         "dependency": "Run `benchbox check-dependencies clickhouse-cloud` first.",
         "dry_run": "Use `--dry-run` to inspect commands before any live run.",
-        "no_secrets": "Set `CLICKHOUSE_HOST/USER/PASSWORD` in your shell env. Do NOT paste credentials in chat."
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
     {
       "deployments": [
+        "local"
+      ],
+      "id": "clickhouse-local",
+      "install_command": "uv add benchbox --extra clickhouse-local",
+      "interfaces": [
+        "sql"
+      ],
+      "label": "ClickHouse Local (chDB)"
+    },
+    {
+      "credential_deployments": [
+        "self-hosted"
+      ],
+      "deployments": [
+        "self-hosted"
+      ],
+      "id": "clickhouse-server",
+      "install_command": "uv add benchbox --extra clickhouse-server",
+      "interfaces": [
+        "sql"
+      ],
+      "label": "ClickHouse Server",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies clickhouse-server` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "deployments": [
+        "local"
+      ],
+      "id": "cudf",
+      "install_command": "pip install cudf-cu12 (requires NVIDIA GPU)",
+      "interfaces": [
+        "dataframe"
+      ],
+      "label": "cuDF"
+    },
+    {
+      "deployments": [
+        "local"
+      ],
+      "id": "dask",
+      "install_command": "uv add dask[distributed]",
+      "interfaces": [
+        "dataframe"
+      ],
+      "label": "Dask"
+    },
+    {
+      "credential_deployments": [
+        "self-hosted",
+        "managed"
+      ],
+      "deployments": [
+        "self-hosted",
+        "managed"
+      ],
+      "id": "databend",
+      "install_command": "uv add databend-driver",
+      "interfaces": [
+        "sql"
+      ],
+      "label": "Databend",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies databend` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "credential_deployments": [
+        "managed"
+      ],
+      "deployments": [
+        "managed"
+      ],
+      "id": "databricks",
+      "install_command": "uv add databricks-sql-connector",
+      "interfaces": [
+        "sql",
+        "dataframe"
+      ],
+      "label": "Databricks SQL",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies databricks` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "credential_deployments": [
+        "managed"
+      ],
+      "deployments": [
+        "managed"
+      ],
+      "id": "databricks-df",
+      "install_command": "uv add databricks-sql-connector databricks-connect",
+      "interfaces": [
+        "sql",
+        "dataframe"
+      ],
+      "label": "Databricks DataFrame",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies databricks-df` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "deployments": [
+        "local"
+      ],
+      "id": "datafusion",
+      "install_command": "uv add datafusion",
+      "interfaces": [
+        "sql",
+        "dataframe"
+      ],
+      "label": "DataFusion"
+    },
+    {
+      "credential_deployments": [
+        "managed"
+      ],
+      "deployments": [
+        "managed"
+      ],
+      "id": "dataproc",
+      "install_command": "uv add google-cloud-dataproc google-cloud-storage",
+      "interfaces": [
+        "sql",
+        "dataframe"
+      ],
+      "label": "Google Cloud Dataproc",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies dataproc` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "credential_deployments": [
+        "managed"
+      ],
+      "deployments": [
+        "managed"
+      ],
+      "id": "dataproc-serverless",
+      "install_command": "uv add google-cloud-dataproc google-cloud-storage",
+      "interfaces": [
+        "sql",
+        "dataframe"
+      ],
+      "label": "Google Cloud Dataproc Serverless",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies dataproc-serverless` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "credential_deployments": [
+        "self-hosted"
+      ],
+      "deployments": [
+        "self-hosted"
+      ],
+      "id": "doris",
+      "install_command": "uv add pymysql",
+      "interfaces": [
+        "sql"
+      ],
+      "label": "Apache Doris",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies doris` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "deployments": [
+        "local"
+      ],
+      "id": "duckdb",
+      "install_command": "uv add duckdb",
+      "interfaces": [
+        "sql"
+      ],
+      "label": "DuckDB"
+    },
+    {
+      "credential_deployments": [
+        "managed"
+      ],
+      "deployments": [
+        "managed"
+      ],
+      "id": "emr-serverless",
+      "install_command": "uv add boto3",
+      "interfaces": [
+        "sql",
+        "dataframe"
+      ],
+      "label": "Amazon EMR Serverless",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies emr-serverless` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "credential_deployments": [
+        "managed"
+      ],
+      "deployments": [
+        "managed"
+      ],
+      "id": "fabric-lakehouse",
+      "install_command": "uv add benchbox --extra fabric",
+      "interfaces": [
+        "sql"
+      ],
+      "label": "Microsoft Fabric Lakehouse SQL",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies fabric-lakehouse` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "credential_deployments": [
+        "managed"
+      ],
+      "deployments": [
+        "managed"
+      ],
+      "id": "fabric-spark",
+      "install_command": "uv add azure-identity azure-storage-file-datalake requests",
+      "interfaces": [
+        "sql",
+        "dataframe"
+      ],
+      "label": "Microsoft Fabric Spark",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies fabric-spark` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "credential_deployments": [
+        "managed"
+      ],
+      "deployments": [
+        "managed"
+      ],
+      "id": "fabric_dw",
+      "install_command": "uv add pyodbc azure-identity azure-storage-file-datalake",
+      "interfaces": [
+        "sql"
+      ],
+      "label": "Microsoft Fabric Warehouse",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies fabric_dw` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "credential_deployments": [
+        "managed"
+      ],
+      "deployments": [
+        "local",
+        "managed"
+      ],
+      "id": "firebolt",
+      "install_command": "uv add firebolt-sdk",
+      "interfaces": [
+        "sql"
+      ],
+      "label": "Firebolt",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies firebolt` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "credential_deployments": [
+        "managed"
+      ],
+      "deployments": [
+        "managed"
+      ],
+      "id": "glue",
+      "install_command": "uv add boto3",
+      "interfaces": [
+        "sql",
+        "dataframe"
+      ],
+      "label": "AWS Glue",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies glue` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "credential_deployments": [
+        "self-hosted"
+      ],
+      "deployments": [
+        "self-hosted"
+      ],
+      "id": "influxdb",
+      "install_command": "uv add influxdb3-python",
+      "interfaces": [
+        "sql"
+      ],
+      "label": "InfluxDB",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies influxdb` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "credential_deployments": [
+        "self-hosted"
+      ],
+      "deployments": [
+        "local",
+        "self-hosted"
+      ],
+      "id": "lakesail",
+      "install_command": "uv add pyspark",
+      "interfaces": [
+        "sql",
+        "dataframe"
+      ],
+      "label": "LakeSail Sail",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies lakesail` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "deployments": [
+        "local"
+      ],
+      "id": "modin",
+      "install_command": "uv add modin[ray]",
+      "interfaces": [
+        "dataframe"
+      ],
+      "label": "Modin"
+    },
+    {
+      "credential_deployments": [
+        "managed"
+      ],
+      "deployments": [
+        "managed"
+      ],
+      "id": "motherduck",
+      "install_command": "uv add duckdb",
+      "interfaces": [
+        "sql"
+      ],
+      "label": "MotherDuck",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies motherduck` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "deployments": [
+        "local"
+      ],
+      "id": "pandas",
+      "install_command": "uv add pandas",
+      "interfaces": [
+        "dataframe"
+      ],
+      "label": "Pandas"
+    },
+    {
+      "credential_deployments": [
+        "self-hosted",
+        "managed"
+      ],
+      "deployments": [
+        "self-hosted",
+        "managed"
+      ],
+      "id": "pg-duckdb",
+      "install_command": "uv add 'psycopg[binary]'",
+      "interfaces": [
+        "sql"
+      ],
+      "label": "pg_duckdb",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies pg-duckdb` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "credential_deployments": [
+        "self-hosted"
+      ],
+      "deployments": [
+        "self-hosted"
+      ],
+      "id": "pg-mooncake",
+      "install_command": "uv add 'psycopg[binary]'",
+      "interfaces": [
+        "sql"
+      ],
+      "label": "pg_mooncake",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies pg-mooncake` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "deployments": [
+        "local"
+      ],
+      "id": "polars",
+      "install_command": "uv add polars",
+      "interfaces": [
+        "dataframe"
+      ],
+      "label": "Polars"
+    },
+    {
+      "credential_deployments": [
+        "self-hosted"
+      ],
+      "deployments": [
+        "self-hosted"
+      ],
+      "id": "postgresql",
+      "install_command": "uv add 'psycopg[binary]'",
+      "interfaces": [
+        "sql"
+      ],
+      "label": "PostgreSQL",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies postgresql` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "credential_deployments": [
+        "self-hosted"
+      ],
+      "deployments": [
+        "self-hosted"
+      ],
+      "id": "presto",
+      "install_command": "uv add presto-python-client",
+      "interfaces": [
+        "sql"
+      ],
+      "label": "PrestoDB",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies presto` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "deployments": [
+        "local"
+      ],
+      "id": "pyspark",
+      "install_command": "uv add pyspark",
+      "interfaces": [
+        "sql",
+        "dataframe"
+      ],
+      "label": "PySpark"
+    },
+    {
+      "credential_deployments": [
+        "managed"
+      ],
+      "deployments": [
+        "managed"
+      ],
+      "id": "quanton",
+      "install_command": "uv add requests boto3",
+      "interfaces": [
+        "sql",
+        "dataframe"
+      ],
+      "label": "Onehouse Quanton",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies quanton` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "credential_deployments": [
+        "self-hosted"
+      ],
+      "deployments": [
+        "self-hosted"
+      ],
+      "id": "questdb",
+      "install_command": "uv add benchbox --extra questdb",
+      "interfaces": [
+        "sql"
+      ],
+      "label": "QuestDB",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies questdb` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "credential_deployments": [
+        "managed"
+      ],
+      "deployments": [
+        "managed"
+      ],
+      "id": "redshift",
+      "install_command": "uv add redshift-connector boto3",
+      "interfaces": [
+        "sql"
+      ],
+      "label": "Amazon Redshift",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies redshift` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "credential_deployments": [
+        "self-hosted",
+        "managed"
+      ],
+      "deployments": [
+        "self-hosted",
+        "managed"
+      ],
+      "id": "singlestore",
+      "install_command": "uv add singlestoredb",
+      "interfaces": [
+        "sql"
+      ],
+      "label": "SingleStore",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies singlestore` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "credential_deployments": [
+        "managed"
+      ],
+      "deployments": [
         "managed"
       ],
       "id": "snowflake",
+      "install_command": "uv add snowflake-connector-python",
       "interfaces": [
         "sql"
       ],
@@ -181,7 +792,194 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "safety_terms": {
         "dependency": "Run `benchbox check-dependencies snowflake` first.",
         "dry_run": "Use `--dry-run` to inspect commands before any live run.",
-        "no_secrets": "Configure `SNOWFLAKE_ACCOUNT/USER/PASSWORD` (or key-pair) in your shell env. Do NOT paste credentials in chat."
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "credential_deployments": [
+        "managed"
+      ],
+      "deployments": [
+        "managed"
+      ],
+      "id": "snowpark-connect",
+      "install_command": "uv add snowflake-snowpark-python",
+      "interfaces": [
+        "sql",
+        "dataframe"
+      ],
+      "label": "Snowpark Connect for Spark",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies snowpark-connect` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "credential_deployments": [
+        "self-hosted"
+      ],
+      "deployments": [
+        "self-hosted"
+      ],
+      "id": "spark",
+      "install_command": "uv add pyspark",
+      "interfaces": [
+        "sql"
+      ],
+      "label": "Apache Spark",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies spark` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "deployments": [
+        "local"
+      ],
+      "id": "sqlite",
+      "install_command": "Built-in Python library",
+      "interfaces": [
+        "sql"
+      ],
+      "label": "SQLite"
+    },
+    {
+      "credential_deployments": [
+        "managed"
+      ],
+      "deployments": [
+        "managed"
+      ],
+      "id": "starburst",
+      "install_command": "uv add trino",
+      "interfaces": [
+        "sql"
+      ],
+      "label": "Starburst",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies starburst` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "credential_deployments": [
+        "self-hosted"
+      ],
+      "deployments": [
+        "self-hosted"
+      ],
+      "id": "starrocks",
+      "install_command": "uv add pymysql",
+      "interfaces": [
+        "sql"
+      ],
+      "label": "StarRocks",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies starrocks` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "credential_deployments": [
+        "managed"
+      ],
+      "deployments": [
+        "managed"
+      ],
+      "id": "synapse",
+      "install_command": "uv add pyodbc azure-storage-blob azure-identity",
+      "interfaces": [
+        "sql"
+      ],
+      "label": "Azure Synapse Analytics",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies synapse` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "credential_deployments": [
+        "managed"
+      ],
+      "deployments": [
+        "managed"
+      ],
+      "id": "synapse-spark",
+      "install_command": "uv add azure-identity azure-storage-file-datalake requests",
+      "interfaces": [
+        "sql",
+        "dataframe"
+      ],
+      "label": "Azure Synapse Analytics Spark",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies synapse-spark` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "credential_deployments": [
+        "self-hosted",
+        "managed"
+      ],
+      "deployments": [
+        "self-hosted",
+        "managed"
+      ],
+      "id": "timescaledb",
+      "install_command": "uv add 'psycopg[binary]'",
+      "interfaces": [
+        "sql"
+      ],
+      "label": "TimescaleDB",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies timescaledb` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "credential_deployments": [
+        "self-hosted"
+      ],
+      "deployments": [
+        "self-hosted"
+      ],
+      "id": "trino",
+      "install_command": "uv add trino",
+      "interfaces": [
+        "sql"
+      ],
+      "label": "Trino",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies trino` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "credential_deployments": [
+        "self-hosted"
+      ],
+      "deployments": [
+        "local",
+        "self-hosted"
+      ],
+      "id": "velox",
+      "install_command": "uv add benchbox --extra velox",
+      "interfaces": [
+        "sql"
+      ],
+      "label": "Apache Gluten + Velox",
+      "safety_terms": {
+        "dependency": "Run `benchbox check-dependencies velox` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     }
   ],

@@ -16,6 +16,7 @@ Licensed under the MIT License.
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import sys
 from pathlib import Path
@@ -33,6 +34,10 @@ FORBIDDEN_JSON = REPO_ROOT / "landing" / "prompts" / "recipes.json"
 
 VALID_DEPLOYMENT_MODES = frozenset({"local", "self-hosted", "managed"})
 MANAGED_SAFETY_KEYS = frozenset({"dependency", "dry_run", "no_secrets"})
+DEPLOYMENT_ORDER = {"local": 0, "self-hosted": 1, "managed": 2}
+LOCAL_CATEGORIES = frozenset({"analytical", "dataframe", "embedded"})
+CLOUD_HINTS = frozenset({"aws", "azure", "cloud", "gcs", "multi_cloud", "onelake", "s3", "saas", "serverless"})
+SELF_HOSTED_CATEGORIES = frozenset({"distributed", "relational", "timeseries"})
 
 
 def load_catalog(path: Path = SOURCE) -> dict[str, Any]:
@@ -74,6 +79,115 @@ def _known_mcp_names() -> tuple[frozenset[str], frozenset[str]]:
     return frozenset(tools), frozenset(prompts)
 
 
+def _ordered(values: set[str]) -> list[str]:
+    return sorted(values, key=lambda value: (DEPLOYMENT_ORDER[value], value))
+
+
+def _is_cloud_like(metadata: dict[str, Any]) -> bool:
+    supports = set(metadata.get("supports") or [])
+    return metadata.get("category") == "cloud" or bool(supports & CLOUD_HINTS)
+
+
+def _infer_default_deployments(metadata: dict[str, Any]) -> tuple[set[str], set[str]]:
+    """Infer UI deployment modes when registry metadata has no deployment_modes block."""
+    category = metadata.get("category")
+    supports = set(metadata.get("supports") or [])
+
+    if _is_cloud_like(metadata):
+        return {"managed"}, {"managed"}
+    if category in SELF_HOSTED_CATEGORIES or "self-hosted" in supports:
+        return {"self-hosted"}, {"self-hosted"}
+    if category in LOCAL_CATEGORIES:
+        return {"local"}, set()
+    return {"local"}, set()
+
+
+def _deployment_from_registry_mode(mode: str, requires_network: bool) -> str:
+    if mode in VALID_DEPLOYMENT_MODES:
+        return mode
+    if mode == "remote":
+        return "self-hosted" if requires_network else "local"
+    raise ValueError(f"unsupported registry deployment mode {mode!r}")
+
+
+def _derive_deployments(platform_id: str, metadata: dict[str, Any]) -> tuple[list[str], list[str]]:
+    caps = PlatformRegistry.get_platform_capabilities(platform_id)
+    if caps is None:
+        return [], []
+    if not caps.deployment_modes:
+        deployments, credential_deployments = _infer_default_deployments(metadata)
+        return _ordered(deployments), _ordered(credential_deployments)
+
+    deployments: set[str] = set()
+    credential_deployments: set[str] = set()
+    for dep in caps.deployment_modes.values():
+        deployment = _deployment_from_registry_mode(dep.mode, dep.requires_network)
+        deployments.add(deployment)
+        if deployment in {"managed", "self-hosted"}:
+            credential_deployments.add(deployment)
+    return _ordered(deployments), _ordered(credential_deployments)
+
+
+def _derive_interfaces(platform_id: str) -> list[str]:
+    caps = PlatformRegistry.get_platform_capabilities(platform_id)
+    if caps is None:
+        return []
+    interfaces: list[str] = []
+    if caps.supports_sql:
+        interfaces.append("sql")
+    if caps.supports_dataframe:
+        interfaces.append("dataframe")
+    return interfaces
+
+
+def _platform_label(metadata: dict[str, Any], platform_id: str) -> str:
+    return str(metadata.get("display_name") or platform_id)
+
+
+def _platform_safety_terms(platform_id: str, credential_deployments: list[str]) -> dict[str, str] | None:
+    if not credential_deployments:
+        return None
+    return {
+        "dependency": f"Run `benchbox check-dependencies {platform_id}` first.",
+        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. "
+        "Do NOT paste credentials in chat.",
+    }
+
+
+def _derive_platform_entries() -> list[dict[str, Any]]:
+    entries: list[dict[str, Any]] = []
+    metadata_by_id = PlatformRegistry.get_all_platform_metadata()
+    for platform_id, metadata in sorted(metadata_by_id.items()):
+        interfaces = _derive_interfaces(platform_id)
+        if not interfaces:
+            continue
+        deployments, credential_deployments = _derive_deployments(platform_id, metadata)
+        if not deployments:
+            continue
+        entry: dict[str, Any] = {
+            "id": platform_id,
+            "install_command": metadata.get("installation_command") or f"uv add benchbox --extra {platform_id}",
+            "label": _platform_label(metadata, platform_id),
+            "deployments": deployments,
+            "interfaces": interfaces,
+        }
+        if credential_deployments:
+            entry["credential_deployments"] = credential_deployments
+            safety_terms = _platform_safety_terms(platform_id, credential_deployments)
+            if safety_terms:
+                entry["safety_terms"] = safety_terms
+        entries.append(entry)
+    return entries
+
+
+def build_prompt_catalog(catalog: dict[str, Any]) -> dict[str, Any]:
+    """Return the browser catalog with PlatformRegistry-derived platform entries."""
+    expanded = copy.deepcopy(catalog)
+    expanded["platforms"] = _derive_platform_entries()
+    return expanded
+
+
 def _validate_one_platform(entry: dict[str, Any], known_platforms: set[str]) -> list[str]:
     errors: list[str] = []
     pid = entry.get("id")
@@ -90,6 +204,9 @@ def _validate_one_platform(entry: dict[str, Any], known_platforms: set[str]) -> 
                 f"platforms[{pid!r}]: managed deployment requires safety_terms "
                 f"covering {sorted(MANAGED_SAFETY_KEYS)}; missing {sorted(missing)}"
             )
+    for d in entry.get("credential_deployments") or []:
+        if d not in entry.get("deployments", []):
+            errors.append(f"platforms[{pid!r}].credential_deployments={d!r}: must be in deployments[]")
     ifaces = entry.get("interfaces") or []
     if not ifaces:
         errors.append(f"platforms[{pid!r}]: at least one interface is required")
@@ -135,14 +252,22 @@ def _validate_agent_removed(catalog: dict[str, Any]) -> list[str]:
     return errors
 
 
+def _validate_platforms_are_derived(catalog: dict[str, Any]) -> list[str]:
+    if "platforms" not in catalog:
+        return []
+    return ["platforms[] is no longer supported in catalog.yaml; prompt platforms are derived from PlatformRegistry"]
+
+
 def validate(catalog: dict[str, Any]) -> list[str]:
     """Return a list of validation error messages; empty means valid."""
     errors: list[str] = []
+    errors.extend(_validate_platforms_are_derived(catalog))
     known_platforms = set(PlatformRegistry.get_all_platform_metadata().keys())
     known_benchmarks = set(BENCHMARK_METADATA.keys())
     known_tools, known_prompts = _known_mcp_names()
+    browser_catalog = build_prompt_catalog(catalog)
 
-    platforms = catalog.get("platforms") or []
+    platforms = browser_catalog.get("platforms") or []
     platform_ids = {p["id"] for p in platforms if isinstance(p, dict) and "id" in p}
     for entry in platforms:
         errors.extend(_validate_one_platform(entry, known_platforms))
@@ -175,7 +300,7 @@ def validate(catalog: dict[str, Any]) -> list[str]:
 
 def render_js(catalog: dict[str, Any]) -> str:
     """Render the catalog as a deterministic catalog.generated.js include."""
-    payload = json.dumps(catalog, sort_keys=True, indent=2, ensure_ascii=False)
+    payload = json.dumps(build_prompt_catalog(catalog), sort_keys=True, indent=2, ensure_ascii=False)
     return (
         "// AUTO-GENERATED by scripts/generate_landing_quickstarts.py. Do not edit by hand.\n"
         "// Edit landing/prompts/catalog.yaml and re-run the generator.\n"
