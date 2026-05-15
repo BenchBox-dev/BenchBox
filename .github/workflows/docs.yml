@@ -8,6 +8,8 @@ on:
       - "docs/**"
       - "examples/**"
       - "landing/**"
+      - "_project/scripts/explorer_pipeline/**"
+      - "_project/scripts/explorer_publish.py"
       - "results-data/**"
       - "results-explorer/**"
       - "scripts/**"
@@ -16,12 +18,14 @@ on:
       - "README.md"
       - "pyproject.toml"
   pull_request:
-    branches: [main]
+    branches: [main, develop]
     paths:
       - "benchbox/**"
       - "docs/**"
       - "examples/**"
       - "landing/**"
+      - "_project/scripts/explorer_pipeline/**"
+      - "_project/scripts/explorer_publish.py"
       - "results-data/**"
       - "results-explorer/**"
       - "scripts/**"

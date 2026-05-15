@@ -6,13 +6,15 @@ on:
     paths:
       - 'results-explorer/**'
       - '_project/scripts/explorer_pipeline/**'
+      - '_project/scripts/explorer_publish.py'
       - 'results-data/**'
       - '.github/workflows/results-explorer-browser.yml'
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]
     paths:
       - 'results-explorer/**'
       - '_project/scripts/explorer_pipeline/**'
+      - '_project/scripts/explorer_publish.py'
       - 'results-data/**'
       - '.github/workflows/results-explorer-browser.yml'
   workflow_dispatch:

@@ -68,8 +68,8 @@ and are both gitignored.
 
 [`.github/workflows/results-explorer-browser.yml`](../../.github/workflows/results-explorer-browser.yml)
 runs on every push and pull request that touches `results-explorer/`,
-`_project/scripts/explorer_pipeline/`, `results-data/`, or the workflow file
-itself.
+`_project/scripts/explorer_pipeline/`, `_project/scripts/explorer_publish.py`,
+`results-data/`, or the workflow file itself.
 
 - **Blocking:** `chromium` job - full suite must pass.
 - **Non-blocking:** `firefox-smoke` and `webkit-smoke` jobs - `@smoke`-tagged

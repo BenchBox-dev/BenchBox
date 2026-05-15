@@ -667,16 +667,17 @@ class DuckDBSnapshotBuilder:
     def _create_metadata(self, con: Any) -> None:
         """Create the one-row read-model metadata table consumed by the browser.
 
-        Uses ``IF NOT EXISTS`` to mirror ``docs/development/browser-duckdb-schema.sql``;
-        callers (``build``, ``build_full``) currently always open a fresh DuckDB file,
-        but matching the schema doc means a future reuse on an existing connection
-        won't silently diverge.
+        Uses ``IF NOT EXISTS`` to mirror ``docs/development/browser-duckdb-schema.sql``.
+        Callers (``build``, ``build_full``) currently open a fresh DuckDB file,
+        but keeping this helper single-row idempotent prevents future connection
+        reuse from leaving multiple read-model versions behind.
         """
         con.execute("""
             CREATE TABLE IF NOT EXISTS metadata (
                 read_model_version INTEGER NOT NULL
             )
         """)
+        con.execute("DELETE FROM metadata")
         con.execute("INSERT INTO metadata VALUES (?)", [EXPLORER_READ_MODEL_VERSION])
 
     # ------------------------------------------------------------------

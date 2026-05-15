@@ -7,6 +7,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   _EXPECTED_READ_MODEL_VERSION_FOR_TEST,
+  _validateAttachedSnapshotForTest,
   _verifyReadModelVersionForTest,
 } from "@/db";
 
@@ -50,6 +51,36 @@ describe("read-model version guard", () => {
     ).rejects.not.toThrow(/is missing required columns/);
   });
 
+  it("does not mask unexpected DuckDB failures as stale v0", async () => {
+    const conn = {
+      async query(_sql: string): Promise<QueryResult> {
+        throw new Error("IO Error: could not read DuckDB file");
+      },
+    };
+
+    await expect(
+      _verifyReadModelVersionForTest(conn as unknown as Parameters<typeof _verifyReadModelVersionForTest>[0]),
+    ).rejects.toThrow(/could not read DuckDB file/);
+    await expect(
+      _verifyReadModelVersionForTest(conn as unknown as Parameters<typeof _verifyReadModelVersionForTest>[0]),
+    ).rejects.not.toThrow(/read-model v0/);
+  });
+
+  it("does not mask generic catalog metadata failures as stale v0", async () => {
+    const conn = {
+      async query(_sql: string): Promise<QueryResult> {
+        throw new Error("Catalog Error: failed to load database metadata block");
+      },
+    };
+
+    await expect(
+      _verifyReadModelVersionForTest(conn as unknown as Parameters<typeof _verifyReadModelVersionForTest>[0]),
+    ).rejects.toThrow(/failed to load database metadata block/);
+    await expect(
+      _verifyReadModelVersionForTest(conn as unknown as Parameters<typeof _verifyReadModelVersionForTest>[0]),
+    ).rejects.not.toThrow(/read-model v0/);
+  });
+
   it("rejects an older read-model version with a humane dev remediation message", async () => {
     const conn = makeConn(0);
     await expect(
@@ -76,5 +107,30 @@ describe("read-model version guard", () => {
     ).resolves.toBeUndefined();
 
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("Proceeding with forward-compatible reads"));
+  });
+
+  it("validates the read-model version before probing schema readiness", async () => {
+    const queries: string[] = [];
+    const conn = {
+      async query(sql: string): Promise<QueryResult> {
+        queries.push(sql);
+        if (sql.includes("bench.metadata")) {
+          return {
+            toArray: () => [
+              {
+                toJSON: () => ({ read_model_version: 0 }),
+              },
+            ],
+          };
+        }
+        throw new Error("Catalog Error: Table with name results does not exist");
+      },
+    };
+
+    await expect(
+      _validateAttachedSnapshotForTest(conn as unknown as Parameters<typeof _validateAttachedSnapshotForTest>[0]),
+    ).rejects.toThrow(/read-model v0; UI requires v1/);
+
+    expect(queries).toEqual(["SELECT read_model_version FROM bench.metadata LIMIT 1"]);
   });
 });
