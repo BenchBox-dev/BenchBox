@@ -131,7 +131,9 @@ def test_enumerate_records_registry_benchmark_gates():
     assert pruned_by_benchmark["metadata_primitives"].evidence.startswith("benchbox.sql_compat benchmark_gate")
 
 
-def test_enumerate_records_pg_family_registry_benchmark_gates():
+def test_enumerate_records_pg_family_compatibility_pruning():
+    from benchbox.core.platform_registry import PlatformRegistry
+
     raw = {
         "platforms": {"include": ["pg-duckdb", "pg-mooncake", "timescaledb"]},
         "benchmarks": {
@@ -163,15 +165,28 @@ def test_enumerate_records_pg_family_registry_benchmark_gates():
     assert len(result.compatibility_pruned) == 17
     pruned = {(c.platform, c.benchmark): c for c in result.compatibility_pruned}
     assert pruned[("pg-mooncake", "tpcds")].rule_id == "uat.compat.pg-mooncake.tpcds.benchmark_gate"
-    assert pruned[("timescaledb", "datavault")].rule_id == "uat.compat.timescaledb.datavault.benchmark_gate"
+    assert pruned[("timescaledb", "datavault")].rule_id == (
+        "uat.compat.timescaledb.datavault.release_gate_runtime_envelope"
+    )
     for platform in ("pg-duckdb", "pg-mooncake", "timescaledb"):
+        caps = PlatformRegistry.get_platform_capabilities(platform)
+        assert caps is not None
+        assert "joinorder" not in caps.unsupported_benchmarks
+        assert "tpcds_obt" not in caps.unsupported_benchmarks
         assert pruned[(platform, "ai_primitives")].rule_id == f"uat.compat.{platform}.ai_primitives.benchmark_gate"
-        assert pruned[(platform, "joinorder")].rule_id == f"uat.compat.{platform}.joinorder.benchmark_gate"
+        assert pruned[(platform, "joinorder")].rule_id == (
+            f"uat.compat.{platform}.joinorder.release_gate_runtime_envelope"
+        )
         assert pruned[(platform, "read_primitives")].rule_id == (
             f"uat.compat.{platform}.read_primitives.benchmark_gate"
         )
-        assert pruned[(platform, "tpcds_obt")].rule_id == f"uat.compat.{platform}.tpcds_obt.benchmark_gate"
+        assert pruned[(platform, "tpcds_obt")].rule_id == (
+            f"uat.compat.{platform}.tpcds_obt.release_gate_runtime_envelope"
+        )
         assert pruned[(platform, "vector_search")].rule_id == f"uat.compat.{platform}.vector_search.benchmark_gate"
+    timescaledb_caps = PlatformRegistry.get_platform_capabilities("timescaledb")
+    assert timescaledb_caps is not None
+    assert "datavault" not in timescaledb_caps.unsupported_benchmarks
 
 
 def test_enumerate_honours_scale_options():
