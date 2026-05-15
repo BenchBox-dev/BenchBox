@@ -53,9 +53,12 @@ theme/header pages and docs adapter CSS:
 
 - `landing/shared/`
 - `landing/index.html`
+- `landing/style.css`
 - `landing/prompts/index.html`
+- `landing/prompts/prompts.css`
 - `docs/_templates/page.html`
 - `docs/_static/custom.css`
+- `results-explorer/index.html`
 - `results-explorer/src/components/Layout.tsx`
 
 ### Known coverage gaps

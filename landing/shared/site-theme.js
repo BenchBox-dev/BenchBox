@@ -2,20 +2,24 @@
     var storageKey = "benchbox:theme";
     var choices = ["system", "light", "dark"];
 
+    function normalizeChoice(value) {
+        return choices.indexOf(value) >= 0 ? value : "system";
+    }
+
     function systemTheme() {
         return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
     }
 
     function storedChoice() {
         try {
-            var value = window.localStorage.getItem(storageKey);
-            return choices.indexOf(value) >= 0 ? value : "system";
+            return normalizeChoice(window.localStorage.getItem(storageKey));
         } catch (error) {
             return "system";
         }
     }
 
     function applyTheme(choice) {
+        choice = normalizeChoice(choice);
         var effective = choice === "system" ? systemTheme() : choice;
         document.documentElement.dataset.bbThemeChoice = choice;
         document.documentElement.dataset.bbTheme = effective;
@@ -33,6 +37,7 @@
     }
 
     function setChoice(choice) {
+        choice = normalizeChoice(choice);
         try {
             if (choice === "system") {
                 window.localStorage.removeItem(storageKey);

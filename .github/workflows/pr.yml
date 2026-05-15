@@ -253,6 +253,11 @@ jobs:
         # does not pay a dependency-sync cost before deciding.
         run: make lint-explorer-tokens
 
+      - name: Run public site theme token scan
+        # Bare python is intentional: the scan is stdlib-only so this gate
+        # does not pay a dependency-sync cost before deciding.
+        run: make lint-site-theme-tokens
+
   audit-sha:
     name: audit-sha
     needs: ci-paths

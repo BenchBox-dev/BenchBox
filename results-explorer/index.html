@@ -9,8 +9,13 @@
     <script>
       (function () {
         try {
-          var choice = localStorage.getItem("benchbox:theme") || "system";
-          var dark = choice === "dark" || (choice === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+          var stored = localStorage.getItem("benchbox:theme");
+          var choice = stored === "light" || stored === "dark" || stored === "system" ? stored : "system";
+          var dark =
+            choice === "dark" ||
+            (choice === "system" &&
+              window.matchMedia &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
           document.documentElement.dataset.bbThemeChoice = choice;
           document.documentElement.dataset.bbTheme = dark ? "dark" : "light";
           document.documentElement.dataset.theme = dark ? "dark" : "light";
