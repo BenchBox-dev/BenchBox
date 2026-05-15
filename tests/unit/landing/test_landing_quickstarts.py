@@ -162,6 +162,15 @@ def test_generated_include_assigns_window_global():
     assert text.endswith(";\n")
 
 
+def test_prompts_route_assets_are_cache_busted():
+    text = PROMPTS_INDEX_PATH.read_text(encoding="utf-8")
+    assert 'href="prompts.css?v=' in text
+    assert 'src="catalog.generated.js?v=' in text
+    assert 'src="prompts.js?v=' in text
+    assert 'src="catalog.generated.js"></script>' not in text
+    assert 'src="prompts.js"></script>' not in text
+
+
 def test_generated_platforms_cover_registry_ids(gen, browser_catalog):
     generated_ids = {p["id"] for p in browser_catalog["platforms"]}
     expected_ids = set(gen.PlatformRegistry.get_all_platform_metadata())
