@@ -2,7 +2,8 @@ id: joinorder-canonical-corpus-uat-backfill
 title: "Canonical JoinOrder SF=1 UAT and corpus backfill for Issue #289"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
+completed_date: "2026-05-15"
 category: Testing and Quality Assurance
 
 description: |
@@ -130,6 +131,8 @@ work:
       Commit: `7ab8f4431 test(joinorder): backfill canonical corpus bundles`.
       Post-commit `make pr-preflight` passed.
       PR: https://github.com/joeharris76/BenchBox/pull/389
+      Hygiene closeout: PR #389 merged to `develop` on 2026-05-13, so this
+      TODO is complete and can move to DONE.
 
 verification:
   - description: "TODO is valid"
