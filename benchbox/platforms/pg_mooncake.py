@@ -268,7 +268,6 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
                 target_name = self._mooncake_table_reference(table_name_lower)
 
                 cursor.execute(f'ALTER TABLE {qualified_table} RENAME TO "{staging_table}"')
-                connection.commit()
                 cursor.execute("CALL mooncake.create_table(%s, %s)", (target_name, source_name))
                 cursor.execute(f"SELECT COUNT(*) FROM {qualified_table}")
                 updated_stats[table_name_lower] = cursor.fetchone()[0]
