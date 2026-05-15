@@ -224,3 +224,18 @@ def test_package_root_resolves_to_bundle_subdirectory(tmp_path: Path):
 
     assert contract["bundles"] == 1
     assert contract["benchmarks"] == ["tpch"]
+
+
+def test_external_corpus_contract_ignores_tuning_sidecars(tmp_path: Path):
+    bundles_dir = tmp_path / "bundles"
+    bundle_path = write_bundle(bundles_dir)
+    bundle_path.with_name(f"{bundle_path.stem}.tuning.json").write_text(
+        json.dumps({"tuning_mode": "manual", "notes": "sidecar shape is not a result bundle"}),
+        encoding="utf-8",
+    )
+
+    contract = explorer_smoke._validate_external_corpus(bundles_dir=bundles_dir)
+
+    assert contract["bundles"] == 1
+    assert contract["checked_bundles"] == 1
+    assert contract["benchmarks"] == ["tpch"]
