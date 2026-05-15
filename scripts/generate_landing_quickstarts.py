@@ -238,13 +238,64 @@ def _validate_one_platform(entry: dict[str, Any], known_platforms: set[str]) -> 
     return errors
 
 
-def _validate_defaults(catalog: dict[str, Any], platform_ids: set[str], benchmark_ids: set[str]) -> list[str]:
+def _catalog_entry_ids(catalog: dict[str, Any], key: str) -> set[str]:
+    return {entry["id"] for entry in catalog.get(key) or [] if isinstance(entry, dict) and "id" in entry}
+
+
+def _validate_defaults(
+    catalog: dict[str, Any],
+    platforms: list[dict[str, Any]],
+    benchmarks: list[dict[str, Any]],
+) -> list[str]:
     errors: list[str] = []
     defaults = catalog.get("defaults") or {}
-    if defaults.get("platform") not in platform_ids:
+    platform_by_id = {p["id"]: p for p in platforms if isinstance(p, dict) and "id" in p}
+    benchmark_by_id = {b["id"]: b for b in benchmarks if isinstance(b, dict) and "id" in b}
+
+    goal_ids = _catalog_entry_ids(catalog, "goals")
+    surface_ids = _catalog_entry_ids(catalog, "surfaces")
+    interface_ids = _catalog_entry_ids(catalog, "interfaces")
+    deployment_ids = _catalog_entry_ids(catalog, "deployments")
+    scale_ids = set(catalog.get("scales") or [])
+
+    if defaults.get("goal") not in goal_ids:
+        errors.append(f"defaults.goal={defaults.get('goal')!r}: not in goals[]")
+    if defaults.get("surface") not in surface_ids:
+        errors.append(f"defaults.surface={defaults.get('surface')!r}: not in surfaces[]")
+    if defaults.get("interface") not in interface_ids:
+        errors.append(f"defaults.interface={defaults.get('interface')!r}: not in interfaces[]")
+    if defaults.get("deployment") not in deployment_ids:
+        errors.append(f"defaults.deployment={defaults.get('deployment')!r}: not in deployments[]")
+    if defaults.get("scale") not in scale_ids:
+        errors.append(f"defaults.scale={defaults.get('scale')!r}: not in scales[]")
+
+    default_platform = platform_by_id.get(defaults.get("platform"))
+    default_benchmark = benchmark_by_id.get(defaults.get("benchmark"))
+    default_interface = defaults.get("interface")
+    default_deployment = defaults.get("deployment")
+
+    if default_platform is None:
         errors.append(f"defaults.platform={defaults.get('platform')!r}: not in platforms[]")
-    if defaults.get("benchmark") not in benchmark_ids:
+    else:
+        if default_interface not in (default_platform.get("interfaces") or []):
+            errors.append(
+                f"defaults.interface={default_interface!r}: not supported by "
+                f"defaults.platform={defaults.get('platform')!r}"
+            )
+        if default_deployment not in (default_platform.get("deployments") or []):
+            errors.append(
+                f"defaults.deployment={default_deployment!r}: not supported by "
+                f"defaults.platform={defaults.get('platform')!r}"
+            )
+
+    if default_benchmark is None:
         errors.append(f"defaults.benchmark={defaults.get('benchmark')!r}: not in benchmarks[]")
+    elif default_interface not in (default_benchmark.get("interfaces") or []):
+        errors.append(
+            f"defaults.interface={default_interface!r}: not supported by "
+            f"defaults.benchmark={defaults.get('benchmark')!r}"
+        )
+
     if defaults.get("deployment") not in VALID_DEPLOYMENT_MODES:
         errors.append(
             f"defaults.deployment={defaults.get('deployment')!r}: must be in {sorted(VALID_DEPLOYMENT_MODES)}"
@@ -290,12 +341,10 @@ def validate(catalog: dict[str, Any]) -> list[str]:
     browser_catalog = build_prompt_catalog(catalog)
 
     platforms = browser_catalog.get("platforms") or []
-    platform_ids = {p["id"] for p in platforms if isinstance(p, dict) and "id" in p}
     for entry in platforms:
         errors.extend(_validate_one_platform(entry, known_platforms))
 
     benchmarks = catalog.get("benchmarks") or []
-    benchmark_ids = {b["id"] for b in benchmarks if isinstance(b, dict) and "id" in b}
     for entry in benchmarks:
         bid = entry.get("id")
         if bid not in known_benchmarks:
@@ -306,7 +355,7 @@ def validate(catalog: dict[str, Any]) -> list[str]:
         if did not in VALID_DEPLOYMENT_MODES:
             errors.append(f"deployments[{did!r}]: must be in {sorted(VALID_DEPLOYMENT_MODES)}")
 
-    errors.extend(_validate_defaults(catalog, platform_ids, benchmark_ids))
+    errors.extend(_validate_defaults(catalog, platforms, benchmarks))
     errors.extend(_validate_agent_removed(catalog))
     errors.extend(_validate_mcp(catalog, known_tools, known_prompts))
 

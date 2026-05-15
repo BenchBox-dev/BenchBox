@@ -139,14 +139,66 @@ def test_compare_cli_template_uses_two_platform_flags(gen, catalog):
 def test_defaults_resolve_to_known_ids(browser_catalog):
     platform_ids = {p["id"] for p in browser_catalog["platforms"]}
     benchmark_ids = {b["id"] for b in browser_catalog["benchmarks"]}
+    goal_ids = {g["id"] for g in browser_catalog["goals"]}
+    surface_ids = {s["id"] for s in browser_catalog["surfaces"]}
+    interface_ids = {i["id"] for i in browser_catalog["interfaces"]}
+    deployment_ids = {d["id"] for d in browser_catalog["deployments"]}
+    platform = next(p for p in browser_catalog["platforms"] if p["id"] == browser_catalog["defaults"]["platform"])
+    benchmark = next(b for b in browser_catalog["benchmarks"] if b["id"] == browser_catalog["defaults"]["benchmark"])
     catalog = browser_catalog
+    assert catalog["defaults"]["goal"] in goal_ids
+    assert catalog["defaults"]["surface"] in surface_ids
+    assert catalog["defaults"]["interface"] in interface_ids
     assert catalog["defaults"]["platform"] in platform_ids
     assert catalog["defaults"]["benchmark"] in benchmark_ids
-    assert catalog["defaults"]["deployment"] in {"local", "self-hosted", "managed"}
+    assert catalog["defaults"]["deployment"] in deployment_ids
     assert catalog["defaults"]["scale"] in catalog["scales"]
+    assert catalog["defaults"]["interface"] in platform["interfaces"]
+    assert catalog["defaults"]["deployment"] in platform["deployments"]
+    assert catalog["defaults"]["interface"] in benchmark["interfaces"]
     assert all(isinstance(scale, str) for scale in catalog["scales"])
     assert "0.01" in catalog["scales"]
     assert "10.0" in catalog["scales"]
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("goal", "definitely-not-a-goal", "defaults.goal"),
+        ("surface", "definitely-not-a-surface", "defaults.surface"),
+        ("interface", "definitely-not-an-interface", "defaults.interface"),
+        ("scale", "999.0", "defaults.scale"),
+    ],
+)
+def test_invalid_default_selector_values_are_rejected(gen, catalog, field, value, message):
+    bad = copy.deepcopy(catalog)
+    bad["defaults"][field] = value
+
+    errors = gen.validate(bad)
+
+    assert any(message in e for e in errors)
+
+
+def test_default_selection_must_match_platform_and_benchmark_interfaces(gen, catalog):
+    bad = copy.deepcopy(catalog)
+    bad["defaults"]["interface"] = "dataframe"
+    bad["defaults"]["platform"] = "duckdb"
+    bad["defaults"]["benchmark"] = "clickbench"
+
+    errors = gen.validate(bad)
+
+    assert any("defaults.platform='duckdb'" in e for e in errors)
+    assert any("defaults.benchmark='clickbench'" in e for e in errors)
+
+
+def test_default_selection_must_match_platform_deployment(gen, catalog):
+    bad = copy.deepcopy(catalog)
+    bad["defaults"]["deployment"] = "managed"
+    bad["defaults"]["platform"] = "duckdb"
+
+    errors = gen.validate(bad)
+
+    assert any("defaults.deployment='managed'" in e and "defaults.platform='duckdb'" in e for e in errors)
 
 
 def test_agent_catalog_is_removed(catalog):
