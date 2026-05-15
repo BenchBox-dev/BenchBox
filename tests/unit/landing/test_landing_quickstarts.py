@@ -271,6 +271,13 @@ def test_self_hosted_platforms_show_credential_safety(browser_catalog):
     assert "Do NOT paste credentials in chat" in postgresql["safety_terms"]["no_secrets"]
 
 
+def test_non_credentialed_remote_modes_do_not_show_credential_safety(browser_catalog):
+    velox = next(platform for platform in browser_catalog["platforms"] if platform["id"] == "velox")
+    assert velox["deployments"] == ["local", "self-hosted"]
+    assert "credential_deployments" not in velox
+    assert "safety_terms" not in velox
+
+
 def test_spark_keeps_local_prompt_deployment_when_registry_modes_are_missing(gen, browser_catalog):
     caps = gen.PlatformRegistry.get_platform_capabilities("spark")
     assert caps is not None

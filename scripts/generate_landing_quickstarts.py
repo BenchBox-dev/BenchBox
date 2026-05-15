@@ -140,7 +140,7 @@ def _derive_deployments(platform_id: str, metadata: dict[str, Any]) -> tuple[lis
     for dep in caps.deployment_modes.values():
         deployment = _deployment_from_registry_mode(dep.mode, dep.requires_network)
         deployments.add(deployment)
-        if deployment in {"managed", "self-hosted"}:
+        if dep.requires_credentials:
             credential_deployments.add(deployment)
     return _ordered(deployments), _ordered(credential_deployments)
 
