@@ -110,13 +110,30 @@ def test_credential_platforms_declare_safety_terms(browser_catalog):
             assert {"dependency", "dry_run", "no_secrets"} <= set(safety), platform["id"]
 
 
-def test_compare_cli_template_uses_two_p_flags(gen, catalog):
+def test_compare_cli_template_uses_two_platform_flags(gen, catalog):
     compare = catalog["templates"]["cli"]["compare"]
-    assert compare.count("-p ") >= 2, compare
+    templates = catalog["templates"]["cli"]
+
+    assert compare.count("--platform ") >= 2, compare
+    assert templates["test_one"] == (
+        "uv run benchbox run --platform {platform} --benchmark {benchmark} --scale {scale}"
+    )
+    assert templates["dependency_check"] == "uv run benchbox check-deps --platform {platform}"
+    assert templates["dry_run"] == (
+        "uv run benchbox run --dry-run {dry_run_dir} --platform {platform} --benchmark {benchmark} --scale {scale}"
+    )
+
     bad = copy.deepcopy(catalog)
     bad["templates"]["cli"]["compare"] = "uv run benchbox compare -p {platform_a} -b {benchmark}"
+    bad["templates"]["cli"]["test_one"] = "uv run benchbox run -p {platform} -b {benchmark} -s {scale}"
+    bad["templates"]["cli"]["dependency_check"] = "uv run benchbox check-dependencies {platform}"
+    bad["templates"]["cli"]["dry_run"] = "uv run benchbox run -p {platform} -b {benchmark} -s {scale} --dry-run"
     errors = gen.validate(bad)
-    assert any("two -p flags" in e for e in errors)
+    assert any("two --platform flags" in e for e in errors)
+    assert any("test_one must use long run flags" in e for e in errors)
+    assert any("dependency_check must call check-deps --platform" in e for e in errors)
+    assert any("dry_run must use long run flags" in e for e in errors)
+    assert any("dry_run must include an explicit dry-run output dir" in e for e in errors)
 
 
 def test_defaults_resolve_to_known_ids(browser_catalog):
@@ -179,6 +196,15 @@ def test_generated_platforms_cover_registry_ids(gen, browser_catalog):
 
 def test_generated_platforms_include_install_commands(browser_catalog):
     assert all(platform.get("install_command") for platform in browser_catalog["platforms"])
+    duckdb = next(platform for platform in browser_catalog["platforms"] if platform["id"] == "duckdb")
+    databricks = next(platform for platform in browser_catalog["platforms"] if platform["id"] == "databricks")
+    fabric_dw = next(platform for platform in browser_catalog["platforms"] if platform["id"] == "fabric_dw")
+
+    assert "dependency_check_command" not in duckdb
+    assert databricks["dependency_check_platform"] == "databricks"
+    assert databricks["dependency_check_command"] == "uv run benchbox check-deps --platform databricks"
+    assert fabric_dw["dependency_check_platform"] == "fabric"
+    assert fabric_dw["dependency_check_command"] == "uv run benchbox check-deps --platform fabric"
 
 
 def test_duckdb_is_sql_only_in_prompt_catalog(browser_catalog):
@@ -215,6 +241,14 @@ def test_agent_field_stays_removed_from_route():
     assert '["goal", "agent"' not in text
 
 
+def test_prompt_state_guards_stay_in_place():
+    text = PROMPTS_JS_PATH.read_text(encoding="utf-8")
+    assert 'state.goal === "compare" && pool.length < 2' in text
+    assert "state.goal = defaults.goal" in text
+    assert "var preferredPlatform = raw.platform || defaults.platform" in text
+    assert "pp.id === preferredPlatform" in text
+
+
 def test_credential_warning_box_is_credentials_only():
     text = PROMPTS_JS_PATH.read_text(encoding="utf-8")
     safety_block = text[text.index('var safetyList = $("cloud-safety-list")') : text.index("function platformLabel")]
@@ -227,9 +261,14 @@ def test_prompt_includes_dependency_and_dry_run_safety():
     text = PROMPTS_JS_PATH.read_text(encoding="utf-8")
     assert "Check dependencies:" in text
     assert "Dry run first:" in text
+    assert "dryRunB" in text
+    assert "dry_run_dir: dryRunDir(platform)" in text
+    assert "dry_run_dir: dryRunDir(platformB)" in text
     assert 'safetyTexts(entries, "dependency", deployment)' in text
     assert 'safetyTexts(entries, "dry_run", deployment)' in text
     assert "appendDeploymentSafetyLines(lines" in text
+    assert 'check_dependencies(platform=\\"' in text
+    assert "dry_run=true" in text
 
 
 def test_agent_identity_sentence_stays_removed():

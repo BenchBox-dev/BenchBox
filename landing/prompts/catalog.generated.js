@@ -90,6 +90,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "credential_deployments": [
         "managed"
       ],
+      "dependency_check_command": "uv run benchbox check-deps --platform athena",
+      "dependency_check_platform": "athena",
       "deployments": [
         "managed"
       ],
@@ -100,8 +102,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "Amazon Athena",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies athena` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -109,6 +111,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "credential_deployments": [
         "managed"
       ],
+      "dependency_check_command": "uv run benchbox check-deps --platform athena-spark",
+      "dependency_check_platform": "athena-spark",
       "deployments": [
         "managed"
       ],
@@ -120,8 +124,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "Amazon Athena for Apache Spark",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies athena-spark` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -129,6 +133,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "credential_deployments": [
         "managed"
       ],
+      "dependency_check_command": "uv run benchbox check-deps --platform bigquery",
+      "dependency_check_platform": "bigquery",
       "deployments": [
         "managed"
       ],
@@ -139,8 +145,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "Google BigQuery",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies bigquery` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -158,8 +164,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "CedarDB",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies cedardb` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -167,6 +173,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "credential_deployments": [
         "self-hosted"
       ],
+      "dependency_check_command": "uv run benchbox check-deps --platform clickhouse",
+      "dependency_check_platform": "clickhouse",
       "deployments": [
         "local",
         "self-hosted"
@@ -178,8 +186,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "ClickHouse",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies clickhouse` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -187,6 +195,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "credential_deployments": [
         "managed"
       ],
+      "dependency_check_command": "uv run benchbox check-deps --platform clickhouse-cloud",
+      "dependency_check_platform": "clickhouse-cloud",
       "deployments": [
         "managed"
       ],
@@ -197,12 +207,14 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "ClickHouse Cloud",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies clickhouse-cloud` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
     {
+      "dependency_check_command": "uv run benchbox check-deps --platform clickhouse-local",
+      "dependency_check_platform": "clickhouse-local",
       "deployments": [
         "local"
       ],
@@ -217,6 +229,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "credential_deployments": [
         "self-hosted"
       ],
+      "dependency_check_command": "uv run benchbox check-deps --platform clickhouse-server",
+      "dependency_check_platform": "clickhouse-server",
       "deployments": [
         "self-hosted"
       ],
@@ -227,8 +241,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "ClickHouse Server",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies clickhouse-server` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -259,6 +273,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
         "self-hosted",
         "managed"
       ],
+      "dependency_check_command": "uv run benchbox check-deps --platform databend",
+      "dependency_check_platform": "databend",
       "deployments": [
         "self-hosted",
         "managed"
@@ -270,8 +286,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "Databend",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies databend` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -279,6 +295,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "credential_deployments": [
         "managed"
       ],
+      "dependency_check_command": "uv run benchbox check-deps --platform databricks",
+      "dependency_check_platform": "databricks",
       "deployments": [
         "managed"
       ],
@@ -290,8 +308,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "Databricks SQL",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies databricks` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -299,6 +317,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "credential_deployments": [
         "managed"
       ],
+      "dependency_check_command": "uv run benchbox check-deps --platform databricks-df",
+      "dependency_check_platform": "databricks-df",
       "deployments": [
         "managed"
       ],
@@ -310,8 +330,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "Databricks DataFrame",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies databricks-df` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -331,6 +351,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "credential_deployments": [
         "managed"
       ],
+      "dependency_check_command": "uv run benchbox check-deps --platform dataproc",
+      "dependency_check_platform": "dataproc",
       "deployments": [
         "managed"
       ],
@@ -342,8 +364,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "Google Cloud Dataproc",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies dataproc` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -351,6 +373,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "credential_deployments": [
         "managed"
       ],
+      "dependency_check_command": "uv run benchbox check-deps --platform dataproc-serverless",
+      "dependency_check_platform": "dataproc-serverless",
       "deployments": [
         "managed"
       ],
@@ -362,8 +386,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "Google Cloud Dataproc Serverless",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies dataproc-serverless` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -381,8 +405,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "Apache Doris",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies doris` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -401,6 +425,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "credential_deployments": [
         "managed"
       ],
+      "dependency_check_command": "uv run benchbox check-deps --platform emr-serverless",
+      "dependency_check_platform": "emr-serverless",
       "deployments": [
         "managed"
       ],
@@ -412,8 +438,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "Amazon EMR Serverless",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies emr-serverless` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -421,6 +447,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "credential_deployments": [
         "managed"
       ],
+      "dependency_check_command": "uv run benchbox check-deps --platform fabric",
+      "dependency_check_platform": "fabric",
       "deployments": [
         "managed"
       ],
@@ -431,8 +459,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "Microsoft Fabric Lakehouse SQL",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies fabric-lakehouse` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -440,6 +468,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "credential_deployments": [
         "managed"
       ],
+      "dependency_check_command": "uv run benchbox check-deps --platform fabric-spark",
+      "dependency_check_platform": "fabric-spark",
       "deployments": [
         "managed"
       ],
@@ -451,8 +481,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "Microsoft Fabric Spark",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies fabric-spark` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -460,6 +490,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "credential_deployments": [
         "managed"
       ],
+      "dependency_check_command": "uv run benchbox check-deps --platform fabric",
+      "dependency_check_platform": "fabric",
       "deployments": [
         "managed"
       ],
@@ -470,8 +502,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "Microsoft Fabric Warehouse",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies fabric_dw` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -479,6 +511,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "credential_deployments": [
         "managed"
       ],
+      "dependency_check_command": "uv run benchbox check-deps --platform firebolt",
+      "dependency_check_platform": "firebolt",
       "deployments": [
         "local",
         "managed"
@@ -490,8 +524,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "Firebolt",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies firebolt` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -499,6 +533,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "credential_deployments": [
         "managed"
       ],
+      "dependency_check_command": "uv run benchbox check-deps --platform glue",
+      "dependency_check_platform": "glue",
       "deployments": [
         "managed"
       ],
@@ -510,8 +546,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "AWS Glue",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies glue` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -519,6 +555,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "credential_deployments": [
         "self-hosted"
       ],
+      "dependency_check_command": "uv run benchbox check-deps --platform influxdb",
+      "dependency_check_platform": "influxdb",
       "deployments": [
         "self-hosted"
       ],
@@ -529,8 +567,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "InfluxDB",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies influxdb` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -538,6 +576,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "credential_deployments": [
         "self-hosted"
       ],
+      "dependency_check_command": "uv run benchbox check-deps --platform lakesail",
+      "dependency_check_platform": "lakesail",
       "deployments": [
         "local",
         "self-hosted"
@@ -550,8 +590,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "LakeSail Sail",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies lakesail` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -580,8 +620,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "MotherDuck",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies motherduck` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -612,8 +652,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "pg_duckdb",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies pg-duckdb` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -631,8 +671,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "pg_mooncake",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies pg-mooncake` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -651,6 +691,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "credential_deployments": [
         "self-hosted"
       ],
+      "dependency_check_command": "uv run benchbox check-deps --platform postgresql",
+      "dependency_check_platform": "postgresql",
       "deployments": [
         "self-hosted"
       ],
@@ -661,8 +703,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "PostgreSQL",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies postgresql` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -670,6 +712,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "credential_deployments": [
         "self-hosted"
       ],
+      "dependency_check_command": "uv run benchbox check-deps --platform presto",
+      "dependency_check_platform": "presto",
       "deployments": [
         "self-hosted"
       ],
@@ -680,8 +724,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "PrestoDB",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies presto` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -712,8 +756,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "Onehouse Quanton",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies quanton` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -721,6 +765,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "credential_deployments": [
         "self-hosted"
       ],
+      "dependency_check_command": "uv run benchbox check-deps --platform questdb",
+      "dependency_check_platform": "questdb",
       "deployments": [
         "self-hosted"
       ],
@@ -731,8 +777,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "QuestDB",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies questdb` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -740,6 +786,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "credential_deployments": [
         "managed"
       ],
+      "dependency_check_command": "uv run benchbox check-deps --platform redshift",
+      "dependency_check_platform": "redshift",
       "deployments": [
         "managed"
       ],
@@ -750,8 +798,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "Amazon Redshift",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies redshift` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -760,6 +808,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
         "self-hosted",
         "managed"
       ],
+      "dependency_check_command": "uv run benchbox check-deps --platform singlestore",
+      "dependency_check_platform": "singlestore",
       "deployments": [
         "self-hosted",
         "managed"
@@ -771,8 +821,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "SingleStore",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies singlestore` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -780,6 +830,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "credential_deployments": [
         "managed"
       ],
+      "dependency_check_command": "uv run benchbox check-deps --platform snowflake",
+      "dependency_check_platform": "snowflake",
       "deployments": [
         "managed"
       ],
@@ -790,8 +842,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "Snowflake",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies snowflake` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -799,6 +851,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "credential_deployments": [
         "managed"
       ],
+      "dependency_check_command": "uv run benchbox check-deps --platform snowpark-connect",
+      "dependency_check_platform": "snowpark-connect",
       "deployments": [
         "managed"
       ],
@@ -810,8 +864,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "Snowpark Connect for Spark",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies snowpark-connect` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -819,6 +873,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "credential_deployments": [
         "self-hosted"
       ],
+      "dependency_check_command": "uv run benchbox check-deps --platform spark",
+      "dependency_check_platform": "spark",
       "deployments": [
         "self-hosted"
       ],
@@ -829,8 +885,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "Apache Spark",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies spark` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -859,8 +915,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "Starburst",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies starburst` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -868,6 +924,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "credential_deployments": [
         "self-hosted"
       ],
+      "dependency_check_command": "uv run benchbox check-deps --platform starrocks",
+      "dependency_check_platform": "starrocks",
       "deployments": [
         "self-hosted"
       ],
@@ -878,8 +936,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "StarRocks",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies starrocks` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -887,6 +945,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "credential_deployments": [
         "managed"
       ],
+      "dependency_check_command": "uv run benchbox check-deps --platform synapse",
+      "dependency_check_platform": "synapse",
       "deployments": [
         "managed"
       ],
@@ -897,8 +957,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "Azure Synapse Analytics",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies synapse` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -906,6 +966,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "credential_deployments": [
         "managed"
       ],
+      "dependency_check_command": "uv run benchbox check-deps --platform synapse-spark",
+      "dependency_check_platform": "synapse-spark",
       "deployments": [
         "managed"
       ],
@@ -917,8 +979,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "Azure Synapse Analytics Spark",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies synapse-spark` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -938,8 +1000,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "TimescaleDB",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies timescaledb` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -947,6 +1009,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "credential_deployments": [
         "self-hosted"
       ],
+      "dependency_check_command": "uv run benchbox check-deps --platform trino",
+      "dependency_check_platform": "trino",
       "deployments": [
         "self-hosted"
       ],
@@ -957,8 +1021,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "Trino",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies trino` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     },
@@ -966,6 +1030,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "credential_deployments": [
         "self-hosted"
       ],
+      "dependency_check_command": "uv run benchbox check-deps --platform velox",
+      "dependency_check_platform": "velox",
       "deployments": [
         "local",
         "self-hosted"
@@ -977,8 +1043,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       ],
       "label": "Apache Gluten + Velox",
       "safety_terms": {
-        "dependency": "Run `benchbox check-dependencies velox` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
       }
     }
@@ -1001,10 +1067,10 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
   ],
   "templates": {
     "cli": {
-      "compare": "uv run benchbox compare -p {platform_a} -p {platform_b} -b {benchmark} -s {scale}",
-      "dependency_check": "uv run benchbox check-dependencies {platform}",
-      "dry_run": "uv run benchbox run -p {platform} -b {benchmark} -s {scale} --dry-run",
-      "test_one": "uv run benchbox run -p {platform} -b {benchmark} -s {scale}"
+      "compare": "uv run benchbox compare --platform {platform_a} --platform {platform_b} --benchmark {benchmark} --scale {scale}",
+      "dependency_check": "uv run benchbox check-deps --platform {platform}",
+      "dry_run": "uv run benchbox run --dry-run {dry_run_dir} --platform {platform} --benchmark {benchmark} --scale {scale}",
+      "test_one": "uv run benchbox run --platform {platform} --benchmark {benchmark} --scale {scale}"
     }
   }
 };

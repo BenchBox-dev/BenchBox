@@ -19,6 +19,7 @@ import argparse
 import copy
 import json
 import sys
+from functools import cache
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +27,7 @@ import yaml
 
 from benchbox.core.benchmark_registry import BENCHMARK_METADATA
 from benchbox.core.platform_registry import PlatformRegistry
+from benchbox.utils.dependencies import list_available_dependency_groups
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SOURCE = REPO_ROOT / "landing" / "prompts" / "catalog.yaml"
@@ -38,6 +40,10 @@ DEPLOYMENT_ORDER = {"local": 0, "self-hosted": 1, "managed": 2}
 LOCAL_CATEGORIES = frozenset({"analytical", "dataframe", "embedded"})
 CLOUD_HINTS = frozenset({"aws", "azure", "cloud", "gcs", "multi_cloud", "onelake", "s3", "saas", "serverless"})
 SELF_HOSTED_CATEGORIES = frozenset({"distributed", "relational", "timeseries"})
+DEPENDENCY_CHECK_ALIASES = {
+    "fabric-lakehouse": "fabric",
+    "fabric_dw": "fabric",
+}
 
 
 def load_catalog(path: Path = SOURCE) -> dict[str, Any]:
@@ -148,11 +154,23 @@ def _platform_safety_terms(platform_id: str, credential_deployments: list[str]) 
     if not credential_deployments:
         return None
     return {
-        "dependency": f"Run `benchbox check-dependencies {platform_id}` first.",
-        "dry_run": "Use `--dry-run` to inspect commands before any live run.",
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
         "no_secrets": "Configure platform connection credentials in your shell env or config files. "
         "Do NOT paste credentials in chat.",
     }
+
+
+def _dependency_check_platform(platform_id: str) -> str | None:
+    candidate = DEPENDENCY_CHECK_ALIASES.get(platform_id, platform_id)
+    if candidate in _dependency_groups():
+        return candidate
+    return None
+
+
+@cache
+def _dependency_groups() -> dict[str, Any]:
+    return list_available_dependency_groups()
 
 
 def _derive_platform_entries() -> list[dict[str, Any]]:
@@ -172,6 +190,10 @@ def _derive_platform_entries() -> list[dict[str, Any]]:
             "deployments": deployments,
             "interfaces": interfaces,
         }
+        dependency_check_platform = _dependency_check_platform(platform_id)
+        if dependency_check_platform:
+            entry["dependency_check_platform"] = dependency_check_platform
+            entry["dependency_check_command"] = f"uv run benchbox check-deps --platform {dependency_check_platform}"
         if credential_deployments:
             entry["credential_deployments"] = credential_deployments
             safety_terms = _platform_safety_terms(platform_id, credential_deployments)
@@ -288,9 +310,22 @@ def validate(catalog: dict[str, Any]) -> list[str]:
     errors.extend(_validate_agent_removed(catalog))
     errors.extend(_validate_mcp(catalog, known_tools, known_prompts))
 
-    compare_tpl = ((catalog.get("templates") or {}).get("cli") or {}).get("compare") or ""
-    if compare_tpl.count("-p ") < 2:
-        errors.append(f"templates.cli.compare must include two -p flags (got: {compare_tpl!r})")
+    cli_templates = (catalog.get("templates") or {}).get("cli") or {}
+    compare_tpl = cli_templates.get("compare") or ""
+    if compare_tpl.count("--platform ") < 2:
+        errors.append(f"templates.cli.compare must include two --platform flags (got: {compare_tpl!r})")
+
+    test_one_tpl = cli_templates.get("test_one") or ""
+    dry_run_tpl = cli_templates.get("dry_run") or ""
+    dependency_tpl = cli_templates.get("dependency_check") or ""
+    if " -p " in test_one_tpl or " -b " in test_one_tpl or " -s " in test_one_tpl:
+        errors.append(f"templates.cli.test_one must use long run flags (got: {test_one_tpl!r})")
+    if " -p " in dry_run_tpl or " -b " in dry_run_tpl or " -s " in dry_run_tpl:
+        errors.append(f"templates.cli.dry_run must use long run flags (got: {dry_run_tpl!r})")
+    if "--dry-run {dry_run_dir}" not in dry_run_tpl:
+        errors.append(f"templates.cli.dry_run must include an explicit dry-run output dir (got: {dry_run_tpl!r})")
+    if dependency_tpl != "uv run benchbox check-deps --platform {platform}":
+        errors.append(f"templates.cli.dependency_check must call check-deps --platform (got: {dependency_tpl!r})")
 
     if FORBIDDEN_JSON.exists():
         errors.append(f"forbidden file present: {FORBIDDEN_JSON.relative_to(REPO_ROOT)}")
