@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import copy
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -49,6 +50,22 @@ def browser_catalog(gen, catalog):
     return gen.build_prompt_catalog(catalog)
 
 
+def _load_committed_generated_payload():
+    text = GENERATED_PATH.read_text(encoding="utf-8")
+    prefix = "window.__BENCHBOX_PROMPT_CATALOG__ = "
+    assert text.startswith("// AUTO-GENERATED")
+    payload = text.split(prefix, 1)[1].rsplit(";\n", 1)[0]
+    return json.loads(payload)
+
+
+def _filter_platform_ids(catalog_payload, interface, deployment):
+    return {
+        platform["id"]
+        for platform in catalog_payload["platforms"]
+        if interface in platform["interfaces"] and deployment in platform["deployments"]
+    }
+
+
 pytestmark = [pytest.mark.fast, pytest.mark.unit]
 
 
@@ -73,6 +90,60 @@ def test_platform_inclusion_list_is_rejected(gen, catalog):
     bad["platforms"] = [{"id": "duckdb", "deployments": ["local"], "interfaces": ["sql"]}]
     errors = gen.validate(bad)
     assert any("platforms[] is no longer supported" in e for e in errors)
+
+
+def test_platform_overrides_apply_without_controlling_inclusion(gen, catalog):
+    overridden = copy.deepcopy(catalog)
+    overridden["platform_overrides"] = {
+        "duckdb": {
+            "label": "DuckDB Local Test Label",
+            "safety_terms": {
+                "dependency": "Custom dependency check.",
+                "dry_run": "Custom dry-run check.",
+                "no_secrets": "Custom secret handling.",
+            },
+        }
+    }
+
+    browser_catalog = gen.build_prompt_catalog(overridden)
+    duckdb = next(platform for platform in browser_catalog["platforms"] if platform["id"] == "duckdb")
+
+    assert "platform_overrides" not in browser_catalog
+    assert {p["id"] for p in browser_catalog["platforms"]} == gen._supported_registry_platform_ids()
+    assert duckdb["label"] == "DuckDB Local Test Label"
+    assert duckdb["safety_terms"]["no_secrets"] == "Custom secret handling."
+
+
+def test_unknown_platform_override_is_rejected(gen, catalog):
+    bad = copy.deepcopy(catalog)
+    bad["platform_overrides"] = {"definitely-not-a-platform": {"label": "Nope"}}
+    errors = gen.validate(bad)
+    assert any("platform_overrides['definitely-not-a-platform']" in e for e in errors)
+
+
+def test_unknown_platform_override_key_is_rejected(gen, catalog):
+    bad = copy.deepcopy(catalog)
+    bad["platform_overrides"] = {"duckdb": {"interfaces": ["sql", "dataframe"]}}
+    errors = gen.validate(bad)
+    assert any("unsupported keys ['interfaces']" in e for e in errors)
+
+
+def test_malformed_platform_override_values_are_rejected(gen, catalog):
+    bad = copy.deepcopy(catalog)
+    bad["platform_overrides"] = {
+        "duckdb": {
+            "label": [],
+            "deployments": "local",
+            "safety_terms": {"dependency": [], "extra": "not allowed"},
+        }
+    }
+
+    errors = gen.validate(bad)
+
+    assert any(".label: must be a non-empty string" in e for e in errors)
+    assert any(".deployments: must be a list" in e for e in errors)
+    assert any("safety_terms['dependency']: must be a non-empty string" in e for e in errors)
+    assert any("safety_terms['extra']: must be one of" in e for e in errors)
 
 
 def test_unknown_benchmark_id_is_rejected(gen, catalog):
@@ -242,8 +313,69 @@ def test_prompts_route_assets_are_cache_busted():
 
 def test_generated_platforms_cover_registry_ids(gen, browser_catalog):
     generated_ids = {p["id"] for p in browser_catalog["platforms"]}
-    expected_ids = set(gen.PlatformRegistry.get_all_platform_metadata())
+    expected_ids = gen._supported_registry_platform_ids()
     assert generated_ids == expected_ids
+
+
+def test_generated_platforms_have_complete_filter_metadata(gen, browser_catalog):
+    for platform in browser_catalog["platforms"]:
+        assert platform["label"], platform["id"]
+        assert platform["interfaces"], platform["id"]
+        assert platform["deployments"], platform["id"]
+        assert set(platform["interfaces"]) <= {"sql", "dataframe"}
+        assert set(platform["deployments"]) <= gen.VALID_DEPLOYMENT_MODES
+        assert "remote" not in platform["deployments"]
+
+
+def test_filter_pools_match_registry_capabilities(gen, browser_catalog):
+    metadata_by_id = gen.PlatformRegistry.get_all_platform_metadata()
+    for interface in ("sql", "dataframe"):
+        for deployment in gen.VALID_DEPLOYMENT_MODES:
+            expected = set()
+            for platform_id, metadata in metadata_by_id.items():
+                caps = gen.PlatformRegistry.get_platform_capabilities(platform_id)
+                if not caps:
+                    continue
+                supports_interface = caps.supports_sql if interface == "sql" else caps.supports_dataframe
+                if not supports_interface:
+                    continue
+                deployments, _credential_deployments = gen._derive_deployments(platform_id, metadata)
+                if deployment in deployments:
+                    expected.add(platform_id)
+
+            assert _filter_platform_ids(browser_catalog, interface, deployment) == expected
+
+
+def test_non_ui_registry_deployment_modes_are_normalized(gen, browser_catalog):
+    assert gen._deployment_from_registry_mode("remote", requires_network=True) == "self-hosted"
+    assert gen._deployment_from_registry_mode("remote", requires_network=False) == "local"
+
+    velox = next(platform for platform in browser_catalog["platforms"] if platform["id"] == "velox")
+    assert "remote" not in velox["deployments"]
+    assert "self-hosted" in velox["deployments"]
+
+
+def test_static_generated_payload_supports_dropdown_smoke(gen, browser_catalog):
+    prompts_js = PROMPTS_JS_PATH.read_text(encoding="utf-8")
+    committed_payload = _load_committed_generated_payload()
+
+    assert "function platformsForFilters" in prompts_js
+    assert committed_payload["platforms"] == browser_catalog["platforms"]
+
+    scenarios = [
+        ("sql", "managed"),
+        ("sql", "self-hosted"),
+        ("dataframe", "local"),
+    ]
+    for interface, deployment in scenarios:
+        expected = _filter_platform_ids(browser_catalog, interface, deployment)
+        actual = _filter_platform_ids(committed_payload, interface, deployment)
+        assert actual == expected
+        assert actual
+
+    assert len(_filter_platform_ids(committed_payload, "sql", "managed")) >= 2
+    assert len(_filter_platform_ids(committed_payload, "sql", "self-hosted")) >= 2
+    assert "polars" in _filter_platform_ids(committed_payload, "dataframe", "local")
 
 
 def test_generated_platforms_include_install_commands(browser_catalog):
