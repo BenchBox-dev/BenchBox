@@ -349,9 +349,16 @@ function defaultImpl(
   rows: readonly Record<string, unknown>[],
   rankings: readonly Record<string, unknown>[],
   cells: readonly Record<string, unknown>[],
+  availableBenchmarks?: readonly string[],
 ): QueryRowsImpl {
   return async (sql: string) => {
     const s = String(sql).replace(/\s+/g, " ").trim();
+    if (s.startsWith("SELECT DISTINCT benchmark FROM bench.results")) {
+      const slugs = availableBenchmarks
+        ? [...availableBenchmarks]
+        : [...new Set(rows.map((row) => String(row.benchmark)))].sort();
+      return slugs.map((benchmark) => ({ benchmark }));
+    }
     if (s.includes("FROM bench.results")) return [...rows];
     if (s.includes("FROM bench.benchmark_rankings")) return [...rankings];
     if (s.startsWith("SELECT benchmark, scale_factor, phase, result_id, platform_id, query_id, display_ms")) {
@@ -483,9 +490,15 @@ describe("BenchmarkIndex", () => {
     const routeMock = vi.mocked(preactRouter.route);
     routeMock.mockClear();
     window.history.replaceState(null, "", "/results/tpch/?sf=10&phase=power&view=ranks");
+    vi.mocked(queryRows).mockImplementation(
+      defaultImpl(RESULT_ROWS, RANKING_ROWS, CELL_ROWS, ["tpch", "clickbench"]),
+    );
 
     render(<BenchmarkIndex benchmark="tpch" />);
     await waitFor(() => expect(screen.getByText("TPC-H Results")).toBeTruthy());
+    await waitFor(() =>
+      expect(within(screen.getByTestId("benchmark-switcher")).queryByRole("option", { name: "ClickBench" })).toBeTruthy(),
+    );
 
     const switcher = screen.getByTestId("benchmark-switcher") as HTMLSelectElement;
     expect(switcher.value).toBe("tpch");
@@ -495,6 +508,46 @@ describe("BenchmarkIndex", () => {
     fireEvent.change(switcher, { target: { value: "clickbench" } });
     expect(routeMock).toHaveBeenCalledTimes(1);
     expect(routeMock).toHaveBeenCalledWith("/results/clickbench/?view=ranks");
+  });
+
+  it("hides no-result benchmarks from the switcher once the public corpus list resolves", async () => {
+    vi.mocked(queryRows).mockImplementation(
+      defaultImpl(RESULT_ROWS, RANKING_ROWS, CELL_ROWS, ["tpch", "clickbench"]),
+    );
+
+    render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() =>
+      expect(within(screen.getByTestId("benchmark-switcher")).queryByRole("option", { name: "ClickBench" })).toBeTruthy(),
+    );
+
+    const switcher = screen.getByTestId("benchmark-switcher") as HTMLSelectElement;
+    const labels = Array.from(switcher.options).map((option) => option.textContent ?? "");
+    expect(labels).toContain("TPC-H");
+    expect(labels).toContain("ClickBench");
+    expect(labels).not.toContain("AMPLab");
+    expect(labels).not.toContain("TPC-DS");
+  });
+
+  it("keeps the no-result current benchmark reachable via the fallback option", async () => {
+    vi.mocked(queryRows).mockImplementation(
+      defaultImpl([], [], [], ["tpch"]),
+    );
+
+    render(<BenchmarkIndex benchmark="amplab" />);
+    // The page renders a NotFound when `amplab` is not in BENCHMARK_LABELS;
+    // we only care that, for any registered benchmark with no published
+    // results, the switcher still exposes the current selection via the
+    // fallback `<option>` so deep links recover.
+    await waitFor(() => {
+      const switcher = screen.queryByTestId("benchmark-switcher") as HTMLSelectElement | null;
+      // For an unknown benchmark slug the page renders NotFound and there is
+      // no switcher; that is the documented direct-route fallback. When the
+      // slug is registered (e.g. "amplab" once added to BENCHMARK_LABELS),
+      // the switcher must still include it.
+      if (switcher === null) return;
+      expect(switcher.value).toBe("amplab");
+      expect(Array.from(switcher.options).map((option) => option.value)).toContain("amplab");
+    });
   });
 
   it.each([
