@@ -77,6 +77,42 @@ If `BENCHBOX_OUTPUT_DIR` is set, the same relative datagen path is resolved
 under that root. Air-gapped environments can pre-populate that directory with
 the 21 Parquet files; BenchBox still verifies the manifest before running.
 
+## BYO Data Path
+
+The default `joinorder` path intentionally remains the verified BenchBox-hosted
+Parquet archive. Environments that require stricter separation from BenchBox's
+re-hosted archive can instead provide their own canonical Parquet files. Place
+the 21 files named in `benchbox/core/joinorder/data_manifest.toml` under:
+
+```text
+benchmark_runs/datagen/joinorder_sf1/
+```
+
+or, when `BENCHBOX_OUTPUT_DIR` is set:
+
+```text
+$BENCHBOX_OUTPUT_DIR/datagen/joinorder_sf1/
+```
+
+On startup BenchBox checks every manifest-owned table file first. If all files
+are present and their sha256 values match the manifest, the benchmark uses that
+pre-populated directory and does not download the hosted archive. If any file is
+missing, BenchBox falls back to the default hosted archive. If a file is present
+but has the wrong sha256, the run fails before downloading so stale or corrupt
+BYO data is visible.
+
+Maintainers can rebuild the canonical Parquet files directly from Dataverse with
+the project script:
+
+```bash
+uv run -- python _project/scripts/build_joinorder_data.py foundation --work-dir ~/Developer/benchmark_runs/joinorder/build/joinorder-imdb-2013-v1
+```
+
+That path downloads `imdb_pg11` from DOI `10.7910/DVN/2QYZBT`, verifies the
+Dataverse checksum, restores the pg_dump into PostgreSQL, converts the 21 tables
+to Parquet, and runs the canonical manifest and logical-content checks. It is a
+heavy maintainer workflow and is not the silent first-run default.
+
 ## Query Set
 
 `JoinOrderQueryManager` exposes all 113 canonical JOB SQL queries:
