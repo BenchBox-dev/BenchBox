@@ -162,8 +162,11 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   const [error, setError] = useState<string | null>(null);
   // Distinct benchmark slugs that have at least one public result bundle.
   // Drives the corpus-aware sibling switcher so users cannot pivot into a
-  // no-result benchmark detail page. `null` means the list is still loading
-  // and the switcher temporarily falls back to the catalog-wide options.
+  // no-result benchmark detail page. `null` means the list is still loading;
+  // on hard failure we instead collapse to a single-element set containing
+  // only the current benchmark so the switcher never silently regresses to
+  // the catalog-wide list (which would re-introduce the no-result dead-end
+  // anti-pattern Contract A is meant to prevent).
   const [availableBenchmarks, setAvailableBenchmarks] = useState<ReadonlySet<string> | null>(null);
 
   useEffect(() => {
@@ -172,16 +175,20 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
       .then((slugs) => {
         if (!cancelled) setAvailableBenchmarks(new Set(slugs));
       })
-      .catch(() => {
-        // Switcher gracefully falls back to the full catalog if the
-        // distinct-benchmarks query fails; that is a strictly weaker
-        // contract, not a route-level regression.
-        if (!cancelled) setAvailableBenchmarks(null);
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        // Hard failure (snapshot missing, transport error, etc.). Collapse
+        // the switcher to just the current benchmark via the fallback
+        // <option>; never silently revert to catalog-wide, which would let
+        // users pivot into no-result dead ends. Log once so observability
+        // can pick up persistent snapshot failures.
+        console.warn("listBenchmarksWithPublicResults failed; switcher will show only the current benchmark", err);
+        setAvailableBenchmarks(new Set(benchmark ? [benchmark] : []));
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [benchmark]);
 
   // Filter state - URL-synced so views are shareable.
   const { facets, setFacet } = useFacetState();

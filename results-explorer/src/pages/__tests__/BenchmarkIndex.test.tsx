@@ -528,26 +528,69 @@ describe("BenchmarkIndex", () => {
     expect(labels).not.toContain("TPC-DS");
   });
 
-  it("keeps the no-result current benchmark reachable via the fallback option", async () => {
+  it("keeps the legacy-aliased current benchmark reachable via the fallback option", async () => {
+    // Same-label aliases (e.g. `ssb` legacy slug + `star_schema` canonical
+    // slug both render "SSB"). When the public corpus only carries the
+    // legacy slug, the corpus-aware filter keeps the canonical option (the
+    // first `seen` slug per the dedupe), so the user's current legacy slug
+    // is missing from `benchmarkOptions`. The fallback `<option>` then
+    // adds it back. This is the only production-reachable code path for
+    // the fallback under the corpus-aware contract.
+    const legacyRows = RESULT_ROWS.map((row) => ({ ...row, benchmark: "ssb" }));
+    const legacyRankings = RANKING_ROWS.map((row) => ({ ...row, benchmark: "ssb" }));
+    const legacyCells = CELL_ROWS.map((row) => ({ ...row, benchmark: "ssb" }));
     vi.mocked(queryRows).mockImplementation(
-      defaultImpl([], [], [], ["tpch"]),
+      defaultImpl(legacyRows, legacyRankings, legacyCells, ["ssb"]),
     );
 
-    render(<BenchmarkIndex benchmark="amplab" />);
-    // The page renders a NotFound when `amplab` is not in BENCHMARK_LABELS;
-    // we only care that, for any registered benchmark with no published
-    // results, the switcher still exposes the current selection via the
-    // fallback `<option>` so deep links recover.
-    await waitFor(() => {
-      const switcher = screen.queryByTestId("benchmark-switcher") as HTMLSelectElement | null;
-      // For an unknown benchmark slug the page renders NotFound and there is
-      // no switcher; that is the documented direct-route fallback. When the
-      // slug is registered (e.g. "amplab" once added to BENCHMARK_LABELS),
-      // the switcher must still include it.
-      if (switcher === null) return;
-      expect(switcher.value).toBe("amplab");
-      expect(Array.from(switcher.options).map((option) => option.value)).toContain("amplab");
+    render(<BenchmarkIndex benchmark="ssb" />);
+    await waitFor(() => expect(screen.getByTestId("benchmark-switcher")).toBeTruthy());
+
+    const switcher = screen.getByTestId("benchmark-switcher") as HTMLSelectElement;
+    expect(switcher.value).toBe("ssb");
+    const optionValues = Array.from(switcher.options).map((option) => option.value);
+    // The fallback adds the legacy slug; the canonical alias remains via
+    // the dedupe-with-cross-alias check inside uniqueBenchmarkOptions.
+    expect(optionValues).toContain("ssb");
+    expect(optionValues).toContain("star_schema");
+    // Other no-result benchmarks must not be present (Contract A).
+    expect(optionValues).not.toContain("amplab");
+    expect(optionValues).not.toContain("tpcdi");
+  });
+
+  it("hides no-result benchmarks even when the corpus-list query fails", async () => {
+    // Hard failure of listBenchmarksWithPublicResults must NOT silently
+    // revert to the catalog-wide list - that would re-introduce the
+    // no-result dead-end anti-pattern. The switcher collapses to only the
+    // current benchmark via the fallback option.
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.mocked(queryRows).mockImplementation(async (sql: string) => {
+      const s = String(sql).replace(/\s+/g, " ").trim();
+      if (s.startsWith("SELECT DISTINCT benchmark FROM bench.results")) {
+        throw new Error("simulated snapshot failure");
+      }
+      if (s.includes("FROM bench.results")) return [...RESULT_ROWS];
+      if (s.includes("FROM bench.benchmark_rankings")) return [...RANKING_ROWS];
+      if (s.startsWith("SELECT benchmark, scale_factor, phase, result_id, platform_id, query_id, display_ms")) {
+        return [...CELL_ROWS];
+      }
+      return [];
     });
+
+    render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() =>
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("listBenchmarksWithPublicResults failed"),
+        expect.any(Error),
+      ),
+    );
+
+    const switcher = screen.getByTestId("benchmark-switcher") as HTMLSelectElement;
+    const optionValues = Array.from(switcher.options).map((option) => option.value);
+    expect(optionValues).toEqual(["tpch"]);
+    expect(optionValues).not.toContain("amplab");
+    expect(optionValues).not.toContain("clickbench");
+    warnSpy.mockRestore();
   });
 
   it.each([
