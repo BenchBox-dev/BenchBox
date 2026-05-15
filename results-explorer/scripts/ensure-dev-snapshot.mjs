@@ -67,6 +67,13 @@ function rebuildSnapshot() {
     stdio: "inherit",
     env: { ...process.env, PYTHONUNBUFFERED: "1" },
   });
+  if (result.error && result.error.code === "ENOENT") {
+    throw new Error(
+      "Explorer dev snapshot rebuild needs `uv`, which was not found on PATH. " +
+        "Install uv (https://docs.astral.sh/uv/) or set EXPLORER_SKIP_PREDEV=1 to skip " +
+        "the rebuild and accept a stale/missing local snapshot.",
+    );
+  }
   if (result.status !== 0) {
     throw new Error(`Explorer dev snapshot rebuild failed with exit ${result.status ?? "unknown"}`);
   }
