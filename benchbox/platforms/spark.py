@@ -66,6 +66,7 @@ except ImportError:
 _MAX_COMPATIBLE_JAVA_VERSION = 22
 
 _logger = logging.getLogger(__name__)
+_SPARK_AUTO_BROADCAST_THRESHOLD = "spark.sql.autoBroadcastJoinThreshold"
 
 
 def _get_java_version(java_home: str | None = None) -> int | None:
@@ -302,6 +303,7 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
         from benchbox.utils.database_naming import generate_database_name
 
         adapter_config: dict[str, Any] = {}
+        benchmark_name = str(config["benchmark"]).lower()
 
         # Generate proper database name using benchmark characteristics
         if "database" in config and config["database"]:
@@ -342,6 +344,14 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
         ]:
             if key in config:
                 adapter_config[key] = config[key]
+
+        spark_config = adapter_config.get("spark_config") or {}
+        if (
+            benchmark_name == "joinorder"
+            and "broadcast_threshold" not in adapter_config
+            and _SPARK_AUTO_BROADCAST_THRESHOLD not in spark_config
+        ):
+            adapter_config["broadcast_threshold"] = -1
 
         return cls(**adapter_config)
 
@@ -433,7 +443,7 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
 
         # Broadcast threshold
         if self.broadcast_threshold is not None:
-            conf["spark.sql.autoBroadcastJoinThreshold"] = str(self.broadcast_threshold)
+            conf[_SPARK_AUTO_BROADCAST_THRESHOLD] = str(self.broadcast_threshold)
 
         # Number of executors (for YARN/K8s)
         if self.num_executors is not None:
@@ -645,7 +655,7 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
         spark = connection
 
         try:
-            if benchmark_type.lower() in ["olap", "analytics", "tpch", "tpcds"]:
+            if benchmark_type.lower() in ["olap", "analytics", "tpch", "tpcds", "joinorder"]:
                 # OLAP-specific optimizations via Spark SQL settings
                 spark.conf.set("spark.sql.adaptive.enabled", "true")
                 spark.conf.set("spark.sql.adaptive.coalescePartitions.enabled", "true")
