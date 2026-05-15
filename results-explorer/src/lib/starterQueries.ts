@@ -30,7 +30,7 @@ export const STARTER_QUERY_CATEGORIES: Record<StarterQueryCategory, string> = {
   results: "Results",
   cost_and_deployment: "Cost & deployment",
   per_query_timings: "Per-query timings",
-  cohort_comparisons: "Cohort comparisons",
+  cohort_comparisons: "Ranking comparisons",
   trust_and_tuning: "Trust & tuning",
   detail_drilldown: "Detail drill-down",
 };
@@ -118,8 +118,8 @@ ORDER BY iter, stream;`,
   {
     id: "cohort_leaderboard",
     category: "cohort_comparisons",
-    label: "Cohort leaderboard",
-    description: "Ranked platforms within a (benchmark, scale_factor, phase) cohort using the persisted ranking.",
+    label: "Ranking leaderboard",
+    description: "Ranked platforms within a (benchmark, scale_factor, phase) ranking using the persisted ranks.",
     sql: `SELECT rank, platform, platform_version, tuning_mode, trust_label,
        power_score, display_geomean_ms, cost_usd
 FROM bench.benchmark_rankings
@@ -131,8 +131,8 @@ ORDER BY rank NULLS LAST, display_geomean_ms ASC;`,
   {
     id: "cohort_query_matrix",
     category: "cohort_comparisons",
-    label: "Cohort query-timing matrix",
-    description: "Platform × query timing grid for a cohort - the same cells used by the benchmark matrix UI.",
+    label: "Ranking query-timing matrix",
+    description: "Platform × query timing grid for a ranking - the same cells used by the benchmark matrix UI.",
     sql: `SELECT c.platform_id, c.query_id, c.display_ms
 FROM bench.benchmark_matrix_cells c
 WHERE c.benchmark = 'tpch'
@@ -143,8 +143,8 @@ ORDER BY c.platform_id, c.query_id;`,
   {
     id: "cross_cohort_platform_presence",
     category: "cohort_comparisons",
-    label: "Platform coverage across cohorts",
-    description: "How many cohorts each platform appears in, via the meta-leaderboard's cohort_metadata table.",
+    label: "Platform coverage across rankings",
+    description: "How many rankings each platform appears in, via the meta-leaderboard's cohort_metadata table.",
     sql: `SELECT platform_id, platform,
        COUNT(DISTINCT cohort_key) AS cohorts_entered,
        AVG(rank)                  AS avg_rank
@@ -178,7 +178,7 @@ ORDER BY benchmark, scale_factor, display_geomean_ms ASC NULLS LAST;`,
     id: "compliance_class_mix",
     category: "trust_and_tuning",
     label: "Compliance class mix per benchmark",
-    description: "Breakdown of compliance_class values per benchmark - spots cohorts dominated by unofficial runs.",
+    description: "Breakdown of compliance_class values per benchmark - spots rankings dominated by unofficial runs.",
     sql: `SELECT benchmark, COALESCE(compliance_class, 'unclassified') AS compliance_class,
        COUNT(*) AS runs
 FROM bench.results

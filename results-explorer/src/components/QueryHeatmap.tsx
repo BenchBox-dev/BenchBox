@@ -329,7 +329,7 @@ export function QueryHeatmap({
   // cohorts. The primary score column keeps its own column header
   // explanation (`primaryLabel`/`primaryDirectionLabel`) below.
   const heatmapMeaning = suppressHeat
-    ? "Heat color is suppressed because this cohort has fewer than two comparable platforms."
+    ? "Heat color is suppressed because this ranking has fewer than two comparable platforms."
     : "Heat color compares each query column with the fastest published timing; darker cells are slower.";
 
   function renderHeaderSortControl(
@@ -833,7 +833,7 @@ function queryOutliers(
 }
 
 function queryRatioLabel(ratio: number | null): string {
-  if (ratio === null) return "No cohort baseline";
-  if (ratio <= 1.005) return "Fastest in cohort";
+  if (ratio === null) return "No ranking baseline";
+  if (ratio <= 1.005) return "Fastest in ranking";
   return `${formatSpeedup(ratio, { unit: "×" }).valueText} fastest`;
 }

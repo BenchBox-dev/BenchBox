@@ -115,16 +115,16 @@ function platformCompareGuidanceMessage(
   }
   if (selectedCount === 1) {
     const row = selectedRows[0];
-    const cohort = row ? compareCohortSummary(compareCohortSignatureForRow(row)) : "this cohort";
-    return `1 result selected in ${cohort}. Select one more result from the same comparable cohort.`;
+    const ranking = row ? compareCohortSummary(compareCohortSignatureForRow(row)) : "this ranking";
+    return `1 result selected in ${ranking}. Select one more result from the same comparable ranking.`;
   }
   const differences = selectedCohortDifferences(selectedRows);
   if (differences.length > 0) {
-    return `${selectedCount} results selected, but they differ by ${differences.join(", ")}. Compare will keep the receipts visible and may suppress winner claims for mixed cohorts.`;
+    return `${selectedCount} results selected, but they differ by ${differences.join(", ")}. Compare will keep the receipts visible and may suppress winner claims for mixed rankings.`;
   }
   const first = selectedRows[0];
-  const cohort = first ? compareCohortSummary(compareCohortSignatureForRow(first)) : "one cohort";
-  return `${selectedCount} results selected in ${cohort}. The sticky tray opens Compare with matching cohort context.`;
+  const ranking = first ? compareCohortSummary(compareCohortSignatureForRow(first)) : "one ranking";
+  return `${selectedCount} results selected in ${ranking}. The sticky tray opens Compare with matching ranking context.`;
 }
 
 export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
@@ -634,7 +634,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                   ? `${zeroSelectableReasons[0]!.count} ${zeroSelectableReasons[0]!.copy.shortText.toLowerCase()} row${
                       zeroSelectableReasons[0]!.count === 1 ? "" : "s"
                     }. ${zeroSelectableReasons[0]!.copy.recoveryHint}`
-                  : "The current filters do not expose a comparable run. Clear filters or choose another cohort."}
+                  : "The current filters do not expose a comparable run. Clear filters or choose another ranking."}
               </p>
             </div>
             <button type="button" class="btn btn-secondary shrink-0 text-sm" onClick={resetW5Filters}>
@@ -659,7 +659,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
             {selected.size > 0 && <span>{formatSelectedCount(selected.size)} for compare</span>}
           </div>
           <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-2 text-xs text-[var(--bb-data-fg-muted)]">
-            <span>Rows are labelled by comparable cohort: benchmark, scale, phase, and primary metric.</span>
+            <span>Rows are labelled by comparable ranking: benchmark, scale, phase, and primary metric.</span>
             <span data-testid="platform-table-scroll-hint">Scroll table for source and receipt columns →</span>
           </div>
           <div class="overflow-x-auto" data-testid="platform-results-scroll-container">
@@ -817,11 +817,11 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
       )}
 
       {platformResultsRaw.length > 0 && (
-        <section class="card mt-8" aria-label="Performance trends by comparable cohort">
-          <h2 class="mb-2 text-base font-semibold text-[var(--bb-data-fg-primary)]">Performance Trends by Cohort</h2>
+        <section class="card mt-8" aria-label="Performance trends by comparable ranking">
+          <h2 class="mb-2 text-base font-semibold text-[var(--bb-data-fg-primary)]">Performance Trends by Ranking</h2>
           <p class="mb-4 text-sm text-[var(--bb-data-fg-muted)]">
-            Trend cohorts never mix benchmark, scale, phase, or metric. Charts require at least {MIN_TREND_OBSERVATIONS} observations;
-            smaller cohorts stay visible as sparse-data states.
+            Trend rankings never mix benchmark, scale, phase, or metric. Charts require at least {MIN_TREND_OBSERVATIONS} observations;
+            smaller rankings stay visible as sparse-data states.
           </p>
           {trendCohorts.length === 0 && sparseTrendCohorts.length === 0 ? (
             <p class="text-sm text-[var(--bb-data-fg-subtle)] italic">
@@ -848,7 +848,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                   <p class="mt-1 text-sm text-[var(--bb-data-fg-muted)]">
                     {`Limited observations: ${cohort.observationCount} published ${
                       cohort.observationCount === 1 ? "run" : "runs"
-                    } in this comparable cohort. Trend chart hidden until at least ${MIN_TREND_OBSERVATIONS} observations exist.`}
+                    } in this comparable ranking. Trend chart hidden until at least ${MIN_TREND_OBSERVATIONS} observations exist.`}
                   </p>
                   <p class="mt-1 text-xs text-[var(--bb-data-fg-subtle)]">Metric: {cohort.metricDescription}.</p>
                 </section>

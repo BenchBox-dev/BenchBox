@@ -344,31 +344,31 @@ export function Home(_: RoutableProps) {
           <div class="max-w-4xl">
             <h1 class="text-2xl font-bold sm:text-4xl">BenchBox Database Leaderboards</h1>
             <p class="mt-2 max-w-3xl text-sm text-[var(--bb-fg-muted)] sm:mt-3 sm:text-lg">
-              Reproducible OLAP benchmark rankings from rankable leaderboard cohorts, with public corpus browse below.
+              Reproducible OLAP benchmark rankings, with public corpus browse below.
             </p>
           </div>
 
           {filteredMetaLeaderboard && (
             <ActiveLeaderboardSummary
-              benchmark={summarizeSelection(benchmarkFilters, "All leaderboard cohorts", humanizeBenchmark)}
-              scaleFactor={summarizeSelection(scaleFilters, "All cohort scales", (value) => `SF ${value}`)}
-              phase={phaseFilter === "all" ? "All cohort phases" : phaseFilter}
+              benchmark={summarizeSelection(benchmarkFilters, "All benchmarks", humanizeBenchmark)}
+              scaleFactor={summarizeSelection(scaleFilters, "All scales", (value) => `SF ${value}`)}
+              phase={phaseFilter === "all" ? "All phases" : phaseFilter}
               activeFacets={activeFacetSummaries}
             />
           )}
 
-          {/* Cohort selector renders above the matrix so users can change
+          {/* Ranking selector renders above the matrix so users can change
               benchmark/scale/phase context without scrolling past the
               matrix to find the controls. */}
           {filteredMetaLeaderboard && (
             <section
-              aria-label="Leaderboard cohort selector"
+              aria-label="Leaderboard ranking selector"
               class="mt-3 rounded-lg border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] p-2 sm:mt-5 sm:p-3"
             >
               <div class="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <MultiSelectFilter
-                  label="Cohort benchmark"
-                  allLabel="All leaderboard cohorts"
+                  label="Benchmark"
+                  allLabel="All benchmarks"
                   options={benchmarkOptions}
                   current={benchmarkFilters}
                   onSelect={(value) =>
@@ -381,8 +381,8 @@ export function Home(_: RoutableProps) {
                   description={benchmarkFilterDescription(publicBenchmarksOutsideLeaderboard)}
                 />
                 <MultiSelectFilter
-                  label="Cohort scale"
-                  allLabel="All cohort scales"
+                  label="Scale"
+                  allLabel="All scales"
                   options={scaleOptions}
                   current={scaleFilters}
                   onSelect={(value) =>
@@ -394,11 +394,11 @@ export function Home(_: RoutableProps) {
                   format={(value) => `SF ${value}`}
                 />
                 <SelectFilter
-                  label="Cohort phase"
+                  label="Phase"
                   options={["all", ...phaseOptions]}
                   current={phaseFilter}
                   onSelect={(value) => setFacet("phase", value === "all" ? [] : [value])}
-                  format={(value) => (value === "all" ? "All cohort phases" : value)}
+                  format={(value) => (value === "all" ? "All phases" : value)}
                 />
                 <CoverageSummary />
               </div>
@@ -498,8 +498,8 @@ export function Home(_: RoutableProps) {
           />
           <StatCard
             value={leaderboardCohortCount}
-            label="leaderboard cohorts"
-            detail={`${visibleLeaderboardCohortCount} visible; ${visibleLeaderboardPlatformCount}/${leaderboardEvidencePlatformCount} leaderboard-scope platforms`}
+            label="leaderboard rankings"
+            detail={`${visibleLeaderboardCohortCount} visible; ${visibleLeaderboardPlatformCount}/${leaderboardEvidencePlatformCount} ranked-scope platforms`}
           />
         </section>
 
@@ -551,14 +551,14 @@ export function Home(_: RoutableProps) {
         <div class="grid grid-cols-1 gap-8 sm:grid-cols-2">
           <BrowseSection
             title="Browse Public Benchmark Results"
-            description={`${benchmarks.length.toLocaleString()} public benchmark set(s). Leaderboard filters above include ${leaderboardCohortCount.toLocaleString()} leaderboard-scope cohort(s).`}
+            description={`${benchmarks.length.toLocaleString()} public benchmark set(s). Leaderboard filters above include ${leaderboardCohortCount.toLocaleString()} ranked leaderboard(s).`}
             items={benchmarks}
             hrefFn={(benchmark) => `/results/${benchmark}/`}
             labelFn={formatBenchmarkLabel}
           />
           <BrowseSection
             title="Browse Public Platform Results"
-            description={`${platformIds.length.toLocaleString()} published platform ID(s) in the public corpus, independent of current leaderboard cohort coverage.`}
+            description={`${platformIds.length.toLocaleString()} published platform ID(s) in the public corpus, independent of current leaderboard coverage.`}
             items={platformIds}
             hrefFn={(platformId) => `/results/p/${platformId}/`}
             labelFn={(platformId) => platformIdToName.get(platformId) ?? platformId}
@@ -577,18 +577,18 @@ function HomeLoadingSkeleton() {
           <div class="max-w-4xl">
             <h1 class="text-3xl font-bold sm:text-4xl">BenchBox Database Leaderboards</h1>
             <p class="mt-3 max-w-3xl text-base text-[var(--bb-fg-muted)] sm:text-lg">
-              Reproducible OLAP benchmark rankings from rankable leaderboard cohorts, with public corpus browse below.
+              Reproducible OLAP benchmark rankings, with public corpus browse below.
             </p>
           </div>
 
           <section
-            aria-label="Leaderboard cohort selector"
+            aria-label="Leaderboard ranking selector"
             class="mt-5 rounded-lg border border-[var(--bb-border-default)] bg-[var(--bb-bg-panel)] p-3"
           >
             <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <SkeletonSelect label="Cohort benchmark" />
-              <SkeletonSelect label="Cohort scale" />
-              <SkeletonSelect label="Cohort phase" />
+              <SkeletonSelect label="Benchmark" />
+              <SkeletonSelect label="Scale" />
+              <SkeletonSelect label="Phase" />
               <CoverageSummary />
             </div>
           </section>
@@ -647,9 +647,9 @@ function ActiveLeaderboardSummary({
   activeFacets: ActiveFacetSummary[];
 }) {
   const items = [
-    { label: "Cohort benchmark", value: benchmark },
-    { label: "Cohort scale", value: scaleFactor },
-    { label: "Cohort phase", value: phase },
+    { label: "Benchmark", value: benchmark },
+    { label: "Scale", value: scaleFactor },
+    { label: "Phase", value: phase },
   ];
 
   return (
@@ -710,7 +710,7 @@ function CoverageEmptyState({
           No leaderboard cells match the current filters
         </h2>
         <p class="mt-2 text-sm text-[var(--bb-data-fg-muted)]">
-          The current facet combination removed every published cohort cell.
+          The current facet combination removed every published ranking cell.
         </p>
       </div>
 
@@ -728,7 +728,7 @@ function CoverageEmptyState({
         </dl>
       ) : (
         <p class="mt-5 text-center text-sm text-[var(--bb-data-fg-muted)]">
-          No active facets are applied; the public corpus has no leaderboard cohorts for this view.
+          No active facets are applied; the public corpus has no leaderboard rankings for this view.
         </p>
       )}
 
@@ -788,8 +788,8 @@ function LeaderboardScopeSummary({
 }) {
   const hiddenBenchmarkCopy =
     publicBenchmarksOutsideLeaderboard.length > 0
-      ? `${publicBenchmarksOutsideLeaderboard.length.toLocaleString()} public benchmark ${plural(publicBenchmarksOutsideLeaderboard.length, "has", "have")} results but no leaderboard-scope cohort: ${publicBenchmarksOutsideLeaderboard.map(formatBenchmarkLabel).join(", ")}.`
-      : "Every public benchmark with results has a leaderboard-scope cohort.";
+      ? `${publicBenchmarksOutsideLeaderboard.length.toLocaleString()} public benchmark ${plural(publicBenchmarksOutsideLeaderboard.length, "has", "have")} results but no ranked leaderboard: ${publicBenchmarksOutsideLeaderboard.map(formatBenchmarkLabel).join(", ")}.`
+      : "Every public benchmark with results has a ranked leaderboard.";
   const publicOnlyPlatformCopy =
     publicPlatformIdsOutsideLeaderboard > 0
       ? `${publicPlatformIdsOutsideLeaderboard.toLocaleString()} public platform ${plural(publicPlatformIdsOutsideLeaderboard, "ID is", "IDs are")} outside the current leaderboard scope.`
@@ -807,12 +807,12 @@ function LeaderboardScopeSummary({
     <div class="mt-3 space-y-1 border-t border-[var(--bb-border-default)] pt-3 text-xs text-[var(--bb-fg-muted)]">
       <p>
         Benchmark options cover {leaderboardBenchmarkCount.toLocaleString()} of{" "}
-        {publicBenchmarkCount.toLocaleString()} public coverage benchmark {plural(publicBenchmarkCount, "set", "sets")}.{" "}
+        {publicBenchmarkCount.toLocaleString()} public benchmark {plural(publicBenchmarkCount, "set", "sets")}.{" "}
         {hiddenBenchmarkCopy}
       </p>
       <p>
         Table scope is {visibleLeaderboardPlatformCount.toLocaleString()} of{" "}
-        {leaderboardEvidencePlatformCount.toLocaleString()} leaderboard-scope platforms visible now;{" "}
+        {leaderboardEvidencePlatformCount.toLocaleString()} ranked-scope platforms visible now;{" "}
         {visibleRankedLeaderboardPlatformCount.toLocaleString()} ranked,{" "}
         {visiblePublishedUnrankedPlatformCount.toLocaleString()} published unranked. Full leaderboard scope has{" "}
         {fullLeaderboardPlatformCount.toLocaleString()} platform{" "}
@@ -902,9 +902,9 @@ function summarizeTuningModes(results: readonly ResultRow[]): TuningModeSummary 
 
 function benchmarkFilterDescription(publicBenchmarksOutsideLeaderboard: readonly string[]): string {
   if (publicBenchmarksOutsideLeaderboard.length === 0) {
-    return "Only benchmarks with leaderboard-scope cohorts appear here.";
+    return "Only benchmarks with ranked leaderboards appear here.";
   }
-  return `${publicBenchmarksOutsideLeaderboard.length.toLocaleString()} public benchmark ${plural(publicBenchmarksOutsideLeaderboard.length, "has", "have")} results but no leaderboard-scope cohort: ${publicBenchmarksOutsideLeaderboard.map(formatBenchmarkLabel).join(", ")}.`;
+  return `${publicBenchmarksOutsideLeaderboard.length.toLocaleString()} public benchmark ${plural(publicBenchmarksOutsideLeaderboard.length, "has", "have")} results but no ranked leaderboard: ${publicBenchmarksOutsideLeaderboard.map(formatBenchmarkLabel).join(", ")}.`;
 }
 
 function formatTuningModeOption(value: string): string {
@@ -1036,7 +1036,7 @@ function CoverageSummary() {
       <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--bb-fg-muted)]">Leaderboard scope</div>
       <div class="flex flex-wrap gap-2">
         <span class="rounded-full bg-[var(--bb-bg-elevated)] px-3 py-1.5 text-xs font-medium text-[var(--bb-fg-muted)]">
-          Ranked cohort filters
+          Ranked-only filters
         </span>
         {/* w5 (compare-flow-entrypoints): Home exposes a direct entry point
             into the in-page Compare builder. The builder handles the empty

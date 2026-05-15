@@ -379,8 +379,8 @@ function DuplicateDayTrendState({
   const duplicateRunLabel = duplicateRunCount === 1 ? "same-day run" : "same-day runs";
   const observationLabel = observationCount === 1 ? "observation remains" : "observations remain";
   const message =
-    `Trend line hidden: ${duplicateRunCount} ${duplicateRunLabel} in this cohort do not carry time-of-day ordering. ` +
-    `${observationCount} ${observationLabel} in the cohort; duplicate same-day runs are listed below.`;
+    `Trend line hidden: ${duplicateRunCount} ${duplicateRunLabel} in this ranking do not carry time-of-day ordering. ` +
+    `${observationCount} ${observationLabel} in the ranking; duplicate same-day runs are listed below.`;
   return (
     <div
       data-testid="time-series-duplicate-day"

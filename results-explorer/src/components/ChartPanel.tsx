@@ -835,8 +835,8 @@ function SummaryBoxPanel({
         label={
           suppressWinnerClaims
             ? primaryMetric === "power_score"
-              ? "Highest power score in cohort"
-              : "Lowest geomean in cohort"
+              ? "Highest power score in ranking"
+              : "Lowest geomean in ranking"
             : primaryMetric === "power_score"
               ? "Best power"
               : "Best geomean"
@@ -845,7 +845,7 @@ function SummaryBoxPanel({
           best
             ? `${summaryLabelByResultId.get(best.result_id) ?? best.platform} · ${
                 primaryMetric === "power_score" ? fmtScore(best.power_score) : fmtGeomean(best.display_geomean_ms)
-              }${suppressWinnerClaims ? " (cohort mismatch — not comparable)" : ""}`
+              }${suppressWinnerClaims ? " (ranking mismatch — not comparable)" : ""}`
             : "-"
         }
         title={suppressWinnerClaims ? suppressionReason : undefined}

@@ -68,7 +68,7 @@ export function CostScatter({ summary }: Props) {
   if (pts.length === 0) {
     return (
       <div class="space-y-1 text-sm italic text-[var(--bb-data-fg-subtle)]">
-        <p>No normalized cost data available for this cohort.</p>
+        <p>No normalized cost data available for this ranking.</p>
         <p class="text-xs">{normalizedCostEmptyReason(summary.platforms)}</p>
       </div>
     );
@@ -247,7 +247,7 @@ export function CostScatter({ summary }: Props) {
 }
 
 function normalizedCostEmptyReason(platforms: PlatformRow[]): string {
-  if (platforms.length === 0) return "No platforms are present in the selected cohort.";
+  if (platforms.length === 0) return "No platforms are present in the selected ranking.";
   if (platforms.every((platform) => platform.cost_status === undefined || platform.cost_status === null)) {
     return "These rows predate the normalized_cost contract; rebuild the DuckDB snapshot to emit cost_status and model metadata.";
   }

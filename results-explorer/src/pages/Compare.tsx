@@ -785,8 +785,8 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
         <p class="text-xs font-semibold uppercase tracking-wide text-[var(--bb-data-fg-subtle)]">Compare</p>
         <h1 class="mt-1 text-2xl font-bold text-[var(--bb-data-fg-primary)]">Pick runs to compare</h1>
         <p class="mt-2 text-sm text-[var(--bb-data-fg-muted)]">
-          Select two to four runs from the same benchmark, scale, and phase. The first selection locks the cohort; runs from
-          other cohorts will be disabled with a reason. You never need to edit the URL.
+          Select two to four runs from the same benchmark, scale, and phase. The first selection locks the ranking; runs from
+          other rankings will be disabled with a reason. You never need to edit the URL.
         </p>
       </section>
 
@@ -859,7 +859,7 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
             ? `1 selected. Select 1 more compatible run to launch.${hiddenIncompatibleSuffix(incompatibleHiddenCount)}`
             : `${formatSelectedCount(selectedCount)}. ${
                 cohortLock
-                  ? `Cohort: ${humanizeBenchmark(cohortLock.benchmark)} · SF ${cohortLock.scale_factor}${
+                  ? `Ranking: ${humanizeBenchmark(cohortLock.benchmark)} · SF ${cohortLock.scale_factor}${
                       cohortLock.test_type ? ` · ${cohortLock.test_type}` : ""
                     }`
                   : ""
@@ -900,7 +900,7 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
                   ? `${zeroSelectableReasons[0]!.count} ${zeroSelectableReasons[0]!.copy.shortText.toLowerCase()} row${
                       zeroSelectableReasons[0]!.count === 1 ? "" : "s"
                     }. ${zeroSelectableReasons[0]!.copy.recoveryHint}`
-                  : "The current filters do not expose a comparable run. Clear filters or choose another cohort."}
+                  : "The current filters do not expose a comparable run. Clear filters or choose another ranking."}
               </p>
             </div>
             <button type="button" class="btn btn-secondary shrink-0 text-sm" onClick={clearFilters}>
@@ -946,7 +946,7 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
               const disabledReason = comparisonExclusion !== null
                 ? comparisonExclusion
                 : !compatible
-                ? `Different cohort from selection (${cohortLock?.benchmark}/SF${cohortLock?.scale_factor}${cohortLock?.test_type ? `/${cohortLock.test_type}` : ""})`
+                ? `Different ranking from selection (${cohortLock?.benchmark}/SF${cohortLock?.scale_factor}${cohortLock?.test_type ? `/${cohortLock.test_type}` : ""})`
                 : selectedCount >= MAX_COMPARE_SELECTIONS && !isSelected
                 ? `Up to ${MAX_COMPARE_SELECTIONS} runs can be compared`
                 : "";

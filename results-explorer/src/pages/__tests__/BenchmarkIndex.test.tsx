@@ -657,7 +657,7 @@ describe("BenchmarkIndex", () => {
     const callout = screen.getByTestId("benchmark-zero-selectable");
     expect(callout.textContent).toContain("No selectable compare rows");
     expect(callout.textContent).toContain("insufficient query coverage");
-    expect(within(callout).getByRole("link", { name: "Choose another cohort" })).toHaveAttribute(
+    expect(within(callout).getByRole("link", { name: "Choose another ranking" })).toHaveAttribute(
       "href",
       "/results/compare",
     );

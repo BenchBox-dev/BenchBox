@@ -120,14 +120,14 @@ function benchmarkCompareGuidanceMessage(
   scaleFactor: string,
   phase: string,
 ): string {
-  const cohort = `${title} SF ${scaleFactor} ${phase}`;
+  const ranking = `${title} SF ${scaleFactor} ${phase}`;
   if (selectedCount === 0) {
-    return `Select two or more platforms from the same ${cohort} cohort to compare. Benchmark, scale, phase, metric, and unit stay fixed on this page.`;
+    return `Select two or more platforms from the same ${ranking} ranking to compare. Benchmark, scale, phase, metric, and unit stay fixed on this page.`;
   }
   if (selectedCount === 1) {
-    return `1 result selected in ${cohort}. Select one more result from this cohort to enable Compare.`;
+    return `1 result selected in ${ranking}. Select one more result from this ranking to enable Compare.`;
   }
-  return `${selectedCount} results selected in ${cohort}. The sticky tray opens Compare with the same benchmark, scale, and phase contract.`;
+  return `${selectedCount} results selected in ${ranking}. The sticky tray opens Compare with the same benchmark, scale, and phase contract.`;
 }
 
 function isResultTimingDisplayable(row: ResultRow): boolean {
@@ -650,11 +650,11 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
                   ? `${zeroSelectableReasons[0]!.count} ${zeroSelectableReasons[0]!.copy.shortText.toLowerCase()} row${
                       zeroSelectableReasons[0]!.count === 1 ? "" : "s"
                     }. ${zeroSelectableReasons[0]!.copy.recoveryHint}`
-                  : "This benchmark cohort does not expose a comparable run. Choose another cohort in the Compare builder."}
+                  : "This ranking does not expose a comparable run. Choose another ranking in the Compare builder."}
               </p>
             </div>
             <a href="/results/compare" class="btn btn-secondary shrink-0 text-sm no-underline">
-              Choose another cohort
+              Choose another ranking
             </a>
           </div>
         </section>
@@ -863,7 +863,7 @@ function RankGateNotice({
         {benchmark} SF {scaleFactor} {phase} is not published as a leaderboard because {reason}
       </p>
       <p class="mt-2 text-xs text-[var(--bb-data-fg-subtle)]">
-        Timing evidence and receipts remain available, but BenchBox will not rank this cohort.
+        Timing evidence and receipts remain available, but BenchBox will not publish a ranking here.
       </p>
     </section>
   );

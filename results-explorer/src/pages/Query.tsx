@@ -735,7 +735,7 @@ export function Query(_: RoutableProps) {
                       >
                         <span>
                           {compareSelectedIds.size === 0
-                            ? "Select two or more rows to compare. The first pick locks the cohort."
+                            ? "Select two or more rows to compare. The first pick locks the ranking."
                             : compareSelectedIds.size === 1
                               ? `1 result selected — pick a compatible second row to enable Compare.${hiddenIncompatibleSuffix(compareIncompatibleHiddenCount)}`
                               : compareSelectedIds.size >= MAX_COMPARE_SELECTIONS
@@ -804,7 +804,7 @@ export function Query(_: RoutableProps) {
                                   ? `${zeroSelectableReasons[0]!.count} ${zeroSelectableReasons[0]!.copy.shortText.toLowerCase()} row${
                                       zeroSelectableReasons[0]!.count === 1 ? "" : "s"
                                     }. ${zeroSelectableReasons[0]!.copy.recoveryHint}`
-                                  : "The current filters do not expose a comparable run. Clear filters or choose another cohort."}
+                                  : "The current filters do not expose a comparable run. Clear filters or choose another ranking."}
                               </p>
                             </div>
                             <button type="button" class="btn btn-secondary shrink-0 text-sm" onClick={resetQueryFilters}>

@@ -684,8 +684,8 @@ describe("ChartPanel", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Summary Box" }));
     expect(screen.getByText("Best geomean")).toBeTruthy();
-    expect(screen.queryByText(/Lowest geomean in cohort/)).toBeNull();
-    expect(screen.queryByText(/cohort mismatch/)).toBeNull();
+    expect(screen.queryByText(/Lowest geomean in ranking/)).toBeNull();
+    expect(screen.queryByText(/ranking mismatch/)).toBeNull();
   });
 
   it("suppresses winner language in the summary box when suppressWinnerClaims is on (w18)", () => {
@@ -701,7 +701,7 @@ describe("ChartPanel", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Summary Box" }));
     expect(screen.queryByText("Best geomean")).toBeNull();
-    expect(screen.getByText("Lowest geomean in cohort")).toBeTruthy();
-    expect(screen.getByText(/cohort mismatch — not comparable/)).toBeTruthy();
+    expect(screen.getByText("Lowest geomean in ranking")).toBeTruthy();
+    expect(screen.getByText(/ranking mismatch — not comparable/)).toBeTruthy();
   });
 });
