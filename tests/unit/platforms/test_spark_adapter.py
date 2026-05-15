@@ -164,6 +164,8 @@ class TestSparkAdapter:
 
     def test_from_config(self, mock_pyspark):
         """Test adapter creation from config."""
+        from benchbox.cli.platform_hooks import PlatformHookRegistry
+        from benchbox.core.platform_config import get_platform_config
         from benchbox.platforms.spark import SparkAdapter
 
         config = {
@@ -189,6 +191,15 @@ class TestSparkAdapter:
 
         assert joinorder_adapter.broadcast_threshold == -1
         assert joinorder_adapter._get_spark_conf()["spark.sql.autoBroadcastJoinThreshold"] == "-1"
+
+        database_config = PlatformHookRegistry.build_database_config(
+            "spark", {}, {"benchmark": "joinorder", "scale_factor": 1.0}
+        )
+        platform_config = get_platform_config(database_config, None, benchmark_name="joinorder", scale_factor=1.0)
+        hook_adapter = SparkAdapter.from_config(platform_config)
+
+        assert hook_adapter.broadcast_threshold == -1
+        assert hook_adapter._get_spark_conf()["spark.sql.autoBroadcastJoinThreshold"] == "-1"
 
         explicit_broadcast_adapter = SparkAdapter.from_config(
             {

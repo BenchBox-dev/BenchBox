@@ -346,9 +346,10 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
                 adapter_config[key] = config[key]
 
         spark_config = adapter_config.get("spark_config") or {}
+        broadcast_threshold = adapter_config.get("broadcast_threshold")
         if (
             benchmark_name == "joinorder"
-            and "broadcast_threshold" not in adapter_config
+            and broadcast_threshold is None
             and _SPARK_AUTO_BROADCAST_THRESHOLD not in spark_config
         ):
             adapter_config["broadcast_threshold"] = -1

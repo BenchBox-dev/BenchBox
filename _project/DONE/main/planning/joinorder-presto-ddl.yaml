@@ -1,0 +1,64 @@
+id: joinorder-presto-ddl
+title: "Canonical JoinOrder DDL failure on Presto"
+worktree: main
+priority: Medium
+status: Completed
+completed_date: "2026-05-15"
+category: Platform Compatibility
+
+description: |
+  Canonical JoinOrder SF=1 UAT on Presto fails during schema creation before
+  data load or query execution because the canonical table DDL emits
+  `PRIMARY KEY`, which Presto rejects. The remediation for this item is the DDL
+  rewrite that lets Presto create the canonical JoinOrder tables; full supported
+  matrix eligibility remains governed by separate canonical UAT evidence.
+
+  Evidence:
+    /Users/joe/Developer/benchmark_runs/logs/uat_joinorder_canonical_corpus_20260512/presto_joinorder_1.0_20260512_224026.log
+
+  Failure signature:
+    PrestoUserError(type=USER_ERROR, name=SYNTAX_ERROR, message="line 1:38:
+    mismatched input 'PRIMARY'. Expecting: ')', ','")
+
+work:
+- id: w1
+  summary: "Remove Presto-incompatible PRIMARY KEY metadata"
+  status: done
+  notes: |
+    Presto rejects benchmark `CREATE TABLE` statements that contain inline
+    `PRIMARY KEY` metadata. The adapter now strips those constraints before the
+    existing memory/Hive catalog rewrites run, preserving the column definitions
+    while removing metadata that BenchBox does not use for loading immutable
+    benchmark data.
+
+- id: w2
+  summary: "Keep DDL governance aligned with runtime behavior"
+  needs: [w1]
+  status: done
+  notes: |
+    The Presto DDL optimization registry entry now documents the PRIMARY KEY
+    strip alongside the existing memory catalog and Hive format rewrites.
+
+- id: w3
+  summary: "Cover canonical JoinOrder DDL and Presto catalog variants"
+  needs: [w1, w2]
+  status: done
+  notes: |
+    Unit coverage verifies memory and Hive catalog rewrites, confirms inline
+    PRIMARY KEY metadata is removed, and checks that all 21 canonical JoinOrder
+    table DDL statements are optimized without PRIMARY KEY or FOREIGN KEY text.
+
+verification:
+- description: "Presto DDL rewrite regression coverage passes"
+  command: "uv run -- python -m pytest tests/unit/platforms/test_presto_adapter.py -q"
+  expected_output: "passes"
+- description: "TODO graph remains valid after moving this item to DONE"
+  command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph && uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate _project/DONE/main/planning/joinorder-presto-ddl.yaml"
+  expected_output: "passes"
+
+metadata:
+  tags:
+    - joinorder
+    - presto
+    - canonical-imdb-2013
+  created_date: "2026-05-12"
