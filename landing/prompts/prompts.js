@@ -131,13 +131,18 @@
             pool = platformsForFilters(state["interface"], state.deployment);
         }
 
+        if (state.goal === "compare" && pool.length < 2) {
+            state.goal = defaults.goal;
+        }
+
         if (state.goal === "compare") {
             var pair = deriveCompareDefaults(Object.assign({}, raw, state));
             state.platformA = pair[0];
             state.platformB = pair[1];
             state.platform = undefined;
         } else {
-            var p = raw.platform && pool.some(function (pp) { return pp.id === raw.platform; }) ? raw.platform : (pool[0] && pool[0].id) || defaults.platform;
+            var preferredPlatform = raw.platform || defaults.platform;
+            var p = preferredPlatform && pool.some(function (pp) { return pp.id === preferredPlatform; }) ? preferredPlatform : (pool[0] && pool[0].id) || defaults.platform;
             state.platform = p;
             state.platformA = undefined;
             state.platformB = undefined;
@@ -186,9 +191,19 @@
             ? renderTemplate(catalog.templates.cli.compare, { platform_a: platform, platform_b: platformB, benchmark: state.benchmark, scale: state.scale }) + compareTypeFlag
             : renderTemplate(catalog.templates.cli.test_one, { platform: platform, benchmark: state.benchmark, scale: state.scale }) + modeFlag;
 
-        var depCheck = renderTemplate(catalog.templates.cli.dependency_check, { platform: platform });
-        var depCheckB = isCompare ? renderTemplate(catalog.templates.cli.dependency_check, { platform: platformB }) : null;
-        var dryRun = cliCmd + " --dry-run";
+        var depChecks = dependencyCommands(selectedEntries);
+        var dryRun = renderTemplate(catalog.templates.cli.dry_run, {
+            dry_run_dir: dryRunDir(platform),
+            platform: platform,
+            benchmark: state.benchmark,
+            scale: state.scale
+        }) + modeFlag;
+        var dryRunB = isCompare ? renderTemplate(catalog.templates.cli.dry_run, {
+            dry_run_dir: dryRunDir(platformB),
+            platform: platformB,
+            benchmark: state.benchmark,
+            scale: state.scale
+        }) + modeFlag : null;
 
         // MCP setup block
         var mcpTomlLines = [
@@ -202,7 +217,7 @@
         if (state.surface === "mcp") {
             $("prompt-text").textContent = buildMcpPrompt(state, platform, platformB, platformEntry, platformBEntry, benchmarkEntry, needsCredentials);
         } else {
-            $("prompt-text").textContent = buildAgentPrompt(state, platform, platformB, platformEntry, platformBEntry, benchmarkEntry, cliCmd, dryRun, depCheck, depCheckB, needsCredentials);
+            $("prompt-text").textContent = buildAgentPrompt(state, platform, platformB, platformEntry, platformBEntry, benchmarkEntry, cliCmd, dryRun, dryRunB, depChecks, needsCredentials);
         }
 
         // Visibility rules:
@@ -227,6 +242,10 @@
     }
 
     function platformLabel(entry) { return entry ? (entry.label || entry.id) : "the selected platform"; }
+
+    function dryRunDir(platform) {
+        return "/tmp/benchbox-dryrun-" + String(platform).replace(/[^A-Za-z0-9_.-]/g, "-");
+    }
 
     function renderTemplate(tpl, vars) {
         return tpl.replace(/\{([a-z_]+)\}/g, function (_, k) {
@@ -264,18 +283,39 @@
         return commands;
     }
 
+    function dependencyCommands(entries) {
+        var commands = [];
+        entries.forEach(function (entry) {
+            if (!entry || !entry.dependency_check_command) return;
+            if (commands.indexOf(entry.dependency_check_command) === -1) commands.push(entry.dependency_check_command);
+        });
+        return commands;
+    }
+
+    function dependencyCheckPlatforms(entries) {
+        var platforms = [];
+        entries.forEach(function (entry) {
+            if (!entry || !entry.dependency_check_platform) return;
+            if (platforms.indexOf(entry.dependency_check_platform) === -1) platforms.push(entry.dependency_check_platform);
+        });
+        return platforms;
+    }
+
     function buildMcpPrompt(state, platform, platformB, platformEntry, platformBEntry, benchmarkEntry, needsCredentials) {
         var isCompare = state.goal === "compare";
         var mcpToolName = catalog.mcp.run_tool;
         var mcpPromptName = isCompare ? catalog.mcp.prompts.compare_platforms : catalog.mcp.prompts.benchmark_run;
+        var dependencyPlatforms = dependencyCheckPlatforms([platformEntry, platformBEntry]);
         if (isCompare) {
             var compareLines = [
                 "Use the BenchBox MCP server to compare " + platformLabel(platformEntry) + " and " + platformLabel(platformBEntry) + ".",
                 "Steps:",
                 "  1. Call the `" + catalog.mcp.list_tool + "` tool to confirm both platforms are available.",
-                "  2. Use the `" + mcpPromptName + "` prompt with benchmark=" + state.benchmark + ", platforms=\"" + platform + "," + platformB + "\", scale_factor=" + state.scale + ".",
-                "  3. Run the `" + mcpToolName + "` tool for each platform with the same benchmark and scale.",
-                "  4. Summarise total runtime, per-query timing, and any failures."
+                renderMcpDependencyStep("2", dependencyPlatforms, "selection"),
+                "  3. Call `" + mcpToolName + "` for each platform with benchmark=" + state.benchmark + ", scale_factor=" + state.scale + ", dry_run=true" + (state["interface"] === "dataframe" ? ", mode=\"dataframe\"" : "") + ". Inspect both plans.",
+                "  4. Use the `" + mcpPromptName + "` prompt with benchmark=" + state.benchmark + ", platforms=\"" + platform + "," + platformB + "\", scale_factor=" + state.scale + ".",
+                "  5. Run the `" + mcpToolName + "` tool for each platform with the same benchmark and scale.",
+                "  6. Summarise total runtime, per-query timing, and any failures."
             ];
             if (needsCredentials) appendDeploymentSafetyLines(compareLines, [platformEntry, platformBEntry], state.deployment);
             compareLines.push(needsCredentials ? "  • Stop and ask the user if credentials or config are missing — do not request secrets in chat." : "");
@@ -285,16 +325,31 @@
             "Use the BenchBox MCP server to run " + (benchmarkEntry ? benchmarkEntry.label : state.benchmark) + " on " + platformLabel(platformEntry) + ".",
             "Steps:",
             "  1. Call the `" + catalog.mcp.list_tool + "` tool to confirm the platform is installed.",
-            "  2. Use the `" + mcpPromptName + "` prompt with platform=" + platform + ", benchmark=" + state.benchmark + ", scale_factor=" + state.scale + ".",
-            "  3. Run the `" + mcpToolName + "` tool with the same arguments.",
-            "  4. Summarise total runtime and any failures."
+            renderMcpDependencyStep("2", dependencyPlatforms, "platform"),
+            "  3. Use the `" + mcpPromptName + "` prompt with platform=" + platform + ", benchmark=" + state.benchmark + ", scale_factor=" + state.scale + ".",
+            "  4. Call `" + mcpToolName + "` with platform=" + platform + ", benchmark=" + state.benchmark + ", scale_factor=" + state.scale + ", dry_run=true" + (state["interface"] === "dataframe" ? ", mode=\"dataframe\"" : "") + ". Inspect the plan.",
+            "  5. Run the `" + mcpToolName + "` tool with the same arguments and dry_run=false.",
+            "  6. Summarise total runtime and any failures."
         ];
         if (needsCredentials) appendDeploymentSafetyLines(lines, [platformEntry], state.deployment);
         lines.push(needsCredentials ? "  • Stop and ask the user if credentials or config are missing — do not request secrets in chat." : "");
         return lines.filter(Boolean).join("\n");
     }
 
-    function buildAgentPrompt(state, platform, platformB, platformEntry, platformBEntry, benchmarkEntry, cliCmd, dryRun, depCheck, depCheckB, needsCredentials) {
+    function renderMcpDependencyStep(stepNumber, platforms, fallbackScope) {
+        if (platforms.length > 0) {
+            return "  " + stepNumber + ". Call " + renderMcpDependencyChecks(platforms) + ". Stop and report if anything is missing.";
+        }
+        return "  " + stepNumber + ". No optional connector dependency check is registered for this " + fallbackScope + "; confirm the install step completed successfully.";
+    }
+
+    function renderMcpDependencyChecks(platforms) {
+        return platforms.map(function (platform) {
+            return "`check_dependencies(platform=\"" + platform + "\")`";
+        }).join(" and ");
+    }
+
+    function buildAgentPrompt(state, platform, platformB, platformEntry, platformBEntry, benchmarkEntry, cliCmd, dryRun, dryRunB, depChecks, needsCredentials) {
         var pretty = benchmarkEntry ? benchmarkEntry.label : state.benchmark;
         var lines = [];
         if (state.goal === "compare") {
@@ -306,8 +361,12 @@
         lines.push("Steps:");
         var installs = installCommands([platformEntry, platformBEntry]);
         lines.push("  1. Install dependencies: `" + installs.join("` and `") + "`.");
-        lines.push("  2. Check dependencies: `" + depCheck + "`" + (depCheckB ? " and `" + depCheckB + "`" : "") + ". Stop and report if anything is missing.");
-        lines.push("  3. Dry run first: `" + dryRun + "`. Inspect the plan.");
+        if (depChecks.length > 0) {
+            lines.push("  2. Check dependencies: `" + depChecks.join("` and `") + "`. Stop and report if anything is missing.");
+        } else {
+            lines.push("  2. Check dependencies: no optional connector check is registered for this selection; confirm the install command completed successfully.");
+        }
+        lines.push("  3. Dry run first: `" + dryRun + "`" + (dryRunB ? " and `" + dryRunB + "`" : "") + ". Inspect the plan" + (dryRunB ? "s" : "") + ".");
         if (needsCredentials) {
             lines.push("  4. Make sure platform connection credentials/config are set outside this conversation (env vars, config files). Do NOT ask me to paste secrets here.");
             lines.push("  5. Once credentials are confirmed, run live: `" + cliCmd + "`.");

@@ -10,7 +10,7 @@
 # - `deployments[].id` must be in {local, self-hosted, managed}
 # - `mcp.run_tool`, `mcp.list_tool`, `mcp.prompts.*` must reference real
 #   MCP tools/prompts registered in benchbox/mcp/
-# - the compare CLI template must include two `-p` flags
+# - the compare CLI template must include two `--platform` flags
 
 defaults:
   goal: test_one
@@ -61,14 +61,14 @@ scales:
   - "10.0"
 
 # Command templates rendered into copyable blocks. Validator checks the
-# compare template uses two `-p` flags so the page never emits a malformed
-# compare command.
+# compare template uses two `--platform` flags so the page never emits a
+# malformed compare command.
 templates:
   cli:
-    test_one: "uv run benchbox run -p {platform} -b {benchmark} -s {scale}"
-    compare: "uv run benchbox compare -p {platform_a} -p {platform_b} -b {benchmark} -s {scale}"
-    dependency_check: "uv run benchbox check-dependencies {platform}"
-    dry_run: "uv run benchbox run -p {platform} -b {benchmark} -s {scale} --dry-run"
+    test_one: "uv run benchbox run --platform {platform} --benchmark {benchmark} --scale {scale}"
+    compare: "uv run benchbox compare --platform {platform_a} --platform {platform_b} --benchmark {benchmark} --scale {scale}"
+    dependency_check: "uv run benchbox check-deps --platform {platform}"
+    dry_run: "uv run benchbox run --dry-run {dry_run_dir} --platform {platform} --benchmark {benchmark} --scale {scale}"
 
 # References to existing MCP surfaces. The generator validates each name
 # resolves to a real tool/prompt in benchbox/mcp/.
