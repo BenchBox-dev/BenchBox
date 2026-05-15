@@ -472,6 +472,58 @@ describe("Home", () => {
     expect(within(summary).queryByText(/^Benchmarks$/)).toBeNull();
   });
 
+  it("renders singular Corpus Summary labels when the count is one", async () => {
+    const singleCohort = COHORT_ROWS.filter((row) => row.cohort_key === "tpch-sf1-power");
+    const singleResultRow = RESULT_ROWS.filter((row) => row.result_id === "r3");
+    const singleMetaLeaderboard = [{ platform_id: "duckdb", platform: "DuckDB", avg_rank: 1, n_cohorts: 1 }];
+    vi.mocked(queryRows).mockImplementation(async (sql: string) => {
+      const s = String(sql).replace(/\s+/g, " ").trim();
+      if (s.includes("FROM bench.results")) return singleResultRow;
+      if (s.startsWith("SELECT platform_id, platform, avg_rank, n_cohorts FROM bench.meta_leaderboard")) {
+        return singleMetaLeaderboard;
+      }
+      if (s.includes("FROM bench.cohort_metadata")) return singleCohort;
+      return [];
+    });
+
+    render(<Home />);
+    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+
+    const summary = screen.getByRole("region", { name: "Corpus summary" });
+    expect(within(summary).getByText("public result bundle")).toBeTruthy();
+    expect(within(summary).queryByText("public result bundles")).toBeNull();
+    expect(within(summary).getByText("platform with public results")).toBeTruthy();
+    expect(within(summary).queryByText("platforms with public results")).toBeNull();
+    expect(within(summary).getByText("leaderboard ranking")).toBeTruthy();
+    expect(within(summary).queryByText("leaderboard rankings")).toBeNull();
+    expect(
+      screen.getByText("1 public benchmark set. Leaderboard filters above include 1 ranked leaderboard."),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("1 published platform ID in the public corpus, independent of current leaderboard coverage."),
+    ).toBeTruthy();
+  });
+
+  it("renders plural Corpus Summary labels when no leaderboard rankings exist", async () => {
+    vi.mocked(queryRows).mockImplementation(async (sql: string) => {
+      const s = String(sql).replace(/\s+/g, " ").trim();
+      if (s.includes("FROM bench.results")) return RESULT_ROWS;
+      if (s.startsWith("SELECT platform_id, platform, avg_rank, n_cohorts FROM bench.meta_leaderboard")) {
+        return META_LEADERBOARD_ROWS;
+      }
+      if (s.includes("FROM bench.cohort_metadata")) return [];
+      return [];
+    });
+
+    render(<Home />);
+    await waitFor(() => expect(screen.getByText("Recent Results")).toBeTruthy());
+
+    const summary = screen.getByRole("region", { name: "Corpus summary" });
+    // 0 cohorts must read as "0 leaderboard rankings", not "0 leaderboard ranking".
+    expect(within(summary).getByText("leaderboard rankings")).toBeTruthy();
+    expect(within(summary).queryByText(/^leaderboard ranking$/)).toBeNull();
+  });
+
   it("states leaderboard cohort scope separately from public browse scope", async () => {
     render(<Home />);
     await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
@@ -483,7 +535,7 @@ describe("Home", () => {
     expect(screen.getAllByText(/1 of 4 public results is not labelled for tuning/).length).toBeGreaterThan(0);
     expect(screen.getByRole("heading", { name: "Browse Public Benchmark Results" })).toBeTruthy();
     expect(
-      screen.getByText("3 public benchmark set(s). Leaderboard filters above include 2 ranked leaderboard(s)."),
+      screen.getByText("3 public benchmark sets. Leaderboard filters above include 2 ranked leaderboards."),
     ).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Browse Public Platform Results" })).toBeTruthy();
   });
