@@ -66,6 +66,21 @@ describe("read-model version guard", () => {
     ).rejects.not.toThrow(/read-model v0/);
   });
 
+  it("does not mask generic catalog metadata failures as stale v0", async () => {
+    const conn = {
+      async query(_sql: string): Promise<QueryResult> {
+        throw new Error("Catalog Error: failed to load database metadata block");
+      },
+    };
+
+    await expect(
+      _verifyReadModelVersionForTest(conn as unknown as Parameters<typeof _verifyReadModelVersionForTest>[0]),
+    ).rejects.toThrow(/failed to load database metadata block/);
+    await expect(
+      _verifyReadModelVersionForTest(conn as unknown as Parameters<typeof _verifyReadModelVersionForTest>[0]),
+    ).rejects.not.toThrow(/read-model v0/);
+  });
+
   it("rejects an older read-model version with a humane dev remediation message", async () => {
     const conn = makeConn(0);
     await expect(

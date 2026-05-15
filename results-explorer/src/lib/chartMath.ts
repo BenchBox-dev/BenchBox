@@ -332,7 +332,7 @@ export function perQuerySpeedup(validMs: number[]): number | null {
 
 // ---------------------------------------------------------------------------
 // Geometric mean
-// Python reference: benchbox/core/explorer_pipeline/transformer.py
+// Python reference: _project/scripts/explorer_pipeline/transformer.py
 //   _display_geomean_ms: math.exp(sum(math.log(v) for v in values) / len(values))
 // ---------------------------------------------------------------------------
 
@@ -419,7 +419,7 @@ export function computeECDFPoints(values: (number | null)[]): { x: number; y: nu
 
 // ---------------------------------------------------------------------------
 // Percentile computation
-// Python reference: benchbox/core/explorer_pipeline/transformer.py
+// Python reference: _project/scripts/explorer_pipeline/transformer.py
 //   _compute_percentile - mirrors textcharts.percentile_ladder.compute_percentile
 // ---------------------------------------------------------------------------
 

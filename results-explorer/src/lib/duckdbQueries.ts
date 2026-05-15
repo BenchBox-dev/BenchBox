@@ -1022,7 +1022,7 @@ async function loadMetaLeaderboardData(): Promise<MetaLeaderboard | null> {
  * ranking rows. The canonical source is the pipeline-written
  * `bench.benchmark_rankings.primary_metric` column - there is deliberately no
  * TypeScript-side family mirror here so the registry cannot drift from
- * `RANKING_METRIC_BY_FAMILY` in `benchbox/core/explorer_pipeline/models.py`.
+ * `RANKING_METRIC_BY_FAMILY` in `_project/scripts/explorer_pipeline/models.py`.
  *
  * Falls back to `"display_geomean_ms"` only when the benchmark has no rows
  * yet (empty corpus), matching Python's `_DEFAULT_RANKING`.

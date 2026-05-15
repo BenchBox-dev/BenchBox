@@ -162,8 +162,7 @@ async function readSnapshotReadModelVersion(conn: DuckDBConnection): Promise<num
 function isMissingReadModelMetadataError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return (
-    /Table with name metadata does not exist/i.test(message) ||
-    /Catalog Error:.*metadata/i.test(message) ||
+    /Table with name "?metadata"? does not exist/i.test(message) ||
     /Referenced column "?read_model_version"? not found/i.test(message) ||
     /Binder Error:.*read_model_version/i.test(message)
   );
