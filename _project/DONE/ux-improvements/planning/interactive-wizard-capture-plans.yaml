@@ -2,7 +2,7 @@ id: interactive-wizard-capture-plans
 title: "Add --capture-plans option to interactive wizard"
 worktree: ux-improvements
 priority: Medium
-status: Not Started
+status: Completed
 description: |
   The CLI supports `--capture-plans` for capturing query execution plans during
   benchmark runs (3-8% overhead). This is useful for:

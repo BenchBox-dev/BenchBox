@@ -2,7 +2,7 @@ id: interactive-wizard-platform-options
 title: "Add --platform-option support to interactive wizard"
 worktree: ux-improvements
 priority: Low
-status: Not Started
+status: Completed
 description: |
   The CLI supports `--platform-option key=value` for platform-specific configuration
   (connection strings, authentication, cluster settings, etc.). This is currently a

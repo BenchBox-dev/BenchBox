@@ -2,7 +2,7 @@ id: interactive-wizard-dry-run-support
 title: "Add --dry-run option to interactive wizard with run summary"
 worktree: ux-improvements
 priority: Critical
-status: Not Started
+status: Completed
 description: |
   The `--dry-run` CLI option allows users to preview benchmark configuration without
   execution. This critical feature is not accessible from the interactive wizard.

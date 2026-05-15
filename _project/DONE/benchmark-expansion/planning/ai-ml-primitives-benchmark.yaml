@@ -3,7 +3,7 @@ title: AI/ML Primitives Benchmark - SQL-Based AI Functions
 worktree: benchmark-expansion
 category: Benchmark Development
 priority: Medium-High
-status: Not Started
+status: Completed
 description: 'Create a new AI/ML Primitives benchmark to test cross-platform SQL-based AI/ML
 
   functions. This benchmark covers built-in AI functions that execute within the

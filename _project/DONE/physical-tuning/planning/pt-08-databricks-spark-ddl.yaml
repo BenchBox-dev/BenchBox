@@ -7,7 +7,7 @@ id: pt-08-databricks-spark-ddl
 title: "PT-08: Spark Family Physical Tuning DDL Generator (All Platforms)"
 worktree: "physical-tuning"
 priority: "Medium"
-status: "Not Started"
+status: "Completed"
 category: "Platform Expansion"
 
 description: |

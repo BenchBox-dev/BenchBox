@@ -3,7 +3,7 @@ title: DataFusion DataFrame Adapter Implementation
 worktree: dataframe-expansion
 category: Platform Enhancement
 priority: Medium
-status: Not Started
+status: Completed
 description: 'Implement a DataFusion DataFrame adapter for BenchBox, enabling TPC-H benchmark
 
   execution using DataFusion''s Python bindings. DataFusion belongs to the Expression

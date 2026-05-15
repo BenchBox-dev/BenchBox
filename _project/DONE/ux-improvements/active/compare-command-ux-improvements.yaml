@@ -3,7 +3,7 @@ title: Compare Command UX Improvements
 worktree: ux-improvements
 category: Usability
 priority: High
-status: In Progress
+status: Completed
 description: |
   Address two UX issues with the `benchbox compare` command:
 

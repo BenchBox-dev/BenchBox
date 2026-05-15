@@ -3,7 +3,7 @@ title: Fix TPC-DS Optional Dependency Example Test
 worktree: testing-improvements
 category: Pre-Release High Priority Tasks (Should-Fix Before Release)
 priority: Low
-status: Identified
+status: Completed
 description: 'Single example test fails when TPC-DS source files are not installed in benchbox/_sources/tpc-ds/tools. The
   test should gracefully skip when optional TPC-DS binaries are unavailable, matching the pattern used for other optional
   dependencies.

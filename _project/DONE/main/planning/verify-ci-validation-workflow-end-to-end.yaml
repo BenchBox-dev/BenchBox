@@ -2,7 +2,7 @@ id: verify-ci-validation-workflow-end-to-end
 title: "Verify the validate-submission CI workflow end-to-end with a real PR"
 worktree: main
 priority: Critical
-status: Not Started
+status: Completed
 category: Testing and Quality Assurance
 
 deps:

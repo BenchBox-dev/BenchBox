@@ -3,7 +3,7 @@ title: Add Time Series Benchmark Suite (TSBS) Implementation
 worktree: benchmark-expansion
 category: Core Functionality
 priority: Medium
-status: In Progress
+status: Completed
 description: '"Implement Time Series Benchmark Suite (TSBS) benchmarks based on https://github.com/timescale/tsbs for time-series
   database performance testing, creating two distinct benchmarks: TSBS DevOps and TSBS IoT"'
 context_sections:

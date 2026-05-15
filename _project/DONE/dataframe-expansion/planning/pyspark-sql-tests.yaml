@@ -2,7 +2,7 @@ id: pyspark-sql-tests
 title: Add comprehensive tests for PySpark SQL adapter
 worktree: dataframe-expansion
 priority: High
-status: Not Started
+status: Completed
 category: Testing and Quality Assurance
 
 description: |

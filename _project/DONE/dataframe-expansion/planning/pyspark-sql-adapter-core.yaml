@@ -2,7 +2,7 @@ id: pyspark-sql-adapter-core
 title: Implement PySparkSQLAdapter core functionality
 worktree: dataframe-expansion
 priority: High
-status: Not Started
+status: Completed
 category: Platform Expansion
 
 description: |

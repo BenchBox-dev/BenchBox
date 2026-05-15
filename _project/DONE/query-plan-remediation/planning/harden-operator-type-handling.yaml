@@ -2,7 +2,7 @@ id: harden-operator-type-handling
 title: "Harden plan comparison and visualization for unknown operator types"
 worktree: "query-plan-remediation"
 priority: "High"
-status: "Not Started"
+status: "Completed"
 description: |
   Comparison and visualization paths assume LogicalOperatorType enums and call
   .value on unknown operator strings. Any new/unsupported operator from parsers

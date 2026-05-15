@@ -2,7 +2,7 @@ id: pyspark-sql-documentation
 title: Document PySpark SQL mode usage
 worktree: dataframe-expansion
 priority: Medium
-status: Not Started
+status: Completed
 category: Documentation
 
 description: |

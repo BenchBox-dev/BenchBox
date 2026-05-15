@@ -2,7 +2,7 @@ id: interactive-wizard-validation-mode
 title: "Add --validation mode selection to interactive wizard"
 worktree: ux-improvements
 priority: Medium
-status: Not Started
+status: Completed
 description: |
   The CLI supports `--validation exact|loose|range|disabled|full` for result
   validation configuration. The interactive wizard doesn't expose this option.

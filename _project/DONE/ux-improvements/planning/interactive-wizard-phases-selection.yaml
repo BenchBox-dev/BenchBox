@@ -2,7 +2,7 @@ id: interactive-wizard-phases-selection
 title: "Add --phases selection to interactive wizard"
 worktree: ux-improvements
 priority: High
-status: Not Started
+status: Completed
 description: |
   The CLI supports flexible phase selection (generate, load, warmup, power, throughput,
   maintenance) via `--phases`, but the interactive wizard hardcodes the default "power"

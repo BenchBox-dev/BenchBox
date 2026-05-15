@@ -2,7 +2,7 @@ id: duckdb-text-plan-reliability
 title: "Make DuckDB text plan parsing reliable or fail fast"
 worktree: "query-plan-remediation"
 priority: "Medium"
-status: "Not Started"
+status: "Completed"
 description: |
   The DuckDB text parser flattens box-drawing plans into a linear chain, losing
   joins/branching and producing misleading fingerprints/insights whenever JSON

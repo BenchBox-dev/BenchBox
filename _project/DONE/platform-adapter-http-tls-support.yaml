@@ -2,7 +2,7 @@ id: platform-adapter-http-tls-support
 title: "Add TLS/HTTPS option for HTTP-based data loading endpoints"
 worktree: platform-expansion
 priority: Medium
-status: Not Started
+status: Completed
 description: |
   Three platform adapters use HTTP APIs for bulk data loading but hardcode http://
   with no option for HTTPS:

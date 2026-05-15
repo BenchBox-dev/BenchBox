@@ -2,7 +2,7 @@ id: explorer-add-tuning-config-visibility
 title: "Surface tuning config in explorer detail pages and enable cross-tuning comparison"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
 category: Core Functionality
 
 description: |

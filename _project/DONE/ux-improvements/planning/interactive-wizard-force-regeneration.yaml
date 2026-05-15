@@ -2,7 +2,7 @@ id: interactive-wizard-force-regeneration
 title: "Add --force option to interactive wizard"
 worktree: ux-improvements
 priority: High
-status: Not Started
+status: Completed
 description: |
   The CLI supports `--force all|datagen|upload` to force regeneration of data
   or re-upload to cloud storage. This is not accessible from the interactive

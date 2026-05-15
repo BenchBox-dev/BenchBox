@@ -2,7 +2,7 @@ id: prune-legacy-publishing-prototype
 title: "Prune legacy publishing prototype (Publisher, ArtifactManager, PermalinkRegistry)"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
 category: Code Quality & Build
 description: |
   The gap matrix (_project/_archive/publishing-gap-matrix.md) recommends PRUNE for the

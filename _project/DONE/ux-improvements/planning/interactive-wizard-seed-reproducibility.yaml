@@ -2,7 +2,7 @@ id: interactive-wizard-seed-reproducibility
 title: "Add --seed option to interactive wizard for reproducibility"
 worktree: ux-improvements
 priority: High
-status: Not Started
+status: Completed
 description: |
   The CLI supports `--seed <int>` for reproducible query parameter generation, which
   is critical for:
