@@ -33,7 +33,7 @@ from typing import TYPE_CHECKING, Any
 
 from benchbox.core.benchmark_mixins import CursorValidationQueryExecutionMixin
 from benchbox.core.sql_utils import normalize_table_name_in_sql
-from benchbox.platforms.base.ddl_helpers import strip_with_properties
+from benchbox.platforms.base.ddl_helpers import strip_primary_keys, strip_with_properties
 from benchbox.platforms.base.external_table_mixin import HiveExternalTableMixin
 from benchbox.platforms.presto_trino_utils import (
     load_file_batches,
@@ -886,8 +886,13 @@ class PrestoAdapter(CursorValidationQueryExecutionMixin, HiveExternalTableMixin,
         if not statement.upper().startswith("CREATE TABLE"):
             return statement
 
-        # For memory catalog, remove any Presto-incompatible syntax
-        # Memory catalog doesn't support WITH properties or NOT NULL constraints
+        # Presto rejects PRIMARY KEY constraints in benchmark CREATE TABLE DDL.
+        # BenchBox workloads load immutable benchmark data, so the constraint is
+        # metadata only and can be stripped for all Presto catalogs.
+        statement = strip_primary_keys(statement)
+
+        # For memory catalog, remove any Presto-incompatible syntax.
+        # Memory catalog doesn't support WITH properties or NOT NULL constraints.
 
         if self.table_format == "memory" or self.catalog == "memory":
             # Memory catalog: simple CREATE TABLE without WITH clause or NOT NULL

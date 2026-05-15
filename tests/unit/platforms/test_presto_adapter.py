@@ -11,6 +11,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 import benchbox.platforms.presto as presto_module
+from benchbox.core.joinorder.schema import JoinOrderSchema
 from benchbox.platforms.presto import PRESTO_DIALECT, PrestoAdapter
 
 pytestmark = [
@@ -687,6 +688,17 @@ class TestPrestoAdapter:
         # Should remove WITH clause for memory catalog
         assert "WITH" not in optimized
 
+    def test_optimize_table_definition_strips_primary_key_for_memory(self, presto_stubs):
+        """Presto rejects inline PRIMARY KEY syntax in benchmark DDL."""
+        adapter = PrestoAdapter(table_format="memory")
+
+        sql = "CREATE TABLE kind_type (id INTEGER PRIMARY KEY, kind VARCHAR(15) NOT NULL)"
+        optimized = adapter._optimize_table_definition(sql)
+
+        assert "PRIMARY KEY" not in optimized
+        assert "NOT NULL" not in optimized
+        assert "id INTEGER" in optimized
+
     def test_optimize_table_definition_hive(self, presto_stubs):
         """Test table optimization for hive catalog."""
         adapter = PrestoAdapter(table_format="hive")
@@ -697,6 +709,32 @@ class TestPrestoAdapter:
         # Should add format specification for hive
         assert "WITH" in optimized
         assert "PARQUET" in optimized
+
+    def test_optimize_table_definition_strips_primary_key_for_hive(self, presto_stubs):
+        """Hive-backed Presto DDL also needs PRIMARY KEY metadata removed."""
+        adapter = PrestoAdapter(table_format="hive")
+
+        sql = "CREATE TABLE kind_type (id INTEGER PRIMARY KEY, kind VARCHAR(15) NOT NULL)"
+        optimized = adapter._optimize_table_definition(sql)
+
+        assert "PRIMARY KEY" not in optimized
+        assert "NOT NULL" in optimized
+        assert "WITH (format = 'PARQUET')" in optimized
+
+    def test_joinorder_schema_is_presto_compatible_after_optimization(self, presto_stubs):
+        """Canonical JoinOrder DDL should not send PRIMARY KEY to Presto."""
+        adapter = PrestoAdapter(table_format="memory")
+        schema_sql = JoinOrderSchema().get_create_tables_sql("duckdb")
+
+        optimized = [
+            adapter._optimize_table_definition(statement.strip())
+            for statement in schema_sql.split(";")
+            if statement.strip()
+        ]
+
+        assert len(optimized) == 21
+        assert all("PRIMARY KEY" not in statement for statement in optimized)
+        assert all("FOREIGN KEY" not in statement for statement in optimized)
 
     def test_analyze_table_memory_catalog(self, presto_stubs):
         """Test ANALYZE is skipped for memory catalog."""

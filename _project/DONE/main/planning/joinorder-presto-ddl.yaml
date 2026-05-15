@@ -2,7 +2,8 @@ id: joinorder-presto-ddl
 title: "Canonical JoinOrder DDL failure on Presto"
 worktree: main
 priority: Medium
-status: Identified
+status: Completed
+completed_date: "2026-05-15"
 category: Platform Compatibility
 
 description: |
