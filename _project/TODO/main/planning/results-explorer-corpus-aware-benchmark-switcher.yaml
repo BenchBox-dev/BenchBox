@@ -1,0 +1,157 @@
+id: results-explorer-corpus-aware-benchmark-switcher
+title: "Make benchmark detail pivot controls corpus-aware and actionably labeled"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: User Experience
+
+description: |
+  The benchmark detail page now has a benchmark switcher, so the original
+  trapped-page navigation defect is largely remediated. The follow-up
+  functional pass found a remaining usability defect: the switcher exposes the
+  full supported benchmark catalog, including benchmarks with no public result
+  page in the current static corpus. Selecting one of those options navigates
+  to an empty benchmark page such as `/results/amplab/` and requires recovery
+  via `Back to Results`.
+
+  The root cause is that the control appears to source options from the static
+  supported-benchmark catalog instead of the current public result corpus. The
+  blind spot is common in the Results Explorer: fixing "can pivot to a sibling"
+  by adding a selector is not enough if the selector does not distinguish
+  actionable public result pages from no-data placeholders.
+
+  This TODO should make benchmark pivots truthfully actionable. The selector
+  should either list only benchmarks with public results for the current
+  explorer corpus, or it should visibly mark/disable no-result options with an
+  explicit empty-state affordance. Do not remove the empty benchmark route
+  itself; it is still useful for direct links and future corpus growth.
+
+work:
+- id: w0
+  summary: "Confirm the benchmark switcher option source and no-result route behavior"
+  status: pending
+  notes: |
+    Reproduce from `/results/tpch/`:
+    - open the benchmark switcher;
+    - record the options shown;
+    - select one benchmark with public results such as SSB;
+    - select one benchmark with no public results such as AMPLab;
+    - record the resulting route and empty-state recovery controls.
+
+    In code, identify whether the switcher options come from a static label
+    catalog, public corpus summary, or generated route manifest.
+
+- id: w1
+  summary: "Define the actionability contract for benchmark pivot options"
+  needs: [w0]
+  status: pending
+  notes: |
+    Decision gate: choose one contract:
+    - Contract A: benchmark detail switcher lists only benchmarks with public
+      results in the current static corpus.
+    - Contract B: switcher lists all supported benchmarks, but no-result
+      options are disabled or grouped under a clear "No public results yet"
+      label and do not navigate as though results exist.
+    - Contract C: switcher lists all supported benchmarks and navigates to
+      empty pages, but each option includes result availability counts.
+
+    Contract A is preferred for a dense results explorer because users expect
+    a detail-page selector to pivot between comparable pages, not catalog
+    placeholders. If another contract is chosen, document why it better serves
+    result discovery.
+
+- id: w2
+  summary: "Implement the corpus-aware benchmark switcher"
+  needs: [w1]
+  status: pending
+  notes: |
+    Update the benchmark detail page selector so its options reflect the
+    chosen actionability contract. If listing only public-result benchmarks,
+    derive the option set from the same corpus data that powers benchmark
+    index/list counts, not from a manually maintained allowlist.
+
+    Preserve direct routing to no-result benchmark pages and their empty-state
+    recovery. The fix is about the selector's implied actionability, not about
+    hiding valid static routes.
+
+- id: w3
+  summary: "Add tests for public-result and no-result benchmark pivot behavior"
+  needs: [w2]
+  status: pending
+  notes: |
+    Add unit and/or e2e coverage that proves:
+    - TPC-H and SSB remain reachable from the benchmark selector when they
+      have public results;
+    - AMPLab/no-result benchmarks are either absent, disabled, or explicitly
+      labeled according to the chosen contract;
+    - direct navigation to `/results/amplab/` still renders a useful empty
+      state with a route back to Results.
+
+- id: w4
+  summary: "Audit platform and compare pivot controls for the same actionability pattern"
+  needs: [w2]
+  status: pending
+  notes: |
+    Check the platform detail selector, compare builder filters, Query
+    Workbench facets, and Home filters for controls that expose unavailable
+    options as if they are actionable. Do not broaden the implementation
+    unless the same defect is reproduced; record any additional issue as a
+    separate TODO if it exceeds this scope.
+
+deferred:
+- summary: "Add public-result counts to every benchmark catalog option"
+  reason: "Counts may be useful later, but the immediate defect is that the selector implies non-empty sibling pages."
+- summary: "Remove empty benchmark routes from the static export"
+  reason: "Direct empty routes are useful for deep links and future corpus growth; the selector should be fixed instead."
+
+prior_art:
+- "results-explorer/src/pages/BenchmarkDetail.tsx — benchmark detail page and switcher behavior"
+- "results-explorer/src/pages/BenchmarkIndex.tsx — benchmark index availability/count display"
+- "results-explorer/src/lib/corpus.ts — generated/public corpus helpers used by route pages"
+- "results-explorer/src/lib/benchmarks.ts — static benchmark label/catalog helpers"
+- "results-explorer/e2e/routes/benchmark-index.spec.ts — existing benchmark navigation coverage"
+- "_project/DONE/main/planning/results-explorer-contract-release-gate.yaml — prior release-gate TODO for Results Explorer user flows"
+
+must_preserve:
+- "Users can still switch from TPC-H to SSB or any other benchmark with public results without returning to the index."
+- "Direct no-result routes render a clear empty state and recovery path."
+- "The switcher does not show stale hard-coded availability that can drift from the generated corpus."
+- "Compare and Query flows are not changed unless the same actionability defect is reproduced there."
+
+approach: |
+  Make the pivot control derive from result availability, not from the whole
+  supported-benchmark catalog. Decide explicitly whether no-result benchmarks
+  are hidden or shown as unavailable before implementing, then test both the
+  actionable selector path and the direct empty-route path.
+
+anti_patterns:
+- "DO NOT hard-code `TPC-H` and `SSB` as the only public-result options."
+- "DO NOT remove empty routes to make the selector simpler."
+- "DO NOT let a selectable option navigate users into a no-result dead end without making that state explicit."
+- "DO NOT broaden this into a redesign of the benchmark index or Home filter system."
+
+verification:
+- description: "Benchmark detail tests cover corpus-aware pivot options"
+  command: "cd results-explorer && npm test -- --run src/pages/__tests__/BenchmarkDetail.test.tsx"
+  expected_output: "Benchmark detail tests pass and prove no-result options follow the chosen actionability contract"
+- description: "Benchmark route e2e covers public and no-result routes"
+  command: "cd results-explorer && npx playwright test --project=chromium --workers=1 e2e/routes/benchmark-index.spec.ts"
+  expected_output: "Benchmark e2e passes, including public benchmark switching and direct no-result empty-state recovery"
+- description: "Corpus availability is not hard-coded"
+  command: "rg -n 'AMPLab|TPC-H|SSB|BENCHMARK_LABELS|public results|No public results' results-explorer/src/pages/BenchmarkDetail.tsx results-explorer/src/lib results-explorer/src/pages/__tests__ results-explorer/e2e/routes/benchmark-index.spec.ts"
+  expected_output: "Implementation derives options from corpus helpers; tests may name fixtures but production code does not hard-code the public option set"
+
+scope_limit:
+  only_modify:
+  - "results-explorer/src/pages/BenchmarkDetail.tsx"
+  - "results-explorer/src/pages/BenchmarkIndex.tsx"
+  - "results-explorer/src/lib/"
+  - "results-explorer/src/pages/__tests__/BenchmarkDetail.test.tsx"
+  - "results-explorer/src/pages/__tests__/BenchmarkIndex.test.tsx"
+  - "results-explorer/e2e/routes/benchmark-index.spec.ts"
+  - "_project/analysis/"
+  do_not_modify:
+  - "benchbox/"
+  - "results-data/"
+  - "landing/"
+  - "docs/"
