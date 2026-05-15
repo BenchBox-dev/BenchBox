@@ -1,8 +1,9 @@
 """Presto DDL rewrite rules for Phase.DDL_OPTIMIZE.
 
-Presto DDL varies by connector/catalog: the memory catalog does not support
-WITH properties or NOT NULL constraints, while Hive connectors benefit from
-explicit format declarations (WITH (format = 'PARQUET')).
+Presto DDL varies by connector/catalog: benchmark schemas can include PRIMARY
+KEY metadata that Presto rejects, the memory catalog does not support WITH
+properties or NOT NULL constraints, and Hive connectors benefit from explicit
+format declarations (WITH (format = 'PARQUET')).
 
 PrestoAdapter._optimize_table_definition() (invoked via execute_schema_statements
 in presto_trino_utils) is the runtime implementation for these transformations.
@@ -31,14 +32,14 @@ REGISTRY.register(
         payload=RewriteDDLPayload(
             transformer_id="presto_ddl_optimizer",
             description=(
-                "Adjust CREATE TABLE DDL for Presto connector: strip WITH/NOT NULL for memory "
-                "catalog, add WITH (format = 'PARQUET') for Hive connector"
+                "Adjust CREATE TABLE DDL for Presto connector: strip PRIMARY KEY constraints, "
+                "strip WITH/NOT NULL for memory catalog, add WITH (format = 'PARQUET') for Hive connector"
             ),
             governance_only=True,
         ),
         reason=(
-            "Presto memory catalog rejects WITH properties and NOT NULL constraints; "
-            "Hive connector requires explicit format declaration for table creation."
+            "Presto rejects PRIMARY KEY constraints in benchmark DDL; memory catalog rejects WITH properties "
+            "and NOT NULL constraints; Hive connector requires explicit format declaration for table creation."
         ),
     ),
     Phase.DDL_OPTIMIZE,
