@@ -1,0 +1,69 @@
+id: joinorder-datafusion-dialect
+title: "Per-engine canonical JoinOrder gaps on DataFusion"
+worktree: main
+priority: Medium
+status: Completed
+completed_date: "2026-05-15"
+category: Platform Compatibility
+
+description: |
+  Cutover UAT for `PLATFORM=datafusion BENCHMARK=joinorder SCALE=1`
+  failed 113/113 queries before execution because the DataFusion adapter
+  registered canonical Parquet tables with synthetic `f0` column names.
+
+  Evidence:
+    /Users/joe/Developer/benchmark_runs/logs/uat_joinorder_cutover/datafusion_joinorder_1.0_20260511_135128.log
+
+  The immediate failure signature is:
+    Schema error: No field named <alias>.<column>. Valid fields are <alias>.f0 ...
+
+  Revalidation on current `develop` (fa1df7359) with DataFusion 53.0.0 showed
+  this failure is no longer present with the current verified canonical
+  JoinOrder Parquet cache. No adapter code change was required in this TODO.
+
+work:
+- id: w1
+  summary: "Re-check the historical DataFusion f0 schema failure"
+  status: done
+  notes: |
+    The May 11 cutover log captured a real failure mode where every canonical
+    JoinOrder query saw only synthetic `f0` fields after DataFusion table
+    registration. Current `develop` no longer reproduces that failure with the
+    verified canonical Parquet cache: DataFusion registers all 21 tables with
+    the expected schema column names.
+
+- id: w2
+  summary: "Verify full canonical SQL execution"
+  needs: [w1]
+  status: done
+  notes: |
+    A local DataFusion smoke loaded the current canonical cache from
+    `/Users/joe/Developer/benchmark_runs/datagen/joinorder_sf1`, registered 21
+    tables / 74,190,187 rows, and executed all 113 canonical JoinOrder SQL
+    queries successfully. The raw local transcript is intentionally kept out of
+    git at `/tmp/joinorder-datafusion-113-smoke.log`.
+
+    Command shape:
+    `uv run -- python` script instantiating `JoinOrderBenchmark(scale_factor=1.0,
+    output_dir=/Users/joe/Developer/benchmark_runs/datagen/joinorder_sf1)`,
+    calling `generate_data()`, `DataFusionAdapter.create_schema()`,
+    `DataFusionAdapter.load_data()`, then iterating `bench.get_queries()` and
+    failing fast on any non-`SUCCESS` result.
+
+verification:
+- description: "DataFusion registers the current canonical Parquet cache with expected schemas"
+  command: "uv run -- python -c 'import datafusion; print(datafusion.__version__)' && grep '^LOAD tables=21 rows=74190187' /tmp/joinorder-datafusion-113-smoke.log"
+  expected_output: "DataFusion 53.0.0 and LOAD tables=21 rows=74190187"
+- description: "All canonical JoinOrder SQL queries pass on DataFusion"
+  command: "tail -1 /tmp/joinorder-datafusion-113-smoke.log"
+  expected_output: "PASS queries=113"
+- description: "TODO graph remains valid after moving this item to DONE"
+  command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph && uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate _project/DONE/main/planning/joinorder-datafusion-dialect.yaml"
+  expected_output: "passes"
+
+metadata:
+  tags:
+    - joinorder
+    - datafusion
+    - canonical-imdb-2013
+  created_date: "2026-05-11"
