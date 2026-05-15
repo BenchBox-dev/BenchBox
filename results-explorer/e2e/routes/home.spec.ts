@@ -17,7 +17,7 @@ test.describe("Home", () => {
       "supported benchmarks",
       "public result bundles",
       "platforms with public results",
-      "leaderboard cohorts",
+      "leaderboard rankings",
     ]) {
       await expect(summary.getByText(label, { exact: true })).toBeVisible();
     }

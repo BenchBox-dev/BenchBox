@@ -85,7 +85,7 @@ def test_global_header_link_contract_is_identical_across_surfaces(path: str, sur
 def test_global_header_exposes_single_shared_theme_control(path: str, surface: str) -> None:
     source = _read(path)
 
-    assert "data-benchbox-theme-toggle" in source, f"{surface} missing shared theme toggle"
+    assert source.count("data-benchbox-theme-toggle") == 1, f"{surface} should expose exactly one shared theme toggle"
     assert "Theme:" in source, f"{surface} missing accessible theme label"
 
 

@@ -452,7 +452,7 @@ lint-explorer-tokens:
 	python3 _project/scripts/scan_explorer_tokens.py
 
 lint-site-theme-tokens:
-	python3 _project/scripts/scan_explorer_tokens.py landing/shared landing/index.html landing/prompts/index.html docs/_templates/page.html docs/_static/custom.css results-explorer/src/components/Layout.tsx
+	python3 _project/scripts/scan_explorer_tokens.py landing/shared landing/index.html landing/style.css landing/prompts/index.html landing/prompts/prompts.css docs/_templates/page.html docs/_static/custom.css results-explorer/index.html results-explorer/src/components/Layout.tsx
 
 artifact-hygiene:
 	uv run -- python _project/scripts/artifact_hygiene_check.py --all-tracked
@@ -513,6 +513,7 @@ ci-lint:
 	uv run ty check
 	$(MAKE) lint-markers
 	$(MAKE) lint-explorer-tokens
+	$(MAKE) lint-site-theme-tokens
 	$(MAKE) artifact-hygiene
 	$(MAKE) skill-sync-check
 	uv run -- python _project/scripts/timing_policy_check.py --strict

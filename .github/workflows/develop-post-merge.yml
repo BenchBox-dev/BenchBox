@@ -68,6 +68,9 @@ jobs:
       - name: Run explorer token scan
         run: make lint-explorer-tokens
 
+      - name: Run public site theme token scan
+        run: make lint-site-theme-tokens
+
   auto-revert-on-failure:
     name: auto-revert-on-failure
     runs-on: ubuntu-latest
