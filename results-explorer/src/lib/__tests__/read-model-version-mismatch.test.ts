@@ -133,4 +133,42 @@ describe("read-model version guard", () => {
 
     expect(queries).toEqual(["SELECT read_model_version FROM bench.metadata LIMIT 1"]);
   });
+
+  it("retries transient metadata-read failures before probing schema readiness", async () => {
+    const queries: string[] = [];
+    const conn = {
+      async query(sql: string): Promise<QueryResult> {
+        queries.push(sql);
+        if (sql.includes("bench.metadata") && queries.length === 1) {
+          throw new Error("RuntimeError: offset is out of bounds");
+        }
+        if (sql.includes("bench.metadata")) {
+          return {
+            toArray: () => [
+              {
+                toJSON: () => ({ read_model_version: _EXPECTED_READ_MODEL_VERSION_FOR_TEST }),
+              },
+            ],
+          };
+        }
+        return {
+          toArray: () => [
+            {
+              toJSON: () => ({}),
+            },
+          ],
+        };
+      },
+    };
+
+    await expect(
+      _validateAttachedSnapshotForTest(conn as unknown as Parameters<typeof _validateAttachedSnapshotForTest>[0]),
+    ).resolves.toBeUndefined();
+
+    expect(queries.slice(0, 2)).toEqual([
+      "SELECT read_model_version FROM bench.metadata LIMIT 1",
+      "SELECT read_model_version FROM bench.metadata LIMIT 1",
+    ]);
+    expect(queries[2]).toBe("SELECT result_id FROM bench.results LIMIT 1");
+  });
 });
