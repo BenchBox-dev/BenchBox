@@ -2,7 +2,7 @@ id: interactive-wizard-output-all-platforms
 title: "Add --output prompt for all platforms in interactive wizard"
 worktree: ux-improvements
 priority: Medium
-status: Not Started
+status: Completed
 description: |
   Currently, the interactive wizard only prompts for output location when a cloud
   platform is selected. However, users may want to specify custom output locations

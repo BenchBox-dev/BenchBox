@@ -2,7 +2,7 @@ id: interactive-wizard-query-subset-selection
 title: "Add --queries subset selection to interactive wizard"
 worktree: ux-improvements
 priority: High
-status: Not Started
+status: Completed
 description: |
   The CLI supports query subset selection via `--queries Q1,Q6,Q17` for running specific
   queries, but the interactive wizard explicitly sets queries to None with a comment

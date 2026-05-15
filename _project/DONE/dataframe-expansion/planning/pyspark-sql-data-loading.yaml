@@ -2,7 +2,7 @@ id: pyspark-sql-data-loading
 title: Implement PySpark SQL data loading for TPC benchmarks
 worktree: dataframe-expansion
 priority: High
-status: Not Started
+status: Completed
 category: Platform Expansion
 
 description: |

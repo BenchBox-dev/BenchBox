@@ -2,7 +2,7 @@ id: pyspark-sql-registry-integration
 title: Register PySpark SQL mode in platform registry
 worktree: dataframe-expansion
 priority: High
-status: Not Started
+status: Completed
 category: Platform Expansion
 
 description: |

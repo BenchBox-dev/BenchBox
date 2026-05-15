@@ -2,7 +2,7 @@ id: pyspark-sql-schema-translation
 title: Implement schema creation with SQLGlot translation for PySpark
 worktree: dataframe-expansion
 priority: High
-status: Not Started
+status: Completed
 category: Platform Expansion
 
 description: |

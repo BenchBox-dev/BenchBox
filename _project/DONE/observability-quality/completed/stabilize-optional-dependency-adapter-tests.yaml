@@ -3,7 +3,7 @@ title: Stabilize Optional-Dependency Adapter Tests
 worktree: observability-quality
 category: Pre-Release High Priority Tasks (Should-Fix Before Release)
 priority: High
-status: Identified
+status: Completed
 description: Ensure pytest’s default run succeeds without optional database connectors by isolating or skipping adapter suites
   that hard-fail when cloud drivers are absent.
 context_sections:

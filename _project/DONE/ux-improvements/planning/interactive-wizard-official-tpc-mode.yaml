@@ -2,7 +2,7 @@ id: interactive-wizard-official-tpc-mode
 title: "Add --official TPC compliance mode to interactive wizard"
 worktree: ux-improvements
 priority: High
-status: Not Started
+status: Completed
 description: |
   The CLI supports `--official` mode for TPC-compliant benchmark runs which:
   1. Validates scale factors against TPC-allowed values (1, 10, 30, 100, etc.)

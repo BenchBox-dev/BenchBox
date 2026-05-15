@@ -2,7 +2,7 @@ id: pyspark-sql-session-manager
 title: Extract SparkSessionManager for shared PySpark session management
 worktree: dataframe-expansion
 priority: High
-status: Not Started
+status: Completed
 category: Platform Expansion
 
 description: |

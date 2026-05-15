@@ -3,7 +3,7 @@ title: DataFrame Tuning Configuration Support
 worktree: dataframe-tuning
 category: Platform Enhancement
 priority: High
-status: Not Started
+status: Completed
 description: 'Implement a tuning configuration framework for DataFrame adapters that parallels the
 
   SQL tuning system. Unlike SQL adapters where tuning affects schema and table creation,

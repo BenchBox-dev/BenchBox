@@ -3,7 +3,7 @@ title: Implement TPC-DS Queries for Both Families
 worktree: dataframe-tpcds
 category: Core Functionality
 priority: High
-status: Not Started
+status: Completed
 description: 'Implement all 99 TPC-DS queries for both Pandas and Expression families.
 
   More complex than TPC-H with advanced patterns.

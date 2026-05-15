@@ -2,7 +2,7 @@ id: interactive-wizard-execution-mode-selection
 title: "Add --mode (SQL/DataFrame) selection to interactive wizard"
 worktree: ux-improvements
 priority: High
-status: Not Started
+status: Completed
 description: |
   Platforms like Polars, Pandas, DuckDB, and others support both SQL and DataFrame
   execution modes. The CLI exposes this via `--mode sql|dataframe`, but the

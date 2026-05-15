@@ -2,7 +2,7 @@ id: interactive-wizard-verbose-output
 title: "Add --verbose/-v option to interactive wizard"
 worktree: ux-improvements
 priority: Low
-status: Not Started
+status: Completed
 description: |
   The CLI supports `-v/--verbose` for detailed logging output, but the interactive
   wizard doesn't prompt for verbosity level. While not critical (most users don't

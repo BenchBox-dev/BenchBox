@@ -6,7 +6,7 @@ id: pt-06-trino-presto-athena-ddl
 title: "PT-06: Trino, Presto & Athena Physical Tuning DDL Generators"
 worktree: "physical-tuning"
 priority: "Medium-High"
-status: "Not Started"
+status: "Completed"
 category: "Platform Expansion"
 
 description: |

@@ -3,7 +3,7 @@ title: Metadata Primitives Benchmark - INFORMATION_SCHEMA, SHOW, DESCRIBE
 worktree: benchmark-expansion
 category: Benchmark Development
 priority: Medium
-status: Not Started
+status: Completed
 description: 'Create a new Metadata Primitives benchmark to test cross-platform catalog/schema
 
   introspection performance. This benchmark tests INFORMATION_SCHEMA views, SHOW commands,

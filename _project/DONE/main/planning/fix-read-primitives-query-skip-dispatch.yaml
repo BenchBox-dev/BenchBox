@@ -2,7 +2,7 @@ id: fix-read-primitives-query-skip-dispatch
 title: "Fix read-primitives SQL/DataFrame query skip dispatch boundaries"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
 category: Bug Fix
 description: |
   A review of commits 7c61f2ac9 and 4a2b00043 found that read-primitives query

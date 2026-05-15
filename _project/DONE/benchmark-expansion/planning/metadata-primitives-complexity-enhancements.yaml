@@ -3,7 +3,7 @@ title: Metadata Primitives Complexity Enhancements
 worktree: benchmark-expansion
 category: Benchmark Development
 priority: High
-status: Not Started
+status: Completed
 description: 'Enhance the Metadata Primitives benchmark to stress-test metadata operations with
 
   complex catalog scenarios that reflect real-world data warehouse characteristics.

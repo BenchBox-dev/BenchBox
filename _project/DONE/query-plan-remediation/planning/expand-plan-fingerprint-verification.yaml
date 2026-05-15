@@ -2,7 +2,7 @@ id: expand-plan-fingerprint-verification
 title: "Expand query plan fingerprint coverage and verification"
 worktree: "query-plan-remediation"
 priority: "High"
-status: "Not Started"
+status: "Completed"
 description: |
   Fingerprint fast-paths currently ignore core logical structure (join conditions,
   grouping, projections, limits/offsets), so materially different plans hash the

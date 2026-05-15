@@ -6,7 +6,7 @@ id: pt-04-duckdb-ddl
 title: "PT-04: DuckDB Physical Tuning DDL Generator"
 worktree: "physical-tuning"
 priority: "High"
-status: "Not Started"
+status: "Completed"
 category: "Platform Expansion"
 
 description: |

@@ -2,7 +2,7 @@ id: interactive-mode-open-table-format-selection
 title: "Add open table format selection to CLI interactive mode"
 worktree: ux-improvements
 priority: Medium
-status: Not Started
+status: Completed
 description: |
   The CLI interactive mode (5-step wizard) currently does not offer users the option to
   select open table formats (Parquet, Delta Lake, Apache Iceberg) for data generation.
