@@ -71,6 +71,124 @@ jobs:
       - name: Run public site theme token scan
         run: make lint-site-theme-tokens
 
+  close-orphaned-prs:
+    name: close-orphaned-prs
+    # When a squash merge to develop lands one of several open PRs whose
+    # branches share linear history (e.g. two worktrees produced overlapping
+    # branches where one is a strict ancestor of the other), the squash hides
+    # the original commit lineage and the unmerged-but-fully-contained PRs sit
+    # open forever. GitHub's own auto-close heuristic does not fire on squash
+    # merges.
+    #
+    # Detection: find the PR associated with this squash commit and recover
+    # its original (un-squashed) branch tip via the GraphQL API. Any other
+    # open PR whose head commit is a git ancestor of that tip has all of its
+    # content already on develop and can be closed safely.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      MERGED_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Close PRs whose branches are ancestors of the merged PR
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          repo_name="${GITHUB_REPOSITORY#*/}"
+          merged_pr_json="$(gh api graphql \
+            -f owner="${GITHUB_REPOSITORY_OWNER}" \
+            -f repo="${repo_name}" \
+            -f oid="${MERGED_SHA}" \
+            -f query='
+              query($owner: String!, $repo: String!, $oid: GitObjectID!) {
+                repository(owner: $owner, name: $repo) {
+                  object(oid: $oid) {
+                    ... on Commit {
+                      associatedPullRequests(first: 1) {
+                        nodes { number headRefOid url }
+                      }
+                    }
+                  }
+                }
+              }
+            ' \
+            --jq '.data.repository.object.associatedPullRequests.nodes[0] // {}')"
+
+          merged_pr_number="$(jq -r '.number // empty' <<<"${merged_pr_json}")"
+          merged_pr_head="$(jq -r '.headRefOid // empty' <<<"${merged_pr_json}")"
+          merged_pr_url="$(jq -r '.url // empty' <<<"${merged_pr_json}")"
+
+          if [ -z "${merged_pr_head}" ]; then
+            echo "No PR associated with ${MERGED_SHA} (direct push?). Nothing to do."
+            exit 0
+          fi
+          echo "Merged PR #${merged_pr_number} head: ${merged_pr_head}"
+
+          # The un-squashed branch tip is not on develop's linear history, so
+          # fetch it explicitly via the pull ref.
+          if ! git cat-file -e "${merged_pr_head}^{commit}" 2>/dev/null; then
+            git fetch --no-tags origin \
+              "+refs/pull/${merged_pr_number}/head:refs/remotes/pull/${merged_pr_number}/head" \
+              --quiet || {
+                echo "Could not fetch merged PR's head ref; cannot detect orphans."
+                exit 0
+              }
+          fi
+
+          mapfile -t records < <(gh pr list \
+            --base develop \
+            --state open \
+            --limit 200 \
+            --json number,headRefOid,headRefName,isDraft \
+            --jq '.[] | [.number, .headRefOid, .headRefName, (.isDraft|tostring)] | @tsv')
+
+          if [ "${#records[@]}" -eq 0 ]; then
+            echo "No open PRs targeting develop."
+            exit 0
+          fi
+
+          closed_any=false
+          for record in "${records[@]}"; do
+            IFS=$'\t' read -r number oid headref isdraft <<<"${record}"
+
+            # Skip the PR that was just merged (its branch may still appear
+            # open momentarily in flaky API states).
+            if [ "${number}" = "${merged_pr_number}" ]; then
+              continue
+            fi
+
+            if ! git cat-file -e "${oid}^{commit}" 2>/dev/null; then
+              git fetch --no-tags origin \
+                "+refs/pull/${number}/head:refs/remotes/pull/${number}/head" \
+                --quiet 2>/dev/null \
+                || { echo "PR #${number}: could not fetch head ${oid:0:12}; skipping."; continue; }
+            fi
+
+            if ! git merge-base --is-ancestor "${oid}" "${merged_pr_head}"; then
+              echo "PR #${number}: head ${oid:0:12} is not an ancestor of merged PR #${merged_pr_number}; not orphaned."
+              continue
+            fi
+
+            comment_body="Closing as superseded: this PR's head commit (\`${oid:0:12}\`) is an ancestor of merged PR ${merged_pr_url} (head \`${merged_pr_head:0:12}\`, squashed as ${MERGED_SHA}). Develop already contains every change from this branch."
+            if gh pr close "${number}" --comment "${comment_body}"; then
+              echo "PR #${number}: closed as orphan (head ${oid:0:12}, branch ${headref}, draft=${isdraft})."
+              closed_any=true
+            else
+              echo "PR #${number}: gh pr close failed; leaving open." >&2
+            fi
+          done
+
+          if [ "${closed_any}" = false ]; then
+            echo "No orphaned PRs detected."
+          fi
+
   auto-revert-on-failure:
     name: auto-revert-on-failure
     runs-on: ubuntu-latest
