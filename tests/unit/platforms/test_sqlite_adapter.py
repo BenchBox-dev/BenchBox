@@ -230,6 +230,24 @@ class TestSQLiteAdapter:
         # Should execute OLTP-specific pragmas
         mock_connection.execute.assert_any_call("PRAGMA synchronous = FULL")
 
+    def test_apply_joinorder_helper_indexes(self):
+        """JoinOrder loads apply benchmark-scoped indexes and ANALYZE."""
+        from benchbox.platforms import sqlite as sqlite_platform
+
+        adapter = SQLiteAdapter()
+        connection = Mock()
+        cursor = Mock()
+        connection.cursor.return_value = cursor
+        cursor.fetchall.return_value = [(table,) for table in sqlite_platform._JOINORDER_TABLES]
+        benchmark = Mock(benchmark_id="joinorder")
+
+        duration = adapter._apply_benchmark_helper_indexes(benchmark, connection)
+
+        assert duration >= 0
+        connection.execute.assert_any_call("ANALYZE")
+        assert connection.execute.call_count == len(sqlite_platform._JOINORDER_HELPER_INDEXES) + 1
+        connection.commit.assert_called_once()
+
     @patch("benchbox.platforms.sqlite.sqlite3")
     def test_execute_query_success(self, mock_sqlite3):
         """Test successful query execution."""
