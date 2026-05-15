@@ -34,6 +34,29 @@ Use this dataset only under the IMDb and Dataverse terms. Do not treat
 BenchBox's converted archive as BenchBox-cleared for broad commercial
 redistribution or republication.
 
+## Strict Redistribution Environments
+
+The selected hardening path is documentation of a BYO-data workflow while the
+accepted-risk hosted archive remains the default fast path. Users who cannot
+consume BenchBox's re-hosted archive can provide the canonical 21 Parquet files
+themselves under the normal datagen directory:
+
+```text
+benchmark_runs/datagen/joinorder_sf1/
+```
+
+or under `datagen/joinorder_sf1/` beneath `BENCHBOX_OUTPUT_DIR`. BenchBox
+verifies the pre-populated Parquet files against `data_manifest.toml` before
+running and does not download the hosted archive when every table file is
+already present with the expected sha256.
+
+Maintainers who need to rebuild those Parquet files from Dataverse should use
+`_project/scripts/build_joinorder_data.py`. That script downloads the
+`imdb_pg11` file from DOI `10.7910/DVN/2QYZBT`, verifies the Dataverse MD5 and
+records the pg_dump SHA256, restores the source into PostgreSQL, converts the 21
+tables to Parquet, and runs the logical-content and manifest checks. This is an
+explicit maintainer path, not the default first-run user experience.
+
 ## Scope
 
 This data is provided for research, database systems evaluation, and query
