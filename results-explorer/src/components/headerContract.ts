@@ -1,19 +1,30 @@
-// Canonical contract for the shared BenchBox global header.
+// Canonical contract for the **Results-side Preact mirror** of the shared
+// BenchBox global header.
 //
-// landing/index.html, docs/_templates/page.html and landing/prompts/index.html
-// emit this contract via the static `benchbox-site-header` class hooks
-// defined in landing/shared/site-header.css. The Results Explorer is a Vite
-// SPA and renders a Preact mirror in components/Layout.tsx; importing the
-// shared static CSS into the Vite bundle is not currently practical because
-// the theme-token cascade and shared deployment paths assume the static
-// surfaces alone. Until that constraint changes, this module is the single
-// source of truth for the visible global-header contract: Layout.tsx, the
-// Layout unit tests, and the e2e header-parity gate all consume it, and the
-// e2e gate cross-checks the same labels/hrefs against the static HTML.
+// IMPORTANT: this module is NOT a runtime source of truth for the static
+// surfaces (landing/index.html, landing/prompts/index.html,
+// docs/_templates/page.html). Those surfaces ship their own hard-coded
+// markup that references the `benchbox-site-header` class hooks defined in
+// landing/shared/site-header.css. The Results Explorer is a Vite SPA and
+// importing the shared static CSS into the Vite bundle is not currently
+// practical because the theme-token cascade and shared deployment paths
+// assume the static surfaces alone (Strategy B, per the global-header
+// parity TODO).
 //
-// Update this file whenever the shared header markup changes; the parity
-// tests will then fail until every consumer (landing, docs, prompts, the
-// Results Preact mirror) is realigned.
+// What this module *does* guarantee:
+//   - Results' Preact `Header` in `components/Layout.tsx` consumes these
+//     constants directly, so the Results-side surface cannot drift from
+//     the constants.
+//   - The e2e parity gate in `e2e/routes/header.spec.ts` cross-checks the
+//     same labels/hrefs/CTA/toggle against the static HTML by loading each
+//     surface via `page.setContent` and asserting against this module's
+//     values, so drift between any surface and this module fails CI.
+//
+// What this module does NOT do:
+//   - Auto-update `landing/index.html`, `landing/prompts/index.html`, or
+//     `docs/_templates/page.html`. When you change a label/href/CTA here,
+//     you MUST hand-edit each static surface to match. The parity test
+//     will fail until every consumer is realigned.
 
 export interface HeaderLink {
   readonly label: string;
