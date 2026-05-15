@@ -36,6 +36,21 @@ FORBIDDEN_JSON = REPO_ROOT / "landing" / "prompts" / "recipes.json"
 
 VALID_DEPLOYMENT_MODES = frozenset({"local", "self-hosted", "managed"})
 MANAGED_SAFETY_KEYS = frozenset({"dependency", "dry_run", "no_secrets"})
+PLATFORM_OVERRIDE_KEYS = frozenset(
+    {
+        "credential_deployments",
+        "dependency_check_command",
+        "dependency_check_platform",
+        "deployments",
+        "install_command",
+        "label",
+        "safety_terms",
+    }
+)
+LIST_PLATFORM_OVERRIDE_KEYS = frozenset({"credential_deployments", "deployments"})
+STRING_PLATFORM_OVERRIDE_KEYS = frozenset(
+    {"dependency_check_command", "dependency_check_platform", "install_command", "label"}
+)
 DEPLOYMENT_ORDER = {"local": 0, "self-hosted": 1, "managed": 2}
 LOCAL_CATEGORIES = frozenset({"analytical", "dataframe", "embedded"})
 CLOUD_HINTS = frozenset({"aws", "azure", "cloud", "gcs", "multi_cloud", "onelake", "s3", "saas", "serverless"})
@@ -123,6 +138,9 @@ def _deployment_from_registry_mode(mode: str, requires_network: bool) -> str:
     if mode in VALID_DEPLOYMENT_MODES:
         return mode
     if mode == "remote":
+        # Registry `remote` means networked user-managed execution for the
+        # current prompt catalog. Keep the browser vocabulary fixed unless
+        # the UI deliberately adds a fourth deployment filter.
         return "self-hosted" if requires_network else "local"
     raise ValueError(f"unsupported registry deployment mode {mode!r}")
 
@@ -184,9 +202,33 @@ def _dependency_groups() -> dict[str, Any]:
     return list_available_dependency_groups()
 
 
-def _derive_platform_entries() -> list[dict[str, Any]]:
+def _apply_platform_override(entry: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    updated = copy.deepcopy(entry)
+    for key in ("label", "install_command", "dependency_check_platform", "dependency_check_command"):
+        if isinstance(override.get(key), str):
+            updated[key] = override[key]
+    for key in ("deployments", "credential_deployments"):
+        if isinstance(override.get(key), list):
+            updated[key] = list(override[key])
+    if isinstance(override.get("safety_terms"), dict):
+        updated["safety_terms"] = dict(override["safety_terms"])
+    if "dependency_check_platform" in override and "dependency_check_command" not in override:
+        platform = updated["dependency_check_platform"]
+        updated["dependency_check_command"] = f"uv run benchbox check-deps --platform {platform}"
+    return updated
+
+
+def _platform_overrides(catalog: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    overrides = catalog.get("platform_overrides") or {}
+    if not isinstance(overrides, dict):
+        return {}
+    return {str(pid): override for pid, override in overrides.items() if isinstance(override, dict)}
+
+
+def _derive_platform_entries(catalog: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     entries: list[dict[str, Any]] = []
     metadata_by_id = PlatformRegistry.get_all_platform_metadata()
+    overrides = _platform_overrides(catalog or {})
     for platform_id, metadata in sorted(metadata_by_id.items()):
         interfaces = _derive_interfaces(platform_id)
         if not interfaces:
@@ -210,6 +252,8 @@ def _derive_platform_entries() -> list[dict[str, Any]]:
             safety_terms = _platform_safety_terms(platform_id, credential_deployments)
             if safety_terms:
                 entry["safety_terms"] = safety_terms
+        if platform_id in overrides:
+            entry = _apply_platform_override(entry, overrides[platform_id])
         entries.append(entry)
     return entries
 
@@ -217,7 +261,8 @@ def _derive_platform_entries() -> list[dict[str, Any]]:
 def build_prompt_catalog(catalog: dict[str, Any]) -> dict[str, Any]:
     """Return the browser catalog with PlatformRegistry-derived platform entries."""
     expanded = copy.deepcopy(catalog)
-    expanded["platforms"] = _derive_platform_entries()
+    expanded.pop("platform_overrides", None)
+    expanded["platforms"] = _derive_platform_entries(catalog)
     return expanded
 
 
@@ -226,6 +271,10 @@ def _validate_one_platform(entry: dict[str, Any], known_platforms: set[str]) -> 
     pid = entry.get("id")
     if pid not in known_platforms:
         errors.append(f"platforms[{pid!r}]: unknown platform id (not in PlatformRegistry)")
+    if not entry.get("label"):
+        errors.append(f"platforms[{pid!r}]: non-empty label is required")
+    if not entry.get("deployments"):
+        errors.append(f"platforms[{pid!r}]: at least one deployment is required")
     for d in entry.get("deployments") or []:
         if d not in VALID_DEPLOYMENT_MODES:
             errors.append(f"platforms[{pid!r}].deployments={d!r}: must be one of {sorted(VALID_DEPLOYMENT_MODES)}")
@@ -246,6 +295,60 @@ def _validate_one_platform(entry: dict[str, Any], known_platforms: set[str]) -> 
     for iface in ifaces:
         if iface not in {"sql", "dataframe"}:
             errors.append(f"platforms[{pid!r}].interfaces={iface!r}: must be 'sql' or 'dataframe'")
+    return errors
+
+
+def _supported_registry_platform_ids() -> set[str]:
+    supported: set[str] = set()
+    for platform_id in PlatformRegistry.get_all_platform_metadata():
+        caps = PlatformRegistry.get_platform_capabilities(platform_id)
+        if caps and (caps.supports_sql or caps.supports_dataframe):
+            supported.add(platform_id)
+    return supported
+
+
+def _validate_platform_overrides(catalog: dict[str, Any], known_platforms: set[str]) -> list[str]:
+    errors: list[str] = []
+    overrides = catalog.get("platform_overrides")
+    if overrides is None:
+        return errors
+    if not isinstance(overrides, dict):
+        return ["platform_overrides must be a mapping of PlatformRegistry id to override metadata"]
+    for platform_id, override in overrides.items():
+        if platform_id not in known_platforms:
+            errors.append(f"platform_overrides[{platform_id!r}]: unknown or non-promptable platform id")
+            continue
+        if not isinstance(override, dict):
+            errors.append(f"platform_overrides[{platform_id!r}]: override must be a mapping")
+            continue
+        unknown = set(override) - PLATFORM_OVERRIDE_KEYS
+        if unknown:
+            errors.append(
+                f"platform_overrides[{platform_id!r}]: unsupported keys {sorted(unknown)}; "
+                f"allowed keys are {sorted(PLATFORM_OVERRIDE_KEYS)}"
+            )
+        for key in sorted(LIST_PLATFORM_OVERRIDE_KEYS & set(override)):
+            if not isinstance(override[key], list):
+                errors.append(f"platform_overrides[{platform_id!r}].{key}: must be a list")
+        for key in sorted(STRING_PLATFORM_OVERRIDE_KEYS & set(override)):
+            if not isinstance(override[key], str) or not override[key]:
+                errors.append(f"platform_overrides[{platform_id!r}].{key}: must be a non-empty string")
+        if "safety_terms" in override:
+            safety = override["safety_terms"]
+            if not isinstance(safety, dict):
+                errors.append(f"platform_overrides[{platform_id!r}].safety_terms: must be a mapping")
+            else:
+                for safety_key, value in safety.items():
+                    if safety_key not in MANAGED_SAFETY_KEYS:
+                        errors.append(
+                            f"platform_overrides[{platform_id!r}].safety_terms[{safety_key!r}]: "
+                            f"must be one of {sorted(MANAGED_SAFETY_KEYS)}"
+                        )
+                    if not isinstance(value, str) or not value:
+                        errors.append(
+                            f"platform_overrides[{platform_id!r}].safety_terms[{safety_key!r}]: "
+                            "must be a non-empty string"
+                        )
     return errors
 
 
@@ -346,9 +449,10 @@ def validate(catalog: dict[str, Any]) -> list[str]:
     """Return a list of validation error messages; empty means valid."""
     errors: list[str] = []
     errors.extend(_validate_platforms_are_derived(catalog))
-    known_platforms = set(PlatformRegistry.get_all_platform_metadata().keys())
+    known_platforms = _supported_registry_platform_ids()
     known_benchmarks = set(BENCHMARK_METADATA.keys())
     known_tools, known_prompts = _known_mcp_names()
+    errors.extend(_validate_platform_overrides(catalog, known_platforms))
     browser_catalog = build_prompt_catalog(catalog)
 
     platforms = browser_catalog.get("platforms") or []

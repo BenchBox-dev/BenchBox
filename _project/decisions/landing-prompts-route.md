@@ -4,7 +4,27 @@
 **Owner:** @joeharris76
 **Drives TODOs:** `landing-prompts-decision-gates`,
 `landing-prompts-catalog-generator`, `landing-prompts-static-route`,
-`landing-prompts-launch-gates`.
+`landing-prompts-launch-gates`,
+`landing-prompts-all-supported-platforms`.
+
+## Correction (2026-05-15)
+
+The launch implementation shipped a hand-curated prompt platform subset.
+That is no longer the product contract. `/prompts/` must expose every
+runtime-supported platform from
+`PlatformRegistry.get_all_platform_metadata()` that supports SQL or
+DataFrame execution. Filtering is allowed only by actual capability:
+SQL/DataFrame support, deployment mode, and benchmark compatibility when
+that metadata is available. Marketing curation must not decide whether a
+supported platform is promptable.
+
+The route remains static. The generator may materialize registry data
+into `landing/prompts/catalog.generated.js`, but must not introduce a
+public JSON API, runtime endpoint, or browser-side registry fetch.
+Hand-authored YAML may supply presentation labels, ordering groups,
+safety copy, dependency-check corrections, or other explicit metadata
+corrections that the registry cannot yet supply. It must not be the
+source of truth for platform inclusion.
 
 ## Correction (2026-05-14)
 
@@ -221,9 +241,8 @@ concrete state at launch.
   that managed platforms declare safety_terms covering
   dependency / dry-run / no-pasted-secrets, and fails CI if missing.
 - **Known limitations (MVP):**
-  - Curated platform subset (8 platforms, 4 benchmarks). Adding more
-    requires editing `landing/prompts/catalog.yaml` and re-running the
-    generator.
+  - Platform choices are registry-derived from every SQL/DataFrame
+    platform. Benchmark choices remain a curated four-benchmark MVP set.
   - No automated a11y tooling. Manual checklist at
     `landing/prompts/a11y-checklist.md` is the gate.
   - No qualitative feedback channel beyond GitHub issues; the deferral

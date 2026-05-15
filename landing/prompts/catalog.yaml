@@ -6,6 +6,8 @@
 #
 # Validation rules (see scripts/generate_landing_quickstarts.py):
 # - prompt platforms are derived from PlatformRegistry, not listed here
+# - optional `platform_overrides` keys must match real promptable
+#   PlatformRegistry ids and may only correct presentation/safety metadata
 # - every `benchmarks[].id` must exist in BENCHMARK_METADATA
 # - `deployments[].id` must be in {local, self-hosted, managed}
 # - `mcp.run_tool`, `mcp.list_tool`, `mcp.prompts.*` must reference real
@@ -37,6 +39,11 @@ deployments:
   - { id: local, label: "Local" }
   - { id: self-hosted, label: "Self-hosted" }
   - { id: managed, label: "Managed cloud" }
+
+# Optional presentation/safety corrections for registry-derived platforms.
+# This is intentionally not an inclusion list: supported platform ids come
+# from PlatformRegistry at generation time.
+platform_overrides: {}
 
 # Curated benchmark subset for MVP. Validator confirms IDs exist in
 # BENCHMARK_METADATA.
