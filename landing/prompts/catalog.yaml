@@ -5,14 +5,11 @@
 # include; edit this YAML and re-run the generator.
 #
 # Validation rules (see scripts/generate_landing_quickstarts.py):
-# - every `platforms[].id` must exist in PlatformRegistry
+# - prompt platforms are derived from PlatformRegistry, not listed here
 # - every `benchmarks[].id` must exist in BENCHMARK_METADATA
-# - `deployments[].id` and `platforms[].deployments[*]` must be in
-#   {local, self-hosted, managed}
+# - `deployments[].id` must be in {local, self-hosted, managed}
 # - `mcp.run_tool`, `mcp.list_tool`, `mcp.prompts.*` must reference real
 #   MCP tools/prompts registered in benchbox/mcp/
-# - any platform with `deployments` containing `managed` must list
-#   `safety_terms` covering dependency-check, dry-run, and no-secrets
 # - the compare CLI template must include two `-p` flags
 
 defaults:
@@ -40,55 +37,6 @@ deployments:
   - { id: local, label: "Local" }
   - { id: self-hosted, label: "Self-hosted" }
   - { id: managed, label: "Managed cloud" }
-
-# Curated MVP platform subset. Add platforms here only when they have a
-# clear marketing story; everything else is implicitly excluded. Each
-# entry is validated against PlatformRegistry by the generator.
-platforms:
-  - id: duckdb
-    label: "DuckDB"
-    deployments: [local]
-    interfaces: [sql, dataframe]
-  - id: datafusion
-    label: "DataFusion"
-    deployments: [local]
-    interfaces: [sql, dataframe]
-  - id: polars
-    label: "Polars"
-    deployments: [local]
-    interfaces: [dataframe]
-  - id: clickhouse
-    label: "ClickHouse"
-    deployments: [local, self-hosted]
-    interfaces: [sql]
-  - id: postgresql
-    label: "PostgreSQL"
-    deployments: [self-hosted]
-    interfaces: [sql]
-  - id: motherduck
-    label: "MotherDuck"
-    deployments: [managed]
-    interfaces: [sql]
-    safety_terms:
-      dependency: "Run `benchbox check-dependencies motherduck` first."
-      dry_run: "Use `--dry-run` to inspect commands before any live run."
-      no_secrets: "Configure `MOTHERDUCK_TOKEN` in your shell env. Do NOT paste it in chat."
-  - id: clickhouse-cloud
-    label: "ClickHouse Cloud"
-    deployments: [managed]
-    interfaces: [sql]
-    safety_terms:
-      dependency: "Run `benchbox check-dependencies clickhouse-cloud` first."
-      dry_run: "Use `--dry-run` to inspect commands before any live run."
-      no_secrets: "Set `CLICKHOUSE_HOST/USER/PASSWORD` in your shell env. Do NOT paste credentials in chat."
-  - id: snowflake
-    label: "Snowflake"
-    deployments: [managed]
-    interfaces: [sql]
-    safety_terms:
-      dependency: "Run `benchbox check-dependencies snowflake` first."
-      dry_run: "Use `--dry-run` to inspect commands before any live run."
-      no_secrets: "Configure `SNOWFLAKE_ACCOUNT/USER/PASSWORD` (or key-pair) in your shell env. Do NOT paste credentials in chat."
 
 # Curated benchmark subset for MVP. Validator confirms IDs exist in
 # BENCHMARK_METADATA.

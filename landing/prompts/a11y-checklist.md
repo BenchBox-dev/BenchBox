@@ -27,8 +27,8 @@ you decide to add it.
 - [ ] When goal switches between "Test one platform" and
       "Compare platforms", the Platform vs Platform A/B fields show or
       hide cleanly (no orphaned announcements).
-- [ ] The "Managed cloud safety" block is reachable and readable when
-      deployment=managed.
+- [ ] The "Credential safety" block is reachable and readable when selected
+      self-hosted or managed platforms need connection credentials.
 
 ## Visual
 
@@ -39,7 +39,7 @@ you decide to add it.
       column.
 - [ ] Contrast ratio: body text ≥ 4.5:1 against `--bg-primary`; copy
       button text ≥ 4.5:1 against both default and `:hover` background.
-- [ ] Yellow `Managed cloud safety` border (`#d29922`) is also paired
+- [ ] Yellow `Credential safety` border (`#d29922`) is also paired
       with a "⚠" glyph so colour is not the sole signal.
 
 ## No-JS fallback
