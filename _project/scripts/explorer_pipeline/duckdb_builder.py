@@ -665,9 +665,15 @@ class DuckDBSnapshotBuilder:
         """)
 
     def _create_metadata(self, con: Any) -> None:
-        """Create the one-row read-model metadata table consumed by the browser."""
+        """Create the one-row read-model metadata table consumed by the browser.
+
+        Uses ``IF NOT EXISTS`` to mirror ``docs/development/browser-duckdb-schema.sql``;
+        callers (``build``, ``build_full``) currently always open a fresh DuckDB file,
+        but matching the schema doc means a future reuse on an existing connection
+        won't silently diverge.
+        """
         con.execute("""
-            CREATE TABLE metadata (
+            CREATE TABLE IF NOT EXISTS metadata (
                 read_model_version INTEGER NOT NULL
             )
         """)

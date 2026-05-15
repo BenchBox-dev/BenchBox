@@ -8,6 +8,12 @@ from pathlib import Path
 
 import click
 
+# `_project/` is a PEP 420 implicit namespace package (no `__init__.py`) and is
+# excluded from the wheel build (see `tool.setuptools.packages.find` in
+# `pyproject.toml`). When this script is invoked as
+# `python _project/scripts/explorer_publish.py`, only the script's own directory
+# lands on sys.path, so `_project.scripts.explorer_pipeline.*` imports below
+# would fail. Insert the repo root so the namespace package resolves.
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
