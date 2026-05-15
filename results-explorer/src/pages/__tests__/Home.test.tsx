@@ -443,15 +443,15 @@ describe("Home", () => {
 
     expect(screen.getByRole("heading", { level: 1, name: "BenchBox Database Leaderboards" })).toBeTruthy();
     expect(
-      screen.getByText("Reproducible OLAP benchmark rankings from rankable leaderboard cohorts, with public corpus browse below."),
+      screen.getByText("Reproducible OLAP benchmark rankings, with public corpus browse below."),
     ).toBeTruthy();
 
-    const selector = screen.getByRole("region", { name: "Leaderboard cohort selector" });
-    expect(within(selector).getByLabelText("Cohort benchmark")).toBeTruthy();
-    expect(within(selector).getByLabelText("Cohort scale")).toBeTruthy();
-    expect(within(selector).getByLabelText("Cohort phase")).toBeTruthy();
+    const selector = screen.getByRole("region", { name: "Leaderboard ranking selector" });
+    expect(within(selector).getByLabelText("Benchmark")).toBeTruthy();
+    expect(within(selector).getByLabelText("Scale")).toBeTruthy();
+    expect(within(selector).getByLabelText("Phase")).toBeTruthy();
     expect(within(selector).getByText("Leaderboard scope")).toBeTruthy();
-    expect(within(selector).getByText("Ranked cohort filters")).toBeTruthy();
+    expect(within(selector).getByText("Ranked-only filters")).toBeTruthy();
 
     fireEvent.click(screen.getByText("Advanced filters"));
     expect(within(selector).getByRole("button", { name: "All tuning labels" })).toBeTruthy();
@@ -467,8 +467,8 @@ describe("Home", () => {
     expect(within(summary).getByText("3 with public results")).toBeTruthy();
     expect(within(summary).getByText("public result bundles")).toBeTruthy();
     expect(within(summary).getByText("platforms with public results")).toBeTruthy();
-    expect(within(summary).getByText("leaderboard cohorts")).toBeTruthy();
-    expect(within(summary).getByText("2 visible; 2/2 leaderboard-scope platforms")).toBeTruthy();
+    expect(within(summary).getByText("leaderboard rankings")).toBeTruthy();
+    expect(within(summary).getByText("2 visible; 2/2 ranked-scope platforms")).toBeTruthy();
     expect(within(summary).queryByText(/^Benchmarks$/)).toBeNull();
   });
 
@@ -476,14 +476,14 @@ describe("Home", () => {
     render(<Home />);
     await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
 
-    expect(screen.getByText("Showing 2 of 2 leaderboard-scope platforms across 2 leaderboard cohorts")).toBeTruthy();
-    expect(screen.getAllByText(/Benchmark options cover 2 of 3 public coverage benchmark sets/).length).toBeGreaterThan(0);
+    expect(screen.getByText("Showing 2 of 2 ranked-scope platforms across 2 leaderboard rankings")).toBeTruthy();
+    expect(screen.getAllByText(/Benchmark options cover 2 of 3 public benchmark sets/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/SSB/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/1 public platform ID is outside the current leaderboard scope/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/1 of 4 public results is not labelled for tuning/).length).toBeGreaterThan(0);
     expect(screen.getByRole("heading", { name: "Browse Public Benchmark Results" })).toBeTruthy();
     expect(
-      screen.getByText("3 public benchmark set(s). Leaderboard filters above include 2 leaderboard-scope cohort(s)."),
+      screen.getByText("3 public benchmark set(s). Leaderboard filters above include 2 ranked leaderboard(s)."),
     ).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Browse Public Platform Results" })).toBeTruthy();
   });
@@ -536,9 +536,9 @@ describe("Home", () => {
     render(<Home />);
     await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
 
-    const selector = screen.getByRole("region", { name: "Leaderboard cohort selector" });
+    const selector = screen.getByRole("region", { name: "Leaderboard ranking selector" });
     expect(selector.textContent).toContain(
-      "Table scope is 3 of 3 leaderboard-scope platforms visible now; 2 ranked, 1 published unranked.",
+      "Table scope is 3 of 3 ranked-scope platforms visible now; 2 ranked, 1 published unranked.",
     );
     expect(selector.textContent).toContain(
       "Full leaderboard scope has 3 platform IDs with published leaderboard evidence: 2 ranked and 1 published unranked.",
@@ -551,7 +551,7 @@ describe("Home", () => {
     await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
 
     const hero = screen.getByTestId("home-hero-filter-band");
-    const selector = within(hero).getByRole("region", { name: "Leaderboard cohort selector" });
+    const selector = within(hero).getByRole("region", { name: "Leaderboard ranking selector" });
     const dataSurface = screen.getByTestId("home-data-surface");
 
     expect(hero.className).toContain("surface-hero");
@@ -570,13 +570,13 @@ describe("Home", () => {
     const headline = screen.getByRole("heading", { level: 1, name: "BenchBox Database Leaderboards" });
     const activeSummary = screen.getByRole("region", { name: "Active leaderboard filters" });
     const leaderboard = screen.getByRole("region", { name: "Cross-Benchmark Leaderboard" });
-    const selector = screen.getByRole("region", { name: "Leaderboard cohort selector" });
+    const selector = screen.getByRole("region", { name: "Leaderboard ranking selector" });
     const workflow = screen.getByRole("navigation", { name: "Result contribution workflow" });
     const recentHeading = screen.getByRole("heading", { name: "Recent Results" });
 
-    expect(within(activeSummary).getByText("All leaderboard cohorts")).toBeTruthy();
-    expect(within(activeSummary).getByText("All cohort scales")).toBeTruthy();
-    expect(within(activeSummary).getByText("All cohort phases")).toBeTruthy();
+    expect(within(activeSummary).getByText("All benchmarks")).toBeTruthy();
+    expect(within(activeSummary).getByText("All scales")).toBeTruthy();
+    expect(within(activeSummary).getByText("All phases")).toBeTruthy();
     expectDocumentOrder(headline, activeSummary);
     expectDocumentOrder(activeSummary, selector);
     expectDocumentOrder(selector, leaderboard);
@@ -614,13 +614,13 @@ describe("Home", () => {
     await waitFor(() => expect(new URL(window.location.href).searchParams.get("mode")).toBe("ranks"));
   });
 
-  it("renders a Compare entrypoint inside the leaderboard cohort selector", async () => {
+  it("renders a Compare entrypoint inside the leaderboard ranking selector", async () => {
     render(<Home />);
     await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
 
     const entrypoint = screen.getByTestId("home-compare-entrypoint");
     expect(entrypoint).toHaveAttribute("href", "/results/compare/");
-    const selector = screen.getByRole("region", { name: "Leaderboard cohort selector" });
+    const selector = screen.getByRole("region", { name: "Leaderboard ranking selector" });
     expect(selector.contains(entrypoint)).toBe(true);
   });
 
@@ -653,7 +653,7 @@ describe("Home", () => {
     expect(within(grid).getByRole("link", { name: /^ClickBench SF0.1/ })).toBeTruthy();
     expect(within(grid).getByRole("link", { name: /^TPC-H SF1/ })).toBeTruthy();
 
-    fireEvent.change(screen.getByLabelText("Cohort benchmark"), { target: { value: "clickbench" } });
+    fireEvent.change(screen.getByLabelText("Benchmark"), { target: { value: "clickbench" } });
 
     await waitFor(() => {
       expect(within(grid).getByRole("link", { name: /^ClickBench SF0.1/ })).toBeTruthy();
@@ -742,8 +742,8 @@ describe("Home", () => {
     });
 
     const grid = screen.getByRole("grid", { name: "Cross-benchmark leaderboard" });
-    expect(within(grid).getByRole("columnheader", { name: "Avg rank over covered cohorts" })).toBeTruthy();
-    expect(within(grid).getByText("1/1 cohorts")).toBeTruthy();
+    expect(within(grid).getByRole("columnheader", { name: "Avg rank over covered rankings" })).toBeTruthy();
+    expect(within(grid).getByText("1/1 rankings")).toBeTruthy();
     expect(within(grid).getByText("over 1/1")).toBeTruthy();
   });
 

@@ -50,21 +50,21 @@ const MODE_LABELS: Record<MetaLeaderboardMode, string> = {
   ranks: "Ranks",
   speedup: "Speedup",
 };
-const AVG_RANK_LABEL = "Avg rank over covered cohorts";
-const COVERAGE_POLICY_COPY = "Missing cohorts are not scored; coverage is shown separately.";
+const AVG_RANK_LABEL = "Avg rank over covered rankings";
+const COVERAGE_POLICY_COPY = "Missing rankings are not scored; coverage is shown separately.";
 const SORT_LABELS: Record<MetaLeaderboardSort, string> = {
   avg_rank: "Avg rank",
   coverage: "Coverage",
-  best_rank: "Best cohort",
+  best_rank: "Best ranking",
   recent_activity: "Recent",
 };
 const SORT_TITLES: Record<MetaLeaderboardSort, string> = {
   avg_rank: AVG_RANK_LABEL,
-  coverage: "Sort by number of covered cohorts; missing cohorts are not scored.",
-  best_rank: "Sort by each platform's best rank in any visible cohort.",
+  coverage: "Sort by number of covered rankings; missing rankings are not scored.",
+  best_rank: "Sort by each platform's best rank in any visible ranking.",
   recent_activity: "Sort by the most recent visible run date.",
 };
-const MISSING_COHORT_TITLE = `No published run for this cohort. ${COVERAGE_POLICY_COPY}`;
+const MISSING_COHORT_TITLE = `No published run for this ranking. ${COVERAGE_POLICY_COPY}`;
 const PLATFORM_RENDER_LIMIT = 200;
 const PLATFORM_RENDER_INCREMENT = 200;
 
@@ -196,7 +196,7 @@ export function MetaLeaderboard({
             Cross-Benchmark Leaderboard
           </h2>
           <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">
-            Absolute values, ranks, or speedup-vs-cohort-best across the visible cohorts.
+            Absolute values, ranks, or speedup-vs-best across the visible rankings.
           </p>
         </div>
         <div
@@ -229,10 +229,10 @@ export function MetaLeaderboard({
                 {
                   value: "times",
                   label: "Times",
-                  title: "Native metric values per cohort (lower is better for latency; higher is better for power)",
+                  title: "Native metric values per ranking (lower is better for latency; higher is better for power)",
                 },
-                { value: "ranks", label: "Ranks", title: "Rank within each cohort (1 is best)" },
-                { value: "speedup", label: "Speedup", title: "Relative to cohort best (1.00x is best; below 1.00x is worse)" },
+                { value: "ranks", label: "Ranks", title: "Rank within each ranking (1 is best)" },
+                { value: "speedup", label: "Speedup", title: "Relative to ranking best (1.00x is best; below 1.00x is worse)" },
               ]}
             />
           </div>
@@ -241,13 +241,13 @@ export function MetaLeaderboard({
 
       <div class="mb-2 flex flex-wrap items-baseline justify-between gap-3">
         <p class="text-sm text-[var(--bb-data-fg-muted)]">
-          Showing {visiblePlatforms.length.toLocaleString()} of {sortedPlatforms.length.toLocaleString()} leaderboard-scope platforms across{" "}
-          {cohorts.length.toLocaleString()} leaderboard {cohorts.length === 1 ? "cohort" : "cohorts"}
+          Showing {visiblePlatforms.length.toLocaleString()} of {sortedPlatforms.length.toLocaleString()} ranked-scope platforms across{" "}
+          {cohorts.length.toLocaleString()} leaderboard {cohorts.length === 1 ? "ranking" : "rankings"}
         </p>
         <p id="meta-leaderboard-legend" class="text-xs text-[var(--bb-data-fg-subtle)]">
-          {mode === "times" && "Heat: darker = faster within each cohort. "}
-          {mode === "ranks" && "Heat: darker = better rank within cohort. "}
-          {mode === "speedup" && "Heat: darker = closer to cohort best (≥1.00x). Values < 1.00x are slower than baseline. "}
+          {mode === "times" && "Heat: darker = faster within each ranking. "}
+          {mode === "ranks" && "Heat: darker = better rank within ranking. "}
+          {mode === "speedup" && "Heat: darker = closer to ranking best (≥1.00x). Values < 1.00x are slower than baseline. "}
           <span class="italic">No run</span> = no published evidence. <span class="font-medium">Excluded</span> or{" "}
           <span class="font-medium">Unranked</span> = published evidence that is not scored.
         </p>
@@ -256,7 +256,7 @@ export function MetaLeaderboard({
       <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
         <TableScrollHint
           testId="meta-leaderboard-scroll-hint"
-          label="Scroll table for more cohorts →"
+          label="Scroll table for more rankings →"
           wrapperClassName="flex justify-end"
           className="m-2"
         />
@@ -281,7 +281,7 @@ export function MetaLeaderboard({
                   >
                     <a
                       href={cohortHref(cohort)}
-                      title={`${cohort.platform_count} ranked platforms in this cohort`}
+                      title={`${cohort.platform_count} ranked platforms in this ranking`}
                       class="flex flex-col gap-0.5 no-underline text-[var(--bb-data-fg-muted)] hover:text-[var(--bb-accent-hover)]"
                     >
                       <span class="font-semibold text-[var(--bb-data-fg-primary)]">{cohort.label}</span>
@@ -294,7 +294,7 @@ export function MetaLeaderboard({
                 <th
                   scope="col"
                   class="table-th whitespace-nowrap py-2 text-[var(--bb-data-fg-primary)]"
-                  title={`Average rank over cohorts where the platform has a published run. ${COVERAGE_POLICY_COPY}`}
+                  title={`Average rank over rankings where the platform has a published run. ${COVERAGE_POLICY_COPY}`}
                 >
                   {AVG_RANK_LABEL}
                 </th>
@@ -318,9 +318,9 @@ export function MetaLeaderboard({
                       </a>
                       <span
                         class="rounded border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--bb-data-fg-muted)]"
-                        title={`Covered cohorts in the current leaderboard view. ${COVERAGE_POLICY_COPY}`}
+                        title={`Covered rankings in the current leaderboard view. ${COVERAGE_POLICY_COPY}`}
                       >
-                        {formatCoverage(platform.n_cohorts, cohorts.length, { unitLabel: "cohorts" }).valueText}
+                        {formatCoverage(platform.n_cohorts, cohorts.length, { unitLabel: "rankings" }).valueText}
                       </span>
                     </div>
                   </td>
@@ -398,7 +398,9 @@ export function MetaLeaderboard({
                   })}
                   <td
                     class="table-td py-2 text-center font-mono font-semibold text-[var(--bb-data-fg-primary)]"
-                    title={`${AVG_RANK_LABEL}: ${formatCoverage(platform.n_cohorts, cohorts.length).valueText}. ${COVERAGE_POLICY_COPY}`}
+                    title={`${AVG_RANK_LABEL}: ${
+                      formatCoverage(platform.n_cohorts, cohorts.length, { unitLabel: "rankings" }).valueText
+                    }. ${COVERAGE_POLICY_COPY}`}
                   >
                     {platform.avg_rank !== null ? (
                       <>
@@ -435,16 +437,16 @@ export function MetaLeaderboard({
         </summary>
         <div class="mt-2 rounded-md border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-3 text-xs text-[var(--bb-data-fg-muted)] space-y-1">
           <p>
-            <strong>Times</strong> shows the cohort&apos;s primary metric in its native units:
+            <strong>Times</strong> shows the ranking&apos;s primary metric in its native units:
             geomean latency for most benchmarks, Power@Size for TPC-H/TPC-DS.
           </p>
           <p>
             <strong>Ranks</strong> keeps the original meta-leaderboard contract: 1 = best in the
-            cohort. {COVERAGE_POLICY_COPY}
+            ranking. {COVERAGE_POLICY_COPY}
           </p>
           <p>
-            <strong>Speedup</strong> normalizes every cell to the cohort best, where 1.00x is
-            best-in-cohort and smaller values are worse.
+            <strong>Speedup</strong> normalizes every cell to the ranking best, where 1.00x is
+            best-in-ranking and smaller values are worse.
           </p>
         </div>
       </details>

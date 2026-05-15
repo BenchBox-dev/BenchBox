@@ -803,8 +803,8 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(screen.queryByRole("img", { name: "Geomean latency trend over time" })).toBeNull();
     const plural = screen.getByTestId("trend-sparse-tpch-sf0.1-power-display_geomean_ms");
     const singular = screen.getByTestId("trend-sparse-star_schema-sf0.01-power-display_geomean_ms");
-    expect(plural.textContent).toContain("Limited observations: 2 published runs in this comparable cohort.");
-    expect(singular.textContent).toContain("Limited observations: 1 published run in this comparable cohort.");
+    expect(plural.textContent).toContain("Limited observations: 2 published runs in this comparable ranking.");
+    expect(singular.textContent).toContain("Limited observations: 1 published run in this comparable ranking.");
     expect(plural.textContent).not.toContain("runin");
     expect(singular.textContent).not.toContain("runin");
     expect(plural.textContent).toContain("Geomean latency (lower is better)");

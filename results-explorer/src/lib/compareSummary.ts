@@ -150,7 +150,7 @@ function buildHeadline(
   options: CompareDecisionSummaryOptions,
 ): string {
   if (options.suppressWinnerClaims) {
-    const reason = options.suppressionReason ?? "selected runs are not from the same comparable cohort";
+    const reason = options.suppressionReason ?? "selected runs are not from the same comparable ranking";
     if (isQueryEvidenceSuppressionReason(reason)) {
       return `Insufficient comparable query evidence: ${reason}. Winner language is suppressed; raw query evidence remains available.`;
     }

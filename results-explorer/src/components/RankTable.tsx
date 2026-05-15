@@ -196,7 +196,7 @@ function RankTableEmptyState({ summary, queryIds }: { summary: BenchmarkSummary;
     >
       <p class="font-semibold text-[var(--bb-data-fg-primary)]">Rank chart unavailable</p>
       <p class="mt-1 text-[var(--bb-data-fg-muted)]">
-        No rankable timing cells are available for this cohort. Submitted evidence is Excluded or lacks valid timing,
+        No rankable timing cells are available for this ranking. Submitted evidence is Excluded or lacks valid timing,
         so a normal rank matrix would be all dashes.
       </p>
       {reasons.length > 0 && (

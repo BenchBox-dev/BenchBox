@@ -220,7 +220,7 @@ export function formatTimingExclusion(
 
 export function formatCohortExclusion(cohort: BenchmarkSummary | MetaCohort): string | null {
   if ("cohort_ranking_exclusion_reason" in cohort && cohort.cohort_ranking_exclusion_reason !== null) {
-    return formatTimingExclusion(cohort.cohort_ranking_exclusion_reason, "Cohort is not rankable.");
+    return formatTimingExclusion(cohort.cohort_ranking_exclusion_reason, "Ranking is not available.");
   }
   if ("platforms" in cohort && cohort.platforms && cohort.platforms.length > 0) {
     if (cohort.platforms.every((platform) => !isRankable(platform))) {

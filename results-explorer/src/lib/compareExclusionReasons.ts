@@ -22,7 +22,7 @@ const REASON_COPY: Record<string, CompareExclusionReasonCopy> = {
     code: "no_valid_display_timing",
     shortText: "No valid display timing",
     detailText: "This run has no positive display timing values available for comparison.",
-    recoveryHint: "Choose a run with positive timing evidence, or clear filters to widen the cohort.",
+    recoveryHint: "Choose a run with positive timing evidence, or clear filters to widen the ranking.",
     category: "timing",
   },
   no_display_timing: {
@@ -43,7 +43,7 @@ const REASON_COPY: Record<string, CompareExclusionReasonCopy> = {
     code: "missing_timing",
     shortText: "Missing timing",
     detailText: "A required query timing is missing for this run.",
-    recoveryHint: "Choose a run with complete timing evidence for the selected cohort.",
+    recoveryHint: "Choose a run with complete timing evidence for the selected ranking.",
     category: "coverage",
   },
   insufficient_query_coverage: {
@@ -64,7 +64,7 @@ const REASON_COPY: Record<string, CompareExclusionReasonCopy> = {
     code: "insufficient_common_valid_timings",
     shortText: "Not enough shared timings",
     detailText: "Selected runs do not share at least two valid query timings.",
-    recoveryHint: "Clear selection and choose runs from a cohort with shared timing evidence.",
+    recoveryHint: "Clear selection and choose runs from a ranking with shared timing evidence.",
     category: "coverage",
   },
   insufficient_common_valid_timing_coverage: {
@@ -92,7 +92,7 @@ const REASON_COPY: Record<string, CompareExclusionReasonCopy> = {
     code: "hidden_result",
     shortText: "Hidden result",
     detailText: "This result is not in the public comparison set.",
-    recoveryHint: "Choose a public result from the current cohort.",
+    recoveryHint: "Choose a public result from the current ranking.",
     category: "visibility",
   },
   visibility_not_comparable: {
@@ -148,9 +148,9 @@ export function describeCompareExclusionReason(reason: string | null | undefined
   if (normalized.startsWith("Locked:")) {
     return {
       code: "cohort_lock",
-      shortText: "Different cohort",
+      shortText: "Different ranking",
       detailText: normalized,
-      recoveryHint: "Clear the current selection or choose a row from the locked cohort.",
+      recoveryHint: "Clear the current selection or choose a row from the locked ranking.",
       category: "cohort",
     };
   }

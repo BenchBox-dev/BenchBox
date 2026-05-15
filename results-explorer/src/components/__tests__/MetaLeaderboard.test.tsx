@@ -195,7 +195,7 @@ describe("MetaLeaderboard", () => {
     expect(screen.getByText("loose")).toBeTruthy();
   });
 
-  it("shows coverage counts and can sort by covered cohort count", () => {
+  it("shows coverage counts and can sort by covered ranking count", () => {
     const data: MetaLeaderboardData = {
       ...DATA,
       cohorts: [
@@ -274,15 +274,15 @@ describe("MetaLeaderboard", () => {
     expect(screen.getByText("Sort")).toBeTruthy();
     expect(screen.getByText("Mode")).toBeTruthy();
     expect(screen.getByRole("radio", { name: "Avg rank" }).getAttribute("aria-checked")).toBe("true");
-    expect(screen.getByRole("radio", { name: "Best cohort" })).toBeTruthy();
+    expect(screen.getByRole("radio", { name: "Best ranking" })).toBeTruthy();
     expect(screen.getByRole("radio", { name: "Recent" })).toBeTruthy();
-    expect(screen.getByRole("columnheader", { name: /Avg rank over covered cohorts/ })).toBeTruthy();
+    expect(screen.getByRole("columnheader", { name: /Avg rank over covered rankings/ })).toBeTruthy();
     expect(rowOrder()[0]).toContain("Polars");
 
     fireEvent.click(screen.getByRole("radio", { name: "Coverage" }));
 
     expect(screen.getByRole("radio", { name: "Coverage" }).getAttribute("aria-checked")).toBe("true");
-    expect(screen.getByText("2/2 cohorts")).toBeTruthy();
+    expect(screen.getByText("2/2 rankings")).toBeTruthy();
     expect(screen.getByText("over 2/2")).toBeTruthy();
     expect(rowOrder()[0]).toContain("DuckDB");
   });
@@ -309,7 +309,7 @@ describe("MetaLeaderboard", () => {
     expect(screen.getByText("0.50x")).toBeTruthy();
   });
 
-  it("keeps avg-rank sorting over covered cohorts instead of penalizing missing coverage", () => {
+  it("keeps avg-rank sorting over covered rankings instead of penalizing missing coverage", () => {
     const data: MetaLeaderboardData = {
       ...DATA,
       cohorts: [
@@ -392,7 +392,7 @@ describe("MetaLeaderboard", () => {
     expect(screen.getByText("2/2")).toBeTruthy();
   });
 
-  it("shows explicit no-run copy for a platform missing a cohort rank entry", () => {
+  it("shows explicit no-run copy for a platform missing a ranking entry", () => {
     const dataWithNa = {
       ...DATA,
       platforms: [
@@ -410,12 +410,12 @@ describe("MetaLeaderboard", () => {
     // "No run" appears both in a missing-cell and in the legend caption; assert
     // both surfaces are present rather than relying on a single-match query.
     expect(screen.getAllByText("No run").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("0/1 cohorts")).toBeTruthy();
+    expect(screen.getByText("0/1 rankings")).toBeTruthy();
     expect(screen.getByText("No score")).toBeTruthy();
     const missingCell = screen.getByRole("gridcell", {
-      name: /Polars has no published run for ClickBench SF0\.1\. Missing cohorts are not scored; coverage is shown separately\./,
+      name: /Polars has no published run for ClickBench SF0\.1\. Missing rankings are not scored; coverage is shown separately\./,
     });
-    expect(missingCell.getAttribute("title")).toContain("Missing cohorts are not scored");
+    expect(missingCell.getAttribute("title")).toContain("Missing rankings are not scored");
     expect(missingCell.querySelector("a")).toBeNull();
     expect(missingCell.textContent).not.toContain("Maintainer");
     expect(missingCell.textContent).not.toContain("exact");
@@ -473,13 +473,13 @@ describe("MetaLeaderboard", () => {
 
     const { container } = render(<MetaLeaderboard data={data} mode="times" onModeChange={vi.fn()} />);
 
-    expect(screen.getByText("Showing 200 of 205 leaderboard-scope platforms across 1 leaderboard cohort")).toBeTruthy();
+    expect(screen.getByText("Showing 200 of 205 ranked-scope platforms across 1 leaderboard ranking")).toBeTruthy();
     expect(container.querySelectorAll("tbody tr")).toHaveLength(200);
     expect(screen.queryByText("Platform 204")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Show more platforms" }));
 
-    expect(screen.getByText("Showing 205 of 205 leaderboard-scope platforms across 1 leaderboard cohort")).toBeTruthy();
+    expect(screen.getByText("Showing 205 of 205 ranked-scope platforms across 1 leaderboard ranking")).toBeTruthy();
     expect(container.querySelectorAll("tbody tr")).toHaveLength(205);
     expect(screen.getByText("Platform 204")).toBeTruthy();
   });
