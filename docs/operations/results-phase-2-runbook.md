@@ -142,7 +142,7 @@ A submission PR that adds files outside the allowlist should be redirected to
 | Inventory generator | `scripts/generate_corpus_inventory.py` |
 | Submission validator | `scripts/validate_submission.py` |
 | Validation workflow | `.github/workflows/validate-submission.yml` |
-| Explorer pipeline | `benchbox/core/explorer_pipeline/` |
+| Explorer pipeline | `_project/scripts/explorer_pipeline/` |
 | Contributor guide | `docs/contributing-results.md` |
 
 ## 9. Verification Commands

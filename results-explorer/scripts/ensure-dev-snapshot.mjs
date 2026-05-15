@@ -5,6 +5,8 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
+import { EXPECTED_READ_MODEL_VERSION } from "./explorer-build-contract.mjs";
+
 const here = fileURLToPath(new URL(".", import.meta.url));
 const explorerRoot = resolve(here, "..");
 const repoRoot = resolve(explorerRoot, "..");
@@ -46,7 +48,62 @@ async function snapshotIsFresh() {
   if (!existsSync(snapshotPath)) return false;
   const snapshotMtime = statSync(snapshotPath).mtimeMs;
   const sourceMtime = await newestMtimeMs([...sourceRoots, ...sourceFiles]);
-  return snapshotMtime >= sourceMtime;
+  if (snapshotMtime < sourceMtime) return false;
+
+  const readModelVersion = readSnapshotReadModelVersion();
+  if (readModelVersion !== EXPECTED_READ_MODEL_VERSION) {
+    log(
+      `snapshot read-model v${readModelVersion ?? "unknown"} does not match ` +
+        `expected v${EXPECTED_READ_MODEL_VERSION}`,
+    );
+    return false;
+  }
+  return true;
+}
+
+function runUv(args, action) {
+  if (action === "validation") {
+    log("validating snapshot read-model version");
+  } else {
+    log(`uv ${args.join(" ")}`);
+  }
+  const result = spawnSync("uv", args, {
+    cwd: repoRoot,
+    encoding: "utf8",
+    env: { ...process.env, PYTHONUNBUFFERED: "1" },
+    stdio: action === "rebuild" ? "inherit" : "pipe",
+  });
+  if (result.error && result.error.code === "ENOENT") {
+    throw new Error(
+      `Explorer dev snapshot ${action} needs \`uv\`, which was not found on PATH. ` +
+        "Install uv (https://docs.astral.sh/uv/) or set EXPLORER_SKIP_PREDEV=1 to skip " +
+        "the rebuild and accept a stale/missing local snapshot.",
+    );
+  }
+  return result;
+}
+
+function readSnapshotReadModelVersion() {
+  const probe = [
+    "run",
+    "--",
+    "python",
+    "-c",
+    [
+      "import duckdb, sys",
+      "path = sys.argv[1]",
+      "with duckdb.connect(path, read_only=True) as con:",
+      "    row = con.execute('SELECT read_model_version FROM metadata LIMIT 1').fetchone()",
+      "print(row[0] if row else 0)",
+    ].join("\n"),
+    snapshotPath,
+  ];
+  const result = runUv(probe, "validation");
+  if (result.status !== 0) {
+    return null;
+  }
+  const version = Number(result.stdout.trim());
+  return Number.isInteger(version) && version >= 0 ? version : null;
 }
 
 function rebuildSnapshot() {
@@ -61,19 +118,7 @@ function rebuildSnapshot() {
     "--output",
     "results-explorer/public/data",
   ];
-  log(`uv ${args.join(" ")}`);
-  const result = spawnSync("uv", args, {
-    cwd: repoRoot,
-    stdio: "inherit",
-    env: { ...process.env, PYTHONUNBUFFERED: "1" },
-  });
-  if (result.error && result.error.code === "ENOENT") {
-    throw new Error(
-      "Explorer dev snapshot rebuild needs `uv`, which was not found on PATH. " +
-        "Install uv (https://docs.astral.sh/uv/) or set EXPLORER_SKIP_PREDEV=1 to skip " +
-        "the rebuild and accept a stale/missing local snapshot.",
-    );
-  }
+  const result = runUv(args, "rebuild");
   if (result.status !== 0) {
     throw new Error(`Explorer dev snapshot rebuild failed with exit ${result.status ?? "unknown"}`);
   }

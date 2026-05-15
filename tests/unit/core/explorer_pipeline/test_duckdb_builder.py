@@ -53,6 +53,17 @@ class TestDuckDBSnapshotBuilder:
 
         assert version == EXPLORER_READ_MODEL_VERSION
 
+    def test_metadata_creation_remains_single_row_when_reused(self, tmp_path: Path) -> None:
+        builder = DuckDBSnapshotBuilder()
+        out = tmp_path / "results.duckdb"
+
+        with duckdb.connect(str(out)) as con:
+            builder._create_metadata(con)
+            builder._create_metadata(con)
+            rows = con.execute("SELECT read_model_version FROM metadata").fetchall()
+
+        assert rows == [(EXPLORER_READ_MODEL_VERSION,)]
+
     def test_results_table_has_correct_columns(self, tmp_path: Path) -> None:
         builder = DuckDBSnapshotBuilder()
         out = tmp_path / "results.duckdb"

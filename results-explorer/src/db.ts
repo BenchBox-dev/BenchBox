@@ -121,6 +121,15 @@ export async function _verifyReadModelVersionForTest(
   return verifyReadModelVersion(conn);
 }
 
+// Exported for unit-test coverage of initialization ordering. The version
+// guard must run before schema-readiness probes so stale snapshots fail with
+// the actionable read-model message instead of a lower-level DuckDB error.
+export async function _validateAttachedSnapshotForTest(
+  conn: DuckDBConnection,
+): Promise<void> {
+  return validateAttachedSnapshot(conn);
+}
+
 export const _EXPECTED_READ_MODEL_VERSION_FOR_TEST = EXPECTED_READ_MODEL_VERSION;
 
 async function verifyReadModelVersion(conn: DuckDBConnection): Promise<void> {
@@ -142,9 +151,30 @@ async function readSnapshotReadModelVersion(conn: DuckDBConnection): Promise<num
     const row = result.toArray()[0]?.toJSON();
     const version = Number(row?.read_model_version ?? 0);
     return Number.isInteger(version) && version >= 0 ? version : 0;
-  } catch {
-    return 0;
+  } catch (error: unknown) {
+    if (isMissingReadModelMetadataError(error)) {
+      return 0;
+    }
+    throw error;
   }
+}
+
+function isMissingReadModelMetadataError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    /Table with name metadata does not exist/i.test(message) ||
+    /Catalog Error:.*metadata/i.test(message) ||
+    /Referenced column "?read_model_version"? not found/i.test(message) ||
+    /Binder Error:.*read_model_version/i.test(message)
+  );
+}
+
+async function validateAttachedSnapshot(conn: DuckDBConnection): Promise<void> {
+  await verifyReadModelVersion(conn);
+  // COUNT(*) can be satisfied from metadata for this projection view.
+  // Run the same projection PlatformIndex uses so a cold HTTP-backed
+  // snapshot is query-ready before the cached DB instance is exposed.
+  await waitForSnapshotRows(conn);
 }
 
 function throwReadModelVersionError(found: number): never {
@@ -237,11 +267,7 @@ export async function getDb(): Promise<duckdb.AsyncDuckDB> {
     const conn = await db.connect();
     try {
       await conn.query("ATTACH 'results.duckdb' AS bench (READ_ONLY)");
-      // COUNT(*) can be satisfied from metadata for this projection view.
-      // Run the same projection PlatformIndex uses so a cold HTTP-backed
-      // snapshot is query-ready before the cached DB instance is exposed.
-      await waitForSnapshotRows(conn);
-      await verifyReadModelVersion(conn);
+      await validateAttachedSnapshot(conn);
     } finally {
       await conn.close();
     }
