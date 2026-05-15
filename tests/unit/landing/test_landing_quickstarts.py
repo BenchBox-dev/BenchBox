@@ -271,6 +271,16 @@ def test_self_hosted_platforms_show_credential_safety(browser_catalog):
     assert "Do NOT paste credentials in chat" in postgresql["safety_terms"]["no_secrets"]
 
 
+def test_spark_keeps_local_prompt_deployment_when_registry_modes_are_missing(gen, browser_catalog):
+    caps = gen.PlatformRegistry.get_platform_capabilities("spark")
+    assert caps is not None
+    assert caps.deployment_modes == {}
+
+    spark = next(platform for platform in browser_catalog["platforms"] if platform["id"] == "spark")
+    assert spark["deployments"] == ["local", "self-hosted"]
+    assert spark["credential_deployments"] == ["self-hosted"]
+
+
 def test_removed_prompt_blocks_stay_removed():
     text = PROMPTS_INDEX_PATH.read_text(encoding="utf-8") + PROMPTS_JS_PATH.read_text(encoding="utf-8")
     assert "block-cli" not in text

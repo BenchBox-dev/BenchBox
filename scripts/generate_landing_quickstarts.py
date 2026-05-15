@@ -40,6 +40,7 @@ DEPLOYMENT_ORDER = {"local": 0, "self-hosted": 1, "managed": 2}
 LOCAL_CATEGORIES = frozenset({"analytical", "dataframe", "embedded"})
 CLOUD_HINTS = frozenset({"aws", "azure", "cloud", "gcs", "multi_cloud", "onelake", "s3", "saas", "serverless"})
 SELF_HOSTED_CATEGORIES = frozenset({"distributed", "relational", "timeseries"})
+LOCAL_EXECUTION_HINTS = frozenset({"local", "embedded", "in-process", "in_memory", "file_based"})
 DEPENDENCY_CHECK_ALIASES = {
     "fabric-lakehouse": "fabric",
     "fabric_dw": "fabric",
@@ -94,6 +95,14 @@ def _is_cloud_like(metadata: dict[str, Any]) -> bool:
     return metadata.get("category") == "cloud" or bool(supports & CLOUD_HINTS)
 
 
+def _has_local_execution_hint(metadata: dict[str, Any]) -> bool:
+    supports = {str(value).lower() for value in metadata.get("supports") or []}
+    if supports & LOCAL_EXECUTION_HINTS:
+        return True
+    text = " ".join(str(metadata.get(key) or "").lower() for key in ("description", "notes"))
+    return any(hint.replace("_", " ") in text for hint in LOCAL_EXECUTION_HINTS)
+
+
 def _infer_default_deployments(metadata: dict[str, Any]) -> tuple[set[str], set[str]]:
     """Infer UI deployment modes when registry metadata has no deployment_modes block."""
     category = metadata.get("category")
@@ -102,6 +111,8 @@ def _infer_default_deployments(metadata: dict[str, Any]) -> tuple[set[str], set[
     if _is_cloud_like(metadata):
         return {"managed"}, {"managed"}
     if category in SELF_HOSTED_CATEGORIES or "self-hosted" in supports:
+        if _has_local_execution_hint(metadata):
+            return {"local", "self-hosted"}, {"self-hosted"}
         return {"self-hosted"}, {"self-hosted"}
     if category in LOCAL_CATEGORIES:
         return {"local"}, set()

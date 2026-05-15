@@ -876,6 +876,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "dependency_check_command": "uv run benchbox check-deps --platform spark",
       "dependency_check_platform": "spark",
       "deployments": [
+        "local",
         "self-hosted"
       ],
       "id": "spark",
