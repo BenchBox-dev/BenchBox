@@ -2,7 +2,8 @@ id: joinorder-canonical-data-assurance
 title: "JoinOrder canonical data assurance: external checksum attestation, deterministic rebuild, conversion fidelity, manifest hash naming"
 worktree: main
 priority: High
-status: Blocked
+status: Completed
+completed_date: "2026-05-15"
 category: Testing and Quality Assurance
 
 description: |
@@ -213,9 +214,13 @@ work:
       `adf28547f5c2b90884a0e2564cdf8a42b9a1c16192461dcc02a78677e21fa952`,
       committed archive
       `669c97ce7e9e7498c7ce0cad018153aa93a9b8eefff0f77e436d690f64ebc5fd`.
-      `cast_info.parquet` differed between run1 and run2, so this TODO is
-      Blocked pending
+      `cast_info.parquet` differed between run1 and run2, so this TODO was
+      blocked pending
       `_project/TODO/main/planning/joinorder-parquet-rebuild-determinism-decision.yaml`.
+      Hygiene closeout: that decision is now completed in
+      `_project/DONE/main/planning/joinorder-parquet-rebuild-determinism-decision.yaml`;
+      BenchBox documents logical content equivalence rather than
+      byte-identical archive rebuilds.
 
   - id: w3
     summary: "Phase 3: conversion-fidelity validation for columns outside the 113-query workload (NULL/empty, int width, UTF-8); wire into the oracle harness"
@@ -382,6 +387,6 @@ success_metrics:
 open_questions:
   - "Does Harvard Dataverse still publish a per-file checksum for DOI 10.7910/DVN/2QYZBT file 3590041, and is it md5 or sha256? (Phase 1 determines the strength of the external anchor.)"
   - question: "If the Parquet rebuild is not byte-deterministic, do we pin the toolchain harder (Gate B-i) or switch to per-table content-hash verification (Gate B-ii)?"
-    gating: true
+    gating: false
     affects: ["w2 success_metric: rebuild result documented"]
-    default: "Document equivalent-not-identical + per-table content hash (B-ii) is the lower-risk default; pursue B-i only if the user wants byte-exact reproducibility"
+    default: "Resolved by `_project/DONE/main/planning/joinorder-parquet-rebuild-determinism-decision.yaml`: logical content equivalence is the rebuild guarantee."
