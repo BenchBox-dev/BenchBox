@@ -424,7 +424,12 @@ class PlatformRegistry:
                 "adoption": "niche",
                 "supports": ["olap", "spark", "lakehouse", "dataframe"],
                 "driver_package": "databricks-connect",
-                "capabilities": {"supports_sql": True, "supports_dataframe": True, "default_mode": "dataframe"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": True,
+                    "default_mode": "dataframe",
+                    "cost_class": "paid_credits",
+                },
             },
             "snowflake": {
                 "display_name": "Snowflake",
@@ -512,6 +517,7 @@ class PlatformRegistry:
                     "default_mode": "sql",
                     "platform_family": "trino",
                     "inherits_from": "trino",
+                    "cost_class": "paid_compute",
                     "default_deployment": "managed",
                     "deployment_modes": {
                         "managed": {
@@ -679,6 +685,7 @@ class PlatformRegistry:
                     "default_mode": "sql",
                     "platform_family": "pg_duckdb",
                     "conflicts_with": ["pg-mooncake"],
+                    "cost_class": "paid_credits",
                     "default_deployment": "self-hosted",
                     "deployment_modes": {
                         "self-hosted": {
@@ -721,7 +728,12 @@ class PlatformRegistry:
                 "supports": ["olap", "columnar", "azure", "distributed"],
                 "driver_package": "pyodbc",
                 "notes": "Supports Azure Synapse Dedicated SQL Pools. COPY INTO for bulk loading. T-SQL dialect.",
-                "capabilities": {"supports_sql": True, "supports_dataframe": False, "default_mode": "sql"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": False,
+                    "default_mode": "sql",
+                    "cost_class": "paid_compute",
+                },
             },
             "fabric_dw": {
                 "display_name": "Microsoft Fabric Warehouse",
@@ -742,7 +754,12 @@ class PlatformRegistry:
                 "supports": ["olap", "columnar", "azure", "delta_lake", "onelake"],
                 "driver_package": "pyodbc",
                 "notes": "Supports Fabric Warehouse only (not Lakehouse). Entra ID auth only. OneLake + COPY INTO for bulk loading. T-SQL dialect (subset).",
-                "capabilities": {"supports_sql": True, "supports_dataframe": False, "default_mode": "sql"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": False,
+                    "default_mode": "sql",
+                    "cost_class": "paid_compute",
+                },
             },
             "firebolt": {
                 "display_name": "Firebolt",
@@ -841,6 +858,7 @@ class PlatformRegistry:
                     "supports_dataframe": False,
                     "default_mode": "sql",
                     "platform_family": "databend",
+                    "cost_class": "paid_compute",
                     "default_deployment": "cloud",
                     "deployment_modes": {
                         "cloud": {
@@ -916,6 +934,7 @@ class PlatformRegistry:
                     "supports_dataframe": False,
                     "default_mode": "sql",
                     "platform_family": "singlestore",
+                    "cost_class": "paid_compute",
                     "default_deployment": "self-hosted",
                     "deployment_modes": {
                         "self-hosted": {
@@ -1032,7 +1051,12 @@ class PlatformRegistry:
                 "supports": ["olap", "serverless", "spark", "etl", "s3"],
                 "driver_package": "boto3",
                 "notes": "AWS managed Spark ETL service. Pay-per-DPU pricing (~$0.44/DPU-hour). Uses Glue Data Catalog for metadata. Supports both SQL and DataFrame execution modes.",
-                "capabilities": {"supports_sql": True, "supports_dataframe": True, "default_mode": "sql"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": True,
+                    "default_mode": "sql",
+                    "cost_class": "paid_compute",
+                },
             },
             "emr-serverless": {
                 "display_name": "Amazon EMR Serverless",
@@ -1047,7 +1071,12 @@ class PlatformRegistry:
                 "supports": ["olap", "serverless", "spark", "s3"],
                 "driver_package": "boto3",
                 "notes": "AWS serverless Spark with automatic scaling and sub-second startup. Pay per vCPU-hour and memory-GB-hour. Uses Glue Data Catalog for metadata.",
-                "capabilities": {"supports_sql": True, "supports_dataframe": True, "default_mode": "sql"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": True,
+                    "default_mode": "sql",
+                    "cost_class": "paid_compute",
+                },
             },
             "athena-spark": {
                 "display_name": "Amazon Athena for Apache Spark",
@@ -1062,7 +1091,12 @@ class PlatformRegistry:
                 "supports": ["olap", "interactive", "spark", "s3", "sessions"],
                 "driver_package": "boto3",
                 "notes": "AWS interactive Spark with notebook-style sessions. Sub-second startup with pre-provisioned capacity. Uses Glue Data Catalog for metadata. Pay per DPU-hour.",
-                "capabilities": {"supports_sql": True, "supports_dataframe": True, "default_mode": "sql"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": True,
+                    "default_mode": "sql",
+                    "cost_class": "paid_compute",
+                },
             },
             "dataproc": {
                 "display_name": "Google Cloud Dataproc",
@@ -1078,7 +1112,12 @@ class PlatformRegistry:
                 "supports": ["olap", "spark", "cluster", "gcs", "hive"],
                 "driver_package": "google-cloud-dataproc",
                 "notes": "Google Cloud managed Spark service. Per-second billing with preemptible VM support. Supports persistent and ephemeral clusters. Uses Hive Metastore for table metadata.",
-                "capabilities": {"supports_sql": True, "supports_dataframe": True, "default_mode": "sql"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": True,
+                    "default_mode": "sql",
+                    "cost_class": "paid_compute",
+                },
             },
             "dataproc-serverless": {
                 "display_name": "Google Cloud Dataproc Serverless",
@@ -1094,7 +1133,12 @@ class PlatformRegistry:
                 "supports": ["olap", "spark", "serverless", "gcs", "hive"],
                 "driver_package": "google-cloud-dataproc",
                 "notes": "Google Cloud Dataproc Serverless for fully managed Spark. No cluster management required. Sub-minute startup, auto-scaling, per-second billing. Uses Batch Controller API.",
-                "capabilities": {"supports_sql": True, "supports_dataframe": True, "default_mode": "sql"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": True,
+                    "default_mode": "sql",
+                    "cost_class": "paid_compute",
+                },
             },
             "fabric-spark": {
                 "display_name": "Microsoft Fabric Spark",
@@ -1111,7 +1155,12 @@ class PlatformRegistry:
                 "supports": ["olap", "spark", "saas", "delta", "onelake"],
                 "driver_package": "azure-identity",
                 "notes": "Microsoft Fabric SaaS Spark with OneLake storage. Uses Livy API for session management. Entra ID (Azure AD) authentication. Capacity Units billing model.",
-                "capabilities": {"supports_sql": True, "supports_dataframe": True, "default_mode": "sql"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": True,
+                    "default_mode": "sql",
+                    "cost_class": "paid_compute",
+                },
             },
             "fabric-lakehouse": {
                 "display_name": "Microsoft Fabric Lakehouse SQL",
@@ -1127,7 +1176,12 @@ class PlatformRegistry:
                 "supports": ["olap", "cloud", "read_only", "delta", "onelake"],
                 "driver_package": "pyodbc",
                 "notes": "Fabric Lakehouse SQL Analytics Endpoint is read-only. Use fabric-spark for generate/load phases and fabric-lakehouse for query phases.",
-                "capabilities": {"supports_sql": True, "supports_dataframe": False, "default_mode": "sql"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": False,
+                    "default_mode": "sql",
+                    "cost_class": "paid_compute",
+                },
             },
             "synapse-spark": {
                 "display_name": "Azure Synapse Analytics Spark",
@@ -1144,7 +1198,12 @@ class PlatformRegistry:
                 "supports": ["olap", "spark", "enterprise", "adls", "hive"],
                 "driver_package": "azure-identity",
                 "notes": "Azure Synapse Analytics Spark with ADLS Gen2 storage. Uses Livy API for session management. vCore-hour billing. Supports external Hive Metastore.",
-                "capabilities": {"supports_sql": True, "supports_dataframe": True, "default_mode": "sql"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": True,
+                    "default_mode": "sql",
+                    "cost_class": "paid_compute",
+                },
             },
             "spark": {
                 "display_name": "Apache Spark",
@@ -1269,7 +1328,12 @@ class PlatformRegistry:
                 "supports": ["olap", "pyspark_compatible", "snowflake", "dataframe"],
                 "driver_package": "snowflake-snowpark-python",
                 "notes": "PySpark DataFrame API compatibility layer on Snowflake. NOT Apache Spark - translates DataFrame operations to Snowflake SQL. No Spark cluster required.",
-                "capabilities": {"supports_sql": True, "supports_dataframe": True, "default_mode": "dataframe"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": True,
+                    "default_mode": "dataframe",
+                    "cost_class": "paid_credits",
+                },
             },
             "quanton": {
                 "display_name": "Onehouse Quanton",
@@ -1290,6 +1354,7 @@ class PlatformRegistry:
                     "supports_dataframe": True,
                     "default_mode": "sql",
                     "platform_family": "spark",
+                    "cost_class": "paid_compute",
                     "default_deployment": "managed",
                     "deployment_modes": {
                         "managed": {

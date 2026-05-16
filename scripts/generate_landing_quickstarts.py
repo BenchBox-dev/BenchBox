@@ -545,6 +545,9 @@ def _validate_cli_templates_and_runtime_hints(catalog: dict[str, Any]) -> list[s
     log_dir = runtime_hints.get("log_dir")
     if not isinstance(log_dir, str) or not log_dir.startswith("/tmp"):
         errors.append("runtime_hints.log_dir must start with '/tmp'")
+    log_slug_template = runtime_hints.get("log_slug_template")
+    if not isinstance(log_slug_template, str) or not log_slug_template:
+        errors.append("runtime_hints.log_slug_template must be a non-empty string")
     return errors
 
 

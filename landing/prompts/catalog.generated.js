@@ -110,7 +110,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
-      "cost_class": "free",
+      "cost_class": "paid_compute",
       "credential_deployments": [
         "managed"
       ],
@@ -280,7 +280,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "label": "Dask"
     },
     {
-      "cost_class": "free",
+      "cost_class": "paid_compute",
       "credential_deployments": [
         "self-hosted",
         "managed"
@@ -327,7 +327,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
-      "cost_class": "free",
+      "cost_class": "paid_credits",
       "credential_deployments": [
         "managed"
       ],
@@ -363,7 +363,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "label": "DataFusion"
     },
     {
-      "cost_class": "free",
+      "cost_class": "paid_compute",
       "credential_deployments": [
         "managed"
       ],
@@ -386,7 +386,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
-      "cost_class": "free",
+      "cost_class": "paid_compute",
       "credential_deployments": [
         "managed"
       ],
@@ -445,7 +445,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "label": "DuckDB"
     },
     {
-      "cost_class": "free",
+      "cost_class": "paid_compute",
       "credential_deployments": [
         "managed"
       ],
@@ -468,7 +468,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
-      "cost_class": "free",
+      "cost_class": "paid_compute",
       "credential_deployments": [
         "managed"
       ],
@@ -490,7 +490,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
-      "cost_class": "free",
+      "cost_class": "paid_compute",
       "credential_deployments": [
         "managed"
       ],
@@ -513,7 +513,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
-      "cost_class": "free",
+      "cost_class": "paid_compute",
       "credential_deployments": [
         "managed"
       ],
@@ -558,7 +558,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
-      "cost_class": "free",
+      "cost_class": "paid_compute",
       "credential_deployments": [
         "managed"
       ],
@@ -663,7 +663,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "label": "Pandas"
     },
     {
-      "cost_class": "free",
+      "cost_class": "paid_credits",
       "credential_deployments": [
         "self-hosted",
         "managed"
@@ -774,7 +774,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "label": "PySpark"
     },
     {
-      "cost_class": "free",
+      "cost_class": "paid_compute",
       "credential_deployments": [
         "managed"
       ],
@@ -842,7 +842,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
-      "cost_class": "free",
+      "cost_class": "paid_compute",
       "credential_deployments": [
         "self-hosted",
         "managed"
@@ -892,7 +892,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
-      "cost_class": "free",
+      "cost_class": "paid_credits",
       "credential_deployments": [
         "managed"
       ],
@@ -950,7 +950,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "label": "SQLite"
     },
     {
-      "cost_class": "free",
+      "cost_class": "paid_compute",
       "credential_deployments": [
         "managed"
       ],
@@ -996,7 +996,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
-      "cost_class": "free",
+      "cost_class": "paid_compute",
       "credential_deployments": [
         "managed"
       ],
@@ -1018,7 +1018,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
-      "cost_class": "free",
+      "cost_class": "paid_compute",
       "credential_deployments": [
         "managed"
       ],
