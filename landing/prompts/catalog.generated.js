@@ -1127,10 +1127,12 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
   ],
   "templates": {
     "cli": {
+      "capture_plans_footer": "To capture EXPLAIN plans, add `--capture-plans` to the live command and inspect with `benchbox show-plan --run <result-json> --query-id Q1`.",
       "compare": "uv run benchbox compare --platform {platform_a} --platform {platform_b} --benchmark {benchmark} --scale {scale} --non-interactive",
       "dependency_check": "uv run benchbox check-deps --platform {platform}",
       "dry_run": "uv run benchbox run --dry-run {dry_run_dir} --platform {platform} --benchmark {benchmark} --scale {scale}",
       "force_datagen_footer": "If the load phase fails partway, re-run with `--force datagen` appended.",
+      "provenance_snapshot": "mkdir -p <bundle-dir>/_provenance\nuv run benchbox --version-json > <bundle-dir>/_provenance/version.json\nuv run benchbox profile > <bundle-dir>/_provenance/system.txt\necho \"<exact command line used>\" > <bundle-dir>/_provenance/command.txt\n",
       "results_paths": "uv run benchbox results --paths --limit 1",
       "show_cli": "uv run benchbox results show-cli <result-json>",
       "test_one": "uv run benchbox run --platform {platform} --benchmark {benchmark} --scale {scale} --non-interactive"

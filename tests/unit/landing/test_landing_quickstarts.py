@@ -361,6 +361,39 @@ def test_show_cli_template_present(gen, catalog):
     assert any("show_cli must call benchbox results show-cli" in e for e in errors)
 
 
+def test_provenance_snapshot_present_in_templates(catalog):
+    templates = catalog["templates"]["cli"]
+    assert "provenance_snapshot" in templates
+    assert "<bundle-dir>/_provenance" in templates["provenance_snapshot"]
+
+
+def test_provenance_snapshot_includes_version_and_profile_commands(gen, catalog):
+    templates = catalog["templates"]["cli"]
+    assert "benchbox --version-json" in templates["provenance_snapshot"]
+    assert "benchbox profile" in templates["provenance_snapshot"]
+
+    bad = copy.deepcopy(catalog)
+    bad["templates"]["cli"]["provenance_snapshot"] = "mkdir -p <bundle-dir>/_provenance"
+    errors = gen.validate(bad)
+    assert any("provenance_snapshot must call benchbox --version-json" in e for e in errors)
+    assert any("provenance_snapshot must call benchbox profile" in e for e in errors)
+
+
+def test_capture_plans_footnote_present(gen, catalog):
+    templates = catalog["templates"]["cli"]
+    assert "--capture-plans" in templates["capture_plans_footer"]
+    assert "benchbox show-plan" in templates["capture_plans_footer"]
+    assert "--run" in templates["capture_plans_footer"]
+    assert "--query-id" in templates["capture_plans_footer"]
+
+    bad = copy.deepcopy(catalog)
+    bad["templates"]["cli"]["capture_plans_footer"] = "Capture plans separately."
+    errors = gen.validate(bad)
+    assert any("capture_plans_footer must mention --capture-plans" in e for e in errors)
+    assert any("capture_plans_footer must mention benchbox show-plan" in e for e in errors)
+    assert any("capture_plans_footer must use show-plan --run and --query-id" in e for e in errors)
+
+
 def test_runtime_hints_well_formed(gen, catalog):
     hints = catalog["runtime_hints"]
     assert set(hints) == {"log_dir", "log_slug_template", "long_run_threshold_scale"}
@@ -408,11 +441,13 @@ def test_agent_prompt_includes_output_discipline_and_summary_labels():
     assert "SMOKE" in prompts_js
     assert "COST ACKNOWLEDGMENT" in prompts_js
     assert "Discover & summarize" in prompts_js
+    assert "Save provenance" in prompts_js
     assert "force_datagen_footer" in prompts_js
     assert "resultsPathsForGoal" in prompts_js
     assert "--limit 2" in prompts_js
     assert "target MCP call(s)" in prompts_js
     assert "MCP tool result payload" in prompts_js
+    assert "capture_plans_footer" in prompts_js
 
 
 def test_mcp_prompt_uses_smoke_and_cost_gates():
@@ -635,7 +670,9 @@ def test_static_generated_payload_supports_dropdown_smoke(gen, browser_catalog):
     browser_templates = browser_catalog["templates"]["cli"]
     assert committed_templates["results_paths"] == browser_templates["results_paths"]
     assert committed_templates["show_cli"] == browser_templates["show_cli"]
+    assert committed_templates["provenance_snapshot"] == browser_templates["provenance_snapshot"]
     assert committed_templates["force_datagen_footer"] == browser_templates["force_datagen_footer"]
+    assert committed_templates["capture_plans_footer"] == browser_templates["capture_plans_footer"]
     benchmark_by_id = {benchmark["id"]: benchmark for benchmark in committed_payload["benchmarks"]}
     assert benchmark_by_id["tpcds"]["requires_bundled_dsdgen_below"] == "1.0"
     assert "requires_bundled_dsdgen_below" not in benchmark_by_id["tpch"]
