@@ -1157,6 +1157,22 @@ worktree-claim-locked:
 # the slot as "clean detached", but the resulting worktree carried the
 # previous tenant's INDEX into the new branch. Resetting before the
 # emptiness check normalizes the slot atomically.
+#
+# Ordering: the marker is written BEFORE `reset --hard` so the EXIT trap
+# can roll back a slot whose reset is interrupted mid-flight (SIGINT/
+# SIGTERM during the reset would otherwise leave the slot in a partial
+# state with no aborted-marker signal). Slots skipped by the post-reset
+# porcelain check or a transient reset failure remove the marker before
+# `continue` so the trap's cleanup does not target the wrong slot on a
+# later iteration. The cleanup function itself runs an extra `reset
+# --hard` so an interrupted pre-gate reset is fully normalized.
+#
+# Note: any detached pool slot is now scrubbed before being judged
+# claimable, even on iterations that ultimately skip the slot. This is
+# intentional — the pool contract is that detached = released, and a
+# detached slot with valuable uncommitted tracked-file state is already
+# out-of-contract (release would have reset it). Untracked-file residue
+# still survives the reset and skips the slot rather than being purged.
 worktree-claim-attempt:
 	@set -e; \
 	marker=""; wt=""; pool=""; claim_ok=0; \
@@ -1164,6 +1180,7 @@ worktree-claim-attempt:
 		if [ "$$claim_ok" != "1" ] && [ -n "$$marker" ]; then \
 			rm -f "$$marker"; \
 			git -C "$$wt" checkout --detach origin/develop >/dev/null 2>&1 || true; \
+			git -C "$$wt" reset --hard origin/develop >/dev/null 2>&1 || true; \
 			git -C "$$wt" branch -D "$(BRANCH)" >/dev/null 2>&1 || true; \
 			echo "claim of $$pool failed; slot returned to detached origin/develop" >&2; \
 			marker=""; \
@@ -1184,12 +1201,20 @@ worktree-claim-attempt:
 		[ -f "$$wt/.benchbox/claim_in_progress" ] && continue; \
 		branch=$$(git -C "$$wt" symbolic-ref -q --short HEAD 2>/dev/null || true); \
 		[ -z "$$branch" ] || continue; \
-		git -C "$$wt" reset --hard origin/develop >/dev/null; \
-		status=$$(git -C "$$wt" status --porcelain --untracked-files=normal | grep -vE '^\?\? \.benchbox(/|$$)' || true); \
-		[ -z "$$status" ] || continue; \
 		marker="$$wt/.benchbox/claim_in_progress"; \
 		mkdir -p "$$wt/.benchbox"; \
 		printf 'pid=%s started=%s branch=%s\n' "$$$$" "$$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(BRANCH)" > "$$marker"; \
+		if ! git -C "$$wt" reset --hard origin/develop >/dev/null 2>&1; then \
+			rm -f "$$marker"; marker=""; \
+			echo "claim skip $$pool: reset --hard origin/develop failed" >&2; \
+			continue; \
+		fi; \
+		status=$$(git -C "$$wt" status --porcelain --untracked-files=normal | grep -vE '^\?\? \.benchbox(/|$$)' || true); \
+		if [ -n "$$status" ]; then \
+			rm -f "$$marker"; marker=""; \
+			echo "claim skip $$pool: post-reset porcelain non-empty (untracked residue)" >&2; \
+			continue; \
+		fi; \
 		git -C "$$wt" checkout -b "$(BRANCH)" >/dev/null; \
 		if [ ! -f "$$wt/.venv/pyvenv.cfg" ] \
 			|| [ -n "$$(find "$$wt/uv.lock" "$$wt/pyproject.toml" -newer "$$wt/.venv/pyvenv.cfg" 2>/dev/null | head -n 1)" ]; then \
