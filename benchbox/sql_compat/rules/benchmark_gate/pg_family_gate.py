@@ -137,7 +137,7 @@ _register_pg_mooncake_gate(
         "pg_mooncake benchmark tables are promoted to mooncake mirrors for analytical execution, and those "
         "mirrors do not support the write_primitives setup/write contract. Targeted UAT on 2026-05-13 "
         "reached execution after raising replication sender limits, then failed setup with "
-        "`DuckDB does not support modififying Postgres tables`."
+        "`DuckDB does not support modifying Postgres tables`."
     ),
 )
 
