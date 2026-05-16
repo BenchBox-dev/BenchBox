@@ -17,6 +17,8 @@ from typing import Any, Literal, Optional
 from benchbox.core.schemas import LibraryInfo, PlatformInfo
 from benchbox.platforms.base import PlatformAdapter
 
+CostClass = Literal["free", "paid_credits", "paid_compute"]
+
 
 @dataclass
 class DeploymentCapability:
@@ -65,6 +67,7 @@ class PlatformCapability:
         default_deployment: Name of the default deployment mode
         platform_family: Platform family for dialect inheritance (e.g., "duckdb", "clickhouse")
         inherits_from: Parent platform name for configuration inheritance
+        cost_class: Coarse cost model for prompt safety gates
     """
 
     supports_sql: bool = False
@@ -74,6 +77,7 @@ class PlatformCapability:
     default_deployment: str = "local"
     platform_family: Optional[str] = None
     inherits_from: Optional[str] = None
+    cost_class: CostClass = "free"
     unsupported_benchmarks: dict[str, str] = field(default_factory=dict)
 
 
@@ -230,6 +234,7 @@ class PlatformRegistry:
                     "default_mode": "sql",
                     "platform_family": "duckdb",
                     "inherits_from": "duckdb",
+                    "cost_class": "paid_credits",
                     "default_deployment": "managed",
                     "deployment_modes": {
                         "managed": {
@@ -352,6 +357,7 @@ class PlatformRegistry:
                     "default_mode": "sql",
                     "platform_family": "clickhouse",
                     "inherits_from": "clickhouse",
+                    "cost_class": "paid_compute",
                     "default_deployment": "managed",
                     "deployment_modes": {
                         "managed": {
@@ -381,7 +387,12 @@ class PlatformRegistry:
                 "adoption": "mainstream",
                 "supports": ["olap", "serverless", "petabyte_scale"],
                 "driver_package": "google-cloud-bigquery",
-                "capabilities": {"supports_sql": True, "supports_dataframe": False, "default_mode": "sql"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": False,
+                    "default_mode": "sql",
+                    "cost_class": "paid_credits",
+                },
             },
             "databricks": {
                 "display_name": "Databricks SQL",
@@ -393,7 +404,12 @@ class PlatformRegistry:
                 "adoption": "mainstream",
                 "supports": ["olap", "spark", "lakehouse"],
                 "driver_package": "databricks-sql-connector",
-                "capabilities": {"supports_sql": True, "supports_dataframe": True, "default_mode": "sql"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": True,
+                    "default_mode": "sql",
+                    "cost_class": "paid_credits",
+                },
             },
             "databricks-df": {
                 "display_name": "Databricks DataFrame",
@@ -420,7 +436,12 @@ class PlatformRegistry:
                 "adoption": "mainstream",
                 "supports": ["olap", "serverless", "multi_cloud"],
                 "driver_package": "snowflake-connector-python",
-                "capabilities": {"supports_sql": True, "supports_dataframe": False, "default_mode": "sql"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": False,
+                    "default_mode": "sql",
+                    "cost_class": "paid_credits",
+                },
             },
             "redshift": {
                 "display_name": "Amazon Redshift",
@@ -435,7 +456,12 @@ class PlatformRegistry:
                 "adoption": "established",
                 "supports": ["olap", "columnar", "aws"],
                 "driver_package": "redshift-connector",
-                "capabilities": {"supports_sql": True, "supports_dataframe": False, "default_mode": "sql"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": False,
+                    "default_mode": "sql",
+                    "cost_class": "paid_compute",
+                },
             },
             "trino": {
                 "display_name": "Trino",
@@ -736,6 +762,7 @@ class PlatformRegistry:
                     "supports_dataframe": False,
                     "default_mode": "sql",
                     "platform_family": "firebolt",
+                    "cost_class": "paid_compute",
                     "default_deployment": "core",
                     "deployment_modes": {
                         "core": {
@@ -985,7 +1012,12 @@ class PlatformRegistry:
                 "supports": ["olap", "serverless", "s3", "data_lake"],
                 "driver_package": "pyathena",
                 "notes": "AWS serverless query service using Trino under the hood. Pay-per-query pricing ($5/TB scanned). Native S3 and Glue Data Catalog integration.",
-                "capabilities": {"supports_sql": True, "supports_dataframe": False, "default_mode": "sql"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": False,
+                    "default_mode": "sql",
+                    "cost_class": "paid_credits",
+                },
             },
             "glue": {
                 "display_name": "AWS Glue",
@@ -1831,6 +1863,7 @@ class PlatformRegistry:
             default_deployment=caps.get("default_deployment", "local"),
             platform_family=caps.get("platform_family"),
             inherits_from=caps.get("inherits_from"),
+            cost_class=caps.get("cost_class", "free"),
             unsupported_benchmarks=unsupported,
         )
 

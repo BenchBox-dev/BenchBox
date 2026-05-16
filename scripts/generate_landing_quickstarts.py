@@ -35,9 +35,11 @@ OUTPUT = REPO_ROOT / "landing" / "prompts" / "catalog.generated.js"
 FORBIDDEN_JSON = REPO_ROOT / "landing" / "prompts" / "recipes.json"
 
 VALID_DEPLOYMENT_MODES = frozenset({"local", "self-hosted", "managed"})
+VALID_COST_CLASSES = frozenset({"free", "paid_credits", "paid_compute"})
 MANAGED_SAFETY_KEYS = frozenset({"dependency", "dry_run", "no_secrets"})
 PLATFORM_OVERRIDE_KEYS = frozenset(
     {
+        "cost_class",
         "dependency_check_command",
         "dependency_check_platform",
         "install_command",
@@ -46,7 +48,7 @@ PLATFORM_OVERRIDE_KEYS = frozenset(
     }
 )
 STRING_PLATFORM_OVERRIDE_KEYS = frozenset(
-    {"dependency_check_command", "dependency_check_platform", "install_command", "label"}
+    {"cost_class", "dependency_check_command", "dependency_check_platform", "install_command", "label"}
 )
 DEPLOYMENT_ORDER = {"local": 0, "self-hosted": 1, "managed": 2}
 LOCAL_CATEGORIES = frozenset({"analytical", "dataframe", "embedded"})
@@ -201,7 +203,7 @@ def _dependency_groups() -> dict[str, Any]:
 
 def _apply_platform_override(entry: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
     updated = copy.deepcopy(entry)
-    for key in ("label", "install_command", "dependency_check_platform", "dependency_check_command"):
+    for key in ("label", "install_command", "dependency_check_platform", "dependency_check_command", "cost_class"):
         if isinstance(override.get(key), str):
             updated[key] = override[key]
     if isinstance(override.get("safety_terms"), dict):
@@ -224,6 +226,9 @@ def _derive_platform_entries(catalog: dict[str, Any] | None = None) -> list[dict
     metadata_by_id = PlatformRegistry.get_all_platform_metadata()
     overrides = _platform_overrides(catalog or {})
     for platform_id, metadata in sorted(metadata_by_id.items()):
+        caps = PlatformRegistry.get_platform_capabilities(platform_id)
+        if caps is None:
+            continue
         interfaces = _derive_interfaces(platform_id)
         if not interfaces:
             continue
@@ -232,6 +237,7 @@ def _derive_platform_entries(catalog: dict[str, Any] | None = None) -> list[dict
             continue
         entry: dict[str, Any] = {
             "id": platform_id,
+            "cost_class": caps.cost_class,
             "install_command": metadata.get("installation_command") or f"uv add benchbox --extra {platform_id}",
             "label": _platform_label(metadata, platform_id),
             "deployments": deployments,
@@ -267,6 +273,10 @@ def _validate_one_platform(entry: dict[str, Any], known_platforms: set[str]) -> 
         errors.append(f"platforms[{pid!r}]: unknown platform id (not in PlatformRegistry)")
     if not entry.get("label"):
         errors.append(f"platforms[{pid!r}]: non-empty label is required")
+    if entry.get("cost_class") not in VALID_COST_CLASSES:
+        errors.append(
+            f"platforms[{pid!r}].cost_class={entry.get('cost_class')!r}: must be one of {sorted(VALID_COST_CLASSES)}"
+        )
     if not entry.get("deployments"):
         errors.append(f"platforms[{pid!r}]: at least one deployment is required")
     for d in entry.get("deployments") or []:
@@ -324,6 +334,10 @@ def _validate_platform_overrides(catalog: dict[str, Any], known_platforms: set[s
         for key in sorted(STRING_PLATFORM_OVERRIDE_KEYS & set(override)):
             if not isinstance(override[key], str) or not override[key]:
                 errors.append(f"platform_overrides[{platform_id!r}].{key}: must be a non-empty string")
+        if "cost_class" in override and override["cost_class"] not in VALID_COST_CLASSES:
+            errors.append(
+                f"platform_overrides[{platform_id!r}].cost_class: must be one of {sorted(VALID_COST_CLASSES)}"
+            )
         if "safety_terms" in override:
             safety = override["safety_terms"]
             if not isinstance(safety, dict):

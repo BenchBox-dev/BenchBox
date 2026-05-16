@@ -17,6 +17,17 @@ pytestmark = [
     pytest.mark.fast,
 ]
 
+KNOWN_PAID_PLATFORM_COST_CLASSES = {
+    "athena": "paid_credits",
+    "bigquery": "paid_credits",
+    "clickhouse-cloud": "paid_compute",
+    "databricks": "paid_credits",
+    "firebolt": "paid_compute",
+    "motherduck": "paid_credits",
+    "redshift": "paid_compute",
+    "snowflake": "paid_credits",
+}
+
 
 class TestPlatformRegistry:
     """Test core PlatformRegistry functionality."""
@@ -280,6 +291,16 @@ class TestPlatformRegistry:
         assert caps.supports_sql
         assert caps.supports_dataframe
         assert caps.default_mode == "dataframe"
+
+    def test_known_paid_platforms_expose_cost_class(self):
+        """Prompt safety gates rely on the coarse paid/free registry tag."""
+        for platform_name, expected_cost_class in KNOWN_PAID_PLATFORM_COST_CLASSES.items():
+            caps = PlatformRegistry.get_platform_capabilities(platform_name)
+            assert caps is not None
+            assert caps.cost_class == expected_cost_class
+
+        assert PlatformRegistry.get_platform_capabilities("duckdb").cost_class == "free"
+        assert PlatformRegistry.get_platform_capabilities("postgresql").cost_class == "free"
 
     def test_requires_cloud_storage_for_cloud_platforms(self):
         """Test that cloud platforms are correctly identified as requiring cloud storage."""

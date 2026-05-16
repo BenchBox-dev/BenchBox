@@ -23,6 +23,16 @@ FORBIDDEN_JSON = REPO_ROOT / "landing" / "prompts" / "recipes.json"
 PROMPTS_INDEX_PATH = REPO_ROOT / "landing" / "prompts" / "index.html"
 PROMPTS_JS_PATH = REPO_ROOT / "landing" / "prompts" / "prompts.js"
 PROMPTS_CSS_PATH = REPO_ROOT / "landing" / "prompts" / "prompts.css"
+KNOWN_PAID_PLATFORM_COST_CLASSES = {
+    "athena": "paid_credits",
+    "bigquery": "paid_credits",
+    "clickhouse-cloud": "paid_compute",
+    "databricks": "paid_credits",
+    "firebolt": "paid_compute",
+    "motherduck": "paid_credits",
+    "redshift": "paid_compute",
+    "snowflake": "paid_credits",
+}
 
 
 def _load_generator():
@@ -154,6 +164,21 @@ def test_malformed_platform_override_values_are_rejected(gen, catalog):
     assert any(".dependency_check_platform: must be a non-empty string" in e for e in errors)
     assert any("safety_terms['dependency']: must be a non-empty string" in e for e in errors)
     assert any("safety_terms['extra']: must be one of" in e for e in errors)
+
+
+def test_cost_class_override_constrained_to_enum(gen, catalog):
+    good = copy.deepcopy(catalog)
+    good["platform_overrides"] = {"motherduck": {"cost_class": "free"}}
+    assert gen.validate(good) == []
+    motherduck = next(
+        platform for platform in gen.build_prompt_catalog(good)["platforms"] if platform["id"] == "motherduck"
+    )
+    assert motherduck["cost_class"] == "free"
+
+    bad = copy.deepcopy(catalog)
+    bad["platform_overrides"] = {"motherduck": {"cost_class": "paid_magic"}}
+    errors = gen.validate(bad)
+    assert any("cost_class: must be one of" in e for e in errors)
 
 
 def test_unknown_benchmark_id_is_rejected(gen, catalog):
@@ -295,6 +320,8 @@ def test_agent_prompt_includes_output_discipline_and_summary_labels():
     assert "set -o pipefail" in prompts_js
     assert " 2>&1 | tee " in prompts_js
     assert "Announce before running" in prompts_js
+    assert "SMOKE" in prompts_js
+    assert "COST ACKNOWLEDGMENT" in prompts_js
     assert "Discover & summarize" in prompts_js
     assert "force_datagen_footer" in prompts_js
 
@@ -412,6 +439,7 @@ def test_generated_platforms_cover_registry_ids(gen, browser_catalog):
 def test_generated_platforms_have_complete_filter_metadata(gen, browser_catalog):
     for platform in browser_catalog["platforms"]:
         assert platform["label"], platform["id"]
+        assert platform["cost_class"] in gen.VALID_COST_CLASSES
         assert platform["interfaces"], platform["id"]
         assert platform["deployments"], platform["id"]
         assert set(platform["interfaces"]) <= {"sql", "dataframe"}
@@ -436,6 +464,15 @@ def test_filter_pools_match_registry_capabilities(gen, browser_catalog):
                     expected.add(platform_id)
 
             assert _filter_platform_ids(browser_catalog, interface, deployment) == expected
+
+
+def test_known_paid_platforms_carry_cost_class(browser_catalog):
+    platform_by_id = {platform["id"]: platform for platform in browser_catalog["platforms"]}
+    for platform_id, expected_cost_class in KNOWN_PAID_PLATFORM_COST_CLASSES.items():
+        assert platform_by_id[platform_id]["cost_class"] == expected_cost_class
+
+    assert platform_by_id["duckdb"]["cost_class"] == "free"
+    assert platform_by_id["postgresql"]["cost_class"] == "free"
 
 
 def test_non_ui_registry_deployment_modes_are_normalized(gen, browser_catalog):
@@ -469,6 +506,9 @@ def test_static_generated_payload_supports_dropdown_smoke(gen, browser_catalog):
     assert len(_filter_platform_ids(committed_payload, "sql", "self-hosted")) >= 2
     assert "polars" in _filter_platform_ids(committed_payload, "dataframe", "local")
     assert committed_payload["runtime_hints"] == browser_catalog["runtime_hints"]
+    committed_by_id = {platform["id"]: platform for platform in committed_payload["platforms"]}
+    assert committed_by_id["snowflake"]["cost_class"] == "paid_credits"
+    assert committed_by_id["duckdb"]["cost_class"] == "free"
     committed_templates = committed_payload["templates"]["cli"]
     browser_templates = browser_catalog["templates"]["cli"]
     assert committed_templates["results_paths"] == browser_templates["results_paths"]

@@ -278,6 +278,26 @@
         return "set -o pipefail; " + command + " 2>&1 | tee " + path;
     }
 
+    function commandAtScale(command, scale) {
+        return command.replace(/--scale\s+\S+/, "--scale " + scale);
+    }
+
+    function isPaidEntry(entry) {
+        return entry && (entry.cost_class || "free") !== "free";
+    }
+
+    function isPaidSelection(platformEntry, platformBEntry) {
+        return isPaidEntry(platformEntry) || isPaidEntry(platformBEntry);
+    }
+
+    function needsSmokeStep(state, isPaid) {
+        return state.scale !== "0.01" && (isPaid || state.deployment !== "local");
+    }
+
+    function needsCostAcknowledgment(state, isPaid) {
+        return isPaid && parseFloat(state.scale) >= 0.1;
+    }
+
     function safetyTexts(entries, key, deployment) {
         var texts = [];
         entries.forEach(function (entry) {
@@ -381,6 +401,9 @@
         var liveCmd = commandWithLogCapture(cliCmd, liveLogPath);
         var resultsPaths = catalog.templates.cli.results_paths;
         var showCli = catalog.templates.cli.show_cli;
+        var isPaid = isPaidSelection(platformEntry, platformBEntry);
+        var smokeState = Object.assign({}, state, { scale: "0.01" });
+        var smokeCmd = commandWithLogCapture(commandAtScale(cliCmd, "0.01"), logPath(smokeState, platformSlug));
         var step = 1;
         var lines = [];
         if (state.goal === "compare") {
@@ -397,14 +420,25 @@
         } else {
             lines.push("  " + step++ + ". Check dependencies: no optional connector check is registered for this selection; confirm the install command completed successfully.");
         }
+        if (needsSmokeStep(state, isPaid)) {
+            lines.push("  " + step++ + ". SMOKE: run the same live command at scale factor 0.01 before the target-scale dry run: `" + smokeCmd + "`. Abort if the smoke run fails.");
+        }
         lines.push("  " + step++ + ". Dry run first: `" + dryRun + "`" + (dryRunB ? " and `" + dryRunB + "`" : "") + ". Inspect the plan" + (dryRunB ? "s" : "") + ".");
         if (shouldAnnounceRun(state)) {
             lines.push("  " + step++ + ". Announce before running: command `" + liveCmd + "`, log path `" + liveLogPath + "`, expected runtime, and stop condition. Stop promptly on user interrupt or redirect.");
         }
         if (needsCredentials) {
             lines.push("  " + step++ + ". Make sure platform connection credentials/config are set outside this conversation (env vars, config files). Do NOT ask me to paste secrets here.");
-            lines.push("  " + step++ + ". Once credentials are confirmed, run live: `" + liveCmd + "`.");
+            if (needsCostAcknowledgment(state, isPaid)) {
+                lines.push("  " + step++ + ". COST ACKNOWLEDGMENT: ask the user to confirm credit or compute spend before running the target scale.");
+                lines.push("  " + step++ + ". Once credentials and cost acknowledgment are confirmed, run live: `" + liveCmd + "`.");
+            } else {
+                lines.push("  " + step++ + ". Once credentials are confirmed, run live: `" + liveCmd + "`.");
+            }
         } else {
+            if (needsCostAcknowledgment(state, isPaid)) {
+                lines.push("  " + step++ + ". COST ACKNOWLEDGMENT: ask the user to confirm credit or compute spend before running the target scale.");
+            }
             lines.push("  " + step++ + ". Run live: `" + liveCmd + "`.");
         }
         lines.push("  " + step++ + ". Discover & summarize: run `" + resultsPaths + "`, then run `" + showCli + "` with the result JSON path. Summarize total runtime, per-query timings, and failures from the result JSON.");
