@@ -30,4 +30,29 @@ test.describe("BenchmarkIndex", () => {
       });
     }
   });
+
+  test("benchmark switcher only lists benchmarks with public results", async ({ page }) => {
+    await page.goto("/results/tpch/");
+    await waitForShell(page);
+
+    const switcher = page.getByTestId("benchmark-switcher");
+    await expect(switcher).toBeVisible();
+    await expect.poll(async () => (await switcher.locator("option").count())).toBeGreaterThan(0);
+
+    const labels = (await switcher.locator("option").allTextContents()).map((label) => label.trim());
+    expect(labels).toContain("TPC-H");
+    expect(labels).toContain("SSB");
+    expect(labels).not.toContain("AMPLab");
+    expect(labels).not.toContain("TPC-DI");
+    expect(labels).not.toContain("TPC-DS");
+  });
+
+  test("direct route to a no-result benchmark renders an empty-state with Back to Results", async ({ page }) => {
+    await page.goto("/results/amplab/");
+    await waitForShell(page);
+
+    await expect(page.getByRole("heading", { name: "AMPLab", level: 1 })).toBeVisible();
+    await expect(page.getByText("No published results yet for AMPLab.")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Back to Results" })).toBeVisible();
+  });
 });

@@ -349,9 +349,16 @@ function defaultImpl(
   rows: readonly Record<string, unknown>[],
   rankings: readonly Record<string, unknown>[],
   cells: readonly Record<string, unknown>[],
+  availableBenchmarks?: readonly string[],
 ): QueryRowsImpl {
   return async (sql: string) => {
     const s = String(sql).replace(/\s+/g, " ").trim();
+    if (s.startsWith("SELECT DISTINCT benchmark FROM bench.results")) {
+      const slugs = availableBenchmarks
+        ? [...availableBenchmarks]
+        : [...new Set(rows.map((row) => String(row.benchmark)))].sort();
+      return slugs.map((benchmark) => ({ benchmark }));
+    }
     if (s.includes("FROM bench.results")) return [...rows];
     if (s.includes("FROM bench.benchmark_rankings")) return [...rankings];
     if (s.startsWith("SELECT benchmark, scale_factor, phase, result_id, platform_id, query_id, display_ms")) {
@@ -483,9 +490,15 @@ describe("BenchmarkIndex", () => {
     const routeMock = vi.mocked(preactRouter.route);
     routeMock.mockClear();
     window.history.replaceState(null, "", "/results/tpch/?sf=10&phase=power&view=ranks");
+    vi.mocked(queryRows).mockImplementation(
+      defaultImpl(RESULT_ROWS, RANKING_ROWS, CELL_ROWS, ["tpch", "clickbench"]),
+    );
 
     render(<BenchmarkIndex benchmark="tpch" />);
     await waitFor(() => expect(screen.getByText("TPC-H Results")).toBeTruthy());
+    await waitFor(() =>
+      expect(within(screen.getByTestId("benchmark-switcher")).queryByRole("option", { name: "ClickBench" })).toBeTruthy(),
+    );
 
     const switcher = screen.getByTestId("benchmark-switcher") as HTMLSelectElement;
     expect(switcher.value).toBe("tpch");
@@ -497,10 +510,82 @@ describe("BenchmarkIndex", () => {
     expect(routeMock).toHaveBeenCalledWith("/results/clickbench/?view=ranks");
   });
 
+  it("hides no-result benchmarks from the switcher once the public corpus list resolves", async () => {
+    vi.mocked(queryRows).mockImplementation(
+      defaultImpl(RESULT_ROWS, RANKING_ROWS, CELL_ROWS, ["tpch", "clickbench"]),
+    );
+
+    render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() =>
+      expect(within(screen.getByTestId("benchmark-switcher")).queryByRole("option", { name: "ClickBench" })).toBeTruthy(),
+    );
+
+    const switcher = screen.getByTestId("benchmark-switcher") as HTMLSelectElement;
+    const labels = Array.from(switcher.options).map((option) => option.textContent ?? "");
+    expect(labels).toContain("TPC-H");
+    expect(labels).toContain("ClickBench");
+    expect(labels).not.toContain("AMPLab");
+    expect(labels).not.toContain("TPC-DS");
+  });
+
+  it("does not expose a same-label alias unless that exact slug has public results", async () => {
+    const legacyRows = RESULT_ROWS.map((row) => ({ ...row, benchmark: "ssb" }));
+    const legacyRankings = RANKING_ROWS.map((row) => ({ ...row, benchmark: "ssb" }));
+    const legacyCells = CELL_ROWS.map((row) => ({ ...row, benchmark: "ssb" }));
+    vi.mocked(queryRows).mockImplementation(
+      defaultImpl(legacyRows, legacyRankings, legacyCells, ["ssb", "tpch"]),
+    );
+
+    render(<BenchmarkIndex benchmark="ssb" />);
+    await waitFor(() =>
+      expect(within(screen.getByTestId("benchmark-switcher")).queryByRole("option", { name: "TPC-H" })).toBeTruthy(),
+    );
+
+    const switcher = screen.getByTestId("benchmark-switcher") as HTMLSelectElement;
+    const optionValues = Array.from(switcher.options).map((option) => option.value);
+    expect(switcher.value).toBe("ssb");
+    expect(optionValues).toContain("ssb");
+    expect(optionValues).not.toContain("star_schema");
+    expect(optionValues).not.toContain("amplab");
+  });
+
+  it("hides no-result benchmarks even when the corpus-list query fails", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.mocked(queryRows).mockImplementation(async (sql: string) => {
+      const s = String(sql).replace(/\s+/g, " ").trim();
+      if (s.startsWith("SELECT DISTINCT benchmark FROM bench.results")) {
+        throw new Error("simulated snapshot failure");
+      }
+      if (s.includes("FROM bench.results")) return [...RESULT_ROWS];
+      if (s.includes("FROM bench.benchmark_rankings")) return [...RANKING_ROWS];
+      if (s.startsWith("SELECT benchmark, scale_factor, phase, result_id, platform_id, query_id, display_ms")) {
+        return [...CELL_ROWS];
+      }
+      if (s.startsWith("SELECT result_id, phase, duration_s FROM bench.result_phase_durations")) return [];
+      return [];
+    });
+
+    render(<BenchmarkIndex benchmark="tpch" />);
+    try {
+      await waitFor(() =>
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining("listBenchmarksWithPublicResults failed"),
+          expect.any(Error),
+        ),
+      );
+
+      const switcher = screen.getByTestId("benchmark-switcher") as HTMLSelectElement;
+      const optionValues = Array.from(switcher.options).map((option) => option.value);
+      expect(optionValues).toEqual(["tpch"]);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
   it.each([
     ["ssb", "star_schema"],
     ["tsbs_devops", "tsbs-devops"],
-  ])("keeps legacy benchmark slug %s selected even when deduped from canonical %s", async (legacySlug, canonicalSlug) => {
+  ])("keeps legacy benchmark slug %s selected without surfacing empty alias %s", async (legacySlug, canonicalSlug) => {
     const legacyRows = RESULT_ROWS.map((row) => ({ ...row, benchmark: legacySlug }));
     const legacyRankings = RANKING_ROWS.map((row) => ({ ...row, benchmark: legacySlug }));
     const legacyCells = CELL_ROWS.map((row) => ({ ...row, benchmark: legacySlug }));
@@ -512,8 +597,8 @@ describe("BenchmarkIndex", () => {
     const switcher = screen.getByTestId("benchmark-switcher") as HTMLSelectElement;
     const optionValues = Array.from(switcher.options).map((option) => option.value);
     expect(switcher.value).toBe(legacySlug);
-    expect(optionValues).toContain(canonicalSlug);
     expect(optionValues).toContain(legacySlug);
+    expect(optionValues).not.toContain(canonicalSlug);
   });
 
   it("labels the Star Schema Benchmark and SSB equivalence explicitly", async () => {

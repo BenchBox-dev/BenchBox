@@ -483,6 +483,22 @@ export async function listResults(where: FacetWhereClause = { sql: "", params: [
   return memoizedSnapshotQueryRows<ResultRow>("list-results", { sql, params: where.params }, { cacheEmpty: false });
 }
 
+/**
+ * Distinct benchmark slugs that have at least one public result bundle.
+ *
+ * Sourced from the same `bench.results` projection that powers the Home
+ * corpus summary, so benchmark detail pivots cannot drift from the actual
+ * public corpus.
+ */
+export async function listBenchmarksWithPublicResults(): Promise<string[]> {
+  const rows = await memoizedSnapshotQueryRows<{ benchmark: string }>(
+    "distinct-benchmarks-with-public-results",
+    { sql: "SELECT DISTINCT benchmark FROM bench.results ORDER BY benchmark", params: [] },
+    { cacheEmpty: false },
+  );
+  return rows.map((row) => row.benchmark);
+}
+
 export async function getResultDetailMetrics(resultId: string): Promise<ResultDetailMetricsRow | null> {
   const rows = await queryRows<ResultDetailMetricsRow>(
     `SELECT ${RESULT_DETAIL_METRICS_COLUMNS} FROM bench.result_detail_metrics WHERE result_id = ?`,

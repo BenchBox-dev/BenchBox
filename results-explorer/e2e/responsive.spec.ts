@@ -75,7 +75,7 @@ test.describe("responsive explorer assertions", () => {
         const rowCount = await leaderboard.locator("tbody tr").count();
         const aboveFold = await rowsAboveFold(leaderboard.locator("tbody tr"), viewport.height);
         // Home intentionally keeps the product identity, active filters,
-        // cohort selector, and table controls ahead of the data grid. The
+        // ranking selector, and table controls ahead of the data grid. The
         // desktop budget is therefore "comparison starts above the fold", not
         // "the whole fixture corpus fits above the fold".
         expect(aboveFold).toBeGreaterThanOrEqual(Math.min(MIN_HOME_ROWS_ABOVE_FOLD_DESKTOP, rowCount));

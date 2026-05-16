@@ -4,7 +4,7 @@ import type { RoutableProps } from "preact-router";
 import { route } from "preact-router";
 import type { BenchmarkSummary, PlatformRow, SortDirection, SortState } from "@/types";
 import type { ResultRow } from "@/lib/duckdbQueries";
-import { getBenchmarkSummaryFromDuckDB, listResults } from "@/lib/duckdbQueries";
+import { getBenchmarkSummaryFromDuckDB, listBenchmarksWithPublicResults, listResults } from "@/lib/duckdbQueries";
 import { BENCHMARK_LABELS, humanizeBenchmark, isKnownBenchmark, fmtScore, fmtGeomean, errMsg, complianceLabel } from "@/utils";
 import { facetsToWhereClause, useFacetState, type FacetKey, type FacetState } from "@/lib/facetModel";
 import { hasActiveFacets, matchesFacetRow, singleFacetValue } from "@/lib/facetMatching";
@@ -98,15 +98,21 @@ function benchmarkContextNote(benchmark: string): string | null {
  * sibling switcher. Two slugs sometimes share a display label
  * (`star_schema` and `ssb` both render "SSB"; `tsbs-devops` and
  * `tsbs_devops` both render "TSBS DevOps") because legacy and
- * canonical routes coexist. We keep the first slug encountered so the
- * switcher lists each benchmark family exactly once and the canonical
- * route wins (BENCHMARK_LABELS is declared with the canonical slug
- * first).
+ * canonical routes coexist.
+ *
+ * Once the corpus availability query resolves, return one option per display
+ * label, choosing the first slug for that label that actually has public
+ * results. This keeps same-label aliases from pivoting into an empty detail
+ * page just because their sibling slug is populated.
  */
-function uniqueBenchmarkOptions(): { value: string; label: string }[] {
+function uniqueBenchmarkOptions(
+  availableBenchmarks: ReadonlySet<string> | null,
+): { value: string; label: string }[] {
+  if (availableBenchmarks === null) return [];
   const seen = new Set<string>();
   const options: { value: string; label: string }[] = [];
   for (const [value, label] of Object.entries(BENCHMARK_LABELS)) {
+    if (!availableBenchmarks.has(value)) continue;
     if (seen.has(label)) continue;
     seen.add(label);
     options.push({ value, label });
@@ -141,6 +147,26 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Distinct benchmark slugs with at least one public result bundle. Until
+  // this resolves, the switcher only exposes the current benchmark through
+  // the fallback option below so it never briefly offers catalog-only pivots.
+  const [availableBenchmarks, setAvailableBenchmarks] = useState<ReadonlySet<string> | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    listBenchmarksWithPublicResults()
+      .then((slugs) => {
+        if (!cancelled) setAvailableBenchmarks(new Set(slugs));
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        console.warn("listBenchmarksWithPublicResults failed; switcher will show only the current benchmark", err);
+        setAvailableBenchmarks(new Set(benchmark ? [benchmark] : []));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [benchmark]);
 
   // Filter state - URL-synced so views are shareable.
   const { facets, setFacet } = useFacetState();
@@ -407,7 +433,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     selectedCompareRows.length >= 2
       ? buildCompareUrl(selectedCompareRows.map((row) => compareIdForRow(row)))
       : null;
-  const benchmarkOptions = uniqueBenchmarkOptions();
+  const benchmarkOptions = uniqueBenchmarkOptions(availableBenchmarks);
   const hasCurrentBenchmarkOption = benchmarkOptions.some((option) => option.value === benchmark);
   const contextNote = benchmarkContextNote(benchmark);
   const selectedComparableCount = selectedCompareRows.length;
