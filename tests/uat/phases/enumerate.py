@@ -93,6 +93,7 @@ def enumerate_cells_with_pruning(
 
     cells: list[Cell] = []
     compatibility_pruned: list[CompatibilityPrunedCell] = []
+    include_release_gate_runtime_envelopes = _release_gate_runtime_envelopes_enabled(raw)
     for platform in platform_list:
         for benchmark in benchmark_list:
             info = benchmarks.get(benchmark)
@@ -102,7 +103,12 @@ def enumerate_cells_with_pruning(
                 requested = [float(override)]
             else:
                 requested = [float(r) for r in rungs]
-            rule = compatibility_rule_for(platform, benchmark, info)
+            rule = compatibility_rule_for(
+                platform,
+                benchmark,
+                info,
+                include_release_gate_runtime_envelopes=include_release_gate_runtime_envelopes,
+            )
             if rule is not None:
                 compatibility_pruned.extend(
                     _pruned_rows_for_rule(platform=platform, benchmark=benchmark, requested=requested, rule=rule)
@@ -143,3 +149,10 @@ def _as_list(value: Iterable | None) -> list:
     if isinstance(value, str):
         return [value]
     return list(value)
+
+
+def _release_gate_runtime_envelopes_enabled(raw: dict[str, Any]) -> bool:
+    compatibility_cfg = raw.get("compatibility") or {}
+    if not isinstance(compatibility_cfg, dict):
+        return False
+    return compatibility_cfg.get("release_gate_runtime_envelopes") is True
