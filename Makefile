@@ -1177,13 +1177,15 @@ worktree-claim-attempt:
 	@set -e; \
 	marker=""; wt=""; pool=""; claim_ok=0; \
 	cleanup() { \
+		trap '' INT TERM; \
 		if [ "$$claim_ok" != "1" ] && [ -n "$$marker" ]; then \
-			rm -f "$$marker"; \
-			git -C "$$wt" checkout --detach origin/develop >/dev/null 2>&1 || true; \
-			git -C "$$wt" reset --hard origin/develop >/dev/null 2>&1 || true; \
-			git -C "$$wt" branch -D "$(BRANCH)" >/dev/null 2>&1 || true; \
-			echo "claim of $$pool failed; slot returned to detached origin/develop" >&2; \
+			cleanup_marker="$$marker"; cleanup_wt="$$wt"; cleanup_pool="$$pool"; \
 			marker=""; \
+			rm -f "$$cleanup_marker"; \
+			git -C "$$cleanup_wt" checkout --detach origin/develop >/dev/null 2>&1 || true; \
+			git -C "$$cleanup_wt" reset --hard origin/develop >/dev/null 2>&1 || true; \
+			git -C "$$cleanup_wt" branch -D "$(BRANCH)" >/dev/null 2>&1 || true; \
+			echo "claim of $$cleanup_pool failed; slot returned to detached origin/develop" >&2; \
 		fi; \
 	}; \
 	on_int() { cleanup; exit 130; }; \
