@@ -29,7 +29,8 @@ description: |
 
 prior_art:
   - "landing/prompts/prompts.js:304-337 buildMcpPrompt — the existing MCP step list to extend"
-  - "landing/prompts/catalog.yaml:83-89 mcp section — already references analyze_results and system_profile; generator validates they exist"
+  - "landing/prompts/catalog.yaml:83-89 mcp section — currently references run_benchmark, list_available, benchmark_run, compare_platforms, and analyze_results; it does NOT yet expose system_profile"
+  - "benchbox/mcp/ — source of truth for whether system_profile exists as a tool and whether the generator can validate it"
   - "Phases 1-4 of this TODO group — mirror the same gating logic; do not redefine thresholds"
 
 work:
@@ -52,6 +53,11 @@ work:
           via list_available metadata if --version-json equivalent
           doesn't exist over MCP
         - --capture-plans footnote -> RENDER as "pass capture_plans=true"
+      Also verify whether `system_profile` is already available in
+      benchbox/mcp/. If it is, decide whether to add
+      `mcp.tools.system_profile` (or equivalent) to catalog.yaml and
+      extend generator validation, or whether buildMcpPrompt should use
+      the literal tool name with a validator pin.
       Document the mapping in /tmp/prompts-phase5-w0.log and
       summarize in this TODO before w1.
 
@@ -87,6 +93,8 @@ work:
       analyze_results MCP prompt with the result-bundle path.
       Add a final "Save provenance" step that calls the
       system_profile MCP tool and stashes output alongside the bundle.
+      If w0 chose a catalog-backed tool name, add it to catalog.yaml and
+      update generator validation in the same work unit.
       Add a one-line passive footnote on capture_plans=true.
 
   - id: w4
@@ -113,14 +121,14 @@ verification:
   - description: "Landing tests pass"
     command: "uv run -- python -m pytest tests/unit/landing/ -v"
     expected_output: "0 failures"
-  - description: "Referenced MCP tools/prompts exist (generator already pins this; re-confirm)"
+  - description: "Referenced MCP tools/prompts exist and system_profile is pinned or explicitly documented"
     command: "uv run -- python scripts/generate_landing_quickstarts.py --validate-only"
-    expected_output: "validate-only: OK (no mcp.* unknown-name errors)"
+    expected_output: "validate-only: OK (no mcp.* unknown-name errors, including the selected system_profile handling)"
 
 must_preserve:
   - "Existing MCP prompt step ordering (list_available -> check_dependencies -> dry-run -> live -> summary) — new steps slot in around the existing scaffold."
   - "Phase 2-3 gating thresholds — MCP uses the same scale/deployment/cost-class predicates."
-  - "Generator pins on mcp.* (lines 411-421) — analyze_results and system_profile must remain registered MCP names."
+  - "Generator pins on mcp.* (lines 411-421) — analyze_results must remain registered, and system_profile must either be added to that validated surface or explicitly validated by a new pin."
 
 approach: |
   After w0's inventory clarifies the CLI->MCP mapping table, the
@@ -141,6 +149,7 @@ anti_patterns:
 scope_limit:
   only_modify:
     - "landing/prompts/prompts.js"
+    - "landing/prompts/catalog.yaml"  # only if w0 chooses a catalog-backed system_profile tool name
     - "landing/prompts/catalog.generated.js"  # regenerated
     - "scripts/generate_landing_quickstarts.py"  # only if new validator pins needed
     - "tests/unit/landing/test_landing_quickstarts.py"
@@ -152,7 +161,9 @@ scope_limit:
 files_affected:
   modified:
     - "landing/prompts/prompts.js"
+    - "landing/prompts/catalog.yaml"
     - "landing/prompts/catalog.generated.js"
+    - "scripts/generate_landing_quickstarts.py"
     - "tests/unit/landing/test_landing_quickstarts.py"
 
 deps:

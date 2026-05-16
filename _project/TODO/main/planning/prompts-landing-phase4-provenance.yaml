@@ -13,9 +13,10 @@ description: |
   guesswork weeks later (which version of BenchBox? what platform
   driver? what hardware?).
 
-  This TODO adds a final "Save provenance" step to both the CLI and
-  MCP rendered prompts using `benchbox --version-json` and
-  `benchbox profile`. As a passive bonus, append a single-line
+  This TODO adds a final "Save provenance" step to the CLI rendered
+  prompt using `benchbox --version-json` and `benchbox profile`.
+  MCP-surface provenance is intentionally deferred to Phase 5 after
+  the CLI contract settles. As a passive bonus, append a single-line
   footnote telling agents how to opt into `--capture-plans` and
   inspect with `benchbox show-plan`, without adding any new form
   control.
@@ -29,13 +30,14 @@ description: |
   - D2 (before w2): where to write the provenance snapshot? Default:
     next to the result bundle (in the directory benchbox printed at
     end of run). Agent extracts the bundle path from the run output
-    or `benchbox results list --latest 1`.
+    or `benchbox results --paths --limit 1`.
 
 prior_art:
   - "landing/prompts/catalog.yaml:74-79 templates.cli — extend with provenance_snapshot (YAML literal block)"
-  - "Phase 1 templates.cli.results_show and report — reuse the same key-then-substring validator pattern"
+  - "Phase 1 templates.cli.results_paths and show_cli — reuse the same key-then-substring validator pattern"
   - "AGENTS.md provenance/reproducibility guidance — surface via the rendered prompt rather than relying on agent recall"
   - "benchbox --version-json and benchbox profile — existing first-class commands; do not invent new ones"
+  - "benchbox/cli/commands/show_plan.py:20 show-plan requires --run and --query-id; do not use non-existent --result/--query flags"
 
 work:
   - id: w1
@@ -44,6 +46,7 @@ work:
     notes: |
       In catalog.yaml templates.cli, add:
         provenance_snapshot: |
+          mkdir -p <bundle-dir>/_provenance
           uv run benchbox --version-json > <bundle-dir>/_provenance/version.json
           uv run benchbox profile > <bundle-dir>/_provenance/system.txt
           echo "<exact command line used>" > <bundle-dir>/_provenance/command.txt
@@ -69,8 +72,8 @@ work:
       Append a single line to the rendered prompt, after the
       force-datagen footer:
         "To capture EXPLAIN plans, add --capture-plans to the live
-         command and inspect with `benchbox show-plan --result
-         <bundle-path> --query Q1`."
+         command and inspect with `benchbox show-plan --run
+         <result-json> --query-id Q1`."
       No form control; advanced users edit the copied prompt.
 
   - id: w4
@@ -105,8 +108,8 @@ verification:
   - description: "Landing tests pass"
     command: "uv run -- python -m pytest tests/unit/landing/ -v"
     expected_output: "0 failures"
-  - description: "Provenance commands are real BenchBox subcommands"
-    command: "uv run benchbox --version-json >/dev/null && uv run benchbox profile --help >/dev/null"
+  - description: "Provenance and plan-inspection commands are real BenchBox subcommands"
+    command: "uv run benchbox --version-json >/dev/null && uv run benchbox profile --help >/dev/null && uv run benchbox show-plan --help >/dev/null"
     expected_output: "exit 0"
 
 must_preserve:
@@ -129,6 +132,7 @@ anti_patterns:
   - "DO NOT introduce a benchbox provenance subcommand — composition of existing commands is sufficient and avoids API growth."
   - "DO NOT write provenance into a fixed path like /tmp/ — the bundle directory is the correct co-location for reproducibility."
   - "DO NOT skip provenance for local DuckDB runs — even local runs need a version pin for reproducibility weeks later."
+  - "DO NOT use `benchbox show-plan --result` or `--query` — the command surface is `--run` and `--query-id`."
 
 scope_limit:
   only_modify:

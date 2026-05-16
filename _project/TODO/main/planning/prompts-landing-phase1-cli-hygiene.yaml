@@ -21,7 +21,8 @@ description: |
   - No long-run announce — AGENTS.md mandates "Runs >10min: announce
     command/runtime/log/stop first."
   - Step 6 says "Summarise" but doesn't say how — no
-    `benchbox results show` / `benchbox report` commands.
+    `benchbox results --paths` / `benchbox results show-cli`
+    guidance for finding and inspecting the result JSON.
   - No `--force datagen` recovery hint for partial loads (a recurring
     sticking point — see QuestDB sessions e47108b5, 2fd35b2d).
 
@@ -31,6 +32,9 @@ description: |
   touch.
 
   Decision gates:
+  - D0 (before w1): re-validate the sampled session evidence and
+    commit a compact summary, or remove the session-ID claims from this
+    TODO before implementation.
   - D1 (before w2): confirm `runtime_hints` map structure with owner —
     flat keys (`log_dir`, `log_slug_template`, `long_run_threshold_scale`)
     vs a sub-map per surface. Default to flat keys unless a second
@@ -43,15 +47,33 @@ description: |
     pins.
 
 prior_art:
-  - "landing/prompts/catalog.yaml:74-79 templates.cli — extend with results_show, report, runtime_hints (do not rename existing keys)"
+  - "landing/prompts/catalog.yaml:74-79 templates.cli — extend with results_paths, show_cli, runtime_hints (do not rename existing keys)"
   - "scripts/generate_landing_quickstarts.py:468-484 validate() flag-shape pins — extend pattern, add --non-interactive presence check the same way"
   - "landing/prompts/prompts.js:352-378 buildAgentPrompt — extend the same step-list builder; do not introduce a new template engine"
   - "AGENTS.md / CLAUDE.md Output Discipline + Long-Running UAT sections — reuse the /tmp/<slug>.log + tail summary convention"
   - "tests/unit/landing/test_landing_quickstarts.py:368 test_static_generated_payload_supports_dropdown_smoke — extend rather than duplicate"
+  - "benchbox/cli/commands/results.py:86 results group and show-cli subcommand — use existing result discovery/repro commands; do not invent `results show`"
 
 work:
+  - id: w0
+    summary: "Re-validate sampled CLI-session evidence and commit compact summary"
+    status: pending
+    notes: |
+      Re-run the evidence search behind the description's local-session
+      claims before editing the prompt surface:
+        - command(s) used to inspect ~/.claude/projects/-Users-joe-Developer-BenchBox/*.jsonl
+        - checked repo SHA and current date
+        - count of sampled sessions and count per observed issue
+        - key anonymized snippets or filenames sufficient to audit the claim
+      Commit the compact summary to
+      `_project/analysis/prompts-landing-phase1-cli-hygiene-evidence.md`.
+      Raw JSONL/stdout stays in /tmp or another ignored local path. If the
+      session logs are unavailable, record that fact and remove or soften
+      the session-ID-specific evidence claims before continuing.
+
   - id: w1
     summary: "Extend catalog.yaml CLI templates with --non-interactive on test_one and compare"
+    needs: [w0]
     status: pending
     notes: |
       In landing/prompts/catalog.yaml lines 75-77, append
@@ -59,7 +81,7 @@ work:
       Leave `dependency_check` and `dry_run` untouched.
 
   - id: w2
-    summary: "Add runtime_hints map + new template keys (results_show, report, force_datagen_footer) to catalog.yaml"
+    summary: "Add runtime_hints map + new template keys (results_paths, show_cli, force_datagen_footer) to catalog.yaml"
     needs: [w1]
     status: pending
     notes: |
@@ -69,8 +91,8 @@ work:
           log_slug_template: "bench_{platform}_{benchmark}_{scale}"
           long_run_threshold_scale: "0.1"
       Add under templates.cli:
-        results_show: "uv run benchbox results show <bundle-path>"
-        report: "uv run benchbox report --result <bundle-path>"
+        results_paths: "uv run benchbox results --paths --limit 1"
+        show_cli: "uv run benchbox results show-cli <result-json>"
         force_datagen_footer: "If the load phase fails partway, re-run with `--force datagen` appended."
       Keep keys snake_case to match existing convention.
 
@@ -81,8 +103,8 @@ work:
     notes: |
       Extend validate() at line 439:
       - test_one and compare templates MUST contain ' --non-interactive'.
-      - results_show must contain 'benchbox results show'.
-      - report must contain 'benchbox report'.
+      - results_paths must contain 'benchbox results --paths'.
+      - show_cli must contain 'benchbox results show-cli'.
       - runtime_hints.long_run_threshold_scale must be a string that appears
         in scales[].
       - runtime_hints.log_dir must start with '/tmp' (be strict; agents
@@ -105,9 +127,13 @@ work:
       (b) Modify the rendered live-run command to append
           ` 2>&1 | tee /tmp/<slug>.log` (build slug from
           log_slug_template substituted with platform/benchmark/scale).
-      (c) New step "Discover & summarize" using results_show and report
-          template keys (replaces — not duplicates — the existing
-          "Summarise the result" prose).
+          Preserve the run's failure status, e.g. render the command under
+          `set -o pipefail` or otherwise instruct the agent not to treat a
+          successful `tee` as a successful benchmark.
+      (c) New step "Discover & summarize" using results_paths and show_cli
+          template keys, plus a short instruction to summarize total runtime,
+          per-query timings, and failures from the result JSON (replaces —
+          not duplicates — the existing "Summarise the result" prose).
       (d) Append force_datagen_footer as the last line.
       Do NOT add new form controls — all behavior is selection-derived.
 
@@ -119,8 +145,8 @@ work:
       Extend tests/unit/landing/test_landing_quickstarts.py:
       - test_test_one_template_uses_non_interactive
       - test_compare_template_uses_non_interactive
-      - test_results_show_template_present
-      - test_report_template_present
+      - test_results_paths_template_present
+      - test_show_cli_template_present
       - test_runtime_hints_well_formed (keys present + types)
       - test_runtime_hints_log_dir_under_tmp
       - extend test_static_generated_payload_supports_dropdown_smoke at
@@ -193,12 +219,15 @@ scope_limit:
     - "landing/prompts/a11y-checklist.md"      # only if step labels change tab order
     - "scripts/generate_landing_quickstarts.py"
     - "tests/unit/landing/test_landing_quickstarts.py"
+    - "_project/analysis/prompts-landing-phase1-cli-hygiene-evidence.md"
   do_not_modify:
     - "benchbox/core/platform_registry.py"
     - "benchbox/core/benchmark_registry.py"
     - "benchbox/mcp/"
     - "landing/prompts/index.html"
     - "landing/prompts/prompts.css"
+    - "benchbox/cli/commands/results.py"
+    - "benchbox/cli/commands/report.py"
 
 files_affected:
   modified:
@@ -207,6 +236,7 @@ files_affected:
     - "landing/prompts/prompts.js"
     - "scripts/generate_landing_quickstarts.py"
     - "tests/unit/landing/test_landing_quickstarts.py"
+    - "_project/analysis/prompts-landing-phase1-cli-hygiene-evidence.md"
 
 deferred:
   - summary: "MCP-surface parity"
@@ -220,7 +250,7 @@ deferred:
 
 success_metrics:
   - "Default DuckDB+TPC-H+0.01+local prompt remains <= 7 numbered steps."
-  - "Managed/cloud (e.g., MotherDuck+TPC-H+1.0) prompt now includes: --non-interactive, /tmp/<slug>.log tee, benchbox results show, benchbox report, --force datagen footer."
+  - "Managed/cloud (e.g., MotherDuck+TPC-H+1.0) prompt now includes: --non-interactive, /tmp/<slug>.log tee with failure status preserved, benchbox results --paths, benchbox results show-cli, --force datagen footer."
   - "tests/unit/landing/ stays at >= current count + 6 new passing tests."
   - "make prompts-landing-check green in CI."
 
