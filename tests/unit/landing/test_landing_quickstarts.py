@@ -25,13 +25,30 @@ PROMPTS_JS_PATH = REPO_ROOT / "landing" / "prompts" / "prompts.js"
 PROMPTS_CSS_PATH = REPO_ROOT / "landing" / "prompts" / "prompts.css"
 KNOWN_PAID_PLATFORM_COST_CLASSES = {
     "athena": "paid_credits",
+    "athena-spark": "paid_compute",
     "bigquery": "paid_credits",
     "clickhouse-cloud": "paid_compute",
+    "databend": "paid_compute",
     "databricks": "paid_credits",
+    "databricks-df": "paid_credits",
+    "dataproc": "paid_compute",
+    "dataproc-serverless": "paid_compute",
+    "emr-serverless": "paid_compute",
+    "fabric-lakehouse": "paid_compute",
+    "fabric-spark": "paid_compute",
+    "fabric_dw": "paid_compute",
     "firebolt": "paid_compute",
+    "glue": "paid_compute",
     "motherduck": "paid_credits",
+    "pg-duckdb": "paid_credits",
+    "quanton": "paid_compute",
     "redshift": "paid_compute",
+    "singlestore": "paid_compute",
     "snowflake": "paid_credits",
+    "snowpark-connect": "paid_credits",
+    "starburst": "paid_compute",
+    "synapse": "paid_compute",
+    "synapse-spark": "paid_compute",
 }
 
 
@@ -391,6 +408,16 @@ def test_runtime_hints_well_formed(gen, catalog):
     assert any("long_run_threshold_scale must be a string present in scales[]" in e for e in errors)
 
     bad = copy.deepcopy(catalog)
+    bad["runtime_hints"]["log_slug_template"] = 123
+    errors = gen.validate(bad)
+    assert any("runtime_hints.log_slug_template must be a non-empty string" in e for e in errors)
+
+    bad = copy.deepcopy(catalog)
+    bad["runtime_hints"]["log_slug_template"] = ""
+    errors = gen.validate(bad)
+    assert any("runtime_hints.log_slug_template must be a non-empty string" in e for e in errors)
+
+    bad = copy.deepcopy(catalog)
     bad["runtime_hints"] = []
     errors = gen.validate(bad)
     assert any("runtime_hints must be a mapping" in e for e in errors)
@@ -416,7 +443,33 @@ def test_agent_prompt_includes_output_discipline_and_summary_labels():
     assert "Discover & summarize" in prompts_js
     assert "Save provenance" in prompts_js
     assert "force_datagen_footer" in prompts_js
+    assert "resultsPathsForGoal" in prompts_js
+    assert "--limit 2" in prompts_js
+    assert "target MCP call(s)" in prompts_js
+    assert "MCP tool result payload" in prompts_js
     assert "capture_plans_footer" in prompts_js
+
+
+def test_mcp_prompt_uses_smoke_and_cost_gates():
+    prompts_js = PROMPTS_JS_PATH.read_text(encoding="utf-8")
+    mcp_block = prompts_js[
+        prompts_js.index("function buildMcpPrompt") : prompts_js.index("function renderMcpDependencyStep")
+    ]
+
+    assert "isPaidSelection(platformEntry, platformBEntry)" in mcp_block
+    assert "needsSmokeStep(state, isPaid)" in mcp_block
+    assert "needsCostAcknowledgment(state, isPaid)" in mcp_block
+    assert 'mcpRunCalls(mcpToolName, selectedPlatforms, state, "0.01", false)' in mcp_block
+    assert "target MCP call(s)" in mcp_block
+
+
+def test_compare_prompt_uses_comparison_log_and_two_result_paths():
+    prompts_js = PROMPTS_JS_PATH.read_text(encoding="utf-8")
+
+    assert 'if (state.goal === "compare")' in prompts_js
+    assert 'command.replace(/--limit\\s+\\S+/, "--limit 2")' in prompts_js
+    assert "summarize the comparison from" in prompts_js
+    assert "for each result JSON path" in prompts_js
 
 
 def test_agent_prompt_includes_platform_footgun_and_dsdgen_labels():
@@ -573,7 +626,9 @@ def test_known_paid_platforms_carry_cost_class(browser_catalog):
         assert platform_by_id[platform_id]["cost_class"] == expected_cost_class
 
     assert platform_by_id["duckdb"]["cost_class"] == "free"
+    assert platform_by_id["datafusion"]["cost_class"] == "free"
     assert platform_by_id["postgresql"]["cost_class"] == "free"
+    assert platform_by_id["sqlite"]["cost_class"] == "free"
 
 
 def test_non_ui_registry_deployment_modes_are_normalized(gen, browser_catalog):
@@ -714,7 +769,7 @@ def test_prompt_includes_dependency_and_dry_run_safety():
     assert 'safetyTexts(entries, "dry_run", deployment)' in text
     assert "appendDeploymentSafetyLines(lines" in text
     assert 'check_dependencies(platform=\\"' in text
-    assert "dry_run=true" in text
+    assert ', dry_run=" + (dryRun ? "true" : "false")' in text
 
 
 def test_agent_identity_sentence_stays_removed():
