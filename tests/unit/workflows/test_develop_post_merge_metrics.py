@@ -150,6 +150,18 @@ def test_auto_revert_triggers_on_explorer_tokens_failure() -> None:
     assert "needs.explorer-tokens.result == 'failure'" in auto_revert["if"]
 
 
+def test_close_orphaned_prs_waits_for_post_merge_validation_success() -> None:
+    # Closing superseded PRs is only safe after the post-merge validation
+    # jobs have passed. Otherwise a failing develop push can be auto-reverted
+    # after ancestor PRs were already closed as superseded.
+    workflow_yaml = yaml.safe_load(
+        (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
+    )
+    close_orphaned_prs = workflow_yaml["jobs"]["close-orphaned-prs"]
+    assert close_orphaned_prs["needs"] == ["lint", "fast-test", "explorer-tokens"]
+    assert close_orphaned_prs.get("if") is None
+
+
 def test_post_merge_explorer_tokens_job_runs_unconditionally() -> None:
     # The post-merge `explorer-tokens` job must have no `if:` so it always
     # runs against the merged develop tree. If a future cleanup added an
