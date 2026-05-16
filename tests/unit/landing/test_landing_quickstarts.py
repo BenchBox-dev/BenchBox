@@ -128,12 +128,22 @@ def test_unknown_platform_override_key_is_rejected(gen, catalog):
     assert any("unsupported keys ['interfaces']" in e for e in errors)
 
 
+def test_platform_override_cannot_control_filter_membership(gen, catalog):
+    for key in ("deployments", "credential_deployments"):
+        bad = copy.deepcopy(catalog)
+        bad["platform_overrides"] = {"polars": {key: ["managed"]}}
+
+        errors = gen.validate(bad)
+
+        assert any(f"unsupported keys ['{key}']" in e for e in errors)
+
+
 def test_malformed_platform_override_values_are_rejected(gen, catalog):
     bad = copy.deepcopy(catalog)
     bad["platform_overrides"] = {
         "duckdb": {
             "label": [],
-            "deployments": "local",
+            "dependency_check_platform": [],
             "safety_terms": {"dependency": [], "extra": "not allowed"},
         }
     }
@@ -141,7 +151,7 @@ def test_malformed_platform_override_values_are_rejected(gen, catalog):
     errors = gen.validate(bad)
 
     assert any(".label: must be a non-empty string" in e for e in errors)
-    assert any(".deployments: must be a list" in e for e in errors)
+    assert any(".dependency_check_platform: must be a non-empty string" in e for e in errors)
     assert any("safety_terms['dependency']: must be a non-empty string" in e for e in errors)
     assert any("safety_terms['extra']: must be one of" in e for e in errors)
 

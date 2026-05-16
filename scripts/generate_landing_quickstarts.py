@@ -38,16 +38,13 @@ VALID_DEPLOYMENT_MODES = frozenset({"local", "self-hosted", "managed"})
 MANAGED_SAFETY_KEYS = frozenset({"dependency", "dry_run", "no_secrets"})
 PLATFORM_OVERRIDE_KEYS = frozenset(
     {
-        "credential_deployments",
         "dependency_check_command",
         "dependency_check_platform",
-        "deployments",
         "install_command",
         "label",
         "safety_terms",
     }
 )
-LIST_PLATFORM_OVERRIDE_KEYS = frozenset({"credential_deployments", "deployments"})
 STRING_PLATFORM_OVERRIDE_KEYS = frozenset(
     {"dependency_check_command", "dependency_check_platform", "install_command", "label"}
 )
@@ -207,12 +204,9 @@ def _apply_platform_override(entry: dict[str, Any], override: dict[str, Any]) ->
     for key in ("label", "install_command", "dependency_check_platform", "dependency_check_command"):
         if isinstance(override.get(key), str):
             updated[key] = override[key]
-    for key in ("deployments", "credential_deployments"):
-        if isinstance(override.get(key), list):
-            updated[key] = list(override[key])
     if isinstance(override.get("safety_terms"), dict):
         updated["safety_terms"] = dict(override["safety_terms"])
-    if "dependency_check_platform" in override and "dependency_check_command" not in override:
+    if isinstance(override.get("dependency_check_platform"), str) and "dependency_check_command" not in override:
         platform = updated["dependency_check_platform"]
         updated["dependency_check_command"] = f"uv run benchbox check-deps --platform {platform}"
     return updated
@@ -327,9 +321,6 @@ def _validate_platform_overrides(catalog: dict[str, Any], known_platforms: set[s
                 f"platform_overrides[{platform_id!r}]: unsupported keys {sorted(unknown)}; "
                 f"allowed keys are {sorted(PLATFORM_OVERRIDE_KEYS)}"
             )
-        for key in sorted(LIST_PLATFORM_OVERRIDE_KEYS & set(override)):
-            if not isinstance(override[key], list):
-                errors.append(f"platform_overrides[{platform_id!r}].{key}: must be a list")
         for key in sorted(STRING_PLATFORM_OVERRIDE_KEYS & set(override)):
             if not isinstance(override[key], str) or not override[key]:
                 errors.append(f"platform_overrides[{platform_id!r}].{key}: must be a non-empty string")

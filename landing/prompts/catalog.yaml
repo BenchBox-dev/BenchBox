@@ -42,7 +42,8 @@ deployments:
 
 # Optional presentation/safety corrections for registry-derived platforms.
 # This is intentionally not an inclusion list: supported platform ids come
-# from PlatformRegistry at generation time.
+# from PlatformRegistry at generation time. Interface and deployment filter
+# membership also remains registry-derived.
 platform_overrides: {}
 
 # Curated benchmark subset for MVP. Validator confirms IDs exist in
