@@ -4,7 +4,7 @@ import type { RoutableProps } from "preact-router";
 import { route } from "preact-router";
 import type { BenchmarkSummary, PlatformRow, SortDirection, SortState } from "@/types";
 import type { ResultRow } from "@/lib/duckdbQueries";
-import { getBenchmarkSummaryFromDuckDB, listResults } from "@/lib/duckdbQueries";
+import { getBenchmarkSummaryFromDuckDB, listBenchmarksWithPublicResults, listResults } from "@/lib/duckdbQueries";
 import { BENCHMARK_LABELS, humanizeBenchmark, isKnownBenchmark, fmtScore, fmtGeomean, errMsg, complianceLabel } from "@/utils";
 import { facetsToWhereClause, useFacetState, type FacetKey, type FacetState } from "@/lib/facetModel";
 import { hasActiveFacets, matchesFacetRow, singleFacetValue } from "@/lib/facetMatching";
@@ -102,16 +102,35 @@ function benchmarkContextNote(benchmark: string): string | null {
  * switcher lists each benchmark family exactly once and the canonical
  * route wins (BENCHMARK_LABELS is declared with the canonical slug
  * first).
+ *
+ * When `availableBenchmarks` is provided, only catalog entries whose
+ * canonical slug *or* alias slug appears in the set are returned. This
+ * implements the corpus-aware actionability contract (Contract A from
+ * the corpus-aware-benchmark-switcher TODO): the switcher must not pivot
+ * users into benchmark detail pages with no public results.
  */
-function uniqueBenchmarkOptions(): { value: string; label: string }[] {
+function uniqueBenchmarkOptions(
+  availableBenchmarks?: ReadonlySet<string> | null,
+): { value: string; label: string }[] {
   const seen = new Set<string>();
+  const labelHasResult = new Map<string, boolean>();
   const options: { value: string; label: string }[] = [];
   for (const [value, label] of Object.entries(BENCHMARK_LABELS)) {
-    if (seen.has(label)) continue;
+    const hasResult = availableBenchmarks ? availableBenchmarks.has(value) : true;
+    if (seen.has(label)) {
+      if (hasResult) labelHasResult.set(label, true);
+      continue;
+    }
     seen.add(label);
+    labelHasResult.set(label, hasResult);
     options.push({ value, label });
   }
-  return options.sort((a, b) => a.label.localeCompare(b.label));
+  if (!availableBenchmarks) {
+    return options.sort((a, b) => a.label.localeCompare(b.label));
+  }
+  return options
+    .filter((option) => labelHasResult.get(option.label) === true)
+    .sort((a, b) => a.label.localeCompare(b.label));
 }
 
 function benchmarkCompareGuidanceMessage(
@@ -141,6 +160,35 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Distinct benchmark slugs that have at least one public result bundle.
+  // Drives the corpus-aware sibling switcher so users cannot pivot into a
+  // no-result benchmark detail page. `null` means the list is still loading;
+  // on hard failure we instead collapse to a single-element set containing
+  // only the current benchmark so the switcher never silently regresses to
+  // the catalog-wide list (which would re-introduce the no-result dead-end
+  // anti-pattern Contract A is meant to prevent).
+  const [availableBenchmarks, setAvailableBenchmarks] = useState<ReadonlySet<string> | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    listBenchmarksWithPublicResults()
+      .then((slugs) => {
+        if (!cancelled) setAvailableBenchmarks(new Set(slugs));
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        // Hard failure (snapshot missing, transport error, etc.). Collapse
+        // the switcher to just the current benchmark via the fallback
+        // <option>; never silently revert to catalog-wide, which would let
+        // users pivot into no-result dead ends. Log once so observability
+        // can pick up persistent snapshot failures.
+        console.warn("listBenchmarksWithPublicResults failed; switcher will show only the current benchmark", err);
+        setAvailableBenchmarks(new Set(benchmark ? [benchmark] : []));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [benchmark]);
 
   // Filter state - URL-synced so views are shareable.
   const { facets, setFacet } = useFacetState();
@@ -407,7 +455,11 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     selectedCompareRows.length >= 2
       ? buildCompareUrl(selectedCompareRows.map((row) => compareIdForRow(row)))
       : null;
-  const benchmarkOptions = uniqueBenchmarkOptions();
+  // Corpus-aware switcher: list only benchmarks with public results once the
+  // distinct-benchmarks query resolves. The currently-viewed benchmark is
+  // always reachable through the fallback option below, so direct links to
+  // no-result benchmark routes still recover gracefully.
+  const benchmarkOptions = uniqueBenchmarkOptions(availableBenchmarks);
   const hasCurrentBenchmarkOption = benchmarkOptions.some((option) => option.value === benchmark);
   const contextNote = benchmarkContextNote(benchmark);
   const selectedComparableCount = selectedCompareRows.length;

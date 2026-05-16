@@ -349,9 +349,16 @@ function defaultImpl(
   rows: readonly Record<string, unknown>[],
   rankings: readonly Record<string, unknown>[],
   cells: readonly Record<string, unknown>[],
+  availableBenchmarks?: readonly string[],
 ): QueryRowsImpl {
   return async (sql: string) => {
     const s = String(sql).replace(/\s+/g, " ").trim();
+    if (s.startsWith("SELECT DISTINCT benchmark FROM bench.results")) {
+      const slugs = availableBenchmarks
+        ? [...availableBenchmarks]
+        : [...new Set(rows.map((row) => String(row.benchmark)))].sort();
+      return slugs.map((benchmark) => ({ benchmark }));
+    }
     if (s.includes("FROM bench.results")) return [...rows];
     if (s.includes("FROM bench.benchmark_rankings")) return [...rankings];
     if (s.startsWith("SELECT benchmark, scale_factor, phase, result_id, platform_id, query_id, display_ms")) {
@@ -483,9 +490,15 @@ describe("BenchmarkIndex", () => {
     const routeMock = vi.mocked(preactRouter.route);
     routeMock.mockClear();
     window.history.replaceState(null, "", "/results/tpch/?sf=10&phase=power&view=ranks");
+    vi.mocked(queryRows).mockImplementation(
+      defaultImpl(RESULT_ROWS, RANKING_ROWS, CELL_ROWS, ["tpch", "clickbench"]),
+    );
 
     render(<BenchmarkIndex benchmark="tpch" />);
     await waitFor(() => expect(screen.getByText("TPC-H Results")).toBeTruthy());
+    await waitFor(() =>
+      expect(within(screen.getByTestId("benchmark-switcher")).queryByRole("option", { name: "ClickBench" })).toBeTruthy(),
+    );
 
     const switcher = screen.getByTestId("benchmark-switcher") as HTMLSelectElement;
     expect(switcher.value).toBe("tpch");
@@ -495,6 +508,89 @@ describe("BenchmarkIndex", () => {
     fireEvent.change(switcher, { target: { value: "clickbench" } });
     expect(routeMock).toHaveBeenCalledTimes(1);
     expect(routeMock).toHaveBeenCalledWith("/results/clickbench/?view=ranks");
+  });
+
+  it("hides no-result benchmarks from the switcher once the public corpus list resolves", async () => {
+    vi.mocked(queryRows).mockImplementation(
+      defaultImpl(RESULT_ROWS, RANKING_ROWS, CELL_ROWS, ["tpch", "clickbench"]),
+    );
+
+    render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() =>
+      expect(within(screen.getByTestId("benchmark-switcher")).queryByRole("option", { name: "ClickBench" })).toBeTruthy(),
+    );
+
+    const switcher = screen.getByTestId("benchmark-switcher") as HTMLSelectElement;
+    const labels = Array.from(switcher.options).map((option) => option.textContent ?? "");
+    expect(labels).toContain("TPC-H");
+    expect(labels).toContain("ClickBench");
+    expect(labels).not.toContain("AMPLab");
+    expect(labels).not.toContain("TPC-DS");
+  });
+
+  it("keeps the legacy-aliased current benchmark reachable via the fallback option", async () => {
+    // Same-label aliases (e.g. `ssb` legacy slug + `star_schema` canonical
+    // slug both render "SSB"). When the public corpus only carries the
+    // legacy slug, the corpus-aware filter keeps the canonical option (the
+    // first `seen` slug per the dedupe), so the user's current legacy slug
+    // is missing from `benchmarkOptions`. The fallback `<option>` then
+    // adds it back. This is the only production-reachable code path for
+    // the fallback under the corpus-aware contract.
+    const legacyRows = RESULT_ROWS.map((row) => ({ ...row, benchmark: "ssb" }));
+    const legacyRankings = RANKING_ROWS.map((row) => ({ ...row, benchmark: "ssb" }));
+    const legacyCells = CELL_ROWS.map((row) => ({ ...row, benchmark: "ssb" }));
+    vi.mocked(queryRows).mockImplementation(
+      defaultImpl(legacyRows, legacyRankings, legacyCells, ["ssb"]),
+    );
+
+    render(<BenchmarkIndex benchmark="ssb" />);
+    await waitFor(() => expect(screen.getByTestId("benchmark-switcher")).toBeTruthy());
+
+    const switcher = screen.getByTestId("benchmark-switcher") as HTMLSelectElement;
+    expect(switcher.value).toBe("ssb");
+    const optionValues = Array.from(switcher.options).map((option) => option.value);
+    // The fallback adds the legacy slug; the canonical alias remains via
+    // the dedupe-with-cross-alias check inside uniqueBenchmarkOptions.
+    expect(optionValues).toContain("ssb");
+    expect(optionValues).toContain("star_schema");
+    // Other no-result benchmarks must not be present (Contract A).
+    expect(optionValues).not.toContain("amplab");
+    expect(optionValues).not.toContain("tpcdi");
+  });
+
+  it("hides no-result benchmarks even when the corpus-list query fails", async () => {
+    // Hard failure of listBenchmarksWithPublicResults must NOT silently
+    // revert to the catalog-wide list - that would re-introduce the
+    // no-result dead-end anti-pattern. The switcher collapses to only the
+    // current benchmark via the fallback option.
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.mocked(queryRows).mockImplementation(async (sql: string) => {
+      const s = String(sql).replace(/\s+/g, " ").trim();
+      if (s.startsWith("SELECT DISTINCT benchmark FROM bench.results")) {
+        throw new Error("simulated snapshot failure");
+      }
+      if (s.includes("FROM bench.results")) return [...RESULT_ROWS];
+      if (s.includes("FROM bench.benchmark_rankings")) return [...RANKING_ROWS];
+      if (s.startsWith("SELECT benchmark, scale_factor, phase, result_id, platform_id, query_id, display_ms")) {
+        return [...CELL_ROWS];
+      }
+      return [];
+    });
+
+    render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() =>
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("listBenchmarksWithPublicResults failed"),
+        expect.any(Error),
+      ),
+    );
+
+    const switcher = screen.getByTestId("benchmark-switcher") as HTMLSelectElement;
+    const optionValues = Array.from(switcher.options).map((option) => option.value);
+    expect(optionValues).toEqual(["tpch"]);
+    expect(optionValues).not.toContain("amplab");
+    expect(optionValues).not.toContain("clickbench");
+    warnSpy.mockRestore();
   });
 
   it.each([
