@@ -128,8 +128,10 @@ async function expectCompletedComparison(
   await expect(page).toHaveURL(/\/results\/compare\?ids=/, { timeout: 20_000 });
   await waitForDataLoaded(page, /TPC-H Comparison/);
 
-  const ids = new URL(page.url()).searchParams.get("ids")?.split(",") ?? [];
-  expect([...ids].sort()).toEqual(runs.map((run) => run.shortId).sort());
+  const expectedIds = runs.map((run) => run.shortId).sort();
+  await expect
+    .poll(() => (new URL(page.url()).searchParams.get("ids")?.split(",") ?? []).sort(), { timeout: 15_000 })
+    .toEqual(expectedIds);
 
   const breadcrumb = page.getByRole("navigation", { name: "Breadcrumb" });
   await expect(breadcrumb).toContainText("TPC-H");
