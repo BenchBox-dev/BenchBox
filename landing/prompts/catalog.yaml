@@ -104,7 +104,13 @@ templates:
     dry_run: "uv run benchbox run --dry-run {dry_run_dir} --platform {platform} --benchmark {benchmark} --scale {scale}"
     results_paths: "uv run benchbox results --paths --limit 1"
     show_cli: "uv run benchbox results show-cli <result-json>"
+    provenance_snapshot: |
+      mkdir -p <bundle-dir>/_provenance
+      uv run benchbox --version-json > <bundle-dir>/_provenance/version.json
+      uv run benchbox profile > <bundle-dir>/_provenance/system.txt
+      echo "<exact command line used>" > <bundle-dir>/_provenance/command.txt
     force_datagen_footer: "If the load phase fails partway, re-run with `--force datagen` appended."
+    capture_plans_footer: "To capture EXPLAIN plans, add `--capture-plans` to the live command and inspect with `benchbox show-plan --run <result-json> --query-id Q1`."
 
 # References to existing MCP surfaces. The generator validates each name
 # resolves to a real tool/prompt in benchbox/mcp/.

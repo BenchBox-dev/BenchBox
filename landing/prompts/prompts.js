@@ -278,6 +278,11 @@
         return "set -o pipefail; " + command + " 2>&1 | tee " + path;
     }
 
+    function provenanceSnapshot(liveCmd) {
+        var template = catalog.templates.cli.provenance_snapshot || "";
+        return template.replace("<exact command line used>", liveCmd);
+    }
+
     function commandAtScale(command, scale) {
         return command.replace(/--scale\s+\S+/, "--scale " + scale);
     }
@@ -478,8 +483,13 @@
             lines.push("  " + step++ + ". Run live: `" + liveCmd + "`.");
         }
         lines.push("  " + step++ + ". Discover & summarize: run `" + resultsPaths + "`, then run `" + showCli + "` with the result JSON path. Summarize total runtime, per-query timings, and failures from the result JSON.");
+        lines.push("  " + step++ + ". Save provenance next to the result bundle. Replace `<bundle-dir>` with the bundle directory from the previous step, then run:");
+        provenanceSnapshot(liveCmd).split("\n").forEach(function (line) {
+            if (line) lines.push("     " + line);
+        });
         lines.push("");
         lines.push(catalog.templates.cli.force_datagen_footer);
+        lines.push(catalog.templates.cli.capture_plans_footer);
         return lines.join("\n");
     }
 

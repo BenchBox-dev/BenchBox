@@ -1,0 +1,195 @@
+id: prompts-landing-phase4-provenance
+title: "Prompts landing — Phase 4: provenance snapshot block + --capture-plans footnote"
+worktree: main
+priority: Medium
+status: Completed
+category: Documentation
+
+description: |
+  Reproducibility of a benchmark run depends on capturing the
+  BenchBox version, system profile, and the exact command line
+  alongside the result bundle. None of the rendered prompts currently
+  tell the agent to do this, so result-bundle archaeology becomes
+  guesswork weeks later (which version of BenchBox? what platform
+  driver? what hardware?).
+
+  This TODO adds a final "Save provenance" step to the CLI rendered
+  prompt using `benchbox --version-json` and `benchbox profile`.
+  MCP-surface provenance is intentionally deferred to Phase 5 after
+  the CLI contract settles. As a passive bonus, append a single-line
+  footnote telling agents how to opt into `--capture-plans` and
+  inspect with `benchbox show-plan`, without adding any new form
+  control.
+
+  Decision gates:
+  - D1 (before w1): provenance is a single multi-line template
+    rendered verbatim vs three separate template keys composed by
+    the builder. Default: a multi-line YAML literal block under
+    templates.cli.provenance_snapshot — keeps the validator simple
+    and the renderer dumb.
+  - D2 (before w2): where to write the provenance snapshot? Default:
+    next to the result bundle (in the directory benchbox printed at
+    end of run). Agent extracts the bundle path from the run output
+    or `benchbox results --paths --limit 1`.
+
+prior_art:
+- "landing/prompts/catalog.yaml:74-79 templates.cli — extend with provenance_snapshot (YAML literal block)"
+- "Phase 1 templates.cli.results_paths and show_cli — reuse the same key-then-substring validator pattern"
+- "AGENTS.md provenance/reproducibility guidance — surface via the rendered prompt rather than relying on agent recall"
+- "benchbox --version-json and benchbox profile — existing first-class commands; do not invent new ones"
+- "benchbox/cli/commands/show_plan.py:20 show-plan requires --run and --query-id; do not use non-existent --result/--query
+  flags"
+
+work:
+- id: w1
+  summary: "Add provenance_snapshot template key and validator pin"
+  status: done
+  notes: |
+    In catalog.yaml templates.cli, add:
+      provenance_snapshot: |
+        mkdir -p <bundle-dir>/_provenance
+        uv run benchbox --version-json > <bundle-dir>/_provenance/version.json
+        uv run benchbox profile > <bundle-dir>/_provenance/system.txt
+        echo "<exact command line used>" > <bundle-dir>/_provenance/command.txt
+    In validate(): require the key to contain 'benchbox --version-json'
+    AND 'benchbox profile'. Reject otherwise.
+
+- id: w2
+  summary: "Render provenance step at end of buildAgentPrompt"
+  needs: [w1]
+  status: done
+  notes: |
+    After Phase 1's summary step but before the force-datagen
+    footer, insert a "Save provenance" step that emits the template
+    verbatim with <bundle-dir> substituted from the agent's earlier
+    capture of the result bundle path. Render unconditionally for
+    CLI — provenance is cheap and universally useful.
+
+- id: w3
+  summary: "Add --capture-plans footnote (no UI control)"
+  needs: [w2]
+  status: done
+  notes: |
+    Append a single line to the rendered prompt, after the
+    force-datagen footer:
+      "To capture EXPLAIN plans, add --capture-plans to the live
+       command and inspect with `benchbox show-plan --run
+       <result-json> --query-id Q1`."
+    No form control; advanced users edit the copied prompt.
+
+- id: w4
+  summary: "Tests"
+  needs: [w3]
+  status: done
+  notes: |
+    - test_provenance_snapshot_present_in_templates
+    - test_provenance_snapshot_includes_version_and_profile_commands
+    - extend dropdown-smoke test to assert "Save provenance" label
+      appears in the rendered payload for the default state.
+    - test_capture_plans_footnote_present (label, not full string)
+
+- id: w5
+  summary: "Regenerate + verify"
+  needs: [w4]
+  status: done
+  notes: |
+    uv run -- python scripts/generate_landing_quickstarts.py --write
+    make prompts-landing-check
+    uv run -- python -m pytest tests/unit/landing/ -v
+    Manually render the default and Snowflake+1.0 prompts; paste
+    both in the PR body.
+
+verification:
+- description: "Validator passes"
+  command: "uv run -- python scripts/generate_landing_quickstarts.py --validate-only"
+  expected_output: "validate-only: OK"
+- description: "Make check green"
+  command: "make prompts-landing-check"
+  expected_output: "check: OK"
+- description: "Landing tests pass"
+  command: "uv run -- python -m pytest tests/unit/landing/ -v"
+  expected_output: "0 failures"
+- description: "Provenance and plan-inspection commands are real BenchBox subcommands"
+  command: "uv run benchbox --version-json >/dev/null && uv run benchbox profile --help >/dev/null && uv run benchbox show-plan
+    --help >/dev/null"
+  expected_output: "exit 0"
+
+must_preserve:
+- "Phase 1's announce/tee/summary step ordering — provenance lands AFTER summary, BEFORE force-datagen footer."
+- "Default prompt brevity — provenance is one step (4 short shell lines), not a paragraph."
+- "No new dropdowns or form controls."
+
+approach: |
+  Treat provenance as a fixed template (multi-line YAML literal block)
+  rendered verbatim. The renderer does not need to compose individual
+  commands — the value is in the agent doing all three steps in the
+  right place, not in dynamic substitution.
+
+  --capture-plans intentionally ships as a one-line passive footnote
+  in this phase. A future phase MAY add a checkbox; this phase does
+  not justify the UI matrix expansion.
+
+anti_patterns:
+- "DO NOT add a 'capture plans' checkbox in this phase — it inflates the dropdown-smoke matrix and the value isn't proven
+  yet."
+- "DO NOT introduce a benchbox provenance subcommand — composition of existing commands is sufficient and avoids API growth."
+- "DO NOT write provenance into a fixed path like /tmp/ — the bundle directory is the correct co-location for reproducibility."
+- "DO NOT skip provenance for local DuckDB runs — even local runs need a version pin for reproducibility weeks later."
+- "DO NOT use `benchbox show-plan --result` or `--query` — the command surface is `--run` and `--query-id`."
+
+scope_limit:
+  only_modify:
+  - "landing/prompts/catalog.yaml"
+  - "landing/prompts/catalog.generated.js"    # regenerated
+  - "landing/prompts/prompts.js"
+  - "scripts/generate_landing_quickstarts.py"
+  - "tests/unit/landing/test_landing_quickstarts.py"
+  - "_project/config/fast_test_lane_policy.json"
+  do_not_modify:
+  - "benchbox/"
+  - "landing/prompts/index.html"
+  - "landing/prompts/prompts.css"
+
+files_affected:
+  modified:
+  - "landing/prompts/catalog.yaml"
+  - "landing/prompts/catalog.generated.js"
+  - "landing/prompts/prompts.js"
+  - "scripts/generate_landing_quickstarts.py"
+  - "tests/unit/landing/test_landing_quickstarts.py"
+  - "_project/config/fast_test_lane_policy.json"
+
+deps:
+  needs:
+  - prompts-landing-phase1-cli-hygiene
+
+deferred:
+- summary: "--capture-plans dropdown control"
+  reason: "Footnote-only in this phase; promote to a control only if user feedback says it's confusing as a footnote."
+- summary: "MCP-surface provenance via system_profile MCP tool"
+  reason: "Tracked in prompts-landing-phase5-mcp-parity."
+- summary: "Auto-derive command.txt content from the rendered prompt's live-run command"
+  reason: "Requires generator-side coupling between provenance template and run template; defer until provenance churn justifies
+    it."
+
+success_metrics:
+- "Every rendered CLI prompt ends with a Save provenance step and a --capture-plans footnote."
+- "Default DuckDB+TPC-H+0.01 prompt grows by <=5 lines."
+- "uv run benchbox --version-json works as the prompt instructs."
+
+open_questions:
+- question: "Bundle dir vs results-runs root for provenance write path?"
+  gating: false
+  default: "Bundle dir — keeps provenance scoped to the specific run, easier to ship/share."
+
+metadata:
+  estimated_effort: "Small (1 session)"
+  tags: [landing, prompts, reproducibility, provenance]
+
+impact:
+  user_impact: |
+    Result bundles become self-describing: version, system, command.
+    Weeks-later archaeology becomes possible without git-history
+    spelunking.
+  technical_debt: |
+    Composes existing commands; no new BenchBox API surface.
