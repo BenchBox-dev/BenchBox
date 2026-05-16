@@ -2,7 +2,7 @@ id: prompts-landing-phase5-mcp-parity
 title: "Prompts landing — Phase 5: MCP-surface parity for hygiene, cost, hints, provenance"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
 category: Documentation
 
 description: |
@@ -36,7 +36,7 @@ prior_art:
 work:
   - id: w0
     summary: "Confirm Phases 1-4 are merged and inventory MCP-side gaps"
-    status: pending
+    status: done
     notes: |
       After Phases 1-4 are merged to develop, list each rendered
       behavior on the CLI side and mark its MCP equivalent:
@@ -46,25 +46,30 @@ work:
           run_benchmark with these parameters" instruction
         - smoke at SF=0.01 -> call run_benchmark twice (smoke then real)
         - cost ack -> RENDER (same gate)
-        - platform-option hints -> RENDER (translated to MCP arguments)
+        - platform-option hints -> RENDER as an MCP surface gap, because
+          run_benchmark has no platform-option argument
         - dsdgen SF<1 warning -> RENDER
-        - results summary -> use analyze_results MCP prompt
-        - provenance -> call system_profile MCP tool; capture version
-          via list_available metadata if --version-json equivalent
-          doesn't exist over MCP
-        - --capture-plans footnote -> RENDER as "pass capture_plans=true"
+        - results summary -> use the analyze_results MCP tool where
+          its real arguments fit, and otherwise summarize the
+          run_benchmark result payload directly
+        - provenance -> call system_profile MCP tool; its payload
+          includes BenchBox version and system fields
+        - --capture-plans footnote -> RENDER as optional
+          capture_plans=true plus get_query_plan inspection
       Also verify whether `system_profile` is already available in
       benchbox/mcp/. If it is, decide whether to add
       `mcp.tools.system_profile` (or equivalent) to catalog.yaml and
       extend generator validation, or whether buildMcpPrompt should use
       the literal tool name with a validator pin.
-      Document the mapping in /tmp/prompts-phase5-w0.log and
-      summarize in this TODO before w1.
+      Completed in the implementation PR. system_profile exists as a
+      registered MCP tool and includes BenchBox version; analyze_results
+      and get_query_plan are registered MCP tools. The prompt now avoids
+      inventing MCP platform-option arguments.
 
   - id: w1
     summary: "Extend buildMcpPrompt with smoke and cost-acknowledgment steps"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Mirror the Phase 2 gating logic in prompts.js buildMcpPrompt
       around lines 304-337. SMOKE = a run_benchmark call with
@@ -75,48 +80,49 @@ work:
   - id: w2
     summary: "Render platform-option hints + dsdgen warning in MCP prompt"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      Platform-option hints translate to "pass platform_options={...}
-      to run_benchmark" — emit the mapped key=value pairs from the
-      Phase 3 hints; strip the `--platform-option ` prefix and rely
-      on the comment portion (after `#`) for the human note.
+      Platform-option hints render as an explicit MCP surface gap because
+      run_benchmark does not expose a platform option argument. Emit the
+      mapped key=value pairs from the Phase 3 hints, strip the
+      `--platform-option ` prefix, and rely on the comment portion
+      (after `#`) for the human note.
       dsdgen warning is identical text.
 
   - id: w3
     summary: "Replace 'Summarise' prose with explicit analyze_results call; add system_profile provenance step"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Replace lines 318/332 ("Summarise total runtime, per-query timing,
-      and any failures.") with an explicit step that calls the
-      analyze_results MCP prompt with the result-bundle path.
-      Add a final "Save provenance" step that calls the
-      system_profile MCP tool and stashes output alongside the bundle.
-      If w0 chose a catalog-backed tool name, add it to catalog.yaml and
-      update generator validation in the same work unit.
+      and any failures.") with explicit result handling: compare prompts
+      call the analyze_results MCP tool with file1/file2 from the live
+      run_benchmark responses; single-run prompts summarize the returned
+      payload and optionally use aggregate analysis. Add a final
+      "Save provenance" step that calls the system_profile MCP tool and
+      records output alongside the bundle. Catalog-backed tool names
+      were added for analyze_results, system_profile, and get_query_plan.
       Add a one-line passive footnote on capture_plans=true.
 
   - id: w4
     summary: "Tests + regenerate"
     needs: [w3]
-    status: pending
+    status: done
     notes: |
       tests/unit/landing/test_landing_quickstarts.py additions:
-      - test_mcp_prompt_includes_smoke_for_managed_at_scale
-      - test_mcp_prompt_includes_cost_ack_for_paid_platforms
-      - test_mcp_prompt_emits_platform_options_mapping
-      - test_mcp_prompt_calls_analyze_results
-      - test_mcp_prompt_calls_system_profile
-      - test_mcp_prompt_footnotes_capture_plans
-      Plus regenerate and run prompts-landing-check + landing tests.
+      - test_mcp_prompt_uses_smoke_and_cost_gates
+      - test_mcp_prompt_uses_real_analysis_profile_and_plan_tools
+      - test_mcp_prompt_does_not_emit_nonexistent_platform_options_argument
+      - extended test_unknown_mcp_tool_is_rejected
+      - extended test_static_generated_payload_supports_dropdown_smoke
+      Plus regenerate and run prompt-quickstarts-check + landing tests.
 
 verification:
   - description: "Validator passes"
     command: "uv run -- python scripts/generate_landing_quickstarts.py --validate-only"
     expected_output: "validate-only: OK"
   - description: "Make check green"
-    command: "make prompts-landing-check"
+    command: "make prompt-quickstarts-check"
     expected_output: "check: OK"
   - description: "Landing tests pass"
     command: "uv run -- python -m pytest tests/unit/landing/ -v"
@@ -188,7 +194,7 @@ open_questions:
   - question: "Does benchbox MCP tool surface have a --version-json equivalent?"
     gating: true
     affects: ["w3 provenance step"]
-    default: "If no equivalent exists, MCP provenance step records system_profile output only and notes the version gap in this TODO for a future MCP-tool addition."
+    default: "Resolved: system_profile includes the BenchBox version and system fields, so the MCP provenance step records system_profile output."
 
 metadata:
   estimated_effort: "Small (1 session) once Phases 1-4 are in"
