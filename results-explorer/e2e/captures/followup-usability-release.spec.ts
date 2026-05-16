@@ -10,7 +10,7 @@
  *   - PR #300 (TODO #2 w1+w2): Chart panel header band is single-row;
  *     Per-query > Heatmap subtab does not duplicate the matrix.
  *   - PR #303 (TODO #3 w2/w3/w4): Benchmark/Platform sibling switchers
- *     and Home cohort selector renders above the matrix.
+ *     and Home ranking selector renders above the matrix.
  *   - PR #304 (TODO #4 w2+w3): Heatmap sticky-left offsets dynamic;
  *     header row is vertically sticky.
  *   - PR #305 (TODO #4 w5): Platform detail filter strip surfaces with
@@ -150,12 +150,12 @@ test.describe("@followup-usability release-gate route walk", () => {
     await expect(launch).toHaveAttribute("href", /\/results\/compare\?ids=[^,]+,[^,]+/);
   });
 
-  test("Home renders the cohort selector above the matrix with a compare entrypoint", async ({ page }) => {
+  test("Home renders the ranking selector above the matrix with a compare entrypoint", async ({ page }) => {
     await page.goto("/results/");
     await waitForShell(page);
     await waitForDataLoaded(page, /Cross-Benchmark Leaderboard/);
 
-    const selector = page.getByRole("region", { name: "Leaderboard cohort selector" });
+    const selector = page.getByRole("region", { name: "Leaderboard ranking selector" });
     const matrix = page.getByRole("region", { name: "Cross-Benchmark Leaderboard" });
     await expect(selector).toBeVisible();
     await expect(matrix).toBeVisible();

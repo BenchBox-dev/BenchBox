@@ -776,7 +776,7 @@ describe("BenchmarkIndex", () => {
     expect(screen.getByRole("button", { name: /maintainer/i }).className).not.toContain("--bb-bg-elevated");
   });
 
-  it("keeps active matrix controls on the light data surface contract", async () => {
+  it("keeps active matrix controls on the data surface theme contract", async () => {
     render(<BenchmarkIndex benchmark="tpch" />);
     await waitFor(() => screen.getAllByText("DuckDB"));
 

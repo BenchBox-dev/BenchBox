@@ -454,6 +454,14 @@ lint-explorer-tokens:
 lint-site-theme-tokens:
 	python3 _project/scripts/scan_explorer_tokens.py landing/shared landing/index.html landing/style.css landing/prompts/index.html landing/prompts/prompts.css docs/_templates/page.html docs/_static/custom.css results-explorer/index.html results-explorer/src/components/Layout.tsx
 
+# Stale-theme gate: fails when active Results Explorer source/tests or
+# unsuperseded analysis files revive the retired mixed-theme contract phrases.
+# Allowlist: inline `allow-stale-theme: <reason>` marker, or a supersession
+# header (Superseded / supersedes / supersession) in `_project/analysis/*`
+# files. `_project/DONE/*` is excluded by design.
+lint-explorer-stale-theme:
+	python3 _project/scripts/scan_explorer_stale_theme.py
+
 artifact-hygiene:
 	uv run -- python _project/scripts/artifact_hygiene_check.py --all-tracked
 

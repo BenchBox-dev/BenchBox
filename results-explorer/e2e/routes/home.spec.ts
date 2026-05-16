@@ -13,14 +13,20 @@ test.describe("Home", () => {
     await waitForDataLoaded(page, /Recent Results/i);
 
     const summary = page.getByRole("region", { name: "Corpus summary" });
+    // Corpus Summary labels are count-aware: when the fixture corpus has
+    // exactly one item, the label must read singular ("leaderboard ranking"),
+    // otherwise plural ("leaderboard rankings"). The route gate enforces both
+    // forms via the regex below so changes to fixture counts cannot reintroduce
+    // grammatically wrong copy like "1 leaderboard rankings".
     for (const label of [
-      "supported benchmarks",
-      "public result bundles",
-      "platforms with public results",
-      "leaderboard rankings",
+      /^supported benchmarks?$/,
+      /^public result bundles?$/,
+      /^platforms? with public results$/,
+      /^leaderboard rankings?$/,
     ]) {
-      await expect(summary.getByText(label, { exact: true })).toBeVisible();
+      await expect(summary.getByText(label).first()).toBeVisible();
     }
+    await expect(summary.getByText("leaderboard cohorts", { exact: true })).toHaveCount(0);
     await expect(summary.getByText("PR-validated corpus", { exact: true })).toHaveCount(0);
     await expect(summary.getByText("Benchmarks", { exact: true })).toHaveCount(0);
   });
