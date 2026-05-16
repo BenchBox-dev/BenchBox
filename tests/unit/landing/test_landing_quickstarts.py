@@ -276,6 +276,11 @@ def test_unknown_mcp_tool_is_rejected(gen, catalog):
     errors = gen.validate(bad)
     assert any("tool_that_does_not_exist" in e for e in errors)
 
+    bad = copy.deepcopy(catalog)
+    bad["mcp"]["system_profile_tool"] = "tool_that_does_not_exist"
+    errors = gen.validate(bad)
+    assert any("mcp.system_profile_tool" in e and "tool_that_does_not_exist" in e for e in errors)
+
 
 def test_unknown_mcp_prompt_is_rejected(gen, catalog):
     bad = copy.deepcopy(catalog)
@@ -480,6 +485,40 @@ def test_agent_prompt_includes_platform_footgun_and_dsdgen_labels():
     assert "requires_bundled_dsdgen_below" in prompts_js
 
 
+def test_mcp_prompt_includes_smoke_for_managed_at_scale():
+    prompts_js = PROMPTS_JS_PATH.read_text(encoding="utf-8")
+    assert "SMOKE: call " in prompts_js
+    assert 'mcpRunCall(mcpToolName, platform, state, "0.01", false, false)' in prompts_js
+    assert "Abort if the smoke run fails" in prompts_js
+
+
+def test_mcp_prompt_includes_cost_ack_for_paid_platforms():
+    prompts_js = PROMPTS_JS_PATH.read_text(encoding="utf-8")
+    assert "COST ACKNOWLEDGMENT" in prompts_js
+    assert "confirm credit or compute spend" in prompts_js
+
+
+def test_mcp_prompt_emits_platform_options_mapping():
+    prompts_js = PROMPTS_JS_PATH.read_text(encoding="utf-8")
+    assert "Platform option hints for " in prompts_js
+    assert "MCP `run_benchmark` does not currently expose a platform_options argument" in prompts_js
+    assert 'replace("--platform-option", "")' in prompts_js
+
+
+def test_mcp_prompt_calls_analyze_results_and_system_profile():
+    prompts_js = PROMPTS_JS_PATH.read_text(encoding="utf-8")
+    assert "analyzePromptName" in prompts_js
+    assert "result-bundle path" in prompts_js
+    assert "systemProfileTool" in prompts_js
+    assert "system_profile_tool" in prompts_js
+
+
+def test_mcp_prompt_footnotes_capture_plans():
+    prompts_js = PROMPTS_JS_PATH.read_text(encoding="utf-8")
+    assert "capture_plans=true" in prompts_js
+    assert "To capture EXPLAIN plans" in prompts_js
+
+
 def test_defaults_resolve_to_known_ids(browser_catalog):
     platform_ids = {p["id"] for p in browser_catalog["platforms"]}
     benchmark_ids = {b["id"] for b in browser_catalog["benchmarks"]}
@@ -662,6 +701,7 @@ def test_static_generated_payload_supports_dropdown_smoke(gen, browser_catalog):
     assert len(_filter_platform_ids(committed_payload, "sql", "self-hosted")) >= 2
     assert "polars" in _filter_platform_ids(committed_payload, "dataframe", "local")
     assert committed_payload["runtime_hints"] == browser_catalog["runtime_hints"]
+    assert committed_payload["mcp"]["system_profile_tool"] == "system_profile"
     committed_by_id = {platform["id"]: platform for platform in committed_payload["platforms"]}
     assert committed_by_id["snowflake"]["cost_class"] == "paid_credits"
     assert committed_by_id["duckdb"]["cost_class"] == "free"
@@ -769,7 +809,7 @@ def test_prompt_includes_dependency_and_dry_run_safety():
     assert 'safetyTexts(entries, "dry_run", deployment)' in text
     assert "appendDeploymentSafetyLines(lines" in text
     assert 'check_dependencies(platform=\\"' in text
-    assert ', dry_run=" + (dryRun ? "true" : "false")' in text
+    assert 'dry_run=" + (dryRun ? "true" : "false")' in text
 
 
 def test_agent_identity_sentence_stays_removed():

@@ -450,6 +450,8 @@ def _validate_mcp(catalog: dict[str, Any], known_tools: frozenset[str], known_pr
         errors.append(f"mcp.run_tool={mcp['run_tool']!r}: not a registered MCP tool")
     if mcp.get("list_tool") and mcp["list_tool"] not in known_tools:
         errors.append(f"mcp.list_tool={mcp['list_tool']!r}: not a registered MCP tool")
+    if mcp.get("system_profile_tool") and mcp["system_profile_tool"] not in known_tools:
+        errors.append(f"mcp.system_profile_tool={mcp['system_profile_tool']!r}: not a registered MCP tool")
     for key, name in (mcp.get("prompts") or {}).items():
         if name not in known_prompts:
             errors.append(f"mcp.prompts.{key}={name!r}: not a registered MCP prompt")
