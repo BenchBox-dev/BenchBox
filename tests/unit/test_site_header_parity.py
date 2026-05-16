@@ -61,6 +61,8 @@ def test_shared_static_header_assets_are_the_static_source_of_truth() -> None:
 )
 def test_global_header_link_contract_is_identical_across_surfaces(path: str, surface: str) -> None:
     source = _read(path)
+    if surface == "results":
+        source = _read("results-explorer/src/components/headerContract.ts")
 
     positions = []
     for label, href in EXPECTED_LINKS:
@@ -91,8 +93,10 @@ def test_global_header_exposes_single_shared_theme_control(path: str, surface: s
 
 def test_results_secondary_nav_remains_separate_from_global_header() -> None:
     layout = _read("results-explorer/src/components/Layout.tsx")
+    contract = _read("results-explorer/src/components/headerContract.ts")
 
-    assert 'aria-label="BenchBox"' in layout
+    assert 'export const HEADER_NAV_ARIA_LABEL = "BenchBox"' in contract
+    assert "aria-label={HEADER_NAV_ARIA_LABEL}" in layout
     assert 'aria-label="Results Explorer"' in layout
     for label in ["Leaderboards", "Benchmarks", "Platforms", "Compare", "Query"]:
         assert label in layout

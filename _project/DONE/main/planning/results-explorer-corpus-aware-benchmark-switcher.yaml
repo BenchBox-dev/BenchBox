@@ -2,7 +2,8 @@ id: results-explorer-corpus-aware-benchmark-switcher
 title: "Make benchmark detail pivot controls corpus-aware and actionably labeled"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-05-15"
 category: User Experience
 
 description: |
@@ -29,7 +30,7 @@ description: |
 work:
 - id: w0
   summary: "Confirm the benchmark switcher option source and no-result route behavior"
-  status: pending
+  status: done
   notes: |
     Reproduce from `/results/tpch/`:
     - open the benchmark switcher;
@@ -44,7 +45,7 @@ work:
 - id: w1
   summary: "Define the actionability contract for benchmark pivot options"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     Decision gate: choose one contract:
     - Contract A: benchmark detail switcher lists only benchmarks with public
@@ -63,7 +64,7 @@ work:
 - id: w2
   summary: "Implement the corpus-aware benchmark switcher"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Update the benchmark detail page selector so its options reflect the
     chosen actionability contract. If listing only public-result benchmarks,
@@ -77,7 +78,7 @@ work:
 - id: w3
   summary: "Add tests for public-result and no-result benchmark pivot behavior"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Add unit and/or e2e coverage that proves:
     - TPC-H and SSB remain reachable from the benchmark selector when they
@@ -90,7 +91,7 @@ work:
 - id: w4
   summary: "Audit platform and compare pivot controls for the same actionability pattern"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Check the platform detail selector, compare builder filters, Query
     Workbench facets, and Home filters for controls that expose unavailable

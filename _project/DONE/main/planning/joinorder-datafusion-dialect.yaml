@@ -41,7 +41,7 @@ work:
     `/Users/joe/Developer/benchmark_runs/datagen/joinorder_sf1`, registered 21
     tables / 74,190,187 rows, and executed all 113 canonical JoinOrder SQL
     queries successfully. The raw local transcript is intentionally kept out of
-    git at `/tmp/joinorder-datafusion-113-smoke.log`.
+    git under local ignored run logs.
 
     Command shape:
     `uv run -- python` script instantiating `JoinOrderBenchmark(scale_factor=1.0,
@@ -51,11 +51,11 @@ work:
     failing fast on any non-`SUCCESS` result.
 
 verification:
-- description: "DataFusion registers the current canonical Parquet cache with expected schemas"
-  command: "uv run -- python -c 'import datafusion; print(datafusion.__version__)' && grep '^LOAD tables=21 rows=74190187' /tmp/joinorder-datafusion-113-smoke.log"
+- description: "Regenerate the DataFusion canonical JoinOrder smoke and verify loaded schemas"
+  command: "Run the w2 smoke command shape against the local canonical JoinOrder SF=1 cache, capture stdout under BENCHBOX_OUTPUT_DIR or /tmp, then verify it reports DataFusion 53.0.0 and LOAD tables=21 rows=74190187"
   expected_output: "DataFusion 53.0.0 and LOAD tables=21 rows=74190187"
-- description: "All canonical JoinOrder SQL queries pass on DataFusion"
-  command: "tail -1 /tmp/joinorder-datafusion-113-smoke.log"
+- description: "Regenerate the DataFusion canonical JoinOrder smoke and verify all queries pass"
+  command: "Run the w2 smoke command shape against the local canonical JoinOrder SF=1 cache, capture stdout under BENCHBOX_OUTPUT_DIR or /tmp, then verify the final summary reports PASS queries=113"
   expected_output: "PASS queries=113"
 - description: "TODO graph remains valid after moving this item to DONE"
   command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph && uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate _project/DONE/main/planning/joinorder-datafusion-dialect.yaml"

@@ -529,6 +529,9 @@ describe("BenchmarkIndex", () => {
   });
 
   it("does not expose a same-label alias unless that exact slug has public results", async () => {
+    // Same-label aliases (e.g. `ssb` legacy slug + `star_schema` canonical
+    // slug both render "SSB"). The switcher should expose the populated slug
+    // and suppress the same-label alias when that alias has no public results.
     const legacyRows = RESULT_ROWS.map((row) => ({ ...row, benchmark: "ssb" }));
     const legacyRankings = RANKING_ROWS.map((row) => ({ ...row, benchmark: "ssb" }));
     const legacyCells = CELL_ROWS.map((row) => ({ ...row, benchmark: "ssb" }));
@@ -550,6 +553,10 @@ describe("BenchmarkIndex", () => {
   });
 
   it("hides no-result benchmarks even when the corpus-list query fails", async () => {
+    // Hard failure of listBenchmarksWithPublicResults must NOT silently
+    // revert to the catalog-wide list - that would re-introduce the
+    // no-result dead-end anti-pattern. The switcher collapses to only the
+    // current benchmark via the fallback option.
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     vi.mocked(queryRows).mockImplementation(async (sql: string) => {
       const s = String(sql).replace(/\s+/g, " ").trim();
@@ -577,6 +584,8 @@ describe("BenchmarkIndex", () => {
       const switcher = screen.getByTestId("benchmark-switcher") as HTMLSelectElement;
       const optionValues = Array.from(switcher.options).map((option) => option.value);
       expect(optionValues).toEqual(["tpch"]);
+      expect(optionValues).not.toContain("amplab");
+      expect(optionValues).not.toContain("clickbench");
     } finally {
       warnSpy.mockRestore();
     }
@@ -861,7 +870,7 @@ describe("BenchmarkIndex", () => {
     expect(screen.getByRole("button", { name: /maintainer/i }).className).not.toContain("--bb-bg-elevated");
   });
 
-  it("keeps active matrix controls on the light data surface contract", async () => {
+  it("keeps active matrix controls on the data surface theme contract", async () => {
     render(<BenchmarkIndex benchmark="tpch" />);
     await waitFor(() => screen.getAllByText("DuckDB"));
 

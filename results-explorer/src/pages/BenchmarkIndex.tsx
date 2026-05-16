@@ -95,19 +95,12 @@ function benchmarkContextNote(benchmark: string): string | null {
 
 /**
  * Distinct benchmark slugs paired with display labels for the in-page
- * sibling switcher. Two slugs sometimes share a display label
- * (`star_schema` and `ssb` both render "SSB"; `tsbs-devops` and
- * `tsbs_devops` both render "TSBS DevOps") because legacy and
- * canonical routes coexist.
- *
- * Once the corpus availability query resolves, return one option per display
- * label, choosing the first slug for that label that actually has public
- * results. This keeps same-label aliases from pivoting into an empty detail
- * page just because their sibling slug is populated.
+ * sibling switcher. Same-label aliases (`star_schema` and `ssb`, for
+ * example) coexist for legacy routes, but the switcher only exposes the
+ * slug that actually has public results so it cannot pivot into an empty
+ * detail page through a populated sibling alias.
  */
-function uniqueBenchmarkOptions(
-  availableBenchmarks: ReadonlySet<string> | null,
-): { value: string; label: string }[] {
+function uniqueBenchmarkOptions(availableBenchmarks: ReadonlySet<string> | null): { value: string; label: string }[] {
   if (availableBenchmarks === null) return [];
   const seen = new Set<string>();
   const options: { value: string; label: string }[] = [];
@@ -147,9 +140,13 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Distinct benchmark slugs with at least one public result bundle. Until
-  // this resolves, the switcher only exposes the current benchmark through
-  // the fallback option below so it never briefly offers catalog-only pivots.
+  // Distinct benchmark slugs that have at least one public result bundle.
+  // Drives the corpus-aware sibling switcher so users cannot pivot into a
+  // no-result benchmark detail page. `null` means the list is still loading;
+  // on hard failure we instead collapse to a single-element set containing
+  // only the current benchmark so the switcher never silently regresses to
+  // the catalog-wide list (which would re-introduce the no-result dead-end
+  // anti-pattern Contract A is meant to prevent).
   const [availableBenchmarks, setAvailableBenchmarks] = useState<ReadonlySet<string> | null>(null);
 
   useEffect(() => {
@@ -160,6 +157,11 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
       })
       .catch((err: unknown) => {
         if (cancelled) return;
+        // Hard failure (snapshot missing, transport error, etc.). Collapse
+        // the switcher to just the current benchmark via the fallback
+        // <option>; never silently revert to catalog-wide, which would let
+        // users pivot into no-result dead ends. Log once so observability
+        // can pick up persistent snapshot failures.
         console.warn("listBenchmarksWithPublicResults failed; switcher will show only the current benchmark", err);
         setAvailableBenchmarks(new Set(benchmark ? [benchmark] : []));
       });
@@ -433,6 +435,10 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     selectedCompareRows.length >= 2
       ? buildCompareUrl(selectedCompareRows.map((row) => compareIdForRow(row)))
       : null;
+  // Corpus-aware switcher: list only benchmarks with public results once the
+  // distinct-benchmarks query resolves. The currently-viewed benchmark is
+  // always reachable through the fallback option below, so direct links to
+  // no-result benchmark routes still recover gracefully.
   const benchmarkOptions = uniqueBenchmarkOptions(availableBenchmarks);
   const hasCurrentBenchmarkOption = benchmarkOptions.some((option) => option.value === benchmark);
   const contextNote = benchmarkContextNote(benchmark);

@@ -117,6 +117,7 @@ def build_tuning_coverage_rows(
 
 
 def default_decision(platform: str, benchmark: str, status: str) -> tuple[str, str]:
+    """Return the matrix disposition for one platform/benchmark status."""
     if status == TUNED_TEMPLATE:
         return DECISION_DONE, "benchmark-specific tuned template exists"
     if (platform, benchmark) in HIGH_PRIORITY_AUTHOR_BACKLOG:
@@ -127,6 +128,7 @@ def default_decision(platform: str, benchmark: str, status: str) -> tuple[str, s
 
 
 def write_tuning_coverage_tsv(rows: Iterable[TuningCoverageRow], path: Path) -> None:
+    """Write coverage rows as a stable tab-separated matrix."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, fieldnames=MATRIX_COLUMNS, delimiter="\t", lineterminator="\n")
@@ -136,6 +138,7 @@ def write_tuning_coverage_tsv(rows: Iterable[TuningCoverageRow], path: Path) -> 
 
 
 def read_tuning_coverage_tsv(path: Path) -> list[TuningCoverageRow]:
+    """Read and validate a saved tuning coverage matrix."""
     with path.open(encoding="utf-8") as fh:
         reader = csv.DictReader(fh, delimiter="\t")
         missing = set(MATRIX_COLUMNS) - set(reader.fieldnames or ())
@@ -236,6 +239,7 @@ def parse_uat_cell_log_stem(
 
 
 def status_from_log_text(text: str) -> str | None:
+    """Extract the tuning resolver status recorded in one runtime log."""
     if "Tuning: auto-discovered template" in text:
         return TUNED_TEMPLATE
     if "Tuning: using basic constraints" in text:

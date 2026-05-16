@@ -487,8 +487,8 @@ export async function listResults(where: FacetWhereClause = { sql: "", params: [
  * Distinct benchmark slugs that have at least one public result bundle.
  *
  * Sourced from the same `bench.results` projection that powers the Home
- * corpus summary, so benchmark detail pivots cannot drift from the actual
- * public corpus.
+ * corpus summary, so the benchmark detail switcher cannot drift from the
+ * actual public corpus.
  */
 export async function listBenchmarksWithPublicResults(): Promise<string[]> {
   const rows = await memoizedSnapshotQueryRows<{ benchmark: string }>(

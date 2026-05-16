@@ -2,6 +2,13 @@ import type { ComponentChildren } from "preact";
 import { useState } from "preact/hooks";
 import { getCurrentUrl, useRouter } from "preact-router";
 import { nextThemeChoice, useThemeChoice } from "@/lib/theme";
+import {
+  HEADER_BRAND,
+  HEADER_CTA,
+  HEADER_LINKS,
+  HEADER_NAV_ARIA_LABEL,
+  HEADER_TOGGLE_ARIA_LABEL,
+} from "@/components/headerContract";
 
 interface LayoutProps {
   children: ComponentChildren;
@@ -31,14 +38,20 @@ function Header() {
 
   return (
     <header class="surface-hero" data-surface="hero">
-      <div class="sticky top-0 z-[1000] border-b border-[var(--bb-border-default)] bg-[var(--bb-site-header-bg)] text-[var(--bb-fg-primary)] backdrop-blur">
+      <div
+        data-testid="benchbox-global-header"
+        class="sticky top-0 z-[1000] border-b border-[var(--bb-border-default)] bg-[var(--bb-site-header-bg)] text-[var(--bb-fg-primary)] backdrop-blur"
+      >
         <div class="mx-auto flex min-h-16 max-w-[1200px] flex-wrap items-center justify-between gap-4 px-4 sm:px-6">
-          <a href="https://benchbox.dev/" class="font-mono text-xl font-bold leading-none no-underline text-[var(--bb-accent)]">
-            BenchBox
+          <a
+            href={HEADER_BRAND.href}
+            class="font-mono text-xl font-bold leading-none no-underline text-[var(--bb-accent)]"
+          >
+            {HEADER_BRAND.label}
           </a>
           <button
             type="button"
-            aria-label="Toggle site navigation"
+            aria-label={HEADER_TOGGLE_ARIA_LABEL}
             aria-controls="benchbox-site-header-nav"
             aria-expanded={menuOpen ? "true" : "false"}
             class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[var(--bb-border-default)] text-[var(--bb-fg-primary)] min-[901px]:hidden"
@@ -52,7 +65,7 @@ function Header() {
           </button>
           <nav
             id="benchbox-site-header-nav"
-            aria-label="BenchBox"
+            aria-label={HEADER_NAV_ARIA_LABEL}
             class={`${menuOpen ? "flex" : "hidden"} w-full flex-col items-start gap-3 pb-4 text-[0.9375rem] min-[901px]:flex min-[901px]:w-auto min-[901px]:flex-row min-[901px]:items-center min-[901px]:justify-end min-[901px]:gap-6 min-[901px]:pb-0`}
             onClick={(event) => {
               if (event.target instanceof Element && event.target.closest("a")) {
@@ -60,21 +73,21 @@ function Header() {
               }
             }}
           >
-            <GlobalNavLink href="https://benchbox.dev/">Home</GlobalNavLink>
-            <GlobalNavLink href="https://benchbox.dev/docs/">Docs</GlobalNavLink>
-            <GlobalNavLink href="https://benchbox.dev/blog/">Blog</GlobalNavLink>
-            <GlobalNavLink href="https://benchbox.dev/results/" active={inResults}>
-              Results
-            </GlobalNavLink>
-            <GlobalNavLink href="https://benchbox.dev/prompts/">Instruct an agent</GlobalNavLink>
-            <GlobalNavLink href="https://github.com/joeharris76/BenchBox" external>
-              GitHub
-            </GlobalNavLink>
+            {HEADER_LINKS.map((link) => (
+              <GlobalNavLink
+                key={link.label}
+                href={link.href}
+                external={link.external}
+                active={link.activeOnSurface === "results" && inResults}
+              >
+                {link.label}
+              </GlobalNavLink>
+            ))}
             <a
-              href="https://benchbox.dev/docs/usage/installation.html"
+              href={HEADER_CTA.href}
               class="inline-flex min-h-8 items-center justify-center whitespace-nowrap rounded bg-[var(--bb-accent)] px-3 py-1.5 font-bold text-[var(--bb-fg-inverse)] no-underline hover:bg-[var(--bb-accent-hover)] hover:text-[var(--bb-fg-inverse)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--bb-focus-ring-on-dark)]"
             >
-              Run benchmark
+              {HEADER_CTA.label}
             </a>
             <button
               type="button"

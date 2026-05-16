@@ -2,7 +2,8 @@ id: results-explorer-post-theme-release-gate-reconciliation
 title: "Reconcile Results Explorer post-theme copy, tests, and stale theme-contract evidence"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-05-15"
 category: User Experience
 
 description: |
@@ -30,7 +31,7 @@ description: |
 work:
 - id: w0
   summary: "Revalidate the failing Home e2e assertion against current UI and unit-test contracts"
-  status: pending
+  status: done
   notes: |
     Re-run the targeted route tests and capture a compact summary in the PR:
     - checked SHA;
@@ -46,7 +47,7 @@ work:
 - id: w1
   summary: "Make Corpus Summary labels count-aware and update Home tests"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     Replace static Corpus Summary labels that can produce mismatched singular
     and plural copy, including the visible `1 leaderboard rankings` case.
@@ -64,7 +65,7 @@ work:
 - id: w2
   summary: "Update stale e2e expectations and add a route-gate assertion for the chosen copy"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Update `results-explorer/e2e/routes/home.spec.ts` so it asserts the chosen
     Corpus Summary wording and no longer expects the stale `leaderboard cohorts`
@@ -76,7 +77,7 @@ work:
 - id: w3
   summary: "Supersede stale mixed-theme evidence and rename stale tests without rewriting history"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     Grep for phrases that encode the retired mixed-theme contract, including:
     - `dark BenchBox shell + light analytical data panels`;
@@ -95,7 +96,7 @@ work:
 - id: w4
   summary: "Add a compact stale-contract scan to the Results Explorer release gate"
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Add or extend a low-cost check that fails on new active-source references
     to the retired mixed-theme contract, while allowing historical artifacts

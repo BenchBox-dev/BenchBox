@@ -2,6 +2,12 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/pre
 import { beforeEach, describe, expect, it } from "vitest";
 import Router, { route } from "preact-router";
 import { Layout } from "@/components/Layout";
+import {
+  HEADER_CTA,
+  HEADER_LINKS,
+  HEADER_NAV_ARIA_LABEL,
+  getHeaderVisibleLabels,
+} from "@/components/headerContract";
 
 function renderAt(path: string) {
   window.history.replaceState(null, "", path);
@@ -47,34 +53,19 @@ describe("Layout", () => {
   it("renders the BenchBox global nav with Results active at the hosted root", () => {
     renderAt("/");
 
-    const globalNav = screen.getByRole("navigation", { name: "BenchBox" });
-    expect(within(globalNav).getAllByRole("link").map((link) => link.textContent)).toEqual([
-      "Home",
-      "Docs",
-      "Blog",
-      "Results",
-      "Instruct an agent",
-      "GitHub",
-      "Run benchmark",
-    ]);
-    expect(within(globalNav).getByRole("link", { name: "Home" })).toHaveAttribute("href", "https://benchbox.dev/");
-    expect(within(globalNav).getByRole("link", { name: "Docs" })).toHaveAttribute("href", "https://benchbox.dev/docs/");
-    expect(within(globalNav).getByRole("link", { name: "Blog" })).toHaveAttribute("href", "https://benchbox.dev/blog/");
-    expect(within(globalNav).getByRole("link", { name: "Instruct an agent" })).toHaveAttribute(
-      "href",
-      "https://benchbox.dev/prompts/",
+    const globalNav = screen.getByRole("navigation", { name: HEADER_NAV_ARIA_LABEL });
+    expect(within(globalNav).getAllByRole("link").map((link) => link.textContent)).toEqual(
+      getHeaderVisibleLabels(),
     );
-    expect(within(globalNav).getByRole("link", { name: "GitHub" })).toHaveAttribute(
-      "href",
-      "https://github.com/joeharris76/BenchBox",
-    );
-    expect(within(globalNav).getByRole("link", { name: "GitHub" })).toHaveAttribute("target", "_blank");
-    expect(within(globalNav).getByRole("link", { name: "GitHub" })).toHaveAttribute("rel", "noopener");
+    for (const link of HEADER_LINKS) {
+      expect(within(globalNav).getByRole("link", { name: link.label })).toHaveAttribute("href", link.href);
+      if (link.external) {
+        expect(within(globalNav).getByRole("link", { name: link.label })).toHaveAttribute("target", "_blank");
+        expect(within(globalNav).getByRole("link", { name: link.label })).toHaveAttribute("rel", "noopener");
+      }
+    }
     expect(within(globalNav).getByRole("link", { name: "Results" })).toHaveAttribute("aria-current", "page");
-    expect(within(globalNav).getByRole("link", { name: "Run benchmark" })).toHaveAttribute(
-      "href",
-      "https://benchbox.dev/docs/usage/installation.html",
-    );
+    expect(within(globalNav).getByRole("link", { name: HEADER_CTA.label })).toHaveAttribute("href", HEADER_CTA.href);
   });
 
   it("keeps Results active under /results/ routes", () => {
@@ -93,16 +84,10 @@ describe("Layout", () => {
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute("aria-expanded", "true");
 
-    const globalNav = screen.getByRole("navigation", { name: "BenchBox" });
-    expect(within(globalNav).getAllByRole("link").map((link) => link.textContent)).toEqual([
-      "Home",
-      "Docs",
-      "Blog",
-      "Results",
-      "Instruct an agent",
-      "GitHub",
-      "Run benchmark",
-    ]);
+    const globalNav = screen.getByRole("navigation", { name: HEADER_NAV_ARIA_LABEL });
+    expect(within(globalNav).getAllByRole("link").map((link) => link.textContent)).toEqual(
+      getHeaderVisibleLabels(),
+    );
   });
 
   it("cycles and persists the shared BenchBox theme preference", () => {

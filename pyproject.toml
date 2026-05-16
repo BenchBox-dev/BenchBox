@@ -648,7 +648,9 @@ ignore-nested-functions = true
 ignore-nested-classes = true
 ignore-private = true
 ignore-property-decorators = false
-ignore-semiprivate = false
+# Keep the blocking gate focused on public API documentation; single-underscore
+# helpers churn heavily and are covered by code review/tests instead.
+ignore-semiprivate = true
 ignore-setters = false
 fail-under = 90  # Ratcheted from baseline after local audit reported 93.1% coverage.
 exclude = [

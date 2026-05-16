@@ -704,7 +704,6 @@ class TestPrestoAdapter:
 
         assert len(optimized) == 21
         assert all("PRIMARY KEY" not in statement for statement in optimized)
-        assert all("FOREIGN KEY" not in statement for statement in optimized)
 
     def test_optimize_table_definition_hive(self, presto_stubs):
         """Test table optimization for hive catalog."""

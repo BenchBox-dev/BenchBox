@@ -29,6 +29,7 @@ import {
   toggleFacetValue,
   toDateWindowFacet,
 } from "@/lib/facetMatching";
+import { formatCount } from "@/lib/copyFormatters";
 import { normalizedCostLabel, normalizedCostValue } from "@/lib/costDisplay";
 import { formatFacetDisplayValue } from "@/lib/facetDisplay";
 import { stringSerde, useUrlState } from "@/lib/useUrlState";
@@ -483,22 +484,25 @@ export function Home(_: RoutableProps) {
         <section aria-label="Corpus summary" class="mb-8 grid grid-cols-2 gap-4 text-center sm:mb-12 lg:grid-cols-4">
           <StatCard
             value={SUPPORTED_BENCHMARK_COUNT}
-            label="supported benchmarks"
+            label={{ singular: "supported benchmark", plural: "supported benchmarks" }}
             detail={`${benchmarks.length} with public results`}
           />
           <StatCard
             value={results.length}
-            label="public result bundles"
+            label={{ singular: "public result bundle", plural: "public result bundles" }}
             detail="maintainer-curated corpus"
           />
           <StatCard
             value={platformIds.length}
-            label="platforms with public results"
+            label={{
+              singular: "platform with public results",
+              plural: "platforms with public results",
+            }}
             detail="published platform IDs"
           />
           <StatCard
             value={leaderboardCohortCount}
-            label="leaderboard rankings"
+            label={{ singular: "leaderboard ranking", plural: "leaderboard rankings" }}
             detail={`${visibleLeaderboardCohortCount} visible; ${visibleLeaderboardPlatformCount}/${leaderboardEvidencePlatformCount} ranked-scope platforms`}
           />
         </section>
@@ -551,14 +555,14 @@ export function Home(_: RoutableProps) {
         <div class="grid grid-cols-1 gap-8 sm:grid-cols-2">
           <BrowseSection
             title="Browse Public Benchmark Results"
-            description={`${benchmarks.length.toLocaleString()} public benchmark set(s). Leaderboard filters above include ${leaderboardCohortCount.toLocaleString()} ranked leaderboard(s).`}
+            description={`${formatCount(benchmarks.length, "public benchmark set")}. Leaderboard filters above include ${formatCount(leaderboardCohortCount, "ranked leaderboard")}.`}
             items={benchmarks}
             hrefFn={(benchmark) => `/results/${benchmark}/`}
             labelFn={formatBenchmarkLabel}
           />
           <BrowseSection
             title="Browse Public Platform Results"
-            description={`${platformIds.length.toLocaleString()} published platform ID(s) in the public corpus, independent of current leaderboard coverage.`}
+            description={`${formatCount(platformIds.length, "published platform ID")} in the public corpus, independent of current leaderboard coverage.`}
             items={platformIds}
             hrefFn={(platformId) => `/results/p/${platformId}/`}
             labelFn={(platformId) => platformIdToName.get(platformId) ?? platformId}
@@ -933,19 +937,27 @@ function plural(count: number, singular: string, pluralValue: string): string {
   return count === 1 ? singular : pluralValue;
 }
 
+type StatCardLabel = string | { singular: string; plural: string };
+
+function resolveStatCardLabel(value: number | string, label: StatCardLabel): string {
+  if (typeof label === "string") return label;
+  return typeof value === "number" && value === 1 ? label.singular : label.plural;
+}
+
 function StatCard({
   value,
   label,
   detail,
 }: {
   value: number | string;
-  label: string;
+  label: StatCardLabel;
   detail?: string;
 }) {
+  const resolvedLabel = resolveStatCardLabel(value, label);
   return (
     <div class="card">
       <div class="text-3xl font-bold text-[var(--bb-accent-hover)]">{value}</div>
-      <div class="mt-1 text-sm font-medium text-[var(--bb-data-fg-muted)]">{label}</div>
+      <div class="mt-1 text-sm font-medium text-[var(--bb-data-fg-muted)]">{resolvedLabel}</div>
       {detail && <div class="mt-2 text-xs text-[var(--bb-data-fg-subtle)]">{detail}</div>}
     </div>
   );
