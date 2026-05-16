@@ -197,7 +197,11 @@ def test_compare_cli_template_uses_two_platform_flags(gen, catalog):
 
     assert compare.count("--platform ") >= 2, compare
     assert templates["test_one"] == (
-        "uv run benchbox run --platform {platform} --benchmark {benchmark} --scale {scale}"
+        "uv run benchbox run --platform {platform} --benchmark {benchmark} --scale {scale} --non-interactive"
+    )
+    assert templates["compare"] == (
+        "uv run benchbox compare --platform {platform_a} --platform {platform_b} "
+        "--benchmark {benchmark} --scale {scale} --non-interactive"
     )
     assert templates["dependency_check"] == "uv run benchbox check-deps --platform {platform}"
     assert templates["dry_run"] == (
@@ -215,6 +219,84 @@ def test_compare_cli_template_uses_two_platform_flags(gen, catalog):
     assert any("dependency_check must call check-deps --platform" in e for e in errors)
     assert any("dry_run must use long run flags" in e for e in errors)
     assert any("dry_run must include an explicit dry-run output dir" in e for e in errors)
+
+
+def test_test_one_template_uses_non_interactive(gen, catalog):
+    templates = catalog["templates"]["cli"]
+    assert " --non-interactive" in templates["test_one"]
+
+    bad = copy.deepcopy(catalog)
+    bad["templates"]["cli"]["test_one"] = bad["templates"]["cli"]["test_one"].replace(" --non-interactive", "")
+    errors = gen.validate(bad)
+    assert any("test_one must include --non-interactive" in e for e in errors)
+
+
+def test_compare_template_uses_non_interactive(gen, catalog):
+    templates = catalog["templates"]["cli"]
+    assert " --non-interactive" in templates["compare"]
+
+    bad = copy.deepcopy(catalog)
+    bad["templates"]["cli"]["compare"] = bad["templates"]["cli"]["compare"].replace(" --non-interactive", "")
+    errors = gen.validate(bad)
+    assert any("compare must include --non-interactive" in e for e in errors)
+
+
+def test_results_paths_template_present(gen, catalog):
+    templates = catalog["templates"]["cli"]
+    assert "benchbox results --paths" in templates["results_paths"]
+
+    bad = copy.deepcopy(catalog)
+    bad["templates"]["cli"]["results_paths"] = "uv run benchbox results list"
+    errors = gen.validate(bad)
+    assert any("results_paths must call benchbox results --paths" in e for e in errors)
+
+
+def test_show_cli_template_present(gen, catalog):
+    templates = catalog["templates"]["cli"]
+    assert "benchbox results show-cli" in templates["show_cli"]
+
+    bad = copy.deepcopy(catalog)
+    bad["templates"]["cli"]["show_cli"] = "uv run benchbox report <result-json>"
+    errors = gen.validate(bad)
+    assert any("show_cli must call benchbox results show-cli" in e for e in errors)
+
+
+def test_runtime_hints_well_formed(gen, catalog):
+    hints = catalog["runtime_hints"]
+    assert set(hints) == {"log_dir", "log_slug_template", "long_run_threshold_scale"}
+    assert isinstance(hints["log_dir"], str)
+    assert isinstance(hints["log_slug_template"], str)
+    assert isinstance(hints["long_run_threshold_scale"], str)
+    assert hints["long_run_threshold_scale"] in catalog["scales"]
+
+    bad = copy.deepcopy(catalog)
+    bad["runtime_hints"]["long_run_threshold_scale"] = 0.1
+    errors = gen.validate(bad)
+    assert any("long_run_threshold_scale must be a string present in scales[]" in e for e in errors)
+
+    bad = copy.deepcopy(catalog)
+    bad["runtime_hints"] = []
+    errors = gen.validate(bad)
+    assert any("runtime_hints must be a mapping" in e for e in errors)
+
+
+def test_runtime_hints_log_dir_under_tmp(gen, catalog):
+    assert catalog["runtime_hints"]["log_dir"].startswith("/tmp")
+
+    bad = copy.deepcopy(catalog)
+    bad["runtime_hints"]["log_dir"] = "/var/log"
+    errors = gen.validate(bad)
+    assert any("runtime_hints.log_dir must start with '/tmp'" in e for e in errors)
+
+
+def test_agent_prompt_includes_output_discipline_and_summary_labels():
+    prompts_js = PROMPTS_JS_PATH.read_text(encoding="utf-8")
+
+    assert "set -o pipefail" in prompts_js
+    assert " 2>&1 | tee " in prompts_js
+    assert "Announce before running" in prompts_js
+    assert "Discover & summarize" in prompts_js
+    assert "force_datagen_footer" in prompts_js
 
 
 def test_defaults_resolve_to_known_ids(browser_catalog):
@@ -386,6 +468,12 @@ def test_static_generated_payload_supports_dropdown_smoke(gen, browser_catalog):
     assert len(_filter_platform_ids(committed_payload, "sql", "managed")) >= 2
     assert len(_filter_platform_ids(committed_payload, "sql", "self-hosted")) >= 2
     assert "polars" in _filter_platform_ids(committed_payload, "dataframe", "local")
+    assert committed_payload["runtime_hints"] == browser_catalog["runtime_hints"]
+    committed_templates = committed_payload["templates"]["cli"]
+    browser_templates = browser_catalog["templates"]["cli"]
+    assert committed_templates["results_paths"] == browser_templates["results_paths"]
+    assert committed_templates["show_cli"] == browser_templates["show_cli"]
+    assert committed_templates["force_datagen_footer"] == browser_templates["force_datagen_footer"]
 
 
 def test_generated_platforms_include_install_commands(browser_catalog):

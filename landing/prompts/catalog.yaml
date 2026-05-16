@@ -68,15 +68,23 @@ scales:
   - "1.0"
   - "10.0"
 
+runtime_hints:
+  log_dir: "/tmp"
+  log_slug_template: "bench_{platform}_{benchmark}_{scale}"
+  long_run_threshold_scale: "0.1"
+
 # Command templates rendered into copyable blocks. Validator checks the
 # compare template uses two `--platform` flags so the page never emits a
 # malformed compare command.
 templates:
   cli:
-    test_one: "uv run benchbox run --platform {platform} --benchmark {benchmark} --scale {scale}"
-    compare: "uv run benchbox compare --platform {platform_a} --platform {platform_b} --benchmark {benchmark} --scale {scale}"
+    test_one: "uv run benchbox run --platform {platform} --benchmark {benchmark} --scale {scale} --non-interactive"
+    compare: "uv run benchbox compare --platform {platform_a} --platform {platform_b} --benchmark {benchmark} --scale {scale} --non-interactive"
     dependency_check: "uv run benchbox check-deps --platform {platform}"
     dry_run: "uv run benchbox run --dry-run {dry_run_dir} --platform {platform} --benchmark {benchmark} --scale {scale}"
+    results_paths: "uv run benchbox results --paths --limit 1"
+    show_cli: "uv run benchbox results show-cli <result-json>"
+    force_datagen_footer: "If the load phase fails partway, re-run with `--force datagen` appended."
 
 # References to existing MCP surfaces. The generator validates each name
 # resolves to a real tool/prompt in benchbox/mcp/.
