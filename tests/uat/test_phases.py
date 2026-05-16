@@ -131,7 +131,38 @@ def test_enumerate_records_registry_benchmark_gates():
     assert pruned_by_benchmark["metadata_primitives"].evidence.startswith("benchbox.sql_compat benchmark_gate")
 
 
-def test_enumerate_records_pg_family_compatibility_pruning():
+def test_enumerate_keeps_release_gate_runtime_envelopes_for_diagnostic_sweeps():
+    raw = {
+        "platforms": {"include": ["pg-duckdb", "pg-mooncake", "timescaledb"]},
+        "benchmarks": {
+            "include": [
+                "ai_primitives",
+                "datavault",
+                "joinorder",
+                "read_primitives",
+                "tpcds",
+                "tpcds_obt",
+                "vector_search",
+                "tpch",
+            ]
+        },
+        "scales": {"rungs": [0.01]},
+    }
+
+    result = enum_phase.enumerate_cells_with_pruning(raw)
+
+    cell_pairs = {(c.platform, c.benchmark) for c in result.cells}
+    for platform in ("pg-duckdb", "pg-mooncake", "timescaledb"):
+        assert (platform, "joinorder") in cell_pairs
+        assert (platform, "tpcds_obt") in cell_pairs
+    assert ("timescaledb", "datavault") in cell_pairs
+    pruned_pairs = {(c.platform, c.benchmark) for c in result.compatibility_pruned}
+    assert ("pg-duckdb", "ai_primitives") in pruned_pairs
+    assert ("pg-mooncake", "tpcds") in pruned_pairs
+    assert all(c.rule_id.endswith(".benchmark_gate") for c in result.compatibility_pruned)
+
+
+def test_enumerate_records_pg_family_release_gate_compatibility_pruning():
     from benchbox.core.platform_registry import PlatformRegistry
 
     raw = {
@@ -148,6 +179,7 @@ def test_enumerate_records_pg_family_compatibility_pruning():
                 "tpch",
             ]
         },
+        "compatibility": {"release_gate_runtime_envelopes": True},
         "scales": {"rungs": [0.01]},
     }
 

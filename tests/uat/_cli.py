@@ -18,6 +18,7 @@ from pathlib import Path
 
 def cell_main(argv: list[str] | None = None) -> int:
     """Implements `make uat-cell PLATFORM=X BENCHMARK=Y SCALE=Z`."""
+    from tests.uat import docker_assets
     from tests.uat.runner import run_cell
 
     parser = argparse.ArgumentParser(prog="uat-cell")
@@ -38,6 +39,7 @@ def cell_main(argv: list[str] | None = None) -> int:
         phases=args.phases,
         compression=args.compression,
         log_dir=Path(args.log_dir) if args.log_dir else None,
+        local_managed_platform=docker_assets.is_docker_platform(args.platform),
     )
     print(
         json.dumps(

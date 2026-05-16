@@ -1148,39 +1148,35 @@ worktree-claim-locked:
 	exit 1
 
 # Single-pass claim attempt. Iterates the pool once; on the first
-# detached, non-claim-aborted slot, hard-resets it to origin/develop
-# (scrubbing any residual INDEX/working-tree skew from an interrupted
-# release or manual `git checkout`) and mutates it to the requested
-# branch under an EXIT trap that rolls back on any failure (including
-# SIGINT/SIGTERM). EXIT is POSIX (works in dash/sh/bash); ERR is not.
+# detached, clean, non-claim-aborted slot, hard-resets it to
+# origin/develop (scrubbing any residual INDEX/working-tree skew from
+# an interrupted release or manual `git checkout`) and mutates it to
+# the requested branch under an EXIT trap that rolls back on any failure
+# (including SIGINT/SIGTERM). EXIT is POSIX (works in dash/sh/bash); ERR
+# is not.
 # A `.benchbox/claim_in_progress` marker is written before mutation and
 # removed on success or rollback; if the process is SIGKILL'd between
 # write and removal, the marker survives and `worktree-pool-status`
 # reports the slot as `aborted` so the operator knows it needs reset.
 #
-# The pre-gate `reset --hard` is the hardening for a subtle prior bug:
-# `git status --porcelain` could return empty on a slot whose INDEX still
-# had stale staged entries from a previous tenant (when the stale blob
-# coincidentally matched HEAD's blob for that path). The gate accepted
-# the slot as "clean detached", but the resulting worktree carried the
-# previous tenant's INDEX into the new branch. Resetting before the
-# emptiness check normalizes the slot atomically.
+# The `reset --hard` immediately before the final emptiness check is the
+# hardening for a subtle prior bug: `git status --porcelain` could return
+# empty on a slot whose INDEX still had stale staged entries from a
+# previous tenant (when the stale blob coincidentally matched HEAD's blob
+# for that path). The gate accepted the slot as "clean detached", but
+# the resulting worktree carried the previous tenant's INDEX into the new
+# branch. Resetting before the final emptiness check normalizes the slot.
 #
-# Ordering: the marker is written BEFORE `reset --hard` so the EXIT trap
-# can roll back a slot whose reset is interrupted mid-flight (SIGINT/
-# SIGTERM during the reset would otherwise leave the slot in a partial
-# state with no aborted-marker signal). Slots skipped by the post-reset
-# porcelain check or a transient reset failure remove the marker before
-# `continue` so the trap's cleanup does not target the wrong slot on a
-# later iteration. The cleanup function itself runs an extra `reset
-# --hard` so an interrupted pre-gate reset is fully normalized.
-#
-# Note: any detached pool slot is now scrubbed before being judged
-# claimable, even on iterations that ultimately skip the slot. This is
-# intentional — the pool contract is that detached = released, and a
-# detached slot with valuable uncommitted tracked-file state is already
-# out-of-contract (release would have reset it). Untracked-file residue
-# still survives the reset and skips the slot rather than being purged.
+# Ordering: a normal porcelain gate runs before mutation so dirty
+# detached slots are preserved for manual recovery. The marker is then
+# written BEFORE `reset --hard` so the EXIT trap can roll back a slot
+# whose reset is interrupted mid-flight (SIGINT/SIGTERM during the reset
+# would otherwise leave the slot in a partial state with no
+# aborted-marker signal). Slots skipped by the post-reset porcelain
+# check or a transient reset failure remove the marker before `continue`
+# so the trap's cleanup does not target the wrong slot on a later
+# iteration. The cleanup function itself runs an extra `reset --hard` so
+# an interrupted reset is fully normalized.
 worktree-claim-attempt:
 	@set -e; \
 	marker=""; wt=""; pool=""; claim_ok=0; \
@@ -1211,6 +1207,11 @@ worktree-claim-attempt:
 		[ -f "$$wt/.benchbox/claim_in_progress" ] && continue; \
 		branch=$$(git -C "$$wt" symbolic-ref -q --short HEAD 2>/dev/null || true); \
 		[ -z "$$branch" ] || continue; \
+		pre_status=$$(git -C "$$wt" status --porcelain --untracked-files=normal | grep -vE '^\?\? \.benchbox(/|$$)' || true); \
+		if [ -n "$$pre_status" ]; then \
+			echo "claim skip $$pool: porcelain non-empty before reset" >&2; \
+			continue; \
+		fi; \
 		marker="$$wt/.benchbox/claim_in_progress"; \
 		mkdir -p "$$wt/.benchbox"; \
 		printf 'pid=%s started=%s branch=%s\n' "$$$$" "$$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(BRANCH)" > "$$marker"; \

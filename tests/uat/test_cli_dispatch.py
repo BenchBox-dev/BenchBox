@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 from types import SimpleNamespace
@@ -52,6 +53,38 @@ def test_main_bare_flags_route_to_cell(monkeypatch):
     rc = _cli.main(["--platform", "duckdb", "--benchmark", "tpch", "--scale", "0.01"])
     assert rc == 0
     assert calls == [["--platform", "duckdb", "--benchmark", "tpch", "--scale", "0.01"]]
+
+
+@pytest.mark.parametrize(("platform", "expected_local_managed"), [("pg-duckdb", True), ("duckdb", False)])
+def test_cell_main_scopes_local_managed_platform_to_uat_docker_platforms(
+    platform,
+    expected_local_managed,
+    monkeypatch,
+    capsys,
+):
+    captured = {}
+
+    def fake_run_cell(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(
+            platform=kwargs["platform"],
+            benchmark=kwargs["benchmark"],
+            scale=kwargs["scale"],
+            status="passed",
+            exit_code=0,
+            elapsed_s=0.1,
+            log_path=Path("cell.log"),
+            result_path=None,
+            submit_terminal_state=None,
+        )
+
+    monkeypatch.setattr("tests.uat.runner.run_cell", fake_run_cell)
+
+    rc = _cli.cell_main(["--platform", platform, "--benchmark", "tpch", "--scale", "0.01"])
+
+    assert rc == 0
+    assert captured["local_managed_platform"] is expected_local_managed
+    assert json.loads(capsys.readouterr().out)["platform"] == platform
 
 
 def test_main_unknown_subcommand_returns_2(capsys):

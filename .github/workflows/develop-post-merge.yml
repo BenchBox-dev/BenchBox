@@ -73,6 +73,7 @@ jobs:
 
   close-orphaned-prs:
     name: close-orphaned-prs
+    needs: [lint, fast-test, explorer-tokens]
     # When a squash merge to develop lands one of several open PRs whose
     # branches share linear history (e.g. two worktrees produced overlapping
     # branches where one is a strict ancestor of the other), the squash hides

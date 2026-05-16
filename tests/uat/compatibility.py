@@ -64,18 +64,25 @@ _PG_FAMILY_RELEASE_GATE_RUNTIME_ENVELOPES = (
 )
 
 
-def compatibility_rule_for(platform: str, benchmark: str, info: BenchmarkInfo) -> CompatibilityRule | None:
+def compatibility_rule_for(
+    platform: str,
+    benchmark: str,
+    info: BenchmarkInfo,
+    *,
+    include_release_gate_runtime_envelopes: bool = False,
+) -> CompatibilityRule | None:
     """Return the rule that blocks a platform/benchmark pair, if any."""
     if platform in DATAFRAME_PLATFORMS and _is_sql_only_benchmark(benchmark, info):
         return DATAFRAME_SQL_ONLY_RULE
-    runtime_envelope_reason = _PG_FAMILY_RELEASE_GATE_RUNTIME_ENVELOPES.get((platform, benchmark))
-    if runtime_envelope_reason:
-        return CompatibilityRule(
-            rule_id=f"uat.compat.{platform}.{benchmark}.release_gate_runtime_envelope",
-            status="blocked",
-            reason=runtime_envelope_reason,
-            evidence="2026-05-14 enabled-platform UAT release-gate audit; not a runtime compatibility gate",
-        )
+    if include_release_gate_runtime_envelopes:
+        runtime_envelope_reason = _PG_FAMILY_RELEASE_GATE_RUNTIME_ENVELOPES.get((platform, benchmark))
+        if runtime_envelope_reason:
+            return CompatibilityRule(
+                rule_id=f"uat.compat.{platform}.{benchmark}.release_gate_runtime_envelope",
+                status="blocked",
+                reason=runtime_envelope_reason,
+                evidence="2026-05-14 enabled-platform UAT release-gate audit; not a runtime compatibility gate",
+            )
     caps = PlatformRegistry.get_platform_capabilities(platform)
     unsupported_benchmarks = getattr(caps, "unsupported_benchmarks", {}) if caps else {}
     reason = unsupported_benchmarks.get(benchmark)
