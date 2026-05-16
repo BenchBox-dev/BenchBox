@@ -112,3 +112,47 @@ def test_worktree_claim_keeps_claim_marker_blocking(tmp_path: Path) -> None:
     assert result.returncode != 0
     assert "WORKTREE_PATH=" not in result.stdout
     assert run(["git", "branch", "--show-current"], pool).stdout.strip() == ""
+
+
+def test_worktree_claim_preserves_dirty_detached_slots(tmp_path: Path) -> None:
+    origin = create_origin_with_develop(tmp_path)
+    main = tmp_path / "BenchBox"
+    pool_parent = tmp_path / "pool"
+    pool_parent.mkdir()
+    dirty_pool = pool_parent / "BenchBox.pool-01"
+    clean_pool = pool_parent / "BenchBox.pool-02"
+    run(["git", "clone", str(origin), str(main)], tmp_path)
+    run(["git", "clone", str(origin), str(dirty_pool)], tmp_path)
+    run(["git", "clone", str(origin), str(clean_pool)], tmp_path)
+    run(["git", "checkout", "--detach", "origin/develop"], dirty_pool)
+    run(["git", "checkout", "--detach", "origin/develop"], clean_pool)
+    (dirty_pool / ".venv").mkdir()
+    (dirty_pool / ".venv" / "pyvenv.cfg").write_text("home = test\n", encoding="utf-8")
+    (clean_pool / ".venv").mkdir()
+    (clean_pool / ".venv" / "pyvenv.cfg").write_text("home = test\n", encoding="utf-8")
+    (dirty_pool / "README.md").write_text("tracked WIP\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            "make",
+            "-f",
+            str(REPO_ROOT / "Makefile"),
+            "-s",
+            "worktree-claim-attempt",
+            "BRANCH=feature/preserve-dirty",
+            "POOL_SIZE=2",
+            f"WORKTREE_POOL_PARENT={pool_parent}",
+        ],
+        cwd=main,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "claim skip pool-01: porcelain non-empty before reset" in result.stderr
+    assert f"WORKTREE_PATH={clean_pool.resolve()}" in result.stdout
+    assert run(["git", "branch", "--show-current"], dirty_pool).stdout.strip() == ""
+    assert run(["git", "branch", "--show-current"], clean_pool).stdout.strip() == "feature/preserve-dirty"
+    assert (dirty_pool / "README.md").read_text(encoding="utf-8") == "tracked WIP\n"
+    assert not (dirty_pool / ".benchbox" / "claim_in_progress").exists()
