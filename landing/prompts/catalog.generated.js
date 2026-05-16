@@ -16,7 +16,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
         "sql",
         "dataframe"
       ],
-      "label": "TPC-DS"
+      "label": "TPC-DS",
+      "requires_bundled_dsdgen_below": "1.0"
     },
     {
       "id": "clickbench",
@@ -421,6 +422,10 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
         "sql"
       ],
       "label": "Apache Doris",
+      "platform_option_hints": [
+        "--platform-option port=9030",
+        "--platform-option http_port=8030"
+      ],
       "safety_terms": {
         "dependency": "Check platform SDK and connector dependencies before any live run.",
         "dry_run": "Use a dry run to inspect commands before any live run.",
@@ -805,6 +810,9 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
         "sql"
       ],
       "label": "QuestDB",
+      "platform_option_hints": [
+        "--platform-option http_port=9000  # REST endpoint, distinct from SQL port 8812"
+      ],
       "safety_terms": {
         "dependency": "Check platform SDK and connector dependencies before any live run.",
         "dry_run": "Use a dry run to inspect commands before any live run.",
@@ -851,6 +859,10 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
         "sql"
       ],
       "label": "SingleStore",
+      "platform_option_hints": [
+        "--platform-option port=3306  # adapter default; override if local Docker maps a different host port",
+        "--platform-option password=<value>  # local/self-managed password"
+      ],
       "safety_terms": {
         "dependency": "Check platform SDK and connector dependencies before any live run.",
         "dry_run": "Use a dry run to inspect commands before any live run.",
@@ -973,6 +985,10 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
         "sql"
       ],
       "label": "StarRocks",
+      "platform_option_hints": [
+        "--platform-option port=9030",
+        "--platform-option http_port=8040"
+      ],
       "safety_terms": {
         "dependency": "Check platform SDK and connector dependencies before any live run.",
         "dry_run": "Use a dry run to inspect commands before any live run.",
@@ -1081,7 +1097,11 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "interfaces": [
         "sql"
       ],
-      "label": "Apache Gluten + Velox"
+      "label": "Apache Gluten + Velox",
+      "platform_option_hints": [
+        "--platform-option deployment=remote",
+        "--platform-option endpoint=sc://host:50051  # Spark Connect"
+      ]
     }
   ],
   "runtime_hints": {

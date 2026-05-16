@@ -181,6 +181,64 @@ def test_cost_class_override_constrained_to_enum(gen, catalog):
     assert any("cost_class: must be one of" in e for e in errors)
 
 
+def test_platform_option_hints_validate_shape_and_flag(gen, catalog):
+    bad = copy.deepcopy(catalog)
+    bad["platform_overrides"] = {
+        "duckdb": {
+            "platform_option_hints": [
+                "--port 9030",
+                "",
+                42,
+            ]
+        }
+    }
+
+    errors = gen.validate(bad)
+
+    assert any("platform_option_hints[0]: must contain --platform-option" in e for e in errors)
+    assert any("platform_option_hints[1]: must be a non-empty string" in e for e in errors)
+    assert any("platform_option_hints[2]: must be a non-empty string" in e for e in errors)
+
+
+def test_platform_option_hints_apply_only_to_promptable_platforms(gen, catalog):
+    bad = copy.deepcopy(catalog)
+    bad["platform_overrides"] = {
+        "definitely-not-a-platform": {"platform_option_hints": ["--platform-option port=9030"]}
+    }
+
+    errors = gen.validate(bad)
+
+    assert any("unknown or non-promptable platform id" in e for e in errors)
+
+
+def test_bundled_dsdgen_metadata_validates_only_for_tpcds(gen, catalog):
+    bad = copy.deepcopy(catalog)
+    bad["benchmarks"] = copy.deepcopy(catalog["benchmarks"])
+    bad["benchmarks"][0]["requires_bundled_dsdgen_below"] = "1.0"
+    bad["benchmarks"][1]["requires_bundled_dsdgen_below"] = "0.2"
+
+    errors = gen.validate(bad)
+
+    assert any("benchmarks['tpch'].requires_bundled_dsdgen_below: only tpcds" in e for e in errors)
+    assert any("benchmarks['tpcds'].requires_bundled_dsdgen_below: must match" in e for e in errors)
+
+
+def test_bundled_dsdgen_metadata_requires_string_float(gen, catalog):
+    bad = copy.deepcopy(catalog)
+    bad["benchmarks"] = copy.deepcopy(catalog["benchmarks"])
+    bad["benchmarks"][1]["requires_bundled_dsdgen_below"] = "not-a-float"
+
+    errors = gen.validate(bad)
+
+    assert any("requires_bundled_dsdgen_below: must be parseable as a float" in e for e in errors)
+
+    bad = copy.deepcopy(catalog)
+    bad["benchmarks"] = copy.deepcopy(catalog["benchmarks"])
+    bad["benchmarks"][1]["requires_bundled_dsdgen_below"] = 1.0
+    errors = gen.validate(bad)
+    assert any("requires_bundled_dsdgen_below: must be a string present in scales[]" in e for e in errors)
+
+
 def test_unknown_benchmark_id_is_rejected(gen, catalog):
     bad = copy.deepcopy(catalog)
     bad["benchmarks"].append({"id": "definitely-not-a-benchmark"})
@@ -324,6 +382,14 @@ def test_agent_prompt_includes_output_discipline_and_summary_labels():
     assert "COST ACKNOWLEDGMENT" in prompts_js
     assert "Discover & summarize" in prompts_js
     assert "force_datagen_footer" in prompts_js
+
+
+def test_agent_prompt_includes_platform_footgun_and_dsdgen_labels():
+    prompts_js = PROMPTS_JS_PATH.read_text(encoding="utf-8")
+
+    assert "Likely required platform options for" in prompts_js
+    assert "TPC-DS sub-scale warning" in prompts_js
+    assert "requires_bundled_dsdgen_below" in prompts_js
 
 
 def test_defaults_resolve_to_known_ids(browser_catalog):
@@ -509,11 +575,15 @@ def test_static_generated_payload_supports_dropdown_smoke(gen, browser_catalog):
     committed_by_id = {platform["id"]: platform for platform in committed_payload["platforms"]}
     assert committed_by_id["snowflake"]["cost_class"] == "paid_credits"
     assert committed_by_id["duckdb"]["cost_class"] == "free"
+    assert "--platform-option http_port=9000" in committed_by_id["questdb"]["platform_option_hints"][0]
     committed_templates = committed_payload["templates"]["cli"]
     browser_templates = browser_catalog["templates"]["cli"]
     assert committed_templates["results_paths"] == browser_templates["results_paths"]
     assert committed_templates["show_cli"] == browser_templates["show_cli"]
     assert committed_templates["force_datagen_footer"] == browser_templates["force_datagen_footer"]
+    benchmark_by_id = {benchmark["id"]: benchmark for benchmark in committed_payload["benchmarks"]}
+    assert benchmark_by_id["tpcds"]["requires_bundled_dsdgen_below"] == "1.0"
+    assert "requires_bundled_dsdgen_below" not in benchmark_by_id["tpch"]
 
 
 def test_generated_platforms_include_install_commands(browser_catalog):
