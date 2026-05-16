@@ -84,7 +84,8 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "benchmark_run": "benchmark_run",
       "compare_platforms": "compare_platforms"
     },
-    "run_tool": "run_benchmark"
+    "run_tool": "run_benchmark",
+    "system_profile_tool": "system_profile"
   },
   "platforms": [
     {

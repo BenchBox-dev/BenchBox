@@ -390,13 +390,13 @@
         return state["interface"] === "dataframe" ? ', mode="dataframe"' : "";
     }
 
-    function mcpRunCall(mcpToolName, platform, state, scale, dryRun) {
-        return "`" + mcpToolName + '(platform="' + platform + '", benchmark="' + state.benchmark + '", scale_factor=' + scale + ", dry_run=" + (dryRun ? "true" : "false") + mcpModeArg(state) + ")`";
+    function mcpRunCall(toolName, platform, state, scale, dryRun, capturePlans) {
+        return "`" + toolName + '(platform="' + platform + '", benchmark="' + state.benchmark + '", scale_factor=' + scale + (dryRun === null ? "" : ", dry_run=" + (dryRun ? "true" : "false")) + mcpModeArg(state) + (capturePlans ? ", capture_plans=true" : "") + ")`";
     }
 
     function mcpRunCalls(mcpToolName, platforms, state, scale, dryRun) {
         return platforms.map(function (p) {
-            return mcpRunCall(mcpToolName, p, state, scale, dryRun);
+            return mcpRunCall(mcpToolName, p, state, scale, dryRun, false);
         }).join(" and ");
     }
 
@@ -407,51 +407,105 @@
         return "`" + mcpPromptName + '(platform="' + platform + '", benchmark="' + state.benchmark + '", scale_factor=' + state.scale + ")`";
     }
 
+    function mcpPlatformOptionBlocks(entries) {
+        return platformOptionHintBlocks(entries).map(function (block) {
+            return {
+                label: block.label,
+                options: block.hints.map(function (hint) {
+                    var parts = hint.split("#");
+                    return {
+                        option: parts[0].replace("--platform-option", "").trim(),
+                        note: parts.slice(1).join("#").trim()
+                    };
+                })
+            };
+        });
+    }
+
+    function appendMcpPlatformOptionLines(lines, entries, step) {
+        mcpPlatformOptionBlocks(entries).forEach(function (block) {
+            lines.push("  " + step.value++ + ". Platform option hints for " + block.label + ": MCP `run_benchmark` does not currently expose a platform_options argument; configure these via BenchBox config/env or use the CLI surface if required.");
+            block.options.forEach(function (item) {
+                lines.push("     • `" + item.option + "`" + (item.note ? " — " + item.note : ""));
+            });
+        });
+    }
+
     function buildMcpPrompt(state, platform, platformB, platformEntry, platformBEntry, benchmarkEntry, needsCredentials) {
         var isCompare = state.goal === "compare";
         var mcpToolName = catalog.mcp.run_tool;
         var mcpPromptName = isCompare ? catalog.mcp.prompts.compare_platforms : catalog.mcp.prompts.benchmark_run;
+        var analyzePromptName = catalog.mcp.prompts.analyze_results;
+        var systemProfileTool = catalog.mcp.system_profile_tool || "system_profile";
         var dependencyPlatforms = dependencyCheckPlatforms([platformEntry, platformBEntry]);
         var selectedEntries = [platformEntry, platformBEntry];
         var selectedPlatforms = isCompare ? [platform, platformB] : [platform];
         var isPaid = isPaidSelection(platformEntry, platformBEntry);
-        var step = 1;
-        var lines = [];
-
+        var step = { value: 1 };
         if (isCompare) {
-            lines.push("Use the BenchBox MCP server to compare " + platformLabel(platformEntry) + " and " + platformLabel(platformBEntry) + ".");
-        } else {
-            lines.push("Use the BenchBox MCP server to run " + (benchmarkEntry ? benchmarkEntry.label : state.benchmark) + " on " + platformLabel(platformEntry) + ".");
+            var compareLines = [];
+            compareLines.push(
+                "Use the BenchBox MCP server to compare " + platformLabel(platformEntry) + " and " + platformLabel(platformBEntry) + ".",
+                "Steps:",
+                "  " + step.value++ + ". Call the `" + catalog.mcp.list_tool + "` tool to confirm both platforms are available.",
+                renderMcpDependencyStep(step.value++, dependencyPlatforms, "selection")
+            );
+            appendMcpPlatformOptionLines(compareLines, selectedEntries, step);
+            compareLines.push("  " + step.value++ + ". Use the " + mcpPromptCall(mcpPromptName, state, platform, platformB) + " prompt.");
+            if (needsBundledDsdgenWarning(state, benchmarkEntry)) {
+                compareLines.push("  " + step.value++ + ". TPC-DS sub-scale warning: scale factors below " + bundledDsdgenThreshold(benchmarkEntry) + " require BenchBox's bundled patched dsdgen at `_binaries/tpc-ds/<platform>/dsdgen`; do not use stock dsdgen.");
+            }
+            if (needsSmokeStep(state, isPaid)) {
+                compareLines.push("  " + step.value++ + ". SMOKE: call " + mcpRunCalls(mcpToolName, selectedPlatforms, state, "0.01", false) + " before the target-scale dry run. Abort if either smoke run fails.");
+            }
+            compareLines.push("  " + step.value++ + ". Call " + mcpRunCalls(mcpToolName, selectedPlatforms, state, state.scale, true) + ". Inspect both plans.");
+            if (shouldAnnounceRun(state)) {
+                compareLines.push("  " + step.value++ + ". Announce before running: target MCP call(s) " + mcpRunCalls(mcpToolName, selectedPlatforms, state, state.scale, false) + ", expected runtime, and stop condition. Stop promptly on user interrupt or redirect.");
+            }
+            if (needsCredentials) {
+                compareLines.push("  " + step.value++ + ". Make sure platform connection credentials/config are set outside this conversation (env vars, config files). Do NOT ask me to paste secrets here.");
+            }
+            if (needsCostAcknowledgment(state, isPaid)) {
+                compareLines.push("  " + step.value++ + ". COST ACKNOWLEDGMENT: ask the user to confirm credit or compute spend before running the target scale.");
+            }
+            compareLines.push("  " + step.value++ + ". Run live: " + mcpRunCalls(mcpToolName, selectedPlatforms, state, state.scale, false) + ".");
+            compareLines.push("  " + step.value++ + ". Use the `" + analyzePromptName + "` prompt with the result-bundle paths; summarize total runtime, per-query timing, and any failures from the MCP tool result payloads.");
+            compareLines.push("  " + step.value++ + ". Save provenance: call `" + systemProfileTool + "()` and store the output alongside the result bundle. MCP has no `benchbox --version-json` equivalent yet; keep the MCP server/version context if available.");
+            compareLines.push("  • To capture EXPLAIN plans, pass `capture_plans=true` to each live `run_benchmark` call and inspect supported plans from the result bundle.");
+            if (needsCredentials) appendDeploymentSafetyLines(compareLines, [platformEntry, platformBEntry], state.deployment);
+            compareLines.push(needsCredentials ? "  • Stop and ask the user if credentials or config are missing — do not request secrets in chat." : "");
+            return compareLines.filter(Boolean).join("\n");
         }
-        lines.push("Steps:");
-        lines.push("  " + step++ + ". Call the `" + catalog.mcp.list_tool + "` tool to confirm " + (isCompare ? "both platforms are available" : "the platform is installed") + ".");
-        platformOptionHintBlocks(selectedEntries).forEach(function (block) {
-            lines.push("  " + step++ + ". Likely required platform options for " + block.label + ":");
-            block.hints.forEach(function (hint) {
-                lines.push("     • `" + hint + "`");
-            });
-        });
-        lines.push(renderMcpDependencyStep(String(step++), dependencyPlatforms, isCompare ? "selection" : "platform"));
+        var lines = [];
+        lines.push(
+            "Use the BenchBox MCP server to run " + (benchmarkEntry ? benchmarkEntry.label : state.benchmark) + " on " + platformLabel(platformEntry) + ".",
+            "Steps:",
+            "  " + step.value++ + ". Call the `" + catalog.mcp.list_tool + "` tool to confirm the platform is installed.",
+            renderMcpDependencyStep(step.value++, dependencyPlatforms, "platform")
+        );
+        appendMcpPlatformOptionLines(lines, [platformEntry], step);
+        lines.push("  " + step.value++ + ". Use the " + mcpPromptCall(mcpPromptName, state, platform, platformB) + " prompt.");
         if (needsBundledDsdgenWarning(state, benchmarkEntry)) {
-            lines.push("  " + step++ + ". TPC-DS sub-scale warning: scale factors below " + bundledDsdgenThreshold(benchmarkEntry) + " require BenchBox's bundled patched dsdgen at `_binaries/tpc-ds/<platform>/dsdgen`; do not use stock dsdgen.");
+            lines.push("  " + step.value++ + ". TPC-DS sub-scale warning: scale factors below " + bundledDsdgenThreshold(benchmarkEntry) + " require BenchBox's bundled patched dsdgen at `_binaries/tpc-ds/<platform>/dsdgen`; do not use stock dsdgen.");
         }
         if (needsSmokeStep(state, isPaid)) {
-            lines.push("  " + step++ + ". SMOKE: call " + mcpRunCalls(mcpToolName, selectedPlatforms, state, "0.01", false) + " before the target-scale dry run. Abort if the smoke run fails.");
+            lines.push("  " + step.value++ + ". SMOKE: call " + mcpRunCall(mcpToolName, platform, state, "0.01", false, false) + ". Abort if the smoke run fails.");
         }
-        lines.push("  " + step++ + ". Use the " + mcpPromptCall(mcpPromptName, state, platform, platformB) + " prompt.");
-        lines.push("  " + step++ + ". Call " + mcpRunCalls(mcpToolName, selectedPlatforms, state, state.scale, true) + ". Inspect " + (isCompare ? "both plans" : "the plan") + ".");
+        lines.push("  " + step.value++ + ". Call " + mcpRunCall(mcpToolName, platform, state, state.scale, true, false) + ". Inspect the plan.");
         if (shouldAnnounceRun(state)) {
-            lines.push("  " + step++ + ". Announce before running: target MCP call(s) " + mcpRunCalls(mcpToolName, selectedPlatforms, state, state.scale, false) + ", expected runtime, and stop condition. Stop promptly on user interrupt or redirect.");
+            lines.push("  " + step.value++ + ". Announce before running: target MCP call(s) " + mcpRunCall(mcpToolName, platform, state, state.scale, false, false) + ", expected runtime, and stop condition. Stop promptly on user interrupt or redirect.");
         }
         if (needsCredentials) {
-            lines.push("  " + step++ + ". Make sure platform connection credentials/config are set outside this conversation (env vars, config files). Do NOT ask me to paste secrets here.");
+            lines.push("  " + step.value++ + ". Make sure platform connection credentials/config are set outside this conversation (env vars, config files). Do NOT ask me to paste secrets here.");
         }
         if (needsCostAcknowledgment(state, isPaid)) {
-            lines.push("  " + step++ + ". COST ACKNOWLEDGMENT: ask the user to confirm credit or compute spend before running the target scale.");
+            lines.push("  " + step.value++ + ". COST ACKNOWLEDGMENT: ask the user to confirm credit or compute spend before running the target scale.");
         }
-        lines.push("  " + step++ + ". Run live: " + mcpRunCalls(mcpToolName, selectedPlatforms, state, state.scale, false) + ".");
-        lines.push("  " + step++ + ". Summarize total runtime, per-query timing, and any failures from the MCP tool result payload" + (isCompare ? "s" : "") + ".");
-        if (needsCredentials) appendDeploymentSafetyLines(lines, selectedEntries, state.deployment);
+        lines.push("  " + step.value++ + ". Run live: " + mcpRunCall(mcpToolName, platform, state, state.scale, false, false) + ".");
+        lines.push("  " + step.value++ + ". Use the `" + analyzePromptName + "` prompt with the result-bundle path; summarize total runtime, per-query timings, and any failures from the MCP tool result payload.");
+        lines.push("  " + step.value++ + ". Save provenance: call `" + systemProfileTool + "()` and store the output alongside the result bundle. MCP has no `benchbox --version-json` equivalent yet; keep the MCP server/version context if available.");
+        lines.push("  • To capture EXPLAIN plans, pass `capture_plans=true` to the live `run_benchmark` call and inspect supported plans from the result bundle.");
+        if (needsCredentials) appendDeploymentSafetyLines(lines, [platformEntry], state.deployment);
         lines.push(needsCredentials ? "  • Stop and ask the user if credentials or config are missing — do not request secrets in chat." : "");
         return lines.filter(Boolean).join("\n");
     }

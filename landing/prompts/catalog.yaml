@@ -117,6 +117,7 @@ templates:
 mcp:
   run_tool: run_benchmark
   list_tool: list_available
+  system_profile_tool: system_profile
   prompts:
     benchmark_run: benchmark_run
     compare_platforms: compare_platforms
