@@ -44,7 +44,26 @@ deployments:
 # This is intentionally not an inclusion list: supported platform ids come
 # from PlatformRegistry at generation time. Interface and deployment filter
 # membership also remains registry-derived.
-platform_overrides: {}
+platform_overrides:
+  doris:
+    platform_option_hints:
+      - "--platform-option port=9030"
+      - "--platform-option http_port=8030"
+  questdb:
+    platform_option_hints:
+      - "--platform-option http_port=9000  # REST endpoint, distinct from SQL port 8812"
+  singlestore:
+    platform_option_hints:
+      - "--platform-option port=3306  # adapter default; override if local Docker maps a different host port"
+      - "--platform-option password=<value>  # local/self-managed password"
+  starrocks:
+    platform_option_hints:
+      - "--platform-option port=9030"
+      - "--platform-option http_port=8040"
+  velox:
+    platform_option_hints:
+      - "--platform-option deployment=remote"
+      - "--platform-option endpoint=sc://host:50051  # Spark Connect"
 
 # Curated benchmark subset for MVP. Validator confirms IDs exist in
 # BENCHMARK_METADATA.
@@ -55,6 +74,7 @@ benchmarks:
   - id: tpcds
     label: "TPC-DS"
     interfaces: [sql, dataframe]
+    requires_bundled_dsdgen_below: "1.0"
   - id: clickbench
     label: "ClickBench"
     interfaces: [sql]

@@ -346,6 +346,33 @@
         return platforms;
     }
 
+    function platformOptionHintBlocks(entries) {
+        var blocks = [];
+        var seen = {};
+        entries.forEach(function (entry) {
+            if (!entry || !entry.platform_option_hints || !entry.platform_option_hints.length) return;
+            var hints = [];
+            entry.platform_option_hints.forEach(function (hint) {
+                if (hints.indexOf(hint) === -1) hints.push(hint);
+            });
+            if (!hints.length || seen[entry.id]) return;
+            seen[entry.id] = true;
+            blocks.push({ label: platformLabel(entry), hints: hints });
+        });
+        return blocks;
+    }
+
+    function bundledDsdgenThreshold(benchmarkEntry) {
+        if (!benchmarkEntry || !benchmarkEntry.requires_bundled_dsdgen_below) return null;
+        var threshold = parseFloat(benchmarkEntry.requires_bundled_dsdgen_below);
+        return isFinite(threshold) ? benchmarkEntry.requires_bundled_dsdgen_below : null;
+    }
+
+    function needsBundledDsdgenWarning(state, benchmarkEntry) {
+        var threshold = bundledDsdgenThreshold(benchmarkEntry);
+        return threshold !== null && parseFloat(state.scale) < parseFloat(threshold);
+    }
+
     function buildMcpPrompt(state, platform, platformB, platformEntry, platformBEntry, benchmarkEntry, needsCredentials) {
         var isCompare = state.goal === "compare";
         var mcpToolName = catalog.mcp.run_tool;
@@ -415,10 +442,19 @@
         lines.push("Steps:");
         var installs = installCommands([platformEntry, platformBEntry]);
         lines.push("  " + step++ + ". Install dependencies: `" + installs.join("` and `") + "`.");
+        platformOptionHintBlocks([platformEntry, platformBEntry]).forEach(function (block) {
+            lines.push("  " + step++ + ". Likely required platform options for " + block.label + ":");
+            block.hints.forEach(function (hint) {
+                lines.push("     • `" + hint + "`");
+            });
+        });
         if (depChecks.length > 0) {
             lines.push("  " + step++ + ". Check dependencies: `" + depChecks.join("` and `") + "`. Stop and report if anything is missing.");
         } else {
             lines.push("  " + step++ + ". Check dependencies: no optional connector check is registered for this selection; confirm the install command completed successfully.");
+        }
+        if (needsBundledDsdgenWarning(state, benchmarkEntry)) {
+            lines.push("  " + step++ + ". TPC-DS sub-scale warning: scale factors below " + bundledDsdgenThreshold(benchmarkEntry) + " require BenchBox's bundled patched dsdgen at `_binaries/tpc-ds/<platform>/dsdgen`; do not use stock dsdgen.");
         }
         if (needsSmokeStep(state, isPaid)) {
             lines.push("  " + step++ + ". SMOKE: run the same live command at scale factor 0.01 before the target-scale dry run: `" + smokeCmd + "`. Abort if the smoke run fails.");

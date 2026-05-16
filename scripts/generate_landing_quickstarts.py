@@ -44,6 +44,7 @@ PLATFORM_OVERRIDE_KEYS = frozenset(
         "dependency_check_platform",
         "install_command",
         "label",
+        "platform_option_hints",
         "safety_terms",
     }
 )
@@ -208,6 +209,8 @@ def _apply_platform_override(entry: dict[str, Any], override: dict[str, Any]) ->
             updated[key] = override[key]
     if isinstance(override.get("safety_terms"), dict):
         updated["safety_terms"] = dict(override["safety_terms"])
+    if isinstance(override.get("platform_option_hints"), list):
+        updated["platform_option_hints"] = list(override["platform_option_hints"])
     if isinstance(override.get("dependency_check_platform"), str) and "dependency_check_command" not in override:
         platform = updated["dependency_check_platform"]
         updated["dependency_check_command"] = f"uv run benchbox check-deps --platform {platform}"
@@ -311,6 +314,22 @@ def _supported_registry_platform_ids() -> set[str]:
     return supported
 
 
+def _validate_platform_option_hints(platform_id: str, hints: Any) -> list[str]:
+    errors: list[str] = []
+    if not isinstance(hints, list):
+        return [f"platform_overrides[{platform_id!r}].platform_option_hints: must be a list"]
+    for idx, hint in enumerate(hints):
+        if not isinstance(hint, str) or not hint:
+            errors.append(
+                f"platform_overrides[{platform_id!r}].platform_option_hints[{idx}]: must be a non-empty string"
+            )
+        elif "--platform-option" not in hint:
+            errors.append(
+                f"platform_overrides[{platform_id!r}].platform_option_hints[{idx}]: must contain --platform-option"
+            )
+    return errors
+
+
 def _validate_platform_overrides(catalog: dict[str, Any], known_platforms: set[str]) -> list[str]:
     errors: list[str] = []
     overrides = catalog.get("platform_overrides")
@@ -354,6 +373,8 @@ def _validate_platform_overrides(catalog: dict[str, Any], known_platforms: set[s
                             f"platform_overrides[{platform_id!r}].safety_terms[{safety_key!r}]: "
                             "must be a non-empty string"
                         )
+        if "platform_option_hints" in override:
+            errors.extend(_validate_platform_option_hints(platform_id, override["platform_option_hints"]))
     return errors
 
 
@@ -435,6 +456,39 @@ def _validate_mcp(catalog: dict[str, Any], known_tools: frozenset[str], known_pr
     return errors
 
 
+def _validate_benchmarks(catalog: dict[str, Any], known_benchmarks: set[str]) -> list[str]:
+    errors: list[str] = []
+    scales = catalog.get("scales") or []
+    scale_numbers = set()
+    for scale in scales:
+        try:
+            scale_numbers.add(float(scale))
+        except (TypeError, ValueError):
+            pass
+
+    for entry in catalog.get("benchmarks") or []:
+        bid = entry.get("id")
+        if bid not in known_benchmarks:
+            errors.append(f"benchmarks[{bid!r}]: unknown benchmark id (not in BENCHMARK_METADATA)")
+        if "requires_bundled_dsdgen_below" not in entry:
+            continue
+
+        threshold = entry["requires_bundled_dsdgen_below"]
+        if bid != "tpcds":
+            errors.append(f"benchmarks[{bid!r}].requires_bundled_dsdgen_below: only tpcds may declare bundled dsdgen")
+        if not isinstance(threshold, str):
+            errors.append(f"benchmarks[{bid!r}].requires_bundled_dsdgen_below: must be a string present in scales[]")
+            continue
+        try:
+            threshold_number = float(threshold)
+        except ValueError:
+            errors.append(f"benchmarks[{bid!r}].requires_bundled_dsdgen_below: must be parseable as a float")
+            continue
+        if threshold_number not in scale_numbers:
+            errors.append(f"benchmarks[{bid!r}].requires_bundled_dsdgen_below: must match a numeric value in scales[]")
+    return errors
+
+
 def _validate_agent_removed(catalog: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     if "agents" in catalog:
@@ -509,10 +563,7 @@ def validate(catalog: dict[str, Any]) -> list[str]:
         errors.extend(_validate_one_platform(entry, known_platforms))
 
     benchmarks = catalog.get("benchmarks") or []
-    for entry in benchmarks:
-        bid = entry.get("id")
-        if bid not in known_benchmarks:
-            errors.append(f"benchmarks[{bid!r}]: unknown benchmark id (not in BENCHMARK_METADATA)")
+    errors.extend(_validate_benchmarks(catalog, known_benchmarks))
 
     for d in catalog.get("deployments") or []:
         did = d.get("id") if isinstance(d, dict) else None
