@@ -436,6 +436,50 @@ def _validate_platforms_are_derived(catalog: dict[str, Any]) -> list[str]:
     return ["platforms[] is no longer supported in catalog.yaml; prompt platforms are derived from PlatformRegistry"]
 
 
+def _validate_cli_templates_and_runtime_hints(catalog: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    cli_templates = (catalog.get("templates") or {}).get("cli") or {}
+    compare_tpl = cli_templates.get("compare") or ""
+    if compare_tpl.count("--platform ") < 2:
+        errors.append(f"templates.cli.compare must include two --platform flags (got: {compare_tpl!r})")
+
+    test_one_tpl = cli_templates.get("test_one") or ""
+    dry_run_tpl = cli_templates.get("dry_run") or ""
+    dependency_tpl = cli_templates.get("dependency_check") or ""
+    results_paths_tpl = cli_templates.get("results_paths") or ""
+    show_cli_tpl = cli_templates.get("show_cli") or ""
+    runtime_hints_raw = catalog.get("runtime_hints")
+    if runtime_hints_raw is None:
+        runtime_hints_raw = {}
+    runtime_hints = runtime_hints_raw if isinstance(runtime_hints_raw, dict) else {}
+    if " -p " in test_one_tpl or " -b " in test_one_tpl or " -s " in test_one_tpl:
+        errors.append(f"templates.cli.test_one must use long run flags (got: {test_one_tpl!r})")
+    if " --non-interactive" not in test_one_tpl:
+        errors.append(f"templates.cli.test_one must include --non-interactive (got: {test_one_tpl!r})")
+    if " --non-interactive" not in compare_tpl:
+        errors.append(f"templates.cli.compare must include --non-interactive (got: {compare_tpl!r})")
+    if " -p " in dry_run_tpl or " -b " in dry_run_tpl or " -s " in dry_run_tpl:
+        errors.append(f"templates.cli.dry_run must use long run flags (got: {dry_run_tpl!r})")
+    if "--dry-run {dry_run_dir}" not in dry_run_tpl:
+        errors.append(f"templates.cli.dry_run must include an explicit dry-run output dir (got: {dry_run_tpl!r})")
+    if dependency_tpl != "uv run benchbox check-deps --platform {platform}":
+        errors.append(f"templates.cli.dependency_check must call check-deps --platform (got: {dependency_tpl!r})")
+    if "benchbox results --paths" not in results_paths_tpl:
+        errors.append(f"templates.cli.results_paths must call benchbox results --paths (got: {results_paths_tpl!r})")
+    if "benchbox results show-cli" not in show_cli_tpl:
+        errors.append(f"templates.cli.show_cli must call benchbox results show-cli (got: {show_cli_tpl!r})")
+
+    if not isinstance(runtime_hints_raw, dict):
+        errors.append("runtime_hints must be a mapping")
+    threshold_scale = runtime_hints.get("long_run_threshold_scale")
+    if not isinstance(threshold_scale, str) or threshold_scale not in set(catalog.get("scales") or []):
+        errors.append("runtime_hints.long_run_threshold_scale must be a string present in scales[]")
+    log_dir = runtime_hints.get("log_dir")
+    if not isinstance(log_dir, str) or not log_dir.startswith("/tmp"):
+        errors.append("runtime_hints.log_dir must start with '/tmp'")
+    return errors
+
+
 def validate(catalog: dict[str, Any]) -> list[str]:
     """Return a list of validation error messages; empty means valid."""
     errors: list[str] = []
@@ -464,23 +508,7 @@ def validate(catalog: dict[str, Any]) -> list[str]:
     errors.extend(_validate_defaults(catalog, platforms, benchmarks))
     errors.extend(_validate_agent_removed(catalog))
     errors.extend(_validate_mcp(catalog, known_tools, known_prompts))
-
-    cli_templates = (catalog.get("templates") or {}).get("cli") or {}
-    compare_tpl = cli_templates.get("compare") or ""
-    if compare_tpl.count("--platform ") < 2:
-        errors.append(f"templates.cli.compare must include two --platform flags (got: {compare_tpl!r})")
-
-    test_one_tpl = cli_templates.get("test_one") or ""
-    dry_run_tpl = cli_templates.get("dry_run") or ""
-    dependency_tpl = cli_templates.get("dependency_check") or ""
-    if " -p " in test_one_tpl or " -b " in test_one_tpl or " -s " in test_one_tpl:
-        errors.append(f"templates.cli.test_one must use long run flags (got: {test_one_tpl!r})")
-    if " -p " in dry_run_tpl or " -b " in dry_run_tpl or " -s " in dry_run_tpl:
-        errors.append(f"templates.cli.dry_run must use long run flags (got: {dry_run_tpl!r})")
-    if "--dry-run {dry_run_dir}" not in dry_run_tpl:
-        errors.append(f"templates.cli.dry_run must include an explicit dry-run output dir (got: {dry_run_tpl!r})")
-    if dependency_tpl != "uv run benchbox check-deps --platform {platform}":
-        errors.append(f"templates.cli.dependency_check must call check-deps --platform (got: {dependency_tpl!r})")
+    errors.extend(_validate_cli_templates_and_runtime_hints(catalog))
 
     if FORBIDDEN_JSON.exists():
         errors.append(f"forbidden file present: {FORBIDDEN_JSON.relative_to(REPO_ROOT)}")

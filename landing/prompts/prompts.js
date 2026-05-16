@@ -253,6 +253,31 @@
         });
     }
 
+    function runtimeHints() {
+        return catalog.runtime_hints || {};
+    }
+
+    function logPath(state, platformSlug) {
+        var hints = runtimeHints();
+        var dir = String(hints.log_dir || "/tmp").replace(/\/+$/, "");
+        var template = hints.log_slug_template || "bench_{platform}_{benchmark}_{scale}";
+        var slug = renderTemplate(template, {
+            platform: platformSlug,
+            benchmark: state.benchmark,
+            scale: state.scale
+        }).replace(/[^A-Za-z0-9_.-]/g, "-");
+        return dir + "/" + slug + ".log";
+    }
+
+    function shouldAnnounceRun(state) {
+        var threshold = parseFloat(runtimeHints().long_run_threshold_scale || "0.1");
+        return parseFloat(state.scale) >= threshold || state.deployment !== "local";
+    }
+
+    function commandWithLogCapture(command, path) {
+        return "set -o pipefail; " + command + " 2>&1 | tee " + path;
+    }
+
     function safetyTexts(entries, key, deployment) {
         var texts = [];
         entries.forEach(function (entry) {
@@ -351,6 +376,12 @@
 
     function buildAgentPrompt(state, platform, platformB, platformEntry, platformBEntry, benchmarkEntry, cliCmd, dryRun, dryRunB, depChecks, needsCredentials) {
         var pretty = benchmarkEntry ? benchmarkEntry.label : state.benchmark;
+        var platformSlug = state.goal === "compare" ? platform + "-vs-" + platformB : platform;
+        var liveLogPath = logPath(state, platformSlug);
+        var liveCmd = commandWithLogCapture(cliCmd, liveLogPath);
+        var resultsPaths = catalog.templates.cli.results_paths;
+        var showCli = catalog.templates.cli.show_cli;
+        var step = 1;
         var lines = [];
         if (state.goal === "compare") {
             lines.push("Goal: compare " + platformLabel(platformEntry) + " and " + platformLabel(platformBEntry) + " on " + pretty + " at scale factor " + state.scale + " (" + state["interface"].toUpperCase() + " interface, " + state.deployment + " deployment).");
@@ -360,20 +391,25 @@
         lines.push("");
         lines.push("Steps:");
         var installs = installCommands([platformEntry, platformBEntry]);
-        lines.push("  1. Install dependencies: `" + installs.join("` and `") + "`.");
+        lines.push("  " + step++ + ". Install dependencies: `" + installs.join("` and `") + "`.");
         if (depChecks.length > 0) {
-            lines.push("  2. Check dependencies: `" + depChecks.join("` and `") + "`. Stop and report if anything is missing.");
+            lines.push("  " + step++ + ". Check dependencies: `" + depChecks.join("` and `") + "`. Stop and report if anything is missing.");
         } else {
-            lines.push("  2. Check dependencies: no optional connector check is registered for this selection; confirm the install command completed successfully.");
+            lines.push("  " + step++ + ". Check dependencies: no optional connector check is registered for this selection; confirm the install command completed successfully.");
         }
-        lines.push("  3. Dry run first: `" + dryRun + "`" + (dryRunB ? " and `" + dryRunB + "`" : "") + ". Inspect the plan" + (dryRunB ? "s" : "") + ".");
+        lines.push("  " + step++ + ". Dry run first: `" + dryRun + "`" + (dryRunB ? " and `" + dryRunB + "`" : "") + ". Inspect the plan" + (dryRunB ? "s" : "") + ".");
+        if (shouldAnnounceRun(state)) {
+            lines.push("  " + step++ + ". Announce before running: command `" + liveCmd + "`, log path `" + liveLogPath + "`, expected runtime, and stop condition. Stop promptly on user interrupt or redirect.");
+        }
         if (needsCredentials) {
-            lines.push("  4. Make sure platform connection credentials/config are set outside this conversation (env vars, config files). Do NOT ask me to paste secrets here.");
-            lines.push("  5. Once credentials are confirmed, run live: `" + cliCmd + "`.");
+            lines.push("  " + step++ + ". Make sure platform connection credentials/config are set outside this conversation (env vars, config files). Do NOT ask me to paste secrets here.");
+            lines.push("  " + step++ + ". Once credentials are confirmed, run live: `" + liveCmd + "`.");
         } else {
-            lines.push("  4. Run live: `" + cliCmd + "`.");
+            lines.push("  " + step++ + ". Run live: `" + liveCmd + "`.");
         }
-        lines.push("  " + (needsCredentials ? "6" : "5") + ". Summarise the result: total runtime, per-query timing, and any failures.");
+        lines.push("  " + step++ + ". Discover & summarize: run `" + resultsPaths + "`, then run `" + showCli + "` with the result JSON path. Summarize total runtime, per-query timings, and failures from the result JSON.");
+        lines.push("");
+        lines.push(catalog.templates.cli.force_datagen_footer);
         return lines.join("\n");
     }
 

@@ -1034,6 +1034,11 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "label": "Apache Gluten + Velox"
     }
   ],
+  "runtime_hints": {
+    "log_dir": "/tmp",
+    "log_slug_template": "bench_{platform}_{benchmark}_{scale}",
+    "long_run_threshold_scale": "0.1"
+  },
   "scales": [
     "0.01",
     "0.1",
@@ -1052,10 +1057,13 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
   ],
   "templates": {
     "cli": {
-      "compare": "uv run benchbox compare --platform {platform_a} --platform {platform_b} --benchmark {benchmark} --scale {scale}",
+      "compare": "uv run benchbox compare --platform {platform_a} --platform {platform_b} --benchmark {benchmark} --scale {scale} --non-interactive",
       "dependency_check": "uv run benchbox check-deps --platform {platform}",
       "dry_run": "uv run benchbox run --dry-run {dry_run_dir} --platform {platform} --benchmark {benchmark} --scale {scale}",
-      "test_one": "uv run benchbox run --platform {platform} --benchmark {benchmark} --scale {scale}"
+      "force_datagen_footer": "If the load phase fails partway, re-run with `--force datagen` appended.",
+      "results_paths": "uv run benchbox results --paths --limit 1",
+      "show_cli": "uv run benchbox results show-cli <result-json>",
+      "test_one": "uv run benchbox run --platform {platform} --benchmark {benchmark} --scale {scale} --non-interactive"
     }
   }
 };
