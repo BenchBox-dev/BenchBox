@@ -87,6 +87,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
   },
   "platforms": [
     {
+      "cost_class": "paid_credits",
       "credential_deployments": [
         "managed"
       ],
@@ -108,6 +109,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "free",
       "credential_deployments": [
         "managed"
       ],
@@ -130,6 +132,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "paid_credits",
       "credential_deployments": [
         "managed"
       ],
@@ -151,6 +154,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "free",
       "credential_deployments": [
         "self-hosted"
       ],
@@ -170,6 +174,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "free",
       "credential_deployments": [
         "self-hosted"
       ],
@@ -192,6 +197,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "paid_compute",
       "credential_deployments": [
         "managed"
       ],
@@ -213,6 +219,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "free",
       "dependency_check_command": "uv run benchbox check-deps --platform clickhouse-local",
       "dependency_check_platform": "clickhouse-local",
       "deployments": [
@@ -226,6 +233,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "label": "ClickHouse Local (chDB)"
     },
     {
+      "cost_class": "free",
       "credential_deployments": [
         "self-hosted"
       ],
@@ -247,6 +255,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "free",
       "deployments": [
         "local"
       ],
@@ -258,6 +267,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "label": "cuDF"
     },
     {
+      "cost_class": "free",
       "deployments": [
         "local"
       ],
@@ -269,6 +279,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "label": "Dask"
     },
     {
+      "cost_class": "free",
       "credential_deployments": [
         "self-hosted",
         "managed"
@@ -292,6 +303,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "paid_credits",
       "credential_deployments": [
         "managed"
       ],
@@ -314,6 +326,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "free",
       "credential_deployments": [
         "managed"
       ],
@@ -336,6 +349,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "free",
       "deployments": [
         "local"
       ],
@@ -348,6 +362,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "label": "DataFusion"
     },
     {
+      "cost_class": "free",
       "credential_deployments": [
         "managed"
       ],
@@ -370,6 +385,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "free",
       "credential_deployments": [
         "managed"
       ],
@@ -392,6 +408,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "free",
       "credential_deployments": [
         "self-hosted"
       ],
@@ -411,6 +428,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "free",
       "deployments": [
         "local"
       ],
@@ -422,6 +440,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "label": "DuckDB"
     },
     {
+      "cost_class": "free",
       "credential_deployments": [
         "managed"
       ],
@@ -444,6 +463,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "free",
       "credential_deployments": [
         "managed"
       ],
@@ -465,6 +485,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "free",
       "credential_deployments": [
         "managed"
       ],
@@ -487,6 +508,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "free",
       "credential_deployments": [
         "managed"
       ],
@@ -508,6 +530,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "paid_compute",
       "credential_deployments": [
         "managed"
       ],
@@ -530,6 +553,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "free",
       "credential_deployments": [
         "managed"
       ],
@@ -552,6 +576,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "free",
       "credential_deployments": [
         "self-hosted"
       ],
@@ -573,6 +598,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "free",
       "dependency_check_command": "uv run benchbox check-deps --platform lakesail",
       "dependency_check_platform": "lakesail",
       "deployments": [
@@ -588,6 +614,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "label": "LakeSail Sail"
     },
     {
+      "cost_class": "free",
       "deployments": [
         "local"
       ],
@@ -599,6 +626,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "label": "Modin"
     },
     {
+      "cost_class": "paid_credits",
       "credential_deployments": [
         "managed"
       ],
@@ -618,6 +646,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "free",
       "deployments": [
         "local"
       ],
@@ -629,6 +658,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "label": "Pandas"
     },
     {
+      "cost_class": "free",
       "credential_deployments": [
         "self-hosted",
         "managed"
@@ -650,6 +680,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "free",
       "credential_deployments": [
         "self-hosted"
       ],
@@ -669,6 +700,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "free",
       "deployments": [
         "local"
       ],
@@ -680,6 +712,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "label": "Polars"
     },
     {
+      "cost_class": "free",
       "credential_deployments": [
         "self-hosted"
       ],
@@ -701,6 +734,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "free",
       "credential_deployments": [
         "self-hosted"
       ],
@@ -722,6 +756,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "free",
       "deployments": [
         "local"
       ],
@@ -734,6 +769,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "label": "PySpark"
     },
     {
+      "cost_class": "free",
       "credential_deployments": [
         "managed"
       ],
@@ -754,6 +790,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "free",
       "credential_deployments": [
         "self-hosted"
       ],
@@ -775,6 +812,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "paid_compute",
       "credential_deployments": [
         "managed"
       ],
@@ -796,6 +834,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "free",
       "credential_deployments": [
         "self-hosted",
         "managed"
@@ -819,6 +858,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "paid_credits",
       "credential_deployments": [
         "managed"
       ],
@@ -840,6 +880,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "free",
       "credential_deployments": [
         "managed"
       ],
@@ -862,6 +903,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "free",
       "credential_deployments": [
         "self-hosted"
       ],
@@ -884,6 +926,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "free",
       "deployments": [
         "local"
       ],
@@ -895,6 +938,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "label": "SQLite"
     },
     {
+      "cost_class": "free",
       "credential_deployments": [
         "managed"
       ],
@@ -914,6 +958,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "free",
       "credential_deployments": [
         "self-hosted"
       ],
@@ -935,6 +980,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "free",
       "credential_deployments": [
         "managed"
       ],
@@ -956,6 +1002,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "free",
       "credential_deployments": [
         "managed"
       ],
@@ -978,6 +1025,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "free",
       "credential_deployments": [
         "self-hosted",
         "managed"
@@ -999,6 +1047,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "free",
       "credential_deployments": [
         "self-hosted"
       ],
@@ -1020,6 +1069,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       }
     },
     {
+      "cost_class": "free",
       "dependency_check_command": "uv run benchbox check-deps --platform velox",
       "dependency_check_platform": "velox",
       "deployments": [
