@@ -504,6 +504,21 @@ def _validate_platforms_are_derived(catalog: dict[str, Any]) -> list[str]:
     return ["platforms[] is no longer supported in catalog.yaml; prompt platforms are derived from PlatformRegistry"]
 
 
+def _validate_provenance_templates(provenance_tpl: str, capture_plans_footer: str) -> list[str]:
+    errors: list[str] = []
+    if "benchbox --version-json" not in provenance_tpl:
+        errors.append("templates.cli.provenance_snapshot must call benchbox --version-json")
+    if "benchbox profile" not in provenance_tpl:
+        errors.append("templates.cli.provenance_snapshot must call benchbox profile")
+    if "--capture-plans" not in capture_plans_footer:
+        errors.append("templates.cli.capture_plans_footer must mention --capture-plans")
+    if "benchbox show-plan" not in capture_plans_footer:
+        errors.append("templates.cli.capture_plans_footer must mention benchbox show-plan")
+    if "--run" not in capture_plans_footer or "--query-id" not in capture_plans_footer:
+        errors.append("templates.cli.capture_plans_footer must use show-plan --run and --query-id")
+    return errors
+
+
 def _validate_cli_templates_and_runtime_hints(catalog: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     cli_templates = (catalog.get("templates") or {}).get("cli") or {}
@@ -516,6 +531,8 @@ def _validate_cli_templates_and_runtime_hints(catalog: dict[str, Any]) -> list[s
     dependency_tpl = cli_templates.get("dependency_check") or ""
     results_paths_tpl = cli_templates.get("results_paths") or ""
     show_cli_tpl = cli_templates.get("show_cli") or ""
+    provenance_tpl = cli_templates.get("provenance_snapshot") or ""
+    capture_plans_footer = cli_templates.get("capture_plans_footer") or ""
     runtime_hints_raw = catalog.get("runtime_hints")
     if runtime_hints_raw is None:
         runtime_hints_raw = {}
@@ -536,6 +553,7 @@ def _validate_cli_templates_and_runtime_hints(catalog: dict[str, Any]) -> list[s
         errors.append(f"templates.cli.results_paths must call benchbox results --paths (got: {results_paths_tpl!r})")
     if "benchbox results show-cli" not in show_cli_tpl:
         errors.append(f"templates.cli.show_cli must call benchbox results show-cli (got: {show_cli_tpl!r})")
+    errors.extend(_validate_provenance_templates(provenance_tpl, capture_plans_footer))
 
     if not isinstance(runtime_hints_raw, dict):
         errors.append("runtime_hints must be a mapping")
