@@ -169,7 +169,7 @@ test.describe("@followup-usability release-gate route walk", () => {
 
     await expect(page.getByTestId("home-compare-entrypoint")).toHaveAttribute("href", "/results/compare/");
 
-    await maybeCapture(page, "home-cohort-selector-and-compare-cta");
+    await maybeCapture(page, "home-ranking-selector-and-compare-cta");
   });
 
   test("Benchmark detail exposes a sibling switcher and the heatmap header is sticky-top", async ({ page }) => {
@@ -179,7 +179,7 @@ test.describe("@followup-usability release-gate route walk", () => {
 
     const switcher = page.getByTestId("benchmark-switcher");
     await expect(switcher).toBeVisible();
-    await expect(switcher.locator("option", { hasText: "ClickBench" })).toBeAttached();
+    await expect(switcher.locator("option", { hasText: "SSB" })).toBeAttached();
 
     const platformHeader = page
       .locator("thead th")

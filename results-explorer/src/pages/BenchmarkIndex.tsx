@@ -95,42 +95,22 @@ function benchmarkContextNote(benchmark: string): string | null {
 
 /**
  * Distinct benchmark slugs paired with display labels for the in-page
- * sibling switcher. Two slugs sometimes share a display label
- * (`star_schema` and `ssb` both render "SSB"; `tsbs-devops` and
- * `tsbs_devops` both render "TSBS DevOps") because legacy and
- * canonical routes coexist. We keep the first slug encountered so the
- * switcher lists each benchmark family exactly once and the canonical
- * route wins (BENCHMARK_LABELS is declared with the canonical slug
- * first).
- *
- * When `availableBenchmarks` is provided, only catalog entries whose
- * canonical slug *or* alias slug appears in the set are returned. This
- * implements the corpus-aware actionability contract (Contract A from
- * the corpus-aware-benchmark-switcher TODO): the switcher must not pivot
- * users into benchmark detail pages with no public results.
+ * sibling switcher. Same-label aliases (`star_schema` and `ssb`, for
+ * example) coexist for legacy routes, but the switcher only exposes the
+ * slug that actually has public results so it cannot pivot into an empty
+ * detail page through a populated sibling alias.
  */
-function uniqueBenchmarkOptions(
-  availableBenchmarks?: ReadonlySet<string> | null,
-): { value: string; label: string }[] {
+function uniqueBenchmarkOptions(availableBenchmarks: ReadonlySet<string> | null): { value: string; label: string }[] {
+  if (availableBenchmarks === null) return [];
   const seen = new Set<string>();
-  const labelHasResult = new Map<string, boolean>();
   const options: { value: string; label: string }[] = [];
   for (const [value, label] of Object.entries(BENCHMARK_LABELS)) {
-    const hasResult = availableBenchmarks ? availableBenchmarks.has(value) : true;
-    if (seen.has(label)) {
-      if (hasResult) labelHasResult.set(label, true);
-      continue;
-    }
+    if (!availableBenchmarks.has(value)) continue;
+    if (seen.has(label)) continue;
     seen.add(label);
-    labelHasResult.set(label, hasResult);
     options.push({ value, label });
   }
-  if (!availableBenchmarks) {
-    return options.sort((a, b) => a.label.localeCompare(b.label));
-  }
-  return options
-    .filter((option) => labelHasResult.get(option.label) === true)
-    .sort((a, b) => a.label.localeCompare(b.label));
+  return options.sort((a, b) => a.label.localeCompare(b.label));
 }
 
 function benchmarkCompareGuidanceMessage(

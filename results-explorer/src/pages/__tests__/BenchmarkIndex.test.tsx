@@ -528,34 +528,28 @@ describe("BenchmarkIndex", () => {
     expect(labels).not.toContain("TPC-DS");
   });
 
-  it("keeps the legacy-aliased current benchmark reachable via the fallback option", async () => {
+  it("does not expose a same-label alias unless that exact slug has public results", async () => {
     // Same-label aliases (e.g. `ssb` legacy slug + `star_schema` canonical
-    // slug both render "SSB"). When the public corpus only carries the
-    // legacy slug, the corpus-aware filter keeps the canonical option (the
-    // first `seen` slug per the dedupe), so the user's current legacy slug
-    // is missing from `benchmarkOptions`. The fallback `<option>` then
-    // adds it back. This is the only production-reachable code path for
-    // the fallback under the corpus-aware contract.
+    // slug both render "SSB"). The switcher should expose the populated slug
+    // and suppress the same-label alias when that alias has no public results.
     const legacyRows = RESULT_ROWS.map((row) => ({ ...row, benchmark: "ssb" }));
     const legacyRankings = RANKING_ROWS.map((row) => ({ ...row, benchmark: "ssb" }));
     const legacyCells = CELL_ROWS.map((row) => ({ ...row, benchmark: "ssb" }));
     vi.mocked(queryRows).mockImplementation(
-      defaultImpl(legacyRows, legacyRankings, legacyCells, ["ssb"]),
+      defaultImpl(legacyRows, legacyRankings, legacyCells, ["ssb", "tpch"]),
     );
 
     render(<BenchmarkIndex benchmark="ssb" />);
-    await waitFor(() => expect(screen.getByTestId("benchmark-switcher")).toBeTruthy());
+    await waitFor(() =>
+      expect(within(screen.getByTestId("benchmark-switcher")).queryByRole("option", { name: "TPC-H" })).toBeTruthy(),
+    );
 
     const switcher = screen.getByTestId("benchmark-switcher") as HTMLSelectElement;
-    expect(switcher.value).toBe("ssb");
     const optionValues = Array.from(switcher.options).map((option) => option.value);
-    // The fallback adds the legacy slug; the canonical alias remains via
-    // the dedupe-with-cross-alias check inside uniqueBenchmarkOptions.
+    expect(switcher.value).toBe("ssb");
     expect(optionValues).toContain("ssb");
-    expect(optionValues).toContain("star_schema");
-    // Other no-result benchmarks must not be present (Contract A).
+    expect(optionValues).not.toContain("star_schema");
     expect(optionValues).not.toContain("amplab");
-    expect(optionValues).not.toContain("tpcdi");
   });
 
   it("hides no-result benchmarks even when the corpus-list query fails", async () => {
@@ -574,29 +568,33 @@ describe("BenchmarkIndex", () => {
       if (s.startsWith("SELECT benchmark, scale_factor, phase, result_id, platform_id, query_id, display_ms")) {
         return [...CELL_ROWS];
       }
+      if (s.startsWith("SELECT result_id, phase, duration_s FROM bench.result_phase_durations")) return [];
       return [];
     });
 
     render(<BenchmarkIndex benchmark="tpch" />);
-    await waitFor(() =>
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining("listBenchmarksWithPublicResults failed"),
-        expect.any(Error),
-      ),
-    );
+    try {
+      await waitFor(() =>
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining("listBenchmarksWithPublicResults failed"),
+          expect.any(Error),
+        ),
+      );
 
-    const switcher = screen.getByTestId("benchmark-switcher") as HTMLSelectElement;
-    const optionValues = Array.from(switcher.options).map((option) => option.value);
-    expect(optionValues).toEqual(["tpch"]);
-    expect(optionValues).not.toContain("amplab");
-    expect(optionValues).not.toContain("clickbench");
-    warnSpy.mockRestore();
+      const switcher = screen.getByTestId("benchmark-switcher") as HTMLSelectElement;
+      const optionValues = Array.from(switcher.options).map((option) => option.value);
+      expect(optionValues).toEqual(["tpch"]);
+      expect(optionValues).not.toContain("amplab");
+      expect(optionValues).not.toContain("clickbench");
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
   it.each([
     ["ssb", "star_schema"],
     ["tsbs_devops", "tsbs-devops"],
-  ])("keeps legacy benchmark slug %s selected even when deduped from canonical %s", async (legacySlug, canonicalSlug) => {
+  ])("keeps legacy benchmark slug %s selected without surfacing empty alias %s", async (legacySlug, canonicalSlug) => {
     const legacyRows = RESULT_ROWS.map((row) => ({ ...row, benchmark: legacySlug }));
     const legacyRankings = RANKING_ROWS.map((row) => ({ ...row, benchmark: legacySlug }));
     const legacyCells = CELL_ROWS.map((row) => ({ ...row, benchmark: legacySlug }));
@@ -608,8 +606,8 @@ describe("BenchmarkIndex", () => {
     const switcher = screen.getByTestId("benchmark-switcher") as HTMLSelectElement;
     const optionValues = Array.from(switcher.options).map((option) => option.value);
     expect(switcher.value).toBe(legacySlug);
-    expect(optionValues).toContain(canonicalSlug);
     expect(optionValues).toContain(legacySlug);
+    expect(optionValues).not.toContain(canonicalSlug);
   });
 
   it("labels the Star Schema Benchmark and SSB equivalence explicitly", async () => {

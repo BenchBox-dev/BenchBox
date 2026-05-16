@@ -48,6 +48,7 @@ test.describe("BenchmarkIndex", () => {
     // TODO) and must not surface catalog-only benchmarks with no public
     // result pages such as AMPLab or TPC-DI.
     expect(labels).toContain("TPC-H");
+    expect(labels).toContain("SSB");
     expect(labels).not.toContain("AMPLab");
     expect(labels).not.toContain("TPC-DI");
     expect(labels).not.toContain("TPC-DS");
