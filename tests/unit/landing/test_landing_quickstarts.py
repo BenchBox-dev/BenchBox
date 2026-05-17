@@ -475,7 +475,7 @@ def test_mcp_prompt_uses_real_analysis_profile_and_plan_tools():
         prompts_js.index("function buildMcpPrompt") : prompts_js.index("function renderMcpDependencyStep")
     ]
 
-    assert "mcpAnalysisStep(state, platform, platformB)" in mcp_block
+    assert "mcpAnalysisStep(state, platform)" in mcp_block
     assert "mcpProvenanceStep()" in mcp_block
     assert "mcpCapturePlansFootnote()" in mcp_block
     assert 'analysis_tool || "analyze_results"' in prompts_js
@@ -492,7 +492,7 @@ def test_mcp_prompt_does_not_emit_nonexistent_platform_options_argument():
 
     assert "Platform option gap for " in prompts_js
     assert "does not expose platform option arguments yet" in prompts_js
-    assert "mcpPlatformOptionHint" in prompts_js
+    assert "appendMcpPlatformOptionLines" in prompts_js
     assert "platform_options" not in prompts_js
 
 
@@ -511,6 +511,40 @@ def test_agent_prompt_includes_platform_footgun_and_dsdgen_labels():
     assert "Likely required platform options for" in prompts_js
     assert "TPC-DS sub-scale warning" in prompts_js
     assert "requires_bundled_dsdgen_below" in prompts_js
+
+
+def test_mcp_prompt_includes_smoke_for_managed_at_scale():
+    prompts_js = PROMPTS_JS_PATH.read_text(encoding="utf-8")
+    assert "SMOKE: call " in prompts_js
+    assert 'mcpRunCall(mcpToolName, platform, state, "0.01", false, false)' in prompts_js
+    assert "Abort if the smoke run fails" in prompts_js
+
+
+def test_mcp_prompt_includes_cost_ack_for_paid_platforms():
+    prompts_js = PROMPTS_JS_PATH.read_text(encoding="utf-8")
+    assert "COST ACKNOWLEDGMENT" in prompts_js
+    assert "confirm credit or compute spend" in prompts_js
+
+
+def test_mcp_prompt_emits_platform_options_mapping():
+    prompts_js = PROMPTS_JS_PATH.read_text(encoding="utf-8")
+    assert "Platform option gap for " in prompts_js
+    assert "MCP `run_benchmark` does not expose platform option arguments yet" in prompts_js
+    assert 'replace("--platform-option", "")' in prompts_js
+
+
+def test_mcp_prompt_calls_analyze_results_and_system_profile():
+    prompts_js = PROMPTS_JS_PATH.read_text(encoding="utf-8")
+    assert "analysis_tool" in prompts_js
+    assert "mcp_metadata.result_file" in prompts_js
+    assert "systemProfileTool" in prompts_js
+    assert "system_profile_tool" in prompts_js
+
+
+def test_mcp_prompt_footnotes_capture_plans():
+    prompts_js = PROMPTS_JS_PATH.read_text(encoding="utf-8")
+    assert "capture_plans=true" in prompts_js
+    assert "To capture EXPLAIN plans" in prompts_js
 
 
 def test_defaults_resolve_to_known_ids(browser_catalog):
@@ -805,7 +839,7 @@ def test_prompt_includes_dependency_and_dry_run_safety():
     assert 'safetyTexts(entries, "dry_run", deployment)' in text
     assert "appendDeploymentSafetyLines(lines" in text
     assert 'check_dependencies(platform=\\"' in text
-    assert ', dry_run=" + (dryRun ? "true" : "false")' in text
+    assert 'dry_run=" + (dryRun ? "true" : "false")' in text
 
 
 def test_agent_identity_sentence_stays_removed():
