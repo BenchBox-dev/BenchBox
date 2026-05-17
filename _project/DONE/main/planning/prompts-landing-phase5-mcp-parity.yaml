@@ -1,225 +1,119 @@
 id: prompts-landing-phase5-mcp-parity
-title: "Prompts landing — Phase 5: MCP-surface parity for hygiene, cost, hints, provenance"
+title: "Prompts landing - Phase 5: MCP-surface parity for hygiene, cost, hints, provenance"
 worktree: main
 priority: Medium
 status: Completed
 category: Documentation
 
 description: |
-  Phases 1-4 augment the CLI-surface prompt produced by
-  buildAgentPrompt at landing/prompts/prompts.js:352-378. The
-  MCP-surface prompt produced by buildMcpPrompt at lines 304-337 is
-  out of date for the same behaviors. A user picking surface=MCP at
-  /prompts/ should get equivalent guardrails — adjusted for MCP
-  semantics (no shell, no `tee`, but yes for smoke calls, cost
-  acknowledgment, and analyze_results / system_profile MCP tools).
+  Phase 5 brings the /prompts/ MCP surface up to the same operational
+  safety contract as the CLI surface after Phases 1-4: smoke runs for
+  paid or non-local target-scale executions, cost acknowledgment for
+  paid target-scale executions, platform-option gap notes, TPC-DS
+  subscale dsdgen warnings, result analysis, provenance capture, and
+  optional plan capture guidance.
 
-  This TODO is intentionally last in the sequence because MCP changes
-  are mechanical mirroring once Phases 1-4 have settled the contract.
-
-  Decision gates:
-  - D1 (before w1): does Phase 1's runtime_hints map need MCP-specific
-    overrides (e.g., no /tmp path because there is no shell)? Default:
-    skip runtime_hints entirely in MCP — substitute MCP-native equivalents
-    (analyze_results prompt + system_profile tool).
-  - D2 (before w3): provenance in MCP — does system_profile MCP tool
-    output a comparable artifact to `benchbox profile`? Confirm
-    output shape before w3; if not, document the gap and defer the
-    MCP provenance step.
-
-prior_art:
-- "landing/prompts/prompts.js:304-337 buildMcpPrompt — the existing MCP step list to extend"
-- "landing/prompts/catalog.yaml:83-89 mcp section — currently references run_benchmark, list_available, benchmark_run, compare_platforms,
-  and analyze_results; it does NOT yet expose system_profile"
-- "benchbox/mcp/ — source of truth for whether system_profile exists as a tool and whether the generator can validate it"
-- "Phases 1-4 of this TODO group — mirror the same gating logic; do not redefine thresholds"
+  The implementation deliberately uses existing MCP surfaces only. It
+  does not add new MCP tools, and it avoids inventing unsupported
+  run_benchmark arguments for platform options.
 
 work:
-- id: w0
-  summary: "Confirm Phases 1-4 are merged and inventory MCP-side gaps"
-  status: done
-  notes: |
-    After Phases 1-4 are merged to develop, list each rendered
-    behavior on the CLI side and mark its MCP equivalent:
-      - --non-interactive  -> N/A (MCP tools are non-interactive)
-      - tee /tmp/<slug>.log -> N/A (MCP captures via tool output)
-      - announce step -> RENDER as a "Tell the user before calling
-        run_benchmark with these parameters" instruction
-      - smoke at SF=0.01 -> call run_benchmark twice (smoke then real)
-      - cost ack -> RENDER (same gate)
-      - platform-option hints -> RENDER (translated to MCP arguments)
-      - dsdgen SF<1 warning -> RENDER
-      - results summary -> use analyze_results MCP prompt
-      - provenance -> call system_profile MCP tool; capture version
-        via list_available metadata if --version-json equivalent
-        doesn't exist over MCP
-      - --capture-plans footnote -> RENDER as "pass capture_plans=true"
-    Also verify whether `system_profile` is already available in
-    benchbox/mcp/. If it is, decide whether to add
-    `mcp.tools.system_profile` (or equivalent) to catalog.yaml and
-    extend generator validation, or whether buildMcpPrompt should use
-    the literal tool name with a validator pin.
-    Document the mapping in /tmp/prompts-phase5-w0.log and
-    summarize in this TODO before w1.
+  - id: w0
+    summary: "Inventory CLI-to-MCP prompt parity mapping"
+    status: done
+    notes: |
+      MCP tools are already non-interactive and capture output through
+      tool responses rather than shell tee logs. The prompt maps CLI
+      guardrails to MCP-native steps: run_benchmark smoke calls,
+      user-facing cost acknowledgment, analyze_results for compare
+      result files, system_profile for provenance, and get_query_plan
+      after optional capture_plans=true runs.
 
-    Summary captured 2026-05-16:
-    - Implemented on a stacked branch because Phase 3 PR #455 and
-      Phase 4 PR #456 were still pending; the branch contains both
-      precursor commits and resolves their prompt-builder overlap.
-    - `system_profile` exists as an MCP tool in
-      `benchbox/mcp/tools/discovery.py`; catalog now validates it as
-      `mcp.system_profile_tool`.
-    - `run_benchmark` supports `capture_plans`, but does not expose
-      a `platform_options` argument. MCP prompt renders stripped
-      key=value hints as a config/env or CLI-surface gap instead of
-      inventing a nonexistent MCP parameter.
-    - MCP has no `benchbox --version-json` equivalent; provenance
-      records `system_profile()` and tells the agent to keep MCP
-      server/version context if available.
+  - id: w1
+    summary: "Extend buildMcpPrompt with smoke and cost-acknowledgment steps"
+    needs: [w0]
+    status: done
+    notes: |
+      Reuses the shared needsSmokeStep and needsCostAcknowledgment
+      predicates so MCP and CLI stay aligned on cost_class, deployment,
+      and scale thresholds.
 
-- id: w1
-  summary: "Extend buildMcpPrompt with smoke and cost-acknowledgment steps"
-  needs: [w0]
-  status: done
-  notes: |
-    Mirror the Phase 2 gating logic in prompts.js buildMcpPrompt
-    around lines 304-337. SMOKE = a run_benchmark call with
-    scale_factor=0.01 BEFORE the target dry-run.
-    COST = an explicit "ask the user to confirm credit/compute
-    spend" step before the live run.
+  - id: w2
+    summary: "Render platform-option hints and dsdgen warnings in MCP prompts"
+    needs: [w1]
+    status: done
+    notes: |
+      TPC-DS dsdgen warnings mirror the CLI text. Platform-option hints
+      render as an explicit MCP surface gap because run_benchmark does
+      not expose a platform option argument; the prompt tells users to
+      configure values via BenchBox config/env or switch to CLI.
 
-- id: w2
-  summary: "Render platform-option hints + dsdgen warning in MCP prompt"
-  needs: [w1]
-  status: done
-  notes: |
-    Platform-option hints translate to "pass platform_options={...}
-    to run_benchmark" — emit the mapped key=value pairs from the
-    Phase 3 hints; strip the `--platform-option ` prefix and rely
-    on the comment portion (after `#`) for the human note.
-    dsdgen warning is identical text.
+  - id: w3
+    summary: "Use real MCP analysis, provenance, and plan tools"
+    needs: [w2]
+    status: done
+    notes: |
+      Compare prompts call analyze_results with file1/file2 from live
+      mcp_metadata.result_file responses. Single-run prompts summarize
+      the run_benchmark payload and optionally call aggregate analysis.
+      Provenance calls system_profile, whose payload includes BenchBox
+      version and system fields. Optional plan capture uses
+      capture_plans=true plus get_query_plan.
 
-- id: w3
-  summary: "Replace 'Summarise' prose with explicit analyze_results call; add system_profile provenance step"
-  needs: [w2]
-  status: done
-  notes: |
-    Replace lines 318/332 ("Summarise total runtime, per-query timing,
-    and any failures.") with an explicit step that calls the
-    analyze_results MCP prompt with the result-bundle path.
-    Add a final "Save provenance" step that calls the
-    system_profile MCP tool and stashes output alongside the bundle.
-    If w0 chose a catalog-backed tool name, add it to catalog.yaml and
-    update generator validation in the same work unit.
-    Add a one-line passive footnote on capture_plans=true.
-
-- id: w4
-  summary: "Tests + regenerate"
-  needs: [w3]
-  status: done
-  notes: |
-    tests/unit/landing/test_landing_quickstarts.py additions:
-    - test_mcp_prompt_includes_smoke_for_managed_at_scale
-    - test_mcp_prompt_includes_cost_ack_for_paid_platforms
-    - test_mcp_prompt_emits_platform_options_mapping
-    - test_mcp_prompt_calls_analyze_results
-    - test_mcp_prompt_calls_system_profile
-    - test_mcp_prompt_footnotes_capture_plans
-    Plus regenerate and run prompts-landing-check + landing tests.
+  - id: w4
+    summary: "Tests, generated catalog, and validation"
+    needs: [w3]
+    status: done
+    notes: |
+      Added validator coverage for analysis_tool, system_profile_tool,
+      and plan_tool; static prompt tests for real-tool wording and the
+      platform-option gap; generated catalog parity assertions; and
+      render smoke coverage for paid/local/compare MCP prompts.
 
 verification:
-- description: "Validator passes"
-  command: "uv run -- python scripts/generate_landing_quickstarts.py --validate-only"
-  expected_output: "validate-only: OK"
-- description: "Make check green"
-  command: "make prompts-landing-check"
-  expected_output: "check: OK"
-- description: "Landing tests pass"
-  command: "uv run -- python -m pytest tests/unit/landing/ -v"
-  expected_output: "0 failures"
-- description: "Referenced MCP tools/prompts exist and system_profile is pinned or explicitly documented"
-  command: "uv run -- python scripts/generate_landing_quickstarts.py --validate-only"
-  expected_output: "validate-only: OK (no mcp.* unknown-name errors, including the selected system_profile handling)"
+  - description: "Validator passes"
+    command: "uv run -- python scripts/generate_landing_quickstarts.py --validate-only"
+    expected_output: "validate-only: OK"
+  - description: "Generated catalog is fresh"
+    command: "uv run -- python scripts/generate_landing_quickstarts.py --check"
+    expected_output: "check: OK"
+  - description: "Prompt quickstart make target passes"
+    command: "make prompt-quickstarts-check"
+    expected_output: "check: OK"
+  - description: "Landing tests pass"
+    command: "uv run -- python -m pytest tests/unit/landing/test_landing_quickstarts.py -n 0 -q"
+    expected_output: "0 failures"
 
 must_preserve:
-- "Existing MCP prompt step ordering (list_available -> check_dependencies -> dry-run -> live -> summary) — new steps slot
-  in around the existing scaffold."
-- "Phase 2-3 gating thresholds — MCP uses the same scale/deployment/cost-class predicates."
-- "Generator pins on mcp.* (lines 411-421) — analyze_results must remain registered, and system_profile must either be added
-  to that validated surface or explicitly validated by a new pin."
-
-approach: |
-  After w0's inventory clarifies the CLI->MCP mapping table, the
-  remaining work is mechanical mirroring inside buildMcpPrompt. Keep
-  the function's array-of-step-strings structure (no helper
-  extraction) to match buildAgentPrompt's idiom.
-
-  Provenance over MCP is gated on system_profile producing a useful
-  artifact; if it doesn't, document the gap and defer that single
-  step rather than reverse-engineer a parallel surface.
-
-anti_patterns:
-- "DO NOT translate CLI behaviors literally (e.g., 'tee output to /tmp/log') — MCP has no shell. Translate to MCP-native equivalents
-  or omit."
-- "DO NOT add new MCP tools to fill gaps in this phase — that's a separate change with its own review burden."
-- "DO NOT duplicate Phase 2 cost_class derivation logic; reuse the same browser-catalog field."
-- "DO NOT diverge MCP step labels from CLI step labels — agents reading both surfaces shouldn't have to map vocabulary."
-
-scope_limit:
-  only_modify:
-  - "landing/prompts/prompts.js"
-  - "landing/prompts/catalog.yaml"    # only if w0 chooses a catalog-backed system_profile tool name
-  - "landing/prompts/catalog.generated.js"    # regenerated
-  - "scripts/generate_landing_quickstarts.py"    # only if new validator pins needed
-  - "tests/unit/landing/test_landing_quickstarts.py"
-  - "_project/config/fast_test_lane_policy.json"
-  do_not_modify:
-  - "benchbox/mcp/"    # no new MCP tools/prompts in this phase
-  - "benchbox/core/"
-  - "landing/prompts/index.html"
-
-files_affected:
-  modified:
-  - "landing/prompts/prompts.js"
-  - "landing/prompts/catalog.yaml"
-  - "landing/prompts/catalog.generated.js"
-  - "scripts/generate_landing_quickstarts.py"
-  - "tests/unit/landing/test_landing_quickstarts.py"
-  - "_project/config/fast_test_lane_policy.json"
-
-deps:
-  needs:
-  - prompts-landing-phase1-cli-hygiene
-  - prompts-landing-phase2-cost-aware-gating
-  - prompts-landing-phase3-platform-footgun-hints
-  - prompts-landing-phase4-provenance
+  - "MCP prompt ordering remains list_available -> dependency check -> optional safety notes -> dry run -> live run -> summary/provenance."
+  - "MCP uses the same Phase 2-3 smoke, cost, and dsdgen predicates as CLI."
+  - "Catalog MCP tool and prompt names are validated against benchbox/mcp/."
 
 deferred:
-- summary: "New MCP tools to fill CLI-only gaps (e.g., MCP-native --capture-plans)"
-  reason: "Outside the landing-page initiative; track separately if a real gap emerges."
-- summary: "MCP-prompt-level integration tests against a running BenchBox MCP server"
-  reason: "tests/unit/landing/ covers payload shape; live-server integration is its own test surface."
+  - summary: "Add first-class MCP platform option arguments"
+    reason: "Requires MCP tool API work outside the landing prompt batch."
+  - summary: "MCP live-server integration tests for rendered prompts"
+    reason: "Unit and render-smoke coverage prove prompt generation; live MCP integration is a separate surface."
 
 success_metrics:
-- "An MCP-surface prompt for Snowflake+TPC-H+1.0 includes smoke, cost-ack, analyze_results, system_profile."
-- "An MCP-surface prompt for DuckDB+TPC-H+0.01+local remains short (no smoke, no cost-ack)."
-- "All landing tests green; generator --check green."
+  - "An MCP Snowflake TPC-H SF=1.0 prompt includes smoke, cost acknowledgment, analyze_results, system_profile, and optional get_query_plan guidance."
+  - "An MCP DuckDB TPC-H SF=0.01 local prompt does not include smoke or cost acknowledgment."
+  - "Generated catalog stays in sync with catalog.yaml."
 
 open_questions:
-- question: "Does benchbox MCP tool surface have a --version-json equivalent?"
-  gating: true
-  affects: ["w3 provenance step"]
-  default: "If no equivalent exists, MCP provenance step records system_profile output only and notes the version gap in this
-    TODO for a future MCP-tool addition."
+  - question: "Does BenchBox MCP have a version-json equivalent?"
+    gating: false
+    affects: ["w3 provenance step"]
+    default: "Resolved for this phase by using system_profile, which includes BenchBox version and system fields."
 
 metadata:
-  estimated_effort: "Small (1 session) once Phases 1-4 are in"
+  estimated_effort: "Small"
   tags: [landing, prompts, mcp, agent-ux]
 
 impact:
   user_impact: |
-    Users on the MCP surface receive the same operational guardrails
-    as CLI users — no second-class prompt for MCP-driven agents.
+    MCP users now receive the same operational guardrails as CLI users
+    without being pointed at nonexistent MCP arguments.
   technical_debt: |
-    Pins the CLI/MCP rendered prompts to a shared semantic contract,
-    enforced via the same test file.
+    The landing catalog now validates the MCP tools referenced by the
+    generated prompt text.

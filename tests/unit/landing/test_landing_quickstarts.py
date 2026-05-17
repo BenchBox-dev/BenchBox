@@ -276,10 +276,11 @@ def test_unknown_mcp_tool_is_rejected(gen, catalog):
     errors = gen.validate(bad)
     assert any("tool_that_does_not_exist" in e for e in errors)
 
-    bad = copy.deepcopy(catalog)
-    bad["mcp"]["system_profile_tool"] = "tool_that_does_not_exist"
-    errors = gen.validate(bad)
-    assert any("mcp.system_profile_tool" in e and "tool_that_does_not_exist" in e for e in errors)
+    for key in ("analysis_tool", "system_profile_tool", "plan_tool"):
+        bad = copy.deepcopy(catalog)
+        bad["mcp"][key] = "tool_that_does_not_exist"
+        errors = gen.validate(bad)
+        assert any(f"mcp.{key}" in e and "tool_that_does_not_exist" in e for e in errors)
 
 
 def test_unknown_mcp_prompt_is_rejected(gen, catalog):
@@ -468,6 +469,33 @@ def test_mcp_prompt_uses_smoke_and_cost_gates():
     assert "target MCP call(s)" in mcp_block
 
 
+def test_mcp_prompt_uses_real_analysis_profile_and_plan_tools():
+    prompts_js = PROMPTS_JS_PATH.read_text(encoding="utf-8")
+    mcp_block = prompts_js[
+        prompts_js.index("function buildMcpPrompt") : prompts_js.index("function renderMcpDependencyStep")
+    ]
+
+    assert "mcpAnalysisStep(state, platform)" in mcp_block
+    assert "mcpProvenanceStep()" in mcp_block
+    assert "mcpCapturePlansFootnote()" in mcp_block
+    assert 'analysis_tool || "analyze_results"' in prompts_js
+    assert 'system_profile_tool || "system_profile"' in prompts_js
+    assert 'plan_tool || "get_query_plan"' in prompts_js
+    assert 'analysis=\\"compare\\", file1=\\"<first-result-json>\\", file2=\\"<second-result-json>\\"' in prompts_js
+    assert 'analysis=\\"aggregate\\", platform=\\"' in prompts_js
+    assert "capture_plans=true" in prompts_js
+    assert 'query_id=\\"Q1\\"' in prompts_js
+
+
+def test_mcp_prompt_does_not_emit_nonexistent_platform_options_argument():
+    prompts_js = PROMPTS_JS_PATH.read_text(encoding="utf-8")
+
+    assert "Platform option gap for " in prompts_js
+    assert "does not expose platform option arguments yet" in prompts_js
+    assert "appendMcpPlatformOptionLines" in prompts_js
+    assert "platform_options" not in prompts_js
+
+
 def test_compare_prompt_uses_comparison_log_and_two_result_paths():
     prompts_js = PROMPTS_JS_PATH.read_text(encoding="utf-8")
 
@@ -500,15 +528,15 @@ def test_mcp_prompt_includes_cost_ack_for_paid_platforms():
 
 def test_mcp_prompt_emits_platform_options_mapping():
     prompts_js = PROMPTS_JS_PATH.read_text(encoding="utf-8")
-    assert "Platform option hints for " in prompts_js
-    assert "MCP `run_benchmark` does not currently expose a platform_options argument" in prompts_js
+    assert "Platform option gap for " in prompts_js
+    assert "MCP `run_benchmark` does not expose platform option arguments yet" in prompts_js
     assert 'replace("--platform-option", "")' in prompts_js
 
 
 def test_mcp_prompt_calls_analyze_results_and_system_profile():
     prompts_js = PROMPTS_JS_PATH.read_text(encoding="utf-8")
-    assert "analyzePromptName" in prompts_js
-    assert "result-bundle path" in prompts_js
+    assert "analysis_tool" in prompts_js
+    assert "mcp_metadata.result_file" in prompts_js
     assert "systemProfileTool" in prompts_js
     assert "system_profile_tool" in prompts_js
 
@@ -701,7 +729,9 @@ def test_static_generated_payload_supports_dropdown_smoke(gen, browser_catalog):
     assert len(_filter_platform_ids(committed_payload, "sql", "self-hosted")) >= 2
     assert "polars" in _filter_platform_ids(committed_payload, "dataframe", "local")
     assert committed_payload["runtime_hints"] == browser_catalog["runtime_hints"]
+    assert committed_payload["mcp"]["analysis_tool"] == "analyze_results"
     assert committed_payload["mcp"]["system_profile_tool"] == "system_profile"
+    assert committed_payload["mcp"]["plan_tool"] == "get_query_plan"
     committed_by_id = {platform["id"]: platform for platform in committed_payload["platforms"]}
     assert committed_by_id["snowflake"]["cost_class"] == "paid_credits"
     assert committed_by_id["duckdb"]["cost_class"] == "free"

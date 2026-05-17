@@ -78,7 +78,9 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
     }
   ],
   "mcp": {
+    "analysis_tool": "analyze_results",
     "list_tool": "list_available",
+    "plan_tool": "get_query_plan",
     "prompts": {
       "analyze_results": "analyze_results",
       "benchmark_run": "benchmark_run",

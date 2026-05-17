@@ -10,8 +10,8 @@
 #   PlatformRegistry ids and may only correct presentation/safety metadata
 # - every `benchmarks[].id` must exist in BENCHMARK_METADATA
 # - `deployments[].id` must be in {local, self-hosted, managed}
-# - `mcp.run_tool`, `mcp.list_tool`, `mcp.prompts.*` must reference real
-#   MCP tools/prompts registered in benchbox/mcp/
+# - `mcp.*_tool` and `mcp.prompts.*` must reference real MCP
+#   tools/prompts registered in benchbox/mcp/
 # - the compare CLI template must include two `--platform` flags
 
 defaults:
@@ -117,7 +117,9 @@ templates:
 mcp:
   run_tool: run_benchmark
   list_tool: list_available
+  analysis_tool: analyze_results
   system_profile_tool: system_profile
+  plan_tool: get_query_plan
   prompts:
     benchmark_run: benchmark_run
     compare_platforms: compare_platforms

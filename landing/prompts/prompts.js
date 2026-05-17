@@ -424,19 +424,35 @@
 
     function appendMcpPlatformOptionLines(lines, entries, step) {
         mcpPlatformOptionBlocks(entries).forEach(function (block) {
-            lines.push("  " + step.value++ + ". Platform option hints for " + block.label + ": MCP `run_benchmark` does not currently expose a platform_options argument; configure these via BenchBox config/env or use the CLI surface if required.");
+            lines.push("  " + step.value++ + ". Platform option gap for " + block.label + ": MCP `run_benchmark` does not expose platform option arguments yet. Configure these via BenchBox config/env or switch to the CLI surface if required.");
             block.options.forEach(function (item) {
                 lines.push("     • `" + item.option + "`" + (item.note ? " — " + item.note : ""));
             });
         });
     }
 
+    function mcpAnalysisStep(state, platform) {
+        var analysisTool = catalog.mcp.analysis_tool || "analyze_results";
+        if (state.goal === "compare") {
+            return "Use the `" + analysisTool + "(analysis=\"compare\", file1=\"<first-result-json>\", file2=\"<second-result-json>\")` tool with the `mcp_metadata.result_file` paths from both live responses; summarize total runtime, per-query timing, and failures.";
+        }
+        return "Summarize total runtime, per-query timings, and failures from the MCP tool result payload. If you need a result rollup, call `" + analysisTool + "(analysis=\"aggregate\", platform=\"" + platform + "\", benchmark=\"" + state.benchmark + "\", limit=1)`.";
+    }
+
+    function mcpProvenanceStep() {
+        var systemProfileTool = catalog.mcp.system_profile_tool || "system_profile";
+        return "Save provenance: call `" + systemProfileTool + "()` and record the BenchBox version plus system profile fields next to the result bundle.";
+    }
+
+    function mcpCapturePlansFootnote() {
+        var planTool = catalog.mcp.plan_tool || "get_query_plan";
+        return "To capture EXPLAIN plans, rerun live with `capture_plans=true` only when plans are needed, then inspect a supported plan with `" + planTool + "(result_file=\"<result-json>\", query_id=\"Q1\")`.";
+    }
+
     function buildMcpPrompt(state, platform, platformB, platformEntry, platformBEntry, benchmarkEntry, needsCredentials) {
         var isCompare = state.goal === "compare";
         var mcpToolName = catalog.mcp.run_tool;
         var mcpPromptName = isCompare ? catalog.mcp.prompts.compare_platforms : catalog.mcp.prompts.benchmark_run;
-        var analyzePromptName = catalog.mcp.prompts.analyze_results;
-        var systemProfileTool = catalog.mcp.system_profile_tool || "system_profile";
         var dependencyPlatforms = dependencyCheckPlatforms([platformEntry, platformBEntry]);
         var selectedEntries = [platformEntry, platformBEntry];
         var selectedPlatforms = isCompare ? [platform, platformB] : [platform];
@@ -469,9 +485,9 @@
                 compareLines.push("  " + step.value++ + ". COST ACKNOWLEDGMENT: ask the user to confirm credit or compute spend before running the target scale.");
             }
             compareLines.push("  " + step.value++ + ". Run live: " + mcpRunCalls(mcpToolName, selectedPlatforms, state, state.scale, false) + ".");
-            compareLines.push("  " + step.value++ + ". Use the `" + analyzePromptName + "` prompt with the result-bundle paths; summarize total runtime, per-query timing, and any failures from the MCP tool result payloads.");
-            compareLines.push("  " + step.value++ + ". Save provenance: call `" + systemProfileTool + "()` and store the output alongside the result bundle. MCP has no `benchbox --version-json` equivalent yet; keep the MCP server/version context if available.");
-            compareLines.push("  • To capture EXPLAIN plans, pass `capture_plans=true` to each live `run_benchmark` call and inspect supported plans from the result bundle.");
+            compareLines.push("  " + step.value++ + ". " + mcpAnalysisStep(state, platform));
+            compareLines.push("  " + step.value++ + ". " + mcpProvenanceStep());
+            compareLines.push("  • " + mcpCapturePlansFootnote());
             if (needsCredentials) appendDeploymentSafetyLines(compareLines, [platformEntry, platformBEntry], state.deployment);
             compareLines.push(needsCredentials ? "  • Stop and ask the user if credentials or config are missing — do not request secrets in chat." : "");
             return compareLines.filter(Boolean).join("\n");
@@ -502,9 +518,9 @@
             lines.push("  " + step.value++ + ". COST ACKNOWLEDGMENT: ask the user to confirm credit or compute spend before running the target scale.");
         }
         lines.push("  " + step.value++ + ". Run live: " + mcpRunCall(mcpToolName, platform, state, state.scale, false, false) + ".");
-        lines.push("  " + step.value++ + ". Use the `" + analyzePromptName + "` prompt with the result-bundle path; summarize total runtime, per-query timings, and any failures from the MCP tool result payload.");
-        lines.push("  " + step.value++ + ". Save provenance: call `" + systemProfileTool + "()` and store the output alongside the result bundle. MCP has no `benchbox --version-json` equivalent yet; keep the MCP server/version context if available.");
-        lines.push("  • To capture EXPLAIN plans, pass `capture_plans=true` to the live `run_benchmark` call and inspect supported plans from the result bundle.");
+        lines.push("  " + step.value++ + ". " + mcpAnalysisStep(state, platform));
+        lines.push("  " + step.value++ + ". " + mcpProvenanceStep());
+        lines.push("  • " + mcpCapturePlansFootnote());
         if (needsCredentials) appendDeploymentSafetyLines(lines, [platformEntry], state.deployment);
         lines.push(needsCredentials ? "  • Stop and ask the user if credentials or config are missing — do not request secrets in chat." : "");
         return lines.filter(Boolean).join("\n");
