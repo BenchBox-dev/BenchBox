@@ -110,9 +110,7 @@ Stricter approaches we may consider later:
 - direct Dataverse fetch with local conversion
 - a bring-your-own dataset path for environments with stricter policies
 
-Users in stricter redistribution environments should review `benchbox/core/joinorder/DATA-LICENSE.md` and the documented BYO data path before relying on the default hosted archive.
-
-These would improve the provenance story, but they also add setup cost. For v0.3.0, the default path prioritizes a verified first run against the real JOB dataset.
+These would improve the provenance story, but they also add setup cost. For v0.3.0, the default path prioritizes a verified first run against the real JOB dataset. Users in stricter redistribution environments should review `benchbox/core/joinorder/DATA-LICENSE.md` and the documented BYO data path before relying on the default hosted archive.
 
 ## What users need to change
 
@@ -135,11 +133,7 @@ The main lesson is simple: benchmark names define contracts. When users see `joi
 
 There is also a provenance lesson worth calling out: dataset version, manifest hash, and archive hash are easy to overlook until someone asks why two published results disagree. They matter when an auditor needs to reconstruct the data contract behind a result.
 
-## Bottom line
-
-BenchBox v0.3.0 aligns `joinorder` with the published JOB contract: real IMDb 2013 JOB data, all 113 queries, fixed scale, and auditable dataset identity. The change came from community feedback; the implementation adds more than the initial report requested, especially around dataset identity, but the core correction is the one issue #289 identified.
-
-If you use JoinOrder to evaluate optimizers, upgrade with care. Pre-v0.3.0 results were generated-data results and should not be compared directly with new IMDb-backed runs; the new `joinorder` is a stricter baseline.
+The implementation adds more than the initial report requested, especially around dataset identity, but the core correction is the one issue #289 identified. If you use JoinOrder to evaluate optimizers, upgrade with care: pre-v0.3.0 results were generated-data results and should not be compared directly with new IMDb-backed runs; the new `joinorder` is a stricter baseline.
 
 ---
 
@@ -155,7 +149,7 @@ If you use JoinOrder to evaluate optimizers, upgrade with care. Pre-v0.3.0 resul
 - JoinOrder data manifest: `benchbox/core/joinorder/data_manifest.toml`
 - JoinOrder data license note: `benchbox/core/joinorder/DATA-LICENSE.md`
 - JoinOrder licensing decision: `_project/decisions/joinorder-canonical-data-licensing-2026-05-12.md`
-- Release overview: [BenchBox v0.3.0: JoinOrder fix, sketch coverage, and /prompts/](./13-v0-3-0-release-overview.md)
+- Release overview: [BenchBox v0.3.0: JoinOrder fix, approximate analytics, and agent prompt composer](./13-v0-3-0-release-overview.md)
 
 [^issue-289]: GitHub issue #289, "[JOB] Uniformly random data generation undermines the benchmark's core motivation - real-world data correlations matter," filed by `@partychicken` on May 9, 2026. The issue asks BenchBox to remove synthetic scaling for JOB and use the original frozen IMDb dataset.
 [^job-2015]: Leis, V., Gubichev, A., Mirchev, A., Boncz, P., Kemper, A., and Neumann, T. "How Good Are Query Optimizers, Really?" PVLDB 9(3), 204-215, 2015.
