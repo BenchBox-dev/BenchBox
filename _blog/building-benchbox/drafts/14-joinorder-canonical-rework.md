@@ -10,27 +10,27 @@ status: draft
 
 # Reworking JoinOrder around the IMDb 2013 dataset
 
-> JoinOrder is supposed to test query optimizers on real-world correlations. BenchBox v0.3.0 changes `joinorder` so the data contract matches that purpose.
+> The Join Order Benchmark evaluates query optimizers against the skewed, correlated distributions in the IMDb 2013 dataset. BenchBox v0.3.0 updates `joinorder` so its data contract reflects that benchmark target.
 
-**TL;DR**: A community report showed that BenchBox's old JoinOrder data did not preserve the real-world structure that makes the Join Order Benchmark useful. v0.3.0 changes `joinorder` to use the IMDb 2013 JOB dataset at scale factor 1, adds all 113 JOB SQL queries, records dataset identity in result bundles, and moves the old generated data to `joinorder_synthetic`.
+**TL;DR**: A community report showed that BenchBox's old JoinOrder data did not preserve the IMDb relationships and distributions that make the Join Order Benchmark useful. The release updates `joinorder` to use the IMDb 2013 JOB dataset at scale factor 1, adds all 113 JOB SQL queries, records dataset identity in result bundles, and moves the old generated data to `joinorder_synthetic`.
 
 ---
 
-On May 9, 2026, GitHub user `@partychicken` filed issue #289 against BenchBox.[^issue-289] The report was about the benchmark contract: BenchBox had a JoinOrder-shaped workload (the schema, queries wired through the framework, and generated data for smoke tests), but the data was not the real IMDb dataset used by the Join Order Benchmark papers. With generated data that doesn't preserve real-world correlations, an optimizer can look better than it should because the data is easier than the benchmark was designed to be.
+On May 9, 2026, GitHub user `@partychicken` filed issue #289 against BenchBox.[^issue-289] The report was about the benchmark contract: BenchBox had a JoinOrder-shaped workload (the schema, queries wired through the framework, and generated data for smoke tests), but the data was not the IMDb dataset used by the Join Order Benchmark papers. With generated data that does not preserve those IMDb correlations, optimizer estimates can appear more accurate because the workload no longer contains the dependency patterns JOB was selected to expose.
 
-v0.3.0 fixes this. `joinorder` now means the real IMDb 2013 Join Order Benchmark dataset, at one fixed scale. The old generated workload is still useful for development, but it has a different name and should not be used as published JOB evidence. Throughout this post, "canonical" means the reference JOB data contract: the fixed IMDb 2013 dataset and the 113-query workload used by the JOB papers, not any future reduced dataset, generated test fixture, or schema-compatible approximation.
+v0.3.0 corrects that contract. `joinorder` now identifies the real IMDb 2013 Join Order Benchmark dataset, at one fixed scale. The old generated workload is still useful for development, but it has a different name and is not published JOB evidence. Throughout this post, "canonical" means the reference JOB data contract: the fixed IMDb 2013 dataset and the 113-query workload used by the JOB papers, not any future reduced dataset, generated test fixture, or schema-compatible approximation.
 
-## Why real-world data matters for JOB
+## Why the IMDb data matters for JOB
 
-The original JOB paper, "How Good Are Query Optimizers, Really?", chose IMDb deliberately.[^job-2015] The follow-up VLDB Journal paper kept that focus on real-world optimizer behavior.[^job-2018] IMDb data has skew, correlations, and uneven distributions: exactly the properties that make cardinality estimates fail in interesting ways.
+The original JOB paper, "How Good Are Query Optimizers, Really?", chose IMDb deliberately.[^job-2015] The follow-up VLDB Journal paper kept that focus on optimizer behavior over real application data.[^job-2018] IMDb data has skew, correlations, and uneven distributions: exactly the properties that make cardinality estimates fail in ways JOB is designed to surface.
 
-If an optimizer assumes predicates are independent when the real data says otherwise, it picks a poor join order. Exposing that failure mode is the signal JOB was built to send. Uniformly random synthetic data erases it: independence assumptions become accidentally accurate, and every query still runs to completion while the benchmark quietly stops measuring what it was designed to measure.
+If an optimizer assumes predicates are independent when the IMDb data shows otherwise, cardinality estimates can drift enough to produce a suboptimal join order. JOB is designed to make that failure mode visible. Uniformly random synthetic data weakens the test: independence assumptions become accidentally accurate, and queries can complete successfully while no longer exercising the intended optimizer challenge.
 
 Issue #289 stated the consequence directly:
 
 > In other words, uniform random generation removes the very property that JOB was designed to test.
 
-BenchBox's generated data wasn't useless. It helped exercise loaders, table creation, query registration, and basic platform tests. But it was not a comparable JOB run, and the report proposed the right shape of fix:
+BenchBox's generated data still had engineering value. It helped exercise loaders, table creation, query registration, and basic platform tests. But it was not a comparable JOB run, and the report proposed the appropriate scope of fix:
 
 | What the report asked for | What v0.3.0 ships |
 | --- | --- |
@@ -45,7 +45,7 @@ The report forced a useful distinction: schema-compatible data is not the same t
 
 Most BenchBox benchmarks support scale factors because the data generator can produce a smaller or larger version of the workload, which makes iteration easier and lets users run smoke tests before larger runs.
 
-JoinOrder is different. The public benchmark now uses a fixed real-world dataset, which is why `joinorder --scale 0.01` is not part of v0.3.0. A smaller public JOB workload would need more than fewer rows:
+JoinOrder is different. The public benchmark now uses a fixed IMDb-derived dataset, which is why `joinorder --scale 0.01` is not part of v0.3.0. A smaller public JOB workload would need more than fewer rows:
 
 - correlated data that preserves the properties JOB is meant to expose
 - reference cardinalities for the smaller data
@@ -53,7 +53,7 @@ JoinOrder is different. The public benchmark now uses a fixed real-world dataset
 - a stable data-delivery contract
 - tests that prove the query semantics still match the intended workload
 
-Without those pieces, a smaller workload would create a false sense of comparability: fast and convenient, but not the Join Order Benchmark in the sense users expect. The generated data remains useful for development and smoke-test coverage; the explicit `joinorder_synthetic` name keeps it from being confused with comparable benchmark data.
+Without those pieces, a smaller workload would create a false sense of comparability: fast and convenient, but not the Join Order Benchmark as defined by the published JOB workload. The generated data remains useful for development and smoke-test coverage; the explicit `joinorder_synthetic` name keeps it from being confused with comparable benchmark data.
 
 ## What the reference dataset means in BenchBox
 
@@ -65,7 +65,7 @@ First, the dataset is fixed. BenchBox's package is derived from the Harvard Data
 dataset_version = "joinorder-imdb-2013-v1"
 ```
 
-Second, the archive is verified. BenchBox records a manifest hash and a logical data archive hash, so result bundles can identify which data contract they used.
+Second, the archive is verified. BenchBox checks the downloadable archive, extracted table hashes, and row counts, then records manifest-backed identity fields so result bundles can identify which data contract they used.
 
 Third, the dataset is structured as the 21-table JOB schema. The largest table, `cast_info`, has 36,244,344 rows. The full table list and per-table hashes live in the data manifest rather than in this post, because the manifest is the durable source of truth.
 
@@ -77,14 +77,14 @@ The data change would be incomplete without the query set. v0.3.0 includes all 1
 
 The release also adds reference cardinalities and predicate-focused fixture tests. Those checks protect the two most important parts of the benchmark:
 
-1. The query catalog should contain the workload users expect.
-2. The predicates should keep the intended semantics as the code evolves.
+1. The query catalog must contain the workload users expect.
+2. The predicates must keep the intended semantics as the code evolves.
 
-DataFrame query coverage exists for the same query IDs, with one caveat: query ID coverage is not the same as saying every DataFrame platform produces equally comparable JOB results. Platform capability, expression support, and execution behavior still matter, and cross-engine comparisons need the usual benchmark care.
+DataFrame query coverage exists for the same query IDs, with one important boundary: SQL `joinorder` stresses optimizer join-order planning, while DataFrame `joinorder` executes explicit join sequences through platform DataFrame APIs. Query ID coverage is useful for workload breadth, but it is not the same as comparable optimizer evidence.
 
 ## Result identity is part of the fix
 
-Once a benchmark depends on a real-world dataset, result identity matters more. A timing number without the data contract is not auditable later, and unauditable benchmark numbers make later comparisons hard to resolve.
+Once a benchmark depends on a fixed external dataset, result identity matters more. A timing number without the data contract is not auditable later, and unauditable benchmark numbers make later comparisons hard to resolve.
 
 v0.3.0 adds three fields that result bundles can use for manifest-backed datasets:
 
@@ -98,17 +98,19 @@ For JoinOrder, these fields separate three cases that should not be mixed:
 2. the real IMDb 2013 JOB dataset
 3. any future reduced or alternate dataset, if one is ever added
 
-The fields are not a replacement for full methodology. Hardware, engine version, adapter configuration, query selection, concurrency, and measurement mode still matter. But the fields do remove one common ambiguity: readers can tell which data contract a result used.
+The fields do not replace full methodology: hardware, platform version, adapter configuration, query selection, concurrency, and measurement mode still matter. They remove one common ambiguity by showing which data contract a result used.
 
 ## Provenance and redistribution
 
-v0.3.0 treats the current re-hosted Parquet archive as an accepted release-risk decision, not as BenchBox-cleared for broad commercial redistribution. The decision is documented alongside the dataset version, archive hash, manifest hash, Dataverse source, and IMDb attribution, so users understand what is being downloaded and measured.
+v0.3.0 treats the current re-hosted Parquet archive as a documented redistribution-risk decision, not as BenchBox-cleared for broad commercial redistribution. The decision is documented alongside the dataset version, archive hash, manifest hash, Dataverse source, and IMDb attribution, so users understand what is being downloaded and measured.
 
 Stricter approaches we may consider later:
 
 - written permission for the redistributed archive
 - direct Dataverse fetch with local conversion
 - a bring-your-own dataset path for environments with stricter policies
+
+Users in stricter redistribution environments should review `benchbox/core/joinorder/DATA-LICENSE.md` and the documented BYO data path before relying on the default hosted archive.
 
 These would improve the provenance story, but they also add setup cost. For v0.3.0, the default path prioritizes a verified first run against the real JOB dataset.
 
@@ -129,13 +131,13 @@ If your automation used a smaller JoinOrder scale, update it. `joinorder` now ac
 
 ## What we learned
 
-The main lesson is simple: benchmark names are promises. When users see `joinorder`, they bring expectations from the JOB papers: a workload shaped by real IMDb correlations, not just tables with familiar names. Generated data can be useful, but if it does not preserve the property the benchmark exists to test, it needs a different label.
+The main lesson is simple: benchmark names define contracts. When users see `joinorder`, they bring expectations from the JOB papers: a workload shaped by IMDb-derived skew and correlations, not just tables with familiar names. Generated data can be useful, but if it does not preserve the property the benchmark exists to test, it needs a different label.
 
-There's also a provenance lesson worth calling out: dataset version, manifest hash, and archive hash are boring fields until someone asks why two published results disagree. They earn their place by being there when an auditor needs them.
+There is also a provenance lesson worth calling out: dataset version, manifest hash, and archive hash are easy to overlook until someone asks why two published results disagree. They matter when an auditor needs to reconstruct the data contract behind a result.
 
 ## Bottom line
 
-BenchBox v0.3.0 turns `joinorder` into the benchmark users expected: real IMDb 2013 JOB data, all 113 queries, fixed scale, and auditable dataset identity. The change came from community feedback; the implementation goes a little further than the initial report, especially around dataset identity, but the core correction is the one issue #289 identified.
+BenchBox v0.3.0 aligns `joinorder` with the published JOB contract: real IMDb 2013 JOB data, all 113 queries, fixed scale, and auditable dataset identity. The change came from community feedback; the implementation adds more than the initial report requested, especially around dataset identity, but the core correction is the one issue #289 identified.
 
 If you use JoinOrder to evaluate optimizers, upgrade with care. Pre-v0.3.0 results were generated-data results and should not be compared directly with new IMDb-backed runs; the new `joinorder` is a stricter baseline.
 
