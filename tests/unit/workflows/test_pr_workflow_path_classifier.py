@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,13 @@ pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
+
+pytestmark.append(
+    pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="workflow aggregate step is bash-specific and Windows resolves bash to WSL without a distro",
+    )
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 

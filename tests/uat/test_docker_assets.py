@@ -38,7 +38,7 @@ def test_compose_down_commands_are_project_scoped_and_targeted():
     for argv in (containers, volumes, images):
         assert not docker_assets.command_has_forbidden_prune(argv)
         assert "-f" in argv
-        assert any("docker/postgresql/docker-compose.yml" in part for part in argv)
+        assert any("docker/postgresql/docker-compose.yml" in part.replace("\\", "/") for part in argv)
 
 
 @pytest.mark.parametrize(

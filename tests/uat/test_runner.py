@@ -107,7 +107,7 @@ def test_run_cell_writes_log_and_returns_result(tmp_path: Path):
     assert result.result_path is not None
     assert str(result.result_path).endswith("duckdb_tpch_smoke.json")
     assert result.log_path.exists()
-    log_text = result.log_path.read_text()
+    log_text = result.log_path.read_text().replace("\\", "/")
     assert "benchmark_runs/results/" in log_text
 
 

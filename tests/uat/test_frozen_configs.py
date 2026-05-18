@@ -37,7 +37,8 @@ def test_every_frozen_file_has_a_hash_entry():
 def test_frozen_files_match_recorded_hash():
     expected = json.loads(HASH_FILE.read_text(encoding="utf-8"))
     for p in _frozen_files():
-        actual = hashlib.sha256(p.read_bytes()).hexdigest()
+        content = p.read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+        actual = hashlib.sha256(content).hexdigest()
         assert actual == expected[p.name], (
             f"FROZEN file {p.name} content drifted from .frozen-hashes.json. "
             "Either revert the edit or clone the file under a new name."

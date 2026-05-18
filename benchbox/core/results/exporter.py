@@ -111,7 +111,7 @@ class ResultExporter:
         elif self.is_cloud_output and hasattr(file_path, "write_bytes"):
             file_path.write_bytes(content.encode("utf-8"))
         else:
-            with open(file_path, mode, encoding="utf-8") as handle:
+            with open(file_path, mode, encoding="utf-8", newline="\n") as handle:
                 handle.write(content)
 
     def _create_file_path(self, filename: str):

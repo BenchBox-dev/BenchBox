@@ -319,7 +319,7 @@ def test_execute_skips_unreachable_platform(tmp_path):
 
 
 def _docker_platform_from_argv(argv: list[str]) -> str:
-    compose_file = argv[argv.index("-f") + 1]
+    compose_file = argv[argv.index("-f") + 1].replace("\\", "/")
     if "/clickhouse/" in compose_file:
         return "clickhouse-server"
     if "/postgresql/" in compose_file:

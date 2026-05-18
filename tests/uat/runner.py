@@ -31,8 +31,8 @@ from tests.uat.timeouts import TimeoutResult, run_with_timeout
 # named `benchmark_runs`. The `[^\s,;]+` is narrower than `[^\s]+` so a
 # comma- or semicolon-separated log line does not collapse two paths into
 # a single match.
-RESULT_PATH_RE = re.compile(r"(?:(?:[A-Za-z]:)?/?[^\s,;]*/)?results/[^\s,;]+\.json")
-WRAPPED_RESULT_PATH_RE = re.compile(r"((?:(?:[A-Za-z]:)?/?[^\s,;]*/)?results/[^\s,;]*)\n([^\s,;]*\.json)")
+RESULT_PATH_RE = re.compile(r"(?:(?:[A-Za-z]:)?[\\/]?[^\s,;]*[\\/])?results[\\/][^\s,;]+\.json")
+WRAPPED_RESULT_PATH_RE = re.compile(r"((?:(?:[A-Za-z]:)?[\\/]?[^\s,;]*[\\/])?results[\\/][^\s,;]*)\n([^\s,;]*\.json)")
 UNOFFICIAL_COMPLIANCE_CLASSES = frozenset({"unofficial_nonstandard", "unofficial_subscale"})
 
 
