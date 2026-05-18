@@ -15,6 +15,8 @@ meta_description: "BenchBox v0.3.0 moves JoinOrder to real IMDb JOB data, adds 1
 
 ---
 
+![Screenshot of the BenchBox /prompts/ landing page configured for a local DuckDB TPC-H quickstart at scale 0.01, showing the goal/surface/interface/deployment/platform/benchmark/scale selectors and a generated copy-paste agent prompt below them](../images/prompts_page.png)
+
 The headline addition is a new [`/prompts/`](https://benchbox.dev/prompts/) page on the landing site. It composes copyable instructions for coding agents so that a first BenchBox run, local or cloud, lands with safer defaults and the right setup steps in the right order. No new runtime command, no MCP tool change, no JSON catalog: the page is a prompt composer over BenchBox's existing CLI and MCP surfaces.
 
 The biggest data-contract change is JoinOrder. A community report ([issue #289](https://github.com/joeharris76/BenchBox/issues/289)) flagged that BenchBox's old JoinOrder data was synthetic and did not exercise the real-world correlations that the Join Order Benchmark was designed around. Thanks to `@partychicken` for raising the issue. v0.3.0 fixes this by making `joinorder` use the real IMDb 2013 JOB dataset at scale factor 1. The companion post, [Reworking JoinOrder around the IMDb 2013 dataset](./14-joinorder-canonical-rework.md), walks through the data contract, scale-factor decision, and provenance work in detail.
