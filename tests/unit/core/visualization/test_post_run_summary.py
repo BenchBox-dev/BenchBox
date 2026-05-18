@@ -240,24 +240,25 @@ class TestGeneratePostRunSummary:
 
     def test_multi_run_preserves_variant_query_ids(self):
         """Variant IDs (e.g., 14a/14b) must remain separate for aggregation."""
-        queries = [
-            _make_query("14a", 100.0),
-            _make_query("Q14a", 110.0),
-            _make_query("14b", 300.0),
-            _make_query("Q14b", 290.0),
-        ]
+        queries = []
+        for i in range(1, 34):
+            queries.append(_make_query(f"{i}a", float(i)))
+            queries.append(_make_query(f"Q{i}a", float(i + 1)))
         result = _make_result(queries)
-        summary = generate_post_run_summary(result, color=False)
+        summary = generate_post_run_summary(result, color=False, max_width=140)
 
         for line in summary.summary_box.split("\n"):
             if "Queries" in line:
-                assert "2" in line
+                assert "33" in line
                 break
         else:
             pytest.fail("Queries line missing from summary box")
 
         assert "Q14a" in summary.query_histogram
-        assert "Q14b" in summary.query_histogram
+        assert _should_use_horizontal([f"Q{i}a" for i in range(1, 34)]) is False
+        assert "Q18a" in summary.query_histogram
+        assert "Q26a" in summary.query_histogram
+        assert "Q1 Q1 Q1" not in summary.query_histogram
 
     def test_chart_rendering_failure_does_not_propagate(self):
         """Verify that the function itself doesn't swallow errors -
