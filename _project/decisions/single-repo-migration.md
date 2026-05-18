@@ -206,8 +206,8 @@ Discovered while implementing the curation-drift CI guard
 top-level tracked path is in either the main-only allowlist or the
 release-cut curation list.
 
-- **`main` only** (extension to A3): `docker/`, `quality/`, `results-data/`,
-  `results-explorer/`, `setup.cfg`, `setup.py`, `tox.ini`, `index.html`.
+- **`main` only** (extension to A3): `docker/`, `quality/`, `setup.cfg`,
+  `setup.py`, `tox.ini`, `index.html`.
 
 These are all build/release/UI artefacts that belong on the released
 tree. They are therefore NOT in the release-cut curation list. This
@@ -227,3 +227,26 @@ main-only allowlist (not the release-cut curation list).
 
 This amendment extends the 2026-04-27 amendment; both bullets are
 authoritative.
+
+## Amendment 2026-05-18 — v0.3.0 release scope curation
+
+The v0.3.0 release intentionally ships the generated `/prompts/` landing
+surface under `landing/prompts/`, canonical JoinOrder runtime code and
+metadata under `benchbox/core/joinorder/`, and promoted release posts under
+`docs/blog/`. It intentionally does not ship the results explorer.
+
+Release branches therefore curate the following develop-only/deferred
+surfaces with `git rm` in `make release-cut`:
+
+- `results-explorer/`
+- `results-data/`
+- `.github/workflows/results-explorer-browser.yml`
+- `.github/workflows/seed-corpus.yml`
+- `.github/workflows/sync-results-data-to-published.yml`
+- `.github/workflows/validate-submission.yml`
+
+The top-level results paths were removed from the 2026-04-27 main-only
+extension above because they are not part of the v0.3.0 release tree.
+`scripts/check_release_curation.py` now pins these required removals in
+addition to the top-level split, so the drift guard fails if a future edit
+accidentally reclassifies the results explorer as shipping content.

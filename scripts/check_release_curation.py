@@ -10,12 +10,14 @@ Sources of truth:
     (the bullet under "**main only**" in the A3 row).
   - Curation list: the `git rm -rf` / `git rm -f` lines inside the
     `release-cut:` target in Makefile.
+  - Required deferred release paths: explicit release-cut removals for
+    v0.3.0 surfaces that remain on develop but must not ship on main.
 
 Fails (exit 1) on any top-level path that appears in neither list, naming
 the offending paths and recommending which list to update.
 
 Run locally:
-    uv run python scripts/check_release_curation.py
+    uv run -- python scripts/check_release_curation.py
 """
 
 from __future__ import annotations
@@ -28,6 +30,16 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DECISION_DOC = REPO_ROOT / "_project" / "decisions" / "single-repo-migration.md"
 MAKEFILE = REPO_ROOT / "Makefile"
+REQUIRED_CURATED_PATHS = frozenset(
+    {
+        "results-data",
+        "results-explorer",
+        ".github/workflows/results-explorer-browser.yml",
+        ".github/workflows/seed-corpus.yml",
+        ".github/workflows/sync-results-data-to-published.yml",
+        ".github/workflows/validate-submission.yml",
+    }
+)
 
 
 def parse_main_only_allowlist(doc: Path) -> set[str]:
@@ -92,6 +104,15 @@ def main() -> int:
     main_only = parse_main_only_allowlist(DECISION_DOC)
     curated = parse_curation_list(MAKEFILE)
     tracked = list_tracked_top_level()
+
+    missing_required = sorted(REQUIRED_CURATED_PATHS - curated)
+    if missing_required:
+        print("ERROR: release-cut is missing required deferred-path curation:")
+        for path in missing_required:
+            print(f"  - {path}")
+        print()
+        print("These paths stay on develop but must be git-rm'd from v0.3.0 release branches.")
+        return 1
 
     accounted = main_only | curated
     unaccounted = sorted(tracked - accounted)

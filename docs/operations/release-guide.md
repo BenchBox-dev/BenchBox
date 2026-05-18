@@ -23,10 +23,13 @@ That's the entire flow. The two Make targets do the rest.
 3. Opens `$EDITOR` on `CHANGELOG.md` for hand-curation. (Headless mode:
    refuses to skip the curation step rather than silently committing
    raw output.)
-4. Curates the release branch — `git rm`'s the dev-only paths
-   (`_project/`, `_blog/`, agent configs, dev-tooling root files; full
-   list in the `release-cut:` Makefile target and gated by
-   `scripts/check_release_curation.py`).
+4. Curates the release branch — `git rm`'s the dev-only and deferred
+   release paths (`_project/`, `_blog/`, results explorer/data, agent
+   configs, dev-tooling root files; full list in the `release-cut:`
+   Makefile target and gated by `scripts/check_release_curation.py`).
+   For v0.3.0, `landing/` and `docs/blog/` stay in the release tree so
+   `/prompts/` and promoted release posts ship; `results-explorer/`,
+   `results-data/`, and explorer/results-data workflows do not.
 5. Commits a single `Release vX.Y.Z` commit on `vX.Y.Z`, pushes, and
    opens a PR against `main`.
 6. Sweeps prior `v*` branches on origin (option-c lifecycle: keep until
@@ -67,5 +70,5 @@ That's the entire flow. The two Make targets do the rest.
 - Version updater: `scripts/update_version.py`.
 - Changelog generator: `scripts/generate_changelog_entry.py`.
 - Architecture record: `_project/decisions/single-repo-migration.md`
-  (D5 / A3 / A4 / A5, plus the 2026-04-27 amendment for the 2-command
-  flow and the develop-not-modified rule).
+  (D5 / A3 / A4 / A5, plus the amendments for the 2-command flow, the
+  develop-not-modified rule, and the v0.3.0 release-scope curation).
