@@ -26,6 +26,7 @@ from benchbox.core.visualization.ascii_api import (
     HistogramBar,
     SummaryBox,
     SummaryStats,
+    detect_terminal_capabilities,
 )
 from benchbox.core.visualization.ascii_runtime import _SUMMARY_QUERY_COUNT
 
@@ -171,6 +172,7 @@ def generate_post_run_summary(
             data=histogram_bars,
             title="Query Latency",
             y_label="Execution Time (ms)",
+            max_per_chart=_max_vertical_bars_for_labels(display_ids, options),
             options=options,
         )
         histogram_text = histogram_chart.render()
@@ -188,6 +190,10 @@ def generate_post_run_summary(
 # 6 chars accommodates TPC-style IDs (Q1-Q22) vertically; longer benchmark IDs
 # (e.g., ClickBench "aggregation_groupby_large") switch to horizontal layout.
 _HORIZONTAL_LABEL_THRESHOLD = 6
+_VERTICAL_Y_AXIS_WIDTH = 8
+_VERTICAL_AXIS_PADDING = 2
+_VERTICAL_LABEL_GAP = 1
+_VERTICAL_MIN_BARS_PER_CHART = 5
 
 
 def _should_use_horizontal(display_ids: list[str]) -> bool:
@@ -200,6 +206,23 @@ def _should_use_horizontal(display_ids: list[str]) -> bool:
         return False
     median_len = statistics.median(len(qid) for qid in display_ids)
     return median_len > _HORIZONTAL_LABEL_THRESHOLD
+
+
+def _max_vertical_bars_for_labels(display_ids: list[str], options: ChartOptions) -> int:
+    """Return the vertical chunk size that lets labels fit without truncation."""
+    if not display_ids:
+        return Histogram.DEFAULT_MAX_BARS
+
+    if options.width is None and options._capabilities is None:
+        options._capabilities = detect_terminal_capabilities()
+
+    width = options.get_effective_width()
+    bar_area_width = width - _VERTICAL_Y_AXIS_WIDTH - _VERTICAL_AXIS_PADDING
+    longest_label = max(len(label) for label in display_ids)
+    max_bars = bar_area_width // (longest_label + _VERTICAL_LABEL_GAP)
+    if len(display_ids) <= max_bars:
+        return Histogram.DEFAULT_MAX_BARS
+    return max(_VERTICAL_MIN_BARS_PER_CHART, min(Histogram.DEFAULT_MAX_BARS, max_bars))
 
 
 def _render_horizontal_bars(
