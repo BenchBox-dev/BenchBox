@@ -17,10 +17,12 @@ description: |
      to the bare minimum (per-user agent config + secrets only) AND
      ALLOWED_ROOT_FILES expanded to include dev-tooling root files
      (.pre-commit-config.yaml, AGENTS.md, CLAUDE.md, GEMINI.md,
-     _benchbox_pytest_xdist_safety.py, etc.). Brings explorer code, _blog/,
-     all source files, dev tooling, and the new release infrastructure
-     (Phases 1-3) onto public main as squashed migration commits.
-     Working-tree contents only — no private commit history preserved.
+     _benchbox_pytest_xdist_safety.py, etc.). Brings _blog/, all source
+     files, dev tooling, the new release infrastructure (Phases 1-3), and
+     explicitly-approved development assets onto public main as squashed
+     migration commits. Working-tree contents only — no private commit
+     history preserved. Results Explorer remains out of v0.3.0 shipment
+     scope even if repository migration mechanics touch explorer paths.
 
   2. _project/** HISTORY FILTER-MERGE: on a fresh clone of private, run
      `git filter-repo --path _project/` to keep only commits that touched
@@ -33,15 +35,16 @@ description: |
      release.yml workflow). Old automate_release.py is still on private
      as a fallback; it gets deleted in Phase 6.
 
-  This is the "release that ships the explorer" — the only feature
-  genuinely held back today. Likely versioned 0.3.0 since it adds a
-  major feature.
+  Results Explorer DOES NOT SHIP in v0.3.0. Any explorer code or
+  planning artifacts present during this migration remain development
+  assets only; they must not be described as a v0.3.0 launch, preview,
+  beta, public release feature, or release-note headline.
 
   Plan file: /Users/joe/.claude/plans/single-repo-migration.md (Phase 4).
 
 work:
 - id: w1
-  summary: "Confirm explorer is ready to ship and remove explorer entries from HOLD_BACK_PATHS"
+  summary: "Confirm explorer remains out of v0.3.0 shipment scope while handling sync allowlists"
   status: done
   notes: |
     Read benchbox/release/workflow.py:18-43. Remove from HOLD_BACK_PATHS:
@@ -51,16 +54,18 @@ work:
       - tests/unit/cli/test_explorer_build_contract.py
       - .github/workflows/results-explorer-browser.yml
       - docs/development/results-explorer-*.md
-    Confirm with the user that the explorer is feature-complete and
-    documented before removing.
+    Do not treat removal from HOLD_BACK_PATHS, if still needed for repo
+    migration mechanics, as a release-scope decision. Results Explorer
+    does not ship in v0.3.0.
 
 - id: w2
   summary: "Reduce HOLD_BACK_PATHS to the bare minimum for the final sync"
   needs: [w1]
   status: done
   notes: |
-    After w1 removes explorer entries, further reduce HOLD_BACK_PATHS to
-    contain only paths that should NEVER reach public:
+    After w1 confirms explorer remains out of v0.3.0 shipment scope,
+    further reduce HOLD_BACK_PATHS to contain only paths that should
+    NEVER reach public:
       HOLD_BACK_PATHS = (
         ".claude",       # per-user agent config
         ".codex",        # per-user agent config
@@ -116,8 +121,9 @@ work:
     uv run python scripts/prepare_release.py --target /tmp/final-sync-preview \
       --no-commit
     # Diff the previewed tree against ~/Developer/benchbox-public to confirm
-    # only the expected NEW additions appear (explorer, _blog, dev-tooling
-    # root files) and no SURPRISE removals:
+    # only the expected NEW additions appear (_blog, dev-tooling root
+    # files, and any explicitly-approved dev assets) and no SURPRISE
+    # removals:
     diff -rq /tmp/final-sync-preview ~/Developer/benchbox-public | head -50
     # Investigate every "Only in" line. Surprises = bugs. Fix HOLD_BACK or
     # ALLOWED_ROOT_FILES until happy.
@@ -128,10 +134,10 @@ work:
     # Apply tree from /tmp/final-sync-preview onto this branch:
     rsync -a --delete --exclude='.git' /tmp/final-sync-preview/ ./
     git add -A
-    git commit -m "Migration: final curated sync from private (explorer launch)"
+    git commit -m "Migration: final curated sync from private"
     git push origin migration/final-sync
-    gh pr create --title "Migration: final sync from private (explorer launch)" \
-      --body "Brings explorer code, _blog working tree, dev tooling, release infrastructure"
+    gh pr create --title "Migration: final sync from private" \
+      --body "Brings _blog working tree, dev tooling, release infrastructure, and explicitly-approved dev assets. Results Explorer does not ship in v0.3.0."
     # Squash-merge.
 
 - id: w5
@@ -248,7 +254,9 @@ verification:
   expected_output: "success"
 
 must_preserve:
-- The explorer code is added to the public release; this is the feature-complete launch.
+- Results Explorer DOES NOT SHIP in v0.3.0. Do not describe repository
+  presence, migration mechanics, or dev assets as a feature-complete
+  launch, preview, beta, public feature, or release-note headline.
 - The fallback path (automate_release.py on private) is not deleted yet - if release.yml fails for any reason, the old
   flow is one command away.
 - _project/** retains its original commit graph on public; `git blame` on TODO/DONE files resolves to original

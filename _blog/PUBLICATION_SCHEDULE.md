@@ -1,7 +1,7 @@
 # Publication Schedule
 
 > BenchBox blog publication queue.
-> **Last updated:** 2026-03-10
+> **Last updated:** 2026-05-18
 
 ---
 
@@ -16,6 +16,9 @@
 | DuckDB `tpch` Extension vs BenchBox TPC-H        | Building BenchBox | Mar 3, 2026  |
 | Extracting textcharts from BenchBox               | Building BenchBox | Mar 10, 2026 |
 | BenchBox v0.1.5 Release Summary                    | Building BenchBox | Mar 10, 2026 |
+| Splitting approximate analytics across BenchBox read and write benchmarks | Building BenchBox | May 18, 2026 |
+| BenchBox v0.3.0: JoinOrder fix, approximate analytics, and agent prompt composer | Building BenchBox | May 18, 2026 |
+| Reworking JoinOrder around the IMDb 2013 dataset | Building BenchBox | May 18, 2026 |
 
 ---
 

@@ -1,13 +1,14 @@
 ---
-title: "Splitting approximate analytics across BenchBox read and write benchmarks"
+blogpost: true
+status: published
+date: May 18, 2026
+author: Joe Harris
 series: building-benchbox
 post_number: 12
 type: architecture-design
-tags: [benchbox, sketches, datasketches, databricks, approximate-analytics, write-primitives, read-primitives, clickhouse, duckdb, redshift]
+tags: benchbox, sketches, datasketches, databricks, approximate-analytics, write-primitives, read-primitives, clickhouse, duckdb, redshift
 meta_description: "Why BenchBox split approximate analytics coverage across one-shot aggregate queries and persisted sketch-state workflows."
-status: draft
 ---
-
 # Splitting approximate analytics across BenchBox read and write benchmarks
 
 > Approximate aggregates answer one query over raw rows. Sketches store compact summary state that can be merged and queried later. BenchBox now tests those workloads separately.

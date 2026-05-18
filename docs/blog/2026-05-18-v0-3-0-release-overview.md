@@ -1,13 +1,14 @@
 ---
-title: "BenchBox v0.3.0: JoinOrder fix, approximate analytics, and agent prompt composer"
+blogpost: true
+status: published
+date: May 18, 2026
+author: Joe Harris
 series: building-benchbox
 post_number: 13
 type: release-notes
-tags: [benchbox, release, joinorder, mcp, prompts, sketch-functions, read-primitives, write-primitives]
+tags: benchbox, release, joinorder, mcp, prompts, sketch-functions, read-primitives, write-primitives
 meta_description: "BenchBox v0.3.0 moves JoinOrder to real IMDb JOB data, adds 113 queries, expands sketch coverage, and adds a prompt composer for safer local first runs."
-status: draft
 ---
-
 # BenchBox v0.3.0: JoinOrder fix, approximate analytics, and agent prompt composer
 
 **TL;DR**: The new [/prompts/](https://benchbox.dev/prompts/) page composes benchmarking instructions for coding agents. `joinorder` now uses the real IMDb 2013 Join Order Benchmark dataset at scale factor 1, replacing synthetic data. BenchBox also expands approximate-aggregate and sketch-lifecycle coverage in the primitives benchmarks.
@@ -16,9 +17,9 @@ status: draft
 
 The headline addition is a new [`/prompts/`](https://benchbox.dev/prompts/) page on the landing site. It composes copyable instructions for coding agents so that a first BenchBox run, local or cloud, lands with safer defaults and the right setup steps in the right order. No new runtime command, no MCP tool change, no JSON catalog: the page is a prompt composer over BenchBox's existing CLI and MCP surfaces.
 
-The biggest data-contract change is JoinOrder. A community report ([issue #289](https://github.com/joeharris76/BenchBox/issues/289)) flagged that BenchBox's old JoinOrder data was synthetic and did not exercise the real-world correlations that the Join Order Benchmark was designed around. Thanks to `@partychicken` for raising the issue. v0.3.0 fixes this by making `joinorder` use the real IMDb 2013 JOB dataset at scale factor 1. The companion post, [Reworking JoinOrder around the IMDb 2013 dataset](./14-joinorder-canonical-rework.md), walks through the data contract, scale-factor decision, and provenance work in detail.
+The biggest data-contract change is JoinOrder. A community report ([issue #289](https://github.com/joeharris76/BenchBox/issues/289)) flagged that BenchBox's old JoinOrder data was synthetic and did not exercise the real-world correlations that the Join Order Benchmark was designed around. Thanks to `@partychicken` for raising the issue. v0.3.0 fixes this by making `joinorder` use the real IMDb 2013 JOB dataset at scale factor 1. The companion post, [Reworking JoinOrder around the IMDb 2013 dataset](./2026-05-18-joinorder-imdb-2013-dataset.md), walks through the data contract, scale-factor decision, and provenance work in detail.
 
-The third theme is approximate analytics. BenchBox now covers more of the path that modern platforms expose for approximate aggregates and sketches: one-shot approximate read queries, persisted sketch state, merge queries, storage-size checks, and parameter sweeps where the platform surface supports them. The architecture deep-dive in [Splitting approximate analytics across BenchBox read and write benchmarks](./12-sketch-functions-databricks-response.md) covers why the work split across `read_primitives` and `write_primitives`.
+The third theme is approximate analytics. BenchBox now covers more of the path that modern platforms expose for approximate aggregates and sketches: one-shot approximate read queries, persisted sketch state, merge queries, storage-size checks, and parameter sweeps where the platform surface supports them. The architecture deep-dive in [Splitting approximate analytics across BenchBox read and write benchmarks](./2026-05-18-sketch-functions-databricks-response.md) covers why the work split across `read_primitives` and `write_primitives`.
 
 ## At a glance
 
@@ -57,7 +58,7 @@ In v0.3.0, `joinorder` switches to the real IMDb 2013 dataset, accepts only `--s
 
 This is a breaking change. Before v0.3.0, it was easy to produce a result labeled "JoinOrder" that was not comparable to the workload described by the JOB papers, and that ambiguity now disappears. There is no small public JoinOrder scale in this release; a smaller workload may follow later, but it needs its own validated data contract, not a random slice of the real one.
 
-Result bundles for manifest-backed datasets can also now record `dataset_version`, `manifest_hash`, and `data_archive_hash`. Hardware, platform version, and methodology still matter, but these fields make one question easier to answer later: which data did this result use? See [Reworking JoinOrder around the IMDb 2013 dataset](./14-joinorder-canonical-rework.md) for the full rationale.
+Result bundles for manifest-backed datasets can also now record `dataset_version`, `manifest_hash`, and `data_archive_hash`. Hardware, platform version, and methodology still matter, but these fields make one question easier to answer later: which data did this result use? See [Reworking JoinOrder around the IMDb 2013 dataset](./2026-05-18-joinorder-imdb-2013-dataset.md) for the full rationale.
 
 ## More approximate aggregate coverage
 
@@ -155,7 +156,7 @@ The deep-dive post has the full set of invocations including ClickHouse-native a
 - Changelog entry: `CHANGELOG.md` (`[0.3.0] - 2026-05-16`)
 - JoinOrder issue: [GitHub issue #289](https://github.com/joeharris76/BenchBox/issues/289)
 - JoinOrder paper: [How Good Are Query Optimizers, Really?](https://www.vldb.org/pvldb/vol9/p204-leis.pdf)
-- Companion post: [Reworking JoinOrder around the IMDb 2013 dataset](./14-joinorder-canonical-rework.md)
+- Companion post: [Reworking JoinOrder around the IMDb 2013 dataset](./2026-05-18-joinorder-imdb-2013-dataset.md)
 - Approximate functions reference: `docs/benchmarks/read-primitives-approximate-functions.md`
 - Sketch functions reference: `docs/benchmarks/write-primitives-sketch-functions.md`
 - Prompt route decision: `_project/decisions/landing-prompts-route.md`

@@ -38,7 +38,9 @@
 | 9   | BenchBox v0.2.1: MPP wave, vector search, and harmonized scale factors | OUTLINED | 6 new platforms (Doris, CedarDB, StarRocks, SingleStore, QuestDB, Gluten+Velox), Vector Search and FlightData benchmarks, NYC Taxi expansion, ClickHouse split into 3 deployment modes |
 | 10  | One SF, one gigabyte: harmonizing scale factors across BenchBox | OUTLINED | Backwards-incompatible by intent: 7 adjustable benchmarks now target ~1 GB at SF=1; spec-locked benchmarks unchanged; covers second-order constraints (TSBS quadratic growth, NYC Taxi/FlightData corpus ceilings) |
 | 11  | What we built on top of SQLGlot (and why transpilation isn't enough) | OUTLINED | SQLGlot does the transpilation 80%; the other ~2,500 lines (dialect normalization, DataFusion semantic rewrites, QuestDB syntax fixups, 19-platform DDL registry, hand-written query overrides, SQL-to-DataFrame layer) are what production cross-engine work looks like |
-| 12  | Two benchmarks for one announcement: covering Databricks' new sketch functions in BenchBox | DRAFTED | The Databricks sketch announcement's headline claim is persist+merge+requery, not aggregate latency. Single-query catalogs can't exercise that loop, so coverage needed `read_primitives` (5 approx queries) and a new `write_primitives` sketch category (8 ops), with Tuple sketches deferred and verification claims separated from catalog support, DuckDB extension drift, and deferred cloud credentials |
+| 12  | Splitting approximate analytics across BenchBox read and write benchmarks | PUBLISHED | Approximate analytics is split across `read_primitives` one-shot aggregate queries and `write_primitives` persisted sketch-state workflows |
+| 13  | BenchBox v0.3.0: JoinOrder fix, approximate analytics, and agent prompt composer | PUBLISHED | Release announcement: `/prompts/`, the JoinOrder data-contract fix, and deeper approximate/sketch coverage |
+| 14  | Reworking JoinOrder around the IMDb 2013 dataset | PUBLISHED | A user-raised benchmark bug drives the post: `joinorder` now means the full IMDb 2013 JOB dataset at SF=1, with 113 query IDs, manifest-backed data identity, provenance notes, and generated data renamed |
 
 ---
 
@@ -48,6 +50,8 @@
 2. **CLI-First, LLM-Friendly**: Design decisions that serve both terminal users and AI tool integrations (MCP).
 3. **Zero-Dependency Where Possible**: Every dependency is a maintenance burden; we justify each one.
 4. **Benchmarking Tools Need to Be Fast**: A benchmarking framework that's slow or bloated undermines its own credibility.
+5. **Comparable Data Contracts**: Real-world benchmark datasets need provenance, identity fields, and honest scale labels, not just schema-compatible generated data.
+6. **Small Surfaces Before New APIs**: When a static page can solve a handoff problem, avoid adding CLI, MCP, or JSON contracts that future releases must support.
 
 ---
 

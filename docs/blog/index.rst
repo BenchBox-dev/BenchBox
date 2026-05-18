@@ -41,3 +41,6 @@ Browse by:
    2026-04-01-v0-2-0-release-summary
    2026-04-26-v0-2-1-release-summary
    2026-04-26-scale-factor-harmonization
+   2026-05-18-sketch-functions-databricks-response
+   2026-05-18-v0-3-0-release-overview
+   2026-05-18-joinorder-imdb-2013-dataset
