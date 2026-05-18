@@ -153,7 +153,7 @@ The deep-dive post has the full set of invocations including ClickHouse-native a
 
 ## References
 
-- Changelog entry: `CHANGELOG.md` (`[0.3.0] - 2026-05-16`)
+- Changelog entry: `CHANGELOG.md` (`[0.3.0] - 2026-05-18`)
 - JoinOrder issue: [GitHub issue #289](https://github.com/joeharris76/BenchBox/issues/289)
 - JoinOrder paper: [How Good Are Query Optimizers, Really?](https://www.vldb.org/pvldb/vol9/p204-leis.pdf)
 - Companion post: [Reworking JoinOrder around the IMDb 2013 dataset](./2026-05-18-joinorder-imdb-2013-dataset.md)

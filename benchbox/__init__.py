@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Type, Union
 # __version__ must be defined before `from . import platforms` because the
 # platforms import chain can circle back to benchbox.cli.app which reads
 # benchbox.__version__ at module level.
-__version__ = "0.2.1"
+__version__ = "0.3.0"
 
 from benchbox.base import BaseBenchmark
 from benchbox.flightdata import FlightData

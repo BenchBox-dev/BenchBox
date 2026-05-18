@@ -43,13 +43,28 @@ jobs:
         run: make lint-markers
 
       - name: Timing policy (wall-clock allowlist)
-        run: uv run -- python _project/scripts/timing_policy_check.py --strict
+        run: |
+          if [ -d _project ]; then
+            uv run -- python _project/scripts/timing_policy_check.py --strict
+          else
+            echo "_project/ is absent on curated release branches; skipping timing policy check."
+          fi
 
       - name: Compatibility docs drift check
         run: make compat-docs-check
 
       - name: Dependency audit (no unused declarations)
-        run: make audit-deps
+        run: |
+          if [ -d _project ]; then
+            make audit-deps
+          else
+            echo "_project/ is absent on curated release branches; skipping dependency audit."
+          fi
 
       - name: Release curation list drift check
-        run: uv run python scripts/check_release_curation.py
+        run: |
+          if [ -d _project ]; then
+            uv run python scripts/check_release_curation.py
+          else
+            echo "_project/ is absent on curated release branches; skipping curation drift check."
+          fi

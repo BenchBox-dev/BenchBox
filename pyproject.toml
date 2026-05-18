@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "benchbox"
-version = "0.2.1"
+version = "0.3.0"
 description = "Embedded benchmark datasets and queries for database evaluation. Implements TPC-H, TPC-DS, TPC-DI and other industry-standard benchmarks."
 readme = "README.md"
 authors = [{ name = "Joe Harris", email = "joe@benchbox.dev" }]
@@ -408,7 +408,7 @@ possibly-missing-attribute = "warn"
 error-on-warning = false
 
 [tool.pytest.ini_options]
-minversion = "0.2.1"
+minversion = "0.3.0"
 testpaths = ["tests"]
 python_files = "test_*.py"
 markers = [
