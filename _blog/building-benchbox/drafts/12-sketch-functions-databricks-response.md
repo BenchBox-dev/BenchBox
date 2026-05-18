@@ -12,7 +12,12 @@ status: draft
 
 > Approximate aggregates answer one query over raw rows. Sketches store compact summary state that can be merged and queried later. BenchBox now tests those workloads separately.
 
-**TL;DR**: Approximate analytics is not just a function-mapping problem. A platform can expose approximate aggregate functions without exposing the full sketch lifecycle: create compact summary state, store it, merge it later, and query the result. BenchBox now separates those claims. `read_primitives` measures one-shot approximate aggregates, including HLL distinct counts, KLL or T-Digest quantiles, vector quantiles, and Top-K. `write_primitives` measures persisted sketch state: store compact summaries, merge them later, validate the extracted answer, and track storage size. The current `develop` branch also adds ClickHouse-native lifecycle coverage, DuckDB-only CPC and REQ variants, parameter sweeps, and a PySpark DataFrame HLL persist-merge path. Tuple sketches and cloud live verification remain deferred.
+**TL;DR**: Approximate analytics is not just a function-mapping problem. A platform can expose approximate aggregate functions without exposing the full sketch lifecycle (build compact state, store it, merge it later, query it). BenchBox now separates those two claims:
+
+- `read_primitives` measures one-shot approximate aggregates: HLL distinct counts, KLL or T-Digest quantiles, vector quantiles, and Top-K.
+- `write_primitives` measures persisted sketch state: store compact summaries, merge them later, validate the extracted answer, and track storage size.
+
+The current `develop` branch also adds ClickHouse-native lifecycle coverage, DuckDB-only CPC and REQ variants, parameter sweeps, and a PySpark DataFrame HLL persist-merge path. Tuple sketches and cloud live verification remain deferred.
 
 ---
 
@@ -22,15 +27,17 @@ A support matrix would have been the obvious first response to Databricks' April
 
 Theta: supported here, substituted there. KLL: supported here, skipped there. Top-K: supported here, missing there. That table is useful, and BenchBox has one now. But it does not answer the question the announcement actually raises.
 
-Sketches become interesting when they stop being a single function call. Build them over partitions. Store them as columns. Merge them across days, regions, campaigns, or partitions. Query the compact state instead of the raw rows. Once that is the claim, a benchmark cannot stop at "which function name maps where?"
+Sketches become interesting when they stop being a single function call: built over partitions, stored as columns, merged across days or regions, and queried against compact state instead of raw rows. Once that is the claim, a benchmark cannot stop at "which function name maps where?"
 
-That is what made the announcement a useful forcing function for BenchBox: one-shot aggregate tests can measure function latency, but they cannot exercise stored, mergeable sketch artifacts.
+The announcement was a useful forcing function for BenchBox: one-shot aggregate tests can measure function latency, but they cannot exercise stored, mergeable sketch artifacts.
+
+A note up front about what BenchBox can and cannot claim here. The catalog covers many platforms and families, but catalog coverage is not the same as live, per-platform verification. Local `read_primitives` paths are straightforward to exercise; chDB gives a local ClickHouse-shaped path for the native `-State` and `-Merge` lifecycle; DuckDB KLL, CPC, and REQ work against the installed community extension, while DuckDB Theta and frequent-items remain blocked by community-extension drift. Snowflake, BigQuery, Databricks, and Redshift lifecycle runs remain credential-gated.
 
 Databricks' SQL docs make that lifecycle explicit for Theta (`theta_sketch_agg`, `theta_union_agg`, `theta_sketch_estimate`), KLL (`kll_sketch_agg_double`, `kll_merge_agg_double`, `kll_sketch_get_quantile_double`), and Top-K (`approx_top_k_accumulate`, `approx_top_k_combine`, `approx_top_k_estimate`).[^2][^3][^4][^5][^6] BenchBox already had a single-query read benchmark. It needed a second benchmark shape for the persist, merge, and requery loop.
 
-## Why Parity Was Only the Starting Point
+## Why parity was only the starting point
 
-The announcement moved Databricks closer to sketch surfaces already present elsewhere in BenchBox's platform matrix. Snowflake already documents DataSketches functions for approximate distinct counts and stateful Top-K functions that accumulate, combine, and estimate stored state.[^7][^8] BigQuery exposes HLL++ sketches and KLL quantile sketches as `BYTES` values that can be initialized, merged, and extracted later.[^9][^10] ClickHouse has long exposed the same lifecycle shape through aggregate-state combinators such as `uniqState` and `uniqMerge`, while DuckDB covers the one-shot approximate aggregate surface with `approx_count_distinct`, `approx_quantile`, and `approx_top_k`.[^11][^12]
+The announcement moved Databricks closer to sketch surfaces already present elsewhere in BenchBox's platform matrix. Snowflake documents DataSketches functions for approximate distinct counts and stateful Top-K functions that accumulate, combine, and estimate stored state.[^7][^8] BigQuery exposes HLL++ sketches and KLL quantile sketches as `BYTES` values that can be initialized, merged, and extracted later.[^9][^10] ClickHouse has long exposed the same lifecycle shape through aggregate-state combinators such as `uniqState` and `uniqMerge`. DuckDB covers the one-shot approximate aggregate surface with `approx_count_distinct`, `approx_quantile`, and `approx_top_k`.[^11][^12]
 
 That competitive context makes the benchmark question sharper. BenchBox needs to show where Databricks now overlaps with existing platform capabilities, where the SQL shapes still differ, and which parts of the lifecycle are actually measurable across platforms.
 
@@ -132,19 +139,13 @@ Approximate analytics has two operational phases: aggregate functions and sketch
 
 The aggregate functions phase is a query like "give me an approximate distinct count now." Most analytical platforms have something here. Some use HLL, some use T-Digest, some use platform-specific Top-K accumulators, and a few still rely on SQL transpilation or hand-written variants. This is the path `read_primitives` measures.
 
-The persisted-state phase asks a different question: can the platform build sketches over partitions, store them, merge them later, and extract answers cheaply? This is the path `write_primitives` measures. The platform matrix narrows at this tier, and the portability story becomes more specific. Some platforms expose Apache DataSketches-family artifacts. Some expose native aggregate-state combinators. Some expose HLL only. A few still do not expose any sketch lifecycle at all.
-
-Verification language has to be precise.
-
-BenchBox can document catalog coverage across different platforms, but that is not the same as saying every platform has been verified live for every family. Local `read_primitives` paths are straightforward to exercise. chDB gives us a local ClickHouse-shaped path for the native `-State` and `-Merge` lifecycle. DuckDB KLL, CPC, and REQ work against the installed community extension, while DuckDB Theta and frequent-items are blocked by community-extension drift until we pin, vendor, or substitute the missing families. Snowflake, BigQuery, Databricks, and Redshift lifecycle runs remain credential-gated.
-
-That distinction matters more than a support badge.
+The persisted-state phase asks a different question: can the platform build sketches over partitions, store them, merge them later, and extract answers cheaply? This is the path `write_primitives` measures. The platform matrix narrows at this tier, and the portability story becomes more specific. Some platforms expose Apache DataSketches-family artifacts. Some expose native aggregate-state combinators. Some expose HLL only. A few still do not expose any sketch lifecycle at all. (See the catalog-versus-live note in the introduction for what BenchBox can claim today.)
 
 DataFrame support needs its own accounting. Polars, PySpark, DataFusion, pandas, Dask, Modin, and cuDF do not expose the same sketch surfaces. On the read side, some rows are sketch-backed and some rows fall back to exact aggregates. A pandas exact `nunique` timing is not semantically comparable to a PySpark HLL timing. On the write side, PySpark now has a CLI-runnable HLL persist-merge path; Top-K is guarded by runtime support; the other DataFrame platforms still lack a comparable sketch persistence API.
 
 The pattern is reusable beyond sketches. Any feature announced as "stored, mergeable, requeryable" needs an execution-model check before we start writing parity tables. Vector indexes, materialized aggregates, search indexes, incremental materialized views, and ML feature stores all have the same shape. The question is not only "what function name maps to what?" It is "does this benchmark have the phases needed to test the claim?"
 
-## Try It Yourself
+## Try it yourself
 
 Run the one-shot approximate aggregate path first:
 
@@ -201,9 +202,9 @@ The public reference docs are the best place to start:
 - [`read_primitives` approximate aggregate functions](https://github.com/joeharris76/BenchBox/blob/develop/docs/benchmarks/read-primitives-approximate-functions.md)[^13]
 - [`write_primitives` sketch persistence operations](https://github.com/joeharris76/BenchBox/blob/develop/docs/benchmarks/write-primitives-sketch-functions.md)[^14]
 
-## Test Environment
+## Test environment
 
-This draft was reviewed against `origin/develop` at commit `46b90052f`, with package version `0.2.1` in `pyproject.toml`.
+This draft was reviewed against `origin/develop` at commit `c48c299b4`. The v0.3.0 version bump has not yet landed on `develop`, so `pyproject.toml` still reads `0.2.1`; the public release will pin against the bump commit.
 
 Evidence status for this draft:
 
@@ -247,7 +248,7 @@ The support matrix separates catalog support from live verification. Cloud verif
 
 [^9]: BigQuery, [HyperLogLog++ functions](https://cloud.google.com/bigquery/docs/reference/standard-sql/hll_functions), accessed May 18, 2026.
 
-[^10]: BigQuery, [KLL quantile functions](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/kll_functions), accessed May 18, 2026.
+[^10]: BigQuery, [KLL quantile functions](https://cloud.google.com/bigquery/docs/reference/standard-sql/kll_functions), accessed May 18, 2026.
 
 [^11]: ClickHouse, ["Using Aggregate Combinators in ClickHouse"](https://clickhouse.com/blog/aggregate-functions-combinators-in-clickhouse-for-arrays-maps-and-states), accessed May 18, 2026.
 
