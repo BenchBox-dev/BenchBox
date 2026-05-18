@@ -25,6 +25,8 @@ from click.testing import CliRunner
 # versions.
 __import__("benchbox.cli.commands.run")
 _run_module = _sys.modules["benchbox.cli.commands.run"]
+__import__("benchbox.cli.commands.publish")
+_publish_module = _sys.modules["benchbox.cli.commands.publish"]
 
 pytestmark = [
     pytest.mark.unit,
@@ -359,7 +361,7 @@ class TestDirectHandleResult:
             ) as export,
             patch.object(_run_module, "_render_post_run_charts") as render_charts,
             patch("benchbox.cli.preferences.save_last_run_config") as save_last_run,
-            patch("benchbox.cli.commands.publish.publish_bundle") as publish_bundle,
+            patch.object(_publish_module, "publish_bundle") as publish_bundle,
             pytest.raises(SystemExit),
         ):
             _direct_handle_result(settings, result, MagicMock(), benchmark_config)
