@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from _project.scripts.explorer_pipeline.models import BenchmarkSummary, PlatformRow, RankingConfig
 from _project.scripts.explorer_pipeline.ranking import rank_platforms
 

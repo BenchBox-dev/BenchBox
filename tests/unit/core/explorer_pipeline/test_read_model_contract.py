@@ -20,7 +20,6 @@ import math
 from pathlib import Path
 
 import pytest
-
 from _project.scripts.explorer_pipeline.models import (
     RANKING_ELIGIBLE_TRUST_LABELS,
     RANKING_ELIGIBLE_VISIBILITIES,
@@ -37,6 +36,7 @@ from _project.scripts.explorer_pipeline.transformer import (
     BundleTransformer,
     _query_display_ms,
 )
+
 from tests.unit.core.explorer_pipeline.conftest import MINIMAL_BUNDLE
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]

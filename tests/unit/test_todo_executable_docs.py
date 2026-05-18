@@ -15,6 +15,9 @@ pytestmark = [
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
+if not (REPO_ROOT / "_project").exists():
+    pytest.skip("TODO executable documentation checks require _project/", allow_module_level=True)
+
 
 def _load_yaml(path: Path) -> dict[str, Any]:
     data = yaml.safe_load(path.read_text(encoding="utf-8"))

@@ -7,9 +7,9 @@ import json
 from pathlib import Path
 
 import pytest
-
 from _project.scripts.explorer_pipeline.models import DetailResult, ManifestEntry
 from _project.scripts.explorer_pipeline.transformer import BundleTransformer
+
 from benchbox.core.cost.models import DeploymentMetadata, NormalizedCost
 from tests.unit.core.explorer_pipeline.conftest import MINIMAL_BUNDLE
 
