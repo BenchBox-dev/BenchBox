@@ -50,6 +50,56 @@ pytest_plugins = [
     "tests.fixtures.utility_fixtures",
 ]
 
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_PROJECT_DIR = _REPO_ROOT / "_project"
+_RESULTS_EXPLORER_DIR = _REPO_ROOT / "results-explorer"
+_PROJECT_DEPENDENT_TEST_FILES = {
+    Path("tests/unit/cli/test_explorer_build_contract.py"),
+    Path("tests/unit/core/test_platform_labels.py"),
+    Path("tests/unit/test_public_site_theme_contract.py"),
+    Path("tests/unit/test_todo_executable_docs.py"),
+    Path("tests/unit/scripts/test_blind_spot_tools.py"),
+    Path("tests/unit/scripts/test_build_joinorder_data.py"),
+    Path("tests/unit/scripts/test_pr_review_followups.py"),
+    Path("tests/unit/scripts/test_reference_usage_audit.py"),
+    Path("tests/unit/scripts/test_scan_explorer_stale_theme.py"),
+    Path("tests/unit/scripts/test_scan_explorer_tokens.py"),
+    Path("tests/unit/scripts/test_skill_sync_lock_audit.py"),
+    Path("tests/unit/scripts/test_validate_todo.py"),
+}
+_PROJECT_DEPENDENT_TEST_DIRS = {
+    Path("tests/unit/core/explorer_pipeline"),
+}
+_RESULTS_EXPLORER_DEPENDENT_TEST_FILES = {
+    Path("tests/uat/test_explorer_smoke.py"),
+    Path("tests/unit/test_site_header_parity.py"),
+    Path("tests/unit/test_sync_results_workflow.py"),
+}
+_RESULTS_EXPLORER_DEPENDENT_TEST_DIRS = {
+    Path("tests/unit/explorer"),
+}
+
+
+def pytest_ignore_collect(collection_path: Path, config: pytest.Config) -> bool:
+    """Skip dev-project tests when the curated release branch omits dev trees."""
+    try:
+        relative = collection_path.relative_to(_REPO_ROOT)
+    except ValueError:
+        return False
+
+    if not _PROJECT_DIR.exists():
+        if relative in _PROJECT_DEPENDENT_TEST_FILES:
+            return True
+        if any(relative == test_dir or test_dir in relative.parents for test_dir in _PROJECT_DEPENDENT_TEST_DIRS):
+            return True
+
+    if not _RESULTS_EXPLORER_DIR.exists() and relative in _RESULTS_EXPLORER_DEPENDENT_TEST_FILES:
+        return True
+    return (
+        any(relative == test_dir or test_dir in relative.parents for test_dir in _RESULTS_EXPLORER_DEPENDENT_TEST_DIRS)
+        and not _RESULTS_EXPLORER_DIR.exists()
+    )
+
 
 @pytest.fixture
 def joinorder_canonical_tiny(tmp_path: Path) -> Path:

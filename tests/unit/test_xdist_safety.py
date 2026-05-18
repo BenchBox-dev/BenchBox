@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-import pytest
-
 import _benchbox_pytest_xdist_safety as safety_plugin
+import pytest
 
 pytestmark = [
     pytest.mark.unit,

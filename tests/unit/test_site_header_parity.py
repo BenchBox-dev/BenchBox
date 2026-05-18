@@ -13,6 +13,9 @@ pytestmark = [
 
 ROOT = Path(__file__).resolve().parents[2]
 
+if not (ROOT / "results-explorer").exists():
+    pytest.skip("global header parity checks require results-explorer/", allow_module_level=True)
+
 EXPECTED_LINKS = [
     ("Home", "https://benchbox.dev/"),
     ("Docs", "https://benchbox.dev/docs/"),
