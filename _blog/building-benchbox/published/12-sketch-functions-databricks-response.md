@@ -22,6 +22,8 @@ The current `develop` branch also adds ClickHouse-native lifecycle coverage, Duc
 
 ---
 
+![Terminal screenshot of the BenchBox write_primitives sketch lifecycle on ClickHouse Local, showing the eight sketch operations (DDL create, three inserts, three merges, DDL drop) with per-operation latencies rendered as a horizontal bar chart](../images/sketch_lifecycle_clickhouse.png)
+
 ## Introduction
 
 A support matrix would have been the obvious first response to Databricks' April 29, 2026 sketch announcement.[^1]
