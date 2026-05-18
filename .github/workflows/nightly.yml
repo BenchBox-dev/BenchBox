@@ -240,30 +240,48 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Detect results explorer
+        id: explorer
+        shell: bash
+        run: |
+          if [ -f results-explorer/package.json ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "results-explorer is absent; skipping explorer parity."
+          fi
+
       - name: Set up Python
+        if: steps.explorer.outputs.present == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
       - name: Install uv
+        if: steps.explorer.outputs.present == 'true'
         uses: astral-sh/setup-uv@v4
 
       - name: Set up Node.js
+        if: steps.explorer.outputs.present == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
       - name: Install Python dependencies
+        if: steps.explorer.outputs.present == 'true'
         run: uv sync --group dev
 
       - name: Install Node dependencies
+        if: steps.explorer.outputs.present == 'true'
         run: npm ci
         working-directory: results-explorer
 
       - name: Verify parity fixtures match Python source
+        if: steps.explorer.outputs.present == 'true'
         run: make parity-check
 
       - name: Run Vitest parity suite
+        if: steps.explorer.outputs.present == 'true'
         run: npm test -- --reporter=verbose
         working-directory: results-explorer
 

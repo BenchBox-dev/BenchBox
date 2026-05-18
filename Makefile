@@ -744,9 +744,11 @@ run-test:
 # Do NOT invoke from the legacy private clone — it has no `origin` remote.
 #
 # Flow: develop -> v$(VERSION) -> (squash) main -> tag main -> release.yml publishes
-#   develop is intentionally NOT modified post-release. dev-only paths
-#   (_project/, _blog/, AGENTS.md, etc.) live on develop and are removed
-#   from the release branch by release-cut's curation step.
+#   develop is intentionally NOT modified post-release. dev-only paths and
+#   deferred release surfaces (_project/, _blog/, results explorer, AGENTS.md,
+#   etc.) live on develop and are removed from the release branch by
+#   release-cut's curation step. landing/ and docs/blog/ stay in the release
+#   tree.
 #
 # See docs/operations/release-guide.md and _project/decisions/single-repo-migration.md.
 
@@ -757,7 +759,7 @@ run-test:
 #   2. On v$(VERSION): bump version sources (scripts/update_version.py).
 #   3. On v$(VERSION): generate CHANGELOG.md entry.
 #   4. $EDITOR opens CHANGELOG.md for hand-curation (skipped if EDITOR unset).
-#   5. Curate: git rm dev-only paths (per A3 in single-repo-migration.md).
+#   5. Curate: git rm dev-only/deferred paths (per A3 in single-repo-migration.md).
 #   6. Commit "Release v$(VERSION)" (bump + changelog + curation in one squash-friendly commit).
 #   7. Push, open PR vs main.
 #   8. Sweep stale v* branches on origin (option-c lifecycle).
@@ -769,8 +771,8 @@ release-cut:
 	@[ -z "$$(git status --porcelain)" ] || (echo "Error: working tree must be clean" && exit 1)
 	git fetch origin
 	git checkout -b v$(VERSION) develop
-	uv run python scripts/update_version.py --version $(VERSION) --update-pyproject
-	uv run python scripts/generate_changelog_entry.py --version $(VERSION)
+	uv run -- python scripts/update_version.py --version $(VERSION) --update-pyproject
+	uv run -- python scripts/generate_changelog_entry.py --version $(VERSION)
 	@if [ -n "$$EDITOR" ]; then \
 		echo "==> Opening CHANGELOG.md in $$EDITOR for hand-curation"; \
 		$$EDITOR CHANGELOG.md; \
@@ -783,8 +785,9 @@ release-cut:
 	@# before git add ensures untracked files inside _project/ etc. don't end up
 	@# staged-for-add by a later git add.
 	@# Curation list: A3 of _project/decisions/single-repo-migration.md.
-	-git rm -rf _project _blog .claude .codex .gemini
+	-git rm -rf _project _blog results-data results-explorer .claude .codex .gemini
 	-git rm -f .pre-commit-config.yaml _benchbox_pytest_xdist_safety.py todo.config.yaml skill-sync.yaml skill-sync.lock .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md
+	-git rm -f .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml
 	@# Stage only the files update_version.py + generate_changelog_entry.py write.
 	@# Explicit list (not `git add -A`) to avoid staging build/cache artifacts.
 	git add pyproject.toml benchbox/__init__.py landing/index.html README.md docs/README.md benchbox/utils/VERSION_MANAGEMENT.md CHANGELOG.md
