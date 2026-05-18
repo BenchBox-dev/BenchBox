@@ -7,161 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Breaking
-
-- `joinorder` now uses the canonical IMDb 2013 Parquet archive at sf=1
-  only. First run downloads and verifies the archive into
-  `benchmark_runs/datagen/joinorder_sf1/`; air-gapped users can
-  pre-populate that directory under `BENCHBOX_OUTPUT_DIR`. (#289)
-- The previous uniformly-random synthetic generator is now
-  `joinorder_synthetic` and is internal-only, hidden from the public
-  result explorer surface.
-- Existing `joinorder_sf1_*` published-result bundles in the develop
-  tree have been re-tagged as `joinorder_synthetic_sf1_*` to reflect
-  their synthetic provenance.
-
-### Added
-
-- Canonical Join Order Benchmark coverage for all 113 JOB SQL queries,
-  with reference cardinality checks and tiny-fixture predicate oracles.
-- Per-benchmark `DATA-LICENSE.md` provenance notes for real-world
-  benchmark datasets.
-- Result bundle dataset identity fields for benchmarks backed by a
-  data manifest: `dataset_version`, `manifest_hash`, and
-  `data_archive_hash`.
-
-### Verified
-
-- **write_primitives sketch (sweep variants)** — live SF=0.01 measurement
-  of KLL `k=100` and `k=1000` sweep variants on DuckDB 1.3.2 +
-  datasketches extension `2e38607`. Observed merged sketch sizes:
-  `kll_k100` 2508 bytes (within `[500, 5000]`), `kll_k1000` 21220 bytes
-  (within `[5000, 40000]`). Replaces the prior "synthetic test" comments
-  with real datasketches build numbers. Top-K (`lgmm8`/`lgmm10`) and
-  Theta (`lgk10`/`lgk14`) sweep bounds remain spec-derived because
-  `datasketch_frequent_items` and `datasketch_theta` are not exported
-  by the current DuckDB community datasketches build — drift tracked in
-  `_project/blind-spots/2026-05-02-155524-duckdb-datasketches-extension-drift.md`.
-  Comments updated to make the spec-vs-measured distinction explicit.
-- **write_primitives sketch** — live `benchbox run --platform clickhouse-local`
-  smoke test against the eight ClickHouse-native sketch ops at SF=0.01
-  (8/8 pass, all scalar-bounds and `*_storage_size_clickhouse` validations
-  pass). Replaces the original chDB-only spike with a real adapter-driven
-  run. Observed merged state sizes on clickhouse-local 25.4.2: theta
-  60003 bytes, KLL 4314 bytes, topK 317 bytes — all inside existing bounds.
-  Inline tolerance comments and `docs/benchmarks/write-primitives-sketch-functions.md`
-  updated with the live numbers and a "Try it locally" snippet so new users
-  can reproduce without cloud creds.
+## [0.3.0] - 2026-05-16
 
 ### New
 
-- **write_primitives DataFrame** — PySpark sketch persist+merge ops
-  available via the benchbox CLI:
-  `sketch_df_hll_persist_merge` (Spark 3.5+) and
-  `sketch_df_topk_persist_merge` (Spark 4.1+, requires
-  `F.approx_top_k_*` symbols which the current 4.1.1 wheel does not
-  expose — the op skips cleanly on those runtimes via
-  `pyspark_supports_approx_top_k`). Catalog ops carry a new
-  `aggregate_state` block that the dispatch fork in
-  `WritePrimitivesBenchmark._execute_dataframe_sql_parity_workload`
-  routes through `manager.execute_aggregate_persist` /
-  `manager.execute_aggregate_merge` instead of the DuckDB parity
-  path. HLL verified live at SF=0.01: aggregate_value=14852
-  (true distinct l_orderkeys = 15000, ~1% RSE, inside `[14250, 15750]`).
-  Run via:
-  `uv run -- benchbox run --platform pyspark --benchmark write_primitives --scale 0.01 --queries sketch_df_hll_persist_merge`.
+- **Prompt composer page** - Added `/prompts/`, a page that turns benchmark
+  choices into copyable prompts for coding agents. It covers platform,
+  benchmark, scale, CLI, and MCP choices with safe defaults for local and
+  cloud runs.
+- **Sketch benchmarking coverage** - Added `write_primitives` workloads for
+  DataSketches Theta, KLL, Top-K, DuckDB CPC/REQ, ClickHouse aggregate-state
+  sketches, and Redshift HLL. The new workloads cover persist, merge, requery,
+  storage-size validation, and parameter sweeps where supported.
+- **Approximate read coverage** - Added `read_primitives` queries for
+  approximate distinct counts, approximate quantiles, and approximate top-k,
+  plus DataFrame implementations where supported.
 
-- **write_primitives sketch** — DuckDB-only parameter-sweep variants
-  (`sketch_query_*_{lgk10,lgk14,k100,k1000,lgmm8,lgmm10}`) so users can
-  measure the size / accuracy / latency tradeoff per sketch family
-  rather than guessing. Theta `lg_k ∈ {10, 14}`, KLL `k ∈ {100, 1000}`,
-  Top-K `lg_max_map_size ∈ {8, 10}`. KLL variants verified end-to-end
-  on the installed datasketches extension (~2KB merged at k=100, ~18KB
-  at k=1000); Theta and frequent-items variants inherit the parent
-  ops' extension-drift status. Cloud-engine sweeps are deferred.
-- **write_primitives DataFrame** — PySpark sketch factory helpers
-  (`make_pyspark_hll_persist_builder` / `make_pyspark_hll_merge_extract`
-  for HLL on Spark 3.5+; `make_pyspark_topk_persist_builder` /
-  `make_pyspark_topk_merge_extract` for top-K on Spark 4.1+, guarded by
-  `pyspark_supports_approx_top_k`). The factories produce the closures
-  expected by `manager.execute_aggregate_persist` / `execute_aggregate_merge`
-  so PySpark sketch persist+merge cycles can run via the architecture-
-  fixes dispatch primitives. KLL is intentionally omitted at the
-  DataFrame layer — Spark's KLL surface is SQL-UDAF-only today.
-  CLI integration (`benchbox run --queries sketch_df_*`) is a tracked
-  follow-up; today the helpers are usable via direct manager calls.
-- **write_primitives sketch** — DuckDB-only CPC and REQ sketch families.
-  CPC (Compressed Probabilistic Counting) is an HLL-family alternative
-  with dramatically smaller serialized state (~1.2KB merged vs Theta's
-  ~16KB at SF=0.01) at the cost of slower update/merge throughput. REQ
-  (Relative Error Quantile) is an alternative quantile sketch with
-  relative-error guarantees vs KLL's normalized-rank error. 8 new ops
-  total: `sketch_cpc_{create,insert,query_union_merge,drop}` and
-  `sketch_req_{create,insert,query_quantile_merge,drop}`. Cloud engines
-  skip cleanly (no native CPC/REQ surface today). Storage-cost
-  side-by-side against Theta and KLL documented in
-  `docs/benchmarks/write-primitives-sketch-functions.md`.
-- **write_primitives sketch** — ClickHouse-native variants for the eight
-  sketch ops using `uniqState`/`uniqMerge`,
-  `quantileTDigestState`/`quantileTDigestMerge(0.5)`, and
-  `topKState(8)`/`topKMerge(8)` over `AggregateFunction(...)` columns.
-  ClickHouse goes from 0/8 (all skipped) to 8/8 supported, completing
-  the cross-engine sketch matrix for the persist+merge+requery story.
-- **write_primitives sketch** — add storage-size validation
-  (`*_storage_size`) on the three ★ headline ops alongside the existing
-  scalar-bounds validation. Per-engine SQL via the new
-  `validation_query.platform_overrides`: `octet_length(<sketch>)` on
-  DuckDB, `length(toString(<agg>MergeState(...)))` on ClickHouse. Bounds
-  span both engines' observed merged-state sizes (theta ~16KB DuckDB /
-  ~60KB ClickHouse, KLL ~3KB / ~3.8KB, topK ~600B / ~294B). Surfaces the
-  cost-per-byte side of the persistence-vs-recompute tradeoff.
-- **write_primitives validation** — `ValidationQuery.platform_overrides`
-  schema extension: each validation query can declare per-platform SQL
-  bodies (or explicit `null` skip). Mirrors operation-level
-  `platform_overrides` and unblocks engine-specific sketch validation
-  without forcing dialect probes into a single SQL body. See
-  `docs/benchmarks/write-primitives-sketch-functions.md`.
-- **write_primitives DataFrame** — `WriteOperationType.AGGREGATE_PERSIST`
-  and `WriteOperationType.AGGREGATE_MERGE` op types with capability flags
-  (`supports_aggregate_persist`/`supports_aggregate_merge`) and dispatch
-  methods (`execute_aggregate_persist`/`execute_aggregate_merge`).
-  PySpark presets enable both; concrete sketch wiring is deferred to a
-  follow-up (write-primitives-sketch-pyspark-dataframe-surface).
-- **read_primitives** — add approximate-aggregate query coverage
-  (`approx_count_distinct_*`, `approx_quantile*`, `approx_top_k_*`).
-  `intrinsic_appx_median` renamed to `approx_quantile_groupby` (its
-  prior `PERCENTILE_CONT` body was exact, not approximate). Cross-engine
-  function reference: `docs/benchmarks/read-primitives-approximate-functions.md`.
-- **read_primitives DataFrame** — add `approx_count_distinct_*` impls
-  (sketch-backed on Polars / PySpark / DataFusion; exact fallback on
-  Pandas / Modin / cuDF / Dask). `approx_quantile_groupby` now uses
-  sketch-backed quantile on PySpark (`percentile_approx`) and
-  DataFusion (`approx_percentile_cont`) via the existing
-  `UnifiedExpr.quantile()` dispatch (was unintentionally exact-via-
-  fallback before). `SKIP_FOR_DATAFRAME` shrinks from 7 to 5;
-  `approx_quantiles_array` and `approx_top_k_lineitem` remain
-  PySpark-only at the DataFrame layer with explicit rationale.
-  Cross-platform DataFrame coverage matrix in
-  `docs/benchmarks/read-primitives-approximate-functions.md`.
-- **read_primitives** — add Redshift variant for `approx_quantile_groupby`
-  using `APPROXIMATE PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY x)`.
-  Was previously skipped because sqlglot's Redshift dialect parser
-  rejects the syntax; the static catalog linter now allowlists this
-  specific parse failure while runtime execution sends the SQL as-is.
-- **write_primitives** — add `sketch` category exercising DataSketches
-  Theta / KLL / Top-K persist + merge + requery on Databricks,
-  Snowflake, BigQuery, and DuckDB-with-extension. Three ★ headline
-  ops measure the millisecond-merge claim end-to-end with
-  tolerance-based scalar validation. Cross-engine reference:
-  `docs/benchmarks/write-primitives-sketch-functions.md`.
-- **write_primitives sketch** — add Redshift HLL coverage on the four
-  HLL-applicable sketch ops (DDL, theta-style insert, theta-style
-  merge, drop) using `HLL_CREATE_SKETCH` / `HLL_COMBINE` /
-  `HLL_CARDINALITY` and `HLLSKETCH`-typed columns with `DISTSTYLE EVEN`.
-  KLL and Top-K ops stay skipped — Redshift has no equivalent. Activates
-  the previously-unused `_BINARY_TYPE_BY_DIALECT[redshift] = HLLSKETCH`
-  path. Cloud verification deferred to the
-  `write-primitives-sketch-cloud-verification` follow-up.
+### Added
+
+- **Complete JoinOrder query set** - Added all 113 Join Order Benchmark SQL
+  queries, reference cardinalities, and fixture tests for query predicates.
+- **Benchmark data provenance** - Published result bundles can now record the
+  dataset version, manifest hash, and data archive hash for benchmark datasets.
+- **PySpark sketch DataFrame support** - Added aggregate persist/merge
+  operation types, PySpark capability flags, and PySpark HLL/top-K helpers so
+  sketch workflows can run through DataFrame managers.
+- **Per-platform validation SQL** - Added `ValidationQuery.platform_overrides`
+  so validation queries can declare engine-specific SQL bodies or explicit
+  skips.
+
+### Fixed
+
+- **JoinOrder benchmark correctness** - `joinorder` now uses the real Join
+  Order Benchmark IMDb 2013 dataset. This fixes a user-raised comparability
+  issue where BenchBox-generated data was being used for JoinOrder runs. The
+  benchmark is now limited to scale factor 1 because JOB is a fixed dataset.
+- **Approximate aggregate semantics** - Fixed `read_primitives` approximate
+  query coverage so names and implementations match the work being measured.
+  `intrinsic_appx_median` is now `approx_quantile_groupby`, PySpark and
+  DataFusion use sketch-backed quantile implementations, and Redshift has an
+  `APPROXIMATE PERCENTILE_DISC` variant.
+
+### Changed
+
+- **JoinOrder synthetic data renamed** - The old synthetic JoinOrder generator
+  is now `joinorder_synthetic` and is kept out of the released benchmark list.
+  Existing `joinorder_sf1_*` published-result bundles were re-tagged as
+  `joinorder_synthetic_sf1_*` so they are not confused with results from the
+  real IMDb dataset.
+- **DataFrame approximate coverage is more explicit** - `SKIP_FOR_DATAFRAME`
+  for `read_primitives` shrank from 7 to 5. `approx_quantiles_array` and
+  `approx_top_k_lineitem` remain PySpark-only at the DataFrame layer with
+  documented rationale.
 
 ## [0.2.1] - 2026-04-26
 

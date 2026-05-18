@@ -1,13 +1,14 @@
 ---
-title: "BenchBox v0.3.0: JoinOrder fix, approximate analytics, and agent prompt composer"
+blogpost: true
+status: published
+date: May 18, 2026
+author: Joe Harris
 series: building-benchbox
 post_number: 13
 type: release-notes
-tags: [benchbox, release, joinorder, mcp, prompts, sketch-functions, read-primitives, write-primitives]
+tags: benchbox, release, joinorder, mcp, prompts, sketch-functions, read-primitives, write-primitives
 meta_description: "BenchBox v0.3.0 moves JoinOrder to real IMDb JOB data, adds 113 queries, expands sketch coverage, and adds a prompt composer for safer local first runs."
-status: draft
 ---
-
 # BenchBox v0.3.0: JoinOrder fix, approximate analytics, and agent prompt composer
 
 **TL;DR**: The new [/prompts/](https://benchbox.dev/prompts/) page composes benchmarking instructions for coding agents. `joinorder` now uses the real IMDb 2013 Join Order Benchmark dataset at scale factor 1, replacing synthetic data. BenchBox also expands approximate-aggregate and sketch-lifecycle coverage in the primitives benchmarks.
