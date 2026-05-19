@@ -15,6 +15,7 @@ from benchbox.core.results.loader import find_latest_result
 from benchbox.core.results.models import BenchmarkResults
 from benchbox.core.results.normalizer import normalize_result_dict
 from benchbox.core.visualization.exceptions import VisualizationError
+from benchbox.core.visualization.utils import is_power_run_result
 
 logger = logging.getLogger(__name__)
 
@@ -277,7 +278,7 @@ class ResultPlotter:
     # ---------------------------------------------------------------- Utilities
     def _suggest_chart_types(self) -> list[str]:
         types = ["performance_bar"]
-        if any(result.power_at_size is not None for result in self.results):
+        if any(result.power_at_size is not None or is_power_run_result(result) for result in self.results):
             types.append("power_bar")
         if any(result.cost_total is not None for result in self.results):
             types.append("cost_scatter")
