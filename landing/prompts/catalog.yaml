@@ -110,7 +110,7 @@ templates:
       uv run benchbox profile > <bundle-dir>/_provenance/system.txt
       echo "<exact command line used>" > <bundle-dir>/_provenance/command.txt
     force_datagen_footer: "If the load phase fails partway, re-run with `--force datagen` appended."
-    capture_plans_footer: "To capture EXPLAIN plans, add `--capture-plans` to the live command and inspect with `benchbox show-plan --run <result-json> --query-id Q1`."
+    capture_plans_footer: "To capture EXPLAIN plans, insert `--capture-plans` in the benchbox command before `2>&1 | tee ...` (for example: `set -o pipefail; uv run benchbox run ... --capture-plans 2>&1 | tee <log>`), then inspect with `benchbox show-plan --run <result-json> --query-id Q1`."
 
 # References to existing MCP surfaces. The generator validates each name
 # resolves to a real tool/prompt in benchbox/mcp/.

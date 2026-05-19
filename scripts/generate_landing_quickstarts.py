@@ -511,6 +511,8 @@ def _validate_provenance_templates(provenance_tpl: str, capture_plans_footer: st
         errors.append("templates.cli.provenance_snapshot must call benchbox profile")
     if "--capture-plans" not in capture_plans_footer:
         errors.append("templates.cli.capture_plans_footer must mention --capture-plans")
+    if "before `2>&1 | tee" not in capture_plans_footer:
+        errors.append("templates.cli.capture_plans_footer must say --capture-plans goes before the tee pipeline")
     if "benchbox show-plan" not in capture_plans_footer:
         errors.append("templates.cli.capture_plans_footer must mention benchbox show-plan")
     if "--run" not in capture_plans_footer or "--query-id" not in capture_plans_footer:

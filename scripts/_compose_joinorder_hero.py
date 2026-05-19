@@ -21,9 +21,7 @@ except ImportError:
 
 ROOT = Path(__file__).resolve().parent.parent
 MANIFEST = ROOT / "benchbox" / "core" / "joinorder" / "data_manifest.toml"
-JSON_PATH = Path(
-    "/Users/joe/Developer/BenchBox/benchmark_runs/results/joinorder_sf1_duckdb_sql_20260518_161132_e392ddcb.json"
-)
+JSON_PATH = ROOT / "benchmark_runs" / "results" / "joinorder_sf1_duckdb_sql_20260518_161132_e392ddcb.json"
 
 ESC = "\x1b"
 RESET = f"{ESC}[0m"
