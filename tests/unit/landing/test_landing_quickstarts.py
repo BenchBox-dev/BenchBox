@@ -588,6 +588,8 @@ def test_mcp_prompt_calls_analyze_results_and_system_profile():
     prompts_js = PROMPTS_JS_PATH.read_text(encoding="utf-8")
     assert "analysis_tool" in prompts_js
     assert "mcp_metadata.result_file" in prompts_js
+    assert "only the filename component from each live response's `mcp_metadata.result_file`" in prompts_js
+    assert "`mcp_metadata.result_file` paths from both live responses" not in prompts_js
     assert "systemProfileTool" in prompts_js
     assert "system_profile_tool" in prompts_js
 

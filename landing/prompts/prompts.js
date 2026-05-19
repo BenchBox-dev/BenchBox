@@ -446,7 +446,7 @@
     function mcpAnalysisStep(state, platform) {
         var analysisTool = catalog.mcp.analysis_tool || "analyze_results";
         if (state.goal === "compare") {
-            return "Use the `" + analysisTool + "(analysis=\"compare\", file1=\"<first-result-json>\", file2=\"<second-result-json>\")` tool with the `mcp_metadata.result_file` paths from both live responses; summarize total runtime, per-query timing, and failures.";
+            return "Use the `" + analysisTool + "(analysis=\"compare\", file1=\"<first-result-json>\", file2=\"<second-result-json>\")` tool with only the filename component from each live response's `mcp_metadata.result_file`; summarize total runtime, per-query timing, and failures.";
         }
         return "Summarize total runtime, per-query timings, and failures from the MCP tool result payload. If you need a result rollup, call `" + analysisTool + "(analysis=\"aggregate\", platform=\"" + platform + "\", benchmark=\"" + state.benchmark + "\", limit=1)`.";
     }
