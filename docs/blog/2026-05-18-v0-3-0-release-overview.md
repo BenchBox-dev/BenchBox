@@ -11,13 +11,13 @@ meta_description: "BenchBox v0.3.0 moves JoinOrder to real IMDb JOB data, adds 1
 ---
 # BenchBox v0.3.0: JoinOrder fix, approximate analytics, and agent prompt composer
 
-**TL;DR**: The new [/prompts/](https://benchbox.dev/prompts/) page composes benchmarking instructions for coding agents. `joinorder` now uses the real IMDb 2013 Join Order Benchmark dataset at scale factor 1, replacing synthetic data. BenchBox also expands approximate-aggregate and sketch-lifecycle coverage in the primitives benchmarks.
+**TL;DR**: The new `/prompts/` page composes benchmarking instructions for coding agents. `joinorder` now uses the real IMDb 2013 Join Order Benchmark dataset at scale factor 1, replacing synthetic data. BenchBox also expands approximate-aggregate and sketch-lifecycle coverage in the primitives benchmarks.
 
 ---
 
 ![Screenshot of the BenchBox /prompts/ landing page configured for a local DuckDB TPC-H quickstart at scale 0.01, showing the goal/surface/interface/deployment/platform/benchmark/scale selectors and a generated copy-paste agent prompt below them](./images/prompts_page.png)
 
-The headline addition is a new [`/prompts/`](https://benchbox.dev/prompts/) page on the landing site. It composes copyable instructions for coding agents so that a first BenchBox run, local or cloud, lands with safer defaults and the right setup steps in the right order. No new runtime command, no MCP tool change, no JSON catalog: the page is a prompt composer over BenchBox's existing CLI and MCP surfaces.
+The headline addition is a new `/prompts/` page on the landing site. It composes copyable instructions for coding agents so that a first BenchBox run, local or cloud, lands with safer defaults and the right setup steps in the right order. No new runtime command, no MCP tool change, no JSON catalog: the page is a prompt composer over BenchBox's existing CLI and MCP surfaces.
 
 The biggest data-contract change is JoinOrder. A community report ([issue #289](https://github.com/joeharris76/BenchBox/issues/289)) flagged that BenchBox's old JoinOrder data was synthetic and did not exercise the real-world correlations that the Join Order Benchmark was designed around. Thanks to `@partychicken` for raising the issue. v0.3.0 fixes this by making `joinorder` use the real IMDb 2013 JOB dataset at scale factor 1. The companion post, [Reworking JoinOrder around the IMDb 2013 dataset](./2026-05-18-joinorder-imdb-2013-dataset.md), walks through the data contract, scale-factor decision, and provenance work in detail.
 
@@ -36,7 +36,7 @@ The third theme is approximate analytics. BenchBox now covers more of the path t
 
 ## Create prompts for agent-assisted benchmarking
 
-This release adds a [new prompt composer page](https://benchbox.dev/prompts/) where you can "Instruct a coding agent to use BenchBox."
+This release adds a new prompt composer page where you can "Instruct a coding agent to use BenchBox."
 
 The page allows you to assemble a common first-run workflow and hand it off to your agent. Instead of asking the agent to infer the right BenchBox setup from memory, you can assemble instructions for a workflow that will run a benchmark correctly.
 
