@@ -17,6 +17,8 @@ meta_description: "How a community report led BenchBox to replace generated Join
 
 ---
 
+![Terminal screenshot of a BenchBox joinorder run at scale 1 on DuckDB 1.3.2, showing dataset identity verification (manifest_hash, data_archive_hash, archive_sha256 all checked), 21 canonical Parquet files verified, per-table row counts led by cast_info at 36,244,344 rows, 74,190,187 total rows loaded, and the first six JOB queries (1a–2b) executing with latencies between 7 and 25 ms](./images/joinorder_first_run.png)
+
 On May 9, 2026, GitHub user `@partychicken` filed issue #289 against BenchBox.[^issue-289] The report was about the benchmark contract: BenchBox had a JoinOrder-shaped workload (the schema, queries wired through the framework, and generated data for smoke tests), but the data was not the IMDb dataset used by the Join Order Benchmark papers. With generated data that does not preserve those IMDb correlations, optimizer estimates can appear more accurate because the workload no longer contains the dependency patterns JOB was selected to expose.
 
 v0.3.0 corrects that contract. `joinorder` now identifies the real IMDb 2013 Join Order Benchmark dataset, at one fixed scale. The old generated workload is still useful for development, but it has a different name and is not published JOB evidence. Throughout this post, "canonical" means the reference JOB data contract: the fixed IMDb 2013 dataset and the 113-query workload used by the JOB papers, not any future reduced dataset, generated test fixture, or schema-compatible approximation.
