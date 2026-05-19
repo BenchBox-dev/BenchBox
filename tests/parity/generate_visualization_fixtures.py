@@ -31,7 +31,7 @@ Each function here MUST mirror the TypeScript counterpart exactly:
   computeECDFPoints          → results-explorer/src/lib/chartMath.ts
   computeRankTable           → results-explorer/src/lib/chartMath.ts
   (also: _display_geomean_ms, _compute_percentile in
-   benchbox/core/explorer_pipeline/transformer.py)
+   _project/scripts/explorer_pipeline/transformer.py)
 """
 
 from __future__ import annotations
@@ -155,7 +155,7 @@ def geomean_ms(values: list[float | None]) -> float | None:
 
     exp(mean(log(v) for v in positives))
     Mirrors: results-explorer/src/lib/chartMath.ts geomeanMs
-    Also matches: benchbox/core/explorer_pipeline/transformer.py _display_geomean_ms
+    Also matches: _project/scripts/explorer_pipeline/transformer.py _display_geomean_ms
     """
     valid = [v for v in values if v is not None and v > 0]
     if not valid:
@@ -190,7 +190,7 @@ def platform_percentile_stats(
     """
     PercentileStats from a list of display_ms values.
 
-    Mirrors: benchbox/core/explorer_pipeline/transformer._platform_percentile_stats
+    Mirrors: _project/scripts/explorer_pipeline/transformer._platform_percentile_stats
     """
     positive = [v for v in display_ms_values if v is not None and v > 0]
     if not positive:

@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
@@ -44,6 +45,48 @@ if TYPE_CHECKING:
     from benchbox.core.tuning.interface import TuningColumn
 
 logger = logging.getLogger(__name__)
+
+_MOTHERDUCK_TOKEN_RE = re.compile(r"(motherduck_token=)[^&\s,;)]*", flags=re.IGNORECASE)
+
+
+def _redact_motherduck_token(message: str, token: str | None = None) -> str:
+    """Remove MotherDuck token material from adapter errors."""
+    redacted = message.replace(token, "****") if token else message
+    return _MOTHERDUCK_TOKEN_RE.sub(r"\1****", redacted)
+
+
+def _build_motherduck_config(
+    platform: str,
+    options: dict[str, Any],
+    overrides: dict[str, Any],
+    info: Any,
+) -> Any:
+    """Build the MotherDuck DatabaseConfig.
+
+    The credential setup wizard (`benchbox/platforms/credentials/motherduck.py`)
+    saves a ``database`` field, but the default config builder did not call
+    CredentialManager, so runtime runs always fell back to the adapter's
+    internal default (``benchbox``) regardless of what the wizard captured.
+    Routing MotherDuck through the shared ``build_platform_config`` helper
+    pulls the saved database into ``options["database"]`` so the adapter's
+    ``config.get("database", "benchbox")`` resolves to the wizard value.
+    """
+    from benchbox.platforms.base.config_utils import build_platform_config
+
+    return build_platform_config(
+        platform_type="motherduck",
+        credential_key="motherduck",
+        default_display_name="MotherDuck",
+        default_driver_package="duckdb",
+        platform_fields=[
+            "database",
+            "memory_limit",
+            "token_env_var",
+        ],
+        options=options,
+        overrides=overrides,
+        info=info,
+    )
 
 
 class MotherDuckAdapter(PlatformAdapter):
@@ -132,9 +175,10 @@ class MotherDuckAdapter(PlatformAdapter):
             "benchmark": config.get("benchmark"),
         }
 
-        # Map CLI args to config
-        if config.get("motherduck_database"):
-            adapter_config["database"] = config["motherduck_database"]
+        # Map the legacy argparse-style key and normalized DatabaseConfig key.
+        database = config.get("motherduck_database") or config.get("database")
+        if database:
+            adapter_config["database"] = database
         if config.get("motherduck_token"):
             adapter_config["token"] = config["motherduck_token"]
         if config.get("memory_limit"):
@@ -181,9 +225,10 @@ class MotherDuckAdapter(PlatformAdapter):
             return self.connection
 
         except Exception as e:
-            logger.error(f"Failed to connect to MotherDuck: {e}")
+            safe_error = _redact_motherduck_token(str(e), self.token)
+            logger.error(f"Failed to connect to MotherDuck: {safe_error}")
             raise ConnectionError(
-                f"Failed to connect to MotherDuck: {e}\nCheck your MOTHERDUCK_TOKEN and network connection."
+                f"Failed to connect to MotherDuck: {safe_error}\nCheck your MOTHERDUCK_TOKEN and network connection."
             ) from e
 
     def close_connection(self, connection=None):

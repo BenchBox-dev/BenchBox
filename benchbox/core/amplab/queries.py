@@ -94,7 +94,7 @@ FROM uservisits
 WHERE visitDate BETWEEN '{start_date}' AND '{end_date}'
   AND searchWord LIKE '%{search_term}%'
 GROUP BY sourceIP
-HAVING visit_count > {min_visits}
+HAVING COUNT(*) > {min_visits}
 ORDER BY total_revenue DESC
 LIMIT {limit_rows};
 """
@@ -131,7 +131,7 @@ FROM uservisits
 WHERE visitDate >= '{start_date}'
   AND adRevenue > {min_revenue}
 GROUP BY countryCode, languageCode
-HAVING visit_count > {min_visits}
+HAVING COUNT(*) > {min_visits}
 ORDER BY total_revenue DESC
 LIMIT {limit_rows};
 """
@@ -150,7 +150,7 @@ JOIN rankings r ON uv.destURL = r.pageURL
 WHERE uv.visitDate >= '{start_date}'
   AND r.pageRank > {pagerank_threshold}
 GROUP BY uv.countryCode
-HAVING total_visits > {min_visits}
+HAVING COUNT(*) > {min_visits}
 ORDER BY total_revenue DESC
 LIMIT {limit_rows};
 """

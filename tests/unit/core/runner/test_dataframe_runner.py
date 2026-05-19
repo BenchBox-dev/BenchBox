@@ -261,7 +261,11 @@ class TestRunDataframeBenchmark:
 
         prepared = {"lineitem": tmp_path / "lineitem.parquet"}
 
-        with patch("benchbox.core.runner.dataframe_runner.DataFrameDataLoader") as loader_cls:
+        with (
+            patch("benchbox.core.runner.dataframe_runner.DataFrameDataLoader") as loader_cls,
+            patch("benchbox.core.runner.dataframe_runner.check_sufficient_memory") as mem_check,
+        ):
+            mem_check.return_value = MagicMock(is_safe=True)
             loader = loader_cls.return_value
             loader.prepare_benchmark_data.return_value = prepared
 

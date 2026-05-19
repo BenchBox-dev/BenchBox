@@ -5,6 +5,7 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import logging
 import os
 from unittest.mock import Mock, patch
 
@@ -229,6 +230,88 @@ class TestMotherDuckFromConfig:
         assert adapter.memory_limit == "8GB"
 
 
+class TestMotherDuckConfigBuilder:
+    """w19 regression: the credential wizard saves a `database` field, but the
+    default registry builder did not call CredentialManager, so runtime always
+    fell back to the adapter's internal default (``benchbox``). Routing
+    MotherDuck through ``_build_motherduck_config`` (registered in
+    benchbox/platforms/__init__.py) pulls the wizard-saved database into
+    runtime config so adapters land on the configured database."""
+
+    def test_config_builder_pulls_database_from_credential_manager(self, monkeypatch):
+        from benchbox.platforms.motherduck import _build_motherduck_config
+
+        # Patch CredentialManager to return a wizard-saved database value.
+        class _FakeCredentialManager:
+            def get_platform_credentials(self, key: str):
+                assert key == "motherduck"
+                return {"database": "wizard_saved_db", "token_env_var": "MOTHERDUCK_TOKEN"}
+
+        monkeypatch.setattr(
+            "benchbox.security.credentials.CredentialManager",
+            lambda: _FakeCredentialManager(),
+        )
+
+        config = _build_motherduck_config(
+            "motherduck",
+            options={},
+            overrides={},
+            info=None,
+        )
+
+        assert config.options["database"] == "wizard_saved_db"
+        assert config.options["token_env_var"] == "MOTHERDUCK_TOKEN"
+
+    def test_explicit_cli_database_overrides_credential_value(self, monkeypatch):
+        from benchbox.platforms.motherduck import _build_motherduck_config
+
+        class _FakeCredentialManager:
+            def get_platform_credentials(self, key: str):
+                return {"database": "saved_db"}
+
+        monkeypatch.setattr(
+            "benchbox.security.credentials.CredentialManager",
+            lambda: _FakeCredentialManager(),
+        )
+
+        config = _build_motherduck_config(
+            "motherduck",
+            options={},
+            overrides={"_explicit_platform_options": {"database": "cli_db"}},
+            info=None,
+        )
+
+        assert config.options["database"] == "cli_db"
+
+    def test_wizard_database_reaches_adapter_from_runtime_config(self, monkeypatch):
+        from benchbox.core.platform_config import get_platform_config
+        from benchbox.platforms.motherduck import MotherDuckAdapter, _build_motherduck_config
+
+        class _FakeCredentialManager:
+            def get_platform_credentials(self, key: str):
+                assert key == "motherduck"
+                return {"database": "wizard_saved_db", "token_env_var": "MOTHERDUCK_TOKEN"}
+
+        monkeypatch.setattr(
+            "benchbox.security.credentials.CredentialManager",
+            lambda: _FakeCredentialManager(),
+        )
+        monkeypatch.setenv("MOTHERDUCK_TOKEN", "env-token")
+
+        database_config = _build_motherduck_config(
+            "motherduck",
+            options={},
+            overrides={"benchmark": "tpch", "scale_factor": 0.01},
+            info=None,
+        )
+        runtime_config = get_platform_config(database_config, None, benchmark_name="tpch", scale_factor=0.01)
+
+        adapter = MotherDuckAdapter.from_config(runtime_config)
+
+        assert runtime_config["database"] == "wizard_saved_db"
+        assert adapter.database == "wizard_saved_db"
+
+
 class TestMotherDuckCreateConnection:
     """Test create_connection with a mocked duckdb.connect."""
 
@@ -267,6 +350,26 @@ class TestMotherDuckCreateConnection:
 
         mock_duckdb.connect.assert_not_called()
         assert conn is mock_conn
+
+    def test_create_connection_redacts_token_from_error_and_log(self, caplog):
+        from benchbox.platforms.motherduck import MotherDuckAdapter
+
+        adapter = MotherDuckAdapter(token="secret-token", database="benchbox")
+
+        with (
+            patch("benchbox.platforms.motherduck.duckdb") as mock_duckdb,
+            caplog.at_level(logging.ERROR, logger="benchbox.platforms.motherduck"),
+            pytest.raises(ConnectionError) as exc_info,
+        ):
+            mock_duckdb.connect.side_effect = RuntimeError(
+                "failed to connect to md:benchbox?motherduck_token=secret-token"
+            )
+            adapter.create_connection()
+
+        assert "secret-token" not in str(exc_info.value)
+        assert "secret-token" not in caplog.text
+        assert "motherduck_token=****" in str(exc_info.value)
+        assert "motherduck_token=****" in caplog.text
 
 
 class TestMotherDuckAddCliArguments:

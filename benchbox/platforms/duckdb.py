@@ -334,6 +334,7 @@ def _build_csv_scan_expression(
 ) -> str:
     """Build a ``read_csv()`` scan expression for DuckDB external views."""
     from benchbox.platforms.base.data_loading import (
+        DUCKDB_NO_NULL_CONVERSION_SENTINEL,
         NO_BENCHMARK,
         DataSource,
         escape_sql_string_literal,
@@ -363,8 +364,10 @@ def _build_csv_scan_expression(
         f"header={str(dialect.has_header).lower()}",
         "ignore_errors=true",
     ]
-    if dialect.null_marker is not None:
-        csv_params.append(f"nullstr='{escape_sql_string_literal(dialect.null_marker)}'")
+    null_marker = dialect.null_marker
+    if null_marker is None:
+        null_marker = DUCKDB_NO_NULL_CONVERSION_SENTINEL
+    csv_params.append(f"nullstr='{escape_sql_string_literal(null_marker)}'")
 
     if column_names and not dialect.has_header:
         # Trailing-delimiter probing is only relevant for TPC-style sources where
@@ -869,7 +872,12 @@ class DuckDBAdapter(PlatformAdapter):
                 dialect = resolve_csv_dialect(
                     dialect_source, table_name or file_path.stem, file_path, benchmark_instance
                 )
-                return DuckDBNativeHandler(dialect.delimiter, adapter, benchmark_instance)
+                return DuckDBNativeHandler(
+                    dialect.delimiter,
+                    adapter,
+                    benchmark_instance,
+                    null_marker=dialect.null_marker,
+                )
             elif base_ext == ".parquet":
                 return DuckDBParquetHandler(adapter)
             return None  # Fall back to generic handler

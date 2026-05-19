@@ -13,11 +13,10 @@ from benchbox.core.joinorder.benchmark import JoinOrderBenchmark
 
 
 class JoinOrder(BaseBenchmark):
-    """Join Order Benchmark implementation.
+    """Canonical IMDb 2013 Join Order Benchmark implementation.
 
-    This class provides an implementation of the Join Order Benchmark, including
-    data generation and access to complex join queries for cardinality estimation
-    and join order optimization testing.
+    This class provides access to the canonical JOB data package and complex
+    join queries for cardinality estimation and join-order optimization testing.
 
     Reference: Viktor Leis et al. "How Good Are Query Optimizers, Really?"
     """
@@ -31,8 +30,8 @@ class JoinOrder(BaseBenchmark):
         """Initialize a Join Order Benchmark instance.
 
         Args:
-            scale_factor: Scale factor for the benchmark (1.0 = ~1GB)
-            output_dir: Directory to output generated data files
+            scale_factor: Canonical JoinOrder accepts only 1.0.
+            output_dir: Directory for verified canonical Parquet files.
             **kwargs: Additional implementation-specific options
         """
         super().__init__(scale_factor=scale_factor, output_dir=output_dir, **kwargs)
@@ -42,7 +41,7 @@ class JoinOrder(BaseBenchmark):
         self._impl = JoinOrderBenchmark(scale_factor=scale_factor, output_dir=output_dir, verbose=verbose, **kwargs)
 
     def generate_data(self) -> list[Path]:
-        """Generate Join Order Benchmark data.
+        """Ensure canonical JoinOrder data is downloaded and verified.
 
         Returns:
             A list of paths to the generated data files

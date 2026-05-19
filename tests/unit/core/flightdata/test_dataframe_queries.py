@@ -247,10 +247,16 @@ def polars_ctx():
                 "month": [1, 2, 3, 4, 5, 6, 7, 11, 12, 12],
                 "day_of_month": [1, 2, 3, 4, 26, 6, 4, 24, 24, 31],
                 "day_of_week": [1, 2, 3, 4, 1, 6, 7, 4, 1, 2],
+                "crs_dep_time": [800, 1200, 1400, 900, 1600, 700, 1100, 1500, 800, 1800],
                 "distance": [100.0, 300.0, 750.0, 1500.0, 2500.0, 400.0, 2200.0, 180.0, 900.0, 1200.0],
                 "dep_delay": [0.0, 12.0, 25.0, 45.0, 80.0, 5.0, 0.0, 30.0, 10.0, 15.0],
                 "arr_delay": [0.0, 10.0, 20.0, 30.0, 60.0, 5.0, 0.0, 25.0, 8.0, 5.0],
                 "cancelled": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                "carrier_delay": [0.0, 5.0, 10.0, 0.0, 30.0, 0.0, 0.0, 5.0, 0.0, 0.0],
+                "weather_delay": [0.0, 0.0, 5.0, 10.0, 0.0, 0.0, 0.0, 5.0, 0.0, 0.0],
+                "nas_delay": [0.0, 5.0, 0.0, 10.0, 20.0, 0.0, 0.0, 10.0, 0.0, 0.0],
+                "security_delay": [0.0] * 10,
+                "late_aircraft_delay": [0.0, 0.0, 5.0, 10.0, 10.0, 0.0, 0.0, 5.0, 0.0, 0.0],
             }
         ),
     )
@@ -440,6 +446,21 @@ class TestExpressionImplParity:
         result = holiday_impact_expression_impl(polars_ctx).collect()
         actual = set(result["period"].to_list())
         assert actual.issubset(expected), f"Unexpected holiday labels: {actual - expected}"
+
+    @pytest.mark.parametrize(
+        ("query_func_name", "expected_column"),
+        [
+            ("delay_by_hour_expression_impl", "dep_hour"),
+            ("delay_causes_expression_impl", "total_delayed_flights"),
+            ("time_of_day_expression_impl", "hour_of_day"),
+        ],
+    )
+    def test_expression_queries_used_by_sf1_smoke_execute(self, polars_ctx, query_func_name, expected_column):
+        import benchbox.core.flightdata.dataframe_queries as flight_queries
+
+        result = getattr(flight_queries, query_func_name)(polars_ctx).collect()
+
+        assert expected_column in result.columns
 
 
 class TestBenchmarkDateSync:

@@ -1,0 +1,315 @@
+name: Nightly Validation
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * *'
+
+concurrency:
+  group: nightly-validation-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Full compatibility matrix kept out of routine develop PRs.
+        os: [ubuntu-latest]
+        python-version: ['3.10', '3.12', '3.13']
+        include:
+          - os: macos-latest
+            python-version: '3.12'
+          - os: windows-latest
+            python-version: '3.12'
+          - os: windows-latest
+            python-version: '3.10'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Create virtual environment
+        run: uv venv
+
+      - name: Install dependencies
+        run: |
+          uv sync --group dev
+
+      - name: Run linting
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+          uv run -- python scripts/check_windows_antipatterns.py
+
+      - name: Run type checking
+        run: |
+          uv run ty check
+
+      - name: Run fast tests
+        run: |
+          # -p pytest_cov re-enables coverage plugin (disabled by default in pytest.ini)
+          uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short -p pytest_cov --cov=benchbox --cov-report=xml --cov-report=term-missing --cov-fail-under=70
+
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  check-test-patterns:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Run patch safety check
+        run: uv run -- python scripts/check_patch_safety.py
+
+  security:
+    runs-on: ubuntu-latest
+    env:
+      PIP_AUDIT_IGNORE_VULNS: ""
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: |
+          uv sync --group dev
+
+      - name: Run security audit
+        run: |
+          if [ -n "${PIP_AUDIT_IGNORE_VULNS}" ]; then
+            IGNORE_ARGS=$(printf '%s' "${PIP_AUDIT_IGNORE_VULNS}" | tr ',' '\n' | sed '/^$/d;s/^[[:space:]]*//;s/[[:space:]]*$//;/^$/d;s/^/--ignore-vuln /' | tr '\n' ' ')
+            uvx pip-audit ${IGNORE_ARGS}
+          else
+            uvx pip-audit
+          fi
+
+  integration-smoke:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python-version: '3.12'
+          - os: windows-latest
+            python-version: '3.12'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: |
+          uv sync --group dev
+
+      - name: Run integration smoke tests
+        run: |
+          uv run -- python -m pytest tests/integration -m "platform_smoke or (integration and fast)" --tb=short
+
+  integration-table-formats:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: |
+          uv sync --group dev
+
+      - name: Run table-format integration tests
+        run: |
+          uv run -- python -m pytest -q tests/integration/core/data_organization/test_presorted_generation.py -m "requires_table_formats" --tb=short
+
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: |
+          uv sync --group dev
+
+      - name: Run integration tests
+        run: |
+          uv run -- python -m pytest tests/integration -m "integration and not slow and not stress" --tb=short --maxfail=5 --timeout=300
+
+  test-package:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python-version: '3.12'
+          - os: windows-latest
+            python-version: '3.12'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Build package
+        run: |
+          uv build
+
+      - name: Test package installation
+        shell: bash
+        run: |
+          uv venv test-venv
+          uv pip install --python test-venv dist/*.whl
+          uv run --python test-venv python -c "import benchbox; print('Package installation successful')"
+          uv run --python test-venv benchbox --help
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-test-build-dist-${{ matrix.os }}
+          path: dist/
+          retention-days: 7
+
+  parity:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Detect results explorer
+        id: explorer
+        shell: bash
+        run: |
+          if [ -f results-explorer/package.json ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "results-explorer is absent; skipping explorer parity."
+          fi
+
+      - name: Set up Python
+        if: steps.explorer.outputs.present == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        if: steps.explorer.outputs.present == 'true'
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Node.js
+        if: steps.explorer.outputs.present == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Python dependencies
+        if: steps.explorer.outputs.present == 'true'
+        run: uv sync --group dev
+
+      - name: Install Node dependencies
+        if: steps.explorer.outputs.present == 'true'
+        run: npm ci
+        working-directory: results-explorer
+
+      - name: Verify parity fixtures match Python source
+        if: steps.explorer.outputs.present == 'true'
+        run: make parity-check
+
+      - name: Run Vitest parity suite
+        if: steps.explorer.outputs.present == 'true'
+        run: npm test -- --reporter=verbose
+        working-directory: results-explorer
+
+  pyspark-tests:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: |
+          uv sync --group dev
+
+      - name: Run PySpark tests
+        run: |
+          make test-pyspark

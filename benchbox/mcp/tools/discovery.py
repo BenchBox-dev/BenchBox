@@ -18,6 +18,9 @@ from mcp.types import ToolAnnotations
 from benchbox.core.benchmark_registry import (
     BENCHMARK_METADATA,
     get_benchmark_class,
+    get_benchmark_default_scale,
+    get_benchmark_surface,
+    list_public_benchmark_ids,
 )
 from benchbox.mcp.errors import ErrorCode, make_error
 from benchbox.utils.dependencies import get_extra_install_message
@@ -61,7 +64,7 @@ def _collect_benchmark_queries_and_tables(benchmark_lower: str) -> tuple[list[di
     try:
         benchmark_class = get_benchmark_class(benchmark_lower)
         if benchmark_class is not None:
-            bm = benchmark_class(scale_factor=0.01)
+            bm = benchmark_class(scale_factor=get_benchmark_default_scale(benchmark_lower))
             if hasattr(bm, "get_queries"):
                 for qid in bm.get_queries():
                     queries.append({"id": str(qid)})
@@ -74,10 +77,10 @@ def _collect_benchmark_queries_and_tables(benchmark_lower: str) -> tuple[list[di
 
 def _get_benchmark_info_impl(benchmark: str) -> dict[str, Any]:
     benchmark_lower = benchmark.lower()
-    if benchmark_lower not in BENCHMARK_METADATA:
+    if benchmark_lower not in BENCHMARK_METADATA or get_benchmark_surface(benchmark_lower) != "public":
         return {
             "error": f"Benchmark '{benchmark}' not found",
-            "available_benchmarks": list(BENCHMARK_METADATA.keys()),
+            "available_benchmarks": list_public_benchmark_ids(),
         }
 
     meta = BENCHMARK_METADATA[benchmark_lower]
@@ -335,6 +338,8 @@ def _list_benchmarks_impl() -> dict[str, Any]:
     """List all available benchmarks."""
     benchmarks = []
     for name, meta in BENCHMARK_METADATA.items():
+        if get_benchmark_surface(name) != "public":
+            continue
         benchmark_data = {
             "name": name,
             "display_name": meta.get("display_name", name),

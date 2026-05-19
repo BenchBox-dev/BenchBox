@@ -104,7 +104,15 @@ class TestWritePrimitivesCatalog:
         assert len(catalog.operations) > 0
 
     def test_catalog_operations_have_required_fields(self):
-        """Test that all operations have required fields."""
+        """Test that all operations have required fields.
+
+        Aggregate-state ops (DataFrame persist+merge) intentionally carry an
+        empty `write_sql` placeholder because their work is dispatched through
+        the DataFrame manager rather than executed as SQL — they declare an
+        `aggregate_state` block instead. The required-fields contract is
+        therefore "either non-empty write_sql or an aggregate_state spec",
+        not "non-empty write_sql for every op."
+        """
         catalog = load_write_primitives_catalog()
 
         for op_id, operation in catalog.operations.items():
@@ -112,7 +120,8 @@ class TestWritePrimitivesCatalog:
             assert operation.id == op_id
             assert len(operation.category) > 0
             assert len(operation.description) > 0
-            assert len(operation.write_sql) > 0
+            if operation.aggregate_state is None:
+                assert len(operation.write_sql) > 0, f"SQL op '{op_id}' missing write_sql"
 
     def test_catalog_validation_queries(self):
         """Test that validation queries are properly structured."""
@@ -132,8 +141,9 @@ class TestWritePrimitivesCatalog:
         for operation in catalog.operations.values():
             categories.add(operation.category)
 
-        # Should have all 6 categories (transaction category removed)
-        expected_categories = {"insert", "update", "delete", "bulk_load", "merge", "ddl"}
+        # Should have all 7 categories (transaction removed; sketch added for
+        # the DataSketches persist+merge+requery lifecycle).
+        expected_categories = {"insert", "update", "delete", "bulk_load", "merge", "ddl", "sketch"}
         assert categories == expected_categories
 
     def test_catalog_operation_count(self):

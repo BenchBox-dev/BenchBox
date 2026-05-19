@@ -131,6 +131,16 @@ class TestGetQueryDetailsTool:
         assert "sql" in result
         assert "select" in result["sql"].lower() or "SELECT" in result["sql"]
 
+    def test_joinorder_query_returns_sql(self, tool_functions):
+        """Canonical JoinOrder query detail uses its registry default SF=1."""
+        fn = tool_functions["get_query_details"]
+        result = fn(benchmark="joinorder", query_id="1a")
+
+        assert "error" not in result
+        assert result["benchmark"] == "joinorder"
+        assert "sql" in result
+        assert "movie_companies" in result["sql"]
+
     def test_query_id_with_q_prefix(self, tool_functions):
         """Q-prefixed query IDs are normalized."""
         fn = tool_functions["get_query_details"]
@@ -236,6 +246,15 @@ class TestListBenchmarksTool:
         names = [b["name"] for b in result["benchmarks"]]
         assert "tpch" in names
 
+    def test_internal_benchmarks_are_hidden(self, tool_functions):
+        """Internal registry entries do not appear in MCP discovery lists."""
+        fn = tool_functions["list_available"]
+        result = fn(category="benchmarks")
+
+        names = [b["name"] for b in result["benchmarks"]]
+        assert "joinorder" in names
+        assert "joinorder_synthetic" not in names
+
     def test_benchmark_entries_have_required_fields(self, tool_functions):
         """Each benchmark entry has required structure."""
         fn = tool_functions["list_available"]
@@ -278,6 +297,14 @@ class TestGetBenchmarkInfoTool:
         result = fn(benchmark="nonexistent")
 
         assert "error" in result
+
+    def test_internal_benchmark_returns_not_found(self, tool_functions):
+        """Internal benchmark entries are hidden from MCP benchmark detail discovery."""
+        fn = tool_functions["get_benchmark_info"]
+        result = fn(benchmark="joinorder_synthetic")
+
+        assert "error" in result
+        assert "joinorder_synthetic" not in result["available_benchmarks"]
 
 
 # ---------------------------------------------------------------------------

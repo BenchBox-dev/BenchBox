@@ -72,6 +72,17 @@ def test_load_config_raises_when_validation_fails(tmp_path: Path, monkeypatch: p
         cfg.load_config(config_file=config_path, validate=True)
 
 
+def test_directory_manager_honors_output_dir_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``DirectoryManager()`` (no base_dir) should resolve via BENCHBOX_OUTPUT_DIR."""
+    custom_root = tmp_path / "custom_runs"
+    monkeypatch.setenv("BENCHBOX_OUTPUT_DIR", str(custom_root))
+    dm = cfg.DirectoryManager()
+    assert dm.base_dir == custom_root
+    assert dm.results_dir == custom_root / "results"
+    assert dm.datagen_dir == custom_root / "datagen"
+    assert dm.databases_dir == custom_root / "databases"
+
+
 def test_directory_manager_paths_and_cleanup(tmp_path: Path) -> None:
     dm = cfg.DirectoryManager(base_dir=str(tmp_path / "runs"))
     assert dm.results_dir.exists() and dm.datagen_dir.exists() and dm.databases_dir.exists()

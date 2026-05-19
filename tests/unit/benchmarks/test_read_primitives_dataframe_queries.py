@@ -64,19 +64,25 @@ class TestSkipLists:
     """Test the skip/exclusion lists."""
 
     def test_skip_for_dataframe_contains_correlated_subqueries(self):
-        """SKIP_FOR_DATAFRAME should only contain correlated subquery queries."""
-        # Only 3 queries are truly SQL-only: correlated subqueries have no DataFrame equivalent
-        assert len(SKIP_FOR_DATAFRAME) == 3, f"Should have 3 correlated-subquery queries, got {len(SKIP_FOR_DATAFRAME)}"
+        """SKIP_FOR_DATAFRAME contains the correlated-subquery + PySpark-only-aggregate skip set."""
+        # 3 correlated-subquery queries + 2 PySpark-only approximate-aggregate
+        # queries (array-quantile and frequency-based top-K). The HLL distinct
+        # pair (`approx_count_distinct_*`) and `approx_quantile_groupby` now
+        # have DataFrame impls. Some pandas-family engines use exact
+        # fallbacks where their API has no matching sketch aggregate.
+        assert len(SKIP_FOR_DATAFRAME) == 5, f"Should have 5 skip entries, got {len(SKIP_FOR_DATAFRAME)}"
 
     def test_skip_for_dataframe_has_expected_queries(self):
-        """SKIP_FOR_DATAFRAME should contain only the correlated subquery optimizer queries."""
+        """SKIP_FOR_DATAFRAME contains correlated subqueries and PySpark-only approximate-aggregates."""
         expected = {
             "optimizer_exists_to_semijoin",  # Correlated EXISTS
             "optimizer_in_to_exists",  # Correlated IN
             "optimizer_scalar_subquery_flattening",  # Correlated scalar subquery
+            "approx_quantiles_array",  # PySpark-only at the DataFrame layer
+            "approx_top_k_lineitem",  # PySpark 4.1+ only at the DataFrame layer
         }
         assert set(SKIP_FOR_DATAFRAME) == expected, (
-            f"Skip list should only contain correlated subquery queries. "
+            f"Skip list should contain correlated-subquery + PySpark-only approximate-aggregates. "
             f"Expected: {expected}, got: {set(SKIP_FOR_DATAFRAME)}"
         )
 
@@ -148,8 +154,9 @@ class TestBenchmarkIntegration:
         benchmark = ReadPrimitivesBenchmark(scale_factor=0.01)
         skip_list = benchmark.get_dataframe_skip_queries()
         assert isinstance(skip_list, list)
-        # Only 3 queries skipped: correlated subquery queries with no DataFrame equivalent
-        assert len(skip_list) == 3
+        # 3 correlated-subquery queries + 2 PySpark-only approximate-aggregate
+        # queries (array-quantile and frequency-based top-K).
+        assert len(skip_list) == 5
 
     def test_benchmark_has_get_expression_family_skip_queries_method(self):
         """ReadPrimitivesBenchmark should have get_expression_family_skip_queries method."""

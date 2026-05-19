@@ -228,6 +228,15 @@ TABLES = {
     **EXTENSION_TABLES,  # Include extended tables
 }
 
+_SPARK_FAMILY_DIALECTS = {"spark", "lakesail", "pyspark", "velox", "databricks"}
+
+
+def _column_type_for_dialect(column: dict[str, Any], dialect: str) -> str:
+    column_type = cast(str, column["type"])
+    if column_type == "TIME" and dialect.lower() in _SPARK_FAMILY_DIALECTS:
+        return "STRING"
+    return column_type
+
 
 def get_create_table_sql(
     table_name: str,
@@ -256,7 +265,7 @@ def get_create_table_sql(
     columns = []
 
     for col in cast(list, table["columns"]):
-        col_def = f"{cast(str, col['name'])} {cast(str, col['type'])}"
+        col_def = f"{cast(str, col['name'])} {_column_type_for_dialect(col, dialect)}"
         if col.get("primary_key") and enable_primary_keys:
             col_def += " PRIMARY KEY"
         columns.append(col_def)

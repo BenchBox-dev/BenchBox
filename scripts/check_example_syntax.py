@@ -61,7 +61,7 @@ def check_basic_imports(file_path: Path) -> Tuple[bool, str]:
         (is_valid, error_message)
     """
     try:
-        content = file_path.read_text()
+        content = file_path.read_text(encoding="utf-8")
 
         # Check for common import patterns that might fail
         if "from benchbox" in content or "import benchbox" in content:

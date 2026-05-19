@@ -60,6 +60,32 @@ def _sample_benchmarks() -> dict[str, dict[str, object]]:
             "default_scale": 1.0,
             "supports_streams": False,
         },
+        "joinorder": {
+            "display_name": "JoinOrder",
+            "description": "Canonical IMDb Join Order Benchmark",
+            "query_description": "113 queries",
+            "category": "Academic",
+            "num_queries": 113,
+            "complexity": "high",
+            "estimated_time_range": (30, 90),
+            "scale_options": [1.0],
+            "default_scale": 1.0,
+            "supports_streams": False,
+            "surface": "public",
+        },
+        "joinorder_synthetic": {
+            "display_name": "JoinOrder Synthetic",
+            "description": "Internal synthetic JoinOrder smoke-test data",
+            "query_description": "13 synthetic smoke queries",
+            "category": "Academic",
+            "num_queries": 13,
+            "complexity": "medium",
+            "estimated_time_range": (2, 10),
+            "scale_options": [0.01, 0.1, 1.0],
+            "default_scale": 1.0,
+            "supports_streams": False,
+            "surface": "internal",
+        },
     }
 
 
@@ -81,6 +107,23 @@ def test_display_all_benchmarks_shows_controls_and_filters(monkeypatch: pytest.M
     assert "Available Benchmarks - TPC" in output
     assert "Controls:" in output
     assert "[p]review" in output
+
+
+def test_display_all_benchmarks_hides_internal_surfaces(monkeypatch: pytest.MonkeyPatch, manager: BenchmarkManager):
+    console, stream = _capture_console()
+    monkeypatch.setattr(bench_mod, "console", console)
+
+    shown = manager._display_all_benchmarks(filter_category="Academic")
+
+    assert list(shown) == ["joinorder"]
+    output = stream.getvalue()
+    assert "JoinOrder" in output
+    assert "JoinOrder Synthetic" not in output
+
+
+def test_internal_benchmarks_remain_directly_addressable(manager: BenchmarkManager):
+    assert "joinorder_synthetic" in manager.benchmarks
+    assert "joinorder_synthetic" not in manager._get_public_benchmarks()
 
 
 def test_display_all_benchmarks_warns_when_filters_match_nothing(

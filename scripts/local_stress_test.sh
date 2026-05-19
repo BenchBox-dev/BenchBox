@@ -25,14 +25,15 @@ Options:
                                 Uses timeout(1)/gtimeout(1) when available,
                                 otherwise falls back to perl(1).
   --log-dir <dir>               Directory for captured stdout/stderr logs
-                                (default: benchmark_runs/logs)
+                                (default: \$BENCHBOX_OUTPUT_DIR/logs, falling back to
+                                ~/Developer/benchmark_runs/logs)
   --skip-unavailable            Skip platforms that fail a pre-flight connectivity check
                                 instead of counting them as failures
   -h, --help                    Show this help
 
 Platform groups:
   fast        - Fast OLAP benchmark execution:
-                duckdb datafusion lakesail clickhouse-server cedardb starrocks
+                duckdb datafusion lakesail clickhouse-local clickhouse-server cedardb starrocks
   slow        - Slower benchmark execution (OLTP, JVM, timeseries):
                 sqlite spark postgresql presto trino databend doris
                 influxdb pg-duckdb pg-mooncake timescaledb questdb singlestore
@@ -47,6 +48,14 @@ EOF
   exit 1
 }
 
+# ---- BenchBox runs root ----
+# All datagen, database, log, and result files land under this root. The
+# framework reads BENCHBOX_OUTPUT_DIR to redirect benchmark_runs/{datagen,
+# databases,results,charts}; we export it here and anchor LOG_DIR to the
+# same root so a single env var controls every artifact path.
+: "${BENCHBOX_OUTPUT_DIR:=$HOME/Developer/benchmark_runs}"
+export BENCHBOX_OUTPUT_DIR
+
 # ---- args ----
 SCALE_OVERRIDE=""
 PHASES="load,power"
@@ -56,7 +65,7 @@ BENCHMARK_FILTER=""
 BENCHMARK_GROUP="all"
 COMPRESSION=""
 PER_BENCHMARK_TIMEOUT="0"
-LOG_DIR="benchmark_runs/logs"
+LOG_DIR="$BENCHBOX_OUTPUT_DIR/logs"
 SKIP_UNAVAILABLE=0
 
 while [[ $# -gt 0 ]]; do
@@ -115,8 +124,8 @@ fi
 
 # ---- Platform lists ----
 # Each platform appears in exactly one list. Speed based on OLAP benchmark execution time.
-FAST_NATIVE=( duckdb datafusion lakesail )
-FAST_DOCKER=( clickhouse-server cedardb starrocks )
+FAST_NATIVE=( duckdb datafusion clickhouse-local )
+FAST_DOCKER=( lakesail clickhouse-server cedardb starrocks )
 SLOW_NATIVE=( sqlite spark )
 SLOW_DOCKER=( postgresql presto trino databend doris influxdb pg-duckdb pg-mooncake timescaledb questdb singlestore velox )
 DF_PLATFORMS=( polars-df pandas-df modin-df pyspark-df dask-df datafusion-df )
@@ -132,6 +141,7 @@ DOCKER_PLATFORMS=( "${FAST_DOCKER[@]}" "${SLOW_DOCKER[@]}" )
 # but each platform gets its own reachability cache entry (keyed by platform).
 get_platform_port() {
   case "$1" in
+    lakesail)           echo "localhost:50051" ;;
     singlestore)        echo "localhost:13306" ;;
     questdb)            echo "localhost:8812" ;;
     presto)             echo "localhost:18081" ;;
@@ -461,9 +471,12 @@ run_benchmark() {
   local elapsed=$(( SECONDS - t0 ))
 
   if [[ "$rc" -eq 0 ]]; then
-    # Extract result JSON path from log if present.
+    # Extract result JSON path from log if present. Match either a relative
+    # benchmark_runs/results/... path (legacy) or an absolute path under
+    # $BENCHBOX_OUTPUT_DIR/results/... so the script works regardless of where
+    # the runs root lives.
     local result_path
-    result_path=$(grep -oE 'benchmark_runs/results/[^[:space:]]+\.json' "$log_file" | tail -1 || true)
+    result_path=$(grep -oE '(/[^[:space:]]+/)?benchmark_runs/results/[^[:space:]]+\.json' "$log_file" | tail -1 || true)
     if [[ -n "$result_path" ]]; then
       echo "done (${elapsed}s) → $result_path"
     else
@@ -535,9 +548,11 @@ done
 # Map platforms → required uv extras so optional dependencies are installed.
 get_platform_uv_extra() {
   case "$1" in
-    singlestore) echo "singlestore" ;;
-    influxdb)    echo "influxdb" ;;
-    *)           echo "" ;;
+    clickhouse-local) echo "clickhouse-local" ;;
+    lakesail)         echo "lakesail" ;;
+    singlestore)      echo "singlestore" ;;
+    influxdb)         echo "influxdb" ;;
+    *)                echo "" ;;
   esac
 }
 _uv_sync_args=()

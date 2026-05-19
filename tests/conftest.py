@@ -12,6 +12,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 # parallelism by the worker count, causing CPU oversubscription and machine
 # lock-ups on developer workstations.
 import os
+import shutil
 from types import FrameType
 
 os.environ.setdefault("POLARS_MAX_THREADS", "2")
@@ -49,9 +50,80 @@ pytest_plugins = [
     "tests.fixtures.utility_fixtures",
 ]
 
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_PROJECT_DIR = _REPO_ROOT / "_project"
+_RESULTS_EXPLORER_DIR = _REPO_ROOT / "results-explorer"
+_PROJECT_DEPENDENT_TEST_FILES = {
+    Path("tests/unit/cli/test_explorer_build_contract.py"),
+    Path("tests/unit/core/test_platform_labels.py"),
+    Path("tests/unit/test_public_site_theme_contract.py"),
+    Path("tests/unit/test_todo_executable_docs.py"),
+    Path("tests/unit/scripts/test_blind_spot_tools.py"),
+    Path("tests/unit/scripts/test_build_joinorder_data.py"),
+    Path("tests/unit/scripts/test_pr_review_followups.py"),
+    Path("tests/unit/scripts/test_reference_usage_audit.py"),
+    Path("tests/unit/scripts/test_scan_explorer_stale_theme.py"),
+    Path("tests/unit/scripts/test_scan_explorer_tokens.py"),
+    Path("tests/unit/scripts/test_skill_sync_lock_audit.py"),
+    Path("tests/unit/scripts/test_validate_todo.py"),
+}
+_PROJECT_DEPENDENT_TEST_DIRS = {
+    Path("tests/unit/core/explorer_pipeline"),
+}
+_RESULTS_EXPLORER_DEPENDENT_TEST_FILES = {
+    Path("tests/uat/test_explorer_smoke.py"),
+    Path("tests/unit/test_site_header_parity.py"),
+    Path("tests/unit/test_sync_results_workflow.py"),
+}
+_RESULTS_EXPLORER_DEPENDENT_TEST_DIRS = {
+    Path("tests/unit/explorer"),
+}
+
+
+def pytest_ignore_collect(collection_path: Path, config: pytest.Config) -> bool:
+    """Skip dev-project tests when the curated release branch omits dev trees."""
+    try:
+        relative = collection_path.relative_to(_REPO_ROOT)
+    except ValueError:
+        return False
+
+    if not _PROJECT_DIR.exists():
+        if relative in _PROJECT_DEPENDENT_TEST_FILES:
+            return True
+        if any(relative == test_dir or test_dir in relative.parents for test_dir in _PROJECT_DEPENDENT_TEST_DIRS):
+            return True
+
+    if not _RESULTS_EXPLORER_DIR.exists() and relative in _RESULTS_EXPLORER_DEPENDENT_TEST_FILES:
+        return True
+    return (
+        any(relative == test_dir or test_dir in relative.parents for test_dir in _RESULTS_EXPLORER_DEPENDENT_TEST_DIRS)
+        and not _RESULTS_EXPLORER_DIR.exists()
+    )
+
+
+@pytest.fixture
+def joinorder_canonical_tiny(tmp_path: Path) -> Path:
+    """Copy the canonical tiny JOB fixture and return its isolated path.
+
+    Predicate oracle: every non-known-zero embedded canonical query has at
+    least one underlying row; 2c, 5a, 5b, 10b, and 32a intentionally preserve
+    zero-underlying-row aggregate semantics.
+    """
+    source = Path(__file__).parent / "fixtures" / "joinorder_canonical_tiny"
+    target = tmp_path / "joinorder_canonical_tiny"
+    shutil.copytree(source, target)
+    return target
+
+
 # ── Parallel test run mutual exclusion ──────────────────────────────────────
-_TEST_LOCK_PATH = Path.home() / ".benchbox" / "test.lock"
 _test_lock_fd: int | None = None  # Kept open to hold the flock for the session lifetime.
+
+
+def _get_test_lock_path() -> Path:
+    """Return the inter-process lock path used by parallel pytest runs."""
+    lock_dir = os.environ.get("BENCHBOX_TEST_LOCK_DIR")
+    base_dir = Path(lock_dir).expanduser() if lock_dir else Path.home() / ".benchbox"
+    return base_dir / "test.lock"
 
 
 def _should_acquire_test_lock(config: pytest.Config) -> bool:
@@ -124,8 +196,9 @@ def pytest_configure(config) -> None:
     # Acquire exclusive lock to prevent concurrent parallel test runs from
     # competing for CPU. Only the controller process (not xdist workers) locks.
     if _should_acquire_test_lock(config):
-        _TEST_LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
-        fd = os.open(str(_TEST_LOCK_PATH), os.O_CREAT | os.O_RDWR | getattr(os, "O_CLOEXEC", 0), 0o644)
+        test_lock_path = _get_test_lock_path()
+        test_lock_path.parent.mkdir(parents=True, exist_ok=True)
+        fd = os.open(str(test_lock_path), os.O_CREAT | os.O_RDWR | getattr(os, "O_CLOEXEC", 0), 0o644)
         try:
             if sys.platform == "win32":
                 import msvcrt
@@ -138,7 +211,7 @@ def pytest_configure(config) -> None:
         except (BlockingIOError, OSError):
             # Another parallel run holds the lock - fail fast with a clear message.
             try:
-                holder_info = _TEST_LOCK_PATH.read_text().strip()
+                holder_info = test_lock_path.read_text(encoding="utf-8").strip()
             except OSError:
                 holder_info = "(could not read lock file)"
             os.close(fd)
@@ -147,7 +220,7 @@ def pytest_configure(config) -> None:
             # os._exit() terminates the process immediately with the given code.
             sys.stderr.write(
                 f"\n\033[91m[benchbox] BLOCKED: A parallel test run is already active.\033[0m\n"
-                f"  Lock file : {_TEST_LOCK_PATH}\n"
+                f"  Lock file : {test_lock_path}\n"
                 f"  Holder    : {holder_info}\n\n"
                 f"  Options:\n"
                 f"    \u2022 Wait for the other run to finish and retry.\n"

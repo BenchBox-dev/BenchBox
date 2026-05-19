@@ -1,9 +1,11 @@
-"""JoinOrder Benchmark DataFrame queries for Expression and Pandas families.
+"""Canonical JoinOrder Benchmark DataFrame queries for Expression and Pandas families.
 
-Implements all 13 JoinOrder benchmark queries for DataFrame execution.
+Implements all 113 canonical JoinOrder query IDs. The original 13 queries keep
+their hand-written translations; the remaining canonical SQL queries use the
+restricted JOB SQL-to-DataFrame translator in this module.
 
-The JoinOrder Benchmark is based on "How Good Are Query Optimizers, Really?"
-(VLDB 2015) and uses a 21-table IMDB-like schema. The key translation
+The canonical JoinOrder Benchmark is based on "How Good Are Query Optimizers, Really?"
+(VLDB 2015) and uses the 21-table IMDb 2013 schema. The key translation
 challenge is converting implicit cross-joins (comma-separated FROM clauses
 with WHERE join conditions) into explicit .join() chains.
 
@@ -21,12 +23,422 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import pandas as pd
+from sqlglot import exp, parse_one
 
 from benchbox.core.dataframe.context import DataFrameContext
 from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory, QueryRegistry
+from benchbox.core.joinorder.queries import CANONICAL_JOINORDER_QUERIES, JoinOrderQueryManager
+from benchbox.core.joinorder.schema import JoinOrderSchema
+
+IMPLEMENTED_DATAFRAME_QUERY_IDS = list(CANONICAL_JOINORDER_QUERIES)
+UNTRANSLATED_DATAFRAME_QUERY_IDS: list[str] = []
+_HAND_TRANSLATED_DATAFRAME_QUERY_IDS = {
+    "1a",
+    "1b",
+    "2a",
+    "3a",
+    "4a",
+    "5a",
+    "6a",
+    "7a",
+    "8a",
+    "9a",
+    "10a",
+    "11a",
+    "12a",
+}
+_TRACK2_TODO = "_project/TODO/main/planning/track2-joinorder-dataframe-coverage.yaml"
+_QUERY_MANAGER = JoinOrderQueryManager()
+
+
+def _schema_columns() -> dict[str, list[str]]:
+    schema = JoinOrderSchema()
+    tables = schema._tables  # noqa: SLF001 - internal benchmark module consuming its schema definition.
+    return {
+        table: [column_def.split()[0] for column_def in table_def["columns"]] for table, table_def in tables.items()
+    }
+
+
+_TABLE_COLUMNS = _schema_columns()
+
+
+def _raise_untranslated_dataframe_query(query_id: str) -> None:
+    raise NotImplementedError(
+        f"DataFrame translation for query {query_id} not yet available. Track-2 TODO: {_TRACK2_TODO}"
+    )
+
+
+def _qualified(alias: str, column: str) -> str:
+    return f"{alias}__{column}"
+
+
+def _join_key(alias: str, column: str, predicate_index: int) -> str:
+    return f"{_qualified(alias, column)}__join_key_{predicate_index}"
+
+
+def _column_ref(node: exp.Expression) -> tuple[str, str]:
+    if not isinstance(node, exp.Column) or not node.table:
+        raise NotImplementedError(f"Unsupported JoinOrder DataFrame SQL column expression: {node}")
+    return str(node.table), node.name
+
+
+def _literal_value(node: exp.Expression) -> Any:
+    if isinstance(node, exp.Null):
+        return None
+    if not isinstance(node, exp.Literal):
+        raise NotImplementedError(f"Unsupported JoinOrder DataFrame SQL literal expression: {node}")
+    if node.is_string:
+        return str(node.this)
+    raw = str(node.this)
+    return int(raw) if raw.isdigit() else float(raw)
+
+
+def _like_pattern_to_regex(pattern: str) -> str:
+    parts: list[str] = ["^"]
+    for char in pattern:
+        if char == "%":
+            parts.append(".*")
+        elif char == "_":
+            parts.append(".")
+        else:
+            parts.append(re.escape(char))
+    parts.append("$")
+    return "".join(parts)
+
+
+def _flatten_and(node: exp.Expression) -> list[exp.Expression]:
+    if isinstance(node, exp.And):
+        return _flatten_and(node.this) + _flatten_and(node.expression)
+    if isinstance(node, exp.Paren):
+        return _flatten_and(node.this)
+    return [node]
+
+
+def _aliases_in(node: exp.Expression) -> set[str]:
+    return {str(column.table) for column in node.find_all(exp.Column) if column.table}
+
+
+def _is_join_equality(node: exp.Expression) -> bool:
+    if not isinstance(node, exp.EQ):
+        return False
+    left = node.this
+    right = node.expression
+    return isinstance(left, exp.Column) and isinstance(right, exp.Column) and str(left.table) != str(right.table)
+
+
+def _sql_tables(tree: exp.Select) -> list[tuple[str, str]]:
+    tables: list[tuple[str, str]] = []
+    from_expr = tree.args.get("from_")
+    if from_expr is not None and isinstance(from_expr.this, exp.Table):
+        table = from_expr.this
+        tables.append((table.alias_or_name, table.name))
+    for join in tree.args.get("joins") or []:
+        if isinstance(join.this, exp.Table):
+            table = join.this
+            tables.append((table.alias_or_name, table.name))
+    if not tables:
+        raise NotImplementedError("JoinOrder DataFrame SQL query has no FROM tables")
+    return tables
+
+
+def _select_min_columns(tree: exp.Select) -> list[tuple[str, str, str]]:
+    columns: list[tuple[str, str, str]] = []
+    for select_expr in tree.expressions:
+        if not isinstance(select_expr, exp.Alias) or not isinstance(select_expr.this, exp.Min):
+            raise NotImplementedError(f"JoinOrder DataFrame only supports MIN(...) projections: {select_expr}")
+        alias, column = _column_ref(select_expr.this.this)
+        columns.append((alias, column, select_expr.alias))
+    return columns
+
+
+def _expr_value(ctx: DataFrameContext, node: exp.Expression) -> Any:
+    if isinstance(node, exp.Column):
+        alias, column = _column_ref(node)
+        return ctx.col(_qualified(alias, column))
+    return ctx.lit(_literal_value(node))
+
+
+def _expression_condition(ctx: DataFrameContext, node: exp.Expression) -> Any:
+    if isinstance(node, exp.Paren):
+        return _expression_condition(ctx, node.this)
+    if isinstance(node, exp.And):
+        return _expression_condition(ctx, node.this) & _expression_condition(ctx, node.expression)
+    if isinstance(node, exp.Or):
+        return _expression_condition(ctx, node.this) | _expression_condition(ctx, node.expression)
+    if isinstance(node, exp.Not):
+        return ~_expression_condition(ctx, node.this)
+    if isinstance(node, exp.EQ):
+        return _expr_value(ctx, node.this) == _expr_value(ctx, node.expression)
+    if isinstance(node, exp.NEQ):
+        return _expr_value(ctx, node.this) != _expr_value(ctx, node.expression)
+    if isinstance(node, exp.GT):
+        return _expr_value(ctx, node.this) > _expr_value(ctx, node.expression)
+    if isinstance(node, exp.GTE):
+        return _expr_value(ctx, node.this) >= _expr_value(ctx, node.expression)
+    if isinstance(node, exp.LT):
+        return _expr_value(ctx, node.this) < _expr_value(ctx, node.expression)
+    if isinstance(node, exp.Between):
+        return _expr_value(ctx, node.this).is_between(
+            _expr_value(ctx, node.args["low"]), _expr_value(ctx, node.args["high"])
+        )
+    if isinstance(node, exp.In):
+        return _expr_value(ctx, node.this).is_in([_literal_value(value) for value in node.expressions])
+    if isinstance(node, exp.Like):
+        return _expr_value(ctx, node.this).str.contains(_like_pattern_to_regex(_literal_value(node.expression)))
+    if isinstance(node, exp.Is):
+        expr = _expr_value(ctx, node.this)
+        return expr.is_null() if isinstance(node.expression, exp.Null) else expr == _expr_value(ctx, node.expression)
+    raise NotImplementedError(f"Unsupported JoinOrder DataFrame SQL predicate: {node}")
+
+
+def _prefixed_expression_frame(
+    ctx: DataFrameContext,
+    table_name: str,
+    alias: str,
+    predicates: list[exp.Expression],
+    join_key_columns: list[tuple[str, int]],
+) -> Any:
+    frame = ctx.get_table(table_name)
+    frame = frame.select(
+        [ctx.col(column).alias(_qualified(alias, column)) for column in _TABLE_COLUMNS[table_name]]
+        + [ctx.col(column).alias(_join_key(alias, column, index)) for column, index in join_key_columns]
+    )
+    for predicate in predicates:
+        frame = frame.filter(_expression_condition(ctx, predicate))
+    return frame
+
+
+def _execute_joinorder_expression_query(ctx: DataFrameContext, query_id: str) -> Any:
+    tree = parse_one(_QUERY_MANAGER.get_query(query_id), read="duckdb")
+    tables = _sql_tables(tree)
+    predicates = _flatten_and(tree.args["where"].this)
+    join_predicates = [predicate for predicate in predicates if _is_join_equality(predicate)]
+    join_key_columns: dict[str, list[tuple[str, int]]] = {alias: [] for alias, _table in tables}
+    for index, predicate in enumerate(join_predicates):
+        left_alias, left_column = _column_ref(predicate.this)
+        right_alias, right_column = _column_ref(predicate.expression)
+        join_key_columns[left_alias].append((left_column, index))
+        join_key_columns[right_alias].append((right_column, index))
+    local_predicates = {
+        alias: [
+            predicate
+            for predicate in predicates
+            if not _is_join_equality(predicate) and _aliases_in(predicate) == {alias}
+        ]
+        for alias, _table in tables
+    }
+    frames = {
+        alias: _prefixed_expression_frame(ctx, table_name, alias, local_predicates[alias], join_key_columns[alias])
+        for alias, table_name in tables
+    }
+
+    joined_aliases = {tables[0][0]}
+    result = frames[tables[0][0]]
+    remaining_aliases = {alias for alias, _table in tables[1:]}
+    used_join_predicates: set[int] = set()
+
+    while remaining_aliases:
+        for predicate_index, predicate in enumerate(join_predicates):
+            left_alias, left_column = _column_ref(predicate.this)
+            right_alias, right_column = _column_ref(predicate.expression)
+            if left_alias in joined_aliases and right_alias in remaining_aliases:
+                result = result.join(
+                    frames[right_alias],
+                    left_on=_join_key(left_alias, left_column, predicate_index),
+                    right_on=_join_key(right_alias, right_column, predicate_index),
+                )
+                joined_aliases.add(right_alias)
+                remaining_aliases.remove(right_alias)
+                used_join_predicates.add(id(predicate))
+                break
+            if right_alias in joined_aliases and left_alias in remaining_aliases:
+                result = result.join(
+                    frames[left_alias],
+                    left_on=_join_key(right_alias, right_column, predicate_index),
+                    right_on=_join_key(left_alias, left_column, predicate_index),
+                )
+                joined_aliases.add(left_alias)
+                remaining_aliases.remove(left_alias)
+                used_join_predicates.add(id(predicate))
+                break
+        else:
+            alias = remaining_aliases.pop()
+            result = result.join(frames[alias], how="cross")
+            joined_aliases.add(alias)
+
+    for predicate in predicates:
+        if id(predicate) not in used_join_predicates:
+            result = result.filter(_expression_condition(ctx, predicate))
+
+    return result.select(
+        [
+            ctx.col(_qualified(alias, column)).min().alias(output_alias)
+            for alias, column, output_alias in _select_min_columns(tree)
+        ]
+    )
+
+
+def _native_pandas_frame(frame: Any) -> Any:
+    return frame.native if hasattr(frame, "native") else frame
+
+
+def _pandas_value(frame: pd.DataFrame, node: exp.Expression) -> Any:
+    if isinstance(node, exp.Column):
+        alias, column = _column_ref(node)
+        return frame[_qualified(alias, column)]
+    return _literal_value(node)
+
+
+def _pandas_not_null_mask(*values: Any) -> Any:
+    mask = True
+    for value in values:
+        if hasattr(value, "notna"):
+            mask = mask & value.notna()
+    return mask
+
+
+def _pandas_sql_compare(left: Any, right: Any, operator: Any) -> Any:
+    return operator(left, right) & _pandas_not_null_mask(left, right)
+
+
+def _pandas_condition(frame: pd.DataFrame, node: exp.Expression) -> Any:
+    if isinstance(node, exp.Paren):
+        return _pandas_condition(frame, node.this)
+    if isinstance(node, exp.And):
+        return _pandas_condition(frame, node.this) & _pandas_condition(frame, node.expression)
+    if isinstance(node, exp.Or):
+        return _pandas_condition(frame, node.this) | _pandas_condition(frame, node.expression)
+    if isinstance(node, exp.Not):
+        return ~_pandas_condition(frame, node.this)
+    if isinstance(node, exp.EQ):
+        return _pandas_sql_compare(
+            _pandas_value(frame, node.this), _pandas_value(frame, node.expression), lambda a, b: a == b
+        )
+    if isinstance(node, exp.NEQ):
+        return _pandas_sql_compare(
+            _pandas_value(frame, node.this), _pandas_value(frame, node.expression), lambda a, b: a != b
+        )
+    if isinstance(node, exp.GT):
+        return _pandas_sql_compare(
+            _pandas_value(frame, node.this), _pandas_value(frame, node.expression), lambda a, b: a > b
+        )
+    if isinstance(node, exp.GTE):
+        return _pandas_sql_compare(
+            _pandas_value(frame, node.this), _pandas_value(frame, node.expression), lambda a, b: a >= b
+        )
+    if isinstance(node, exp.LT):
+        return _pandas_sql_compare(
+            _pandas_value(frame, node.this), _pandas_value(frame, node.expression), lambda a, b: a < b
+        )
+    if isinstance(node, exp.Between):
+        return _pandas_value(frame, node.this).between(
+            _literal_value(node.args["low"]), _literal_value(node.args["high"])
+        )
+    if isinstance(node, exp.In):
+        return _pandas_value(frame, node.this).isin([_literal_value(value) for value in node.expressions])
+    if isinstance(node, exp.Like):
+        return (
+            _pandas_value(frame, node.this)
+            .astype("string")
+            .str.contains(_like_pattern_to_regex(_literal_value(node.expression)), regex=True, na=pd.NA)
+        )
+    if isinstance(node, exp.Is):
+        value = _pandas_value(frame, node.this)
+        return value.isna() if isinstance(node.expression, exp.Null) else value == _pandas_value(frame, node.expression)
+    raise NotImplementedError(f"Unsupported JoinOrder DataFrame SQL predicate: {node}")
+
+
+def _filter_pandas(frame: pd.DataFrame, predicate: exp.Expression) -> pd.DataFrame:
+    return frame[_pandas_condition(frame, predicate).fillna(False)]
+
+
+def _prefixed_pandas_frame(
+    ctx: DataFrameContext, table_name: str, alias: str, predicates: list[exp.Expression]
+) -> pd.DataFrame:
+    frame = _native_pandas_frame(ctx.get_table(table_name))
+    frame = frame.rename(columns={column: _qualified(alias, column) for column in _TABLE_COLUMNS[table_name]})
+    for predicate in predicates:
+        frame = _filter_pandas(frame, predicate)
+    return frame
+
+
+def _empty_safe_min(frame: Any, column: str) -> Any:
+    value = frame[column].min()
+    if hasattr(value, "compute"):
+        value = value.compute()
+    return None if pd.isna(value) else value
+
+
+def _execute_joinorder_pandas_query(ctx: DataFrameContext, query_id: str) -> pd.DataFrame:
+    tree = parse_one(_QUERY_MANAGER.get_query(query_id), read="duckdb")
+    tables = _sql_tables(tree)
+    predicates = _flatten_and(tree.args["where"].this)
+    join_predicates = [predicate for predicate in predicates if _is_join_equality(predicate)]
+    local_predicates = {
+        alias: [
+            predicate
+            for predicate in predicates
+            if not _is_join_equality(predicate) and _aliases_in(predicate) == {alias}
+        ]
+        for alias, _table in tables
+    }
+    frames = {
+        alias: _prefixed_pandas_frame(ctx, table_name, alias, local_predicates[alias]) for alias, table_name in tables
+    }
+
+    joined_aliases = {tables[0][0]}
+    result = frames[tables[0][0]]
+    remaining_aliases = {alias for alias, _table in tables[1:]}
+    used_join_predicates: set[int] = set()
+
+    while remaining_aliases:
+        for predicate in join_predicates:
+            left_alias, left_column = _column_ref(predicate.this)
+            right_alias, right_column = _column_ref(predicate.expression)
+            if left_alias in joined_aliases and right_alias in remaining_aliases:
+                result = result.merge(
+                    frames[right_alias],
+                    left_on=_qualified(left_alias, left_column),
+                    right_on=_qualified(right_alias, right_column),
+                    how="inner",
+                )
+                joined_aliases.add(right_alias)
+                remaining_aliases.remove(right_alias)
+                used_join_predicates.add(id(predicate))
+                break
+            if right_alias in joined_aliases and left_alias in remaining_aliases:
+                result = result.merge(
+                    frames[left_alias],
+                    left_on=_qualified(right_alias, right_column),
+                    right_on=_qualified(left_alias, left_column),
+                    how="inner",
+                )
+                joined_aliases.add(left_alias)
+                remaining_aliases.remove(left_alias)
+                used_join_predicates.add(id(predicate))
+                break
+        else:
+            alias = remaining_aliases.pop()
+            result = result.merge(frames[alias], how="cross")
+            joined_aliases.add(alias)
+
+    for predicate in predicates:
+        if id(predicate) not in used_join_predicates:
+            result = _filter_pandas(result, predicate)
+
+    return pd.DataFrame(
+        [
+            {
+                output_alias: _empty_safe_min(result, _qualified(alias, column))
+                for alias, column, output_alias in _select_min_columns(tree)
+            }
+        ]
+    )
+
 
 # ===========================================================================
 # Expression Family (Polars, DataFusion, PySpark)
@@ -1004,6 +1416,1031 @@ def q12a_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
+def q1c_expression_impl(ctx: DataFrameContext) -> Any:
+    """1c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("1c")
+
+
+def q1c_pandas_impl(ctx: DataFrameContext) -> Any:
+    """1c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("1c")
+
+
+def q1d_expression_impl(ctx: DataFrameContext) -> Any:
+    """1d: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("1d")
+
+
+def q1d_pandas_impl(ctx: DataFrameContext) -> Any:
+    """1d: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("1d")
+
+
+def q2b_expression_impl(ctx: DataFrameContext) -> Any:
+    """2b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("2b")
+
+
+def q2b_pandas_impl(ctx: DataFrameContext) -> Any:
+    """2b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("2b")
+
+
+def q2c_expression_impl(ctx: DataFrameContext) -> Any:
+    """2c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("2c")
+
+
+def q2c_pandas_impl(ctx: DataFrameContext) -> Any:
+    """2c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("2c")
+
+
+def q2d_expression_impl(ctx: DataFrameContext) -> Any:
+    """2d: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("2d")
+
+
+def q2d_pandas_impl(ctx: DataFrameContext) -> Any:
+    """2d: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("2d")
+
+
+def q3b_expression_impl(ctx: DataFrameContext) -> Any:
+    """3b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("3b")
+
+
+def q3b_pandas_impl(ctx: DataFrameContext) -> Any:
+    """3b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("3b")
+
+
+def q3c_expression_impl(ctx: DataFrameContext) -> Any:
+    """3c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("3c")
+
+
+def q3c_pandas_impl(ctx: DataFrameContext) -> Any:
+    """3c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("3c")
+
+
+def q4b_expression_impl(ctx: DataFrameContext) -> Any:
+    """4b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("4b")
+
+
+def q4b_pandas_impl(ctx: DataFrameContext) -> Any:
+    """4b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("4b")
+
+
+def q4c_expression_impl(ctx: DataFrameContext) -> Any:
+    """4c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("4c")
+
+
+def q4c_pandas_impl(ctx: DataFrameContext) -> Any:
+    """4c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("4c")
+
+
+def q5b_expression_impl(ctx: DataFrameContext) -> Any:
+    """5b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("5b")
+
+
+def q5b_pandas_impl(ctx: DataFrameContext) -> Any:
+    """5b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("5b")
+
+
+def q5c_expression_impl(ctx: DataFrameContext) -> Any:
+    """5c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("5c")
+
+
+def q5c_pandas_impl(ctx: DataFrameContext) -> Any:
+    """5c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("5c")
+
+
+def q6b_expression_impl(ctx: DataFrameContext) -> Any:
+    """6b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("6b")
+
+
+def q6b_pandas_impl(ctx: DataFrameContext) -> Any:
+    """6b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("6b")
+
+
+def q6c_expression_impl(ctx: DataFrameContext) -> Any:
+    """6c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("6c")
+
+
+def q6c_pandas_impl(ctx: DataFrameContext) -> Any:
+    """6c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("6c")
+
+
+def q6d_expression_impl(ctx: DataFrameContext) -> Any:
+    """6d: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("6d")
+
+
+def q6d_pandas_impl(ctx: DataFrameContext) -> Any:
+    """6d: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("6d")
+
+
+def q6e_expression_impl(ctx: DataFrameContext) -> Any:
+    """6e: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("6e")
+
+
+def q6e_pandas_impl(ctx: DataFrameContext) -> Any:
+    """6e: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("6e")
+
+
+def q6f_expression_impl(ctx: DataFrameContext) -> Any:
+    """6f: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("6f")
+
+
+def q6f_pandas_impl(ctx: DataFrameContext) -> Any:
+    """6f: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("6f")
+
+
+def q7b_expression_impl(ctx: DataFrameContext) -> Any:
+    """7b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("7b")
+
+
+def q7b_pandas_impl(ctx: DataFrameContext) -> Any:
+    """7b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("7b")
+
+
+def q7c_expression_impl(ctx: DataFrameContext) -> Any:
+    """7c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("7c")
+
+
+def q7c_pandas_impl(ctx: DataFrameContext) -> Any:
+    """7c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("7c")
+
+
+def q8b_expression_impl(ctx: DataFrameContext) -> Any:
+    """8b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("8b")
+
+
+def q8b_pandas_impl(ctx: DataFrameContext) -> Any:
+    """8b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("8b")
+
+
+def q8c_expression_impl(ctx: DataFrameContext) -> Any:
+    """8c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("8c")
+
+
+def q8c_pandas_impl(ctx: DataFrameContext) -> Any:
+    """8c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("8c")
+
+
+def q8d_expression_impl(ctx: DataFrameContext) -> Any:
+    """8d: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("8d")
+
+
+def q8d_pandas_impl(ctx: DataFrameContext) -> Any:
+    """8d: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("8d")
+
+
+def q9b_expression_impl(ctx: DataFrameContext) -> Any:
+    """9b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("9b")
+
+
+def q9b_pandas_impl(ctx: DataFrameContext) -> Any:
+    """9b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("9b")
+
+
+def q9c_expression_impl(ctx: DataFrameContext) -> Any:
+    """9c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("9c")
+
+
+def q9c_pandas_impl(ctx: DataFrameContext) -> Any:
+    """9c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("9c")
+
+
+def q9d_expression_impl(ctx: DataFrameContext) -> Any:
+    """9d: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("9d")
+
+
+def q9d_pandas_impl(ctx: DataFrameContext) -> Any:
+    """9d: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("9d")
+
+
+def q10b_expression_impl(ctx: DataFrameContext) -> Any:
+    """10b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("10b")
+
+
+def q10b_pandas_impl(ctx: DataFrameContext) -> Any:
+    """10b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("10b")
+
+
+def q10c_expression_impl(ctx: DataFrameContext) -> Any:
+    """10c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("10c")
+
+
+def q10c_pandas_impl(ctx: DataFrameContext) -> Any:
+    """10c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("10c")
+
+
+def q11b_expression_impl(ctx: DataFrameContext) -> Any:
+    """11b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("11b")
+
+
+def q11b_pandas_impl(ctx: DataFrameContext) -> Any:
+    """11b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("11b")
+
+
+def q11c_expression_impl(ctx: DataFrameContext) -> Any:
+    """11c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("11c")
+
+
+def q11c_pandas_impl(ctx: DataFrameContext) -> Any:
+    """11c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("11c")
+
+
+def q11d_expression_impl(ctx: DataFrameContext) -> Any:
+    """11d: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("11d")
+
+
+def q11d_pandas_impl(ctx: DataFrameContext) -> Any:
+    """11d: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("11d")
+
+
+def q12b_expression_impl(ctx: DataFrameContext) -> Any:
+    """12b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("12b")
+
+
+def q12b_pandas_impl(ctx: DataFrameContext) -> Any:
+    """12b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("12b")
+
+
+def q12c_expression_impl(ctx: DataFrameContext) -> Any:
+    """12c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("12c")
+
+
+def q12c_pandas_impl(ctx: DataFrameContext) -> Any:
+    """12c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("12c")
+
+
+def q13a_expression_impl(ctx: DataFrameContext) -> Any:
+    """13a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("13a")
+
+
+def q13a_pandas_impl(ctx: DataFrameContext) -> Any:
+    """13a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("13a")
+
+
+def q13b_expression_impl(ctx: DataFrameContext) -> Any:
+    """13b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("13b")
+
+
+def q13b_pandas_impl(ctx: DataFrameContext) -> Any:
+    """13b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("13b")
+
+
+def q13c_expression_impl(ctx: DataFrameContext) -> Any:
+    """13c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("13c")
+
+
+def q13c_pandas_impl(ctx: DataFrameContext) -> Any:
+    """13c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("13c")
+
+
+def q13d_expression_impl(ctx: DataFrameContext) -> Any:
+    """13d: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("13d")
+
+
+def q13d_pandas_impl(ctx: DataFrameContext) -> Any:
+    """13d: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("13d")
+
+
+def q14a_expression_impl(ctx: DataFrameContext) -> Any:
+    """14a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("14a")
+
+
+def q14a_pandas_impl(ctx: DataFrameContext) -> Any:
+    """14a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("14a")
+
+
+def q14b_expression_impl(ctx: DataFrameContext) -> Any:
+    """14b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("14b")
+
+
+def q14b_pandas_impl(ctx: DataFrameContext) -> Any:
+    """14b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("14b")
+
+
+def q14c_expression_impl(ctx: DataFrameContext) -> Any:
+    """14c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("14c")
+
+
+def q14c_pandas_impl(ctx: DataFrameContext) -> Any:
+    """14c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("14c")
+
+
+def q15a_expression_impl(ctx: DataFrameContext) -> Any:
+    """15a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("15a")
+
+
+def q15a_pandas_impl(ctx: DataFrameContext) -> Any:
+    """15a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("15a")
+
+
+def q15b_expression_impl(ctx: DataFrameContext) -> Any:
+    """15b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("15b")
+
+
+def q15b_pandas_impl(ctx: DataFrameContext) -> Any:
+    """15b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("15b")
+
+
+def q15c_expression_impl(ctx: DataFrameContext) -> Any:
+    """15c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("15c")
+
+
+def q15c_pandas_impl(ctx: DataFrameContext) -> Any:
+    """15c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("15c")
+
+
+def q15d_expression_impl(ctx: DataFrameContext) -> Any:
+    """15d: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("15d")
+
+
+def q15d_pandas_impl(ctx: DataFrameContext) -> Any:
+    """15d: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("15d")
+
+
+def q16a_expression_impl(ctx: DataFrameContext) -> Any:
+    """16a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("16a")
+
+
+def q16a_pandas_impl(ctx: DataFrameContext) -> Any:
+    """16a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("16a")
+
+
+def q16b_expression_impl(ctx: DataFrameContext) -> Any:
+    """16b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("16b")
+
+
+def q16b_pandas_impl(ctx: DataFrameContext) -> Any:
+    """16b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("16b")
+
+
+def q16c_expression_impl(ctx: DataFrameContext) -> Any:
+    """16c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("16c")
+
+
+def q16c_pandas_impl(ctx: DataFrameContext) -> Any:
+    """16c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("16c")
+
+
+def q16d_expression_impl(ctx: DataFrameContext) -> Any:
+    """16d: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("16d")
+
+
+def q16d_pandas_impl(ctx: DataFrameContext) -> Any:
+    """16d: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("16d")
+
+
+def q17a_expression_impl(ctx: DataFrameContext) -> Any:
+    """17a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("17a")
+
+
+def q17a_pandas_impl(ctx: DataFrameContext) -> Any:
+    """17a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("17a")
+
+
+def q17b_expression_impl(ctx: DataFrameContext) -> Any:
+    """17b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("17b")
+
+
+def q17b_pandas_impl(ctx: DataFrameContext) -> Any:
+    """17b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("17b")
+
+
+def q17c_expression_impl(ctx: DataFrameContext) -> Any:
+    """17c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("17c")
+
+
+def q17c_pandas_impl(ctx: DataFrameContext) -> Any:
+    """17c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("17c")
+
+
+def q17d_expression_impl(ctx: DataFrameContext) -> Any:
+    """17d: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("17d")
+
+
+def q17d_pandas_impl(ctx: DataFrameContext) -> Any:
+    """17d: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("17d")
+
+
+def q17e_expression_impl(ctx: DataFrameContext) -> Any:
+    """17e: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("17e")
+
+
+def q17e_pandas_impl(ctx: DataFrameContext) -> Any:
+    """17e: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("17e")
+
+
+def q17f_expression_impl(ctx: DataFrameContext) -> Any:
+    """17f: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("17f")
+
+
+def q17f_pandas_impl(ctx: DataFrameContext) -> Any:
+    """17f: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("17f")
+
+
+def q18a_expression_impl(ctx: DataFrameContext) -> Any:
+    """18a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("18a")
+
+
+def q18a_pandas_impl(ctx: DataFrameContext) -> Any:
+    """18a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("18a")
+
+
+def q18b_expression_impl(ctx: DataFrameContext) -> Any:
+    """18b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("18b")
+
+
+def q18b_pandas_impl(ctx: DataFrameContext) -> Any:
+    """18b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("18b")
+
+
+def q18c_expression_impl(ctx: DataFrameContext) -> Any:
+    """18c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("18c")
+
+
+def q18c_pandas_impl(ctx: DataFrameContext) -> Any:
+    """18c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("18c")
+
+
+def q19a_expression_impl(ctx: DataFrameContext) -> Any:
+    """19a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("19a")
+
+
+def q19a_pandas_impl(ctx: DataFrameContext) -> Any:
+    """19a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("19a")
+
+
+def q19b_expression_impl(ctx: DataFrameContext) -> Any:
+    """19b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("19b")
+
+
+def q19b_pandas_impl(ctx: DataFrameContext) -> Any:
+    """19b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("19b")
+
+
+def q19c_expression_impl(ctx: DataFrameContext) -> Any:
+    """19c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("19c")
+
+
+def q19c_pandas_impl(ctx: DataFrameContext) -> Any:
+    """19c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("19c")
+
+
+def q19d_expression_impl(ctx: DataFrameContext) -> Any:
+    """19d: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("19d")
+
+
+def q19d_pandas_impl(ctx: DataFrameContext) -> Any:
+    """19d: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("19d")
+
+
+def q20a_expression_impl(ctx: DataFrameContext) -> Any:
+    """20a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("20a")
+
+
+def q20a_pandas_impl(ctx: DataFrameContext) -> Any:
+    """20a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("20a")
+
+
+def q20b_expression_impl(ctx: DataFrameContext) -> Any:
+    """20b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("20b")
+
+
+def q20b_pandas_impl(ctx: DataFrameContext) -> Any:
+    """20b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("20b")
+
+
+def q20c_expression_impl(ctx: DataFrameContext) -> Any:
+    """20c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("20c")
+
+
+def q20c_pandas_impl(ctx: DataFrameContext) -> Any:
+    """20c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("20c")
+
+
+def q21a_expression_impl(ctx: DataFrameContext) -> Any:
+    """21a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("21a")
+
+
+def q21a_pandas_impl(ctx: DataFrameContext) -> Any:
+    """21a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("21a")
+
+
+def q21b_expression_impl(ctx: DataFrameContext) -> Any:
+    """21b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("21b")
+
+
+def q21b_pandas_impl(ctx: DataFrameContext) -> Any:
+    """21b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("21b")
+
+
+def q21c_expression_impl(ctx: DataFrameContext) -> Any:
+    """21c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("21c")
+
+
+def q21c_pandas_impl(ctx: DataFrameContext) -> Any:
+    """21c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("21c")
+
+
+def q22a_expression_impl(ctx: DataFrameContext) -> Any:
+    """22a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("22a")
+
+
+def q22a_pandas_impl(ctx: DataFrameContext) -> Any:
+    """22a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("22a")
+
+
+def q22b_expression_impl(ctx: DataFrameContext) -> Any:
+    """22b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("22b")
+
+
+def q22b_pandas_impl(ctx: DataFrameContext) -> Any:
+    """22b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("22b")
+
+
+def q22c_expression_impl(ctx: DataFrameContext) -> Any:
+    """22c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("22c")
+
+
+def q22c_pandas_impl(ctx: DataFrameContext) -> Any:
+    """22c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("22c")
+
+
+def q22d_expression_impl(ctx: DataFrameContext) -> Any:
+    """22d: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("22d")
+
+
+def q22d_pandas_impl(ctx: DataFrameContext) -> Any:
+    """22d: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("22d")
+
+
+def q23a_expression_impl(ctx: DataFrameContext) -> Any:
+    """23a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("23a")
+
+
+def q23a_pandas_impl(ctx: DataFrameContext) -> Any:
+    """23a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("23a")
+
+
+def q23b_expression_impl(ctx: DataFrameContext) -> Any:
+    """23b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("23b")
+
+
+def q23b_pandas_impl(ctx: DataFrameContext) -> Any:
+    """23b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("23b")
+
+
+def q23c_expression_impl(ctx: DataFrameContext) -> Any:
+    """23c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("23c")
+
+
+def q23c_pandas_impl(ctx: DataFrameContext) -> Any:
+    """23c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("23c")
+
+
+def q24a_expression_impl(ctx: DataFrameContext) -> Any:
+    """24a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("24a")
+
+
+def q24a_pandas_impl(ctx: DataFrameContext) -> Any:
+    """24a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("24a")
+
+
+def q24b_expression_impl(ctx: DataFrameContext) -> Any:
+    """24b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("24b")
+
+
+def q24b_pandas_impl(ctx: DataFrameContext) -> Any:
+    """24b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("24b")
+
+
+def q25a_expression_impl(ctx: DataFrameContext) -> Any:
+    """25a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("25a")
+
+
+def q25a_pandas_impl(ctx: DataFrameContext) -> Any:
+    """25a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("25a")
+
+
+def q25b_expression_impl(ctx: DataFrameContext) -> Any:
+    """25b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("25b")
+
+
+def q25b_pandas_impl(ctx: DataFrameContext) -> Any:
+    """25b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("25b")
+
+
+def q25c_expression_impl(ctx: DataFrameContext) -> Any:
+    """25c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("25c")
+
+
+def q25c_pandas_impl(ctx: DataFrameContext) -> Any:
+    """25c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("25c")
+
+
+def q26a_expression_impl(ctx: DataFrameContext) -> Any:
+    """26a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("26a")
+
+
+def q26a_pandas_impl(ctx: DataFrameContext) -> Any:
+    """26a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("26a")
+
+
+def q26b_expression_impl(ctx: DataFrameContext) -> Any:
+    """26b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("26b")
+
+
+def q26b_pandas_impl(ctx: DataFrameContext) -> Any:
+    """26b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("26b")
+
+
+def q26c_expression_impl(ctx: DataFrameContext) -> Any:
+    """26c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("26c")
+
+
+def q26c_pandas_impl(ctx: DataFrameContext) -> Any:
+    """26c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("26c")
+
+
+def q27a_expression_impl(ctx: DataFrameContext) -> Any:
+    """27a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("27a")
+
+
+def q27a_pandas_impl(ctx: DataFrameContext) -> Any:
+    """27a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("27a")
+
+
+def q27b_expression_impl(ctx: DataFrameContext) -> Any:
+    """27b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("27b")
+
+
+def q27b_pandas_impl(ctx: DataFrameContext) -> Any:
+    """27b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("27b")
+
+
+def q27c_expression_impl(ctx: DataFrameContext) -> Any:
+    """27c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("27c")
+
+
+def q27c_pandas_impl(ctx: DataFrameContext) -> Any:
+    """27c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("27c")
+
+
+def q28a_expression_impl(ctx: DataFrameContext) -> Any:
+    """28a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("28a")
+
+
+def q28a_pandas_impl(ctx: DataFrameContext) -> Any:
+    """28a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("28a")
+
+
+def q28b_expression_impl(ctx: DataFrameContext) -> Any:
+    """28b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("28b")
+
+
+def q28b_pandas_impl(ctx: DataFrameContext) -> Any:
+    """28b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("28b")
+
+
+def q28c_expression_impl(ctx: DataFrameContext) -> Any:
+    """28c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("28c")
+
+
+def q28c_pandas_impl(ctx: DataFrameContext) -> Any:
+    """28c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("28c")
+
+
+def q29a_expression_impl(ctx: DataFrameContext) -> Any:
+    """29a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("29a")
+
+
+def q29a_pandas_impl(ctx: DataFrameContext) -> Any:
+    """29a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("29a")
+
+
+def q29b_expression_impl(ctx: DataFrameContext) -> Any:
+    """29b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("29b")
+
+
+def q29b_pandas_impl(ctx: DataFrameContext) -> Any:
+    """29b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("29b")
+
+
+def q29c_expression_impl(ctx: DataFrameContext) -> Any:
+    """29c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("29c")
+
+
+def q29c_pandas_impl(ctx: DataFrameContext) -> Any:
+    """29c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("29c")
+
+
+def q30a_expression_impl(ctx: DataFrameContext) -> Any:
+    """30a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("30a")
+
+
+def q30a_pandas_impl(ctx: DataFrameContext) -> Any:
+    """30a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("30a")
+
+
+def q30b_expression_impl(ctx: DataFrameContext) -> Any:
+    """30b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("30b")
+
+
+def q30b_pandas_impl(ctx: DataFrameContext) -> Any:
+    """30b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("30b")
+
+
+def q30c_expression_impl(ctx: DataFrameContext) -> Any:
+    """30c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("30c")
+
+
+def q30c_pandas_impl(ctx: DataFrameContext) -> Any:
+    """30c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("30c")
+
+
+def q31a_expression_impl(ctx: DataFrameContext) -> Any:
+    """31a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("31a")
+
+
+def q31a_pandas_impl(ctx: DataFrameContext) -> Any:
+    """31a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("31a")
+
+
+def q31b_expression_impl(ctx: DataFrameContext) -> Any:
+    """31b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("31b")
+
+
+def q31b_pandas_impl(ctx: DataFrameContext) -> Any:
+    """31b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("31b")
+
+
+def q31c_expression_impl(ctx: DataFrameContext) -> Any:
+    """31c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("31c")
+
+
+def q31c_pandas_impl(ctx: DataFrameContext) -> Any:
+    """31c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("31c")
+
+
+def q32a_expression_impl(ctx: DataFrameContext) -> Any:
+    """32a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("32a")
+
+
+def q32a_pandas_impl(ctx: DataFrameContext) -> Any:
+    """32a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("32a")
+
+
+def q32b_expression_impl(ctx: DataFrameContext) -> Any:
+    """32b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("32b")
+
+
+def q32b_pandas_impl(ctx: DataFrameContext) -> Any:
+    """32b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("32b")
+
+
+def q33a_expression_impl(ctx: DataFrameContext) -> Any:
+    """33a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("33a")
+
+
+def q33a_pandas_impl(ctx: DataFrameContext) -> Any:
+    """33a: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("33a")
+
+
+def q33b_expression_impl(ctx: DataFrameContext) -> Any:
+    """33b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("33b")
+
+
+def q33b_pandas_impl(ctx: DataFrameContext) -> Any:
+    """33b: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("33b")
+
+
+def q33c_expression_impl(ctx: DataFrameContext) -> Any:
+    """33c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("33c")
+
+
+def q33c_pandas_impl(ctx: DataFrameContext) -> Any:
+    """33c: untranslated canonical JoinOrder query."""
+    _raise_untranslated_dataframe_query("33c")
+
+
+def _make_generated_expression_impl(query_id: str) -> Any:
+    def _impl(ctx: DataFrameContext) -> Any:
+        return _execute_joinorder_expression_query(ctx, query_id)
+
+    _impl.__name__ = f"q{query_id}_expression_impl"
+    _impl.__doc__ = f"{query_id}: generated canonical JoinOrder DataFrame translation."
+    return _impl
+
+
+def _make_generated_pandas_impl(query_id: str) -> Any:
+    def _impl(ctx: DataFrameContext) -> Any:
+        return _execute_joinorder_pandas_query(ctx, query_id)
+
+    _impl.__name__ = f"q{query_id}_pandas_impl"
+    _impl.__doc__ = f"{query_id}: generated canonical JoinOrder pandas translation."
+    return _impl
+
+
+for _query_id in CANONICAL_JOINORDER_QUERIES:
+    if _query_id in _HAND_TRANSLATED_DATAFRAME_QUERY_IDS:
+        continue
+    globals()[f"q{_query_id}_expression_impl"] = _make_generated_expression_impl(_query_id)
+    globals()[f"q{_query_id}_pandas_impl"] = _make_generated_pandas_impl(_query_id)
+
+
 # ===========================================================================
 # Registry
 # ===========================================================================
@@ -1115,16 +2552,827 @@ _QUERIES = [
         expression_impl=q12a_expression_impl,
         pandas_impl=q12a_pandas_impl,
     ),
+    DataFrameQuery(
+        query_id="1c",
+        query_name="Canonical JoinOrder 1c",
+        description="Canonical JoinOrder SQL query 1c; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q1c_expression_impl,
+        pandas_impl=q1c_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="1d",
+        query_name="Canonical JoinOrder 1d",
+        description="Canonical JoinOrder SQL query 1d; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q1d_expression_impl,
+        pandas_impl=q1d_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="2b",
+        query_name="Canonical JoinOrder 2b",
+        description="Canonical JoinOrder SQL query 2b; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q2b_expression_impl,
+        pandas_impl=q2b_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="2c",
+        query_name="Canonical JoinOrder 2c",
+        description="Canonical JoinOrder SQL query 2c; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q2c_expression_impl,
+        pandas_impl=q2c_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="2d",
+        query_name="Canonical JoinOrder 2d",
+        description="Canonical JoinOrder SQL query 2d; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q2d_expression_impl,
+        pandas_impl=q2d_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="3b",
+        query_name="Canonical JoinOrder 3b",
+        description="Canonical JoinOrder SQL query 3b; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q3b_expression_impl,
+        pandas_impl=q3b_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="3c",
+        query_name="Canonical JoinOrder 3c",
+        description="Canonical JoinOrder SQL query 3c; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q3c_expression_impl,
+        pandas_impl=q3c_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="4b",
+        query_name="Canonical JoinOrder 4b",
+        description="Canonical JoinOrder SQL query 4b; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q4b_expression_impl,
+        pandas_impl=q4b_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="4c",
+        query_name="Canonical JoinOrder 4c",
+        description="Canonical JoinOrder SQL query 4c; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q4c_expression_impl,
+        pandas_impl=q4c_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="5b",
+        query_name="Canonical JoinOrder 5b",
+        description="Canonical JoinOrder SQL query 5b; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q5b_expression_impl,
+        pandas_impl=q5b_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="5c",
+        query_name="Canonical JoinOrder 5c",
+        description="Canonical JoinOrder SQL query 5c; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q5c_expression_impl,
+        pandas_impl=q5c_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="6b",
+        query_name="Canonical JoinOrder 6b",
+        description="Canonical JoinOrder SQL query 6b; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q6b_expression_impl,
+        pandas_impl=q6b_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="6c",
+        query_name="Canonical JoinOrder 6c",
+        description="Canonical JoinOrder SQL query 6c; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q6c_expression_impl,
+        pandas_impl=q6c_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="6d",
+        query_name="Canonical JoinOrder 6d",
+        description="Canonical JoinOrder SQL query 6d; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q6d_expression_impl,
+        pandas_impl=q6d_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="6e",
+        query_name="Canonical JoinOrder 6e",
+        description="Canonical JoinOrder SQL query 6e; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q6e_expression_impl,
+        pandas_impl=q6e_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="6f",
+        query_name="Canonical JoinOrder 6f",
+        description="Canonical JoinOrder SQL query 6f; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q6f_expression_impl,
+        pandas_impl=q6f_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="7b",
+        query_name="Canonical JoinOrder 7b",
+        description="Canonical JoinOrder SQL query 7b; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q7b_expression_impl,
+        pandas_impl=q7b_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="7c",
+        query_name="Canonical JoinOrder 7c",
+        description="Canonical JoinOrder SQL query 7c; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q7c_expression_impl,
+        pandas_impl=q7c_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="8b",
+        query_name="Canonical JoinOrder 8b",
+        description="Canonical JoinOrder SQL query 8b; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q8b_expression_impl,
+        pandas_impl=q8b_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="8c",
+        query_name="Canonical JoinOrder 8c",
+        description="Canonical JoinOrder SQL query 8c; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q8c_expression_impl,
+        pandas_impl=q8c_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="8d",
+        query_name="Canonical JoinOrder 8d",
+        description="Canonical JoinOrder SQL query 8d; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q8d_expression_impl,
+        pandas_impl=q8d_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="9b",
+        query_name="Canonical JoinOrder 9b",
+        description="Canonical JoinOrder SQL query 9b; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q9b_expression_impl,
+        pandas_impl=q9b_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="9c",
+        query_name="Canonical JoinOrder 9c",
+        description="Canonical JoinOrder SQL query 9c; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q9c_expression_impl,
+        pandas_impl=q9c_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="9d",
+        query_name="Canonical JoinOrder 9d",
+        description="Canonical JoinOrder SQL query 9d; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q9d_expression_impl,
+        pandas_impl=q9d_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="10b",
+        query_name="Canonical JoinOrder 10b",
+        description="Canonical JoinOrder SQL query 10b; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q10b_expression_impl,
+        pandas_impl=q10b_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="10c",
+        query_name="Canonical JoinOrder 10c",
+        description="Canonical JoinOrder SQL query 10c; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q10c_expression_impl,
+        pandas_impl=q10c_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="11b",
+        query_name="Canonical JoinOrder 11b",
+        description="Canonical JoinOrder SQL query 11b; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q11b_expression_impl,
+        pandas_impl=q11b_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="11c",
+        query_name="Canonical JoinOrder 11c",
+        description="Canonical JoinOrder SQL query 11c; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q11c_expression_impl,
+        pandas_impl=q11c_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="11d",
+        query_name="Canonical JoinOrder 11d",
+        description="Canonical JoinOrder SQL query 11d; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q11d_expression_impl,
+        pandas_impl=q11d_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="12b",
+        query_name="Canonical JoinOrder 12b",
+        description="Canonical JoinOrder SQL query 12b; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q12b_expression_impl,
+        pandas_impl=q12b_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="12c",
+        query_name="Canonical JoinOrder 12c",
+        description="Canonical JoinOrder SQL query 12c; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q12c_expression_impl,
+        pandas_impl=q12c_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="13a",
+        query_name="Canonical JoinOrder 13a",
+        description="Canonical JoinOrder SQL query 13a; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q13a_expression_impl,
+        pandas_impl=q13a_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="13b",
+        query_name="Canonical JoinOrder 13b",
+        description="Canonical JoinOrder SQL query 13b; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q13b_expression_impl,
+        pandas_impl=q13b_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="13c",
+        query_name="Canonical JoinOrder 13c",
+        description="Canonical JoinOrder SQL query 13c; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q13c_expression_impl,
+        pandas_impl=q13c_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="13d",
+        query_name="Canonical JoinOrder 13d",
+        description="Canonical JoinOrder SQL query 13d; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q13d_expression_impl,
+        pandas_impl=q13d_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="14a",
+        query_name="Canonical JoinOrder 14a",
+        description="Canonical JoinOrder SQL query 14a; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q14a_expression_impl,
+        pandas_impl=q14a_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="14b",
+        query_name="Canonical JoinOrder 14b",
+        description="Canonical JoinOrder SQL query 14b; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q14b_expression_impl,
+        pandas_impl=q14b_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="14c",
+        query_name="Canonical JoinOrder 14c",
+        description="Canonical JoinOrder SQL query 14c; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q14c_expression_impl,
+        pandas_impl=q14c_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="15a",
+        query_name="Canonical JoinOrder 15a",
+        description="Canonical JoinOrder SQL query 15a; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q15a_expression_impl,
+        pandas_impl=q15a_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="15b",
+        query_name="Canonical JoinOrder 15b",
+        description="Canonical JoinOrder SQL query 15b; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q15b_expression_impl,
+        pandas_impl=q15b_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="15c",
+        query_name="Canonical JoinOrder 15c",
+        description="Canonical JoinOrder SQL query 15c; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q15c_expression_impl,
+        pandas_impl=q15c_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="15d",
+        query_name="Canonical JoinOrder 15d",
+        description="Canonical JoinOrder SQL query 15d; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q15d_expression_impl,
+        pandas_impl=q15d_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="16a",
+        query_name="Canonical JoinOrder 16a",
+        description="Canonical JoinOrder SQL query 16a; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q16a_expression_impl,
+        pandas_impl=q16a_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="16b",
+        query_name="Canonical JoinOrder 16b",
+        description="Canonical JoinOrder SQL query 16b; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q16b_expression_impl,
+        pandas_impl=q16b_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="16c",
+        query_name="Canonical JoinOrder 16c",
+        description="Canonical JoinOrder SQL query 16c; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q16c_expression_impl,
+        pandas_impl=q16c_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="16d",
+        query_name="Canonical JoinOrder 16d",
+        description="Canonical JoinOrder SQL query 16d; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q16d_expression_impl,
+        pandas_impl=q16d_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="17a",
+        query_name="Canonical JoinOrder 17a",
+        description="Canonical JoinOrder SQL query 17a; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q17a_expression_impl,
+        pandas_impl=q17a_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="17b",
+        query_name="Canonical JoinOrder 17b",
+        description="Canonical JoinOrder SQL query 17b; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q17b_expression_impl,
+        pandas_impl=q17b_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="17c",
+        query_name="Canonical JoinOrder 17c",
+        description="Canonical JoinOrder SQL query 17c; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q17c_expression_impl,
+        pandas_impl=q17c_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="17d",
+        query_name="Canonical JoinOrder 17d",
+        description="Canonical JoinOrder SQL query 17d; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q17d_expression_impl,
+        pandas_impl=q17d_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="17e",
+        query_name="Canonical JoinOrder 17e",
+        description="Canonical JoinOrder SQL query 17e; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q17e_expression_impl,
+        pandas_impl=q17e_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="17f",
+        query_name="Canonical JoinOrder 17f",
+        description="Canonical JoinOrder SQL query 17f; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q17f_expression_impl,
+        pandas_impl=q17f_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="18a",
+        query_name="Canonical JoinOrder 18a",
+        description="Canonical JoinOrder SQL query 18a; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q18a_expression_impl,
+        pandas_impl=q18a_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="18b",
+        query_name="Canonical JoinOrder 18b",
+        description="Canonical JoinOrder SQL query 18b; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q18b_expression_impl,
+        pandas_impl=q18b_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="18c",
+        query_name="Canonical JoinOrder 18c",
+        description="Canonical JoinOrder SQL query 18c; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q18c_expression_impl,
+        pandas_impl=q18c_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="19a",
+        query_name="Canonical JoinOrder 19a",
+        description="Canonical JoinOrder SQL query 19a; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q19a_expression_impl,
+        pandas_impl=q19a_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="19b",
+        query_name="Canonical JoinOrder 19b",
+        description="Canonical JoinOrder SQL query 19b; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q19b_expression_impl,
+        pandas_impl=q19b_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="19c",
+        query_name="Canonical JoinOrder 19c",
+        description="Canonical JoinOrder SQL query 19c; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q19c_expression_impl,
+        pandas_impl=q19c_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="19d",
+        query_name="Canonical JoinOrder 19d",
+        description="Canonical JoinOrder SQL query 19d; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q19d_expression_impl,
+        pandas_impl=q19d_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="20a",
+        query_name="Canonical JoinOrder 20a",
+        description="Canonical JoinOrder SQL query 20a; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q20a_expression_impl,
+        pandas_impl=q20a_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="20b",
+        query_name="Canonical JoinOrder 20b",
+        description="Canonical JoinOrder SQL query 20b; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q20b_expression_impl,
+        pandas_impl=q20b_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="20c",
+        query_name="Canonical JoinOrder 20c",
+        description="Canonical JoinOrder SQL query 20c; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q20c_expression_impl,
+        pandas_impl=q20c_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="21a",
+        query_name="Canonical JoinOrder 21a",
+        description="Canonical JoinOrder SQL query 21a; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q21a_expression_impl,
+        pandas_impl=q21a_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="21b",
+        query_name="Canonical JoinOrder 21b",
+        description="Canonical JoinOrder SQL query 21b; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q21b_expression_impl,
+        pandas_impl=q21b_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="21c",
+        query_name="Canonical JoinOrder 21c",
+        description="Canonical JoinOrder SQL query 21c; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q21c_expression_impl,
+        pandas_impl=q21c_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="22a",
+        query_name="Canonical JoinOrder 22a",
+        description="Canonical JoinOrder SQL query 22a; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q22a_expression_impl,
+        pandas_impl=q22a_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="22b",
+        query_name="Canonical JoinOrder 22b",
+        description="Canonical JoinOrder SQL query 22b; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q22b_expression_impl,
+        pandas_impl=q22b_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="22c",
+        query_name="Canonical JoinOrder 22c",
+        description="Canonical JoinOrder SQL query 22c; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q22c_expression_impl,
+        pandas_impl=q22c_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="22d",
+        query_name="Canonical JoinOrder 22d",
+        description="Canonical JoinOrder SQL query 22d; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q22d_expression_impl,
+        pandas_impl=q22d_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="23a",
+        query_name="Canonical JoinOrder 23a",
+        description="Canonical JoinOrder SQL query 23a; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q23a_expression_impl,
+        pandas_impl=q23a_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="23b",
+        query_name="Canonical JoinOrder 23b",
+        description="Canonical JoinOrder SQL query 23b; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q23b_expression_impl,
+        pandas_impl=q23b_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="23c",
+        query_name="Canonical JoinOrder 23c",
+        description="Canonical JoinOrder SQL query 23c; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q23c_expression_impl,
+        pandas_impl=q23c_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="24a",
+        query_name="Canonical JoinOrder 24a",
+        description="Canonical JoinOrder SQL query 24a; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q24a_expression_impl,
+        pandas_impl=q24a_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="24b",
+        query_name="Canonical JoinOrder 24b",
+        description="Canonical JoinOrder SQL query 24b; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q24b_expression_impl,
+        pandas_impl=q24b_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="25a",
+        query_name="Canonical JoinOrder 25a",
+        description="Canonical JoinOrder SQL query 25a; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q25a_expression_impl,
+        pandas_impl=q25a_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="25b",
+        query_name="Canonical JoinOrder 25b",
+        description="Canonical JoinOrder SQL query 25b; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q25b_expression_impl,
+        pandas_impl=q25b_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="25c",
+        query_name="Canonical JoinOrder 25c",
+        description="Canonical JoinOrder SQL query 25c; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q25c_expression_impl,
+        pandas_impl=q25c_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="26a",
+        query_name="Canonical JoinOrder 26a",
+        description="Canonical JoinOrder SQL query 26a; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q26a_expression_impl,
+        pandas_impl=q26a_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="26b",
+        query_name="Canonical JoinOrder 26b",
+        description="Canonical JoinOrder SQL query 26b; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q26b_expression_impl,
+        pandas_impl=q26b_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="26c",
+        query_name="Canonical JoinOrder 26c",
+        description="Canonical JoinOrder SQL query 26c; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q26c_expression_impl,
+        pandas_impl=q26c_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="27a",
+        query_name="Canonical JoinOrder 27a",
+        description="Canonical JoinOrder SQL query 27a; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q27a_expression_impl,
+        pandas_impl=q27a_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="27b",
+        query_name="Canonical JoinOrder 27b",
+        description="Canonical JoinOrder SQL query 27b; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q27b_expression_impl,
+        pandas_impl=q27b_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="27c",
+        query_name="Canonical JoinOrder 27c",
+        description="Canonical JoinOrder SQL query 27c; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q27c_expression_impl,
+        pandas_impl=q27c_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="28a",
+        query_name="Canonical JoinOrder 28a",
+        description="Canonical JoinOrder SQL query 28a; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q28a_expression_impl,
+        pandas_impl=q28a_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="28b",
+        query_name="Canonical JoinOrder 28b",
+        description="Canonical JoinOrder SQL query 28b; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q28b_expression_impl,
+        pandas_impl=q28b_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="28c",
+        query_name="Canonical JoinOrder 28c",
+        description="Canonical JoinOrder SQL query 28c; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q28c_expression_impl,
+        pandas_impl=q28c_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="29a",
+        query_name="Canonical JoinOrder 29a",
+        description="Canonical JoinOrder SQL query 29a; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q29a_expression_impl,
+        pandas_impl=q29a_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="29b",
+        query_name="Canonical JoinOrder 29b",
+        description="Canonical JoinOrder SQL query 29b; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q29b_expression_impl,
+        pandas_impl=q29b_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="29c",
+        query_name="Canonical JoinOrder 29c",
+        description="Canonical JoinOrder SQL query 29c; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q29c_expression_impl,
+        pandas_impl=q29c_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="30a",
+        query_name="Canonical JoinOrder 30a",
+        description="Canonical JoinOrder SQL query 30a; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q30a_expression_impl,
+        pandas_impl=q30a_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="30b",
+        query_name="Canonical JoinOrder 30b",
+        description="Canonical JoinOrder SQL query 30b; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q30b_expression_impl,
+        pandas_impl=q30b_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="30c",
+        query_name="Canonical JoinOrder 30c",
+        description="Canonical JoinOrder SQL query 30c; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q30c_expression_impl,
+        pandas_impl=q30c_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="31a",
+        query_name="Canonical JoinOrder 31a",
+        description="Canonical JoinOrder SQL query 31a; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q31a_expression_impl,
+        pandas_impl=q31a_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="31b",
+        query_name="Canonical JoinOrder 31b",
+        description="Canonical JoinOrder SQL query 31b; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q31b_expression_impl,
+        pandas_impl=q31b_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="31c",
+        query_name="Canonical JoinOrder 31c",
+        description="Canonical JoinOrder SQL query 31c; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q31c_expression_impl,
+        pandas_impl=q31c_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="32a",
+        query_name="Canonical JoinOrder 32a",
+        description="Canonical JoinOrder SQL query 32a; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q32a_expression_impl,
+        pandas_impl=q32a_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="32b",
+        query_name="Canonical JoinOrder 32b",
+        description="Canonical JoinOrder SQL query 32b; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q32b_expression_impl,
+        pandas_impl=q32b_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="33a",
+        query_name="Canonical JoinOrder 33a",
+        description="Canonical JoinOrder SQL query 33a; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q33a_expression_impl,
+        pandas_impl=q33a_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="33b",
+        query_name="Canonical JoinOrder 33b",
+        description="Canonical JoinOrder SQL query 33b; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q33b_expression_impl,
+        pandas_impl=q33b_pandas_impl,
+    ),
+    DataFrameQuery(
+        query_id="33c",
+        query_name="Canonical JoinOrder 33c",
+        description="Canonical JoinOrder SQL query 33c; DataFrame translation pending Track-2 coverage",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=q33c_expression_impl,
+        pandas_impl=q33c_pandas_impl,
+    ),
 ]
 
 for _query in _QUERIES:
+    if _query.query_id not in _HAND_TRANSLATED_DATAFRAME_QUERY_IDS:
+        _query.description = f"Canonical JoinOrder SQL query {_query.query_id}; generated DataFrame translation"
     JOINORDER_DATAFRAME_QUERIES.register(_query)
 
 
 def get_dataframe_queries() -> QueryRegistry:
-    """Get the JoinOrder DataFrame query registry.
+    """Get the canonical JoinOrder DataFrame query registry.
 
-    Returns:
-        QueryRegistry containing all 13 JoinOrder DataFrame queries
+    The registry contains DataFrame implementations for all 113 canonical query IDs.
     """
     return JOINORDER_DATAFRAME_QUERIES
+
+
+def get_implemented_dataframe_query_ids() -> list[str]:
+    """Return query IDs with real DataFrame translations."""
+    return list(IMPLEMENTED_DATAFRAME_QUERY_IDS)
+
+
+def get_untranslated_dataframe_query_ids() -> list[str]:
+    """Return canonical query IDs that are not available in DataFrame mode."""
+    return list(UNTRANSLATED_DATAFRAME_QUERY_IDS)

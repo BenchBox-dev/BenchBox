@@ -68,6 +68,15 @@ class PublicationRecord:
     scale_factor: float = 1.0
     """Scale factor extracted from the result bundle."""
 
+    dataset_version: str | None = None
+    """Logical dataset version from the benchmark data manifest, when present."""
+
+    manifest_hash: str | None = None
+    """Logical manifest hash from the benchmark data manifest, when present."""
+
+    data_archive_hash: str | None = None
+    """Aggregate data archive hash from the benchmark data manifest, when present."""
+
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
@@ -110,6 +119,9 @@ class PublicationStore:
         benchmark: str = "",
         platform: str = "",
         scale_factor: float = 1.0,
+        dataset_version: str | None = None,
+        manifest_hash: str | None = None,
+        data_archive_hash: str | None = None,
     ) -> PublicationRecord:
         """Add or update a publication record.
 
@@ -142,6 +154,11 @@ class PublicationStore:
             existing.benchmark = benchmark or existing.benchmark
             existing.platform = platform or existing.platform
             existing.scale_factor = scale_factor or existing.scale_factor
+            existing.dataset_version = dataset_version if dataset_version is not None else existing.dataset_version
+            existing.manifest_hash = manifest_hash if manifest_hash is not None else existing.manifest_hash
+            existing.data_archive_hash = (
+                data_archive_hash if data_archive_hash is not None else existing.data_archive_hash
+            )
             self._save(records)
             return existing
 
@@ -156,6 +173,9 @@ class PublicationStore:
             benchmark=benchmark,
             platform=platform,
             scale_factor=scale_factor,
+            dataset_version=dataset_version,
+            manifest_hash=manifest_hash,
+            data_archive_hash=data_archive_hash,
         )
         records.append(record)
         self._save(records)

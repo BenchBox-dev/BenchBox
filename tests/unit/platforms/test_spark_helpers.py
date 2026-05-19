@@ -277,6 +277,83 @@ class TestOptimizeSparkTableDefinition:
         assert "\n" in result
         assert "PRIMARY KEY" not in result.upper()
 
+    def test_table_level_pk_after_trailing_comma_leaves_no_dangling_paren(self) -> None:
+        """Stripping ``, PRIMARY KEY (col)`` must not leave a bare ``, (col)`` group.
+
+        Regression: the inline-PK regex used to drop just the keywords, leaving
+        ``service_zone VARCHAR, (location_id))`` which Sail's DataFusion parser
+        rejected with ``found ( expected identifier``.
+        """
+        result = optimize_spark_table_definition(
+            "CREATE TABLE taxi_zones (\n    location_id INTEGER,\n    zone VARCHAR,\n    PRIMARY KEY (location_id)\n)",
+            table_format="parquet",
+        )
+        assert "PRIMARY KEY" not in result.upper()
+        # No dangling parenthesised group where a column definition should be.
+        assert "(location_id))" not in result.replace(" ", "")
+        assert result.count("(") == result.count(")")
+        assert result.endswith("USING PARQUET")
+        assert "location_id INTEGER" in result
+        assert "zone VARCHAR" in result
+
+    def test_strips_leading_line_comments_so_create_table_is_detected(self) -> None:
+        """A ``-- comment`` header must not block normalisation of the DDL below it.
+
+        Several benchmark schema generators (metadata_primitives, write_primitives,
+        transaction_primitives) emit a comment banner before ``CREATE TABLE``;
+        without stripping it the constraint clauses reached Sail verbatim.
+        """
+        result = optimize_spark_table_definition(
+            "-- Benchmark schema\n-- second comment line\n\n"
+            "CREATE TABLE region (\n    r_regionkey INTEGER NOT NULL,\n"
+            "    r_name CHAR(25) NOT NULL,\n    PRIMARY KEY (r_regionkey)\n)",
+            table_format="parquet",
+        )
+        assert result.upper().startswith("CREATE TABLE")
+        assert "PRIMARY KEY" not in result.upper()
+        assert "--" not in result
+        assert result.endswith("USING PARQUET")
+
+    def test_strips_leading_block_comments(self) -> None:
+        """SQLGlot transpilation rewrites -- headers into /* */ blocks folded onto
+        the first statement; those must also be stripped before CREATE TABLE
+        detection."""
+        result = optimize_spark_table_definition(
+            "/* Benchmark Schema */ /* second banner */ "
+            "CREATE TABLE `region` (`r_regionkey` INT NOT NULL, "
+            "`r_comment` STRING, PRIMARY KEY (`r_regionkey`))",
+            table_format="parquet",
+        )
+        assert result.upper().startswith("CREATE TABLE")
+        assert "PRIMARY KEY" not in result.upper()
+        assert "/*" not in result
+        assert result.endswith("USING PARQUET")
+
+    def test_comment_only_chunk_returns_empty(self) -> None:
+        assert optimize_spark_table_definition("-- just a comment\n", table_format="parquet") == ""
+        assert optimize_spark_table_definition("/* only a block comment */", table_format="parquet") == ""
+        assert optimize_spark_table_definition("   \n  ", table_format="parquet") == ""
+
+    def test_fixed_size_array_type_rewritten_to_array_element_type(self) -> None:
+        """DuckDB ``FLOAT[128]`` array columns become portable ``ARRAY<FLOAT>``."""
+        result = optimize_spark_table_definition(
+            "CREATE TABLE vectors (id BIGINT, embedding FLOAT[128], doc_id VARCHAR(100))",
+            table_format="parquet",
+        )
+        assert "ARRAY<FLOAT>" in result.upper()
+        assert "[128]" not in result
+        assert "embedding ARRAY<FLOAT>" in result
+
+    def test_array_type_with_transpiled_fixed_size_suffix_normalised(self) -> None:
+        """SQLGlot may emit ``ARRAY<FLOAT>[128]``; the trailing suffix must drop."""
+        result = optimize_spark_table_definition(
+            "CREATE TABLE vectors (id BIGINT, embedding ARRAY<FLOAT>[128])",
+            table_format="parquet",
+        )
+        assert "[128]" not in result
+        assert "ARRAY<FLOAT>" in result.upper()
+        assert result.endswith("USING PARQUET")
+
 
 # ---------------------------------------------------------------------------
 # purge_orphaned_warehouse_directory
@@ -439,6 +516,40 @@ class TestRunSparkSchemaCreationLoop:
         assert any(c.startswith("CREATE TABLE orders") for c in calls)
         assert any(c.startswith("DROP TABLE IF EXISTS") for c in calls)
         assert sum(1 for c in calls if c.startswith("CREATE TABLE orders")) == 2
+
+    def test_already_exists_with_backtick_identifier_drops_unquoted_safe_name(self) -> None:
+        spark = MagicMock()
+        calls: list[str] = []
+
+        def sql_side_effect(query):
+            calls.append(query)
+            if calls.count(query) == 1 and query.startswith("CREATE TABLE"):
+                raise RuntimeError("[LOCATION_ALREADY_EXISTS] The location for table 'region' already exists.")
+            return MagicMock()
+
+        spark.sql.side_effect = sql_side_effect
+
+        run_spark_schema_creation_loop(
+            spark,
+            ["CREATE TABLE `region` (`r_regionkey` INT)"],
+            lambda s: s,
+            logger=logging.getLogger(__name__),
+        )
+
+        assert "DROP TABLE IF EXISTS region" in calls
+        assert sum(1 for c in calls if c.startswith("CREATE TABLE `region`")) == 2
+
+    def test_backtick_quoted_dotted_identifier_still_fails_validation(self) -> None:
+        spark = MagicMock()
+        spark.sql.side_effect = RuntimeError("Table already exists")
+
+        with pytest.raises(RuntimeError, match="strict-ASCII identifier validation"):
+            run_spark_schema_creation_loop(
+                spark,
+                ["CREATE TABLE `my_schema.tbl` (id INT)"],
+                lambda s: s,
+                logger=logging.getLogger(__name__),
+            )
 
     def test_location_collision_hook_fires_on_location_already_exists(self) -> None:
         """Spark.py uses on_location_collision to rmtree the orphaned warehouse dir."""

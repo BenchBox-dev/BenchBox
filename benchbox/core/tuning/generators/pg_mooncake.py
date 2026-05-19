@@ -1,9 +1,9 @@
 """pg_mooncake DDL Generator.
 
-Generates CREATE TABLE statements for pg_mooncake with columnstore access method:
-- Adds USING columnstore to all CREATE TABLE statements
+Generates loadable CREATE TABLE statements for pg_mooncake:
+- Keeps PostgreSQL heap DDL for the bulk COPY load path
 - Skips PostgreSQL-specific tuning (indexes, CLUSTER, partitioning)
-  since columnstore tables manage their own storage layout
+  because loaded tables are promoted into mooncake mirrors after load
 
 pg_mooncake uses Parquet-based columnstore tables with Iceberg metadata.
 The DuckDB execution engine handles query optimization internally, so
@@ -14,7 +14,7 @@ Example:
     >>> generator = PgMooncakeDDLGenerator()
     >>> clauses = generator.generate_tuning_clauses(table_tuning)
     >>> ddl = generator.generate_create_table_ddl("lineitem", columns, clauses)
-    >>> # DDL ends with USING columnstore
+    >>> # DDL remains COPY-loadable PostgreSQL heap DDL
 
 Copyright 2026 Joe Harris / BenchBox Project
 
@@ -40,12 +40,12 @@ logger = logging.getLogger(__name__)
 
 
 class PgMooncakeDDLGenerator(PostgreSQLDDLGenerator):
-    """DDL generator for pg_mooncake columnstore tables.
+    """DDL generator for pg_mooncake heap-load tables.
 
-    Extends PostgreSQLDDLGenerator to add USING columnstore to CREATE TABLE
-    statements. Since columnstore tables manage their own Parquet-based
-    storage layout internally, most PostgreSQL physical tuning options
-    (partitioning, clustering, indexes) are not applicable.
+    Extends PostgreSQLDDLGenerator to preserve COPY-loadable heap CREATE TABLE
+    statements. The runtime adapter promotes loaded heap tables into mooncake
+    mirrors after COPY because pg_mooncake 0.2.0 does not support COPY into
+    mooncake access-method tables.
 
     Tuning Notes:
     - PARTITION BY is not applicable (Iceberg handles partitioning internally)
@@ -87,10 +87,11 @@ class PgMooncakeDDLGenerator(PostgreSQLDDLGenerator):
         tuning: TuningClauses,
         schema: str | None = None,
     ) -> str:
-        """Generate CREATE TABLE DDL with USING columnstore.
+        """Generate COPY-loadable heap CREATE TABLE DDL.
 
-        Delegates to PostgreSQL generator for the base DDL, then appends
-        USING columnstore before the semicolon.
+        Delegates to PostgreSQL generator for the base DDL and deliberately
+        avoids adding ``USING mooncake``. Runtime promotion happens after data
+        load through ``mooncake.create_table``.
 
         Args:
             table_name: Name of the table to create.
@@ -99,18 +100,9 @@ class PgMooncakeDDLGenerator(PostgreSQLDDLGenerator):
             schema: Optional schema name.
 
         Returns:
-            CREATE TABLE statement with USING columnstore access method.
+            CREATE TABLE statement suitable for PostgreSQL COPY loading.
         """
-        base_ddl = super().generate_create_table_ddl(table_name, columns, tuning, schema)
-
-        # Add USING columnstore if not already present
-        if "USING columnstore" not in base_ddl and "using columnstore" not in base_ddl:
-            if base_ddl.rstrip().endswith(";"):
-                base_ddl = base_ddl.rstrip()[:-1] + " USING columnstore;"
-            else:
-                base_ddl = base_ddl.rstrip() + " USING columnstore"
-
-        return base_ddl
+        return super().generate_create_table_ddl(table_name, columns, tuning, schema)
 
     def generate_partition_children(
         self,

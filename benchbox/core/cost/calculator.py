@@ -5,11 +5,13 @@ platform-specific resource usage metrics and configuration.
 """
 
 import logging
+from decimal import Decimal
 from typing import Any, Callable, Optional
 
-from benchbox.core.cost.models import BenchmarkCost, PhaseCost, QueryCost
+from benchbox.core.cost.models import BenchmarkCost, DeploymentMetadata, NormalizedCost, PhaseCost, QueryCost
 from benchbox.core.cost.pricing import (
     CURRENCY,
+    PRICING_VERSION,
     get_athena_price_per_tb,
     get_bigquery_price_per_tb,
     get_databricks_dbu_price,
@@ -24,6 +26,7 @@ from benchbox.core.cost.pricing import (
 )
 
 logger = logging.getLogger(__name__)
+_COST_MODEL_SOURCE = "benchbox.core.cost.pricing"
 
 # Conversion constants
 BYTES_PER_TB = 1024**4
@@ -66,9 +69,8 @@ RESOURCE_USAGE_SCHEMA = {
         "optional": ["execution_time_seconds", "memory_usage", "bytes_read"],
     },
     "athena": {
-        "required": [],  # Either data_scanned_bytes or cost_usd required
-        "optional": ["data_scanned_bytes", "cost_usd", "execution_time_ms"],
-        "requires_one_of": ["data_scanned_bytes", "cost_usd"],
+        "required": ["data_scanned_bytes"],
+        "optional": ["cost_usd", "execution_time_ms"],
     },
     "synapse": {
         "required": [],  # Either bytes_processed (serverless) or execution_time_seconds (dedicated) required
@@ -228,13 +230,169 @@ class CostCalculator:
             "pyspark",
             # DataFrame platforms
             "datafusion",
+            "datafusion-df",
             "polars",
             "polars-df",
+            "pandas",
             "pandas-df",
+            "cudf",
             "cudf-df",
+            "modin",
             "modin-df",
+            "dask",
             "dask-df",
+            "pyspark-df",
+            "lakesail",
+            "lakesail-df",
         }
+
+    def is_local_platform(self, platform: str) -> bool:
+        """Return True when a platform has no normalized cloud compute cost."""
+        return platform.lower() in self._local_platforms
+
+    def calculate_normalized_benchmark_cost(
+        self,
+        platform: str,
+        benchmark_cost: BenchmarkCost,
+        platform_config: dict[str, Any],
+    ) -> tuple[NormalizedCost, list[str]]:
+        """Build the normalized public cost contract for a benchmark run."""
+        platform_lower = platform.lower()
+        if self.is_local_platform(platform):
+            return (
+                NormalizedCost(
+                    normalized_cost_usd=Decimal("0"),
+                    cost_model_version=PRICING_VERSION,
+                    cost_model_source=_COST_MODEL_SOURCE,
+                    cost_scope="compute_only",
+                    cost_status="not_applicable_local",
+                    billing_unit="not_applicable",
+                    pricing_region="not_applicable",
+                ),
+                [],
+            )
+
+        billing_unit = self._billing_unit(platform_lower, platform_config)
+        deployment = self._deployment_metadata(platform_lower, platform_config)
+        pricing_region = self._pricing_region(platform_lower, platform_config)
+        warnings = self._normalized_cost_warnings(
+            platform_lower,
+            benchmark_cost,
+            platform_config,
+            deployment,
+            billing_unit,
+            pricing_region,
+        )
+
+        if warnings:
+            return (
+                NormalizedCost(
+                    normalized_cost_usd=None,
+                    cost_model_version=PRICING_VERSION,
+                    cost_model_source=_COST_MODEL_SOURCE,
+                    cost_scope="compute_only",
+                    cost_status="unavailable",
+                    billing_unit=billing_unit or "unknown",
+                    pricing_region=pricing_region or "unknown",
+                    deployment=deployment,
+                ),
+                warnings,
+            )
+
+        return (
+            NormalizedCost(
+                normalized_cost_usd=Decimal(str(benchmark_cost.total_cost)),
+                cost_model_version=PRICING_VERSION,
+                cost_model_source=_COST_MODEL_SOURCE,
+                cost_scope="compute_only",
+                cost_status="normalized",
+                billing_unit=billing_unit,
+                pricing_region=pricing_region,
+                deployment=deployment,
+            ),
+            [],
+        )
+
+    def _billing_unit(self, platform_lower: str, platform_config: dict[str, Any]) -> str:
+        if platform_lower == "snowflake":
+            return "credit"
+        if platform_lower in {"bigquery", "athena"}:
+            return "tb_scanned"
+        if platform_lower == "redshift":
+            return "node_hour"
+        if platform_lower in {"databricks", "databricks-df"}:
+            return "dbu"
+        if platform_lower == "synapse":
+            mode = str(platform_config.get("mode") or "serverless").lower()
+            return "tb_scanned" if mode == "serverless" else "dwu_hour"
+        if platform_lower == "fabric_dw":
+            return "cu_hour"
+        if platform_lower == "firebolt":
+            return "fbu"
+        return "unknown"
+
+    def _pricing_region(self, platform_lower: str, platform_config: dict[str, Any]) -> str:
+        if platform_lower == "bigquery":
+            return str(platform_config.get("location") or "")
+        return str(platform_config.get("region") or "")
+
+    def _deployment_metadata(self, platform_lower: str, platform_config: dict[str, Any]) -> DeploymentMetadata:
+        provider = platform_config.get("cloud") or platform_config.get("cloud_provider")
+        if not provider:
+            provider = {
+                "athena": "aws",
+                "bigquery": "gcp",
+                "redshift": "aws",
+                "synapse": "azure",
+                "fabric_dw": "azure",
+            }.get(platform_lower)
+        return DeploymentMetadata(
+            cloud_provider=provider,
+            cloud_region=self._pricing_region(platform_lower, platform_config) or None,
+            instance_type=platform_config.get("node_type") or platform_config.get("instance_type"),
+            warehouse_size=platform_config.get("warehouse_size") or platform_config.get("dwu_level"),
+            node_count=platform_config.get("node_count"),
+            cluster_size=(
+                str(platform_config["cluster_size_dbu_per_hour"])
+                if platform_config.get("cluster_size_dbu_per_hour") is not None
+                else platform_config.get("cluster_size")
+            ),
+            storage_format=platform_config.get("storage_format"),
+            storage_tier=platform_config.get("storage_tier"),
+        )
+
+    def _normalized_cost_warnings(
+        self,
+        platform_lower: str,
+        benchmark_cost: BenchmarkCost,
+        platform_config: dict[str, Any],
+        deployment: DeploymentMetadata,
+        billing_unit: str,
+        pricing_region: str,
+    ) -> list[str]:
+        warnings: list[str] = []
+        if not benchmark_cost.phase_costs:
+            warnings.append("normalized cost unavailable: no computed query or phase cost measurements")
+        for field in platform_config.get("_defaulted_fields", []):
+            warnings.append(f"normalized cost unavailable: {field} metadata was defaulted for {platform_lower}")
+        if not billing_unit or billing_unit == "unknown":
+            warnings.append(f"normalized cost unavailable: billing unit metadata missing for {platform_lower}")
+        if not deployment.cloud_provider:
+            warnings.append(f"normalized cost unavailable: cloud provider metadata missing for {platform_lower}")
+        if not pricing_region:
+            warnings.append(f"normalized cost unavailable: pricing region metadata missing for {platform_lower}")
+        if platform_lower == "snowflake" and not deployment.warehouse_size:
+            warnings.append("normalized cost unavailable: Snowflake warehouse_size metadata missing")
+        if platform_lower == "redshift":
+            if not deployment.instance_type:
+                warnings.append("normalized cost unavailable: Redshift node_type metadata missing")
+            if not deployment.node_count:
+                warnings.append("normalized cost unavailable: Redshift node_count metadata missing")
+        if platform_lower in {"databricks", "databricks-df"} and not (
+            deployment.warehouse_size or deployment.cluster_size
+        ):
+            warnings.append("normalized cost unavailable: Databricks warehouse or cluster size metadata missing")
+        return warnings
 
     def calculate_query_cost(
         self,
@@ -499,35 +657,16 @@ class CostCalculator:
     ) -> Optional[QueryCost]:
         """Calculate cost for an Athena query.
 
-        Athena charges $5.00 per TB of data scanned. The Athena adapter provides
-        both data_scanned_bytes and a pre-calculated cost_usd. We prefer using
-        cost_usd if available since it's calculated by the adapter using the
-        same pricing model.
+        Athena charges $5.00 per TB of data scanned. BenchBox derives cost
+        from measured data_scanned_bytes plus its pricing table; legacy
+        adapter-provided cost_usd is ignored when present.
 
         Expected resource_usage fields:
             - data_scanned_bytes: Bytes scanned by the query
-            OR
-            - cost_usd: Pre-calculated cost from the adapter
 
         Expected platform_config fields:
             - region: AWS region (for informational purposes; pricing is uniform)
         """
-        # Prefer pre-calculated cost from adapter if available
-        cost_usd = resource_usage.get("cost_usd")
-        if cost_usd is not None:
-            data_scanned_bytes = resource_usage.get("data_scanned_bytes", 0)
-            return QueryCost(
-                compute_cost=cost_usd,
-                currency=CURRENCY,
-                pricing_details={
-                    "data_scanned_bytes": data_scanned_bytes,
-                    "tb_scanned": data_scanned_bytes / BYTES_PER_TB,
-                    "price_per_tb": get_athena_price_per_tb(),
-                    "source": "adapter",
-                },
-            )
-
-        # Calculate from bytes scanned
         data_scanned_bytes = resource_usage.get("data_scanned_bytes")
         if data_scanned_bytes is None:
             return None
@@ -571,7 +710,7 @@ class CostCalculator:
             - region: Azure region
             - dwu_level: DWU level for dedicated mode (e.g., dw100c, dw1000c)
         """
-        mode = platform_config.get("mode", "serverless").lower()
+        mode = str(platform_config.get("mode") or "serverless").lower()
         region = platform_config.get("region", "eastus")
 
         if mode == "serverless":

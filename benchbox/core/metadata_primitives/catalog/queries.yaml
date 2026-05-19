@@ -1226,7 +1226,7 @@ queries:
     SELECT
         COUNT(*) AS total_columns,
         COUNT(DISTINCT table_name) AS total_tables,
-        CAST(COUNT(*) AS FLOAT) / COUNT(DISTINCT table_name) AS avg_columns_per_table
+        CAST(COUNT(*) AS FLOAT) / NULLIF(COUNT(DISTINCT table_name), 0) AS avg_columns_per_table
     FROM information_schema.columns
     WHERE table_name LIKE 'benchbox_catalog_%';
   variants:
@@ -1234,7 +1234,7 @@ queries:
       SELECT
           COUNT(*) AS total_columns,
           uniq(table) AS total_tables,
-          COUNT(*) / uniq(table) AS avg_columns_per_table
+          COUNT(*) / nullIf(uniq(table), 0) AS avg_columns_per_table
       FROM system.columns
       WHERE table LIKE 'benchbox_catalog_%';
 

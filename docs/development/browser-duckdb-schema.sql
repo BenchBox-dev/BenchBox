@@ -1,5 +1,5 @@
 -- browser-duckdb-schema.sql
--- Frozen DuckDB DDL for the ten canonical browser metric tables and views.
+-- Frozen DuckDB DDL for the canonical browser metric tables and views.
 --
 -- Originating TODO: explorer-canonical-browser-duckdb-read-model (W1 deliverable)
 -- Locked: 2026-04-18
@@ -9,6 +9,16 @@
 --   - Views project only bare column references (G-11 compliance).
 --   - No arithmetic, aggregation, CASE, or window functions in view projections.
 --   - ATTACH ... (READ_ONLY) is enforced at the browser layer; DDL never runs in-browser.
+--   - If the column set of `results` changes, bump
+--     EXPLORER_READ_MODEL_VERSION in `_project/scripts/explorer_pipeline/contract.py`.
+
+-- ---------------------------------------------------------------------------
+-- Metadata table (required by browser read-model version guard)
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS metadata (
+    read_model_version INTEGER NOT NULL
+);
 
 -- ---------------------------------------------------------------------------
 -- Supporting tables (required by result_detail_metrics view)
@@ -49,6 +59,14 @@ CREATE TABLE IF NOT EXISTS results (
     geomean_ms           DOUBLE,
     display_geomean_ms   DOUBLE,
     query_count          INTEGER  NOT NULL,
+    logical_query_count  INTEGER  NOT NULL,
+    has_display_timing   BOOLEAN  NOT NULL,
+    valid_query_count    INTEGER  NOT NULL,
+    missing_query_count  INTEGER  NOT NULL,
+    zero_timing_count    INTEGER  NOT NULL,
+    display_exclusion_reason    VARCHAR,
+    comparison_exclusion_reason VARCHAR,
+    ranking_exclusion_reason    VARCHAR,
     trust_label          VARCHAR  NOT NULL,
     visibility           VARCHAR  NOT NULL,
     platform_version     VARCHAR,
@@ -58,9 +76,27 @@ CREATE TABLE IF NOT EXISTS results (
     test_type            VARCHAR,
     validation_status    VARCHAR,
     cost_usd             DOUBLE,
+    normalized_cost_usd  DOUBLE,
+    cost_model_version   VARCHAR,
+    cost_model_source    VARCHAR,
+    cost_scope           VARCHAR,
+    cost_status          VARCHAR  NOT NULL,
+    billing_unit         VARCHAR,
+    pricing_region       VARCHAR,
+    deployment_class     VARCHAR,
+    cloud_provider       VARCHAR,
+    cloud_region         VARCHAR,
+    instance_or_warehouse VARCHAR,
+    storage_format       VARCHAR,
+    instance_type        VARCHAR,
+    warehouse_size       VARCHAR,
+    node_count           INTEGER,
+    cluster_size         VARCHAR,
+    storage_tier         VARCHAR,
     compliance_class     VARCHAR,
     is_ranking_eligible  BOOLEAN  NOT NULL,
     has_plans            BOOLEAN  NOT NULL,
+    plans_published      BOOLEAN  NOT NULL,
     has_tuning           BOOLEAN  NOT NULL,
     bundle_download_url  VARCHAR  NOT NULL
 );
@@ -76,6 +112,8 @@ CREATE TABLE IF NOT EXISTS query_display_timings (
     query_id     VARCHAR  NOT NULL,
     display_ms   DOUBLE,
     sample_count INTEGER  NOT NULL,
+    is_valid_display_timing BOOLEAN NOT NULL,
+    timing_exclusion_reason VARCHAR,
     PRIMARY KEY (result_id, query_id)
 );
 
@@ -118,6 +156,14 @@ SELECT
     r.geomean_ms,
     r.display_geomean_ms,
     r.query_count,
+    r.logical_query_count,
+    r.has_display_timing,
+    r.valid_query_count,
+    r.missing_query_count,
+    r.zero_timing_count,
+    r.display_exclusion_reason,
+    r.comparison_exclusion_reason,
+    r.ranking_exclusion_reason,
     r.trust_label,
     r.visibility,
     r.platform_version,
@@ -127,8 +173,26 @@ SELECT
     r.test_type,
     r.validation_status,
     r.cost_usd,
+    r.normalized_cost_usd,
+    r.cost_model_version,
+    r.cost_model_source,
+    r.cost_scope,
+    r.cost_status,
+    r.billing_unit,
+    r.pricing_region,
+    r.deployment_class,
+    r.cloud_provider,
+    r.cloud_region,
+    r.instance_or_warehouse,
+    r.instance_type,
+    r.warehouse_size,
+    r.node_count,
+    r.cluster_size,
+    r.storage_format,
+    r.storage_tier,
     r.compliance_class,
     r.has_plans,
+    r.plans_published,
     r.has_tuning,
     r.bundle_download_url,
     e.os,
@@ -154,6 +218,8 @@ CREATE TABLE IF NOT EXISTS benchmark_matrix_cells (
     platform_id  VARCHAR  NOT NULL,
     query_id     VARCHAR  NOT NULL,
     display_ms   DOUBLE,
+    is_valid_display_timing BOOLEAN NOT NULL,
+    timing_exclusion_reason VARCHAR,
     PRIMARY KEY (benchmark, scale_factor, phase, result_id, query_id)
 );
 
@@ -181,6 +247,14 @@ CREATE TABLE IF NOT EXISTS benchmark_rankings (
     compliance_class   VARCHAR,
     run_date           VARCHAR  NOT NULL,
     is_ranking_eligible BOOLEAN NOT NULL,
+    has_display_timing BOOLEAN  NOT NULL,
+    logical_query_count INTEGER NOT NULL,
+    valid_query_count  INTEGER  NOT NULL,
+    missing_query_count INTEGER NOT NULL,
+    zero_timing_count  INTEGER  NOT NULL,
+    display_exclusion_reason    VARCHAR,
+    comparison_exclusion_reason VARCHAR,
+    ranking_exclusion_reason    VARCHAR,
     power_score        DOUBLE,
     display_geomean_ms DOUBLE,
     sample_geomean_ms  DOUBLE,
@@ -188,7 +262,11 @@ CREATE TABLE IF NOT EXISTS benchmark_rankings (
     primary_metric     VARCHAR  NOT NULL,
     primary_order      VARCHAR  NOT NULL,
     rank               INTEGER,
+    -- Number of ranking-eligible rows with non-null primary metrics.
+    -- Visible but unranked rows keep rank=NULL and do not increment this total.
     total_in_cohort    INTEGER  NOT NULL,
+    cohort_ranked_count INTEGER NOT NULL,
+    cohort_ranking_exclusion_reason VARCHAR,
     percentile_p50     DOUBLE,
     percentile_p90     DOUBLE,
     percentile_p95     DOUBLE,
@@ -225,11 +303,36 @@ SELECT
     geomean_ms,
     display_geomean_ms,
     query_count,
+    logical_query_count,
+    has_display_timing,
+    valid_query_count,
+    missing_query_count,
+    zero_timing_count,
+    display_exclusion_reason,
+    comparison_exclusion_reason,
+    ranking_exclusion_reason,
     trust_label,
     tuning_mode,
     execution_mode,
     compliance_class,
-    cost_usd
+    cost_usd,
+    normalized_cost_usd,
+    cost_model_version,
+    cost_model_source,
+    cost_scope,
+    cost_status,
+    billing_unit,
+    pricing_region,
+    deployment_class,
+    cloud_provider,
+    cloud_region,
+    instance_or_warehouse,
+    instance_type,
+    warehouse_size,
+    node_count,
+    cluster_size,
+    storage_format,
+    storage_tier
 FROM results;
 
 -- ---------------------------------------------------------------------------
@@ -250,7 +353,12 @@ CREATE TABLE IF NOT EXISTS cohort_metadata (
     phase          VARCHAR  NOT NULL,
     cohort_label   VARCHAR  NOT NULL,
     cohort_href    VARCHAR  NOT NULL,
+    -- Number of ranking-eligible rows with non-null primary metrics in this
+    -- cohort. The table can still preserve additional visible rows with
+    -- rank=NULL, so this may be lower than COUNT(*) per cohort_key.
     platform_count INTEGER  NOT NULL,
+    cohort_ranked_count INTEGER NOT NULL,
+    cohort_ranking_exclusion_reason VARCHAR,
     primary_metric VARCHAR  NOT NULL,
     primary_order  VARCHAR  NOT NULL,
     platform_id    VARCHAR  NOT NULL,
@@ -259,6 +367,14 @@ CREATE TABLE IF NOT EXISTS cohort_metadata (
     short_id       VARCHAR  NOT NULL,
     tuning_mode    VARCHAR,
     trust_label    VARCHAR  NOT NULL,
+    has_display_timing BOOLEAN NOT NULL,
+    logical_query_count INTEGER NOT NULL,
+    valid_query_count INTEGER NOT NULL,
+    missing_query_count INTEGER NOT NULL,
+    zero_timing_count INTEGER NOT NULL,
+    display_exclusion_reason VARCHAR,
+    comparison_exclusion_reason VARCHAR,
+    ranking_exclusion_reason VARCHAR,
     rank           INTEGER,
     metric_value   DOUBLE,
     speedup_vs_best DOUBLE,

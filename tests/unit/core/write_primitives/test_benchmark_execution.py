@@ -359,6 +359,50 @@ class TestExecuteOperation:
         assert result.validation_passed is True
         mock_conn.execute.assert_not_called()
 
+    def test_execute_operation_skips_postgres_bulk_load_operation(self, wp_benchmark, monkeypatch):
+        """PostgreSQL-family operation execution cannot use server-side file COPY from host paths."""
+        mock_conn = Mock()
+        mock_conn.execute = Mock()
+        monkeypatch.setattr(wp_benchmark, "is_setup", lambda conn: True)
+
+        result = wp_benchmark.execute_operation("bulk_load_csv_small_uncompressed", mock_conn, platform_key="postgres")
+
+        assert result.status == "SKIPPED"
+        assert result.success is True
+        assert result.error is None
+        assert "server-side file COPY" in (result.skip_reason or "")
+        mock_conn.execute.assert_not_called()
+
+    def test_execute_operation_skips_postgres_sketch_operation(self, wp_benchmark, monkeypatch):
+        """PostgreSQL-family engines do not accept DuckDB DataSketches INSTALL statements."""
+        mock_conn = Mock()
+        mock_conn.execute = Mock()
+        monkeypatch.setattr(wp_benchmark, "is_setup", lambda conn: True)
+
+        result = wp_benchmark.execute_operation(
+            "sketch_ddl_create_persistent_table", mock_conn, platform_key="postgres"
+        )
+
+        assert result.status == "SKIPPED"
+        assert result.success is True
+        assert result.error is None
+        assert "DataSketches" in (result.skip_reason or "")
+        mock_conn.execute.assert_not_called()
+
+    def test_execute_operation_skips_postgres_merge_shorthand(self, wp_benchmark, monkeypatch):
+        """DuckDB MERGE INSERT shorthand is not accepted by PostgreSQL-family engines."""
+        mock_conn = Mock()
+        mock_conn.execute = Mock()
+        monkeypatch.setattr(wp_benchmark, "is_setup", lambda conn: True)
+
+        result = wp_benchmark.execute_operation("merge_simple_upsert_small", mock_conn, platform_key="postgres")
+
+        assert result.status == "SKIPPED"
+        assert result.success is True
+        assert result.error is None
+        assert "MERGE" in (result.skip_reason or "")
+        mock_conn.execute.assert_not_called()
+
     def test_execute_operation_uses_platform_override_when_available(self, wp_benchmark, monkeypatch):
         """Platform override SQL should be used instead of base write_sql."""
         operation = wp_benchmark.get_operation("insert_on_conflict_ignore")
@@ -386,6 +430,43 @@ class TestExecuteOperation:
 
         assert result.status == "SUCCESS"
         assert any("INSERT OR IGNORE" in sql for sql in sql_calls)
+
+    def test_execute_operation_rolls_back_after_failed_write(self, wp_benchmark, monkeypatch):
+        """Drivers such as psycopg require rollback before the connection can be reused after an error."""
+        mock_conn = Mock()
+        mock_conn.execute.side_effect = RuntimeError("COPY failed")
+        mock_conn.rollback = Mock()
+        monkeypatch.setattr(wp_benchmark, "is_setup", lambda conn: True)
+
+        result = wp_benchmark.execute_operation("insert_single_row", mock_conn)
+
+        assert result.status == "FAILED"
+        mock_conn.rollback.assert_called_once()
+
+    def test_execute_operation_rewrites_generate_series_for_postgres(self, wp_benchmark, monkeypatch):
+        """PostgreSQL-family engines do not accept DuckDB's unnest(generate_series(...)) form."""
+
+        class _Result:
+            rowcount = 100
+
+            def fetchall(self):
+                return [(100,)]
+
+        sql_calls: list[str] = []
+
+        def _execute(sql):
+            sql_calls.append(sql)
+            return _Result()
+
+        mock_conn = Mock()
+        mock_conn.execute = _execute
+        monkeypatch.setattr(wp_benchmark, "is_setup", lambda conn: True)
+
+        result = wp_benchmark.execute_operation("insert_batch_values_100", mock_conn, platform_key="postgres")
+
+        assert result.status == "SUCCESS"
+        assert "FROM (SELECT generate_series(0, 99) AS n) t" in sql_calls[0]
+        assert "unnest(generate_series" not in sql_calls[0]
 
 
 class TestRunBenchmark:
@@ -722,11 +803,20 @@ class TestCheckValidationQuery:
 
     pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
-    def _make_query(self, expected_rows=None, expected_rows_min=None, expected_rows_max=None):
+    def _make_query(
+        self,
+        expected_rows=None,
+        expected_rows_min=None,
+        expected_rows_max=None,
+        expected_value_min=None,
+        expected_value_max=None,
+    ):
         return SimpleNamespace(
             expected_rows=expected_rows,
             expected_rows_min=expected_rows_min,
             expected_rows_max=expected_rows_max,
+            expected_value_min=expected_value_min,
+            expected_value_max=expected_value_max,
         )
 
     def test_exact_match_passes(self):
@@ -774,6 +864,86 @@ class TestCheckValidationQuery:
 
         q = self._make_query()
         assert _check_validation_query(q, actual_rows=999) is True
+
+    def test_value_bounds_within_range_passes(self):
+        from benchbox.core.write_primitives.benchmark import _check_validation_query
+
+        q = self._make_query(expected_value_min=14000, expected_value_max=16000)
+        assert _check_validation_query(q, actual_rows=1, val_result=[(14836.89,)]) is True
+
+    def test_value_bounds_below_range_fails(self):
+        from benchbox.core.write_primitives.benchmark import _check_validation_query
+
+        q = self._make_query(expected_value_min=14000, expected_value_max=16000)
+        assert _check_validation_query(q, actual_rows=1, val_result=[(0.0,)]) is False
+
+    def test_value_bounds_above_range_fails(self):
+        from benchbox.core.write_primitives.benchmark import _check_validation_query
+
+        q = self._make_query(expected_value_min=14000, expected_value_max=16000)
+        assert _check_validation_query(q, actual_rows=1, val_result=[(50000.0,)]) is False
+
+    def test_value_bounds_no_rows_fails(self):
+        from benchbox.core.write_primitives.benchmark import _check_validation_query
+
+        q = self._make_query(expected_value_min=14000, expected_value_max=16000)
+        assert _check_validation_query(q, actual_rows=0, val_result=[]) is False
+
+    def test_value_bounds_non_numeric_fails(self):
+        from benchbox.core.write_primitives.benchmark import _check_validation_query
+
+        q = self._make_query(expected_value_min=14000, expected_value_max=16000)
+        assert _check_validation_query(q, actual_rows=1, val_result=[("not a number",)]) is False
+
+    def test_value_bounds_integer_scalar_passes(self):
+        """Integer scalars (e.g. topk frequent_count = 7) coerce to float for the range check."""
+        from benchbox.core.write_primitives.benchmark import _check_validation_query
+
+        q = self._make_query(expected_value_min=6, expected_value_max=8)
+        assert _check_validation_query(q, actual_rows=1, val_result=[(7,)]) is True
+
+    # w4 regression: every row of expected_value_* must be in range, not just [0][0].
+
+    def test_value_bounds_multi_row_all_in_range_passes(self):
+        from benchbox.core.write_primitives.benchmark import _check_validation_query
+
+        q = self._make_query(expected_value_min=10, expected_value_max=20)
+        assert _check_validation_query(q, actual_rows=3, val_result=[(11,), (15,), (19,)]) is True
+
+    def test_value_bounds_multi_row_first_out_of_range_fails(self):
+        from benchbox.core.write_primitives.benchmark import _check_validation_query
+
+        q = self._make_query(expected_value_min=10, expected_value_max=20)
+        assert _check_validation_query(q, actual_rows=3, val_result=[(0,), (15,), (19,)]) is False
+
+    def test_value_bounds_multi_row_middle_out_of_range_fails(self):
+        """Pre-w4 behavior would have passed because only [0][0] was inspected;
+        post-w4 we walk every row and fail on the first out-of-range value."""
+        from benchbox.core.write_primitives.benchmark import _check_validation_query
+
+        q = self._make_query(expected_value_min=10, expected_value_max=20)
+        assert _check_validation_query(q, actual_rows=3, val_result=[(11,), (999,), (19,)]) is False
+
+    def test_value_bounds_multi_row_last_out_of_range_fails(self):
+        from benchbox.core.write_primitives.benchmark import _check_validation_query
+
+        q = self._make_query(expected_value_min=10, expected_value_max=20)
+        assert _check_validation_query(q, actual_rows=3, val_result=[(11,), (15,), (0,)]) is False
+
+    def test_value_bounds_empty_result_fails(self):
+        """Empty result (after the bounds branch is taken) must fail rather than
+        silently pass — there's nothing to validate."""
+        from benchbox.core.write_primitives.benchmark import _check_validation_query
+
+        q = self._make_query(expected_value_min=10, expected_value_max=20)
+        assert _check_validation_query(q, actual_rows=0, val_result=None) is False
+
+    def test_value_bounds_empty_row_fails(self):
+        """A row with no columns can't be coerced to a scalar; treat as failure."""
+        from benchbox.core.write_primitives.benchmark import _check_validation_query
+
+        q = self._make_query(expected_value_min=10, expected_value_max=20)
+        assert _check_validation_query(q, actual_rows=2, val_result=[(15,), ()]) is False
 
 
 # ============================================================================
@@ -1398,6 +1568,8 @@ def test_get_create_tables_sql_returns_sql_string(fast_bench):
     sql = fast_bench.get_create_tables_sql()
     assert isinstance(sql, str)
     assert "CREATE TABLE" in sql.upper()
+    assert "CREATE TABLE orders_stage" in sql
+    assert "CREATE TABLE lineitem_stage" in sql
 
 
 # ---------------------------------------------------------------------------

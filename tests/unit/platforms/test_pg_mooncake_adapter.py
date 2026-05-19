@@ -175,12 +175,12 @@ class TestPgMooncakeColumnstoreDDL:
     """Tests for columnstore DDL generation."""
 
     def test_add_columnstore_basic(self, pg_mooncake_stubs):
-        """_add_columnstore_access_method should add USING columnstore."""
+        """_add_columnstore_access_method should add USING mooncake."""
         adapter = PgMooncakeAdapter()
 
         result = adapter._add_columnstore_access_method("CREATE TABLE foo (id INT, name TEXT);")
 
-        assert "USING columnstore" in result
+        assert "USING mooncake" in result
         assert result.endswith(";")
 
     def test_add_columnstore_no_semicolon(self, pg_mooncake_stubs):
@@ -189,16 +189,16 @@ class TestPgMooncakeColumnstoreDDL:
 
         result = adapter._add_columnstore_access_method("CREATE TABLE foo (id INT)")
 
-        assert "USING columnstore" in result
+        assert "USING mooncake" in result
 
     def test_add_columnstore_already_present(self, pg_mooncake_stubs):
-        """Should not double-add USING columnstore."""
+        """Should not double-add USING mooncake."""
         adapter = PgMooncakeAdapter()
 
-        ddl = "CREATE TABLE foo (id INT) USING columnstore;"
+        ddl = "CREATE TABLE foo (id INT) USING mooncake;"
         result = adapter._add_columnstore_access_method(ddl)
 
-        assert result.count("USING columnstore") == 1
+        assert result.count("USING mooncake") == 1
 
     def test_add_columnstore_skips_non_create_table(self, pg_mooncake_stubs):
         """Should not modify non-CREATE TABLE statements."""
@@ -213,7 +213,7 @@ class TestPgMooncakeColumnstoreDDL:
         assert adapter._add_columnstore_access_method(index) == index
 
     def test_create_schema_adds_columnstore(self, pg_mooncake_stubs):
-        """create_schema should add USING columnstore through the parent flow."""
+        """create_schema should keep heap tables for the COPY load phase."""
         adapter = PgMooncakeAdapter()
         conn = Mock()
         cursor = Mock()
@@ -228,9 +228,9 @@ class TestPgMooncakeColumnstoreDDL:
             adapter.create_schema(Mock(), conn)
 
         executed = [call.args[0] for call in cursor.execute.call_args_list]
-        assert executed[0] == "CREATE TABLE foo (id INT, name TEXT) USING columnstore"
+        assert executed[0] == "CREATE TABLE foo (id INT, name TEXT)"
         assert executed[1] == "CREATE INDEX idx_foo ON foo (id)"
-        assert executed[2] == "CREATE TABLE bar (x BIGINT, y DECIMAL(10,2)) USING columnstore"
+        assert executed[2] == "CREATE TABLE bar (x BIGINT, y DECIMAL(10,2))"
         conn.commit.assert_called_once()
         cursor.close.assert_called_once()
 
@@ -240,10 +240,9 @@ class TestPgMooncakeColumnstoreDDL:
             postgresql_module.PostgreSQLAdapter.create_schema
         )
 
-    def test_create_schema_fk_strip_retry_preserves_columnstore(self, pg_mooncake_stubs):
+    def test_create_schema_fk_strip_retry_preserves_heap_table(self, pg_mooncake_stubs):
         """When the initial CREATE TABLE fails and FK-strip retry runs, the retry
-        statement must still carry ``USING columnstore`` — pg_mooncake's only
-        reason to override the parent hook.
+        statement should remain loadable by PostgreSQL COPY before mirror promotion.
         """
         adapter = PgMooncakeAdapter()
         conn = Mock()
@@ -260,9 +259,9 @@ class TestPgMooncakeColumnstoreDDL:
 
         executed = [call.args[0] for call in cursor.execute.call_args_list]
         assert len(executed) == 2
-        assert "USING columnstore" in executed[0]
+        assert "USING mooncake" not in executed[0]
         assert "FOREIGN KEY" in executed[0]
-        assert "USING columnstore" in executed[1], f"FK-strip retry dropped columnstore: {executed[1]!r}"
+        assert "USING mooncake" not in executed[1]
         assert "FOREIGN KEY" not in executed[1]
         conn.rollback.assert_called_once()
 
@@ -321,6 +320,206 @@ class TestPgMooncakeExtensionVerification:
             pytest.raises(RuntimeError, match="pg_mooncake extension is not available"),
         ):
             adapter.create_connection()
+
+    def test_create_connection_uses_cascade_when_creating_extension(self, pg_mooncake_stubs):
+        """pg_mooncake requires dependent extensions to be created as needed."""
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        mock_cursor.fetchone.side_effect = [
+            (1,),  # parent PostgreSQL connection verification
+            None,  # extension not found
+            ("0.5.0",),  # extension exists after CREATE EXTENSION CASCADE
+        ]
+
+        pg_mooncake_stubs.connect.return_value = mock_conn
+
+        adapter = PgMooncakeAdapter()
+
+        with (
+            patch.object(adapter, "check_server_database_exists", return_value=True),
+            patch.object(adapter, "handle_existing_database"),
+        ):
+            adapter.create_connection()
+
+        calls = [str(call) for call in mock_cursor.execute.call_args_list]
+        assert any("CREATE EXTENSION IF NOT EXISTS pg_mooncake CASCADE" in call for call in calls)
+
+
+class TestPgMooncakeLoadPromotion:
+    """Tests for heap-load to mooncake-mirror promotion."""
+
+    def test_load_data_promotes_loaded_tables_to_mooncake_mirrors(self, pg_mooncake_stubs, tmp_path):
+        adapter = PgMooncakeAdapter()
+        conn = Mock()
+        cursor = Mock()
+        cursor.fetchone.side_effect = [(2,), (3,)]
+        conn.cursor.return_value = cursor
+
+        with patch.object(
+            postgresql_module.PostgreSQLAdapter,
+            "load_data",
+            return_value=({"orders": 2, "lineitem": 3, "empty": 0}, 1.25, None),
+        ) as parent_load:
+            stats, load_time, extra = adapter.load_data(Mock(), conn, tmp_path)
+
+        parent_load.assert_called_once()
+        assert load_time == 1.25
+        assert extra is None
+        assert stats == {"orders": 2, "lineitem": 3, "empty": 0}
+
+        executed = [call.args for call in cursor.execute.call_args_list]
+        assert ('ALTER TABLE "orders" RENAME TO "__bb_moon_src_orders"',) in executed
+        assert ("CALL mooncake.create_table(%s, %s)", ("orders", "__bb_moon_src_orders")) in executed
+        assert ('SELECT COUNT(*) FROM "orders"',) in executed
+        assert ('ALTER TABLE "lineitem" RENAME TO "__bb_moon_src_lineitem"',) in executed
+        assert ("CALL mooncake.create_table(%s, %s)", ("lineitem", "__bb_moon_src_lineitem")) in executed
+        assert ('SELECT COUNT(*) FROM "lineitem"',) in executed
+        assert all("empty" not in str(args) for args in executed)
+        conn.commit.assert_called_once()
+        cursor.close.assert_called_once()
+
+    def test_load_data_rolls_back_on_promotion_failure(self, pg_mooncake_stubs, tmp_path):
+        adapter = PgMooncakeAdapter()
+        conn = Mock()
+        cursor = Mock()
+        cursor.execute.side_effect = RuntimeError("promotion failed")
+        conn.cursor.return_value = cursor
+
+        with (
+            patch.object(
+                postgresql_module.PostgreSQLAdapter,
+                "load_data",
+                return_value=({"orders": 2}, 1.25, None),
+            ),
+            pytest.raises(RuntimeError, match="promotion failed"),
+        ):
+            adapter.load_data(Mock(), conn, tmp_path)
+
+        conn.rollback.assert_called_once()
+        cursor.close.assert_called_once()
+
+    def test_load_data_keeps_rename_and_mirror_creation_atomic(self, pg_mooncake_stubs, tmp_path):
+        adapter = PgMooncakeAdapter()
+        conn = Mock()
+        cursor = Mock()
+        cursor.execute.side_effect = [
+            None,
+            RuntimeError("mirror creation failed"),
+        ]
+        conn.cursor.return_value = cursor
+
+        with (
+            patch.object(
+                postgresql_module.PostgreSQLAdapter,
+                "load_data",
+                return_value=({"orders": 2}, 1.25, None),
+            ),
+            pytest.raises(RuntimeError, match="mirror creation failed"),
+        ):
+            adapter.load_data(Mock(), conn, tmp_path)
+
+        executed = [call.args for call in cursor.execute.call_args_list]
+        assert executed == [
+            ('ALTER TABLE "orders" RENAME TO "__bb_moon_src_orders"',),
+            ("CALL mooncake.create_table(%s, %s)", ("orders", "__bb_moon_src_orders")),
+        ]
+        conn.commit.assert_not_called()
+        conn.rollback.assert_called_once()
+        cursor.close.assert_called_once()
+
+    def test_load_data_rejects_invalid_schema_identifier(self, pg_mooncake_stubs, tmp_path):
+        adapter = PgMooncakeAdapter(schema='public";drop')
+        conn = Mock()
+
+        with (
+            patch.object(
+                postgresql_module.PostgreSQLAdapter,
+                "load_data",
+                return_value=({"orders": 2}, 1.25, None),
+            ),
+            pytest.raises(ValueError, match="Invalid pg_mooncake schema identifier"),
+        ):
+            adapter.load_data(Mock(), conn, tmp_path)
+
+        conn.cursor.assert_not_called()
+
+
+class TestPgMooncakeValidationCatalog:
+    """Tests for pg_mooncake catalog reads used by validation."""
+
+    def test_execute_query_commits_around_mooncake_scan(self, pg_mooncake_stubs):
+        adapter = PgMooncakeAdapter()
+        conn = Mock()
+        expected = {"query_id": "1", "status": "SUCCESS"}
+
+        with patch.object(postgresql_module.PostgreSQLAdapter, "execute_query", return_value=expected) as parent:
+            result = adapter.execute_query(conn, "SELECT * FROM rankings", "1")
+
+        assert result == expected
+        parent.assert_called_once_with(
+            conn,
+            "SELECT * FROM rankings",
+            "1",
+            benchmark_type=None,
+            scale_factor=None,
+            validate_row_count=True,
+            stream_id=None,
+        )
+        assert conn.commit.call_count == 2
+        conn.rollback.assert_not_called()
+
+    def test_execute_query_retries_duckdb_function_transaction_error(self, pg_mooncake_stubs):
+        adapter = PgMooncakeAdapter()
+        conn = Mock()
+        failed = {
+            "query_id": "1",
+            "status": "FAILED",
+            "error": "DuckDB execution is not supported inside functions",
+        }
+        expected = {"query_id": "1", "status": "SUCCESS"}
+
+        with patch.object(
+            postgresql_module.PostgreSQLAdapter,
+            "execute_query",
+            side_effect=[failed, expected],
+        ) as parent:
+            result = adapter.execute_query(conn, "SELECT * FROM rankings", "1")
+
+        assert result == expected
+        assert parent.call_count == 2
+        conn.rollback.assert_called_once()
+        assert conn.commit.call_count == 2
+
+    def test_get_existing_tables_commits_catalog_transaction(self, pg_mooncake_stubs):
+        adapter = PgMooncakeAdapter()
+        conn = Mock()
+        cursor = Mock()
+        cursor.fetchall.return_value = [("Customer",), ("__bb_moon_src_customer",)]
+        conn.cursor.return_value = cursor
+
+        tables = adapter._get_existing_tables(conn)
+
+        assert tables == ["customer", "__bb_moon_src_customer"]
+        cursor.execute.assert_called_once()
+        conn.commit.assert_called_once()
+        conn.rollback.assert_not_called()
+        cursor.close.assert_called_once()
+
+    def test_get_existing_tables_rolls_back_catalog_failure(self, pg_mooncake_stubs):
+        adapter = PgMooncakeAdapter()
+        conn = Mock()
+        cursor = Mock()
+        cursor.execute.side_effect = RuntimeError("catalog failed")
+        conn.cursor.return_value = cursor
+
+        tables = adapter._get_existing_tables(conn)
+
+        assert tables == []
+        conn.rollback.assert_called_once()
+        conn.commit.assert_not_called()
+        cursor.close.assert_called_once()
 
 
 class TestPgMooncakeStorageConfig:

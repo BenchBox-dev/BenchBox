@@ -100,10 +100,25 @@ class FingerprintIntegrityError(Exception):
         super().__init__(f"{message} for {query_id}. Plan may have been corrupted or modified.")
 
 
+class ScaleFactorNotSupportedError(ValueError):
+    """Raised when scale_factor is not in the benchmark's declared scale_options.
+
+    Subclasses ValueError so existing call sites that catch ValueError keep
+    working; new code can catch ScaleFactorNotSupportedError specifically.
+    """
+
+    def __init__(self, benchmark_id: str, scale_factor: float, scale_options: list[float]):
+        self.benchmark_id = benchmark_id
+        self.scale_factor = scale_factor
+        self.scale_options = list(scale_options)
+        super().__init__(f"{benchmark_id} accepts scale_factor in {self.scale_options}; got {scale_factor}")
+
+
 __all__ = [
     "PlanCaptureError",
     "SerializationError",
     "PlanValidationError",
     "PlanParseError",
     "FingerprintIntegrityError",
+    "ScaleFactorNotSupportedError",
 ]

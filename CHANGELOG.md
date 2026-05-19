@@ -5,6 +5,61 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.3.0] - 2026-05-18
+
+### New
+
+- **Prompt composer page** - Added `/prompts/`, a page that turns benchmark
+  choices into copyable prompts for coding agents. It covers platform,
+  benchmark, scale, CLI, and MCP choices with safe defaults for local and
+  cloud runs.
+- **Sketch benchmarking coverage** - Added `write_primitives` workloads for
+  DataSketches Theta, KLL, Top-K, DuckDB CPC/REQ, ClickHouse aggregate-state
+  sketches, and Redshift HLL. The new workloads cover persist, merge, requery,
+  storage-size validation, and parameter sweeps where supported.
+- **Approximate read coverage** - Added `read_primitives` queries for
+  approximate distinct counts, approximate quantiles, and approximate top-k,
+  plus DataFrame implementations where supported.
+
+### Added
+
+- **Complete JoinOrder query set** - Added all 113 Join Order Benchmark SQL
+  queries, reference cardinalities, and fixture tests for query predicates.
+- **Benchmark data provenance** - Published result bundles can now record the
+  dataset version, manifest hash, and data archive hash for benchmark datasets.
+- **PySpark sketch DataFrame support** - Added aggregate persist/merge
+  operation types, PySpark capability flags, and PySpark HLL/top-K helpers so
+  sketch workflows can run through DataFrame managers.
+- **Per-platform validation SQL** - Added `ValidationQuery.platform_overrides`
+  so validation queries can declare engine-specific SQL bodies or explicit
+  skips.
+
+### Fixed
+
+- **JoinOrder benchmark correctness** - `joinorder` now uses the real Join
+  Order Benchmark IMDb 2013 dataset. This fixes a user-raised comparability
+  issue where BenchBox-generated data was being used for JoinOrder runs. The
+  benchmark is now limited to scale factor 1 because JOB is a fixed dataset.
+- **Approximate aggregate semantics** - Fixed `read_primitives` approximate
+  query coverage so names and implementations match the work being measured.
+  `intrinsic_appx_median` is now `approx_quantile_groupby`, PySpark and
+  DataFusion use sketch-backed quantile implementations, and Redshift has an
+  `APPROXIMATE PERCENTILE_DISC` variant.
+
+### Changed
+
+- **JoinOrder synthetic data renamed** - The old synthetic JoinOrder generator
+  is now `joinorder_synthetic` and is kept out of the released benchmark list.
+  Existing `joinorder_sf1_*` published-result bundles were re-tagged as
+  `joinorder_synthetic_sf1_*` so they are not confused with results from the
+  real IMDb dataset.
+- **DataFrame approximate coverage is more explicit** - `SKIP_FOR_DATAFRAME`
+  for `read_primitives` shrank from 7 to 5. `approx_quantiles_array` and
+  `approx_top_k_lineitem` remain PySpark-only at the DataFrame layer with
+  documented rationale.
+
 ## [0.2.1] - 2026-04-26
 
 ### New
@@ -570,7 +625,8 @@ benchbox run --platform polars-df --benchmark tpch --scale 0.01
 - **Issues**: [Report bugs and request features](https://github.com/joeharris76/benchbox/issues)
 - **PyPI**: [pypi.org/project/benchbox](https://pypi.org/project/benchbox/)
 
-[Unreleased]: https://github.com/joeharris76/benchbox/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/joeharris76/benchbox/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/joeharris76/benchbox/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/joeharris76/benchbox/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/joeharris76/benchbox/compare/v0.1.5...v0.2.0
 [0.1.5]: https://github.com/joeharris76/benchbox/compare/v0.1.4...v0.1.5

@@ -11,7 +11,7 @@ from benchbox.core.coffeeshop.generator import CoffeeShopDataGenerator
 from benchbox.core.flightdata.benchmark import FlightDataBenchmark
 from benchbox.core.flightdata.downloader import MONTHS_PER_SCALE_FACTOR
 from benchbox.core.h2odb.generator import H2ODataGenerator
-from benchbox.core.joinorder.generator import JoinOrderGenerator
+from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator
 from benchbox.core.nyctaxi.benchmark import NYCTaxiBenchmark
 from benchbox.core.nyctaxi.downloader import SCALE_FACTOR_SAMPLE_DIVISOR
 from benchbox.core.ssb.generator import SSBDataGenerator

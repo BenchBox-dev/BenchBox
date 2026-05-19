@@ -65,6 +65,43 @@ def _tuned_unified_config() -> UnifiedTuningConfiguration:
     return config
 
 
+def _banner_state(*, platform: str | None, benchmark: str | None) -> SimpleNamespace:
+    return SimpleNamespace(
+        iterations=None,
+        phases_to_run=["power"],
+        logger=None,
+        platform=platform,
+        benchmark=benchmark,
+        quiet=False,
+    )
+
+
+def test_interactive_header_suppressed_for_explicit_run_args():
+    state = _banner_state(platform="duckdb", benchmark="tpch")
+    interactive_sys = SimpleNamespace(stdin=SimpleNamespace(isatty=lambda: True))
+
+    with (
+        patch.object(_run_module, "sys", interactive_sys),
+        patch.object(_run_module, "console") as mock_console,
+    ):
+        _run_module._derive_exec_type_and_banner(state)
+
+    mock_console.print.assert_not_called()
+
+
+def test_interactive_header_shown_for_prompted_tty_run():
+    state = _banner_state(platform=None, benchmark=None)
+    interactive_sys = SimpleNamespace(stdin=SimpleNamespace(isatty=lambda: True))
+
+    with (
+        patch.object(_run_module, "sys", interactive_sys),
+        patch.object(_run_module, "console") as mock_console,
+    ):
+        _run_module._derive_exec_type_and_banner(state)
+
+    mock_console.print.assert_called_once()
+
+
 def test_interactive_guided_flow_uses_prompted_values_and_saves_preferences(tmp_path: Path):
     runner = CliRunner()
 
@@ -972,8 +1009,10 @@ class TestRunCommandValidation:
         assert "Too many queries" in result.output
 
     def test_queries_too_long_id_rejected(self):
+        from benchbox.utils.input_validation import MAX_QUERY_ID_LENGTH
+
         runner = CliRunner()
-        long_id = "Q" + "x" * 20  # 21 chars, exceeds max 20
+        long_id = "Q" + "x" * MAX_QUERY_ID_LENGTH  # exceeds limit by 1
         with _non_interactive_base_patches():
             result = runner.invoke(
                 run,
@@ -981,7 +1020,7 @@ class TestRunCommandValidation:
                 obj=_run_obj(),
             )
         assert result.exit_code != 0
-        assert "Query ID too long (max 20 chars)" in result.output
+        assert f"Query ID too long (max {MAX_QUERY_ID_LENGTH} chars)" in result.output
 
     def test_non_interactive_missing_benchmark_rejected(self):
         runner = CliRunner()

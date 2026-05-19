@@ -16,10 +16,16 @@ class ChartTypeSpec:
 
 _CHART_SPECS: tuple[ChartTypeSpec, ...] = (
     ChartTypeSpec("performance_bar", "Bar chart comparing total runtime across platforms"),
-    ChartTypeSpec("power_bar", "Bar chart comparing TPC Power@Size metric across platforms (higher is better)"),
+    ChartTypeSpec(
+        "power_bar",
+        "Bar chart comparing TPC Power@Size; falls back to power-run query latency when no TPC metric exists",
+    ),
     ChartTypeSpec("distribution_box", "Box plot showing query execution time distribution"),
     ChartTypeSpec("query_heatmap", "Heatmap comparing per-query execution times across platforms"),
-    ChartTypeSpec("query_histogram", "Vertical bar histogram showing latency per query (auto-splits for >33 queries)"),
+    ChartTypeSpec(
+        "query_histogram",
+        "Per-query latency chart; uses horizontal bars for long query labels and vertical bars otherwise",
+    ),
     ChartTypeSpec("cost_scatter", "Scatter plot of cost vs performance (requires cost data)"),
     ChartTypeSpec("time_series", "Line chart showing performance trends over time"),
     ChartTypeSpec(

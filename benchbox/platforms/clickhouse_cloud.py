@@ -30,10 +30,13 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlparse
 
 from benchbox.platforms.base.adapter import DriverIsolationCapability
+from benchbox.platforms.base.runtime_metadata import build_default_normalized_result_metadata
 from benchbox.platforms.clickhouse import ClickHouseAdapter
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
@@ -41,6 +44,10 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from benchbox.core.tuning.interface import TuningColumn
+
+
+def _compact_metadata(payload: Mapping[str, Any]) -> dict[str, Any]:
+    return {str(key): value for key, value in payload.items() if value not in (None, "", {}, [], ())}
 
 
 class ClickHouseCloudAdapter(ClickHouseAdapter):
@@ -251,7 +258,20 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
         adapter_config: dict[str, Any] = {}
 
         # Map cloud-specific parameters
-        for key in ["host", "password", "username", "database", "oauth_token"]:
+        for key in [
+            "host",
+            "password",
+            "username",
+            "database",
+            "oauth_token",
+            "region",
+            "cloud_region",
+            "cloud_provider",
+            "service_id",
+            "service_name",
+            "service_tier",
+            "compute_size",
+        ]:
             if key in config and config[key] is not None:
                 adapter_config[key] = config[key]
 
@@ -289,10 +309,21 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
             Dictionary with platform metadata
         """
         info = super().get_platform_info(connection)
+        info.setdefault("configuration", {})
         info["platform_type"] = "clickhouse-cloud"
         info["platform_name"] = "ClickHouse Cloud"
         info["connection_mode"] = "cloud"
         info["configuration"]["deployment"] = "managed"
+        info["configuration"]["host"] = getattr(self, "host", None)
+        info["configuration"]["port"] = getattr(self, "port", None)
+        info["configuration"]["database"] = getattr(self, "database", None)
+        info["configuration"]["secure"] = getattr(self, "secure", None)
+        info["configuration"]["region"] = self.platform_config.get("region") or self.platform_config.get("cloud_region")
+        info["configuration"]["cloud_provider"] = self.platform_config.get("cloud_provider")
+        info["configuration"]["service_id"] = self.platform_config.get("service_id")
+        info["configuration"]["service_name"] = self.platform_config.get("service_name")
+        info["configuration"]["service_tier"] = self.platform_config.get("service_tier")
+        info["configuration"]["compute_size"] = self.platform_config.get("compute_size")
 
         # Include authentication mode indicator
         if getattr(self, "oauth_token", None):
@@ -303,10 +334,152 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
         # Include cloud storage staging configuration if set
         if getattr(self, "s3_staging_url", None):
             info["configuration"]["s3_staging_url"] = self.s3_staging_url
+        if getattr(self, "s3_region", None):
+            info["configuration"]["s3_region"] = self.s3_region
         if getattr(self, "gcs_staging_url", None):
             info["configuration"]["gcs_staging_url"] = self.gcs_staging_url
 
         return info
+
+    def get_normalized_result_metadata(
+        self,
+        *,
+        connection: Any | None = None,
+        platform_info: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Return ClickHouse Cloud-specific normalized deployment and storage metadata."""
+        info = dict(platform_info) if isinstance(platform_info, Mapping) else self.get_platform_info(connection)
+        metadata = build_default_normalized_result_metadata(self, connection=connection, platform_info=info)
+        config = info.get("configuration") if isinstance(info.get("configuration"), Mapping) else {}
+        compute = info.get("compute_configuration") if isinstance(info.get("compute_configuration"), Mapping) else {}
+        host_metadata = self._clickhouse_cloud_host_metadata(config.get("host"))
+
+        metadata["platform_deployment"] = self._clickhouse_cloud_deployment_metadata(config)
+        metadata["platform_cloud"] = self._clickhouse_cloud_cloud_metadata(config, host_metadata)
+        metadata["platform_compute"] = self._clickhouse_cloud_compute_metadata(config, compute, host_metadata)
+        metadata["platform_storage"] = self._clickhouse_cloud_storage_metadata(config)
+        return metadata
+
+    @staticmethod
+    def _clickhouse_cloud_host_metadata(host: Any) -> dict[str, Any]:
+        host_value = str(host or "").strip().lower()
+        if not host_value:
+            return {}
+        parsed = urlparse(host_value if "://" in host_value else f"//{host_value}")
+        hostname = parsed.hostname or host_value.split("/", 1)[0].split(":", 1)[0]
+        labels = hostname.split(".")
+        metadata: dict[str, Any] = {"service_endpoint": hostname}
+        if len(labels) >= 5 and labels[-2:] == ["clickhouse", "cloud"]:
+            provider = labels[-3]
+            if provider in {"aws", "gcp", "azure"}:
+                metadata["provider"] = provider
+                metadata["region"] = labels[-4]
+                metadata["service_id"] = ".".join(labels[:-4]) or None
+        return _compact_metadata(metadata)
+
+    @staticmethod
+    def _clickhouse_cloud_deployment_metadata(config: Mapping[str, Any]) -> dict[str, Any]:
+        return _compact_metadata(
+            {
+                "deployment_type": "managed_cloud",
+                "connection_mode": "cloud",
+                "endpoint_class": "cloud_endpoint",
+                "metadata_source": "requested",
+                "collection_status": "partial",
+                "service_endpoint": config.get("host"),
+                "port": config.get("port"),
+                "secure": config.get("secure"),
+                "auth_method": config.get("auth_method"),
+                "database": config.get("database"),
+            }
+        )
+
+    @staticmethod
+    def _clickhouse_cloud_cloud_metadata(
+        config: Mapping[str, Any],
+        host_metadata: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        provider = config.get("cloud_provider") or host_metadata.get("provider")
+        provider = str(provider).lower() if provider else None
+        region = config.get("region") or config.get("cloud_region") or host_metadata.get("region")
+        explicit_location = bool(config.get("cloud_provider") or config.get("region") or config.get("cloud_region"))
+        inferred_location = bool(host_metadata.get("provider") or host_metadata.get("region"))
+        source = "requested" if explicit_location else "inferred" if inferred_location else "requested"
+        has_cloud_metadata = bool(provider or region or config.get("host"))
+        return _compact_metadata(
+            {
+                "provider": provider,
+                "region": region,
+                "workspace": config.get("service_id") or host_metadata.get("service_id"),
+                "service_endpoint": config.get("host"),
+                "region_collection_status": "available" if region else "unavailable",
+                "source": source if has_cloud_metadata else "unavailable",
+                "collection_status": "partial" if has_cloud_metadata else "unavailable",
+            }
+        )
+
+    @staticmethod
+    def _clickhouse_cloud_compute_metadata(
+        config: Mapping[str, Any],
+        compute: Mapping[str, Any],
+        host_metadata: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        observed = bool(compute.get("system_settings") or compute.get("build_options"))
+        service_id = config.get("service_id") or host_metadata.get("service_id")
+        has_compute_metadata = bool(
+            observed
+            or service_id
+            or config.get("service_name")
+            or config.get("service_tier")
+            or config.get("compute_size")
+            or config.get("result_cache_enabled") is not None
+        )
+        return _compact_metadata(
+            {
+                "service_model": "managed",
+                "service_id": service_id,
+                "service_name": config.get("service_name"),
+                "service_tier": config.get("service_tier"),
+                "compute_size": config.get("compute_size"),
+                "result_cache_enabled": config.get("result_cache_enabled"),
+                "system_settings": compute.get("system_settings"),
+                "build_options": compute.get("build_options"),
+                "source": "observed" if observed else "requested" if has_compute_metadata else "unavailable",
+                "collection_status": "available" if observed else "partial" if has_compute_metadata else "unavailable",
+            }
+        )
+
+    @classmethod
+    def _clickhouse_cloud_storage_metadata(cls, config: Mapping[str, Any]) -> dict[str, Any]:
+        staging_url = config.get("s3_staging_url") or config.get("gcs_staging_url")
+        staging = cls._clickhouse_cloud_staging_metadata(staging_url)
+        if config.get("s3_region"):
+            staging["region"] = config.get("s3_region")
+        has_staging = bool(staging_url)
+        return _compact_metadata(
+            {
+                "table_format": "MergeTree",
+                "staging_location": staging_url,
+                "staging_url_type": staging.get("type"),
+                "staging_url_type_status": "available" if has_staging else "unavailable",
+                "bucket": staging.get("bucket"),
+                "prefix": staging.get("prefix"),
+                "region": staging.get("region"),
+                "source": "requested" if has_staging else "inferred",
+                "collection_status": "partial",
+            }
+        )
+
+    @staticmethod
+    def _clickhouse_cloud_staging_metadata(staging_url: Any) -> dict[str, Any]:
+        url = str(staging_url or "")
+        if url.startswith("s3://"):
+            bucket, prefix = ClickHouseCloudAdapter._parse_s3_url(url)
+            return {"type": "s3", "bucket": bucket, "prefix": prefix}
+        if url.startswith("gs://"):
+            bucket, prefix = ClickHouseCloudAdapter._parse_gcs_url(url)
+            return {"type": "gcs", "bucket": bucket, "prefix": prefix}
+        return {}
 
     # -------------------------------------------------------------------------
     # Cloud Storage Staging for Data Loading
@@ -804,6 +977,13 @@ def _build_clickhouse_cloud_config(
             "username",
             "database",
             "oauth_token",
+            "region",
+            "cloud_region",
+            "cloud_provider",
+            "service_id",
+            "service_name",
+            "service_tier",
+            "compute_size",
             "s3_staging_url",
             "s3_region",
             "gcs_staging_url",

@@ -113,7 +113,7 @@ All tuning configurations follow the unified tuning format with these sections:
 
 ### Constraint Configuration
 - `primary_keys` - Primary key constraint settings
-- `foreign_keys` - Foreign key constraint settings  
+- `foreign_keys` - Foreign key constraint settings
 - `unique_constraints` - Unique constraint settings
 - `check_constraints` - Check constraint settings
 

@@ -173,7 +173,9 @@ class TPCHPowerTest:
             validation = False
             actual_validation_mode = "disabled"
             self.logger.warning(
-                "⚠️  TPC-H answer sets are only available for stream 0. Disabling validation for stream_id != 0."
+                "⚠️  Stream 0 was validated against the answer set; "
+                "streams > 0 are run for timing only (per TPC-H spec). "
+                f"stream_id={stream_id} therefore runs without answer-set validation."
             )
 
         # If validation is disabled, override mode

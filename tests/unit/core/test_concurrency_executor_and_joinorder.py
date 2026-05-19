@@ -347,13 +347,13 @@ class TestConcurrentLoadExecutor:
 
 
 # ===================================================================
-# JoinOrder Generator
+# Synthetic JoinOrder Generator
 # ===================================================================
 
 
 class TestJoinOrderGenerator:
     def test_init_defaults(self, tmp_path):
-        from benchbox.core.joinorder.generator import JoinOrderGenerator
+        from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator
 
         gen = JoinOrderGenerator(scale_factor=0.001, output_dir=tmp_path)
         assert gen.scale_factor == 0.001
@@ -361,28 +361,28 @@ class TestJoinOrderGenerator:
         assert gen.quiet is False
 
     def test_init_verbose_bool(self, tmp_path):
-        from benchbox.core.joinorder.generator import JoinOrderGenerator
+        from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator
 
         gen = JoinOrderGenerator(scale_factor=0.001, verbose=True, output_dir=tmp_path)
         assert gen.verbose_level == 1
         assert gen.verbose_enabled is True
 
     def test_init_verbose_int(self, tmp_path):
-        from benchbox.core.joinorder.generator import JoinOrderGenerator
+        from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator
 
         gen = JoinOrderGenerator(scale_factor=0.001, verbose=2, output_dir=tmp_path)
         assert gen.verbose_level == 2
         assert gen.very_verbose is True
 
     def test_init_quiet_overrides_verbose(self, tmp_path):
-        from benchbox.core.joinorder.generator import JoinOrderGenerator
+        from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator
 
         gen = JoinOrderGenerator(scale_factor=0.001, verbose=2, quiet=True, output_dir=tmp_path)
         assert gen.verbose_enabled is False
         assert gen.very_verbose is False
 
     def test_get_table_row_count(self, tmp_path):
-        from benchbox.core.joinorder.generator import JoinOrderGenerator
+        from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator
 
         gen = JoinOrderGenerator(scale_factor=0.001, output_dir=tmp_path)
         count = gen.get_table_row_count("title")
@@ -390,14 +390,14 @@ class TestJoinOrderGenerator:
         assert gen.get_table_row_count("nonexistent") == 0
 
     def test_get_total_size_estimate(self, tmp_path):
-        from benchbox.core.joinorder.generator import JoinOrderGenerator
+        from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator
 
         gen = JoinOrderGenerator(scale_factor=0.001, output_dir=tmp_path)
         size = gen.get_total_size_estimate()
         assert size > 0
 
     def test_generate_lookup_tables(self, tmp_path):
-        from benchbox.core.joinorder.generator import JoinOrderGenerator
+        from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator
 
         gen = JoinOrderGenerator(scale_factor=0.001, output_dir=tmp_path)
         data = gen._generate_lookup_tables()
@@ -413,7 +413,7 @@ class TestJoinOrderGenerator:
         assert len(data["link_type"]) == 18
 
     def test_generate_titles(self, tmp_path):
-        from benchbox.core.joinorder.generator import JoinOrderGenerator
+        from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator
 
         gen = JoinOrderGenerator(scale_factor=0.001, output_dir=tmp_path)
         titles = gen._generate_titles(10)
@@ -424,7 +424,7 @@ class TestJoinOrderGenerator:
         assert isinstance(titles[0][1], str)  # title string
 
     def test_generate_names(self, tmp_path):
-        from benchbox.core.joinorder.generator import JoinOrderGenerator
+        from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator
 
         gen = JoinOrderGenerator(scale_factor=0.001, output_dir=tmp_path)
         names = gen._generate_names(10)
@@ -433,7 +433,7 @@ class TestJoinOrderGenerator:
         assert names[0][0] == 1
 
     def test_generate_companies(self, tmp_path):
-        from benchbox.core.joinorder.generator import JoinOrderGenerator
+        from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator
 
         gen = JoinOrderGenerator(scale_factor=0.001, output_dir=tmp_path)
         companies = gen._generate_companies(10)
@@ -441,7 +441,7 @@ class TestJoinOrderGenerator:
         assert len(companies[0]) == 7
 
     def test_generate_keywords(self, tmp_path):
-        from benchbox.core.joinorder.generator import JoinOrderGenerator
+        from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator
 
         gen = JoinOrderGenerator(scale_factor=0.001, output_dir=tmp_path)
         keywords = gen._generate_keywords(30)
@@ -450,7 +450,7 @@ class TestJoinOrderGenerator:
         assert keywords[29][1] == "keyword_30"  # generated keyword
 
     def test_generate_character_names(self, tmp_path):
-        from benchbox.core.joinorder.generator import JoinOrderGenerator
+        from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator
 
         gen = JoinOrderGenerator(scale_factor=0.001, output_dir=tmp_path)
         chars = gen._generate_character_names(10)
@@ -459,7 +459,7 @@ class TestJoinOrderGenerator:
         assert chars[9][1] == "Character 10"  # generated character
 
     def test_generate_cast_info(self, tmp_path):
-        from benchbox.core.joinorder.generator import JoinOrderGenerator
+        from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator
 
         gen = JoinOrderGenerator(scale_factor=0.001, output_dir=tmp_path)
         cast = gen._generate_cast_info(20, max_name_id=100, max_title_id=50, max_char_id=30)
@@ -472,7 +472,7 @@ class TestJoinOrderGenerator:
             assert 1 <= row[6] <= 12  # role_id
 
     def test_generate_movie_companies(self, tmp_path):
-        from benchbox.core.joinorder.generator import JoinOrderGenerator
+        from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator
 
         gen = JoinOrderGenerator(scale_factor=0.001, output_dir=tmp_path)
         mc = gen._generate_movie_companies(20, max_title_id=50, max_company_id=30)
@@ -480,7 +480,7 @@ class TestJoinOrderGenerator:
         assert len(mc[0]) == 5
 
     def test_generate_movie_info(self, tmp_path):
-        from benchbox.core.joinorder.generator import JoinOrderGenerator
+        from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator
 
         gen = JoinOrderGenerator(scale_factor=0.001, output_dir=tmp_path)
         mi = gen._generate_movie_info(20, max_title_id=50)
@@ -488,7 +488,7 @@ class TestJoinOrderGenerator:
         assert len(mi[0]) == 5
 
     def test_generate_movie_info_idx(self, tmp_path):
-        from benchbox.core.joinorder.generator import JoinOrderGenerator
+        from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator
 
         gen = JoinOrderGenerator(scale_factor=0.001, output_dir=tmp_path)
         mi_idx = gen._generate_movie_info_idx(20, max_title_id=50)
@@ -496,7 +496,7 @@ class TestJoinOrderGenerator:
         assert len(mi_idx[0]) == 5
 
     def test_generate_movie_keyword(self, tmp_path):
-        from benchbox.core.joinorder.generator import JoinOrderGenerator
+        from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator
 
         gen = JoinOrderGenerator(scale_factor=0.001, output_dir=tmp_path)
         mk = gen._generate_movie_keyword(20, max_title_id=50, max_keyword_id=30)
@@ -504,7 +504,7 @@ class TestJoinOrderGenerator:
         assert len(mk[0]) == 3
 
     def test_generate_dimension_tables(self, tmp_path):
-        from benchbox.core.joinorder.generator import JoinOrderGenerator
+        from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator
 
         gen = JoinOrderGenerator(scale_factor=0.001, output_dir=tmp_path)
         lookup = gen._generate_lookup_tables()
@@ -517,7 +517,7 @@ class TestJoinOrderGenerator:
         assert len(dims["title"]) == int(500_000 * 0.001)
 
     def test_generate_relationship_tables(self, tmp_path):
-        from benchbox.core.joinorder.generator import JoinOrderGenerator
+        from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator
 
         gen = JoinOrderGenerator(scale_factor=0.0001, output_dir=tmp_path)
         lookup = gen._generate_lookup_tables()
@@ -530,7 +530,7 @@ class TestJoinOrderGenerator:
         assert "movie_keyword" in rels
 
     def test_write_table_data(self, tmp_path):
-        from benchbox.core.joinorder.generator import JoinOrderGenerator
+        from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator
 
         gen = JoinOrderGenerator(scale_factor=0.001, output_dir=tmp_path)
         data = [(1, "value with, comma", None), (2, 'value with "quote"', 42)]
@@ -541,7 +541,7 @@ class TestJoinOrderGenerator:
         assert '"value with, comma"' in content
 
     def test_write_manifest(self, tmp_path):
-        from benchbox.core.joinorder.generator import JoinOrderGenerator
+        from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator
 
         gen = JoinOrderGenerator(scale_factor=0.001, output_dir=tmp_path)
         gen._manifest_row_counts = {"test": 100}
@@ -553,7 +553,7 @@ class TestJoinOrderGenerator:
         assert len(manifest_files) > 0
 
     def test_write_manifest_empty(self, tmp_path):
-        from benchbox.core.joinorder.generator import JoinOrderGenerator
+        from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator
 
         gen = JoinOrderGenerator(scale_factor=0.001, output_dir=tmp_path)
         gen._write_manifest({})
@@ -562,7 +562,7 @@ class TestJoinOrderGenerator:
         assert len(manifest_files) == 0
 
     def test_generate_data_local(self, tmp_path):
-        from benchbox.core.joinorder.generator import JoinOrderGenerator
+        from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator
 
         gen = JoinOrderGenerator(scale_factor=0.0001, output_dir=tmp_path)
         result = gen._generate_data_local(tmp_path)

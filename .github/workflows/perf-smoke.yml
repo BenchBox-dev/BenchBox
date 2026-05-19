@@ -12,7 +12,10 @@ jobs:
   perf-smoke:
     # Skip when maintainer attaches the skip-perf-smoke label - reserved for
     # intentional baseline shifts or CI-runner flake triage.
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-perf-smoke') }}
+    # Also skip on Release v* PRs (curation + version bumps; nothing perf-affecting).
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'skip-perf-smoke')
+      && !startsWith(github.event.pull_request.title, 'Release v')
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -52,7 +55,6 @@ jobs:
           echo "path=$current" >> "$GITHUB_OUTPUT"
 
       - name: Compare against baseline (fail on >10% regression)
-        if: hashFiles('_project/baselines/perf_smoke_duckdb_tpch_001.json') != ''
         run: |
           uv run benchbox compare \
             _project/baselines/perf_smoke_duckdb_tpch_001.json \
@@ -64,5 +66,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: perf-smoke-result
-          path: ${{ steps.current.outputs.path }}
+          path: |
+            ${{ steps.current.outputs.path }}
+            _project/baselines/perf_smoke_duckdb_tpch_001.json
           retention-days: 14

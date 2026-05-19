@@ -4,7 +4,7 @@ Thank you for contributing to the BenchBox community results dataset! Community-
 
 ## Prerequisites
 
-1. **Install BenchBox** - follow the [Getting Started](getting-started.rst) guide
+1. **Install BenchBox** - follow the [Getting Started](usage/getting-started.md) guide
 2. **Run a benchmark** - you need a complete benchmark result to submit
 
 ## Step-by-Step Submission Flow
@@ -13,25 +13,41 @@ Thank you for contributing to the BenchBox community results dataset! Community-
 
 Run a complete benchmark suite (not a cherry-picked subset of queries):
 
+Install the platform extra first in your project environment (for example,
+`uv add benchbox --extra duckdb`).
+
 ```bash
-benchbox run --platform duckdb --benchmark tpch --scale 0.01
+uv run -- benchbox run --platform duckdb --benchmark tpch --scale 0.01
 ```
 
 The result JSON is written to `benchmark_runs/results/`.
 
+Optional companion files may be written next to the result JSON. Add
+`--capture-plans` on supported platforms to create `<result>.plans.json`.
+The `--tuning` flag accepts `notuning` (default), `tuned`, `auto`, or a
+path to a YAML config; use `tuned`, `auto`, or a YAML path only for
+intentionally tuned submissions, which create `<result>.tuning.json`
+when tuning clauses are applied. `benchbox submit` packages either
+companion automatically when it sits next to the result JSON, so missing
+companion files do not make a default submission incomplete.
+
 ### 2. Package the submission
 
-Use `benchbox submit` to create a submission package:
+Use `uv run -- benchbox submit` to create a submission package:
 
 ```bash
 # Package the most recent result
-benchbox submit --last --output ./submission
+uv run -- benchbox submit --last --output ./submission
+
+# Show exact result paths if you need to choose a specific run
+# (--paths writes one path per line to stdout, safe to pipe to xargs)
+uv run -- benchbox results --paths --limit 25
 
 # Or specify a result file directly
-benchbox submit benchmark_runs/results/tpch_sf001_duckdb_20260401_120000.json --output ./submission
+uv run -- benchbox submit benchmark_runs/results/tpch_sf001_duckdb_20260401_120000.json --output ./submission
 
 # Preview what would be packaged (no files written)
-benchbox submit --last --dry-run
+uv run -- benchbox submit --last --dry-run
 ```
 
 This creates a `submission/` directory containing:
@@ -39,16 +55,21 @@ This creates a `submission/` directory containing:
 | File | Description |
 |------|-------------|
 | `bundle/<result>.json` | The canonical schema-v2 result bundle |
-| `bundle/<result>.plans.json` | Query execution plans (if captured) |
-| `bundle/<result>.tuning.json` | Tuning configuration (if used) |
-| `submission-manifest.json` | Metadata: hash, benchmark, platform, contributor |
+| `bundle/<result>.plans.json` | Optional query execution plans from `--capture-plans` |
+| `bundle/<result>.tuning.json` | Optional tuning details from an intentionally tuned run |
+| `<result>.manifest.json` | Metadata: hash, benchmark, platform, contributor |
 | `CONTRIBUTING.md` | PR instructions (for reference) |
+
+The manifest's `submitted_by` field defaults to your `git config user.name`.
+If that is empty (e.g. a fresh sandbox or CI runner), `benchbox submit` warns
+and writes the field as `""`. Override with `--submitted-by "Your Name"` if
+you prefer not to set git config or want a different attribution.
 
 ### 3. Fork and open a PR
 
 1. Fork the [BenchBox repository](https://github.com/joeharris76/BenchBox) on GitHub (or use your existing fork)
 2. Copy the contents of `submission/bundle/` into `results-data/bundles/` in your fork
-3. Copy `submission/submission-manifest.json` alongside the bundle files
+3. Copy `submission/<result>.manifest.json` alongside the bundle files (the per-bundle manifest filename inherits the bundle stem so two contributors submitting the same week cannot collide)
 4. Regenerate the inventory before you commit:
 
    ```bash
@@ -116,11 +137,12 @@ Submissions that don't meet these criteria may be asked for revisions:
 2. **No synthetic data** - results must come from actual benchmark execution
 3. **Reasonable timings** - query durations should be plausible for the platform and scale factor
 4. **Valid metadata** - benchmark ID, platform name, and scale factor must match known values
-5. **Schema v2 format** - only the current schema version is accepted
+5. **Schema v2 format** - bundle's top-level `version` field must be the current schema version (currently `"2.1"`). To check your bundle: `uv run -- python -c "import json; print(json.load(open('bundle.json'))['version'])"`
 
 ## Running Validation Locally
 
-You can validate your bundle before opening a PR:
+You can validate your bundle before opening a PR. Run validation through
+`uv run -- python` so it uses the same environment as BenchBox.
 
 ```bash
 # Validate a specific bundle

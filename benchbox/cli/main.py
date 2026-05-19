@@ -10,6 +10,7 @@ from benchbox.cli.app import CLI_HELP, cli, main, version_callback
 from benchbox.cli.benchmarks import BenchmarkConfig, BenchmarkManager
 from benchbox.cli.commands import (
     PlatformOptionParamType,
+    auth,
     benchmarks,
     check_dependencies,
     create_sample_tuning,
@@ -49,6 +50,7 @@ def get_config_manager() -> ConfigManager:
 __all__ = [
     "CLI_HELP",
     "PlatformOptionParamType",
+    "auth",
     "BenchmarkConfig",
     "BenchmarkManager",
     "DatabaseManager",

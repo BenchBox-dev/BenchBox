@@ -138,15 +138,16 @@ class CsvDialect:
     in SingleStore's LOAD DATA, NULL in PostgreSQL COPY).  It does NOT gate
     trailing-delimiter stripping.
 
-    Trailing-delimiter stripping is controlled by file extension, not by
-    null_marker.  Both TPC-H dbgen (.tbl) and TPC-DS dsdgen (.dat) emit a
-    spurious trailing pipe after every record; all CSV files do not.  Adapters
-    must use ``get_data_extension(data_file) in (".tbl", ".dat")`` and pass that
-    result as ``strip_trailing_delim`` to prepare_local_load_file() — never
-    derive it from ``null_marker is not None``, and never use
-    ``data_file.suffix.lower()`` which breaks for compressed inputs like
-    ``lineitem.tbl.zst``.  A .csv file with null_marker="" (e.g. JoinOrder) has
-    meaningful trailing commas that represent NULL fields and must not be stripped.
+    Trailing-delimiter stripping is controlled by file extension and loader
+    semantics, not by ``null_marker``.  TPC-H dbgen ``.tbl`` emits a spurious
+    trailing pipe after every record; some TPC-DS ``.dat`` rows use trailing
+    pipes to represent nullable final columns and must keep them when a fixed
+    column-count loader such as PostgreSQL COPY is used.  Adapters must use
+    ``get_data_extension(data_file)`` to make that decision — never derive it
+    from ``null_marker is not None``, and never use ``data_file.suffix.lower()``
+    which breaks for compressed inputs like ``lineitem.tbl.zst``.  A .csv file
+    with null_marker="" (e.g. JoinOrder) has meaningful trailing commas that
+    represent NULL fields and must not be stripped.
     """
 
     delimiter: str
@@ -985,6 +986,9 @@ class DelimitedFileHandler(FileFormatHandler):
             return total_rows
 
 
+DUCKDB_NO_NULL_CONVERSION_SENTINEL = "__NULL__"
+
+
 class DuckDBNativeHandler(FileFormatHandler):
     """Handler for DuckDB's native read_csv() function.
 
@@ -992,17 +996,19 @@ class DuckDBNativeHandler(FileFormatHandler):
     instead of loading row-by-row.
     """
 
-    def __init__(self, delimiter: str, adapter: Any, benchmark: Any):
+    def __init__(self, delimiter: str, adapter: Any, benchmark: Any, null_marker: str | None = ""):
         """Initialize handler.
 
         Args:
             delimiter: Field delimiter character
             adapter: Platform adapter (for config and dry-run support)
             benchmark: Benchmark instance (for CSV loading config)
+            null_marker: Resolved CSV null marker; ``None`` preserves empty strings.
         """
         self.delimiter_char = delimiter
         self.adapter = adapter
         self.benchmark = benchmark
+        self.null_marker = null_marker
 
     def get_delimiter(self) -> str:
         """Get delimiter for this file format."""
@@ -1030,6 +1036,13 @@ class DuckDBNativeHandler(FileFormatHandler):
                 pass  # Use defaults
 
         return ",\n                                ".join(config_parts)
+
+    def _pipe_nullstr_config(self) -> str:
+        """Return DuckDB nullstr config for pipe-delimited native loads."""
+        null_marker = self.null_marker
+        if null_marker is None:
+            null_marker = DUCKDB_NO_NULL_CONVERSION_SENTINEL
+        return f"nullstr='{escape_sql_string_literal(null_marker)}'"
 
     def load_table(self, table_name: str, file_path: Path, connection: Any, benchmark: Any, logger: Any) -> int:
         """Load table using DuckDB's native read_csv() function.
@@ -1069,7 +1082,7 @@ class DuckDBNativeHandler(FileFormatHandler):
                     SELECT {select_cols} FROM read_csv('{escaped_path}',
                         delim='|',
                         header=false,
-                        nullstr='',
+                        {self._pipe_nullstr_config()},
                         ignore_errors=true,
                         null_padding=true,
                         names=[{names_param}]
@@ -1082,7 +1095,7 @@ class DuckDBNativeHandler(FileFormatHandler):
                     SELECT * FROM read_csv('{escaped_path}',
                         delim='|',
                         header=false,
-                        nullstr='',
+                        {self._pipe_nullstr_config()},
                         ignore_errors=true,
                         auto_detect=true
                     )
@@ -1144,7 +1157,7 @@ class DuckDBNativeHandler(FileFormatHandler):
                     SELECT {select_cols} FROM read_csv({paths_array},
                         delim='|',
                         header=false,
-                        nullstr='',
+                        {self._pipe_nullstr_config()},
                         ignore_errors=true,
                         null_padding=true,
                         names=[{names_param}]
@@ -1156,7 +1169,7 @@ class DuckDBNativeHandler(FileFormatHandler):
                     SELECT * FROM read_csv({paths_array},
                         delim='|',
                         header=false,
-                        nullstr='',
+                        {self._pipe_nullstr_config()},
                         ignore_errors=true,
                         auto_detect=true
                     )
@@ -1885,17 +1898,19 @@ class ClickHouseNativeHandler(FileFormatHandler):
     with support for both server and local modes.
     """
 
-    def __init__(self, delimiter: str, adapter: Any, benchmark: Any):
+    def __init__(self, delimiter: str, adapter: Any, benchmark: Any, *, has_header: bool = False):
         """Initialize handler.
 
         Args:
             delimiter: Field delimiter character
             adapter: Platform adapter (for mode and config)
             benchmark: Benchmark instance (for CSV loading config)
+            has_header: Whether CSV input files include a header row.
         """
         self.delimiter_char = delimiter
         self.adapter = adapter
         self.benchmark = benchmark
+        self.has_header = has_header
 
     def get_delimiter(self) -> str:
         """Get delimiter for this file format."""
@@ -1911,7 +1926,7 @@ class ClickHouseNativeHandler(FileFormatHandler):
             Dictionary with CSV loading configuration (delimiter, format, etc.)
         """
         # Default configuration for ClickHouse
-        config = {"delimiter": self.delimiter_char, "format": "CSV"}
+        config = {"delimiter": self.delimiter_char, "format": "CSVWithNames" if self.has_header else "CSV"}
 
         # Check if benchmark provides CSV loading configuration
         if hasattr(self.benchmark, "get_csv_loading_config"):
@@ -1920,10 +1935,15 @@ class ClickHouseNativeHandler(FileFormatHandler):
                 if benchmark_config_list:
                     # Parse DuckDB-style config list into ClickHouse config
                     for config_item in benchmark_config_list:
-                        if "delim=" in config_item:
+                        normalized_item = config_item.lower()
+                        if "delim=" in normalized_item:
                             # Extract delimiter: delim='|' -> delimiter = '|'
                             delim_part = config_item.split("delim=")[1].strip("'\"")
                             config["delimiter"] = delim_part
+                        elif "header=true" in normalized_item:
+                            config["format"] = "CSVWithNames"
+                        elif "header=false" in normalized_item:
+                            config["format"] = "CSV"
             except Exception:
                 pass  # Use defaults
 
@@ -1961,17 +1981,18 @@ class ClickHouseNativeHandler(FileFormatHandler):
                 # files via auto-detection of .zst file extensions in file().
                 csv_config = self._get_csv_loading_config(validated_table)
                 delimiter = csv_config["delimiter"]
+                csv_format = csv_config["format"]
 
                 if delimiter == ",":
                     load_query = f"""
                         INSERT INTO {validated_table}
-                        SELECT * FROM file('{escaped_path}', 'CSV')
+                        SELECT * FROM file('{escaped_path}', '{csv_format}')
                     """
                 else:
                     escaped_delimiter = escape_sql_string_literal(delimiter)
                     load_query = f"""
                         INSERT INTO {validated_table}
-                        SELECT * FROM file('{escaped_path}', 'CSV')
+                        SELECT * FROM file('{escaped_path}', '{csv_format}')
                         SETTINGS format_csv_delimiter='{escaped_delimiter}'
                     """
 
@@ -2031,12 +2052,13 @@ class ClickHouseNativeHandler(FileFormatHandler):
         else:
             csv_config = self._get_csv_loading_config(validated_table)
             delimiter = csv_config["delimiter"]
+            csv_format = csv_config["format"]
             if delimiter == ",":
-                insert_sql = f"INSERT INTO {validated_table} SELECT * FROM file('{escaped_glob}', 'CSV')"
+                insert_sql = f"INSERT INTO {validated_table} SELECT * FROM file('{escaped_glob}', '{csv_format}')"
             else:
                 escaped_delimiter = escape_sql_string_literal(delimiter)
                 insert_sql = (
-                    f"INSERT INTO {validated_table} SELECT * FROM file('{escaped_glob}', 'CSV')"
+                    f"INSERT INTO {validated_table} SELECT * FROM file('{escaped_glob}', '{csv_format}')"
                     f" SETTINGS format_csv_delimiter='{escaped_delimiter}'"
                 )
 
@@ -2763,6 +2785,7 @@ __all__ = [
     "DataLoadingError",
     "DataSource",
     "CsvDialect",
+    "DUCKDB_NO_NULL_CONVERSION_SENTINEL",
     "resolve_csv_dialect",
     "prepare_local_load_file",
     "DataSourceResolver",

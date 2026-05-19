@@ -17,6 +17,8 @@ from typing import Any, Literal, Optional
 from benchbox.core.schemas import LibraryInfo, PlatformInfo
 from benchbox.platforms.base import PlatformAdapter
 
+CostClass = Literal["free", "paid_credits", "paid_compute"]
+
 
 @dataclass
 class DeploymentCapability:
@@ -65,6 +67,7 @@ class PlatformCapability:
         default_deployment: Name of the default deployment mode
         platform_family: Platform family for dialect inheritance (e.g., "duckdb", "clickhouse")
         inherits_from: Parent platform name for configuration inheritance
+        cost_class: Coarse cost model for prompt safety gates
     """
 
     supports_sql: bool = False
@@ -74,6 +77,7 @@ class PlatformCapability:
     default_deployment: str = "local"
     platform_family: Optional[str] = None
     inherits_from: Optional[str] = None
+    cost_class: CostClass = "free"
     unsupported_benchmarks: dict[str, str] = field(default_factory=dict)
 
 
@@ -230,6 +234,7 @@ class PlatformRegistry:
                     "default_mode": "sql",
                     "platform_family": "duckdb",
                     "inherits_from": "duckdb",
+                    "cost_class": "paid_credits",
                     "default_deployment": "managed",
                     "deployment_modes": {
                         "managed": {
@@ -352,6 +357,7 @@ class PlatformRegistry:
                     "default_mode": "sql",
                     "platform_family": "clickhouse",
                     "inherits_from": "clickhouse",
+                    "cost_class": "paid_compute",
                     "default_deployment": "managed",
                     "deployment_modes": {
                         "managed": {
@@ -381,7 +387,12 @@ class PlatformRegistry:
                 "adoption": "mainstream",
                 "supports": ["olap", "serverless", "petabyte_scale"],
                 "driver_package": "google-cloud-bigquery",
-                "capabilities": {"supports_sql": True, "supports_dataframe": False, "default_mode": "sql"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": False,
+                    "default_mode": "sql",
+                    "cost_class": "paid_credits",
+                },
             },
             "databricks": {
                 "display_name": "Databricks SQL",
@@ -393,7 +404,12 @@ class PlatformRegistry:
                 "adoption": "mainstream",
                 "supports": ["olap", "spark", "lakehouse"],
                 "driver_package": "databricks-sql-connector",
-                "capabilities": {"supports_sql": True, "supports_dataframe": True, "default_mode": "sql"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": True,
+                    "default_mode": "sql",
+                    "cost_class": "paid_credits",
+                },
             },
             "databricks-df": {
                 "display_name": "Databricks DataFrame",
@@ -408,7 +424,12 @@ class PlatformRegistry:
                 "adoption": "niche",
                 "supports": ["olap", "spark", "lakehouse", "dataframe"],
                 "driver_package": "databricks-connect",
-                "capabilities": {"supports_sql": True, "supports_dataframe": True, "default_mode": "dataframe"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": True,
+                    "default_mode": "dataframe",
+                    "cost_class": "paid_credits",
+                },
             },
             "snowflake": {
                 "display_name": "Snowflake",
@@ -420,7 +441,12 @@ class PlatformRegistry:
                 "adoption": "mainstream",
                 "supports": ["olap", "serverless", "multi_cloud"],
                 "driver_package": "snowflake-connector-python",
-                "capabilities": {"supports_sql": True, "supports_dataframe": False, "default_mode": "sql"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": False,
+                    "default_mode": "sql",
+                    "cost_class": "paid_credits",
+                },
             },
             "redshift": {
                 "display_name": "Amazon Redshift",
@@ -435,7 +461,12 @@ class PlatformRegistry:
                 "adoption": "established",
                 "supports": ["olap", "columnar", "aws"],
                 "driver_package": "redshift-connector",
-                "capabilities": {"supports_sql": True, "supports_dataframe": False, "default_mode": "sql"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": False,
+                    "default_mode": "sql",
+                    "cost_class": "paid_compute",
+                },
             },
             "trino": {
                 "display_name": "Trino",
@@ -486,6 +517,7 @@ class PlatformRegistry:
                     "default_mode": "sql",
                     "platform_family": "trino",
                     "inherits_from": "trino",
+                    "cost_class": "paid_compute",
                     "default_deployment": "managed",
                     "deployment_modes": {
                         "managed": {
@@ -653,6 +685,7 @@ class PlatformRegistry:
                     "default_mode": "sql",
                     "platform_family": "pg_duckdb",
                     "conflicts_with": ["pg-mooncake"],
+                    "cost_class": "paid_credits",
                     "default_deployment": "self-hosted",
                     "deployment_modes": {
                         "self-hosted": {
@@ -695,7 +728,12 @@ class PlatformRegistry:
                 "supports": ["olap", "columnar", "azure", "distributed"],
                 "driver_package": "pyodbc",
                 "notes": "Supports Azure Synapse Dedicated SQL Pools. COPY INTO for bulk loading. T-SQL dialect.",
-                "capabilities": {"supports_sql": True, "supports_dataframe": False, "default_mode": "sql"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": False,
+                    "default_mode": "sql",
+                    "cost_class": "paid_compute",
+                },
             },
             "fabric_dw": {
                 "display_name": "Microsoft Fabric Warehouse",
@@ -716,7 +754,12 @@ class PlatformRegistry:
                 "supports": ["olap", "columnar", "azure", "delta_lake", "onelake"],
                 "driver_package": "pyodbc",
                 "notes": "Supports Fabric Warehouse only (not Lakehouse). Entra ID auth only. OneLake + COPY INTO for bulk loading. T-SQL dialect (subset).",
-                "capabilities": {"supports_sql": True, "supports_dataframe": False, "default_mode": "sql"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": False,
+                    "default_mode": "sql",
+                    "cost_class": "paid_compute",
+                },
             },
             "firebolt": {
                 "display_name": "Firebolt",
@@ -736,6 +779,7 @@ class PlatformRegistry:
                     "supports_dataframe": False,
                     "default_mode": "sql",
                     "platform_family": "firebolt",
+                    "cost_class": "paid_compute",
                     "default_deployment": "core",
                     "deployment_modes": {
                         "core": {
@@ -814,6 +858,7 @@ class PlatformRegistry:
                     "supports_dataframe": False,
                     "default_mode": "sql",
                     "platform_family": "databend",
+                    "cost_class": "paid_compute",
                     "default_deployment": "cloud",
                     "deployment_modes": {
                         "cloud": {
@@ -889,6 +934,7 @@ class PlatformRegistry:
                     "supports_dataframe": False,
                     "default_mode": "sql",
                     "platform_family": "singlestore",
+                    "cost_class": "paid_compute",
                     "default_deployment": "self-hosted",
                     "deployment_modes": {
                         "self-hosted": {
@@ -985,7 +1031,12 @@ class PlatformRegistry:
                 "supports": ["olap", "serverless", "s3", "data_lake"],
                 "driver_package": "pyathena",
                 "notes": "AWS serverless query service using Trino under the hood. Pay-per-query pricing ($5/TB scanned). Native S3 and Glue Data Catalog integration.",
-                "capabilities": {"supports_sql": True, "supports_dataframe": False, "default_mode": "sql"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": False,
+                    "default_mode": "sql",
+                    "cost_class": "paid_credits",
+                },
             },
             "glue": {
                 "display_name": "AWS Glue",
@@ -1000,7 +1051,12 @@ class PlatformRegistry:
                 "supports": ["olap", "serverless", "spark", "etl", "s3"],
                 "driver_package": "boto3",
                 "notes": "AWS managed Spark ETL service. Pay-per-DPU pricing (~$0.44/DPU-hour). Uses Glue Data Catalog for metadata. Supports both SQL and DataFrame execution modes.",
-                "capabilities": {"supports_sql": True, "supports_dataframe": True, "default_mode": "sql"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": True,
+                    "default_mode": "sql",
+                    "cost_class": "paid_compute",
+                },
             },
             "emr-serverless": {
                 "display_name": "Amazon EMR Serverless",
@@ -1015,7 +1071,12 @@ class PlatformRegistry:
                 "supports": ["olap", "serverless", "spark", "s3"],
                 "driver_package": "boto3",
                 "notes": "AWS serverless Spark with automatic scaling and sub-second startup. Pay per vCPU-hour and memory-GB-hour. Uses Glue Data Catalog for metadata.",
-                "capabilities": {"supports_sql": True, "supports_dataframe": True, "default_mode": "sql"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": True,
+                    "default_mode": "sql",
+                    "cost_class": "paid_compute",
+                },
             },
             "athena-spark": {
                 "display_name": "Amazon Athena for Apache Spark",
@@ -1030,7 +1091,12 @@ class PlatformRegistry:
                 "supports": ["olap", "interactive", "spark", "s3", "sessions"],
                 "driver_package": "boto3",
                 "notes": "AWS interactive Spark with notebook-style sessions. Sub-second startup with pre-provisioned capacity. Uses Glue Data Catalog for metadata. Pay per DPU-hour.",
-                "capabilities": {"supports_sql": True, "supports_dataframe": True, "default_mode": "sql"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": True,
+                    "default_mode": "sql",
+                    "cost_class": "paid_compute",
+                },
             },
             "dataproc": {
                 "display_name": "Google Cloud Dataproc",
@@ -1046,7 +1112,12 @@ class PlatformRegistry:
                 "supports": ["olap", "spark", "cluster", "gcs", "hive"],
                 "driver_package": "google-cloud-dataproc",
                 "notes": "Google Cloud managed Spark service. Per-second billing with preemptible VM support. Supports persistent and ephemeral clusters. Uses Hive Metastore for table metadata.",
-                "capabilities": {"supports_sql": True, "supports_dataframe": True, "default_mode": "sql"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": True,
+                    "default_mode": "sql",
+                    "cost_class": "paid_compute",
+                },
             },
             "dataproc-serverless": {
                 "display_name": "Google Cloud Dataproc Serverless",
@@ -1062,7 +1133,12 @@ class PlatformRegistry:
                 "supports": ["olap", "spark", "serverless", "gcs", "hive"],
                 "driver_package": "google-cloud-dataproc",
                 "notes": "Google Cloud Dataproc Serverless for fully managed Spark. No cluster management required. Sub-minute startup, auto-scaling, per-second billing. Uses Batch Controller API.",
-                "capabilities": {"supports_sql": True, "supports_dataframe": True, "default_mode": "sql"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": True,
+                    "default_mode": "sql",
+                    "cost_class": "paid_compute",
+                },
             },
             "fabric-spark": {
                 "display_name": "Microsoft Fabric Spark",
@@ -1079,7 +1155,12 @@ class PlatformRegistry:
                 "supports": ["olap", "spark", "saas", "delta", "onelake"],
                 "driver_package": "azure-identity",
                 "notes": "Microsoft Fabric SaaS Spark with OneLake storage. Uses Livy API for session management. Entra ID (Azure AD) authentication. Capacity Units billing model.",
-                "capabilities": {"supports_sql": True, "supports_dataframe": True, "default_mode": "sql"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": True,
+                    "default_mode": "sql",
+                    "cost_class": "paid_compute",
+                },
             },
             "fabric-lakehouse": {
                 "display_name": "Microsoft Fabric Lakehouse SQL",
@@ -1095,7 +1176,12 @@ class PlatformRegistry:
                 "supports": ["olap", "cloud", "read_only", "delta", "onelake"],
                 "driver_package": "pyodbc",
                 "notes": "Fabric Lakehouse SQL Analytics Endpoint is read-only. Use fabric-spark for generate/load phases and fabric-lakehouse for query phases.",
-                "capabilities": {"supports_sql": True, "supports_dataframe": False, "default_mode": "sql"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": False,
+                    "default_mode": "sql",
+                    "cost_class": "paid_compute",
+                },
             },
             "synapse-spark": {
                 "display_name": "Azure Synapse Analytics Spark",
@@ -1112,7 +1198,12 @@ class PlatformRegistry:
                 "supports": ["olap", "spark", "enterprise", "adls", "hive"],
                 "driver_package": "azure-identity",
                 "notes": "Azure Synapse Analytics Spark with ADLS Gen2 storage. Uses Livy API for session management. vCore-hour billing. Supports external Hive Metastore.",
-                "capabilities": {"supports_sql": True, "supports_dataframe": True, "default_mode": "sql"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": True,
+                    "default_mode": "sql",
+                    "cost_class": "paid_compute",
+                },
             },
             "spark": {
                 "display_name": "Apache Spark",
@@ -1237,7 +1328,12 @@ class PlatformRegistry:
                 "supports": ["olap", "pyspark_compatible", "snowflake", "dataframe"],
                 "driver_package": "snowflake-snowpark-python",
                 "notes": "PySpark DataFrame API compatibility layer on Snowflake. NOT Apache Spark - translates DataFrame operations to Snowflake SQL. No Spark cluster required.",
-                "capabilities": {"supports_sql": True, "supports_dataframe": True, "default_mode": "dataframe"},
+                "capabilities": {
+                    "supports_sql": True,
+                    "supports_dataframe": True,
+                    "default_mode": "dataframe",
+                    "cost_class": "paid_credits",
+                },
             },
             "quanton": {
                 "display_name": "Onehouse Quanton",
@@ -1258,6 +1354,7 @@ class PlatformRegistry:
                     "supports_dataframe": True,
                     "default_mode": "sql",
                     "platform_family": "spark",
+                    "cost_class": "paid_compute",
                     "default_deployment": "managed",
                     "deployment_modes": {
                         "managed": {
@@ -1805,6 +1902,8 @@ class PlatformRegistry:
 
         # unsupported_benchmarks is computed from registry benchmark_gate rules;
         # the hardcoded dict in metadata is the legacy source and is ignored post-w16.
+        import benchbox.sql_compat.rules.benchmark_gate.lakesail_gate  # noqa: F401
+        import benchbox.sql_compat.rules.benchmark_gate.pg_family_gate  # noqa: F401
         import benchbox.sql_compat.rules.benchmark_gate.questdb_gate  # noqa: F401
         from benchbox.sql_compat.actions import CompatAction
         from benchbox.sql_compat.context import Phase
@@ -1829,6 +1928,7 @@ class PlatformRegistry:
             default_deployment=caps.get("default_deployment", "local"),
             platform_family=caps.get("platform_family"),
             inherits_from=caps.get("inherits_from"),
+            cost_class=caps.get("cost_class", "free"),
             unsupported_benchmarks=unsupported,
         )
 

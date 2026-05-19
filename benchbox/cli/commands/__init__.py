@@ -7,6 +7,7 @@ import click
 from benchbox.cli.platform import platforms
 
 from .aggregate import aggregate
+from .auth import auth
 from .benchmarks import benchmarks
 from .calculate_qphh import calculate_qphh
 from .checks import check_dependencies
@@ -38,6 +39,7 @@ from .visualize import visualize
 COMMANDS = (
     run,
     run_official,
+    auth,
     publish,
     compare,
     compare_dataframes,
@@ -77,6 +79,7 @@ def register_commands(cli: click.Group) -> None:
 __all__ = [
     "COMMANDS",
     "register_commands",
+    "auth",
     "run",
     "publish",
     "publish_bundle",

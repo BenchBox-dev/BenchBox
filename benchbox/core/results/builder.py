@@ -30,6 +30,15 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+from benchbox.core.results.environment import (
+    NormalizedExecutionEnvironment,
+    PlatformCloudMetadata,
+    PlatformComputeMetadata,
+    PlatformDeploymentMetadata,
+    PlatformStorageMetadata,
+    build_environment_payload,
+    build_platform_metadata_payload,
+)
 from benchbox.core.results.metrics import (
     TimingStatsCalculator,
     TPCMetricsCalculator,
@@ -165,6 +174,7 @@ class RunConfigInput:
     tuning_mode: str | None = None
     tuning_config: dict[str, Any] | None = None
     platform_options: dict[str, Any] | None = None
+    platform_option_sources: dict[str, str] | None = None
     table_mode: str | None = None
     external_format: str | None = None
     table_format: str | None = None
@@ -189,6 +199,8 @@ class RunConfigInput:
             data["tuning_config"] = self.tuning_config
         if self.platform_options:
             data["platform_options"] = self.platform_options
+        if self.platform_option_sources:
+            data["platform_option_sources"] = self.platform_option_sources
         if self.table_mode and self.table_mode != "native":
             data["table_mode"] = self.table_mode
         if self.external_format:
@@ -252,6 +264,13 @@ class ResultBuilder:
         self._run_config: RunConfigInput | None = None
         self._phase_status: dict[str, dict[str, Any]] = {}
         self._system_profile: dict[str, Any] | None = None
+        self._execution_environment: NormalizedExecutionEnvironment | dict[str, Any] | None = None
+        self._platform_deployment: PlatformDeploymentMetadata | dict[str, Any] | None = None
+        self._platform_cloud: PlatformCloudMetadata | dict[str, Any] | None = None
+        self._platform_compute: PlatformComputeMetadata | dict[str, Any] | None = None
+        self._platform_storage: PlatformStorageMetadata | dict[str, Any] | None = None
+        self._platform_raw_config: dict[str, Any] | None = None
+        self._platform_raw_metadata: dict[str, Any] | None = None
         self._tunings_applied: dict[str, Any] | None = None
         self._tuning_config_hash: str | None = None
         self._tuning_source_file: str | None = None
@@ -418,6 +437,34 @@ class ResultBuilder:
         """Set system profile information."""
         self._system_profile = profile
 
+    def set_execution_environment(self, environment: NormalizedExecutionEnvironment | dict[str, Any]) -> None:
+        """Set normalized execution-environment metadata."""
+        self._execution_environment = environment
+
+    def set_platform_environment_metadata(
+        self,
+        *,
+        deployment: PlatformDeploymentMetadata | dict[str, Any] | None = None,
+        cloud: PlatformCloudMetadata | dict[str, Any] | None = None,
+        compute: PlatformComputeMetadata | dict[str, Any] | None = None,
+        storage: PlatformStorageMetadata | dict[str, Any] | None = None,
+        raw_config: dict[str, Any] | None = None,
+        raw_metadata: dict[str, Any] | None = None,
+    ) -> None:
+        """Set normalized platform deployment/cloud/compute/storage metadata."""
+        if deployment is not None:
+            self._platform_deployment = deployment
+        if cloud is not None:
+            self._platform_cloud = cloud
+        if compute is not None:
+            self._platform_compute = compute
+        if storage is not None:
+            self._platform_storage = storage
+        if raw_config is not None:
+            self._platform_raw_config = raw_config
+        if raw_metadata is not None:
+            self._platform_raw_metadata = raw_metadata
+
     def set_tuning_info(
         self,
         tunings_applied: dict[str, Any] | None = None,
@@ -544,6 +591,8 @@ class ResultBuilder:
 
         # Build platform info dict
         platform_info = self._build_platform_info_dict()
+        execution_environment = self._build_execution_environment_metadata()
+        platform_environment = self._build_platform_environment_metadata(platform_info)
 
         # Determine validation status based on failures
         validation_status = self._validation_status
@@ -590,6 +639,31 @@ class ResultBuilder:
             # Validation
             validation_status=validation_status,
             validation_details=self._validation_details,
+            execution_environment=execution_environment,
+            platform_deployment=(
+                self._platform_deployment
+                if self._platform_deployment is not None
+                else platform_environment.get("deployment")
+            ),
+            platform_cloud=self._platform_cloud
+            if self._platform_cloud is not None
+            else platform_environment.get("cloud"),
+            platform_compute=(
+                self._platform_compute if self._platform_compute is not None else platform_environment.get("compute")
+            ),
+            platform_storage=(
+                self._platform_storage if self._platform_storage is not None else platform_environment.get("storage")
+            ),
+            platform_raw_config=(
+                self._platform_raw_config
+                if self._platform_raw_config is not None
+                else platform_environment.get("raw_config")
+            ),
+            platform_raw_metadata=(
+                self._platform_raw_metadata
+                if self._platform_raw_metadata is not None
+                else platform_environment.get("raw_metadata")
+            ),
             # Platform info
             platform_info=platform_info,
             # Execution metadata
@@ -932,6 +1006,34 @@ class ResultBuilder:
 
         return info
 
+    def _build_execution_environment_metadata(self) -> dict[str, Any]:
+        """Build normalized execution-environment metadata carried by BenchmarkResults."""
+        payload = build_environment_payload(
+            system_profile=self._system_profile,
+            execution_environment=self._execution_environment,
+        )
+        return {
+            key: payload[key]
+            for key in ("client_host", "platform_runtime", "container")
+            if isinstance(payload.get(key), dict)
+        }
+
+    def _build_platform_environment_metadata(self, platform_info: dict[str, Any]) -> dict[str, Any]:
+        """Build normalized platform metadata carried by BenchmarkResults."""
+        platform_config = (
+            platform_info.get("configuration") if isinstance(platform_info.get("configuration"), dict) else {}
+        )
+        return build_platform_metadata_payload(
+            platform_info=platform_info,
+            platform_config=platform_config,
+            deployment=self._platform_deployment,
+            cloud=self._platform_cloud,
+            compute=self._platform_compute,
+            storage=self._platform_storage,
+            raw_config=self._platform_raw_config if self._platform_raw_config is not None else platform_config,
+            raw_metadata=self._platform_raw_metadata,
+        )
+
     def _build_execution_metadata(self) -> dict[str, Any]:
         """Build execution metadata dictionary."""
         metadata = dict(self._execution_metadata)
@@ -947,7 +1049,12 @@ class ResultBuilder:
                 metadata["dataframe_family"] = self._platform.family
 
         if self._run_config:
-            metadata["run_config"] = self._run_config.to_dict()
+            run_config = {}
+            existing_run_config = metadata.get("run_config")
+            if isinstance(existing_run_config, dict):
+                run_config.update(existing_run_config)
+            run_config.update(self._run_config.to_dict())
+            metadata["run_config"] = run_config
         if self._phase_status:
             merged_phase_status: dict[str, dict[str, Any]] = {}
             existing_phase_status = metadata.get("phase_status")

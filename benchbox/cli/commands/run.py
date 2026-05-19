@@ -61,12 +61,15 @@ from benchbox.cli.tuning_runtime import (
     infer_runtime_tuning_mode,
     resolve_dataframe_tuning_config,
 )
+from benchbox.core.benchmark_registry import get_benchmark_default_scale
 from benchbox.core.config import DatabaseConfig
 from benchbox.core.platform_registry import PlatformRegistry
+from benchbox.core.results.status import result_non_clean_reason
 from benchbox.core.schemas import ExecutionContext
 from benchbox.platforms import is_dataframe_platform, list_available_dataframe_platforms
 from benchbox.utils.cloud_storage import is_cloud_path
 from benchbox.utils.compression import CompressionManager
+from benchbox.utils.input_validation import MAX_QUERY_ID_LENGTH
 from benchbox.utils.output_path import normalize_output_root
 from benchbox.utils.verbosity import VerbositySettings
 
@@ -581,6 +584,62 @@ def _parse_plat_bench_options(s: types.SimpleNamespace) -> None:
         _reject_external_tuned(console, s.logger, s.ctx)
 
 
+def _apply_benchmark_default_scale(s: types.SimpleNamespace) -> None:
+    """Use the selected benchmark's registry default when --scale was omitted."""
+    if not s.benchmark:
+        return
+
+    s.benchmark = normalize_benchmark_name(s.benchmark)
+    if not hasattr(s.ctx, "get_parameter_source"):
+        return
+
+    try:
+        scale_source = s.ctx.get_parameter_source("scale")
+    except Exception:
+        return
+
+    if scale_source == click.core.ParameterSource.DEFAULT:
+        s.scale = get_benchmark_default_scale(s.benchmark, fallback=s.scale)
+
+
+def _platform_option_sources_for_state(s: types.SimpleNamespace) -> dict[str, str]:
+    """Return source provenance for parsed platform options in the current CLI state."""
+    if not s.platform_key or not s.parsed_platform_options:
+        return {}
+
+    explicit_keys = _explicit_platform_option_keys(s.platform_key, s.platform_option_pairs or ())
+    defaults = PlatformHookRegistry.get_default_options(s.platform_key)
+    sources: dict[str, str] = {}
+    for key in s.parsed_platform_options:
+        if key in explicit_keys:
+            sources[key] = "cli_option"
+        elif key in defaults:
+            sources[key] = "registered_default"
+        else:
+            sources[key] = "requested"
+    return sources
+
+
+def _explicit_platform_option_keys(platform_key: str, pairs: Iterable[tuple[str, str]]) -> set[str]:
+    specs = PlatformHookRegistry.list_option_specs(platform_key)
+    alias_index = {alias.lower(): name for name, spec in specs.items() for alias in spec.aliases}
+    explicit: set[str] = set()
+    for key, _value in pairs:
+        normalized = key.lower()
+        explicit.add(normalized if normalized in specs else alias_index.get(normalized, normalized))
+    return explicit
+
+
+def _platform_option_config_entries(s: types.SimpleNamespace) -> dict[str, Any]:
+    if not s.parsed_platform_options:
+        return {}
+    entries: dict[str, Any] = {"platform_options": dict(s.parsed_platform_options)}
+    sources = _platform_option_sources_for_state(s)
+    if sources:
+        entries["platform_option_sources"] = sources
+    return entries
+
+
 def _validate_non_interactive(s: types.SimpleNamespace) -> None:
     """Set env flag and validate required args for non-interactive mode."""
     if not s.non_interactive:
@@ -647,16 +706,15 @@ def _parse_queries_list(s: types.SimpleNamespace) -> None:
         s.ctx.exit(1)
 
     max_queries = 100
-    max_query_id_len = 20
     if len(queries_to_run) > max_queries:
         console.print(f"[red]❌ Too many queries: {len(queries_to_run)} (max {max_queries})[/red]")
         if s.logger:
             s.logger.error(f"Query list too long: {len(queries_to_run)} exceeds limit of {max_queries}")
         s.ctx.exit(1)
 
-    if any(len(q) > max_query_id_len for q in queries_to_run):
-        too_long = [q for q in queries_to_run if len(q) > max_query_id_len]
-        console.print(f"[red]❌ Query ID too long (max {max_query_id_len} chars): {', '.join(too_long[:3])}[/red]")
+    if any(len(q) > MAX_QUERY_ID_LENGTH for q in queries_to_run):
+        too_long = [q for q in queries_to_run if len(q) > MAX_QUERY_ID_LENGTH]
+        console.print(f"[red]❌ Query ID too long (max {MAX_QUERY_ID_LENGTH} chars): {', '.join(too_long[:3])}[/red]")
         if s.logger:
             s.logger.error(f"Query IDs exceed length limit: {too_long}")
         s.ctx.exit(1)
@@ -700,7 +758,12 @@ def _derive_exec_type_and_banner(s: types.SimpleNamespace) -> None:
         s.logger.debug(f"Test execution type: {s.test_execution_type}")
     s.execution_mode = s.test_execution_type
 
-    if not s.quiet:
+    # Only show the "Interactive Benchmark Runner" header in actually-interactive
+    # contexts: a TTY and no explicit platform+benchmark args. Showing it when
+    # the user already provided --platform/--benchmark (or when piping output
+    # to a log) misrepresents the run as interactive.
+    is_interactive = sys.stdin.isatty() and not (s.platform and s.benchmark)
+    if not s.quiet and is_interactive:
         console.print(
             Panel.fit(
                 Text("BenchBox Interactive Benchmark Runner", style="bold blue"),
@@ -1032,6 +1095,7 @@ def _validate_output_dir(s: types.SimpleNamespace) -> None:
 def _prepare_run_state(s: types.SimpleNamespace) -> None:
     """Run the full preamble: normalize CLI params, validate, resolve configs."""
     _apply_cli_adapter(s)
+    _apply_benchmark_default_scale(s)
     _validate_initial_flags(s)
     _parse_plat_bench_options(s)
     _validate_non_interactive(s)
@@ -1183,6 +1247,7 @@ def _run_dry_run(s: types.SimpleNamespace) -> None:
                 else {}
             ),
             **({"presort": s.presort} if s.presort is not None else {}),
+            **_platform_option_config_entries(s),
             **({"benchmark_options": s.parsed_benchmark_options} if s.parsed_benchmark_options else {}),
         },
     )
@@ -1388,6 +1453,7 @@ def _run_direct(s: types.SimpleNamespace) -> None:
                 else {}
             ),
             **({"presort": s.presort} if s.presort is not None else {}),
+            **_platform_option_config_entries(s),
             **({"benchmark_options": s.parsed_benchmark_options} if s.parsed_benchmark_options else {}),
         },
     )
@@ -1440,7 +1506,7 @@ def _direct_handle_result(
     benchmark_config: BenchmarkConfig,
 ) -> None:
     """Export results and perform post-run actions for the direct branch."""
-    ctx = s.ctx
+    non_clean_reason = result_non_clean_reason(result)
     if result.validation_status not in ["FAILED", "INTERRUPTED"]:
         if not s.quiet:
             console.print("\n[bold]Exporting results...[/bold]")
@@ -1460,25 +1526,29 @@ def _direct_handle_result(
             for _format_name, filepath in exported_files.items():
                 click.echo(filepath)
         else:
-            console.print(f"\n[green]✅ Benchmark completed: {result.validation_status}[/green]")
+            if non_clean_reason:
+                console.print(
+                    f"\n[yellow]⚠ Benchmark completed with non-clean status: {result.validation_status}[/yellow]\n"
+                    f"[yellow]Reason:[/yellow] {non_clean_reason}"
+                )
+            else:
+                console.print(f"\n[green]✅ Benchmark completed: {result.validation_status}[/green]")
             for format_name, filepath in exported_files.items():
                 console.print(f"{format_name.upper()}: [dim]{filepath}[/dim]")
 
         _render_post_run_charts(result, console, s.quiet)
 
-        if s.publish:
-            json_bundle = exported_files.get("json")
-            if json_bundle:
-                from benchbox.cli.commands.publish import publish_bundle
+        if s.publish and not non_clean_reason and (json_bundle := exported_files.get("json")):
+            from benchbox.cli.commands.publish import publish_bundle
 
-                if not s.quiet:
-                    console.print("\n[bold]Publishing result bundle...[/bold]")
-                publish_bundle(
-                    source_bundle=json_bundle,
-                    target=s.publish_target,
-                    label=s.publish_label,
-                    quiet=bool(s.quiet),
-                )
+            if not s.quiet:
+                console.print("\n[bold]Publishing result bundle...[/bold]")
+            publish_bundle(
+                source_bundle=json_bundle,
+                target=s.publish_target,
+                label=s.publish_label,
+                quiet=bool(s.quiet),
+            )
 
         from benchbox.cli.preferences import save_last_run_config
 
@@ -1497,9 +1567,11 @@ def _direct_handle_result(
             output=s.output,
             additional_options={"table_mode": s.table_mode},
         )
+        if non_clean_reason:
+            s.ctx.exit(1)
     else:
         console.print(f"\n[red]❌ Benchmark failed: {result.validation_status}[/red]")
-        ctx.exit(1)
+        s.ctx.exit(1)
 
 
 def _data_or_load_build_db_config(s: types.SimpleNamespace, db_manager: DatabaseManager) -> DatabaseConfig | None:
@@ -1633,6 +1705,7 @@ def _run_data_or_load_only(s: types.SimpleNamespace) -> None:
                 else {}
             ),
             **({"presort": s.presort} if s.presort is not None else {}),
+            **_platform_option_config_entries(s),
             **({"benchmark_options": s.parsed_benchmark_options} if s.parsed_benchmark_options else {}),
         },
     )
@@ -1890,6 +1963,7 @@ def _interactive_try_quick_restart(s: types.SimpleNamespace) -> bool:
                 else {}
             ),
             **({"presort": s.presort} if s.presort is not None else {}),
+            **_platform_option_config_entries(s),
             **({"benchmark_options": s.parsed_benchmark_options} if s.parsed_benchmark_options else {}),
         },
     )
@@ -2110,6 +2184,10 @@ def _interactive_collect_flags(
             if s.database_config.options is None:
                 s.database_config.options = {}
             s.database_config.options.update(platform_opts)
+            s.benchmark_config.options["platform_options"] = dict(platform_opts)
+            s.benchmark_config.options["platform_option_sources"] = {
+                str(key): "runtime_override" for key in platform_opts
+            }
 
 
 def _interactive_prompt_seed(s: types.SimpleNamespace, prompt_seed_fn: Any) -> None:
@@ -2403,12 +2481,10 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
 
 @click.command("run", cls=BenchBoxCommand)
 # === Core Options (Tier 1 - Always visible) ===
+@click.option("--platform", type=str, help="Platform with optional deployment mode (platform:mode).")
 @click.option(
-    "--platform",
-    type=str,
-    help="Platform with optional deployment mode (platform:mode). Examples: duckdb, clickhouse:server, firebolt:core",
+    "--benchmark", type=str, help="Benchmark (tpch, tpcds, ssb, joinorder, clickbench); joinorder is IMDb SF=1."
 )
-@click.option("--benchmark", type=str, help="Benchmark (tpch, tpcds, ssb, clickbench)")
 @click.option("--scale", type=float, default=0.01, help="Scale factor", show_default=True)
 @click.option(
     "--output",

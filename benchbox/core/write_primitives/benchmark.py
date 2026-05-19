@@ -36,8 +36,14 @@ from benchbox.core.write_primitives.schema import (
     get_all_staging_tables_sql,
     get_create_table_sql,
 )
+from benchbox.sql_compat.rules.execution_filter.postgres_write_primitives import (
+    POSTGRES_WRITE_PRIMITIVES_CATEGORY_SKIPS,
+    POSTGRES_WRITE_PRIMITIVES_OPERATION_SKIPS,
+)
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
+
+_POSTGRES_OPERATION_SKIP_DIALECTS = frozenset({"postgres", "postgresql"})
 
 
 def _pk_lock_bypass_required(dialect: str) -> bool:
@@ -106,8 +112,18 @@ class OperationResult:
     skip_reason: Optional[str] = None
 
 
-def _check_validation_query(val_query: Any, actual_rows: int) -> bool:
-    """Check whether a validation query passes based on expected row criteria."""
+def _check_validation_query(val_query: Any, actual_rows: int, val_result: list | None = None) -> bool:
+    """Check whether a validation query passes based on expected row or scalar-value criteria.
+
+    Three validation modes (mutually exclusive at load time — see catalog loader):
+    - expected_rows: exact row-count match
+    - expected_rows_min/max: row-count range
+    - expected_value_min/max: scalar value(s) from each row's first column must
+      fall in [min, max]. Used by approximate-aggregate sketch ops where a
+      tolerance-bounded number certifies correctness without strict cross-engine
+      equality. Multi-row results (e.g. partition-aggregation validation
+      queries) must have *every* row in range, not just the first.
+    """
     expected_rows = val_query.expected_rows
     if expected_rows is not None:
         return actual_rows == expected_rows
@@ -115,7 +131,43 @@ def _check_validation_query(val_query: Any, actual_rows: int) -> bool:
         min_val = val_query.expected_rows_min if val_query.expected_rows_min is not None else 0
         max_val = val_query.expected_rows_max if val_query.expected_rows_max is not None else float("inf")
         return min_val <= actual_rows <= max_val
+    if (
+        getattr(val_query, "expected_value_min", None) is not None
+        and getattr(val_query, "expected_value_max", None) is not None
+    ):
+        if not val_result:
+            return False
+        for row in val_result:
+            if not row:
+                return False
+            try:
+                scalar = float(row[0])
+            except (TypeError, ValueError):
+                return False
+            if not (val_query.expected_value_min <= scalar <= val_query.expected_value_max):
+                return False
+        return True
     return True
+
+
+def _resolve_validation_sql(val_query: Any, platform_key: str | None) -> tuple[str | None, str | None]:
+    """Resolve the effective validation SQL for the active platform.
+
+    Returns (sql, skip_reason). If skip_reason is not None, the validation must be
+    skipped (still treated as passed since skip = "not applicable on this engine",
+    not "failed"). Mirrors `_get_effective_write_sql` for the operation-level
+    overrides.
+    """
+    overrides = val_query.platform_overrides or {}
+    if not platform_key or platform_key not in overrides:
+        return val_query.sql, None
+    override = overrides[platform_key]
+    if override is None:
+        return None, (
+            f"Validation '{val_query.id}' explicitly skipped on platform '{platform_key}' "
+            "via null platform_overrides entry"
+        )
+    return override, None
 
 
 class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
@@ -319,6 +371,26 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         # Adapter-preprocessed SQL takes priority
         if sql_override is not None:
             return sql_override, None
+
+        if getattr(operation, "aggregate_state", None) is not None:
+            platform_label = platform_key or "SQL"
+            return None, (
+                f"Operation '{operation.id}' is DataFrame aggregate-state only and is unsupported on "
+                f"platform '{platform_label}'."
+            )
+
+        if (platform_key or "").lower() in _POSTGRES_OPERATION_SKIP_DIALECTS:
+            category = getattr(operation, "category", "")
+            if category in POSTGRES_WRITE_PRIMITIVES_CATEGORY_SKIPS:
+                return None, (
+                    f"Operation '{operation.id}' is skipped on PostgreSQL-family platforms: "
+                    f"{POSTGRES_WRITE_PRIMITIVES_CATEGORY_SKIPS[category]}"
+                )
+            if operation.id in POSTGRES_WRITE_PRIMITIVES_OPERATION_SKIPS:
+                return None, (
+                    f"Operation '{operation.id}' is skipped on PostgreSQL-family platforms: "
+                    f"{POSTGRES_WRITE_PRIMITIVES_OPERATION_SKIPS[operation.id]}"
+                )
 
         effective_sql = operation.write_sql
 
@@ -787,6 +859,24 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             get_staging_tables_sql=get_all_staging_tables_sql,
         )
 
+    def get_query(self, query_id: Union[int, str], **kwargs: Any) -> str:
+        """Get SQL for a SQL-runnable write operation."""
+        operation = self.operations_manager.get_operation(str(query_id))
+        if operation.aggregate_state is not None:
+            raise ValueError(f"Operation '{operation.id}' is DataFrame aggregate-state only and is not exposed as SQL")
+        return operation.write_sql
+
+    def get_queries(self, dialect: Optional[str] = None) -> dict[str, str]:
+        """Get SQL-runnable write operations, excluding DataFrame-only aggregate-state ops."""
+        _ = dialect
+        operations = self.operations_manager.get_all_operations()
+        return {op_id: op.write_sql for op_id, op in operations.items() if op.aggregate_state is None}
+
+    def get_queries_by_category(self, category: str) -> dict[str, str]:
+        """Get SQL-runnable write operations for a category."""
+        operations = self.operations_manager.get_operations_by_category(category)
+        return {op_id: op.write_sql for op_id, op in operations.items() if op.aggregate_state is None}
+
     def execute_operation(
         self,
         operation_id: str,
@@ -831,13 +921,14 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                     cleanup_duration_ms=0.0,
                     cleanup_success=True,
                     status="SKIPPED",
-                    error=skip_reason,
+                    skip_reason=skip_reason,
                 )
 
             # Execute write SQL (with placeholder replacement)
             self.log_verbose(f"Executing write operation: {operation_id}")
             if effective_sql is None:
                 raise RuntimeError(f"No executable SQL resolved for operation '{operation_id}'")
+            effective_sql = self._rewrite_transactional_sql_for_platform(effective_sql, platform_key)
             write_sql = self._replace_placeholders(effective_sql)
             write_start = time.perf_counter()
             write_result = connection.execute(write_sql)
@@ -847,7 +938,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
 
             # Execute validation queries
             validation_passed, validation_results, validation_duration_ms = self._run_operation_validation(
-                operation, connection, operation_id
+                operation, connection, operation_id, platform_key=platform_key
             )
 
             # Execute cleanup if specified
@@ -870,6 +961,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             )
 
         except Exception as e:
+            self._rollback_connection_after_error(connection)
             error_msg = f"Operation {operation_id} failed: {str(e)}"
             self.log_verbose(error_msg)
 
@@ -899,25 +991,54 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         return rows_affected
 
     def _run_operation_validation(
-        self, operation: Any, connection: DatabaseConnection, operation_id: str
+        self,
+        operation: Any,
+        connection: DatabaseConnection,
+        operation_id: str,
+        platform_key: str | None = None,
     ) -> tuple[bool, list[dict], float]:
-        """Run validation queries for a write operation."""
+        """Run validation queries for a write operation.
+
+        Resolves per-platform validation SQL via `ValidationQuery.platform_overrides`
+        before execution: a string override replaces the default sql for that
+        platform; an explicit `null` override skips that validation with a logged
+        reason (the op stays passed because skip means "not applicable on this
+        engine"). Platforms with no override key fall through to the default sql.
+        """
         self.log_verbose(f"Validating operation: {operation_id}")
         validation_start = time.perf_counter()
         validation_results = []
         validation_passed = True
 
         for val_query in operation.validation_queries:
-            val_sql = self._replace_placeholders(val_query.sql)
+            effective_sql, skip_reason = _resolve_validation_sql(val_query, platform_key)
+
+            if skip_reason is not None:
+                self.log_verbose(f"Skipping validation '{val_query.id}' for {operation_id}: {skip_reason}")
+                validation_results.append(
+                    {
+                        "query_id": val_query.id,
+                        "sql": val_query.sql,
+                        "expected_rows": val_query.expected_rows,
+                        "actual_rows": 0,
+                        "passed": True,
+                        "skipped": True,
+                        "skip_reason": skip_reason,
+                        "sample": [],
+                    }
+                )
+                continue
+
+            val_sql = self._replace_placeholders(effective_sql)
             val_result = connection.execute(val_sql).fetchall()
             actual_rows = len(val_result)
-            passed = _check_validation_query(val_query, actual_rows)
+            passed = _check_validation_query(val_query, actual_rows, val_result)
             validation_passed = validation_passed and passed
 
             validation_results.append(
                 {
                     "query_id": val_query.id,
-                    "sql": val_query.sql,
+                    "sql": effective_sql,
                     "expected_rows": val_query.expected_rows,
                     "actual_rows": actual_rows,
                     "passed": passed,
@@ -1031,7 +1152,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         SQL operation catalog and benchmark logic used by SQL adapters so each
         operation ID performs equivalent work.
         """
-        _ = (ctx, adapter, monitor, run_options)
+        _ = (ctx, monitor, run_options)
         config_options = getattr(benchmark_config, "options", {}) or {}
         warmup_iterations = int(config_options.get("power_warmup_iterations", 1) or 1)
         measurement_iterations = int(config_options.get("power_iterations", 3) or 3)
@@ -1042,7 +1163,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             # Keep iteration semantics aligned with SQL runners:
             # warmup iteration index=0, measurement iterations index=1..N.
             for _warmup_idx in range(max(warmup_iterations, 0)):
-                warmup_rows = self._execute_dataframe_sql_parity_workload(query_filter=query_filter)
+                warmup_rows = self._execute_dataframe_sql_parity_workload(query_filter=query_filter, adapter=adapter)
                 for row in warmup_rows:
                     warmup_row = dict(row)
                     warmup_row["run_type"] = "warmup"
@@ -1051,7 +1172,9 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                     results.append(warmup_row)
 
             for measurement_idx in range(1, measurement_iterations + 1):
-                measurement_rows = self._execute_dataframe_sql_parity_workload(query_filter=query_filter)
+                measurement_rows = self._execute_dataframe_sql_parity_workload(
+                    query_filter=query_filter, adapter=adapter
+                )
                 for row in measurement_rows:
                     measurement_row = dict(row)
                     measurement_row["run_type"] = "measurement"
@@ -1075,21 +1198,44 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         self,
         *,
         query_filter: set[str] | None = None,
+        adapter: Any = None,
     ) -> list[dict[str, Any]]:
-        """Run write primitive operations through DuckDB for SQL/dataframe parity."""
+        """Run write primitive operations through DuckDB for SQL/dataframe parity.
+
+        Ops with an `aggregate_state` spec on their catalog entry route through
+        the platform's DataFrameWriteOperationsManager via
+        ``manager.execute_aggregate_persist`` then ``execute_aggregate_merge``
+        instead of the DuckDB parity path. This keeps DataFrame-layer sketch
+        ops (HLL, Top-K) measured on their actual engine when the platform
+        supports them, while leaving CRUD parity ops on the DuckDB path.
+        """
         from benchbox.platforms.duckdb import DuckDBAdapter
 
         data_dir = Path(self.output_dir)
         parity_db_path = data_dir / "_write_primitives_df_parity.duckdb"
 
-        adapter = DuckDBAdapter(database_path=str(parity_db_path))
-        connection = adapter.create_connection(database_path=str(parity_db_path), force_recreate=True)
-        try:
-            adapter.create_schema(self, connection)
-            adapter.load_data(self, connection, data_dir)
+        # Partition ops: aggregate-state ones bypass the DuckDB parity path.
+        all_op_ids = self._select_dataframe_operation_ids(query_filter=query_filter)
+        operations = self.operations_manager.get_all_operations()
+        agg_state_op_ids = [op_id for op_id in all_op_ids if operations[op_id].aggregate_state is not None]
+        sql_parity_op_ids = [op_id for op_id in all_op_ids if operations[op_id].aggregate_state is None]
 
-            results: list[dict[str, Any]] = []
-            for op_id in self._select_dataframe_operation_ids(query_filter=query_filter):
+        results: list[dict[str, Any]] = []
+
+        # Aggregate-state ops first — they don't need the parity DuckDB.
+        for op_id in agg_state_op_ids:
+            results.append(self._execute_aggregate_state_op(op_id, adapter=adapter))
+
+        if not sql_parity_op_ids:
+            return results
+
+        parity_adapter = DuckDBAdapter(database_path=str(parity_db_path))
+        connection = parity_adapter.create_connection(database_path=str(parity_db_path), force_recreate=True)
+        try:
+            parity_adapter.create_schema(self, connection)
+            parity_adapter.load_data(self, connection, data_dir)
+
+            for op_id in sql_parity_op_ids:
                 op_result = self.execute_operation(op_id, connection)
                 status = "SUCCESS" if op_result.success and op_result.validation_passed else "FAILED"
                 error = op_result.error
@@ -1108,12 +1254,310 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             return results
         finally:
             try:
-                adapter.close_connection(connection)
+                parity_adapter.close_connection(connection)
             finally:
                 try:
                     parity_db_path.unlink(missing_ok=True)
                 except Exception:
                     pass
+
+    def _execute_aggregate_state_op(self, op_id: str, *, adapter: Any) -> dict[str, Any]:
+        """Run an AGGREGATE_PERSIST + AGGREGATE_MERGE cycle for a catalog op.
+
+        Routes through the platform's DataFrameWriteOperationsManager and the
+        sketch factories in `dataframe_operations.py`. Today only PySpark
+        advertises support; other platforms surface a structured "skipped"
+        result without crashing the workload.
+        """
+        import shutil
+
+        op = self.operations_manager.get_operation(op_id)
+        spec = op.aggregate_state
+        if spec is None:  # defensive — caller already filtered
+            return {
+                "query_id": op_id,
+                "status": "FAILED",
+                "execution_time_seconds": 0.0,
+                "rows_returned": 0,
+                "error": f"Operation '{op_id}' has no aggregate_state spec",
+            }
+
+        platform_name = self._resolve_platform_name(adapter)
+        if platform_name not in spec.supported_platforms:
+            return {
+                "query_id": op_id,
+                "status": "SKIPPED",
+                "execution_time_seconds": 0.0,
+                "rows_returned": 0,
+                "error": (
+                    f"Aggregate-state op '{op_id}' not supported on platform "
+                    f"'{platform_name}' (supports: {','.join(spec.supported_platforms) or 'none'})"
+                ),
+            }
+
+        try:
+            from benchbox.core.write_primitives.dataframe_operations import (
+                get_dataframe_write_manager,
+                make_pyspark_hll_merge_extract,
+                make_pyspark_hll_persist_builder,
+                make_pyspark_topk_merge_extract,
+                make_pyspark_topk_persist_builder,
+                pyspark_supports_approx_top_k,
+            )
+
+            spark = self._extract_spark_session(adapter)
+            if spark is None:
+                return {
+                    "query_id": op_id,
+                    "status": "FAILED",
+                    "execution_time_seconds": 0.0,
+                    "rows_returned": 0,
+                    "error": f"Adapter for '{platform_name}' did not expose a SparkSession for op '{op_id}'",
+                }
+
+            if spec.sketch_type == "topk" and not pyspark_supports_approx_top_k(spark):
+                return {
+                    "query_id": op_id,
+                    "status": "SKIPPED",
+                    "execution_time_seconds": 0.0,
+                    "rows_returned": 0,
+                    "error": (
+                        f"Top-K aggregate-state op '{op_id}' requires Spark 4.1+; "
+                        f"runtime version {getattr(spark, 'version', 'unknown')}"
+                    ),
+                }
+
+            output_dir = Path(self.output_dir)
+            source_path = self._resolve_aggregate_source_path(spec.source_table, adapter, output_dir, spark)
+            target_path = output_dir / spec.target_subdir
+
+            # Clear stale state from prior iterations.
+            if target_path.exists():
+                shutil.rmtree(target_path, ignore_errors=True)
+
+            manager = get_dataframe_write_manager("pyspark-df", spark_session=spark)
+            if manager is None:
+                return {
+                    "query_id": op_id,
+                    "status": "FAILED",
+                    "execution_time_seconds": 0.0,
+                    "rows_returned": 0,
+                    "error": f"No DataFrameWriteOperationsManager for pyspark-df (op '{op_id}')",
+                }
+
+            if spec.sketch_type == "hll":
+                state_builder = make_pyspark_hll_persist_builder(
+                    spark_session=spark,
+                    source_path=source_path,
+                    group_cols=spec.group_cols,
+                    value_col=spec.value_col,
+                    sketch_alias=spec.sketch_alias,
+                )
+                merge_extract = make_pyspark_hll_merge_extract(spark_session=spark, sketch_col=spec.sketch_alias)
+            else:  # topk
+                state_builder = make_pyspark_topk_persist_builder(
+                    spark_session=spark,
+                    source_path=source_path,
+                    group_cols=spec.group_cols,
+                    value_col=spec.value_col,
+                    sketch_alias=spec.sketch_alias,
+                )
+                merge_extract = make_pyspark_topk_merge_extract(spark_session=spark, sketch_col=spec.sketch_alias)
+
+            t0 = mono_time()
+            persist = manager.execute_aggregate_persist(target_path, state_builder)
+            if not persist.success:
+                return {
+                    "query_id": op_id,
+                    "status": "FAILED",
+                    "execution_time_seconds": elapsed_seconds(t0),
+                    "rows_returned": 0,
+                    "error": f"AGGREGATE_PERSIST failed: {persist.error_message or 'unknown error'}",
+                }
+            merge = manager.execute_aggregate_merge(target_path, merge_extract)
+            elapsed = elapsed_seconds(t0)
+            if not merge.success:
+                return {
+                    "query_id": op_id,
+                    "status": "FAILED",
+                    "execution_time_seconds": elapsed,
+                    "rows_returned": int(persist.rows_affected),
+                    "error": f"AGGREGATE_MERGE failed: {merge.error_message or 'unknown error'}",
+                }
+
+            # Validate the extracted scalar against bounds in the first
+            # validation_query (aggregate-state ops carry only one).
+            aggregate_value = float(merge.metrics.get("aggregate_value", 0.0))
+            validation_pass, validation_error = self._validate_aggregate_value(op, aggregate_value)
+            if not validation_pass:
+                return {
+                    "query_id": op_id,
+                    "status": "FAILED",
+                    "execution_time_seconds": elapsed,
+                    "rows_returned": int(persist.rows_affected),
+                    "error": validation_error,
+                }
+
+            # Cleanup the state directory so repeat measurement iterations
+            # start clean.
+            shutil.rmtree(target_path, ignore_errors=True)
+
+            return {
+                "query_id": op_id,
+                "status": "SUCCESS",
+                "execution_time_seconds": elapsed,
+                "rows_returned": int(persist.rows_affected),
+                "aggregate_value": aggregate_value,
+            }
+        except Exception as exc:
+            return {
+                "query_id": op_id,
+                "status": "FAILED",
+                "execution_time_seconds": 0.0,
+                "rows_returned": 0,
+                "error": f"Aggregate-state op '{op_id}' raised: {exc}",
+            }
+
+    @staticmethod
+    def _resolve_platform_name(adapter: Any) -> str:
+        """Map an adapter instance to the platform identifier used in catalog specs."""
+        if adapter is None:
+            return ""
+        name = getattr(adapter, "platform_name", None) or getattr(adapter, "name", None) or ""
+        return str(name).strip().lower().replace("-df", "").replace("_df", "")
+
+    @staticmethod
+    def _extract_spark_session(adapter: Any) -> Any:
+        """Pull a SparkSession out of a PySpark adapter, if present."""
+        for attr in ("spark", "_spark", "spark_session", "session"):
+            value = getattr(adapter, attr, None)
+            if value is not None:
+                return value
+        return None
+
+    def _resolve_aggregate_source_path(self, source_table: str, adapter: Any, output_dir: Path, spark: Any) -> Path:
+        """Resolve the on-disk source path for an aggregate-state op.
+
+        Aggregate-state ops read from a Parquet directory the persist builder
+        passes through `spark.read.parquet(...)`. Today the workload runner
+        prepares this on demand from BenchBox's TBL fixtures by writing a
+        Parquet copy under ``output_dir/_aggregate_state_sources/<table>``
+        if one isn't already present.
+        """
+        cache_dir = output_dir / "_aggregate_state_sources" / source_table
+        if cache_dir.exists() and any(cache_dir.iterdir()):
+            return cache_dir
+        cache_dir.mkdir(parents=True, exist_ok=True)
+
+        # Find the TBL fixture for the table at the active scale factor.
+        # benchbox/datagen writes them to `<run_root>/datagen/tpch_<sf-label>/<table>.tbl`
+        # with optional numeric shards and compression suffixes.
+        # We probe upward from output_dir to locate that fixture root.
+        from benchbox.utils.scale_factor import format_scale_factor
+
+        scale = float(getattr(self, "scale_factor", 0.01) or 0.01)
+        scale_label = f"tpch_{format_scale_factor(scale)}"
+        candidate_roots = [
+            output_dir.parent / "datagen" / scale_label,
+            output_dir / "datagen" / scale_label,
+            Path.cwd() / "benchmark_runs" / "datagen" / scale_label,
+        ]
+        tbl_files = self._find_aggregate_tbl_sources(source_table, candidate_roots)
+        if not tbl_files:
+            raise RuntimeError(
+                f"Could not locate {source_table}.tbl fixture for scale {scale} "
+                f"under any of {[str(r) for r in candidate_roots]}"
+            )
+
+        # Read the TBL via DuckDB (handles zst), write a Parquet file Spark
+        # can consume via spark.read.parquet(<dir>) since Spark accepts both
+        # single-file and directory paths.
+        import duckdb
+
+        from benchbox.platforms.base.data_loading import escape_sql_string_literal
+
+        column_specs = self._tbl_column_specs(source_table)
+        column_list = ", ".join(f"'{name}': '{type_}'" for name, type_ in column_specs)
+        escaped_paths = [escape_sql_string_literal(str(path)) for path in tbl_files]
+        path_list = "[" + ", ".join(f"'{path}'" for path in escaped_paths) + "]"
+        target_file = cache_dir / "data.parquet"
+        conn = duckdb.connect()
+        try:
+            conn.execute(
+                f"COPY (SELECT * FROM read_csv({path_list}, delim='|', "
+                f"columns={{{column_list}}}, header=false)) "
+                f"TO '{target_file}' (FORMAT PARQUET, COMPRESSION ZSTD)"
+            )
+        finally:
+            conn.close()
+
+        return cache_dir
+
+    @staticmethod
+    def _find_aggregate_tbl_sources(source_table: str, candidate_roots: list[Path]) -> list[Path]:
+        """Find actual TPC fixture files for aggregate-state parquet conversion."""
+        patterns = (
+            f"{source_table}.tbl",
+            f"{source_table}.tbl.[0-9]*",
+            f"{source_table}.tbl.gz",
+            f"{source_table}.tbl.[0-9]*.gz",
+            f"{source_table}.tbl.zst",
+            f"{source_table}.tbl.[0-9]*.zst",
+        )
+        for root in candidate_roots:
+            if not root.exists():
+                continue
+            files = sorted({path for pattern in patterns for path in root.glob(pattern) if path.is_file()})
+            if files:
+                return files
+        return []
+
+    @staticmethod
+    def _tbl_column_specs(source_table: str) -> list[tuple[str, str]]:
+        """Column specs for the TBL fixtures the aggregate-state ops read.
+
+        Today only `lineitem` is a documented source; extend as new
+        aggregate-state ops land for other tables.
+        """
+        if source_table == "lineitem":
+            return [
+                ("l_orderkey", "BIGINT"),
+                ("l_partkey", "BIGINT"),
+                ("l_suppkey", "BIGINT"),
+                ("l_linenumber", "INTEGER"),
+                ("l_quantity", "DOUBLE"),
+                ("l_extendedprice", "DOUBLE"),
+                ("l_discount", "DOUBLE"),
+                ("l_tax", "DOUBLE"),
+                ("l_returnflag", "VARCHAR"),
+                ("l_linestatus", "VARCHAR"),
+                ("l_shipdate", "DATE"),
+                ("l_commitdate", "DATE"),
+                ("l_receiptdate", "DATE"),
+                ("l_shipinstruct", "VARCHAR"),
+                ("l_shipmode", "VARCHAR"),
+                ("l_comment", "VARCHAR"),
+            ]
+        raise NotImplementedError(
+            f"Aggregate-state source table '{source_table}' has no TBL column spec; "
+            f"add one to WritePrimitivesBenchmark._tbl_column_specs."
+        )
+
+    @staticmethod
+    def _validate_aggregate_value(op: Any, value: float) -> tuple[bool, str | None]:
+        """Apply the first validation_query's expected_value_min/max bounds."""
+        if not op.validation_queries:
+            return True, None
+        vq = op.validation_queries[0]
+        lo = vq.expected_value_min
+        hi = vq.expected_value_max
+        if lo is None or hi is None:
+            return True, None
+        if value < float(lo) or value > float(hi):
+            return False, (
+                f"Aggregate scalar {value:.4f} outside bounds [{lo}, {hi}] for op '{op.id}' validation '{vq.id}'"
+            )
+        return True, None
 
     def _select_dataframe_operation_ids(self, query_filter: set[str] | None = None) -> list[str]:
         """Select operation IDs honoring DataFrame query filters."""

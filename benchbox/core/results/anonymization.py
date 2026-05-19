@@ -17,8 +17,125 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
+
+PUBLIC_REDACTED_VALUE = "<redacted>"
+
+_SECRET_KEY_PARTS = (
+    "password",
+    "token",
+    "secret",
+    "accesskey",
+    "privatekey",
+    "sessiontoken",
+    "connectionstring",
+    "credential",
+)
+
+_IDENTIFIER_KEYS = {
+    "account": "account",
+    "accountid": "account",
+    "accountname": "account",
+    "org": "organization",
+    "orgid": "organization",
+    "orgname": "organization",
+    "organization": "organization",
+    "organizationid": "organization",
+    "organizationname": "organization",
+    "project": "project",
+    "projectid": "project",
+    "workspace": "workspace",
+    "workspaceid": "workspace",
+    "warehouse": "warehouse",
+    "warehousename": "warehouse",
+    "workgroup": "workgroup",
+    "workgroupname": "workgroup",
+    "cluster": "cluster",
+    "clusterid": "cluster",
+    "clustername": "cluster",
+    "database": "database",
+    "databasename": "database",
+    "db": "database",
+    "dbname": "database",
+    "schema": "schema",
+    "schemaname": "schema",
+    "bucket": "bucket",
+    "bucketname": "bucket",
+    "prefix": "prefix",
+    "containerid": "container",
+    "containername": "container",
+    "username": "user",
+    "user": "user",
+    "userid": "user",
+    "role": "role",
+    "rolename": "role",
+    "rolearn": "role",
+    "iamrole": "role",
+    "iamrolearn": "role",
+    "arn": "arn",
+    "engine": "engine",
+    "enginename": "engine",
+    "clientid": "client",
+    "machineid": "machine",
+}
+
+_ENDPOINT_KEYS = {
+    "host",
+    "hostname",
+    "server",
+    "endpoint",
+    "apiendpoint",
+    "serviceendpoint",
+    "workspacehost",
+    "workspaceurl",
+    "url",
+}
+
+_PATH_KEYS = {
+    "httppath",
+    "path",
+    "filepath",
+    "datapath",
+    "outputpath",
+    "databasepath",
+    "datadirectory",
+    "outputdirectory",
+    "sourceroot",
+    "staginglocation",
+    "stagingurl",
+    "s3stagingurl",
+    "outputlocation",
+    "credentialfile",
+}
+
+_MOUNT_COLLECTION_KEYS = {"bindmounts", "volumes", "mounts"}
+_MOUNT_PATH_KEYS = {"source", "destination", "target"}
+_LOCAL_ENDPOINT_VALUES = {"localhost", "127.0.0.1", "::1", "0.0.0.0", "[::1]"}
+_MESSAGE_KEYS = {
+    "message",
+    "errormessage",
+    "collectionerrormessage",
+    "exception",
+    "stderr",
+    "stdout",
+}
+_MESSAGE_PATH_RE = re.compile(
+    r"(?<![A-Za-z0-9_])("
+    r"(?:~|/Users|/home|/private/var|/var/folders|/var/run|/Volumes)/[^\s'\",;)]*"
+    r"|[A-Za-z]:\\Users\\[^\s'\",;)]*"
+    r")"
+)
+_MESSAGE_URL_RE = re.compile(r"\b[a-z][a-z0-9+.-]*://[^\s'\",;)]*", flags=re.IGNORECASE)
+_MESSAGE_SECRET_ASSIGNMENT_RE = re.compile(
+    r"\b([a-z0-9_]*(?:token|password|secret|access_key|private_key)[a-z0-9_]*)=[^&\s,;)]*",
+    flags=re.IGNORECASE,
+)
+
+
+def _compact_key(key: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", key.lower())
 
 
 @dataclass
@@ -269,6 +386,117 @@ class AnonymizationManager:
         self._machine_id_cache = anonymous_id
         logger.debug(f"Generated anonymous machine ID: {anonymous_id}")
         return anonymous_id
+
+    def anonymize_result_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Anonymize public result payload metadata beyond the client host block.
+
+        This is intentionally key-aware: secret-like keys are redacted, while
+        stable infrastructure identifiers are hashed so public artifacts can
+        still be grouped without exposing account, endpoint, storage, or
+        container identities.
+        """
+        return self._anonymize_public_value(payload, ())
+
+    def _anonymize_public_value(self, value: Any, key_path: tuple[str, ...]) -> Any:
+        if isinstance(value, dict):
+            anonymized: dict[str, Any] = {}
+            for key, child in value.items():
+                child_path = (*key_path, str(key))
+                if self._is_secret_metadata_key(child_path):
+                    anonymized[key] = PUBLIC_REDACTED_VALUE if child not in (None, "") else child
+                else:
+                    anonymized[key] = self._anonymize_public_value(child, child_path)
+            return anonymized
+
+        if isinstance(value, list):
+            return [self._anonymize_public_value(item, key_path) for item in value]
+
+        return self._anonymize_public_scalar(value, key_path)
+
+    def _anonymize_public_scalar(self, value: Any, key_path: tuple[str, ...]) -> Any:
+        if value in (None, ""):
+            return value
+
+        if isinstance(value, str) and self._looks_like_connection_string(value):
+            return PUBLIC_REDACTED_VALUE
+
+        if isinstance(value, str) and self._is_message_metadata_key(key_path):
+            return self._sanitize_public_message(value)
+
+        prefix = self._identifier_prefix_for_key_path(key_path)
+        if prefix is not None:
+            if prefix == "host" and isinstance(value, str) and self._is_local_endpoint_value(value):
+                return value
+            return self._hash_public_identifier(str(value), prefix)
+
+        if isinstance(value, str):
+            return self.remove_pii(value)
+
+        return value
+
+    def _is_secret_metadata_key(self, key_path: tuple[str, ...]) -> bool:
+        key = _compact_key(key_path[-1]) if key_path else ""
+        return any(part in key for part in _SECRET_KEY_PARTS)
+
+    def _is_message_metadata_key(self, key_path: tuple[str, ...]) -> bool:
+        key = _compact_key(key_path[-1]) if key_path else ""
+        return key in _MESSAGE_KEYS or key.endswith("message") or key.endswith("error") or key.endswith("errors")
+
+    def _identifier_prefix_for_key_path(self, key_path: tuple[str, ...]) -> str | None:
+        if not key_path:
+            return None
+
+        key = _compact_key(key_path[-1])
+        parent = _compact_key(key_path[-2]) if len(key_path) >= 2 else ""
+
+        if parent in _MOUNT_COLLECTION_KEYS and key in _MOUNT_PATH_KEYS:
+            return "path"
+        if key in _IDENTIFIER_KEYS:
+            return _IDENTIFIER_KEYS[key]
+        if key.endswith("bucket"):
+            return "bucket"
+        if key.endswith("prefix"):
+            return "prefix"
+        if key.endswith("arn"):
+            return "arn"
+        if key.endswith("host") or key.endswith("hostname") or key in _ENDPOINT_KEYS:
+            return "host" if key in {"host", "hostname", "server", "enginehost"} else "endpoint"
+        if key.endswith("url") or key.endswith("endpoint"):
+            return "endpoint"
+        if key.endswith("path") or key.endswith("directory") or key.endswith("file") or key in _PATH_KEYS:
+            return "path"
+        return None
+
+    def _hash_public_identifier(self, value: str, prefix: str) -> str:
+        salt = self.config.machine_id_salt or ""
+        digest = hashlib.sha256(f"{salt}|{prefix}|{value}".encode()).hexdigest()[:12]
+        return f"{prefix}_{digest}"
+
+    @staticmethod
+    def _is_local_endpoint_value(value: str) -> bool:
+        value = value.strip()
+        parsed = urlparse(value if "://" in value else f"//{value}")
+        host = (parsed.hostname or value.split("/", 1)[0].split(":", 1)[0]).lower()
+        return host in _LOCAL_ENDPOINT_VALUES
+
+    @staticmethod
+    def _looks_like_connection_string(value: str) -> bool:
+        if re.search(r"://[^/@\s:]+:[^/@\s]+@", value):
+            return True
+        return bool(
+            re.search(
+                r"\b[a-z0-9_]*(?:password|token|secret|access_key|private_key)[a-z0-9_]*=",
+                value,
+                flags=re.IGNORECASE,
+            )
+        )
+
+    def _sanitize_public_message(self, value: str) -> str:
+        cleaned = self.remove_pii(value)
+        cleaned = _MESSAGE_SECRET_ASSIGNMENT_RE.sub(lambda match: f"{match.group(1)}={PUBLIC_REDACTED_VALUE}", cleaned)
+        cleaned = _MESSAGE_URL_RE.sub(lambda match: self._hash_public_identifier(match.group(0), "endpoint"), cleaned)
+        cleaned = _MESSAGE_PATH_RE.sub(lambda match: self._hash_public_identifier(match.group(0), "path"), cleaned)
+        return cleaned
 
     def anonymize_system_profile(self) -> dict[str, Any]:
         """Generate anonymized system profile information.

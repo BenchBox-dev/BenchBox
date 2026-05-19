@@ -591,6 +591,18 @@ class LakeSailAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecu
             stream_id=stream_id,
         )
 
+    def _get_dialect_queries(self, benchmark: Any, benchmark_slug: str, connection: Any | None = None) -> dict:
+        """Use LakeSail-specific query rules where Spark syntax compatibility diverges."""
+        if benchmark_slug == "vector_search" and hasattr(benchmark, "get_queries"):
+            try:
+                return benchmark.get_queries(
+                    dialect="lakesail",
+                    platform_version=self._get_runtime_platform_version(connection),
+                )
+            except TypeError:
+                return benchmark.get_queries(dialect="lakesail")
+        return super()._get_dialect_queries(benchmark, benchmark_slug, connection)
+
     def get_query_plan(self, connection: Any, query: str) -> str:
         """Get query execution plan from Sail server."""
         return get_spark_query_plan(connection, query)

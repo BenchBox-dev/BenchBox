@@ -836,8 +836,15 @@ class DirectoryManager:
     """Manages BenchBox directory structure and file organization."""
 
     def __init__(self, base_dir: Optional[str] = None):
-        """Initialize directory manager with configurable base directory."""
-        self.base_dir = Path(base_dir or "benchmark_runs")
+        """Initialize directory manager with configurable base directory.
+
+        When ``base_dir`` is omitted, the root is resolved via
+        :func:`resolve_benchmark_runs_dir`, which honors
+        ``BENCHBOX_OUTPUT_DIR`` and falls back to ``Path.cwd() / "benchmark_runs"``.
+        """
+        from benchbox.utils.path_utils import resolve_benchmark_runs_dir
+
+        self.base_dir = Path(base_dir) if base_dir else resolve_benchmark_runs_dir()
         self.results_dir = self.base_dir / "results"
         self.datagen_dir = self.base_dir / "datagen"
         self.databases_dir = self.base_dir / "databases"

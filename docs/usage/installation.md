@@ -21,7 +21,7 @@ python -m pip install benchbox
 pipx install benchbox
 ```
 
-BenchBox installs a `benchbox` executable. If you use `uv`, prefer `uv run benchbox <command>` to ensure the project virtual environment is activated automatically.
+BenchBox installs a `benchbox` executable. If you use `uv`, prefer `uv run -- benchbox <command>` to ensure the project virtual environment is activated automatically.
 
 (installation-extras)=
 ## 2. Pick Optional Extras
@@ -77,7 +77,7 @@ Re-run the installer at any time to add extras. For `pipx`, use `pipx inject ben
 ## 3. Verify the CLI
 
 ```bash
-uv run benchbox --version
+uv run -- benchbox --version
 ```
 
 The command prints the current BenchBox version and validates that `pyproject.toml`, `benchbox/__init__.py`, and doc version markers match.
@@ -88,13 +88,13 @@ The command prints the current BenchBox version and validates that `pyproject.to
 
 ```bash
 # Overview of all platforms
-uv run benchbox check-deps
+uv run -- benchbox check-deps
 
 # Detailed matrix with extras guidance
-uv run benchbox check-deps --matrix
+uv run -- benchbox check-deps --matrix
 
 # Focus on a single platform
-uv run benchbox check-deps --platform snowflake --verbose
+uv run -- benchbox check-deps --platform snowflake --verbose
 ```
 
 ## 5. Create a Workspace (Optional)

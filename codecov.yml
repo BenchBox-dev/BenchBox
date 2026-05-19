@@ -1,0 +1,9 @@
+comment: false   # no PR comments
+coverage:
+  status:
+    project:
+      default:
+        threshold: 1%   # small tolerance
+    patch:
+      default:
+        target: 80%     # enforce diff coverage

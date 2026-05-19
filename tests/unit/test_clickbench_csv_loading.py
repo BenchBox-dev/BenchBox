@@ -51,6 +51,61 @@ class TestClickBenchCSVLoading:
         # DuckDB will preserve actual empty strings in the CSV as empty strings
         # rather than converting them to NULL values
 
+    def test_duckdb_native_pipe_loader_preserves_empty_referer(self, tmp_path):
+        """DuckDB native pipe loads must preserve empty ClickBench Referer fields."""
+        from unittest.mock import Mock
+
+        import duckdb
+
+        from benchbox.platforms.base.data_loading import DuckDBNativeHandler
+
+        data_file = tmp_path / "hits.csv"
+        data_file.write_text("https://example.test||0\n", encoding="utf-8")
+
+        connection = duckdb.connect(":memory:")
+        try:
+            connection.execute(
+                "CREATE TABLE hits (URL TEXT NOT NULL, Referer TEXT NOT NULL, IsRefresh INTEGER NOT NULL)"
+            )
+            adapter = Mock()
+            adapter.dry_run_mode = False
+            handler = DuckDBNativeHandler("|", adapter, self.benchmark, null_marker=None)
+
+            loaded_rows = handler.load_table("hits", data_file, connection, self.benchmark, None)
+
+            assert loaded_rows == 1
+            row = connection.execute("SELECT Referer, Referer IS NULL FROM hits").fetchone()
+            assert row is not None
+            referer, is_null = row
+            assert referer == ""
+            assert is_null is False
+        finally:
+            connection.close()
+
+    def test_duckdb_external_scan_preserves_empty_referer_for_none_null_marker(self, tmp_path):
+        """DuckDB external scans must give null_marker=None the same empty-string semantics."""
+        from benchbox.platforms.base.data_loading import DataSource
+        from benchbox.platforms.duckdb import _build_csv_scan_expression
+
+        data_file = tmp_path / "hits.csv"
+        data_file.write_text("https://example.test||0\n", encoding="utf-8")
+        data_source = DataSource(
+            source_type="test",
+            tables={"hits": [data_file]},
+            table_metadata={"hits": {"csv_delimiter": "|", "csv_null_marker": None}},
+        )
+
+        scan_sql = _build_csv_scan_expression(
+            [data_file],
+            column_names=["URL", "Referer", "IsRefresh"],
+            data_source=data_source,
+            table_name="hits",
+            benchmark=self.benchmark,
+        )
+
+        assert "nullstr='__NULL__'" in scan_sql
+        assert "nullstr=''" not in scan_sql
+
     def test_clickbench_schema_consistency(self):
         """Test that ClickBench schema is consistent with NOT NULL expectations."""
         from benchbox.core.clickbench.schema import HITS_TABLE
@@ -59,8 +114,15 @@ class TestClickBenchCSVLoading:
         for column in HITS_TABLE["columns"]:
             assert column["nullable"] is False, f"Column {column['name']} should be NOT NULL"
 
-        # This validates that the schema correctly expects no NULL values,
-        # which is why preserving empty strings (not converting to NULL) is critical
+    def test_spark_schema_omits_not_null_constraints(self):
+        """Spark-family readers surface empty ClickBench fields as NULL at scan time."""
+        from benchbox.core.clickbench.schema import get_create_table_sql
+
+        spark_sql = get_create_table_sql(dialect="spark")
+        duckdb_sql = get_create_table_sql(dialect="duckdb")
+
+        assert " NOT NULL" not in spark_sql
+        assert " NOT NULL" in duckdb_sql
 
     def test_clickbench_query_patterns(self):
         """Test that ClickBench queries use empty string filtering patterns."""

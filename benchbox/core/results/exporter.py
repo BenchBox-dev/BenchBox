@@ -36,6 +36,7 @@ from benchbox.core.results.anonymization import (
     AnonymizationConfig,
     AnonymizationManager,
 )
+from benchbox.core.results.canonical_json import canonical_json_text
 from benchbox.core.results.models import BenchmarkResults
 from benchbox.core.results.normalizer import get_query_map, normalize_result_dict
 from benchbox.core.results.schema import (
@@ -106,11 +107,11 @@ class ResultExporter:
     def _write_file(self, file_path: Path, content: str, mode: str = "w") -> None:
         """Write content to file, handling both local and cloud paths."""
         if self.is_cloud_output and hasattr(file_path, "write_text"):
-            file_path.write_text(content)
+            file_path.write_text(content, encoding="utf-8")
         elif self.is_cloud_output and hasattr(file_path, "write_bytes"):
             file_path.write_bytes(content.encode("utf-8"))
         else:
-            with open(file_path, mode, encoding="utf-8") as handle:
+            with open(file_path, mode, encoding="utf-8", newline="\n") as handle:
                 handle.write(content)
 
     def _create_file_path(self, filename: str):
@@ -239,11 +240,7 @@ class ResultExporter:
 
         # Write primary result file
         filepath = self._create_file_path(f"{filename_base}.json")
-        json_content = json.dumps(
-            self._convert_datetimes_to_iso(payload),
-            indent=2,
-            ensure_ascii=False,
-        )
+        json_content = canonical_json_text(self._convert_datetimes_to_iso(payload))
         self._write_file(filepath, json_content)
 
         # Write companion files
@@ -257,45 +254,50 @@ class ResultExporter:
         plans_payload = build_plans_payload(result)
         if plans_payload:
             plans_path = self._create_file_path(f"{filename_base}.plans.json")
-            json_content = json.dumps(plans_payload, indent=2, ensure_ascii=False)
-            self._write_file(plans_path, json_content)
+            self._write_file(plans_path, canonical_json_text(plans_payload))
             self.console.print(f"[dim]Exported plans: {plans_path}[/dim]")
 
         # Tuning companion file
         tuning_payload = build_tuning_payload(result)
         if tuning_payload:
             tuning_path = self._create_file_path(f"{filename_base}.tuning.json")
-            json_content = json.dumps(tuning_payload, indent=2, ensure_ascii=False)
-            self._write_file(tuning_path, json_content)
+            self._write_file(tuning_path, canonical_json_text(tuning_payload))
             self.console.print(f"[dim]Exported tuning: {tuning_path}[/dim]")
 
     def _apply_anonymization(self, payload: dict[str, Any]) -> None:
-        """Apply anonymization to environment block."""
+        """Apply public-export anonymization to environment, platform, config, and execution metadata."""
         if not self.anonymization_manager:
             return
 
-        system_profile = self.anonymization_manager.anonymize_system_profile()
-        if system_profile:
-            env_block = payload.get("environment", {})
-            # Update with anonymized values
-            if system_profile.get("os_type"):
-                env_block["os"] = f"{system_profile.get('os_type', '')} {system_profile.get('os_release', '')}".strip()
-            if system_profile.get("architecture"):
-                env_block["arch"] = system_profile["architecture"]
-            if system_profile.get("cpu_count"):
-                env_block["cpu_count"] = system_profile["cpu_count"]
-            if system_profile.get("memory_gb"):
-                env_block["memory_gb"] = system_profile["memory_gb"]
-            if system_profile.get("python_version"):
-                env_block["python"] = system_profile["python_version"]
+        anonymized_payload = self.anonymization_manager.anonymize_result_payload(payload)
+        payload.clear()
+        payload.update(anonymized_payload)
 
-            if env_block:
-                payload["environment"] = env_block
-
-        # Add anonymous machine ID
+        # Ensure public exports have a stable grouping key without replacing
+        # any captured client-host or platform-runtime metadata.
         machine_id = self.anonymization_manager.get_anonymous_machine_id()
-        if machine_id:
-            payload.setdefault("environment", {})["machine_id"] = machine_id
+        if not machine_id:
+            return
+
+        env_block = payload.get("environment")
+        if not isinstance(env_block, dict):
+            env_block = {}
+            payload["environment"] = env_block
+
+        client_host = env_block.get("client_host")
+        client_host_block = client_host if isinstance(client_host, dict) else None
+        captured_machine_id = env_block.get("machine_id")
+        if captured_machine_id in (None, "") and client_host_block is not None:
+            captured_machine_id = client_host_block.get("machine_id")
+
+        effective_machine_id = captured_machine_id or machine_id
+        if env_block.get("machine_id") in (None, ""):
+            env_block["machine_id"] = effective_machine_id
+        if client_host_block is not None:
+            if client_host_block.get("machine_id") in (None, ""):
+                client_host_block["machine_id"] = effective_machine_id
+        elif not captured_machine_id:
+            env_block["client_host"] = {"machine_id": effective_machine_id}
 
     def _convert_datetimes_to_iso(self, obj: Any) -> Any:
         """Convert datetime objects to ISO format strings."""
@@ -527,7 +529,11 @@ class ResultExporter:
 
         for json_file in self.output_dir.glob("*.json"):
             # Skip companion files
-            if json_file.name.endswith(".plans.json") or json_file.name.endswith(".tuning.json"):
+            if (
+                json_file.name.endswith(".plans.json")
+                or json_file.name.endswith(".tuning.json")
+                or json_file.name.endswith(".submission.json")
+            ):
                 continue
 
             try:

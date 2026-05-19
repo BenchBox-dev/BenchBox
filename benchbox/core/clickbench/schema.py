@@ -179,11 +179,13 @@ def get_create_table_sql(
         SQL CREATE TABLE statement
     """
     table = HITS_TABLE
+    target = dialect.lower()
+    enforce_not_null = target not in {"spark", "lakesail", "pyspark"}
     columns = []
 
     for col in table["columns"]:
         col_def = f"{cast(str, col['name'])} {cast(str, col['type'])}"
-        if not col.get("nullable", True):
+        if enforce_not_null and not col.get("nullable", True):
             col_def += " NOT NULL"
         columns.append(f"  {col_def}")
 

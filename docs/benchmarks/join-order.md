@@ -1,329 +1,201 @@
-<!-- Copyright 2026 Joe Harris / BenchBox Project. Licensed under the MIT License. -->
-
-# Join Order Benchmark Implementation
+# Join Order Benchmark
 
 ```{tags} intermediate, concept, join-order, custom-benchmark
 ```
 
-> **CLI name:** `joinorder` - use `benchbox run --benchmark joinorder`
+> **CLI name:** `joinorder` - use `benchbox run --benchmark joinorder --scale 1`
 
-## Overview
+BenchBox's public Join Order Benchmark implementation uses the canonical IMDb
+2013 dataset used by the JOB paper, "How Good Are Query Optimizers, Really?"
+by Leis et al. The benchmark is designed to expose cardinality-estimation and
+join-order planning behavior across many-table SQL queries.
 
-The Join Order Benchmark (JOB) has been successfully implemented in BenchBox as a systematic test suite for query optimizer join order selection capabilities. Based on the seminal paper "How Good Are Query Optimizers, Really?" by Viktor Leis et al. (VLDB 2015), this benchmark uses a complex IMDB-like schema to stress-test database query optimizers.
+## Data Source
 
-## Key Features
+`joinorder` downloads and verifies the BenchBox Parquet package for
+`joinorder-imdb-2013-v1`. The package is derived from the Harvard Dataverse
+`imdb_pg11` archive, DOI `10.7910/DVN/2QYZBT`, restored into PostgreSQL and
+converted to 21 Parquet tables for repeatable benchmark execution.
 
-### Schema Complexity
-- **21 interconnected tables** modeling a movie database (IMDB-like)
-- **Complex relationships** between movies, people, companies, and metadata
-- **Multiple join patterns**: star joins, chain joins, and complex multi-table joins
-- **Realistic foreign key relationships** creating challenging optimization scenarios
+The provenance attestation lives at
+`_project/joinorder/provenance-attestation.md`. It records that the
+Dataverse-published MD5 for file id `3590041` matches the cached source pg_dump,
+that the restored source has 21 tables and 74,190,187 rows, and that the
+Postgres-to-Parquet conversion fidelity check passes for row counts,
+null/empty-string preservation, integer ranges, and UTF-8 samples.
 
-### Query Characteristics
-- **13 core queries** representing different join optimization challenges
-- **Multi-table joins** (3-8 tables per query)
-- **Varying selectivity** patterns to test cost-based optimization
-- **Real-world query patterns** based on actual IMDB data analysis
+BenchBox does not define JoinOrder source recovery as byte-identical
+Parquet/archive reproduction. A 2026-05-12 rebuild check produced different
+archive hashes across two local rebuilds, with byte-hash drift in
+`cast_info.parquet`, while conversion-fidelity checks passed. The rebuild
+contract is therefore logical table-content equivalence: maintainer rebuilds
+export PostgreSQL rows in `id` order, read rebuilt Parquet rows in `id` order,
+and compare versioned typed row-content hashes before packaging. The downloaded
+published archive is still verified by its pinned `archive_sha256` and
+per-table Parquet file hashes.
 
-### Synthetic Data Generation
-- **Scalable data generation** (scale factor 0.001 to 1.0+)
-- **Realistic data distributions** preserving join characteristics
-- **Configurable sizes** for testing and production use
-- **CSV format output** compatible with all major databases
+Licensing status is separate from integrity status. The Dataverse record
+declares the deposit as `CC0 1.0`, but IMDb's current dataset terms and the JOB
+paper frame the underlying IMDb data as non-commercial. BenchBox records the
+current re-hosted Parquet release asset as an accepted project-owner
+redistribution risk, keeps it as the default fast path, and does not treat it as
+BenchBox-cleared for broad commercial redistribution.
 
-## Implementation Architecture
+The benchmark accepts only `--scale 1`. There is currently no public small,
+comparable JOB workload; the decision is recorded in
+`_project/decisions/joinorder-small-workload-2026-05-12.md`. The old
+uniformly-random data generator has been renamed to the internal
+`joinorder_synthetic` benchmark for loader and schema smoke tests; it is not a
+substitute for JOB cardinality testing.
 
-### Core Components
-
-1. **JoinOrderSchema** (`benchbox/core/joinorder/schema.py`)
-   - Complete IMDB schema definition with 21 tables
-   - Foreign key relationships and constraints
-   - Multi-dialect SQL generation (SQLite, PostgreSQL, MySQL, DuckDB)
-
-2. **JoinOrderQueryManager** (`benchbox/core/joinorder/queries.py`)
-   - 13 embedded core queries based on original benchmark
-   - Query complexity categorization (simple, medium, complex)
-   - Join pattern analysis (star, chain, complex)
-   - Support for loading original benchmark query files
-
-3. **JoinOrderGenerator** (`benchbox/core/joinorder/generator.py`)
-   - Synthetic data generation preserving join characteristics
-   - Configurable scale factors
-   - Realistic data distributions for movies, people, companies
-   - CSV output format
-
-4. **JoinOrderBenchmark** (`benchbox/core/joinorder/benchmark.py`)
-   - Main benchmark interface
-   - Data generation and schema management
-   - Query execution and performance measurement
-   - Integration with BenchBox ecosystem
-
-## Usage Examples
-
-### Basic Usage
-
-```python
-from benchbox import JoinOrder
-
-# Initialize benchmark (uses default path: benchmark_runs/datagen/joinorder_sf01)
-joinorder = JoinOrder(scale_factor=0.1)
-
-# Generate data (compressed with zstd by default when using CLI)
-data_files = joinorder.generate_data()
-
-# Get schema
-schema_sql = joinorder.get_create_tables_sql()
-
-# Get queries
-queries = joinorder.get_queries()
-query_1a = joinorder.get_query("1a")
-
-# Analyze query complexity
-complexity_dist = joinorder.get_queries_by_complexity()
-pattern_dist = joinorder.get_queries_by_pattern()
-```
-
-### DuckDB Integration
-
-```python
-import duckdb
-from benchbox import JoinOrder
-
-# Initialize and generate data (default path: benchmark_runs/datagen/joinorder_sf001)
-joinorder = JoinOrder(scale_factor=0.01)
-data_files = joinorder.generate_data()
-
-# Create DuckDB database
-conn = duckdb.connect("joinorder_test.duckdb")
-
-# Create schema
-for statement in joinorder.get_create_tables_sql().split(';'):
-    if statement.strip():
-        conn.execute(statement)
-
-# Load data from generated files
-for table_name in joinorder.get_table_names():
-    # Use the actual output directory path
-    csv_path = joinorder.output_dir / f"{table_name}.csv"
-    conn.execute(f"""
-        INSERT INTO {table_name}
-        SELECT * FROM read_csv('{csv_path}', header=false)
-    """)
-
-# Run queries and analyze performance
-for query_id in joinorder.get_query_ids():
-    query_sql = joinorder.get_query(query_id)
-    result = conn.execute(query_sql).fetchall()
-    print(f"Query {query_id}: {len(result)} rows")
-```
-
-### Original Benchmark Query Files
-
-```python
-# Load queries from original Join Order Benchmark repository
-joinorder = JoinOrder(queries_dir="path/to/join-order-benchmark")
-
-# This will load all .sql files from the directory
-# providing access to the full 113-query benchmark
-```
-
-## Database Schema
-
-### Main Tables
-
-**Dimension Tables:**
-- `title` (500K rows @ SF=1.0) - Movies and TV shows
-- `name` (800K rows @ SF=1.0) - People (actors, directors, etc.)
-- `company_name` (60K rows @ SF=1.0) - Production companies
-- `keyword` (24K rows @ SF=1.0) - Movie keywords
-- `char_name` (600K rows @ SF=1.0) - Character names
-
-**Relationship Tables:**
-- `cast_info` (7M rows @ SF=1.0) - Person-movie relationships
-- `movie_companies` (520K rows @ SF=1.0) - Movie-company relationships
-- `movie_info` (3M rows @ SF=1.0) - Movie metadata
-- `movie_keyword` (1M rows @ SF=1.0) - Movie-keyword relationships
-
-**Lookup Tables:**
-- `kind_type`, `company_type`, `info_type`, `role_type`, etc.
-
-### Key Relationships
-
-The schema creates a complex web of relationships:
-- Movies connect to people through `cast_info`
-- Movies connect to companies through `movie_companies`
-- Movies connect to keywords through `movie_keyword`
-- Multiple metadata tables (`movie_info`, `movie_info_idx`)
-- Alternative name tables (`aka_name`, `aka_title`)
-
-## Query Analysis
-
-### Query Complexity Distribution
-
-**Simple Queries (3-4 tables):**
-- Focus on basic join patterns
-- Test predicate pushdown
-- Minimal optimization challenges
-
-**Medium Queries (5-6 tables):**
-- Multi-table star joins
-- Moderate selectivity
-- Cost-based optimization important
-
-**Complex Queries (7+ tables):**
-- Multiple join types
-- High optimization potential
-- Stress-test advanced optimizers
-
-### Join Pattern Analysis
-
-**Star Joins:**
-- Central table (usually `title` or `cast_info`)
-- Multiple dimension table joins
-- Common in movie database queries
-
-**Chain Joins:**
-- Sequential table connections
-- Foreign key following patterns
-- Test join reordering algorithms
-
-**Complex Joins:**
-- Mixed star and chain patterns
-- Multiple relationship paths
-- Advanced-level optimization scenarios
-
-## CLI Options (`--benchmark-option`)
-
-Configure Join Order Benchmark via `--benchmark-option KEY=VALUE`:
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `queries_dir` | - | Directory containing custom query files |
-| `force_regenerate` | - | Force data regeneration (`true`/`false`) |
-
-Accepts hyphenated aliases (e.g. `queries-dir`).
+## First Run
 
 ```bash
-# Use custom queries directory
-benchbox run --platform duckdb --benchmark joinorder --scale 0.1 \
-  --benchmark-option queries_dir=/path/to/custom/queries
+uv run -- benchbox run --platform duckdb --benchmark joinorder --scale 1
 ```
 
-## Performance Characteristics
+On first use BenchBox downloads the compressed archive, verifies the archive
+hash, extracts the 21 Parquet files, and verifies table-level hashes and row
+counts from `benchbox/core/joinorder/data_manifest.toml`.
 
-### Scale Factor Impact
+The manifest hash fields have separate roles:
 
-| Scale Factor | Data Size | title rows | cast_info rows | Query Time (avg) |
-| ------------ | --------- | ---------- | -------------- | ---------------- |
-| 0.001        | ~140 KB   | 500        | 7,000          | 1-5 ms           |
-| 0.01         | ~3.4 MB   | 5,000      | 70,000         | 2-10 ms          |
-| 0.1          | ~34 MB    | 50,000     | 700,000        | 10-100 ms        |
-| 1.0          | ~1 GB     | 500,000    | 7,000,000      | 100ms-10s        |
+- `archive_sha256`: sha256 of the downloadable `.tar.zst`, consumed by the
+  downloader before extraction.
+- `data_archive_hash`: aggregate sha256 over sorted per-table Parquet hashes,
+  used to identify the extracted canonical Parquet file set in result metadata.
+- `manifest_hash`: sha256 of the stable manifest content with transport-only
+  fields excluded, consumed by manifest parsing before runtime use.
 
-### Optimization Opportunities
+Subsequent runs reuse the verified data under:
 
-The benchmark tests several key optimization patterns:
+```text
+benchmark_runs/datagen/joinorder_sf1/
+```
 
-1. **Join Reordering**
-   - Optimal join order selection based on cardinality
-   - Cost model accuracy testing
-   - Bushy vs. left-deep plan comparison
+If `BENCHBOX_OUTPUT_DIR` is set, the same relative datagen path is resolved
+under that root. Air-gapped environments can pre-populate that directory with
+the 21 Parquet files; BenchBox still verifies the manifest before running.
 
-2. **Predicate Pushdown**
-   - Filter placement optimization
-   - Selectivity estimation accuracy
-   - Join input size reduction
+## BYO Data Path
 
-3. **Index Usage**
-   - Foreign key index utilization
-   - Covering index opportunities
-   - Index intersection strategies
+The default `joinorder` path intentionally remains the verified BenchBox-hosted
+Parquet archive. Environments that require stricter separation from BenchBox's
+re-hosted archive can instead provide their own canonical Parquet files. Place
+the 21 files named in `benchbox/core/joinorder/data_manifest.toml` under:
 
-4. **Runtime Filters**
-   - Bloom filter generation
-   - Hash filter pushdown
-   - Dynamic optimization
+```text
+benchmark_runs/datagen/joinorder_sf1/
+```
 
-## Integration with BenchBox
+or, when `BENCHBOX_OUTPUT_DIR` is set:
 
-### Ecosystem Compatibility
+```text
+$BENCHBOX_OUTPUT_DIR/datagen/joinorder_sf1/
+```
 
-The JOB implementation follows BenchBox patterns:
-- Compatible with existing analysis tools
-- SQL dialect translation via SQLGlot
-- Consistent API with TPC-H, TPC-DS, etc.
-- Pluggable data generation
+On startup BenchBox checks every manifest-owned table file first. If all files
+are present and their sha256 values match the manifest, the benchmark uses that
+pre-populated directory and does not download the hosted archive. If any file is
+missing, BenchBox falls back to the default hosted archive. If a file is present
+but has the wrong sha256, the run fails before downloading so stale or corrupt
+BYO data is visible.
 
-### Complementary Benchmarks
+Maintainers can rebuild the canonical Parquet files directly from Dataverse with
+the project script:
 
-Join Order Benchmark complements other BenchBox benchmarks:
-- **TPC-H**: Analytical query performance
-- **TPC-DS**: Complex OLAP workloads
-- **Read Primitives**: Individual operation testing
-- **JoinOrder**: Join order optimization focus
+```bash
+uv run -- python _project/scripts/build_joinorder_data.py foundation --work-dir ~/Developer/benchmark_runs/joinorder/build/joinorder-imdb-2013-v1
+```
 
-## Validation and Testing
+That path downloads `imdb_pg11` from DOI `10.7910/DVN/2QYZBT`, verifies the
+Dataverse checksum, restores the pg_dump into PostgreSQL, converts the 21 tables
+to Parquet, and runs the canonical manifest and logical-content checks. It is a
+heavy maintainer workflow and is not the silent first-run default.
 
-### Test Coverage
+## Query Set
 
-- Schema creation across dialects
-- Data generation at multiple scale factors
-- Query execution validation
-- DuckDB integration example
-- Performance measurement
-- Error handling and edge cases
+`JoinOrderQueryManager` exposes all 113 canonical JOB SQL queries:
 
-### Performance Validation
+```python
+from benchbox.core.joinorder.queries import JoinOrderQueryManager
 
-Tested against DuckDB with scale factor 0.01:
-- All 13 queries execute successfully
-- Average query time: 2.1ms
-- Data generation: 904ms for 17MB
-- Schema creation: <50ms
+queries = JoinOrderQueryManager()
+assert queries.get_query_count() == 113
+query_1a = queries.get_query("1a")
+```
 
-## Future Enhancements
+The SQL text is imported from the Greg Rahn JOB query corpus pinned by the
+canonical build. Runtime platform adapters handle dialect translation.
 
-### Additional Queries
+## Python API
 
-- Load full 113-query set from original benchmark
-- Add query variants with different selectivity
-- Include UPDATE/DELETE queries for optimizer testing
+```python
+from benchbox import JoinOrder
 
-### Features
+benchmark = JoinOrder(scale_factor=1.0)
+data_files = benchmark.generate_data()
+schema_sql = benchmark.get_create_tables_sql(dialect="duckdb")
+query_sql = benchmark.get_query("1a")
+```
 
-- **Query plan analysis** integration
-- **Cost model validation** tools
-- **Cardinality estimation** accuracy testing
-- **Index recommendation** based on workload
+Passing any scale other than `1.0` raises a clear error pointing to
+`joinorder_synthetic` for synthetic smoke-test data.
 
-### Extended Schema
+## DataFrame Mode
 
-- **Temporal tables** for time-based optimization
-- **Partitioning** support for large-scale testing
-- **Materialized views** for complex query optimization
+The DataFrame registry exposes all 113 canonical query IDs. The original 13
+queries keep their hand-written expression-family and pandas-family
+translations; the rest use a restricted translator for the canonical JOB SQL
+shape: comma-join tables, WHERE predicates, equality joins, and top-level
+`MIN(...)` projections.
+
+DataFrame `joinorder` still has a different benchmark interpretation from SQL
+`joinorder`: SQL mode stresses optimizer join ordering, while DataFrame mode
+executes an explicit join sequence and primarily measures multi-join execution
+through the DataFrame APIs.
+
+## License And Attribution
+
+Dataset provenance and redistribution notes live in:
+
+```text
+benchbox/core/joinorder/DATA-LICENSE.md
+```
+
+Decision record:
+
+```text
+_project/decisions/joinorder-canonical-data-licensing-2026-05-12.md
+```
+
+IMDb attribution:
+
+```text
+Information courtesy of IMDb (https://www.imdb.com). Used with permission.
+```
+
+Use this dataset for research, database systems evaluation, and query optimizer
+benchmarking. It is not intended for republication as a general-purpose movie
+database, and BenchBox does not treat the current converted archive as
+BenchBox-cleared for broad commercial redistribution. Optional follow-up work may
+seek explicit permission or add an advanced direct-Dataverse/BYO path, but the
+default user experience remains the verified BenchBox-hosted Parquet archive.
 
 ## References
 
-- **Paper**: "How Good Are Query Optimizers, Really?" - VLDB 2015
-- **Authors**: Viktor Leis, Andrey Gubichev, Atanas Mirchev, Peter Boncz, Alfons Kemper, Thomas Neumann
-- **Original Repository**: https://github.com/gregrahn/join-order-benchmark
-- **IMDB Dataset**: http://www.imdb.com/interfaces
+- Paper: https://www.vldb.org/pvldb/vol9/p204-leis.pdf
+- Query corpus: https://github.com/gregrahn/join-order-benchmark
+- Dataset DOI: https://doi.org/10.7910/DVN/2QYZBT
 
-## File Structure
+## Implementation Files
 
-```
+```text
 benchbox/core/joinorder/
-├── __init__.py                 # Module exports
-├── benchmark.py                # Main JoinOrderBenchmark class
-├── generator.py                # Synthetic data generation
-├── queries.py                  # Query management and categorization
-└── schema.py                   # IMDB schema definition
-
-benchbox/
-└── joinorder.py                # Top-level JoinOrder export
-
-examples/
-└── duckdb_joinorder.py         # Complete DuckDB example
+|-- benchmark.py          # canonical IMDb 2013 benchmark driver
+|-- data_manifest.toml    # archive, table hash, schema, row-count manifest
+|-- DATA-LICENSE.md       # dataset provenance and redistribution notes
+|-- queries.py            # 113 canonical JOB SQL queries
+|-- dataframe_queries.py  # 113 DataFrame query implementations
+`-- schema.py             # 21-table JOB schema
 ```
-
-The Join Order Benchmark implementation provides a valuable addition to BenchBox's suite of database benchmarks, specifically targeting join order optimization - a critical component of modern query optimizer performance.

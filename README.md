@@ -28,7 +28,7 @@ BenchBox _loosely_ follows [Semantic Versioning](https://semver.org/) using the 
 - **MINOR** when we add backward-compatible changes _OR significantly expand functionality_.
 - **PATCH** when we make bug fixes or documentation updates, _bug-fixes may not be backward-compatible_.
 
-Current release: v0.2.1. Check your installation with `benchbox --version`, which also reports metadata consistency diagnostics pulled from `pyproject.toml` and documentation markers.
+Current release: v0.3.0. Check your installation with `benchbox --version`, which also reports metadata consistency diagnostics pulled from `pyproject.toml` and documentation markers.
 
 **For Developers**: See [Release Automation Guide](release/RELEASE_AUTOMATION.md) for the automated release process with reproducible builds and timestamp normalization.
 
@@ -687,7 +687,7 @@ benchbox export --last --format html
 
 BenchBox also publishes a public results corpus and explorer at `benchbox.dev/results/`.
 If you run BenchBox on a platform you want represented there, package the run with
-`benchbox submit --output ./submission` and open a PR against the `published-results`
+`uv run -- benchbox submit --output ./submission` and open a PR against the `published-results`
 branch of the public repository.
 
 The full contributor workflow, local validation steps, and trust-label rules live in
@@ -913,7 +913,7 @@ print(normalize_output_root("s3://bucket/prefix", "tpch", 0.01))
     * Original paper: https://www.cs.umb.edu/~poneil/StarSchemaB.PDF
 * **AMPLab** - Big data benchmark with text processing. Complex data patterns.
     * Original site: https://amplab.cs.berkeley.edu/benchmark/
-* **Join Order** - IMDB dataset for join optimization testing. Complex join patterns test cardinality estimation.
+* **Join Order** - Canonical IMDb 2013 JOB dataset for join optimization testing. Runs at sf=1 only; first use downloads and verifies the Parquet archive under `BENCHBOX_OUTPUT_DIR` / `benchmark_runs/datagen/joinorder_sf1/`.
     * Original paper: https://www.vldb.org/pvldb/vol9/p204-leis.pdf
 
 ### Industry Benchmarks

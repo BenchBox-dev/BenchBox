@@ -11,6 +11,7 @@ import logging
 import os
 import sys
 import sys as _sys
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -24,6 +25,8 @@ from click.testing import CliRunner
 # versions.
 __import__("benchbox.cli.commands.run")
 _run_module = _sys.modules["benchbox.cli.commands.run"]
+__import__("benchbox.cli.commands.publish")
+_publish_module = _sys.modules["benchbox.cli.commands.publish"]
 
 pytestmark = [
     pytest.mark.unit,
@@ -311,6 +314,63 @@ class TestRenderPostRunCharts:
         ):
             _render_post_run_charts(mock_result, mock_console, quiet=False)
         # Should not raise
+
+
+# ===================================================================
+# _direct_handle_result
+# ===================================================================
+
+
+class TestDirectHandleResult:
+    def test_partial_query_failure_exports_but_exits_and_skips_publish(self):
+        from benchbox.cli.commands.run import _direct_handle_result
+
+        ctx = MagicMock()
+        ctx.exit.side_effect = SystemExit
+        settings = SimpleNamespace(
+            ctx=ctx,
+            quiet=False,
+            benchmark="tpch",
+            scale=0.01,
+            platform="duckdb",
+            resolved_mode="sql",
+            publish=True,
+            publish_target="benchmark_runs/published",
+            publish_label="maintainer-run",
+            tuning="notuning",
+            phases_to_run=["power"],
+            compress_data=False,
+            compression_type="none",
+            compression_level=None,
+            test_execution_type="power",
+            seed=None,
+            output=None,
+            table_mode="standard",
+        )
+        result = SimpleNamespace(
+            validation_status="PARTIAL",
+            total_queries=2,
+            successful_queries=1,
+            failed_queries=1,
+        )
+        benchmark_config = SimpleNamespace(concurrency=1)
+
+        with (
+            patch.object(
+                _run_module, "_export_orchestrated_result", return_value={"json": "/tmp/result.json"}
+            ) as export,
+            patch.object(_run_module, "_render_post_run_charts") as render_charts,
+            patch("benchbox.cli.preferences.save_last_run_config") as save_last_run,
+            patch.object(_publish_module, "publish_bundle") as publish_bundle,
+            pytest.raises(SystemExit),
+        ):
+            _direct_handle_result(settings, result, MagicMock(), benchmark_config)
+
+        export.assert_called_once()
+        render_charts.assert_called_once()
+        save_last_run.assert_called_once()
+        publish_bundle.assert_not_called()
+        ctx.exit.assert_called_once_with(1)
 
 
 # ===================================================================

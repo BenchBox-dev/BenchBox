@@ -28,7 +28,7 @@ BENCHMARK_ORDER = {
         "ai_primitives",
     ],
     "Industry": ["clickbench", "h2odb", "coffeeshop"],
-    "Academic": ["ssb", "joinorder", "amplab"],
+    "Academic": ["ssb", "joinorder", "joinorder_synthetic", "amplab"],
     "Time Series": ["tsbs_devops"],
     "Real World": ["nyctaxi", "flightdata"],
     "AI/ML": ["vector_search"],
@@ -51,6 +51,7 @@ BENCHMARK_CLASS_NAMES: dict[str, str] = {
     "ai_primitives": "AIPrimitives",
     "transaction_primitives": "TransactionPrimitives",
     "joinorder": "JoinOrder",
+    "joinorder_synthetic": "JoinOrderSynthetic",
     "coffeeshop": "CoffeeShop",
     "tpchavoc": "TPCHavoc",
     "tpch_skew": "TPCHSkew",
@@ -73,6 +74,19 @@ CORE_BENCHMARK_CLASS_NAMES: dict[str, str] = {
     bid: _CORE_CLASS_NAME_OVERRIDES.get(bid, f"{name}Benchmark") for bid, name in BENCHMARK_CLASS_NAMES.items()
 }
 
+TPC_OFFICIAL_SCALE_OPTIONS: tuple[float, ...] = (
+    1.0,
+    10.0,
+    30.0,
+    100.0,
+    300.0,
+    1000.0,
+    3000.0,
+    10000.0,
+    30000.0,
+    100000.0,
+)
+
 
 # Complete benchmark metadata - the single source of truth
 # All metadata fields are documented here for consistency
@@ -85,7 +99,7 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "query_description": "22 analytical queries",
         "supports_streams": True,
         "default_scale": 0.01,
-        "scale_options": [0.01, 0.1, 1.0, 10.0],
+        "scale_options": [0.01, 0.1, *TPC_OFFICIAL_SCALE_OPTIONS],
         "min_scale": 0.01,
         "complexity": "Medium",
         "estimated_time_range": (2, 10),  # minutes
@@ -263,7 +277,7 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
     },
     "joinorder": {
         "display_name": "JoinOrder",
-        "description": "Query optimizer testing",
+        "description": "Canonical IMDb 2013 Join Order Benchmark",
         "category": "Academic",
         "num_queries": 113,
         "query_description": "113 queries",
@@ -272,8 +286,27 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "scale_options": [1.0],
         "min_scale": 1.0,
         "complexity": "High",
-        "estimated_time_range": (10, 30),
+        "estimated_time_range": (30, 90),
         "supports_dataframe": True,
+        "surface": "public",
+        "data_source": "canonical",
+        "data_manifest": "benchbox/core/joinorder/data_manifest.toml",
+    },
+    "joinorder_synthetic": {
+        "display_name": "JoinOrder Synthetic",
+        "description": "Uniformly-random Join Order schema smoke-test data",
+        "category": "Academic",
+        "num_queries": 13,
+        "query_description": "13 synthetic smoke queries",
+        "supports_streams": False,
+        "default_scale": 1.0,
+        "scale_options": [0.001, 0.01, 0.1, 0.5, 1.0, 2.0],
+        "min_scale": 0.001,
+        "complexity": "Medium",
+        "estimated_time_range": (2, 10),
+        "supports_dataframe": True,
+        "surface": "internal",
+        "data_source": "synthetic",
     },
     "coffeeshop": {
         "display_name": "CoffeeShop",
@@ -411,6 +444,20 @@ def get_benchmark_metadata(benchmark_id: str) -> dict[str, Any] | None:
     return BENCHMARK_METADATA.get(benchmark_id.lower())
 
 
+def get_benchmark_default_scale(benchmark_id: str, fallback: float = 0.01) -> float:
+    """Return a valid default scale factor for benchmark instantiation."""
+    meta = get_benchmark_metadata(benchmark_id)
+    if meta is None:
+        return fallback
+    default_scale = meta.get("default_scale")
+    if default_scale is not None:
+        return float(default_scale)
+    scale_options = meta.get("scale_options") or ()
+    if scale_options:
+        return float(scale_options[0])
+    return fallback
+
+
 def get_benchmark_class_name(benchmark_id: str) -> str | None:
     """Get the class name for a benchmark in the benchbox module.
 
@@ -491,6 +538,11 @@ def list_benchmark_ids() -> list[str]:
     return list(BENCHMARK_METADATA.keys())
 
 
+def list_public_benchmark_ids() -> list[str]:
+    """Get benchmark IDs visible on public discovery surfaces."""
+    return [bid for bid in list_benchmark_ids() if get_benchmark_surface(bid) == "public"]
+
+
 def list_loader_benchmark_ids() -> list[str]:
     """Get benchmark IDs supported by the core benchmark loader.
 
@@ -537,17 +589,33 @@ def validate_scale_factor(
 ) -> None:
     """Validate scale factor against benchmark requirements.
 
-    For TPC-DS, validation is delegated to the compliance classifier in
-    ``benchbox.core.tpcds.compliance``.  All other benchmarks use the generic
-    ``min_scale`` metadata key.
+    Resolution order:
+
+    1. TPC-DS delegates to the compliance classifier in
+       ``benchbox.core.tpcds.compliance``.
+    2. If the benchmark declares ``scale_options`` (a list of canonical
+       scales), require ``scale_factor`` to be one of those values. This
+       is the primary gate — single-element lists like joinorder's
+       ``[1.0]`` reject everything else, multi-element lists like
+       tpch's development subscales plus official TPC scale ladder reject
+       any non-canonical SF.
+    3. Otherwise fall back to the legacy ``min_scale`` key, which only
+       enforces a lower bound.
 
     Args:
-        benchmark_id: The benchmark identifier (e.g., 'tpcds', 'tpch')
-        scale_factor: The requested scale factor
+        benchmark_id: The benchmark identifier (e.g., 'tpcds', 'tpch').
+        scale_factor: The requested scale factor.
 
     Raises:
-        ValueError: If scale factor violates benchmark constraints.
+        ScaleFactorNotSupportedError: If the benchmark declares
+            ``scale_options`` and ``scale_factor`` is not in that list.
+        ValueError: If the legacy ``min_scale`` lower bound is violated
+            (subclass-compatible — ``ScaleFactorNotSupportedError``
+            inherits from ``ValueError`` so existing handlers keep
+            working).
     """
+    from benchbox.core.errors import ScaleFactorNotSupportedError
+
     if benchmark_id == "tpcds":
         # TPC-DS uses the shared compliance classifier - not a simple min_scale check.
         from benchbox.core.tpcds.compliance import validate_tpcds_scale
@@ -559,6 +627,35 @@ def validate_scale_factor(
     if meta is None:
         return  # Unknown benchmark, skip validation
 
+    scale_options = meta.get("scale_options")
+    if scale_options:
+        # Compare as floats to avoid 1 vs 1.0 mismatches (e.g., when callers
+        # pass int literals).
+        try:
+            sf = float(scale_factor)
+        except (TypeError, ValueError) as exc:
+            raise ScaleFactorNotSupportedError(benchmark_id, scale_factor, scale_options) from exc
+        if not any(abs(sf - float(opt)) < 1e-9 for opt in scale_options):
+            raise ScaleFactorNotSupportedError(benchmark_id, scale_factor, scale_options)
+        return
+
     min_scale = meta.get("min_scale")
     if min_scale is not None and scale_factor < min_scale:
         raise ValueError(f"{benchmark_id.upper()} requires scale_factor >= {min_scale} (got {scale_factor}).")
+
+
+def get_benchmark_surface(benchmark_id: str) -> str:
+    """Return the registry-declared surface visibility for a benchmark.
+
+    "public" (default) means the benchmark is visible to public discovery
+    surfaces: CLI listing/filter/category selection, MCP listings, result
+    publisher discovery, and the result explorer. "internal" means those
+    discovery surfaces hide the benchmark, but explicit callers can still run
+    it by ID; result bundles publish locally.
+
+    Returns "public" for unregistered benchmarks (defensive default).
+    """
+    meta = get_benchmark_metadata(benchmark_id)
+    if meta is None:
+        return "public"
+    return str(meta.get("surface", "public"))

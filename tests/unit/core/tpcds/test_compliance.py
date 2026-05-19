@@ -115,8 +115,13 @@ class TestValidateTpcdsScale:
 
     def test_tpcds_obt_still_requires_scale_one_or_greater(self):
         from benchbox.core.benchmark_registry import validate_scale_factor as validate_registry_scale_factor
+        from benchbox.core.errors import ScaleFactorNotSupportedError
 
-        with pytest.raises(ValueError, match="requires scale_factor >= 1.0"):
+        # tpcds_obt declares scale_options=[1.0]; the registry-side gate
+        # now enforces strict membership and raises ScaleFactorNotSupportedError
+        # (subclass of ValueError, so legacy `except ValueError` callers keep
+        # working).
+        with pytest.raises(ScaleFactorNotSupportedError, match=r"tpcds_obt accepts scale_factor in \[1\.0\]"):
             validate_registry_scale_factor("tpcds_obt", 0.5)
 
 

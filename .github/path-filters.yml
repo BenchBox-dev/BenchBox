@@ -1,0 +1,90 @@
+# Shared path rules for the develop PR CI classifier.
+#
+# The classifier fails closed: every changed path must match `safe-content`
+# before Python code CI can be skipped. Any non-matching path, including a new
+# top-level area, is treated as `code-ci`. `safe-content` lists prose-only
+# extensions, not directories. Directories like `docs/` and `_project/` mix
+# prose with executable code (Sphinx config, extension modules, helper
+# scripts) — those code paths must run lint/type/test like any other code.
+safe-content:
+  - "_project/TODO/**"
+  - "_project/DONE/**"
+  - "_project/blind-spots/**"
+  - "_project/decisions/**"
+  - "_project/handoffs/**"
+  - "_project/notes/**"
+  - "_project/research/**"
+  - "_project/planning/**"
+  - "_blog/**.md"
+  - "_blog/**.rst"
+  - "_blog/**.png"
+  - "_blog/**.jpg"
+  - "_blog/**.jpeg"
+  - "_blog/**.gif"
+  - "_blog/**.svg"
+  - "_blog/**.json"
+  - "docs/**.md"
+  - "docs/**.rst"
+  - "docs/**.txt"
+  - "*.md"
+  - "CLAUDE.md"
+  - "AGENTS.md"
+
+# Documentation-only changes are validated by the content guard. The guard
+# patterns intentionally stay broader than `safe-content` so a docs change
+# that touches both prose and Sphinx code still triggers docs-validate
+# alongside the full PR tier.
+content-guard:
+  - "_project/TODO/**"
+  - "_project/DONE/**"
+  - "_project/blind-spots/**"
+  - "_project/decisions/**"
+  - "_project/handoffs/**"
+  - "_project/notes/**"
+  - "_project/research/**"
+  - "_project/planning/**"
+  - "_blog/**"
+  - "docs/**"
+  - "*.md"
+  - "CLAUDE.md"
+  - "AGENTS.md"
+
+# Explicit code paths. Unknown paths also fall through to `code-ci` because
+# the classifier fails closed when no `safe-content` pattern matches. The
+# `docs/**.{py,js,css,html,jinja,j2}` and explicit `docs/conf.py` /
+# `docs/Makefile` / `docs/_extensions/**` / `docs/_static/**` /
+# `docs/_templates/**` patterns route the Sphinx machinery (which is
+# executable Python and templates, not prose) through full lint/type/test.
+code-ci:
+  - "benchbox/**"
+  - "tests/**"
+  - "scripts/**"
+  - "examples/**"
+  - "landing/**"
+  - "results-data/**"
+  - "results-explorer/**"
+  - "docker/**"
+  - "_binaries/**"
+  - "_sources/**"
+  - "_project/scripts/**"
+  - "_project/config/**"
+  - "_project/compat/**"
+  - "docs/conf.py"
+  - "docs/Makefile"
+  - "docs/_extensions/**"
+  - "docs/_static/**"
+  - "docs/_templates/**"
+  - "docs/**.py"
+  - "docs/**.js"
+  - "docs/**.css"
+  - "docs/**.html"
+  - "docs/**.jinja"
+  - "docs/**.j2"
+  - "pyproject.toml"
+  - "uv.lock"
+  - "Makefile"
+  - ".github/workflows/**"
+  - ".pre-commit-config.yaml"
+  - ".claude/commands/**"
+  - ".gitignore"
+  - ".gitattributes"

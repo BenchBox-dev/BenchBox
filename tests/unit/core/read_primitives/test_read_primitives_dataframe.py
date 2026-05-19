@@ -1167,6 +1167,8 @@ CORE_EXPRESSION_QUERIES = [
     # Advanced sweeps that execute cleanly across both families
     "aggregation_distinct_groupby",
     "aggregation_groupby_large",
+    "approx_count_distinct_simple",
+    "approx_count_distinct_groupby",
     "any_value_simple",
     "any_value_with_filter",
     "array_agg_distinct",
@@ -1187,7 +1189,7 @@ CORE_EXPRESSION_QUERIES = [
     "fulltext_phrase_search",
     "fulltext_simple_search",
     "groupby_all_simple",
-    "intrinsic_appx_median",
+    "approx_quantile_groupby",
     "intrinsic_to_date",
     "json_aggregates",
     "json_extract_nested",

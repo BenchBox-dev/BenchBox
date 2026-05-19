@@ -37,7 +37,7 @@ class DependencyValidationError(RuntimeError):
 def _load_toml(path: Path) -> Mapping[str, object]:
     if not path.exists():  # pragma: no cover - defensive guard
         raise FileNotFoundError(f"Missing required file: {path}")
-    return tomllib.loads(path.read_text())
+    return tomllib.loads(path.read_text(encoding="utf-8"))
 
 
 def _collect_locked_versions(lock_data: Mapping[str, object]) -> dict[str, set[Version]]:

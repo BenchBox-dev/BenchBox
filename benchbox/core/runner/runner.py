@@ -19,6 +19,7 @@ from typing import Any
 from benchbox.core.benchmark_loader import (
     get_benchmark_instance,
 )
+from benchbox.core.benchmark_registry import validate_scale_factor
 from benchbox.core.constants import (
     GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS,
     GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS,
@@ -26,6 +27,7 @@ from benchbox.core.constants import (
 from benchbox.core.results.models import (
     BenchmarkResults,
 )
+from benchbox.core.results.platform_options import build_platform_options_capture
 from benchbox.core.runner.conversion import FormatConversionOrchestrator
 from benchbox.core.schemas import (
     BenchmarkConfig,
@@ -50,6 +52,10 @@ except ImportError:
 
 
 from benchbox.platforms import get_platform_adapter
+from benchbox.platforms.base.runtime_metadata import (
+    apply_normalized_result_metadata,
+    collect_normalized_result_metadata,
+)
 from benchbox.platforms.dataframe.benchmark_mixin import DataFramePhases, DataFrameRunOptions
 from benchbox.utils.cloud_storage import create_path_handler
 from benchbox.utils.format_converters import ConversionOptions
@@ -341,6 +347,47 @@ def _enrich_driver_runtime_metadata(
     return result
 
 
+def _enrich_normalized_runtime_metadata(
+    result: BenchmarkResults,
+    *,
+    adapter: Any | None,
+    platform_config: Mapping[str, Any] | None = None,
+) -> BenchmarkResults:
+    """Attach normalized execution-environment metadata from optional adapter hooks."""
+    if adapter is None:
+        return result
+    if _has_adapter_runtime_metadata(result):
+        return result
+
+    platform_info = result.platform_info if isinstance(result.platform_info, Mapping) else None
+    execution_metadata = result.execution_metadata if isinstance(result.execution_metadata, Mapping) else {}
+    metadata = collect_normalized_result_metadata(
+        adapter,
+        platform_info=platform_info,
+        platform_config=platform_config,
+        execution_mode=str(execution_metadata.get("mode") or execution_metadata.get("execution_mode") or ""),
+    )
+    return apply_normalized_result_metadata(result, metadata)
+
+
+def _has_adapter_runtime_metadata(result: BenchmarkResults) -> bool:
+    """Return True when a result already carries adapter-supplied normalized metadata."""
+    environment = result.execution_environment if isinstance(result.execution_environment, Mapping) else {}
+    runtime = environment.get("platform_runtime") if isinstance(environment.get("platform_runtime"), Mapping) else {}
+    deployment = result.platform_deployment if isinstance(result.platform_deployment, Mapping) else {}
+
+    has_runtime = bool(
+        runtime
+        and (
+            runtime.get("runtime_type") not in (None, "", "unknown")
+            or runtime.get("collection_error_class") not in (None, "")
+            or runtime.get("collection_status") not in (None, "", "unavailable")
+        )
+    )
+    has_deployment = bool(deployment and deployment.get("deployment_type") not in (None, "", "unknown"))
+    return has_runtime and has_deployment
+
+
 def _execute_load_only_mode(
     *,
     benchmark: Any,
@@ -593,10 +640,34 @@ def _parse_partition_cols(raw: Any) -> list[str]:
     return []
 
 
+def _database_platform_options(database_config: DatabaseConfig | None) -> dict[str, Any]:
+    """Collect resolved platform options from DatabaseConfig options plus extra fields."""
+    if database_config is None:
+        return {}
+
+    collected = dict(getattr(database_config, "options", None) or {})
+    if hasattr(database_config, "model_dump"):
+        data = database_config.model_dump(exclude_none=True)
+    else:
+        data = dict(getattr(database_config, "__dict__", {}) or {})
+
+    standard_fields = {
+        "type",
+        "name",
+        "connection_string",
+        "options",
+    }
+    for key, value in data.items():
+        if key not in standard_fields:
+            collected.setdefault(key, value)
+    return collected
+
+
 def _build_run_config_from_options(
     benchmark_config: BenchmarkConfig,
     options: Mapping[str, Any],
     platform_config: dict[str, Any] | None,
+    database_config: DatabaseConfig | None,
     validation_opts: ValidationOptions,
     verbosity_settings: VerbositySettings,
     test_type: str,
@@ -612,6 +683,11 @@ def _build_run_config_from_options(
         or GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS
     )
     seed_raw = options.get("seed")
+    platform_options, platform_option_sources = build_platform_options_capture(
+        requested_options=options.get("platform_options"),
+        requested_sources=options.get("platform_option_sources"),
+        database_options=_database_platform_options(database_config),
+    )
     return RunConfig(
         benchmark=benchmark_config.name,
         query_subset=benchmark_config.queries,
@@ -619,6 +695,8 @@ def _build_run_config_from_options(
         test_execution_type=test_type,
         scale_factor=benchmark_config.scale_factor,
         seed=(int(seed_raw) if seed_raw is not None else None),
+        platform_options=platform_options or None,
+        platform_option_sources=platform_option_sources or None,
         connection={
             "database_path": (platform_config or {}).get("database_path"),
         },
@@ -766,6 +844,7 @@ def _build_setup_only_result(
     benchmark: Any,
     adapter: Any,
     database_config: DatabaseConfig | None,
+    platform_config: Mapping[str, Any] | None,
     phases: LifecyclePhases,
     validation_records: list[tuple[str, ValidationResult]],
     execution_context: ExecutionContext | None,
@@ -786,6 +865,11 @@ def _build_setup_only_result(
     )
     result_obj = _finalize_validation_metadata(result_obj, validation_records)
     result_obj = _enrich_driver_runtime_metadata(result_obj, adapter=adapter, database_config=database_config)
+    result_obj = _enrich_normalized_runtime_metadata(
+        result_obj,
+        adapter=adapter,
+        platform_config=platform_config,
+    )
     if execution_context is not None:
         result_obj.execution_context = execution_context.model_dump()
     return result_obj
@@ -939,6 +1023,7 @@ def _finalize_lifecycle_result(
     *,
     adapter: Any | None,
     database_config: DatabaseConfig | None,
+    platform_config: Mapping[str, Any] | None,
     monitor: PerformanceMonitor | None,
     resource_monitor: ResourceMonitor | None,
     execution_context: ExecutionContext | None,
@@ -952,6 +1037,11 @@ def _finalize_lifecycle_result(
         result_with_validation,
         adapter=adapter,
         database_config=database_config,
+    )
+    result_with_validation = _enrich_normalized_runtime_metadata(
+        result_with_validation,
+        adapter=adapter,
+        platform_config=platform_config,
     )
 
     if monitor is not None:
@@ -1008,6 +1098,7 @@ def run_benchmark_lifecycle(
     options_map = getattr(benchmark_config, "options", {}) or {}
     verbosity_settings = _resolve_verbosity_settings(verbosity, options_map)
 
+    validate_scale_factor(benchmark_config.name, benchmark_config.scale_factor)
     benchmark = benchmark_instance or get_benchmark_instance(benchmark_config, system_profile)
     if isinstance(benchmark, VerbosityMixin):  # type: ignore[arg-type]
         benchmark.apply_verbosity(verbosity_settings)
@@ -1074,6 +1165,11 @@ def run_benchmark_lifecycle(
         )
         result_obj = _finalize_validation_metadata(result_obj, validation_records)
         result_obj = _enrich_driver_runtime_metadata(result_obj, adapter=adapter, database_config=database_config)
+        result_obj = _enrich_normalized_runtime_metadata(
+            result_obj,
+            adapter=adapter,
+            platform_config=platform_config,
+        )
         if execution_context is not None:
             result_obj.execution_context = execution_context.model_dump()
         return result_obj
@@ -1083,6 +1179,7 @@ def run_benchmark_lifecycle(
             benchmark=benchmark,
             adapter=adapter,
             database_config=database_config,
+            platform_config=platform_config,
             phases=phases,
             validation_records=validation_records,
             execution_context=execution_context,
@@ -1094,6 +1191,7 @@ def run_benchmark_lifecycle(
         benchmark_config=benchmark_config,
         options=options,
         platform_config=platform_config,
+        database_config=database_config,
         validation_opts=validation_opts,
         verbosity_settings=verbosity_settings,
         test_type=test_type,
@@ -1124,6 +1222,7 @@ def run_benchmark_lifecycle(
         validation_records,
         adapter=adapter,
         database_config=database_config,
+        platform_config=platform_config,
         monitor=monitor,
         resource_monitor=resource_monitor,
         execution_context=execution_context,
@@ -1427,7 +1526,11 @@ def _check_table_directory_collisions(output_dir: Any, tables: dict) -> bool:
         if not table_dir.is_dir():
             continue
         all_entries = _collect_all_entries(table_data)
-        if not any(e.get("path") == table_name for e in all_entries):
+        recorded_prefix = f"{table_name}/"
+        if not any(
+            str(e.get("path", "")).rstrip("/") == table_name or str(e.get("path", "")).startswith(recorded_prefix)
+            for e in all_entries
+        ):
             logger.warning(
                 "Datagen cache rejected: directory '%s/' collides with table "
                 "name but is not recorded in manifest. Regenerating.",

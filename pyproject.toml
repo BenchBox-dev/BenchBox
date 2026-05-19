@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "benchbox"
-version = "0.2.1"
+version = "0.3.0"
 description = "Embedded benchmark datasets and queries for database evaluation. Implements TPC-H, TPC-DS, TPC-DI and other industry-standard benchmarks."
 readme = "README.md"
 authors = [{ name = "Joe Harris", email = "joe@benchbox.dev" }]
@@ -28,11 +28,14 @@ dependencies = [
     "textcharts>=0.1.0",
     # sqlglot ships majors ~quarterly with dialect-translation breakage; cap to next major to catch
     # regressions in CI rather than silently in `uv sync`. Bump after validating on the new major.
-    "sqlglot>=20.0.0,<31.0.0",
+    # Floor is v25.6.0 — first release containing PR #3756, which preserves DuckDB
+    # GROUP/ORDER BY ALL as bare keywords under identify=True (was a BenchBox post-fixup).
+    "sqlglot>=25.6.0,<31.0.0",
     # CLI essentials
     # click: capped <9 - historically click majors rename decorators/context APIs.
     "click>=8.0.0,<9.0.0",
     "rich>=13.0.0",
+    "keyring>=25.0.0",
     "psutil>=5.9.0",
     # pydantic: v1→v2 migration broke the entire validation surface; capped <3 until pydantic v3 lands
     # and is audited.
@@ -45,8 +48,10 @@ dependencies = [
     "pyarrow>=21.0.0,<25.0.0",
     "numpy>=1.24.0",
     "zstandard>=0.20.0",
-    "grpcio>=1.48.1",
-    "grpcio-status>=1.48.1",
+    # grpcio / grpcio-status are NOT declared at the core level. They are
+    # pulled in transitively by optional cloud / connectivity extras
+    # (e.g. influxdb3-python, snowflake, databricks-sdk, pyspark[connect]).
+    # Users without those extras don't pay the grpc weight.
 ]
 
 [tool.setuptools]
@@ -58,9 +63,6 @@ include = ["benchbox*"]
 exclude = [
     "benchmark_runs",
     "benchmark_runs.*",
-    # benchbox.release contains internal release tooling — never ship in the default wheel.
-    "benchbox.release",
-    "benchbox.release.*",
     # benchbox.experimental is intentionally INCLUDED in the default wheel (Option A, Beta contract).
     # It is an explicitly unsupported namespace with no CLI/registry integration.
     # See README.md "Beta Software" section for the documented support boundary.
@@ -74,8 +76,9 @@ dev = [
     "pytest-cov>=4.1.0",
     "pytest-benchmark>=4.0.0",
     "pytest-xdist>=3.0.0",
-    # duckdb: tight integration with BenchBox SQL runner; cap <2 to catch v2 ABI/API breakage.
-    "duckdb>=1.0.0,<2.0.0",
+    # duckdb: tight integration with BenchBox SQL runner and browser snapshot writer.
+    # Cap <1.4 until @duckdb/duckdb-wasm can attach newer native DB files.
+    "duckdb>=1.0.0,<1.4.0",
     "tox>=4.13.0",
     "pyspark>=3.5.0",  # Aligned with pyspark extra
 ]
@@ -91,11 +94,12 @@ docs = [
     "ablog>=0.11.13 ; python_version >= '3.11'",  # uv source override pins to git main for unreleased Sphinx 9 fix
 ]
 viz = []
-explorer = ["duckdb>=1.0.0"]
+explorer = ["duckdb>=1.0.0,<1.4.0"]
 
 # Meta-groups for common scenarios
 all = [
-    "duckdb>=1.0.0",
+    # Keep browser-generated results.duckdb files readable by @duckdb/duckdb-wasm 1.32.x.
+    "duckdb>=1.0.0,<1.4.0",
     "clickhouse-connect>=0.10.0",
     "clickhouse-driver>=0.2.0",
     "databricks-sql-connector>=2.0.0",
@@ -146,7 +150,7 @@ cloud = [
 cloudstorage = ["cloudpathlib>=0.15.0"]
 
 # Individual platforms (for minimal installations)
-duckdb = ["duckdb>=1.0.0"]
+duckdb = ["duckdb>=1.0.0,<1.4.0"]
 clickhouse = ["clickhouse-driver>=0.2.0"]  # TCP binary protocol (clickhouse-server)
 clickhouse-server = ["clickhouse-driver>=0.2.0"]  # Canonical extra for clickhouse-server platform
 clickhouse-cloud = ["clickhouse-connect>=0.10.0"]  # HTTP protocol (ClickHouse Cloud)
@@ -245,7 +249,7 @@ dataframe-polars = [
     "polars>=1.35.2",
 ]
 pyspark = ["pyspark>=3.5.0"]
-lakesail = ["pyspark>=3.5.0"]
+lakesail = ["pyspark[connect]>=3.5.0"]
 velox = ["pyspark[connect]>=3.5.0"]
 dataframe-pyspark = [
     "pyspark>=3.5.0",
@@ -404,7 +408,7 @@ possibly-missing-attribute = "warn"
 error-on-warning = false
 
 [tool.pytest.ini_options]
-minversion = "0.2.1"
+minversion = "0.3.0"
 testpaths = ["tests"]
 python_files = "test_*.py"
 markers = [
@@ -467,7 +471,8 @@ dev = [
     "ty>=0.0.1a14",
     "ansi2html>=1.8.0",  # scripts/capture_chart_images.py - ANSI→HTML conversion for chart captures
     "pillow>=10.0.0",  # scripts/capture_chart_images.py - PIL.Image for chart PNG output
-    "duckdb>=1.0.0",
+    # Keep explorer fixture and deployment snapshots readable by @duckdb/duckdb-wasm 1.32.x.
+    "duckdb>=1.0.0,<1.4.0",
     "polars>=1.35.2",
     "clickhouse-connect>=0.10.0",
     "psycopg[binary]>=3.1",
@@ -503,6 +508,7 @@ dev = [
     "delta-spark>=4.1.0",
     "presto-python-client>=0.8.4",
     "codespell>=2.4.2",
+    "pre-commit>=4.6.0",
 ]
 
 [tool.mutmut]
@@ -642,7 +648,9 @@ ignore-nested-functions = true
 ignore-nested-classes = true
 ignore-private = true
 ignore-property-decorators = false
-ignore-semiprivate = false
+# Keep the blocking gate focused on public API documentation; single-underscore
+# helpers churn heavily and are covered by code review/tests instead.
+ignore-semiprivate = true
 ignore-setters = false
 fail-under = 90  # Ratcheted from baseline after local audit reported 93.1% coverage.
 exclude = [

@@ -15,7 +15,7 @@ services. This threat model applies exclusively to Phase 3.
 |---|---|---|---|---|
 | Raw canonical bundles (schema-v2 JSON + companions) | Sensitive - content-addressed, immutable after commit | Object store (S3/R2), `bundles/` prefix | Download link on result detail page; not browsable | Ingest service (write), CDN (read) |
 | Durable submission metadata (submission_id, bundle_hash, visibility state, trust labels) | Sensitive - controls public visibility | Metadata DB (Postgres) | Indirect - reflected in public read models only | API server |
-| Public read models (manifest.json, detail JSONs, results.duckdb) | Public | Derived store → GitHub Pages / CDN | Fully public | CI pipeline (write), CDN (read) |
+| Public read models (`results.duckdb`, copied bundles) | Public | Derived store → GitHub Pages / CDN | Fully public | CI pipeline (write), CDN (read) |
 | Service API keys / user tokens | Secret | Metadata DB (hashed) + `~/.benchbox/credentials.yaml` (client) | Never - server stores hash only | Auth service |
 | Actor identity records (actor_id, contact, trust tier) | Private | Metadata DB | Not exposed publicly; used internally for attribution and moderation | API server |
 | Explorer static site (benchbox.dev/results/) | Public | GitHub Pages | Fully public - read-only | GitHub Actions CI |
@@ -80,8 +80,8 @@ admin action recorded in the audit log.
 
 | STRIDE | Threat | Likelihood | Impact | Risk | Proposed Mitigation |
 |---|---|---|---|---|---|
-| **Spoofing** | Serving a modified read model from a compromised CDN edge node | Low | High | Med | Subresource Integrity (SRI) hashes on all derived data files; explorer app verifies manifest checksum on load; CDN cache-poisoning alerts |
-| **Tampering** | PR-injecting a malformed manifest.json that breaks all compare views for all users | Low | High | Med | CI schema validation rejects malformed manifest before merge; read-only GitHub Pages (no direct push); branch protection on `main` prevents force-push |
+| **Spoofing** | Serving a modified read model from a compromised CDN edge node | Low | High | Med | Subresource Integrity (SRI) hashes on all derived data files; explorer app verifies the DuckDB snapshot schema on load; CDN cache-poisoning alerts |
+| **Tampering** | PR-injecting a malformed `results.duckdb` snapshot that breaks all compare views for all users | Low | High | Med | CI schema validation rejects malformed browser snapshots before merge; read-only GitHub Pages (no direct push); branch protection on `main` prevents force-push |
 | **Repudiation** | No access logs for static pages, making abuse attribution impossible after the fact | Med | Low | Low | GitHub Pages access logs are not available; rely on CDN-level logging (Cloudflare or equivalent) if custom domain is used; static-only scope limits blast radius |
 | **Information Disclosure** | DuckDB snapshot (`results.duckdb`) contains fields that should be redacted before public release | Med | High | High | Build pipeline explicitly projects only public fields into `results.duckdb`; no private, unlisted, or actor contact fields are included; CI test asserts schema shape |
 | **Denial of Service** | GitHub Pages rate limiting under a traffic spike rendering the explorer unavailable | Med | Med | Med | Custom domain with Cloudflare CDN as a caching layer in front of GitHub Pages; static assets are fully cacheable; no server to overload |
@@ -102,4 +102,4 @@ admin action recorded in the audit log.
 | 7 | Direct write to storage bucket bypassing ingest API | Storage | Med | Bucket policy: ingest service role only; CloudTrail logging | API8:2023 Security Misconfiguration | Phase 3 launch gate - storage design |
 | 8 | No audit log for visibility state changes | Storage | Med | Append-only audit log (actor_id, action, timestamp); stored outside metadata DB | API9:2023 Improper Inventory Management | w6 (moderation + audit log) |
 | 9 | CI pipeline credentials with overly broad storage permissions | Storage | Med | Read-only CI role; write access restricted to ingest service; IAM role separation | API8:2023 Security Misconfiguration | Phase 3 launch gate - storage design |
-| 10 | Malformed manifest.json injected via PR | Explorer | Med | CI schema validation before merge; branch protection | API10:2023 Unsafe Consumption of APIs | Phase 1 CI hardening |
+| 10 | Malformed `results.duckdb` snapshot injected via PR | Explorer | Med | CI schema validation before merge; branch protection | API10:2023 Unsafe Consumption of APIs | Phase 1 CI hardening |

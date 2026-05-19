@@ -17,6 +17,34 @@ pytestmark = [
     pytest.mark.fast,
 ]
 
+KNOWN_PAID_PLATFORM_COST_CLASSES = {
+    "athena": "paid_credits",
+    "athena-spark": "paid_compute",
+    "bigquery": "paid_credits",
+    "clickhouse-cloud": "paid_compute",
+    "databend": "paid_compute",
+    "databricks": "paid_credits",
+    "databricks-df": "paid_credits",
+    "dataproc": "paid_compute",
+    "dataproc-serverless": "paid_compute",
+    "emr-serverless": "paid_compute",
+    "fabric-lakehouse": "paid_compute",
+    "fabric-spark": "paid_compute",
+    "fabric_dw": "paid_compute",
+    "firebolt": "paid_compute",
+    "glue": "paid_compute",
+    "motherduck": "paid_credits",
+    "pg-duckdb": "paid_credits",
+    "quanton": "paid_compute",
+    "redshift": "paid_compute",
+    "singlestore": "paid_compute",
+    "snowflake": "paid_credits",
+    "snowpark-connect": "paid_credits",
+    "starburst": "paid_compute",
+    "synapse": "paid_compute",
+    "synapse-spark": "paid_compute",
+}
+
 
 class TestPlatformRegistry:
     """Test core PlatformRegistry functionality."""
@@ -280,6 +308,18 @@ class TestPlatformRegistry:
         assert caps.supports_sql
         assert caps.supports_dataframe
         assert caps.default_mode == "dataframe"
+
+    def test_known_paid_platforms_expose_cost_class(self):
+        """Prompt safety gates rely on the coarse paid/free registry tag."""
+        for platform_name, expected_cost_class in KNOWN_PAID_PLATFORM_COST_CLASSES.items():
+            caps = PlatformRegistry.get_platform_capabilities(platform_name)
+            assert caps is not None
+            assert caps.cost_class == expected_cost_class
+
+        assert PlatformRegistry.get_platform_capabilities("duckdb").cost_class == "free"
+        assert PlatformRegistry.get_platform_capabilities("datafusion").cost_class == "free"
+        assert PlatformRegistry.get_platform_capabilities("postgresql").cost_class == "free"
+        assert PlatformRegistry.get_platform_capabilities("sqlite").cost_class == "free"
 
     def test_requires_cloud_storage_for_cloud_platforms(self):
         """Test that cloud platforms are correctly identified as requiring cloud storage."""

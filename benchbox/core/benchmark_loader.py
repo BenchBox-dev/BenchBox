@@ -13,12 +13,14 @@ from typing import Any
 from benchbox.core.benchmark_registry import (
     get_core_benchmark_class_name,
     list_loader_benchmark_ids,
+    validate_scale_factor,
 )
 from benchbox.core.schemas import BenchmarkConfig, SystemProfile
 
 
 def get_benchmark_instance(config: BenchmarkConfig, system_profile: SystemProfile | None) -> Any:
     """Get benchmark instance based on configuration."""
+    validate_scale_factor(config.name, config.scale_factor)
     benchmark_class = get_benchmark_class(config.name)
 
     cpu_cores = 1
@@ -41,7 +43,7 @@ def get_benchmark_instance(config: BenchmarkConfig, system_profile: SystemProfil
             force_regenerate=force_regenerate,
             **benchmark_kwargs,
         )
-    elif benchmark_id == "joinorder":
+    elif benchmark_id in {"joinorder", "joinorder_synthetic"}:
         try:
             return benchmark_class(
                 parallel=cpu_cores,

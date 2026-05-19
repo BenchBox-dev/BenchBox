@@ -11,17 +11,17 @@ pg_mooncake is a PostgreSQL extension that adds native columnstore tables with D
 
 ## Features
 
-- **Columnstore tables** - `CREATE TABLE ... USING columnstore` for Parquet-based columnar storage
+- **Columnstore mirrors** - BenchBox heap-loads with COPY, then promotes loaded tables with `mooncake.create_table`
 - **DuckDB execution** - Vectorized query engine for analytical workloads
 - **Columnar compression** - 5-20x compression ratios vs PostgreSQL heap tables
 - **Object storage** - Optional S3/GCS backend for Parquet data
-- **PostgreSQL compatible** - Uses standard PostgreSQL wire protocol and COPY loading
+- **PostgreSQL compatible** - Uses standard PostgreSQL wire protocol and COPY loading before columnstore promotion
 - **Top-10 ClickBench** - Competitive with dedicated OLAP engines on real-world analytical queries
 
 ## Quick Start
 
 ```bash
-# Basic TPC-H benchmark with columnstore tables
+# Basic TPC-H benchmark with columnstore mirrors
 benchbox run --platform pg-mooncake --benchmark tpch --scale 0.01
 
 # With custom connection
@@ -67,17 +67,18 @@ See the [pg_mooncake GitHub repository](https://github.com/Mooncake-Labs/pg_moon
 
 pg_mooncake transforms PostgreSQL into a hybrid analytical database:
 
-1. **Schema creation** - BenchBox adds `USING columnstore` to all `CREATE TABLE` statements
-2. **Data loading** - PostgreSQL COPY loads data, which pg_mooncake stores as Parquet files
-3. **Query execution** - Queries on columnstore tables are routed through DuckDB's vectorized engine
-4. **Results** - Results are returned through the standard PostgreSQL wire protocol
+1. **Schema creation** - BenchBox creates PostgreSQL heap tables so COPY remains supported
+2. **Data loading** - PostgreSQL COPY loads benchmark files into the heap tables
+3. **Promotion** - BenchBox renames the loaded heap tables and exposes mooncake mirrors with the original benchmark table names
+4. **Query execution** - Queries on the mooncake mirrors are routed through DuckDB's vectorized engine
+5. **Results** - Results are returned through the standard PostgreSQL wire protocol
 
 ### Storage Architecture
 
 ```
 PostgreSQL Instance
 ├── pg_mooncake extension
-│   ├── Columnstore Access Method (USING columnstore)
+│   ├── Columnstore Access Method (USING mooncake)
 │   ├── pg_moonlink (WAL-based ingestion)
 │   └── DuckDB execution engine
 └── Storage Backend
@@ -119,13 +120,14 @@ S3 mode requires standard AWS credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCE
 | Storage | Columnstore (Parquet) | PostgreSQL heap | DuckDB columnar | PostgreSQL heap |
 | Execution | DuckDB vectorized | DuckDB vectorized | DuckDB vectorized | PostgreSQL row-based |
 | Compression | 5-20x (columnar) | No (heap) | Yes (columnar) | No (heap) |
-| DDL changes | `USING columnstore` | None | N/A | None |
+| Load path | COPY into heap, then mooncake mirror promotion | COPY into heap | Native load | COPY into heap |
 | Workload | OLAP columnstore | OLAP acceleration | Standalone analytics | General purpose |
 | ClickBench rank | Top 10 | Not ranked | Top 5 | Not ranked |
 
 ## Known Limitations
 
 - **Extension conflicts** - pg_mooncake cannot coexist with standalone pg_duckdb (shared libduckdb.so). Use separate PostgreSQL instances for each.
+- **Direct COPY limitation** - pg_mooncake 0.2.0 does not support COPY directly into `USING mooncake` tables; BenchBox uses heap-load plus mirror promotion.
 - **Data type support** - Not all PostgreSQL data types are supported on columnstore tables. The extension is actively evolving.
 - **No constraints** - Columnstore tables don't support PRIMARY KEY, FOREIGN KEY, or other constraints.
 - **No indexes** - B-tree and other indexes are not applicable to columnstore tables.

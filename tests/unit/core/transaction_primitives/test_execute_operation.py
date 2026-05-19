@@ -13,6 +13,7 @@ import pytest
 
 from benchbox.core.transaction_primitives.benchmark import TransactionPrimitivesBenchmark
 from benchbox.core.transaction_primitives.catalog.loader import WriteOperation
+from benchbox.core.transaction_primitives.operations import TransactionOperationsManager
 
 pytestmark = [
     pytest.mark.unit,
@@ -57,6 +58,16 @@ def _make_connection(rowcount: int = 1) -> MagicMock:
     exec_result.fetchall.return_value = []
     conn.execute.return_value = exec_result
     return conn
+
+
+def test_transaction_commit_large_cleanup_covers_inserted_range() -> None:
+    operation = TransactionOperationsManager().get_operation("transaction_commit_large")
+
+    assert "DELETE FROM txn_lineitem WHERE l_comment = 'tx_large'" in operation.write_sql
+    assert "9300000 + n" in operation.write_sql
+    assert "generate_series(1, 1000)" in operation.write_sql
+    assert "l_comment = 'tx_large'" in operation.validation_queries[0].sql
+    assert "l_comment = 'tx_large'" in (operation.cleanup_sql or "")
 
 
 # ---------------------------------------------------------------------------
@@ -128,6 +139,17 @@ class TestBasicExecution:
         assert result.operation_id == "op1"
         assert "DB error" in (result.error or "")
 
+    def test_rolls_back_after_failed_operation(self, tmp_path: Path):
+        bench = _make_benchmark(tmp_path)
+        bench.operations_manager.get_operation.return_value = _make_operation()
+        conn = MagicMock()
+        conn.execute.side_effect = RuntimeError("DB error")
+
+        result = bench.execute_operation("op1", conn)
+
+        assert result.success is False
+        conn.rollback.assert_called_once()
+
 
 # ---------------------------------------------------------------------------
 # sql_override kwarg
@@ -197,6 +219,43 @@ class TestPlatformKeyDispatch:
 
         conn.execute.assert_called_once_with("generic SQL")
 
+    def test_rewrites_generate_series_for_postgres(self, tmp_path: Path):
+        bench = _make_benchmark(tmp_path)
+        bench.operations_manager.get_operation.return_value = _make_operation(
+            write_sql="""
+                BEGIN TRANSACTION;
+                INSERT INTO txn_orders
+                SELECT 9200000 + n, 1
+                FROM (SELECT unnest(generate_series(1, 100)) AS n) t;
+                COMMIT;
+            """,
+        )
+        conn = _make_connection()
+
+        bench.execute_operation("op1", conn, platform_key="postgres")
+
+        executed_sql = conn.execute.call_args.args[0]
+        assert "FROM (SELECT generate_series(1, 100) AS n) t" in executed_sql
+        assert "unnest(generate_series" not in executed_sql
+
+    def test_rewrites_isolation_level_begin_for_postgres(self, tmp_path: Path):
+        bench = _make_benchmark(tmp_path)
+        bench.operations_manager.get_operation.return_value = _make_operation(
+            write_sql="""
+                SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+                BEGIN TRANSACTION;
+                INSERT INTO txn_orders VALUES (1);
+                COMMIT;
+            """,
+        )
+        conn = _make_connection()
+
+        bench.execute_operation("op1", conn, platform_key="postgres")
+
+        executed_sql = conn.execute.call_args.args[0]
+        assert "BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;" in executed_sql
+        assert "SET TRANSACTION ISOLATION LEVEL" not in executed_sql
+
 
 # ---------------------------------------------------------------------------
 # SKIPPED status (None platform override)
@@ -214,6 +273,45 @@ class TestSkippedStatus:
 
         assert result.status == "SKIPPED"
         assert result.success is True
+
+    def test_returns_skipped_for_pg_duckdb_savepoint_gap(self, tmp_path: Path):
+        bench = _make_benchmark(tmp_path)
+        bench.operations_manager.get_operation.return_value = _make_operation(id="transaction_savepoint_nested")
+        conn = _make_connection()
+
+        result = bench.execute_operation(
+            "transaction_savepoint_nested",
+            conn,
+            platform_key="postgres",
+            platform_name="pg_duckdb",
+        )
+
+        assert result.status == "SKIPPED"
+        assert result.success is True
+        assert result.error is None
+        assert "SAVEPOINT is not supported" in (result.skip_reason or "")
+        conn.execute.assert_not_called()
+
+    def test_returns_skipped_for_timescaledb_non_default_isolation_gap(self, tmp_path: Path):
+        bench = _make_benchmark(tmp_path)
+        bench.operations_manager.get_operation.return_value = _make_operation(
+            id="transaction_isolation_serializable",
+            write_sql="SET TRANSACTION ISOLATION LEVEL SERIALIZABLE; BEGIN TRANSACTION; COMMIT;",
+        )
+        conn = _make_connection()
+
+        result = bench.execute_operation(
+            "transaction_isolation_serializable",
+            conn,
+            platform_key="postgres",
+            platform_name="timescaledb",
+        )
+
+        assert result.status == "SKIPPED"
+        assert result.success is True
+        assert result.error is None
+        assert "TimescaleDB" in (result.skip_reason or "")
+        conn.execute.assert_not_called()
 
     def test_skipped_result_has_skip_reason_field(self, tmp_path: Path):
         """The skip_reason field carries the human-readable skip reason; error stays None."""

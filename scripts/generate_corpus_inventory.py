@@ -17,6 +17,7 @@ INVENTORY_PATH = Path("results-data/corpus-inventory.json")
 SKIP_NAMES = {"corpus-inventory.json", "submission-manifest.json"}
 COMPANION_SUFFIXES = (".plans.json", ".tuning.json")
 SUBMISSION_MANIFEST = "submission-manifest.json"
+SUBMISSION_MANIFEST_SUFFIX = ".manifest.json"
 COMMUNITY_TRUST_LABEL = "community-submission"
 DEFAULT_TRUST_LABEL = "maintainer-run"
 
@@ -26,7 +27,9 @@ def discover_bundles(bundles_dir: Path) -> list[Path]:
     return [
         path
         for path in sorted(bundles_dir.rglob("*.json"))
-        if path.name not in SKIP_NAMES and not any(path.name.endswith(s) for s in COMPANION_SUFFIXES)
+        if path.name not in SKIP_NAMES
+        and not any(path.name.endswith(s) for s in COMPANION_SUFFIXES)
+        and not path.name.endswith(SUBMISSION_MANIFEST_SUFFIX)
     ]
 
 
@@ -36,8 +39,15 @@ def _bundle_hash(bundle_path: Path) -> str:
 
 
 def _bundle_trust_label(bundle_path: Path) -> str:
-    """Resolve trust label using the established sidecar-presence contract."""
-    if (bundle_path.parent / SUBMISSION_MANIFEST).is_file():
+    """Resolve trust label using the established sidecar-presence contract.
+
+    Prefers the per-bundle name (`<stem>.manifest.json`); falls back to the
+    legacy singleton (`submission-manifest.json`) so already-merged
+    submissions keep their community label.
+    """
+    per_bundle = bundle_path.parent / f"{bundle_path.stem}{SUBMISSION_MANIFEST_SUFFIX}"
+    legacy = bundle_path.parent / SUBMISSION_MANIFEST
+    if per_bundle.is_file() or legacy.is_file():
         return COMMUNITY_TRUST_LABEL
     return DEFAULT_TRUST_LABEL
 
@@ -76,10 +86,23 @@ def extract_metadata(bundle_path: Path, bundles_dir: Path) -> dict:
     }
 
 
+def _is_public_benchmark(benchmark_id: str) -> bool:
+    """Return whether a bundle should be included in the public corpus inventory."""
+    try:
+        from benchbox.core.benchmark_registry import get_benchmark_surface
+    except ImportError:
+        return True
+    return get_benchmark_surface(benchmark_id) == "public"
+
+
 def generate_inventory(bundles_dir: Path) -> dict:
     """Generate the full inventory dict."""
     bundle_paths = discover_bundles(bundles_dir)
-    entries = [extract_metadata(p, bundles_dir) for p in bundle_paths]
+    entries = []
+    for path in bundle_paths:
+        entry = extract_metadata(path, bundles_dir)
+        if _is_public_benchmark(entry["benchmark"]):
+            entries.append(entry)
 
     entries.sort(
         key=lambda e: (

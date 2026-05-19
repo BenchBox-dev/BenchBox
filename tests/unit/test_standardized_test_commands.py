@@ -131,6 +131,35 @@ class TestMakefileCommands:
         for target in expected_targets:
             assert target in makefile_content, f"Makefile should contain target: {target}"
 
+    def test_makefile_test_unlock_expands_user_lock_dir_without_uv(self, tmp_path):
+        home = tmp_path / "home"
+        lock_dir = home / "tmp" / "benchbox-lock-probe"
+        lock_dir.mkdir(parents=True)
+        lock_path = lock_dir / "test.lock"
+        lock_path.write_text("stale lock\n", encoding="utf-8")
+        env = {
+            **subprocess.os.environ,
+            "BENCHBOX_TEST_LOCK_DIR": "~/tmp/benchbox-lock-probe",
+            "HOME": str(home),
+            "PATH": "/usr/bin:/bin",
+        }
+
+        result = subprocess.run(
+            ["make", "--no-print-directory", "test-unlock"],
+            cwd=Path.cwd(),
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env=env,
+        )
+
+        expected_path = str(lock_path)
+        assert result.returncode == 0, result.stderr
+        assert expected_path in result.stdout
+        assert "~/tmp/benchbox-lock-probe/test.lock" not in result.stdout
+        assert "uv:" not in result.stdout + result.stderr
+        assert not lock_path.exists()
+
     def test_makefile_test_all_splits_parallel_and_serial_lanes_explicitly(self):
         makefile_content = (Path.cwd() / "Makefile").read_text()
 

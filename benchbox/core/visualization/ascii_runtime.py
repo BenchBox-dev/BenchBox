@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import re
+import statistics
 import warnings
 from datetime import datetime
 from typing import Any, Protocol
@@ -21,6 +22,7 @@ from benchbox.core.visualization.ascii.box_plot import BoxPlotSeries
 from benchbox.core.visualization.ascii.histogram import HistogramBar
 from benchbox.core.visualization.ascii.line_chart import LinePoint
 from benchbox.core.visualization.ascii.scatter_plot import ScatterPoint
+from benchbox.core.visualization.utils import is_power_run_result
 
 # Percentage change within ±STABLE_THRESHOLD is classified as "stable" (no meaningful regression or improvement).
 # 2% accounts for typical run-to-run variance in OLAP benchmarks at SF≥1.
@@ -38,6 +40,7 @@ _SUMMARY_LABELS = {
     "count_label": "Queries",
 }
 _PHASE_TIMING_KEYS = ("phases", "phase_breakdown", "phase_times")
+_HORIZONTAL_LABEL_THRESHOLD = 6
 
 
 class QueryResultLike(Protocol):
@@ -120,7 +123,16 @@ def _render_power_bar(results: list[NormalizedResultLike], options: Any, subtitl
         BarData(label=r.platform, value=float(r.power_at_size)) for r in results if r.power_at_size is not None
     ]
     if not bar_data:
-        return None
+        power_results = [result for result in results if is_power_run_result(result)]
+        if not power_results:
+            return None
+        return _render_power_query_latency_bars(power_results, options, subtitle)
+    return _render_power_metric_bars(bar_data, options, subtitle)
+
+
+def _render_power_metric_bars(bar_data: list[BarData], options: Any, subtitle: str | None) -> str:
+    if not bar_data:
+        raise ValueError("power metric bar chart requires at least one data point")
     # Higher Power@Size = better performance; mark accordingly (descending sort)
     sorted_data = sorted(bar_data, key=lambda x: x.value, reverse=True)
     sorted_data[0].is_best = True
@@ -131,6 +143,24 @@ def _render_power_bar(results: list[NormalizedResultLike], options: Any, subtitl
         data=bar_data,
         title="Power@Size Comparison",
         metric_label="Power@Size",
+        options=options,
+        subtitle=subtitle,
+    )
+    return chart.render()
+
+
+def _render_power_query_latency_bars(
+    results: list[NormalizedResultLike], options: Any, subtitle: str | None
+) -> str | None:
+    bar_data = _build_query_latency_bar_data(results)
+    if not bar_data:
+        return None
+
+    chart = BarChart(
+        data=bar_data,
+        title="Power Run Query Latency",
+        metric_label="ms",
+        sort_by="value",
         options=options,
         subtitle=subtitle,
     )
@@ -197,11 +227,31 @@ def _render_query_histogram(results: list[NormalizedResultLike], options: Any, s
         query_means.setdefault(bar.label, []).append(bar.value)
     avg_by_query = {qid: sum(v) / len(v) for qid, v in query_means.items()}
     if avg_by_query:
-        best_qid = min(avg_by_query, key=avg_by_query.get)  # type: ignore[arg-type]
-        worst_qid = max(avg_by_query, key=avg_by_query.get)  # type: ignore[arg-type]
+        best_qid = min(avg_by_query, key=lambda qid: avg_by_query[qid])
+        worst_qid = max(avg_by_query, key=lambda qid: avg_by_query[qid])
         for bar in histogram_data:
             bar.is_best = bar.label == best_qid
             bar.is_worst = bar.label == worst_qid
+
+    if _should_use_horizontal([bar.label for bar in histogram_data]):
+        chart = BarChart(
+            data=[
+                BarData(
+                    label=bar.label,
+                    value=bar.value,
+                    group=bar.platform,
+                    is_best=bar.is_best,
+                    is_worst=bar.is_worst,
+                )
+                for bar in histogram_data
+            ],
+            title="Query Latency",
+            metric_label="ms",
+            sort_by="value",
+            options=options,
+            subtitle=subtitle,
+        )
+        return chart.render()
 
     chart = Histogram(
         data=histogram_data,
@@ -211,6 +261,41 @@ def _render_query_histogram(results: list[NormalizedResultLike], options: Any, s
         subtitle=subtitle,
     )
     return chart.render()
+
+
+def _build_query_latency_bar_data(results: list[NormalizedResultLike]) -> list[BarData]:
+    query_timings: dict[tuple[str, str], list[float]] = {}
+    use_platform = len({result.platform for result in results}) > 1
+
+    for result in results:
+        for query in result.queries:
+            if query.execution_time_ms is not None:
+                query_timings.setdefault((result.platform, query.query_id), []).append(float(query.execution_time_ms))
+
+    bar_data = [
+        BarData(
+            label=query_id,
+            value=sum(timings) / len(timings),
+            group=platform if use_platform else None,
+        )
+        for (platform, query_id), timings in query_timings.items()
+        if timings
+    ]
+    if not bar_data:
+        return []
+
+    sorted_data = sorted(bar_data, key=lambda bar: bar.value)
+    sorted_data[0].is_best = True
+    if len(sorted_data) > 1:
+        sorted_data[-1].is_worst = True
+    return bar_data
+
+
+def _should_use_horizontal(display_ids: list[str]) -> bool:
+    if not display_ids:
+        return False
+    median_len = statistics.median(len(qid) for qid in display_ids)
+    return median_len > _HORIZONTAL_LABEL_THRESHOLD
 
 
 def _render_cost_scatter(results: list[NormalizedResultLike], options: Any, subtitle: str | None) -> str | None:

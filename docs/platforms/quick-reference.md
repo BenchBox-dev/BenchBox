@@ -26,7 +26,7 @@ Looking ahead? See the [Development Roadmap](../development/roadmap.md) for plan
 | **Snowflake**       | Available | Data Cloud / Multi-cloud data warehouse                      | `uv add snowflake-connector-python`                 |
 | **Trino**           | Available | Distributed SQL (Trino/Starburst)                            | `uv add benchbox[trino]`                            |
 | **PrestoDB**        | Available | Distributed SQL (Meta's Presto)                              | `uv add benchbox[presto]`                           |
-| **LakeSail Sail**   | Available | Rust drop-in Spark replacement (SQL + DataFrame via Spark Connect) | `uv add pyspark pyarrow`                      |
+| **LakeSail Sail**   | Available | Rust drop-in Spark replacement (SQL + DataFrame via Spark Connect) | `uv add benchbox --extra lakesail`            |
 | **Apache Gluten + Velox** | Available | Native C++ acceleration for Spark SQL (Linux-only local; Docker on macOS/Windows) | `uv add benchbox --extra velox`       |
 | **SQLite**          | Built-in  | Embedded transactional database                              | (built-in)                                          |
 | **Azure Platforms** | Available | Microsoft Fabric Warehouse, Azure Synapse Analytics, Microsoft Fabric Spark, Azure Synapse Analytics Spark | See [Azure Platforms](azure-platforms.md)           |
@@ -41,7 +41,7 @@ BenchBox supports benchmarking DataFrame libraries using their native APIs inste
 | **Pandas**     | `pandas-df`     | Available | Pandas     | Reference Pandas implementation                        | `uv add benchbox --extra pandas`     |
 | **PySpark**    | `pyspark-df`    | Available | Expression | Apache Spark DataFrame API (distributed)               | `uv add benchbox --extra pyspark`    |
 | **DataFusion** | `datafusion-df` | Available | Expression | Arrow-native query engine                              | `uv add benchbox --extra datafusion` |
-| **LakeSail**   | `lakesail-df`   | Available | Expression | Rust/DataFusion Spark replacement via Spark Connect    | `uv add pyspark pyarrow`             |
+| **LakeSail**   | `lakesail-df`   | Available | Expression | Rust/DataFusion Spark replacement via Spark Connect    | `uv add benchbox --extra lakesail`   |
 | Modin          | `modin-df`      | Available | Pandas     | Distributed Pandas replacement                         | `uv add benchbox --extra modin`      |
 | Dask           | `dask-df`       | Available | Pandas     | Parallel computing DataFrames                          | `uv add benchbox --extra dask`       |
 | cuDF           | `cudf-df`       | Available | Pandas     | NVIDIA GPU-accelerated DataFrames                      | `uv add benchbox --extra cudf`       |
@@ -93,6 +93,16 @@ benchbox platforms list
 ```bash
 benchbox platforms status databricks
 ```
+
+**Check local provisioning readiness before a run:**
+```bash
+benchbox platforms check clickhouse-server trino lakesail-df modin-df
+benchbox platforms status lakesail-df
+```
+
+The readiness check reports unreachable local service ports, LakeSail Spark Connect endpoints, and missing Modin
+backend packages as environment readiness gaps. It does not start services, initialize Ray/Dask, or mutate benchmark
+databases.
 
 **Install missing libraries for a platform (guided):**
 ```bash
@@ -317,11 +327,11 @@ adapter = SQLiteAdapter(database_path="benchmark.db")
 ### Configuration
 
 ```bash
-# Install the PySpark client (Sail uses standard PySpark via Spark Connect)
-uv add pyspark pyarrow
+# Install the Spark Connect-capable PySpark client
+uv add benchbox --extra lakesail
 
-# Start your LakeSail Sail server (see LakeSail documentation)
-# Default endpoint: sc://localhost:50051
+# Start the local Docker-backed Sail server
+make uat-bring-up PLATFORM=lakesail
 
 # SQL mode
 benchbox run --platform lakesail --benchmark tpch --scale 1.0

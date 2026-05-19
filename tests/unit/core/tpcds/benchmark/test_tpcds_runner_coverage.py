@@ -75,6 +75,38 @@ def test_normalize_interval_syntax(tpcds_benchmark):
     assert "- INTERVAL 30 DAY" in normalized
 
 
+def test_spark_q90_rewrite_guards_zero_denominator(tpcds_benchmark):
+    query = "SELECT CAST(`amc` AS DECIMAL(15, 4)) / CAST(`pmc` AS DECIMAL(15, 4)) AS `am_pm_ratio` FROM counts"
+
+    rewritten = tpcds_benchmark._apply_target_dialect_overrides(90, query, "spark")
+
+    assert "/ NULLIF(CAST(`pmc` AS DECIMAL(15, 4)), 0)" in rewritten
+
+
+def test_postgres_q90_rewrite_guards_zero_denominator(tpcds_benchmark):
+    query = "SELECT CAST(amc AS DECIMAL(15, 4)) / CAST(pmc AS DECIMAL(15, 4)) AS am_pm_ratio FROM counts"
+
+    rewritten = tpcds_benchmark._apply_target_dialect_overrides(90, query, "postgres")
+
+    assert "/ NULLIF(CAST(pmc AS DECIMAL(15, 4)), 0)" in rewritten
+
+
+def test_postgres_rollup_order_alias_rewrite_repeats_grouping_expression(tpcds_benchmark):
+    query = (
+        "SELECT GROUPING(i_category) + GROUPING(i_class) AS lochierarchy "
+        "FROM store_sales GROUP BY ROLLUP (i_category, i_class) "
+        "ORDER BY lochierarchy DESC, CASE WHEN lochierarchy = 0 THEN i_category END, rank_within_parent"
+    )
+
+    rewritten = tpcds_benchmark._apply_target_dialect_overrides(36, query, "postgres")
+
+    assert "CASE WHEN lochierarchy = 0" not in rewritten
+    assert (
+        "ORDER BY GROUPING(i_category) + GROUPING(i_class) DESC, "
+        "CASE WHEN GROUPING(i_category) + GROUPING(i_class) = 0 THEN i_category END"
+    ) in rewritten
+
+
 def test_fix_query58_ambiguity(tpcds_benchmark):
     query = (
         "WITH ss_items AS (SELECT 1 AS item_id), cs_items AS (SELECT 1 AS item_id), "

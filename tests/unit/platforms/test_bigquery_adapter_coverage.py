@@ -133,6 +133,34 @@ class TestFromConfigProjectAutoDetect:
 
         assert adapter.project_id == "fallback-proj"
 
+    def test_from_config_passes_result_metadata_options(self):
+        import benchbox.platforms.bigquery as bq_module
+
+        with patch("benchbox.utils.database_naming.generate_database_name", return_value="gen_ds"):
+            adapter = bq_module.BigQueryAdapter.from_config(
+                {
+                    "project_id": "explicit-proj",
+                    "benchmark": "tpch",
+                    "scale_factor": 1.0,
+                    "location": "EU",
+                    "storage_bucket": "bench-bucket",
+                    "storage_prefix": "bench-prefix",
+                    "job_priority": "BATCH",
+                    "biglake_connection": "project.eu.conn",
+                    "query_cache": True,
+                    "maximum_bytes_billed": 123456,
+                }
+            )
+
+        assert adapter.dataset_id == "gen_ds"
+        assert adapter.location == "EU"
+        assert adapter.storage_bucket == "bench-bucket"
+        assert adapter.storage_prefix == "bench-prefix"
+        assert adapter.job_priority == "BATCH"
+        assert adapter.biglake_connection == "project.eu.conn"
+        assert adapter.query_cache is True
+        assert adapter.maximum_bytes_billed == 123456
+
 
 # ---------------------------------------------------------------------------
 # _load_credentials: both paths
@@ -583,7 +611,15 @@ class TestGetPlatformInfoReservations:
 
     def test_no_reservation_gives_on_demand(self):
         """Empty reservation query → on-demand pricing and edition=ON_DEMAND."""
-        adapter = _make_adapter(project_id="my-proj", dataset_id="my_ds")
+        adapter = _make_adapter(
+            project_id="my-proj",
+            dataset_id="my_ds",
+            storage_bucket="bench-bucket",
+            storage_prefix="bench-prefix",
+            job_priority="BATCH",
+            query_cache=True,
+            maximum_bytes_billed=123456,
+        )
 
         mock_conn = Mock()
         mock_dataset = Mock()
@@ -604,6 +640,23 @@ class TestGetPlatformInfoReservations:
         assert cc.get("pricing_model") == "on-demand"
         assert cc.get("edition") == "ON_DEMAND"
         assert cc.get("slot_capacity") is None
+
+        metadata = adapter.get_normalized_result_metadata(platform_info=info)
+        assert metadata["execution_environment"]["platform_runtime"]["runtime_type"] == "serverless"
+        assert metadata["platform_deployment"]["deployment_type"] == "serverless"
+        assert metadata["platform_deployment"]["dataset"] == "my_ds"
+        assert metadata["platform_cloud"]["provider"] == "gcp"
+        assert metadata["platform_cloud"]["project"] == "my-proj"
+        assert metadata["platform_cloud"]["location"] == "EU"
+        assert metadata["platform_compute"]["pricing_model"] == "on-demand"
+        assert metadata["platform_compute"]["edition"] == "ON_DEMAND"
+        assert metadata["platform_compute"]["job_priority"] == "BATCH"
+        assert metadata["platform_compute"]["cache_enabled"] is True
+        assert metadata["platform_compute"]["maximum_bytes_billed"] == 123456
+        assert metadata["platform_compute"]["collection_status"] == "available"
+        assert metadata["platform_storage"]["bucket"] == "bench-bucket"
+        assert metadata["platform_storage"]["prefix"] == "bench-prefix"
+        assert metadata["platform_storage"]["staging_location"] == "gs://bench-bucket/bench-prefix"
 
     def test_monthly_commitment_sets_monthly_commitment_pricing(self):
         """MONTHLY commitment plan → monthly-commitment pricing model."""
@@ -661,6 +714,139 @@ class TestGetPlatformInfoReservations:
         info = self._get_platform_info_with_mocked_scalar_param(adapter, mock_conn)
         cc = info.get("compute_configuration", {})
         assert cc.get("pricing_model") == "monthly-commitment"
+
+    def test_normalized_metadata_maps_reservation_commitment_and_assignment(self):
+        adapter = _make_adapter(project_id="my-proj", dataset_id="my_ds")
+
+        mock_conn = Mock()
+        mock_dataset = Mock()
+        mock_dataset.location = "US"
+        mock_dataset.default_table_expiration_ms = None
+        mock_dataset.default_partition_expiration_ms = None
+        mock_dataset.created = None
+        mock_dataset.modified = None
+        mock_conn.get_dataset.return_value = mock_dataset
+
+        res_row = self._make_row(
+            reservation_name="prod-res",
+            slot_capacity=1000,
+            ignore_idle_slots=True,
+            edition="ENTERPRISE",
+            autoscale_max_slots=2000,
+            creation_time=None,
+            update_time=None,
+        )
+        res_job = Mock()
+        res_job.result.return_value = [res_row]
+
+        commit_row = self._make_row(
+            commitment_id="c1",
+            slot_count=1000,
+            commitment_plan="ANNUAL",
+            state="ACTIVE",
+            renewal_plan=None,
+            commitment_start_time=None,
+            commitment_end_time=None,
+        )
+        commit_job = Mock()
+        commit_job.result.return_value = [commit_row]
+
+        assign_row = self._make_row(
+            assignment_id="a1",
+            assignee_type="PROJECT",
+            job_type="QUERY",
+            reservation_name="prod-res",
+        )
+        assign_job = Mock()
+        assign_job.result.return_value = [assign_row]
+
+        call_count = [0]
+
+        def side_effect_query(q, job_config=None):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return res_job
+            if call_count[0] == 2:
+                return commit_job
+            return assign_job
+
+        mock_conn.query.side_effect = side_effect_query
+
+        info = self._get_platform_info_with_mocked_scalar_param(adapter, mock_conn)
+        metadata = adapter.get_normalized_result_metadata(platform_info=info)
+
+        assert metadata["platform_compute"]["serverless_slots"] == 1000
+        assert metadata["platform_compute"]["pricing_model"] == "annual-commitment"
+        assert metadata["platform_compute"]["edition"] == "ENTERPRISE"
+        assert metadata["platform_compute"]["reservation"] == "prod-res"
+        assert metadata["platform_compute"]["reservation_slot_capacity"] == 1000
+        assert metadata["platform_compute"]["reservation_ignore_idle_slots"] is True
+        assert metadata["platform_compute"]["autoscale_max_slots"] == 2000
+        assert metadata["platform_compute"]["capacity_commitment_id"] == "c1"
+        assert metadata["platform_compute"]["capacity_commitment_plan"] == "ANNUAL"
+        assert metadata["platform_compute"]["capacity_commitment_slots"] == 1000
+        assert metadata["platform_compute"]["reservation_assignment_id"] == "a1"
+        assert metadata["platform_compute"]["reservation_assignment"] == "prod-res"
+        assert metadata["platform_compute"]["reservation_assignment_job_type"] == "QUERY"
+        assert metadata["platform_compute"]["collection_status"] == "available"
+        assert metadata["platform_storage"]["collection_status"] == "unavailable"
+        assert "prefix" not in metadata["platform_storage"]
+
+    def test_normalized_metadata_records_unavailable_dataset_metadata(self):
+        adapter = _make_adapter(project_id="my-proj", dataset_id="my_ds", location="US")
+
+        mock_conn = Mock()
+        mock_conn.get_dataset.side_effect = RuntimeError("dataset metadata denied")
+        mock_conn.query.side_effect = RuntimeError("permission denied")
+
+        info = adapter.get_platform_info(connection=mock_conn)
+        metadata = adapter.get_normalized_result_metadata(platform_info=info)
+
+        assert metadata["platform_cloud"]["location"] == "US"
+        assert metadata["platform_compute"]["pricing_model"] == "on-demand"
+        assert metadata["platform_compute"]["edition"] == "ON_DEMAND"
+        assert metadata["platform_compute"]["dataset_metadata_collection_status"] == "unavailable"
+        assert metadata["platform_compute"]["dataset_metadata_error_class"] == "RuntimeError"
+        assert "dataset metadata denied" in metadata["platform_compute"]["dataset_metadata_error_message"]
+        assert metadata["platform_compute"]["collection_status"] == "partial"
+
+    def test_normalized_metadata_keeps_compute_partial_when_dataset_metadata_fails_with_reservation(self):
+        adapter = _make_adapter(project_id="my-proj", dataset_id="my_ds", location="US")
+
+        mock_conn = Mock()
+        mock_conn.get_dataset.side_effect = RuntimeError("dataset metadata denied")
+
+        res_row = self._make_row(
+            reservation_name="prod-res",
+            slot_capacity=1000,
+            ignore_idle_slots=True,
+            edition="ENTERPRISE",
+            autoscale_max_slots=None,
+            creation_time=None,
+            update_time=None,
+        )
+        res_job = Mock()
+        res_job.result.return_value = [res_row]
+
+        empty_job = Mock()
+        empty_job.result.return_value = []
+
+        call_count = [0]
+
+        def side_effect_query(q, job_config=None):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return res_job
+            return empty_job
+
+        mock_conn.query.side_effect = side_effect_query
+
+        info = self._get_platform_info_with_mocked_scalar_param(adapter, mock_conn)
+        metadata = adapter.get_normalized_result_metadata(platform_info=info)
+
+        assert metadata["platform_compute"]["reservation"] == "prod-res"
+        assert metadata["platform_compute"]["dataset_metadata_collection_status"] == "unavailable"
+        assert metadata["platform_compute"]["collection_status"] == "partial"
 
 
 # ---------------------------------------------------------------------------

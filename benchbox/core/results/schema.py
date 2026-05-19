@@ -20,9 +20,14 @@ import statistics
 from collections.abc import Mapping
 from dataclasses import asdict, is_dataclass
 from datetime import datetime
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from benchbox.core.results.builder import normalize_benchmark_id
+from benchbox.core.results.environment import (
+    build_environment_payload,
+    build_platform_metadata_payload,
+)
 from benchbox.core.results.query_normalizer import normalize_query_id
 
 if TYPE_CHECKING:
@@ -45,13 +50,14 @@ CANONICAL_KEY_ORDER = [
     "validation",
     "comparisons",
     "cost",
+    "normalized_cost",
     "execution",
     "environment",
     "export",
     "errors",
 ]
 
-QUERY_KEY_ORDER = ["id", "ms", "rows", "iter", "stream", "run_type", "status"]
+QUERY_KEY_ORDER = ["id", "ms", "rows", "iter", "stream", "run_type", "status", "dataframe_skip_summary"]
 CONFIG_KEY_ORDER = [
     "compression",
     "seed",
@@ -61,6 +67,7 @@ CONFIG_KEY_ORDER = [
     "tuning_mode",
     "tuning_config",
     "platform_options",
+    "platform_option_sources",
     "table_mode",
     "external_format",
     "table_format",
@@ -158,6 +165,14 @@ def _normalize_query_result(qr: Any) -> dict[str, Any]:
     return result
 
 
+def _round_duration_ms_for_export(value: float) -> float:
+    """Round milliseconds for schema-v2 export without erasing measured sub-ms durations."""
+    rounded = round(value, 1)
+    if value <= 0 or rounded > 0:
+        return rounded
+    return float(f"{value:.6g}")
+
+
 class SchemaV2ValidationError(ValueError):
     """Raised when schema v2.0 validation fails."""
 
@@ -170,7 +185,18 @@ class SchemaV2Validator:
     """
 
     REQUIRED_KEYS = ("version", "run", "benchmark", "platform", "summary", "queries")
-    OPTIONAL_KEYS = ("environment", "tables", "errors", "cost", "export", "tuning", "execution", "config", "phases")
+    OPTIONAL_KEYS = (
+        "environment",
+        "tables",
+        "errors",
+        "cost",
+        "normalized_cost",
+        "export",
+        "tuning",
+        "execution",
+        "config",
+        "phases",
+    )
 
     RUN_REQUIRED = ("id", "timestamp", "total_duration_ms", "query_time_ms")
     BENCHMARK_REQUIRED = ("id", "name", "scale_factor")
@@ -255,16 +281,19 @@ def build_result_payload(result: BenchmarkResults) -> dict[str, Any]:
     measurement_queries = [q for q in queries_list if q.get("run_type") == "measurement"]
     total_queries = len(measurement_queries)
     successful_queries = len([q for q in measurement_queries if q.get("status") == "SUCCESS"])
-    failed_count = total_queries - successful_queries
+    skipped_queries = len([q for q in measurement_queries if q.get("status") == "SKIPPED"])
+    failed_count = total_queries - successful_queries - skipped_queries
 
-    summary = _build_summary_section(result, query_times_ms, total_queries, successful_queries, failed_count)
+    summary = _build_summary_section(
+        result, query_times_ms, total_queries, successful_queries, failed_count, skipped_queries
+    )
     run = _build_run_section(result, query_times_ms, iterations_set, streams_set)
     benchmark = _build_benchmark_section(result)
     driver_metadata = _collect_driver_metadata(result)
     platform = _build_platform_section(result, driver_metadata)
 
     # Build environment block
-    environment = _build_environment_block(result.system_profile)
+    environment = _build_environment_block(result)
 
     # Build tables block (compact)
     tables = _build_tables_block(result.table_statistics)
@@ -285,7 +314,23 @@ def build_result_payload(result: BenchmarkResults) -> dict[str, Any]:
             run, ["id", "timestamp", "total_duration_ms", "query_time_ms", "iterations", "streams", "query_subset"]
         ),
         "benchmark": order_dict(benchmark, ["id", "name", "scale_factor", "test_type"]),
-        "platform": order_dict(platform, ["name", "version", "client_version", "variant", "config", "tuning"]),
+        "platform": order_dict(
+            platform,
+            [
+                "name",
+                "version",
+                "client_version",
+                "variant",
+                "config",
+                "deployment",
+                "cloud",
+                "compute",
+                "storage",
+                "raw_config",
+                "raw_metadata",
+                "tuning",
+            ],
+        ),
         "config": order_dict(config_block, CONFIG_KEY_ORDER),
         "summary": order_dict(summary, ["queries", "timing", "data", "validation", "tpc_metrics"]),
         "phases": order_dict(phases_block, PHASE_KEY_ORDER),
@@ -349,7 +394,7 @@ def _build_query_results_section(
         if status == "SUCCESS":
             if exec_time_ms is not None and run_type == "measurement":
                 query_times_ms.append(exec_time_ms)
-        else:
+        elif status != "SKIPPED":
             error_entry = {
                 "phase": "query",
                 "query_id": str(query_id),
@@ -365,13 +410,15 @@ def _build_query_results_section(
 
         entry: dict[str, Any] = {"id": str(query_id)}
         if exec_time_ms is not None:
-            entry["ms"] = round(exec_time_ms, 1)
+            entry["ms"] = _round_duration_ms_for_export(float(exec_time_ms))
         if rows is not None:
             entry["rows"] = rows
         entry["iter"] = iteration
         entry["stream"] = stream_id
         entry["run_type"] = run_type
         entry["status"] = status
+        if qr.get("dataframe_skip_summary"):
+            entry["dataframe_skip_summary"] = qr["dataframe_skip_summary"]
 
         queries_list.append(order_dict(entry, QUERY_KEY_ORDER))
 
@@ -384,6 +431,7 @@ def _build_summary_section(
     total_queries: int,
     successful_queries: int,
     failed_count: int,
+    skipped_queries: int = 0,
 ) -> dict[str, Any]:
     """Build the summary block of the payload."""
     timing_stats = _compute_timing_stats(query_times_ms)
@@ -396,6 +444,8 @@ def _build_summary_section(
         },
         "timing": timing_stats,
     }
+    if skipped_queries:
+        summary["queries"]["skipped"] = skipped_queries
 
     if result.total_rows_loaded or result.data_loading_time:
         data_stats: dict[str, Any] = {}
@@ -448,13 +498,46 @@ def _build_benchmark_section(result: BenchmarkResults) -> dict[str, Any]:
     compliance_class = getattr(result, "compliance_class", None)
     if compliance_class is not None:
         section["compliance_class"] = compliance_class
+    section.update(_dataset_identity_fields(result))
     return section
+
+
+def _dataset_identity_fields(result: BenchmarkResults) -> dict[str, str]:
+    """Return canonical dataset identity fields for data-manifest benchmarks."""
+    captured_identity = {
+        "dataset_version": getattr(result, "dataset_version", None),
+        "manifest_hash": getattr(result, "manifest_hash", None),
+        "data_archive_hash": getattr(result, "data_archive_hash", None),
+    }
+    if any(value is not None for value in captured_identity.values()):
+        return {key: str(value) for key, value in captured_identity.items() if value is not None}
+
+    benchmark_id = result.benchmark_id
+    try:
+        from benchbox.core.benchmark_registry import get_benchmark_metadata
+        from benchbox.core.data_fetch import load_manifest
+
+        metadata = get_benchmark_metadata(benchmark_id) or {}
+        manifest_rel = metadata.get("data_manifest")
+        if not manifest_rel:
+            return {}
+        repo_root = Path(__file__).resolve().parents[3]
+        manifest = load_manifest(repo_root / str(manifest_rel))
+    except Exception as exc:  # pragma: no cover - identity is best-effort for export
+        logger.warning("Unable to load dataset identity for %s: %s", benchmark_id, exc)
+        return {}
+    return {
+        "dataset_version": manifest.dataset_version,
+        "manifest_hash": manifest.manifest_hash,
+        "data_archive_hash": manifest.data_archive_hash,
+    }
 
 
 def _build_platform_section(result: BenchmarkResults, driver_metadata: dict[str, Any]) -> dict[str, Any]:
     """Build the platform block of the payload."""
     platform_name = str(result.platform).replace(" (DataFrame)", "")
     platform: dict[str, Any] = {"name": platform_name}
+    config: dict[str, Any] = {}
 
     if result.platform_info:
         version = result.platform_info.get("platform_version") or result.platform_info.get("version")
@@ -468,6 +551,23 @@ def _build_platform_section(result: BenchmarkResults, driver_metadata: dict[str,
         config = _extract_platform_config(result.platform_info)
         if config:
             platform["config"] = config
+
+    platform.update(
+        build_platform_metadata_payload(
+            platform_info=result.platform_info,
+            platform_config=config,
+            deployment=getattr(result, "platform_deployment", None),
+            cloud=getattr(result, "platform_cloud", None),
+            compute=getattr(result, "platform_compute", None),
+            storage=getattr(result, "platform_storage", None),
+            raw_config=getattr(result, "platform_raw_config", None) or config,
+            raw_metadata=(
+                getattr(result, "platform_raw_metadata", None)
+                if getattr(result, "platform_raw_metadata", None) is not None
+                else getattr(result, "platform_metadata", None)
+            ),
+        )
+    )
 
     for src_key, dest_key in _DRIVER_PLATFORM_KEYS:
         if driver_metadata.get(src_key):
@@ -519,12 +619,33 @@ def _add_comparisons_section(payload: dict[str, Any], result: BenchmarkResults) 
 def _add_cost_section(payload: dict[str, Any], result: BenchmarkResults) -> None:
     """Add cost summary to payload if available."""
     if result.cost_summary:
+        normalized_cost = result.cost_summary.get("normalized_cost")
+        if isinstance(normalized_cost, dict):
+            payload["normalized_cost"] = normalized_cost
         cost_block: dict[str, Any] = {}
-        if "total_cost" in result.cost_summary:
+        if "total_cost" in result.cost_summary and _normalized_cost_allows_direct_total(normalized_cost):
             cost_block["total_usd"] = result.cost_summary["total_cost"]
         cost_block["model"] = result.cost_summary.get("cost_model", "estimated")
         if cost_block:
             payload["cost"] = cost_block
+
+
+def _normalized_cost_allows_direct_total(normalized_cost: Any) -> bool:
+    """Return True when legacy direct cost totals can satisfy the public contract.
+
+    A genuinely missing normalized_cost block (legacy bundles produced before
+    the normalized_cost contract existed) means we have nothing to *reject*
+    — the direct total is the only signal available, so allow it. Only an
+    explicitly-rejected normalized_cost dict (e.g. ``cost_status="unavailable"``)
+    blocks emitting the direct total.
+    """
+    if normalized_cost is None:
+        return True
+    if not isinstance(normalized_cost, dict):
+        return False
+    if normalized_cost.get("cost_status") not in {"normalized", "not_applicable_local"}:
+        return False
+    return normalized_cost.get("normalized_cost_usd") is not None
 
 
 def _add_execution_section(payload: dict[str, Any], result: BenchmarkResults, driver_metadata: dict[str, Any]) -> None:
@@ -719,6 +840,7 @@ def _shorten_benchmark_name(name: str) -> str:
 _CONFIG_CTX_OR_RUN = ["seed", "phases", "query_subset"]
 _CONFIG_RUN_ONLY = [
     "platform_options",
+    "platform_option_sources",
     "tuning_mode",
     "tuning_config",
     "table_mode",
@@ -1049,17 +1171,17 @@ def _compute_timing_stats(times_ms: list[float]) -> dict[str, Any]:
     max_ms = max(times_ms)
 
     stats: dict[str, Any] = {
-        "total_ms": round(total_ms, 1),
-        "avg_ms": round(avg_ms, 1),
-        "min_ms": round(min_ms, 1),
-        "max_ms": round(max_ms, 1),
+        "total_ms": _round_duration_ms_for_export(total_ms),
+        "avg_ms": _round_duration_ms_for_export(avg_ms),
+        "min_ms": _round_duration_ms_for_export(min_ms),
+        "max_ms": _round_duration_ms_for_export(max_ms),
     }
 
     # Compute geometric mean
     if all(t > 0 for t in times_ms):
         try:
             geo_mean = statistics.geometric_mean(times_ms)
-            stats["geometric_mean_ms"] = round(geo_mean, 1)
+            stats["geometric_mean_ms"] = _round_duration_ms_for_export(geo_mean)
         except (statistics.StatisticsError, ValueError):
             pass
 
@@ -1067,7 +1189,7 @@ def _compute_timing_stats(times_ms: list[float]) -> dict[str, Any]:
     if len(times_ms) >= 3:
         try:
             stdev = statistics.stdev(times_ms)
-            stats["stdev_ms"] = round(stdev, 1)
+            stats["stdev_ms"] = _round_duration_ms_for_export(stdev)
         except statistics.StatisticsError:
             pass
 
@@ -1077,15 +1199,15 @@ def _compute_timing_stats(times_ms: list[float]) -> dict[str, Any]:
 
         # p90
         p90_idx = int(n * 0.90)
-        stats["p90_ms"] = round(sorted_times[min(p90_idx, n - 1)], 1)
+        stats["p90_ms"] = _round_duration_ms_for_export(sorted_times[min(p90_idx, n - 1)])
 
         # p95
         p95_idx = int(n * 0.95)
-        stats["p95_ms"] = round(sorted_times[min(p95_idx, n - 1)], 1)
+        stats["p95_ms"] = _round_duration_ms_for_export(sorted_times[min(p95_idx, n - 1)])
 
         # p99
         p99_idx = int(n * 0.99)
-        stats["p99_ms"] = round(sorted_times[min(p99_idx, n - 1)], 1)
+        stats["p99_ms"] = _round_duration_ms_for_export(sorted_times[min(p99_idx, n - 1)])
 
     return stats
 
@@ -1149,45 +1271,12 @@ def _build_tuning_summary(result: BenchmarkResults) -> dict[str, Any] | None:
     return summary if summary else None
 
 
-def _build_environment_block(system_profile: dict[str, Any] | None) -> dict[str, Any]:
-    """Build environment block from system profile."""
-    if not system_profile:
-        return {}
-
-    env: dict[str, Any] = {}
-
-    # OS info
-    os_type = system_profile.get("os_type") or system_profile.get("os")
-    os_release = system_profile.get("os_release", "")
-    if os_type:
-        env["os"] = f"{os_type} {os_release}".strip() if os_release else os_type
-
-    # Architecture
-    arch = system_profile.get("architecture") or system_profile.get("arch")
-    if arch:
-        env["arch"] = arch
-
-    # CPU
-    cpu_count = system_profile.get("cpu_count")
-    if cpu_count:
-        env["cpu_count"] = cpu_count
-
-    # Memory
-    memory_gb = system_profile.get("memory_gb")
-    if memory_gb:
-        env["memory_gb"] = memory_gb
-
-    # Python version
-    python_version = system_profile.get("python_version")
-    if python_version:
-        env["python"] = python_version
-
-    # Machine ID (anonymized)
-    machine_id = system_profile.get("machine_id") or system_profile.get("anonymous_machine_id")
-    if machine_id:
-        env["machine_id"] = machine_id
-
-    return env
+def _build_environment_block(result: BenchmarkResults) -> dict[str, Any]:
+    """Build environment block with legacy flat keys plus normalized metadata."""
+    return build_environment_payload(
+        system_profile=getattr(result, "system_profile", None),
+        execution_environment=getattr(result, "execution_environment", None),
+    )
 
 
 def _build_tables_block(table_statistics: dict[str, Any] | None) -> dict[str, Any]:

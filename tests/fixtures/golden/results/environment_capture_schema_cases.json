@@ -1,0 +1,332 @@
+{
+  "cases": [
+    {
+      "id": "local_embedded_duckdb",
+      "platform": "DuckDB",
+      "system_profile": {
+        "os_type": "Linux",
+        "os_release": "6.8",
+        "architecture": "x86_64"
+      },
+      "execution_environment": {
+        "platform_runtime": {
+          "runtime_type": "local_process",
+          "collection_status": "available",
+          "source": "observed",
+          "os": "Linux",
+          "arch": "x86_64"
+        }
+      },
+      "platform_deployment": {
+        "deployment_type": "embedded",
+        "connection_mode": "in-memory",
+        "endpoint_class": "embedded_process",
+        "metadata_source": "observed",
+        "collection_status": "available"
+      },
+      "platform_raw_config": {
+        "database": ":memory:",
+        "threads": 4
+      },
+      "assertions": {
+        "environment.client_host.os": "Linux 6.8",
+        "environment.platform_runtime.runtime_type": "local_process",
+        "platform.deployment.endpoint_class": "embedded_process",
+        "platform.raw_config.database": ":memory:"
+      }
+    },
+    {
+      "id": "docker_localhost_clickhouse",
+      "platform": "ClickHouse Server",
+      "system_profile": {
+        "os_type": "Darwin",
+        "os_release": "24.4.0",
+        "architecture": "arm64"
+      },
+      "execution_environment": {
+        "platform_runtime": {
+          "runtime_type": "docker_container",
+          "collection_status": "available",
+          "source": "observed",
+          "os": "Linux",
+          "arch": "amd64",
+          "engine_host": "container:benchbox-clickhouse"
+        },
+        "container": {
+          "collection_status": "available",
+          "source": "observed",
+          "docker_engine_version": "26.1.0",
+          "image": "clickhouse/clickhouse-server:24.1",
+          "image_digest": "sha256:fixturedigest",
+          "container_id": "clickhouse-container-id",
+          "container_name": "benchbox-clickhouse-fixture",
+          "os": "linux",
+          "arch": "amd64",
+          "port_mappings": {
+            "8123/tcp": [
+              {
+                "host_ip": "127.0.0.1",
+                "host_port": "8123"
+              }
+            ]
+          },
+          "bind_mounts": [
+            {
+              "source": "/Users/benchbox/data/clickhouse",
+              "destination": "/var/lib/clickhouse"
+            }
+          ]
+        }
+      },
+      "platform_deployment": {
+        "deployment_type": "self_hosted",
+        "connection_mode": "localhost",
+        "endpoint_class": "localhost_port",
+        "metadata_source": "observed",
+        "collection_status": "available"
+      },
+      "platform_raw_config": {
+        "host": "localhost",
+        "port": 8123
+      },
+      "platform_raw_metadata": {
+        "server_version": "24.1"
+      },
+      "assertions": {
+        "environment.client_host.os": "Darwin 24.4.0",
+        "environment.platform_runtime.runtime_type": "docker_container",
+        "environment.container.image": "clickhouse/clickhouse-server:24.1",
+        "platform.deployment.endpoint_class": "localhost_port",
+        "platform.raw_config.host": "localhost",
+        "platform.raw_metadata.server_version": "24.1"
+      },
+      "public_export": {
+        "absent": [
+          "clickhouse-container-id",
+          "benchbox-clickhouse-fixture",
+          "/Users/benchbox/data/clickhouse",
+          "/var/lib/clickhouse"
+        ],
+        "prefixes": {
+          "environment.container.container_id": "container_",
+          "environment.container.container_name": "container_",
+          "environment.container.bind_mounts.0.source": "path_",
+          "environment.container.bind_mounts.0.destination": "path_"
+        }
+      }
+    },
+    {
+      "id": "remote_self_hosted_postgresql",
+      "platform": "PostgreSQL",
+      "execution_environment": {
+        "platform_runtime": {
+          "runtime_type": "remote_server",
+          "collection_status": "partial",
+          "source": "inferred",
+          "engine_host": "db.internal.example.com"
+        }
+      },
+      "platform_deployment": {
+        "deployment_type": "self_hosted",
+        "connection_mode": "remote",
+        "endpoint_class": "remote_host",
+        "metadata_source": "inferred",
+        "collection_status": "partial"
+      },
+      "platform_raw_config": {
+        "host": "db.internal.example.com",
+        "port": 5432,
+        "database": "benchbox_private"
+      },
+      "assertions": {
+        "environment.platform_runtime.runtime_type": "remote_server",
+        "environment.platform_runtime.engine_host": "db.internal.example.com",
+        "platform.deployment.endpoint_class": "remote_host",
+        "platform.raw_config.host": "db.internal.example.com"
+      },
+      "public_export": {
+        "absent": [
+          "db.internal.example.com",
+          "benchbox_private"
+        ],
+        "prefixes": {
+          "environment.platform_runtime.engine_host": "host_",
+          "platform.raw_config.host": "host_",
+          "platform.raw_config.database": "database_"
+        }
+      }
+    },
+    {
+      "id": "managed_cloud_snowflake",
+      "platform": "Snowflake",
+      "execution_environment": {
+        "platform_runtime": {
+          "runtime_type": "managed_cloud",
+          "collection_status": "partial",
+          "source": "requested",
+          "engine_host": "acct123.us-east-1.snowflakecomputing.com"
+        }
+      },
+      "platform_deployment": {
+        "deployment_type": "managed_cloud",
+        "connection_mode": "cloud",
+        "endpoint_class": "cloud_endpoint",
+        "metadata_source": "requested",
+        "collection_status": "partial"
+      },
+      "platform_cloud": {
+        "provider": "aws",
+        "region": "us-east-1",
+        "account": "acct123",
+        "collection_status": "partial",
+        "source": "requested"
+      },
+      "platform_compute": {
+        "warehouse": "BENCH_WH",
+        "warehouse_size": "XSMALL",
+        "result_cache_enabled": false,
+        "collection_status": "partial",
+        "source": "requested"
+      },
+      "platform_storage": {
+        "table_format": "snowflake_native",
+        "collection_status": "partial",
+        "source": "inferred"
+      },
+      "platform_raw_config": {
+        "account": "acct123",
+        "warehouse": "BENCH_WH",
+        "password": "fixture-password"
+      },
+      "assertions": {
+        "environment.platform_runtime.runtime_type": "managed_cloud",
+        "platform.deployment.endpoint_class": "cloud_endpoint",
+        "platform.cloud.provider": "aws",
+        "platform.cloud.region": "us-east-1",
+        "platform.compute.warehouse": "BENCH_WH",
+        "platform.raw_config.warehouse": "BENCH_WH"
+      },
+      "public_export": {
+        "absent": [
+          "acct123",
+          "BENCH_WH",
+          "fixture-password"
+        ],
+        "prefixes": {
+          "platform.cloud.account": "account_",
+          "platform.compute.warehouse": "warehouse_",
+          "platform.raw_config.password": "<redacted>"
+        }
+      }
+    },
+    {
+      "id": "serverless_athena",
+      "platform": "Athena",
+      "execution_environment": {
+        "platform_runtime": {
+          "runtime_type": "serverless",
+          "collection_status": "partial",
+          "source": "requested"
+        }
+      },
+      "platform_deployment": {
+        "deployment_type": "managed_cloud",
+        "connection_mode": "serverless",
+        "endpoint_class": "cloud_endpoint",
+        "metadata_source": "requested",
+        "collection_status": "partial"
+      },
+      "platform_cloud": {
+        "provider": "aws",
+        "region": "us-west-2",
+        "account": "123456789012",
+        "collection_status": "partial",
+        "source": "requested"
+      },
+      "platform_compute": {
+        "workgroup": "primary-private",
+        "collection_status": "partial",
+        "source": "requested"
+      },
+      "platform_storage": {
+        "staging_location": "s3://athena-fixture-results/prefix/",
+        "bucket": "athena-fixture-results",
+        "prefix": "prefix/",
+        "table_format": "parquet",
+        "collection_status": "partial",
+        "source": "requested"
+      },
+      "platform_raw_config": {
+        "workgroup": "primary-private",
+        "database": "athena_private",
+        "output_location": "s3://athena-fixture-results/prefix/"
+      },
+      "assertions": {
+        "environment.platform_runtime.runtime_type": "serverless",
+        "platform.cloud.region": "us-west-2",
+        "platform.compute.workgroup": "primary-private",
+        "platform.storage.bucket": "athena-fixture-results",
+        "platform.raw_config.output_location": "s3://athena-fixture-results/prefix/"
+      },
+      "public_export": {
+        "absent": [
+          "123456789012",
+          "primary-private",
+          "athena-fixture-results",
+          "prefix/",
+          "athena_private"
+        ],
+        "prefixes": {
+          "platform.cloud.account": "account_",
+          "platform.compute.workgroup": "workgroup_",
+          "platform.storage.bucket": "bucket_",
+          "platform.raw_config.output_location": "path_"
+        }
+      }
+    },
+    {
+      "id": "metadata_unavailable_bigquery",
+      "platform": "BigQuery",
+      "execution_environment": {
+        "platform_runtime": {
+          "runtime_type": "managed_cloud",
+          "collection_status": "unavailable",
+          "source": "unavailable",
+          "collection_error_class": "Forbidden"
+        }
+      },
+      "platform_deployment": {
+        "deployment_type": "managed_cloud",
+        "connection_mode": "cloud",
+        "endpoint_class": "cloud_endpoint",
+        "metadata_source": "unavailable",
+        "collection_status": "unavailable"
+      },
+      "platform_cloud": {
+        "provider": "gcp",
+        "region_collection_status": "unavailable",
+        "collection_status": "unavailable",
+        "source": "unavailable"
+      },
+      "platform_compute": {
+        "slot_metadata_collection_status": "unavailable",
+        "collection_status": "unavailable",
+        "source": "unavailable"
+      },
+      "platform_storage": {
+        "collection_status": "unavailable",
+        "source": "unavailable"
+      },
+      "platform_raw_metadata": {
+        "metadata_error_class": "Forbidden"
+      },
+      "assertions": {
+        "environment.platform_runtime.collection_status": "unavailable",
+        "platform.deployment.collection_status": "unavailable",
+        "platform.cloud.region_collection_status": "unavailable",
+        "platform.compute.slot_metadata_collection_status": "unavailable",
+        "platform.raw_metadata.metadata_error_class": "Forbidden"
+      }
+    }
+  ]
+}

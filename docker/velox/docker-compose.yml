@@ -1,0 +1,98 @@
+name: benchbox-velox
+
+# Two services for two development workflows:
+#
+#   velox-connect  - starts a Gluten-enabled Spark-Connect server on :50051.
+#                    Use this when you want to run `benchbox` on your host and
+#                    connect to a containerised Velox backend:
+#                      docker compose up -d velox-connect
+#                      benchbox run --platform velox --platform-option deployment=remote \
+#                        --platform-option endpoint=sc://localhost:50051 ...
+#
+#   velox-runner   - runs a complete benchbox benchmark end-to-end inside the
+#                    container using the local (in-process) Gluten session.
+#                    Pass benchmark args via BENCHBOX_ARGS or command override:
+#                      docker compose run --rm velox-runner \
+#                        --benchmark tpch --scale 1 --queries Q1,Q6
+#
+# Apache Gluten 1.6.0 ships an official amd64 release jar, but not an official
+# arm64 jar. Compose therefore defaults to linux/amd64. On Apple Silicon this
+# works via emulation for smoke/setup only; use a native x86_64 Linux host for
+# timing-valid benchmark runs.
+#
+# DATA ACCESS (velox-connect mode):
+#   The Spark server runs inside Docker and reads data files by their host-side
+#   absolute paths (the client sends paths over gRPC, not file contents).  The
+#   compose file mounts the data directory at the SAME absolute path inside the
+#   container so host paths resolve identically server-side.  This is a
+#   path-mirroring contract: the client-side absolute path MUST equal the
+#   server-side mount path or every load fails with file-not-found.
+#
+#   Default: ${PWD}/benchmark_runs (assumes you run `docker compose` from the
+#   BenchBox project root).  Override with BENCHBOX_DATA_DIR if your data lives
+#   elsewhere - the same value is used as both the host path AND the in-container
+#   mount path:
+#     BENCHBOX_DATA_DIR=/mnt/benchbox-data docker compose up -d velox-connect
+#   …and run benchbox so the absolute paths it sends point inside the mount.
+#
+#   Mounted :ro because Spark writes managed-table data to
+#   spark.sql.warehouse.dir (=/tmp/spark-warehouse, set in entrypoint.sh), not
+#   under the data dir.  If a future change stages writable artefacts under
+#   benchmark_runs, drop the :ro suffix.
+
+services:
+  velox-connect:
+    image: benchbox-velox:${VELOX_IMAGE_TAG:-dev}
+    platform: ${VELOX_DOCKER_PLATFORM:-linux/amd64}
+    build:
+      context: ../..
+      dockerfile: docker/velox/Dockerfile
+      args:
+        GLUTEN_VERSION: ${GLUTEN_VERSION:-1.6.0}
+    command: ["connect"]
+    ports:
+      - "${SPARK_CONNECT_PORT:-50051}:50051"
+    environment:
+      GLUTEN_JAR: /opt/gluten.jar
+      SPARK_DRIVER_MEM: ${SPARK_DRIVER_MEM:-4g}
+      VELOX_OFFHEAP: ${VELOX_OFFHEAP:-8g}
+      SPARK_CONNECT_PORT: "50051"
+    volumes:
+      # Mount data directory at the same absolute path on host and in container
+      # so the Spark server resolves the host-side paths benchbox sends over
+      # gRPC.  See "DATA ACCESS" in the file header for the full contract.
+      - "${BENCHBOX_DATA_DIR:-${PWD}/benchmark_runs}:${BENCHBOX_DATA_DIR:-${PWD}/benchmark_runs}:ro"
+      # Optional: bind-mount a locally-downloaded jar instead of the one built
+      # into the image (useful during jar version upgrades):
+      #   - /path/to/gluten-velox-bundle-spark4.0_2.13-linux_amd64-1.6.0.jar:/opt/gluten.jar:ro
+    tmpfs:
+      # spark.sql.warehouse.dir lives under /tmp/spark-warehouse (set in
+      # entrypoint.sh).  A plain container /tmp is part of the writable
+      # filesystem layer and survives docker stop/start, so an orphaned
+      # warehouse can re-trigger LOCATION_ALREADY_EXISTS on restart.  The
+      # tmpfs guarantees /tmp is wiped on every container start.
+      - /tmp:size=2g
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import socket; s=socket.socket(); s.settimeout(2); s.connect(('localhost', 50051)); s.close()"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 60s
+
+  velox-runner:
+    profiles: [runner]
+    image: benchbox-velox:${VELOX_IMAGE_TAG:-dev}
+    platform: ${VELOX_DOCKER_PLATFORM:-linux/amd64}
+    build:
+      context: ../..
+      dockerfile: docker/velox/Dockerfile
+      args:
+        GLUTEN_VERSION: ${GLUTEN_VERSION:-1.6.0}
+    command: ["run", "--benchmark", "tpch", "--scale", "0.01"]
+    environment:
+      GLUTEN_JAR: /opt/gluten.jar
+      SPARK_DRIVER_MEM: ${SPARK_DRIVER_MEM:-4g}
+      VELOX_OFFHEAP: ${VELOX_OFFHEAP:-8g}
+    # Mount a results directory to persist output outside the container:
+    #   volumes:
+    #     - ./results:/opt/benchbox/results

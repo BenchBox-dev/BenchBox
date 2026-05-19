@@ -62,6 +62,11 @@ class TestGetCreateTableSql:
         sql = get_create_table_sql("dim_locations", enable_primary_keys=False)
         assert "PRIMARY KEY" not in sql
 
+    def test_spark_family_uses_string_for_order_time(self):
+        sql = get_create_table_sql("order_lines", dialect="spark")
+        assert "order_time STRING" in sql
+        assert "order_time TIME" not in sql
+
 
 class TestGetAllCreateTableSql:
     def test_contains_all_three_create_table_headers(self):
@@ -77,6 +82,11 @@ class TestGetAllCreateTableSql:
 
     def test_returns_string(self):
         assert isinstance(get_all_create_table_sql(), str)
+
+    def test_spark_family_order_time_type_applies_to_all_tables_sql(self):
+        sql = get_all_create_table_sql(dialect="lakesail")
+        assert "order_time STRING" in sql
+        assert "order_time TIME" not in sql
 
 
 class TestGetTunings:

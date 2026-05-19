@@ -22,11 +22,11 @@ Each file is a JSON contract for one chart math helper:
 | `delta_pct.json` | `deltaPct` | `benchbox/core/visualization/ascii/diverging_bar.py` |
 | `sort_by_magnitude_desc.json` | `sortByMagnitudeDesc` | same |
 | `per_query_speedup.json` | `perQuerySpeedup` | N/A - no Python CLI chart; originated in `Compare.tsx`, unified via `chartMath.ts` |
-| `geomean_ms.json` | `geomeanMs` | `benchbox/core/explorer_pipeline/transformer.py` `_display_geomean_ms` |
-| `box_stats.json` | `computeBoxStats` | `benchbox/core/explorer_pipeline/transformer.py` `_compute_box_stats` |
-| `cdf_ecdf.json` | `computeECDFPoints` | `benchbox/core/explorer_pipeline/transformer.py` `_compute_ecdf` |
-| `rank_table.json` | `computeRankTable` | `benchbox/core/explorer_pipeline/transformer.py` `_compute_ranks` |
-| `percentile_ladder.json` | `computePercentile` | `benchbox/core/explorer_pipeline/transformer.py` `_compute_percentile` |
+| `geomean_ms.json` | `geomeanMs` | `_project/scripts/explorer_pipeline/transformer.py` `_display_geomean_ms` |
+| `box_stats.json` | `computeBoxStats` | `_project/scripts/explorer_pipeline/transformer.py` `_compute_box_stats` |
+| `cdf_ecdf.json` | `computeECDFPoints` | `_project/scripts/explorer_pipeline/transformer.py` `_compute_ecdf` |
+| `rank_table.json` | `computeRankTable` | `_project/scripts/explorer_pipeline/transformer.py` `_compute_ranks` |
+| `percentile_ladder.json` | `computePercentile` | `_project/scripts/explorer_pipeline/transformer.py` `_compute_percentile` |
 
 ## Policy
 

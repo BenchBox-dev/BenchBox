@@ -1,0 +1,254 @@
+#!/usr/bin/env python3
+"""Classify changed paths for the develop PR CI umbrella."""
+
+from __future__ import annotations
+
+import argparse
+import fnmatch
+import json
+import subprocess
+import sys
+from pathlib import Path
+from typing import Iterable, cast
+
+DEFAULT_RULES = Path(".github/path-filters.yml")
+LIST_NAMES = {
+    "changed": "changed_paths",
+    "content": "content_guard_paths",
+    "code": "code_paths",
+    "unknown": "unknown_paths",
+    "yaml": "yaml_paths",
+    "markdown": "markdown_paths",
+    "todo": "todo_paths",
+    "docs": "docs_paths",
+}
+
+
+def normalize_path(path: str) -> str:
+    normalized = path.strip().replace("\\", "/")
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
+    return normalized
+
+
+def unquote_yaml_scalar(value: str) -> str:
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        return value[1:-1]
+    return value
+
+
+def load_rules(path: Path) -> dict[str, list[str]]:
+    """Load the simple filter YAML shape without depending on PyYAML."""
+    rules: dict[str, list[str]] = {}
+    current_key: str | None = None
+
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.split("#", 1)[0].rstrip()
+        if not line.strip():
+            continue
+        if not line.startswith(" ") and line.endswith(":"):
+            current_key = line[:-1].strip()
+            rules[current_key] = []
+            continue
+        if current_key and line.lstrip().startswith("- "):
+            rules[current_key].append(unquote_yaml_scalar(line.lstrip()[2:]))
+
+    missing = {"safe-content", "content-guard", "code-ci"} - set(rules)
+    if missing:
+        raise ValueError(f"{path} is missing required filter keys: {', '.join(sorted(missing))}")
+    return rules
+
+
+def pattern_matches(path: str, pattern: str) -> bool:
+    path = normalize_path(path)
+    pattern = normalize_path(pattern)
+    if pattern.endswith("/**"):
+        prefix = pattern[:-3]
+        return path == prefix or path.startswith(f"{prefix}/")
+    if "/" not in pattern:
+        return "/" not in path and fnmatch.fnmatchcase(path, pattern)
+    return fnmatch.fnmatchcase(path, pattern)
+
+
+def matches_any(path: str, patterns: Iterable[str]) -> bool:
+    return any(pattern_matches(path, pattern) for pattern in patterns)
+
+
+def git_changed_paths(base_ref: str) -> list[str]:
+    # Include deletions (D) so a PR that only deletes a code file is
+    # still classified as a code change. Without D, removing a Python
+    # module while adding a markdown file would land in safe-content
+    # and skip lint/test even though it removes executable code.
+    result = subprocess.run(
+        ["git", "diff", "--name-only", "--diff-filter=ACDMRT", f"{base_ref}...HEAD"],
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+    )
+    return [normalize_path(line) for line in result.stdout.splitlines() if normalize_path(line)]
+
+
+def stdin_changed_paths() -> list[str]:
+    if sys.stdin.isatty():
+        return []
+    return [normalize_path(line) for line in sys.stdin.read().splitlines() if normalize_path(line)]
+
+
+def ordered_unique(paths: Iterable[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for path in paths:
+        if path not in seen:
+            seen.add(path)
+            result.append(path)
+    return result
+
+
+def classify_paths(changed_paths: list[str], rules: dict[str, list[str]]) -> dict[str, object]:
+    safe_patterns = rules["safe-content"]
+    content_patterns = rules["content-guard"]
+    code_patterns = rules["code-ci"]
+
+    safe_paths = [path for path in changed_paths if matches_any(path, safe_patterns)]
+    content_paths = [path for path in changed_paths if matches_any(path, content_patterns)]
+    explicit_code_paths = [path for path in changed_paths if matches_any(path, code_patterns)]
+    # A path is `code` if it is not on the safe-content allowlist OR if it is
+    # explicitly on the code-ci allowlist (the latter wins over safe-content
+    # so a file like `docs/conf.py` runs full CI even when `docs/**.md`
+    # is also matched in the same diff).
+    code_paths = [path for path in changed_paths if path not in safe_paths or path in explicit_code_paths]
+    # `unknown_paths` are code-classified paths with no explicit code-ci
+    # match — typically a brand-new top-level area. They still route through
+    # code-ci because the classifier fails closed.
+    unknown_paths = [path for path in code_paths if not matches_any(path, code_patterns)]
+
+    safe_content_only = bool(changed_paths) and not code_paths
+    needs_code_ci = not safe_content_only
+    markdown_paths = [path for path in content_paths if path.endswith(".md")]
+    yaml_paths = [path for path in content_paths if path.endswith((".yaml", ".yml"))]
+    todo_paths = [path for path in yaml_paths if path.startswith("_project/TODO/") or path.startswith("_project/DONE/")]
+    docs_paths = [path for path in content_paths if path.startswith("docs/")]
+
+    return {
+        "changed_paths": changed_paths,
+        "safe_content_paths": safe_paths,
+        "content_guard_paths": content_paths,
+        "code_paths": code_paths,
+        "unknown_paths": unknown_paths,
+        "yaml_paths": yaml_paths,
+        "markdown_paths": markdown_paths,
+        "todo_paths": todo_paths,
+        "docs_paths": docs_paths,
+        "safe_content_only": safe_content_only,
+        "needs_code_ci": needs_code_ci,
+        "content_guard_needed": bool(content_paths),
+        "estimated_runner_minutes_saved": 5 if safe_content_only else 0,
+    }
+
+
+def bool_text(value: object) -> str:
+    return "true" if bool(value) else "false"
+
+
+def path_list(decision: dict[str, object], key: str) -> list[str]:
+    return cast(list[str], decision[key])
+
+
+def write_github_output(path: Path, decision: dict[str, object]) -> None:
+    lines = [
+        f"safe-content-only={bool_text(decision['safe_content_only'])}",
+        f"needs-code-ci={bool_text(decision['needs_code_ci'])}",
+        f"content-guard-needed={bool_text(decision['content_guard_needed'])}",
+        f"estimated-runner-minutes-saved={decision['estimated_runner_minutes_saved']}",
+    ]
+    for key, decision_key in [
+        ("changed-paths", "changed_paths"),
+        ("content-paths", "content_guard_paths"),
+        ("code-paths", "code_paths"),
+        ("unknown-paths", "unknown_paths"),
+    ]:
+        value = "\n".join(path_list(decision, decision_key))
+        lines.append(f"{key}<<EOF_{key}")
+        lines.append(value)
+        lines.append(f"EOF_{key}")
+    with path.open("a", encoding="utf-8") as output:
+        output.write("\n".join(lines))
+        output.write("\n")
+
+
+def write_summary(path: Path, decision: dict[str, object]) -> None:
+    changed_paths = path_list(decision, "changed_paths")
+    code_paths = path_list(decision, "code_paths")
+    content_paths = path_list(decision, "content_guard_paths")
+    unknown_paths = path_list(decision, "unknown_paths")
+    with path.open("a", encoding="utf-8") as summary:
+        summary.write("### Develop PR Path Decision\n\n")
+        summary.write(f"- Changed paths: {len(changed_paths)}\n")
+        summary.write(f"- Content paths: {len(content_paths)}\n")
+        summary.write(f"- Code paths: {len(code_paths)}\n")
+        summary.write(f"- Unknown paths: {len(unknown_paths)}\n")
+        summary.write(f"- Safe content only: `{bool_text(decision['safe_content_only'])}`\n")
+        summary.write(f"- Needs code CI: `{bool_text(decision['needs_code_ci'])}`\n")
+        summary.write(f"- Estimated runner minutes saved: `{decision['estimated_runner_minutes_saved']}`\n")
+
+
+def write_lists(directory: Path, decision: dict[str, object]) -> None:
+    directory.mkdir(parents=True, exist_ok=True)
+    for filename, decision_key in LIST_NAMES.items():
+        with (directory / f"{filename}.txt").open("w", encoding="utf-8") as list_file:
+            for path in path_list(decision, decision_key):
+                list_file.write(f"{path}\n")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--rules", type=Path, default=DEFAULT_RULES)
+    parser.add_argument("--base-ref", help="Git ref to diff against, for example origin/develop")
+    parser.add_argument("--changed-file", type=Path, help="Read changed paths from a newline-delimited file")
+    parser.add_argument("--json-in", type=Path, help="Read an existing decision JSON instead of classifying paths")
+    parser.add_argument("--json-out", type=Path, help="Write the full decision as JSON")
+    parser.add_argument("--github-output", type=Path, help="Append GitHub Actions outputs")
+    parser.add_argument("--summary", type=Path, help="Append a GitHub step summary")
+    parser.add_argument("--lists-dir", type=Path, help="Write changed/content/code helper lists")
+    parser.add_argument(
+        "--check",
+        choices=["needs-code-ci", "safe-content-only", "content-guard-needed"],
+        help="Exit 0 when the named decision is true, otherwise exit 1",
+    )
+    args = parser.parse_args()
+
+    if args.json_in:
+        decision = json.loads(args.json_in.read_text(encoding="utf-8"))
+    else:
+        rules = load_rules(args.rules)
+        if args.changed_file:
+            changed_paths = [
+                normalize_path(line)
+                for line in args.changed_file.read_text(encoding="utf-8").splitlines()
+                if normalize_path(line)
+            ]
+        elif args.base_ref:
+            changed_paths = git_changed_paths(args.base_ref)
+        else:
+            changed_paths = stdin_changed_paths()
+        decision = classify_paths(ordered_unique(changed_paths), rules)
+
+    if args.json_out:
+        args.json_out.write_text(json.dumps(decision, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    if args.github_output:
+        write_github_output(args.github_output, decision)
+    if args.summary:
+        write_summary(args.summary, decision)
+    if args.lists_dir:
+        write_lists(args.lists_dir, decision)
+
+    print(json.dumps(decision, indent=2, sort_keys=True))
+    if args.check:
+        decision_key = args.check.replace("-", "_")
+        return 0 if decision[decision_key] else 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

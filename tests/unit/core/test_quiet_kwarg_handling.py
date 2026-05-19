@@ -131,14 +131,14 @@ class TestQuietKwargHandling:
         )
         assert benchmark.quiet is True
 
-    def test_joinorder_benchmark_accepts_quiet_kwarg(self, tmp_path):
-        """Regression test: JoinOrderBenchmark should accept quiet=True without error."""
-        from benchbox.core.joinorder import JoinOrderBenchmark
+    def test_joinorder_synthetic_benchmark_accepts_quiet_kwarg(self, tmp_path):
+        """Regression test: JoinOrderSyntheticBenchmark should accept quiet=True without error."""
+        from benchbox.core.joinorder_synthetic import JoinOrderSyntheticBenchmark
 
         # Should not raise TypeError about duplicate kwarg
-        benchmark = JoinOrderBenchmark(
+        benchmark = JoinOrderSyntheticBenchmark(
             scale_factor=0.01,
-            output_dir=tmp_path / "joinorder",
+            output_dir=tmp_path / "joinorder_synthetic",
             quiet=True,
         )
         assert benchmark.quiet is True

@@ -47,6 +47,16 @@ def extract_spark_table_name(statement: str) -> str | None:
     return _extract_table_name(statement)
 
 
+def _unquote_spark_retry_identifier(identifier: str | None) -> str | None:
+    """Return a simple extracted Spark identifier suitable for retry SQL."""
+    if not identifier:
+        return None
+    identifier = identifier.strip()
+    if len(identifier) >= 2 and identifier[0] == identifier[-1] and identifier[0] in {'"', "`"}:
+        identifier = identifier[1:-1]
+    return identifier
+
+
 def normalize_spark_table_name_in_sql(sql: str) -> str:
     """Normalize table names in SQL to lowercase for Spark."""
     return _normalize_table_name_in_sql(sql)
@@ -129,7 +139,13 @@ def get_spark_query_plan(connection: Any, query: str) -> str:
 # datavault) fail at CREATE TABLE without stripping.
 _USING_CLAUSE_RE = re.compile(r"\s+USING\s+\w+", re.IGNORECASE)
 _SMALLINT_RE = re.compile(r"\bSMALLINT\b", re.IGNORECASE)
-_INLINE_PK_RE = re.compile(r"\bPRIMARY\s+KEY\b", re.IGNORECASE)
+# Inline column-level PRIMARY KEY: matches the keyword pair only when it is NOT
+# followed by '(' - that '(' marks a table-level ``PRIMARY KEY (cols)`` clause,
+# which the balanced-paren stripper handles separately. Without the lookahead,
+# this regex stripped just the keywords and left a dangling ``(cols)`` group
+# that no longer matched the table-constraint stripper, producing invalid DDL
+# like ``service_zone VARCHAR, (location_id))``.
+_INLINE_PK_RE = re.compile(r"\bPRIMARY\s+KEY\b(?!\s*\()", re.IGNORECASE)
 # Inline column-level UNIQUE: matches the bare keyword only when it is NOT
 # followed by '(' - that '(' would mark a table-level UNIQUE clause, which
 # the balanced-paren stripper handles separately.
@@ -143,6 +159,22 @@ _TRAILING_COMMA_RE = re.compile(r",\s*\)")
 # Collapse runs of plain spaces or tabs only.  Using ``\s`` here would also
 # fold newlines, flattening multi-line DDL in debug logs to a single line.
 _REPEATED_SPACE_RE = re.compile(r"[ \t]{2,}")
+# Leading SQL comments that some benchmark schema generators emit ahead of the
+# ``CREATE TABLE`` - both ``-- line`` comments and ``/* block */`` comments
+# (SQLGlot transpilation rewrites ``-- ...`` headers into ``/* ... */`` form and
+# folds them onto the first statement). They must be stripped before the
+# ``CREATE TABLE`` detection below, otherwise the whole statement is returned
+# un-normalised and the table-level constraint clauses reach Spark/Sail verbatim
+# (e.g. ``PRIMARY KEY (col)`` -> "found KEY expected data type").
+_LEADING_COMMENTS_RE = re.compile(r"\A(?:\s*(?:--[^\n]*(?:\n|$)|/\*.*?\*/))+\s*", re.DOTALL)
+# DuckDB-style fixed-size array column type ``<TYPE>[<N>]`` (e.g. vector_search's
+# ``embedding FLOAT[128]``). Spark and Sail DDL parsers reject the postfix
+# bracket form; rewrite to the portable ``ARRAY<TYPE>`` element-typed form
+# (the fixed length is not enforceable on a V1 parquet table anyway).
+_FIXED_SIZE_ARRAY_TYPE_RE = re.compile(r"\b([A-Za-z]\w*)\s*\[\s*\d+\s*\]")
+# SQLGlot may transpile ``FLOAT[128]`` to ``ARRAY<FLOAT>[128]`` (element type
+# converted but the fixed-size suffix left in place); drop the trailing suffix.
+_ARRAY_FIXED_SIZE_SUFFIX_RE = re.compile(r"(>)\s*\[\s*\d+\s*\]")
 
 
 def _strip_balanced_paren_constraints(statement: str) -> str:
@@ -219,11 +251,21 @@ def optimize_spark_table_definition(
 
     For V2 catalog formats (Delta, Iceberg) callers should pass
     ``strip_v1_constraints=False`` to preserve constraint metadata.
+
+    Leading ``-- ...`` line comments are stripped first so the ``CREATE TABLE``
+    detection (and therefore the whole normalisation) still applies to schema
+    text that carries a comment header. Returns ``""`` for a chunk that is only
+    comments/whitespace so callers can skip it.
     """
+    statement = _LEADING_COMMENTS_RE.sub("", statement)
+    if not statement.strip():
+        return ""
     if not statement.upper().startswith("CREATE TABLE"):
         return statement
 
     statement = _USING_CLAUSE_RE.sub("", statement)
+    statement = _FIXED_SIZE_ARRAY_TYPE_RE.sub(r"ARRAY<\1>", statement)
+    statement = _ARRAY_FIXED_SIZE_SUFFIX_RE.sub(r"\1", statement)
 
     if upcast_smallint:
         statement = _SMALLINT_RE.sub("INT", statement)
@@ -410,6 +452,9 @@ def run_spark_schema_creation_loop(
             continue
         statement = normalize_spark_table_name_in_sql(statement)
         statement = optimize_statement(statement)
+        if not statement.strip():
+            # optimize_statement collapsed a comment-only chunk to nothing.
+            continue
         try:
             spark.sql(statement)
             logger.debug(f"Executed schema statement: {statement[:100]}...")
@@ -418,7 +463,8 @@ def run_spark_schema_creation_loop(
             if "already exists" not in error_lower:
                 raise
 
-            table_name = extract_spark_table_name(statement)
+            extracted_table_name = extract_spark_table_name(statement)
+            table_name = _unquote_spark_retry_identifier(extracted_table_name)
             if not (table_name and validate_spark_identifier(table_name)):
                 # Cannot safely recover - re-raise rather than silently
                 # consuming the error and leaving the schema half-built.
@@ -427,7 +473,7 @@ def run_spark_schema_creation_loop(
                 # just the original Spark "already exists" string.
                 raise RuntimeError(
                     "Cannot safely retry CREATE: extracted table name "
-                    f"{table_name!r} from statement {statement[:80]!r} failed "
+                    f"{extracted_table_name!r} from statement {statement[:80]!r} failed "
                     "strict-ASCII identifier validation. Either rename the "
                     "table to match ^[a-zA-Z_][a-zA-Z0-9_]*$ (<=128 chars) or "
                     "drop the conflicting object manually."

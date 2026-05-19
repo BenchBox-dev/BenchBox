@@ -107,6 +107,18 @@ results = adapter.run_benchmark(benchmark)
 
 ## Performance Tuning
 
+### TPC-H Helper Indexes
+
+BenchBox creates a small set of SQLite-specific helper indexes after loading
+TPC-H data. These indexes target the order, supplier, nation, and lineitem
+access paths used by correlated queries such as Q21, which otherwise require
+repeated full scans in SQLite and can dominate local smoke runs even at SF 0.01.
+
+The helper indexes are applied after bulk load so they do not slow row ingestion,
+and they preserve query results and status classification. Generated `.tbl` data
+is still reusable across TPC-H-derived workloads; only loaded SQLite database
+files need cleanup when disk space is constrained.
+
 ### WAL Mode
 
 Write-Ahead Logging improves read performance:
@@ -148,7 +160,7 @@ SQLite has characteristics that affect OLAP benchmarks:
 
 | Scale Factor | Expected Performance |
 |--------------|---------------------|
-| 0.01 | Fast (seconds) |
+| 0.01 | Fast for smoke; Q21 is sensitive to missing helper indexes |
 | 0.1 | Moderate (minutes) |
 | 1.0 | Slow (10+ minutes) |
 | 10.0+ | Not recommended |

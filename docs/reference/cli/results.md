@@ -84,7 +84,7 @@ benchbox export --last --format json --format csv --format html --output-dir ./a
 ### Notes
 
 - The `export` command loads existing result files from `benchmark_runs/results/`
-- Schema version 1.0 is required (all recent benchmarks use this version)
+- Schema versions 2.0 and 2.1 are supported by current result tooling
 - Export preserves all metrics and metadata from original results
 - Large result files (TPC-DS at scale 100+) may take a few seconds to process
 - The --force flag skips confirmation prompts when overwriting existing files
@@ -100,6 +100,19 @@ Display exported benchmark results and execution history.
 ### Options
 
 - `--limit INTEGER`: Number of results to show (default: 10)
+- `--submitted`: Show hosted submission history sidecars instead of exported
+  benchmark result files
+- `--paths`: Print copyable primary result JSON paths for use with
+  `benchbox submit`, `benchbox export`, or `benchbox results show-cli`
+
+`--paths` writes one path per line to stdout (no Rich formatting, no preamble)
+so the output is safe to pipe into `xargs` or save with `tee`. Hint text and
+overflow notices are written to stderr. The list contains only primary
+schema-v2 result JSON files — companion files such as `.plans.json`,
+`.tuning.json`, and hosted `.submission.json` sidecars are excluded.
+
+`--paths` and `--submitted` are mutually exclusive: hosted submission history
+is a separate sidecar surface from local result discovery.
 
 ### Usage Examples
 
@@ -109,6 +122,15 @@ benchbox results
 
 # Show more results
 benchbox results --limit 25
+
+# Show exact result file paths accepted by submit/export (one per line, pipeable)
+benchbox results --paths
+
+# Pipe into submit to package each result in turn
+benchbox results --paths --limit 100 | xargs -n1 -I{} benchbox submit {} --output ./submissions
+
+# Show hosted submissions and public URLs
+benchbox results --submitted
 ```
 
 ---

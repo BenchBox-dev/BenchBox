@@ -4,77 +4,6 @@
  */
 
 /* ============================================================================
-   Site-Wide Navigation Bar
-   ============================================================================ */
-
-.benchbox-site-nav {
-    position: sticky;
-    top: 0;
-    background-color: rgba(13, 17, 23, 0.95);
-    backdrop-filter: blur(10px);
-    border-bottom: 1px solid #30363d;
-    z-index: 100;
-    padding: 0.75rem 0;
-}
-
-.benchbox-site-nav-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 1.5rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.benchbox-site-nav-logo {
-    font-family: 'SF Mono', Monaco, monospace;
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: #58a6ff !important;
-    text-decoration: none !important;
-}
-
-.benchbox-site-nav-links {
-    display: flex;
-    gap: 2rem;
-}
-
-.benchbox-site-nav-links a {
-    color: #8b949e !important;
-    text-decoration: none !important;
-    font-weight: 500;
-    transition: color 0.2s ease;
-}
-
-.benchbox-site-nav-links a:hover {
-    color: #f0f6fc !important;
-}
-
-/* Always dark theme regardless of Furo light/dark mode */
-[data-theme="light"] .benchbox-site-nav {
-    background-color: rgba(13, 17, 23, 0.95);
-}
-
-[data-theme="light"] .benchbox-site-nav-logo {
-    color: #58a6ff !important;
-}
-
-[data-theme="light"] .benchbox-site-nav-links a {
-    color: #8b949e !important;
-}
-
-[data-theme="light"] .benchbox-site-nav-links a:hover {
-    color: #f0f6fc !important;
-}
-
-/* Responsive: hide nav links on mobile */
-@media screen and (max-width: 768px) {
-    .benchbox-site-nav-links {
-        display: none;
-    }
-}
-
-/* ============================================================================
    Code Block Styling (Cobalt2 Theme)
    ============================================================================ */
 
@@ -84,8 +13,8 @@ div.highlight-python pre,
 div.highlight-bash pre,
 div.highlight-text pre,
 pre.literal-block {
-    background-color: #122738 !important;
-    color: #fff !important;
+    background-color: var(--code-bg) !important;
+    color: var(--code-fg) !important;
     border: none !important;
     border-radius: 6px !important;
     padding: 16px !important;
@@ -94,7 +23,7 @@ pre.literal-block {
     font-size: 14px !important;
     line-height: 1.6 !important;
     overflow-x: auto !important;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+    box-shadow: var(--card-shadow) !important;
 }
 
 /* Code block container */
@@ -108,13 +37,13 @@ div.highlight {
 /* Inline code */
 code.literal,
 code.docutils.literal {
-    background-color: #1a3548 !important;
-    color: #ffc600 !important;
+    background-color: var(--code-bg) !important;
+    color: var(--code-accent) !important;
     padding: 2px 6px !important;
     border-radius: 3px !important;
     font-family: 'Monaco', 'Consolas', 'Menlo', 'DejaVu Sans Mono', 'Courier New', monospace !important;
     font-size: 0.9em !important;
-    border: 1px solid #2a4558 !important;
+    border: 1px solid var(--code-border) !important;
 }
 
 /* Code in headings */
@@ -124,16 +53,16 @@ h3 code.literal,
 h4 code.literal,
 h5 code.literal,
 h6 code.literal {
-    background-color: #1a3548 !important;
-    color: #ffc600 !important;
+    background-color: var(--code-bg) !important;
+    color: var(--code-accent) !important;
     font-size: 0.85em !important;
 }
 
 /* Line numbers in code blocks */
 .linenos {
-    background-color: #0d1f2d !important;
-    color: #668799 !important;
-    border-right: 1px solid #1a3548 !important;
+    background-color: var(--code-bg) !important;
+    color: var(--code-line-number) !important;
+    border-right: 1px solid var(--code-border) !important;
     padding-right: 8px !important;
     margin-right: 8px !important;
     user-select: none !important;
@@ -141,8 +70,8 @@ h6 code.literal {
 
 /* Copy button for code blocks (if enabled) */
 button.copybtn {
-    background-color: #0088ff !important;
-    color: #fff !important;
+    background-color: var(--accent-primary) !important;
+    color: var(--bb-site-header-cta-text) !important;
     border: none !important;
     border-radius: 3px !important;
     padding: 4px 8px !important;
@@ -164,27 +93,27 @@ button.copybtn:hover {
 /* Note admonitions */
 .admonition.note,
 .admonition.seealso {
-    border-left: 4px solid #0088ff;
+    border-left: 4px solid var(--info-color);
 }
 
 /* Warning admonitions */
 .admonition.warning,
 .admonition.attention,
 .admonition.caution {
-    border-left: 4px solid #ff9d00;
+    border-left: 4px solid var(--warning-color);
 }
 
 /* Important/Danger admonitions */
 .admonition.danger,
 .admonition.error {
-    border-left: 4px solid #ff628c;
+    border-left: 4px solid var(--danger-color);
 }
 
 /* Tip admonitions */
 .admonition.tip,
 .admonition.hint,
 .admonition.important {
-    border-left: 4px solid #3ad900;
+    border-left: 4px solid var(--success-color);
 }
 
 /* ============================================================================
@@ -193,8 +122,8 @@ button.copybtn:hover {
 
 /* Example blocks */
 .example {
-    background-color: #f8f9fa !important;
-    border-left: 4px solid #ffc600 !important;
+    background-color: var(--bg-tertiary) !important;
+    border-left: 4px solid var(--warning-color) !important;
     padding: 12px !important;
     margin: 16px 0 !important;
     border-radius: 4px !important;
@@ -202,8 +131,8 @@ button.copybtn:hover {
 
 /* Method signatures */
 dt.sig {
-    background-color: #f8f9fa !important;
-    border-left: 3px solid #0088ff !important;
+    background-color: var(--bg-tertiary) !important;
+    border-left: 3px solid var(--info-color) !important;
     padding: 8px 12px !important;
     font-family: 'Monaco', 'Consolas', 'Menlo', 'DejaVu Sans Mono', 'Courier New', monospace !important;
 }
@@ -258,7 +187,7 @@ dt.sig {
 }
 
 .content a:hover code.literal {
-    color: #ffc600;
+    color: var(--code-accent);
 }
 
 /* Preserve Cobalt2 styling for external links */
@@ -267,7 +196,7 @@ a.reference.external {
 }
 
 a.reference.external:hover {
-    color: #ffc600;
+    color: var(--code-accent);
 }
 
 /* ============================================================================
@@ -277,89 +206,89 @@ a.reference.external:hover {
 /* Table styling - Light mode */
 table.docutils {
     border-collapse: collapse !important;
-    border: 1px solid #e1e4e8 !important;
+    border: 1px solid var(--border-primary) !important;
 }
 
 table.docutils thead {
-    background-color: #f6f8fa !important;
+    background-color: var(--table-header-bg) !important;
 }
 
 table.docutils th {
-    background-color: #f6f8fa !important;
-    border: 1px solid #e1e4e8 !important;
+    background-color: var(--table-header-bg) !important;
+    border: 1px solid var(--border-primary) !important;
     padding: 8px 12px !important;
     font-weight: 600 !important;
 }
 
 table.docutils td {
-    border: 1px solid #e1e4e8 !important;
+    border: 1px solid var(--border-primary) !important;
     padding: 8px 12px !important;
 }
 
 table.docutils tr:nth-child(even) {
-    background-color: #f9f9f9 !important;
+    background-color: var(--table-row-alt-bg) !important;
 }
 
 /* Table styling - Dark mode (explicit) */
 [data-theme="dark"] table.docutils {
-    border: 1px solid #3d444d !important;
+    border: 1px solid var(--border-primary) !important;
 }
 
 [data-theme="dark"] table.docutils thead {
-    background-color: #1c2128 !important;
+    background-color: var(--table-header-bg) !important;
 }
 
 [data-theme="dark"] table.docutils th {
-    background-color: #1c2128 !important;
-    border: 1px solid #3d444d !important;
-    color: #c9d1d9 !important;
+    background-color: var(--table-header-bg) !important;
+    border: 1px solid var(--border-primary) !important;
+    color: var(--text-primary) !important;
 }
 
 [data-theme="dark"] table.docutils td {
-    border: 1px solid #3d444d !important;
-    color: #c9d1d9 !important;
+    border: 1px solid var(--border-primary) !important;
+    color: var(--text-primary) !important;
 }
 
 /* Alternating row colors - Dark Mode: apply to both tr and td for full coverage */
 [data-theme="dark"] table.docutils tbody tr:nth-child(even),
 [data-theme="dark"] table.docutils tbody tr:nth-child(even) td {
-    background-color: #161b22 !important;
+    background-color: var(--table-row-alt-bg) !important;
 }
 
 [data-theme="dark"] table.docutils tbody tr:nth-child(odd),
 [data-theme="dark"] table.docutils tbody tr:nth-child(odd) td {
-    background-color: #0d1117 !important;
+    background-color: var(--bg-primary) !important;
 }
 
 /* Table styling - Dark mode (auto via prefers-color-scheme) */
 @media (prefers-color-scheme: dark) {
     body:not([data-theme="light"]) table.docutils {
-        border: 1px solid #3d444d !important;
+        border: 1px solid var(--border-primary) !important;
     }
 
     body:not([data-theme="light"]) table.docutils thead {
-        background-color: #1c2128 !important;
+        background-color: var(--table-header-bg) !important;
     }
 
     body:not([data-theme="light"]) table.docutils th {
-        background-color: #1c2128 !important;
-        border: 1px solid #3d444d !important;
-        color: #c9d1d9 !important;
+        background-color: var(--table-header-bg) !important;
+        border: 1px solid var(--border-primary) !important;
+        color: var(--text-primary) !important;
     }
 
     body:not([data-theme="light"]) table.docutils td {
-        border: 1px solid #3d444d !important;
-        color: #c9d1d9 !important;
+        border: 1px solid var(--border-primary) !important;
+        color: var(--text-primary) !important;
     }
 
     body:not([data-theme="light"]) table.docutils tbody tr:nth-child(even),
     body:not([data-theme="light"]) table.docutils tbody tr:nth-child(even) td {
-        background-color: #161b22 !important;
+        background-color: var(--table-row-alt-bg) !important;
     }
 
     body:not([data-theme="light"]) table.docutils tbody tr:nth-child(odd),
     body:not([data-theme="light"]) table.docutils tbody tr:nth-child(odd) td {
-        background-color: #0d1117 !important;
+        background-color: var(--bg-primary) !important;
     }
 }
 
@@ -374,8 +303,8 @@ table.docutils code.literal {
 
 /* Search result highlighting */
 .highlighted {
-    background-color: #ffc600 !important;
-    color: #122738 !important;
+    background-color: var(--highlight-bg) !important;
+    color: var(--highlight-fg) !important;
     padding: 2px 4px !important;
     border-radius: 2px !important;
 }
@@ -410,14 +339,14 @@ table.docutils code.literal {
     div.highlight-python pre,
     div.highlight-bash pre,
     pre.literal-block {
-        border: 1px solid #000 !important;
+        border: 1px solid CanvasText !important;
         page-break-inside: avoid !important;
         margin: 0 !important;
     }
 
     code.literal,
     code.docutils.literal {
-        border: 1px solid #000 !important;
+        border: 1px solid CanvasText !important;
     }
 }
 
@@ -503,7 +432,12 @@ table.docutils code.literal {
 
 .post-tag:hover {
     background-color: var(--color-brand-primary);
-    color: white;
+    color: var(--bb-site-header-cta-text);
+}
+
+/* One BenchBox theme control owns the visible state on docs/blog. */
+.theme-toggle-container {
+    display: none !important;
 }
 
 /* Dark mode adjustments for post metadata */

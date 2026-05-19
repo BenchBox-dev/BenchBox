@@ -1,0 +1,31 @@
+name: Validate main PR base
+
+on:
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: validate-main-pr-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate-base:
+    name: validate-base
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject non-release-branch PRs to main
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          if [[ "${HEAD_REF}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.+-]+)?$ ]]; then
+            echo "Release branch '${HEAD_REF}' approved for merge into main."
+            exit 0
+          fi
+          echo "::error::Only release branches matching 'vX.Y.Z' (optionally with a '-suffix') may merge into main. Got '${HEAD_REF}'."
+          echo "::error::Open this PR against 'develop' instead, or cut a release branch via 'make release-cut VERSION=X.Y.Z'."
+          exit 1

@@ -7,7 +7,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from benchbox.core.benchmark_loader import get_benchmark_instance
+from benchbox.core.errors import ScaleFactorNotSupportedError
 from benchbox.core.joinorder.benchmark import JoinOrderBenchmark
+from benchbox.core.joinorder.schema import JoinOrderSchema
+from benchbox.core.joinorder_synthetic.benchmark import JoinOrderSyntheticBenchmark
 from benchbox.core.schemas import BenchmarkConfig, SystemProfile
 
 pytestmark = [
@@ -37,7 +40,7 @@ def _make_system_profile() -> SystemProfile:
 def test_joinorder_benchmark_propagates_compression(tmp_path) -> None:
     """JoinOrderBenchmark should respect compression kwargs and pass them to the generator."""
 
-    benchmark = JoinOrderBenchmark(
+    benchmark = JoinOrderSyntheticBenchmark(
         scale_factor=0.1,
         output_dir=tmp_path,
         compress_data=True,
@@ -58,7 +61,7 @@ def test_joinorder_benchmark_propagates_compression(tmp_path) -> None:
 def test_joinorder_benchmark_propagates_compression_gzip(tmp_path) -> None:
     """JoinOrderBenchmark should respect gzip compression settings."""
 
-    benchmark = JoinOrderBenchmark(
+    benchmark = JoinOrderSyntheticBenchmark(
         scale_factor=0.1,
         output_dir=tmp_path,
         compress_data=True,
@@ -77,12 +80,12 @@ def test_joinorder_benchmark_propagates_compression_gzip(tmp_path) -> None:
 
 
 def test_get_benchmark_instance_handles_joinorder_compression() -> None:
-    """Loader should instantiate JoinOrderBenchmark with compression and force_regenerate options."""
+    """Loader should instantiate the synthetic benchmark with compression options."""
 
     config = BenchmarkConfig(
-        name="joinorder",
-        display_name="JoinOrder",
-        scale_factor=0.1,
+        name="joinorder_synthetic",
+        display_name="JoinOrder Synthetic",
+        scale_factor=1.0,
         compress_data=True,
         compression_type="zstd",
         compression_level=5,
@@ -95,7 +98,7 @@ def test_get_benchmark_instance_handles_joinorder_compression() -> None:
 
     generator = instance._generator
 
-    assert isinstance(instance, JoinOrderBenchmark)
+    assert isinstance(instance, JoinOrderSyntheticBenchmark)
     assert instance.parallel == profile.cpu_cores_logical
     # Compression settings are stored in the generator, not the benchmark
     assert instance.force_regenerate is True
@@ -105,13 +108,24 @@ def test_get_benchmark_instance_handles_joinorder_compression() -> None:
     assert generator.force_regenerate is True
 
 
+def test_get_benchmark_instance_rejects_unsupported_joinorder_scale() -> None:
+    config = BenchmarkConfig(
+        name="joinorder",
+        display_name="JoinOrder",
+        scale_factor=0.5,
+    )
+
+    with pytest.raises(ScaleFactorNotSupportedError, match=r"joinorder accepts scale_factor in \[1\.0\]"):
+        get_benchmark_instance(config, _make_system_profile())
+
+
 def test_joinorder_invalid_parallel_raises(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="parallel must be a positive integer"):
-        JoinOrderBenchmark(scale_factor=0.1, output_dir=tmp_path, parallel=0)
+        JoinOrderSyntheticBenchmark(scale_factor=0.1, output_dir=tmp_path, parallel=0)
 
 
 def test_joinorder_generate_data_logs_and_returns_files(tmp_path: Path) -> None:
-    benchmark = JoinOrderBenchmark(scale_factor=0.1, output_dir=tmp_path)
+    benchmark = JoinOrderSyntheticBenchmark(scale_factor=0.1, output_dir=tmp_path)
     benchmark._generator = MagicMock()
     benchmark._generator.generate_data.return_value = [tmp_path / "title.csv"]
 
@@ -123,7 +137,7 @@ def test_joinorder_generate_data_logs_and_returns_files(tmp_path: Path) -> None:
 
 
 def test_joinorder_schema_and_query_helpers_delegate_to_components(tmp_path: Path) -> None:
-    benchmark = JoinOrderBenchmark(scale_factor=0.1, output_dir=tmp_path)
+    benchmark = JoinOrderSyntheticBenchmark(scale_factor=0.1, output_dir=tmp_path)
     benchmark._schema = MagicMock()
     benchmark._schema._tables = {"title": {"columns": []}}
     benchmark._schema.get_create_tables_sql.return_value = "CREATE TABLE title (id INT)"
@@ -159,17 +173,30 @@ def test_joinorder_schema_and_query_helpers_delegate_to_components(tmp_path: Pat
 
 
 def test_joinorder_get_query_rejects_params(tmp_path: Path) -> None:
-    benchmark = JoinOrderBenchmark(scale_factor=0.1, output_dir=tmp_path)
+    benchmark = JoinOrderSyntheticBenchmark(scale_factor=0.1, output_dir=tmp_path)
 
     with pytest.raises(ValueError, match="don't accept parameters"):
         benchmark.get_query("1a", params={"seed": 1})
 
 
+def test_canonical_joinorder_schema_omits_foreign_keys_by_default() -> None:
+    """Canonical IMDb data has dangling references; FK constraints are opt-in."""
+    schema = JoinOrderSchema()
+
+    sql = schema.get_create_tables_sql("postgres")
+    sql_with_fks = schema.get_create_tables_sql("postgres", include_foreign_keys=True)
+
+    assert "FOREIGN KEY" not in sql
+    assert "FOREIGN KEY" in sql_with_fks
+
+
 def test_joinorder_load_queries_from_directory_replaces_query_manager(tmp_path: Path) -> None:
-    benchmark = JoinOrderBenchmark(scale_factor=0.1, output_dir=tmp_path)
+    benchmark = JoinOrderSyntheticBenchmark(scale_factor=0.1, output_dir=tmp_path)
     replacement = MagicMock()
 
-    with patch("benchbox.core.joinorder.benchmark.JoinOrderQueryManager", return_value=replacement) as manager_cls:
+    with patch(
+        "benchbox.core.joinorder_synthetic.benchmark.JoinOrderQueryManager", return_value=replacement
+    ) as manager_cls:
         benchmark.load_queries_from_directory("/queries")
 
     manager_cls.assert_called_once_with("/queries")
@@ -177,7 +204,7 @@ def test_joinorder_load_queries_from_directory_replaces_query_manager(tmp_path: 
 
 
 def test_joinorder_validate_query_benchmark_info_and_repr(tmp_path: Path) -> None:
-    benchmark = JoinOrderBenchmark(scale_factor=0.1, output_dir=tmp_path)
+    benchmark = JoinOrderSyntheticBenchmark(scale_factor=0.1, output_dir=tmp_path)
 
     with (
         patch.object(benchmark, "get_query", return_value="SELECT 1 FROM title"),
@@ -193,15 +220,15 @@ def test_joinorder_validate_query_benchmark_info_and_repr(tmp_path: Path) -> Non
         representation = repr(benchmark)
 
     assert benchmark.validate_query("1a") is True
-    assert info["benchmark_name"] == "Join Order Benchmark"
+    assert info["benchmark_name"] == "Synthetic Join Order Benchmark"
     assert info["total_queries"] == 12
     assert info["total_tables"] == 2
     assert info["estimated_size_bytes"] == 2048
-    assert representation == "JoinOrderBenchmark(scale_factor=0.1, queries=12)"
+    assert representation == "JoinOrderSyntheticBenchmark(scale_factor=0.1, queries=12)"
 
 
 def test_joinorder_validate_query_returns_false_for_invalid_sql(tmp_path: Path) -> None:
-    benchmark = JoinOrderBenchmark(scale_factor=0.1, output_dir=tmp_path)
+    benchmark = JoinOrderSyntheticBenchmark(scale_factor=0.1, output_dir=tmp_path)
 
     with patch.object(benchmark, "get_query", return_value="DELETE title"):
         assert benchmark.validate_query("1a") is False

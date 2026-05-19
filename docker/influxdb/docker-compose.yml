@@ -1,0 +1,41 @@
+# InfluxDB 3 Core Docker Compose - DEVELOPMENT/TEST ONLY
+# InfluxDB 3 Core with file-based object store for integration testing
+# Plaintext token below is for local testing only - do not use in production
+#
+# Usage:
+#   docker compose -f docker-compose.yml up -d --wait
+#   benchbox run --platform influxdb --benchmark tsbs-devops --scale 0.01 \
+#     --platform-option host=localhost --platform-option port=8181 \
+#     --platform-option mode=core --platform-option ssl=false
+#
+# Ports:
+#   8181 - HTTP API + gRPC FlightSQL (multiplexed)
+#
+# Notes:
+#   InfluxDB 3 Core requires influxdb3-python client (not influxdb-client v2).
+#   Databases are created on first write. Token is generated post-startup.
+#   The BenchBox adapter uses FlightSQL for queries and HTTP for writes.
+
+services:
+  influxdb:
+    image: influxdb:3-core
+    ports:
+      - "8181:8181"
+    command: >
+      influxdb3 serve
+        --node-id=benchbox-node
+        --object-store=memory
+        --without-auth
+    volumes:
+      - influxdb-data:/tmp/influxdb3
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8181/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  influxdb-data:
+    driver: local

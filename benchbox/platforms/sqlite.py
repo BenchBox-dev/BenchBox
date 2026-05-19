@@ -31,6 +31,85 @@ try:
 except ImportError:
     sqlite3 = None
 
+_TPCH_TABLES: frozenset[str] = frozenset(
+    {"customer", "lineitem", "nation", "orders", "part", "partsupp", "region", "supplier"}
+)
+
+_TPCH_HELPER_INDEXES: tuple[str, ...] = (
+    "CREATE INDEX IF NOT EXISTS idx_bb_tpch_lineitem_order_supp_dates "
+    "ON lineitem (l_orderkey, l_suppkey, l_receiptdate, l_commitdate)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_tpch_orders_status_order ON orders (o_orderstatus, o_orderkey)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_tpch_supplier_nation_supp ON supplier (s_nationkey, s_suppkey)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_tpch_nation_name_key ON nation (n_name, n_nationkey)",
+)
+
+_JOINORDER_TABLES: frozenset[str] = frozenset(
+    {
+        "aka_name",
+        "aka_title",
+        "cast_info",
+        "char_name",
+        "comp_cast_type",
+        "company_name",
+        "company_type",
+        "complete_cast",
+        "info_type",
+        "keyword",
+        "kind_type",
+        "link_type",
+        "movie_companies",
+        "movie_info",
+        "movie_info_idx",
+        "movie_keyword",
+        "movie_link",
+        "name",
+        "person_info",
+        "role_type",
+        "title",
+    }
+)
+
+_JOINORDER_HELPER_INDEXES: tuple[str, ...] = (
+    "CREATE INDEX IF NOT EXISTS idx_bb_job_company_name_country_id ON company_name (country_code, id)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_job_company_type_kind_id ON company_type (kind, id)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_job_info_type_info_id ON info_type (info, id)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_job_keyword_keyword_id ON keyword (keyword, id)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_job_kind_type_kind_id ON kind_type (kind, id)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_job_link_type_link_id ON link_type (link, id)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_job_role_type_role_id ON role_type (role, id)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_job_comp_cast_type_kind_id ON comp_cast_type (kind, id)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_job_title_year_kind_id ON title (production_year, kind_id, id)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_job_title_kind_year_id ON title (kind_id, production_year, id)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_job_name_name_id ON name (name, id)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_job_name_pcode_gender_id ON name (name_pcode_cf, gender, id)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_job_aka_name_person_id ON aka_name (person_id)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_job_aka_title_movie_kind ON aka_title (movie_id, kind_id)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_job_cast_info_person_movie ON cast_info (person_id, movie_id)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_job_cast_info_movie_person ON cast_info (movie_id, person_id)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_job_cast_info_role_movie ON cast_info (role_id, movie_id)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_job_cast_info_person_role_movie ON cast_info (person_role_id, movie_id)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_job_complete_cast_movie_subject_status "
+    "ON complete_cast (movie_id, subject_id, status_id)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_job_movie_companies_type_movie_company "
+    "ON movie_companies (company_type_id, movie_id, company_id)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_job_movie_companies_company_movie_type "
+    "ON movie_companies (company_id, movie_id, company_type_id)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_job_movie_companies_movie_type_company "
+    "ON movie_companies (movie_id, company_type_id, company_id)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_job_movie_info_type_movie ON movie_info (info_type_id, movie_id)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_job_movie_info_movie_type ON movie_info (movie_id, info_type_id)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_job_movie_info_idx_type_movie ON movie_info_idx (info_type_id, movie_id)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_job_movie_info_idx_movie_type ON movie_info_idx (movie_id, info_type_id)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_job_movie_keyword_keyword_movie ON movie_keyword (keyword_id, movie_id)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_job_movie_keyword_movie_keyword ON movie_keyword (movie_id, keyword_id)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_job_movie_link_link_movie_linked "
+    "ON movie_link (link_type_id, movie_id, linked_movie_id)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_job_movie_link_linked_link_movie "
+    "ON movie_link (linked_movie_id, link_type_id, movie_id)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_job_person_info_person_type ON person_info (person_id, info_type_id)",
+    "CREATE INDEX IF NOT EXISTS idx_bb_job_person_info_type_person ON person_info (info_type_id, person_id)",
+)
+
 
 class SQLiteAdapter(PlatformAdapter):
     """SQLite platform adapter for testing and lightweight usage."""
@@ -298,8 +377,67 @@ class SQLiteAdapter(PlatformAdapter):
             tuning_config=self.unified_tuning_configuration if self.tuning_enabled else None,
         )
         table_stats, loading_time = loader.load()
+        helper_index_time = self._apply_benchmark_helper_indexes(benchmark, connection)
         # DataLoader doesn't provide per-table timings yet
-        return table_stats, loading_time, None
+        return table_stats, loading_time + helper_index_time, None
+
+    def _apply_benchmark_helper_indexes(self, benchmark: Any, connection: Any) -> float:
+        """Apply SQLite indexes needed to keep supported local benchmark runs terminating."""
+        if _is_tpch_benchmark(benchmark):
+            return self._apply_helper_index_set(
+                benchmark_name="TPC-H",
+                required_tables=_TPCH_TABLES,
+                statements=_TPCH_HELPER_INDEXES,
+                connection=connection,
+                analyze=False,
+            )
+        if _is_joinorder_benchmark(benchmark):
+            return self._apply_helper_index_set(
+                benchmark_name="JoinOrder",
+                required_tables=_JOINORDER_TABLES,
+                statements=_JOINORDER_HELPER_INDEXES,
+                connection=connection,
+                analyze=True,
+            )
+
+        return 0.0
+
+    def _apply_helper_index_set(
+        self,
+        *,
+        benchmark_name: str,
+        required_tables: frozenset[str],
+        statements: tuple[str, ...],
+        connection: Any,
+        analyze: bool,
+    ) -> float:
+        """Apply a benchmark-scoped set of SQLite helper indexes."""
+        existing_tables = set(self._get_existing_tables(connection))
+        if not required_tables.issubset(existing_tables):
+            missing = ", ".join(sorted(required_tables - existing_tables))
+            self.log_very_verbose(f"Skipping SQLite {benchmark_name} helper indexes; missing tables: {missing}")
+            return 0.0
+
+        start_time = mono_time()
+        created = 0
+        for statement in statements:
+            try:
+                connection.execute(statement)
+                created += 1
+            except Exception as exc:
+                self.logger.warning("SQLite helper index creation failed: %s", exc)
+
+        if created and analyze:
+            try:
+                connection.execute("ANALYZE")
+            except Exception as exc:
+                self.logger.warning("SQLite ANALYZE after helper indexes failed: %s", exc)
+
+        if created:
+            connection.commit()
+            self.log_verbose(f"Applied {created} SQLite {benchmark_name} helper index(es)")
+
+        return elapsed_seconds(start_time)
 
     def _build_ctas_sort_sql(self, table_name: str, sort_columns: list[TuningColumn]) -> str | None:
         """SQLite does not support efficient post-load CTAS sorting in this workflow."""
@@ -419,3 +557,21 @@ class SQLiteAdapter(PlatformAdapter):
     def run_maintenance_test(self, benchmark, **kwargs) -> dict[str, Any]:
         """Run TPC maintenance test (not implemented for SQLite)."""
         raise NotImplementedError("Maintenance test not implemented for SQLite adapter")
+
+
+def _is_tpch_benchmark(benchmark: Any) -> bool:
+    benchmark_id = str(getattr(benchmark, "benchmark_id", "") or getattr(benchmark, "id", "")).lower()
+    if benchmark_id in {"tpch", "tpc-h"}:
+        return True
+    class_name = benchmark.__class__.__name__.lower()
+    display_name = str(getattr(benchmark, "_name", "") or getattr(benchmark, "name", "")).lower()
+    return "tpch" in class_name or "tpc-h" in display_name
+
+
+def _is_joinorder_benchmark(benchmark: Any) -> bool:
+    benchmark_id = str(getattr(benchmark, "benchmark_id", "") or getattr(benchmark, "id", "")).lower()
+    if benchmark_id in {"joinorder", "join-order"}:
+        return True
+    class_name = benchmark.__class__.__name__.lower()
+    display_name = str(getattr(benchmark, "_name", "") or getattr(benchmark, "name", "")).lower()
+    return "joinorder" in class_name or "join order" in display_name

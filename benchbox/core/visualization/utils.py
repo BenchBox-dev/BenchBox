@@ -89,3 +89,10 @@ def extract_chart_subtitle(results: list[Any]) -> str | None:
         platform_version=platform_version,
         tuning=tuning,
     )
+
+
+def is_power_run_result(result: Any) -> bool:
+    """Return whether a normalized result came from a power-run benchmark file."""
+    raw = getattr(result, "raw", {}) or {}
+    benchmark = raw.get("benchmark") or {}
+    return isinstance(benchmark, dict) and benchmark.get("test_type") == "power"

@@ -2,7 +2,7 @@ import logging
 
 import pytest
 
-from benchbox.core.joinorder.benchmark import JoinOrderBenchmark
+from benchbox.core.joinorder_synthetic.benchmark import JoinOrderSyntheticBenchmark
 
 pytestmark = [
     pytest.mark.unit,
@@ -12,7 +12,7 @@ pytestmark = [
 
 def test_core_verbose_logs_info(caplog):
     caplog.set_level(logging.INFO, logger="benchbox.core.joinorderbenchmark")
-    b = JoinOrderBenchmark(scale_factor=0.01, output_dir="/tmp/joinorder", verbose=1)
+    b = JoinOrderSyntheticBenchmark(scale_factor=0.01, output_dir="/tmp/joinorder_synthetic", verbose=1)
     with caplog.at_level(logging.INFO, logger=b.logger.name):
         # Run a method that logs
         b.generate_data = list  # avoid heavy work; still want logs
@@ -23,7 +23,7 @@ def test_core_verbose_logs_info(caplog):
 
 def test_core_very_verbose_logs_debug(caplog):
     caplog.set_level(logging.DEBUG, logger="benchbox.core.joinorderbenchmark")
-    b = JoinOrderBenchmark(scale_factor=0.01, output_dir="/tmp/joinorder", verbose=2)
+    b = JoinOrderSyntheticBenchmark(scale_factor=0.01, output_dir="/tmp/joinorder_synthetic", verbose=2)
     with caplog.at_level(logging.DEBUG, logger=b.logger.name):
         b.generate_data = list
         b.generate_data()

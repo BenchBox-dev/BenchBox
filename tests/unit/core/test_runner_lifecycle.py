@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 
 from benchbox.base import BaseBenchmark
+from benchbox.core.errors import ScaleFactorNotSupportedError
 from benchbox.core.nyctaxi.benchmark import NYCTaxiBenchmark
 from benchbox.core.results.models import BenchmarkResults
 from benchbox.core.runner import LifecyclePhases, ValidationOptions, run_benchmark_lifecycle
@@ -40,6 +41,27 @@ def _mk_system_profile():
         timestamp=datetime.now(),
         hostname="host",
     )
+
+
+@pytest.mark.unit
+def test_lifecycle_rejects_unsupported_scale_before_using_supplied_instance():
+    cfg = BenchmarkConfig(
+        name="joinorder",
+        display_name="JoinOrder",
+        scale_factor=0.5,
+        test_execution_type="data_only",
+    )
+    bench = MagicMock()
+
+    with pytest.raises(ScaleFactorNotSupportedError, match=r"joinorder accepts scale_factor in \[1\.0\]"):
+        run_benchmark_lifecycle(
+            benchmark_config=cfg,
+            database_config=None,
+            system_profile=_mk_system_profile(),
+            benchmark_instance=bench,
+        )
+
+    bench.generate_data.assert_not_called()
 
 
 @pytest.mark.unit
@@ -836,7 +858,7 @@ def test_run_benchmark_lifecycle_propagates_capture_plans(tmp_path):
 def test_manifest_reuse_accepts_data_source_alias(tmp_path):
     """Manifest reuse should work when benchmark declares a data-source alias."""
 
-    data_dir = tmp_path / "tpch_sf1"
+    data_dir = tmp_path / "tpch_sf0_1"
     data_dir.mkdir()
     customer_path = data_dir / "customer.tbl"
     contents = "1|cust\n"
@@ -844,7 +866,7 @@ def test_manifest_reuse_accepts_data_source_alias(tmp_path):
 
     manifest = {
         "benchmark": "tpch",
-        "scale_factor": 1.0,
+        "scale_factor": 0.1,
         "tables": {
             "customer": {
                 "formats": {
@@ -863,7 +885,7 @@ def test_manifest_reuse_accepts_data_source_alias(tmp_path):
 
     class AliasBenchmark(BaseBenchmark):
         def __init__(self, output_dir: Path):
-            super().__init__(scale_factor=1.0, output_dir=output_dir)
+            super().__init__(scale_factor=0.1, output_dir=output_dir)
             self.tables = {}
 
         def get_data_source_benchmark(self) -> str:
@@ -884,7 +906,7 @@ def test_manifest_reuse_accepts_data_source_alias(tmp_path):
     cfg = BenchmarkConfig(
         name="read_primitives",
         display_name="Primitives",
-        scale_factor=1.0,
+        scale_factor=0.1,
         compress_data=False,
         options={"force_regenerate": False, "no_regenerate": False},
     )
@@ -907,13 +929,13 @@ def test_manifest_reuse_accepts_data_source_alias(tmp_path):
 def test_no_regenerate_respects_alias_manifest(tmp_path):
     """no_regenerate should pass when shared manifest is valid."""
 
-    data_dir = tmp_path / "tpch_sf1"
+    data_dir = tmp_path / "tpch_sf0_1"
     data_dir.mkdir()
     orders_path = data_dir / "orders.tbl"
     orders_path.write_text("1|order\n")
     manifest = {
         "benchmark": "tpch",
-        "scale_factor": 1.0,
+        "scale_factor": 0.1,
         "tables": {
             "orders": {
                 "formats": {
@@ -932,7 +954,7 @@ def test_no_regenerate_respects_alias_manifest(tmp_path):
 
     class AliasBenchmark(BaseBenchmark):
         def __init__(self, output_dir: Path):
-            super().__init__(scale_factor=1.0, output_dir=output_dir)
+            super().__init__(scale_factor=0.1, output_dir=output_dir)
             self.tables = {}
 
         def get_data_source_benchmark(self) -> str:
@@ -953,7 +975,7 @@ def test_no_regenerate_respects_alias_manifest(tmp_path):
     cfg = BenchmarkConfig(
         name="read_primitives",
         display_name="Primitives",
-        scale_factor=1.0,
+        scale_factor=0.1,
         compress_data=False,
         options={"force_regenerate": False, "no_regenerate": True},
     )

@@ -16,6 +16,43 @@ from benchbox.utils.clock import elapsed_seconds, mono_time
 if TYPE_CHECKING:
     from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 
+_SPARK_FAMILY_DIALECTS = {"spark", "lakesail", "pyspark", "velox", "databricks"}
+
+SPARK_TM1_SQL = """\
+SELECT
+    CASE
+        WHEN HOUR(TO_TIMESTAMP(CONCAT('1970-01-01 ', ol.order_time))) BETWEEN 5 AND 10 THEN 'Morning'
+        WHEN HOUR(TO_TIMESTAMP(CONCAT('1970-01-01 ', ol.order_time))) BETWEEN 11 AND 14 THEN 'Midday'
+        WHEN HOUR(TO_TIMESTAMP(CONCAT('1970-01-01 ', ol.order_time))) BETWEEN 15 AND 17 THEN 'Afternoon'
+        ELSE 'Evening'
+    END AS day_part,
+    COUNT(DISTINCT ol.order_id) AS orders,
+    SUM(ol.total_price) AS revenue,
+    AVG(ol.total_price) AS avg_line_value
+FROM order_lines ol
+JOIN dim_locations dl ON ol.location_record_id = dl.record_id
+WHERE dl.region = '{region}'
+  AND ol.order_date BETWEEN DATE '{start_date}' AND DATE '{end_date}'
+GROUP BY day_part
+ORDER BY day_part;"""
+
+SPARK_SA4_SQL = """\
+SELECT
+    dl.region,
+    COUNT(DISTINCT ol.order_id) AS orders,
+    SUM(ol.total_price) AS revenue,
+    CAST(SUM(ol.total_price) AS DOUBLE) / NULLIF(CAST(totals.grand_total AS DOUBLE), 0D) AS revenue_share
+FROM order_lines ol
+JOIN dim_locations dl ON ol.location_record_id = dl.record_id
+CROSS JOIN (
+    SELECT SUM(total_price) AS grand_total
+    FROM order_lines
+    WHERE order_date BETWEEN DATE '{start_date}' AND DATE '{end_date}'
+) totals
+WHERE ol.order_date BETWEEN DATE '{start_date}' AND DATE '{end_date}'
+GROUP BY dl.region, totals.grand_total
+ORDER BY revenue DESC;"""
+
 
 class CoffeeShopBenchmark(TranslatableQueryMixin, BaseBenchmark):
     """Expose data generation and query execution for the CoffeeShop benchmark."""
@@ -89,6 +126,13 @@ class CoffeeShopBenchmark(TranslatableQueryMixin, BaseBenchmark):
         translated: dict[str, str] = {}
         for query_id, sql in queries.items():
             translated[query_id] = self.translate_query_text(sql, dialect)
+
+        if dialect.lower() in _SPARK_FAMILY_DIALECTS and "TM1" in translated:
+            params = dict(self.query_manager._queries["TM1"].get("defaults", {}))
+            translated["TM1"] = SPARK_TM1_SQL.format(**params)
+        if dialect.lower() in _SPARK_FAMILY_DIALECTS and "SA4" in translated:
+            params = dict(self.query_manager._queries["SA4"].get("defaults", {}))
+            translated["SA4"] = SPARK_SA4_SQL.format(**params)
 
         if "clickhouse" not in dialect.lower():
             return translated

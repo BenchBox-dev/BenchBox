@@ -22,6 +22,7 @@ from mcp.types import ToolAnnotations
 from benchbox.core.benchmark_registry import (
     get_all_benchmarks,
     get_benchmark_class,
+    get_benchmark_default_scale,
 )
 from benchbox.core.results.exporter import ResultExporter
 from benchbox.core.results.schema import build_result_payload
@@ -152,8 +153,8 @@ def register_benchmark_tools(mcp: FastMCP, *, results_dir: Path) -> None:
 
         Args:
             platform: Target platform (duckdb, polars-df, snowflake, etc.)
-            benchmark: Benchmark to run (tpch, tpcds, tpcds_obt, ssb, clickbench, nyctaxi, tsbs_devops, h2odb, amplab, coffeeshop, tpch_skew, datavault, tpcdi, write_primitives, read_primitives, and more)
-            scale_factor: Data scale factor (0.01 for testing, 1+ for production)
+            benchmark: Benchmark to run (tpch, tpcds, tpcds_obt, ssb, joinorder, clickbench, nyctaxi, tsbs_devops, h2odb, amplab, coffeeshop, tpch_skew, datavault, tpcdi, write_primitives, read_primitives, and more)
+            scale_factor: Data scale factor (0.01 for testing, 1+ for production; joinorder uses canonical IMDb 2013 data and only accepts 1.0)
             queries: Comma-separated query IDs to run (e.g., "1,3,6")
             phases: Comma-separated phases (default: "load,power")
             mode: Execution mode: 'sql', 'dataframe', or 'data_only'
@@ -171,6 +172,10 @@ def register_benchmark_tools(mcp: FastMCP, *, results_dir: Path) -> None:
                 installed ("true"/"false"). Available for all platforms.
             engine_version: Select the Spark engine version for Athena Spark
                 (e.g. "PySpark engine version 3"). Athena Spark only; auto-probed on other platforms.
+
+        JoinOrder note:
+            The public joinorder benchmark downloads and verifies the canonical IMDb 2013
+            Parquet archive on first use, then reuses BENCHBOX_OUTPUT_DIR/benchmark_runs/datagen/joinorder_sf1/.
         """
         # Handle validate_only mode
         if validate_only:
@@ -791,7 +796,7 @@ def _populate_sql_query_details(
         response["error"] = f"Benchmark '{benchmark}' requires additional dependencies"
         return
 
-    bm = benchmark_class(scale_factor=0.01)
+    bm = benchmark_class(scale_factor=get_benchmark_default_scale(benchmark))
 
     dialect = None
     if platform is not None:

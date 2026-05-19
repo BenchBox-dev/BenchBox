@@ -32,11 +32,20 @@ from benchbox.cli.platform import (
     platform_status,
     setup_platforms,
 )
+from benchbox.cli.platform_readiness import PlatformReadinessResult
+from benchbox.core.platform_registry import PlatformRegistry
 
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
+
+
+def reset_platform_registry_test_state() -> None:
+    """Reset lazy adapter registration after importlib-mocking tests."""
+    PlatformRegistry._adapters = {}
+    PlatformRegistry._auto_registered = False
+    PlatformRegistry.clear_cache()
 
 
 # Skip marker for tests that use mock.patch on CLI module attributes (Python 3.10 incompatible)
@@ -116,6 +125,17 @@ class TestPlatformNameNormalization:
         assert normalize_platform_name("azure-synapse") == "synapse"
         assert normalize_platform_name("azuresynapse") == "synapse"
 
+    def test_normalize_dataframe_platform_aliases(self):
+        """Test DataFrame platform CLI aliases."""
+        assert normalize_platform_name("polars-df") == "polars"
+        assert normalize_platform_name("pandas-df") == "pandas"
+        assert normalize_platform_name("pyspark-df") == "pyspark"
+        assert normalize_platform_name("datafusion-df") == "datafusion"
+        assert normalize_platform_name("dask-df") == "dask"
+        assert normalize_platform_name("modin-df") == "modin"
+        assert normalize_platform_name("cudf-df") == "cudf"
+        assert normalize_platform_name("lakesail-df") == "lakesail"
+
     def test_normalize_canonical_names_unchanged(self):
         """Test that canonical names are not changed."""
         assert normalize_platform_name("duckdb") == "duckdb"
@@ -168,6 +188,7 @@ class TestPlatformManager:
 
     def setup_method(self):
         """Set up test environment."""
+        reset_platform_registry_test_state()
         self.temp_dir = Path(tempfile.mkdtemp())
         self.config_path = self.temp_dir / "test_platforms.yaml"
         self.manager = PlatformManager(config_path=self.config_path)
@@ -175,6 +196,7 @@ class TestPlatformManager:
     def teardown_method(self):
         """Clean up test environment."""
         shutil.rmtree(self.temp_dir)
+        reset_platform_registry_test_state()
 
     def test_platform_registry_exists(self):
         """Test that platform registry is properly initialized."""
@@ -713,6 +735,45 @@ class TestCLICommands:
         assert "DuckDB" in result.output
         assert "High-performance database" in result.output
 
+    @patch("benchbox.cli.platform.check_platform_readiness")
+    @patch("benchbox.cli.platform.get_platform_manager")
+    def test_platform_status_specific_includes_readiness_details(self, mock_get_manager, mock_check_readiness):
+        """Specific platform status should include side-effect-free readiness diagnostics."""
+        mock_manager = Mock()
+        mock_lib = LibraryInfo(name="pyspark", version="4.1.1", installed=True)
+        mock_manager.detect_platforms.return_value = {
+            "lakesail": PlatformInfo(
+                name="lakesail",
+                display_name="LakeSail Sail",
+                description="Spark Connect",
+                libraries=[mock_lib],
+                available=True,
+                enabled=True,
+                requirements=["pyspark>=3.4.0"],
+                installation_command="uv add pyspark",
+                category="analytical",
+            )
+        }
+        mock_get_manager.return_value = mock_manager
+        mock_check_readiness.return_value = (
+            PlatformReadinessResult(
+                platform="lakesail-df",
+                check="spark_connect_endpoint",
+                status="environment_skip",
+                summary="LakeSail endpoint is not reachable.",
+                remediation="Start a Sail server.",
+            ),
+        )
+
+        result = self.runner.invoke(platform_status, ["lakesail-df"])
+
+        assert result.exit_code == 0
+        assert "LakeSail Sail" in result.output
+        assert "Environment skip" in result.output
+        assert "LakeSail endpoint is not reachable." in result.output
+        assert "Start a Sail server." in result.output
+        mock_check_readiness.assert_called_once_with("lakesail-df")
+
     @patch("benchbox.cli.platform.get_platform_manager")
     def test_platform_status_missing_dependencies_shows_installation_details(self, mock_get_manager):
         """Missing platform details should include import errors and install guidance."""
@@ -1048,6 +1109,87 @@ class TestCLICommands:
         assert "DuckDB: Ready" in result.output
         assert "Missing Platform: Missing dependencies" in result.output
         assert "Some platforms need attention" in result.output
+
+    @patch("benchbox.cli.platform.check_platform_readiness")
+    @patch("benchbox.cli.platform.get_platform_manager")
+    def test_check_platforms_environment_skip_from_readiness(self, mock_get_manager, mock_check_readiness):
+        """Readiness gaps should be rendered as environment issues and exit non-zero."""
+        mock_manager = Mock()
+        mock_manager.detect_platforms.return_value = {
+            "lakesail": PlatformInfo(
+                name="lakesail",
+                display_name="LakeSail Sail",
+                description="Spark Connect",
+                libraries=[],
+                available=True,
+                enabled=True,
+                requirements=[],
+                installation_command="uv add pyspark",
+                category="analytical",
+            )
+        }
+        mock_get_manager.return_value = mock_manager
+        mock_check_readiness.return_value = (
+            PlatformReadinessResult(
+                platform="lakesail-df",
+                check="spark_connect_endpoint",
+                status="environment_skip",
+                summary="LakeSail endpoint is not reachable.",
+                detail="Benchmark should be skipped until provisioning is complete.",
+                remediation="Start a Sail server.",
+            ),
+        )
+
+        result = self.runner.invoke(check_platforms, ["lakesail-df"])
+
+        assert result.exit_code == 1
+        assert "LakeSail Sail: Environment not ready" in result.output
+        assert "environment skip" in result.output
+        assert "Benchmark should be skipped" in result.output
+        assert "Some platforms need attention" in result.output
+        mock_check_readiness.assert_called_once_with("lakesail-df")
+
+    @patch("benchbox.cli.platform.check_platform_readiness")
+    @patch("benchbox.cli.platform.get_platform_manager")
+    def test_check_platforms_disabled_with_readiness_failure_does_not_fail_command(
+        self, mock_get_manager, mock_check_readiness
+    ):
+        """w12 regression: an available-but-disabled platform whose readiness
+        probe fails must be reported as informational ("Available but disabled")
+        and must NOT cause ``benchbox platforms check`` to exit non-zero. The
+        user has opted out of running this platform; environment gaps don't
+        apply."""
+        mock_manager = Mock()
+        mock_manager.detect_platforms.return_value = {
+            "lakesail": PlatformInfo(
+                name="lakesail",
+                display_name="LakeSail Sail",
+                description="Spark Connect",
+                libraries=[],
+                available=True,
+                enabled=False,
+                requirements=[],
+                installation_command="uv add pyspark",
+                category="analytical",
+            )
+        }
+        mock_get_manager.return_value = mock_manager
+        mock_check_readiness.return_value = (
+            PlatformReadinessResult(
+                platform="lakesail",
+                check="spark_connect_endpoint",
+                status="environment_skip",
+                summary="LakeSail endpoint is not reachable.",
+                detail="Benchmark should be skipped until provisioning is complete.",
+                remediation="Start a Sail server.",
+            ),
+        )
+
+        result = self.runner.invoke(check_platforms, ["lakesail"])
+
+        assert result.exit_code == 0, result.output
+        assert "Available but disabled" in result.output
+        assert "Environment not ready" not in result.output
 
     @patch("benchbox.cli.platform.get_platform_manager")
     def test_check_platforms_enabled_only_with_none_enabled(self, mock_get_manager):

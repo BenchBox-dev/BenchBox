@@ -45,8 +45,9 @@ extract). Together:
    import sites but is required by another live dep is annotated
    `transitive-via-X` rather than flagged unused.
 5. **Plugin-style deps verified.** `pytest-*`, `ruff`, `ty`, `tox`, `mutmut`,
-   `codespell`, `sphinx-*`, `furo`, `pygments`, `roman-numerals`, `myst-parser`
-   are CLI tools or build-time plugins. They are correctly absent from
+   `codespell`, `pre-commit`, `sphinx-*`, `furo`, `pygments`,
+   `roman-numerals`, `myst-parser` are CLI tools or build-time plugins.
+   They are correctly absent from
    `import` lines and were verified live by checking the relevant config
    surface (`pytest.ini`, `tox.ini`, `docs/conf.py`).
 6. **Ongoing check.** `make audit-deps` runs
@@ -181,6 +182,7 @@ or declaration appears unused.
 | `tox` | DEV | (CLI tool) | 0 | KEEP - `tox.ini` is present and used |
 | `mutmut` | DEV | (CLI tool) | 0 | KEEP - `[tool.mutmut]` config block targets specific files |
 | `codespell` | DEV | (CLI tool) | 0 | KEEP - invoked via `pre-commit` and CI |
+| `pre-commit` | DEV | (CLI tool) | 0 | KEEP - invoked by local hooks and content-guard CI |
 | `lxml` | DEV | `tests/unit/core/tpcdi/test_etl_sources.py` | 1 | **FLAG-UNUSED-RUNTIME** - only test imports; verify whether `benchbox/core/tpcdi/etl/sources.py` actually requires lxml at runtime (it parses XML). If yes, promote to runtime extra; if no, keep dev-only. See finding F3. |
 | `clickhouse-connect` | DEV | (also in dev for tests) | covered above | KEEP |
 | `cloudpathlib[s3,gs,azure]` | DEV | tests use `cloudpathlib` core | covered above | KEEP - extras pin S3/GCS/Azure providers for live tests |

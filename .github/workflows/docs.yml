@@ -8,6 +8,8 @@ on:
       - "docs/**"
       - "examples/**"
       - "landing/**"
+      - "_project/scripts/explorer_pipeline/**"
+      - "_project/scripts/explorer_publish.py"
       - "results-data/**"
       - "results-explorer/**"
       - "scripts/**"
@@ -16,12 +18,14 @@ on:
       - "README.md"
       - "pyproject.toml"
   pull_request:
-    branches: [main]
+    branches: [main, develop]
     paths:
       - "benchbox/**"
       - "docs/**"
       - "examples/**"
       - "landing/**"
+      - "_project/scripts/explorer_pipeline/**"
+      - "_project/scripts/explorer_publish.py"
       - "results-data/**"
       - "results-explorer/**"
       - "scripts/**"
@@ -40,9 +44,6 @@ jobs:
   # Build HTML documentation with warnings as errors
   build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - uses: actions/checkout@v4
@@ -103,9 +104,8 @@ jobs:
 
       - name: Build explorer data (static pipeline)
         if: hashFiles('results-explorer/package.json') != ''
-        run: uv run benchbox explorer build --data-dir results-data/ --output results-explorer/public/data/
+        run: uv run -- python _project/scripts/explorer_publish.py build --data-dir results-data/ --output results-explorer/public/data/
         # Note: results-data/bundles/ may be empty on first deploy; pipeline handles empty gracefully
-        # Note: requires `benchbox explorer` CLI subcommand (added in PR #46)
 
       - name: Build results-explorer
         if: hashFiles('results-explorer/package.json') != ''
@@ -181,9 +181,19 @@ jobs:
         with:
           path: site
 
+  # Deploy to GitHub Pages (main pushes only)
+  # Isolated as its own job so the github-pages environment protection
+  # rules don't gate the build job on PRs.
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/deploy-pages@v4
 
   # Validate example files and documentation references
@@ -213,6 +223,13 @@ jobs:
 
       - name: Validate visualization screenshot sync
         run: uv run python scripts/validate_visualization_images.py
+
+      - name: Check /prompts/ catalog is fresh
+        # Fails if landing/prompts/catalog.generated.js is stale or invalid.
+        # Must use the main project env (not --project _project/scripts) so
+        # benchbox is importable; see landing-prompts-catalog-generator
+        # decision and anti_patterns.
+        run: uv run -- python scripts/generate_landing_quickstarts.py --check
 
       - name: Check for unsafe patch() string paths in tests
         run: uv run python scripts/check_patch_safety.py

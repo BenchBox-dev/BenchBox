@@ -2,9 +2,15 @@ name: Lint
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   pull_request:
-    branches: [main]
+    branches:
+      - main
+
+concurrency:
+  group: lint-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lint:
@@ -36,5 +42,29 @@ jobs:
       - name: Validate test marker annotations
         run: make lint-markers
 
+      - name: Timing policy (wall-clock allowlist)
+        run: |
+          if [ -d _project ]; then
+            uv run -- python _project/scripts/timing_policy_check.py --strict
+          else
+            echo "_project/ is absent on curated release branches; skipping timing policy check."
+          fi
+
       - name: Compatibility docs drift check
         run: make compat-docs-check
+
+      - name: Dependency audit (no unused declarations)
+        run: |
+          if [ -d _project ]; then
+            make audit-deps
+          else
+            echo "_project/ is absent on curated release branches; skipping dependency audit."
+          fi
+
+      - name: Release curation list drift check
+        run: |
+          if [ -d _project ]; then
+            uv run python scripts/check_release_curation.py
+          else
+            echo "_project/ is absent on curated release branches; skipping curation drift check."
+          fi

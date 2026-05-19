@@ -365,10 +365,23 @@ class TPCDSOBTBenchmark(BaseBenchmark):
     def translate_query_text(self, query_text: str, target_dialect: str) -> str:
         """Apply dialect-specific rewrites to a single OBT query.
 
-        Currently handles Doris/MySQL which requires every FROM (...)
-        derived table to carry an explicit alias.
+        OBT query conversion emits DuckDB SQL.  Route non-DuckDB targets through
+        the shared translation pipeline so Spark-family engines receive their
+        native identifier quoting (for example aliases with spaces use
+        backticks instead of DuckDB double quotes).
         """
-        if target_dialect.lower() in {"doris", "starrocks"}:
+        target = target_dialect.lower()
+        if target not in {"duckdb", "standard", "ansi"}:
+            from benchbox.utils.dialect_utils import translate_sql_query
+
+            query_text = translate_sql_query(
+                query_text,
+                target_dialect=target,
+                source_dialect="duckdb",
+                identify=True,
+            )
+
+        if target in {"doris", "starrocks"}:
             query_text = _add_derived_table_aliases(query_text)
         return query_text
 

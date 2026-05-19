@@ -1,0 +1,196 @@
+"""Fast tests for UAT preflight local-platform provisioning checks."""
+
+from __future__ import annotations
+
+import importlib.util
+import subprocess
+from pathlib import Path
+
+import pytest
+
+from tests.uat import config, matrix, preflight_budget
+from tests.uat.phases import preflight
+
+pytestmark = pytest.mark.fast
+
+
+def test_local_platforms_check_attempts_automated_platform_then_succeeds(tmp_path: Path, monkeypatch):
+    calls: list[str] = []
+    reachable_calls = 0
+
+    def fake_reachable(platform: str) -> bool:
+        nonlocal reachable_calls
+        assert platform == "postgresql"
+        reachable_calls += 1
+        return reachable_calls > 1
+
+    def fake_bring_up(platform: str) -> int:
+        calls.append(platform)
+        return 0
+
+    monkeypatch.setattr(preflight, "free_space_gib", lambda path: 100.0)
+    monkeypatch.setattr(preflight, "docker_reachable", lambda: True)
+    monkeypatch.setattr(preflight, "host_load_1m", lambda: 0.5)
+
+    result = preflight.run_preflight(
+        free_space_path=tmp_path,
+        local_platforms_check=True,
+        requested_platforms=("postgresql",),
+        bring_up_runner=fake_bring_up,
+        reachability_checker=fake_reachable,
+    )
+
+    assert result.aborted is False
+    assert calls == ["postgresql"]
+    assert result.local_platforms_checked == ("postgresql",)
+    assert result.local_platforms_attempted == ("postgresql",)
+    assert any("recovered" in warning for warning in result.warnings)
+
+
+def test_local_platforms_check_aborts_non_automated_platform(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(preflight, "free_space_gib", lambda path: 100.0)
+    monkeypatch.setattr(preflight, "docker_reachable", lambda: True)
+    monkeypatch.setattr(preflight, "host_load_1m", lambda: 0.5)
+
+    result = preflight.run_preflight(
+        free_space_path=tmp_path,
+        local_platforms_check=True,
+        requested_platforms=("spark",),
+        reachability_checker=lambda platform: False,
+    )
+
+    assert result.aborted is True
+    assert "spark" in (result.abort_reason or "")
+    assert "no automated UAT bring-up" in (result.abort_reason or "")
+
+
+def test_local_platforms_check_default_checker_probes_lakesail(tmp_path: Path, monkeypatch):
+    probe_calls: list[tuple[str, int]] = []
+
+    def fake_tcp_probe(host: str, port: int, timeout_s: float = 2.0) -> bool:
+        probe_calls.append((host, port))
+        return False
+
+    matrix.reset_reachability_cache()
+    monkeypatch.setattr(preflight, "free_space_gib", lambda path: 100.0)
+    monkeypatch.setattr(preflight, "docker_reachable", lambda: True)
+    monkeypatch.setattr(preflight, "host_load_1m", lambda: 0.5)
+    monkeypatch.setattr(matrix, "tcp_probe", fake_tcp_probe)
+
+    result = preflight.run_preflight(
+        free_space_path=tmp_path,
+        local_platforms_check=True,
+        requested_platforms=("lakesail",),
+        bring_up_runner=lambda platform: 0,
+    )
+
+    assert result.aborted is True
+    assert probe_calls == [("localhost", 50051), ("localhost", 50051)]
+    assert result.local_platforms_checked == ("lakesail",)
+    assert result.local_platforms_attempted == ("lakesail",)
+    assert "lakesail" in (result.abort_reason or "")
+    assert "remains unreachable" in (result.abort_reason or "")
+
+
+def test_preflight_config_accepts_local_platforms_check():
+    cfg = config.validate_config({"name": "smoke", "preflight": {"local_platforms_check": True}})
+    assert cfg.preflight.local_platforms_check is True
+
+
+def test_preflight_disk_budget_table_error_is_advisory(tmp_path: Path, monkeypatch):
+    table = tmp_path / "disk_budget.tsv"
+    table.write_text(
+        "platform\tbenchmark\tpeak_datagen_gib\tpeak_database_gib\ttransient_growth_gib\nduckdb\ttpch\t1.0\t2.0\t0.5\n",
+        encoding="utf-8",
+    )
+    cfg = config.validate_config(
+        {
+            "name": "budget-smoke",
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+        }
+    )
+
+    monkeypatch.setattr(preflight, "free_space_gib", lambda path: 100.0)
+    monkeypatch.setattr(preflight, "docker_reachable", lambda: True)
+    monkeypatch.setattr(preflight, "host_load_1m", lambda: 0.5)
+    monkeypatch.setattr(preflight_budget, "DEFAULT_TABLE_PATH", table)
+
+    result = preflight.run_preflight(free_space_path=tmp_path, disk_budget_config=cfg)
+
+    assert result.aborted is False
+    assert result.abort_reason is None
+    assert result.disk_budget_summary is None
+    assert len(result.warnings) == 1
+    assert result.warnings[0].startswith("disk budget estimate unavailable: ValueError: disk budget table ")
+    assert "missing columns" in result.warnings[0]
+    assert "scale_factor" in result.warnings[0]
+
+
+def test_requested_platforms_from_raw_matches_uat_defaults():
+    assert preflight.requested_platforms_from_raw({"platforms": {"include": ["postgresql"]}}) == ("postgresql",)
+    assert "duckdb" in preflight.requested_platforms_from_raw({})
+
+
+def test_uat_bring_up_unknown_platform_returns_clear_error(capsys):
+    module = _load_bring_up_module()
+    rc = module.main(["--platform", "does-not-exist"])
+    captured = capsys.readouterr()
+    assert rc == 2
+    assert "unknown platform" in captured.err
+
+
+def test_make_platform_filter_does_not_trip_bring_up_validation():
+    completed = subprocess.run(
+        ["make", "-n", "uat-stress", "PLATFORM=duckdb", "CONFIG=tests/uat/configs/stress-default.yaml"],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0
+    assert "unknown platform" not in completed.stderr
+
+
+@pytest.mark.parametrize("platform", ["lakesail", "velox"])
+def test_uat_bring_up_path_mirrored_platforms_pass_benchmark_runs_dir_env(
+    platform: str,
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+):
+    module = _load_bring_up_module()
+    captured: dict[str, dict[str, str]] = {}
+
+    def fake_run_docker_command(argv, **kwargs):
+        captured["env"] = kwargs.get("env") or {}
+        return module.docker_assets.DockerCommandResult(
+            argv=tuple(argv), returncode=0, stdout="", stderr="", dry_run=True
+        )
+
+    monkeypatch.setattr(module.docker_assets, "run_docker_command", fake_run_docker_command)
+
+    rc = module.main(["--platform", platform, "--benchmark-runs-dir", str(tmp_path), "--dry-run"])
+
+    assert rc == 0
+    assert captured["env"] == {"BENCHBOX_DATA_DIR": str(tmp_path)}
+    assert "UAT bring-up OK" in capsys.readouterr().out
+
+
+def test_preflight_automated_set_matches_script_automated_set():
+    """Preflight and the bring-up script must agree on which platforms are automated."""
+    bring_up = _load_bring_up_module()
+
+    assert bring_up.automated_platforms() == preflight.automated_local_platforms()
+    assert bring_up.automated_platforms() == preflight.AUTOMATED_LOCAL_PLATFORMS
+
+
+def _load_bring_up_module():
+    path = Path("scripts/uat-bring-up/uat_bring_up.py").resolve()
+    spec = importlib.util.spec_from_file_location("uat_bring_up", path)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module

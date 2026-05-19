@@ -60,6 +60,15 @@ class WriteOperationType(Enum):
     # Transaction operations (ACID platforms only)
     TRANSACTION = "transaction"
 
+    # Aggregate-state operations (engines with DataFrame-layer sketch APIs).
+    # Modeled as two distinct ops because the persist and merge phases
+    # produce separate user-facing measurements (write latency + persisted
+    # state size vs. merge+extract latency). The persist phase builds
+    # per-group aggregate state and writes it durably; the merge phase
+    # reads that state, folds it across rows, and extracts a scalar.
+    AGGREGATE_PERSIST = "aggregate_persist"
+    AGGREGATE_MERGE = "aggregate_merge"
+
 
 @dataclass
 class DataFrameWriteCapabilities:
@@ -86,6 +95,11 @@ class DataFrameWriteCapabilities:
     supported_compressions: list[str] = field(default_factory=lambda: ["zstd", "snappy", "gzip", "lz4"])
     supports_partitioning: bool = False  # PySpark, Polars have partitioning
     supports_sorting: bool = True  # Most platforms can sort before write
+    # DataFrame-layer aggregate-state ops require engine-native sketch APIs
+    # (e.g. PySpark `hll_sketch_agg`/`hll_union_agg`). Default False; engines
+    # that wire concrete sketch surfaces flip these on.
+    supports_aggregate_persist: bool = False
+    supports_aggregate_merge: bool = False
     notes: str = ""
 
     def supports_operation(self, operation: WriteOperationType) -> bool:
@@ -102,6 +116,13 @@ class DataFrameWriteCapabilities:
             return self.supports_bulk_load
         if operation == WriteOperationType.TRANSACTION:
             return self.maintenance_caps.supports_transactions if self.maintenance_caps else False
+
+        # Aggregate-state ops are decided by their own dedicated capability flags
+        # (no fallback to maintenance_caps because they are not row-level mutations).
+        if operation == WriteOperationType.AGGREGATE_PERSIST:
+            return self.supports_aggregate_persist
+        if operation == WriteOperationType.AGGREGATE_MERGE:
+            return self.supports_aggregate_merge
 
         # Row-level operations depend on maintenance capabilities
         if self.maintenance_caps is None:
@@ -156,6 +177,12 @@ PYSPARK_WRITE_CAPABILITIES = DataFrameWriteCapabilities(
     supported_compressions=["zstd", "snappy", "gzip", "lz4"],
     supports_partitioning=True,  # partitionBy
     supports_sorting=True,  # orderBy
+    # PySpark exposes hll_sketch_agg / hll_union_agg / hll_sketch_estimate
+    # at the DataFrame layer (Spark 3.5+). Concrete sketch wiring lives in
+    # the pyspark-dataframe-surface TODO; the capability flag here marks
+    # the engine as eligible for the aggregate-state dispatch path.
+    supports_aggregate_persist=True,
+    supports_aggregate_merge=True,
     notes="Row-level operations require Delta Lake or Iceberg table format.",
 )
 
@@ -372,6 +399,10 @@ class DataFrameWriteOperationsManager:
                 supported_compressions=["zstd", "snappy", "gzip", "lz4"],
                 supports_partitioning=True,
                 supports_sorting=True,
+                # PySpark has DataFrame-layer sketch APIs (hll_sketch_agg etc., Spark 3.5+).
+                # See PYSPARK_WRITE_CAPABILITIES preset for rationale.
+                supports_aggregate_persist=True,
+                supports_aggregate_merge=True,
                 notes="Row-level operations require Delta Lake table format.",
             )
         else:
@@ -425,6 +456,14 @@ class DataFrameWriteOperationsManager:
             return (
                 f"{self.platform_name} does not support explicit transactions.\n"
                 f"Use Delta Lake or Iceberg for ACID transaction support."
+            )
+        if operation in (WriteOperationType.AGGREGATE_PERSIST, WriteOperationType.AGGREGATE_MERGE):
+            return (
+                f"{self.platform_name} does not support DataFrame-layer "
+                f"{operation.value} operations.\n"
+                f"Aggregate-state ops require an engine with sketch APIs at the "
+                f"DataFrame layer (e.g. PySpark `hll_sketch_agg`). "
+                f"Use the SQL surface or skip this op."
             )
         return f"{self.platform_name} does not support {operation.value} operations."
 
@@ -871,6 +910,160 @@ class DataFrameWriteOperationsManager:
 
         return row_count, bytes_written, file_count
 
+    def execute_aggregate_persist(
+        self,
+        target_path: Path | str,
+        state_builder: Any,
+        compression: str | None = "zstd",
+    ) -> DataFrameWriteResult:
+        """Execute AGGREGATE_PERSIST: build per-group aggregate state and persist it.
+
+        Sketch-shaped DataFrame ops express the persist phase as a callable that
+        returns a DataFrame holding the per-group sketch state column(s). The
+        manager handles the durable write to ``target_path`` (Parquet) plus the
+        timing, byte, and file-count bookkeeping. Engine-specific sketch APIs
+        live in the callable; the manager stays agnostic.
+
+        Args:
+            target_path: Directory where the aggregate state is persisted.
+            state_builder: Callable taking no arguments and returning a DataFrame
+                whose columns include the aggregate-state output(s). For PySpark
+                the typical implementation calls ``df.groupBy(...).agg(F.hll_sketch_agg(...))``;
+                for engines without a DataFrame-layer sketch surface this method
+                is unsupported and is rejected upstream by ``supports_operation``.
+            compression: Parquet compression codec (default zstd).
+
+        Returns:
+            DataFrameWriteResult with rows_affected = number of state rows
+            persisted, bytes_written = persisted state size, and file_count.
+        """
+        if not self.supports_operation(WriteOperationType.AGGREGATE_PERSIST):
+            return DataFrameWriteResult.failure(
+                WriteOperationType.AGGREGATE_PERSIST,
+                self.get_unsupported_message(WriteOperationType.AGGREGATE_PERSIST),
+            )
+
+        start_time = time.time()
+        target_path = Path(target_path)
+        # Track whether we created the directory ourselves so a failed persist
+        # doesn't leak an empty directory onto disk for the caller to clean up.
+        target_existed_before = target_path.exists()
+        try:
+            state_df = state_builder()
+            target_path.mkdir(parents=True, exist_ok=True)
+            rows, bytes_written, file_count = self._persist_dataframe_to_parquet(state_df, target_path, compression)
+            end_time = time.time()
+            return DataFrameWriteResult(
+                operation_type=WriteOperationType.AGGREGATE_PERSIST,
+                success=True,
+                start_time=start_time,
+                end_time=end_time,
+                duration_ms=(end_time - start_time) * 1000,
+                rows_affected=rows,
+                bytes_written=bytes_written,
+                compression=compression,
+                file_count=file_count,
+            )
+        except Exception as e:
+            self.logger.error(f"AGGREGATE_PERSIST failed: {e}")
+            if not target_existed_before and target_path.exists():
+                try:
+                    if not any(target_path.iterdir()):
+                        target_path.rmdir()
+                except OSError:
+                    pass
+            return DataFrameWriteResult.failure(
+                WriteOperationType.AGGREGATE_PERSIST,
+                str(e),
+                start_time,
+            )
+
+    def execute_aggregate_merge(
+        self,
+        source_path: Path | str,
+        merge_extract: Any,
+    ) -> DataFrameWriteResult:
+        """Execute AGGREGATE_MERGE: read persisted state, merge across rows, extract scalar.
+
+        The merge phase is the user-facing measurement that pairs with
+        AGGREGATE_PERSIST. The callable receives the path the persist phase wrote
+        to and is responsible for reading the state, folding it via the engine's
+        merge UDF (e.g. ``F.hll_union_agg`` on PySpark), and returning the final
+        scalar (e.g. via ``F.hll_sketch_estimate``). The manager handles the
+        timing and result envelope.
+
+        Args:
+            source_path: Directory the AGGREGATE_PERSIST run wrote to.
+            merge_extract: Callable taking ``Path`` and returning the extracted
+                scalar value. Engine-agnostic at this layer; concrete sketch
+                wiring lives in the callable.
+
+        Returns:
+            DataFrameWriteResult with rows_affected = 1 and the extracted scalar
+            in ``metrics["aggregate_value"]``.
+        """
+        if not self.supports_operation(WriteOperationType.AGGREGATE_MERGE):
+            return DataFrameWriteResult.failure(
+                WriteOperationType.AGGREGATE_MERGE,
+                self.get_unsupported_message(WriteOperationType.AGGREGATE_MERGE),
+            )
+
+        start_time = time.time()
+        source_path = Path(source_path)
+        try:
+            value = merge_extract(source_path)
+            end_time = time.time()
+            return DataFrameWriteResult(
+                operation_type=WriteOperationType.AGGREGATE_MERGE,
+                success=True,
+                start_time=start_time,
+                end_time=end_time,
+                duration_ms=(end_time - start_time) * 1000,
+                rows_affected=1,
+                metrics={"aggregate_value": value},
+            )
+        except Exception as e:
+            self.logger.error(f"AGGREGATE_MERGE failed: {e}")
+            return DataFrameWriteResult.failure(
+                WriteOperationType.AGGREGATE_MERGE,
+                str(e),
+                start_time,
+            )
+
+    def _persist_dataframe_to_parquet(
+        self,
+        state_df: Any,
+        target_path: Path,
+        compression: str | None,
+    ) -> tuple[int, int, int]:
+        """Persist an arbitrary DataFrame to Parquet at ``target_path``.
+
+        Returns (row_count, bytes_written, file_count). Selects the writer based
+        on ``self.platform_name`` so engines expose their native partitioned
+        writers. Aggregate-state engines that introduce richer state shapes can
+        override this method later without touching the dispatch envelope.
+        """
+        if "pyspark" in self.platform_name or "spark" in self.platform_name:
+            row_count = state_df.count()
+            (
+                state_df.write.mode("overwrite")
+                .option("compression", compression or "uncompressed")
+                .parquet(str(target_path))
+            )
+        elif "polars" in self.platform_name:
+            row_count = state_df.height
+            state_df.write_parquet(
+                target_path / "part-00000.parquet",
+                compression=compression or "uncompressed",
+            )
+        else:
+            raise RuntimeError(f"Aggregate-state persistence not implemented for platform '{self.platform_name}'")
+
+        parquet_files = list(target_path.rglob("*.parquet"))
+        file_count = len(parquet_files)
+        bytes_written = sum(f.stat().st_size for f in parquet_files)
+        return row_count, bytes_written, file_count
+
 
 def get_dataframe_write_manager(
     platform_name: str,
@@ -896,12 +1089,193 @@ def get_dataframe_write_manager(
     )
 
 
+# ---------------------------------------------------------------------------
+# PySpark sketch helpers (write-primitives-sketch-pyspark-dataframe-surface)
+# ---------------------------------------------------------------------------
+#
+# Factory functions that produce the `state_builder` and `merge_extract`
+# callables expected by `DataFrameWriteOperationsManager.execute_aggregate_persist`
+# and `execute_aggregate_merge`. The factories let consumers close over the
+# spark session, source data path, group columns, and value column without
+# the manager needing to know about Spark.
+#
+# The CLI integration (`benchbox run --platform pyspark --queries
+# sketch_df_hll_persist_merge`) is intentionally NOT wired here — it requires
+# changes to operations.yaml and benchmark.py that are outside this TODO's
+# scope_limit. See the recorded blind-spot
+# `_project/blind-spots/2026-05-04-011321-pyspark-sketch-todo-scope-vs-verification-mismatch.md`
+# for the follow-up.
+
+
+def pyspark_supports_approx_top_k(spark_session: Any) -> bool:
+    """Return whether the active Spark runtime exposes approx_top_k_accumulate.
+
+    `pyspark.sql.functions.approx_top_k_accumulate` ships with Spark 4.1+.
+    BenchBox's PySpark adapter targets Spark 3.5+, so callers must guard
+    top-K aggregate-state ops on the runtime version. Returns False on
+    older Spark versions or when the function symbol is not available.
+
+    Note: this is a conservative version-then-attribute check. If a
+    distribution backports `approx_top_k_accumulate` to a 3.5.x build,
+    the `< (4, 1)` gate rejects it spuriously — callers in that
+    environment should bypass this guard or file a TODO to add the
+    backport-detection branch.
+
+    Args:
+        spark_session: A SparkSession.
+
+    Returns:
+        True if approx_top_k_accumulate is callable on this Spark runtime.
+    """
+    if spark_session is None:
+        return False
+    try:
+        version = str(spark_session.version)
+    except Exception:
+        return False
+    parts = version.split(".")
+    try:
+        major = int(parts[0])
+        minor = int(parts[1]) if len(parts) > 1 else 0
+    except (ValueError, IndexError):
+        return False
+    if (major, minor) < (4, 1):
+        return False
+    try:
+        from pyspark.sql import functions as F  # noqa: F401, N812
+
+        return hasattr(F, "approx_top_k_accumulate")
+    except ImportError:
+        return False
+
+
+def make_pyspark_hll_persist_builder(
+    spark_session: Any,
+    source_path: Path | str,
+    group_cols: list[str],
+    value_col: str,
+    sketch_alias: str = "sketch",
+) -> Any:
+    """Factory: build the `state_builder` callable for HLL persist on PySpark.
+
+    Reads the source table at `source_path`, groups by `group_cols`, and
+    builds an HLL sketch of `value_col` per group via `F.hll_sketch_agg`
+    (Spark 3.5+). The callable returned has no arguments — the manager
+    invokes it during `execute_aggregate_persist` and writes the resulting
+    DataFrame to Parquet.
+
+    Args:
+        spark_session: A SparkSession.
+        source_path: Parquet directory or table path the source rows live at.
+        group_cols: Group-by column names for per-partition state.
+        value_col: Column whose distinct count the sketch tracks.
+        sketch_alias: Output column name for the HLL state (default "sketch").
+
+    Returns:
+        A zero-arg callable suitable for `manager.execute_aggregate_persist`.
+    """
+    source_str = str(source_path)
+
+    def builder() -> Any:
+        from pyspark.sql import functions as F  # noqa: N812
+
+        return (
+            spark_session.read.parquet(source_str)
+            .groupBy(*group_cols)
+            .agg(F.hll_sketch_agg(value_col).alias(sketch_alias))
+        )
+
+    return builder
+
+
+def make_pyspark_hll_merge_extract(
+    spark_session: Any,
+    sketch_col: str = "sketch",
+) -> Any:
+    """Factory: build the `merge_extract` callable for HLL merge on PySpark.
+
+    Reads the persisted state from `state_path`, unions the per-partition
+    HLL sketches via `F.hll_union_agg`, extracts the distinct count via
+    `F.hll_sketch_estimate`, and returns the float estimate. The manager
+    times the call and records the value in `result.metrics["aggregate_value"]`.
+
+    Args:
+        spark_session: A SparkSession.
+        sketch_col: Column name holding the per-partition HLL state
+            (must match the alias used by the persist builder).
+
+    Returns:
+        A `(Path) -> float` callable suitable for `manager.execute_aggregate_merge`.
+    """
+
+    def merge_extract(state_path: Path) -> float:
+        from pyspark.sql import functions as F  # noqa: N812
+
+        state = spark_session.read.parquet(str(state_path))
+        row = state.agg(F.hll_sketch_estimate(F.hll_union_agg(sketch_col))).collect()[0]
+        return float(row[0])
+
+    return merge_extract
+
+
+def make_pyspark_topk_persist_builder(
+    spark_session: Any,
+    source_path: Path | str,
+    group_cols: list[str],
+    value_col: str,
+    sketch_alias: str = "sketch",
+) -> Any:
+    """Factory: build the top-K `state_builder` callable on PySpark.
+
+    Requires Spark 4.1+ for `F.approx_top_k_accumulate`. Callers must
+    `pyspark_supports_approx_top_k(spark)` before invoking this factory;
+    otherwise it raises at call time inside the builder.
+    """
+    source_str = str(source_path)
+
+    def builder() -> Any:
+        from pyspark.sql import functions as F  # noqa: N812
+
+        return (
+            spark_session.read.parquet(source_str)
+            .groupBy(*group_cols)
+            .agg(F.approx_top_k_accumulate(value_col).alias(sketch_alias))
+        )
+
+    return builder
+
+
+def make_pyspark_topk_merge_extract(
+    spark_session: Any,
+    sketch_col: str = "sketch",
+) -> Any:
+    """Factory: build the top-K `merge_extract` callable on PySpark (Spark 4.1+).
+
+    Returns the count of frequent items in the merged sketch (i.e.,
+    `len(approx_top_k_estimate(...))`).
+    """
+
+    def merge_extract(state_path: Path) -> float:
+        from pyspark.sql import functions as F  # noqa: N812
+
+        state = spark_session.read.parquet(str(state_path))
+        row = state.agg(F.size(F.approx_top_k_estimate(F.approx_top_k_combine(sketch_col)))).collect()[0]
+        return float(row[0])
+
+    return merge_extract
+
+
 __all__ = [
     "WriteOperationType",
     "DataFrameWriteCapabilities",
     "DataFrameWriteResult",
     "DataFrameWriteOperationsManager",
     "get_dataframe_write_manager",
+    "make_pyspark_hll_persist_builder",
+    "make_pyspark_hll_merge_extract",
+    "make_pyspark_topk_persist_builder",
+    "make_pyspark_topk_merge_extract",
+    "pyspark_supports_approx_top_k",
     "POLARS_WRITE_CAPABILITIES",
     "PANDAS_WRITE_CAPABILITIES",
     "PYSPARK_WRITE_CAPABILITIES",

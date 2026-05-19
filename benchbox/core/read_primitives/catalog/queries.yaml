@@ -50,6 +50,48 @@ queries:
         COUNT(DISTINCT l_partkey) as unique_parts
     FROM lineitem
     GROUP BY l_returnflag, l_linestatus;
+- id: approx_count_distinct_simple
+  category: aggregation
+  sql: |2
+
+    -- Approximate distinct count (HLL) on a high-cardinality key
+    -- Companion to aggregation_distinct; tests one-shot approx-distinct latency.
+    -- Cross-dialect rewrites are handled by sqlglot:
+    --   ClickHouse: uniq(o_custkey)
+    --   Redshift:   APPROXIMATE COUNT(DISTINCT o_custkey)
+    SELECT APPROX_COUNT_DISTINCT(o_custkey) as unique_customers
+    FROM orders
+    WHERE o_orderdate >= DATE '1995-01-01';
+  result_contract:
+    capability: approximate_distinct_count
+    columns:
+      - unique_customers
+  # SQLite has no APPROX_COUNT_DISTINCT (or rewrite target) — skip.
+  skip_on: [sqlite]
+- id: approx_count_distinct_groupby
+  category: aggregation
+  sql: |2
+
+    -- Approximate distinct counts (HLL) per low-cardinality group
+    -- Companion to aggregation_distinct_groupby. Cross-dialect rewrites
+    -- (ClickHouse uniq, Redshift APPROXIMATE COUNT(DISTINCT)) are handled
+    -- by sqlglot.
+    SELECT
+        l_returnflag,
+        l_linestatus,
+        APPROX_COUNT_DISTINCT(l_orderkey) as unique_orders,
+        APPROX_COUNT_DISTINCT(l_partkey) as unique_parts
+    FROM lineitem
+    GROUP BY l_returnflag, l_linestatus;
+  result_contract:
+    capability: approximate_distinct_count
+    row_identity: [l_returnflag, l_linestatus]
+    columns:
+      - l_returnflag
+      - l_linestatus
+      - unique_orders
+      - unique_parts
+  skip_on: [sqlite]
 - id: aggregation_groupby_large
   category: aggregation
   sql: |2
@@ -439,25 +481,71 @@ queries:
         AVG(l_quantity) as avg_qty
     FROM lineitem
     GROUP BY l_discount;
-- id: intrinsic_appx_median
-  category: intrinsic
+- id: approx_quantile_groupby
+  category: statistical
   sql: |2
 
-    -- Approximate statistical function (PERCENTILE_CONT)
+    -- Approximate single-quantile per group (T-Digest / KLL family)
+    -- Hard rename of the prior intrinsic_appx_median entry, which used
+    -- exact PERCENTILE_CONT despite the "appx" name.
     SELECT
         l_shipmode,
-        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY l_quantity) as median_quantity
+        APPROX_QUANTILE(l_quantity, 0.5) as median_quantity
     FROM lineitem
     GROUP BY l_shipmode;
+  result_contract:
+    capability: approximate_quantile_groupby
+    row_identity: [l_shipmode]
+    columns:
+      - l_shipmode
+      - median_quantity
   variants:
-    clickhouse: |2
+    # sqlglot leaves APPROX_QUANTILE unchanged for BigQuery, but BigQuery
+    # has no APPROX_QUANTILE function — only APPROX_QUANTILES with array
+    # extraction. Provide an explicit variant.
+    bigquery: |2
 
-      -- ClickHouse uses quantile(0.5)(col) instead of PERCENTILE_CONT WITHIN GROUP
       SELECT
           l_shipmode,
-          quantile(0.5)(l_quantity) as median_quantity
+          APPROX_QUANTILES(l_quantity, 100)[OFFSET(50)] as median_quantity
       FROM lineitem
       GROUP BY l_shipmode;
+    # sqlglot leaves APPROX_QUANTILE unchanged for ClickHouse; rewrite to
+    # the curried quantileTDigest form. ClickHouse rejects Decimal args
+    # for quantileTDigest (ILLEGAL_TYPE_OF_ARGUMENT), so cast to Float64
+    # — same pattern as the statistical_correlation ClickHouse variant.
+    clickhouse: |2
+
+      SELECT
+          l_shipmode,
+          quantileTDigest(0.5)(toFloat64(l_quantity)) as median_quantity
+      FROM lineitem
+      GROUP BY l_shipmode;
+    # DataFusion has no APPROX_QUANTILE; use approx_percentile_cont.
+    datafusion: |2
+
+      SELECT
+          l_shipmode,
+          approx_percentile_cont(l_quantity, 0.5) as median_quantity
+      FROM lineitem
+      GROUP BY l_shipmode;
+    # Snowflake (APPROX_PERCENTILE) and Databricks (PERCENTILE_APPROX)
+    # rewrites are handled by sqlglot.
+    # Redshift uses APPROXIMATE PERCENTILE_DISC. sqlglot's Redshift dialect
+    # parser doesn't recognise the APPROXIMATE qualifier on aggregates
+    # other than COUNT(DISTINCT), so this variant is allowlisted in
+    # tests/unit/core/read_primitives/test_read_primitives_variant_contracts.py
+    # against the variant_parse_error path. l_shipmode has 7 distinct
+    # values, well under any per-node group cap.
+    redshift: |2
+
+      SELECT
+          l_shipmode,
+          APPROXIMATE PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY l_quantity) as median_quantity
+      FROM lineitem
+      GROUP BY l_shipmode;
+  # SQLite has no APPROX_QUANTILE.
+  skip_on: [sqlite]
 - id: intrinsic_to_date
   category: intrinsic
   sql: |2
@@ -467,6 +555,10 @@ queries:
         COUNT(*) as orders_by_month
     FROM orders
     WHERE o_orderdate = TO_DATE('1995-03-15', 'yyyy-MM-dd');
+  result_contract:
+    capability: date_parse_filter
+    columns:
+      - orders_by_month
   variants:
     datafusion: |2
 
@@ -753,6 +845,31 @@ queries:
     GROUP BY l_orderkey
     ORDER BY total_quantity DESC
     LIMIT 10;
+- id: approx_top_k_lineitem
+  category: topn
+  sql: |2
+
+    -- Approximate Top-K aggregate returning the most-frequent values as an array.
+    -- Result shapes diverge across engines: DuckDB / ClickHouse / Snowflake return
+    -- ARRAY of values; BigQuery's APPROX_TOP_COUNT returns ARRAY<STRUCT<value,count>>.
+    -- Validation enforces capability + array type_class, not deep equality.
+    SELECT APPROX_TOP_K(l_shipmode, 5) as top_shipmodes
+    FROM lineitem;
+  result_contract:
+    capability: approximate_top_k
+    columns:
+      - name: top_shipmodes
+        type_class: array
+  variants:
+    # ClickHouse uses the curried topK form. BigQuery (APPROX_TOP_COUNT),
+    # Snowflake/Databricks (APPROX_TOP_K) rewrites are handled by sqlglot.
+    clickhouse: |2
+
+      SELECT topK(5)(l_shipmode) as top_shipmodes
+      FROM lineitem;
+  # Redshift has no top-K function family. DataFusion lacks approx_top_k.
+  # SQLite has no APPROX_TOP_K function.
+  skip_on: [redshift, datafusion, sqlite]
 - id: window_growing_frame
   category: window
   sql: |2
@@ -821,12 +938,22 @@ queries:
     FROM lineitem
     WHERE l_orderkey <= 10000
     ORDER BY l_orderkey, price_rank;
+  result_contract:
+    capability: window_rank_distribution
+    columns:
+      - l_orderkey
+      - l_partkey
+      - l_quantity
+      - l_extendedprice
+      - price_rank
+      - quantity_percentile
+      - price_distribution
   variants:
     clickhouse: |2
 
-      -- ClickHouse rejects aliases in ORDER BY when the sqlglot-rewritten
-      -- source query injects NULLS FIRST; wrap in a subquery so the outer
-      -- ORDER BY references a materialized column.
+      -- ClickHouse window function names are case-sensitive (dense_rank,
+      -- percent_rank, cume_dist). Wrap in a subquery so the outer ORDER BY
+      -- references a materialized column.
       SELECT *
       FROM (
           SELECT
@@ -834,9 +961,9 @@ queries:
               l_partkey,
               l_quantity,
               l_extendedprice,
-              DENSE_RANK() OVER (PARTITION BY l_orderkey ORDER BY l_extendedprice DESC) as price_rank,
-              PERCENT_RANK() OVER (PARTITION BY l_orderkey ORDER BY l_quantity) as quantity_percentile,
-              CUME_DIST() OVER (PARTITION BY l_orderkey ORDER BY l_extendedprice) as price_distribution
+              dense_rank() OVER (PARTITION BY l_orderkey ORDER BY l_extendedprice DESC) as price_rank,
+              percent_rank() OVER (PARTITION BY l_orderkey ORDER BY l_quantity) as quantity_percentile,
+              cume_dist() OVER (PARTITION BY l_orderkey ORDER BY l_extendedprice) as price_distribution
           FROM lineitem
           WHERE l_orderkey <= 10000
       ) t
@@ -864,27 +991,7 @@ queries:
     WHERE o_orderdate >= DATE '1995-01-01'
       AND o_orderdate < DATE '1996-01-01'
     ORDER BY o_orderdate;
-  variants:
-    clickhouse: |2
-
-      -- ClickHouse does not support RANGE BETWEEN INTERVAL ... PRECEDING; use ROWS BETWEEN instead
-      SELECT
-          o_orderkey,
-          o_orderdate,
-          o_totalprice,
-          AVG(o_totalprice) OVER (
-              ORDER BY o_orderdate
-              ROWS BETWEEN 5 PRECEDING AND CURRENT ROW
-          ) as moving_avg_6_orders,
-          SUM(o_totalprice) OVER (
-              ORDER BY o_orderdate
-              ROWS BETWEEN 30 PRECEDING AND CURRENT ROW
-          ) as monthly_running_total
-      FROM orders
-      WHERE o_orderdate >= toDate('1995-01-01')
-        AND o_orderdate < toDate('1996-01-01')
-      ORDER BY o_orderdate;
-  skip_on: [redshift]
+  skip_on: [clickhouse, redshift]
 - id: window_unbounded_frame
   category: window
   sql: |2
@@ -934,6 +1041,31 @@ queries:
     FROM customer
     WHERE JSON_VALID(c_comment)
     LIMIT 500;
+  result_contract:
+    capability: json_nested_path_extraction
+    row_identity: [c_custkey]
+    columns:
+      - c_custkey
+      - name: customer_segment
+        type_class: json
+      - name: primary_preference
+        type_class: json
+      - name: last_order_date
+        type_class: json
+  variants:
+    clickhouse: |2
+
+      -- ClickHouse JSON access uses JSONExtract*(json, path...) with positional
+      -- path components; isValidJSON replaces JSON_VALID. TPC-H c_comment is
+      -- plain text so isValidJSON gates rows out (matches duckdb behavior).
+      SELECT
+          c_custkey,
+          JSONExtractRaw(c_comment, 'profile', 'segment') as customer_segment,
+          JSONExtractRaw(c_comment, 'profile', 'preferences', 1) as primary_preference,
+          JSONExtractRaw(c_comment, 'history', 'last_order', 'date') as last_order_date
+      FROM customer
+      WHERE isValidJSON(c_comment)
+      LIMIT 500;
   skip_on: [datafusion, redshift]
 - id: json_aggregates
   category: json
@@ -941,24 +1073,52 @@ queries:
 
     -- Create JSON array and object with JSON aggregate functions
     SELECT
+        p_brand,
         JSON_ARRAYAGG(p_name) as part_names,
         JSON_OBJECTAGG(p_partkey, p_retailprice) as part_prices,
         COUNT(*) as part_count
     FROM part
     WHERE p_type LIKE '%STEEL%'
     GROUP BY p_brand
+    ORDER BY p_brand
     LIMIT 100;
+  result_contract:
+    capability: json_array_object_aggregation
+    row_identity: [p_brand]
+    columns:
+      - p_brand
+      - name: part_names
+        type_class: json
+      - name: part_prices
+        type_class: json
+      - part_count
   variants:
     duckdb: |2
 
       -- DuckDB uses JSON_GROUP_ARRAY and JSON_GROUP_OBJECT instead
       SELECT
+          p_brand,
           JSON_GROUP_ARRAY(p_name) as part_names,
           JSON_GROUP_OBJECT(p_partkey, p_retailprice) as part_prices,
           COUNT(*) as part_count
       FROM part
       WHERE p_type LIKE '%STEEL%'
       GROUP BY p_brand
+      ORDER BY p_brand
+      LIMIT 100;
+    clickhouse: |2
+
+      -- ClickHouse has no JSON_ARRAYAGG/JSON_OBJECTAGG; build arrays/maps with
+      -- groupArray + mapFromArrays then serialize via toJSONString.
+      SELECT
+          p_brand,
+          toJSONString(groupArray(p_name)) as part_names,
+          toJSONString(mapFromArrays(groupArray(p_partkey), groupArray(p_retailprice))) as part_prices,
+          COUNT(*) as part_count
+      FROM part
+      WHERE p_type LIKE '%STEEL%'
+      GROUP BY p_brand
+      ORDER BY p_brand
       LIMIT 100;
   skip_on: [datafusion, redshift]
 - id: fulltext_simple_search
@@ -974,54 +1134,7 @@ queries:
     FROM part
     WHERE MATCH(p_name, p_comment) AGAINST ('STEEL COPPER' IN NATURAL LANGUAGE MODE)
     LIMIT 100;
-  variants:
-    duckdb: |2
-
-      -- DuckDB doesn't support MATCH...AGAINST, use LIKE instead
-      SELECT
-          p_partkey,
-          p_name,
-          p_mfgr,
-          p_comment
-      FROM part
-      WHERE p_name LIKE '%STEEL%' OR p_name LIKE '%COPPER%'
-         OR p_comment LIKE '%STEEL%' OR p_comment LIKE '%COPPER%'
-      LIMIT 100;
-    datafusion: |2
-
-      SELECT
-          p_partkey,
-          p_name,
-          p_mfgr,
-          p_comment
-      FROM part
-      WHERE p_name LIKE '%STEEL%' OR p_name LIKE '%COPPER%'
-         OR p_comment LIKE '%STEEL%' OR p_comment LIKE '%COPPER%'
-      LIMIT 100;
-    redshift: |2
-
-      -- Redshift doesn't support MATCH...AGAINST, use LIKE instead
-      SELECT
-          p_partkey,
-          p_name,
-          p_mfgr,
-          p_comment
-      FROM part
-      WHERE p_name LIKE '%STEEL%' OR p_name LIKE '%COPPER%'
-         OR p_comment LIKE '%STEEL%' OR p_comment LIKE '%COPPER%'
-      LIMIT 100;
-    clickhouse: |2
-
-      -- ClickHouse doesn't support MATCH...AGAINST, use LIKE instead
-      SELECT
-          p_partkey,
-          p_name,
-          p_mfgr,
-          p_comment
-      FROM part
-      WHERE p_name LIKE '%STEEL%' OR p_name LIKE '%COPPER%'
-         OR p_comment LIKE '%STEEL%' OR p_comment LIKE '%COPPER%'
-      LIMIT 100;
+  skip_on: [bigquery, clickhouse, datafusion, databricks, duckdb, redshift, snowflake]
 - id: fulltext_boolean_search
   category: fulltext
   sql: |2
@@ -1036,50 +1149,7 @@ queries:
     WHERE MATCH(c_comment) AGAINST ('+BUILDING -FURNITURE' IN BOOLEAN MODE)
     ORDER BY relevance_score DESC
     LIMIT 50;
-  variants:
-    duckdb: |2
-
-      -- DuckDB doesn't support MATCH...AGAINST, use LIKE with AND/NOT logic
-      SELECT
-          c_custkey,
-          c_name,
-          c_comment
-      FROM customer
-      WHERE c_comment LIKE '%BUILDING%'
-        AND c_comment NOT LIKE '%FURNITURE%'
-      LIMIT 50;
-    datafusion: |2
-
-      SELECT
-          c_custkey,
-          c_name,
-          c_comment
-      FROM customer
-      WHERE c_comment LIKE '%BUILDING%'
-        AND c_comment NOT LIKE '%FURNITURE%'
-      LIMIT 50;
-    redshift: |2
-
-      -- Redshift doesn't support MATCH...AGAINST, use LIKE with AND/NOT logic
-      SELECT
-          c_custkey,
-          c_name,
-          c_comment
-      FROM customer
-      WHERE c_comment LIKE '%BUILDING%'
-        AND c_comment NOT LIKE '%FURNITURE%'
-      LIMIT 50;
-    clickhouse: |2
-
-      -- ClickHouse doesn't support MATCH...AGAINST, use LIKE with AND/NOT logic
-      SELECT
-          c_custkey,
-          c_name,
-          c_comment
-      FROM customer
-      WHERE c_comment LIKE '%BUILDING%'
-        AND c_comment NOT LIKE '%FURNITURE%'
-      LIMIT 50;
+  skip_on: [bigquery, clickhouse, datafusion, databricks, duckdb, redshift, snowflake]
 - id: fulltext_phrase_search
   category: fulltext
   sql: |2
@@ -1093,46 +1163,7 @@ queries:
     FROM supplier
     WHERE MATCH(s_comment) AGAINST ('"Customer Complaints"' IN BOOLEAN MODE)
     ORDER BY phrase_match_score DESC;
-  variants:
-    duckdb: |2
-
-      -- DuckDB doesn't support MATCH...AGAINST, use LIKE with exact phrase
-      SELECT
-          s_suppkey,
-          s_name,
-          s_comment
-      FROM supplier
-      WHERE s_comment LIKE '%Customer Complaints%'
-      ORDER BY s_suppkey;
-    datafusion: |2
-
-      SELECT
-          s_suppkey,
-          s_name,
-          s_comment
-      FROM supplier
-      WHERE s_comment LIKE '%Customer Complaints%'
-      ORDER BY s_suppkey;
-    redshift: |2
-
-      -- Redshift doesn't support MATCH...AGAINST, use LIKE with exact phrase
-      SELECT
-          s_suppkey,
-          s_name,
-          s_comment
-      FROM supplier
-      WHERE s_comment LIKE '%Customer Complaints%'
-      ORDER BY s_suppkey;
-    clickhouse: |2
-
-      -- ClickHouse doesn't support MATCH...AGAINST, use LIKE with exact phrase
-      SELECT
-          s_suppkey,
-          s_name,
-          s_comment
-      FROM supplier
-      WHERE s_comment LIKE '%Customer Complaints%'
-      ORDER BY s_suppkey;
+  skip_on: [bigquery, clickhouse, datafusion, databricks, duckdb, redshift, snowflake]
 - id: statistical_percentiles
   category: statistical
   sql: |2
@@ -1148,20 +1179,18 @@ queries:
         PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY l_extendedprice) as price_p95
     FROM lineitem
     GROUP BY l_returnflag, l_linestatus;
+  result_contract:
+    capability: exact_continuous_percentiles
+    row_identity: [l_returnflag, l_linestatus]
+    columns:
+      - l_returnflag
+      - l_linestatus
+      - record_count
+      - quantity_q1
+      - quantity_median
+      - quantity_q3
+      - price_p95
   variants:
-    clickhouse: |2
-
-      -- ClickHouse uses quantile(p)(col) instead of PERCENTILE_CONT WITHIN GROUP
-      SELECT
-          l_returnflag,
-          l_linestatus,
-          COUNT(*) as record_count,
-          quantile(0.25)(l_quantity) as quantity_q1,
-          quantile(0.5)(l_quantity) as quantity_median,
-          quantile(0.75)(l_quantity) as quantity_q3,
-          quantile(0.95)(l_extendedprice) as price_p95
-      FROM lineitem
-      GROUP BY l_returnflag, l_linestatus;
     redshift: |2
 
       -- Redshift supports PERCENTILE_CONT only as a window function, not aggregate
@@ -1174,6 +1203,75 @@ queries:
           PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY l_quantity) OVER (PARTITION BY l_returnflag, l_linestatus) as quantity_q3,
           PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY l_extendedprice) OVER (PARTITION BY l_returnflag, l_linestatus) as price_p95
       FROM lineitem;
+  skip_on: [clickhouse]
+- id: approx_quantiles_array
+  category: statistical
+  sql: |2
+
+    -- Approximate quantiles returned as a single array per group
+    -- Companion to statistical_percentiles, but exercises the
+    -- vector-quantile path (one sketch evaluation per group instead of
+    -- four PERCENTILE_CONT calls).
+    SELECT
+        l_returnflag,
+        l_linestatus,
+        APPROX_QUANTILE(l_quantity, [0.25, 0.5, 0.75, 0.95]) as quantity_quantiles
+    FROM lineitem
+    GROUP BY l_returnflag, l_linestatus;
+  result_contract:
+    capability: approximate_quantile_array
+    row_identity: [l_returnflag, l_linestatus]
+    columns:
+      - l_returnflag
+      - l_linestatus
+      - name: quantity_quantiles
+        type_class: array
+  variants:
+    # BigQuery has no APPROX_QUANTILE; APPROX_QUANTILES(x, n) returns n+1
+    # boundary values, so slice the requested percentiles into an array
+    # to match the cross-engine shape.
+    bigquery: |2
+
+      SELECT
+          l_returnflag,
+          l_linestatus,
+          [
+            APPROX_QUANTILES(l_quantity, 100)[OFFSET(25)],
+            APPROX_QUANTILES(l_quantity, 100)[OFFSET(50)],
+            APPROX_QUANTILES(l_quantity, 100)[OFFSET(75)],
+            APPROX_QUANTILES(l_quantity, 100)[OFFSET(95)]
+          ] as quantity_quantiles
+      FROM lineitem
+      GROUP BY l_returnflag, l_linestatus;
+    # ClickHouse uses curried quantilesTDigest with multiple quantile args;
+    # cast Decimal to Float64 (rejects Decimal args, same as quantileTDigest).
+    clickhouse: |2
+
+      SELECT
+          l_returnflag,
+          l_linestatus,
+          quantilesTDigest(0.25, 0.5, 0.75, 0.95)(toFloat64(l_quantity)) as quantity_quantiles
+      FROM lineitem
+      GROUP BY l_returnflag, l_linestatus;
+    # Snowflake's APPROX_PERCENTILE accepts only a scalar quantile;
+    # assemble the array from four single-quantile calls.
+    snowflake: |2
+
+      SELECT
+          l_returnflag,
+          l_linestatus,
+          ARRAY_CONSTRUCT(
+            APPROX_PERCENTILE(l_quantity, 0.25),
+            APPROX_PERCENTILE(l_quantity, 0.5),
+            APPROX_PERCENTILE(l_quantity, 0.75),
+            APPROX_PERCENTILE(l_quantity, 0.95)
+          ) as quantity_quantiles
+      FROM lineitem
+      GROUP BY l_returnflag, l_linestatus;
+    # Databricks rewrite (PERCENTILE_APPROX with ARRAY(...)) handled by sqlglot.
+  # DataFusion has no array-returning approximate-quantile aggregate.
+  # SQLite has no ARRAY type or APPROX_QUANTILE function.
+  skip_on: [redshift, datafusion, sqlite]
 - id: statistical_variance_stddev
   category: statistical
   sql: |2
@@ -1206,18 +1304,29 @@ queries:
     FROM lineitem
     WHERE l_shipdate >= DATE '1995-01-01'
       AND l_shipdate < DATE '1996-01-01';
+  result_contract:
+    capability: correlation_covariance_regression
+    columns:
+      - qty_price_correlation
+      - qty_discount_covariance
+      - tax_price_covariance
+      - price_qty_slope
+      - price_qty_intercept
+      - regression_r_squared
   variants:
     clickhouse: |2
 
-      -- ClickHouse native aggregate functions for correlation and covariance.
-      -- REGR_SLOPE/INTERCEPT/R2 not available; compute manually from corr() and stddevSamp().
+      -- ClickHouse's corr/covarPop/covarSamp reject Decimal arguments
+      -- (ILLEGAL_TYPE_OF_ARGUMENT); cast columns to Float64 first.
+      -- REGR_SLOPE/INTERCEPT/R2 are not available; compute manually from
+      -- corr() and stddevSamp() over the cast columns.
       SELECT
-          corr(l_quantity, l_extendedprice) as qty_price_correlation,
-          covarPop(l_quantity, l_discount) as qty_discount_covariance,
-          covarSamp(l_tax, l_extendedprice) as tax_price_covariance,
-          corr(l_extendedprice, l_quantity) * stddevSamp(l_extendedprice) / nullif(stddevSamp(l_quantity), 0) as price_qty_slope,
-          avg(l_extendedprice) - corr(l_extendedprice, l_quantity) * stddevSamp(l_extendedprice) / nullif(stddevSamp(l_quantity), 0) * avg(l_quantity) as price_qty_intercept,
-          pow(corr(l_extendedprice, l_quantity), 2) as regression_r_squared
+          corr(toFloat64(l_quantity), toFloat64(l_extendedprice)) as qty_price_correlation,
+          covarPop(toFloat64(l_quantity), toFloat64(l_discount)) as qty_discount_covariance,
+          covarSamp(toFloat64(l_tax), toFloat64(l_extendedprice)) as tax_price_covariance,
+          corr(toFloat64(l_extendedprice), toFloat64(l_quantity)) * stddevSamp(toFloat64(l_extendedprice)) / nullif(stddevSamp(toFloat64(l_quantity)), 0) as price_qty_slope,
+          avg(toFloat64(l_extendedprice)) - corr(toFloat64(l_extendedprice), toFloat64(l_quantity)) * stddevSamp(toFloat64(l_extendedprice)) / nullif(stddevSamp(toFloat64(l_quantity)), 0) * avg(toFloat64(l_quantity)) as price_qty_intercept,
+          pow(corr(toFloat64(l_extendedprice), toFloat64(l_quantity)), 2) as regression_r_squared
       FROM lineitem
       WHERE l_shipdate >= toDate('1995-01-01')
         AND l_shipdate < toDate('1996-01-01');
@@ -1269,22 +1378,49 @@ queries:
   sql: |2
 
     -- Time series trend analysis with linear regression
-    SELECT
+    WITH monthly_totals AS (
+      SELECT
         DATE_TRUNC('month', o_orderdate) as order_month,
         COUNT(*) as order_count,
         SUM(o_totalprice) as monthly_revenue,
         AVG(o_totalprice) as avg_order_value,
-        -- Linear trend calculation
-        REGR_SLOPE(SUM(o_totalprice), EXTRACT(EPOCH FROM o_orderdate)) as revenue_trend_slope,
-        -- Month-over-month growth
-        LAG(SUM(o_totalprice), 1) OVER (ORDER BY DATE_TRUNC('month', o_orderdate)) as prev_month_revenue,
-        (SUM(o_totalprice) - LAG(SUM(o_totalprice), 1) OVER (ORDER BY DATE_TRUNC('month', o_orderdate)))
-        / NULLIF(LAG(SUM(o_totalprice), 1) OVER (ORDER BY DATE_TRUNC('month', o_orderdate)), 0) * 100 as mom_growth_pct
-    FROM orders
-    WHERE o_orderdate >= DATE '1995-01-01'
-      AND o_orderdate < DATE '1997-01-01'
-    GROUP BY DATE_TRUNC('month', o_orderdate)
+        EXTRACT(EPOCH FROM DATE_TRUNC('month', o_orderdate)) as month_epoch
+      FROM orders
+      WHERE o_orderdate >= DATE '1995-01-01'
+        AND o_orderdate < DATE '1997-01-01'
+      GROUP BY DATE_TRUNC('month', o_orderdate)
+    ),
+    monthly_with_lag AS (
+      SELECT
+        order_month,
+        order_count,
+        monthly_revenue,
+        avg_order_value,
+        month_epoch,
+        LAG(monthly_revenue, 1) OVER (ORDER BY order_month) as prev_month_revenue
+      FROM monthly_totals
+    )
+    SELECT
+      order_month,
+      order_count,
+      monthly_revenue,
+      avg_order_value,
+      REGR_SLOPE(monthly_revenue, month_epoch) OVER () as revenue_trend_slope,
+      prev_month_revenue,
+      (monthly_revenue - prev_month_revenue) / NULLIF(prev_month_revenue, 0) * 100 as mom_growth_pct
+    FROM monthly_with_lag
     ORDER BY order_month;
+  result_contract:
+    capability: monthly_time_series_regression
+    row_identity: [order_month]
+    columns:
+      - order_month
+      - order_count
+      - monthly_revenue
+      - avg_order_value
+      - revenue_trend_slope
+      - prev_month_revenue
+      - mom_growth_pct
   variants:
     duckdb: |2
 
@@ -1324,14 +1460,16 @@ queries:
     clickhouse: |2
 
       -- ClickHouse: use toStartOfMonth for DATE_TRUNC, toUnixTimestamp for EPOCH.
-      -- REGR_SLOPE not available; compute slope manually from corr/stddev over the CTE.
+      -- REGR_SLOPE not available; compute slope manually from corr/stddev.
+      -- Cast revenue/epoch to Float64 in the CTE because corr/stddev reject
+      -- Decimal/UInt arguments (ILLEGAL_TYPE_OF_ARGUMENT).
       WITH monthly_totals AS (
         SELECT
           toStartOfMonth(o_orderdate) as order_month,
           COUNT(*) as order_count,
-          SUM(o_totalprice) as monthly_revenue,
-          AVG(o_totalprice) as avg_order_value,
-          toUnixTimestamp(toStartOfMonth(o_orderdate)) as month_epoch
+          toFloat64(SUM(o_totalprice)) as monthly_revenue,
+          toFloat64(AVG(o_totalprice)) as avg_order_value,
+          toFloat64(toUnixTimestamp(toStartOfMonth(o_orderdate))) as month_epoch
         FROM orders
         WHERE o_orderdate >= toDate('1995-01-01')
           AND o_orderdate < toDate('1997-01-01')
@@ -1352,7 +1490,7 @@ queries:
         order_count,
         monthly_revenue,
         avg_order_value,
-        corr(monthly_revenue, month_epoch) OVER () * stddevSamp(monthly_revenue) OVER () / nullif(stddevSamp(toFloat64(month_epoch)) OVER (), 0) as revenue_trend_slope,
+        corr(monthly_revenue, month_epoch) OVER () * stddevSamp(monthly_revenue) OVER () / nullif(stddevSamp(month_epoch) OVER (), 0) as revenue_trend_slope,
         prev_month_revenue,
         (monthly_revenue - prev_month_revenue) / nullif(prev_month_revenue, 0) * 100 as mom_growth_pct
       FROM monthly_with_lag
@@ -1403,7 +1541,14 @@ queries:
     FROM customer c
     JOIN nation n ON c.c_nationkey = n.n_nationkey
     GROUP BY n_name
-    ORDER BY max_balance DESC;
+    ORDER BY max_balance DESC, n_name;
+  result_contract:
+    capability: arg_max_aggregate
+    row_identity: [n_name]
+    columns:
+      - n_name
+      - richest_customer
+      - max_balance
   variants:
     datafusion: |2
 
@@ -1422,7 +1567,7 @@ queries:
         c_acctbal as max_balance
       FROM ranked
       WHERE rn = 1
-      ORDER BY max_balance DESC;
+      ORDER BY max_balance DESC, n_name;
     redshift: |2
 
       WITH ranked AS (
@@ -1440,7 +1585,7 @@ queries:
         c_acctbal as max_balance
       FROM ranked
       WHERE rn = 1
-      ORDER BY max_balance DESC;
+      ORDER BY max_balance DESC, n_name;
 - id: min_by_simple
   category: min
   sql: |2
@@ -1453,7 +1598,14 @@ queries:
     FROM customer c
     JOIN nation n ON c.c_nationkey = n.n_nationkey
     GROUP BY n_name
-    ORDER BY min_balance ASC;
+    ORDER BY min_balance ASC, n_name;
+  result_contract:
+    capability: arg_min_aggregate
+    row_identity: [n_name]
+    columns:
+      - n_name
+      - poorest_customer
+      - min_balance
   variants:
     datafusion: |2
 
@@ -1472,7 +1624,7 @@ queries:
         c_acctbal as min_balance
       FROM ranked
       WHERE rn = 1
-      ORDER BY min_balance ASC;
+      ORDER BY min_balance ASC, n_name;
     redshift: |2
 
       WITH ranked AS (
@@ -1490,7 +1642,7 @@ queries:
         c_acctbal as min_balance
       FROM ranked
       WHERE rn = 1
-      ORDER BY min_balance ASC;
+      ORDER BY min_balance ASC, n_name;
 - id: max_by_complex
   category: max
   sql: |2
@@ -1504,7 +1656,15 @@ queries:
     FROM orders o
     JOIN customer c ON o.o_custkey = c.c_custkey
     GROUP BY c_mktsegment
-    ORDER BY max_order_value DESC;
+    ORDER BY max_order_value DESC, c_mktsegment;
+  result_contract:
+    capability: arg_max_aggregate
+    row_identity: [c_mktsegment]
+    columns:
+      - c_mktsegment
+      - most_expensive_order_id
+      - most_expensive_order_date
+      - max_order_value
   variants:
     datafusion: |2
 
@@ -1528,7 +1688,7 @@ queries:
         o_totalprice as max_order_value
       FROM ranked
       WHERE rn = 1
-      ORDER BY max_order_value DESC;
+      ORDER BY max_order_value DESC, c_mktsegment;
     redshift: |2
 
       WITH ranked AS (
@@ -1551,7 +1711,7 @@ queries:
         o_totalprice as max_order_value
       FROM ranked
       WHERE rn = 1
-      ORDER BY max_order_value DESC;
+      ORDER BY max_order_value DESC, c_mktsegment;
 - id: min_by_complex
   category: min
   sql: |2
@@ -1564,7 +1724,15 @@ queries:
         MIN(p_retailprice) as min_price
     FROM part
     GROUP BY p_brand
-    ORDER BY min_price ASC;
+    ORDER BY min_price ASC, p_brand;
+  result_contract:
+    capability: arg_min_aggregate
+    row_identity: [p_brand]
+    columns:
+      - p_brand
+      - cheapest_part_name
+      - cheapest_part_type
+      - min_price
   variants:
     datafusion: |2
 
@@ -1587,7 +1755,7 @@ queries:
         p_retailprice as min_price
       FROM ranked
       WHERE rn = 1
-      ORDER BY min_price ASC;
+      ORDER BY min_price ASC, p_brand;
     redshift: |2
 
       WITH ranked AS (
@@ -1609,7 +1777,7 @@ queries:
         p_retailprice as min_price
       FROM ranked
       WHERE rn = 1
-      ORDER BY min_price ASC;
+      ORDER BY min_price ASC, p_brand;
 - id: max_by_with_ties
   category: max
   sql: |2
@@ -1624,8 +1792,16 @@ queries:
     JOIN part p ON ps.ps_partkey = p.p_partkey
     JOIN supplier s ON ps.ps_suppkey = s.s_suppkey
     GROUP BY p_partkey, p_name
-    ORDER BY max_supply_cost DESC
+    ORDER BY max_supply_cost DESC, p_partkey, p_name
     LIMIT 100;
+  result_contract:
+    capability: arg_max_aggregate
+    row_identity: [p_partkey, p_name]
+    columns:
+      - p_partkey
+      - p_name
+      - supplier_name
+      - max_supply_cost
   variants:
     datafusion: |2
 
@@ -1650,7 +1826,7 @@ queries:
         ps_supplycost as max_supply_cost
       FROM ranked
       WHERE rn = 1
-      ORDER BY max_supply_cost DESC
+      ORDER BY max_supply_cost DESC, p_partkey, p_name
       LIMIT 100;
     redshift: |2
 
@@ -1675,7 +1851,7 @@ queries:
         ps_supplycost as max_supply_cost
       FROM ranked
       WHERE rn = 1
-      ORDER BY max_supply_cost DESC
+      ORDER BY max_supply_cost DESC, p_partkey, p_name
       LIMIT 100;
 - id: min_by_with_ties
   category: min
@@ -1691,8 +1867,16 @@ queries:
     JOIN part p ON ps.ps_partkey = p.p_partkey
     JOIN supplier s ON ps.ps_suppkey = s.s_suppkey
     GROUP BY p_partkey, p_name
-    ORDER BY min_supply_cost ASC
+    ORDER BY min_supply_cost ASC, p_partkey, p_name
     LIMIT 100;
+  result_contract:
+    capability: arg_min_aggregate
+    row_identity: [p_partkey, p_name]
+    columns:
+      - p_partkey
+      - p_name
+      - supplier_name
+      - min_supply_cost
   variants:
     datafusion: |2
 
@@ -1717,7 +1901,7 @@ queries:
         ps_supplycost as min_supply_cost
       FROM ranked
       WHERE rn = 1
-      ORDER BY min_supply_cost ASC
+      ORDER BY min_supply_cost ASC, p_partkey, p_name
       LIMIT 100;
     redshift: |2
 
@@ -1742,7 +1926,7 @@ queries:
         ps_supplycost as min_supply_cost
       FROM ranked
       WHERE rn = 1
-      ORDER BY min_supply_cost ASC
+      ORDER BY min_supply_cost ASC, p_partkey, p_name
       LIMIT 100;
 - id: qualify_row_number
   category: qualify
@@ -1773,7 +1957,15 @@ queries:
         DENSE_RANK() OVER (PARTITION BY p_type ORDER BY p_retailprice DESC) as price_rank
     FROM part
     QUALIFY DENSE_RANK() OVER (PARTITION BY p_type ORDER BY p_retailprice DESC) <= 2
-    ORDER BY p_type, price_rank;
+    ORDER BY p_type, price_rank, p_name;
+  result_contract:
+    capability: qualify_dense_rank_filter
+    row_identity: [p_type, p_name, p_retailprice]
+    columns:
+      - p_type
+      - p_name
+      - p_retailprice
+      - price_rank
   variants:
     redshift: |2
 
@@ -1788,7 +1980,7 @@ queries:
           FROM part
       ) ranked
       WHERE price_rank <= 2
-      ORDER BY p_type, price_rank;
+      ORDER BY p_type, price_rank, p_name;
 - id: qualify_percentile
   category: qualify
   sql: |2
@@ -1833,11 +2025,21 @@ queries:
     WHERE l_shipdate >= DATE '1995-01-01'
       AND l_shipdate < DATE '1996-01-01'
     QUALIFY CUME_DIST() OVER (PARTITION BY l_shipdate ORDER BY l_quantity) >= 0.95
-    ORDER BY l_shipdate, l_quantity DESC;
+    ORDER BY l_shipdate, l_quantity DESC, l_orderkey, l_linenumber;
+  result_contract:
+    capability: qualify_cume_dist_filter
+    row_identity: [l_shipdate, l_orderkey, l_linenumber]
+    columns:
+      - l_shipdate
+      - l_orderkey
+      - l_linenumber
+      - l_quantity
+      - quantity_cumulative_dist
   variants:
     clickhouse: |2
 
-      -- ClickHouse does not support QUALIFY; rewrite using subquery WHERE filter
+      -- ClickHouse does not support QUALIFY; rewrite using subquery WHERE filter.
+      -- Window function names are case-sensitive (cume_dist, not CUME_DIST).
       SELECT l_shipdate, l_orderkey, l_linenumber, l_quantity, quantity_cumulative_dist
       FROM (
         SELECT
@@ -1845,13 +2047,13 @@ queries:
             l_orderkey,
             l_linenumber,
             l_quantity,
-            CUME_DIST() OVER (PARTITION BY l_shipdate ORDER BY l_quantity) as quantity_cumulative_dist
+            cume_dist() OVER (PARTITION BY l_shipdate ORDER BY l_quantity) as quantity_cumulative_dist
         FROM lineitem
         WHERE l_shipdate >= toDate('1995-01-01')
           AND l_shipdate < toDate('1996-01-01')
       ) t
       WHERE quantity_cumulative_dist >= 0.95
-      ORDER BY l_shipdate, l_quantity DESC;
+      ORDER BY l_shipdate, l_quantity DESC, l_orderkey, l_linenumber;
 - id: qualify_lag_lead
   category: qualify
   sql: |2
@@ -1988,34 +2190,25 @@ queries:
   category: optimizer
   sql: "\n-- Test scalar subquery flattening optimization\n-- Good optimizers should convert scalar subqueries to joins for\
     \ better performance\nSELECT\n    c.c_name,\n    c.c_mktsegment,\n    c.c_acctbal,\n    (SELECT AVG(o.o_totalprice) \n\
-    \     FROM orders o \n     WHERE o.o_custkey = c.c_custkey \n       AND o.o_orderdate >= DATE '1995-01-01') as avg_order_value,\n\
+     \     FROM orders o \n     WHERE o.o_custkey = c.c_custkey \n       AND o.o_orderdate >= DATE '1995-01-01') as avg_order_value,\n\
     \    (SELECT COUNT(o.o_orderkey)\n     FROM orders o \n     WHERE o.o_custkey = c.c_custkey \n       AND o.o_orderdate\
     \ >= DATE '1995-01-01') as order_count\nFROM customer c\nWHERE c.c_nationkey = 15\n  AND c.c_acctbal > 5000\nORDER BY\
-    \ avg_order_value DESC\nLIMIT 100;\n"
-  variants:
-    datafusion: |2
-
-      WITH order_stats AS (
-          SELECT
-              o.o_custkey,
-              AVG(o.o_totalprice) as avg_order_value,
-              COUNT(o.o_orderkey) as order_count
-          FROM orders o
-          WHERE o.o_orderdate >= DATE '1995-01-01'
-          GROUP BY o.o_custkey
-      )
-      SELECT
-          c.c_name,
-          c.c_mktsegment,
-          c.c_acctbal,
-          os.avg_order_value,
-          os.order_count
-      FROM customer c
-      LEFT JOIN order_stats os ON os.o_custkey = c.c_custkey
-      WHERE c.c_nationkey = 15
-        AND c.c_acctbal > 5000
-      ORDER BY os.avg_order_value DESC
-      LIMIT 100;
+    \ avg_order_value DESC, c.c_name\nLIMIT 100;\n"
+  skip_on: [clickhouse, datafusion]
+  description: "ClickHouse and DataFusion do not support correlated subqueries
+    (ClickHouse: NOT_IMPLEMENTED Code 48; DataFusion: planner rejects). The
+    point of this query is to measure the optimizer's ability to auto-flatten
+    correlated scalar subqueries into joins, so a pre-flattened LEFT JOIN
+    rewrite would only measure plain join execution and defeat the test."
+  result_contract:
+    capability: scalar_subquery_flattening
+    row_identity: [c_name, c_mktsegment, c_acctbal]
+    columns:
+      - c_name
+      - c_mktsegment
+      - c_acctbal
+      - avg_order_value
+      - order_count
 - id: optimizer_constant_folding
   category: optimizer
   sql: |2
@@ -2158,6 +2351,13 @@ queries:
         COUNT(*) as customer_count
     FROM customer
     GROUP BY c_mktsegment;
+  result_contract:
+    capability: arbitrary_value_aggregate
+    row_identity: [c_mktsegment]
+    columns:
+      - c_mktsegment
+      - sample_customer
+      - customer_count
   variants:
     clickhouse: |2
 
@@ -2167,14 +2367,7 @@ queries:
           COUNT(*) as customer_count
       FROM customer
       GROUP BY c_mktsegment;
-    datafusion: |2
-
-      SELECT
-          c_mktsegment,
-          MIN(c_name) as sample_customer,
-          COUNT(*) as customer_count
-      FROM customer
-      GROUP BY c_mktsegment;
+  skip_on: [datafusion]
 - id: any_value_with_filter
   category: aggregation
   sql: |2
@@ -2187,6 +2380,14 @@ queries:
         COUNT(*) as nation_count
     FROM nation
     GROUP BY n_regionkey;
+  result_contract:
+    capability: arbitrary_value_aggregate
+    row_identity: [n_regionkey]
+    columns:
+      - n_regionkey
+      - sample_nation
+      - sample_comment
+      - nation_count
   variants:
     clickhouse: |2
 
@@ -2197,15 +2398,7 @@ queries:
           COUNT(*) as nation_count
       FROM nation
       GROUP BY n_regionkey;
-    datafusion: |2
-
-      SELECT
-          n_regionkey,
-          MIN(n_name) as sample_nation,
-          MIN(n_comment) as sample_comment,
-          COUNT(*) as nation_count
-      FROM nation
-      GROUP BY n_regionkey;
+  skip_on: [datafusion]
 
 # GROUP BY ALL - automatic grouping by all non-aggregate columns
 - id: groupby_all_simple
@@ -2234,6 +2427,14 @@ queries:
     WHERE o_orderdate >= DATE '1995-01-01'
     GROUP BY ALL
     ORDER BY order_month, o_orderpriority;
+  result_contract:
+    capability: group_by_all_expansion
+    row_identity: [order_month, o_orderpriority]
+    columns:
+      - order_month
+      - o_orderpriority
+      - order_count
+      - monthly_revenue
   variants:
     datafusion: |2
 
@@ -2262,6 +2463,13 @@ queries:
     JOIN region r ON n.n_regionkey = r.r_regionkey
     GROUP BY r_name, n_name
     ORDER BY ALL;
+  result_contract:
+    capability: order_by_all_expansion
+    row_identity: [r_name, n_name]
+    columns:
+      - r_name
+      - n_name
+      - supplier_count
   variants:
     datafusion: |2
 
@@ -2298,6 +2506,13 @@ queries:
     GROUP BY p_brand, p_type
     ORDER BY ALL DESC
     LIMIT 100;
+  result_contract:
+    capability: order_by_all_desc_expansion
+    row_identity: [p_brand, p_type]
+    columns:
+      - p_brand
+      - p_type
+      - avg_price
   variants:
     datafusion: |2
 
@@ -2336,17 +2551,28 @@ queries:
     FROM partsupp
     GROUP BY ps_suppkey
     HAVING COUNT(*) <= 10
+    ORDER BY ps_suppkey
     LIMIT 100;
+  result_contract:
+    capability: ordered_array_aggregation
+    row_identity: [ps_suppkey]
+    columns:
+      - ps_suppkey
+      - name: supplied_parts
+        type_class: array
+        order_sensitive: true
+      - part_count
   variants:
     clickhouse: |2
 
       SELECT
           ps_suppkey,
-          groupArray(ps_partkey) as supplied_parts,
+          arraySort(groupArray(ps_partkey)) as supplied_parts,
           COUNT(*) as part_count
       FROM partsupp
       GROUP BY ps_suppkey
       HAVING COUNT(*) <= 10
+      ORDER BY ps_suppkey
       LIMIT 100;
   skip_on: [redshift]
 - id: array_agg_distinct
@@ -2358,15 +2584,25 @@ queries:
         c_mktsegment,
         ARRAY_AGG(DISTINCT c_nationkey ORDER BY c_nationkey) as nation_keys
     FROM customer
-    GROUP BY c_mktsegment;
+    GROUP BY c_mktsegment
+    ORDER BY c_mktsegment;
+  result_contract:
+    capability: ordered_distinct_array_aggregation
+    row_identity: [c_mktsegment]
+    columns:
+      - c_mktsegment
+      - name: nation_keys
+        type_class: array
+        order_sensitive: true
   variants:
     clickhouse: |2
 
       SELECT
           c_mktsegment,
-          groupUniqArray(c_nationkey) as nation_keys
+          arraySort(groupUniqArray(c_nationkey)) as nation_keys
       FROM customer
-      GROUP BY c_mktsegment;
+      GROUP BY c_mktsegment
+      ORDER BY c_mktsegment;
   skip_on: [redshift]
 - id: array_unnest
   category: array
@@ -2385,6 +2621,12 @@ queries:
         ps_suppkey,
         UNNEST(parts) as part_key
     FROM supplier_parts;
+  result_contract:
+    capability: array_unnest
+    row_identity: [ps_suppkey, part_key]
+    columns:
+      - ps_suppkey
+      - part_key
   variants:
     bigquery: |2
 
@@ -2431,7 +2673,14 @@ queries:
         ps_suppkey,
         ARRAY_CONTAINS(parts, 100) as has_part_100
     FROM supplier_parts
+    ORDER BY ps_suppkey
     LIMIT 100;
+  result_contract:
+    capability: array_membership_predicate
+    row_identity: [ps_suppkey]
+    columns:
+      - ps_suppkey
+      - has_part_100
   variants:
     duckdb: |2
 
@@ -2446,6 +2695,7 @@ queries:
           ps_suppkey,
           list_contains(parts, 100) as has_part_100
       FROM supplier_parts
+      ORDER BY ps_suppkey
       LIMIT 100;
     clickhouse: |2
 
@@ -2460,6 +2710,7 @@ queries:
           ps_suppkey,
           has(parts, 100) as has_part_100
       FROM supplier_parts
+      ORDER BY ps_suppkey
       LIMIT 100;
     bigquery: |2
 
@@ -2474,24 +2725,9 @@ queries:
           ps_suppkey,
           100 IN UNNEST(parts) as has_part_100
       FROM supplier_parts
+      ORDER BY ps_suppkey
       LIMIT 100;
-    datafusion: |2
-
-      SELECT
-          ps_suppkey,
-          MAX(CASE WHEN ps_partkey = 100 THEN 1 ELSE 0 END) = 1 as has_part_100
-      FROM partsupp
-      GROUP BY ps_suppkey
-      LIMIT 100;
-    redshift: |2
-
-      -- Redshift has no native array type; use a scalar membership test
-      SELECT
-          ps_suppkey,
-          MAX(CASE WHEN ps_partkey = 100 THEN 1 ELSE 0 END) = 1 as has_part_100
-      FROM partsupp
-      GROUP BY ps_suppkey
-      LIMIT 100;
+  skip_on: [datafusion, redshift]
 - id: array_length
   category: array
   sql: |2
@@ -2508,8 +2744,14 @@ queries:
         ps_suppkey,
         CARDINALITY(parts) as num_parts
     FROM supplier_parts
-    ORDER BY num_parts DESC
+    ORDER BY num_parts DESC, ps_suppkey
     LIMIT 100;
+  result_contract:
+    capability: array_cardinality
+    row_identity: [ps_suppkey]
+    columns:
+      - ps_suppkey
+      - num_parts
   variants:
     duckdb: |2
 
@@ -2524,7 +2766,7 @@ queries:
           ps_suppkey,
           len(parts) as num_parts
       FROM supplier_parts
-      ORDER BY num_parts DESC
+      ORDER BY num_parts DESC, ps_suppkey
       LIMIT 100;
     clickhouse: |2
 
@@ -2539,27 +2781,9 @@ queries:
           ps_suppkey,
           length(parts) as num_parts
       FROM supplier_parts
-      ORDER BY num_parts DESC
+      ORDER BY num_parts DESC, ps_suppkey
       LIMIT 100;
-    datafusion: |2
-
-      SELECT
-          ps_suppkey,
-          COUNT(*) as num_parts
-      FROM partsupp
-      GROUP BY ps_suppkey
-      ORDER BY num_parts DESC
-      LIMIT 100;
-    redshift: |2
-
-      -- Redshift has no native array type; count parts directly
-      SELECT
-          ps_suppkey,
-          COUNT(*) as num_parts
-      FROM partsupp
-      GROUP BY ps_suppkey
-      ORDER BY num_parts DESC
-      LIMIT 100;
+  skip_on: [datafusion, redshift]
 - id: array_slice
   category: array
   sql: |2
@@ -2577,7 +2801,16 @@ queries:
         o_custkey,
         ARRAY_SLICE(prices, 1, 3) as top_3_orders
     FROM order_prices
+    ORDER BY o_custkey
     LIMIT 100;
+  result_contract:
+    capability: ordered_array_slice
+    row_identity: [o_custkey]
+    columns:
+      - o_custkey
+      - name: top_3_orders
+        type_class: array
+        order_sensitive: true
   variants:
     duckdb: |2
 
@@ -2593,6 +2826,7 @@ queries:
           o_custkey,
           prices[1:3] as top_3_orders
       FROM order_prices
+      ORDER BY o_custkey
       LIMIT 100;
     clickhouse: |2
 
@@ -2608,6 +2842,7 @@ queries:
           o_custkey,
           arraySlice(prices, 1, 3) as top_3_orders
       FROM order_prices
+      ORDER BY o_custkey
       LIMIT 100;
   skip_on: [redshift]
 - id: array_min_max
@@ -2627,7 +2862,15 @@ queries:
         ARRAY_MIN(prices) as min_order,
         ARRAY_MAX(prices) as max_order
     FROM order_prices
+    ORDER BY o_custkey
     LIMIT 100;
+  result_contract:
+    capability: array_min_max
+    row_identity: [o_custkey]
+    columns:
+      - o_custkey
+      - min_order
+      - max_order
   variants:
     duckdb: |2
 
@@ -2643,6 +2886,7 @@ queries:
           list_min(prices) as min_order,
           list_max(prices) as max_order
       FROM order_prices
+      ORDER BY o_custkey
       LIMIT 100;
     clickhouse: |2
 
@@ -2658,27 +2902,9 @@ queries:
           arrayMin(prices) as min_order,
           arrayMax(prices) as max_order
       FROM order_prices
+      ORDER BY o_custkey
       LIMIT 100;
-    datafusion: |2
-
-      SELECT
-          o_custkey,
-          MIN(o_totalprice) as min_order,
-          MAX(o_totalprice) as max_order
-      FROM orders
-      GROUP BY o_custkey
-      LIMIT 100;
-    redshift: |2
-
-      -- Redshift has no native array type; compute min/max directly
-      SELECT
-          o_custkey,
-          MIN(o_totalprice) as min_order,
-          MAX(o_totalprice) as max_order
-      FROM orders
-      GROUP BY o_custkey
-      LIMIT 100;
-  skip_on: [bigquery]
+  skip_on: [bigquery, datafusion, redshift]
 - id: array_sort
   category: array
   sql: |2
@@ -2695,7 +2921,16 @@ queries:
         p_brand,
         ARRAY_SORT(sizes) as sorted_sizes
     FROM part_sizes
+    ORDER BY p_brand
     LIMIT 50;
+  result_contract:
+    capability: array_sort
+    row_identity: [p_brand]
+    columns:
+      - p_brand
+      - name: sorted_sizes
+        type_class: array
+        order_sensitive: true
   variants:
     duckdb: |2
 
@@ -2710,6 +2945,7 @@ queries:
           p_brand,
           list_sort(sizes) as sorted_sizes
       FROM part_sizes
+      ORDER BY p_brand
       LIMIT 50;
     clickhouse: |2
 
@@ -2724,6 +2960,7 @@ queries:
           p_brand,
           arraySort(sizes) as sorted_sizes
       FROM part_sizes
+      ORDER BY p_brand
       LIMIT 50;
   skip_on: [bigquery, redshift]
 - id: array_distinct
@@ -2742,7 +2979,15 @@ queries:
         l_orderkey,
         ARRAY_DISTINCT(modes) as unique_modes
     FROM ship_modes
+    ORDER BY l_orderkey
     LIMIT 100;
+  result_contract:
+    capability: distinct_array_values
+    row_identity: [l_orderkey]
+    columns:
+      - l_orderkey
+      - name: unique_modes
+        type_class: array
   variants:
     duckdb: |2
 
@@ -2757,6 +3002,7 @@ queries:
           l_orderkey,
           list_distinct(modes) as unique_modes
       FROM ship_modes
+      ORDER BY l_orderkey
       LIMIT 100;
     clickhouse: |2
 
@@ -2771,16 +3017,9 @@ queries:
           l_orderkey,
           arrayDistinct(modes) as unique_modes
       FROM ship_modes
+      ORDER BY l_orderkey
       LIMIT 100;
-    datafusion: |2
-
-      SELECT
-          l_orderkey,
-          ARRAY_AGG(DISTINCT l_shipmode) as unique_modes
-      FROM lineitem
-      GROUP BY l_orderkey
-      LIMIT 100;
-  skip_on: [bigquery, redshift]
+  skip_on: [bigquery, datafusion, redshift]
 
 # ============================================================================
 # STRUCT type operations - composite data types
@@ -2797,7 +3036,16 @@ queries:
         c_acctbal
     FROM customer
     WHERE c_nationkey = 1
+    ORDER BY c_custkey
     LIMIT 100;
+  result_contract:
+    capability: positional_struct_construction
+    row_identity: [c_custkey]
+    columns:
+      - c_custkey
+      - name: contact_info
+        type_class: struct
+      - c_acctbal
   variants:
     clickhouse: |2
 
@@ -2807,6 +3055,7 @@ queries:
           c_acctbal
       FROM customer
       WHERE c_nationkey = 1
+      ORDER BY c_custkey
       LIMIT 100;
     duckdb: |2
 
@@ -2816,6 +3065,7 @@ queries:
           c_acctbal
       FROM customer
       WHERE c_nationkey = 1
+      ORDER BY c_custkey
       LIMIT 100;
   skip_on: [redshift]
 - id: struct_access
@@ -2836,7 +3086,15 @@ queries:
         info.balance
     FROM customer_info
     WHERE info.balance > 5000
+    ORDER BY c_custkey
     LIMIT 100;
+  result_contract:
+    capability: struct_field_access
+    row_identity: [c_custkey]
+    columns:
+      - c_custkey
+      - name
+      - balance
   variants:
     clickhouse: |2
 
@@ -2853,6 +3111,7 @@ queries:
           info.3 as balance
       FROM customer_info
       WHERE info.3 > 5000
+      ORDER BY c_custkey
       LIMIT 100;
   skip_on: [redshift]
 - id: array_of_struct
@@ -2870,17 +3129,54 @@ queries:
     JOIN lineitem l ON o.o_orderkey = l.l_orderkey
     WHERE o_orderdate = DATE '1995-03-15'
     GROUP BY o_orderkey
+    ORDER BY o_orderkey
     LIMIT 50;
+  result_contract:
+    capability: ordered_array_of_structs
+    row_identity: [o_orderkey]
+    columns:
+      - o_orderkey
+      - name: line_items
+        type_class: array
+        order_sensitive: true
   variants:
+    duckdb: |2
+
+      SELECT
+          o_orderkey,
+          ARRAY_AGG(
+              struct_pack(
+                  l_linenumber := l_linenumber,
+                  l_partkey := l_partkey,
+                  l_quantity := l_quantity,
+                  l_extendedprice := l_extendedprice
+              )
+              ORDER BY l_linenumber
+          ) as line_items
+      FROM orders o
+      JOIN lineitem l ON o.o_orderkey = l.l_orderkey
+      WHERE o_orderdate = DATE '1995-03-15'
+      GROUP BY o_orderkey
+      ORDER BY o_orderkey
+      LIMIT 50;
     clickhouse: |2
 
       SELECT
           o_orderkey,
-          groupArray(tuple(l_linenumber, l_partkey, l_quantity, l_extendedprice)) as line_items
+          arraySort(
+              x -> x.1,
+              groupArray(
+                  CAST(
+                      (l_linenumber, l_partkey, l_quantity, l_extendedprice),
+                      'Tuple(l_linenumber Int32, l_partkey Int32, l_quantity Decimal(15,2), l_extendedprice Decimal(15,2))'
+                  )
+              )
+          ) as line_items
       FROM orders o
       JOIN lineitem l ON o.o_orderkey = l.l_orderkey
       WHERE o_orderdate = '1995-03-15'
       GROUP BY o_orderkey
+      ORDER BY o_orderkey
       LIMIT 50;
   skip_on: [redshift]
 
@@ -2900,7 +3196,15 @@ queries:
         ) as part_costs
     FROM partsupp
     WHERE ps_suppkey <= 10
-    GROUP BY ps_suppkey;
+    GROUP BY ps_suppkey
+    ORDER BY ps_suppkey;
+  result_contract:
+    capability: map_construction
+    row_identity: [ps_suppkey]
+    columns:
+      - ps_suppkey
+      - name: part_costs
+        type_class: map
   variants:
     duckdb: |2
 
@@ -2911,7 +3215,8 @@ queries:
           ) as part_costs
       FROM partsupp
       WHERE ps_suppkey <= 10
-      GROUP BY ps_suppkey;
+      GROUP BY ps_suppkey
+      ORDER BY ps_suppkey;
     datafusion: |2
 
       SELECT
@@ -2922,7 +3227,8 @@ queries:
           ) as part_costs
       FROM partsupp
       WHERE ps_suppkey <= 10
-      GROUP BY ps_suppkey;
+      GROUP BY ps_suppkey
+      ORDER BY ps_suppkey;
     clickhouse: |2
 
       SELECT
@@ -2933,7 +3239,8 @@ queries:
           ) as part_costs
       FROM partsupp
       WHERE ps_suppkey <= 10
-      GROUP BY ps_suppkey;
+      GROUP BY ps_suppkey
+      ORDER BY ps_suppkey;
   skip_on: [bigquery, redshift]
 - id: map_access
   category: map
@@ -2955,7 +3262,15 @@ queries:
         part_costs['1'] as cost_for_part_1,
         part_costs['5'] as cost_for_part_5
     FROM supplier_costs
+    ORDER BY ps_suppkey
     LIMIT 10;
+  result_contract:
+    capability: map_key_access
+    row_identity: [ps_suppkey]
+    columns:
+      - ps_suppkey
+      - cost_for_part_1
+      - cost_for_part_5
   variants:
     datafusion: |2
 
@@ -2974,6 +3289,28 @@ queries:
           ps_suppkey,
           MAP_EXTRACT(part_costs, '1')[1] as cost_for_part_1,
           MAP_EXTRACT(part_costs, '5')[1] as cost_for_part_5
+      FROM supplier_costs
+      ORDER BY ps_suppkey
+      LIMIT 10;
+    clickhouse: |2
+
+      -- ClickHouse builds Map via CAST((Array(K), Array(V)) AS Map(K, V));
+      -- match the map_construction / map_keys_values convention.
+      WITH supplier_costs AS (
+          SELECT
+              ps_suppkey,
+              CAST(
+                  (groupArray(CAST(ps_partkey AS String)), groupArray(ps_supplycost)),
+                  'Map(String, Decimal(15,2))'
+              ) as part_costs
+          FROM partsupp
+          WHERE ps_suppkey <= 10
+          GROUP BY ps_suppkey
+      )
+      SELECT
+          ps_suppkey,
+          part_costs['1'] as cost_for_part_1,
+          part_costs['5'] as cost_for_part_5
       FROM supplier_costs
       LIMIT 10;
   skip_on: [bigquery, redshift]
@@ -2996,7 +3333,17 @@ queries:
         ps_suppkey,
         MAP_KEYS(part_costs) as part_ids,
         MAP_VALUES(part_costs) as costs
-    FROM supplier_costs;
+    FROM supplier_costs
+    ORDER BY ps_suppkey;
+  result_contract:
+    capability: map_keys_values
+    row_identity: [ps_suppkey]
+    columns:
+      - ps_suppkey
+      - name: part_ids
+        type_class: array
+      - name: costs
+        type_class: array
   variants:
     datafusion: |2
 
@@ -3015,7 +3362,8 @@ queries:
           ps_suppkey,
           MAP_KEYS(part_costs) as part_ids,
           MAP_VALUES(part_costs) as costs
-      FROM supplier_costs;
+      FROM supplier_costs
+      ORDER BY ps_suppkey;
     clickhouse: |2
 
       WITH supplier_costs AS (
@@ -3033,7 +3381,8 @@ queries:
           ps_suppkey,
           mapKeys(part_costs) as part_ids,
           mapValues(part_costs) as costs
-      FROM supplier_costs;
+      FROM supplier_costs
+      ORDER BY ps_suppkey;
   skip_on: [bigquery, redshift]
 
 # ============================================================================
@@ -3056,7 +3405,15 @@ queries:
         p_brand,
         TRANSFORM(prices, x -> x * 1.1) as prices_with_tax
     FROM part_prices
+    ORDER BY p_brand
     LIMIT 50;
+  result_contract:
+    capability: array_lambda_transform
+    row_identity: [p_brand]
+    columns:
+      - p_brand
+      - name: prices_with_tax
+        type_class: array
   variants:
     duckdb: |2
 
@@ -3071,6 +3428,7 @@ queries:
           p_brand,
           list_transform(prices, x -> x * 1.1) as prices_with_tax
       FROM part_prices
+      ORDER BY p_brand
       LIMIT 50;
     clickhouse: |2
 
@@ -3085,29 +3443,9 @@ queries:
           p_brand,
           arrayMap(x -> x * 1.1, prices) as prices_with_tax
       FROM part_prices
+      ORDER BY p_brand
       LIMIT 50;
-    datafusion: |2
-
-      WITH part_prices AS (
-          SELECT
-              p_brand,
-              ARRAY_AGG(p_retailprice) as prices
-          FROM part
-          GROUP BY p_brand
-      ),
-      exploded AS (
-          SELECT
-              p_brand,
-              UNNEST(prices) as price
-          FROM part_prices
-      )
-      SELECT
-          p_brand,
-          ARRAY_AGG(price * 1.1) as prices_with_tax
-      FROM exploded
-      GROUP BY p_brand
-      LIMIT 50;
-  skip_on: [bigquery, redshift]
+  skip_on: [bigquery, datafusion, redshift]
 - id: list_filter
   category: lambda
   sql: |2
@@ -3124,7 +3462,15 @@ queries:
         o_custkey,
         FILTER(prices, x -> x > 100000) as large_orders
     FROM order_prices
+    ORDER BY o_custkey
     LIMIT 100;
+  result_contract:
+    capability: array_lambda_filter
+    row_identity: [o_custkey]
+    columns:
+      - o_custkey
+      - name: large_orders
+        type_class: array
   variants:
     duckdb: |2
 
@@ -3139,6 +3485,7 @@ queries:
           o_custkey,
           list_filter(prices, x -> x > 100000) as large_orders
       FROM order_prices
+      ORDER BY o_custkey
       LIMIT 100;
     clickhouse: |2
 
@@ -3153,30 +3500,9 @@ queries:
           o_custkey,
           arrayFilter(x -> x > 100000, prices) as large_orders
       FROM order_prices
+      ORDER BY o_custkey
       LIMIT 100;
-    datafusion: |2
-
-      WITH order_prices AS (
-          SELECT
-              o_custkey,
-              ARRAY_AGG(o_totalprice) as prices
-          FROM orders
-          GROUP BY o_custkey
-      ),
-      exploded AS (
-          SELECT
-              o_custkey,
-              UNNEST(prices) as price
-          FROM order_prices
-      )
-      SELECT
-          o_custkey,
-          ARRAY_AGG(price) as large_orders
-      FROM exploded
-      WHERE price > 100000
-      GROUP BY o_custkey
-      LIMIT 100;
-  skip_on: [bigquery, redshift]
+  skip_on: [bigquery, datafusion, redshift]
 - id: list_reduce
   category: lambda
   sql: |2
@@ -3193,7 +3519,14 @@ queries:
         l_orderkey,
         REDUCE(qtys, 0, (acc, x) -> acc + x) as total_qty
     FROM quantities
+    ORDER BY l_orderkey
     LIMIT 100;
+  result_contract:
+    capability: array_lambda_reduce
+    row_identity: [l_orderkey]
+    columns:
+      - l_orderkey
+      - total_qty
   variants:
     duckdb: |2
 
@@ -3208,6 +3541,7 @@ queries:
           l_orderkey,
           list_reduce(qtys, (acc, x) -> acc + x) as total_qty
       FROM quantities
+      ORDER BY l_orderkey
       LIMIT 100;
     clickhouse: |2
 
@@ -3222,29 +3556,9 @@ queries:
           l_orderkey,
           arrayReduce('sum', qtys) as total_qty
       FROM quantities
+      ORDER BY l_orderkey
       LIMIT 100;
-    datafusion: |2
-
-      WITH quantities AS (
-          SELECT
-              l_orderkey,
-              ARRAY_AGG(l_quantity) as qtys
-          FROM lineitem
-          GROUP BY l_orderkey
-      ),
-      exploded AS (
-          SELECT
-              l_orderkey,
-              UNNEST(qtys) as qty
-          FROM quantities
-      )
-      SELECT
-          l_orderkey,
-          SUM(qty) as total_qty
-      FROM exploded
-      GROUP BY l_orderkey
-      LIMIT 100;
-  skip_on: [bigquery, redshift]
+  skip_on: [bigquery, datafusion, redshift]
 
 # ============================================================================
 # ASOF JOIN - time series fuzzy temporal lookups
@@ -3267,7 +3581,16 @@ queries:
         AND l.l_shipdate >= o.o_orderdate
     WHERE l.l_shipdate >= DATE '1995-01-01'
       AND l.l_shipdate < DATE '1995-02-01'
+    ORDER BY l.l_orderkey, l.l_shipdate
     LIMIT 100;
+  result_contract:
+    capability: asof_temporal_join
+    columns:
+      - l_orderkey
+      - l_shipdate
+      - o_orderdate
+      - o_totalprice
+      - days_to_ship
   variants:
     snowflake: |2
 
@@ -3283,23 +3606,9 @@ queries:
           ON l.l_orderkey = o.o_orderkey
       WHERE l.l_shipdate >= DATE '1995-01-01'
         AND l.l_shipdate < DATE '1995-02-01'
+      ORDER BY l.l_orderkey, l.l_shipdate
       LIMIT 100;
-    datafusion: |2
-
-      SELECT
-          l.l_orderkey,
-          l.l_shipdate,
-          o.o_orderdate,
-          o.o_totalprice,
-          l.l_shipdate - o.o_orderdate as days_to_ship
-      FROM lineitem l
-      ASOF JOIN orders o
-          MATCH_CONDITION (l.l_shipdate >= o.o_orderdate)
-          ON l.l_orderkey = o.o_orderkey
-      WHERE l.l_shipdate >= DATE '1995-01-01'
-        AND l.l_shipdate < DATE '1995-02-01'
-      LIMIT 100;
-  skip_on: [bigquery, databricks, redshift]
+  skip_on: [bigquery, datafusion, databricks, redshift]
 
 # ============================================================================
 # PIVOT/UNPIVOT operations - row-to-column and column-to-row transformations
@@ -3345,7 +3654,15 @@ queries:
     UNPIVOT (
         dimension_value
         FOR dimension_name IN (p_size, p_retailprice)
-    );
+    )
+    ORDER BY p_partkey, dimension_name;
+  result_contract:
+    capability: unpivot_rows
+    row_identity: [p_partkey, dimension_name]
+    columns:
+      - p_partkey
+      - dimension_name
+      - dimension_value
   variants:
     datafusion: |2
 
@@ -3361,7 +3678,8 @@ queries:
           'p_retailprice' as dimension_name,
           p_retailprice as dimension_value
       FROM part
-      WHERE p_partkey <= 100;
+      WHERE p_partkey <= 100
+      ORDER BY p_partkey, dimension_name;
   skip_on: [clickhouse]
 
 # ============================================================================
@@ -3506,7 +3824,15 @@ queries:
     SELECT l_orderkey, l_returnflag, l_quantity,
            RANK() OVER (PARTITION BY l_returnflag ORDER BY l_quantity DESC) as qty_rank
     FROM lineitem
-    QUALIFY RANK() OVER (PARTITION BY l_returnflag ORDER BY l_quantity DESC) <= 5;
+    QUALIFY RANK() OVER (PARTITION BY l_returnflag ORDER BY l_quantity DESC) <= 5
+    ORDER BY l_returnflag, qty_rank, l_orderkey;
+  result_contract:
+    capability: qualify_rank_filter
+    columns:
+      - l_orderkey
+      - l_returnflag
+      - l_quantity
+      - qty_rank
   variants:
     datafusion: |2
 
@@ -3516,7 +3842,8 @@ queries:
                  RANK() OVER (PARTITION BY l_returnflag ORDER BY l_quantity DESC) as qty_rank
           FROM lineitem
       ) ranked
-      WHERE qty_rank <= 5;
+      WHERE qty_rank <= 5
+      ORDER BY l_returnflag, qty_rank, l_orderkey;
     redshift: |2
 
       -- Redshift QUALIFY with RANK requires subquery workaround
@@ -3526,7 +3853,8 @@ queries:
                  RANK() OVER (PARTITION BY l_returnflag ORDER BY l_quantity DESC) as qty_rank
           FROM lineitem
       ) ranked
-      WHERE qty_rank <= 5;
+      WHERE qty_rank <= 5
+      ORDER BY l_returnflag, qty_rank, l_orderkey;
 
 - id: window_sum
   category: window

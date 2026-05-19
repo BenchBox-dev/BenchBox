@@ -446,11 +446,11 @@ LakeSail Sail is a Rust-based drop-in replacement for Apache Spark. Both SQL (`l
 Single-node multi-threaded execution. Start a Sail server locally, then connect over Spark Connect.
 
 ```bash
-# Install the PySpark client (Sail uses standard PySpark + pyarrow)
-uv add pyspark pyarrow
+# Install the Spark Connect-capable PySpark client
+uv add benchbox --extra lakesail
 
-# Start your LakeSail Sail server (see LakeSail documentation)
-# Default endpoint: sc://localhost:50051
+# Start the local Docker-backed Sail server
+make uat-bring-up PLATFORM=lakesail
 
 # SQL benchmark
 benchbox run --platform lakesail --benchmark tpch --scale 1.0

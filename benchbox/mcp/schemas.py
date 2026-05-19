@@ -18,7 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # Validation constants
 MAX_QUERY_IDS = 100  # Maximum number of query IDs per request (DoS protection)
-MAX_QUERY_ID_LENGTH = 20  # Maximum length of a single query ID
+MAX_QUERY_ID_LENGTH = 64  # Maximum length of a single query ID
 QUERY_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_-]+$")  # Alphanumeric with dash/underscore
 PLATFORM_PATTERN = re.compile(r"^[a-zA-Z0-9_-]+$")  # Alphanumeric platform names
 BENCHMARK_PATTERN = re.compile(r"^[a-zA-Z0-9_-]+$")  # Alphanumeric benchmark names

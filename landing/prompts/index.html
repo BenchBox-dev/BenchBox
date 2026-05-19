@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Instruct a coding agent to use BenchBox</title>
+        <meta
+            name="description"
+            content="Build a copy-paste prompt that tells a coding agent how to run a BenchBox benchmark. Pick a surface, platform, benchmark, and scale; copy the prompt."
+        />
+        <link rel="icon" href="data:," />
+        <script>
+            (function () {
+                try {
+                    var stored = localStorage.getItem("benchbox:theme");
+                    var choice = stored === "light" || stored === "dark" || stored === "system" ? stored : "system";
+                    var dark =
+                        choice === "dark" ||
+                        (choice === "system" &&
+                            window.matchMedia &&
+                            window.matchMedia("(prefers-color-scheme: dark)").matches);
+                    document.documentElement.dataset.bbThemeChoice = choice;
+                    document.documentElement.dataset.bbTheme = dark ? "dark" : "light";
+                    document.documentElement.dataset.theme = dark ? "dark" : "light";
+                    document.documentElement.style.colorScheme = dark ? "dark" : "light";
+                } catch (error) {}
+            })();
+        </script>
+        <link rel="stylesheet" href="../shared/site-header.css?v=1" />
+        <link rel="stylesheet" href="../style.css?v=5" />
+        <link rel="stylesheet" href="../shared/site-theme.css?v=1" />
+        <link rel="stylesheet" href="prompts.css?v=20260515" />
+    </head>
+
+    <body>
+        <header class="benchbox-site-header" data-benchbox-site-header data-scrolled="false">
+            <div class="benchbox-site-header__container">
+                <a href="https://benchbox.dev/" class="benchbox-site-header__logo">BenchBox</a>
+                <button
+                    class="benchbox-site-header__toggle"
+                    type="button"
+                    aria-label="Toggle site navigation"
+                    aria-controls="benchbox-site-header-nav"
+                    aria-expanded="false"
+                    data-benchbox-site-header-toggle
+                >
+                    <span class="benchbox-site-header__toggle-lines" aria-hidden="true"></span>
+                </button>
+                <nav
+                    id="benchbox-site-header-nav"
+                    class="benchbox-site-header__nav"
+                    aria-label="BenchBox"
+                    data-benchbox-site-header-nav
+                >
+                    <a class="benchbox-site-header__link" href="https://benchbox.dev/">Home</a>
+                    <a class="benchbox-site-header__link" href="https://benchbox.dev/docs/">Docs</a>
+                    <a class="benchbox-site-header__link" href="https://benchbox.dev/blog/">Blog</a>
+                    <a class="benchbox-site-header__link" href="https://benchbox.dev/results/">Results</a>
+                    <a class="benchbox-site-header__link" href="/prompts/" aria-current="page"
+                        >Instruct an agent</a
+                    >
+                    <a
+                        class="benchbox-site-header__link"
+                        href="https://github.com/joeharris76/BenchBox"
+                        target="_blank"
+                        rel="noopener"
+                        >GitHub</a
+                    >
+                    <a class="benchbox-site-header__cta" href="https://benchbox.dev/docs/usage/installation.html"
+                        >Run benchmark</a
+                    >
+                    <button
+                        class="benchbox-site-header__theme"
+                        type="button"
+                        aria-label="Theme: system. Activate to switch theme."
+                        data-benchbox-theme-toggle
+                    >
+                        System
+                    </button>
+                </nav>
+            </div>
+        </header>
+
+        <main class="prompts-main">
+            <header class="prompts-header">
+                <h1>Instruct a coding agent to use BenchBox</h1>
+                <p class="prompts-lede">
+                    Pick a surface, platform, benchmark, and scale. Copy the prompt into your coding agent.
+                    Defaults to a safe local DuckDB + TPC-H quickstart.
+                </p>
+            </header>
+
+            <noscript>
+                <div class="prompts-noscript">
+                    This builder is interactive and requires JavaScript. If JavaScript is disabled, here is the
+                    default quickstart:
+                    <code>uv add 'benchbox[duckdb]' &amp;&amp; uv run benchbox run --platform duckdb --benchmark tpch --scale 0.01</code>
+                </div>
+            </noscript>
+
+            <form class="prompts-form" id="prompts-form" aria-label="Prompt builder">
+                <div class="prompts-grid">
+                    <label class="prompts-field">
+                        <span>Goal</span>
+                        <select id="sel-goal" name="goal"></select>
+                    </label>
+                    <label class="prompts-field">
+                        <span>Surface</span>
+                        <select id="sel-surface" name="surface"></select>
+                    </label>
+                    <label class="prompts-field">
+                        <span>Interface</span>
+                        <select id="sel-interface" name="interface"></select>
+                    </label>
+                    <label class="prompts-field">
+                        <span>Deployment</span>
+                        <select id="sel-deployment" name="deployment"></select>
+                    </label>
+                    <label class="prompts-field" data-mode="test_one">
+                        <span>Platform</span>
+                        <select id="sel-platform" name="platform"></select>
+                    </label>
+                    <label class="prompts-field" data-mode="compare" hidden>
+                        <span>Platform A</span>
+                        <select id="sel-platformA" name="platformA"></select>
+                    </label>
+                    <label class="prompts-field" data-mode="compare" hidden>
+                        <span>Platform B</span>
+                        <select id="sel-platformB" name="platformB"></select>
+                    </label>
+                    <label class="prompts-field">
+                        <span>Benchmark</span>
+                        <select id="sel-benchmark" name="benchmark"></select>
+                    </label>
+                    <label class="prompts-field">
+                        <span>Scale</span>
+                        <select id="sel-scale" name="scale"></select>
+                    </label>
+                </div>
+            </form>
+
+            <section class="prompts-output">
+                <div class="prompts-block" id="block-prompt" hidden>
+                    <header>
+                        <h2>📋 Agent prompt</h2>
+                        <button type="button" class="prompts-copy" data-copy-target="prompt-text">Copy</button>
+                    </header>
+                    <pre id="prompt-text"></pre>
+                </div>
+
+                <div class="prompts-block" id="block-mcp-setup" hidden>
+                    <header>
+                        <h2>🔧 MCP server config</h2>
+                        <button type="button" class="prompts-copy" data-copy-target="mcp-setup-text">Copy</button>
+                    </header>
+                    <p class="prompts-block-hint">
+                        Add this entry to your agent's MCP config (e.g.
+                        <code>~/.codex/config.toml</code> or <code>claude_desktop_config.json</code>):
+                    </p>
+                    <pre id="mcp-setup-text"></pre>
+                </div>
+
+                <div class="prompts-block prompts-block--warn" id="block-cloud-safety" hidden>
+                    <header>
+                        <h2>Credential safety</h2>
+                    </header>
+                    <ul id="cloud-safety-list"></ul>
+                </div>
+
+                <div role="status" aria-live="polite" class="prompts-aria" id="copy-status"></div>
+            </section>
+        </main>
+
+        <script src="../shared/site-theme.js"></script>
+        <script src="../shared/site-header.js"></script>
+        <script src="catalog.generated.js?v=20260515"></script>
+        <script src="prompts.js?v=20260515"></script>
+    </body>
+</html>

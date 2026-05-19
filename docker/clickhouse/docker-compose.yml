@@ -1,0 +1,35 @@
+# ClickHouse Server Docker Compose
+# Single-node ClickHouse for integration testing (server mode)
+#
+# Usage:
+#   docker compose -f docker-compose.yml up -d
+#   benchbox run --platform clickhouse --benchmark tpch --scale 0.01 \
+#     --platform-option host=localhost --platform-option port=9000
+#
+# Ports:
+#   9000 - Native TCP protocol (clickhouse-driver)
+#   8123 - HTTP interface (clickhouse-connect)
+#
+# Default credentials:
+#   Username: default
+#   Password: (empty)
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.8
+    ports:
+      - "9000:9000"
+      - "8123:8123"
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  clickhouse-data:
+    driver: local

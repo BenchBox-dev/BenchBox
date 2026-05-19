@@ -93,6 +93,86 @@ LIMIT 20
 # ---------------------------------------------------------------------------
 
 QUERY_VARIANTS: dict[str, dict[str, str]] = {
+    # Spark-family engines do not expose DuckDB's array_cosine_similarity /
+    # array_distance helpers, but can express the same exact search with
+    # higher-order array functions.
+    "spark": {
+        "Q1": """
+SELECT v.id,
+       aggregate(zip_with(v.embedding, q.query_vector, (x, y) -> x * y), 0D, (acc, z) -> acc + z)
+       / NULLIF(
+           sqrt(aggregate(v.embedding, 0D, (acc, x) -> acc + x * x))
+           * sqrt(aggregate(q.query_vector, 0D, (acc, x) -> acc + x * x)),
+           0D
+         ) AS similarity
+FROM vectors v
+CROSS JOIN (SELECT query_vector FROM vector_queries WHERE query_id = 1) q
+ORDER BY similarity DESC
+LIMIT 10
+""".strip(),
+        "Q2": """
+SELECT v.id,
+       sqrt(aggregate(zip_with(v.embedding, q.query_vector, (x, y) -> (x - y) * (x - y)), 0D, (acc, z) -> acc + z)) AS distance
+FROM vectors v
+CROSS JOIN (SELECT query_vector FROM vector_queries WHERE query_id = 1) q
+ORDER BY distance ASC
+LIMIT 10
+""".strip(),
+        "Q3": """
+SELECT v.id,
+       aggregate(zip_with(v.embedding, q.query_vector, (x, y) -> x * y), 0D, (acc, z) -> acc + z)
+       / NULLIF(
+           sqrt(aggregate(v.embedding, 0D, (acc, x) -> acc + x * x))
+           * sqrt(aggregate(q.query_vector, 0D, (acc, x) -> acc + x * x)),
+           0D
+         ) AS similarity
+FROM vectors v
+CROSS JOIN (SELECT query_vector FROM vector_queries WHERE query_id = 1) q
+WHERE v.category = 'category_01'
+ORDER BY similarity DESC
+LIMIT 10
+""".strip(),
+        "Q4": """
+SELECT v.id,
+       aggregate(zip_with(v.embedding, q.query_vector, (x, y) -> x * y), 0D, (acc, z) -> acc + z)
+       / NULLIF(
+           sqrt(aggregate(v.embedding, 0D, (acc, x) -> acc + x * x))
+           * sqrt(aggregate(q.query_vector, 0D, (acc, x) -> acc + x * x)),
+           0D
+         ) AS similarity
+FROM vectors v
+CROSS JOIN (SELECT query_vector FROM vector_queries WHERE query_id = 1) q
+ORDER BY similarity DESC
+LIMIT 100
+""".strip(),
+        "Q5": """
+SELECT v.id,
+       aggregate(zip_with(v.embedding, q.query_vector, (x, y) -> x * y), 0D, (acc, z) -> acc + z)
+       / NULLIF(
+           sqrt(aggregate(v.embedding, 0D, (acc, x) -> acc + x * x))
+           * sqrt(aggregate(q.query_vector, 0D, (acc, x) -> acc + x * x)),
+           0D
+         ) AS similarity
+FROM vectors v
+CROSS JOIN (SELECT query_vector FROM vector_queries WHERE query_id = 1) q
+ORDER BY similarity DESC
+LIMIT 10
+""".strip(),
+        "Q6": """
+SELECT v.id,
+       aggregate(zip_with(v.embedding, q.query_vector, (x, y) -> x * y), 0D, (acc, z) -> acc + z)
+       / NULLIF(
+           sqrt(aggregate(v.embedding, 0D, (acc, x) -> acc + x * x))
+           * sqrt(aggregate(q.query_vector, 0D, (acc, x) -> acc + x * x)),
+           0D
+         ) AS similarity
+FROM vectors v
+CROSS JOIN (SELECT query_vector FROM vector_queries WHERE query_id = 2) q
+WHERE v.category IN ('category_01', 'category_02', 'category_03')
+ORDER BY similarity DESC
+LIMIT 20
+""".strip(),
+    },
     # StarRocks 3.x: cosine_similarity on ARRAY<FLOAT> works from 3.0+.
     # l2_distance (Q2) requires StarRocks ≥3.2; older builds return a parse
     # error and the query is skipped (benchmark reports PARTIAL).
@@ -362,6 +442,9 @@ LIMIT 20
 """.strip(),
     },
 }
+
+for _spark_alias in ("pyspark", "velox", "databricks"):
+    QUERY_VARIANTS[_spark_alias] = QUERY_VARIANTS["spark"]
 
 
 # ---------------------------------------------------------------------------

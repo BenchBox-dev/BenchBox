@@ -701,7 +701,7 @@ Data generation support by benchmark:
 | **Read Primitives** | ✅ Full           | ✅ Yes          | ✅ Yes            | Shares TPC-H data         |
 | **SSB**        | ⚠️️ Basic          | ❌ No           | ✅ Yes            | Will be improved          |
 | **ClickBench** | ⚠️️ Basic          | ❌ No           | ❌ No             | External data             |
-| **Join Order** | ⚠️️ Basic          | ❌ No           | ❌ No             | IMDB dataset              |
+| **Join Order** | ✅ Downloaded      | ✅ Hashes/rows   | ❌ No             | Canonical IMDb JOB data, `SF=1` only |
 | **Others**     | ⚠️️ Basic          | ❌ No           | ❌ No             | Being improved            |
 
 ## Future Enhancements

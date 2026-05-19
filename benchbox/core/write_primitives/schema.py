@@ -266,6 +266,28 @@ DDL_TRUNCATE_TARGET = {
     ],
 }
 
+# SKETCH operations staging table for theta+kll sketches partitioned by date/region.
+# Sketch columns use the logical BINARY type; translate_column_type rewrites it
+# per dialect (BLOB/BYTES/HLLSKETCH/etc.).
+SKETCH_OPS_DAILY_USERS = {
+    "name": "sketch_ops_daily_users",
+    "columns": [
+        {"name": "activity_date", "type": "DATE"},
+        {"name": "region", "type": "VARCHAR(25)"},
+        {"name": "user_sketch", "type": "BINARY", "nullable": True},
+        {"name": "rev_sketch", "type": "BINARY", "nullable": True},
+    ],
+}
+
+# SKETCH operations staging table for top-K sketches per shard.
+SKETCH_OPS_TOPK = {
+    "name": "sketch_ops_topk",
+    "columns": [
+        {"name": "shard_id", "type": "INTEGER"},
+        {"name": "topk_sketch", "type": "BINARY", "nullable": True},
+    ],
+}
+
 # Audit log for tracking write operations
 WRITE_OPS_LOG = {
     "name": "write_ops_log",
@@ -323,6 +345,8 @@ TABLES = {
     "merge_ops_summary_target": MERGE_OPS_SUMMARY_TARGET,
     "bulk_load_ops_target": BULK_LOAD_OPS_TARGET,
     "ddl_truncate_target": DDL_TRUNCATE_TARGET,
+    "sketch_ops_daily_users": SKETCH_OPS_DAILY_USERS,
+    "sketch_ops_topk": SKETCH_OPS_TOPK,
     # Metadata tables
     "write_ops_log": WRITE_OPS_LOG,
     "batch_metadata": BATCH_METADATA,
@@ -346,7 +370,42 @@ STAGING_TABLES = {
     "ddl_truncate_target": DDL_TRUNCATE_TARGET,
     "write_ops_log": WRITE_OPS_LOG,
     "batch_metadata": BATCH_METADATA,
+    # SKETCH_OPS_* tables are intentionally NOT in STAGING_TABLES — sketch
+    # operations manage their own CREATE / DROP via sketch_ddl_create_persistent_table
+    # and sketch_drop_persistent_table to keep BINARY-column DDL out of the
+    # bootstrap loop on dialects that lack a BINARY type (DataFusion, SQLite).
 }
+
+
+# Per-dialect rewrites for the logical BINARY column type used by sketch ops.
+# Engines without a binary type (e.g. SQLite) are listed here as None to opt
+# out — callers must handle the None by skipping the table for that dialect.
+_BINARY_TYPE_BY_DIALECT: dict[str, str | None] = {
+    "standard": "BINARY",
+    "duckdb": "BLOB",
+    "databricks": "BINARY",
+    "snowflake": "BINARY",
+    "bigquery": "BYTES",
+    "clickhouse": "String",
+    "postgres": "BYTEA",
+    "redshift": "HLLSKETCH",
+    "sqlite": None,
+    "datafusion": None,
+}
+
+
+def translate_column_type(type_str: str, dialect: str) -> str | None:
+    """Translate a logical column type string to a dialect-specific one.
+
+    Currently only rewrites the logical `BINARY` type. Returns the input
+    unchanged for any other type. Returns `None` when the dialect does
+    not support the requested type — callers must skip the column or
+    table accordingly.
+    """
+    canonical = type_str.strip().upper()
+    if canonical == "BINARY":
+        return _BINARY_TYPE_BY_DIALECT.get(dialect.lower(), "BINARY")
+    return type_str
 
 
 def _supports_primary_keys(dialect: str) -> bool:
@@ -394,7 +453,13 @@ def get_create_table_sql(table_name: str, dialect: str = "standard", if_not_exis
     columns: list[str] = []
 
     for col in table["columns"]:
-        col_def = f"{col['name']} {col['type']}"
+        column_type = translate_column_type(col["type"], dialect)
+        if column_type is None:
+            raise ValueError(
+                f"Column '{col['name']}' uses logical type '{col['type']}' which has no "
+                f"mapping for dialect '{dialect}'. Skip this table or pick a dialect with support."
+            )
+        col_def = f"{col['name']} {column_type}"
         if col.get("primary_key") and supports_primary_keys:
             col_def += " PRIMARY KEY"
         if not col.get("nullable", False) and not col.get("primary_key"):
@@ -485,9 +550,12 @@ __all__ = [
     "MERGE_OPS_SUMMARY_TARGET",
     "BULK_LOAD_OPS_TARGET",
     "DDL_TRUNCATE_TARGET",
+    "SKETCH_OPS_DAILY_USERS",
+    "SKETCH_OPS_TOPK",
     "WRITE_OPS_LOG",
     "BATCH_METADATA",
     "get_create_table_sql",
     "get_all_staging_tables_sql",
     "get_table_schema",
+    "translate_column_type",
 ]

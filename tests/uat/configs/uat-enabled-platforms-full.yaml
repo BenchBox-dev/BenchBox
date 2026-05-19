@@ -1,0 +1,65 @@
+name: "uat-enabled-platforms-full"
+description: "Release-gate UAT sweep for enabled local SQL platforms"
+
+phases:
+  - preflight
+  - enumerate
+  - execute
+  - validate
+  - package
+  - explorer_smoke
+  - report
+
+platforms:
+  include: ["lakesail", "pg-duckdb", "pg-mooncake", "timescaledb"]
+
+benchmarks:
+  groups: ["all"]
+
+compatibility:
+  release_gate_runtime_envelopes: true
+
+scales:
+  rungs: [0.01]
+
+execute:
+  # TimescaleDB TPC-Havoc is correctness-clean but measured at ~758s after
+  # PostgreSQL-family compatibility filtering, so the full release gate needs a
+  # longer per-cell budget than the enumeration sweep.
+  per_cell_timeout_s: 1200
+  early_stop_after_s: 86400
+  early_stop_on_failure: false
+  phases_arg: "load,power"
+  skip_unreachable: true
+  parallel_platforms: false
+
+preflight:
+  free_space_min_gib: 5
+  free_space_path: "~/Developer/benchmark_runs"
+  docker_required: true
+
+cleanup:
+  preserve_datagen: true
+  prune_databases: true
+  docker_manage_platforms: true
+  docker_platform_switch: "volumes"
+  docker_project_prefix: "benchbox-uat-full"
+  docker_start_timeout_s: 300
+  docker_fixed_container_name_policy: "fail"
+
+validate:
+  validator_clean_rate_floor: 1.0
+
+package:
+  submit_terminal_state: "local-stage"
+
+explorer_smoke:
+  playwright_browsers: ["chromium"]
+
+report:
+  matrix_summary_tsv: "matrix_summary.tsv"
+
+output:
+  benchmark_runs_dir_template: "~/Developer/benchmark_runs"
+  logs_dir_template: "~/Developer/benchmark_runs/logs/uat_enabled_platforms_full_{date}"
+  submissions_dir_template: "~/Developer/benchmark_runs/submissions/{name}"

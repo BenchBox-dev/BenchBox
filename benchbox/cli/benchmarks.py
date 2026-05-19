@@ -22,6 +22,7 @@ from benchbox.core.benchmark_registry import (
     BENCHMARK_ORDER,
     CATEGORY_ORDER,
     get_all_benchmarks,
+    get_benchmark_surface,
     validate_scale_factor as core_validate_scale_factor,
 )
 from benchbox.core.schemas import BenchmarkConfig
@@ -51,9 +52,25 @@ class BenchmarkManager:
     def _get_available_benchmarks(self) -> dict[str, dict[str, Any]]:
         """Get information about available benchmarks with consistent typing.
 
-        Returns benchmark metadata from the core registry.
+        Returns all benchmark metadata from the core registry, including
+        internal benchmarks that remain directly runnable by ID.
         """
         return get_all_benchmarks()
+
+    def _is_public_benchmark(self, benchmark_id: str, benchmark_info: dict[str, Any]) -> bool:
+        """Return whether a benchmark belongs on public interactive surfaces."""
+        surface = benchmark_info.get("surface")
+        if surface is None:
+            surface = get_benchmark_surface(benchmark_id)
+        return str(surface) == "public"
+
+    def _get_public_benchmarks(self) -> dict[str, dict[str, Any]]:
+        """Return benchmarks shown in interactive selection and listing UIs."""
+        return {
+            bench_id: bench_info
+            for bench_id, bench_info in self.benchmarks.items()
+            if self._is_public_benchmark(bench_id, bench_info)
+        }
 
     def validate_scale_factor(self, benchmark_id: str, scale_factor: float) -> None:
         """Validate scale factor against benchmark requirements.
@@ -70,7 +87,7 @@ class BenchmarkManager:
     def list_available_benchmarks(self):
         """Display all available benchmarks categorized."""
         categories = {}
-        for bench_id, bench_info in self.benchmarks.items():
+        for bench_id, bench_info in self._get_public_benchmarks().items():
             category = bench_info["category"]
             if category not in categories:
                 categories[category] = []
@@ -103,7 +120,7 @@ class BenchmarkManager:
         Returns:
             Filtered dictionary of benchmarks
         """
-        filtered = self.benchmarks.copy()
+        filtered = self._get_public_benchmarks()
 
         if category:
             filtered = {k: v for k, v in filtered.items() if v["category"] == category}
@@ -306,7 +323,8 @@ class BenchmarkManager:
             from benchbox.core.benchmark_loader import get_benchmark_class
 
             benchmark_class = get_benchmark_class(benchmark_id)
-            benchmark = benchmark_class(scale_factor=0.01)
+            default_scale = self.benchmarks.get(benchmark_id, {}).get("default_scale", 0.01)
+            benchmark = benchmark_class(scale_factor=default_scale)
 
             if not hasattr(benchmark, "queries") or not benchmark.queries:
                 console.print("[yellow]No queries available for preview[/yellow]")
@@ -360,7 +378,8 @@ class BenchmarkManager:
         """
         # Build category info with counts, ordered by popularity
         categories_info = {}
-        for bench_info in self.benchmarks.values():
+        public_benchmarks = self._get_public_benchmarks()
+        for bench_info in public_benchmarks.values():
             category = bench_info["category"]
             if category not in categories_info:
                 categories_info[category] = {"count": 0, "benchmarks": []}
@@ -422,7 +441,7 @@ class BenchmarkManager:
         """
         # Filter benchmarks by category
         category_benchmarks = {
-            bench_id: info for bench_id, info in self.benchmarks.items() if info["category"] == category
+            bench_id: info for bench_id, info in self._get_public_benchmarks().items() if info["category"] == category
         }
 
         # Sort by popularity order (if defined), then alphabetically
@@ -469,12 +488,12 @@ class BenchmarkManager:
 
         selection = Prompt.ask("Select benchmark", choices=valid_choices, default="1")
         benchmark_id = choice_map[selection]
-        return benchmark_id, self.benchmarks[benchmark_id]
+        return benchmark_id, category_benchmarks[benchmark_id]
 
     def _display_benchmark_categories(self):
         """Display benchmark categories."""
         categories = {}
-        for bench_info in self.benchmarks.values():
+        for bench_info in self._get_public_benchmarks().values():
             category = bench_info["category"]
             if category not in categories:
                 categories[category] = []
@@ -792,7 +811,8 @@ class BenchmarkManager:
             "amplab": 1.2,
             "read_primitives": 0.1,
             "metadata_primitives": 0.01,  # No data generation, queries catalog metadata
-            "joinorder": 0.5,
+            "joinorder": 5.0,  # Canonical IMDb JOB: 74M rows across 21 Parquet tables
+            "joinorder_synthetic": 1.0,
             "coffeeshop": 1.0,
             "write_primitives": 1.0,  # Same as TPC-H since it reuses TPC-H data
             "datavault": 3.0,  # ~3x TPC-H due to denormalization (21 tables from 8)
@@ -816,7 +836,8 @@ class BenchmarkManager:
             "amplab": (3, 15),
             "read_primitives": (1, 3),
             "metadata_primitives": (1, 2),  # Fast catalog queries, no data generation
-            "joinorder": (10, 30),
+            "joinorder": (30, 90),  # Full canonical JOB data and 113-query suite
+            "joinorder_synthetic": (2, 10),
             "coffeeshop": (2, 8),
             "write_primitives": (2, 5),
             "datavault": (5, 30),  # TPC-H generation + DuckDB transform + complex joins

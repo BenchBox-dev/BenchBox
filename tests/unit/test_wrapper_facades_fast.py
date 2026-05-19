@@ -349,7 +349,7 @@ def test_tpcds_wrapper_proxies_helper_methods_and_validates_inputs(tmp_path: Pat
 def test_tpcds_obt_wrapper_proxies_public_methods_and_enforces_scale(tmp_path: Path) -> None:
     impl = MagicMock()
     impl.generate_data.return_value = {"store_sales_obt": tmp_path / "store_sales_obt.parquet"}
-    impl.get_all_queries.return_value = {"Q1": "SELECT 1"}
+    impl.get_queries.return_value = {"Q1": "SELECT 1"}
     impl.get_query.return_value = "SELECT 1"
     impl.get_schema.return_value = {"store_sales_obt": {}}
     impl.get_create_tables_sql.return_value = "CREATE TABLE store_sales_obt (id INT)"
@@ -359,7 +359,9 @@ def test_tpcds_obt_wrapper_proxies_public_methods_and_enforces_scale(tmp_path: P
 
     assert benchmark.generate_data() == {"store_sales_obt": tmp_path / "store_sales_obt.parquet"}
     assert benchmark.get_queries(dialect="duckdb", base_dialect="spark") == {"Q1": "SELECT 1"}
+    impl.get_queries.assert_called_once_with(dialect="duckdb")
     assert benchmark.get_query("Q1", ignored=True) == "SELECT 1"
+    impl.get_query.assert_called_once_with("Q1", ignored=True)
     assert benchmark.get_schema() == {"store_sales_obt": {}}
     assert benchmark.get_create_tables_sql() == "CREATE TABLE store_sales_obt (id INT)"
 

@@ -27,6 +27,12 @@ from benchbox.core.transaction_primitives.generator import TransactionPrimitives
 from benchbox.core.transaction_primitives.operations import TransactionOperationsManager
 from benchbox.core.transaction_primitives.schema import STAGING_TABLES, get_all_staging_tables_sql, get_create_table_sql
 from benchbox.core.transactional.benchmark_base import TransactionalBenchmarkBase
+from benchbox.sql_compat.rules.execution_filter.pg_duckdb_transaction_primitives import (
+    PG_DUCKDB_TRANSACTION_PRIMITIVES_OPERATION_SKIPS,
+)
+from benchbox.sql_compat.rules.execution_filter.timescaledb_transaction_primitives import (
+    TIMESCALEDB_TRANSACTION_PRIMITIVES_OPERATION_SKIPS,
+)
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
 
@@ -658,8 +664,31 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
             RuntimeError: If staging tables not initialized
         """
         operation, platform_key, sql_override = self._prepare_operation(operation_id, connection, **kwargs)
+        platform_name = str(kwargs.get("platform_name") or "").lower()
 
         try:
+            platform_operation_skips = {
+                "pg_duckdb": PG_DUCKDB_TRANSACTION_PRIMITIVES_OPERATION_SKIPS,
+                "timescaledb": TIMESCALEDB_TRANSACTION_PRIMITIVES_OPERATION_SKIPS,
+            }
+            if operation_id in platform_operation_skips.get(platform_name, {}):
+                skip_details = platform_operation_skips[platform_name][operation_id]
+                skip_reason = f"Operation '{operation_id}' is skipped on {platform_name}: {skip_details}"
+                self.log_verbose(f"Skipping operation {operation_id}: {skip_reason}")
+                return OperationResult(
+                    operation_id=operation_id,
+                    success=True,
+                    write_duration_ms=0.0,
+                    rows_affected=0,
+                    validation_duration_ms=0.0,
+                    validation_passed=True,
+                    validation_results=[],
+                    cleanup_duration_ms=0.0,
+                    cleanup_success=True,
+                    status="SKIPPED",
+                    skip_reason=skip_reason,
+                )
+
             # Resolve effective SQL respecting platform overrides
             if sql_override is not None:
                 write_sql_raw = sql_override
@@ -692,6 +721,7 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
 
             # Execute transaction SQL (operations already contain BEGIN/COMMIT/ROLLBACK)
             self.log_verbose(f"Executing transaction operation: {operation_id}")
+            write_sql_raw = self._rewrite_transactional_sql_for_platform(write_sql_raw, platform_key)
             write_sql = self._replace_placeholders(write_sql_raw)
             write_start = time.perf_counter()
             write_result = connection.execute(write_sql)
@@ -783,6 +813,7 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
             )
 
         except Exception as e:
+            self._rollback_connection_after_error(connection)
             error_msg = f"Operation {operation_id} failed: {str(e)}"
             self.log_verbose(error_msg)
 

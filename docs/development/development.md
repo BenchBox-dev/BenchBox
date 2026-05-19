@@ -96,49 +96,20 @@ uv run ty check
 
 We welcome contributions! Please see the `CONTRIBUTING.md` file in the root of the project for details on our development process, coding standards, and how to submit a pull request.
 
+## Maintainer Dev Loop
+
+Maintainers (and AI agents working in this repo) use a retained pool
+of 10 git worktrees for parallel branch work. New work claims a free
+slot, runs there until merge, then releases it back. See
+[the worktree-pool guide](../operations/dev-loop-worktree-pool.md) for
+common commands, slot states, and recovery scenarios. External
+contributors working from a fork do not need the pool.
+
 ## Release Preparation Workflow
 
-BenchBox uses a fully automated release process that handles tree curation, package building,
-smoke testing, and git operations with timestamp normalization. See
-[release/RELEASE_AUTOMATION.md](../../release/RELEASE_AUTOMATION.md) for complete documentation.
-
-### Quick Start
-
-```bash
-# Run the complete automated release workflow
-./scripts/automate_release.py --version 0.2.0
-```
-
-This single command performs:
-
-1. **Pre-flight checks**: Validates CHANGELOG, git status, and version format
-2. **Tree curation**: Creates public snapshot in `../BenchBox-public/`
-3. **Package building**: Builds wheel and sdist with `SOURCE_DATE_EPOCH`
-4. **Smoke tests**: Installs and tests in isolated environment
-5. **Git operations**: Creates commit and tag with normalized timestamps
-6. **Archiving**: Saves artifacts to `release/archive/v0.2.0/`
-
-All file timestamps are normalized to the most recent Saturday at midnight UTC,
-ensuring no trace of actual creation/modification times.
-
-### Manual Steps
-
-The following remain manual for safety:
-
-- **Before release**: Update CHANGELOG.md with release notes
-- **After automation**: Push to remote (`git push origin main && git push origin v0.2.0`)
-- **Publishing**: Upload to PyPI (`twine upload dist/benchbox-0.2.0*`)
-
-### Component Scripts
-
-The automation orchestrates these internal scripts (not typically called directly):
-
-- `scripts/prepare_release.py` - Tree curation
-- `scripts/build_release.py` - Package building with timestamp normalization
-- `scripts/verify_release.py` - Smoke testing
-- `scripts/finalize_release.py` - Git operations
-
-For emergency manual operation or debugging, see the detailed documentation.
+See [the release guide](../operations/release-guide.md) for the full
+maintainer workflow (version-branch flow on a single repo with
+`develop` and `main`).
 
 ## Validation APIs
 

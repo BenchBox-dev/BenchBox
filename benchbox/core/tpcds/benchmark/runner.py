@@ -310,7 +310,18 @@ class TPCDSBenchmark(BaseBenchmark):
 
     def _apply_target_dialect_overrides(self, query_id: int, query: str, target_dialect: str) -> str:
         """Apply benchmark-local overrides after dialect translation."""
-        if "clickhouse" not in target_dialect.lower():
+        target = target_dialect.lower()
+
+        if query_id in {36, 70, 86} and target == "postgres":
+            return self._rewrite_postgres_rollup_order_aliases(query_id, query)
+
+        if query_id == 90 and target == "postgres":
+            return self._rewrite_postgres_q90_zero_denominator(query)
+
+        if query_id == 90 and target in {"spark", "lakesail"}:
+            return self._rewrite_spark_q90_zero_denominator(query)
+
+        if "clickhouse" not in target:
             return query
 
         if query_id in (47, 57):
@@ -318,6 +329,54 @@ class TPCDSBenchmark(BaseBenchmark):
         if query_id == 66:
             return self._rewrite_clickhouse_q66(query)
         return query
+
+    @staticmethod
+    def _rewrite_spark_q90_zero_denominator(query: str) -> str:
+        """Guard Q90's PM count denominator for ANSI Spark-compatible engines."""
+        return re.sub(
+            r"/\s+CAST\(`pmc`\s+AS\s+DECIMAL\(15,\s*4\)\)",
+            "/ NULLIF(CAST(`pmc` AS DECIMAL(15, 4)), 0)",
+            query,
+            count=1,
+            flags=re.IGNORECASE,
+        )
+
+    @staticmethod
+    def _rewrite_postgres_q90_zero_denominator(query: str) -> str:
+        """Guard Q90's PM count denominator for PostgreSQL-family engines."""
+        return re.sub(
+            r"/\s+CAST\(pmc\s+AS\s+DECIMAL\(15,\s*4\)\)",
+            "/ NULLIF(CAST(pmc AS DECIMAL(15, 4)), 0)",
+            query,
+            count=1,
+            flags=re.IGNORECASE,
+        )
+
+    @staticmethod
+    def _rewrite_postgres_rollup_order_aliases(query_id: int, query: str) -> str:
+        """Replace TPC-DS rollup ORDER BY alias references inside expressions.
+
+        PostgreSQL allows select-list aliases as standalone ORDER BY items, but not
+        inside another expression such as ``CASE WHEN lochierarchy = 0``.
+        """
+        rollup_columns_by_query = {
+            36: ("i_category", "i_class", "i_category"),
+            70: ("s_state", "s_county", "s_state"),
+            86: ("i_category", "i_class", "i_category"),
+        }
+        rollup_columns = rollup_columns_by_query.get(query_id)
+        if rollup_columns is None:
+            return query
+
+        first_col, second_col, hierarchy_key = rollup_columns
+        hierarchy_expr = f"GROUPING({first_col}) + GROUPING({second_col})"
+        return re.sub(
+            rf"ORDER BY\s+lochierarchy\s+DESC,\s+CASE\s+WHEN\s+lochierarchy\s*=\s*0\s+THEN\s+{hierarchy_key}\s+END",
+            f"ORDER BY {hierarchy_expr} DESC, CASE WHEN {hierarchy_expr} = 0 THEN {hierarchy_key} END",
+            query,
+            count=1,
+            flags=re.IGNORECASE,
+        )
 
     def _rewrite_clickhouse_monthly_avg_query(self, query_id: int, query: str) -> str:
         """Rewrite Q47/Q57 to avoid AVG(SUM(...)) OVER (...) under the new analyzer."""

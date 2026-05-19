@@ -48,6 +48,7 @@ def _apply_run_config(builder: ResultBuilder, execution_metadata: dict[str, Any]
             tuning_mode=run_cfg.get("tuning_mode"),
             tuning_config=run_cfg.get("tuning_config"),
             platform_options=run_cfg.get("platform_options"),
+            platform_option_sources=run_cfg.get("platform_option_sources"),
             table_mode=run_cfg.get("table_mode"),
             external_format=run_cfg.get("external_format"),
             table_format=run_cfg.get("table_format"),
@@ -108,6 +109,16 @@ def _apply_optional_builder_data(
     builder.set_execution_metadata(execution_metadata)
     builder.set_validation_status(kwargs.get("validation_status", "UNKNOWN"), kwargs.get("validation_details", {}))
     builder.set_system_profile(kwargs.get("system_profile", {}))
+    if kwargs.get("execution_environment") is not None:
+        builder.set_execution_environment(kwargs["execution_environment"])
+    builder.set_platform_environment_metadata(
+        deployment=kwargs.get("platform_deployment"),
+        cloud=kwargs.get("platform_cloud"),
+        compute=kwargs.get("platform_compute"),
+        storage=kwargs.get("platform_storage"),
+        raw_config=kwargs.get("platform_raw_config"),
+        raw_metadata=kwargs.get("platform_raw_metadata"),
+    )
     builder.set_tuning_info(
         tunings_applied=kwargs.get("tunings_applied"),
         config_hash=kwargs.get("tuning_config_hash"),

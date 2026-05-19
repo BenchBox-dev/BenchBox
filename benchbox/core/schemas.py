@@ -100,6 +100,8 @@ class RunConfig(BaseModel):
     scale_factor: float = 0.01
     seed: Optional[int] = None
     tuning_config: Optional[dict[str, Any]] = None
+    platform_options: Optional[dict[str, Any]] = None
+    platform_option_sources: Optional[dict[str, str]] = None
     connection: Optional[dict[str, Any]] = None
     options: dict[str, Any] = Field(default_factory=dict)
     enable_postload_validation: bool = False

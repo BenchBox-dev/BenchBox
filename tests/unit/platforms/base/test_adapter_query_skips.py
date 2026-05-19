@@ -120,6 +120,32 @@ def test_datafusion_sql_keeps_variants():
     assert "q1" in filtered
 
 
+def test_operation_skip_logging_uses_skip_reason_when_error_is_none(monkeypatch):
+    """Operation SKIPPED results carry skip_reason separately from error."""
+    adapter = MinimalAdapter("pg-duckdb")
+    printed: list[str] = []
+
+    monkeypatch.setattr(
+        "benchbox.platforms.base.execution.quiet_console",
+        SimpleNamespace(print=lambda message: printed.append(str(message))),
+    )
+
+    adapter._log_query_result(
+        {
+            "query_id": "bulk_load_csv_small_uncompressed",
+            "status": "SKIPPED",
+            "error": None,
+            "skip_reason": "server-side file COPY is unsupported",
+        },
+        1,
+        1,
+        "bulk_load_csv_small_uncompressed",
+    )
+
+    assert "SKIPPED" in printed[0]
+    assert "server-side file COPY" in printed[0]
+
+
 def test_lakesail_sql_skip_remains_active():
     """LakeSail SQL skip (empty_build_join) must still work in generic hook."""
     adapter = MinimalAdapter("LakeSail")

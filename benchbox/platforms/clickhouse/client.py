@@ -4,54 +4,76 @@ from __future__ import annotations
 
 import contextlib
 import csv
+import io
 import logging
 import re
+
+import pandas as pd
+import pyarrow as pa
 
 logger = logging.getLogger(__name__)
 
 
 class _ResultProxy:
-    """Cursor-like wrapper around a list of rows returned by chDB.
+    """Cursor-like wrapper around a result returned by chDB.
 
-    Lets benchmarks call .fetchone() / .fetchall() without knowing whether
-    the underlying driver returned a cursor or a plain list.
+    Accepts either a list of row tuples or a pandas DataFrame. When backed by a
+    DataFrame, tuple materialization is deferred until the caller iterates,
+    indexes, or compares — keeping `len(result)` O(1) for large result sets.
     """
 
-    def __init__(self, rows: list) -> None:
-        self._rows = rows
+    def __init__(self, rows_or_df) -> None:
+        self._df = None
+        self._rows: list | None = None
+        if rows_or_df is None:
+            self._rows = []
+        elif hasattr(rows_or_df, "itertuples"):  # pandas DataFrame
+            self._df = rows_or_df
+        else:
+            self._rows = list(rows_or_df)
         self._pos = 0
 
+    def _ensure_rows(self) -> list:
+        if self._rows is None:
+            assert self._df is not None
+            self._rows = [tuple(r) for r in self._df.itertuples(index=False, name=None)]
+        return self._rows
+
     def fetchone(self):
-        if self._pos < len(self._rows):
-            row = self._rows[self._pos]
+        rows = self._ensure_rows()
+        if self._pos < len(rows):
+            row = rows[self._pos]
             self._pos += 1
             return row
         return None
 
     def fetchall(self):
-        remaining = self._rows[self._pos :]
-        self._pos = len(self._rows)
+        rows = self._ensure_rows()
+        remaining = rows[self._pos :]
+        self._pos = len(rows)
         return remaining
 
     # Allow direct indexing / iteration so existing code that treats the
     # result as a list (e.g. `result[0][0]`) continues to work.
     def __getitem__(self, idx):
-        return self._rows[idx]
+        return self._ensure_rows()[idx]
 
     def __iter__(self):
-        return iter(self._rows)
+        return iter(self._ensure_rows())
 
     def __len__(self):
-        return len(self._rows)
+        if self._df is not None and self._rows is None:
+            return len(self._df)
+        return len(self._rows or [])
 
     def __bool__(self):
-        return bool(self._rows)
+        return self.__len__() > 0
 
     def __eq__(self, other):
         if isinstance(other, _ResultProxy):
-            return self._rows == other._rows
+            return self._ensure_rows() == other._ensure_rows()
         if isinstance(other, list):
-            return self._rows == other
+            return self._ensure_rows() == other
         return NotImplemented
 
 
@@ -83,27 +105,45 @@ class ClickHouseLocalClient:
             if query.strip().upper().startswith("INSERT") and params:
                 return self._execute_insert(query, params)
 
-            # Use different API for persistent session vs connection
-            # Session API: query(sql, format) vs Connection API: query(sql, format=format)
-            result = self._conn.query(query, "CSV") if self._is_persistent else self._conn.query(query, format="CSV")
-
-            # Parse result into list of tuples (similar to clickhouse-driver format)
-            if result:
-                # Convert chDB result to string data
-                result_str = str(result).strip()
-                if result_str:
-                    rows = []
-                    for line in result_str.split("\n"):
-                        if line.strip():  # Skip empty lines
-                            # Enhanced CSV parsing
-                            row = self._parse_csv_line(line)
-                            rows.append(row)
-                    return _ResultProxy(rows)
-            return _ResultProxy([])
+            # `format="ArrowStream"` returns Arrow IPC bytes that we decode via
+            # pyarrow into a pandas DataFrame. Two reasons not to use chDB's
+            # built-in `format="DataFrame"`:
+            #   1. it SIGABRTs (uncatchable) when the result contains a Tuple-
+            #      typed column (e.g. read_primitives.array_of_struct returns
+            #      Array(Tuple(...))), killing the whole benchmark process;
+            #   2. it's a thin wrapper around the same Arrow path anyway, so
+            #      decoding via pyarrow ourselves keeps the perf benefit that
+            #      replaced per-row CSV parsing while sidestepping the bug.
+            # Session API: query(sql, format)  /  Connection API: query(sql, format=format)
+            result = (
+                self._conn.query(query, "ArrowStream")
+                if self._is_persistent
+                else self._conn.query(query, format="ArrowStream")
+            )
+            return _ResultProxy(self._arrow_to_dataframe(result))
 
         except Exception as e:
             # Re-raise with more context
             raise RuntimeError(f"ClickHouse local query failed: {e}") from e
+
+    @staticmethod
+    def _arrow_to_dataframe(result):
+        """Decode chDB ArrowStream result bytes into a pandas DataFrame.
+
+        Empty results (e.g. INSERT, DDL, or `WHERE 0=1`) return zero bytes from
+        chDB; treat that as an empty DataFrame instead of erroring on the IPC
+        stream reader.
+
+        TODO(chdb-tuple-dataframe): once chDB's `format="DataFrame"` stops
+        SIGABRTing on Tuple-typed columns, the explicit ArrowStream + pyarrow
+        decode here can be reverted to a direct DataFrame fetch. File / track
+        this in the chdb upstream issue tracker.
+        """
+        data = result.bytes()
+        if not data:
+            return pd.DataFrame()
+        reader = pa.ipc.open_stream(io.BytesIO(data))
+        return reader.read_all().to_pandas()
 
     def close(self):
         """Close the local connection and ensure data is persisted."""

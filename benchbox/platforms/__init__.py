@@ -661,6 +661,14 @@ try:
     # These platforms use lazy config builders to avoid importing heavy SDKs
     # at module load time. Option specs are registered unconditionally.
 
+    # MotherDuck — the credential wizard saves a `database` field, but the
+    # default builder did not call CredentialManager, so the configured
+    # database was silently dropped at run time. Routing through a lazy
+    # config builder pulls the wizard-saved database into runtime config.
+    PlatformHookRegistry.register_config_builder(
+        "motherduck", _make_lazy_config_builder(".motherduck", "_build_motherduck_config")
+    )
+
     # Databricks
     PlatformHookRegistry.register_config_builder(
         "databricks", _make_lazy_config_builder(".databricks", "_build_databricks_config")
@@ -744,8 +752,10 @@ try:
     PlatformHookRegistry.register_option_specs(
         "firebolt",
         PlatformOptionSpec(
-            name="firebolt_mode",
+            name="deployment_mode",
+            aliases=("firebolt_mode",),
             help="Explicit Firebolt mode: 'core' for local Docker, 'cloud' for managed Firebolt",
+            choices=("core", "cloud"),
         ),
         PlatformOptionSpec(
             name="url",
@@ -772,6 +782,51 @@ try:
             name="api_endpoint",
             help="Firebolt Cloud API endpoint",
             default="api.app.firebolt.io",
+        ),
+        PlatformOptionSpec(
+            name="database",
+            help="Firebolt database name",
+        ),
+        PlatformOptionSpec(
+            name="region",
+            aliases=("cloud_region",),
+            help="Firebolt Cloud region when known",
+        ),
+        PlatformOptionSpec(
+            name="cloud_provider",
+            help="Firebolt Cloud provider when known",
+        ),
+        PlatformOptionSpec(
+            name="engine_type",
+            help="Firebolt Cloud engine type when known",
+        ),
+        PlatformOptionSpec(
+            name="engine_size",
+            help="Firebolt Cloud requested engine size when known",
+        ),
+        PlatformOptionSpec(
+            name="compute_size",
+            help="Firebolt Cloud requested compute size alias for engine size",
+        ),
+        PlatformOptionSpec(
+            name="s3_staging_url",
+            help="S3 URL for Firebolt Cloud data staging",
+        ),
+        PlatformOptionSpec(
+            name="s3_region",
+            help="AWS region for Firebolt S3 staging",
+        ),
+        PlatformOptionSpec(
+            name="disable_result_cache",
+            parser=parse_bool,
+            help="Disable Firebolt Cloud result cache during benchmark execution",
+            default=True,
+        ),
+        PlatformOptionSpec(
+            name="strict_validation",
+            parser=parse_bool,
+            help="Fail when Firebolt cache-control validation cannot prove expected state",
+            default=False,
         ),
     )
 
@@ -820,7 +875,8 @@ try:
         PlatformOptionSpec(
             name="port",
             help="PostgreSQL server port",
-            default="5432",
+            parser=int,
+            default=5432,
         ),
         PlatformOptionSpec(
             name="database",
@@ -868,7 +924,8 @@ try:
         PlatformOptionSpec(
             name="port",
             help="TimescaleDB server port",
-            default="5432",
+            parser=int,
+            default=5432,
         ),
         PlatformOptionSpec(
             name="database",
@@ -952,7 +1009,8 @@ try:
         PlatformOptionSpec(
             name="port",
             help="PostgreSQL server port",
-            default="5432",
+            parser=int,
+            default=5432,
         ),
         PlatformOptionSpec(
             name="database",
@@ -1007,13 +1065,13 @@ try:
             name="force_execution",
             help="Force DuckDB execution engine for all queries",
             parser=parse_bool,
-            default="true",
+            default=True,
         ),
         PlatformOptionSpec(
             name="postgres_scan_threads",
             help="Threads for parallel PostgreSQL table scanning (0 = auto)",
             parser=int,
-            default="0",
+            default=0,
         ),
         PlatformOptionSpec(
             name="compare_native",
@@ -1039,7 +1097,8 @@ try:
         PlatformOptionSpec(
             name="port",
             help="PostgreSQL server port",
-            default="5432",
+            parser=int,
+            default=5432,
         ),
         PlatformOptionSpec(
             name="database",
@@ -1347,6 +1406,30 @@ try:
             default="default",
         ),
         PlatformOptionSpec(
+            name="region",
+            help="ClickHouse Cloud service region when it cannot be inferred from the host",
+        ),
+        PlatformOptionSpec(
+            name="cloud_provider",
+            help="ClickHouse Cloud provider when it cannot be inferred from the host",
+        ),
+        PlatformOptionSpec(
+            name="service_id",
+            help="ClickHouse Cloud service identifier for result metadata",
+        ),
+        PlatformOptionSpec(
+            name="service_name",
+            help="ClickHouse Cloud service display name for result metadata",
+        ),
+        PlatformOptionSpec(
+            name="service_tier",
+            help="ClickHouse Cloud service tier for result metadata",
+        ),
+        PlatformOptionSpec(
+            name="compute_size",
+            help="ClickHouse Cloud requested compute size for result metadata",
+        ),
+        PlatformOptionSpec(
             name="oauth_token",
             help="OAuth token for keyless authentication (alternative to password)",
         ),
@@ -1592,17 +1675,24 @@ try:
             name="threads_per_worker",
             help="Threads per worker process",
             parser=int,
-            default="1",
         ),
         PlatformOptionSpec(
             name="use_distributed",
             help="Use distributed scheduler (enables dashboard)",
             parser=parse_bool,
-            default="false",
+            default=True,
         ),
         PlatformOptionSpec(
             name="scheduler_address",
             help="Connect to existing scheduler (e.g., 'tcp://...')",
+        ),
+        PlatformOptionSpec(
+            name="memory_limit",
+            help="Memory limit per local Dask worker (e.g., '4GB')",
+        ),
+        PlatformOptionSpec(
+            name="spill_directory",
+            help="Directory for Dask spill files; explicit directories are not deleted by close()",
         ),
     )
 

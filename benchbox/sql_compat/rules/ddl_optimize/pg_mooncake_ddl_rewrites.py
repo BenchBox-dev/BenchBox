@@ -1,15 +1,12 @@
-"""pg_mooncake DDL rewrite rules for Phase.DDL_OPTIMIZE.
+"""pg_mooncake DDL compatibility rule for Phase.DDL_OPTIMIZE.
 
-pg_mooncake (a PostgreSQL columnstore extension) appends ``USING columnstore``
-to every CREATE TABLE statement so tables land in the columnstore access method
-instead of the default heap. The transformation happens inside
-``PgMooncakeAdapter._transform_create_statement`` (an override of the
-PostgreSQLAdapter hook); the parent ``create_schema`` flow calls that hook
-directly rather than going through ``BaseDdlOptimizer``.
+pg_mooncake 0.2.0 cannot load data with PostgreSQL COPY directly into
+``USING mooncake`` access-method tables. BenchBox therefore keeps CREATE TABLE
+DDL as PostgreSQL heap DDL for the load phase, then promotes loaded tables into
+mooncake mirrors via ``mooncake.create_table``.
 
-This rule registers the REWRITE_DDL intent for governance / compat_lint
-enforcement only; ``transformer_id`` is documentary and not resolved at
-runtime.
+This governance-only rule records that the pg_mooncake DDL optimization is
+implemented outside ``BaseDdlOptimizer`` by the adapter load/promotion path.
 """
 
 from __future__ import annotations
@@ -26,21 +23,22 @@ from benchbox.sql_compat.registry import REGISTRY
 
 REGISTRY.register(
     CompatibilityDecision(
-        rule_id="ddl_optimize.pg_mooncake.all.add_columnstore_access_method",
+        rule_id="ddl_optimize.pg_mooncake.all.heap_load_then_mooncake_mirror",
         action=CompatAction.REWRITE_DDL,
         support_level=SupportLevel.REWRITTEN,
         failure_mode=FailureMode.PERFORMANCE_REGRESSION,
         payload=RewriteDDLPayload(
-            transformer_id="pg_mooncake_add_columnstore_access_method",
+            transformer_id="pg_mooncake_heap_load_then_mirror",
             description=(
-                "Append ``USING columnstore`` to CREATE TABLE so pg_mooncake places the "
-                "table in the columnstore access method instead of the default heap."
+                "Keep CREATE TABLE loadable as heap DDL, then promote loaded tables "
+                "into mooncake mirrors with the original benchmark table names."
             ),
             governance_only=True,
         ),
         reason=(
-            "Without ``USING columnstore``, pg_mooncake tables fall back to the row-store "
-            "heap and lose the analytical scan performance the extension exists to provide."
+            "Direct COPY into mooncake access-method tables fails on pg_mooncake 0.2.0; "
+            "heap-load plus mirror promotion preserves both load compatibility and "
+            "DuckDB-backed columnar query execution."
         ),
     ),
     Phase.DDL_OPTIMIZE,

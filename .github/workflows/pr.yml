@@ -1,0 +1,351 @@
+name: Develop PR
+
+on:
+  pull_request:
+    branches:
+      - develop
+
+concurrency:
+  group: develop-pr-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ci-paths:
+    name: ci-paths
+    runs-on: ubuntu-latest
+    outputs:
+      safe-content-only: ${{ steps.classify.outputs.safe-content-only }}
+      needs-code-ci: ${{ steps.classify.outputs.needs-code-ci }}
+      content-guard-needed: ${{ steps.classify.outputs.content-guard-needed }}
+      changed-paths: ${{ steps.classify.outputs.changed-paths }}
+      code-paths: ${{ steps.classify.outputs.code-paths }}
+      unknown-paths: ${{ steps.classify.outputs.unknown-paths }}
+      estimated-runner-minutes-saved: ${{ steps.classify.outputs.estimated-runner-minutes-saved }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        run: git fetch --no-tags origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
+
+      - name: Classify changed paths
+        id: classify
+        # Bare python is intentional: the classifier is stdlib-only so
+        # content-only PRs do not pay a dependency-sync cost before deciding.
+        run: |
+          python scripts/path_filter_decision.py \
+            --base-ref "origin/${{ github.base_ref }}" \
+            --json-out ci-path-decision.json \
+            --lists-dir .ci-paths \
+            --github-output "$GITHUB_OUTPUT" \
+            --summary "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload path decision
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-path-decision
+          path: ci-path-decision.json
+          retention-days: 30
+
+  content-guard:
+    name: content-guard
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.content-guard-needed == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        run: git fetch --no-tags origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: |
+          uv sync --group dev
+
+      - name: Recreate path lists
+        # Bare python is intentional: the classifier is stdlib-only.
+        run: |
+          python scripts/path_filter_decision.py \
+            --base-ref "origin/${{ github.base_ref }}" \
+            --json-out ci-path-decision.json \
+            --lists-dir .ci-paths
+
+      - name: Validate YAML hygiene
+        shell: bash
+        run: |
+          if [ ! -s .ci-paths/yaml.txt ]; then
+            echo "No YAML content paths changed."
+            exit 0
+          fi
+          mapfile -t yaml_paths < .ci-paths/yaml.txt
+          uv run -- pre-commit run check-yaml --files "${yaml_paths[@]}"
+
+      - name: Validate artifact hygiene
+        run: uv run -- python _project/scripts/artifact_hygiene_check.py --all-tracked
+
+      - name: Validate markdown hygiene
+        shell: bash
+        run: |
+          if [ ! -s .ci-paths/markdown.txt ]; then
+            echo "No markdown content paths changed."
+            exit 0
+          fi
+          mapfile -t markdown_paths < .ci-paths/markdown.txt
+          uv run -- pre-commit run markdownlint --files "${markdown_paths[@]}"
+
+      - name: Validate TODO graph
+        shell: bash
+        run: |
+          if [ ! -s .ci-paths/todo.txt ]; then
+            echo "No TODO/DONE YAML paths changed."
+            exit 0
+          fi
+          while IFS= read -r todo_path; do
+            if [ ! -e "$todo_path" ]; then
+              echo "Skipping deleted TODO/DONE path: $todo_path"
+              continue
+            fi
+            uv run --project _project/scripts -- python _project/scripts/validate_todo.py "$todo_path"
+          done < .ci-paths/todo.txt
+          uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph
+
+      - name: Validate executable TODO docs
+        shell: bash
+        run: |
+          if [ ! -s .ci-paths/todo.txt ]; then
+            echo "No TODO/DONE YAML paths changed."
+            exit 0
+          fi
+          uv run -- python -m pytest tests/unit/test_todo_executable_docs.py -q
+
+      - name: Validate docs references
+        shell: bash
+        run: |
+          if [ ! -s .ci-paths/docs.txt ]; then
+            echo "No docs paths changed."
+            exit 0
+          fi
+          make docs-validate
+
+  code-lint:
+    name: lint
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.needs-code-ci == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: |
+          uv sync --group dev
+
+      - name: Lint and format check with ruff
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+
+      - name: Type check with ty
+        run: uv run ty check
+
+      - name: Validate test marker annotations
+        run: make lint-markers
+
+      - name: Validate artifact hygiene
+        run: make artifact-hygiene
+
+      - name: Timing policy (wall-clock allowlist)
+        run: uv run -- python _project/scripts/timing_policy_check.py --strict
+
+      - name: Compatibility docs drift check
+        run: make compat-docs-check
+
+      - name: Dependency audit (no unused declarations)
+        run: make audit-deps
+
+      - name: Release curation list drift check
+        run: uv run -- python scripts/check_release_curation.py
+
+  code-test:
+    name: test (ubuntu-latest, 3.12)
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.needs-code-ci == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Create virtual environment
+        run: uv venv
+
+      - name: Install dependencies
+        run: |
+          uv sync --group dev
+
+      - name: Run fast tests
+        run: |
+          # -p pytest_cov re-enables coverage plugin (disabled by default in pytest.ini)
+          uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short -p pytest_cov --cov=benchbox --cov-report=xml --cov-report=term-missing --cov-fail-under=70
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false  # Don't fail CI if Codecov upload fails (token may not be configured)
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  explorer-tokens:
+    name: explorer-tokens
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.needs-code-ci == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        run: git fetch --no-tags origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
+
+      - name: Detect results-explorer/src changes
+        id: scope
+        shell: bash
+        run: |
+          if git diff --name-only "origin/${{ github.base_ref }}...HEAD" \
+              | grep -qE '^results-explorer/src/'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "No results-explorer/src paths changed; skipping token scan."
+          fi
+
+      - name: Run explorer token scan
+        if: ${{ steps.scope.outputs.run == 'true' }}
+        # Bare python is intentional: the scan is stdlib-only so this gate
+        # does not pay a dependency-sync cost before deciding.
+        run: make lint-explorer-tokens
+
+      - name: Run public site theme token scan
+        # Bare python is intentional: the scan is stdlib-only so this gate
+        # does not pay a dependency-sync cost before deciding.
+        run: make lint-site-theme-tokens
+
+  audit-sha:
+    name: audit-sha
+    needs: ci-paths
+    if: ${{ contains(needs.ci-paths.outputs.changed-paths, '_project/audits/') || contains(needs.ci-paths.outputs.changed-paths, 'results-explorer/e2e/captures/') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: git fetch --no-tags origin "$BASE_REF:refs/remotes/origin/$BASE_REF"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Validate changed audit develop SHA stamps
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --name-only --diff-filter=ACMRT "origin/${{ github.base_ref }}...HEAD" \
+            | grep -E '^_project/audits/.*\.md$' > /tmp/changed-audits.txt || true
+          if [ ! -s /tmp/changed-audits.txt ]; then
+            echo "No changed audit Markdown files to validate."
+            exit 0
+          fi
+          while IFS= read -r audit_path; do
+            make audit-sha-check FILE="$audit_path" AUDIT_SHA_TARGET_REF="origin/${{ github.base_ref }}"
+          done < /tmp/changed-audits.txt
+
+  ci-required-result:
+    name: ci-required-result
+    needs: [ci-paths, content-guard, code-lint, code-test, explorer-tokens, audit-sha]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aggregate required result
+        env:
+          CI_PATHS_RESULT: ${{ needs.ci-paths.result }}
+          CONTENT_RESULT: ${{ needs.content-guard.result }}
+          LINT_RESULT: ${{ needs.code-lint.result }}
+          TEST_RESULT: ${{ needs.code-test.result }}
+          EXPLORER_TOKENS_RESULT: ${{ needs.explorer-tokens.result }}
+          AUDIT_SHA_RESULT: ${{ needs.audit-sha.result }}
+          CONTENT_GUARD_NEEDED: ${{ needs.ci-paths.outputs.content-guard-needed }}
+          NEEDS_CODE_CI: ${{ needs.ci-paths.outputs.needs-code-ci }}
+          SAFE_CONTENT_ONLY: ${{ needs.ci-paths.outputs.safe-content-only }}
+        run: |
+          set -euo pipefail
+
+          if [ "$CI_PATHS_RESULT" != "success" ]; then
+            echo "ci-paths=$CI_PATHS_RESULT"
+            exit 1
+          fi
+
+          if [ "$CONTENT_GUARD_NEEDED" = "true" ] && [ "$CONTENT_RESULT" != "success" ]; then
+            echo "content-guard=$CONTENT_RESULT"
+            exit 1
+          fi
+
+          if [ "$AUDIT_SHA_RESULT" != "success" ] \
+              && [ "$AUDIT_SHA_RESULT" != "skipped" ]; then
+            echo "audit-sha=$AUDIT_SHA_RESULT"
+            exit 1
+          fi
+
+          if [ "$NEEDS_CODE_CI" = "false" ]; then
+            echo "Content-only PR; skipped Python code CI."
+            echo "safe-content-only=$SAFE_CONTENT_ONLY"
+            exit 0
+          fi
+
+          # explorer-tokens is gated on needs-code-ci; when it runs it must
+          # pass. A "skipped" result (no results-explorer/src changes within
+          # the code-CI tier) counts as success here.
+          if [ "$EXPLORER_TOKENS_RESULT" != "success" ] \
+              && [ "$EXPLORER_TOKENS_RESULT" != "skipped" ]; then
+            echo "explorer-tokens=$EXPLORER_TOKENS_RESULT"
+            exit 1
+          fi
+
+          if [ "$LINT_RESULT" = "success" ] && [ "$TEST_RESULT" = "success" ]; then
+            echo "Code/infra PR; lint and fast tests passed."
+            exit 0
+          fi
+
+          echo "code-lint=$LINT_RESULT code-test=$TEST_RESULT"
+          exit 1

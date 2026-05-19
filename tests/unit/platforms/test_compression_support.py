@@ -30,7 +30,7 @@ class TestPlatformCompressionSupport:
         test_data = "id|name|value\n1|test1|100\n2|test2|200\n3|test3|300\n"
 
         if not compressed:
-            path.write_text(test_data)
+            path.write_text(test_data, encoding="utf-8")
             return path
 
         # Create compressed file
