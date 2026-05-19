@@ -377,6 +377,19 @@
         return isFinite(threshold) ? benchmarkEntry.requires_bundled_dsdgen_below : null;
     }
 
+    function bundledDsdgenPathHint() {
+        return "`_binaries/tpc-ds/<os>-<arch>/dsdgen` (for example "
+            + "`_binaries/tpc-ds/linux-x86_64/dsdgen` or `_binaries/tpc-ds/darwin-arm64/dsdgen`)";
+    }
+
+    function bundledDsdgenWarningStep(stepNumber, benchmarkEntry) {
+        return "  " + stepNumber + ". TPC-DS sub-scale warning: scale factors below "
+            + bundledDsdgenThreshold(benchmarkEntry)
+            + " require BenchBox's bundled patched dsdgen at "
+            + bundledDsdgenPathHint()
+            + "; do not use stock dsdgen.";
+    }
+
     function needsBundledDsdgenWarning(state, benchmarkEntry) {
         var threshold = bundledDsdgenThreshold(benchmarkEntry);
         return threshold !== null && parseFloat(state.scale) < parseFloat(threshold);
@@ -465,7 +478,7 @@
             appendMcpPlatformOptionLines(compareLines, selectedEntries, step);
             compareLines.push("  " + step.value++ + ". Use the " + mcpPromptCall(mcpPromptName, state, platform, platformB) + " prompt.");
             if (needsBundledDsdgenWarning(state, benchmarkEntry)) {
-                compareLines.push("  " + step.value++ + ". TPC-DS sub-scale warning: scale factors below " + bundledDsdgenThreshold(benchmarkEntry) + " require BenchBox's bundled patched dsdgen at `_binaries/tpc-ds/<platform>/dsdgen`; do not use stock dsdgen.");
+                compareLines.push(bundledDsdgenWarningStep(step.value++, benchmarkEntry));
             }
             if (needsCredentials) {
                 compareLines.push("  " + step.value++ + ". Make sure platform connection credentials/config are set outside this conversation (env vars, config files). Do NOT ask me to paste secrets here.");
@@ -498,7 +511,7 @@
         appendMcpPlatformOptionLines(lines, [platformEntry], step);
         lines.push("  " + step.value++ + ". Use the " + mcpPromptCall(mcpPromptName, state, platform, platformB) + " prompt.");
         if (needsBundledDsdgenWarning(state, benchmarkEntry)) {
-            lines.push("  " + step.value++ + ". TPC-DS sub-scale warning: scale factors below " + bundledDsdgenThreshold(benchmarkEntry) + " require BenchBox's bundled patched dsdgen at `_binaries/tpc-ds/<platform>/dsdgen`; do not use stock dsdgen.");
+            lines.push(bundledDsdgenWarningStep(step.value++, benchmarkEntry));
         }
         if (needsCredentials) {
             lines.push("  " + step.value++ + ". Make sure platform connection credentials/config are set outside this conversation (env vars, config files). Do NOT ask me to paste secrets here.");
@@ -567,7 +580,7 @@
             lines.push("  " + step++ + ". Check dependencies: no optional connector check is registered for this selection; confirm the install command completed successfully.");
         }
         if (needsBundledDsdgenWarning(state, benchmarkEntry)) {
-            lines.push("  " + step++ + ". TPC-DS sub-scale warning: scale factors below " + bundledDsdgenThreshold(benchmarkEntry) + " require BenchBox's bundled patched dsdgen at `_binaries/tpc-ds/<platform>/dsdgen`; do not use stock dsdgen.");
+            lines.push(bundledDsdgenWarningStep(step++, benchmarkEntry));
         }
         if (needsCredentials) {
             lines.push("  " + step++ + ". Make sure platform connection credentials/config are set outside this conversation (env vars, config files). Do NOT ask me to paste secrets here.");

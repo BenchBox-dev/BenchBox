@@ -518,6 +518,10 @@ def test_agent_prompt_includes_platform_footgun_and_dsdgen_labels():
     assert "Likely required platform options for" in prompts_js
     assert "TPC-DS sub-scale warning" in prompts_js
     assert "requires_bundled_dsdgen_below" in prompts_js
+    assert "_binaries/tpc-ds/<platform>/dsdgen" not in prompts_js
+    assert "_binaries/tpc-ds/<os>-<arch>/dsdgen" in prompts_js
+    assert "_binaries/tpc-ds/linux-x86_64/dsdgen" in prompts_js
+    assert "_binaries/tpc-ds/darwin-arm64/dsdgen" in prompts_js
 
 
 def test_mcp_prompt_includes_smoke_for_managed_at_scale():
