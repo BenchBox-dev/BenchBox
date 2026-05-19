@@ -449,8 +449,7 @@ def test_agent_prompt_includes_output_discipline_and_summary_labels():
     assert "Discover & summarize" in prompts_js
     assert "Save provenance" in prompts_js
     assert "force_datagen_footer" in prompts_js
-    assert "resultsPathsForGoal" in prompts_js
-    assert "--limit 2" in prompts_js
+    assert "resultsPathsCommand" in prompts_js
     assert "target MCP call(s)" in prompts_js
     assert "MCP tool result payload" in prompts_js
     assert "capture_plans_footer" in prompts_js
@@ -496,13 +495,21 @@ def test_mcp_prompt_does_not_emit_nonexistent_platform_options_argument():
     assert "platform_options" not in prompts_js
 
 
-def test_compare_prompt_uses_comparison_log_and_two_result_paths():
+def test_compare_prompt_uses_comparison_log_not_recent_result_paths():
     prompts_js = PROMPTS_JS_PATH.read_text(encoding="utf-8")
+    build_agent_prompt = prompts_js[
+        prompts_js.index("function buildAgentPrompt") : prompts_js.index("function readStateFromForm")
+    ]
+    discover_start = build_agent_prompt.index("Discover & summarize: summarize total runtime")
+    compare_start = build_agent_prompt.rfind('if (state.goal === "compare")', 0, discover_start)
+    compare_summary = build_agent_prompt[compare_start : build_agent_prompt.index("        } else {", compare_start)]
 
-    assert 'if (state.goal === "compare")' in prompts_js
-    assert 'command.replace(/--limit\\s+\\S+/, "--limit 2")' in prompts_js
-    assert "summarize the comparison from" in prompts_js
-    assert "for each result JSON path" in prompts_js
+    assert 'if (state.goal === "compare")' in build_agent_prompt
+    assert "comparison output in" in compare_summary
+    assert "liveLogPath" in compare_summary
+    assert "benchbox results --paths" not in compare_summary
+    assert "resultsPaths" not in compare_summary
+    assert "showCli" not in compare_summary
 
 
 def test_agent_prompt_includes_platform_footgun_and_dsdgen_labels():

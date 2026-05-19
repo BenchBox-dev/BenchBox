@@ -287,12 +287,8 @@
         return command.replace(/--scale\s+\S+/, "--scale " + scale);
     }
 
-    function resultsPathsForGoal(state) {
-        var command = catalog.templates.cli.results_paths;
-        if (state.goal === "compare") {
-            return command.replace(/--limit\s+\S+/, "--limit 2");
-        }
-        return command;
+    function resultsPathsCommand() {
+        return catalog.templates.cli.results_paths;
     }
 
     function isPaidEntry(entry) {
@@ -544,7 +540,6 @@
         var platformSlug = state.goal === "compare" ? platform + "-vs-" + platformB : platform;
         var liveLogPath = logPath(state, platformSlug);
         var liveCmd = commandWithLogCapture(cliCmd, liveLogPath);
-        var resultsPaths = resultsPathsForGoal(state);
         var showCli = catalog.templates.cli.show_cli;
         var isPaid = isPaidSelection(platformEntry, platformBEntry);
         var smokeState = Object.assign({}, state, { scale: "0.01" });
@@ -596,8 +591,9 @@
             lines.push("  " + step++ + ". Run live: `" + liveCmd + "`.");
         }
         if (state.goal === "compare") {
-            lines.push("  " + step++ + ". Discover & summarize: summarize the comparison from `" + liveLogPath + "`, then run `" + resultsPaths + "` and `" + showCli + "` for each result JSON path needed to inspect per-platform timings.");
+            lines.push("  " + step++ + ". Discover & summarize: summarize total runtime, per-query timings, and failures from the comparison output in `" + liveLogPath + "`. If the compare command was run with an explicit output path, inspect that file too.");
         } else {
+            var resultsPaths = resultsPathsCommand();
             lines.push("  " + step++ + ". Discover & summarize: run `" + resultsPaths + "`, then run `" + showCli + "` with the result JSON path. Summarize total runtime, per-query timings, and failures from the result JSON.");
         }
         lines.push("  " + step++ + ". Save provenance next to the result bundle. Replace `<bundle-dir>` with the bundle directory from the previous step, then run:");
