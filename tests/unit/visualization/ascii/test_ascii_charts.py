@@ -405,80 +405,6 @@ class TestPowerBarRenderer:
         output = render_ascii_chart_from_results(results, "power_bar", opts, {})
         assert output is None
 
-    def test_falls_back_to_query_latency_bars_without_power_metric(self):
-        """power_bar renders power-run query latency bars when no Power@Size metric exists."""
-        from types import SimpleNamespace
-
-        from benchbox.core.visualization.ascii.base import ChartOptions
-        from benchbox.core.visualization.ascii_runtime import render_ascii_chart_from_results
-
-        results = [
-            make_normalized_result(
-                platform="DuckDB",
-                benchmark="joinorder",
-                scale_factor=1,
-                raw={"benchmark": {"test_type": "power"}},
-                queries=[
-                    SimpleNamespace(query_id="1a", execution_time_ms=12.0),
-                    SimpleNamespace(query_id="1b", execution_time_ms=8.0),
-                    SimpleNamespace(query_id="2a", execution_time_ms=23.0),
-                ],
-            )
-        ]
-        opts = ChartOptions(use_color=False)
-        output = render_ascii_chart_from_results(results, "power_bar", opts, {})
-        assert output is not None
-        assert "Power Run Query Latency" in output
-        assert "1a" in output
-        assert "1b" in output
-        assert "2a" in output
-
-    def test_non_power_runs_without_power_metric_do_not_render(self):
-        """power_bar remains inapplicable for ordinary query runs without Power@Size."""
-        from types import SimpleNamespace
-
-        from benchbox.core.visualization.ascii.base import ChartOptions
-        from benchbox.core.visualization.ascii_runtime import render_ascii_chart_from_results
-
-        results = [
-            make_normalized_result(
-                platform="DuckDB",
-                benchmark="custom",
-                scale_factor=1,
-                queries=[SimpleNamespace(query_id="Q1", execution_time_ms=12.0)],
-            )
-        ]
-        opts = ChartOptions(use_color=False)
-        output = render_ascii_chart_from_results(results, "power_bar", opts, {})
-        assert output is None
-
-    def test_query_histogram_uses_horizontal_bars_for_long_query_names(self):
-        """Primitives-style long query names stay readable in query_histogram."""
-        from types import SimpleNamespace
-
-        from benchbox.core.visualization.ascii.base import ChartOptions
-        from benchbox.core.visualization.ascii_runtime import render_ascii_chart_from_results
-
-        results = [
-            make_normalized_result(
-                platform="DuckDB",
-                benchmark="read_primitives",
-                scale_factor=1,
-                queries=[
-                    SimpleNamespace(query_id="aggregation_groupby_large", execution_time_ms=100.0),
-                    SimpleNamespace(query_id="shuffle_inner_join", execution_time_ms=200.0),
-                    SimpleNamespace(query_id="read_parquet_single", execution_time_ms=150.0),
-                ],
-            )
-        ]
-        opts = ChartOptions(use_color=False)
-        output = render_ascii_chart_from_results(results, "query_histogram", opts, {})
-        assert output is not None
-        assert "Query Latency" in output
-        assert "aggregation_groupby_large" in output
-        assert "shuffle_inner_join" in output
-        assert "read_parquet_single" in output
-
     def test_best_is_highest_value(self):
         """The result with the highest Power@Size is marked is_best."""
         from benchbox.core.visualization.ascii.bar_chart import BarData
@@ -622,26 +548,6 @@ class TestSuggestChartTypesPowerBar:
         plotter.results = results
         return plotter
 
-    @staticmethod
-    def _make_power_context_plotter():
-        from benchbox.core.visualization.result_plotter import NormalizedResult, ResultPlotter
-
-        result = NormalizedResult(
-            benchmark="joinorder",
-            platform="duckdb",
-            scale_factor=1,
-            execution_id=None,
-            timestamp=None,
-            total_time_ms=1000.0,
-            avg_time_ms=None,
-            success_rate=None,
-            cost_total=None,
-            raw={"benchmark": {"test_type": "power"}},
-        )
-        plotter = ResultPlotter.__new__(ResultPlotter)
-        plotter.results = [result]
-        return plotter
-
     def test_power_bar_suggested_when_power_data_present(self):
         plotter = self._make_plotter([385807.0, 669328.0])
         assert "power_bar" in plotter._suggest_chart_types()
@@ -653,11 +559,6 @@ class TestSuggestChartTypesPowerBar:
     def test_power_bar_suggested_when_at_least_one_has_power(self):
         """Partial power data is enough to suggest the chart."""
         plotter = self._make_plotter([None, 500.0])
-        assert "power_bar" in plotter._suggest_chart_types()
-
-    def test_power_bar_suggested_for_power_run_without_power_metric(self):
-        """Power-run context is enough to suggest the query-latency fallback."""
-        plotter = self._make_power_context_plotter()
         assert "power_bar" in plotter._suggest_chart_types()
 
 

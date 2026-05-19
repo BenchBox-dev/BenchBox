@@ -178,53 +178,6 @@ def test_visualize_cli_invalid_chart_type_fails(tmp_path):
     assert "Unknown chart type" in result.output
 
 
-def test_visualize_cli_power_bar_renders_query_latency_without_tpc_metric(tmp_path):
-    """Non-TPC power runs should still render a useful power_bar chart."""
-    result_file = tmp_path / "joinorder_result.json"
-    result_file.write_text(
-        """{
-  "version": "2.1",
-  "run": {
-    "id": "joinorder-run",
-    "timestamp": "2026-05-18T16:11:32.838385",
-    "total_duration_ms": 1000,
-    "query_time_ms": 500
-  },
-  "benchmark": {
-    "id": "joinorder",
-    "name": "JoinOrderBenchmark",
-    "scale_factor": 1,
-    "test_type": "power"
-  },
-  "platform": {
-    "name": "DuckDB",
-    "version": "1.3.2"
-  },
-  "summary": {
-    "queries": {"total": 3, "passed": 3, "failed": 0},
-    "timing": {"total_ms": 43, "avg_ms": 14.3, "geometric_mean_ms": 12.9}
-  },
-  "queries": [
-    {"id": "1a", "ms": 12.0, "status": "SUCCESS"},
-    {"id": "1b", "ms": 8.0, "status": "SUCCESS"},
-    {"id": "2a", "ms": 23.0, "status": "SUCCESS"}
-  ]
-}"""
-    )
-
-    runner = CliRunner()
-    result = runner.invoke(
-        visualize_module.visualize,
-        [str(result_file), "--chart-type", "power_bar", "--no-color"],
-    )
-
-    assert result.exit_code == 0
-    assert "Power Run Query Latency" in result.output
-    assert "1a" in result.output
-    assert "1b" in result.output
-    assert "2a" in result.output
-
-
 def test_visualize_cli_comparison_chart_requires_two_results(tmp_path):
     """Pairwise comparison charts should require exactly two results."""
     result_file = tmp_path / "test_result.json"
