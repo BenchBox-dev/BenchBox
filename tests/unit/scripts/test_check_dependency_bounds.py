@@ -1,11 +1,11 @@
 """Unit tests for scripts/check_dependency_bounds.py.
 
 Pinned invariants:
-  * The PEP 508 parser extracts the upper-bound major from the forms
-    BenchBox actually uses (``<N``, ``<N.0``, ``<N.0.0``).
+  * The PEP 508 parser extracts the full upper bound from the forms
+    BenchBox actually uses (``<N``, ``<N.0``, ``<N.0.0``, ``<N.M.P``).
   * A dep with no upper bound is skipped (not mis-reported).
-  * ``cap-reached`` blocks only when locked_major >= cap_major.
-  * ``ceiling-minus-one`` blocks when locked_major == cap_major - 1.
+  * ``cap-reached`` blocks only when locked_version >= the full upper bound.
+  * ``ceiling-minus-one`` blocks for next-major caps when locked_major == cap_major - 1.
   * ``--report-only`` never fails.
 """
 
@@ -18,6 +18,7 @@ import pytest
 from scripts.check_dependency_bounds import (
     CappedDep,
     _extract_cap_major,
+    _extract_upper_bound,
     _split_requirement,
     collect_capped_deps,
     main,
@@ -43,6 +44,24 @@ class TestUpperBoundExtraction:
     )
     def test_extracts_cap_major(self, spec: str, expected: int | None) -> None:
         assert _extract_cap_major(spec) == expected
+
+    @pytest.mark.parametrize(
+        ("spec", "expected"),
+        [
+            (">=20.0.0,<31.0.0", "31.0.0"),
+            (">=8.0.0,<9.0.0", "9.0.0"),
+            ("<4", "4"),
+            ("<4.0", "4.0"),
+            ("<4.0.0", "4.0.0"),
+            (">=1.0.0,<1.4.0", "1.4.0"),
+            ("~=2.12", None),
+            (">=1.0", None),
+            ("", None),
+        ],
+    )
+    def test_extracts_full_upper_bound(self, spec: str, expected: str | None) -> None:
+        parsed = _extract_upper_bound(spec)
+        assert (None if parsed is None else parsed[0]) == expected
 
 
 class TestRequirementSplit:
@@ -94,6 +113,7 @@ version = "2.31.0"
         deps = collect_capped_deps(py, lk)
         assert [d.name for d in deps] == ["sqlglot"]
         assert deps[0].cap_major == 31
+        assert deps[0].cap_text == "31.0.0"
         assert deps[0].locked_version == "30.2.1"
 
     def test_collects_from_dependency_groups(self, tmp_path: Path) -> None:
@@ -119,6 +139,27 @@ version = "1.5.1"
         assert deps[0].name == "duckdb"
         assert deps[0].cap_major == 2
 
+    def test_collects_minor_cap_without_truncating_to_major(self, tmp_path: Path) -> None:
+        py, lk = _write(
+            tmp_path,
+            """
+[project]
+name = "demo"
+version = "0.0.0"
+dependencies = ["duckdb>=1.0.0,<1.4.0"]
+""",
+            """
+[[package]]
+name = "duckdb"
+version = "1.3.2"
+""",
+        )
+        deps = collect_capped_deps(py, lk)
+        assert len(deps) == 1
+        assert deps[0].cap_major == 1
+        assert deps[0].cap_text == "1.4.0"
+        assert deps[0].cap_display == "1.4.0"
+
     def test_deduplicates_multiple_declarations(self, tmp_path: Path) -> None:
         py, lk = _write(
             tmp_path,
@@ -138,17 +179,37 @@ dev = ["click>=8,<9"]
 
 
 class TestSeverityFlags:
-    def test_cap_reached_when_locked_major_at_cap(self) -> None:
-        dep = CappedDep(name="x", cap_major=3, locked_version="3.0.0")
+    def test_cap_reached_when_locked_version_at_full_cap(self) -> None:
+        dep = CappedDep(name="x", cap_major=1, locked_version="1.4.0", cap_text="1.4.0")
         assert dep.cap_reached
         assert not dep.ceiling_minus_one
 
-    def test_cap_reached_when_locked_major_above_cap(self) -> None:
-        dep = CappedDep(name="x", cap_major=3, locked_version="4.1.0")
+    def test_cap_reached_when_locked_version_above_full_cap(self) -> None:
+        dep = CappedDep(name="x", cap_major=1, locked_version="1.4.1", cap_text="1.4.0")
         assert dep.cap_reached
+
+    def test_healthy_when_locked_version_below_minor_cap(self) -> None:
+        dep = CappedDep(name="duckdb", cap_major=1, locked_version="1.3.2", cap_text="1.4.0")
+        assert not dep.cap_reached
+        assert not dep.ceiling_minus_one
 
     def test_ceiling_minus_one_when_locked_major_is_cap_minus_one(self) -> None:
         dep = CappedDep(name="x", cap_major=3, locked_version="2.12.5")
+        assert dep.ceiling_minus_one
+        assert not dep.cap_reached
+
+    @pytest.mark.parametrize(
+        ("name", "cap_major", "locked"),
+        [
+            ("sqlglot", 31, "30.6.0"),
+            ("click", 9, "8.3.2"),
+            ("pydantic", 3, "2.12.5"),
+            ("pyarrow", 25, "24.0.0"),
+            ("roman-numerals", 4, "3.1.0"),
+        ],
+    )
+    def test_known_major_caps_remain_ceiling_minus_one(self, name: str, cap_major: int, locked: str) -> None:
+        dep = CappedDep(name=name, cap_major=cap_major, locked_version=locked, cap_text=f"{cap_major}.0.0")
         assert dep.ceiling_minus_one
         assert not dep.cap_reached
 
@@ -199,6 +260,34 @@ dependencies = ["pydantic>=2{cap}"]
         py, lk = self._fixture(tmp_path, "2.12.5")
         rc = main(["--fail-on=cap-reached", f"--pyproject={py}", f"--lock={lk}"])
         assert rc == 0
+
+    def test_minor_cap_exits_zero_when_below_full_cap(self, tmp_path: Path) -> None:
+        py, lk = _write(
+            tmp_path,
+            """
+[project]
+name = "demo"
+version = "0.0.0"
+dependencies = ["duckdb>=1.0.0,<1.4.0"]
+""",
+            '[[package]]\nname = "duckdb"\nversion = "1.3.2"\n',
+        )
+        rc = main(["--fail-on=cap-reached", f"--pyproject={py}", f"--lock={lk}"])
+        assert rc == 0
+
+    def test_minor_cap_exits_non_zero_when_at_full_cap(self, tmp_path: Path) -> None:
+        py, lk = _write(
+            tmp_path,
+            """
+[project]
+name = "demo"
+version = "0.0.0"
+dependencies = ["duckdb>=1.0.0,<1.4.0"]
+""",
+            '[[package]]\nname = "duckdb"\nversion = "1.4.0"\n',
+        )
+        rc = main(["--fail-on=cap-reached", f"--pyproject={py}", f"--lock={lk}"])
+        assert rc == 1
 
     def test_ceiling_minus_one_exits_non_zero_when_at_cap_minus_one(self, tmp_path: Path) -> None:
         py, lk = self._fixture(tmp_path, "2.12.5")

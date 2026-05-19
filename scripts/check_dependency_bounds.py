@@ -9,10 +9,9 @@ surfaces that signal.
 Two modes
 ---------
 * ``--fail-on=cap-reached``  (blocking, offline)
-    Exit non-zero if any locked version's major equals the cap major -
-    i.e., uv lock allowed a version at or past our stated ceiling. This
-    should not happen under normal flow; it's a safety net for
-    lockfile-level drift.
+    Exit non-zero if any locked version is at or past the full stated
+    upper bound. This should not happen under normal flow; it's a safety
+    net for lockfile-level drift.
 
 * ``--report-only``  (non-blocking, offline)
     Emit a markdown report listing each capped dep, its locked version,
@@ -21,9 +20,10 @@ Two modes
     requiring a bump/hold decision). Suitable for appending to release
     notes.
 
-Parsing is intentionally restrained: PEP 508 with a single upper bound
-of the form ``<N`` or ``<N.0`` or ``<N.0.0`` (the form we actually use).
-Exotic specifiers fall through untracked rather than being misparsed.
+Parsing is intentionally restrained: PEP 508 with a single exclusive
+upper bound of the form ``<N`` or ``<N.0`` or ``<N.0.0`` or a tighter
+minor/patch cap such as ``<1.4.0`` (the forms we actually use). Exotic
+specifiers fall through untracked rather than being misparsed.
 
 Design notes
 ------------
@@ -48,12 +48,14 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from packaging.version import InvalidVersion, Version
+
 try:
     import tomllib
 except ModuleNotFoundError:
     import tomli as tomllib  # type: ignore[no-redef]
 
-_UPPER_BOUND_RE = re.compile(r"<\s*(\d+)(?:\.\d+)*")
+_UPPER_BOUND_RE = re.compile(r"<\s*(\d+(?:\.\d+)*)")
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -64,34 +66,79 @@ class CappedDep:
     name: str
     cap_major: int
     locked_version: str | None
+    cap_version: Version | None = None
+    cap_text: str | None = None
+
+    @property
+    def effective_cap_version(self) -> Version:
+        """Full upper bound used for blocking comparisons."""
+        if self.cap_version is not None:
+            return self.cap_version
+        if self.cap_text is not None:
+            try:
+                return Version(self.cap_text)
+            except InvalidVersion:
+                pass
+        return Version(str(self.cap_major))
+
+    @property
+    def cap_display(self) -> str:
+        """Compact upper-bound display for markdown reports."""
+        if self._is_major_cap:
+            return str(self.cap_major)
+        return self.cap_text or str(self.effective_cap_version)
+
+    @property
+    def locked_parsed(self) -> Version | None:
+        if not self.locked_version:
+            return None
+        try:
+            return Version(self.locked_version)
+        except InvalidVersion:
+            return None
 
     @property
     def locked_major(self) -> int | None:
-        if not self.locked_version:
+        locked = self.locked_parsed
+        if locked is None:
             return None
-        head = self.locked_version.split(".")[0]
-        try:
-            return int(head)
-        except ValueError:
-            return None
+        return locked.major
+
+    @property
+    def _is_major_cap(self) -> bool:
+        release_tail = self.effective_cap_version.release[1:]
+        return all(part == 0 for part in release_tail)
 
     @property
     def cap_reached(self) -> bool:
-        """Locked major >= cap major - bounds violation."""
-        return self.locked_major is not None and self.locked_major >= self.cap_major
+        """Locked version >= full upper bound - bounds violation."""
+        locked = self.locked_parsed
+        return locked is not None and locked >= self.effective_cap_version
 
     @property
     def ceiling_minus_one(self) -> bool:
         """Locked major == cap major - 1 - one bump from decision time."""
-        return self.locked_major is not None and self.locked_major == self.cap_major - 1
+        return self._is_major_cap and self.locked_major is not None and self.locked_major == self.cap_major - 1
 
 
 def _extract_cap_major(spec: str) -> int | None:
     """Return the upper-bound major from a PEP 508 specifier, or None."""
+    parsed = _extract_upper_bound(spec)
+    if parsed is None:
+        return None
+    return parsed[1].major
+
+
+def _extract_upper_bound(spec: str) -> tuple[str, Version] | None:
+    """Return the exclusive upper-bound text and parsed version, or None."""
     m = _UPPER_BOUND_RE.search(spec)
     if not m:
         return None
-    return int(m.group(1))
+    text = m.group(1)
+    try:
+        return text, Version(text)
+    except InvalidVersion:
+        return None
 
 
 def _iter_capped_requirements(pyproject: dict) -> list[tuple[str, str]]:
@@ -139,15 +186,18 @@ def collect_capped_deps(pyproject_path: Path, lock_path: Path) -> list[CappedDep
     for name, spec in _iter_capped_requirements(pyproject):
         if name in seen:
             continue
-        cap_major = _extract_cap_major(spec)
-        if cap_major is None:
+        upper_bound = _extract_upper_bound(spec)
+        if upper_bound is None:
             continue
+        cap_text, cap_version = upper_bound
         seen.add(name)
         capped.append(
             CappedDep(
                 name=name,
-                cap_major=cap_major,
+                cap_major=cap_version.major,
                 locked_version=locked.get(name),
+                cap_version=cap_version,
+                cap_text=cap_text,
             )
         )
     return capped
@@ -169,7 +219,7 @@ def render_report(deps: list[CappedDep]) -> str:
             status = "⚠️ ceiling-minus-one - one major from decision"
         else:
             status = "✅ healthy"
-        lines.append(f"| `{dep.name}` | {locked} | <{dep.cap_major} | {status} |")
+        lines.append(f"| `{dep.name}` | {locked} | <{dep.cap_display} | {status} |")
     lines.append("")
     return "\n".join(lines)
 
