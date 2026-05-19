@@ -123,9 +123,10 @@ def _render_power_bar(results: list[NormalizedResultLike], options: Any, subtitl
         BarData(label=r.platform, value=float(r.power_at_size)) for r in results if r.power_at_size is not None
     ]
     if not bar_data:
-        if not any(is_power_run_result(result) for result in results):
+        power_results = [result for result in results if is_power_run_result(result)]
+        if not power_results:
             return None
-        return _render_power_query_latency_bars(results, options, subtitle)
+        return _render_power_query_latency_bars(power_results, options, subtitle)
     return _render_power_metric_bars(bar_data, options, subtitle)
 
 

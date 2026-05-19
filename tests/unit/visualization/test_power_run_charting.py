@@ -69,6 +69,32 @@ def test_power_bar_ignores_non_power_runs_without_power_metric():
     assert output is None
 
 
+def test_power_bar_latency_fallback_filters_mixed_non_power_runs():
+    """power_bar fallback labels only power-run query timings in mixed invocations."""
+    results = [
+        make_normalized_result(
+            platform="PowerDB",
+            benchmark="joinorder",
+            scale_factor=1,
+            raw={"benchmark": {"test_type": "power"}},
+            queries=[SimpleNamespace(query_id="POWER_ONLY", execution_time_ms=12.0)],
+        ),
+        make_normalized_result(
+            platform="StandardDB",
+            benchmark="custom",
+            scale_factor=1,
+            queries=[SimpleNamespace(query_id="STANDARD_ONLY", execution_time_ms=99.0)],
+        ),
+    ]
+    opts = ChartOptions(use_color=False)
+    output = render_ascii_chart_from_results(results, "power_bar", opts, {})
+    assert output is not None
+    assert "Power Run Query Latency" in output
+    assert "POWER_ONLY" in output
+    assert "STANDARD_ONLY" not in output
+    assert "StandardDB" not in output
+
+
 def test_query_histogram_uses_horizontal_bars_for_long_query_names():
     """Primitives-style long query names stay readable in query_histogram."""
     results = [
