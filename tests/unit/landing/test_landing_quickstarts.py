@@ -388,6 +388,7 @@ def test_provenance_snapshot_includes_version_and_profile_commands(gen, catalog)
 def test_capture_plans_footnote_present(gen, catalog):
     templates = catalog["templates"]["cli"]
     assert "--capture-plans" in templates["capture_plans_footer"]
+    assert "before `2>&1 | tee" in templates["capture_plans_footer"]
     assert "benchbox show-plan" in templates["capture_plans_footer"]
     assert "--run" in templates["capture_plans_footer"]
     assert "--query-id" in templates["capture_plans_footer"]
@@ -396,8 +397,17 @@ def test_capture_plans_footnote_present(gen, catalog):
     bad["templates"]["cli"]["capture_plans_footer"] = "Capture plans separately."
     errors = gen.validate(bad)
     assert any("capture_plans_footer must mention --capture-plans" in e for e in errors)
+    assert any("capture_plans_footer must say --capture-plans goes before the tee pipeline" in e for e in errors)
     assert any("capture_plans_footer must mention benchbox show-plan" in e for e in errors)
     assert any("capture_plans_footer must use show-plan --run and --query-id" in e for e in errors)
+
+    bad = copy.deepcopy(catalog)
+    bad["templates"]["cli"]["capture_plans_footer"] = (
+        "To capture EXPLAIN plans, add `--capture-plans` to the live command and inspect with "
+        "`benchbox show-plan --run <result-json> --query-id Q1`."
+    )
+    errors = gen.validate(bad)
+    assert errors == ["templates.cli.capture_plans_footer must say --capture-plans goes before the tee pipeline"]
 
 
 def test_runtime_hints_well_formed(gen, catalog):
@@ -449,8 +459,7 @@ def test_agent_prompt_includes_output_discipline_and_summary_labels():
     assert "Discover & summarize" in prompts_js
     assert "Save provenance" in prompts_js
     assert "force_datagen_footer" in prompts_js
-    assert "resultsPathsForGoal" in prompts_js
-    assert "--limit 2" in prompts_js
+    assert "resultsPathsCommand" in prompts_js
     assert "target MCP call(s)" in prompts_js
     assert "MCP tool result payload" in prompts_js
     assert "capture_plans_footer" in prompts_js
@@ -496,13 +505,21 @@ def test_mcp_prompt_does_not_emit_nonexistent_platform_options_argument():
     assert "platform_options" not in prompts_js
 
 
-def test_compare_prompt_uses_comparison_log_and_two_result_paths():
+def test_compare_prompt_uses_comparison_log_not_recent_result_paths():
     prompts_js = PROMPTS_JS_PATH.read_text(encoding="utf-8")
+    build_agent_prompt = prompts_js[
+        prompts_js.index("function buildAgentPrompt") : prompts_js.index("function readStateFromForm")
+    ]
+    discover_start = build_agent_prompt.index("Discover & summarize: summarize total runtime")
+    compare_start = build_agent_prompt.rfind('if (state.goal === "compare")', 0, discover_start)
+    compare_summary = build_agent_prompt[compare_start : build_agent_prompt.index("        } else {", compare_start)]
 
-    assert 'if (state.goal === "compare")' in prompts_js
-    assert 'command.replace(/--limit\\s+\\S+/, "--limit 2")' in prompts_js
-    assert "summarize the comparison from" in prompts_js
-    assert "for each result JSON path" in prompts_js
+    assert 'if (state.goal === "compare")' in build_agent_prompt
+    assert "comparison output in" in compare_summary
+    assert "liveLogPath" in compare_summary
+    assert "benchbox results --paths" not in compare_summary
+    assert "resultsPaths" not in compare_summary
+    assert "showCli" not in compare_summary
 
 
 def test_agent_prompt_includes_platform_footgun_and_dsdgen_labels():
@@ -511,6 +528,22 @@ def test_agent_prompt_includes_platform_footgun_and_dsdgen_labels():
     assert "Likely required platform options for" in prompts_js
     assert "TPC-DS sub-scale warning" in prompts_js
     assert "requires_bundled_dsdgen_below" in prompts_js
+    assert "_binaries/tpc-ds/<platform>/dsdgen" not in prompts_js
+    assert "_binaries/tpc-ds/<os>-<arch>/dsdgen" in prompts_js
+    assert "_binaries/tpc-ds/linux-x86_64/dsdgen" in prompts_js
+    assert "_binaries/tpc-ds/darwin-arm64/dsdgen" in prompts_js
+
+
+def test_dsdgen_warning_accounts_for_injected_smoke_scale():
+    prompts_js = PROMPTS_JS_PATH.read_text(encoding="utf-8")
+    warning_fn = prompts_js[
+        prompts_js.index("function needsBundledDsdgenWarning") : prompts_js.index("function mcpModeArg")
+    ]
+
+    assert "function needsBundledDsdgenWarning(state, benchmarkEntry, isPaid)" in warning_fn
+    assert "needsSmokeStep(state, isPaid) && 0.01 < numericThreshold" in warning_fn
+
+    assert prompts_js.count("if (needsBundledDsdgenWarning(state, benchmarkEntry, isPaid))") == 3
 
 
 def test_mcp_prompt_includes_smoke_for_managed_at_scale():
@@ -518,6 +551,24 @@ def test_mcp_prompt_includes_smoke_for_managed_at_scale():
     assert "SMOKE: call " in prompts_js
     assert 'mcpRunCall(mcpToolName, platform, state, "0.01", false, false)' in prompts_js
     assert "Abort if the smoke run fails" in prompts_js
+
+
+def test_credential_preflight_precedes_smoke_steps():
+    prompts_js = PROMPTS_JS_PATH.read_text(encoding="utf-8")
+    credential_step = "Make sure platform connection credentials/config are set outside this conversation"
+
+    mcp_block = prompts_js[
+        prompts_js.index("function buildMcpPrompt") : prompts_js.index("function renderMcpDependencyStep")
+    ]
+    mcp_compare_block = mcp_block[mcp_block.index("if (isCompare)") : mcp_block.index("        var lines = [];")]
+    mcp_single_block = mcp_block[mcp_block.index("        var lines = [];") :]
+    agent_block = prompts_js[
+        prompts_js.index("function buildAgentPrompt") : prompts_js.index("function readStateFromForm")
+    ]
+
+    assert mcp_compare_block.index(credential_step) < mcp_compare_block.index("SMOKE: call ")
+    assert mcp_single_block.index(credential_step) < mcp_single_block.index("SMOKE: call ")
+    assert agent_block.index(credential_step) < agent_block.index("SMOKE: run the same live command")
 
 
 def test_mcp_prompt_includes_cost_ack_for_paid_platforms():
@@ -537,6 +588,8 @@ def test_mcp_prompt_calls_analyze_results_and_system_profile():
     prompts_js = PROMPTS_JS_PATH.read_text(encoding="utf-8")
     assert "analysis_tool" in prompts_js
     assert "mcp_metadata.result_file" in prompts_js
+    assert "only the filename component from each live response's `mcp_metadata.result_file`" in prompts_js
+    assert "`mcp_metadata.result_file` paths from both live responses" not in prompts_js
     assert "systemProfileTool" in prompts_js
     assert "system_profile_tool" in prompts_js
 

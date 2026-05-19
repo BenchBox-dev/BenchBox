@@ -287,12 +287,8 @@
         return command.replace(/--scale\s+\S+/, "--scale " + scale);
     }
 
-    function resultsPathsForGoal(state) {
-        var command = catalog.templates.cli.results_paths;
-        if (state.goal === "compare") {
-            return command.replace(/--limit\s+\S+/, "--limit 2");
-        }
-        return command;
+    function resultsPathsCommand() {
+        return catalog.templates.cli.results_paths;
     }
 
     function isPaidEntry(entry) {
@@ -381,9 +377,25 @@
         return isFinite(threshold) ? benchmarkEntry.requires_bundled_dsdgen_below : null;
     }
 
-    function needsBundledDsdgenWarning(state, benchmarkEntry) {
+    function bundledDsdgenPathHint() {
+        return "`_binaries/tpc-ds/<os>-<arch>/dsdgen` (for example "
+            + "`_binaries/tpc-ds/linux-x86_64/dsdgen` or `_binaries/tpc-ds/darwin-arm64/dsdgen`)";
+    }
+
+    function bundledDsdgenWarningStep(stepNumber, benchmarkEntry) {
+        return "  " + stepNumber + ". TPC-DS sub-scale warning: scale factors below "
+            + bundledDsdgenThreshold(benchmarkEntry)
+            + " require BenchBox's bundled patched dsdgen at "
+            + bundledDsdgenPathHint()
+            + "; do not use stock dsdgen.";
+    }
+
+    function needsBundledDsdgenWarning(state, benchmarkEntry, isPaid) {
         var threshold = bundledDsdgenThreshold(benchmarkEntry);
-        return threshold !== null && parseFloat(state.scale) < parseFloat(threshold);
+        if (threshold === null) return false;
+        var numericThreshold = parseFloat(threshold);
+        return parseFloat(state.scale) < numericThreshold
+            || (needsSmokeStep(state, isPaid) && 0.01 < numericThreshold);
     }
 
     function mcpModeArg(state) {
@@ -434,7 +446,7 @@
     function mcpAnalysisStep(state, platform) {
         var analysisTool = catalog.mcp.analysis_tool || "analyze_results";
         if (state.goal === "compare") {
-            return "Use the `" + analysisTool + "(analysis=\"compare\", file1=\"<first-result-json>\", file2=\"<second-result-json>\")` tool with the `mcp_metadata.result_file` paths from both live responses; summarize total runtime, per-query timing, and failures.";
+            return "Use the `" + analysisTool + "(analysis=\"compare\", file1=\"<first-result-json>\", file2=\"<second-result-json>\")` tool with only the filename component from each live response's `mcp_metadata.result_file`; summarize total runtime, per-query timing, and failures.";
         }
         return "Summarize total runtime, per-query timings, and failures from the MCP tool result payload. If you need a result rollup, call `" + analysisTool + "(analysis=\"aggregate\", platform=\"" + platform + "\", benchmark=\"" + state.benchmark + "\", limit=1)`.";
     }
@@ -468,8 +480,11 @@
             );
             appendMcpPlatformOptionLines(compareLines, selectedEntries, step);
             compareLines.push("  " + step.value++ + ". Use the " + mcpPromptCall(mcpPromptName, state, platform, platformB) + " prompt.");
-            if (needsBundledDsdgenWarning(state, benchmarkEntry)) {
-                compareLines.push("  " + step.value++ + ". TPC-DS sub-scale warning: scale factors below " + bundledDsdgenThreshold(benchmarkEntry) + " require BenchBox's bundled patched dsdgen at `_binaries/tpc-ds/<platform>/dsdgen`; do not use stock dsdgen.");
+            if (needsBundledDsdgenWarning(state, benchmarkEntry, isPaid)) {
+                compareLines.push(bundledDsdgenWarningStep(step.value++, benchmarkEntry));
+            }
+            if (needsCredentials) {
+                compareLines.push("  " + step.value++ + ". Make sure platform connection credentials/config are set outside this conversation (env vars, config files). Do NOT ask me to paste secrets here.");
             }
             if (needsSmokeStep(state, isPaid)) {
                 compareLines.push("  " + step.value++ + ". SMOKE: call " + mcpRunCalls(mcpToolName, selectedPlatforms, state, "0.01", false) + " before the target-scale dry run. Abort if either smoke run fails.");
@@ -477,9 +492,6 @@
             compareLines.push("  " + step.value++ + ". Call " + mcpRunCalls(mcpToolName, selectedPlatforms, state, state.scale, true) + ". Inspect both plans.");
             if (shouldAnnounceRun(state)) {
                 compareLines.push("  " + step.value++ + ". Announce before running: target MCP call(s) " + mcpRunCalls(mcpToolName, selectedPlatforms, state, state.scale, false) + ", expected runtime, and stop condition. Stop promptly on user interrupt or redirect.");
-            }
-            if (needsCredentials) {
-                compareLines.push("  " + step.value++ + ". Make sure platform connection credentials/config are set outside this conversation (env vars, config files). Do NOT ask me to paste secrets here.");
             }
             if (needsCostAcknowledgment(state, isPaid)) {
                 compareLines.push("  " + step.value++ + ". COST ACKNOWLEDGMENT: ask the user to confirm credit or compute spend before running the target scale.");
@@ -501,8 +513,11 @@
         );
         appendMcpPlatformOptionLines(lines, [platformEntry], step);
         lines.push("  " + step.value++ + ". Use the " + mcpPromptCall(mcpPromptName, state, platform, platformB) + " prompt.");
-        if (needsBundledDsdgenWarning(state, benchmarkEntry)) {
-            lines.push("  " + step.value++ + ". TPC-DS sub-scale warning: scale factors below " + bundledDsdgenThreshold(benchmarkEntry) + " require BenchBox's bundled patched dsdgen at `_binaries/tpc-ds/<platform>/dsdgen`; do not use stock dsdgen.");
+        if (needsBundledDsdgenWarning(state, benchmarkEntry, isPaid)) {
+            lines.push(bundledDsdgenWarningStep(step.value++, benchmarkEntry));
+        }
+        if (needsCredentials) {
+            lines.push("  " + step.value++ + ". Make sure platform connection credentials/config are set outside this conversation (env vars, config files). Do NOT ask me to paste secrets here.");
         }
         if (needsSmokeStep(state, isPaid)) {
             lines.push("  " + step.value++ + ". SMOKE: call " + mcpRunCall(mcpToolName, platform, state, "0.01", false, false) + ". Abort if the smoke run fails.");
@@ -510,9 +525,6 @@
         lines.push("  " + step.value++ + ". Call " + mcpRunCall(mcpToolName, platform, state, state.scale, true, false) + ". Inspect the plan.");
         if (shouldAnnounceRun(state)) {
             lines.push("  " + step.value++ + ". Announce before running: target MCP call(s) " + mcpRunCall(mcpToolName, platform, state, state.scale, false, false) + ", expected runtime, and stop condition. Stop promptly on user interrupt or redirect.");
-        }
-        if (needsCredentials) {
-            lines.push("  " + step.value++ + ". Make sure platform connection credentials/config are set outside this conversation (env vars, config files). Do NOT ask me to paste secrets here.");
         }
         if (needsCostAcknowledgment(state, isPaid)) {
             lines.push("  " + step.value++ + ". COST ACKNOWLEDGMENT: ask the user to confirm credit or compute spend before running the target scale.");
@@ -544,7 +556,6 @@
         var platformSlug = state.goal === "compare" ? platform + "-vs-" + platformB : platform;
         var liveLogPath = logPath(state, platformSlug);
         var liveCmd = commandWithLogCapture(cliCmd, liveLogPath);
-        var resultsPaths = resultsPathsForGoal(state);
         var showCli = catalog.templates.cli.show_cli;
         var isPaid = isPaidSelection(platformEntry, platformBEntry);
         var smokeState = Object.assign({}, state, { scale: "0.01" });
@@ -571,8 +582,11 @@
         } else {
             lines.push("  " + step++ + ". Check dependencies: no optional connector check is registered for this selection; confirm the install command completed successfully.");
         }
-        if (needsBundledDsdgenWarning(state, benchmarkEntry)) {
-            lines.push("  " + step++ + ". TPC-DS sub-scale warning: scale factors below " + bundledDsdgenThreshold(benchmarkEntry) + " require BenchBox's bundled patched dsdgen at `_binaries/tpc-ds/<platform>/dsdgen`; do not use stock dsdgen.");
+        if (needsBundledDsdgenWarning(state, benchmarkEntry, isPaid)) {
+            lines.push(bundledDsdgenWarningStep(step++, benchmarkEntry));
+        }
+        if (needsCredentials) {
+            lines.push("  " + step++ + ". Make sure platform connection credentials/config are set outside this conversation (env vars, config files). Do NOT ask me to paste secrets here.");
         }
         if (needsSmokeStep(state, isPaid)) {
             lines.push("  " + step++ + ". SMOKE: run the same live command at scale factor 0.01 before the target-scale dry run: `" + smokeCmd + "`. Abort if the smoke run fails.");
@@ -582,7 +596,6 @@
             lines.push("  " + step++ + ". Announce before running: command `" + liveCmd + "`, log path `" + liveLogPath + "`, expected runtime, and stop condition. Stop promptly on user interrupt or redirect.");
         }
         if (needsCredentials) {
-            lines.push("  " + step++ + ". Make sure platform connection credentials/config are set outside this conversation (env vars, config files). Do NOT ask me to paste secrets here.");
             if (needsCostAcknowledgment(state, isPaid)) {
                 lines.push("  " + step++ + ". COST ACKNOWLEDGMENT: ask the user to confirm credit or compute spend before running the target scale.");
                 lines.push("  " + step++ + ". Once credentials and cost acknowledgment are confirmed, run live: `" + liveCmd + "`.");
@@ -596,8 +609,9 @@
             lines.push("  " + step++ + ". Run live: `" + liveCmd + "`.");
         }
         if (state.goal === "compare") {
-            lines.push("  " + step++ + ". Discover & summarize: summarize the comparison from `" + liveLogPath + "`, then run `" + resultsPaths + "` and `" + showCli + "` for each result JSON path needed to inspect per-platform timings.");
+            lines.push("  " + step++ + ". Discover & summarize: summarize total runtime, per-query timings, and failures from the comparison output in `" + liveLogPath + "`. If the compare command was run with an explicit output path, inspect that file too.");
         } else {
+            var resultsPaths = resultsPathsCommand();
             lines.push("  " + step++ + ". Discover & summarize: run `" + resultsPaths + "`, then run `" + showCli + "` with the result JSON path. Summarize total runtime, per-query timings, and failures from the result JSON.");
         }
         lines.push("  " + step++ + ". Save provenance next to the result bundle. Replace `<bundle-dir>` with the bundle directory from the previous step, then run:");
