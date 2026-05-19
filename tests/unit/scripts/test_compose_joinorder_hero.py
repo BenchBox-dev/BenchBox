@@ -3,6 +3,12 @@
 from __future__ import annotations
 
 import _compose_joinorder_hero as compose_joinorder_hero
+import pytest
+
+pytestmark = [
+    pytest.mark.unit,
+    pytest.mark.fast,
+]
 
 
 def test_joinorder_json_input_path_is_repo_relative() -> None:
