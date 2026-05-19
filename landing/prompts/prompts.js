@@ -467,15 +467,15 @@
             if (needsBundledDsdgenWarning(state, benchmarkEntry)) {
                 compareLines.push("  " + step.value++ + ". TPC-DS sub-scale warning: scale factors below " + bundledDsdgenThreshold(benchmarkEntry) + " require BenchBox's bundled patched dsdgen at `_binaries/tpc-ds/<platform>/dsdgen`; do not use stock dsdgen.");
             }
+            if (needsCredentials) {
+                compareLines.push("  " + step.value++ + ". Make sure platform connection credentials/config are set outside this conversation (env vars, config files). Do NOT ask me to paste secrets here.");
+            }
             if (needsSmokeStep(state, isPaid)) {
                 compareLines.push("  " + step.value++ + ". SMOKE: call " + mcpRunCalls(mcpToolName, selectedPlatforms, state, "0.01", false) + " before the target-scale dry run. Abort if either smoke run fails.");
             }
             compareLines.push("  " + step.value++ + ". Call " + mcpRunCalls(mcpToolName, selectedPlatforms, state, state.scale, true) + ". Inspect both plans.");
             if (shouldAnnounceRun(state)) {
                 compareLines.push("  " + step.value++ + ". Announce before running: target MCP call(s) " + mcpRunCalls(mcpToolName, selectedPlatforms, state, state.scale, false) + ", expected runtime, and stop condition. Stop promptly on user interrupt or redirect.");
-            }
-            if (needsCredentials) {
-                compareLines.push("  " + step.value++ + ". Make sure platform connection credentials/config are set outside this conversation (env vars, config files). Do NOT ask me to paste secrets here.");
             }
             if (needsCostAcknowledgment(state, isPaid)) {
                 compareLines.push("  " + step.value++ + ". COST ACKNOWLEDGMENT: ask the user to confirm credit or compute spend before running the target scale.");
@@ -500,15 +500,15 @@
         if (needsBundledDsdgenWarning(state, benchmarkEntry)) {
             lines.push("  " + step.value++ + ". TPC-DS sub-scale warning: scale factors below " + bundledDsdgenThreshold(benchmarkEntry) + " require BenchBox's bundled patched dsdgen at `_binaries/tpc-ds/<platform>/dsdgen`; do not use stock dsdgen.");
         }
+        if (needsCredentials) {
+            lines.push("  " + step.value++ + ". Make sure platform connection credentials/config are set outside this conversation (env vars, config files). Do NOT ask me to paste secrets here.");
+        }
         if (needsSmokeStep(state, isPaid)) {
             lines.push("  " + step.value++ + ". SMOKE: call " + mcpRunCall(mcpToolName, platform, state, "0.01", false, false) + ". Abort if the smoke run fails.");
         }
         lines.push("  " + step.value++ + ". Call " + mcpRunCall(mcpToolName, platform, state, state.scale, true, false) + ". Inspect the plan.");
         if (shouldAnnounceRun(state)) {
             lines.push("  " + step.value++ + ". Announce before running: target MCP call(s) " + mcpRunCall(mcpToolName, platform, state, state.scale, false, false) + ", expected runtime, and stop condition. Stop promptly on user interrupt or redirect.");
-        }
-        if (needsCredentials) {
-            lines.push("  " + step.value++ + ". Make sure platform connection credentials/config are set outside this conversation (env vars, config files). Do NOT ask me to paste secrets here.");
         }
         if (needsCostAcknowledgment(state, isPaid)) {
             lines.push("  " + step.value++ + ". COST ACKNOWLEDGMENT: ask the user to confirm credit or compute spend before running the target scale.");
@@ -569,6 +569,9 @@
         if (needsBundledDsdgenWarning(state, benchmarkEntry)) {
             lines.push("  " + step++ + ". TPC-DS sub-scale warning: scale factors below " + bundledDsdgenThreshold(benchmarkEntry) + " require BenchBox's bundled patched dsdgen at `_binaries/tpc-ds/<platform>/dsdgen`; do not use stock dsdgen.");
         }
+        if (needsCredentials) {
+            lines.push("  " + step++ + ". Make sure platform connection credentials/config are set outside this conversation (env vars, config files). Do NOT ask me to paste secrets here.");
+        }
         if (needsSmokeStep(state, isPaid)) {
             lines.push("  " + step++ + ". SMOKE: run the same live command at scale factor 0.01 before the target-scale dry run: `" + smokeCmd + "`. Abort if the smoke run fails.");
         }
@@ -577,7 +580,6 @@
             lines.push("  " + step++ + ". Announce before running: command `" + liveCmd + "`, log path `" + liveLogPath + "`, expected runtime, and stop condition. Stop promptly on user interrupt or redirect.");
         }
         if (needsCredentials) {
-            lines.push("  " + step++ + ". Make sure platform connection credentials/config are set outside this conversation (env vars, config files). Do NOT ask me to paste secrets here.");
             if (needsCostAcknowledgment(state, isPaid)) {
                 lines.push("  " + step++ + ". COST ACKNOWLEDGMENT: ask the user to confirm credit or compute spend before running the target scale.");
                 lines.push("  " + step++ + ". Once credentials and cost acknowledgment are confirmed, run live: `" + liveCmd + "`.");

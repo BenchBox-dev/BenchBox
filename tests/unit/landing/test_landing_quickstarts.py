@@ -527,6 +527,24 @@ def test_mcp_prompt_includes_smoke_for_managed_at_scale():
     assert "Abort if the smoke run fails" in prompts_js
 
 
+def test_credential_preflight_precedes_smoke_steps():
+    prompts_js = PROMPTS_JS_PATH.read_text(encoding="utf-8")
+    credential_step = "Make sure platform connection credentials/config are set outside this conversation"
+
+    mcp_block = prompts_js[
+        prompts_js.index("function buildMcpPrompt") : prompts_js.index("function renderMcpDependencyStep")
+    ]
+    mcp_compare_block = mcp_block[mcp_block.index("if (isCompare)") : mcp_block.index("        var lines = [];")]
+    mcp_single_block = mcp_block[mcp_block.index("        var lines = [];") :]
+    agent_block = prompts_js[
+        prompts_js.index("function buildAgentPrompt") : prompts_js.index("function readStateFromForm")
+    ]
+
+    assert mcp_compare_block.index(credential_step) < mcp_compare_block.index("SMOKE: call ")
+    assert mcp_single_block.index(credential_step) < mcp_single_block.index("SMOKE: call ")
+    assert agent_block.index(credential_step) < agent_block.index("SMOKE: run the same live command")
+
+
 def test_mcp_prompt_includes_cost_ack_for_paid_platforms():
     prompts_js = PROMPTS_JS_PATH.read_text(encoding="utf-8")
     assert "COST ACKNOWLEDGMENT" in prompts_js
