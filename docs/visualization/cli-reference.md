@@ -54,10 +54,10 @@ benchbox visualize results/*.json --chart-type performance_bar --chart-type dist
 | `auto` | Render all applicable chart types (default) |
 | `all` | Same as `auto` |
 | `performance_bar` | Platform comparison bar chart (total execution time, lower is better) |
-| `power_bar` | TPC Power@Size comparison bar chart (higher is better; TPC benchmarks only) |
+| `power_bar` | TPC Power@Size comparison bar chart; falls back to power-run query latency bars when no TPC metric exists |
 | `distribution_box` | Latency distribution box plot |
 | `query_heatmap` | Query x platform variance heatmap |
-| `query_histogram` | Per-query latency vertical bars (auto-splits for >33 queries) |
+| `query_histogram` | Per-query latency bars; uses horizontal bars for long query labels and vertical bars otherwise |
 | `cost_scatter` | Cost-performance scatter plot |
 | `time_series` | Performance trend line chart |
 | `comparison_bar` | Per-query paired bars with % change (requires 2 results) |
