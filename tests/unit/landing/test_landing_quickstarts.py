@@ -534,6 +534,18 @@ def test_agent_prompt_includes_platform_footgun_and_dsdgen_labels():
     assert "_binaries/tpc-ds/darwin-arm64/dsdgen" in prompts_js
 
 
+def test_dsdgen_warning_accounts_for_injected_smoke_scale():
+    prompts_js = PROMPTS_JS_PATH.read_text(encoding="utf-8")
+    warning_fn = prompts_js[
+        prompts_js.index("function needsBundledDsdgenWarning") : prompts_js.index("function mcpModeArg")
+    ]
+
+    assert "function needsBundledDsdgenWarning(state, benchmarkEntry, isPaid)" in warning_fn
+    assert "needsSmokeStep(state, isPaid) && 0.01 < numericThreshold" in warning_fn
+
+    assert prompts_js.count("if (needsBundledDsdgenWarning(state, benchmarkEntry, isPaid))") == 3
+
+
 def test_mcp_prompt_includes_smoke_for_managed_at_scale():
     prompts_js = PROMPTS_JS_PATH.read_text(encoding="utf-8")
     assert "SMOKE: call " in prompts_js

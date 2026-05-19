@@ -390,9 +390,12 @@
             + "; do not use stock dsdgen.";
     }
 
-    function needsBundledDsdgenWarning(state, benchmarkEntry) {
+    function needsBundledDsdgenWarning(state, benchmarkEntry, isPaid) {
         var threshold = bundledDsdgenThreshold(benchmarkEntry);
-        return threshold !== null && parseFloat(state.scale) < parseFloat(threshold);
+        if (threshold === null) return false;
+        var numericThreshold = parseFloat(threshold);
+        return parseFloat(state.scale) < numericThreshold
+            || (needsSmokeStep(state, isPaid) && 0.01 < numericThreshold);
     }
 
     function mcpModeArg(state) {
@@ -477,7 +480,7 @@
             );
             appendMcpPlatformOptionLines(compareLines, selectedEntries, step);
             compareLines.push("  " + step.value++ + ". Use the " + mcpPromptCall(mcpPromptName, state, platform, platformB) + " prompt.");
-            if (needsBundledDsdgenWarning(state, benchmarkEntry)) {
+            if (needsBundledDsdgenWarning(state, benchmarkEntry, isPaid)) {
                 compareLines.push(bundledDsdgenWarningStep(step.value++, benchmarkEntry));
             }
             if (needsCredentials) {
@@ -510,7 +513,7 @@
         );
         appendMcpPlatformOptionLines(lines, [platformEntry], step);
         lines.push("  " + step.value++ + ". Use the " + mcpPromptCall(mcpPromptName, state, platform, platformB) + " prompt.");
-        if (needsBundledDsdgenWarning(state, benchmarkEntry)) {
+        if (needsBundledDsdgenWarning(state, benchmarkEntry, isPaid)) {
             lines.push(bundledDsdgenWarningStep(step.value++, benchmarkEntry));
         }
         if (needsCredentials) {
@@ -579,7 +582,7 @@
         } else {
             lines.push("  " + step++ + ". Check dependencies: no optional connector check is registered for this selection; confirm the install command completed successfully.");
         }
-        if (needsBundledDsdgenWarning(state, benchmarkEntry)) {
+        if (needsBundledDsdgenWarning(state, benchmarkEntry, isPaid)) {
             lines.push(bundledDsdgenWarningStep(step++, benchmarkEntry));
         }
         if (needsCredentials) {
