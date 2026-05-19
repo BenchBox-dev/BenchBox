@@ -241,10 +241,11 @@ Statistics:
 
 ## Query Latency Histogram
 
-**Purpose:** Display per-query execution latency with one vertical bar per query. Provides immediate visual insight into which queries are fastest/slowest and the overall latency distribution pattern.
+**Purpose:** Display per-query execution latency with one bar per query. Short query IDs render as vertical bars; long descriptive query names render as horizontal bars so labels remain readable. Provides immediate visual insight into which queries are fastest/slowest and the overall latency distribution pattern.
 
 **Key Features:**
-- One vertical bar per query showing execution time
+- One bar per query showing execution time
+- Horizontal layout for long labels such as Primitives query names
 - Automatic best/worst highlighting (green for fastest, orange for slowest)
 - Mean reference line for quick comparison
 - Natural query ID sorting (Q1, Q2, Q10 - not Q1, Q10, Q2)
