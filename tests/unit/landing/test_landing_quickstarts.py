@@ -388,6 +388,7 @@ def test_provenance_snapshot_includes_version_and_profile_commands(gen, catalog)
 def test_capture_plans_footnote_present(gen, catalog):
     templates = catalog["templates"]["cli"]
     assert "--capture-plans" in templates["capture_plans_footer"]
+    assert "before `2>&1 | tee" in templates["capture_plans_footer"]
     assert "benchbox show-plan" in templates["capture_plans_footer"]
     assert "--run" in templates["capture_plans_footer"]
     assert "--query-id" in templates["capture_plans_footer"]
@@ -396,8 +397,17 @@ def test_capture_plans_footnote_present(gen, catalog):
     bad["templates"]["cli"]["capture_plans_footer"] = "Capture plans separately."
     errors = gen.validate(bad)
     assert any("capture_plans_footer must mention --capture-plans" in e for e in errors)
+    assert any("capture_plans_footer must say --capture-plans goes before the tee pipeline" in e for e in errors)
     assert any("capture_plans_footer must mention benchbox show-plan" in e for e in errors)
     assert any("capture_plans_footer must use show-plan --run and --query-id" in e for e in errors)
+
+    bad = copy.deepcopy(catalog)
+    bad["templates"]["cli"]["capture_plans_footer"] = (
+        "To capture EXPLAIN plans, add `--capture-plans` to the live command and inspect with "
+        "`benchbox show-plan --run <result-json> --query-id Q1`."
+    )
+    errors = gen.validate(bad)
+    assert errors == ["templates.cli.capture_plans_footer must say --capture-plans goes before the tee pipeline"]
 
 
 def test_runtime_hints_well_formed(gen, catalog):

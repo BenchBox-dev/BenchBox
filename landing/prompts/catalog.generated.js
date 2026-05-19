@@ -1130,7 +1130,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
   ],
   "templates": {
     "cli": {
-      "capture_plans_footer": "To capture EXPLAIN plans, add `--capture-plans` to the live command and inspect with `benchbox show-plan --run <result-json> --query-id Q1`.",
+      "capture_plans_footer": "To capture EXPLAIN plans, insert `--capture-plans` in the benchbox command before `2>&1 | tee ...` (for example: `set -o pipefail; uv run benchbox run ... --capture-plans 2>&1 | tee <log>`), then inspect with `benchbox show-plan --run <result-json> --query-id Q1`.",
       "compare": "uv run benchbox compare --platform {platform_a} --platform {platform_b} --benchmark {benchmark} --scale {scale} --non-interactive",
       "dependency_check": "uv run benchbox check-deps --platform {platform}",
       "dry_run": "uv run benchbox run --dry-run {dry_run_dir} --platform {platform} --benchmark {benchmark} --scale {scale}",
