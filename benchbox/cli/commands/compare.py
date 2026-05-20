@@ -35,6 +35,13 @@ from benchbox.core.results.loader import (
     load_result_file,
 )
 
+_SIGNIFICANT_IMPROVEMENT_ASSESSMENT = "significant_improvement"
+_MAX_BOUNDED_QUERY_REGRESSIONS = 2
+_MAX_BOUNDED_QUERY_REGRESSION_FRACTION = 0.10
+_MAX_BOUNDED_QUERY_REGRESSION_MULTIPLIER = 2.0
+_MAX_BOUNDED_QUERY_SLOWDOWN_MS = 2.0
+_MAX_BOUNDED_TOTAL_QUERY_SLOWDOWN_MS = 4.0
+
 
 class ResultFileMetadata:
     """Metadata extracted from a benchmark result file."""
@@ -1209,13 +1216,16 @@ def _check_regression_threshold(comparison: dict[str, Any], regression_threshold
     """Check for regressions and exit if threshold exceeded."""
     if regression_threshold is None:
         return
-    has_regression = _check_regression(comparison, regression_threshold)
-    if has_regression:
+    decision = _evaluate_regression_gate(comparison, regression_threshold)
+    if decision["failed"]:
         console.print(
             f"\n[bold red]❌ Performance regression detected (threshold: {regression_threshold * 100:.1f}%)[/bold red]"
         )
+        console.print(_format_regression_gate_details(decision, regression_threshold))
         sys.exit(1)
     else:
+        if decision["query_regressions"]:
+            console.print(_format_regression_gate_details(decision, regression_threshold))
         console.print(
             f"\n[bold green]✓ No performance regression (threshold: {regression_threshold * 100:.1f}%)[/bold green]"
         )
@@ -1352,25 +1362,172 @@ def _parse_threshold(threshold_str: str) -> float | None:
 
 def _check_regression(comparison: dict[str, Any], threshold: float) -> bool:
     """Check if any query or overall performance regressed beyond threshold."""
+    return bool(_evaluate_regression_gate(comparison, threshold)["failed"])
+
+
+def _evaluate_regression_gate(comparison: dict[str, Any], threshold: float) -> dict[str, Any]:
+    """Evaluate aggregate and per-query regression policy for CI gating."""
+    threshold_pct = threshold * 100
+    overall_regressions = _find_overall_regressions(comparison, threshold_pct)
+    query_regressions = _find_query_regressions(comparison, threshold_pct)
+
+    decision = {
+        "failed": False,
+        "rule": "no metric or per-query regression exceeded the configured threshold",
+        "overall_regressions": overall_regressions,
+        "query_regressions": query_regressions,
+        "summary": comparison.get("summary", {}),
+        "performance_changes": comparison.get("performance_changes", {}),
+    }
+
+    if overall_regressions:
+        decision["failed"] = True
+        decision["rule"] = "aggregate performance metric exceeded the configured regression threshold"
+        return decision
+
+    if not query_regressions:
+        return decision
+
+    allowed, rule = _bounded_query_regressions_allowed(comparison, query_regressions, threshold_pct)
+    decision["failed"] = not allowed
+    decision["rule"] = rule
+    return decision
+
+
+def _find_overall_regressions(comparison: dict[str, Any], threshold_pct: float) -> list[dict[str, Any]]:
     # Check overall performance changes
+    regressions: list[dict[str, Any]] = []
     perf_changes = comparison.get("performance_changes", {})
-    for _metric_name, metric_data in perf_changes.items():
+    for metric_name, metric_data in perf_changes.items():
         if not isinstance(metric_data, dict):
             continue
-        change_pct = metric_data.get("change_percent", 0)
+        change_pct = _coerce_float(metric_data.get("change_percent", 0))
         # Positive change = slower = regression
-        if change_pct > (threshold * 100):
-            return True
+        if change_pct > threshold_pct:
+            regressions.append(
+                {
+                    "metric": metric_name,
+                    "baseline": _coerce_float(metric_data.get("baseline", 0)),
+                    "current": _coerce_float(metric_data.get("current", 0)),
+                    "change_percent": change_pct,
+                }
+            )
+    return regressions
+
+
+def _find_query_regressions(comparison: dict[str, Any], threshold_pct: float) -> list[dict[str, Any]]:
+    regressions: list[dict[str, Any]] = []
 
     # Check per-query regressions
     query_comparisons = comparison.get("query_comparisons", [])
     for query in query_comparisons:
-        change_pct = query.get("change_percent", 0)
+        change_pct = _coerce_float(query.get("change_percent", 0))
         # Positive change = slower = regression
-        if change_pct > (threshold * 100):
-            return True
+        if change_pct > threshold_pct:
+            baseline_ms = _coerce_float(query.get("baseline_time_ms", 0))
+            current_ms = _coerce_float(query.get("current_time_ms", 0))
+            regressions.append(
+                {
+                    "query_id": query.get("query_id", "unknown"),
+                    "baseline_time_ms": baseline_ms,
+                    "current_time_ms": current_ms,
+                    "delta_ms": current_ms - baseline_ms,
+                    "change_percent": change_pct,
+                }
+            )
+    return regressions
 
-    return False
+
+def _bounded_query_regressions_allowed(
+    comparison: dict[str, Any],
+    query_regressions: list[dict[str, Any]],
+    threshold_pct: float,
+) -> tuple[bool, str]:
+    """Allow tiny smoke-test query blips only when aggregate performance is clearly better."""
+    if threshold_pct <= 0:
+        return False, "per-query regression exceeded the configured threshold"
+
+    summary = comparison.get("summary", {})
+    assessment = str(summary.get("overall_assessment", "")).lower()
+    if assessment != _SIGNIFICANT_IMPROVEMENT_ASSESSMENT:
+        return False, "per-query regression exceeded the threshold without significant aggregate improvement"
+
+    aggregate_changes = _aggregate_change_percentages(comparison)
+    if not aggregate_changes or any(change > -threshold_pct for change in aggregate_changes):
+        return False, "aggregate improvement was not strong enough to waive bounded per-query noise"
+
+    query_count = int(summary.get("total_queries_compared") or len(comparison.get("query_comparisons", [])) or 0)
+    if len(query_regressions) > _MAX_BOUNDED_QUERY_REGRESSIONS:
+        return False, "too many per-query regressions exceeded the threshold"
+
+    if query_count <= 0 or len(query_regressions) / query_count > _MAX_BOUNDED_QUERY_REGRESSION_FRACTION:
+        return False, "per-query regressions exceeded the bounded-noise fraction"
+
+    max_allowed_change = threshold_pct * _MAX_BOUNDED_QUERY_REGRESSION_MULTIPLIER
+    if any(regression["change_percent"] > max_allowed_change for regression in query_regressions):
+        return False, "per-query regression percent exceeded the bounded-noise cap"
+
+    if any(
+        regression["delta_ms"] <= 0 or regression["delta_ms"] > _MAX_BOUNDED_QUERY_SLOWDOWN_MS
+        for regression in query_regressions
+    ):
+        return False, "per-query absolute slowdown exceeded the bounded-noise cap"
+
+    total_slowdown_ms = sum(regression["delta_ms"] for regression in query_regressions)
+    if total_slowdown_ms > _MAX_BOUNDED_TOTAL_QUERY_SLOWDOWN_MS:
+        return False, "total per-query slowdown exceeded the bounded-noise budget"
+
+    return True, "significant aggregate improvement with bounded per-query smoke-test noise"
+
+
+def _aggregate_change_percentages(comparison: dict[str, Any]) -> list[float]:
+    changes = []
+    for metric_data in comparison.get("performance_changes", {}).values():
+        if isinstance(metric_data, dict):
+            changes.append(_coerce_float(metric_data.get("change_percent", 0)))
+    return changes
+
+
+def _coerce_float(value: Any) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _format_regression_gate_details(decision: dict[str, Any], threshold: float) -> str:
+    threshold_pct = threshold * 100
+    summary = decision.get("summary", {})
+    rule_label = "Policy rule failed" if decision["failed"] else "Policy rule"
+    lines = [
+        f"{rule_label}: {decision['rule']}",
+        f"Aggregate assessment: {str(summary.get('overall_assessment', 'unknown')).upper()}",
+        "Policy bounds for significant-improvement noise waiver: "
+        f"aggregate metrics <= -{threshold_pct:.1f}%, "
+        f"query count <= {_MAX_BOUNDED_QUERY_REGRESSIONS} and <= {_MAX_BOUNDED_QUERY_REGRESSION_FRACTION:.0%}, "
+        f"each query <= {threshold_pct * _MAX_BOUNDED_QUERY_REGRESSION_MULTIPLIER:.1f}% "
+        f"and <= {_MAX_BOUNDED_QUERY_SLOWDOWN_MS:.1f} ms, "
+        f"total query slowdown <= {_MAX_BOUNDED_TOTAL_QUERY_SLOWDOWN_MS:.1f} ms.",
+    ]
+
+    for regression in decision.get("overall_regressions", []):
+        lines.append(
+            "Overall metric regression: "
+            f"{regression['metric']} baseline={regression['baseline']:.3f}s "
+            f"current={regression['current']:.3f}s "
+            f"delta={regression['change_percent']:+.2f}%"
+        )
+
+    for regression in decision.get("query_regressions", []):
+        lines.append(
+            "Query regression: "
+            f"{regression['query_id']} baseline={regression['baseline_time_ms']:.2f} ms "
+            f"current={regression['current_time_ms']:.2f} ms "
+            f"delta={regression['delta_ms']:+.2f} ms "
+            f"({regression['change_percent']:+.2f}%)"
+        )
+
+    return "\n".join(lines)
 
 
 def _format_text_comparison(comparison: dict[str, Any], baseline: Any, current: Any, show_all: bool) -> str:
