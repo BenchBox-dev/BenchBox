@@ -426,10 +426,10 @@ lint:
 	$(MAKE) lint-explorer-tokens
 	$(MAKE) lint-site-theme-tokens
 
-# Dependency audit - checks that every declared dep has an import site or is allowlisted.
-# Fails if an unused dep is introduced. See _project/scripts/dependency_audit/.
+# Dependency audit - checks declarations against whole-tree import sites.
+# Fails on both unused declarations and undeclared third-party imports.
 audit-deps:
-	uv run -- python _project/scripts/dependency_audit/check_deps.py
+	uv run -- python scripts/check_dependency_audit.py
 
 # Validate that an audit report records the develop SHA it describes.
 audit-sha-check:
