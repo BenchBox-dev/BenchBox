@@ -231,7 +231,7 @@ def collect_python_imports(root: pathlib.Path, paths: Iterable[str]) -> dict[str
         except (SyntaxError, UnicodeDecodeError):
             continue
 
-        rel = path.relative_to(root)
+        rel = path.relative_to(root).as_posix()
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for alias in node.names:
