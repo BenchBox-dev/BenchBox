@@ -141,7 +141,7 @@ body::before {
     padding: var(--space-md);
     font-family: var(--font-mono);
     font-size: 0.85rem;
-    color: var(--text-primary);
+    color: var(--code-fg);
     white-space: pre-wrap;
     word-break: break-word;
     overflow-wrap: anywhere;
