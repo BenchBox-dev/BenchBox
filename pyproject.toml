@@ -48,6 +48,9 @@ dependencies = [
     "pyarrow>=21.0.0,<25.0.0",
     "numpy>=1.24.0",
     "zstandard>=0.20.0",
+    # Required by the current import path: benchbox imports platform adapters at
+    # module load time, and the ClickHouse/TPC-DI/DataFrame paths import pandas.
+    "pandas>=2.0.0",
     # grpcio / grpcio-status are NOT declared at the core level. They are
     # pulled in transitively by optional cloud / connectivity extras
     # (e.g. influxdb3-python, snowflake, databricks-sdk, pyspark[connect]).
