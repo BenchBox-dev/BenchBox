@@ -52,6 +52,7 @@ pytest_plugins = [
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _PROJECT_DIR = _REPO_ROOT / "_project"
+_PROJECT_SCRIPTS_DIR = _PROJECT_DIR / "scripts"
 _RESULTS_EXPLORER_DIR = _REPO_ROOT / "results-explorer"
 _PROJECT_DEPENDENT_TEST_FILES = {
     Path("tests/unit/cli/test_explorer_build_contract.py"),
@@ -87,7 +88,7 @@ def pytest_ignore_collect(collection_path: Path, config: pytest.Config) -> bool:
     except ValueError:
         return False
 
-    if not _PROJECT_DIR.exists():
+    if not _PROJECT_SCRIPTS_DIR.exists():
         if relative in _PROJECT_DEPENDENT_TEST_FILES:
             return True
         if any(relative == test_dir or test_dir in relative.parents for test_dir in _PROJECT_DEPENDENT_TEST_DIRS):
