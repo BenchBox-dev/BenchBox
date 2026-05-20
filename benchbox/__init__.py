@@ -11,9 +11,8 @@ from importlib import import_module
 from types import ModuleType
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Type, Union
 
-# __version__ must be defined before `from . import platforms` because the
-# platforms import chain can circle back to benchbox.cli.app which reads
-# benchbox.__version__ at module level.
+# __version__ must stay near the top because lazily imported submodules can
+# circle back to benchbox.cli.app, which reads it at module level.
 __version__ = "0.3.0"
 
 from benchbox.base import BaseBenchmark
@@ -24,8 +23,6 @@ from benchbox.tpch import TPCH
 from benchbox.tpch_skew import TPCHSkew
 from benchbox.tpchavoc import TPCHavoc
 from benchbox.tsbs_devops import TSBSDevOps
-
-from . import platforms
 
 # Perform version consistency check on import (but don't fail - just warn)
 try:
@@ -153,7 +150,9 @@ def __getattr__(name: str) -> Any:
             return ImportError(f"Could not import {benchmark_name}")
 
     if name == "platforms":
-        return platforms
+        module = import_module("benchbox.platforms")
+        globals()[name] = module
+        return module
 
     if name in _PUBLIC_REEXPORTS:
         module_path, attr = _PUBLIC_REEXPORTS[name]

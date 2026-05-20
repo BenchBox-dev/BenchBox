@@ -38,6 +38,23 @@ if result.exit_code != 0:
 """,
 }
 
+LEAN_IMPORT_ENTRYPOINTS = {
+    "import benchbox": "import benchbox",
+    "from benchbox import platforms": "from benchbox import platforms",
+    "from benchbox.platforms import get_adapter": "from benchbox.platforms import get_adapter",
+    "from benchbox.platforms import PlatformRegistry": "from benchbox.platforms import PlatformRegistry",
+}
+
+PROHIBITED_EAGER_IMPORTS = {
+    "chdb",
+    "clickhouse_connect",
+    "clickhouse_driver",
+    "datafusion",
+    "pandas",
+    "polars",
+    "pyspark",
+}
+
 
 def _pyproject() -> dict:
     return tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
@@ -113,6 +130,19 @@ def _direct_third_party_imports(statement: str) -> set[str]:
     return imported
 
 
+def _loaded_module_roots(statement: str) -> set[str]:
+    script = f"""
+import json
+import sys
+
+{statement}
+
+print(json.dumps(sorted(name.partition(".")[0] for name in sys.modules)))
+"""
+    output = subprocess.check_output([sys.executable, "-c", script], cwd=REPO_ROOT, text=True)
+    return set(json.loads(output))
+
+
 def _canonical_distribution_names(import_name: str, package_distributions: dict[str, list[str]]) -> set[str]:
     distributions = package_distributions.get(import_name, [import_name])
     return {canonicalize_name(distribution) for distribution in distributions}
@@ -161,4 +191,15 @@ def test_optional_only_dependencies_stay_off_eager_import_paths(entrypoint: str,
 
     assert not imported_optional_only, (
         f"{entrypoint} eagerly imports optional-only dependencies: {sorted(imported_optional_only)}"
+    )
+
+
+@pytest.mark.parametrize(
+    ("entrypoint", "statement"), LEAN_IMPORT_ENTRYPOINTS.items(), ids=list(LEAN_IMPORT_ENTRYPOINTS)
+)
+def test_lean_import_paths_do_not_load_platform_or_dataframe_dependencies(entrypoint: str, statement: str) -> None:
+    loaded = _loaded_module_roots(statement)
+
+    assert not (loaded & PROHIBITED_EAGER_IMPORTS), (
+        f"{entrypoint} eagerly loaded platform/dataframe dependencies: {sorted(loaded & PROHIBITED_EAGER_IMPORTS)}"
     )
