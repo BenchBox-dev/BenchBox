@@ -465,6 +465,15 @@ def test_agent_prompt_includes_output_discipline_and_summary_labels():
     assert "capture_plans_footer" in prompts_js
 
 
+def test_prompt_code_blocks_use_code_foreground_token():
+    prompts_css = PROMPTS_CSS_PATH.read_text(encoding="utf-8")
+    pre_rule = prompts_css[prompts_css.index(".prompts-block pre") : prompts_css.index(".prompts-copy")]
+
+    assert "background: var(--code-bg);" in pre_rule
+    assert "color: var(--code-fg);" in pre_rule
+    assert "color: var(--text-primary);" not in pre_rule
+
+
 def test_mcp_prompt_uses_smoke_and_cost_gates():
     prompts_js = PROMPTS_JS_PATH.read_text(encoding="utf-8")
     mcp_block = prompts_js[
