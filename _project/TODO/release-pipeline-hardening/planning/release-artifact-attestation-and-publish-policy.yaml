@@ -1,0 +1,117 @@
+id: "release-artifact-attestation-and-publish-policy"
+title: "Attest release artifacts before publish and document the no-bypass policy"
+worktree: "release-pipeline-hardening"
+priority: "Medium-High"
+status: "Not Started"
+description: |
+  The v0.3.0 incident was not only a missing dependency and weak install smoke
+  coverage. The dependency-bounds false positive blocked the legitimate release
+  workflow, yet the package still reached PyPI out-of-band. That means the
+  release process lacked a durable artifact attestation and a policy barrier
+  saying "only publish the artifact that passed the pre-publish gates."
+
+  ci-isolated-wheel-smoke-gates makes the normal workflow hermetic and
+  pre-publish. This item closes the remaining bypass blind spot: every release
+  artifact must carry a compact, reviewable attestation that records the exact
+  wheel/sdist path, version, metadata dependency excerpt, isolated import smoke,
+  isolated CLI smoke, and the git SHA used to produce it. Manual or emergency
+  release repair must either use the same attested artifact path or document why
+  the gate could not run before any upload.
+
+category: "Release Engineering"
+
+prior_art:
+  - ".github/workflows/release.yml:build job — extend (emit the attestation after build, metadata inspection, twine check, and pre-publish smoke)"
+  - ".github/workflows/release.yml:publish job — extend (consume the attestation artifact and publish only artifacts produced by the gated build job)"
+  - "_project/TODO/release-pipeline-hardening/planning/ci-isolated-wheel-smoke-gates.yaml — depends on (pre-publish import/CLI smoke must exist before this attestation is meaningful)"
+
+work:
+  - id: w1
+    summary: >-
+      Define the compact release attestation format with exact artifact, hash,
+      metadata, smoke-result, version, and SHA fields.
+    status: pending
+
+  - id: w2
+    summary: >-
+      Emit the attestation from release.yml after the pre-publish smoke gate
+      passes and before publish. Upload it as a workflow artifact and print a
+      short summary in the GitHub Actions step summary.
+    needs: [w1]
+    status: pending
+
+  - id: w3
+    summary: >-
+      Make publish consume the attestation and fail on missing, mismatched, or
+      incomplete artifact evidence.
+    needs: [w2]
+    status: pending
+
+  - id: w4
+    summary: >-
+      Document the no-bypass policy and equivalent evidence requirements for
+      manual or emergency release repair.
+    needs: [w1]
+    status: pending
+
+must_preserve:
+  - "Existing release.yml build -> pre-publish smoke -> publish job ordering from ci-isolated-wheel-smoke-gates"
+  - "No secrets or PyPI tokens in attestation output, step summaries, or artifacts"
+  - "No raw stdout transcript committed to the repo; durable summaries only"
+  - "The same-version repair flow remains possible, but must produce its own attestation for the repaired wheel"
+
+approach: |
+  Keep the attestation simple and machine-checkable: a small JSON or YAML file
+  generated in the release workflow, plus a human-readable step summary. Prefer
+  shell/Python snippets already available in the workflow over a new dependency.
+  Hash the exact files in dist/, inspect wheel METADATA with unzip, and reuse the
+  isolated smoke output from ci-isolated-wheel-smoke-gates. The publish job should
+  validate the attestation before upload so a future bounds-gate or workflow
+  misfire cannot silently route around the only artifact that passed smoke.
+
+anti_patterns:
+  - "DO NOT make attestation a post-publish-only artifact — the point is to gate publish."
+  - "DO NOT attest a version range or package name only — attest exact artifact filenames, hashes, version, and git SHA."
+  - "DO NOT include PyPI tokens, environment dumps, or raw long logs in the committed policy text."
+  - "DO NOT allow a manual publish path with weaker evidence than the automated release path."
+
+verification:
+  - description: "Attestation is generated before publish and references the exact dist artifacts"
+    command: "dry-run the release build/pre-publish path or inspect workflow graph after editing"
+    expected_output: "attestation artifact contains SHA/version/filename/hash/Requires-Dist/smoke summaries for each upload candidate"
+  - description: "Publish fails if attestation is missing or mismatched"
+    command: "run the workflow validation/unit test added with the implementation, or locally exercise the validation snippet against a mismatched fixture"
+    expected_output: "non-zero exit with a clear mismatch message"
+  - description: "Manual release policy is discoverable"
+    command: "review the release documentation section added by this item"
+    expected_output: "documents required evidence for any manual/emergency upload"
+
+scope_limit:
+  only_modify:
+    - ".github/workflows/release.yml"
+    - "docs/"
+    - "README.md"
+    - "_project/TODO/release-pipeline-hardening/planning/release-artifact-attestation-and-publish-policy.yaml"
+  do_not_modify:
+    - "benchbox/"
+    - "pyproject.toml"
+
+impact:
+  user_impact: |
+    Reduces the chance that a broken package can be uploaded through an
+    emergency/manual path after a release-gate failure.
+  technical_debt: |
+    Turns release evidence into an explicit artifact instead of relying on
+    scattered CI logs or operator memory.
+
+success_metrics:
+  - "Every publish job validates an attestation for the exact artifacts it uploads."
+  - "A manual/emergency publish has an explicit documented evidence checklist."
+
+deps:
+  needs: ["ci-isolated-wheel-smoke-gates"]
+
+metadata:
+  tags: ["release", "ci", "attestation", "packaging"]
+  estimated_effort: "Medium"
+  created_date: "2026-05-20"

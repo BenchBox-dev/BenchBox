@@ -1,0 +1,92 @@
+id: "dependency-bounds-gate-regression-test"
+title: "Lock the dependency-bounds parser against minor/patch-cap regressions"
+worktree: "release-pipeline-hardening"
+priority: "High"
+status: "Not Started"
+description: |
+  The dependency-bounds gate is the ESCALATION VECTOR for the v0.3.0 incident.
+  At tag b2559016b, scripts/check_dependency_bounds.py parsed upper bounds with
+  `<\s*(\d+)(?:\.\d+)*` — capturing only the MAJOR digit — and compared
+  "locked major == cap major". For `duckdb>=1.0.0,<1.4.0` this parsed the cap as
+  major `1`; duckdb's locked `1.3.x` also has major `1`, producing a FALSE
+  POSITIVE "cap reached" and FAILING the gate. Because release.yml chains
+  `dependency-bounds -> build -> publish -> test-installation`, the failing gate
+  meant the legitimate release workflow could not run build/publish/
+  test-installation — yet the package reached PyPI anyway (out-of-band publish),
+  so the post-publish smoke that WOULD have caught missing pandas never ran.
+
+  The recovery commit 038ad5488 ("Release v0.3.0 recovery — Fix dependency
+  bounds version comparison") already fixed the parser: regex now
+  `<\s*(\d+(?:\.\d+)*)` (full version) and comparison uses
+  packaging.version.Version. THIS ITEM does not re-fix it — it adds the
+  regression test that pins the fixed behavior so the gate cannot silently
+  fail-open or fail-closed again. A guard that can misfire is worse than no
+  guard, because it reroutes publish around the real checks.
+
+category: "Testing and Quality Assurance"
+
+prior_art:
+  - "scripts/check_dependency_bounds.py — reference only (already fixed by 038ad5488; do NOT re-fix logic, only test it)"
+  - "tests/unit/scripts/test_check_dependency_bounds.py — extend (recovery commit 038ad5488 already touched this file; add the minor/patch-cap cases)"
+
+work:
+  - id: w1
+    summary: >-
+      Add minor/patch cap regression cases for duckdb<1.4.0 and a major-cap
+      control case for pyarrow<25.0.0.
+    status: pending
+
+  - id: w2
+    summary: >-
+      Add parser tests proving `_UPPER_BOUND_RE` captures full upper-bound
+      versions and exotic specifiers fall through safely.
+    needs: [w1]
+    status: pending
+
+must_preserve:
+  - "check_dependency_bounds.py public CLI (--fail-on=cap-reached, --report-only, --output) and offline behavior"
+  - "The recovery commit's Version-based comparison logic — tests must lock it, not change it"
+  - "All five currently-capped deps remain covered: sqlglot<31, click<9, pydantic<3, pyarrow<25, duckdb<1.4.0 (pyproject.toml:33,36,42,48 + dev duckdb)"
+
+approach: |
+  Pure test addition. Read the current (fixed) check_dependency_bounds.py to
+  mirror its CappedDep API (cap_version, cap_text, effective_cap_version,
+  locked_parsed). Construct synthetic CappedDep / lockfile fixtures rather than
+  depending on the live uv.lock so the test is deterministic across dependency
+  bumps. The duckdb<1.4.0 vs 1.3.x case is the exact bug — make it the headline
+  test with a comment linking 038ad5488 and the v0.3.0 incident.
+
+anti_patterns:
+  - "DO NOT modify check_dependency_bounds.py logic — it is already fixed (038ad5488). This item is test-only; touching logic risks reintroducing the bug."
+  - "DO NOT assert against the live uv.lock — it drifts; use synthetic fixtures so the regression test stays stable."
+
+verification:
+  - description: "New regression tests pass against the fixed parser"
+    command: "uv run -- python -m pytest tests/unit/scripts/test_check_dependency_bounds.py -q"
+    expected_output: "all pass, including the duckdb<1.4.0 / 1.3.x case"
+  - description: "Reverting the parser to major-only would fail the new test (sanity, local only)"
+    command: "temporarily restore `<\\s*(\\d+)(?:\\.\\d+)*` + major comparison, run tests, then revert"
+    expected_output: "duckdb<1.4.0/1.3.x case fails -> proves the regression test bites"
+
+scope_limit:
+  only_modify:
+    - "tests/unit/scripts/test_check_dependency_bounds.py"
+  do_not_modify:
+    - "scripts/check_dependency_bounds.py"
+    - ".github/workflows/release.yml"
+
+impact:
+  technical_debt: |
+    Prevents the release-gate parser from regressing into the exact misfire that
+    rerouted the v0.3.0 publish around the post-publish smoke.
+
+success_metrics:
+  - "A reintroduction of the major-only cap comparison is caught by CI."
+
+deps:
+  needs: []
+
+metadata:
+  tags: ["release", "ci", "testing", "regression"]
+  estimated_effort: "Small"
+  created_date: "2026-05-20"

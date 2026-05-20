@@ -1,0 +1,111 @@
+id: "relocate-reverse-dependency-audit"
+title: "Make dependency audit release-visible and add imported-but-undeclared direction"
+worktree: "release-pipeline-hardening"
+priority: "Medium-High"
+status: "Not Started"
+description: |
+  The dependency audit failed the v0.3.0 incident twice over:
+
+  1. WRONG DIRECTION. `make audit-deps` (Makefile:429-432) "checks that every
+     declared dep has an import site or is allowlisted. Fails if an UNUSED dep
+     is introduced." That is declared-but-unused — the OPPOSITE of the v0.3.0
+     bug (pandas was imported-but-undeclared). It could never have caught a
+     missing declaration.
+
+  2. SKIPPED ON RELEASE. The script lives at
+     `_project/scripts/dependency_audit/check_deps.py`, but `_project/` is
+     pruned on curated release branches (VERIFIED absent at tag b2559016b and
+     absent locally). lint.yml:56-62 explicitly skips it: "if [ -d
+     _project/scripts ]; then make audit-deps; else echo '... absent on curated
+     release branches; skipping dependency audit.'" So on the release-cut PR
+     (base=main) the audit does not run at all.
+
+  This item makes the release-relevant audit run on release branches (relocate
+  out of pruned _project/) and adds the missing imported-but-undeclared
+  direction so the audit covers BOTH failure modes. Note: the
+  import-contract-regression-test item already covers the eager `import
+  benchbox` path; this audit complements it by covering the broader declared
+  surface and the CLI path.
+
+category: "Testing and Quality Assurance"
+
+prior_art:
+  - "_project/scripts/dependency_audit/check_deps.py — supersede/relocate (declared-but-unused direction; lives under pruned _project/, never runs on release). Relocate the release-relevant part to scripts/ or tests/."
+  - "Makefile:429-432 audit-deps target — extend (repoint to the relocated script)"
+  - ".github/workflows/lint.yml:56-62 + pr.yml:183 — extend (remove the `_project/scripts` existence guard for the relocated check so it runs on release branches)"
+  - "import-contract-regression-test (this worktree) — reference (covers eager import path; avoid duplicating its scope — this item owns the declared-surface + CLI direction)"
+
+work:
+  - id: w1
+    summary: >-
+      Decide the release-visible home for the audit and relocate the
+      release-relevant logic out of pruned _project paths.
+    status: pending
+
+  - id: w2
+    summary: >-
+      Add a whole-tree imported-but-undeclared audit direction while preserving
+      existing declared-but-unused detection.
+    needs: [w1]
+    status: pending
+
+  - id: w3
+    summary: >-
+      Wire the relocated audit into CI without the _project skip guard and
+      verify it still runs in a curated checkout.
+    needs: [w1]
+    status: pending
+
+must_preserve:
+  - "Existing declared-but-unused detection keeps working (do not regress the original audit purpose)"
+  - "Developer-only portions of the audit may stay in _project/; only the release-relevant check must relocate"
+  - "lint.yml and pr.yml triggers (push/PR to main) unchanged"
+
+approach: |
+  Prefer a tests/ unit test for the relocated, release-relevant portion — it
+  then runs automatically in the existing pytest lane on every main PR without a
+  bespoke Makefile/CI guard, sidestepping the `_project/` pruning problem
+  entirely. Keep `make audit-deps` for the richer developer-side report. Reuse
+  the import-name -> distribution mapping approach from the import-contract test
+  to avoid two divergent import scanners.
+
+anti_patterns:
+  - "DO NOT leave the release-relevant audit under _project/ — VERIFIED it is pruned on release branches and the CI guard silently skips it there."
+  - "DO NOT only check declared-but-unused — that direction is blind to the v0.3.0 failure (imported-but-undeclared). Cover both."
+  - "DO NOT duplicate the eager-import scanner from import-contract-regression-test — depend on that item for shared import-name/distribution mapping, and keep this audit focused on whole-tree declared-surface coverage."
+
+verification:
+  - description: "Relocated audit runs even without _project/ present"
+    command: "rename _project temporarily, run the relocated check (or its pytest), confirm it executes"
+    expected_output: "audit runs and passes; no 'skipping' message"
+  - description: "Imported-but-undeclared direction catches a synthetic violation"
+    command: "add a throwaway top-level `import <undeclared-pkg>` in a benchbox module, run the audit"
+    expected_output: "audit fails naming the undeclared module; remove the throwaway after"
+
+scope_limit:
+  only_modify:
+    - "scripts/"
+    - "tests/"
+    - "Makefile"
+    - ".github/workflows/lint.yml"
+    - ".github/workflows/pr.yml"
+  do_not_modify:
+    - "benchbox/"
+    - "pyproject.toml"
+
+impact:
+  technical_debt: |
+    Closes the audit's two-way blind spot and makes it actually run where
+    releases are cut.
+
+success_metrics:
+  - "Both an unused declaration and an undeclared import are caught on a main PR."
+  - "The audit runs on curated release branches (no silent skip)."
+
+deps:
+  needs: ["import-contract-regression-test"]
+
+metadata:
+  tags: ["ci", "dependencies", "audit", "release"]
+  estimated_effort: "Medium"
+  created_date: "2026-05-20"
