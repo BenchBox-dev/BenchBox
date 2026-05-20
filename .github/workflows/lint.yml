@@ -53,13 +53,8 @@ jobs:
       - name: Compatibility docs drift check
         run: make compat-docs-check
 
-      - name: Dependency audit (no unused declarations)
-        run: |
-          if [ -d _project/scripts ]; then
-            make audit-deps
-          else
-            echo "_project/scripts/ is absent on curated release branches; skipping dependency audit."
-          fi
+      - name: Dependency audit (declared/imported contract)
+        run: make audit-deps
 
       - name: Release curation list drift check
         run: |

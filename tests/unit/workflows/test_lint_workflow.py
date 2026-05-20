@@ -27,7 +27,6 @@ def _step_run(workflow: dict, name: str) -> str:
     "step_name",
     [
         "Timing policy (wall-clock allowlist)",
-        "Dependency audit (no unused declarations)",
         "Release curation list drift check",
     ],
 )
@@ -36,3 +35,10 @@ def test_lint_workflow_skips_project_tooling_when_only_project_baselines_exist(s
 
     assert "if [ -d _project/scripts ]; then" in run_script
     assert "if [ -d _project ]; then" not in run_script
+
+
+def test_lint_workflow_runs_dependency_audit_without_project_tooling_guard() -> None:
+    run_script = _step_run(_lint_workflow(), "Dependency audit (declared/imported contract)")
+
+    assert run_script == "make audit-deps"
+    assert "_project/scripts" not in run_script
