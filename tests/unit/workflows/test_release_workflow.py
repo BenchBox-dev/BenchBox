@@ -39,6 +39,20 @@ def test_release_workflow_supports_build_tagged_repair_wheels() -> None:
     assert "--config-setting=--build-option=--build-number" in build_script
 
 
+def test_release_pre_publish_smoke_requires_exactly_one_wheel() -> None:
+    workflow = _release_workflow()
+    smoke_steps = workflow["jobs"]["pre-publish-smoke"]["steps"]
+    smoke_script = next(
+        step["run"] for step in smoke_steps if step.get("name") == "Test wheel import and CLI before publish"
+    )
+
+    assert "mapfile -t wheels" in smoke_script
+    assert "find \"$PWD/dist\" -maxdepth 1 -type f -name '*.whl' | sort" in smoke_script
+    assert 'if [ "${#wheels[@]}" -ne 1 ]; then' in smoke_script
+    assert 'wheel="${wheels[0]}"' in smoke_script
+    assert 'wheel="$(echo "$PWD"/dist/*.whl)"' not in smoke_script
+
+
 def test_release_workflow_updates_existing_github_release_without_clobbering_assets() -> None:
     workflow = _release_workflow()
     release_steps = workflow["jobs"]["github-release"]["steps"]

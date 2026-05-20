@@ -239,6 +239,25 @@ class TestCheckRegression:
 
         assert _check_regression(comparison, 0.10) is False
 
+    def test_significant_aggregate_improvement_still_fails_above_percent_cap(self):
+        from benchbox.cli.commands.compare import _check_regression
+
+        comparison = {
+            "summary": {
+                "total_queries_compared": 22,
+                "overall_assessment": "significant_improvement",
+            },
+            "performance_changes": {
+                "total_execution_time": {"change_percent": -30.0},
+                "average_query_time": {"change_percent": -30.0},
+            },
+            "query_comparisons": [
+                {"query_id": "8", "baseline_time_ms": 10.0, "current_time_ms": 12.6, "change_percent": 26.0},
+            ],
+        }
+
+        assert _check_regression(comparison, 0.10) is True
+
     def test_significant_aggregate_improvement_still_fails_material_query_regression(self):
         from benchbox.cli.commands.compare import _check_regression
 
@@ -274,6 +293,25 @@ class TestCheckRegression:
                 {"query_id": "8", "baseline_time_ms": 9.0, "current_time_ms": 10.0, "change_percent": 11.11},
                 {"query_id": "18", "baseline_time_ms": 10.0, "current_time_ms": 12.0, "change_percent": 20.0},
                 {"query_id": "21", "baseline_time_ms": 10.0, "current_time_ms": 11.0, "change_percent": 11.0},
+            ],
+        }
+
+        assert _check_regression(comparison, 0.10) is True
+
+    def test_significant_aggregate_improvement_still_fails_query_fraction_above_cap(self):
+        from benchbox.cli.commands.compare import _check_regression
+
+        comparison = {
+            "summary": {
+                "total_queries_compared": 5,
+                "overall_assessment": "significant_improvement",
+            },
+            "performance_changes": {
+                "total_execution_time": {"change_percent": -30.0},
+                "average_query_time": {"change_percent": -30.0},
+            },
+            "query_comparisons": [
+                {"query_id": "8", "baseline_time_ms": 10.0, "current_time_ms": 12.0, "change_percent": 20.0},
             ],
         }
 
