@@ -5,8 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-import tomllib
 from packaging.requirements import Requirement
+
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib  # type: ignore[import-not-found]
 
 pytestmark = [
     pytest.mark.unit,
