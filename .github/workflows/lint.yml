@@ -44,10 +44,10 @@ jobs:
 
       - name: Timing policy (wall-clock allowlist)
         run: |
-          if [ -d _project ]; then
+          if [ -d _project/scripts ]; then
             uv run -- python _project/scripts/timing_policy_check.py --strict
           else
-            echo "_project/ is absent on curated release branches; skipping timing policy check."
+            echo "_project/scripts/ is absent on curated release branches; skipping timing policy check."
           fi
 
       - name: Compatibility docs drift check
@@ -55,16 +55,16 @@ jobs:
 
       - name: Dependency audit (no unused declarations)
         run: |
-          if [ -d _project ]; then
+          if [ -d _project/scripts ]; then
             make audit-deps
           else
-            echo "_project/ is absent on curated release branches; skipping dependency audit."
+            echo "_project/scripts/ is absent on curated release branches; skipping dependency audit."
           fi
 
       - name: Release curation list drift check
         run: |
-          if [ -d _project ]; then
+          if [ -d _project/scripts ]; then
             uv run python scripts/check_release_curation.py
           else
-            echo "_project/ is absent on curated release branches; skipping curation drift check."
+            echo "_project/scripts/ is absent on curated release branches; skipping curation drift check."
           fi

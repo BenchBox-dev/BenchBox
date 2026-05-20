@@ -10,6 +10,11 @@ on:
         required: false
         default: false
         type: boolean
+      wheel_build_number:
+        description: 'Optional wheel build tag for same-version repair wheels'
+        required: false
+        default: ''
+        type: string
 
 jobs:
   # Note: ruleset main-release-only gates the release-cut PR on lint + test
@@ -75,12 +80,25 @@ jobs:
           echo "version=$version" >> $GITHUB_OUTPUT
 
       - name: Build package with reproducible timestamp
+        env:
+          WHEEL_BUILD_NUMBER: ${{ inputs.wheel_build_number }}
         run: |
           # Use commit timestamp for reproducible builds
           # Anyone building from the same commit gets identical artifacts
           export SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
           echo "Building with SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
-          uv build
+          rm -rf dist
+          if [[ -n "$WHEEL_BUILD_NUMBER" ]]; then
+            if [[ ! "$WHEEL_BUILD_NUMBER" =~ ^[0-9][A-Za-z0-9_.]*$ ]]; then
+              echo "::error::wheel_build_number must start with a digit and contain only letters, digits, underscores, or dots."
+              exit 1
+            fi
+            uv build --wheel \
+              --config-setting=--build-option=--build-number \
+              --config-setting=--build-option="$WHEEL_BUILD_NUMBER"
+          else
+            uv build
+          fi
 
       - name: Check package
         run: uvx twine check dist/*
@@ -140,12 +158,25 @@ jobs:
           name: release-dist
           path: dist/
 
-      - name: Create GitHub Release
-        run: >
-          gh release create "${{ github.ref_name }}"
-          dist/*
-          --title "BenchBox ${{ needs.build.outputs.version }}"
-          --generate-notes
+      - name: Create or update GitHub Release
+        run: |
+          tag="${{ github.ref_name }}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            existing_assets="$(gh release view "$tag" --json assets --jq '.assets[].name')"
+            for artifact in dist/*; do
+              name="$(basename "$artifact")"
+              if printf '%s\n' "$existing_assets" | grep -Fxq "$name"; then
+                echo "Asset $name already exists; skipping."
+              else
+                gh release upload "$tag" "$artifact"
+              fi
+            done
+          else
+            gh release create "$tag" \
+              dist/* \
+              --title "BenchBox ${{ needs.build.outputs.version }}" \
+              --generate-notes
+          fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
