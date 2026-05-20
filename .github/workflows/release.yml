@@ -127,7 +127,13 @@ jobs:
         shell: bash
         run: |
           # --no-project plus a temp cwd prevents uv from syncing a checkout env.
-          wheel="$(echo "$PWD"/dist/*.whl)"
+          mapfile -t wheels < <(find "$PWD/dist" -maxdepth 1 -type f -name '*.whl' | sort)
+          if [ "${#wheels[@]}" -ne 1 ]; then
+            printf 'Expected exactly one wheel in dist/, found %s:\n' "${#wheels[@]}"
+            printf '  %s\n' "${wheels[@]}"
+            exit 1
+          fi
+          wheel="${wheels[0]}"
           smoke_dir="$(mktemp -d)"
           cd "$smoke_dir"
           uv run --isolated --no-project --with "$wheel" -- python -c "import benchbox; assert 'site-packages' in benchbox.__file__, benchbox.__file__; print(f'BenchBox {benchbox.__version__} imported from wheel')"
