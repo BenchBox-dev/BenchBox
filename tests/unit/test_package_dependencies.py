@@ -118,7 +118,9 @@ def _canonical_distribution_names(import_name: str, package_distributions: dict[
     return {canonicalize_name(distribution) for distribution in distributions}
 
 
-def _import_names_for_distributions(distribution_names: set[str], package_distributions: dict[str, list[str]]) -> set[str]:
+def _import_names_for_distributions(
+    distribution_names: set[str], package_distributions: dict[str, list[str]]
+) -> set[str]:
     import_names = set()
     for import_name, distributions in package_distributions.items():
         if any(canonicalize_name(distribution) in distribution_names for distribution in distributions):
@@ -157,4 +159,6 @@ def test_optional_only_dependencies_stay_off_eager_import_paths(entrypoint: str,
 
     imported_optional_only = _direct_third_party_imports(statement) & optional_only_import_names
 
-    assert not imported_optional_only, f"{entrypoint} eagerly imports optional-only dependencies: {sorted(imported_optional_only)}"
+    assert not imported_optional_only, (
+        f"{entrypoint} eagerly imports optional-only dependencies: {sorted(imported_optional_only)}"
+    )
