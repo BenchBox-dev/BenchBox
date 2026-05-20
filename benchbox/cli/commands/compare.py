@@ -1457,10 +1457,11 @@ def _bounded_query_regressions_allowed(
         return False, "aggregate improvement was not strong enough to waive bounded per-query noise"
 
     query_count = int(summary.get("total_queries_compared") or len(comparison.get("query_comparisons", [])) or 0)
-    max_allowed_by_fraction = max(1, int(query_count * _MAX_BOUNDED_QUERY_REGRESSION_FRACTION))
-    max_allowed_queries = min(_MAX_BOUNDED_QUERY_REGRESSIONS, max_allowed_by_fraction)
-    if len(query_regressions) > max_allowed_queries:
+    if len(query_regressions) > _MAX_BOUNDED_QUERY_REGRESSIONS:
         return False, "too many per-query regressions exceeded the threshold"
+
+    if query_count <= 0 or len(query_regressions) / query_count > _MAX_BOUNDED_QUERY_REGRESSION_FRACTION:
+        return False, "per-query regressions exceeded the bounded-noise fraction"
 
     max_allowed_change = threshold_pct * _MAX_BOUNDED_QUERY_REGRESSION_MULTIPLIER
     if any(regression["change_percent"] > max_allowed_change for regression in query_regressions):
