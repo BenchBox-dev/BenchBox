@@ -1,0 +1,122 @@
+id: "import-contract-regression-test"
+title: "Add an import-contract test: every import-time dep must be in core"
+worktree: "release-pipeline-hardening"
+priority: "High"
+status: "Completed"
+completed_date: "2026-05-20"
+description: |
+  Root cause of the v0.3.0 incident: `import benchbox` eagerly imports pandas
+  (via the ClickHouse adapter, clickhouse/client.py:11), but pandas was declared
+  only in extras. The masking substrate is permanent: flat-layout editable
+  install + pandas in the `dev` group + `uv sync --group dev` in every CI job
+  means bare `import benchbox` can never fail in dev/CI. There was NO test
+  asserting the package is importable with only its declared CORE dependencies.
+
+  The fix (7334727b2) added `tests/unit/test_package_dependencies.py` asserting
+  pandas specifically is in core. Note `tests/unit/test_init.py:78` does the
+  OPPOSITE — `@pytest.mark.skipif(not PANDAS_AVAILABLE)` — treating pandas as
+  optional, so the suite tolerated its absence.
+
+  This item generalizes the one-off pandas assertion into a durable contract:
+  every unguarded top-level third-party module reachable from `import benchbox`
+  (and `benchbox --help`) must be declared in `[project].dependencies`, with an
+  explicit allowlist for modules that are known-optional AND lazily/guard-
+  imported. This catches the whole class, not just pandas, and is the test that
+  guards the lazy-import refactor (import-surface-reduction) from regressing.
+
+category: "Testing and Quality Assurance"
+
+prior_art:
+- "tests/unit/test_package_dependencies.py — extend (added by fix 7334727b2; currently asserts only pandas-in-core; generalize
+  to a full contract)"
+- "tests/unit/test_init.py:78 PANDAS_AVAILABLE skipif — reference (illustrates the suite previously treated pandas as optional;
+  the new test must NOT skip)"
+- "benchbox/__init__.py:71-174 _BENCHMARK_REGISTRY + __getattr__ lazy pattern — reference (defines what 'lazy/guarded is acceptable'
+  means for the allowlist)"
+
+work:
+- id: w1
+  summary: >-
+    Choose and document the fast-lane import-contract mechanism; do not build
+    or install wheels in this unit test.
+  status: done
+
+- id: w2
+  summary: >-
+    Implement the eager import contract test and assert every unguarded
+    third-party import is declared in core dependencies.
+  needs: [w1]
+  status: done
+
+- id: w3
+  summary: >-
+    Strengthen the pandas assertion and ensure the new contract test fails,
+    rather than skips, when a required dependency is absent.
+  needs: [w2]
+  status: done
+
+must_preserve:
+- "Existing tests/unit/test_package_dependencies.py assertions keep passing"
+- "The test runs in the default fast lane (no network, no extras install) so it gates every PR via test.yml"
+- "Test must work on Python 3.10 (note d146d2173 'Fix package dependency test on Python 3.10' — respect tomllib/tomli split,
+  pyproject.toml:46)"
+
+approach: |
+  Reuse importlib.metadata to map import names -> distributions and tomllib to
+  read [project].dependencies (handle the tomli fallback for 3.10). For the
+  eager-graph walk, import benchbox in a subprocess with `-X importtime` or
+  instrument sys.modules before/after `import benchbox` to get the real eager
+  set rather than guessing statically. Seed KNOWN_OPTIONAL from the extras in
+  pyproject.toml (clickhouse-connect, snowflake, etc.) and assert none of them
+  appear in the eager set — that assertion is what fails loudly if a future
+  edit makes an optional adapter eager again. Keep this test in the ordinary
+  pytest lane; isolated wheel installation and CLI smoke checks belong to the
+  workflow gate in ci-isolated-wheel-smoke-gates.
+
+anti_patterns:
+- "DO NOT skipif when a dependency is missing (the test_init.py:78 pattern) — that is precisely how the suite tolerated missing
+  pandas. The contract test must FAIL, not skip."
+- "DO NOT hardcode only pandas — the point is to catch the next undeclared eager import (pyarrow, numpy, or a future adapter
+  dep), not refight the last war."
+- "DO NOT parse imports with regex alone — guarded `try/except ImportError` and function-scoped imports must be excluded;
+  use AST or runtime sys.modules diffing."
+- "DO NOT build or install wheels in this unit test — that coverage is owned by ci-isolated-wheel-smoke-gates, which tests
+  the actual wheel artifact off-project."
+
+verification:
+- description: "Contract test passes on current tree (pandas is in core)"
+  command: "uv run -- python -m pytest tests/unit/test_package_dependencies.py -q"
+  expected_output: "all pass"
+- description: "Contract test FAILS if pandas is removed from core (temporarily, locally)"
+  command: "remove the pandas core line, run the test, then restore"
+  expected_output: "test fails citing pandas / clickhouse/client.py:11"
+- description: "Runs in fast lane on 3.10 and 3.12"
+  command: 'uv run --python 3.10 -- python -m pytest tests/unit/test_package_dependencies.py -m fast -q && uv run --python
+    3.12 -- python -m pytest tests/unit/test_package_dependencies.py -m fast -q'
+  expected_output: "collected and passing under both interpreters"
+
+scope_limit:
+  only_modify:
+  - "tests/unit/test_package_dependencies.py"
+  - "tests/unit/"
+  do_not_modify:
+  - "benchbox/"
+  - ".github/workflows/"
+  - "pyproject.toml"
+
+impact:
+  technical_debt: |
+    Converts a one-off "pandas is core" assertion into a reusable contract that
+    keeps the import surface honest and guards the planned lazy-import refactor.
+
+success_metrics:
+- "Any undeclared third-party import added to the eager `import benchbox` path fails this test."
+- "The test never skips on a missing dependency."
+
+deps:
+  needs: []
+
+metadata:
+  tags: ["testing", "packaging", "regression", "import-contract"]
+  estimated_effort: "Medium"
+  created_date: "2026-05-20"

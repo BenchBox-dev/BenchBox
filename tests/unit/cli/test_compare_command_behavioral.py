@@ -215,6 +215,96 @@ class TestCheckRegression:
 
         assert _check_regression(comparison, 0.10) is True  # 50% > 10% threshold
 
+    def test_significant_aggregate_improvement_allows_bounded_micro_regressions(self):
+        """PR 481 shape: a 30% aggregate win should not fail on 1-2ms query noise."""
+        from benchbox.cli.commands.compare import _check_regression
+
+        comparison = {
+            "summary": {
+                "total_queries_compared": 22,
+                "improved_queries": 20,
+                "regressed_queries": 2,
+                "unchanged_queries": 0,
+                "overall_assessment": "significant_improvement",
+            },
+            "performance_changes": {
+                "total_execution_time": {"baseline": 0.686, "current": 0.480, "change_percent": -30.03},
+                "average_query_time": {"baseline": 0.010, "current": 0.007, "change_percent": -29.81},
+            },
+            "query_comparisons": [
+                {"query_id": "18", "baseline_time_ms": 10.0, "current_time_ms": 12.0, "change_percent": 20.0},
+                {"query_id": "8", "baseline_time_ms": 9.0, "current_time_ms": 11.0, "change_percent": 22.22},
+            ],
+        }
+
+        assert _check_regression(comparison, 0.10) is False
+
+    def test_significant_aggregate_improvement_still_fails_material_query_regression(self):
+        from benchbox.cli.commands.compare import _check_regression
+
+        comparison = {
+            "summary": {
+                "total_queries_compared": 22,
+                "overall_assessment": "significant_improvement",
+            },
+            "performance_changes": {
+                "total_execution_time": {"change_percent": -30.0},
+                "average_query_time": {"change_percent": -30.0},
+            },
+            "query_comparisons": [
+                {"query_id": "8", "baseline_time_ms": 9.0, "current_time_ms": 12.0, "change_percent": 33.33},
+            ],
+        }
+
+        assert _check_regression(comparison, 0.10) is True
+
+    def test_significant_aggregate_improvement_still_fails_too_many_query_regressions(self):
+        from benchbox.cli.commands.compare import _check_regression
+
+        comparison = {
+            "summary": {
+                "total_queries_compared": 22,
+                "overall_assessment": "significant_improvement",
+            },
+            "performance_changes": {
+                "total_execution_time": {"change_percent": -30.0},
+                "average_query_time": {"change_percent": -30.0},
+            },
+            "query_comparisons": [
+                {"query_id": "8", "baseline_time_ms": 9.0, "current_time_ms": 10.0, "change_percent": 11.11},
+                {"query_id": "18", "baseline_time_ms": 10.0, "current_time_ms": 12.0, "change_percent": 20.0},
+                {"query_id": "21", "baseline_time_ms": 10.0, "current_time_ms": 11.0, "change_percent": 11.0},
+            ],
+        }
+
+        assert _check_regression(comparison, 0.10) is True
+
+    def test_regression_threshold_failure_prints_actionable_query_details(self, capsys):
+        from benchbox.cli.commands.compare import _check_regression_threshold
+
+        comparison = {
+            "summary": {
+                "total_queries_compared": 22,
+                "overall_assessment": "significant_improvement",
+            },
+            "performance_changes": {
+                "total_execution_time": {"change_percent": -30.0},
+                "average_query_time": {"change_percent": -30.0},
+            },
+            "query_comparisons": [
+                {"query_id": "8", "baseline_time_ms": 9.0, "current_time_ms": 12.0, "change_percent": 33.33},
+            ],
+        }
+
+        with pytest.raises(SystemExit):
+            _check_regression_threshold(comparison, 0.10)
+
+        output = capsys.readouterr().out
+        assert "Policy rule failed:" in output
+        assert "Aggregate assessment: SIGNIFICANT_IMPROVEMENT" in output
+        assert "Query regression: 8 baseline=9.00 ms current=12.00 ms" in output
+        assert "each query <= 25.0%" in output
+
     def test_no_regression_empty_comparison(self):
         from benchbox.cli.commands.compare import _check_regression
 
