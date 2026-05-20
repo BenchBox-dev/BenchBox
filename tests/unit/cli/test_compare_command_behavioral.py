@@ -233,13 +233,13 @@ class TestCheckRegression:
             },
             "query_comparisons": [
                 {"query_id": "18", "baseline_time_ms": 10.0, "current_time_ms": 12.0, "change_percent": 20.0},
-                {"query_id": "8", "baseline_time_ms": 9.0, "current_time_ms": 10.0, "change_percent": 11.11},
+                {"query_id": "8", "baseline_time_ms": 9.0, "current_time_ms": 11.0, "change_percent": 22.22},
             ],
         }
 
         assert _check_regression(comparison, 0.10) is False
 
-    def test_significant_aggregate_improvement_still_fails_above_twice_threshold(self):
+    def test_significant_aggregate_improvement_still_fails_above_percent_cap(self):
         from benchbox.cli.commands.compare import _check_regression
 
         comparison = {
@@ -252,7 +252,7 @@ class TestCheckRegression:
                 "average_query_time": {"change_percent": -30.0},
             },
             "query_comparisons": [
-                {"query_id": "8", "baseline_time_ms": 10.0, "current_time_ms": 12.1, "change_percent": 21.0},
+                {"query_id": "8", "baseline_time_ms": 10.0, "current_time_ms": 12.6, "change_percent": 26.0},
             ],
         }
 
@@ -341,7 +341,7 @@ class TestCheckRegression:
         assert "Policy rule failed:" in output
         assert "Aggregate assessment: SIGNIFICANT_IMPROVEMENT" in output
         assert "Query regression: 8 baseline=9.00 ms current=12.00 ms" in output
-        assert "each query <= 20.0%" in output
+        assert "each query <= 25.0%" in output
 
     def test_no_regression_empty_comparison(self):
         from benchbox.cli.commands.compare import _check_regression
