@@ -11,8 +11,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 import importlib
 from typing import Optional, Type
 
-from benchbox.core.platform_registry import PlatformRegistry
-from benchbox.utils.runtime_env import DriverResolution, DriverRuntimeStrategy, ensure_driver_version
+from benchbox.utils.runtime_env import DriverResolution, ensure_driver_version
 
 from .base import BenchmarkResults, ConnectionConfig, DriverIsolationCapability, PlatformAdapter
 from .base.adapter import check_isolation_capability
@@ -188,6 +187,11 @@ def __getattr__(name: str):
     if name in _LAZY_CONSTANTS:
         return _load_lazy_constant(name)
 
+    if name == "PlatformRegistry":
+        from benchbox.core.platform_registry import PlatformRegistry
+
+        return PlatformRegistry
+
     # Special case: clickhouse module reference (for legacy patches/tests)
     if name == "clickhouse":
         if _clickhouse_module_cache is None:
@@ -326,14 +330,44 @@ __all__ = [
 ]
 
 
-# Import unified adapter factory
-from benchbox.platforms.adapter_factory import (
-    get_adapter,
-    get_available_deployments,
-    get_available_modes,
-    get_default_deployment,
-    is_dataframe_mode,
-)
+def get_adapter(*args, **kwargs):
+    """Lazy wrapper for the unified adapter factory."""
+
+    from benchbox.platforms.adapter_factory import get_adapter as _get_adapter
+
+    return _get_adapter(*args, **kwargs)
+
+
+def is_dataframe_mode(*args, **kwargs):
+    """Lazy wrapper for adapter_factory.is_dataframe_mode."""
+
+    from benchbox.platforms.adapter_factory import is_dataframe_mode as _is_dataframe_mode
+
+    return _is_dataframe_mode(*args, **kwargs)
+
+
+def get_available_modes(*args, **kwargs):
+    """Lazy wrapper for adapter_factory.get_available_modes."""
+
+    from benchbox.platforms.adapter_factory import get_available_modes as _get_available_modes
+
+    return _get_available_modes(*args, **kwargs)
+
+
+def get_available_deployments(*args, **kwargs):
+    """Lazy wrapper for adapter_factory.get_available_deployments."""
+
+    from benchbox.platforms.adapter_factory import get_available_deployments as _get_available_deployments
+
+    return _get_available_deployments(*args, **kwargs)
+
+
+def get_default_deployment(*args, **kwargs):
+    """Lazy wrapper for adapter_factory.get_default_deployment."""
+
+    from benchbox.platforms.adapter_factory import get_default_deployment as _get_default_deployment
+
+    return _get_default_deployment(*args, **kwargs)
 
 
 def get_platform_adapter(platform_name: str, **config) -> PlatformAdapter:
@@ -354,6 +388,8 @@ def get_platform_adapter(platform_name: str, **config) -> PlatformAdapter:
         ValueError: If platform is not supported
         ImportError: If platform dependencies are not installed
     """
+    from benchbox.core.platform_registry import PlatformRegistry
+
     # Resolve aliases and normalize to canonical name via PlatformRegistry
     canonical_name = PlatformRegistry.resolve_platform_name(platform_name)
 
@@ -458,6 +494,8 @@ def list_available_platforms() -> dict[str, bool]:
     Returns:
         Dictionary mapping platform names to availability boolean.
     """
+    from benchbox.core.platform_registry import PlatformRegistry
+
     return PlatformRegistry.get_platform_availability()
 
 
@@ -473,6 +511,8 @@ def get_platform_requirements(platform_name: str) -> str:
     Returns:
         Installation command string
     """
+    from benchbox.core.platform_registry import PlatformRegistry
+
     return PlatformRegistry.get_platform_requirements(platform_name)
 
 

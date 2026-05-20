@@ -77,6 +77,13 @@ def test_ensure_driver_version_rejects_requested_version_without_package():
         )
 
 
+def test_platforms_reexports_real_platform_registry_class():
+    import benchbox.platforms as platforms
+    from benchbox.core.platform_registry import PlatformRegistry
+
+    assert platforms.PlatformRegistry is PlatformRegistry
+
+
 def test_dataframe_adapter_rejects_requested_version_for_non_package_platform():
     # pandas-df has driver_package=None - version pinning should be rejected with a clear error.
     # (polars-df previously had driver_package=None but now has driver_package="polars".)
