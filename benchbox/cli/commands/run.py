@@ -640,6 +640,12 @@ def _platform_option_config_entries(s: types.SimpleNamespace) -> dict[str, Any]:
     return entries
 
 
+def _strict_translation_config_entry(s: types.SimpleNamespace) -> dict[str, bool]:
+    if not getattr(s, "strict_translation", False):
+        return {}
+    return {"strict_translation": True}
+
+
 def _validate_non_interactive(s: types.SimpleNamespace) -> None:
     """Set env flag and validate required args for non-interactive mode."""
     if not s.non_interactive:
@@ -1247,6 +1253,7 @@ def _run_dry_run(s: types.SimpleNamespace) -> None:
                 else {}
             ),
             **({"presort": s.presort} if s.presort is not None else {}),
+            **_strict_translation_config_entry(s),
             **_platform_option_config_entries(s),
             **({"benchmark_options": s.parsed_benchmark_options} if s.parsed_benchmark_options else {}),
         },
@@ -1453,6 +1460,7 @@ def _run_direct(s: types.SimpleNamespace) -> None:
                 else {}
             ),
             **({"presort": s.presort} if s.presort is not None else {}),
+            **_strict_translation_config_entry(s),
             **_platform_option_config_entries(s),
             **({"benchmark_options": s.parsed_benchmark_options} if s.parsed_benchmark_options else {}),
         },
@@ -1705,6 +1713,7 @@ def _run_data_or_load_only(s: types.SimpleNamespace) -> None:
                 else {}
             ),
             **({"presort": s.presort} if s.presort is not None else {}),
+            **_strict_translation_config_entry(s),
             **_platform_option_config_entries(s),
             **({"benchmark_options": s.parsed_benchmark_options} if s.parsed_benchmark_options else {}),
         },
@@ -1963,6 +1972,7 @@ def _interactive_try_quick_restart(s: types.SimpleNamespace) -> bool:
                 else {}
             ),
             **({"presort": s.presort} if s.presort is not None else {}),
+            **_strict_translation_config_entry(s),
             **_platform_option_config_entries(s),
             **({"benchmark_options": s.parsed_benchmark_options} if s.parsed_benchmark_options else {}),
         },
@@ -2411,6 +2421,7 @@ def _interactive_show_preview(s: types.SimpleNamespace) -> None:
         sorted_ingestion_mode=s.sorted_ingestion_mode,
         sorted_ingestion_method=s.sorted_ingestion_method,
         global_cache=s.global_cache,
+        strict_translation=s.strict_translation,
         benchmark_options=dict(s.benchmark_option_pairs) if s.benchmark_option_pairs else None,
     )
 
@@ -2594,6 +2605,11 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
     default=None,
     help="Validation: exact, loose, range, disabled, full",
 )
+@advanced_option(
+    "--strict-translation",
+    is_flag=True,
+    help="Fail when SQL dialect translation falls back instead of returning source SQL.",
+)
 # Platform-specific
 @click.option(
     "--platform-option",
@@ -2684,6 +2700,7 @@ def run(
     non_interactive: bool,
     official: bool,
     capture_plans: bool,
+    strict_translation: bool,
     plan_config: PlanCaptureConfig | None,
     compression: CompressionConfig | None,
     table_format: TableFormatConfig | None,
@@ -2740,6 +2757,7 @@ def run(
         non_interactive=non_interactive,
         official=official,
         capture_plans=capture_plans,
+        strict_translation=strict_translation,
         plan_config=plan_config,
         compression=compression,
         table_format=table_format,

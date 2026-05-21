@@ -166,7 +166,8 @@ configuration:
 - Query IDs in exported `queries`.
 - Row counts when both modes report them.
 - Validation state and absence/presence of exported error records.
-- Execution metadata key shape.
+- Execution metadata key shape, except conditional SQL translation metadata
+  under `execution.translation`.
 - Timing field names and units: run-level milliseconds and query-level `ms`.
 
 Allowed differences:
@@ -178,6 +179,9 @@ Allowed differences:
   `SKIPPED`.
 - Optional `tables` blocks can be absent when a DataFrame benchmark manages or
   skips generic loading.
+- `execution.translation` is SQL-only additive metadata and may appear when SQL
+  dialect translation was attempted. DataFrame bundles are not expected to emit
+  matching translation metadata.
 - Exact timing values must not be compared across modes.
 
 ## Translation and Validation Mode Policy
@@ -191,8 +195,8 @@ as uncertainty.
 | Mode | Translation failure policy | Result-bundle policy | Consumer expectation |
 |---|---|---|---|
 | Interactive/local default | Fail open and warn. | `execution.translation.status="fallback"` when translation falls back; `summary.validation="uncertain"` if the result otherwise looked clean. | Users can keep experimenting, but the bundle is not a clean correctness claim. |
-| CI and compatibility governance | Fail closed by setting `strict_translation=true`, `translation_strict=true`, or `sql_translation_strict=true` in benchmark options or platform options. | Strict failures raise before a result is published as successful. | Gates should fail rather than accept untranslated SQL. |
-| Publishing and explorer ingestion | Reject non-clean validation statuses or label them uncertain. | `not_run`, `not_validated`, `unknown`, and `uncertain` are non-clean validation statuses. | Hosted/public views must not rank or present unchecked/fallback runs as validated results. |
+| CI and compatibility governance | Fail closed with CLI `--strict-translation`, or by setting `strict_translation=true`, `translation_strict=true`, or `sql_translation_strict=true` in benchmark/runtime options. | Strict failures raise before a result is published as successful. | Gates should fail rather than accept untranslated SQL. |
+| Publishing and explorer ingestion | Reject non-clean validation statuses or translation fallback metadata. | `not_run`, `not_validated`, `unknown`, and `uncertain` are non-clean validation statuses; `execution.translation.status="fallback"` and `"failed"` are non-clean translation statuses. | Hosted/public views must not rank or present unchecked/fallback runs as validated results. |
 
 Translation metadata is exported under `execution.translation` without a schema
 version bump because it is an additive field inside the existing execution

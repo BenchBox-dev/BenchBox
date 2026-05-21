@@ -6,7 +6,11 @@ import pytest
 
 from benchbox.core.results.loader import reconstruct_benchmark_results
 from benchbox.core.results.schema import build_result_payload
-from benchbox.core.runner.runner import _attach_translation_metadata, _finalize_validation_metadata
+from benchbox.core.runner.runner import (
+    _attach_translation_metadata,
+    _finalize_validation_metadata,
+    _resolve_strict_translation_mode,
+)
 from benchbox.utils.dialect_utils import SqlTranslationOutcome
 from tests.fixtures.result_dict_fixtures import make_benchmark_results
 
@@ -79,3 +83,15 @@ def test_no_validation_records_do_not_leave_default_passed_status() -> None:
 
     assert finalized.validation_status == "NOT_RUN"
     assert finalized.validation_details == {"stages": [], "error_count": 0, "warning_count": 0}
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {"strict_translation": True},
+        {"platform_options": {"translation_strict": "true"}},
+        {"benchmark_options": {"sql_translation_strict": "strict"}},
+    ],
+)
+def test_strict_translation_mode_resolves_from_supported_option_scopes(options: dict) -> None:
+    assert _resolve_strict_translation_mode(options) is True

@@ -51,6 +51,8 @@ NUMERIC_SCHEMA_VERSION_RE = re.compile(r"^\d+\.\d+(?:\.\d+)?$")
 COMPANION_SUFFIXES = (".plans.json", ".tuning.json")
 SUBMISSION_MANIFEST_FILENAME = "submission-manifest.json"
 SUBMISSION_MANIFEST_SUFFIX = ".manifest.json"
+PUBLIC_CLEAN_VALIDATION_STATUS = "passed"
+PUBLIC_NON_CLEAN_TRANSLATION_STATUSES = {"fallback", "failed"}
 
 # Known benchmarks and platforms - warn (not fail) on unknown values.
 KNOWN_BENCHMARKS = {
@@ -281,6 +283,38 @@ def _validate_summary_section(summary: Any, vr: ValidationResult) -> None:
         if isinstance(total_q, (int, float)) and total_q == 0:
             vr.warn("summary.queries.total is 0 - empty result?")
 
+    validation_status = _normalize_status(summary.get("validation"))
+    if validation_status != PUBLIC_CLEAN_VALIDATION_STATUS:
+        if validation_status is None:
+            vr.error("summary.validation is required for public submissions and must be 'passed'")
+        else:
+            vr.error(f"summary.validation must be 'passed' for public submissions, got {validation_status!r}")
+
+
+def _normalize_status(value: Any) -> str | None:
+    if isinstance(value, dict):
+        value = value.get("status")
+    if value is None:
+        return None
+    normalized = str(value).strip().lower()
+    return normalized or None
+
+
+def _validate_translation_section(data: dict, vr: ValidationResult) -> None:
+    execution = data.get("execution")
+    if not isinstance(execution, dict):
+        return
+
+    translation = execution.get("translation")
+    if translation is None:
+        return
+
+    translation_status = _normalize_status(translation)
+    if translation_status is None:
+        vr.error("execution.translation.status is required when execution.translation is present")
+    elif translation_status in PUBLIC_NON_CLEAN_TRANSLATION_STATUSES:
+        vr.error(f"execution.translation.status={translation_status!r} is not accepted for public submissions")
+
 
 def _raw_normalized_cost_block(data: dict[str, Any]) -> dict[str, Any] | None:
     """Find normalized cost in current and transitional bundle shapes."""
@@ -508,6 +542,7 @@ def _validate_bundle(data: dict, vr: ValidationResult) -> None:
     _validate_benchmark_section(data.get("benchmark", {}), vr)
     _validate_platform_section(data.get("platform", {}), vr)
     _validate_summary_section(data.get("summary", {}), vr)
+    _validate_translation_section(data, vr)
     _validate_public_cost_section(data, vr)
     _validate_queries_section(data.get("queries", []), vr)
 

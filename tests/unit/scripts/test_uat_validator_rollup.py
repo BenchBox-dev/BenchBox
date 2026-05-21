@@ -49,7 +49,7 @@ def _bundle(
             "compliance_class": compliance_class,
         },
         "platform": {"name": platform, "version": "0.0.0"},
-        "summary": {"queries": {"total": len(queries), "passed": len(queries), "failed": 0}},
+        "summary": {"validation": "passed", "queries": {"total": len(queries), "passed": len(queries), "failed": 0}},
         "queries": queries,
         "normalized_cost": {
             "normalized_cost_usd": "0",

@@ -67,8 +67,9 @@ work:
     notes: |
       Added sql_translation_context(strict=True) plus lifecycle-runner wiring.
       Runner reads strict_translation, translation_strict, or
-      sql_translation_strict from benchmark options or platform_options, so CLI
-      platform-option paths can request fail-closed behavior.
+      sql_translation_strict from runtime options, benchmark_options, or
+      platform_options. CLI users request fail-closed behavior with
+      --strict-translation.
 
   - id: w4
     summary: "Add golden or representative translation tests for risky dialect paths"

@@ -47,6 +47,7 @@ def _minimal_bundle() -> dict:
             "version": "1.4.3",
         },
         "summary": {
+            "validation": "passed",
             "queries": {"total": 2, "passed": 2, "failed": 0},
         },
         "queries": [
@@ -194,6 +195,31 @@ class TestValidateBundle:
         _validate_bundle(data, vr)
         assert vr.ok
         assert not any("Unknown platform name" in w for w in vr.warnings)
+
+    def test_missing_public_validation_status_fails(self):
+        data = _minimal_bundle()
+        del data["summary"]["validation"]
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok
+        assert any("summary.validation is required" in e for e in vr.errors)
+
+    @pytest.mark.parametrize("status", ["not_run", "uncertain", "unknown"])
+    def test_non_clean_public_validation_status_fails(self, status: str):
+        data = _minimal_bundle()
+        data["summary"]["validation"] = status
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok
+        assert any("summary.validation must be 'passed'" in e for e in vr.errors)
+
+    def test_translation_fallback_fails_public_submission(self):
+        data = _minimal_bundle()
+        data["execution"] = {"translation": {"status": "fallback", "strict_mode": False}}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok
+        assert any("execution.translation.status='fallback'" in e for e in vr.errors)
 
     def test_all_zero_timings_fails(self):
         data = _minimal_bundle()

@@ -48,8 +48,32 @@ def test_bundle_unchecked_validation_statuses_are_not_clean(status: str) -> None
     assert bundle_is_clean_pass(data) is False
 
 
+@pytest.mark.parametrize("status", ["fallback", "failed"])
+def test_bundle_non_clean_translation_statuses_are_not_clean(status: str) -> None:
+    data = {
+        "summary": {"validation": "passed", "queries": {"total": 1, "passed": 1, "failed": 0}},
+        "execution": {"translation": {"status": status}},
+        "queries": [{"id": "Q1", "status": "SUCCESS", "run_type": "measurement"}],
+    }
+
+    assert bundle_is_clean_pass(data) is False
+
+
 @pytest.mark.parametrize("status", ["NOT_RUN", "UNCERTAIN", "NOT_VALIDATED", "UNKNOWN"])
 def test_result_unchecked_validation_statuses_are_not_clean(status: str) -> None:
     result = SimpleNamespace(total_queries=1, successful_queries=1, failed_queries=0, validation_status=status)
+
+    assert result_is_clean_pass(result) is False
+
+
+@pytest.mark.parametrize("status", ["fallback", "failed"])
+def test_result_non_clean_translation_statuses_are_not_clean(status: str) -> None:
+    result = SimpleNamespace(
+        total_queries=1,
+        successful_queries=1,
+        failed_queries=0,
+        validation_status="PASSED",
+        execution_metadata={"translation": {"status": status}},
+    )
 
     assert result_is_clean_pass(result) is False

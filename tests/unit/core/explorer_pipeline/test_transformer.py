@@ -359,6 +359,25 @@ class TestExtendedManifestFields:
 
         assert entry.validation_status == "passed"
 
+    def test_translation_fallback_marks_explorer_validation_uncertain(self, tmp_path: Path) -> None:
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["summary"]["validation"] = "passed"
+        data["execution"] = {
+            "mode": "sql",
+            "translation": {"status": "fallback", "strict_mode": False},
+        }
+        bundle = tmp_path / "translation_fallback.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        entry = transformer.to_manifest_entry(bundle)
+        detail = transformer.to_detail_result(bundle, result_id="translation-fallback")
+
+        assert entry.validation_status == "uncertain"
+        assert entry.ranking_exclusion_reason == "validation_not_clean"
+        assert detail.validation_status == "uncertain"
+        assert detail.ranking_exclusion_reason == "validation_not_clean"
+
     def test_partial_query_failure_count_and_status_extracted(self, tmp_path: Path) -> None:
         data = copy.deepcopy(MINIMAL_BUNDLE)
         data["summary"]["queries"] = {"total": 2, "passed": 1, "failed": 1}

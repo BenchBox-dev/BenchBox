@@ -43,10 +43,11 @@ Lifecycle finalization converts default `PASSED` placeholders to `NOT_RUN` when
 no validation records or validation details exist. SQL translation fallback is
 recorded under `execution.translation`; if fallback occurred and the result
 otherwise looked clean, the lifecycle marks `summary.validation` as `uncertain`.
-Strict translation mode is available through benchmark or platform options
-(`strict_translation=true`, `translation_strict=true`, or
+Strict translation mode is available through CLI `--strict-translation` or
+runtime options (`strict_translation=true`, `translation_strict=true`, or
 `sql_translation_strict=true`) for CI, publishing, and compatibility gates that
-should fail closed.
+should fail closed. Public submission and publishing gates also reject
+`execution.translation.status` values of `fallback` or `failed`.
 
 ## Three-Tier Validation Model
 
