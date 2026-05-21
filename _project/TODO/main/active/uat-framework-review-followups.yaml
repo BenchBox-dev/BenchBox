@@ -2,7 +2,7 @@ id: uat-framework-review-followups
 title: "UAT framework: address all findings from post-PR-205 simplification review"
 worktree: main
 priority: "Medium-High"
-status: "Not Started"
+status: "In Progress"
 category: "Testing and Quality Assurance"
 
 deps:
@@ -99,7 +99,7 @@ work:
 - id: w0
   summary: "Revalidate review findings against current develop before deleting or extracting anything"
   needs: []
-  status: pending
+  status: done
   notes: |
     Required first step. The original review evidence is pinned to PR #205
     / commit d78b06588 on 2026-05-05, while current develop has additional
@@ -123,6 +123,60 @@ work:
 
     This work unit may edit this TODO before implementation if current code
     invalidates a planned deletion. It must not make runtime changes.
+
+    Completed evidence (2026-05-21, develop c0837d4e2):
+      Commands run:
+        - `git rev-parse HEAD`
+        - path existence check for the claimed removed/added files
+        - `rg -n` sweep for `config.raw`, `raw: dict`,
+          `apply_stress_overrides`, `KNOWN_SQL_ONLY_BENCHMARKS`,
+          `SOURCE_REUSE_GRAPH`, `reset_reachability_cache`,
+          `extract_result_path`, `local_stress_test.sh`, `# FROZEN`,
+          `pr_target_branch`, `preserve_datagen`, `prune_databases`,
+          and validator-library symbols.
+
+      Current-state findings:
+        - Still present and eligible for planned removal/refactor:
+          `scripts/local_stress_test.sh`,
+          `tests/fixtures/published_results_validator.py`,
+          `tests/uat/configs/.frozen-hashes.json`,
+          `tests/uat/test_frozen_configs.py`, `UATConfig.raw`,
+          `apply_stress_overrides`, `KNOWN_SQL_ONLY_BENCHMARKS`,
+          `SOURCE_REUSE_GRAPH`, `reset_reachability_cache`,
+          `extract_result_path`, and the validate-phase
+          subprocess/TSV parse path.
+        - Still absent and needs W4/W17:
+          `benchbox/validation/bundle.py` and
+          `tests/uat/test_no_cli_surface_drift.py`.
+        - Stale deletion claim corrected by this TODO remains correct:
+          `cleanup.prune_databases` is live at
+          `tests/uat/orchestrator.py:256` and `tests/uat/_cli.py:452`.
+          Do not delete it in W10.
+        - `cleanup.preserve_datagen` is not a runtime action reader, but it
+          is an explicit rejected safety knob at
+          `tests/uat/config.py:244-246`. W10 must either document that
+          reserved contract or deliberately remove the field with tests.
+        - Docker lifecycle cleanup fields are live at config validation and
+          execution sites (`tests/uat/config.py:247-282`,
+          `tests/uat/phases/execute.py:231-284`, `:469`). W10 must
+          preserve them.
+        - `package.pr_target_branch` has only a spec hit
+          (`_project/specs/uat-framework.md:305`) and remains the only
+          clear orphan-field deletion candidate from W10.
+        - TPC-DS OBT really uses TPC-DS source data
+          (`benchbox/core/tpcds_obt/benchmark.py:123-150`, `:246-249`),
+          while registry metadata lacks a corresponding `data_source`
+          entry (`benchbox/core/benchmark_registry.py:138-152`).
+          W15 remains valid.
+        - PR #502 already added benchmark support-status metadata and
+          registry summary helpers, but no platform helper methods named
+          `get_sql_platforms`, `get_dataframe_platforms`, or
+          `get_self_hosted_platforms` exist yet. W16 remains valid.
+
+      Resulting plan update:
+        W0 unblocks W1, W2, W4, W6, and W12-W18. W10 remains scoped to
+        current orphan-field reconciliation rather than deleting live
+        cleanup fields.
 
 # ============================================================
 # Tier 1 — Foundation (blocks subsequent work)
@@ -328,7 +382,8 @@ work:
     `ValidateResult(aborted=True, ...)`).
 
 - id: w6
-  summary: "Retire the frozen-config ceremony; replace with plain # HISTORICAL header; delete .frozen-hashes.json and the three-test guard"
+  summary: "Retire the frozen-config ceremony; replace with plain # HISTORICAL header; delete .frozen-hashes.json and the
+    three-test guard"
   needs: [w0]
   status: pending
   notes: |
@@ -395,7 +450,8 @@ work:
     Deps: w1 (typed `PreflightConfig` exists).
 
 - id: w8
-  summary: "Drop enumerate from the canonical phase list; orchestrator no-op branch deleted; corrected 2026-05-02 historical config"
+  summary: "Drop enumerate from the canonical phase list; orchestrator no-op branch deleted; corrected 2026-05-02 historical
+    config"
   needs: [w6]
   status: pending
   notes: |
@@ -838,18 +894,26 @@ must_preserve:
 - "Sequential platform execution discipline (no parallel_platforms; YAML validator + runtime assert remain)"
 - "validator-clean-rate floor enforcement semantics"
 - "submit_terminal_state vocabulary in tests/uat/phases/package.py"
-- "The published-results-branch validation contract (the library API replaces the script byte-identity, but the contract is preserved)"
+- "The published-results-branch validation contract (the library API replaces the script byte-identity, but the contract is
+  preserved)"
 - "tests/integration/test_local_platform_benchmark_matrix.py query-cardinality and row-count assertions"
-- "All eight Make targets (uat-cell, uat-stress, uat-sweep, uat-execute, uat-validate, uat-package, uat-explorer-smoke, uat-report) continue to work; argument syntax unchanged"
+- "All eight Make targets (uat-cell, uat-stress, uat-sweep, uat-execute, uat-validate, uat-package, uat-explorer-smoke, uat-report)
+  continue to work; argument syntax unchanged"
 - "Fast-test wall time stays under the existing budget (no new slow tests added; new fast tests must justify their cost)"
 
 prior_art:
-- "scripts/validate_submission.py: current published-results validator CLI and validation helper surface -- extract shared logic instead of reimplementing bundle validation."
-- "tests/fixtures/published_results_validator.py: vendored published-results copy -- supersede with a mirrored library plus thin entrypoint, then delete the duplicate fixture."
-- "benchbox/core/results/schema.py: schema-v2 required-key validation -- consolidate constants only if the production validator and published-results contract stay aligned."
-- "benchbox/core/results/integrity_validator.py: result integrity checks used by internal validation -- reuse concepts, but do not merge user-submission policy into integrity checks unless W0 proves the contracts match."
-- "benchbox/core/publishing/bundle_publisher.py: companion suffix handling and bundle publishing contract -- reuse constants or document why validation needs a narrower policy."
-- "_project/DONE/main/active/uat-docker-platform-switch-cleanup.yaml: post-PR-205 Docker cleanup fields and validation requirements -- preserve these live fields and coordinate config cleanup with them."
+- "scripts/validate_submission.py: current published-results validator CLI and validation helper surface -- extract shared
+  logic instead of reimplementing bundle validation."
+- "tests/fixtures/published_results_validator.py: vendored published-results copy -- supersede with a mirrored library plus
+  thin entrypoint, then delete the duplicate fixture."
+- "benchbox/core/results/schema.py: schema-v2 required-key validation -- consolidate constants only if the production validator
+  and published-results contract stay aligned."
+- "benchbox/core/results/integrity_validator.py: result integrity checks used by internal validation -- reuse concepts, but
+  do not merge user-submission policy into integrity checks unless W0 proves the contracts match."
+- "benchbox/core/publishing/bundle_publisher.py: companion suffix handling and bundle publishing contract -- reuse constants
+  or document why validation needs a narrower policy."
+- "_project/DONE/main/active/uat-docker-platform-switch-cleanup.yaml: post-PR-205 Docker cleanup fields and validation requirements
+  -- preserve these live fields and coordinate config cleanup with them."
 
 approach: |
   Work from the dependency graph, but treat W0 as the implementation gate.
@@ -860,15 +924,21 @@ approach: |
   TODO and implementation plan instead of forcing stale deletes through code.
 
 anti_patterns:
-- "DO NOT delete cleanup fields that current UAT execution paths read or validate; stale orphan-field evidence must be corrected, not implemented."
-- "DO NOT add a blanket `benchbox/cli/` diff-is-empty gate while W4 intentionally changes submit.py internals; guard user-visible CLI surface instead."
+- "DO NOT delete cleanup fields that current UAT execution paths read or validate; stale orphan-field evidence must be corrected,
+  not implemented."
+- "DO NOT add a blanket `benchbox/cli/` diff-is-empty gate while W4 intentionally changes submit.py internals; guard user-visible
+  CLI surface instead."
 - "DO NOT create a second bundle-validation implementation under tests/ or scripts/ after extracting benchbox/validation/bundle.py."
-- "DO NOT preserve old bash, frozen-config, raw-config, or duplicate-validator surfaces as compatibility shims unless the TODO is explicitly revised."
-- "DO NOT rely on raw stdout transcripts as durable evidence; keep raw logs in /tmp, CI artifacts, or BENCHBOX_OUTPUT_DIR and commit compact summaries only."
+- "DO NOT preserve old bash, frozen-config, raw-config, or duplicate-validator surfaces as compatibility shims unless the
+  TODO is explicitly revised."
+- "DO NOT rely on raw stdout transcripts as durable evidence; keep raw logs in /tmp, CI artifacts, or BENCHBOX_OUTPUT_DIR
+  and commit compact summaries only."
 
 verification:
 - description: "TODO schema and work graph remain valid before implementation starts"
-  command: "uv run --project _project/scripts -- python _project/scripts/validate_todo.py _project/TODO/main/planning/uat-framework-review-followups.yaml && uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph"
+  command: |
+    uv run --project _project/scripts -- python _project/scripts/validate_todo.py _project/TODO/main/active/uat-framework-review-followups.yaml &&
+    uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph
   expected_output: "TODO validation and graph checks pass"
 - description: "All UAT fast tests pass after each work unit"
   command: "uv run -- python -m pytest tests/uat -m fast -q"
@@ -877,7 +947,8 @@ verification:
   command: "uv run -- ruff check tests/uat benchbox/validation && uv run -- ty check tests/uat benchbox/validation"
   expected_output: "All checks passed"
 - description: "Submission validator and submit dry-run contracts pass after W4/W5"
-  command: "uv run -- python -m pytest tests/unit/scripts/test_validate_submission.py tests/unit/scripts/test_uat_validator_rollup.py tests/unit/cli/commands/test_submit.py tests/integration/test_cross_branch_validator_contract.py -q"
+  command: |
+    uv run -- python -m pytest tests/unit/scripts/test_validate_submission.py tests/unit/scripts/test_uat_validator_rollup.py tests/unit/cli/commands/test_submit.py tests/integration/test_cross_branch_validator_contract.py -q
   expected_output: "validator extraction, rollup, submit, and cross-branch contract tests pass"
 - description: "Bash script is gone"
   command: "test ! -f scripts/local_stress_test.sh && echo OK"
@@ -886,7 +957,8 @@ verification:
   command: "test ! -f tests/uat/configs/.frozen-hashes.json && test ! -f tests/uat/test_frozen_configs.py && echo OK"
   expected_output: "OK"
 - description: "Validator library exists and is the source of truth"
-  command: "uv run -- python -c 'from benchbox.validation.bundle import validate_bundles, REQUIRED_TOP_KEYS; print(\"OK\")'"
+  command: |
+    uv run -- python -c 'from benchbox.validation.bundle import validate_bundles, REQUIRED_TOP_KEYS; print("OK")'
   expected_output: "OK"
 - description: "Vendored validator fixture is gone"
   command: "test ! -f tests/fixtures/published_results_validator.py && echo OK"
@@ -907,7 +979,8 @@ verification:
   command: "uv run -- python -m pytest tests/uat/test_no_cli_surface_drift.py -q"
   expected_output: "1 passed"
 - description: "All Make targets still resolve (dry-help)"
-  command: "make -n uat-cell uat-stress uat-sweep uat-execute uat-validate uat-package uat-explorer-smoke uat-report 2>&1 | head -1"
+  command: |
+    make -n uat-cell uat-stress uat-sweep uat-execute uat-validate uat-package uat-explorer-smoke uat-report 2>&1 | head -1
   expected_output: "no error"
 
 scope_limit:
