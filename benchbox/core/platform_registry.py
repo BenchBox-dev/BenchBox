@@ -11,6 +11,8 @@ enabling dynamic discovery and instantiation of platform adapters.
 
 import argparse
 import importlib
+from collections import Counter
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any, Literal, Optional
 
@@ -18,6 +20,121 @@ from benchbox.core.schemas import LibraryInfo, PlatformInfo
 from benchbox.platforms.base import PlatformAdapter
 
 CostClass = Literal["free", "paid_credits", "paid_compute"]
+SupportStatus = Literal["stable", "beta", "experimental", "repo_only", "deprecated", "document_only"]
+OptionalAdapterImportStatus = Literal[
+    "available",
+    "missing_optional_dependency",
+    "native_library_load_failure",
+    "broken_adapter_import",
+    "deprecated_platform",
+    "intentionally_disabled",
+    "not_configured",
+]
+
+SUPPORT_STATUS_VALUES: tuple[SupportStatus, ...] = (
+    "stable",
+    "beta",
+    "experimental",
+    "repo_only",
+    "deprecated",
+    "document_only",
+)
+
+_PLATFORM_SUPPORT_STATUS: dict[str, SupportStatus] = {
+    # Local/core platforms with broad fast-test and docs coverage.
+    "duckdb": "stable",
+    "sqlite": "stable",
+    "datafusion": "stable",
+    "polars": "stable",
+    "pandas": "stable",
+    # Supported beta product surface. Local dependency availability remains separate.
+    "motherduck": "beta",
+    "clickhouse-local": "beta",
+    "clickhouse-server": "beta",
+    "clickhouse-cloud": "beta",
+    "databricks": "beta",
+    "bigquery": "beta",
+    "redshift": "beta",
+    "snowflake": "beta",
+    "trino": "beta",
+    "starburst": "beta",
+    "athena": "beta",
+    "spark": "beta",
+    "pyspark": "beta",
+    "firebolt": "beta",
+    "presto": "beta",
+    "postgresql": "beta",
+    "timescaledb": "beta",
+    "synapse": "beta",
+    "fabric_dw": "beta",
+    "fabric-lakehouse": "beta",
+    "influxdb": "beta",
+    "starrocks": "beta",
+    "doris": "beta",
+    "databend": "beta",
+    "questdb": "beta",
+    "dask": "beta",
+    "singlestore": "beta",
+    # Shipped for evaluation, migration work, or ecosystem breadth.
+    "cedardb": "experimental",
+    "pg-duckdb": "experimental",
+    "pg-mooncake": "experimental",
+    "databricks-df": "experimental",
+    "glue": "experimental",
+    "emr-serverless": "experimental",
+    "athena-spark": "experimental",
+    "dataproc": "experimental",
+    "dataproc-serverless": "experimental",
+    "fabric-spark": "experimental",
+    "synapse-spark": "experimental",
+    "snowpark-connect": "experimental",
+    "lakesail": "experimental",
+    "velox": "experimental",
+    "quanton": "experimental",
+    "modin": "experimental",
+    "cudf": "experimental",
+    # Legacy selector retained while users migrate to first-class ClickHouse names.
+    "clickhouse": "deprecated",
+}
+
+_NATIVE_IMPORT_ERROR_MARKERS = (
+    "dlopen",
+    "dylib",
+    "cannot open shared object file",
+    "image not found",
+    "library not loaded",
+    "undefined symbol",
+    "symbol not found",
+    "dll load failed",
+    "failed to map segment",
+)
+
+
+@dataclass(frozen=True)
+class OptionalAdapterDiagnostic:
+    """Diagnostic detail for an optional adapter import attempt."""
+
+    platform_name: str
+    module_path: str
+    class_name: str
+    status: OptionalAdapterImportStatus
+    support_status: Optional[SupportStatus] = None
+    available: bool = False
+    error_type: Optional[str] = None
+    error_message: Optional[str] = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-friendly representation for CLI/tests/docs tooling."""
+        return {
+            "platform_name": self.platform_name,
+            "module_path": self.module_path,
+            "class_name": self.class_name,
+            "status": self.status,
+            "support_status": self.support_status,
+            "available": self.available,
+            "error_type": self.error_type,
+            "error_message": self.error_message,
+        }
 
 
 @dataclass
@@ -1460,8 +1577,37 @@ class PlatformRegistry:
         metadata = dict(base_metadata)
         metadata.update(experimental_metadata)
         metadata.update(dataframe_metadata)
+        cls._apply_support_status(metadata)
 
         return metadata
+
+    @staticmethod
+    def _apply_support_status(metadata: dict[str, dict[str, Any]]) -> None:
+        """Attach and validate product support status for every platform."""
+        missing = sorted(set(metadata) - set(_PLATFORM_SUPPORT_STATUS))
+        orphaned = sorted(set(_PLATFORM_SUPPORT_STATUS) - set(metadata))
+        invalid = sorted(
+            name for name, status in _PLATFORM_SUPPORT_STATUS.items() if status not in SUPPORT_STATUS_VALUES
+        )
+        if missing or orphaned or invalid:
+            details = []
+            if missing:
+                details.append(f"missing support_status for: {', '.join(missing)}")
+            if orphaned:
+                details.append(f"support_status entries without metadata: {', '.join(orphaned)}")
+            if invalid:
+                details.append(f"invalid support_status entries: {', '.join(invalid)}")
+            raise ValueError("Invalid platform support_status metadata: " + "; ".join(details))
+
+        for platform_name, platform_spec in metadata.items():
+            existing = platform_spec.get("support_status")
+            status = _PLATFORM_SUPPORT_STATUS[platform_name]
+            if existing is not None and existing != status:
+                raise ValueError(
+                    f"Platform {platform_name!r} has conflicting support_status values: "
+                    f"{existing!r} in metadata and {status!r} in registry map"
+                )
+            platform_spec["support_status"] = status
 
     @classmethod
     def _ensure_registered(cls) -> None:
@@ -1852,6 +1998,104 @@ class PlatformRegistry:
         return cls._platform_metadata.copy()
 
     @classmethod
+    def get_platform_support_status(cls, platform_name: str) -> Optional[SupportStatus]:
+        """Return the registry support status for a platform."""
+        metadata = cls.get_all_platform_metadata()
+        canonical_name = cls.resolve_platform_name(platform_name)
+        platform_spec = metadata.get(canonical_name)
+        if platform_spec is None:
+            return None
+        return platform_spec["support_status"]
+
+    @classmethod
+    def get_platforms_by_support_status(cls, status: SupportStatus) -> list[str]:
+        """Get platforms filtered by product support status."""
+        if status not in SUPPORT_STATUS_VALUES:
+            raise ValueError(f"Unknown support_status {status!r}. Expected one of: {', '.join(SUPPORT_STATUS_VALUES)}")
+
+        metadata = cls.get_all_platform_metadata()
+        return sorted(name for name, spec in metadata.items() if spec["support_status"] == status)
+
+    @classmethod
+    def get_platform_count_summary(cls) -> dict[str, Any]:
+        """Return registry-derived platform counts for docs drift checks."""
+        metadata = cls.get_all_platform_metadata()
+        status_counts = Counter(spec["support_status"] for spec in metadata.values())
+        category_counts = Counter(spec.get("category", "unknown") for spec in metadata.values())
+        sql_capable = sum(1 for spec in metadata.values() if spec.get("capabilities", {}).get("supports_sql", False))
+        dataframe_capable = sum(
+            1 for spec in metadata.values() if spec.get("capabilities", {}).get("supports_dataframe", False)
+        )
+        dual_mode = sum(
+            1
+            for spec in metadata.values()
+            if spec.get("capabilities", {}).get("supports_sql", False)
+            and spec.get("capabilities", {}).get("supports_dataframe", False)
+        )
+        dataframe_only = sum(
+            1
+            for spec in metadata.values()
+            if not spec.get("capabilities", {}).get("supports_sql", False)
+            and spec.get("capabilities", {}).get("supports_dataframe", False)
+        )
+
+        return {
+            "total": len(metadata),
+            "sql_capable": sql_capable,
+            "dataframe_capable": dataframe_capable,
+            "dual_mode": dual_mode,
+            "dataframe_only": dataframe_only,
+            "support_status": {status: status_counts.get(status, 0) for status in SUPPORT_STATUS_VALUES},
+            "category": dict(sorted(category_counts.items())),
+        }
+
+    @classmethod
+    def classify_optional_import_error(cls, exc: BaseException) -> OptionalAdapterImportStatus:
+        """Classify an optional adapter import failure without raising it."""
+        message = str(exc).lower()
+        if isinstance(exc, ModuleNotFoundError) or "no module named" in message:
+            return "missing_optional_dependency"
+        if isinstance(exc, OSError) or any(marker in message for marker in _NATIVE_IMPORT_ERROR_MARKERS):
+            return "native_library_load_failure"
+        return "broken_adapter_import"
+
+    @classmethod
+    def diagnose_optional_adapter_imports(
+        cls,
+        platform_names: Optional[Iterable[str]] = None,
+    ) -> dict[str, dict[str, Any]]:
+        """Diagnose optional adapter import health on demand.
+
+        Normal registry discovery remains fail-open for missing optional
+        dependencies. This explicit diagnostic path imports selected adapters
+        and reports whether a failure is dependency, native-library, broken
+        adapter, deprecated, or intentionally disabled status.
+        """
+        requested = None
+        if platform_names is not None:
+            requested = {cls.resolve_platform_name(platform_name) for platform_name in platform_names}
+
+        diagnostics: dict[str, dict[str, Any]] = {}
+        for name, module_path, class_name in _OPTIONAL_ADAPTERS:
+            if requested is not None and name not in requested:
+                continue
+            diagnostics[name] = _diagnose_optional_adapter_entry(name, module_path, class_name).to_dict()
+
+        if requested is not None:
+            missing = requested - set(diagnostics)
+            for name in sorted(missing):
+                diagnostics[name] = OptionalAdapterDiagnostic(
+                    platform_name=name,
+                    module_path="",
+                    class_name="",
+                    status="not_configured",
+                    support_status=cls.get_platform_support_status(name),
+                    error_message="Platform is not configured for optional adapter registration.",
+                ).to_dict()
+
+        return diagnostics
+
+    @classmethod
     def detect_library(cls, lib_spec: dict[str, Any]) -> LibraryInfo:
         """Detect a single library for CLI use.
 
@@ -2192,6 +2436,68 @@ _OPTIONAL_ADAPTERS: tuple[tuple[str, str, str], ...] = (
     ("quanton", "benchbox.platforms.onehouse", "QuantonAdapter"),
 )
 
+_OPTIONAL_ADAPTER_REGISTRATION_DIAGNOSTICS: dict[str, dict[str, Any]] = {}
+
+
+def _diagnose_optional_adapter_entry(
+    name: str,
+    module_path: str,
+    class_name: str,
+) -> OptionalAdapterDiagnostic:
+    """Import one optional adapter and return a structured diagnostic."""
+    support_status = PlatformRegistry.get_platform_support_status(name)
+    if support_status == "deprecated":
+        return OptionalAdapterDiagnostic(
+            platform_name=name,
+            module_path=module_path,
+            class_name=class_name,
+            status="deprecated_platform",
+            support_status=support_status,
+            error_message="Platform selector is deprecated; use the documented replacement.",
+        )
+    if support_status in {"repo_only", "document_only"}:
+        return OptionalAdapterDiagnostic(
+            platform_name=name,
+            module_path=module_path,
+            class_name=class_name,
+            status="intentionally_disabled",
+            support_status=support_status,
+            error_message=f"Platform support_status is {support_status}; it is not a default runtime adapter.",
+        )
+
+    try:
+        module = importlib.import_module(module_path)
+        adapter_cls = getattr(module, class_name)
+    except AttributeError as exc:
+        return OptionalAdapterDiagnostic(
+            platform_name=name,
+            module_path=module_path,
+            class_name=class_name,
+            status="broken_adapter_import",
+            support_status=support_status,
+            error_type=type(exc).__name__,
+            error_message=f"{module_path} does not expose {class_name}",
+        )
+    except (ImportError, OSError) as exc:
+        return OptionalAdapterDiagnostic(
+            platform_name=name,
+            module_path=module_path,
+            class_name=class_name,
+            status=PlatformRegistry.classify_optional_import_error(exc),
+            support_status=support_status,
+            error_type=type(exc).__name__,
+            error_message=str(exc),
+        )
+
+    return OptionalAdapterDiagnostic(
+        platform_name=name,
+        module_path=module_path,
+        class_name=class_name,
+        status="available",
+        support_status=support_status,
+        available=adapter_cls is not None,
+    )
+
 
 def _try_register_adapter(name: str, module_path: str, class_name: str) -> None:
     """Import ``class_name`` from ``module_path`` and register as ``name``.
@@ -2199,12 +2505,39 @@ def _try_register_adapter(name: str, module_path: str, class_name: str) -> None:
     Missing optional dependencies are silently skipped - adapters whose driver
     packages aren't installed simply don't appear in the registry.
     """
+    support_status = PlatformRegistry.get_platform_support_status(name)
     try:
         module = importlib.import_module(module_path)
         adapter_cls = getattr(module, class_name)
         PlatformRegistry.register_adapter(name, adapter_cls)
-    except ImportError:
-        pass
+        _OPTIONAL_ADAPTER_REGISTRATION_DIAGNOSTICS[name] = OptionalAdapterDiagnostic(
+            platform_name=name,
+            module_path=module_path,
+            class_name=class_name,
+            status="available",
+            support_status=support_status,
+            available=True,
+        ).to_dict()
+    except AttributeError as exc:
+        _OPTIONAL_ADAPTER_REGISTRATION_DIAGNOSTICS[name] = OptionalAdapterDiagnostic(
+            platform_name=name,
+            module_path=module_path,
+            class_name=class_name,
+            status="broken_adapter_import",
+            support_status=support_status,
+            error_type=type(exc).__name__,
+            error_message=f"{module_path} does not expose {class_name}",
+        ).to_dict()
+    except (ImportError, OSError) as exc:
+        _OPTIONAL_ADAPTER_REGISTRATION_DIAGNOSTICS[name] = OptionalAdapterDiagnostic(
+            platform_name=name,
+            module_path=module_path,
+            class_name=class_name,
+            status=PlatformRegistry.classify_optional_import_error(exc),
+            support_status=support_status,
+            error_type=type(exc).__name__,
+            error_message=str(exc),
+        ).to_dict()
 
 
 def auto_register_platforms() -> None:
