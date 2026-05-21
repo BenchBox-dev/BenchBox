@@ -1,13 +1,13 @@
 {
   "version": 1,
-  "lockedAt": "2026-05-12T13:49:27.679Z",
+  "lockedAt": "2026-05-21T13:21:45.263Z",
   "skills": {
     "blog": {
       "source": {
         "type": "local",
         "name": "personal",
         "path": "/Users/joe/.skill-sync/skills/blog",
-        "fetchedAt": "2026-05-11T13:09:00.700Z"
+        "fetchedAt": "2026-05-21T13:21:45.150Z"
       },
       "installMode": "mirror",
       "files": {
@@ -16,12 +16,12 @@
           "size": 2117
         },
         "SKILL.md": {
-          "sha256": "26382c08807bfb516034f883689fde5a91c6974089138e366f95dbd6f164a073",
-          "size": 3560
+          "sha256": "4bb1876c53495598e1fe46a2e00d23628420590ca7bbae92106445ccb2fa2da4",
+          "size": 3812
         },
         "skill.yaml": {
-          "sha256": "aa5ae37ee34c1ddfd90617ebd9a87bd5993b89d3a96d90445411d5123d1b2faf",
-          "size": 120
+          "sha256": "44bf3fd9cae4da27eee662fb0e91b826a4d19c1757ac4474b57952eee94ec36f",
+          "size": 183
         }
       }
     },
@@ -30,7 +30,7 @@
         "type": "local",
         "name": "personal",
         "path": "/Users/joe/.skill-sync/skills/code",
-        "fetchedAt": "2026-05-12T13:49:27.555Z"
+        "fetchedAt": "2026-05-21T13:21:45.154Z"
       },
       "installMode": "mirror",
       "files": {
@@ -55,8 +55,8 @@
           "size": 721
         },
         "SKILL.md": {
-          "sha256": "ba7bc5524cf6dc146e1f3db1ce96a3f584a5fe8bc282a362523a08fe2969ae1b",
-          "size": 4980
+          "sha256": "692d7724a5f8d99f76c4c335bd37eb863f63e85c6495e2511dbaca68f1177c30",
+          "size": 5061
         },
         "skill.yaml": {
           "sha256": "d828f5f4c7075ad76083914ad5b3525bb3ab16d59ba0c293cb8d1f2759cf75bf",
@@ -111,7 +111,7 @@
         "type": "local",
         "name": "personal",
         "path": "/Users/joe/.skill-sync/skills/todo",
-        "fetchedAt": "2026-05-12T13:49:27.561Z"
+        "fetchedAt": "2026-05-21T13:21:45.162Z"
       },
       "installMode": "mirror",
       "files": {
@@ -132,12 +132,12 @@
           "size": 1464
         },
         "SKILL.md": {
-          "sha256": "eadffb869b3683e76461a7efd10f9d22659559240aaf385ebb56e919551e64ff",
-          "size": 7070
+          "sha256": "c3778ce302d168c1803d6abbacf68fe49d19090e5fe48a6b9f143c206bfc8ac8",
+          "size": 7254
         },
         "skill.yaml": {
-          "sha256": "02fb9215abb958fbb853438905ee2fab5eaf49c9cc820033edb23c992313fe20",
-          "size": 298
+          "sha256": "9bd74caf58dbf07c5ae218109faa0a7cb2fefd44ff85b91414d7dc46b82714ab",
+          "size": 361
         }
       }
     },
@@ -387,13 +387,13 @@
         "type": "local",
         "name": "personal",
         "path": "/Users/joe/.skill-sync/skills/SHARED/plan-deepening-framework",
-        "fetchedAt": "2026-05-07T00:39:26.520Z"
+        "fetchedAt": "2026-05-21T13:21:45.180Z"
       },
       "installMode": "mirror",
       "files": {
         "SKILL.md": {
-          "sha256": "207dd1ecce97e1ca8f7de470268c96b5b99d98e120f7418a851408076ea866d2",
-          "size": 685
+          "sha256": "7eb6c98a00c01504b0884503bf3e00eaa7adfb9618756dc85c8d3f8ca3beef35",
+          "size": 762
         },
         "skill.yaml": {
           "sha256": "39b007a53d9126d3fe4e8938a67d616a52be210a82ba211753afa92a073d06bd",
