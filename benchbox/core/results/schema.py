@@ -714,6 +714,7 @@ def _build_execution_from_context(result: BenchmarkResults, driver_metadata: dic
         if ctx.get(key):
             exec_block[key] = ctx[key]
 
+    _inject_translation_metadata(exec_block, result)
     return exec_block
 
 
@@ -728,6 +729,7 @@ def _build_execution_fallback(result: BenchmarkResults, driver_metadata: dict[st
     if mode_value:
         exec_block["mode"] = mode_value
     _inject_driver_metadata(exec_block, driver_metadata)
+    _inject_translation_metadata(exec_block, result)
     return exec_block
 
 
@@ -827,6 +829,15 @@ def _inject_driver_metadata(exec_block: dict[str, Any], driver_metadata: dict[st
         value = driver_metadata.get(key)
         if value:
             exec_block[key] = value
+
+
+def _inject_translation_metadata(exec_block: dict[str, Any], result: BenchmarkResults) -> None:
+    """Inject SQL translation outcome metadata into the execution block."""
+    if not isinstance(result.execution_metadata, Mapping):
+        return
+    translation = result.execution_metadata.get("translation")
+    if isinstance(translation, Mapping):
+        exec_block["translation"] = dict(translation)
 
 
 def _shorten_benchmark_name(name: str) -> str:

@@ -162,6 +162,28 @@ Allowed differences:
   skips generic loading.
 - Exact timing values must not be compared across modes.
 
+## Translation and Validation Mode Policy
+
+Decision from `fail-open-policy-and-translation-strictness`: SQL translation is
+mode-aware. Interactive/local runs may fail open by returning source SQL with a
+warning, but CI, publishing, compatibility governance, and any caller making a
+public correctness claim must use strict translation or treat fallback metadata
+as uncertainty.
+
+| Mode | Translation failure policy | Result-bundle policy | Consumer expectation |
+|---|---|---|---|
+| Interactive/local default | Fail open and warn. | `execution.translation.status="fallback"` when translation falls back; `summary.validation="uncertain"` if the result otherwise looked clean. | Users can keep experimenting, but the bundle is not a clean correctness claim. |
+| CI and compatibility governance | Fail closed by setting `strict_translation=true`, `translation_strict=true`, or `sql_translation_strict=true` in benchmark options or platform options. | Strict failures raise before a result is published as successful. | Gates should fail rather than accept untranslated SQL. |
+| Publishing and explorer ingestion | Reject non-clean validation statuses or label them uncertain. | `not_run`, `not_validated`, `unknown`, and `uncertain` are non-clean validation statuses. | Hosted/public views must not rank or present unchecked/fallback runs as validated results. |
+
+Translation metadata is exported under `execution.translation` without a schema
+version bump because it is an additive field inside the existing execution
+block. It records strict mode, aggregate status, attempt counts, translators,
+source/target dialects, warning/error categories, and compact grouped outcomes.
+`summary.validation="passed"` is reserved for runs with evidence that validation
+actually ran. When no validation record or validation details exist, lifecycle
+finalization labels the result `not_run` instead of `passed`.
+
 ## Evidence Snapshot
 
 This TODO revalidated the contract map against the following files before

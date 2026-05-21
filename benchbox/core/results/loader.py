@@ -202,6 +202,7 @@ def reconstruct_benchmark_results(
     benchmark_section = data.get("benchmark", {})
     platform_section = data.get("platform", {})
     summary_section = data.get("summary", {})
+    execution_section = data.get("execution", {})
 
     timestamp = _parse_timestamp(run_section.get("timestamp", ""))
     query_results = _reconstruct_query_results(data.get("queries", []), data.get("errors", []))
@@ -247,7 +248,8 @@ def reconstruct_benchmark_results(
         qph_at_size=tpc["qph_at_size"],
         geometric_mean_execution_time=tpc["geometric_mean_execution_time"],
         test_execution_type=benchmark_section.get("mode", "standard"),
-        validation_status=summary_section.get("validation", "PASSED"),
+        validation_status=summary_section.get("validation", "NOT_RUN"),
+        execution_metadata=_extract_execution_metadata(execution_section),
         execution_environment=execution_environment,
         platform_deployment=platform_section.get("deployment"),
         platform_cloud=platform_section.get("cloud"),
@@ -273,6 +275,15 @@ def reconstruct_benchmark_results(
         manifest_hash=benchmark_section.get("manifest_hash"),
         data_archive_hash=benchmark_section.get("data_archive_hash"),
     )
+
+
+def _extract_execution_metadata(execution_section: dict[str, Any]) -> dict[str, Any] | None:
+    """Preserve execution metadata that is not otherwise reconstructed."""
+    metadata: dict[str, Any] = {}
+    translation = execution_section.get("translation")
+    if isinstance(translation, dict):
+        metadata["translation"] = translation
+    return metadata or None
 
 
 def _parse_timestamp(timestamp_str: str) -> datetime:

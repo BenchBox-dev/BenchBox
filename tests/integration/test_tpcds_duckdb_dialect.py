@@ -10,6 +10,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -29,6 +30,7 @@ except ImportError:
 from benchbox import TPCDS
 from benchbox.core.tpcds.benchmark import TPCDSBenchmark
 from benchbox.platforms.duckdb import DuckDBAdapter
+from benchbox.utils.dialect_utils import SQLTranslationError, sql_translation_context
 
 
 @pytest.mark.integration
@@ -231,6 +233,22 @@ class TestTPCDSDuckDBDialectIntegration:
             assert len(result) > 0
         except Exception as e:
             pytest.fail(f"Should handle same-dialect translation gracefully: {e}")
+
+    def test_strict_dialect_translation_fails_closed(self):
+        """Strict translation mode raises instead of returning source SQL."""
+        benchmark = TPCDSBenchmark(scale_factor=1.0, verbose=False)
+
+        with patch("sqlglot.transpile", side_effect=RuntimeError("synthetic translation failure")):
+            with sql_translation_context(strict=True) as outcomes:
+                with pytest.raises(SQLTranslationError):
+                    benchmark.translate_query_text(
+                        "SELECT * FROM customer",
+                        source_dialect="netezza",
+                        target_dialect="duckdb",
+                    )
+
+        assert outcomes[0].status == "failed"
+        assert outcomes[0].error_category == "translation_failed"
 
     def test_interval_syntax_normalization(self):
         """Test that Netezza interval syntax is converted to standard SQL."""

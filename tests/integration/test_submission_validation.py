@@ -36,7 +36,7 @@ _FAKE_BUNDLE = {
     },
     "benchmark": {"id": "tpch", "scale_factor": 0.01},
     "platform": {"name": "duckdb"},
-    "summary": {"power_score": 1.0, "geomean_ms": 1.0, "total_duration_s": 0.1},
+    "summary": {"power_score": 1.0, "geomean_ms": 1.0, "total_duration_s": 0.1, "validation": "passed"},
     "queries": [
         {"id": 1, "ms": 1.0},
         {"id": 6, "ms": 1.0},
