@@ -127,9 +127,11 @@ def test_preflight_disk_budget_table_error_is_advisory(tmp_path: Path, monkeypat
     assert "scale_factor" in result.warnings[0]
 
 
-def test_requested_platforms_from_raw_matches_uat_defaults():
-    assert preflight.requested_platforms_from_raw({"platforms": {"include": ["postgresql"]}}) == ("postgresql",)
-    assert "duckdb" in preflight.requested_platforms_from_raw({})
+def test_requested_platforms_from_config_matches_uat_defaults():
+    assert preflight.requested_platforms_from_config(
+        config.validate_config({"name": "smoke", "platforms": {"include": ["postgresql"]}})
+    ) == ("postgresql",)
+    assert "duckdb" in preflight.requested_platforms_from_config(config.validate_config({"name": "smoke"}))
 
 
 def test_uat_bring_up_unknown_platform_returns_clear_error(capsys):

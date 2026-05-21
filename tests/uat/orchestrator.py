@@ -19,7 +19,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from tests.uat.config import UATConfig, apply_stress_overrides, load_config
+from tests.uat.config import UATConfig, load_config
 from tests.uat.phases import (
     execute as exec_phase,
     preflight as preflight_phase,
@@ -203,7 +203,7 @@ def run_sweep(  # noqa: C901
                 docker_required=config.preflight.docker_required or config.cleanup.docker_manage_platforms,
                 noisy_neighbor_warn_load=config.preflight.noisy_neighbor_warn_load,
                 local_platforms_check=config.preflight.local_platforms_check,
-                requested_platforms=preflight_phase.requested_platforms_from_raw(config.raw),
+                requested_platforms=preflight_phase.requested_platforms_from_config(config),
                 benchmark_runs_dir=benchmark_runs_dir,
                 disk_budget_config=config,
             )
@@ -311,7 +311,6 @@ def run_sweep(  # noqa: C901
         elif phase == "validate":
             from tests.uat.phases.validate import ValidatePhaseError, run_validate
 
-            validate_cfg = config.raw.get("validate") or {}
             if execute_outcome is None:
                 phase_exit_codes[phase] = 2
                 aborted_phase = phase
@@ -323,7 +322,7 @@ def run_sweep(  # noqa: C901
                 vr = run_validate(
                     result_paths,
                     output_tsv=output_tsv,
-                    floor=float(validate_cfg.get("validator_clean_rate_floor", 0.80)),
+                    floor=config.validate.validator_clean_rate_floor,
                 )
                 phase_exit_codes[phase] = vr.exit_code()
                 validator_rollup_tsv = vr.rollup_tsv_path
@@ -355,21 +354,17 @@ def run_sweep(  # noqa: C901
         elif phase == "explorer_smoke":
             from tests.uat.phases.explorer_smoke import run_explorer_smoke
 
-            es_cfg = config.raw.get("explorer_smoke") or {}
             bundles_dir = submissions_dir if submissions_dir is not None else log_dir / "bundles"
             result = run_explorer_smoke(
                 bundles_dir=bundles_dir,
                 output_dir=log_dir / "explorer_data",
                 log_dir=log_dir,
-                playwright_browsers=tuple(es_cfg.get("playwright_browsers", ["chromium"])),
+                playwright_browsers=config.explorer_smoke.playwright_browsers,
             )
             phase_exit_codes[phase] = result.exit_code()
         elif phase == "report":
-            report_cfg = config.raw.get("report") or {}
-            tsv_path = log_dir / report_cfg.get("matrix_summary_tsv", "matrix_summary.tsv")
+            tsv_path = log_dir / config.report.matrix_summary_tsv
             cells = execute_outcome.results if execute_outcome else []
-            scales_cfg = config.raw.get("scales") or {}
-            rungs = scales_cfg.get("rungs")
             # Wire validator status into the cross-scale check when a
             # validate phase ran earlier in this sweep. Without this,
             # cross_scale_clean_pair_count silently degrades to a
@@ -378,8 +373,8 @@ def run_sweep(  # noqa: C901
             summary = report_phase.write_report(
                 cells,
                 output_path=tsv_path,
-                rungs=[float(r) for r in rungs] if rungs else None,
-                cross_scale_floor=report_cfg.get("cross_scale_coverage_min_pairs"),
+                rungs=list(config.scales.rungs),
+                cross_scale_floor=config.report.cross_scale_coverage_min_pairs,
                 validator_status_by_path=validator_status_by_path,
                 compatibility_pruned_count=(
                     len(getattr(execute_outcome, "compatibility_pruned", ())) if execute_outcome else 0
@@ -415,14 +410,15 @@ def run_sweep_from_path(
     """Convenience wrapper for `make uat-sweep` and `make uat-stress`."""
     config = load_config(config_path)
     if stress_overrides:
-        config = apply_stress_overrides(
-            config,
-            platform=stress_overrides.get("platform"),
-            benchmark=stress_overrides.get("benchmark"),
-            scale=stress_overrides.get("scale"),
-        )
+        platform = stress_overrides.get("platform")
+        benchmark = stress_overrides.get("benchmark")
+        scale = stress_overrides.get("scale")
+        if platform is not None:
+            config = replace(config, platforms=replace(config.platforms, groups=(), include=(str(platform),)))
+        if benchmark is not None:
+            config = replace(config, benchmarks=replace(config.benchmarks, groups=(), include=(str(benchmark),)))
+        if scale is not None:
+            config = replace(config, scales=replace(config.scales, override=float(scale)))
     if dry_run_override is not None:
-        raw = dict(config.raw)
-        raw["dry_run"] = dry_run_override
-        config = replace(config, dry_run=dry_run_override, raw=raw)
+        config = replace(config, dry_run=dry_run_override)
     return run_sweep(config, resume_manifest=resume_manifest)

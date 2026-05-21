@@ -10,6 +10,7 @@ from types import SimpleNamespace
 import pytest
 
 from tests.uat import _cli
+from tests.uat.config import validate_config
 
 pytestmark = pytest.mark.fast
 
@@ -102,7 +103,7 @@ def test_main_help_returns_0(capsys):
 
 
 def test_main_preflight_returns_2_when_preflight_aborts(tmp_path, monkeypatch, capsys):
-    config = SimpleNamespace(raw={"preflight": {"free_space_min_gib": 1000.0}})
+    config = validate_config({"name": "preflight-smoke", "preflight": {"free_space_min_gib": 1000.0}})
 
     def fake_run_preflight(**kwargs):
         return SimpleNamespace(

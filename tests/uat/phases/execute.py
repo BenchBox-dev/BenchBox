@@ -112,7 +112,7 @@ def run_execute(
     if free_space_min_gib is None:
         free_space_min_gib = config.preflight.free_space_min_gib
 
-    enumeration = enumerate_cells_with_pruning(config.raw)
+    enumeration = enumerate_cells_with_pruning(config)
     cells = list(enumeration.cells)
     by_pb: dict[tuple[str, str], list[Cell]] = defaultdict(list)
     for cell in cells:

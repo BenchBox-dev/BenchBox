@@ -10,7 +10,7 @@ from unittest.mock import patch
 import pytest
 
 from tests.uat import docker_assets, matrix
-from tests.uat.config import validate_config
+from tests.uat.config import UATConfig, validate_config
 from tests.uat.phases import (
     enumerate as enum_phase,
     execute as exec_phase,
@@ -44,6 +44,10 @@ def _write_submit_result(path: Path, *, failed: int = 0) -> None:
         "phases": {},
     }
     path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def _cfg(payload: dict) -> UATConfig:
+    return validate_config({"name": "phase-test", **payload})
 
 
 # ---------------------------------------------------------------------------
@@ -86,7 +90,7 @@ def test_enumerate_filters_dataframe_against_sql_only():
         "benchmarks": {"include": ["vector_search", "tpch"]},
         "scales": {"rungs": [0.01]},
     }
-    cells = enum_phase.enumerate_cells(raw)
+    cells = enum_phase.enumerate_cells(_cfg(raw))
     benches = {c.benchmark for c in cells}
     assert "vector_search" not in benches  # sql-only
     assert "tpch" in benches
@@ -99,7 +103,7 @@ def test_enumerate_records_compatibility_pruned_cells():
         "scales": {"rungs": [0.01, 0.1]},
     }
 
-    result = enum_phase.enumerate_cells_with_pruning(raw)
+    result = enum_phase.enumerate_cells_with_pruning(_cfg(raw))
 
     assert {c.benchmark for c in result.cells} == {"tpch"}
     assert len(result.compatibility_pruned) == 2
@@ -127,7 +131,7 @@ def test_enumerate_uses_registry_supports_dataframe_without_name_fallback():
         )
     }
 
-    result = enum_phase.enumerate_cells_with_pruning(raw, benchmarks=benchmarks)
+    result = enum_phase.enumerate_cells_with_pruning(_cfg(raw), benchmarks=benchmarks)
 
     assert [(c.platform, c.benchmark, c.scale) for c in result.cells] == [("polars-df", "vector_search", 0.01)]
     assert result.compatibility_pruned == ()
@@ -140,7 +144,7 @@ def test_enumerate_records_registry_benchmark_gates():
         "scales": {"rungs": [0.01]},
     }
 
-    result = enum_phase.enumerate_cells_with_pruning(raw)
+    result = enum_phase.enumerate_cells_with_pruning(_cfg(raw))
 
     assert {c.benchmark for c in result.cells} == {"tpch"}
     assert len(result.compatibility_pruned) == 3
@@ -172,7 +176,7 @@ def test_enumerate_keeps_release_gate_runtime_envelopes_for_diagnostic_sweeps():
         "scales": {"rungs": [0.01]},
     }
 
-    result = enum_phase.enumerate_cells_with_pruning(raw)
+    result = enum_phase.enumerate_cells_with_pruning(_cfg(raw))
 
     cell_pairs = {(c.platform, c.benchmark) for c in result.cells}
     for platform in ("pg-duckdb", "pg-mooncake", "timescaledb"):
@@ -206,7 +210,7 @@ def test_enumerate_records_pg_family_release_gate_compatibility_pruning():
         "scales": {"rungs": [0.01]},
     }
 
-    result = enum_phase.enumerate_cells_with_pruning(raw)
+    result = enum_phase.enumerate_cells_with_pruning(_cfg(raw))
 
     assert {(c.platform, c.benchmark) for c in result.cells} == {
         ("pg-duckdb", "tpch"),
@@ -250,7 +254,7 @@ def test_enumerate_honours_scale_options():
         "benchmarks": {"include": ["tpch"]},
         "scales": {"rungs": [0.01, 0.1, 1.0, 50.0, 100.0]},
     }
-    cells = enum_phase.enumerate_cells(raw)
+    cells = enum_phase.enumerate_cells(_cfg(raw))
     scales = {c.scale for c in cells}
     # tpch scale_options = development subscales + official TPC ladder
     # (PR #332 review follow-up): 0.01, 0.1, 1.0, 10.0, 30.0, 100.0, 300.0…
@@ -265,7 +269,7 @@ def test_enumerate_override_replaces_rungs():
         "benchmarks": {"include": ["tpch"]},
         "scales": {"rungs": [0.01, 0.1, 1.0], "override": 0.1},
     }
-    cells = enum_phase.enumerate_cells(raw)
+    cells = enum_phase.enumerate_cells(_cfg(raw))
     assert {c.scale for c in cells} == {0.1}
 
 

@@ -91,7 +91,10 @@ def sweep_main(argv: list[str] | None = None) -> int:
 
 def stress_main(argv: list[str] | None = None) -> int:
     """Implements `make uat-stress [PLATFORM=] [BENCHMARK=] [SCALE=]`."""
-    from tests.uat.orchestrator import run_sweep_from_path
+    from dataclasses import replace
+
+    from tests.uat.config import load_config
+    from tests.uat.orchestrator import run_sweep
 
     parser = argparse.ArgumentParser(prog="uat-stress")
     parser.add_argument("--config", default=None, help="Defaults to tests/uat/configs/stress-default.yaml")
@@ -104,12 +107,14 @@ def stress_main(argv: list[str] | None = None) -> int:
         config_path = Path(__file__).resolve().parent / "configs" / "stress-default.yaml"
     else:
         config_path = Path(args.config)
-    overrides: dict[str, str | float | None] = {
-        "platform": args.platform,
-        "benchmark": args.benchmark,
-        "scale": args.scale,
-    }
-    result = run_sweep_from_path(config_path, stress_overrides=overrides)
+    config = load_config(config_path)
+    if args.platform is not None:
+        config = replace(config, platforms=replace(config.platforms, groups=(), include=(args.platform,)))
+    if args.benchmark is not None:
+        config = replace(config, benchmarks=replace(config.benchmarks, groups=(), include=(args.benchmark,)))
+    if args.scale is not None:
+        config = replace(config, scales=replace(config.scales, override=args.scale))
+    result = run_sweep(config)
     print(
         json.dumps(
             {
@@ -128,7 +133,7 @@ def preflight_main(argv: list[str] | None = None) -> int:
     """Print the advisory disk budget and current preflight status for a config."""
     from tests.uat.config import load_config
     from tests.uat.phases.execute import default_benchmark_runs_dir
-    from tests.uat.phases.preflight import run_preflight
+    from tests.uat.phases.preflight import requested_platforms_from_config, run_preflight
 
     parser = argparse.ArgumentParser(prog="uat-preflight")
     parser.add_argument("--config", required=True)
@@ -136,12 +141,14 @@ def preflight_main(argv: list[str] | None = None) -> int:
 
     config = load_config(args.config)
     benchmark_runs_dir = default_benchmark_runs_dir(config)
-    preflight_cfg = config.raw.get("preflight") or {}
     result = run_preflight(
-        free_space_path=preflight_cfg.get("free_space_path", str(benchmark_runs_dir)),
-        free_space_min_gib=float(preflight_cfg.get("free_space_min_gib", 5.0)),
-        docker_required=bool(preflight_cfg.get("docker_required", False)),
-        noisy_neighbor_warn_load=float(preflight_cfg.get("noisy_neighbor_warn_load", 8.0)),
+        free_space_path=config.preflight.free_space_path or str(benchmark_runs_dir),
+        free_space_min_gib=config.preflight.free_space_min_gib,
+        docker_required=config.preflight.docker_required or config.cleanup.docker_manage_platforms,
+        noisy_neighbor_warn_load=config.preflight.noisy_neighbor_warn_load,
+        local_platforms_check=config.preflight.local_platforms_check,
+        requested_platforms=requested_platforms_from_config(config),
+        benchmark_runs_dir=benchmark_runs_dir,
         disk_budget_config=config,
     )
     if result.disk_budget_summary:
@@ -399,7 +406,7 @@ def execute_main(argv: list[str] | None = None) -> int:
     """Implements `make uat-execute CONFIG=path/to/uat.yaml`."""
     from tests.uat.config import load_config
     from tests.uat.phases.execute import default_benchmark_runs_dir, default_log_dir, run_execute
-    from tests.uat.phases.preflight import requested_platforms_from_raw, run_preflight
+    from tests.uat.phases.preflight import requested_platforms_from_config, run_preflight
 
     parser = argparse.ArgumentParser(prog="uat-execute")
     parser.add_argument("--config", required=True)
@@ -425,7 +432,7 @@ def execute_main(argv: list[str] | None = None) -> int:
             docker_required=config.preflight.docker_required or config.cleanup.docker_manage_platforms,
             noisy_neighbor_warn_load=config.preflight.noisy_neighbor_warn_load,
             local_platforms_check=config.preflight.local_platforms_check,
-            requested_platforms=requested_platforms_from_raw(config.raw),
+            requested_platforms=requested_platforms_from_config(config),
             benchmark_runs_dir=benchmark_runs_dir,
             disk_budget_config=config,
         )

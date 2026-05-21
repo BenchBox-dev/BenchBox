@@ -7,6 +7,7 @@ matrix even in dry-run mode; not in the fast-test default.
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -27,15 +28,7 @@ def test_replay_dry_run_produces_expected_columns(tmp_path: Path):
     from tests.uat.orchestrator import run_sweep
 
     cfg = load_config(CONFIG)
-    cfg = type(cfg)(
-        name=cfg.name,
-        description=cfg.description,
-        phases=cfg.phases,
-        dry_run=True,  # force structural pass
-        execute=cfg.execute,
-        output=cfg.output,
-        raw=cfg.raw,
-    )
+    cfg = replace(cfg, dry_run=True)  # force structural pass
     result = run_sweep(cfg, log_dir_override=tmp_path)
     # In dry_run mode every phase records 0; the report phase isn't asked
     # to write the TSV under dry_run, so we compare only the column header

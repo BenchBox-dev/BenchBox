@@ -98,15 +98,14 @@ def host_load_1m() -> float | None:
         return None
 
 
-def requested_platforms_from_raw(raw: dict) -> tuple[str, ...]:
-    """Resolve the platforms requested by a UAT config's raw matrix filters."""
-    platforms_cfg = raw.get("platforms") or {}
-    platform_groups_default = ["sql"] if "include" not in platforms_cfg else []
+def requested_platforms_from_config(config: UATConfig) -> tuple[str, ...]:
+    """Resolve the platforms requested by a validated UAT config."""
+    platform_groups_default = ("sql",) if config.platforms.groups is None and not config.platforms.include else ()
     return tuple(
         resolve_platforms(
-            groups=_as_list(platforms_cfg.get("groups", platform_groups_default)),
-            include=_as_list(platforms_cfg.get("include", [])),
-            exclude=_as_list(platforms_cfg.get("exclude", [])),
+            groups=config.platforms.groups if config.platforms.groups is not None else platform_groups_default,
+            include=config.platforms.include,
+            exclude=config.platforms.exclude,
         )
     )
 
@@ -237,14 +236,6 @@ def _run_make_bring_up(platform: str, *, benchmark_runs_dir: str | Path | None =
         check=False,
     )
     return completed.returncode
-
-
-def _as_list(value: Iterable | None) -> list:
-    if value is None:
-        return []
-    if isinstance(value, str):
-        return [value]
-    return list(value)
 
 
 def estimate_disk_budget_summary(config: UATConfig) -> str:

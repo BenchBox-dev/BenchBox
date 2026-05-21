@@ -185,7 +185,7 @@ work:
 - id: w1
   summary: "Promote every UAT YAML section to a typed dataclass; delete config.raw and apply_stress_overrides"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     Replaces the W3/W4 staging artifact in `tests/uat/config.py`. After
     this work unit, `UATConfig.raw: dict[str, Any]` does not exist;

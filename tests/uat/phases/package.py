@@ -50,8 +50,7 @@ class PackagePhaseError(RuntimeError):
 
 
 def _resolve_state(config: UATConfig) -> str:
-    pkg_cfg = config.raw.get("package") or {}
-    state = pkg_cfg.get("submit_terminal_state")
+    state = config.package.submit_terminal_state
     if state is None:
         raise PackagePhaseError("package.submit_terminal_state is required when the package phase is enabled")
     if state not in VALID_TERMINAL_STATES:
@@ -60,8 +59,7 @@ def _resolve_state(config: UATConfig) -> str:
 
 
 def _resolve_service(config: UATConfig, state: str) -> str | None:
-    pkg_cfg = config.raw.get("package") or {}
-    service = pkg_cfg.get("service")
+    service = config.package.service
     if state == "cloud-uploaded" and not service:
         raise PackagePhaseError("submit_terminal_state=cloud-uploaded requires package.service")
     return service
