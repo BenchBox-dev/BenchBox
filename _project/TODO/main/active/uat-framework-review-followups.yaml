@@ -357,7 +357,7 @@ work:
 - id: w5
   summary: "Convert tests/uat/phases/validate.py from subprocess to in-process import; delete parse_rollup TSV re-derivation"
   needs: [w4, w2]
-  status: pending
+  status: done
   notes: |
     Closes the C3 finding (3-hop subprocess → script → library) by
     importing the library directly.
