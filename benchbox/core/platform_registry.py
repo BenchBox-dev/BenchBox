@@ -110,6 +110,66 @@ _NATIVE_IMPORT_ERROR_MARKERS = (
 )
 
 
+def _deployment(
+    mode: Literal["local", "self-hosted", "managed", "remote"],
+    display_name: str,
+    description: str,
+    *,
+    credentials: bool = False,
+    cloud_storage: bool = False,
+    network: bool = False,
+    default: bool = False,
+    dependencies: Optional[list[str]] = None,
+    auth_methods: Optional[list[str]] = None,
+) -> dict[str, Any]:
+    return {
+        "mode": mode,
+        "display_name": display_name,
+        "description": description,
+        "requires_credentials": credentials,
+        "requires_cloud_storage": cloud_storage,
+        "requires_network": network,
+        "default_for_platform": default,
+        "dependencies": dependencies or [],
+        "auth_methods": auth_methods or [],
+    }
+
+
+def _capabilities(
+    *,
+    sql: bool = True,
+    dataframe: bool = False,
+    default_mode: Literal["sql", "dataframe"] = "sql",
+    platform_family: Optional[str] = None,
+    inherits_from: Optional[str] = None,
+    conflicts_with: Optional[list[str]] = None,
+    cost_class: Optional[CostClass] = None,
+    default_deployment: Optional[str] = None,
+    deployment_modes: Optional[dict[str, dict[str, Any]]] = None,
+    unsupported_benchmarks: Optional[dict[str, str]] = None,
+) -> dict[str, Any]:
+    capabilities: dict[str, Any] = {
+        "supports_sql": sql,
+        "supports_dataframe": dataframe,
+        "default_mode": default_mode,
+    }
+    if platform_family is not None:
+        capabilities["platform_family"] = platform_family
+    if inherits_from is not None:
+        capabilities["inherits_from"] = inherits_from
+    if conflicts_with is not None:
+        capabilities["conflicts_with"] = conflicts_with
+    if cost_class is not None:
+        capabilities["cost_class"] = cost_class
+    if default_deployment is not None:
+        capabilities["default_deployment"] = default_deployment
+    if deployment_modes is not None:
+        capabilities["deployment_modes"] = deployment_modes
+    if unsupported_benchmarks is not None:
+        capabilities["unsupported_benchmarks"] = unsupported_benchmarks
+    return capabilities
+
+
 @dataclass(frozen=True)
 class OptionalAdapterDiagnostic:
     """Diagnostic detail for an optional adapter import attempt."""
@@ -278,26 +338,15 @@ class PlatformRegistry:
                 "adoption": "mainstream",
                 "supports": ["olap", "in_memory", "columnar"],
                 "driver_package": "duckdb",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": False,
-                    "default_mode": "sql",
-                    "platform_family": "duckdb",
-                    "default_deployment": "local",
-                    "deployment_modes": {
-                        "local": {
-                            "mode": "local",
-                            "display_name": "DuckDB Local",
-                            "description": "Embedded in-process DuckDB",
-                            "requires_credentials": False,
-                            "requires_cloud_storage": False,
-                            "requires_network": False,
-                            "default_for_platform": True,
-                            "dependencies": ["duckdb"],
-                            "auth_methods": [],
-                        },
+                "capabilities": _capabilities(
+                    platform_family="duckdb",
+                    default_deployment="local",
+                    deployment_modes={
+                        "local": _deployment(
+                            "local", "DuckDB Local", "Embedded in-process DuckDB", default=True, dependencies=["duckdb"]
+                        )
                     },
-                },
+                ),
             },
             "datafusion": {
                 "display_name": "DataFusion",
@@ -309,7 +358,7 @@ class PlatformRegistry:
                 "adoption": "emerging",
                 "supports": ["olap", "in_memory", "columnar", "arrow", "dataframe"],
                 "driver_package": "datafusion",
-                "capabilities": {"supports_sql": True, "supports_dataframe": True, "default_mode": "sql"},
+                "capabilities": _capabilities(dataframe=True),
             },
             "sqlite": {
                 "display_name": "SQLite",
@@ -321,7 +370,7 @@ class PlatformRegistry:
                 "adoption": "niche",
                 "supports": ["transactional", "file_based"],
                 "driver_package": None,
-                "capabilities": {"supports_sql": True, "supports_dataframe": False, "default_mode": "sql"},
+                "capabilities": _capabilities(),
             },
             "polars": {
                 "display_name": "Polars",
@@ -333,7 +382,7 @@ class PlatformRegistry:
                 "adoption": "established",
                 "supports": ["olap", "in_memory", "columnar", "dataframe"],
                 "driver_package": "polars",
-                "capabilities": {"supports_sql": False, "supports_dataframe": True, "default_mode": "dataframe"},
+                "capabilities": _capabilities(sql=False, dataframe=True, default_mode="dataframe"),
             },
             "motherduck": {
                 "display_name": "MotherDuck",
@@ -345,28 +394,24 @@ class PlatformRegistry:
                 "adoption": "emerging",
                 "supports": ["olap", "cloud", "columnar", "serverless"],
                 "driver_package": "duckdb",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": False,
-                    "default_mode": "sql",
-                    "platform_family": "duckdb",
-                    "inherits_from": "duckdb",
-                    "cost_class": "paid_credits",
-                    "default_deployment": "managed",
-                    "deployment_modes": {
-                        "managed": {
-                            "mode": "managed",
-                            "display_name": "MotherDuck Cloud",
-                            "description": "Serverless DuckDB in MotherDuck cloud",
-                            "requires_credentials": True,
-                            "requires_cloud_storage": False,
-                            "requires_network": True,
-                            "default_for_platform": True,
-                            "dependencies": ["duckdb"],
-                            "auth_methods": ["token"],
-                        },
+                "capabilities": _capabilities(
+                    platform_family="duckdb",
+                    inherits_from="duckdb",
+                    cost_class="paid_credits",
+                    default_deployment="managed",
+                    deployment_modes={
+                        "managed": _deployment(
+                            "managed",
+                            "MotherDuck Cloud",
+                            "Serverless DuckDB in MotherDuck cloud",
+                            credentials=True,
+                            network=True,
+                            default=True,
+                            dependencies=["duckdb"],
+                            auth_methods=["token"],
+                        ),
                     },
-                },
+                ),
             },
         }
 
@@ -384,37 +429,28 @@ class PlatformRegistry:
                 "adoption": "established",
                 "supports": ["olap", "columnar", "distributed"],
                 "driver_package": "clickhouse-driver",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": False,
-                    "default_mode": "sql",
-                    "platform_family": "clickhouse",
-                    "default_deployment": "local",
-                    "deployment_modes": {
-                        "local": {
-                            "mode": "local",
-                            "display_name": "ClickHouse Local (chDB)",
-                            "description": "Embedded ClickHouse via chDB library",
-                            "requires_credentials": False,
-                            "requires_cloud_storage": False,
-                            "requires_network": False,
-                            "default_for_platform": True,
-                            "dependencies": ["chdb"],
-                            "auth_methods": [],
-                        },
-                        "server": {
-                            "mode": "self-hosted",
-                            "display_name": "ClickHouse Server",
-                            "description": "Self-hosted ClickHouse server or cluster",
-                            "requires_credentials": True,
-                            "requires_cloud_storage": False,
-                            "requires_network": True,
-                            "default_for_platform": False,
-                            "dependencies": ["clickhouse-driver"],
-                            "auth_methods": ["password"],
-                        },
+                "capabilities": _capabilities(
+                    platform_family="clickhouse",
+                    default_deployment="local",
+                    deployment_modes={
+                        "local": _deployment(
+                            "local",
+                            "ClickHouse Local (chDB)",
+                            "Embedded ClickHouse via chDB library",
+                            default=True,
+                            dependencies=["chdb"],
+                        ),
+                        "server": _deployment(
+                            "self-hosted",
+                            "ClickHouse Server",
+                            "Self-hosted ClickHouse server or cluster",
+                            credentials=True,
+                            network=True,
+                            dependencies=["clickhouse-driver"],
+                            auth_methods=["password"],
+                        ),
                     },
-                },
+                ),
             },
             "clickhouse-local": {
                 "display_name": "ClickHouse Local (chDB)",
@@ -428,13 +464,7 @@ class PlatformRegistry:
                 "adoption": "established",
                 "supports": ["olap", "columnar", "embedded", "in-process"],
                 "driver_package": "chdb",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": False,
-                    "default_mode": "sql",
-                    "platform_family": "clickhouse",
-                    "inherits_from": "clickhouse",
-                },
+                "capabilities": _capabilities(platform_family="clickhouse", inherits_from="clickhouse"),
             },
             "clickhouse-server": {
                 "display_name": "ClickHouse Server",
@@ -448,13 +478,7 @@ class PlatformRegistry:
                 "adoption": "established",
                 "supports": ["olap", "columnar", "distributed", "self-hosted"],
                 "driver_package": "clickhouse-driver",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": False,
-                    "default_mode": "sql",
-                    "platform_family": "clickhouse",
-                    "inherits_from": "clickhouse",
-                },
+                "capabilities": _capabilities(platform_family="clickhouse", inherits_from="clickhouse"),
             },
             "clickhouse-cloud": {
                 "display_name": "ClickHouse Cloud",
@@ -468,28 +492,25 @@ class PlatformRegistry:
                 "adoption": "emerging",
                 "supports": ["olap", "columnar", "distributed", "serverless", "cloud"],
                 "driver_package": "clickhouse-connect",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": False,
-                    "default_mode": "sql",
-                    "platform_family": "clickhouse",
-                    "inherits_from": "clickhouse",
-                    "cost_class": "paid_compute",
-                    "default_deployment": "managed",
-                    "deployment_modes": {
-                        "managed": {
-                            "mode": "managed",
-                            "display_name": "ClickHouse Cloud",
-                            "description": "ClickHouse Cloud managed service",
-                            "requires_credentials": True,
-                            "requires_cloud_storage": True,
-                            "requires_network": True,
-                            "default_for_platform": True,
-                            "dependencies": ["clickhouse-connect"],
-                            "auth_methods": ["password", "oauth"],
-                        },
+                "capabilities": _capabilities(
+                    platform_family="clickhouse",
+                    inherits_from="clickhouse",
+                    cost_class="paid_compute",
+                    default_deployment="managed",
+                    deployment_modes={
+                        "managed": _deployment(
+                            "managed",
+                            "ClickHouse Cloud",
+                            "ClickHouse Cloud managed service",
+                            credentials=True,
+                            cloud_storage=True,
+                            network=True,
+                            default=True,
+                            dependencies=["clickhouse-connect"],
+                            auth_methods=["password", "oauth"],
+                        ),
                     },
-                },
+                ),
             },
             "bigquery": {
                 "display_name": "Google BigQuery",
@@ -504,12 +525,7 @@ class PlatformRegistry:
                 "adoption": "mainstream",
                 "supports": ["olap", "serverless", "petabyte_scale"],
                 "driver_package": "google-cloud-bigquery",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": False,
-                    "default_mode": "sql",
-                    "cost_class": "paid_credits",
-                },
+                "capabilities": _capabilities(cost_class="paid_credits"),
             },
             "databricks": {
                 "display_name": "Databricks SQL",
@@ -521,12 +537,7 @@ class PlatformRegistry:
                 "adoption": "mainstream",
                 "supports": ["olap", "spark", "lakehouse"],
                 "driver_package": "databricks-sql-connector",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": True,
-                    "default_mode": "sql",
-                    "cost_class": "paid_credits",
-                },
+                "capabilities": _capabilities(dataframe=True, cost_class="paid_credits"),
             },
             "databricks-df": {
                 "display_name": "Databricks DataFrame",
@@ -541,12 +552,7 @@ class PlatformRegistry:
                 "adoption": "niche",
                 "supports": ["olap", "spark", "lakehouse", "dataframe"],
                 "driver_package": "databricks-connect",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": True,
-                    "default_mode": "dataframe",
-                    "cost_class": "paid_credits",
-                },
+                "capabilities": _capabilities(dataframe=True, default_mode="dataframe", cost_class="paid_credits"),
             },
             "snowflake": {
                 "display_name": "Snowflake",
@@ -558,12 +564,7 @@ class PlatformRegistry:
                 "adoption": "mainstream",
                 "supports": ["olap", "serverless", "multi_cloud"],
                 "driver_package": "snowflake-connector-python",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": False,
-                    "default_mode": "sql",
-                    "cost_class": "paid_credits",
-                },
+                "capabilities": _capabilities(cost_class="paid_credits"),
             },
             "redshift": {
                 "display_name": "Amazon Redshift",
@@ -578,12 +579,7 @@ class PlatformRegistry:
                 "adoption": "established",
                 "supports": ["olap", "columnar", "aws"],
                 "driver_package": "redshift-connector",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": False,
-                    "default_mode": "sql",
-                    "cost_class": "paid_compute",
-                },
+                "capabilities": _capabilities(cost_class="paid_compute"),
             },
             "trino": {
                 "display_name": "Trino",
@@ -596,26 +592,22 @@ class PlatformRegistry:
                 "supports": ["olap", "federated", "distributed"],
                 "driver_package": "trino",
                 "notes": "Supports Trino and Starburst Enterprise. For PrestoDB use presto-python-client. For AWS Athena use the athena adapter.",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": False,
-                    "default_mode": "sql",
-                    "platform_family": "trino",
-                    "default_deployment": "self-hosted",
-                    "deployment_modes": {
-                        "self-hosted": {
-                            "mode": "self-hosted",
-                            "display_name": "Trino Self-Hosted",
-                            "description": "Self-hosted Trino cluster",
-                            "requires_credentials": True,
-                            "requires_cloud_storage": False,
-                            "requires_network": True,
-                            "default_for_platform": True,
-                            "dependencies": ["trino"],
-                            "auth_methods": ["password", "oauth"],
-                        },
+                "capabilities": _capabilities(
+                    platform_family="trino",
+                    default_deployment="self-hosted",
+                    deployment_modes={
+                        "self-hosted": _deployment(
+                            "self-hosted",
+                            "Trino Self-Hosted",
+                            "Self-hosted Trino cluster",
+                            credentials=True,
+                            network=True,
+                            default=True,
+                            dependencies=["trino"],
+                            auth_methods=["password", "oauth"],
+                        ),
                     },
-                },
+                ),
             },
             "starburst": {
                 "display_name": "Starburst",
@@ -628,28 +620,24 @@ class PlatformRegistry:
                 "supports": ["olap", "federated", "distributed", "serverless", "cloud"],
                 "driver_package": "trino",
                 "notes": "Starburst Galaxy managed Trino service. Uses trino Python driver with HTTPS. For self-hosted Trino use the trino adapter.",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": False,
-                    "default_mode": "sql",
-                    "platform_family": "trino",
-                    "inherits_from": "trino",
-                    "cost_class": "paid_compute",
-                    "default_deployment": "managed",
-                    "deployment_modes": {
-                        "managed": {
-                            "mode": "managed",
-                            "display_name": "Starburst Galaxy",
-                            "description": "Starburst Galaxy managed Trino service",
-                            "requires_credentials": True,
-                            "requires_cloud_storage": False,
-                            "requires_network": True,
-                            "default_for_platform": True,
-                            "dependencies": ["trino"],
-                            "auth_methods": ["password", "api_key"],
-                        },
+                "capabilities": _capabilities(
+                    platform_family="trino",
+                    inherits_from="trino",
+                    cost_class="paid_compute",
+                    default_deployment="managed",
+                    deployment_modes={
+                        "managed": _deployment(
+                            "managed",
+                            "Starburst Galaxy",
+                            "Starburst Galaxy managed Trino service",
+                            credentials=True,
+                            network=True,
+                            default=True,
+                            dependencies=["trino"],
+                            auth_methods=["password", "api_key"],
+                        ),
                     },
-                },
+                ),
             },
             "presto": {
                 "display_name": "PrestoDB",
@@ -662,7 +650,7 @@ class PlatformRegistry:
                 "supports": ["olap", "federated", "distributed"],
                 "driver_package": "presto-python-client",
                 "notes": "Supports PrestoDB (Meta's fork) with X-Presto-* headers. For Trino/Starburst use the trino adapter. For AWS Athena use the athena adapter.",
-                "capabilities": {"supports_sql": True, "supports_dataframe": False, "default_mode": "sql"},
+                "capabilities": _capabilities(),
             },
             "postgresql": {
                 "display_name": "PostgreSQL",
@@ -675,7 +663,7 @@ class PlatformRegistry:
                 "supports": ["olap", "oltp", "relational"],
                 "driver_package": "psycopg",
                 "notes": "Supports PostgreSQL 12+. COPY-based bulk loading. For time-series workloads use timescaledb.",
-                "capabilities": {"supports_sql": True, "supports_dataframe": False, "default_mode": "sql"},
+                "capabilities": _capabilities(),
             },
             "timescaledb": {
                 "display_name": "TimescaleDB",
@@ -688,37 +676,31 @@ class PlatformRegistry:
                 "supports": ["timeseries", "olap", "compression"],
                 "driver_package": "psycopg",
                 "notes": "PostgreSQL extension for time-series. Automatic hypertables, compression policies. Requires TimescaleDB 2.x on server.",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": False,
-                    "default_mode": "sql",
-                    "platform_family": "timescaledb",
-                    "default_deployment": "self-hosted",
-                    "deployment_modes": {
-                        "self-hosted": {
-                            "mode": "self-hosted",
-                            "display_name": "TimescaleDB Self-Hosted",
-                            "description": "Self-hosted TimescaleDB server",
-                            "requires_credentials": True,
-                            "requires_cloud_storage": False,
-                            "requires_network": True,
-                            "default_for_platform": True,
-                            "dependencies": ["psycopg[binary]"],
-                            "auth_methods": ["password"],
-                        },
-                        "cloud": {
-                            "mode": "managed",
-                            "display_name": "TigerData",
-                            "description": "TigerData managed PostgreSQL service",
-                            "requires_credentials": True,
-                            "requires_cloud_storage": False,
-                            "requires_network": True,
-                            "default_for_platform": False,
-                            "dependencies": ["psycopg[binary]"],
-                            "auth_methods": ["password"],
-                        },
+                "capabilities": _capabilities(
+                    platform_family="timescaledb",
+                    default_deployment="self-hosted",
+                    deployment_modes={
+                        "self-hosted": _deployment(
+                            "self-hosted",
+                            "TimescaleDB Self-Hosted",
+                            "Self-hosted TimescaleDB server",
+                            credentials=True,
+                            network=True,
+                            default=True,
+                            dependencies=["psycopg[binary]"],
+                            auth_methods=["password"],
+                        ),
+                        "cloud": _deployment(
+                            "managed",
+                            "TigerData",
+                            "TigerData managed PostgreSQL service",
+                            credentials=True,
+                            network=True,
+                            dependencies=["psycopg[binary]"],
+                            auth_methods=["password"],
+                        ),
                     },
-                },
+                ),
             },
             "pg-mooncake": {
                 "display_name": "pg_mooncake",
@@ -731,27 +713,23 @@ class PlatformRegistry:
                 "supports": ["olap", "columnstore", "analytics"],
                 "driver_package": "psycopg",
                 "notes": "PostgreSQL extension adding native columnstore tables (Parquet/Iceberg) with DuckDB execution. Requires pg_mooncake on server. Conflicts with standalone pg_duckdb (shared libduckdb.so).",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": False,
-                    "default_mode": "sql",
-                    "platform_family": "pg_mooncake",
-                    "conflicts_with": ["pg-duckdb"],
-                    "default_deployment": "self-hosted",
-                    "deployment_modes": {
-                        "self-hosted": {
-                            "mode": "self-hosted",
-                            "display_name": "pg_mooncake Self-Hosted",
-                            "description": "Self-hosted PostgreSQL with pg_mooncake extension",
-                            "requires_credentials": True,
-                            "requires_cloud_storage": False,
-                            "requires_network": True,
-                            "default_for_platform": True,
-                            "dependencies": ["psycopg[binary]"],
-                            "auth_methods": ["password"],
-                        },
+                "capabilities": _capabilities(
+                    platform_family="pg_mooncake",
+                    conflicts_with=["pg-duckdb"],
+                    default_deployment="self-hosted",
+                    deployment_modes={
+                        "self-hosted": _deployment(
+                            "self-hosted",
+                            "pg_mooncake Self-Hosted",
+                            "Self-hosted PostgreSQL with pg_mooncake extension",
+                            credentials=True,
+                            network=True,
+                            default=True,
+                            dependencies=["psycopg[binary]"],
+                            auth_methods=["password"],
+                        ),
                     },
-                },
+                ),
             },
             "cedardb": {
                 "display_name": "CedarDB",
@@ -764,26 +742,22 @@ class PlatformRegistry:
                 "supports": ["olap", "oltp", "relational"],
                 "driver_package": "psycopg",
                 "notes": "CedarDB (formerly Umbra) is a standalone RDBMS with PostgreSQL wire protocol compatibility. Not a PostgreSQL extension - connects via standard psycopg3 (psycopg) drivers.",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": False,
-                    "default_mode": "sql",
-                    "platform_family": "cedardb",
-                    "default_deployment": "self-hosted",
-                    "deployment_modes": {
-                        "self-hosted": {
-                            "mode": "self-hosted",
-                            "display_name": "CedarDB Self-Hosted",
-                            "description": "Self-hosted CedarDB server",
-                            "requires_credentials": True,
-                            "requires_cloud_storage": False,
-                            "requires_network": True,
-                            "default_for_platform": True,
-                            "dependencies": ["psycopg[binary]"],
-                            "auth_methods": ["password"],
-                        },
+                "capabilities": _capabilities(
+                    platform_family="cedardb",
+                    default_deployment="self-hosted",
+                    deployment_modes={
+                        "self-hosted": _deployment(
+                            "self-hosted",
+                            "CedarDB Self-Hosted",
+                            "Self-hosted CedarDB server",
+                            credentials=True,
+                            network=True,
+                            default=True,
+                            dependencies=["psycopg[binary]"],
+                            auth_methods=["password"],
+                        ),
                     },
-                },
+                ),
             },
             "pg-duckdb": {
                 "display_name": "pg_duckdb",
@@ -796,39 +770,33 @@ class PlatformRegistry:
                 "supports": ["olap", "analytics"],
                 "driver_package": "psycopg",
                 "notes": "PostgreSQL extension embedding DuckDB vectorized execution. Requires pg_duckdb 1.0+ on server. Conflicts with pg_mooncake (shared libduckdb.so).",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": False,
-                    "default_mode": "sql",
-                    "platform_family": "pg_duckdb",
-                    "conflicts_with": ["pg-mooncake"],
-                    "cost_class": "paid_credits",
-                    "default_deployment": "self-hosted",
-                    "deployment_modes": {
-                        "self-hosted": {
-                            "mode": "self-hosted",
-                            "display_name": "pg_duckdb Self-Hosted",
-                            "description": "Self-hosted PostgreSQL with pg_duckdb extension",
-                            "requires_credentials": True,
-                            "requires_cloud_storage": False,
-                            "requires_network": True,
-                            "default_for_platform": True,
-                            "dependencies": ["psycopg[binary]"],
-                            "auth_methods": ["password"],
-                        },
-                        "motherduck": {
-                            "mode": "managed",
-                            "display_name": "pg_duckdb + MotherDuck",
-                            "description": "pg_duckdb with MotherDuck cloud offload for hybrid queries",
-                            "requires_credentials": True,
-                            "requires_cloud_storage": False,
-                            "requires_network": True,
-                            "default_for_platform": False,
-                            "dependencies": ["psycopg[binary]"],
-                            "auth_methods": ["token"],
-                        },
+                "capabilities": _capabilities(
+                    platform_family="pg_duckdb",
+                    conflicts_with=["pg-mooncake"],
+                    cost_class="paid_credits",
+                    default_deployment="self-hosted",
+                    deployment_modes={
+                        "self-hosted": _deployment(
+                            "self-hosted",
+                            "pg_duckdb Self-Hosted",
+                            "Self-hosted PostgreSQL with pg_duckdb extension",
+                            credentials=True,
+                            network=True,
+                            default=True,
+                            dependencies=["psycopg[binary]"],
+                            auth_methods=["password"],
+                        ),
+                        "motherduck": _deployment(
+                            "managed",
+                            "pg_duckdb + MotherDuck",
+                            "pg_duckdb with MotherDuck cloud offload for hybrid queries",
+                            credentials=True,
+                            network=True,
+                            dependencies=["psycopg[binary]"],
+                            auth_methods=["token"],
+                        ),
                     },
-                },
+                ),
             },
             "synapse": {
                 "display_name": "Azure Synapse Analytics",
@@ -845,12 +813,7 @@ class PlatformRegistry:
                 "supports": ["olap", "columnar", "azure", "distributed"],
                 "driver_package": "pyodbc",
                 "notes": "Supports Azure Synapse Dedicated SQL Pools. COPY INTO for bulk loading. T-SQL dialect.",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": False,
-                    "default_mode": "sql",
-                    "cost_class": "paid_compute",
-                },
+                "capabilities": _capabilities(cost_class="paid_compute"),
             },
             "fabric_dw": {
                 "display_name": "Microsoft Fabric Warehouse",
@@ -871,12 +834,7 @@ class PlatformRegistry:
                 "supports": ["olap", "columnar", "azure", "delta_lake", "onelake"],
                 "driver_package": "pyodbc",
                 "notes": "Supports Fabric Warehouse only (not Lakehouse). Entra ID auth only. OneLake + COPY INTO for bulk loading. T-SQL dialect (subset).",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": False,
-                    "default_mode": "sql",
-                    "cost_class": "paid_compute",
-                },
+                "capabilities": _capabilities(cost_class="paid_compute"),
             },
             "firebolt": {
                 "display_name": "Firebolt",
@@ -891,38 +849,30 @@ class PlatformRegistry:
                 "supports": ["olap", "vectorized", "columnar", "local", "cloud"],
                 "driver_package": "firebolt-sdk",
                 "notes": "Supports Firebolt Core (free, local Docker) and Firebolt Cloud. PostgreSQL-compatible SQL dialect. Vectorized query execution optimized for analytics.",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": False,
-                    "default_mode": "sql",
-                    "platform_family": "firebolt",
-                    "cost_class": "paid_compute",
-                    "default_deployment": "core",
-                    "deployment_modes": {
-                        "core": {
-                            "mode": "local",
-                            "display_name": "Firebolt Core",
-                            "description": "Free local Firebolt via Docker container",
-                            "requires_credentials": False,
-                            "requires_cloud_storage": False,
-                            "requires_network": False,
-                            "default_for_platform": True,
-                            "dependencies": ["firebolt-sdk"],
-                            "auth_methods": [],
-                        },
-                        "cloud": {
-                            "mode": "managed",
-                            "display_name": "Firebolt Cloud",
-                            "description": "Firebolt Cloud managed service",
-                            "requires_credentials": True,
-                            "requires_cloud_storage": True,
-                            "requires_network": True,
-                            "default_for_platform": False,
-                            "dependencies": ["firebolt-sdk"],
-                            "auth_methods": ["oauth", "service_account"],
-                        },
+                "capabilities": _capabilities(
+                    platform_family="firebolt",
+                    cost_class="paid_compute",
+                    default_deployment="core",
+                    deployment_modes={
+                        "core": _deployment(
+                            "local",
+                            "Firebolt Core",
+                            "Free local Firebolt via Docker container",
+                            default=True,
+                            dependencies=["firebolt-sdk"],
+                        ),
+                        "cloud": _deployment(
+                            "managed",
+                            "Firebolt Cloud",
+                            "Firebolt Cloud managed service",
+                            credentials=True,
+                            cloud_storage=True,
+                            network=True,
+                            dependencies=["firebolt-sdk"],
+                            auth_methods=["oauth", "service_account"],
+                        ),
                     },
-                },
+                ),
             },
             "starrocks": {
                 "display_name": "StarRocks",
@@ -936,26 +886,22 @@ class PlatformRegistry:
                 "adoption": "emerging",
                 "supports": ["olap", "columnar", "distributed", "mpp"],
                 "driver_package": "pymysql",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": False,
-                    "default_mode": "sql",
-                    "platform_family": "starrocks",
-                    "default_deployment": "self-hosted",
-                    "deployment_modes": {
-                        "self-hosted": {
-                            "mode": "self-hosted",
-                            "display_name": "StarRocks Self-Hosted",
-                            "description": "Self-hosted StarRocks cluster",
-                            "requires_credentials": True,
-                            "requires_cloud_storage": False,
-                            "requires_network": True,
-                            "default_for_platform": True,
-                            "dependencies": ["pymysql"],
-                            "auth_methods": ["password"],
-                        },
+                "capabilities": _capabilities(
+                    platform_family="starrocks",
+                    default_deployment="self-hosted",
+                    deployment_modes={
+                        "self-hosted": _deployment(
+                            "self-hosted",
+                            "StarRocks Self-Hosted",
+                            "Self-hosted StarRocks cluster",
+                            credentials=True,
+                            network=True,
+                            default=True,
+                            dependencies=["pymysql"],
+                            auth_methods=["password"],
+                        ),
                     },
-                },
+                ),
             },
             "databend": {
                 "display_name": "Databend",
@@ -970,38 +916,34 @@ class PlatformRegistry:
                 "supports": ["olap", "cloud", "columnar", "object_storage", "snowflake_compatible"],
                 "driver_package": "databend-driver",
                 "notes": "Cloud-native Rust-based data warehouse with Snowflake-compatible SQL. Compute/storage separation on object storage (S3, GCS, Azure Blob). Uses Snowflake dialect as sqlglot translation proxy.",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": False,
-                    "default_mode": "sql",
-                    "platform_family": "databend",
-                    "cost_class": "paid_compute",
-                    "default_deployment": "cloud",
-                    "deployment_modes": {
-                        "cloud": {
-                            "mode": "managed",
-                            "display_name": "Databend Cloud",
-                            "description": "Databend Cloud managed service",
-                            "requires_credentials": True,
-                            "requires_cloud_storage": True,
-                            "requires_network": True,
-                            "default_for_platform": True,
-                            "dependencies": ["databend-driver"],
-                            "auth_methods": ["password"],
-                        },
-                        "self-hosted": {
-                            "mode": "self-hosted",
-                            "display_name": "Databend Self-Hosted",
-                            "description": "User-managed Databend cluster with object storage",
-                            "requires_credentials": True,
-                            "requires_cloud_storage": True,
-                            "requires_network": True,
-                            "default_for_platform": False,
-                            "dependencies": ["databend-driver"],
-                            "auth_methods": ["password"],
-                        },
+                "capabilities": _capabilities(
+                    platform_family="databend",
+                    cost_class="paid_compute",
+                    default_deployment="cloud",
+                    deployment_modes={
+                        "cloud": _deployment(
+                            "managed",
+                            "Databend Cloud",
+                            "Databend Cloud managed service",
+                            credentials=True,
+                            cloud_storage=True,
+                            network=True,
+                            default=True,
+                            dependencies=["databend-driver"],
+                            auth_methods=["password"],
+                        ),
+                        "self-hosted": _deployment(
+                            "self-hosted",
+                            "Databend Self-Hosted",
+                            "User-managed Databend cluster with object storage",
+                            credentials=True,
+                            cloud_storage=True,
+                            network=True,
+                            dependencies=["databend-driver"],
+                            auth_methods=["password"],
+                        ),
                     },
-                },
+                ),
             },
             "doris": {
                 "display_name": "Apache Doris",
@@ -1014,26 +956,22 @@ class PlatformRegistry:
                 "supports": ["olap", "mpp", "columnar", "real-time", "vectorized"],
                 "driver_package": "pymysql",
                 "notes": "Apache Doris 2.0+ with vectorized execution. MySQL protocol on port 9030, Stream Load on port 8030. SQLGlot 'doris' dialect.",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": False,
-                    "default_mode": "sql",
-                    "platform_family": "doris",
-                    "default_deployment": "self-hosted",
-                    "deployment_modes": {
-                        "self-hosted": {
-                            "mode": "self-hosted",
-                            "display_name": "Apache Doris Self-Hosted",
-                            "description": "Self-hosted Apache Doris cluster",
-                            "requires_credentials": True,
-                            "requires_cloud_storage": False,
-                            "requires_network": True,
-                            "default_for_platform": True,
-                            "dependencies": ["pymysql"],
-                            "auth_methods": ["password"],
-                        },
+                "capabilities": _capabilities(
+                    platform_family="doris",
+                    default_deployment="self-hosted",
+                    deployment_modes={
+                        "self-hosted": _deployment(
+                            "self-hosted",
+                            "Apache Doris Self-Hosted",
+                            "Self-hosted Apache Doris cluster",
+                            credentials=True,
+                            network=True,
+                            default=True,
+                            dependencies=["pymysql"],
+                            auth_methods=["password"],
+                        ),
                     },
-                },
+                ),
             },
             "singlestore": {
                 "display_name": "SingleStore",
@@ -1046,38 +984,32 @@ class PlatformRegistry:
                 "supports": ["olap", "htap", "distributed", "columnstore", "real-time", "mysql-compatible"],
                 "driver_package": "singlestoredb",
                 "notes": "SingleStore 8.0+ with columnstore analytics. MySQL wire protocol on port 3306. SQLGlot 'mysql' dialect. Supports both Helios (cloud) and self-managed deployments.",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": False,
-                    "default_mode": "sql",
-                    "platform_family": "singlestore",
-                    "cost_class": "paid_compute",
-                    "default_deployment": "self-hosted",
-                    "deployment_modes": {
-                        "self-hosted": {
-                            "mode": "self-hosted",
-                            "display_name": "SingleStore Self-Managed",
-                            "description": "Self-managed SingleStore cluster",
-                            "requires_credentials": True,
-                            "requires_cloud_storage": False,
-                            "requires_network": True,
-                            "default_for_platform": True,
-                            "dependencies": ["singlestoredb"],
-                            "auth_methods": ["password"],
-                        },
-                        "cloud": {
-                            "mode": "managed",
-                            "display_name": "SingleStore Helios",
-                            "description": "SingleStore Helios managed cloud service",
-                            "requires_credentials": True,
-                            "requires_cloud_storage": False,
-                            "requires_network": True,
-                            "default_for_platform": False,
-                            "dependencies": ["singlestoredb"],
-                            "auth_methods": ["password"],
-                        },
+                "capabilities": _capabilities(
+                    platform_family="singlestore",
+                    cost_class="paid_compute",
+                    default_deployment="self-hosted",
+                    deployment_modes={
+                        "self-hosted": _deployment(
+                            "self-hosted",
+                            "SingleStore Self-Managed",
+                            "Self-managed SingleStore cluster",
+                            credentials=True,
+                            network=True,
+                            default=True,
+                            dependencies=["singlestoredb"],
+                            auth_methods=["password"],
+                        ),
+                        "cloud": _deployment(
+                            "managed",
+                            "SingleStore Helios",
+                            "SingleStore Helios managed cloud service",
+                            credentials=True,
+                            network=True,
+                            dependencies=["singlestoredb"],
+                            auth_methods=["password"],
+                        ),
                     },
-                },
+                ),
             },
             "influxdb": {
                 "display_name": "InfluxDB",
@@ -1093,7 +1025,7 @@ class PlatformRegistry:
                 "supports": ["timeseries", "olap", "arrow", "flightsql"],
                 "driver_package": "influxdb3-python",
                 "notes": "InfluxDB 3.x time series database with native SQL support via FlightSQL. Built on Apache Arrow, DataFusion, and Parquet. Optimized for TSBS DevOps workloads.",
-                "capabilities": {"supports_sql": True, "supports_dataframe": False, "default_mode": "sql"},
+                "capabilities": _capabilities(),
             },
             "questdb": {
                 "display_name": "QuestDB",
@@ -1106,33 +1038,29 @@ class PlatformRegistry:
                 "supports": ["timeseries", "olap", "columnar", "high_throughput"],
                 "driver_package": "psycopg",
                 "notes": "QuestDB 7.0+ time-series database. PostgreSQL wire protocol for queries, REST API for data import. Optimized for fast ingestion and time-series analytics.",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": False,
-                    "default_mode": "sql",
-                    "platform_family": "questdb",
-                    "default_deployment": "self-hosted",
-                    "deployment_modes": {
-                        "self-hosted": {
-                            "mode": "self-hosted",
-                            "display_name": "QuestDB Self-Hosted",
-                            "description": "Self-hosted QuestDB server (Docker recommended)",
-                            "requires_credentials": True,
-                            "requires_cloud_storage": False,
-                            "requires_network": True,
-                            "default_for_platform": True,
-                            "dependencies": ["psycopg[binary]"],
-                            "auth_methods": ["password"],
-                        },
+                "capabilities": _capabilities(
+                    platform_family="questdb",
+                    default_deployment="self-hosted",
+                    deployment_modes={
+                        "self-hosted": _deployment(
+                            "self-hosted",
+                            "QuestDB Self-Hosted",
+                            "Self-hosted QuestDB server (Docker recommended)",
+                            credentials=True,
+                            network=True,
+                            default=True,
+                            dependencies=["psycopg[binary]"],
+                            auth_methods=["password"],
+                        ),
                     },
-                    "unsupported_benchmarks": {
+                    unsupported_benchmarks={
                         "vector_search": (
                             "QuestDB 9.3.4 has no VECTOR column type. "
                             "Schema creation fails immediately. "
                             "No fix planned: requires QuestDB to add native vector support."
                         ),
                     },
-                },
+                ),
             },
             "athena": {
                 "display_name": "Amazon Athena",
@@ -1148,12 +1076,7 @@ class PlatformRegistry:
                 "supports": ["olap", "serverless", "s3", "data_lake"],
                 "driver_package": "pyathena",
                 "notes": "AWS serverless query service using Trino under the hood. Pay-per-query pricing ($5/TB scanned). Native S3 and Glue Data Catalog integration.",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": False,
-                    "default_mode": "sql",
-                    "cost_class": "paid_credits",
-                },
+                "capabilities": _capabilities(cost_class="paid_credits"),
             },
             "glue": {
                 "display_name": "AWS Glue",
@@ -1168,12 +1091,7 @@ class PlatformRegistry:
                 "supports": ["olap", "serverless", "spark", "etl", "s3"],
                 "driver_package": "boto3",
                 "notes": "AWS managed Spark ETL service. Pay-per-DPU pricing (~$0.44/DPU-hour). Uses Glue Data Catalog for metadata. Supports both SQL and DataFrame execution modes.",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": True,
-                    "default_mode": "sql",
-                    "cost_class": "paid_compute",
-                },
+                "capabilities": _capabilities(dataframe=True, cost_class="paid_compute"),
             },
             "emr-serverless": {
                 "display_name": "Amazon EMR Serverless",
@@ -1188,12 +1106,7 @@ class PlatformRegistry:
                 "supports": ["olap", "serverless", "spark", "s3"],
                 "driver_package": "boto3",
                 "notes": "AWS serverless Spark with automatic scaling and sub-second startup. Pay per vCPU-hour and memory-GB-hour. Uses Glue Data Catalog for metadata.",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": True,
-                    "default_mode": "sql",
-                    "cost_class": "paid_compute",
-                },
+                "capabilities": _capabilities(dataframe=True, cost_class="paid_compute"),
             },
             "athena-spark": {
                 "display_name": "Amazon Athena for Apache Spark",
@@ -1208,12 +1121,7 @@ class PlatformRegistry:
                 "supports": ["olap", "interactive", "spark", "s3", "sessions"],
                 "driver_package": "boto3",
                 "notes": "AWS interactive Spark with notebook-style sessions. Sub-second startup with pre-provisioned capacity. Uses Glue Data Catalog for metadata. Pay per DPU-hour.",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": True,
-                    "default_mode": "sql",
-                    "cost_class": "paid_compute",
-                },
+                "capabilities": _capabilities(dataframe=True, cost_class="paid_compute"),
             },
             "dataproc": {
                 "display_name": "Google Cloud Dataproc",
@@ -1229,12 +1137,7 @@ class PlatformRegistry:
                 "supports": ["olap", "spark", "cluster", "gcs", "hive"],
                 "driver_package": "google-cloud-dataproc",
                 "notes": "Google Cloud managed Spark service. Per-second billing with preemptible VM support. Supports persistent and ephemeral clusters. Uses Hive Metastore for table metadata.",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": True,
-                    "default_mode": "sql",
-                    "cost_class": "paid_compute",
-                },
+                "capabilities": _capabilities(dataframe=True, cost_class="paid_compute"),
             },
             "dataproc-serverless": {
                 "display_name": "Google Cloud Dataproc Serverless",
@@ -1250,12 +1153,7 @@ class PlatformRegistry:
                 "supports": ["olap", "spark", "serverless", "gcs", "hive"],
                 "driver_package": "google-cloud-dataproc",
                 "notes": "Google Cloud Dataproc Serverless for fully managed Spark. No cluster management required. Sub-minute startup, auto-scaling, per-second billing. Uses Batch Controller API.",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": True,
-                    "default_mode": "sql",
-                    "cost_class": "paid_compute",
-                },
+                "capabilities": _capabilities(dataframe=True, cost_class="paid_compute"),
             },
             "fabric-spark": {
                 "display_name": "Microsoft Fabric Spark",
@@ -1272,12 +1170,7 @@ class PlatformRegistry:
                 "supports": ["olap", "spark", "saas", "delta", "onelake"],
                 "driver_package": "azure-identity",
                 "notes": "Microsoft Fabric SaaS Spark with OneLake storage. Uses Livy API for session management. Entra ID (Azure AD) authentication. Capacity Units billing model.",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": True,
-                    "default_mode": "sql",
-                    "cost_class": "paid_compute",
-                },
+                "capabilities": _capabilities(dataframe=True, cost_class="paid_compute"),
             },
             "fabric-lakehouse": {
                 "display_name": "Microsoft Fabric Lakehouse SQL",
@@ -1293,12 +1186,7 @@ class PlatformRegistry:
                 "supports": ["olap", "cloud", "read_only", "delta", "onelake"],
                 "driver_package": "pyodbc",
                 "notes": "Fabric Lakehouse SQL Analytics Endpoint is read-only. Use fabric-spark for generate/load phases and fabric-lakehouse for query phases.",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": False,
-                    "default_mode": "sql",
-                    "cost_class": "paid_compute",
-                },
+                "capabilities": _capabilities(cost_class="paid_compute"),
             },
             "synapse-spark": {
                 "display_name": "Azure Synapse Analytics Spark",
@@ -1315,12 +1203,7 @@ class PlatformRegistry:
                 "supports": ["olap", "spark", "enterprise", "adls", "hive"],
                 "driver_package": "azure-identity",
                 "notes": "Azure Synapse Analytics Spark with ADLS Gen2 storage. Uses Livy API for session management. vCore-hour billing. Supports external Hive Metastore.",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": True,
-                    "default_mode": "sql",
-                    "cost_class": "paid_compute",
-                },
+                "capabilities": _capabilities(dataframe=True, cost_class="paid_compute"),
             },
             "spark": {
                 "display_name": "Apache Spark",
@@ -1335,7 +1218,7 @@ class PlatformRegistry:
                 "supports": ["olap", "distributed", "spark", "batch"],
                 "driver_package": "pyspark",
                 "notes": "Apache Spark distributed SQL engine. Supports local, standalone, YARN, and Kubernetes modes. Use 'pyspark' for DataFrame API benchmarking.",
-                "capabilities": {"supports_sql": True, "supports_dataframe": False, "default_mode": "sql"},
+                "capabilities": _capabilities(),
             },
             "velox": {
                 "display_name": "Apache Gluten + Velox",
@@ -1355,37 +1238,26 @@ class PlatformRegistry:
                     "Linux only for local mode; Docker is the primary path on macOS/Windows. "
                     "See docs/platforms/velox.md and docker/velox/."
                 ),
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": False,
-                    "default_mode": "sql",
-                    "platform_family": "spark",
-                    "default_deployment": "local",
-                    "deployment_modes": {
-                        "local": {
-                            "mode": "local",
-                            "display_name": "Velox Local",
-                            "description": "SparkSession with Gluten jar on local Linux host (or Docker container)",
-                            "requires_credentials": False,
-                            "requires_cloud_storage": False,
-                            "requires_network": False,
-                            "default_for_platform": True,
-                            "dependencies": ["pyspark"],
-                            "auth_methods": [],
-                        },
-                        "remote": {
-                            "mode": "remote",
-                            "display_name": "Velox Remote",
-                            "description": "Connect to a pre-started Spark-Connect server with Gluten wired",
-                            "requires_credentials": False,
-                            "requires_cloud_storage": False,
-                            "requires_network": True,
-                            "default_for_platform": False,
-                            "dependencies": ["pyspark"],
-                            "auth_methods": [],
-                        },
+                "capabilities": _capabilities(
+                    platform_family="spark",
+                    default_deployment="local",
+                    deployment_modes={
+                        "local": _deployment(
+                            "local",
+                            "Velox Local",
+                            "SparkSession with Gluten jar on local Linux host (or Docker container)",
+                            default=True,
+                            dependencies=["pyspark"],
+                        ),
+                        "remote": _deployment(
+                            "remote",
+                            "Velox Remote",
+                            "Connect to a pre-started Spark-Connect server with Gluten wired",
+                            network=True,
+                            dependencies=["pyspark"],
+                        ),
                     },
-                },
+                ),
             },
             "lakesail": {
                 "display_name": "LakeSail Sail",
@@ -1400,37 +1272,27 @@ class PlatformRegistry:
                 "supports": ["olap", "spark_compatible", "datafusion", "rust", "batch"],
                 "driver_package": "pyspark",
                 "notes": "LakeSail Sail is a Rust-based drop-in Spark replacement built on DataFusion. Connects via Spark Connect protocol using standard PySpark client. 4x faster than Apache Spark on TPC-H SF100.",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": True,
-                    "default_mode": "sql",
-                    "platform_family": "spark",
-                    "default_deployment": "local",
-                    "deployment_modes": {
-                        "local": {
-                            "mode": "local",
-                            "display_name": "LakeSail Local",
-                            "description": "Single-node multi-threaded execution",
-                            "requires_credentials": False,
-                            "requires_cloud_storage": False,
-                            "requires_network": False,
-                            "default_for_platform": True,
-                            "dependencies": ["pyspark"],
-                            "auth_methods": [],
-                        },
-                        "distributed": {
-                            "mode": "self-hosted",
-                            "display_name": "LakeSail Distributed",
-                            "description": "Distributed cluster of Rust workers",
-                            "requires_credentials": False,
-                            "requires_cloud_storage": False,
-                            "requires_network": True,
-                            "default_for_platform": False,
-                            "dependencies": ["pyspark"],
-                            "auth_methods": [],
-                        },
+                "capabilities": _capabilities(
+                    dataframe=True,
+                    platform_family="spark",
+                    default_deployment="local",
+                    deployment_modes={
+                        "local": _deployment(
+                            "local",
+                            "LakeSail Local",
+                            "Single-node multi-threaded execution",
+                            default=True,
+                            dependencies=["pyspark"],
+                        ),
+                        "distributed": _deployment(
+                            "self-hosted",
+                            "LakeSail Distributed",
+                            "Distributed cluster of Rust workers",
+                            network=True,
+                            dependencies=["pyspark"],
+                        ),
                     },
-                },
+                ),
             },
             "snowpark-connect": {
                 "display_name": "Snowpark Connect for Spark",
@@ -1445,12 +1307,7 @@ class PlatformRegistry:
                 "supports": ["olap", "pyspark_compatible", "snowflake", "dataframe"],
                 "driver_package": "snowflake-snowpark-python",
                 "notes": "PySpark DataFrame API compatibility layer on Snowflake. NOT Apache Spark - translates DataFrame operations to Snowflake SQL. No Spark cluster required.",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": True,
-                    "default_mode": "dataframe",
-                    "cost_class": "paid_credits",
-                },
+                "capabilities": _capabilities(dataframe=True, default_mode="dataframe", cost_class="paid_credits"),
             },
             "quanton": {
                 "display_name": "Onehouse Quanton",
@@ -1466,27 +1323,25 @@ class PlatformRegistry:
                 "supports": ["olap", "serverless", "spark", "hudi", "iceberg", "delta", "s3", "lakehouse"],
                 "driver_package": "requests",
                 "notes": "Onehouse Quanton serverless Spark. Multi-table-format support (Hudi, Iceberg, Delta). XTable cross-format metadata translation. 2-3x better price-performance than EMR/Databricks.",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": True,
-                    "default_mode": "sql",
-                    "platform_family": "spark",
-                    "cost_class": "paid_compute",
-                    "default_deployment": "managed",
-                    "deployment_modes": {
-                        "managed": {
-                            "mode": "managed",
-                            "display_name": "Onehouse Quanton",
-                            "description": "Serverless managed Spark on Onehouse",
-                            "requires_credentials": True,
-                            "requires_cloud_storage": True,
-                            "requires_network": True,
-                            "default_for_platform": True,
-                            "dependencies": ["requests", "boto3"],
-                            "auth_methods": ["api_key"],
-                        },
+                "capabilities": _capabilities(
+                    dataframe=True,
+                    platform_family="spark",
+                    cost_class="paid_compute",
+                    default_deployment="managed",
+                    deployment_modes={
+                        "managed": _deployment(
+                            "managed",
+                            "Onehouse Quanton",
+                            "Serverless managed Spark on Onehouse",
+                            credentials=True,
+                            cloud_storage=True,
+                            network=True,
+                            default=True,
+                            dependencies=["requests", "boto3"],
+                            auth_methods=["api_key"],
+                        ),
                     },
-                },
+                ),
             },
         }
 
@@ -1502,7 +1357,7 @@ class PlatformRegistry:
                 "adoption": "emerging",
                 "supports": ["dataframe", "in_memory"],
                 "driver_package": None,
-                "capabilities": {"supports_sql": False, "supports_dataframe": True, "default_mode": "dataframe"},
+                "capabilities": _capabilities(sql=False, dataframe=True, default_mode="dataframe"),
             },
             "modin": {
                 "display_name": "Modin",
@@ -1514,7 +1369,7 @@ class PlatformRegistry:
                 "adoption": "niche",
                 "supports": ["dataframe", "distributed"],
                 "driver_package": None,
-                "capabilities": {"supports_sql": False, "supports_dataframe": True, "default_mode": "dataframe"},
+                "capabilities": _capabilities(sql=False, dataframe=True, default_mode="dataframe"),
             },
             "cudf": {
                 "display_name": "cuDF",
@@ -1526,7 +1381,7 @@ class PlatformRegistry:
                 "adoption": "niche",
                 "supports": ["dataframe", "gpu"],
                 "driver_package": None,
-                "capabilities": {"supports_sql": False, "supports_dataframe": True, "default_mode": "dataframe"},
+                "capabilities": _capabilities(sql=False, dataframe=True, default_mode="dataframe"),
             },
             "dask": {
                 "display_name": "Dask",
@@ -1538,7 +1393,7 @@ class PlatformRegistry:
                 "adoption": "niche",
                 "supports": ["dataframe", "distributed", "lazy"],
                 "driver_package": None,
-                "capabilities": {"supports_sql": False, "supports_dataframe": True, "default_mode": "dataframe"},
+                "capabilities": _capabilities(sql=False, dataframe=True, default_mode="dataframe"),
             },
             "pyspark": {
                 "display_name": "PySpark",
@@ -1551,26 +1406,21 @@ class PlatformRegistry:
                 "supports": ["dataframe", "distributed", "spark"],
                 "driver_package": None,
                 "notes": "Requires Java 17 or 21. Java 23+ not supported by PySpark 4.x.",
-                "capabilities": {
-                    "supports_sql": True,
-                    "supports_dataframe": True,
-                    "default_mode": "dataframe",
-                    "platform_family": "spark",
-                    "default_deployment": "local",
-                    "deployment_modes": {
-                        "local": {
-                            "mode": "local",
-                            "display_name": "PySpark Local",
-                            "description": "Local PySpark with single-node Spark",
-                            "requires_credentials": False,
-                            "requires_cloud_storage": False,
-                            "requires_network": False,
-                            "default_for_platform": True,
-                            "dependencies": ["pyspark"],
-                            "auth_methods": [],
-                        },
+                "capabilities": _capabilities(
+                    dataframe=True,
+                    default_mode="dataframe",
+                    platform_family="spark",
+                    default_deployment="local",
+                    deployment_modes={
+                        "local": _deployment(
+                            "local",
+                            "PySpark Local",
+                            "Local PySpark with single-node Spark",
+                            default=True,
+                            dependencies=["pyspark"],
+                        ),
                     },
-                },
+                ),
             },
         }
 
