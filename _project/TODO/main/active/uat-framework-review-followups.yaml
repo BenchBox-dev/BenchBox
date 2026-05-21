@@ -590,24 +590,32 @@ work:
 - id: w13
   summary: "Delete reset_reachability_cache; document module-level dict as process-lifetime cache"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     F4. `reset_reachability_cache()` at `matrix.py:181-183` claims
     to be a "sweep-restart hook" but is called only from tests.
     Sequential platform execution + no orchestrator invalidation
     means the cache is process-lifetime by behaviour.
 
+    Current-state correction (2026-05-21): W0 proved the "called only
+    from tests" claim is stale. UAT-managed platform bring-up and Docker
+    startup now need runtime invalidation so a cached negative probe does
+    not survive after the framework changes service state.
+
     Concrete:
       - Delete `reset_reachability_cache` from
         `tests/uat/matrix.py:181-183`.
-      - Update `tests/uat/test_matrix.py:150,155` and
-        `tests/uat/test_phases.py:112,139` to use a context manager
-        or fixture that monkeypatches `_REACHABILITY_CACHE` directly
-        for test isolation (or accepts the dict-clear pattern
-        inline).
+      - Replace runtime callers with
+        `invalidate_reachability_cache_after_lifecycle_change()`, whose
+        name documents that cache clearing is only for UAT-managed
+        platform state changes. This includes the current runtime
+        callers in preflight, execute, and `scripts/uat-bring-up`.
+      - Add a UAT test fixture that clears `_REACHABILITY_CACHE`
+        directly before/after each test; delete explicit test calls to
+        the old helper.
       - Comment on `_REACHABILITY_CACHE` updated to say
-        "process-lifetime; no invalidation hook (sequential-only
-        execution makes mid-sweep reset unnecessary)".
+        the cache is process-lifetime except for explicit lifecycle
+        invalidation after UAT-managed platform changes.
 
     Deps: w0.
 
@@ -1021,6 +1029,7 @@ scope_limit:
   - "benchbox/validation/"
   - "scripts/validate_submission.py"
   - "scripts/uat_validator_rollup.py"
+  - "scripts/uat-bring-up/uat_bring_up.py"
   - "scripts/local_stress_test.sh"
   - "tests/fixtures/published_results_validator.py"
   - "_project/specs/uat-framework.md"

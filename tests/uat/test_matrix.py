@@ -147,12 +147,10 @@ def test_resolve_benchmarks_unknown_group():
 
 
 def test_platform_is_reachable_no_port_assumes_reachable():
-    matrix.reset_reachability_cache()
     assert matrix.platform_is_reachable("duckdb") is True
 
 
 def test_platform_is_reachable_uses_cache():
-    matrix.reset_reachability_cache()
     with patch.object(matrix, "tcp_probe", return_value=False) as probe:
         assert matrix.platform_is_reachable("postgresql") is False
         assert matrix.platform_is_reachable("postgresql") is False

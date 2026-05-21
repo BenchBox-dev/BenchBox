@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.uat import matrix, orchestrator
+from tests.uat import orchestrator
 from tests.uat.config import validate_config
 from tests.uat.runner import CellResult
 
@@ -56,7 +56,6 @@ def test_e2e_two_platforms_three_benchmarks_with_cleanup_and_report(
       - cells.jsonl contains every cell that ran.
       - matrix_summary.tsv has the right row count and pass count.
     """
-    matrix.reset_reachability_cache()
 
     cfg = validate_config(
         {
@@ -126,7 +125,6 @@ def test_e2e_two_platforms_three_benchmarks_with_cleanup_and_report(
 
 def test_e2e_validator_status_reaches_cross_scale_check(tmp_path: Path, monkeypatch):
     """A failed validator status should disqualify the cell from cross_scale_clean_pair_count."""
-    matrix.reset_reachability_cache()
 
     cfg = validate_config(
         {

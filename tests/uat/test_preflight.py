@@ -71,7 +71,6 @@ def test_local_platforms_check_default_checker_probes_lakesail(tmp_path: Path, m
         probe_calls.append((host, port))
         return False
 
-    matrix.reset_reachability_cache()
     monkeypatch.setattr(preflight, "free_space_gib", lambda path: 100.0)
     monkeypatch.setattr(preflight, "docker_reachable", lambda: True)
     monkeypatch.setattr(preflight, "host_load_1m", lambda: 0.5)

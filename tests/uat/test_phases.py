@@ -293,7 +293,6 @@ def _stub_runner_factory(elapsed_map: dict[float, float], pass_map: dict[float, 
 
 
 def test_execute_walks_ladder_and_prunes_after_slow_rung(tmp_path):
-    matrix.reset_reachability_cache()
     cfg = validate_config(
         {
             "name": "fake",
@@ -320,7 +319,6 @@ def test_execute_walks_ladder_and_prunes_after_slow_rung(tmp_path):
 
 
 def test_execute_skips_unreachable_platform(tmp_path):
-    matrix.reset_reachability_cache()
     cfg = validate_config(
         {
             "name": "fake",
@@ -353,7 +351,6 @@ def _docker_platform_from_argv(argv: list[str]) -> str:
 
 
 def test_execute_managed_docker_tears_down_platform_before_next_starts(tmp_path):
-    matrix.reset_reachability_cache()
     cfg = validate_config(
         {
             "name": "docker smoke",
@@ -409,7 +406,6 @@ def test_execute_managed_docker_tears_down_platform_before_next_starts(tmp_path)
 
 
 def test_execute_docker_teardown_failure_aborts_before_next_platform(tmp_path):
-    matrix.reset_reachability_cache()
     cfg = validate_config(
         {
             "name": "docker cleanup failure",
@@ -444,7 +440,6 @@ def test_execute_docker_teardown_failure_aborts_before_next_platform(tmp_path):
 
 
 def test_execute_unmanaged_docker_keeps_skip_probe_without_commands(tmp_path):
-    matrix.reset_reachability_cache()
     cfg = validate_config(
         {
             "name": "external",
@@ -481,7 +476,6 @@ def test_execute_scopes_local_managed_platform_options_to_managed_docker(
     expected_local_managed: bool,
     tmp_path,
 ):
-    matrix.reset_reachability_cache()
     cfg = validate_config(
         {
             "name": "docker scope",
@@ -526,7 +520,6 @@ def test_execute_scopes_local_managed_platform_options_to_managed_docker(
 
 
 def test_execute_runner_exception_still_tears_down_managed_docker(tmp_path):
-    matrix.reset_reachability_cache()
     cfg = validate_config(
         {
             "name": "docker failure",
@@ -601,7 +594,6 @@ def test_execute_fixed_container_name_platform_aborts_before_docker_command(tmp_
 
 
 def test_execute_free_space_abort_reports_context_after_docker_teardown(tmp_path):
-    matrix.reset_reachability_cache()
     cfg = validate_config(
         {
             "name": "docker disk",
@@ -635,7 +627,6 @@ def test_execute_free_space_abort_reports_context_after_docker_teardown(tmp_path
 
 
 def test_execute_passes_config_extra_args_to_runner(tmp_path):
-    matrix.reset_reachability_cache()
     cfg = validate_config(
         {
             "name": "fake",
@@ -672,7 +663,6 @@ def test_execute_passes_config_extra_args_to_runner(tmp_path):
 
 
 def test_execute_outcome_carries_compatibility_pruned_cells(tmp_path):
-    matrix.reset_reachability_cache()
     cfg = validate_config(
         {
             "name": "compat",
@@ -695,7 +685,6 @@ def test_execute_outcome_carries_compatibility_pruned_cells(tmp_path):
 
 
 def test_execute_downgrades_passed_cell_with_query_failure_result(tmp_path):
-    matrix.reset_reachability_cache()
     result_path = tmp_path / "benchmark_runs" / "results" / "failed-query.json"
     _write_submit_result(result_path, failed=1)
     cfg = validate_config(
@@ -823,7 +812,6 @@ def test_topological_sort_keeps_available_unrelated_benchmark_before_source():
 
 def test_execute_reorders_consumer_before_source(tmp_path):
     """Even if include lists read_primitives first, tpch must run first."""
-    matrix.reset_reachability_cache()
     cfg = validate_config(
         {
             "name": "fake",
@@ -860,7 +848,6 @@ def test_execute_reorders_consumer_before_source(tmp_path):
 
 def test_execute_prunes_source_after_consumer_completes(tmp_path):
     """The tpch DB should be pruned once its only consumer (read_primitives) finishes."""
-    matrix.reset_reachability_cache()
     cfg = validate_config(
         {
             "name": "fake",
@@ -890,7 +877,6 @@ def test_execute_prunes_source_after_consumer_completes(tmp_path):
 
 def test_execute_does_not_prune_source_while_consumer_pending(tmp_path):
     """During the (duckdb, tpch) cleanup pass, read_primitives is still pending — DB stays."""
-    matrix.reset_reachability_cache()
     cfg = validate_config(
         {
             "name": "fake",

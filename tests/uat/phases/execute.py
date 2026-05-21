@@ -27,7 +27,7 @@ from tests.uat import docker_assets
 from tests.uat.cleanup import SOURCE_REUSE_GRAPH, CellKey, can_prune, prune_database_dir
 from tests.uat.config import UATConfig
 from tests.uat.ladder import LadderRung, plan_ladder
-from tests.uat.matrix import platform_is_reachable, reset_reachability_cache
+from tests.uat.matrix import invalidate_reachability_cache_after_lifecycle_change, platform_is_reachable
 from tests.uat.phases.enumerate import (
     Cell,
     CompatibilityPrunedCell,
@@ -281,7 +281,7 @@ def _start_docker_platform_if_needed(
         cleanup_status="started" if up_result.succeeded else "startup-failed",
     )
     if up_result.succeeded:
-        reset_reachability_cache()
+        invalidate_reachability_cache_after_lifecycle_change()
         return state, None
     return (
         state,

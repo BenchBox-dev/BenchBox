@@ -189,14 +189,16 @@ def resolve_platforms(
 # TCP reachability with sentinel-file cache equivalent.
 # ---------------------------------------------------------------------------
 
-# Bash uses one sentinel file per platform under $TMPDIR; the Python port
+# Bash used one sentinel file per platform under $TMPDIR; the Python port
 # uses an in-process dict keyed by platform name. Same effect: probe once
-# per platform per sweep, not once per cell.
+# per platform for this process, not once per cell. Runtime code clears the
+# cache only after UAT-managed platform lifecycle changes that can make a
+# prior reachability answer stale.
 _REACHABILITY_CACHE: dict[str, bool] = {}
 
 
-def reset_reachability_cache() -> None:
-    """Clear the per-platform reachability cache (test/sweep-restart hook)."""
+def invalidate_reachability_cache_after_lifecycle_change() -> None:
+    """Clear cached reachability after UAT starts or mutates a local platform."""
     _REACHABILITY_CACHE.clear()
 
 
