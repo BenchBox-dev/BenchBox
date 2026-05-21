@@ -32,10 +32,11 @@ description: |
       deleted in favour of typed dataclasses + `dataclasses.replace`.
     - `cleanup.SOURCE_REUSE_GRAPH`, `KNOWN_SQL_ONLY_BENCHMARKS`,
       `enumerate` phase, `.frozen-hashes.json`, the `# FROZEN` ceremony,
-      `apply_stress_overrides`, and unused YAML fields all leave the
-      tree.
+      `apply_stress_overrides`, and confirmed-unused YAML fields all leave
+      the tree.
     - The `benchbox/cli/` surface constraint gains a real test guard
-      (not a one-shot TODO verification block).
+      with an explicit exception for the internal submit-validator wiring
+      moved by W4.
 
   ## Evidence base
 
@@ -47,9 +48,15 @@ description: |
     - `_project/blind-spots/2026-05-05-154308-uat-cli-surface-constraint-no-enforcement.md`
   And the two pre-existing UAT blind-spots that this TODO also resolves:
     - `_project/blind-spots/2026-05-05-080138-uat-bash-parity-structural-only.md`
-      (resolved by deleting the bash + parity test in W6)
+      (resolved by deleting the bash + parity test in W3)
     - `_project/blind-spots/2026-05-05-080138-uat-frozen-config-replay-not-runnable.md`
-      (resolved by W7's frozen-ceremony retirement)
+      (resolved by W6's frozen-ceremony retirement)
+
+  Current-state note (2026-05-21): this TODO was created against PR #205
+  review evidence, but the branch has since gained Docker lifecycle cleanup
+  fields and additional UAT configs. W0 must revalidate every path/reader
+  claim against the implementation branch before code edits. Do not carry
+  forward deletion claims just because they were true on 2026-05-05.
 
   ## Decisions this TODO commits to (no further user gates required)
 
@@ -86,12 +93,44 @@ description: |
 work:
 
 # ============================================================
+# Tier 0 — Freshness gate
+# ============================================================
+
+- id: w0
+  summary: "Revalidate review findings against current develop before deleting or extracting anything"
+  needs: []
+  status: pending
+  notes: |
+    Required first step. The original review evidence is pinned to PR #205
+    / commit d78b06588 on 2026-05-05, while current develop has additional
+    UAT cleanup fields, configs, tests, and docs.
+
+    Minimum revalidation:
+      - Run targeted grep/path checks for every removal claim in this TODO:
+        `local_stress_test.sh`, `published_results_validator.py`,
+        `.frozen-hashes.json`, `test_frozen_configs.py`, `config.raw`,
+        `apply_stress_overrides`, `KNOWN_SQL_ONLY_BENCHMARKS`,
+        `SOURCE_REUSE_GRAPH`, `reset_reachability_cache`,
+        `extract_result_path`, `cleanup.preserve_datagen`,
+        `cleanup.prune_databases`, and `package.pr_target_branch`.
+      - Read the current readers before deleting YAML fields. In particular,
+        `cleanup.prune_databases` is currently read by UAT execution paths,
+        and Docker lifecycle fields from `uat-docker-platform-switch-cleanup`
+        must be preserved.
+      - Record a compact summary in the implementation PR body: command(s),
+        checked develop SHA, which claims stayed true, which changed, and
+        which W units were adjusted.
+
+    This work unit may edit this TODO before implementation if current code
+    invalidates a planned deletion. It must not make runtime changes.
+
+# ============================================================
 # Tier 1 — Foundation (blocks subsequent work)
 # ============================================================
 
 - id: w1
   summary: "Promote every UAT YAML section to a typed dataclass; delete config.raw and apply_stress_overrides"
-  needs: []
+  needs: [w0]
   status: pending
   notes: |
     Replaces the W3/W4 staging artifact in `tests/uat/config.py`. After
@@ -122,11 +161,11 @@ work:
       - YAML validator at `config.py:84-91` rejects unknown sections
         AND unknown fields-within-sections.
 
-    Deps: none (pure refactor inside config.py + read sites).
+    Deps: w0 (current config readers must be revalidated first).
 
 - id: w2
   summary: "Define PhaseResult ABC; every phase returns one; orchestrator drops inline exit-code logic"
-  needs: []
+  needs: [w0]
   status: pending
   notes: |
     Removes the non-uniform exit-code conventions documented in F7 of
@@ -162,7 +201,7 @@ work:
                 abort_reason = result.abort_reason
                 break
 
-    Deps: none. Lands before W6 (centralize preflight) and W9
+    Deps: w0. Lands before W7 (centralize preflight) and W9
     (argparse subparsers) so they consume the unified contract.
 
 # ============================================================
@@ -206,7 +245,7 @@ work:
 
 - id: w4
   summary: "Carve benchbox/validation/bundle.py; delete the 798-LOC byte-identical fixture; thin entrypoint scripts"
-  needs: []
+  needs: [w0]
   status: pending
   notes: |
     Eliminates the largest single duplication in the project: the
@@ -256,7 +295,8 @@ work:
         gains a mirror of `benchbox/validation/bundle.py`. Document
         the dual-mirror in the workflow comments.
 
-    Deps: none. Independent of UAT framework changes.
+    Deps: w0. Independent of other UAT framework changes after the
+    validator/source-of-truth evidence is refreshed.
 
 - id: w5
   summary: "Convert tests/uat/phases/validate.py from subprocess to in-process import; delete parse_rollup TSV re-derivation"
@@ -289,7 +329,7 @@ work:
 
 - id: w6
   summary: "Retire the frozen-config ceremony; replace with plain # HISTORICAL header; delete .frozen-hashes.json and the three-test guard"
-  needs: []
+  needs: [w0]
   status: pending
   notes: |
     F13 + blind-spot
@@ -322,7 +362,7 @@ work:
       (status → actioned: ceremony retired; replay test docstring
       corrected to match its actual assertion).
 
-    Deps: none.
+    Deps: w0.
 
 # ============================================================
 # Tier 3 — Cleanup enabled by foundation
@@ -408,36 +448,44 @@ work:
     invoke phases through it).
 
 - id: w10
-  summary: "Delete cleanup.preserve_datagen, cleanup.prune_databases, package.pr_target_branch from configs and spec"
+  summary: "Reconcile orphan YAML fields; delete only fields still proven unused on current develop"
   needs: [w1]
   status: pending
   notes: |
     Closes blind-spot `2026-05-05-154305-uat-orphan-yaml-fields.md`
-    and F10. These three fields are declared in YAML/spec but have
-    zero readers — silent noops.
+    and F10 without deleting live cleanup controls introduced after the
+    original review.
 
-    Decision: per the no-backward-compat posture, we DELETE rather
-    than implement. None of the three has documented behavioural
-    intent that the framework actually wants today.
+    Current-state correction: the original deletion plan is stale on
+    2026-05-21. `cleanup.prune_databases` is read by execute/orchestrator
+    paths, `cleanup.preserve_datagen` is part of config validation, and
+    Docker cleanup fields from `uat-docker-platform-switch-cleanup` are
+    live. Do not remove those fields as "orphans".
 
-    Concrete deletions:
-      - `cleanup.preserve_datagen` from
-        `tests/uat/configs/uat-2026-05-02.yaml:45`,
-        `_project/specs/uat-framework.md:219,433`.
-      - `cleanup.prune_databases` from
-        `tests/uat/configs/uat-2026-05-02.yaml:46`, spec lines 220
-        and 434.
-      - `package.pr_target_branch` from spec line 264.
+    Concrete:
+      - Re-run the W0 grep/readers check immediately before editing.
+      - Keep `cleanup.prune_databases` and all Docker lifecycle cleanup
+        fields unless W0 finds the current implementation no longer reads
+        them.
+      - Keep or deliberately remove `cleanup.preserve_datagen` based on
+        current code reality: if it remains a rejected safety knob, document
+        that contract; if it is truly inert, delete it from config/spec in
+        the same PR.
+      - Delete `package.pr_target_branch` from the spec/configs only if W0
+        still proves it has no reader.
 
     Concrete additions:
       - `tests/uat/test_config.py` regression: every field present
         in `tests/uat/configs/stress-default.yaml` MUST have a
-        reader under `tests/uat/` or `benchbox/`. Mechanical grep
-        test, fast-marked. Prevents future orphan fields.
+        reader, explicit validator rejection, or documented reserved-field
+        reason under `tests/uat/` or `benchbox/`. Mechanical grep plus an
+        exception map, fast-marked. Prevents future orphan fields without
+        treating reserved safety fields as accidental noops.
 
     Resolves: blind-spot
-      `2026-05-05-154305-uat-orphan-yaml-fields.md` (status →
-      actioned: fields deleted, regression guard added).
+      `2026-05-05-154305-uat-orphan-yaml-fields.md` (status ->
+      actioned: current orphan fields deleted or explicitly documented,
+      regression guard added).
 
     Deps: w1 (typed schema makes orphan fields impossible at the
     dataclass level; this work unit cleans up the YAML and spec
@@ -468,7 +516,7 @@ work:
 
 - id: w12
   summary: "Delete KNOWN_SQL_ONLY_BENCHMARKS OR-shortcut; phases/enumerate.py uses registry truth directly"
-  needs: []
+  needs: [w0]
   status: pending
   notes: |
     F12. The constant at `tests/uat/matrix.py:233` is documented as a
@@ -481,11 +529,11 @@ work:
       - `tests/uat/phases/enumerate.py:30-33`: `_is_sql_only` becomes
         `return not info.supports_dataframe`.
 
-    Deps: none.
+    Deps: w0.
 
 - id: w13
   summary: "Delete reset_reachability_cache; document module-level dict as process-lifetime cache"
-  needs: []
+  needs: [w0]
   status: pending
   notes: |
     F4. `reset_reachability_cache()` at `matrix.py:181-183` claims
@@ -505,11 +553,11 @@ work:
         "process-lifetime; no invalidation hook (sequential-only
         execution makes mid-sweep reset unnecessary)".
 
-    Deps: none.
+    Deps: w0.
 
 - id: w14
   summary: "Pass --quiet to benchbox run; take last stdout line as result path; delete the regex"
-  needs: []
+  needs: [w0]
   status: pending
   notes: |
     F5. `tests/uat/runner.py:24-26` regex
@@ -527,11 +575,11 @@ work:
       - Update tests that fixture-mock CLI output to mock just the
         path, not log noise.
 
-    Deps: none.
+    Deps: w0.
 
 - id: w15
   summary: "Add data_source to BENCHMARK_METADATA; delete cleanup.SOURCE_REUSE_GRAPH; verify tpcds_obt claim"
-  needs: []
+  needs: [w0]
   status: pending
   notes: |
     F9 + blind-spot
@@ -565,11 +613,11 @@ work:
     Resolves: blind-spot
       `2026-05-05-154307-uat-tpcds-obt-reuse-graph-asymmetry.md`.
 
-    Deps: none.
+    Deps: w0.
 
 - id: w16
   summary: "Lift sql/dataframe/docker derivations into platform_registry; auto-generate CATEGORY_GROUPS; keep fast/slow UAT-private"
-  needs: []
+  needs: [w0]
   status: pending
   notes: |
     F15 + F16. `PLATFORM_GROUPS` and `CATEGORY_GROUPS` in
@@ -592,15 +640,15 @@ work:
         auto-generated from `benchbox/core/benchmark_registry.py:18`
         `CATEGORY_ORDER` via slug-derivation helper.
 
-    Deps: none.
+    Deps: w0.
 
 # ============================================================
 # Tier 4 — Spec/contract guard
 # ============================================================
 
 - id: w17
-  summary: "Add fast-marked test that asserts git diff origin/develop -- benchbox/cli/ is empty"
-  needs: []
+  summary: "Add fast-marked CLI surface guard with a submit-validator internal exception"
+  needs: [w0]
   status: pending
   notes: |
     F14 + blind-spot
@@ -608,11 +656,14 @@ work:
 
     The spec asserts "no benchbox CLI surface change" but the only
     enforcement was a one-shot verification block in the parent TODO
-    (now in DONE/, no longer evaluated).
+    (now in DONE/, no longer evaluated). W4 intentionally changes
+    `benchbox/cli/commands/submit.py` internals so `git diff --name-only
+    origin/develop -- benchbox/cli/` cannot be required to be empty.
+    Guard the user-visible surface instead.
 
     Concrete:
       - New test `tests/uat/test_no_cli_surface_drift.py`:
-            def test_uat_did_not_modify_benchbox_cli():
+            def test_uat_did_not_modify_benchbox_cli_surface():
                 base = os.environ.get("BENCHBOX_BASE_REF",
                                        "origin/develop")
                 changed = subprocess.check_output(
@@ -620,24 +671,43 @@ work:
                      "benchbox/cli/"],
                     cwd=REPO_ROOT, text=True
                 ).splitlines()
-                # Allow a documented exception list if needed
-                assert not changed, (
-                    f"benchbox/cli/ must not change as a side effect "
-                    f"of UAT framework work; saw: {changed}"
+                allowed_internal = {"benchbox/cli/commands/submit.py"}
+                unexpected = set(changed) - allowed_internal
+                assert not unexpected
+
+                diff = subprocess.check_output(
+                    ["git", "diff", "--unified=0", base, "--",
+                     "benchbox/cli/commands/submit.py"],
+                    cwd=REPO_ROOT, text=True
+                )
+                changed_lines = [
+                    line for line in diff.splitlines()
+                    if line.startswith(("+", "-"))
+                    and not line.startswith(("+++", "---"))
+                ]
+                assert not any("@click.option" in line for line in changed_lines)
+                assert not any("@click.command" in line for line in changed_lines)
+                assert not any(
+                    line[1:].lstrip().startswith("def submit(")
+                    for line in changed_lines
                 )
         Fast-marked. Skips when not in a git repo or origin missing.
+        This test allows W4's internal validator import change while
+        failing if UAT follow-up work adds/removes CLI commands, options,
+        or the submit command signature.
       - Update `_project/specs/uat-framework.md:371-373`: replace
         "enforced by the verification block in the parent TODO" with
-        "enforced by `tests/uat/test_no_cli_surface_drift.py`".
+        "enforced by `tests/uat/test_no_cli_surface_drift.py`, which
+        permits only the internal submit-validator refactor."
 
     Resolves: blind-spot
       `2026-05-05-154308-uat-cli-surface-constraint-no-enforcement.md`.
 
-    Deps: none.
+    Deps: w0.
 
 - id: w18
   summary: "Add spec §10 documenting what UAT does NOT assert; dedupe LOCAL_SQL_PLATFORMS"
-  needs: []
+  needs: [w0]
   status: pending
   notes: |
     De-duplication candidate #2 from the review. The integration test
@@ -661,7 +731,7 @@ work:
         constant: "consumed by both the UAT framework and the
         integration matrix test; align with both before changing."
 
-    Deps: none.
+    Deps: w0.
 
 # ============================================================
 # Documentation & retrospective
@@ -671,12 +741,21 @@ work:
   summary: "Bring docs/operations/uat-framework.md, uat-methodology.md, and the spec in line with the new shape"
   needs:
   - w1
+  - w2
   - w3
   - w4
   - w5
   - w6
+  - w7
   - w8
   - w9
+  - w10
+  - w11
+  - w12
+  - w13
+  - w14
+  - w15
+  - w16
   - w17
   - w18
   status: pending
@@ -725,14 +804,21 @@ files_affected:
   - "tests/uat/test_config.py"
   - "tests/uat/test_orchestrator.py"
   - "tests/uat/test_phases.py"
+  - "tests/uat/test_validate.py"
   - "tests/uat/test_replay_2026_05_02.py"
+  - "tests/unit/scripts/test_validate_submission.py"
+  - "tests/unit/scripts/test_uat_validator_rollup.py"
+  - "tests/unit/cli/commands/test_submit.py"
+  - "tests/unit/core/results/"
   - "tests/integration/test_cross_branch_validator_contract.py"
   - "tests/integration/test_local_platform_benchmark_matrix.py"
   - "benchbox/cli/commands/submit.py"
   - "benchbox/core/benchmark_registry.py"
   - "benchbox/core/platform_registry.py"
   - "benchbox/core/results/schema.py"
+  - "benchbox/core/publishing/bundle_publisher.py"
   - "scripts/validate_submission.py"
+  - "scripts/uat_validator_rollup.py"
   - "_project/specs/uat-framework.md"
   - "docs/operations/uat-framework.md"
   - "tests/uat/README.md"
@@ -757,13 +843,42 @@ must_preserve:
 - "All eight Make targets (uat-cell, uat-stress, uat-sweep, uat-execute, uat-validate, uat-package, uat-explorer-smoke, uat-report) continue to work; argument syntax unchanged"
 - "Fast-test wall time stays under the existing budget (no new slow tests added; new fast tests must justify their cost)"
 
+prior_art:
+- "scripts/validate_submission.py: current published-results validator CLI and validation helper surface -- extract shared logic instead of reimplementing bundle validation."
+- "tests/fixtures/published_results_validator.py: vendored published-results copy -- supersede with a mirrored library plus thin entrypoint, then delete the duplicate fixture."
+- "benchbox/core/results/schema.py: schema-v2 required-key validation -- consolidate constants only if the production validator and published-results contract stay aligned."
+- "benchbox/core/results/integrity_validator.py: result integrity checks used by internal validation -- reuse concepts, but do not merge user-submission policy into integrity checks unless W0 proves the contracts match."
+- "benchbox/core/publishing/bundle_publisher.py: companion suffix handling and bundle publishing contract -- reuse constants or document why validation needs a narrower policy."
+- "_project/DONE/main/active/uat-docker-platform-switch-cleanup.yaml: post-PR-205 Docker cleanup fields and validation requirements -- preserve these live fields and coordinate config cleanup with them."
+
+approach: |
+  Work from the dependency graph, but treat W0 as the implementation gate.
+  Revalidate current readers first, then land small PR-sized slices that remove
+  an old surface in the same change that installs its replacement. Favor
+  typed config and registry-owned metadata over extra compatibility layers.
+  When current develop contradicts the 2026-05-05 review evidence, update this
+  TODO and implementation plan instead of forcing stale deletes through code.
+
+anti_patterns:
+- "DO NOT delete cleanup fields that current UAT execution paths read or validate; stale orphan-field evidence must be corrected, not implemented."
+- "DO NOT add a blanket `benchbox/cli/` diff-is-empty gate while W4 intentionally changes submit.py internals; guard user-visible CLI surface instead."
+- "DO NOT create a second bundle-validation implementation under tests/ or scripts/ after extracting benchbox/validation/bundle.py."
+- "DO NOT preserve old bash, frozen-config, raw-config, or duplicate-validator surfaces as compatibility shims unless the TODO is explicitly revised."
+- "DO NOT rely on raw stdout transcripts as durable evidence; keep raw logs in /tmp, CI artifacts, or BENCHBOX_OUTPUT_DIR and commit compact summaries only."
+
 verification:
+- description: "TODO schema and work graph remain valid before implementation starts"
+  command: "uv run --project _project/scripts -- python _project/scripts/validate_todo.py _project/TODO/main/planning/uat-framework-review-followups.yaml && uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph"
+  expected_output: "TODO validation and graph checks pass"
 - description: "All UAT fast tests pass after each work unit"
   command: "uv run -- python -m pytest tests/uat -m fast -q"
   expected_output: "all green"
 - description: "Lint + typecheck clean across the touched paths"
-  command: "uv run ruff check tests/uat benchbox/validation && uv run ty check tests/uat benchbox/validation"
+  command: "uv run -- ruff check tests/uat benchbox/validation && uv run -- ty check tests/uat benchbox/validation"
   expected_output: "All checks passed"
+- description: "Submission validator and submit dry-run contracts pass after W4/W5"
+  command: "uv run -- python -m pytest tests/unit/scripts/test_validate_submission.py tests/unit/scripts/test_uat_validator_rollup.py tests/unit/cli/commands/test_submit.py tests/integration/test_cross_branch_validator_contract.py -q"
+  expected_output: "validator extraction, rollup, submit, and cross-branch contract tests pass"
 - description: "Bash script is gone"
   command: "test ! -f scripts/local_stress_test.sh && echo OK"
   expected_output: "OK"
@@ -795,10 +910,65 @@ verification:
   command: "make -n uat-cell uat-stress uat-sweep uat-execute uat-validate uat-package uat-explorer-smoke uat-report 2>&1 | head -1"
   expected_output: "no error"
 
+scope_limit:
+  only_modify:
+  - "tests/uat/_cli.py"
+  - "tests/uat/config.py"
+  - "tests/uat/matrix.py"
+  - "tests/uat/orchestrator.py"
+  - "tests/uat/runner.py"
+  - "tests/uat/cleanup.py"
+  - "tests/uat/phases/__init__.py"
+  - "tests/uat/phases/preflight.py"
+  - "tests/uat/phases/enumerate.py"
+  - "tests/uat/phases/execute.py"
+  - "tests/uat/phases/validate.py"
+  - "tests/uat/phases/package.py"
+  - "tests/uat/phases/explorer_smoke.py"
+  - "tests/uat/phases/report.py"
+  - "tests/uat/configs/"
+  - "tests/uat/test_matrix.py"
+  - "tests/uat/test_config.py"
+  - "tests/uat/test_orchestrator.py"
+  - "tests/uat/test_phases.py"
+  - "tests/uat/test_validate.py"
+  - "tests/uat/test_replay_2026_05_02.py"
+  - "tests/uat/test_no_cli_surface_drift.py"
+  - "tests/integration/test_cross_branch_validator_contract.py"
+  - "tests/integration/test_local_platform_benchmark_matrix.py"
+  - "tests/unit/scripts/test_validate_submission.py"
+  - "tests/unit/scripts/test_uat_validator_rollup.py"
+  - "tests/unit/cli/commands/test_submit.py"
+  - "tests/unit/core/results/"
+  - "benchbox/cli/commands/submit.py"
+  - "benchbox/core/benchmark_registry.py"
+  - "benchbox/core/platform_registry.py"
+  - "benchbox/core/results/schema.py"
+  - "benchbox/core/publishing/bundle_publisher.py"
+  - "benchbox/validation/"
+  - "scripts/validate_submission.py"
+  - "scripts/uat_validator_rollup.py"
+  - "scripts/local_stress_test.sh"
+  - "tests/fixtures/published_results_validator.py"
+  - "_project/specs/uat-framework.md"
+  - "_project/specs/uat-methodology-blind-spot-remediation.md"
+  - "docs/operations/uat-framework.md"
+  - "tests/uat/README.md"
+  - "CLAUDE.md"
+  - ".github/workflows/sync-results-data-to-published.yml"
+  - "_project/TODO/main/planning/uat-framework-review-followups.yaml"
+  - "_project/DONE/main/planning/uat-framework-review-followups.yaml"
+  do_not_modify:
+  - "benchbox/cli/commands/run.py"
+  - "benchbox/platforms/"
+  - "results-explorer/"
+  - "results-data/bundles/"
+
 metadata:
   tags: ["uat-framework", "simplification", "deduplication", "review-followup", "tech-debt"]
-  estimated_effort: "Large (~3-4 weeks across 19 work units)"
+  estimated_effort: "Large (~3-4 weeks across 20 work units)"
   created_date: "2026-05-05"
+  quality_review_updated_date: "2026-05-21"
   source: |
     Principal-engineer review of UAT framework PR #205 (commit
     d78b06588), conducted 2026-05-05. Review output in conversation
@@ -807,3 +977,9 @@ metadata:
     pre-existing 2026-05-05-080138 entries. User authorized
     forward-fix posture (no backward compatibility surface) at
     TODO-creation time.
+  quality_review_update: |
+    2026-05-21 TODO quality review found required fixes for stale cleanup
+    deletion evidence, a self-conflicting CLI-surface guard, missing
+    prior_art for the new validation module, too-narrow verification, and
+    missing approach/anti-pattern/scope guardrails. This revision addresses
+    those findings before implementation activation.
