@@ -1,8 +1,7 @@
 """Signal-based subprocess timeout wrapper.
 
-Replaces the perl process-group fallback path in
-scripts/local_stress_test.sh:359-429 with native Python. Same exit-code
-semantics: 0 on success, child exit code on failure, 124 on timeout.
+Exit-code semantics: 0 on success, child exit code on failure, 124 on
+timeout.
 """
 
 from __future__ import annotations
@@ -19,7 +18,7 @@ EXIT_TIMEOUT = 124  # POSIX coreutils convention: SIGTERM after timeout.
 
 @dataclass(frozen=True)
 class TimeoutResult:
-    """Outcome of `run_with_timeout`. Mirrors the bash wrapper's contract."""
+    """Outcome of `run_with_timeout`."""
 
     exit_code: int
     timed_out: bool
@@ -39,10 +38,9 @@ def run_with_timeout(
 ) -> TimeoutResult:
     """Run `argv` with a hard wall-clock cap.
 
-    `timeout_s == 0` means no timeout (matches the bash flag default).
-    Otherwise, after `timeout_s` seconds the process group receives
-    SIGTERM, and 200 ms later SIGKILL — same kill ladder as the perl
-    wrapper.
+    `timeout_s == 0` means no timeout. Otherwise, after `timeout_s`
+    seconds the process group receives SIGTERM, and 200 ms later
+    SIGKILL.
 
     `stdout` and `stderr` accept anything `subprocess.Popen` would. When
     callers pass `subprocess.PIPE`, this wrapper drains the pipes with

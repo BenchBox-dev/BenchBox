@@ -1,8 +1,4 @@
-"""Fast-test coverage for tests/uat/timeouts.py.
-
-Verifies the same exit-code semantics as the bash perl wrapper:
-0 on success, child exit code on failure, 124 on timeout.
-"""
+"""Fast-test coverage for tests/uat/timeouts.py."""
 
 from __future__ import annotations
 

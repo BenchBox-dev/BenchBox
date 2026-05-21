@@ -265,7 +265,7 @@ work:
 - id: w3
   summary: "Delete scripts/local_stress_test.sh, the parity test, and the bash-mirror documentation in matrix.py"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Commits to the framework as the sole matrix-iteration surface.
 
@@ -273,6 +273,8 @@ work:
       - `scripts/local_stress_test.sh` (entire file, 607 lines).
       - `tests/uat/test_matrix.py` `test_bash_parity_*` functions and
         the `_parse_bash_case` helper (~73 lines).
+      - `tests/unit/scripts/test_local_stress_test.py`, whose fast
+        tests targeted timeout behavior in the deleted shell surface.
       - All "Mirrors scripts/local_stress_test.sh:NNN" header comments
         in `tests/uat/matrix.py` (lines 23, 43, 75, 84, 91, 190-193,
         204, 322, 373, 394). The dicts remain — they are now primary

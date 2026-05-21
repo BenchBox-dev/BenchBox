@@ -57,13 +57,12 @@ uv run -- python -m pytest tests/uat -q -m fast
 uv run -- python -m pytest tests/uat -q -m "fast or slow"
 ```
 
-## Bash-parity test
+## Matrix Source Of Truth
 
-`tests/uat/test_matrix.py::test_bash_parity_*` parses
-`scripts/local_stress_test.sh` and asserts every key/value in the
-bash case statements matches `matrix.py`. If the bash script changes,
-this test fails and the Python port must be updated in the same PR.
-This is the drift-prevention contract.
+`tests/uat/matrix.py` is the framework-owned source of truth for UAT
+platform groups, reachability probes, uv extras, platform options, and
+per-platform CLI flags. Keep updates in the same PR as the tests that
+exercise the affected matrix behavior.
 
 ## Sequential platform execution
 
