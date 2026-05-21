@@ -320,6 +320,7 @@ class ResultCaptureMixin:
         self.query_plans_captured = 0
         self.plan_capture_failures = 0
         self.plan_capture_errors: list[dict[str, Any]] = []
+        self._plan_capture_iteration_counts: dict[str, int] = {}
 
     def get_normalized_result_metadata(
         self,

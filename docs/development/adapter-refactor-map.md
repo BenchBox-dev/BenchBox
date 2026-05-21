@@ -19,6 +19,36 @@ slices that each preserve import paths and public method signatures. This map en
 public symbol, groups them into candidate target modules, identifies coupling hotspots from
 subclass override data, and documents the slice order followed during execution.
 
+## Adapter Lifecycle Contract
+
+`PlatformAdapter` instances are **serial execution objects**. A caller may reuse
+one adapter instance for multiple benchmark runs sequentially, but it must not
+call `run_benchmark()` concurrently on the same adapter instance. Concurrency
+requires a future per-run context design that moves mutable execution state out
+of the adapter object.
+
+At the start of every `run_benchmark()` / `run_enhanced_benchmark()` call, the
+base adapter resets run-scoped state:
+
+- database reuse decision (`database_was_reused`)
+- cached power/throughput phase results
+- sorted-ingestion applied-table counters and timings
+- plan-capture counters, failures, errors, and `plan_first_n` iteration counts
+- captured SQL buffer and counter when explicit dry-run mode is active
+
+`capture_plans`, `strict_plan_capture`, and `plan_capture_timeout_seconds` may
+be passed in `run_config`; those overrides are per-run and are restored to their
+previous adapter values after the run. Direct adapter attributes such as
+`dry_run_mode`, `table_mode`, and platform-specific connection configuration are
+adapter-scoped and remain the caller's responsibility to set deliberately before
+each run.
+
+Connection lifecycle remains per run for the base path: `run_enhanced_benchmark`
+stores the active connection on `self.connection`, closes it in `finally`, and
+sets `self.connection = None`. Adapter subclasses may own client pools, but
+pool handles must not make one adapter instance safe for concurrent
+`run_benchmark()` calls unless a future contract explicitly says so.
+
 All line ranges reference `benchbox/platforms/base/adapter.py` at the time of writing
 (5,178 lines, pre-refactor). Override counts were gathered by AST-walking every
 `Adapter`-suffixed class in `benchbox/platforms/**/*.py` and counting public-method
