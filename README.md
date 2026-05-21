@@ -38,14 +38,16 @@ Current release: v0.2.1. Check your installation with `benchbox --version`, whic
 
 The default wheel ships the `benchbox.experimental` namespace (nl2sql, aiml-functions, multiregion, gpu, concurrency subsystems). This namespace is **outside the supported Beta product surface**: it has no stability guarantees, may change or be removed without notice, and is not integrated with the benchmark registry or public CLI. It is present in the wheel for developer convenience only.
 
+Public contract tiers, support-status vocabulary, and source-of-truth rules for platform and benchmark count claims are tracked in [Public Contracts and Support Taxonomy](docs/reference/public-contracts.md).
+
 ## Features
 
 - **Embedded Benchmarks**: Self-contained benchmark data and queries
-- **Twenty-Two Benchmarks**: TPC-H, TPC-DS, TPC-DI, TPC-DS-OBT, TPC-H Skew, TPC-Havoc, SSB, AMPLab, JoinOrder, ClickBench, H2ODB, NYC Taxi, Flight Data, TSBS DevOps, CoffeeShop, TPC-H Data Vault, Vector Search, Read Primitives, Write Primitives, Transaction Primitives, Metadata Primitives, AI Primitives
+- **Benchmark Catalog**: TPC-H, TPC-DS, TPC-DI, TPC-DS-OBT, TPC-H Skew, TPC-Havoc, SSB, AMPLab, JoinOrder, ClickBench, H2ODB, NYC Taxi, Flight Data, TSBS DevOps, CoffeeShop, TPC-H Data Vault, Vector Search, Read Primitives, Write Primitives, Transaction Primitives, Metadata Primitives, AI Primitives
 - **Cross-Database**: Same benchmarks work on any database platform
-- **DataFrame Mode**: Native DataFrame API benchmarking with Polars, Pandas, and 6 other libraries
-- **SQL Platforms** (42): DuckDB, MotherDuck, SQLite, DataFusion, PostgreSQL, TimescaleDB, ClickHouse (Local, Server, Cloud), CedarDB, Firebolt, Databend, Doris, StarRocks, SingleStore, QuestDB, InfluxDB, pg_duckdb, pg_mooncake, Databricks SQL, Snowflake, BigQuery, Redshift, Azure Synapse Analytics, Microsoft Fabric Warehouse, Microsoft Fabric Lakehouse SQL, Trino, Starburst, Presto, Amazon Athena, Spark, PySpark, LakeSail Sail, Apache Gluten + Velox, Onehouse Quanton, AWS Glue, Amazon EMR Serverless, Amazon Athena for Apache Spark, Google Cloud Dataproc, Google Cloud Dataproc Serverless, Microsoft Fabric Spark, Azure Synapse Analytics Spark
-- **DataFrame Platforms** (9): DataFusion-DF, Polars-DF, Pandas-DF, Modin-DF, Dask-DF, cuDF-DF (GPU), PySpark-DF, Databricks-DF, LakeSail-DF
+- **DataFrame Mode**: Native DataFrame API benchmarking with Polars, Pandas, DataFusion, Dask, and other DataFrame runtimes
+- **SQL Platforms**: DuckDB, MotherDuck, SQLite, DataFusion, PostgreSQL, TimescaleDB, ClickHouse (Local, Server, Cloud), CedarDB, Firebolt, Databend, Doris, StarRocks, SingleStore, QuestDB, InfluxDB, pg_duckdb, pg_mooncake, Databricks SQL, Snowflake, BigQuery, Redshift, Azure Synapse Analytics, Microsoft Fabric Warehouse, Microsoft Fabric Lakehouse SQL, Trino, Starburst, Presto, Amazon Athena, Spark, PySpark, LakeSail Sail, Apache Gluten + Velox, Onehouse Quanton, AWS Glue, Amazon EMR Serverless, Amazon Athena for Apache Spark, Google Cloud Dataproc, Google Cloud Dataproc Serverless, Microsoft Fabric Spark, Azure Synapse Analytics Spark
+- **DataFrame Platforms**: DataFusion-DF, Polars-DF, Pandas-DF, Modin-DF, Dask-DF, cuDF-DF (GPU), PySpark-DF, Databricks-DF, LakeSail-DF
 - **Open Table Formats**: Delta Lake, Apache Iceberg, Apache Hudi (via Databricks, Quanton, Trino, Spark platforms)
 - **SQL Translation**: Automatic query conversion between SQL dialects
 - **Self-Contained Python Package**: Core install requires no external database servers or system dependencies; opt-in to extra package installs for cloud platforms when needed.

@@ -1,0 +1,196 @@
+id: architecture-contract-map-and-support-taxonomy
+title: "Architecture hardening: create the public contract map and support taxonomy"
+worktree: main
+priority: High
+status: Completed
+completed_date: "2026-05-21"
+category: Architecture
+
+deps:
+  needs: []
+
+description: |
+  BenchBox has several real product contracts that are only partially declared:
+  CLI behavior, Python wrappers, BaseBenchmark.run_with_platform, adapter
+  subclassing, MCP tools, result JSON, explorer input, generated compatibility
+  docs, platform availability, and experimental modules. The architecture is
+  still sound, but future work is making contract decisions implicitly.
+
+  This item creates one authoritative map of public/stable, beta-public,
+  internal, experimental, deprecated, generated, and repo-only surfaces. It also
+  defines support status vocabulary for platforms and benchmarks so docs,
+  registry metadata, packaging, MCP, and PR review use the same language.
+
+work:
+- id: w0
+  summary: "Revalidate contract-surface evidence against the current branch before editing"
+  status: done
+  notes: |
+    Capture a compact committed summary of checked SHA, inspected files, and
+    any line-number drift. Do not commit raw command transcripts.
+
+    Minimum evidence to re-check:
+      - README support disclaimer and platform counts: README.md:35-48.
+      - Backward-compat registry: docs/reference/backward-compatibility.md:24-84.
+      - Wrapper facade tests: tests/unit/test_wrapper_facades_fast.py.
+      - MCP public API decision: _project/DONE/mcp-integration/active/refactor-mcp-use-public-api.yaml.
+      - Existing future-state architecture docs under docs/design/future-state/.
+
+- id: w1
+  summary: "Create docs/reference/public-contracts.md with a complete surface classification table"
+  needs: [w0]
+  status: done
+  notes: |
+    The table must cover at least: CLI commands/options, Python wrapper
+    facades, benchbox.base.BaseBenchmark, BaseBenchmark.run_with_platform,
+    core.base_benchmark, adapter subclassing hooks, platform registry
+    metadata, MCP tools, result JSON bundles, explorer read model,
+    submission validator behavior, sql_compat rule catalog, generated docs,
+    benchbox.experimental, _project scripts, and TODO/ADR docs.
+
+    Required columns: surface, current tier, owner, compatibility promise,
+    deprecation path, verification gate, and source of truth.
+
+- id: w2
+  summary: "Add a support_status taxonomy for platforms and benchmarks"
+  needs: [w1]
+  status: done
+  notes: |
+    Define allowed statuses: stable, beta, experimental, repo_only,
+    deprecated, document_only. Record what each status means for packaging,
+    docs, registry visibility, MCP exposure, CI coverage, and breakage policy.
+
+    This work unit defines the vocabulary and contract. It may add minimal
+    schema/constants only if that avoids duplicating strings in follow-up
+    items. Full registry migration belongs to the platform-extension TODO.
+
+- id: w3
+  summary: "Add a PR checklist gate for public/deprecated surface changes"
+  needs: [w1]
+  status: done
+  notes: |
+    Add or update the project PR checklist so any new public, beta-public,
+    deprecated, generated, or experimental surface must update the contract
+    map or explicitly state why no contract-map change is needed.
+
+    The checklist must mention result schema, MCP params, platform support
+    status, wrapper facades, adapter subclassing hooks, and generated docs.
+
+- id: w4
+  summary: "Create an ADR/contract index for scattered future-state decisions"
+  needs: [w1]
+  status: done
+  notes: |
+    Promote active architecture decisions from scattered TODOs and
+    future-state docs into one index. Include status, owner, blocking gates,
+    and the current implementation surface.
+
+    At minimum index:
+      - docs/design/future-state/formalize-mcp-internal-apis/README.md.
+      - docs/design/future-state/isolate-experimental-core-subsystems/README.md.
+      - docs/reference/backward-compatibility.md entries for wrappers and core.base_benchmark.
+
+- id: w5
+  summary: "Add docs drift checks for current-count and support-claim statements"
+  needs: [w2]
+  status: done
+  notes: |
+    Add generated or tested checks for platform counts, benchmark counts,
+    support-status tables, result-schema version claims, and adapter
+    availability statements. The check should fail on contradictory claims
+    like docs saying a platform is both unavailable and supported.
+
+    Prefer generating tables from registry metadata where possible. If a
+    section is intentionally editorial, mark it as non-authoritative in the
+    public contract map.
+
+deferred:
+- summary: "Fully migrate every platform registry entry to support_status"
+  reason: "Belongs in platform-support-status-and-extension-health after the taxonomy is accepted."
+- summary: "Rewrite architecture.md around the new contract map"
+  reason: "Do after this map lands and downstream TODOs resolve their product-surface decisions."
+
+metadata:
+  tags:
+  - architecture
+  - contracts
+  - docs
+  - support-status
+  estimated_effort: "3-5 days"
+  created_date: "2026-05-21"
+  last_updated: "2026-05-21T00:00:00Z"
+
+impact:
+  business_value: |
+    Converts implicit product promises into explicit contracts so users,
+    contributors, and agents stop treating stale docs or accidental imports as
+    authoritative.
+  user_impact: |
+    Users can tell which surfaces are stable, beta, experimental, deprecated, or
+    repo-only before depending on them.
+  technical_debt: |
+    Reduces map/territory drift and gives the rest of the hardening work one
+    shared vocabulary.
+
+files_affected:
+  added:
+  - "docs/reference/public-contracts.md"
+  modified:
+  - "README.md"
+  - "docs/reference/backward-compatibility.md"
+  - "docs/design/future-state/"
+  - ".github/"
+  - "_project/TODO/"
+
+must_preserve:
+- "Do not downgrade existing public wrapper tests or imply wrappers are unsupported without an explicit deprecation decision."
+- "Do not mark experimental code as stable merely because it is packaged."
+- "Do not change runtime behavior except for narrowly scoped docs/checklist validation needed by this TODO."
+
+approach: |
+  Treat this as a taxonomy and governance change first. Start from existing
+  documented commitments, then reconcile code evidence against those
+  commitments. Prefer a small, enforceable contract map over aspirational prose.
+
+anti_patterns:
+- "DO NOT collapse wrappers into internals just because they duplicate CLI reachability -- tests assert wrapper facades as
+  public behavior -- classify them first, then decide deprecation separately."
+- "DO NOT generate platform counts from docs -- docs are the drifting surface -- generate docs from registry metadata or fail
+  the drift check."
+- "DO NOT introduce vague tiers like supported-ish -- ambiguous tiers recreate the same blind spot -- use the finite support_status
+  vocabulary."
+
+verification:
+- description: "Validate TODO graph and schema after adding the contract-map item."
+  command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate"
+  expected_output: "Validation passes or reports only pre-existing unrelated TODO issues."
+- description: "Run targeted docs checks added by this work."
+  command: "uv run -- python -m pytest tests -k 'contract or docs_drift' --tb=short"
+  expected_output: "New or updated contract/drift checks pass."
+
+scope_limit:
+  only_modify:
+  - "README.md"
+  - "docs/reference/"
+  - "docs/design/future-state/"
+  - ".github/"
+  - "_project/TODO/"
+  - "_project/DONE/"
+  do_not_modify:
+  - "benchbox/platforms/"
+  - "benchbox/core/results/"
+  - "benchbox/mcp/"
+
+prior_art:
+- "docs/reference/backward-compatibility.md: existing shim/deprecation registry -- extend, do not duplicate."
+- "docs/reference/hosted-results-contract.md: existing product-contract style -- reuse the crisp contract language."
+- "Makefile: compat docs generation targets -- reuse generated-docs checks where feasible."
+
+success_metrics:
+- "Every reviewed public surface has one tier, one owner, and one verification gate."
+- "Platform and benchmark counts in docs derive from one authoritative source or are marked non-authoritative."
+- "Future architecture reviews can cite the contract map instead of rebuilding the surface inventory."
+
+open_questions:
+- "Should benchbox.experimental remain packaged in wheels, move to an extra, or become repo-only before 1.0?"
+- "Who owns the public contract map review gate: maintainers generally, docs owners, or release owners?"

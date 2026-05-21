@@ -34,6 +34,8 @@ Two proposals were discarded during adversarial review:
 
 ## Proposals
 
+- [Architecture contract decision index](contract-index.md) - active planning
+  index for public-contract and future-state decisions
 - [Prune publishing](prune-publishing-subsystem/README.md) - **High** priority (dead code removal)
 - [Remove release tooling from wheel](remove-release-tooling-from-wheel/README.md) - **High** priority
 - [Isolate experimental subsystems](isolate-experimental-core-subsystems/README.md) - **High** priority
@@ -44,6 +46,7 @@ Two proposals were discarded during adversarial review:
 :maxdepth: 1
 :hidden:
 
+contract-index
 prune-publishing-subsystem/README
 remove-release-tooling-from-wheel/README
 isolate-experimental-core-subsystems/README
