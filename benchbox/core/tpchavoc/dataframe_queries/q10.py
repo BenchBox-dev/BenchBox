@@ -53,7 +53,7 @@ def q10_v2_expression_impl(ctx: DataFrameContext) -> Any:
     filtered_orders = orders.filter((col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") < lit(end_date)))
     filtered_lineitem = lineitem.filter(col("l_returnflag") == lit("R"))
 
-    result = (
+    return (
         customer.join(filtered_orders, left_on="c_custkey", right_on="o_custkey")
         .join(filtered_lineitem, left_on="o_orderkey", right_on="l_orderkey")
         .join(nation, left_on="c_nationkey", right_on="n_nationkey")
@@ -62,7 +62,6 @@ def q10_v2_expression_impl(ctx: DataFrameContext) -> Any:
         .sort("revenue", descending=True)
         .limit(20)
     )
-    return result
 
 
 def q10_v2_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -110,7 +109,7 @@ def q10_v3_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    result = (
+    return (
         customer.select("c_custkey", "c_name", "c_acctbal", "c_phone", "c_address", "c_comment", "c_nationkey")
         .join(
             orders.select("o_custkey", "o_orderkey", "o_orderdate").filter(
@@ -132,7 +131,6 @@ def q10_v3_expression_impl(ctx: DataFrameContext) -> Any:
         .sort("revenue", descending=True)
         .limit(20)
     )
-    return result
 
 
 def q10_v3_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -211,7 +209,7 @@ def q10_v5_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    result = (
+    return (
         customer.join(orders, left_on="c_custkey", right_on="o_custkey")
         .filter((col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") < lit(end_date)))
         .join(lineitem, left_on="o_orderkey", right_on="l_orderkey")
@@ -223,7 +221,6 @@ def q10_v5_expression_impl(ctx: DataFrameContext) -> Any:
         .sort("revenue", descending=True)
         .limit(20)
     )
-    return result
 
 
 def q10_v5_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -299,7 +296,7 @@ def q10_v7_expression_impl(ctx: DataFrameContext) -> Any:
     end_date = params["end_date"]
 
     # Swapped: start from orders→customer
-    result = (
+    return (
         orders.filter((col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") < lit(end_date)))
         .join(customer, left_on="o_custkey", right_on="c_custkey")
         .join(lineitem.filter(col("l_returnflag") == lit("R")), left_on="o_orderkey", right_on="l_orderkey")
@@ -309,7 +306,6 @@ def q10_v7_expression_impl(ctx: DataFrameContext) -> Any:
         .sort("revenue", descending=True)
         .limit(20)
     )
-    return result
 
 
 def q10_v7_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -357,7 +353,7 @@ def q10_v8_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    result = (
+    return (
         customer.join(orders, left_on="c_custkey", right_on="o_custkey")
         .join(lineitem, left_on="o_orderkey", right_on="l_orderkey")
         # Combine both filters in single call after all joins
@@ -372,7 +368,6 @@ def q10_v8_expression_impl(ctx: DataFrameContext) -> Any:
         .sort("revenue", descending=True)
         .limit(20)
     )
-    return result
 
 
 def q10_v8_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -421,7 +416,7 @@ def q10_v9_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    result = (
+    return (
         customer.join(orders, left_on="c_custkey", right_on="o_custkey")
         .filter((col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") < lit(end_date)))
         .join(lineitem, left_on="o_orderkey", right_on="l_orderkey")
@@ -432,7 +427,6 @@ def q10_v9_expression_impl(ctx: DataFrameContext) -> Any:
         .sort("revenue", descending=True)
         .limit(20)
     )
-    return result
 
 
 def q10_v9_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -481,7 +475,7 @@ def q10_v10_expression_impl(ctx: DataFrameContext) -> Any:
 
     revenue_alt = col("l_extendedprice") - col("l_extendedprice") * col("l_discount")
 
-    result = (
+    return (
         customer.join(orders, left_on="c_custkey", right_on="o_custkey")
         .filter((col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") < lit(end_date)))
         .join(lineitem, left_on="o_orderkey", right_on="l_orderkey")
@@ -492,7 +486,6 @@ def q10_v10_expression_impl(ctx: DataFrameContext) -> Any:
         .sort("revenue", descending=True)
         .limit(20)
     )
-    return result
 
 
 def q10_v10_pandas_impl(ctx: DataFrameContext) -> Any:

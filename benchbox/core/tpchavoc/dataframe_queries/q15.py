@@ -180,12 +180,11 @@ def q15_v4_expression_impl(ctx: DataFrameContext) -> Any:
     # Step 4: filter to top suppliers
     top_revenue = revenue.filter(col("total_revenue") == lit(max_revenue))
     # Step 5: join with suppliers
-    result = (
+    return (
         supplier.join(top_revenue, left_on="s_suppkey", right_on="supplier_no")
         .select("s_suppkey", "s_name", "s_address", "s_phone", "total_revenue")
         .sort("s_suppkey")
     )
-    return result
 
 
 def q15_v4_pandas_impl(ctx: DataFrameContext) -> Any:

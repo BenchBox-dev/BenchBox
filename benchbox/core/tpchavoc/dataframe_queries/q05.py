@@ -56,7 +56,7 @@ def q5_v2_expression_impl(ctx: DataFrameContext) -> Any:
     filtered_region = region.filter(col("r_name") == lit(region_name))
     filtered_orders = orders.filter((col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") < lit(end_date)))
 
-    result = (
+    return (
         filtered_region.join(nation, left_on="r_regionkey", right_on="n_regionkey")
         .join(customer, left_on="n_nationkey", right_on="c_nationkey")
         .join(filtered_orders, left_on="c_custkey", right_on="o_custkey")
@@ -66,7 +66,6 @@ def q5_v2_expression_impl(ctx: DataFrameContext) -> Any:
         .agg((col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"))
         .sort("revenue", descending=True)
     )
-    return result
 
 
 def q5_v2_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -119,7 +118,7 @@ def q5_v3_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    result = (
+    return (
         region.select("r_regionkey", "r_name")
         .filter(col("r_name") == lit(region_name))
         .join(nation.select("n_regionkey", "n_nationkey", "n_name"), left_on="r_regionkey", right_on="n_regionkey")
@@ -145,7 +144,6 @@ def q5_v3_expression_impl(ctx: DataFrameContext) -> Any:
         .agg((col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"))
         .sort("revenue", descending=True)
     )
-    return result
 
 
 def q5_v3_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -237,7 +235,7 @@ def q5_v5_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    result = (
+    return (
         region.filter(col("r_name") == lit(region_name))
         .join(nation, left_on="r_regionkey", right_on="n_regionkey")
         .join(customer, left_on="n_nationkey", right_on="c_nationkey")
@@ -250,7 +248,6 @@ def q5_v5_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("revenue").sum().alias("revenue"))
         .sort("revenue", descending=True)
     )
-    return result
 
 
 def q5_v5_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -342,14 +339,13 @@ def q5_v7_expression_impl(ctx: DataFrameContext) -> Any:
     customer_orders = asia_customers.join(orders, left_on="c_custkey", right_on="o_custkey").filter(
         (col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") < lit(end_date))
     )
-    result = (
+    return (
         customer_orders.join(lineitem, left_on="o_orderkey", right_on="l_orderkey")
         .join(supplier, left_on=["l_suppkey", "n_nationkey"], right_on=["s_suppkey", "s_nationkey"])
         .group_by("n_name")
         .agg((col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"))
         .sort("revenue", descending=True)
     )
-    return result
 
 
 def q5_v7_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -441,7 +437,7 @@ def q5_v9_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    result = (
+    return (
         region.filter(col("r_name") == lit(region_name))
         .join(nation, left_on="r_regionkey", right_on="n_regionkey")
         .join(customer, left_on="n_nationkey", right_on="c_nationkey")
@@ -453,7 +449,6 @@ def q5_v9_expression_impl(ctx: DataFrameContext) -> Any:
         .agg((col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"))
         .sort("revenue", descending=True)
     )
-    return result
 
 
 def q5_v9_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -508,7 +503,7 @@ def q5_v10_expression_impl(ctx: DataFrameContext) -> Any:
 
     revenue_alt = col("l_extendedprice") - col("l_extendedprice") * col("l_discount")
 
-    result = (
+    return (
         region.filter(col("r_name") == lit(region_name))
         .join(nation, left_on="r_regionkey", right_on="n_regionkey")
         .join(customer, left_on="n_nationkey", right_on="c_nationkey")
@@ -520,7 +515,6 @@ def q5_v10_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(revenue_alt.sum().alias("revenue"))
         .sort("revenue", descending=True)
     )
-    return result
 
 
 def q5_v10_pandas_impl(ctx: DataFrameContext) -> Any:

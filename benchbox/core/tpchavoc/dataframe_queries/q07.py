@@ -59,7 +59,7 @@ def q7_v2_expression_impl(ctx: DataFrameContext) -> Any:
     # Pre-filter lineitem by date
     filtered_lineitem = lineitem.filter((col("l_shipdate") >= lit(start_date)) & (col("l_shipdate") <= lit(end_date)))
 
-    result = (
+    return (
         supplier.join(n1, left_on="s_nationkey", right_on="n1_nationkey")
         .join(filtered_lineitem, left_on="s_suppkey", right_on="l_suppkey")
         .join(orders, left_on="l_orderkey", right_on="o_orderkey")
@@ -77,7 +77,6 @@ def q7_v2_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("volume").sum().alias("revenue"))
         .sort("supp_nation", "cust_nation", "l_year")
     )
-    return result
 
 
 def q7_v2_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -144,7 +143,7 @@ def q7_v3_expression_impl(ctx: DataFrameContext) -> Any:
     n1 = nation.select(col("n_nationkey").alias("n1_nationkey"), col("n_name").alias("supp_nation"))
     n2 = nation.select(col("n_nationkey").alias("n2_nationkey"), col("n_name").alias("cust_nation"))
 
-    result = (
+    return (
         supplier.select("s_suppkey", "s_nationkey")
         .join(n1, left_on="s_nationkey", right_on="n1_nationkey")
         .join(
@@ -168,7 +167,6 @@ def q7_v3_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("volume").sum().alias("revenue"))
         .sort("supp_nation", "cust_nation", "l_year")
     )
-    return result
 
 
 def q7_v3_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -246,7 +244,7 @@ def q7_v5_expression_impl(ctx: DataFrameContext) -> Any:
     n1 = nation.select(col("n_nationkey").alias("n1_nationkey"), col("n_name").alias("supp_nation"))
     n2 = nation.select(col("n_nationkey").alias("n2_nationkey"), col("n_name").alias("cust_nation"))
 
-    result = (
+    return (
         supplier.join(n1, left_on="s_nationkey", right_on="n1_nationkey")
         .join(lineitem, left_on="s_suppkey", right_on="l_suppkey")
         .filter((col("l_shipdate") >= lit(start_date)) & (col("l_shipdate") <= lit(end_date)))
@@ -266,7 +264,6 @@ def q7_v5_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("volume").sum().alias("revenue"))
         .sort("supp_nation", "cust_nation", "l_year")
     )
-    return result
 
 
 def q7_v5_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -368,7 +365,7 @@ def q7_v7_expression_impl(ctx: DataFrameContext) -> Any:
     n2 = nation.select(col("n_nationkey").alias("n2_nationkey"), col("n_name").alias("cust_nation"))
 
     # Swapped: lineitem → supplier instead of supplier → lineitem
-    result = (
+    return (
         lineitem.filter((col("l_shipdate") >= lit(start_date)) & (col("l_shipdate") <= lit(end_date)))
         .join(supplier, left_on="l_suppkey", right_on="s_suppkey")
         .join(n1, left_on="s_nationkey", right_on="n1_nationkey")
@@ -387,7 +384,6 @@ def q7_v7_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("volume").sum().alias("revenue"))
         .sort("supp_nation", "cust_nation", "l_year")
     )
-    return result
 
 
 def q7_v7_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -464,7 +460,7 @@ def q7_v9_expression_impl(ctx: DataFrameContext) -> Any:
     n1 = nation.select(col("n_nationkey").alias("n1_nationkey"), col("n_name").alias("supp_nation"))
     n2 = nation.select(col("n_nationkey").alias("n2_nationkey"), col("n_name").alias("cust_nation"))
 
-    result = (
+    return (
         supplier.join(n1, left_on="s_nationkey", right_on="n1_nationkey")
         .join(lineitem, left_on="s_suppkey", right_on="l_suppkey")
         .filter((col("l_shipdate") >= lit(start_date)) & (col("l_shipdate") <= lit(end_date)))
@@ -483,7 +479,6 @@ def q7_v9_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("volume").sum().alias("revenue"))
         .sort(["supp_nation", "cust_nation", "l_year"], descending=[False, False, False])
     )
-    return result
 
 
 def q7_v9_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -549,7 +544,7 @@ def q7_v10_expression_impl(ctx: DataFrameContext) -> Any:
     # Alternative: price - price*disc
     volume_alt = col("l_extendedprice") - col("l_extendedprice") * col("l_discount")
 
-    result = (
+    return (
         supplier.join(n1, left_on="s_nationkey", right_on="n1_nationkey")
         .join(lineitem, left_on="s_suppkey", right_on="l_suppkey")
         .filter((col("l_shipdate") >= lit(start_date)) & (col("l_shipdate") <= lit(end_date)))
@@ -568,7 +563,6 @@ def q7_v10_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("volume").sum().alias("revenue"))
         .sort("supp_nation", "cust_nation", "l_year")
     )
-    return result
 
 
 def q7_v10_pandas_impl(ctx: DataFrameContext) -> Any:

@@ -54,7 +54,7 @@ def q9_v2_expression_impl(ctx: DataFrameContext) -> Any:
     # Pre-filter part by name
     filtered_part = part.filter(col("p_name").str.contains(color))
 
-    result = (
+    return (
         filtered_part.join(lineitem, left_on="p_partkey", right_on="l_partkey")
         .join(supplier, left_on="l_suppkey", right_on="s_suppkey")
         .join(partsupp, left_on=["l_suppkey", "p_partkey"], right_on=["ps_suppkey", "ps_partkey"])
@@ -70,7 +70,6 @@ def q9_v2_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("amount").sum().alias("sum_profit"))
         .sort(["nation", "o_year"], descending=[False, True])
     )
-    return result
 
 
 def q9_v2_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -122,7 +121,7 @@ def q9_v3_expression_impl(ctx: DataFrameContext) -> Any:
     params = get_tpch_parameters(9)
     color = params["color"]
 
-    result = (
+    return (
         part.select("p_partkey", "p_name")
         .filter(col("p_name").str.contains(color))
         .join(
@@ -148,7 +147,6 @@ def q9_v3_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("amount").sum().alias("sum_profit"))
         .sort(["nation", "o_year"], descending=[False, True])
     )
-    return result
 
 
 def q9_v3_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -289,7 +287,7 @@ def q9_v7_expression_impl(ctx: DataFrameContext) -> Any:
     color = params["color"]
 
     # Swapped: start from lineitem→part
-    result = (
+    return (
         lineitem.join(part.filter(col("p_name").str.contains(color)), left_on="l_partkey", right_on="p_partkey")
         .join(supplier, left_on="l_suppkey", right_on="s_suppkey")
         .join(partsupp, left_on=["l_suppkey", "p_partkey"], right_on=["ps_suppkey", "ps_partkey"])
@@ -305,7 +303,6 @@ def q9_v7_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("amount").sum().alias("sum_profit"))
         .sort(["nation", "o_year"], descending=[False, True])
     )
-    return result
 
 
 def q9_v7_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -397,7 +394,7 @@ def q9_v9_expression_impl(ctx: DataFrameContext) -> Any:
     params = get_tpch_parameters(9)
     color = params["color"]
 
-    result = (
+    return (
         part.filter(col("p_name").str.contains(color))
         .join(lineitem, left_on="p_partkey", right_on="l_partkey")
         .join(supplier, left_on="l_suppkey", right_on="s_suppkey")
@@ -414,7 +411,6 @@ def q9_v9_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("amount").sum().alias("sum_profit"))
         .sort(["nation", "o_year"], descending=[False, True])
     )
-    return result
 
 
 def q9_v9_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -443,7 +439,7 @@ def q9_v10_expression_impl(ctx: DataFrameContext) -> Any:
         "l_quantity"
     )
 
-    result = (
+    return (
         part.filter(col("p_name").str.contains(color))
         .join(lineitem, left_on="p_partkey", right_on="l_partkey")
         .join(supplier, left_on="l_suppkey", right_on="s_suppkey")
@@ -458,7 +454,6 @@ def q9_v10_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("amount").sum().alias("sum_profit"))
         .sort(["nation", "o_year"], descending=[False, True])
     )
-    return result
 
 
 def q9_v10_pandas_impl(ctx: DataFrameContext) -> Any:

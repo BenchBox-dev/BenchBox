@@ -48,7 +48,7 @@ def q1_v2_expression_impl(ctx: DataFrameContext) -> Any:
 
     # Pre-filter first, then aggregate
     filtered = lineitem.filter(col("l_shipdate") <= lit(cutoff_date))
-    result = (
+    return (
         filtered.group_by("l_returnflag", "l_linestatus")
         .agg(
             col("l_quantity").sum().alias("sum_qty"),
@@ -62,7 +62,6 @@ def q1_v2_expression_impl(ctx: DataFrameContext) -> Any:
         )
         .sort("l_returnflag", "l_linestatus")
     )
-    return result
 
 
 def q1_v2_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -78,7 +77,7 @@ def q1_v2_pandas_impl(ctx: DataFrameContext) -> Any:
     filtered["disc_price"] = filtered["l_extendedprice"] * (1 - filtered["l_discount"])
     filtered["charge"] = filtered["disc_price"] * (1 + filtered["l_tax"])
 
-    result = (
+    return (
         filtered.groupby(["l_returnflag", "l_linestatus"], as_index=False)
         .agg(
             sum_qty=("l_quantity", "sum"),
@@ -92,7 +91,6 @@ def q1_v2_pandas_impl(ctx: DataFrameContext) -> Any:
         )
         .sort_values(["l_returnflag", "l_linestatus"])
     )
-    return result
 
 
 # ---------------------------------------------------------------------------
@@ -118,7 +116,7 @@ def q1_v3_expression_impl(ctx: DataFrameContext) -> Any:
         "l_orderkey",
         "l_shipdate",
     ]
-    result = (
+    return (
         lineitem.select(needed_cols)
         .filter(col("l_shipdate") <= lit(cutoff_date))
         .group_by("l_returnflag", "l_linestatus")
@@ -134,7 +132,6 @@ def q1_v3_expression_impl(ctx: DataFrameContext) -> Any:
         )
         .sort("l_returnflag", "l_linestatus")
     )
-    return result
 
 
 def q1_v3_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -158,7 +155,7 @@ def q1_v3_pandas_impl(ctx: DataFrameContext) -> Any:
     filtered["disc_price"] = filtered["l_extendedprice"] * (1 - filtered["l_discount"])
     filtered["charge"] = filtered["disc_price"] * (1 + filtered["l_tax"])
 
-    result = (
+    return (
         filtered.groupby(["l_returnflag", "l_linestatus"], as_index=False)
         .agg(
             sum_qty=("l_quantity", "sum"),
@@ -172,7 +169,6 @@ def q1_v3_pandas_impl(ctx: DataFrameContext) -> Any:
         )
         .sort_values(["l_returnflag", "l_linestatus"])
     )
-    return result
 
 
 # ---------------------------------------------------------------------------
@@ -202,8 +198,7 @@ def q1_v4_expression_impl(ctx: DataFrameContext) -> Any:
         col("l_orderkey").count().alias("count_order"),
     )
     # Step 3: sort
-    result = step2.sort("l_returnflag", "l_linestatus")
-    return result
+    return step2.sort("l_returnflag", "l_linestatus")
 
 
 def q1_v4_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -228,8 +223,7 @@ def q1_v4_pandas_impl(ctx: DataFrameContext) -> Any:
         count_order=("l_orderkey", "count"),
     )
     # Step 4: sort
-    result = aggregated.sort_values(["l_returnflag", "l_linestatus"])
-    return result
+    return aggregated.sort_values(["l_returnflag", "l_linestatus"])
 
 
 # ---------------------------------------------------------------------------
@@ -245,7 +239,7 @@ def q1_v5_expression_impl(ctx: DataFrameContext) -> Any:
     params = get_tpch_parameters(1)
     cutoff_date = params["cutoff_date"]
 
-    result = (
+    return (
         lineitem.filter(col("l_shipdate") <= lit(cutoff_date))
         .with_columns(
             (col("l_extendedprice") * (lit(1) - col("l_discount"))).alias("disc_price"),
@@ -264,7 +258,6 @@ def q1_v5_expression_impl(ctx: DataFrameContext) -> Any:
         )
         .sort("l_returnflag", "l_linestatus")
     )
-    return result
 
 
 def q1_v5_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -277,7 +270,7 @@ def q1_v5_pandas_impl(ctx: DataFrameContext) -> Any:
     filtered["disc_price"] = filtered["l_extendedprice"] * (1 - filtered["l_discount"])
     filtered["charge"] = filtered["disc_price"] * (1 + filtered["l_tax"])
 
-    result = (
+    return (
         filtered.groupby(["l_returnflag", "l_linestatus"], as_index=False)
         .agg(
             sum_qty=("l_quantity", "sum"),
@@ -291,7 +284,6 @@ def q1_v5_pandas_impl(ctx: DataFrameContext) -> Any:
         )
         .sort_values(["l_returnflag", "l_linestatus"])
     )
-    return result
 
 
 # ---------------------------------------------------------------------------
@@ -359,7 +351,7 @@ def q1_v7_expression_impl(ctx: DataFrameContext) -> Any:
     cutoff_date = params["cutoff_date"]
 
     # Group by in reversed key order, then re-sort correctly
-    result = (
+    return (
         lineitem.filter(col("l_shipdate") <= lit(cutoff_date))
         .group_by("l_linestatus", "l_returnflag")
         .agg(
@@ -386,7 +378,6 @@ def q1_v7_expression_impl(ctx: DataFrameContext) -> Any:
         )
         .sort("l_returnflag", "l_linestatus")
     )
-    return result
 
 
 def q1_v7_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -442,7 +433,7 @@ def q1_v8_expression_impl(ctx: DataFrameContext) -> Any:
     cutoff_date = params["cutoff_date"]
 
     # Compound predicate in a single filter call
-    result = (
+    return (
         lineitem.filter((col("l_shipdate") <= lit(cutoff_date)) & (col("l_quantity") > lit(0)))
         .filter(col("l_extendedprice") > lit(0))
         .group_by("l_returnflag", "l_linestatus")
@@ -458,7 +449,6 @@ def q1_v8_expression_impl(ctx: DataFrameContext) -> Any:
         )
         .sort("l_returnflag", "l_linestatus")
     )
-    return result
 
 
 def q1_v8_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -474,7 +464,7 @@ def q1_v8_pandas_impl(ctx: DataFrameContext) -> Any:
     filtered["disc_price"] = filtered["l_extendedprice"] * (1 - filtered["l_discount"])
     filtered["charge"] = filtered["disc_price"] * (1 + filtered["l_tax"])
 
-    result = (
+    return (
         filtered.groupby(["l_returnflag", "l_linestatus"], as_index=False)
         .agg(
             sum_qty=("l_quantity", "sum"),
@@ -488,7 +478,6 @@ def q1_v8_pandas_impl(ctx: DataFrameContext) -> Any:
         )
         .sort_values(["l_returnflag", "l_linestatus"])
     )
-    return result
 
 
 # ---------------------------------------------------------------------------
@@ -504,7 +493,7 @@ def q1_v9_expression_impl(ctx: DataFrameContext) -> Any:
     params = get_tpch_parameters(1)
     cutoff_date = params["cutoff_date"]
 
-    result = (
+    return (
         lineitem.filter(col("l_shipdate") <= lit(cutoff_date))
         .group_by("l_returnflag", "l_linestatus")
         .agg(
@@ -519,7 +508,6 @@ def q1_v9_expression_impl(ctx: DataFrameContext) -> Any:
         )
         .sort(["l_returnflag", "l_linestatus"], descending=[False, False])
     )
-    return result
 
 
 def q1_v9_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -531,7 +519,7 @@ def q1_v9_pandas_impl(ctx: DataFrameContext) -> Any:
     filtered["disc_price"] = filtered["l_extendedprice"] * (1 - filtered["l_discount"])
     filtered["charge"] = filtered["disc_price"] * (1 + filtered["l_tax"])
 
-    result = (
+    return (
         filtered.groupby(["l_returnflag", "l_linestatus"], as_index=False)
         .agg(
             sum_qty=("l_quantity", "sum"),
@@ -545,7 +533,6 @@ def q1_v9_pandas_impl(ctx: DataFrameContext) -> Any:
         )
         .sort_values(["l_returnflag", "l_linestatus"], ascending=[True, True])
     )
-    return result
 
 
 # ---------------------------------------------------------------------------
@@ -565,7 +552,7 @@ def q1_v10_expression_impl(ctx: DataFrameContext) -> Any:
     disc_price_alt = col("l_extendedprice") - col("l_extendedprice") * col("l_discount")
     charge_alt = disc_price_alt * (lit(1) + col("l_tax"))
 
-    result = (
+    return (
         lineitem.filter(col("l_shipdate") <= lit(cutoff_date))
         .group_by("l_returnflag", "l_linestatus")
         .agg(
@@ -580,7 +567,6 @@ def q1_v10_expression_impl(ctx: DataFrameContext) -> Any:
         )
         .sort("l_returnflag", "l_linestatus")
     )
-    return result
 
 
 def q1_v10_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -593,7 +579,7 @@ def q1_v10_pandas_impl(ctx: DataFrameContext) -> Any:
     filtered["disc_price"] = filtered["l_extendedprice"] - filtered["l_extendedprice"] * filtered["l_discount"]
     filtered["charge"] = filtered["disc_price"] * (1 + filtered["l_tax"])
 
-    result = (
+    return (
         filtered.groupby(["l_returnflag", "l_linestatus"], as_index=False)
         .agg(
             sum_qty=("l_quantity", "sum"),
@@ -607,7 +593,6 @@ def q1_v10_pandas_impl(ctx: DataFrameContext) -> Any:
         )
         .sort_values(["l_returnflag", "l_linestatus"])
     )
-    return result
 
 
 # ---------------------------------------------------------------------------

@@ -54,7 +54,7 @@ def q3_v2_expression_impl(ctx: DataFrameContext) -> Any:
     filtered_orders = orders.filter(col("o_orderdate") < lit(order_date))
     filtered_lineitem = lineitem.filter(col("l_shipdate") > lit(order_date))
 
-    result = (
+    return (
         filtered_customer.join(filtered_orders, left_on="c_custkey", right_on="o_custkey")
         .join(filtered_lineitem, left_on="o_orderkey", right_on="l_orderkey")
         .group_by("o_orderkey", "o_orderdate", "o_shippriority")
@@ -62,7 +62,6 @@ def q3_v2_expression_impl(ctx: DataFrameContext) -> Any:
         .sort(["revenue", "o_orderdate"], descending=[True, False])
         .limit(10)
     )
-    return result
 
 
 def q3_v2_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -106,7 +105,7 @@ def q3_v3_expression_impl(ctx: DataFrameContext) -> Any:
     segment = params["segment"]
     order_date = params["order_date"]
 
-    result = (
+    return (
         customer.select("c_custkey", "c_mktsegment")
         .filter(col("c_mktsegment") == lit(segment))
         .join(
@@ -126,7 +125,6 @@ def q3_v3_expression_impl(ctx: DataFrameContext) -> Any:
         .sort(["revenue", "o_orderdate"], descending=[True, False])
         .limit(10)
     )
-    return result
 
 
 def q3_v3_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -186,8 +184,7 @@ def q3_v4_expression_impl(ctx: DataFrameContext) -> Any:
         (col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue")
     )
     # Step 5: sort and limit
-    result = aggregated.sort(["revenue", "o_orderdate"], descending=[True, False]).limit(10)
-    return result
+    return aggregated.sort(["revenue", "o_orderdate"], descending=[True, False]).limit(10)
 
 
 def q3_v4_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -227,7 +224,7 @@ def q3_v5_expression_impl(ctx: DataFrameContext) -> Any:
     segment = params["segment"]
     order_date = params["order_date"]
 
-    result = (
+    return (
         customer.filter(col("c_mktsegment") == lit(segment))
         .join(orders, left_on="c_custkey", right_on="o_custkey")
         .filter(col("o_orderdate") < lit(order_date))
@@ -239,7 +236,6 @@ def q3_v5_expression_impl(ctx: DataFrameContext) -> Any:
         .sort(["revenue", "o_orderdate"], descending=[True, False])
         .limit(10)
     )
-    return result
 
 
 def q3_v5_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -312,7 +308,7 @@ def q3_v7_expression_impl(ctx: DataFrameContext) -> Any:
     orders_lineitem = orders.filter(col("o_orderdate") < lit(order_date)).join(
         lineitem.filter(col("l_shipdate") > lit(order_date)), left_on="o_orderkey", right_on="l_orderkey"
     )
-    result = (
+    return (
         customer.filter(col("c_mktsegment") == lit(segment))
         .join(orders_lineitem, left_on="c_custkey", right_on="o_custkey")
         .group_by("o_orderkey", "o_orderdate", "o_shippriority")
@@ -320,7 +316,6 @@ def q3_v7_expression_impl(ctx: DataFrameContext) -> Any:
         .sort(["revenue", "o_orderdate"], descending=[True, False])
         .limit(10)
     )
-    return result
 
 
 def q3_v7_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -366,7 +361,7 @@ def q3_v8_expression_impl(ctx: DataFrameContext) -> Any:
     segment = params["segment"]
     order_date = params["order_date"]
 
-    result = (
+    return (
         customer.filter(col("c_mktsegment") == lit(segment))
         .join(orders, left_on="c_custkey", right_on="o_custkey")
         .join(lineitem, left_on="o_orderkey", right_on="l_orderkey")
@@ -377,7 +372,6 @@ def q3_v8_expression_impl(ctx: DataFrameContext) -> Any:
         .sort(["revenue", "o_orderdate"], descending=[True, False])
         .limit(10)
     )
-    return result
 
 
 def q3_v8_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -420,7 +414,7 @@ def q3_v9_expression_impl(ctx: DataFrameContext) -> Any:
     segment = params["segment"]
     order_date = params["order_date"]
 
-    result = (
+    return (
         customer.filter(col("c_mktsegment") == lit(segment))
         .join(orders, left_on="c_custkey", right_on="o_custkey")
         .filter(col("o_orderdate") < lit(order_date))
@@ -431,7 +425,6 @@ def q3_v9_expression_impl(ctx: DataFrameContext) -> Any:
         .sort(["revenue", "o_orderdate"], descending=[True, False])
         .limit(10)
     )
-    return result
 
 
 def q3_v9_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -476,7 +469,7 @@ def q3_v10_expression_impl(ctx: DataFrameContext) -> Any:
 
     revenue_alt = col("l_extendedprice") - col("l_extendedprice") * col("l_discount")
 
-    result = (
+    return (
         customer.filter(col("c_mktsegment") == lit(segment))
         .join(orders, left_on="c_custkey", right_on="o_custkey")
         .filter(col("o_orderdate") < lit(order_date))
@@ -487,7 +480,6 @@ def q3_v10_expression_impl(ctx: DataFrameContext) -> Any:
         .sort(["revenue", "o_orderdate"], descending=[True, False])
         .limit(10)
     )
-    return result
 
 
 def q3_v10_pandas_impl(ctx: DataFrameContext) -> Any:
