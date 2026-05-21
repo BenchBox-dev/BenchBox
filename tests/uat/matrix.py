@@ -19,6 +19,9 @@ import socket
 from dataclasses import dataclass
 from typing import Iterable
 
+from benchbox.core.benchmark_registry import CATEGORY_ORDER
+from benchbox.core.platform_registry import PlatformRegistry
+
 # Platform → "host:port" for TCP reachability probes. Mirrors
 # `get_platform_port` in scripts/local_stress_test.sh.
 PLATFORM_PORTS: dict[str, str] = {
@@ -131,30 +134,61 @@ SLOW_DOCKER_PLATFORMS: tuple[str, ...] = (
     "singlestore",
     "velox",
 )
-DATAFRAME_PLATFORMS: tuple[str, ...] = (
-    "polars-df",
-    "pandas-df",
-    "modin-df",
-    "pyspark-df",
-    "dask-df",
-    "datafusion-df",
+UAT_DATAFRAME_PLATFORM_BASES: tuple[str, ...] = (
+    "polars",
+    "pandas",
+    "modin",
+    "pyspark",
+    "dask",
+    "datafusion",
 )
+
+SQL_PLATFORMS: tuple[str, ...] = ()
+DOCKER_PLATFORMS: tuple[str, ...] = ()
+DATAFRAME_PLATFORMS: tuple[str, ...] = ()
+
+
+def _registry_platform_subset(
+    group_name: str,
+    candidates: tuple[str, ...],
+    registry_platforms: Iterable[str],
+) -> tuple[str, ...]:
+    registry_set = set(registry_platforms)
+    missing = tuple(platform for platform in candidates if platform not in registry_set)
+    if missing:
+        raise ValueError(f"UAT {group_name} platforms missing from platform registry: {missing}")
+    return candidates
+
+
+def _dataframe_selector_platforms() -> tuple[str, ...]:
+    registry_platforms = set(PlatformRegistry.get_dataframe_platforms())
+    missing = tuple(platform for platform in UAT_DATAFRAME_PLATFORM_BASES if platform not in registry_platforms)
+    if missing:
+        raise ValueError(f"UAT dataframe platforms missing from platform registry: {missing}")
+    return tuple(f"{platform}-df" for platform in UAT_DATAFRAME_PLATFORM_BASES)
+
+
+SQL_PLATFORMS = _registry_platform_subset(
+    "sql",
+    FAST_NATIVE_PLATFORMS + FAST_DOCKER_PLATFORMS + SLOW_NATIVE_PLATFORMS + SLOW_DOCKER_PLATFORMS,
+    PlatformRegistry.get_sql_platforms(),
+)
+DOCKER_PLATFORMS = _registry_platform_subset(
+    "docker",
+    FAST_DOCKER_PLATFORMS + SLOW_DOCKER_PLATFORMS,
+    PlatformRegistry.get_self_hosted_platforms(),
+)
+DATAFRAME_PLATFORMS = _dataframe_selector_platforms()
 
 PLATFORM_GROUPS: dict[str, tuple[str, ...]] = {
     "fast": FAST_NATIVE_PLATFORMS + FAST_DOCKER_PLATFORMS,
     "slow": SLOW_NATIVE_PLATFORMS + SLOW_DOCKER_PLATFORMS,
-    "sql": (FAST_NATIVE_PLATFORMS + FAST_DOCKER_PLATFORMS + SLOW_NATIVE_PLATFORMS + SLOW_DOCKER_PLATFORMS),
+    "sql": SQL_PLATFORMS,
     "dataframe": DATAFRAME_PLATFORMS,
-    "docker": FAST_DOCKER_PLATFORMS + SLOW_DOCKER_PLATFORMS,
+    "docker": DOCKER_PLATFORMS,
     "docker-fast": FAST_DOCKER_PLATFORMS,
     "docker-slow": SLOW_DOCKER_PLATFORMS,
-    "all": (
-        FAST_NATIVE_PLATFORMS
-        + FAST_DOCKER_PLATFORMS
-        + SLOW_NATIVE_PLATFORMS
-        + SLOW_DOCKER_PLATFORMS
-        + DATAFRAME_PLATFORMS
-    ),
+    "all": SQL_PLATFORMS + DATAFRAME_PLATFORMS,
 }
 
 
@@ -282,26 +316,14 @@ def load_benchmarks() -> dict[str, BenchmarkInfo]:
     return out
 
 
+def category_group_slug(category: str) -> str:
+    return "".join(ch for ch in category.lower() if ch.isalnum())
+
+
 CATEGORY_GROUPS: dict[str, tuple[str, ...]] = {
-    "tpc": ("TPC",),
-    "primitives": ("Primitives",),
-    "industry": ("Industry",),
-    "academic": ("Academic",),
-    "timeseries": ("Time Series",),
-    "realworld": ("Real World",),
-    "aiml": ("AI/ML",),
-    "experimental": ("Experimental",),
-    "all": (
-        "TPC",
-        "Primitives",
-        "Industry",
-        "Academic",
-        "Time Series",
-        "Real World",
-        "AI/ML",
-        "Experimental",
-    ),
+    category_group_slug(category): (category,) for category in CATEGORY_ORDER
 }
+CATEGORY_GROUPS["all"] = tuple(CATEGORY_ORDER)
 
 
 def resolve_benchmarks(

@@ -694,7 +694,7 @@ work:
 - id: w16
   summary: "Lift sql/dataframe/docker derivations into platform_registry; auto-generate CATEGORY_GROUPS; keep fast/slow UAT-private"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     F15 + F16. `PLATFORM_GROUPS` and `CATEGORY_GROUPS` in
     `tests/uat/matrix.py:127-142,271-290` reinvent or shim taxonomies
@@ -715,6 +715,18 @@ work:
       - `tests/uat/matrix.py:271-290`: CATEGORY_GROUPS
         auto-generated from `benchbox/core/benchmark_registry.py:18`
         `CATEGORY_ORDER` via slug-derivation helper.
+
+    Completed evidence (2026-05-21):
+      - Platform registry now exposes `get_sql_platforms()`,
+        `get_dataframe_platforms()`, and `get_self_hosted_platforms()`.
+      - Server-style platforms that UAT manages through Docker now have
+        explicit self-hosted deployment metadata, and deprecated
+        `clickhouse` stays out of the default helpers.
+      - UAT still owns fast/slow timing buckets, but the `sql`,
+        `dataframe`, `docker`, and `all` groups are derived from
+        registry-backed platform sets.
+      - Category groups are generated from `CATEGORY_ORDER` with a
+        slug helper.
 
     Deps: w0.
 

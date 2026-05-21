@@ -14,6 +14,8 @@ from unittest.mock import patch
 
 import pytest
 
+from benchbox.core.benchmark_registry import CATEGORY_ORDER
+from benchbox.core.platform_registry import PlatformRegistry
 from tests.uat import matrix
 
 pytestmark = pytest.mark.fast
@@ -130,6 +132,15 @@ def test_resolve_platforms_unknown_group():
         matrix.resolve_platforms(groups=["nope"])
 
 
+def test_platform_groups_are_registry_backed():
+    assert matrix.PLATFORM_GROUPS["sql"] == matrix.SQL_PLATFORMS
+    assert matrix.PLATFORM_GROUPS["docker"] == matrix.DOCKER_PLATFORMS
+    assert matrix.PLATFORM_GROUPS["dataframe"] == matrix.DATAFRAME_PLATFORMS
+    assert set(matrix.SQL_PLATFORMS).issubset(PlatformRegistry.get_sql_platforms())
+    assert set(matrix.DOCKER_PLATFORMS).issubset(PlatformRegistry.get_self_hosted_platforms())
+    assert tuple(f"{platform}-df" for platform in matrix.UAT_DATAFRAME_PLATFORM_BASES) == matrix.DATAFRAME_PLATFORMS
+
+
 def test_resolve_benchmarks_categories():
     out = matrix.resolve_benchmarks(groups=["tpc"])
     assert "tpch" in out
@@ -139,6 +150,13 @@ def test_resolve_benchmarks_categories():
 def test_resolve_benchmarks_unknown_group():
     with pytest.raises(ValueError, match="Unknown benchmark group"):
         matrix.resolve_benchmarks(groups=["nope"])
+
+
+def test_category_groups_are_derived_from_registry_order():
+    expected = {matrix.category_group_slug(category): (category,) for category in CATEGORY_ORDER}
+    expected["all"] = tuple(CATEGORY_ORDER)
+
+    assert expected == matrix.CATEGORY_GROUPS
 
 
 # ---------------------------------------------------------------------------

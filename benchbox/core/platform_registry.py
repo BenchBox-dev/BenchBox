@@ -276,6 +276,12 @@ class PlatformRegistry:
     _availability_cache: Optional[dict[str, bool]] = None
     _platform_metadata: dict[str, dict[str, Any]] = {}
     _auto_registered: bool = False
+    _self_hosted_deployment_platforms: tuple[str, ...] = (
+        "clickhouse-server",
+        "postgresql",
+        "presto",
+        "influxdb",
+    )
 
     # Platform name aliases mapping user-friendly names to canonical names
     _platform_aliases: dict[str, str] = {
@@ -1427,9 +1433,39 @@ class PlatformRegistry:
         metadata = dict(base_metadata)
         metadata.update(experimental_metadata)
         metadata.update(dataframe_metadata)
+        cls._apply_self_hosted_deployment_defaults(metadata)
         cls._apply_support_status(metadata)
 
         return metadata
+
+    @classmethod
+    def _apply_self_hosted_deployment_defaults(cls, metadata: dict[str, dict[str, Any]]) -> None:
+        """Add explicit self-hosted deployment metadata for server-style platforms."""
+        for platform_name in cls._self_hosted_deployment_platforms:
+            spec = metadata.get(platform_name)
+            if spec is None:
+                continue
+            caps = spec.setdefault("capabilities", {})
+            caps.setdefault("default_deployment", "self-hosted")
+            deployment_modes = caps.setdefault("deployment_modes", {})
+            deployment_modes.setdefault(
+                "self-hosted",
+                {
+                    "mode": "self-hosted",
+                    "display_name": f"{spec['display_name']} Self-Hosted",
+                    "description": f"Self-hosted {spec['display_name']} server",
+                    "requires_credentials": True,
+                    "requires_cloud_storage": False,
+                    "requires_network": True,
+                    "default_for_platform": True,
+                    "dependencies": [lib["name"] for lib in spec.get("libraries", []) if lib.get("required")],
+                    "auth_methods": ["password"],
+                },
+            )
+
+        velox = metadata.get("velox", {}).get("capabilities", {}).get("deployment_modes", {}).get("remote")
+        if velox is not None:
+            velox["mode"] = "self-hosted"
 
     @staticmethod
     def _apply_support_status(metadata: dict[str, dict[str, Any]]) -> None:
@@ -2103,6 +2139,45 @@ class PlatformRegistry:
             if caps.get("supports_sql") and caps.get("supports_dataframe"):
                 dual_mode.append(name)
         return dual_mode
+
+    @classmethod
+    def get_sql_platforms(cls, *, include_deprecated: bool = False) -> list[str]:
+        """Return registry platforms that support SQL execution."""
+        return cls._get_platforms_matching_capability("supports_sql", include_deprecated=include_deprecated)
+
+    @classmethod
+    def get_dataframe_platforms(cls, *, include_deprecated: bool = False) -> list[str]:
+        """Return registry platforms that support DataFrame execution."""
+        return cls._get_platforms_matching_capability("supports_dataframe", include_deprecated=include_deprecated)
+
+    @classmethod
+    def get_self_hosted_platforms(cls, *, include_deprecated: bool = False) -> list[str]:
+        """Return platforms with at least one self-hosted deployment mode."""
+        metadata = cls.get_all_platform_metadata()
+        out: list[str] = []
+        for name, spec in metadata.items():
+            if not include_deprecated and spec.get("support_status") in {"deprecated", "document_only"}:
+                continue
+            deployment_modes = spec.get("capabilities", {}).get("deployment_modes", {})
+            if any(mode.get("mode") == "self-hosted" for mode in deployment_modes.values()):
+                out.append(name)
+        return out
+
+    @classmethod
+    def _get_platforms_matching_capability(
+        cls,
+        capability: str,
+        *,
+        include_deprecated: bool = False,
+    ) -> list[str]:
+        metadata = cls.get_all_platform_metadata()
+        out: list[str] = []
+        for name, spec in metadata.items():
+            if not include_deprecated and spec.get("support_status") in {"deprecated", "document_only"}:
+                continue
+            if spec.get("capabilities", {}).get(capability, False):
+                out.append(name)
+        return out
 
     @classmethod
     def get_deployment_capability(cls, platform_name: str, deployment_mode: str) -> Optional[DeploymentCapability]:
