@@ -215,7 +215,9 @@ def _ddl_optimize_records() -> list[BaselineRecord]:
     # Platform keys inferred from file paths in the inventory.
     # Note: azure_synapse registers under canonical key "synapse" in the registry
     # (see synapse_ddl_rewrites.py and test_synapse_ddl_optimize_rule_uses_canonical_platform_key).
+    #   platforms/athena.py              → athena  (_convert_to_external_table)
     #   platforms/azure_synapse.py       → azure_synapse  (registry canonical key: "synapse")
+    #   platforms/bigquery.py            → bigquery  (_convert_to_bigquery_table)
     #   platforms/clickhouse/workload.py → clickhouse
     #   platforms/databend/adapter.py    → databend
     #   platforms/databricks/adapter.py  → databricks  (platform_transform_fn → pre-pass loop, w17)
@@ -234,7 +236,9 @@ def _ddl_optimize_records() -> list[BaselineRecord]:
     #   platforms/trino.py               → trino
     #   platforms/velox.py               → velox
     platforms = [
+        "athena",
         "azure_synapse",
+        "bigquery",
         "clickhouse",
         "databend",
         "databricks",

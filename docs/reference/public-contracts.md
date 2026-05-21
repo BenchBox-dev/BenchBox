@@ -39,7 +39,7 @@ the map is unchanged.
 | Result JSON bundles | `beta-public` | results | Schema-versioned result bundles are product data consumed by CLI, submission validation, hosted results, and explorer. | Schema policy and hosted-results contract update before changing accepted versions or field semantics. | Result schema policy, loader, normalizer, submission, and explorer tests. | `benchbox/core/results/schema_policy.py`, `benchbox/core/results/schema.py`, `docs/reference/result-formats.md`, `docs/reference/hosted-results-contract.md` |
 | Explorer read model and generated browser inputs | `generated` | results-explorer | Browser data stores are generated from accepted result bundles; generated outputs should be reproducible from source bundles and pipeline code. | Read-model version bump or pipeline contract update. | Explorer pipeline contract tests and browser release gates. | `_project/scripts/explorer_pipeline/`, results explorer generated data |
 | Public submission validator behavior | `beta-public` | hosted-results | PR-based public result submissions must receive deterministic validation errors and privacy/trust handling. | Hosted-results contract update and validator tests. | `validate-submission` workflow, submission validator tests. | `scripts/validate_submission.py`, `docs/contributing-results.md`, `docs/reference/hosted-results-contract.md` |
-| SQL compatibility rule catalog | `internal` | sql-compat | Current catalog is governance and transformation metadata; downstream TODOs decide which parts are authoritative runtime behavior. | sql_compat README and contract-map update before claiming broader enforcement. | `make compat-docs-check`, `benchbox.sql_compat.inventory`. | `benchbox/sql_compat/`, `docs/compat/` |
+| SQL compatibility rule catalog | `internal` | sql-compat | Hybrid governance catalog: every source-detected adapter CREATE TABLE rewrite must be runtime-dispatched by `BaseDdlOptimizer`, registered as `governance_only`, or explicitly exempted. | sql_compat README and contract-map update before changing the governance guarantee. | `make compat-docs-check`, `uv run -- python -m benchbox.sql_compat.inventory --check-ddl-drift`. | `benchbox/sql_compat/`, `benchbox/platforms/`, `docs/compat/` |
 | Generated compatibility docs | `generated` | sql-compat | Generated docs must match registry/rule metadata; hand edits are drift unless the section says it is editorial. | Regenerate from source metadata or update the generator. | `make compat-docs-check`. | `benchbox/sql_compat/`, generated docs under `docs/compat/` |
 | `benchbox.experimental` namespace | `experimental` | architecture | Ships in the default wheel for developer convenience but is outside the supported beta product surface. | Promote through a contract-map update and tests, or extract/remove through the experimental future-state plan. | Package metadata review and explicit tests for promoted surfaces only. | `README.md`, `pyproject.toml`, `docs/design/future-state/isolate-experimental-core-subsystems/README.md` |
 | `_project` scripts, audits, and analysis artifacts | `repo-only` | maintainers | Contributor workflow and project governance aids; not user-facing API. | Repo workflow docs or TODO updates. | Script-specific tests where present. | `_project/` |
@@ -83,6 +83,21 @@ Authoritative count statements should come from registry metadata once the
 support-status migration lands. Editorial lists may remain in narrative docs,
 but they must not claim to be exhaustive unless a generated or tested check keeps
 them synchronized.
+
+## SQL Compatibility Governance Decision
+
+Decision from `sql-compat-governance-ddl-hardening`: `sql_compat` is a hybrid
+governance catalog plus optional runtime dispatcher. `BaseDdlOptimizer` is the
+preferred dispatch path for ordered statement-to-statement DDL transforms, but
+adapters may keep local CREATE TABLE rewrite paths when the rewrite depends on
+adapter state, SDK-specific create/load loops, or platform deployment settings.
+
+`governance_only=True` rules are allowed to represent real runtime behavior.
+They are not dispatch targets; they are the auditable source of intent that the
+drift checker requires before CI can call DDL governance clean. `compat_lint CLEAN`
+means the source scanner found no unregistered or uninspectable adapter
+CREATE TABLE rewrite behavior. It does not mean every DDL rewrite flows through
+`BaseDdlOptimizer`.
 
 ## Evidence Snapshot
 

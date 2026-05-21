@@ -1,8 +1,9 @@
 """Integration smoke test: DDL drift check must report zero unregistered transforms.
 
 Verifies that every platform adapter that performs DDL optimization
-(via _optimize_table_definition or _transform_create_statement) has a
-registered Phase.DDL_OPTIMIZE rule in the compatibility registry.
+(via known names or CREATE TABLE rewrite behavior) has a registered
+Phase.DDL_OPTIMIZE rule in the compatibility registry, or is explicitly
+exempted.
 
 Uses check_ddl_drift() directly rather than the CLI so the test is
 isolated from unrelated inventory validation failures.
@@ -39,6 +40,139 @@ def test_ddl_drift_check_is_clean():
             + "\n\nRegister each in benchbox/sql_compat/rules/ddl_optimize/"
             "{platform}_ddl_rewrites.py — see benchbox/sql_compat/README.md."
         )
+
+
+def test_current_run_benchmark_gate_shape_is_detected():
+    """Mandatory inventory validation accepts the current CLI getattr() gate."""
+    from benchbox.sql_compat.inventory import _validate_mandatory_sites, scan
+
+    entries = scan(_BENCHBOX_ROOT)
+    gate_sites = [entry for entry in entries if entry.kind == "benchmark_gate" and entry.file.endswith("run.py")]
+
+    assert gate_sites
+    assert not [err for err in _validate_mandatory_sites(entries) if "benchmark_gate" in err]
+
+
+def test_behavior_detector_catches_custom_named_create_table_rewrites(tmp_path):
+    """CREATE TABLE rewrites are detected even when the method name is not canonical."""
+    from benchbox.sql_compat.inventory import collect_ddl_governance_statuses
+
+    root = tmp_path / "benchbox"
+    platforms = root / "platforms"
+    platforms.mkdir(parents=True)
+    (platforms / "custom.py").write_text(
+        "\n".join(
+            [
+                "class CustomAdapter:",
+                "    def arbitrary_converter(self, statement: str) -> str:",
+                "        if not statement.upper().startswith('CREATE TABLE'):",
+                "            return statement",
+                "        return statement.replace('CREATE TABLE', 'CREATE OR REPLACE TABLE', 1)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    statuses = collect_ddl_governance_statuses(root)
+
+    assert [(entry.func_name, entry.inferred_platform_key, entry.status) for entry in statuses] == [
+        ("arbitrary_converter", "custom", "unregistered_detected_behavior")
+    ]
+
+
+def test_ddl_rule_does_not_blanket_cover_unmapped_new_platform_function(tmp_path):
+    """A platform rule covers named behavior, not every future rewrite in the same file."""
+    from benchbox.sql_compat.inventory import collect_ddl_governance_statuses
+
+    root = tmp_path / "benchbox"
+    platforms = root / "platforms"
+    platforms.mkdir(parents=True)
+    (platforms / "bigquery.py").write_text(
+        "\n".join(
+            [
+                "class BigQueryAdapter:",
+                "    def arbitrary_converter(self, statement: str) -> str:",
+                "        if not statement.upper().startswith('CREATE TABLE'):",
+                "            return statement",
+                "        return statement.replace('CREATE TABLE', 'CREATE OR REPLACE TABLE', 1)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    statuses = collect_ddl_governance_statuses(root)
+
+    assert [(entry.func_name, entry.inferred_platform_key, entry.status) for entry in statuses] == [
+        ("arbitrary_converter", "bigquery", "unregistered_detected_behavior")
+    ]
+
+
+def test_ddl_governance_statuses_distinguish_runtime_governance_and_no_rewrite_platforms():
+    """Inventory status explains whether detected behavior is dispatched or governance-only."""
+    from benchbox.sql_compat.inventory import collect_ddl_governance_statuses
+
+    statuses = collect_ddl_governance_statuses(_BENCHBOX_ROOT)
+    by_key = {(entry.inferred_platform_key, entry.func_name): entry for entry in statuses}
+
+    assert by_key[("bigquery", "_convert_to_bigquery_table")].status == "registered_governance_only_intent"
+    assert by_key[("athena", "_convert_to_external_table")].status == "registered_governance_only_intent"
+    assert by_key[("databricks", "_convert_to_delta_table")].status == "registered_governance_only_intent"
+    assert by_key[("singlestore", "_transform_create_statement")].status == "registered_runtime_behavior"
+    assert by_key[("spark", "optimize_spark_table_definition")].status == "registered_governance_only_intent"
+    assert all(entry.inferred_platform_key != "duckdb" for entry in statuses)
+
+
+def test_bigquery_runtime_ddl_rewrite_is_represented_in_governance_inventory():
+    """BigQuery's local CREATE TABLE conversion has runtime coverage and a governance status."""
+    from benchbox.platforms.bigquery import BigQueryAdapter
+    from benchbox.sql_compat.inventory import collect_ddl_governance_statuses
+
+    adapter = BigQueryAdapter.__new__(BigQueryAdapter)
+    adapter.project_id = "proj"
+    adapter.dataset_id = "ds"
+    adapter.partitioning_field = "created_at"
+    adapter.clustering_fields = ["customer_id"]
+
+    converted = adapter._convert_to_bigquery_table("CREATE TABLE orders (created_at DATE, customer_id INT64)")
+
+    assert "CREATE OR REPLACE TABLE `proj.ds.orders`" in converted
+    assert "PARTITION BY DATE(created_at)" in converted
+    assert "CLUSTER BY customer_id" in converted
+    status = next(
+        entry
+        for entry in collect_ddl_governance_statuses(_BENCHBOX_ROOT)
+        if entry.inferred_platform_key == "bigquery" and entry.func_name == "_convert_to_bigquery_table"
+    )
+    assert status.status == "registered_governance_only_intent"
+
+
+def test_athena_runtime_ddl_rewrite_is_represented_in_governance_inventory():
+    """Athena's local CREATE TABLE conversion has runtime coverage and a governance status."""
+    from benchbox.platforms.athena import AthenaAdapter
+    from benchbox.sql_compat.inventory import collect_ddl_governance_statuses
+
+    adapter = AthenaAdapter.__new__(AthenaAdapter)
+    adapter.s3_bucket = "bucket"
+    adapter.s3_prefix = "prefix"
+    adapter.database = "db"
+    adapter.data_format = "parquet"
+    adapter.default_format = "PARQUET"
+
+    converted = adapter._convert_to_external_table(
+        "CREATE TABLE orders (id VARCHAR(20) NOT NULL, amount DECIMAL)", is_staging=False
+    )
+
+    assert "CREATE EXTERNAL TABLE IF NOT EXISTS orders" in converted
+    assert "id STRING" in converted
+    assert "NOT NULL" not in converted
+    assert "STORED AS PARQUET" in converted
+    assert "LOCATION 's3://bucket/prefix/db/orders/'" in converted
+    status = next(
+        entry
+        for entry in collect_ddl_governance_statuses(_BENCHBOX_ROOT)
+        if entry.inferred_platform_key == "athena" and entry.func_name == "_convert_to_external_table"
+    )
+    assert status.status == "registered_governance_only_intent"
 
 
 def test_singlestore_ddl_rules_resolve_via_base_optimizer():

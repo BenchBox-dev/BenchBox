@@ -264,7 +264,7 @@ jobs:
       - name: Timing policy (wall-clock allowlist)
         run: uv run -- python _project/scripts/timing_policy_check.py --strict
 
-      - name: Compatibility docs drift check
+      - name: Compatibility governance drift check
         run: make compat-docs-check
 
       - name: Public contract drift check

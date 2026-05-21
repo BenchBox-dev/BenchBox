@@ -712,11 +712,12 @@ parity-fixtures:
 
 # Regenerate sql_compat capability matrix and skip reference docs from the registry.
 compat-docs:
-	uv run scripts/generate_compat_docs.py
+	uv run -- python scripts/generate_compat_docs.py
 
-# Verify the committed compat docs match the registry. CI gate against drift.
+# Verify committed compat docs and DDL governance match the registry/source.
 compat-docs-check:
-	uv run scripts/generate_compat_docs.py --check
+	uv run -- python scripts/generate_compat_docs.py --check
+	uv run -- python -m benchbox.sql_compat.inventory --output /tmp/benchbox-compat-inventory.jsonl --check-ddl-drift
 
 # Verify fixtures match the current Python implementation without overwriting.
 # Fails if any fixture is out of date (drift detected).
