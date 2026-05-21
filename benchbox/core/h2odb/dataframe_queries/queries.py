@@ -22,6 +22,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+from csv import reader
 from typing import Any
 
 from benchbox.core.dataframe.context import DataFrameContext
@@ -305,109 +306,47 @@ def q10_pandas_impl(ctx: DataFrameContext) -> Any:
 # Query Registration
 # =============================================================================
 
+_CATEGORY_CODES = {
+    "AG": QueryCategory.AGGREGATE,
+    "AN": QueryCategory.ANALYTICAL,
+    "FI": QueryCategory.FILTER,
+    "GB": QueryCategory.GROUP_BY,
+    "SC": QueryCategory.SCAN,
+    "SO": QueryCategory.SORT,
+}
+
+_QUERY_METADATA = """\
+Q1|Count|Basic COUNT(*) full table scan|SC,AG|q1
+Q2|Sum and Mean|SUM and AVG of fare_amount (scalar aggregation)|AG|q2
+Q3|Sum by Passenger Count|SUM(fare_amount) GROUP BY passenger_count|GB,AG|q3
+Q4|Sum and Mean by Passenger Count|SUM and AVG of fare_amount GROUP BY passenger_count|GB,AG|q4
+Q5|Sum by Passenger and Vendor|SUM(fare_amount) GROUP BY passenger_count, vendor_id|GB,AG|q5
+Q6|Sum and Mean by Passenger and Vendor|SUM and AVG of fare_amount GROUP BY passenger_count, vendor_id|GB,AG|q6
+Q7|Sum by Hour|SUM(fare_amount) GROUP BY EXTRACT(HOUR FROM pickup_datetime)|GB,AG,AN|q7
+Q8|Sum by Year and Hour|SUM(fare_amount) GROUP BY EXTRACT(YEAR), EXTRACT(HOUR)|GB,AG,AN|q8
+Q9|Percentiles by Passenger Count|PERCENTILE_CONT(0.5, 0.9) of fare_amount GROUP BY passenger_count|GB,AG,AN|q9
+Q10|Top Pickup Locations|Top 10 pickup locations by trip count with WHERE IS NOT NULL|FI,GB,SO|q10
+"""
+
+
+def _impl_for(stem: str, family: str) -> Any:
+    return globals()[f"{stem}_{family}_impl"]
+
 
 def _register_all_queries() -> None:
-    """Register all 10 H2ODB DataFrame queries."""
-    register_query(
-        DataFrameQuery(
-            query_id="Q1",
-            query_name="Count",
-            description="Basic COUNT(*) full table scan",
-            categories=[QueryCategory.SCAN, QueryCategory.AGGREGATE],
-            expression_impl=q1_expression_impl,
-            pandas_impl=q1_pandas_impl,
+    for query_id, query_name, description, category_codes, impl_stem in reader(
+        _QUERY_METADATA.splitlines(), delimiter="|"
+    ):
+        register_query(
+            DataFrameQuery(
+                query_id=query_id,
+                query_name=query_name,
+                description=description,
+                categories=[_CATEGORY_CODES[code] for code in category_codes.split(",")],
+                expression_impl=_impl_for(impl_stem, "expression"),
+                pandas_impl=_impl_for(impl_stem, "pandas"),
+            )
         )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q2",
-            query_name="Sum and Mean",
-            description="SUM and AVG of fare_amount (scalar aggregation)",
-            categories=[QueryCategory.AGGREGATE],
-            expression_impl=q2_expression_impl,
-            pandas_impl=q2_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q3",
-            query_name="Sum by Passenger Count",
-            description="SUM(fare_amount) GROUP BY passenger_count",
-            categories=[QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-            expression_impl=q3_expression_impl,
-            pandas_impl=q3_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q4",
-            query_name="Sum and Mean by Passenger Count",
-            description="SUM and AVG of fare_amount GROUP BY passenger_count",
-            categories=[QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-            expression_impl=q4_expression_impl,
-            pandas_impl=q4_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q5",
-            query_name="Sum by Passenger and Vendor",
-            description="SUM(fare_amount) GROUP BY passenger_count, vendor_id",
-            categories=[QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-            expression_impl=q5_expression_impl,
-            pandas_impl=q5_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q6",
-            query_name="Sum and Mean by Passenger and Vendor",
-            description="SUM and AVG of fare_amount GROUP BY passenger_count, vendor_id",
-            categories=[QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-            expression_impl=q6_expression_impl,
-            pandas_impl=q6_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q7",
-            query_name="Sum by Hour",
-            description="SUM(fare_amount) GROUP BY EXTRACT(HOUR FROM pickup_datetime)",
-            categories=[QueryCategory.GROUP_BY, QueryCategory.AGGREGATE, QueryCategory.ANALYTICAL],
-            expression_impl=q7_expression_impl,
-            pandas_impl=q7_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q8",
-            query_name="Sum by Year and Hour",
-            description="SUM(fare_amount) GROUP BY EXTRACT(YEAR), EXTRACT(HOUR)",
-            categories=[QueryCategory.GROUP_BY, QueryCategory.AGGREGATE, QueryCategory.ANALYTICAL],
-            expression_impl=q8_expression_impl,
-            pandas_impl=q8_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q9",
-            query_name="Percentiles by Passenger Count",
-            description="PERCENTILE_CONT(0.5, 0.9) of fare_amount GROUP BY passenger_count",
-            categories=[QueryCategory.GROUP_BY, QueryCategory.AGGREGATE, QueryCategory.ANALYTICAL],
-            expression_impl=q9_expression_impl,
-            pandas_impl=q9_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q10",
-            query_name="Top Pickup Locations",
-            description="Top 10 pickup locations by trip count with WHERE IS NOT NULL",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q10_expression_impl,
-            pandas_impl=q10_pandas_impl,
-        )
-    )
 
 
 _register_all_queries()
