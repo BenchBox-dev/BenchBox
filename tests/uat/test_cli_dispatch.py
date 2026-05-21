@@ -16,44 +16,38 @@ pytestmark = pytest.mark.fast
 
 
 def test_main_routes_subcommand(monkeypatch):
-    calls: list[tuple[str, list[str]]] = []
+    calls: list[tuple[str, str]] = []
 
-    def fake_execute_main(argv):
-        calls.append(("execute", argv))
+    def fake_execute(args):
+        calls.append((args.cmd, args.config))
         return 0
 
-    monkeypatch.setitem(_cli.SUBCOMMANDS, "execute", fake_execute_main)
+    monkeypatch.setattr(_cli, "_handle_execute", fake_execute)
     rc = _cli.main(["execute", "--config", "x.yaml"])
     assert rc == 0
-    assert calls == [("execute", ["--config", "x.yaml"])]
+    assert calls == [("execute", "x.yaml")]
 
 
-def test_main_no_args_routes_to_cell(monkeypatch):
-    calls: list[list[str]] = []
-
-    def fake_cell_main(argv):
-        calls.append(argv)
-        return 0
-
-    monkeypatch.setitem(_cli.SUBCOMMANDS, "cell", fake_cell_main)
-    monkeypatch.setattr(_cli, "cell_main", fake_cell_main)
+def test_main_no_args_uses_cell_parser(capsys):
     rc = _cli.main([])
-    assert rc == 0
-    assert calls == [[]]
+    assert rc == 2
+    err = capsys.readouterr().err
+    assert "cell" in err
+    assert "--platform" in err
 
 
 def test_main_bare_flags_route_to_cell(monkeypatch):
     """Backward-compat: `python -m tests.uat._cli --platform=...` is the uat-cell make target."""
-    calls: list[list[str]] = []
+    calls: list[tuple[str, str, float]] = []
 
-    def fake_cell_main(argv):
-        calls.append(argv)
+    def fake_cell(args):
+        calls.append((args.platform, args.benchmark, args.scale))
         return 0
 
-    monkeypatch.setattr(_cli, "cell_main", fake_cell_main)
+    monkeypatch.setattr(_cli, "_handle_cell", fake_cell)
     rc = _cli.main(["--platform", "duckdb", "--benchmark", "tpch", "--scale", "0.01"])
     assert rc == 0
-    assert calls == [["--platform", "duckdb", "--benchmark", "tpch", "--scale", "0.01"]]
+    assert calls == [("duckdb", "tpch", 0.01)]
 
 
 @pytest.mark.parametrize(("platform", "expected_local_managed"), [("pg-duckdb", True), ("duckdb", False)])
@@ -81,7 +75,7 @@ def test_cell_main_scopes_local_managed_platform_to_uat_docker_platforms(
 
     monkeypatch.setattr("tests.uat.runner.run_cell", fake_run_cell)
 
-    rc = _cli.cell_main(["--platform", platform, "--benchmark", "tpch", "--scale", "0.01"])
+    rc = _cli.main(["cell", "--platform", platform, "--benchmark", "tpch", "--scale", "0.01"])
 
     assert rc == 0
     assert captured["local_managed_platform"] is expected_local_managed
@@ -92,14 +86,16 @@ def test_main_unknown_subcommand_returns_2(capsys):
     rc = _cli.main(["nonsense"])
     assert rc == 2
     err = capsys.readouterr().err
-    assert "unknown subcommand" in err
+    assert "invalid choice" in err
 
 
 def test_main_help_returns_0(capsys):
     rc = _cli.main(["--help"])
     assert rc == 0
     out = capsys.readouterr().out
-    assert "subcommands" in out
+    assert "cell" in out
+    assert "preflight" in out
+    assert "replay-classify" in out
 
 
 def test_main_preflight_returns_2_when_preflight_aborts(tmp_path, monkeypatch, capsys):
@@ -162,8 +158,8 @@ def test_execute_and_sweep_use_same_preflight_kwargs(tmp_path, monkeypatch):
 
     monkeypatch.setattr("tests.uat.phases.preflight.run_preflight", fake_run_preflight)
 
-    execute_rc = _cli.execute_main(["--config", str(config_path)])
-    sweep_rc = _cli.sweep_main(["--config", str(config_path)])
+    execute_rc = _cli.main(["execute", "--config", str(config_path)])
+    sweep_rc = _cli.main(["sweep", "--config", str(config_path)])
 
     assert execute_rc == 2
     assert sweep_rc == 2
@@ -175,7 +171,7 @@ def test_execute_and_sweep_use_same_preflight_kwargs(tmp_path, monkeypatch):
 
 
 def test_subcommands_table_covers_all_make_targets():
-    """The dispatch table must cover every make uat-* target's subcommand."""
+    """The parser must cover every make uat-* target's subcommand."""
     expected = {
         "cell",
         "docker-cleanup",
@@ -188,7 +184,7 @@ def test_subcommands_table_covers_all_make_targets():
         "stress",
         "verify-tuning-matrix",
     }
-    assert set(_cli.SUBCOMMANDS) == expected
+    assert set(_cli.MAKE_TARGET_SUBCOMMANDS) == expected
 
 
 def test_sweep_main_forwards_dry_run_override(monkeypatch, capsys):
@@ -210,7 +206,7 @@ def test_sweep_main_forwards_dry_run_override(monkeypatch, capsys):
         return StubResult()
 
     monkeypatch.setattr("tests.uat.orchestrator.run_sweep_from_path", fake_run_sweep_from_path)
-    rc = _cli.sweep_main(["--config", "tests/uat/configs/uat-2026-05-02.yaml", "--dry-run"])
+    rc = _cli.main(["sweep", "--config", "tests/uat/configs/uat-2026-05-02.yaml", "--dry-run"])
 
     assert rc == 0
     assert calls == [(Path("tests/uat/configs/uat-2026-05-02.yaml"), True)]
@@ -333,7 +329,7 @@ def test_execute_main_reads_cleanup_config_for_standalone_path(tmp_path, monkeyp
         )()
 
     monkeypatch.setattr("tests.uat.phases.execute.run_execute", fake_run_execute)
-    rc = _cli.execute_main(["--config", str(config_path)])
+    rc = _cli.main(["execute", "--config", str(config_path)])
 
     assert rc == 0
     assert captured == {

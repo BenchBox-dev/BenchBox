@@ -97,7 +97,7 @@ def test_runtime_log_mismatch_reports_context(tmp_path: Path):
 
 
 def test_verify_tuning_matrix_rejects_empty_observations(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
-    rc = _cli.verify_tuning_matrix_main(["--logs", str(tmp_path)])
+    rc = _cli.main(["verify-tuning-matrix", "--logs", str(tmp_path)])
 
     captured = capsys.readouterr()
     assert rc == 1
