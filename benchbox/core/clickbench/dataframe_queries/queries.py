@@ -20,6 +20,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+from csv import reader
 from typing import Any
 
 from benchbox.core.dataframe.context import DataFrameContext
@@ -1159,459 +1160,78 @@ def q43_pandas_impl(ctx: DataFrameContext) -> Any:
 # Query Registration
 # =============================================================================
 
+_CATEGORY_CODES = {
+    "AG": QueryCategory.AGGREGATE,
+    "AN": QueryCategory.ANALYTICAL,
+    "FI": QueryCategory.FILTER,
+    "GB": QueryCategory.GROUP_BY,
+    "PR": QueryCategory.PROJECTION,
+    "SC": QueryCategory.SCAN,
+    "SO": QueryCategory.SORT,
+}
+
+_QUERY_METADATA = """Q1|Full Scan Count|COUNT(*) full table scan - baseline performance test|SC,AG
+Q2|Filtered Count|COUNT(*) with single equality filter on AdvEngineID|FI,AG
+Q3|Multi-Aggregate Scan|SUM, COUNT, AVG on full table scan - multiple aggregate functions|SC,AG
+Q4|Average UserID|AVG on BIGINT column - numeric precision test|SC,AG
+Q5|Unique Users|COUNT(DISTINCT UserID) - cardinality estimation|SC,AG
+Q6|Unique Search Phrases|COUNT(DISTINCT SearchPhrase) - string cardinality|SC,AG
+Q7|Date Range|MIN/MAX on EventDate - date column statistics|SC,AG
+Q8|AdvEngine Distribution|GROUP BY AdvEngineID with COUNT, filtered and sorted|FI,GB,SO
+Q9|Users by Region|COUNT(DISTINCT UserID) by RegionID, top 10|GB,SO,AG
+Q10|Region Multi-Aggregate|Multi-aggregate by RegionID - SUM, COUNT, AVG, COUNT(DISTINCT)|GB,SO,AG
+Q11|Mobile Phone Models|Unique users by phone model, filtered on non-empty|FI,GB,SO
+Q12|Phone + Model Unique Users|Unique users by phone and model, multi-column grouping|FI,GB,SO
+Q13|Top Search Phrases|Most frequent non-empty search phrases|FI,GB,SO
+Q14|Search Phrase Unique Users|Top search phrases by unique user count|FI,GB,SO
+Q15|Search Engine + Phrase|Search engine and phrase combination counts|FI,GB,SO
+Q16|Top Users|Most active users by event count|GB,SO
+Q17|User Search Activity|Top user + search phrase combinations by count|GB,SO
+Q18|User Search Unordered|User + search phrase group without ordering - nondeterministic|GB
+Q19|User Minute Activity|User + minute + search phrase grouping with datetime extraction|GB,SO,AN
+Q20|User Point Lookup|Single user lookup by exact UserID value|FI,SC
+Q21|URL Google Count|Count rows where URL contains 'google' - string containment test|FI,AG
+Q22|Google URL Search Phrases|Top search phrases for google URLs with MIN(URL)|FI,GB,SO
+Q23|Google Title Analysis|Search phrases for Google titles excluding .google. URLs - case-sensitive LIKE|FI,GB,SO,AN
+Q24|Google URL Full Rows|All columns for google URLs sorted by EventTime - wide output|FI,SO,PR
+Q25|Search Phrase by Time|Non-empty search phrases sorted by EventTime|FI,SO,PR
+Q26|Search Phrase Lexicographic|Non-empty search phrases sorted lexicographically|FI,SO,PR
+Q27|Search Phrase Compound Sort|Non-empty search phrases with compound sort (EventTime, SearchPhrase)|FI,SO,PR
+Q28|URL Length Analysis|Average URL length by counter with HAVING > 100000|GB,AG,AN
+Q29|Domain Extraction|Regex domain extraction from Referer with HAVING - complex string operation|GB,AG,AN
+Q30|Wide Aggregation|90-column SUM(ResolutionWidth + N) - wide aggregation test|SC,AG
+Q31|Search Engine Client Analysis|Multi-agg by SearchEngineID + ClientIP, filtered on non-empty search|FI,GB,SO
+Q32|Watch Client Analysis (Filtered)|Multi-agg by WatchID + ClientIP, filtered - high cardinality|FI,GB,SO
+Q33|Watch Client Analysis (Unfiltered)|Multi-agg by WatchID + ClientIP, unfiltered - high cardinality full scan|GB,SO
+Q34|Top URLs|Top URLs by count - high cardinality text GROUP BY|GB,SO
+Q35|Literal Column URL Group|GROUP BY literal constant column plus URL - tests derived column grouping|GB,SO,AN
+Q36|Derived Column Group|GROUP BY ClientIP and derived arithmetic columns - expression grouping|GB,SO,AN
+Q37|July URL Page Views|Top URLs for CounterID=62, July 2013 with multiple filters|FI,GB,SO
+Q38|July Title Page Views|Top titles for CounterID=62, July 2013 with multiple filters|FI,GB,SO
+Q39|URL Views with Offset|URL page views with OFFSET 1000 - pagination test|FI,GB,SO
+Q40|Traffic Source CASE WHEN|Traffic source analysis with CASE WHEN conditional and OFFSET|FI,GB,SO,AN
+Q41|URL Hash IN Clause|URLHash + EventDate with IN clause filter and OFFSET 100|FI,GB,SO
+Q42|Window Dimensions|Window dimensions for specific URL hash with large OFFSET 10000|FI,GB,SO
+Q43|Minute Granularity|Page views by minute with DATE_TRUNC - temporal aggregation|FI,GB,SO,AN
+"""
+
+
+def _impl_for(query_id: str, family: str) -> Any:
+    return globals()[f"q{query_id[1:]}_{family}_impl"]
+
 
 def _register_all_queries() -> None:
-    """Register all 43 ClickBench DataFrame queries."""
-    # Basic aggregation (Q1-Q7)
-    register_query(
-        DataFrameQuery(
-            query_id="Q1",
-            query_name="Full Scan Count",
-            description="COUNT(*) full table scan - baseline performance test",
-            categories=[QueryCategory.SCAN, QueryCategory.AGGREGATE],
-            expression_impl=q1_expression_impl,
-            pandas_impl=q1_pandas_impl,
+    for query_id, query_name, description, category_codes in reader(_QUERY_METADATA.splitlines(), delimiter="|"):
+        register_query(
+            DataFrameQuery(
+                query_id=query_id,
+                query_name=query_name,
+                description=description,
+                categories=[_CATEGORY_CODES[code] for code in category_codes.split(",")],
+                expression_impl=_impl_for(query_id, "expression"),
+                pandas_impl=_impl_for(query_id, "pandas"),
+            )
         )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q2",
-            query_name="Filtered Count",
-            description="COUNT(*) with single equality filter on AdvEngineID",
-            categories=[QueryCategory.FILTER, QueryCategory.AGGREGATE],
-            expression_impl=q2_expression_impl,
-            pandas_impl=q2_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q3",
-            query_name="Multi-Aggregate Scan",
-            description="SUM, COUNT, AVG on full table scan - multiple aggregate functions",
-            categories=[QueryCategory.SCAN, QueryCategory.AGGREGATE],
-            expression_impl=q3_expression_impl,
-            pandas_impl=q3_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q4",
-            query_name="Average UserID",
-            description="AVG on BIGINT column - numeric precision test",
-            categories=[QueryCategory.SCAN, QueryCategory.AGGREGATE],
-            expression_impl=q4_expression_impl,
-            pandas_impl=q4_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q5",
-            query_name="Unique Users",
-            description="COUNT(DISTINCT UserID) - cardinality estimation",
-            categories=[QueryCategory.SCAN, QueryCategory.AGGREGATE],
-            expression_impl=q5_expression_impl,
-            pandas_impl=q5_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q6",
-            query_name="Unique Search Phrases",
-            description="COUNT(DISTINCT SearchPhrase) - string cardinality",
-            categories=[QueryCategory.SCAN, QueryCategory.AGGREGATE],
-            expression_impl=q6_expression_impl,
-            pandas_impl=q6_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q7",
-            query_name="Date Range",
-            description="MIN/MAX on EventDate - date column statistics",
-            categories=[QueryCategory.SCAN, QueryCategory.AGGREGATE],
-            expression_impl=q7_expression_impl,
-            pandas_impl=q7_pandas_impl,
-        )
-    )
-
-    # Grouping and ordering (Q8-Q15)
-    register_query(
-        DataFrameQuery(
-            query_id="Q8",
-            query_name="AdvEngine Distribution",
-            description="GROUP BY AdvEngineID with COUNT, filtered and sorted",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q8_expression_impl,
-            pandas_impl=q8_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q9",
-            query_name="Users by Region",
-            description="COUNT(DISTINCT UserID) by RegionID, top 10",
-            categories=[QueryCategory.GROUP_BY, QueryCategory.SORT, QueryCategory.AGGREGATE],
-            expression_impl=q9_expression_impl,
-            pandas_impl=q9_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q10",
-            query_name="Region Multi-Aggregate",
-            description="Multi-aggregate by RegionID - SUM, COUNT, AVG, COUNT(DISTINCT)",
-            categories=[QueryCategory.GROUP_BY, QueryCategory.SORT, QueryCategory.AGGREGATE],
-            expression_impl=q10_expression_impl,
-            pandas_impl=q10_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q11",
-            query_name="Mobile Phone Models",
-            description="Unique users by phone model, filtered on non-empty",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q11_expression_impl,
-            pandas_impl=q11_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q12",
-            query_name="Phone + Model Unique Users",
-            description="Unique users by phone and model, multi-column grouping",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q12_expression_impl,
-            pandas_impl=q12_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q13",
-            query_name="Top Search Phrases",
-            description="Most frequent non-empty search phrases",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q13_expression_impl,
-            pandas_impl=q13_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q14",
-            query_name="Search Phrase Unique Users",
-            description="Top search phrases by unique user count",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q14_expression_impl,
-            pandas_impl=q14_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q15",
-            query_name="Search Engine + Phrase",
-            description="Search engine and phrase combination counts",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q15_expression_impl,
-            pandas_impl=q15_pandas_impl,
-        )
-    )
-
-    # User analysis (Q16-Q20)
-    register_query(
-        DataFrameQuery(
-            query_id="Q16",
-            query_name="Top Users",
-            description="Most active users by event count",
-            categories=[QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q16_expression_impl,
-            pandas_impl=q16_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q17",
-            query_name="User Search Activity",
-            description="Top user + search phrase combinations by count",
-            categories=[QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q17_expression_impl,
-            pandas_impl=q17_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q18",
-            query_name="User Search Unordered",
-            description="User + search phrase group without ordering - nondeterministic",
-            categories=[QueryCategory.GROUP_BY],
-            expression_impl=q18_expression_impl,
-            pandas_impl=q18_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q19",
-            query_name="User Minute Activity",
-            description="User + minute + search phrase grouping with datetime extraction",
-            categories=[QueryCategory.GROUP_BY, QueryCategory.SORT, QueryCategory.ANALYTICAL],
-            expression_impl=q19_expression_impl,
-            pandas_impl=q19_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q20",
-            query_name="User Point Lookup",
-            description="Single user lookup by exact UserID value",
-            categories=[QueryCategory.FILTER, QueryCategory.SCAN],
-            expression_impl=q20_expression_impl,
-            pandas_impl=q20_pandas_impl,
-        )
-    )
-
-    # Text and pattern matching (Q21-Q27)
-    register_query(
-        DataFrameQuery(
-            query_id="Q21",
-            query_name="URL Google Count",
-            description="Count rows where URL contains 'google' - string containment test",
-            categories=[QueryCategory.FILTER, QueryCategory.AGGREGATE],
-            expression_impl=q21_expression_impl,
-            pandas_impl=q21_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q22",
-            query_name="Google URL Search Phrases",
-            description="Top search phrases for google URLs with MIN(URL)",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q22_expression_impl,
-            pandas_impl=q22_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q23",
-            query_name="Google Title Analysis",
-            description="Search phrases for Google titles excluding .google. URLs - case-sensitive LIKE",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT, QueryCategory.ANALYTICAL],
-            expression_impl=q23_expression_impl,
-            pandas_impl=q23_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q24",
-            query_name="Google URL Full Rows",
-            description="All columns for google URLs sorted by EventTime - wide output",
-            categories=[QueryCategory.FILTER, QueryCategory.SORT, QueryCategory.PROJECTION],
-            expression_impl=q24_expression_impl,
-            pandas_impl=q24_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q25",
-            query_name="Search Phrase by Time",
-            description="Non-empty search phrases sorted by EventTime",
-            categories=[QueryCategory.FILTER, QueryCategory.SORT, QueryCategory.PROJECTION],
-            expression_impl=q25_expression_impl,
-            pandas_impl=q25_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q26",
-            query_name="Search Phrase Lexicographic",
-            description="Non-empty search phrases sorted lexicographically",
-            categories=[QueryCategory.FILTER, QueryCategory.SORT, QueryCategory.PROJECTION],
-            expression_impl=q26_expression_impl,
-            pandas_impl=q26_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q27",
-            query_name="Search Phrase Compound Sort",
-            description="Non-empty search phrases with compound sort (EventTime, SearchPhrase)",
-            categories=[QueryCategory.FILTER, QueryCategory.SORT, QueryCategory.PROJECTION],
-            expression_impl=q27_expression_impl,
-            pandas_impl=q27_pandas_impl,
-        )
-    )
-
-    # String operations (Q28-Q29)
-    register_query(
-        DataFrameQuery(
-            query_id="Q28",
-            query_name="URL Length Analysis",
-            description="Average URL length by counter with HAVING > 100000",
-            categories=[QueryCategory.GROUP_BY, QueryCategory.AGGREGATE, QueryCategory.ANALYTICAL],
-            expression_impl=q28_expression_impl,
-            pandas_impl=q28_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q29",
-            query_name="Domain Extraction",
-            description="Regex domain extraction from Referer with HAVING - complex string operation",
-            categories=[QueryCategory.GROUP_BY, QueryCategory.AGGREGATE, QueryCategory.ANALYTICAL],
-            expression_impl=q29_expression_impl,
-            pandas_impl=q29_pandas_impl,
-        )
-    )
-
-    # Mathematical operations (Q30)
-    register_query(
-        DataFrameQuery(
-            query_id="Q30",
-            query_name="Wide Aggregation",
-            description="90-column SUM(ResolutionWidth + N) - wide aggregation test",
-            categories=[QueryCategory.SCAN, QueryCategory.AGGREGATE],
-            expression_impl=q30_expression_impl,
-            pandas_impl=q30_pandas_impl,
-        )
-    )
-
-    # Complex grouping (Q31-Q36)
-    register_query(
-        DataFrameQuery(
-            query_id="Q31",
-            query_name="Search Engine Client Analysis",
-            description="Multi-agg by SearchEngineID + ClientIP, filtered on non-empty search",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q31_expression_impl,
-            pandas_impl=q31_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q32",
-            query_name="Watch Client Analysis (Filtered)",
-            description="Multi-agg by WatchID + ClientIP, filtered - high cardinality",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q32_expression_impl,
-            pandas_impl=q32_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q33",
-            query_name="Watch Client Analysis (Unfiltered)",
-            description="Multi-agg by WatchID + ClientIP, unfiltered - high cardinality full scan",
-            categories=[QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q33_expression_impl,
-            pandas_impl=q33_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q34",
-            query_name="Top URLs",
-            description="Top URLs by count - high cardinality text GROUP BY",
-            categories=[QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q34_expression_impl,
-            pandas_impl=q34_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q35",
-            query_name="Literal Column URL Group",
-            description="GROUP BY literal constant column plus URL - tests derived column grouping",
-            categories=[QueryCategory.GROUP_BY, QueryCategory.SORT, QueryCategory.ANALYTICAL],
-            expression_impl=q35_expression_impl,
-            pandas_impl=q35_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q36",
-            query_name="Derived Column Group",
-            description="GROUP BY ClientIP and derived arithmetic columns - expression grouping",
-            categories=[QueryCategory.GROUP_BY, QueryCategory.SORT, QueryCategory.ANALYTICAL],
-            expression_impl=q36_expression_impl,
-            pandas_impl=q36_pandas_impl,
-        )
-    )
-
-    # Time-based analysis (Q37-Q43)
-    register_query(
-        DataFrameQuery(
-            query_id="Q37",
-            query_name="July URL Page Views",
-            description="Top URLs for CounterID=62, July 2013 with multiple filters",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q37_expression_impl,
-            pandas_impl=q37_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q38",
-            query_name="July Title Page Views",
-            description="Top titles for CounterID=62, July 2013 with multiple filters",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q38_expression_impl,
-            pandas_impl=q38_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q39",
-            query_name="URL Views with Offset",
-            description="URL page views with OFFSET 1000 - pagination test",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q39_expression_impl,
-            pandas_impl=q39_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q40",
-            query_name="Traffic Source CASE WHEN",
-            description="Traffic source analysis with CASE WHEN conditional and OFFSET",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.SORT,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=q40_expression_impl,
-            pandas_impl=q40_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q41",
-            query_name="URL Hash IN Clause",
-            description="URLHash + EventDate with IN clause filter and OFFSET 100",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q41_expression_impl,
-            pandas_impl=q41_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q42",
-            query_name="Window Dimensions",
-            description="Window dimensions for specific URL hash with large OFFSET 10000",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q42_expression_impl,
-            pandas_impl=q42_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q43",
-            query_name="Minute Granularity",
-            description="Page views by minute with DATE_TRUNC - temporal aggregation",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT, QueryCategory.ANALYTICAL],
-            expression_impl=q43_expression_impl,
-            pandas_impl=q43_pandas_impl,
-        )
-    )
 
 
 _register_all_queries()
