@@ -40,6 +40,15 @@ The default wheel ships the `benchbox.experimental` namespace (nl2sql, aiml-func
 
 Public contract tiers, support-status vocabulary, and source-of-truth rules for platform and benchmark count claims are tracked in [Public Contracts and Support Taxonomy](docs/reference/public-contracts.md).
 
+Registry-backed count claims are checked by unit tests so README and platform docs do not drift from runtime metadata:
+
+<!-- benchbox-registry-counts:start -->
+
+- Platform registry: **50** metadata entries; **45** SQL-capable; **19** DataFrame-capable; **14** dual-mode; support status counts: stable=5, beta=27, experimental=17, deprecated=1.
+- Benchmark registry: **23** metadata entries; **22** public discovery entries.
+
+<!-- benchbox-registry-counts:end -->
+
 ## Features
 
 - **Embedded Benchmarks**: Self-contained benchmark data and queries
@@ -108,7 +117,7 @@ BenchBox and [LakeBench](https://github.com/mwc360/LakeBench) are both Python-ba
 
 LakeBench focuses on **lakehouse compute engines** (Spark, Fabric, Synapse, HDInsight) and evaluates end-to-end ELT workflows - ingestion, transformation, maintenance, and queries - using Delta Lake tables. It offers 4 benchmarks including ELTBench, a custom workflow-oriented benchmark.
 
-BenchBox focuses on the **broad ecosystem of analytic platforms**-from single-node engines like DuckDB, to DataFrame libraries like Polars and Pandas, through to cloud data warehouses like Snowflake, BigQuery, and Redshift. It provides 22 benchmarks including TPC standards, academic workloads like SSB and JoinOrder, and BenchBox-original benchmarks like TPC-Havoc for optimizer stress testing.
+BenchBox focuses on the **broad ecosystem of analytic platforms**-from single-node engines like DuckDB, to DataFrame libraries like Polars and Pandas, through to cloud data warehouses like Snowflake, BigQuery, and Redshift. It provides 22 public-discovery benchmarks including TPC standards, academic workloads like SSB and JoinOrder, and BenchBox-original benchmarks like TPC-Havoc for optimizer stress testing.
 
 Consider LakeBench when evaluating Spark-based lakehouse engines, testing complete ELT pipeline performance, or working primarily in Microsoft Fabric/Azure environments. Consider BenchBox when benchmarking across the analytic platform spectrum, needing benchmark variety beyond TPC standards, or comparing DataFrame libraries alongside SQL engines.
 

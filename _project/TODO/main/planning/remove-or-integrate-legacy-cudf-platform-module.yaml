@@ -1,0 +1,126 @@
+id: remove-or-integrate-legacy-cudf-platform-module
+title: "Platform cleanup: decide fate of legacy top-level cuDF adapter module"
+worktree: main
+priority: Medium
+status: "Not Started"
+category: Platform Architecture
+
+deps:
+  needs:
+    - platform-support-status-and-extension-health
+
+description: |
+  The platform support-status inventory found `benchbox/platforms/cudf.py`, a
+  legacy top-level GPU adapter module that imports `benchbox.experimental.gpu`.
+  Current registry metadata classifies `cudf` as experimental DataFrame support,
+  and DataFrame execution routes through the DataFrame platform family instead
+  of this top-level module.
+
+  Decide whether the legacy module should be removed, moved behind a repo-only
+  experimental boundary, or integrated into the supported DataFrame path.
+
+work:
+  - id: w0
+    summary: "Revalidate whether any runtime path imports benchbox.platforms.cudf"
+    status: pending
+    notes: |
+      Search CLI, adapter factory, registry, tests, docs, and examples for the
+      top-level module. Distinguish direct imports from narrative docs.
+
+  - id: w1
+    summary: "Choose removal, repo-only quarantine, or integration"
+    needs: [w0]
+    status: pending
+    notes: |
+      If it is dead, remove it with tests proving DataFrame cuDF still routes
+      through `benchbox.platforms.dataframe`. If it is retained, document why it
+      imports experimental GPU helpers and what support_status applies.
+
+  - id: w2
+    summary: "Update docs/tests and compatibility notes for the chosen path"
+    needs: [w1]
+    status: pending
+    notes: |
+      Keep public cuDF docs aligned with the registry support status and avoid
+      making `benchbox.experimental` part of the supported platform surface by
+      accident.
+
+deferred:
+  - summary: "Promote GPU metrics helpers to a stable public platform API"
+    reason: "GPU helper promotion needs a separate product/API decision."
+
+metadata:
+  tags:
+    - platforms
+    - cudf
+    - experimental
+    - cleanup
+  estimated_effort: "1-2 days"
+  created_date: "2026-05-21"
+  last_updated: "2026-05-21T00:00:00Z"
+
+impact:
+  business_value: |
+    Reduces confusion around GPU platform support and keeps experimental
+    modules from leaking into supported platform claims.
+  user_impact: |
+    Users get a clearer cuDF support story and fewer import surprises.
+  technical_debt: |
+    Removes or classifies a legacy platform module outside the current registry
+    and DataFrame routing path.
+
+files_affected:
+  modified:
+    - "benchbox/platforms/cudf.py"
+    - "benchbox/platforms/dataframe/"
+    - "benchbox/core/platform_registry.py"
+    - "docs/platforms/cudf.md"
+    - "docs/platforms/support-status.md"
+    - "tests/unit/platforms/"
+    - "_project/TODO/"
+    - "_project/DONE/"
+
+must_preserve:
+  - "Do not remove working DataFrame cuDF support while handling the legacy top-level module."
+  - "Do not promote benchbox.experimental.gpu to public support without an explicit contract decision."
+
+approach: |
+  Treat the top-level module as a cleanup decision. Revalidate imports first,
+  then either delete dead code with coverage or quarantine/document it if there
+  is a real consumer.
+
+anti_patterns:
+  - "DO NOT delete the module based only on filename inventory -- prove import reachability first."
+  - "DO NOT make GPU helper imports run during base benchbox import."
+
+verification:
+  - description: "Run cuDF/DataFrame routing tests after the decision."
+    command: "uv run -- python -m pytest tests -k 'cudf or dataframe_factory or optional import' --tb=short"
+    expected_output: "cuDF DataFrame routing and optional import behavior pass."
+  - description: "Verify base import remains optional."
+    command: "uv run -- python -c 'import benchbox; print(\"ok\")'"
+    expected_output: "ok"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/cudf.py"
+    - "benchbox/platforms/dataframe/"
+    - "benchbox/core/platform_registry.py"
+    - "docs/platforms/cudf.md"
+    - "docs/platforms/support-status.md"
+    - "tests/unit/platforms/"
+    - "_project/TODO/"
+    - "_project/DONE/"
+  do_not_modify:
+    - "benchbox/core/results/"
+    - "benchbox/mcp/"
+    - "benchbox/sql_compat/rules/"
+
+prior_art:
+  - "docs/platforms/support-status.md: platform inventory classified the legacy cuDF module as a removal candidate."
+  - "benchbox/platforms/dataframe/cudf_df.py: current DataFrame-family cuDF adapter path."
+  - "benchbox/platforms/cudf.py: legacy top-level module importing benchbox.experimental.gpu."
+
+success_metrics:
+  - "The top-level cuDF module is removed, quarantined, or documented with a clear support boundary."
+  - "DataFrame cuDF support remains covered by tests or explicit skip conditions."

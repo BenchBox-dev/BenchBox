@@ -2,7 +2,8 @@ id: platform-support-status-and-extension-health
 title: "Architecture hardening: add platform support status, diagnostics, and extension health checks"
 worktree: main
 priority: Medium-High
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-05-21"
 category: Platform Architecture
 
 deps:
@@ -24,8 +25,29 @@ description: |
 work:
   - id: w0
     summary: "Revalidate registry counts, docs counts, optional import behavior, and platform-add docs"
-    status: pending
+    status: done
     notes: |
+      Completed 2026-05-21 at checked SHA ed9db3c8dbc03a01987ed97db714aee3049c71ed.
+
+      Revalidation summary:
+        - `PlatformRegistry.get_all_platform_metadata()` exposed 50 metadata
+          entries: 45 SQL-capable, 19 DataFrame-capable, 14 dual-mode, and
+          5 DataFrame-only.
+        - `README.md` no longer had stale platform counts, while
+          `docs/platforms/comparison-matrix.md` still claimed 41 platforms
+          and 30 SQL + 11 DataFrame.
+        - `_try_register_adapter()` and `benchbox/platforms/__init__.py`
+          intentionally swallowed optional import failures but did not expose a
+          diagnostic split between missing SDKs, native load failures, broken
+          adapter imports, or deprecated selectors.
+        - Recent platform additions showed a minimum durable extension cost of
+          4 files for small follow-ups and 7-12 files for normal SQL/DataFrame
+          additions once registry metadata, docs, dependencies, tests, and
+          compatibility/UAT scope are included.
+        - File inventory found `benchbox/platforms/cudf.py` as a legacy
+          top-level module importing `benchbox.experimental.gpu`; removal was
+          deferred to a follow-up TODO.
+
       Commit a compact summary of checked SHA, registry platform counts,
       SQL/DataFrame capability counts, docs counts, optional import behavior,
       and files touched by recent platform additions.
@@ -41,7 +63,7 @@ work:
   - id: w1
     summary: "Add support_status to platform metadata using the accepted taxonomy"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Use the taxonomy from architecture-contract-map-and-support-taxonomy:
       stable, beta, experimental, repo_only, deprecated, document_only. Add
@@ -55,7 +77,7 @@ work:
   - id: w2
     summary: "Add diagnostic mode for optional adapter import failures"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Keep normal imports lazy and quiet for missing optional dependencies, but
       add a diagnostic mode or command that reports:
@@ -70,7 +92,7 @@ work:
   - id: w3
     summary: "Generate platform and benchmark count tables from registry metadata"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Replace hand-maintained count claims where feasible. Generated tables
       should include support_status, SQL/DataFrame capability, dependency group,
@@ -82,7 +104,7 @@ work:
   - id: w4
     summary: "Create a new-platform acceptance checklist covering files, tests, docs, compat, and UAT"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       The checklist must cover SQL and DataFrame platforms separately:
         - adapter/family/context files,
@@ -97,7 +119,7 @@ work:
   - id: w5
     summary: "Add a platform scaffold or template and measure extension cost"
     needs: [w4]
-    status: pending
+    status: done
     notes: |
       Add either a small scaffold script or documented template set. Track
       "files touched to add one platform" as an architecture health metric and
@@ -109,7 +131,7 @@ work:
   - id: w6
     summary: "Inventory orphan/deprecated platform files and classify them"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Identify orphan platform files, especially dead paths that import
       experimental modules. Classify each as supported, deprecated,

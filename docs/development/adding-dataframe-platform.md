@@ -7,6 +7,8 @@
 
 This guide explains how to add support for a new DataFrame platform to BenchBox.
 
+Before opening a PR, run through the [New Platform Acceptance Checklist](new-platform-acceptance-checklist.md). DataFrame platforms need registry metadata, a `support_status`, optional dependency isolation, native query coverage, docs, and parity validation separate from SQL platforms.
+
 ## Overview
 
 BenchBox uses a **family-based architecture** that minimizes code duplication when adding new platforms. Most new platforms require:
@@ -204,7 +206,7 @@ class MyPlatformAdapter(ExpressionFamilyAdapter[MyDF, MyLazyDF, MyExpr]):
 
 ## Step 4: Register the Platform
 
-Add the platform to the registry.
+Add the platform to the DataFrame adapter registry and `PlatformRegistry` metadata. DataFrame-only platforms must set `supports_sql=False`, `supports_dataframe=True`, and exactly one `support_status`.
 
 ```python
 # benchbox/platforms/dataframe/__init__.py
@@ -216,6 +218,12 @@ DATAFRAME_ADAPTERS = {
     "pandas-df": PandasDataFrameAdapter,
     "myplatform-df": MyPlatformAdapter,  # Add new platform
 }
+```
+
+Run the scaffold helper before implementation to inspect the expected file plan:
+
+```bash
+uv run -- python _project/scripts/platform_scaffold.py --name myplatform --kind dataframe
 ```
 
 ## Step 5: Add Tests
@@ -323,11 +331,12 @@ class TestMyPlatformTPCH:
 
 Before submitting a PR:
 
-- [ ] Unit tests pass: `pytest tests/unit/platforms/test_myplatform_adapter.py`
+- [ ] Unit tests pass: `uv run -- python -m pytest tests/unit/platforms/test_myplatform_adapter.py`
 - [ ] Integration tests pass (if platform installed)
 - [ ] Platform availability check works correctly
 - [ ] Version detection works
 - [ ] All TPC-H queries execute successfully
+- [ ] `support_status` and registry capabilities match the platform family
 - [ ] Documentation updated
 - [ ] Example script created in `examples/dataframe/`
 
@@ -336,3 +345,4 @@ Before submitting a PR:
 - [DataFrame Platforms Overview](../platforms/dataframe.md)
 - [DataFrameContext API](../platforms/dataframe.md#api-reference)
 - [TPC-H Query Implementations](../guides/tpc/tpc-h-official-guide.md)
+- [New Platform Acceptance Checklist](new-platform-acceptance-checklist.md)

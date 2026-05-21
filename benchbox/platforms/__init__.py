@@ -9,6 +9,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 """
 
 import importlib
+from collections.abc import Iterable
 from typing import Optional, Type
 
 from benchbox.core.platform_registry import PlatformRegistry
@@ -59,6 +60,7 @@ from .base.adapter import check_isolation_capability
 # Cache for lazily loaded adapters and constants
 _lazy_adapter_cache: dict[str, Optional[Type[PlatformAdapter]]] = {}
 _lazy_constant_cache: dict[str, bool] = {}
+_lazy_adapter_diagnostics: dict[str, dict[str, object]] = {}
 
 # Mapping of lazy adapter names to their module paths
 _LAZY_ADAPTERS = {
@@ -139,8 +141,25 @@ def _load_lazy_adapter(name: str) -> Optional[Type[PlatformAdapter]]:
         module = importlib.import_module(module_path, __package__)
         adapter_class = getattr(module, name, None)
         _lazy_adapter_cache[name] = adapter_class
+        if adapter_class is None:
+            _lazy_adapter_diagnostics[name] = {
+                "adapter": name,
+                "module_path": module_path,
+                "status": "broken_adapter_import",
+                "error_type": "AttributeError",
+                "error_message": f"{module_path} does not expose {name}",
+            }
+        else:
+            _lazy_adapter_diagnostics.pop(name, None)
         return adapter_class
-    except ImportError:
+    except (ImportError, OSError) as exc:
+        _lazy_adapter_diagnostics[name] = {
+            "adapter": name,
+            "module_path": module_path,
+            "status": PlatformRegistry.classify_optional_import_error(exc),
+            "error_type": type(exc).__name__,
+            "error_message": str(exc),
+        }
         _lazy_adapter_cache[name] = None
         return None
 
@@ -198,6 +217,16 @@ def __getattr__(name: str):
         return _clickhouse_module_cache
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def get_lazy_adapter_diagnostics() -> dict[str, dict[str, object]]:
+    """Return diagnostics captured by lazy adapter loading."""
+    return {name: diagnostic.copy() for name, diagnostic in _lazy_adapter_diagnostics.items()}
+
+
+def diagnose_optional_adapter_imports(platform_names: Optional[Iterable[str]] = None) -> dict[str, dict[str, object]]:
+    """Run registry-level optional adapter diagnostics on demand."""
+    return PlatformRegistry.diagnose_optional_adapter_imports(platform_names)
 
 
 # ============================================================================
@@ -323,6 +352,8 @@ __all__ = [
     "get_dataframe_requirements",
     "check_platform_connectivity",
     "is_dataframe_platform",
+    "diagnose_optional_adapter_imports",
+    "get_lazy_adapter_diagnostics",
 ]
 
 
