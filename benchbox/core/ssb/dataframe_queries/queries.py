@@ -18,6 +18,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+from csv import reader
 from typing import Any
 
 from benchbox.core.dataframe.context import DataFrameContext
@@ -946,146 +947,50 @@ def q4_3_pandas_impl(ctx: DataFrameContext) -> Any:
 # Query Registration
 # =============================================================================
 
+_CATEGORY_CODES = {
+    "AG": QueryCategory.AGGREGATE,
+    "FI": QueryCategory.FILTER,
+    "GB": QueryCategory.GROUP_BY,
+    "JO": QueryCategory.JOIN,
+    "MJ": QueryCategory.MULTI_JOIN,
+    "SO": QueryCategory.SORT,
+}
+
+_QUERY_METADATA = """\
+Q1.1|Revenue by Year|Revenue aggregation filtered by year, discount range, and quantity threshold|JO,FI,AG|q1_1
+Q1.2|Revenue by Year-Month|Revenue drill-down from year to year-month with quantity range filter|JO,FI,AG|q1_2
+Q1.3|Revenue by Week|Revenue drill-down from year-month to week with quantity range filter|JO,FI,AG|q1_3
+Q2.1|Revenue by Year/Brand (Category)|Revenue by year and brand filtered by part category and supplier region|MJ,FI,GB,SO|q2_1
+Q2.2|Revenue by Year/Brand (Brand Range)|Revenue by year and brand filtered by brand range and supplier region|MJ,FI,GB,SO|q2_2
+Q2.3|Revenue by Year/Brand (Single Brand)|Revenue by year and brand filtered by single brand and supplier region|MJ,FI,GB,SO|q2_3
+Q3.1|Revenue by Nation/Year|Revenue by customer/supplier nation and year filtered by region|MJ,FI,GB,SO|q3_1
+Q3.2|Revenue by City/Year (Nation)|Revenue by city and year filtered by nation (drill-down from region)|MJ,FI,GB,SO|q3_2
+Q3.3|Revenue by City/Year (City Pairs)|Revenue by city and year filtered by specific city pairs (OR conditions)|MJ,FI,GB,SO|q3_3
+Q3.4|Revenue by City/Year-Month|Revenue by city filtered by city pairs and specific year-month|MJ,FI,GB,SO|q3_4
+Q4.1|Profit by Year/Nation|Profit (revenue - supply cost) by year and nation filtered by region and manufacturer|MJ,FI,GB,SO|q4_1
+Q4.2|Profit by Year/Nation/Category|Profit by year, supplier nation, and part category with year and manufacturer filters|MJ,FI,GB,SO|q4_2
+Q4.3|Profit by Year/City/Brand|Profit by year, supplier city, and brand with category filter (deepest drill-down)|MJ,FI,GB,SO|q4_3
+"""
+
+
+def _impl_for(stem: str, family: str) -> Any:
+    return globals()[f"{stem}_{family}_impl"]
+
 
 def _register_all_queries() -> None:
-    """Register all 13 SSB DataFrame queries."""
-    # Flight 1: Revenue aggregations
-    register_query(
-        DataFrameQuery(
-            query_id="Q1.1",
-            query_name="Revenue by Year",
-            description="Revenue aggregation filtered by year, discount range, and quantity threshold",
-            categories=[QueryCategory.JOIN, QueryCategory.FILTER, QueryCategory.AGGREGATE],
-            expression_impl=q1_1_expression_impl,
-            pandas_impl=q1_1_pandas_impl,
+    for query_id, query_name, description, category_codes, impl_stem in reader(
+        _QUERY_METADATA.splitlines(), delimiter="|"
+    ):
+        register_query(
+            DataFrameQuery(
+                query_id=query_id,
+                query_name=query_name,
+                description=description,
+                categories=[_CATEGORY_CODES[code] for code in category_codes.split(",")],
+                expression_impl=_impl_for(impl_stem, "expression"),
+                pandas_impl=_impl_for(impl_stem, "pandas"),
+            )
         )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q1.2",
-            query_name="Revenue by Year-Month",
-            description="Revenue drill-down from year to year-month with quantity range filter",
-            categories=[QueryCategory.JOIN, QueryCategory.FILTER, QueryCategory.AGGREGATE],
-            expression_impl=q1_2_expression_impl,
-            pandas_impl=q1_2_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q1.3",
-            query_name="Revenue by Week",
-            description="Revenue drill-down from year-month to week with quantity range filter",
-            categories=[QueryCategory.JOIN, QueryCategory.FILTER, QueryCategory.AGGREGATE],
-            expression_impl=q1_3_expression_impl,
-            pandas_impl=q1_3_pandas_impl,
-        )
-    )
-
-    # Flight 2: Revenue by year and brand
-    register_query(
-        DataFrameQuery(
-            query_id="Q2.1",
-            query_name="Revenue by Year/Brand (Category)",
-            description="Revenue by year and brand filtered by part category and supplier region",
-            categories=[QueryCategory.MULTI_JOIN, QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q2_1_expression_impl,
-            pandas_impl=q2_1_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q2.2",
-            query_name="Revenue by Year/Brand (Brand Range)",
-            description="Revenue by year and brand filtered by brand range and supplier region",
-            categories=[QueryCategory.MULTI_JOIN, QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q2_2_expression_impl,
-            pandas_impl=q2_2_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q2.3",
-            query_name="Revenue by Year/Brand (Single Brand)",
-            description="Revenue by year and brand filtered by single brand and supplier region",
-            categories=[QueryCategory.MULTI_JOIN, QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q2_3_expression_impl,
-            pandas_impl=q2_3_pandas_impl,
-        )
-    )
-
-    # Flight 3: Revenue by geography and year
-    register_query(
-        DataFrameQuery(
-            query_id="Q3.1",
-            query_name="Revenue by Nation/Year",
-            description="Revenue by customer/supplier nation and year filtered by region",
-            categories=[QueryCategory.MULTI_JOIN, QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q3_1_expression_impl,
-            pandas_impl=q3_1_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q3.2",
-            query_name="Revenue by City/Year (Nation)",
-            description="Revenue by city and year filtered by nation (drill-down from region)",
-            categories=[QueryCategory.MULTI_JOIN, QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q3_2_expression_impl,
-            pandas_impl=q3_2_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q3.3",
-            query_name="Revenue by City/Year (City Pairs)",
-            description="Revenue by city and year filtered by specific city pairs (OR conditions)",
-            categories=[QueryCategory.MULTI_JOIN, QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q3_3_expression_impl,
-            pandas_impl=q3_3_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q3.4",
-            query_name="Revenue by City/Year-Month",
-            description="Revenue by city filtered by city pairs and specific year-month",
-            categories=[QueryCategory.MULTI_JOIN, QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q3_4_expression_impl,
-            pandas_impl=q3_4_pandas_impl,
-        )
-    )
-
-    # Flight 4: Profit by various dimensions
-    register_query(
-        DataFrameQuery(
-            query_id="Q4.1",
-            query_name="Profit by Year/Nation",
-            description="Profit (revenue - supply cost) by year and nation filtered by region and manufacturer",
-            categories=[QueryCategory.MULTI_JOIN, QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q4_1_expression_impl,
-            pandas_impl=q4_1_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q4.2",
-            query_name="Profit by Year/Nation/Category",
-            description="Profit by year, supplier nation, and part category with year and manufacturer filters",
-            categories=[QueryCategory.MULTI_JOIN, QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q4_2_expression_impl,
-            pandas_impl=q4_2_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q4.3",
-            query_name="Profit by Year/City/Brand",
-            description="Profit by year, supplier city, and brand with category filter (deepest drill-down)",
-            categories=[QueryCategory.MULTI_JOIN, QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q4_3_expression_impl,
-            pandas_impl=q4_3_pandas_impl,
-        )
-    )
 
 
 _register_all_queries()
