@@ -126,6 +126,53 @@ def test_main_preflight_returns_2_when_preflight_aborts(tmp_path, monkeypatch, c
     assert "[preflight] ABORT: free space 0.1 GiB < cutoff 1000.0 GiB" in captured.err
 
 
+def test_execute_and_sweep_use_same_preflight_kwargs(tmp_path, monkeypatch):
+    config_path = tmp_path / "uat.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                'name: "preflight-kwargs"',
+                "phases: [preflight, execute]",
+                "platforms:",
+                '  include: ["postgresql"]',
+                "preflight:",
+                "  free_space_min_gib: 12.5",
+                f'  free_space_path: "{tmp_path / "free-space"}"',
+                "  docker_required: true",
+                "  noisy_neighbor_warn_load: 3.5",
+                "  local_platforms_check: true",
+                "output:",
+                f'  benchmark_runs_dir_template: "{tmp_path / "runs"}"',
+                f'  logs_dir_template: "{tmp_path / "logs" / "{name}-{date}"}"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+    calls: list[dict[str, object]] = []
+
+    def fake_run_preflight(**kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(
+            disk_budget_summary=None,
+            warnings=(),
+            aborted=True,
+            abort_reason="stop after capturing preflight kwargs",
+        )
+
+    monkeypatch.setattr("tests.uat.phases.preflight.run_preflight", fake_run_preflight)
+
+    execute_rc = _cli.execute_main(["--config", str(config_path)])
+    sweep_rc = _cli.sweep_main(["--config", str(config_path)])
+
+    assert execute_rc == 2
+    assert sweep_rc == 2
+    assert len(calls) == 2
+    execute_kwargs = {key: value for key, value in calls[0].items() if key != "disk_budget_config"}
+    sweep_kwargs = {key: value for key, value in calls[1].items() if key != "disk_budget_config"}
+    assert execute_kwargs == sweep_kwargs
+    assert calls[0]["disk_budget_config"] == calls[1]["disk_budget_config"]
+
+
 def test_subcommands_table_covers_all_make_targets():
     """The dispatch table must cover every make uat-* target's subcommand."""
     expected = {

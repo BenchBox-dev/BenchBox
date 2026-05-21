@@ -133,7 +133,7 @@ def preflight_main(argv: list[str] | None = None) -> int:
     """Print the advisory disk budget and current preflight status for a config."""
     from tests.uat.config import load_config
     from tests.uat.phases.execute import default_benchmark_runs_dir
-    from tests.uat.phases.preflight import requested_platforms_from_config, run_preflight
+    from tests.uat.phases.preflight import preflight_kwargs_from_config, run_preflight
 
     parser = argparse.ArgumentParser(prog="uat-preflight")
     parser.add_argument("--config", required=True)
@@ -141,16 +141,7 @@ def preflight_main(argv: list[str] | None = None) -> int:
 
     config = load_config(args.config)
     benchmark_runs_dir = default_benchmark_runs_dir(config)
-    result = run_preflight(
-        free_space_path=config.preflight.free_space_path or str(benchmark_runs_dir),
-        free_space_min_gib=config.preflight.free_space_min_gib,
-        docker_required=config.preflight.docker_required or config.cleanup.docker_manage_platforms,
-        noisy_neighbor_warn_load=config.preflight.noisy_neighbor_warn_load,
-        local_platforms_check=config.preflight.local_platforms_check,
-        requested_platforms=requested_platforms_from_config(config),
-        benchmark_runs_dir=benchmark_runs_dir,
-        disk_budget_config=config,
-    )
+    result = run_preflight(**preflight_kwargs_from_config(config, benchmark_runs_dir=benchmark_runs_dir))
     if result.disk_budget_summary:
         print(result.disk_budget_summary)
     for warning in result.warnings:
@@ -406,7 +397,7 @@ def execute_main(argv: list[str] | None = None) -> int:
     """Implements `make uat-execute CONFIG=path/to/uat.yaml`."""
     from tests.uat.config import load_config
     from tests.uat.phases.execute import default_benchmark_runs_dir, default_log_dir, run_execute
-    from tests.uat.phases.preflight import requested_platforms_from_config, run_preflight
+    from tests.uat.phases.preflight import preflight_kwargs_from_config, run_preflight
 
     parser = argparse.ArgumentParser(prog="uat-execute")
     parser.add_argument("--config", required=True)
@@ -426,16 +417,7 @@ def execute_main(argv: list[str] | None = None) -> int:
     config = load_config(args.config)
     benchmark_runs_dir = default_benchmark_runs_dir(config)
     if "preflight" in config.phases:
-        preflight = run_preflight(
-            free_space_path=config.preflight.free_space_path or str(benchmark_runs_dir),
-            free_space_min_gib=config.preflight.free_space_min_gib,
-            docker_required=config.preflight.docker_required or config.cleanup.docker_manage_platforms,
-            noisy_neighbor_warn_load=config.preflight.noisy_neighbor_warn_load,
-            local_platforms_check=config.preflight.local_platforms_check,
-            requested_platforms=requested_platforms_from_config(config),
-            benchmark_runs_dir=benchmark_runs_dir,
-            disk_budget_config=config,
-        )
+        preflight = run_preflight(**preflight_kwargs_from_config(config, benchmark_runs_dir=benchmark_runs_dir))
         if preflight.disk_budget_summary:
             print(preflight.disk_budget_summary, file=sys.stderr)
         for warning in preflight.warnings:
