@@ -686,6 +686,15 @@ def _make_lazy_config_builder(module_path: str, builder_name: str):
 try:
     from benchbox.cli.platform_hooks import PlatformHookRegistry, PlatformOptionSpec, parse_bool
 
+    def _spec(name: str, help_text: str, **kwargs) -> PlatformOptionSpec:
+        return PlatformOptionSpec(name=name, help=help_text, **kwargs)
+
+    def _register_specs(platform: str, *specs) -> None:
+        PlatformHookRegistry.register_option_specs(
+            platform,
+            *(_spec(spec[0], spec[1], **(spec[2] if len(spec) > 2 else {})) for spec in specs),
+        )
+
     # ========================================================================
     # Cloud Platform Hooks (Lazy Config Builders)
     # ========================================================================
@@ -704,184 +713,86 @@ try:
     PlatformHookRegistry.register_config_builder(
         "databricks", _make_lazy_config_builder(".databricks", "_build_databricks_config")
     )
-    PlatformHookRegistry.register_option_specs(
+    _register_specs(
         "databricks",
-        PlatformOptionSpec(
-            name="uc_catalog",
-            help="Unity Catalog catalog name for staging data",
+        ("uc_catalog", "Unity Catalog catalog name for staging data"),
+        ("uc_schema", "Unity Catalog schema name for staging data"),
+        ("uc_volume", "Unity Catalog volume name for staging data"),
+        ("staging_root", "Cloud storage path for staging data (e.g., dbfs:/Volumes/..., s3://..., abfss://...)"),
+        (
+            "databricks_clustering_strategy",
+            "Databricks SQL tuning strategy override (z_order, liquid_clustering, none)",
+            {"choices": ("z_order", "liquid_clustering", "none")},
         ),
-        PlatformOptionSpec(
-            name="uc_schema",
-            help="Unity Catalog schema name for staging data",
-        ),
-        PlatformOptionSpec(
-            name="uc_volume",
-            help="Unity Catalog volume name for staging data",
-        ),
-        PlatformOptionSpec(
-            name="staging_root",
-            help="Cloud storage path for staging data (e.g., dbfs:/Volumes/..., s3://..., abfss://...)",
-        ),
-        PlatformOptionSpec(
-            name="databricks_clustering_strategy",
-            choices=("z_order", "liquid_clustering", "none"),
-            help="Databricks SQL tuning strategy override (z_order, liquid_clustering, none)",
-        ),
-        PlatformOptionSpec(
-            name="liquid_clustering_columns",
-            help="Comma-separated Databricks liquid clustering columns",
-        ),
+        ("liquid_clustering_columns", "Comma-separated Databricks liquid clustering columns"),
     )
 
     # BigQuery
     PlatformHookRegistry.register_config_builder(
         "bigquery", _make_lazy_config_builder(".bigquery", "_build_bigquery_config")
     )
-    PlatformHookRegistry.register_option_specs(
+    _register_specs(
         "bigquery",
-        PlatformOptionSpec(
-            name="staging_root",
-            help="GCS path for staging data (e.g., gs://bucket/path)",
-        ),
-        PlatformOptionSpec(
-            name="storage_bucket",
-            help="GCS bucket name for data staging (alternative to staging_root)",
-        ),
-        PlatformOptionSpec(
-            name="storage_prefix",
-            help="GCS path prefix within bucket for data staging",
-        ),
+        ("staging_root", "GCS path for staging data (e.g., gs://bucket/path)"),
+        ("storage_bucket", "GCS bucket name for data staging (alternative to staging_root)"),
+        ("storage_prefix", "GCS path prefix within bucket for data staging"),
     )
 
     # Trino
     PlatformHookRegistry.register_config_builder("trino", _make_lazy_config_builder(".trino", "_build_trino_config"))
-    PlatformHookRegistry.register_option_specs(
+    _register_specs(
         "trino",
-        PlatformOptionSpec(
-            name="catalog",
-            help="Trino catalog to use (e.g., hive, iceberg, memory). Auto-discovered if not specified.",
-        ),
-        PlatformOptionSpec(
-            name="staging_root",
-            help="Cloud storage path for staging data (e.g., s3://..., gs://..., abfss://...)",
-        ),
-        PlatformOptionSpec(
-            name="table_format",
-            help="Table format for creating tables (memory, hive, iceberg, delta)",
-            default="memory",
-        ),
-        PlatformOptionSpec(
-            name="source_catalog",
-            help="Source catalog for external data loading (e.g., hive connector)",
-        ),
+        ("catalog", "Trino catalog to use (e.g., hive, iceberg, memory). Auto-discovered if not specified."),
+        ("staging_root", "Cloud storage path for staging data (e.g., s3://..., gs://..., abfss://...)"),
+        ("table_format", "Table format for creating tables (memory, hive, iceberg, delta)", {"default": "memory"}),
+        ("source_catalog", "Source catalog for external data loading (e.g., hive connector)"),
     )
 
     # Firebolt
     PlatformHookRegistry.register_config_builder(
         "firebolt", _make_lazy_config_builder(".firebolt", "_build_firebolt_config")
     )
-    PlatformHookRegistry.register_option_specs(
+    _register_specs(
         "firebolt",
-        PlatformOptionSpec(
-            name="deployment_mode",
-            aliases=("firebolt_mode",),
-            help="Explicit Firebolt mode: 'core' for local Docker, 'cloud' for managed Firebolt",
-            choices=("core", "cloud"),
+        (
+            "deployment_mode",
+            "Explicit Firebolt mode: 'core' for local Docker, 'cloud' for managed Firebolt",
+            {"aliases": ("firebolt_mode",), "choices": ("core", "cloud")},
         ),
-        PlatformOptionSpec(
-            name="url",
-            help="Firebolt Core endpoint URL (default: http://localhost:3473)",
-            default="http://localhost:3473",
+        ("url", "Firebolt Core endpoint URL (default: http://localhost:3473)", {"default": "http://localhost:3473"}),
+        ("client_id", "Firebolt Cloud OAuth client ID"),
+        ("client_secret", "Firebolt Cloud OAuth client secret"),
+        ("account_name", "Firebolt Cloud account name"),
+        ("engine_name", "Firebolt Cloud engine name"),
+        ("api_endpoint", "Firebolt Cloud API endpoint", {"default": "api.app.firebolt.io"}),
+        ("database", "Firebolt database name"),
+        ("region", "Firebolt Cloud region when known", {"aliases": ("cloud_region",)}),
+        ("cloud_provider", "Firebolt Cloud provider when known"),
+        ("engine_type", "Firebolt Cloud engine type when known"),
+        ("engine_size", "Firebolt Cloud requested engine size when known"),
+        ("compute_size", "Firebolt Cloud requested compute size alias for engine size"),
+        ("s3_staging_url", "S3 URL for Firebolt Cloud data staging"),
+        ("s3_region", "AWS region for Firebolt S3 staging"),
+        (
+            "disable_result_cache",
+            "Disable Firebolt Cloud result cache during benchmark execution",
+            {"parser": parse_bool, "default": True},
         ),
-        PlatformOptionSpec(
-            name="client_id",
-            help="Firebolt Cloud OAuth client ID",
-        ),
-        PlatformOptionSpec(
-            name="client_secret",
-            help="Firebolt Cloud OAuth client secret",
-        ),
-        PlatformOptionSpec(
-            name="account_name",
-            help="Firebolt Cloud account name",
-        ),
-        PlatformOptionSpec(
-            name="engine_name",
-            help="Firebolt Cloud engine name",
-        ),
-        PlatformOptionSpec(
-            name="api_endpoint",
-            help="Firebolt Cloud API endpoint",
-            default="api.app.firebolt.io",
-        ),
-        PlatformOptionSpec(
-            name="database",
-            help="Firebolt database name",
-        ),
-        PlatformOptionSpec(
-            name="region",
-            aliases=("cloud_region",),
-            help="Firebolt Cloud region when known",
-        ),
-        PlatformOptionSpec(
-            name="cloud_provider",
-            help="Firebolt Cloud provider when known",
-        ),
-        PlatformOptionSpec(
-            name="engine_type",
-            help="Firebolt Cloud engine type when known",
-        ),
-        PlatformOptionSpec(
-            name="engine_size",
-            help="Firebolt Cloud requested engine size when known",
-        ),
-        PlatformOptionSpec(
-            name="compute_size",
-            help="Firebolt Cloud requested compute size alias for engine size",
-        ),
-        PlatformOptionSpec(
-            name="s3_staging_url",
-            help="S3 URL for Firebolt Cloud data staging",
-        ),
-        PlatformOptionSpec(
-            name="s3_region",
-            help="AWS region for Firebolt S3 staging",
-        ),
-        PlatformOptionSpec(
-            name="disable_result_cache",
-            parser=parse_bool,
-            help="Disable Firebolt Cloud result cache during benchmark execution",
-            default=True,
-        ),
-        PlatformOptionSpec(
-            name="strict_validation",
-            parser=parse_bool,
-            help="Fail when Firebolt cache-control validation cannot prove expected state",
-            default=False,
+        (
+            "strict_validation",
+            "Fail when Firebolt cache-control validation cannot prove expected state",
+            {"parser": parse_bool, "default": False},
         ),
     )
 
     # Presto
     PlatformHookRegistry.register_config_builder("presto", _make_lazy_config_builder(".presto", "_build_presto_config"))
-    PlatformHookRegistry.register_option_specs(
+    _register_specs(
         "presto",
-        PlatformOptionSpec(
-            name="catalog",
-            help="Presto catalog to use (e.g., hive, memory). Auto-discovered if not specified.",
-        ),
-        PlatformOptionSpec(
-            name="staging_root",
-            help="Cloud storage path for staging data (e.g., s3://..., gs://...)",
-        ),
-        PlatformOptionSpec(
-            name="table_format",
-            help="Table format for creating tables (memory, hive)",
-            default="memory",
-        ),
-        PlatformOptionSpec(
-            name="source_catalog",
-            help="Source catalog for external data loading (e.g., hive connector)",
-        ),
+        ("catalog", "Presto catalog to use (e.g., hive, memory). Auto-discovered if not specified."),
+        ("staging_root", "Cloud storage path for staging data (e.g., s3://..., gs://...)"),
+        ("table_format", "Table format for creating tables (memory, hive)", {"default": "memory"}),
+        ("source_catalog", "Source catalog for external data loading (e.g., hive connector)"),
     )
 
     # ========================================================================
@@ -896,47 +807,16 @@ try:
 
         PlatformHookRegistry.register_config_builder("postgresql", _build_postgresql_config)
 
-    PlatformHookRegistry.register_option_specs(
+    _register_specs(
         "postgresql",
-        PlatformOptionSpec(
-            name="host",
-            help="PostgreSQL server hostname",
-            default="localhost",
-        ),
-        PlatformOptionSpec(
-            name="port",
-            help="PostgreSQL server port",
-            parser=int,
-            default=5432,
-        ),
-        PlatformOptionSpec(
-            name="database",
-            help="PostgreSQL database name (auto-generated if not specified)",
-        ),
-        PlatformOptionSpec(
-            name="username",
-            help="PostgreSQL username",
-            default="postgres",
-        ),
-        PlatformOptionSpec(
-            name="password",
-            help="PostgreSQL password",
-        ),
-        PlatformOptionSpec(
-            name="schema",
-            help="PostgreSQL schema name",
-            default="public",
-        ),
-        PlatformOptionSpec(
-            name="work_mem",
-            help="PostgreSQL work_mem setting for queries",
-            default="256MB",
-        ),
-        PlatformOptionSpec(
-            name="enable_timescale",
-            help="Enable TimescaleDB extensions if available",
-            default="false",
-        ),
+        ("host", "PostgreSQL server hostname", {"default": "localhost"}),
+        ("port", "PostgreSQL server port", {"parser": int, "default": 5432}),
+        ("database", "PostgreSQL database name (auto-generated if not specified)"),
+        ("username", "PostgreSQL username", {"default": "postgres"}),
+        ("password", "PostgreSQL password"),
+        ("schema", "PostgreSQL schema name", {"default": "public"}),
+        ("work_mem", "PostgreSQL work_mem setting for queries", {"default": "256MB"}),
+        ("enable_timescale", "Enable TimescaleDB extensions if available", {"default": "false"}),
     )
 
     # TimescaleDB (eagerly loaded - shares psycopg2 with PostgreSQL)
@@ -945,83 +825,27 @@ try:
 
         PlatformHookRegistry.register_config_builder("timescaledb", _build_timescaledb_config)
 
-    PlatformHookRegistry.register_option_specs(
+    _register_specs(
         "timescaledb",
-        PlatformOptionSpec(
-            name="host",
-            help="TimescaleDB server hostname",
-            default="localhost",
+        ("host", "TimescaleDB server hostname", {"default": "localhost"}),
+        ("port", "TimescaleDB server port", {"parser": int, "default": 5432}),
+        ("database", "TimescaleDB database name (auto-generated if not specified)"),
+        ("username", "TimescaleDB username", {"default": "postgres"}),
+        ("password", "TimescaleDB password"),
+        ("schema", "TimescaleDB schema name", {"default": "public"}),
+        ("admin_database", "Database used for CREATE/DROP DATABASE operations", {"default": "postgres"}),
+        ("sslmode", "PostgreSQL SSL mode", {"default": "prefer"}),
+        ("work_mem", "TimescaleDB work_mem setting for queries", {"default": "256MB"}),
+        ("maintenance_work_mem", "TimescaleDB maintenance_work_mem for VACUUM/CREATE INDEX", {"default": "512MB"}),
+        ("effective_cache_size", "TimescaleDB effective_cache_size planner hint", {"default": "1GB"}),
+        (
+            "max_parallel_workers_per_gather",
+            "TimescaleDB max_parallel_workers_per_gather setting",
+            {"parser": int, "default": 2},
         ),
-        PlatformOptionSpec(
-            name="port",
-            help="TimescaleDB server port",
-            parser=int,
-            default=5432,
-        ),
-        PlatformOptionSpec(
-            name="database",
-            help="TimescaleDB database name (auto-generated if not specified)",
-        ),
-        PlatformOptionSpec(
-            name="username",
-            help="TimescaleDB username",
-            default="postgres",
-        ),
-        PlatformOptionSpec(
-            name="password",
-            help="TimescaleDB password",
-        ),
-        PlatformOptionSpec(
-            name="schema",
-            help="TimescaleDB schema name",
-            default="public",
-        ),
-        PlatformOptionSpec(
-            name="admin_database",
-            help="Database used for CREATE/DROP DATABASE operations",
-            default="postgres",
-        ),
-        PlatformOptionSpec(
-            name="sslmode",
-            help="PostgreSQL SSL mode",
-            default="prefer",
-        ),
-        PlatformOptionSpec(
-            name="work_mem",
-            help="TimescaleDB work_mem setting for queries",
-            default="256MB",
-        ),
-        PlatformOptionSpec(
-            name="maintenance_work_mem",
-            help="TimescaleDB maintenance_work_mem for VACUUM/CREATE INDEX",
-            default="512MB",
-        ),
-        PlatformOptionSpec(
-            name="effective_cache_size",
-            help="TimescaleDB effective_cache_size planner hint",
-            default="1GB",
-        ),
-        PlatformOptionSpec(
-            name="max_parallel_workers_per_gather",
-            help="TimescaleDB max_parallel_workers_per_gather setting",
-            parser=int,
-            default=2,
-        ),
-        PlatformOptionSpec(
-            name="chunk_interval",
-            help="Chunk time interval for hypertables (e.g., '1 day', '1 week')",
-            default="1 day",
-        ),
-        PlatformOptionSpec(
-            name="compression_enabled",
-            help="Enable compression on hypertables",
-            default="false",
-        ),
-        PlatformOptionSpec(
-            name="compression_after",
-            help="Compress chunks older than this interval (e.g., '7 days')",
-            default="7 days",
-        ),
+        ("chunk_interval", "Chunk time interval for hypertables (e.g., '1 day', '1 week')", {"default": "1 day"}),
+        ("compression_enabled", "Enable compression on hypertables", {"default": "false"}),
+        ("compression_after", "Compress chunks older than this interval (e.g., '7 days')", {"default": "7 days"}),
     )
 
     # pg_duckdb (eagerly loaded - shares psycopg2 with PostgreSQL)
@@ -1030,85 +854,34 @@ try:
 
         PlatformHookRegistry.register_config_builder("pg-duckdb", _build_pg_duckdb_config)
 
-    PlatformHookRegistry.register_option_specs(
+    _register_specs(
         "pg-duckdb",
-        PlatformOptionSpec(
-            name="host",
-            help="PostgreSQL server hostname (with pg_duckdb installed)",
-            default="localhost",
+        ("host", "PostgreSQL server hostname (with pg_duckdb installed)", {"default": "localhost"}),
+        ("port", "PostgreSQL server port", {"parser": int, "default": 5432}),
+        ("database", "PostgreSQL database name (auto-generated if not specified)"),
+        ("username", "PostgreSQL username", {"default": "postgres"}),
+        ("password", "PostgreSQL password"),
+        ("schema", "PostgreSQL schema name", {"default": "public"}),
+        ("admin_database", "Database used for CREATE/DROP DATABASE operations", {"default": "postgres"}),
+        ("sslmode", "PostgreSQL SSL mode", {"default": "prefer"}),
+        ("work_mem", "PostgreSQL work_mem setting for queries", {"default": "256MB"}),
+        ("maintenance_work_mem", "PostgreSQL maintenance_work_mem for VACUUM/CREATE INDEX", {"default": "512MB"}),
+        ("effective_cache_size", "PostgreSQL effective_cache_size planner hint", {"default": "1GB"}),
+        (
+            "max_parallel_workers_per_gather",
+            "PostgreSQL max_parallel_workers_per_gather setting",
+            {"parser": int, "default": 2},
         ),
-        PlatformOptionSpec(
-            name="port",
-            help="PostgreSQL server port",
-            parser=int,
-            default=5432,
+        ("force_execution", "Force DuckDB execution engine for all queries", {"parser": parse_bool, "default": True}),
+        (
+            "postgres_scan_threads",
+            "Threads for parallel PostgreSQL table scanning (0 = auto)",
+            {"parser": int, "default": 0},
         ),
-        PlatformOptionSpec(
-            name="database",
-            help="PostgreSQL database name (auto-generated if not specified)",
-        ),
-        PlatformOptionSpec(
-            name="username",
-            help="PostgreSQL username",
-            default="postgres",
-        ),
-        PlatformOptionSpec(
-            name="password",
-            help="PostgreSQL password",
-        ),
-        PlatformOptionSpec(
-            name="schema",
-            help="PostgreSQL schema name",
-            default="public",
-        ),
-        PlatformOptionSpec(
-            name="admin_database",
-            help="Database used for CREATE/DROP DATABASE operations",
-            default="postgres",
-        ),
-        PlatformOptionSpec(
-            name="sslmode",
-            help="PostgreSQL SSL mode",
-            default="prefer",
-        ),
-        PlatformOptionSpec(
-            name="work_mem",
-            help="PostgreSQL work_mem setting for queries",
-            default="256MB",
-        ),
-        PlatformOptionSpec(
-            name="maintenance_work_mem",
-            help="PostgreSQL maintenance_work_mem for VACUUM/CREATE INDEX",
-            default="512MB",
-        ),
-        PlatformOptionSpec(
-            name="effective_cache_size",
-            help="PostgreSQL effective_cache_size planner hint",
-            default="1GB",
-        ),
-        PlatformOptionSpec(
-            name="max_parallel_workers_per_gather",
-            help="PostgreSQL max_parallel_workers_per_gather setting",
-            parser=int,
-            default=2,
-        ),
-        PlatformOptionSpec(
-            name="force_execution",
-            help="Force DuckDB execution engine for all queries",
-            parser=parse_bool,
-            default=True,
-        ),
-        PlatformOptionSpec(
-            name="postgres_scan_threads",
-            help="Threads for parallel PostgreSQL table scanning (0 = auto)",
-            parser=int,
-            default=0,
-        ),
-        PlatformOptionSpec(
-            name="compare_native",
-            help="Run native DuckDB comparison for matched queries",
-            parser=parse_bool,
-            default=False,
+        (
+            "compare_native",
+            "Run native DuckDB comparison for matched queries",
+            {"parser": parse_bool, "default": False},
         ),
     )
 
@@ -1118,78 +891,30 @@ try:
 
         PlatformHookRegistry.register_config_builder("pg-mooncake", _build_pg_mooncake_config)
 
-    PlatformHookRegistry.register_option_specs(
+    _register_specs(
         "pg-mooncake",
-        PlatformOptionSpec(
-            name="host",
-            help="PostgreSQL server hostname (with pg_mooncake installed)",
-            default="localhost",
+        ("host", "PostgreSQL server hostname (with pg_mooncake installed)", {"default": "localhost"}),
+        ("port", "PostgreSQL server port", {"parser": int, "default": 5432}),
+        ("database", "PostgreSQL database name (auto-generated if not specified)"),
+        ("username", "PostgreSQL username", {"default": "postgres"}),
+        ("password", "PostgreSQL password"),
+        ("schema", "PostgreSQL schema name", {"default": "public"}),
+        ("admin_database", "Database used for CREATE/DROP DATABASE operations", {"default": "postgres"}),
+        ("sslmode", "PostgreSQL SSL mode", {"default": "prefer"}),
+        ("work_mem", "PostgreSQL work_mem setting for queries", {"default": "256MB"}),
+        ("maintenance_work_mem", "PostgreSQL maintenance_work_mem for VACUUM/CREATE INDEX", {"default": "512MB"}),
+        ("effective_cache_size", "PostgreSQL effective_cache_size planner hint", {"default": "1GB"}),
+        (
+            "max_parallel_workers_per_gather",
+            "PostgreSQL max_parallel_workers_per_gather setting",
+            {"parser": int, "default": 2},
         ),
-        PlatformOptionSpec(
-            name="port",
-            help="PostgreSQL server port",
-            parser=int,
-            default=5432,
+        (
+            "storage_mode",
+            "Storage backend: local (disk) or s3 (object storage)",
+            {"choices": ("local", "s3"), "default": "local"},
         ),
-        PlatformOptionSpec(
-            name="database",
-            help="PostgreSQL database name (auto-generated if not specified)",
-        ),
-        PlatformOptionSpec(
-            name="username",
-            help="PostgreSQL username",
-            default="postgres",
-        ),
-        PlatformOptionSpec(
-            name="password",
-            help="PostgreSQL password",
-        ),
-        PlatformOptionSpec(
-            name="schema",
-            help="PostgreSQL schema name",
-            default="public",
-        ),
-        PlatformOptionSpec(
-            name="admin_database",
-            help="Database used for CREATE/DROP DATABASE operations",
-            default="postgres",
-        ),
-        PlatformOptionSpec(
-            name="sslmode",
-            help="PostgreSQL SSL mode",
-            default="prefer",
-        ),
-        PlatformOptionSpec(
-            name="work_mem",
-            help="PostgreSQL work_mem setting for queries",
-            default="256MB",
-        ),
-        PlatformOptionSpec(
-            name="maintenance_work_mem",
-            help="PostgreSQL maintenance_work_mem for VACUUM/CREATE INDEX",
-            default="512MB",
-        ),
-        PlatformOptionSpec(
-            name="effective_cache_size",
-            help="PostgreSQL effective_cache_size planner hint",
-            default="1GB",
-        ),
-        PlatformOptionSpec(
-            name="max_parallel_workers_per_gather",
-            help="PostgreSQL max_parallel_workers_per_gather setting",
-            parser=int,
-            default=2,
-        ),
-        PlatformOptionSpec(
-            name="storage_mode",
-            help="Storage backend: local (disk) or s3 (object storage)",
-            choices=("local", "s3"),
-            default="local",
-        ),
-        PlatformOptionSpec(
-            name="mooncake_bucket",
-            help="S3/GCS bucket URL for columnstore data (required when storage_mode=s3)",
-        ),
+        ("mooncake_bucket", "S3/GCS bucket URL for columnstore data (required when storage_mode=s3)"),
     )
 
     # QuestDB (eagerly loaded - shares psycopg2 with PostgreSQL)
@@ -1198,47 +923,23 @@ try:
 
         PlatformHookRegistry.register_config_builder("questdb", _build_questdb_config)
 
-    PlatformHookRegistry.register_option_specs(
+    _register_specs(
         "questdb",
-        PlatformOptionSpec(
-            name="host",
-            help="QuestDB server hostname",
-            default="localhost",
+        ("host", "QuestDB server hostname", {"default": "localhost"}),
+        ("pg_port", "QuestDB PostgreSQL wire protocol port", {"default": "8812"}),
+        (
+            "http_port",
+            "QuestDB REST API HTTP port (BenchBox Docker uses 19000; native default is 9000)",
+            {"default": "9000"},
         ),
-        PlatformOptionSpec(
-            name="pg_port",
-            help="QuestDB PostgreSQL wire protocol port",
-            default="8812",
-        ),
-        PlatformOptionSpec(
-            name="http_port",
-            help="QuestDB REST API HTTP port (BenchBox Docker uses 19000; native default is 9000)",
-            default="9000",
-        ),
-        PlatformOptionSpec(
-            name="ilp_port",
-            help="QuestDB InfluxDB Line Protocol port",
-            default="9009",
-        ),
-        PlatformOptionSpec(
-            name="username",
-            help="QuestDB username",
-            default="admin",
-        ),
-        PlatformOptionSpec(
-            name="password",
-            help="QuestDB password",
-            default="quest",
-        ),
-        PlatformOptionSpec(
-            name="database",
-            help="QuestDB database name",
-            default="qdb",
-        ),
-        PlatformOptionSpec(
-            name="loading_method",
-            help="Data loading method: 'rest' (CSV import, default) or 'ilp' (InfluxDB Line Protocol)",
-            default="rest",
+        ("ilp_port", "QuestDB InfluxDB Line Protocol port", {"default": "9009"}),
+        ("username", "QuestDB username", {"default": "admin"}),
+        ("password", "QuestDB password", {"default": "quest"}),
+        ("database", "QuestDB database name", {"default": "qdb"}),
+        (
+            "loading_method",
+            "Data loading method: 'rest' (CSV import, default) or 'ilp' (InfluxDB Line Protocol)",
+            {"default": "rest"},
         ),
     )
 
@@ -1248,36 +949,14 @@ try:
 
         PlatformHookRegistry.register_config_builder("cedardb", _build_cedardb_config)
 
-    PlatformHookRegistry.register_option_specs(
+    _register_specs(
         "cedardb",
-        PlatformOptionSpec(
-            name="host",
-            help="CedarDB server hostname",
-            default="localhost",
-        ),
-        PlatformOptionSpec(
-            name="port",
-            help="CedarDB server port",
-            default="5432",
-        ),
-        PlatformOptionSpec(
-            name="database",
-            help="CedarDB database name (auto-generated if not specified)",
-        ),
-        PlatformOptionSpec(
-            name="username",
-            help="CedarDB username",
-            default="postgres",
-        ),
-        PlatformOptionSpec(
-            name="password",
-            help="CedarDB password",
-        ),
-        PlatformOptionSpec(
-            name="schema",
-            help="CedarDB schema name",
-            default="public",
-        ),
+        ("host", "CedarDB server hostname", {"default": "localhost"}),
+        ("port", "CedarDB server port", {"default": "5432"}),
+        ("database", "CedarDB database name (auto-generated if not specified)"),
+        ("username", "CedarDB username", {"default": "postgres"}),
+        ("password", "CedarDB password"),
+        ("schema", "CedarDB schema name", {"default": "public"}),
     )
 
     # ========================================================================
@@ -1288,127 +967,57 @@ try:
     PlatformHookRegistry.register_config_builder(
         "synapse", _make_lazy_config_builder(".azure_synapse", "_build_synapse_config")
     )
-    PlatformHookRegistry.register_option_specs(
+    _register_specs(
         "synapse",
-        PlatformOptionSpec(
-            name="server",
-            help="Azure Synapse server endpoint (e.g., myworkspace.sql.azuresynapse.net)",
-        ),
-        PlatformOptionSpec(
-            name="database",
-            help="Azure Synapse database name (auto-generated if not specified)",
-        ),
-        PlatformOptionSpec(
-            name="username",
-            help="Azure Synapse username",
-        ),
-        PlatformOptionSpec(
-            name="password",
-            help="Azure Synapse password",
-        ),
-        PlatformOptionSpec(
-            name="auth_method",
-            help="Authentication method: sql, aad_password, or aad_msi",
-            default="sql",
-        ),
-        PlatformOptionSpec(
-            name="storage_account",
-            help="Azure storage account for data staging",
-        ),
-        PlatformOptionSpec(
-            name="container",
-            help="Azure blob container name",
-        ),
-        PlatformOptionSpec(
-            name="storage_sas_token",
-            help="SAS token for Azure storage access",
-        ),
-        PlatformOptionSpec(
-            name="resource_class",
-            help="Workload resource class (e.g., staticrc20, staticrc30)",
-            default="staticrc20",
-        ),
+        ("server", "Azure Synapse server endpoint (e.g., myworkspace.sql.azuresynapse.net)"),
+        ("database", "Azure Synapse database name (auto-generated if not specified)"),
+        ("username", "Azure Synapse username"),
+        ("password", "Azure Synapse password"),
+        ("auth_method", "Authentication method: sql, aad_password, or aad_msi", {"default": "sql"}),
+        ("storage_account", "Azure storage account for data staging"),
+        ("container", "Azure blob container name"),
+        ("storage_sas_token", "SAS token for Azure storage access"),
+        ("resource_class", "Workload resource class (e.g., staticrc20, staticrc30)", {"default": "staticrc20"}),
     )
 
     # Microsoft Fabric Warehouse (lazy - uses pyodbc and azure-identity)
     # Fabric uses from_config pattern, no separate config builder needed
-    PlatformHookRegistry.register_option_specs(
+    _register_specs(
         "fabric_dw",
-        PlatformOptionSpec(
-            name="server",
-            help="Fabric warehouse endpoint (e.g., workspace-guid.datawarehouse.fabric.microsoft.com)",
+        ("server", "Fabric warehouse endpoint (e.g., workspace-guid.datawarehouse.fabric.microsoft.com)"),
+        ("workspace", "Fabric workspace name or GUID"),
+        ("warehouse", "Fabric warehouse name"),
+        ("database", "Database/warehouse name (alias for --warehouse)"),
+        (
+            "auth_method",
+            "Authentication method: service_principal, default_credential, or interactive",
+            {"default": "default_credential"},
         ),
-        PlatformOptionSpec(
-            name="workspace",
-            help="Fabric workspace name or GUID",
-        ),
-        PlatformOptionSpec(
-            name="warehouse",
-            help="Fabric warehouse name",
-        ),
-        PlatformOptionSpec(
-            name="database",
-            help="Database/warehouse name (alias for --warehouse)",
-        ),
-        PlatformOptionSpec(
-            name="auth_method",
-            help="Authentication method: service_principal, default_credential, or interactive",
-            default="default_credential",
-        ),
-        PlatformOptionSpec(
-            name="tenant_id",
-            help="Azure tenant ID for service principal auth",
-        ),
-        PlatformOptionSpec(
-            name="client_id",
-            help="Service principal client ID",
-        ),
-        PlatformOptionSpec(
-            name="client_secret",
-            help="Service principal client secret",
-        ),
-        PlatformOptionSpec(
-            name="staging_path",
-            help="OneLake staging path for data loading",
-            default="benchbox-staging",
-        ),
+        ("tenant_id", "Azure tenant ID for service principal auth"),
+        ("client_id", "Service principal client ID"),
+        ("client_secret", "Service principal client secret"),
+        ("staging_path", "OneLake staging path for data loading", {"default": "benchbox-staging"}),
     )
 
     # Onehouse Quanton (lazy - uses requests and boto3)
     PlatformHookRegistry.register_config_builder(
         "quanton", _make_lazy_config_builder(".onehouse", "_build_quanton_config")
     )
-    PlatformHookRegistry.register_option_specs(
+    _register_specs(
         "quanton",
-        PlatformOptionSpec(
-            name="api_key",
-            help="Onehouse API key (or set ONEHOUSE_API_KEY env var)",
+        ("api_key", "Onehouse API key (or set ONEHOUSE_API_KEY env var)"),
+        ("s3_staging_dir", "S3 path for data staging (e.g., s3://bucket/path)"),
+        ("region", "AWS region for cluster deployment", {"default": "us-east-1"}),
+        ("database", "Database name for benchmarks", {"default": "benchbox"}),
+        (
+            "table_format",
+            "Table format: iceberg, hudi, or delta",
+            {"choices": ("iceberg", "hudi", "delta"), "default": "iceberg"},
         ),
-        PlatformOptionSpec(
-            name="s3_staging_dir",
-            help="S3 path for data staging (e.g., s3://bucket/path)",
-        ),
-        PlatformOptionSpec(
-            name="region",
-            help="AWS region for cluster deployment",
-            default="us-east-1",
-        ),
-        PlatformOptionSpec(
-            name="database",
-            help="Database name for benchmarks",
-            default="benchbox",
-        ),
-        PlatformOptionSpec(
-            name="table_format",
-            help="Table format: iceberg, hudi, or delta",
-            choices=("iceberg", "hudi", "delta"),
-            default="iceberg",
-        ),
-        PlatformOptionSpec(
-            name="cluster_size",
-            help="Cluster size: small, medium, large, xlarge",
-            choices=("small", "medium", "large", "xlarge"),
-            default="small",
+        (
+            "cluster_size",
+            "Cluster size: small, medium, large, xlarge",
+            {"choices": ("small", "medium", "large", "xlarge"), "default": "small"},
         ),
     )
 
@@ -1416,214 +1025,77 @@ try:
     PlatformHookRegistry.register_config_builder(
         "clickhouse-cloud", _make_lazy_config_builder(".clickhouse_cloud", "_build_clickhouse_cloud_config")
     )
-    PlatformHookRegistry.register_option_specs(
+    _register_specs(
         "clickhouse-cloud",
-        PlatformOptionSpec(
-            name="host",
-            help="ClickHouse Cloud hostname (e.g., abc123.us-east-2.aws.clickhouse.cloud)",
-        ),
-        PlatformOptionSpec(
-            name="password",
-            help="ClickHouse Cloud password (or set CLICKHOUSE_CLOUD_PASSWORD env var)",
-        ),
-        PlatformOptionSpec(
-            name="username",
-            help="Username (default: 'default')",
-            default="default",
-        ),
-        PlatformOptionSpec(
-            name="database",
-            help="Database name",
-            default="default",
-        ),
-        PlatformOptionSpec(
-            name="region",
-            help="ClickHouse Cloud service region when it cannot be inferred from the host",
-        ),
-        PlatformOptionSpec(
-            name="cloud_provider",
-            help="ClickHouse Cloud provider when it cannot be inferred from the host",
-        ),
-        PlatformOptionSpec(
-            name="service_id",
-            help="ClickHouse Cloud service identifier for result metadata",
-        ),
-        PlatformOptionSpec(
-            name="service_name",
-            help="ClickHouse Cloud service display name for result metadata",
-        ),
-        PlatformOptionSpec(
-            name="service_tier",
-            help="ClickHouse Cloud service tier for result metadata",
-        ),
-        PlatformOptionSpec(
-            name="compute_size",
-            help="ClickHouse Cloud requested compute size for result metadata",
-        ),
-        PlatformOptionSpec(
-            name="oauth_token",
-            help="OAuth token for keyless authentication (alternative to password)",
-        ),
-        PlatformOptionSpec(
-            name="s3_staging_url",
-            help="S3 URL for bulk data loading (e.g., s3://my-bucket/benchbox-staging/)",
-        ),
-        PlatformOptionSpec(
-            name="s3_region",
-            help="AWS region for the S3 staging bucket",
-            default="us-east-1",
-        ),
-        PlatformOptionSpec(
-            name="gcs_staging_url",
-            help="GCS URL for bulk data loading (e.g., gs://my-bucket/benchbox-staging/)",
-        ),
+        ("host", "ClickHouse Cloud hostname (e.g., abc123.us-east-2.aws.clickhouse.cloud)"),
+        ("password", "ClickHouse Cloud password (or set CLICKHOUSE_CLOUD_PASSWORD env var)"),
+        ("username", "Username (default: 'default')", {"default": "default"}),
+        ("database", "Database name", {"default": "default"}),
+        ("region", "ClickHouse Cloud service region when it cannot be inferred from the host"),
+        ("cloud_provider", "ClickHouse Cloud provider when it cannot be inferred from the host"),
+        ("service_id", "ClickHouse Cloud service identifier for result metadata"),
+        ("service_name", "ClickHouse Cloud service display name for result metadata"),
+        ("service_tier", "ClickHouse Cloud service tier for result metadata"),
+        ("compute_size", "ClickHouse Cloud requested compute size for result metadata"),
+        ("oauth_token", "OAuth token for keyless authentication (alternative to password)"),
+        ("s3_staging_url", "S3 URL for bulk data loading (e.g., s3://my-bucket/benchbox-staging/)"),
+        ("s3_region", "AWS region for the S3 staging bucket", {"default": "us-east-1"}),
+        ("gcs_staging_url", "GCS URL for bulk data loading (e.g., gs://my-bucket/benchbox-staging/)"),
     )
 
     # StarRocks (lazy - uses pymysql)
     PlatformHookRegistry.register_config_builder(
         "starrocks", _make_lazy_config_builder(".starrocks.setup", "_build_starrocks_config")
     )
-    PlatformHookRegistry.register_option_specs(
+    _register_specs(
         "starrocks",
-        PlatformOptionSpec(
-            name="host",
-            help="StarRocks FE hostname",
-            default="localhost",
-        ),
-        PlatformOptionSpec(
-            name="port",
-            help="StarRocks FE MySQL protocol port",
-            default="9030",
-        ),
-        PlatformOptionSpec(
-            name="username",
-            help="StarRocks username",
-            default="root",
-        ),
-        PlatformOptionSpec(
-            name="password",
-            help="StarRocks password",
-        ),
-        PlatformOptionSpec(
-            name="database",
-            help="StarRocks database name (auto-generated if not specified)",
-        ),
-        PlatformOptionSpec(
-            name="http_port",
-            help="StarRocks BE HTTP port for Stream Load",
-            default="8040",
-        ),
+        ("host", "StarRocks FE hostname", {"default": "localhost"}),
+        ("port", "StarRocks FE MySQL protocol port", {"default": "9030"}),
+        ("username", "StarRocks username", {"default": "root"}),
+        ("password", "StarRocks password"),
+        ("database", "StarRocks database name (auto-generated if not specified)"),
+        ("http_port", "StarRocks BE HTTP port for Stream Load", {"default": "8040"}),
     )
 
     # Databend (lazy - uses databend-driver)
     PlatformHookRegistry.register_config_builder(
         "databend", _make_lazy_config_builder(".databend", "_build_databend_config")
     )
-    PlatformHookRegistry.register_option_specs(
+    _register_specs(
         "databend",
-        PlatformOptionSpec(
-            name="host",
-            help="Databend host (or set DATABEND_HOST env var)",
-        ),
-        PlatformOptionSpec(
-            name="port",
-            help="Databend port (default: 443 for cloud, 8000 for self-hosted)",
-        ),
-        PlatformOptionSpec(
-            name="username",
-            help="Databend username (default: benchbox)",
-            default="benchbox",
-        ),
-        PlatformOptionSpec(
-            name="password",
-            help="Databend password (or set DATABEND_PASSWORD env var)",
-        ),
-        PlatformOptionSpec(
-            name="database",
-            help="Database name (default: benchbox)",
-            default="benchbox",
-        ),
-        PlatformOptionSpec(
-            name="dsn",
-            help="Full Databend DSN (overrides individual connection params)",
-        ),
-        PlatformOptionSpec(
-            name="warehouse",
-            help="Databend Cloud warehouse name",
-        ),
+        ("host", "Databend host (or set DATABEND_HOST env var)"),
+        ("port", "Databend port (default: 443 for cloud, 8000 for self-hosted)"),
+        ("username", "Databend username (default: benchbox)", {"default": "benchbox"}),
+        ("password", "Databend password (or set DATABEND_PASSWORD env var)"),
+        ("database", "Database name (default: benchbox)", {"default": "benchbox"}),
+        ("dsn", "Full Databend DSN (overrides individual connection params)"),
+        ("warehouse", "Databend Cloud warehouse name"),
     )
 
     # Doris (lazy - uses pymysql)
     PlatformHookRegistry.register_config_builder("doris", _make_lazy_config_builder(".doris", "_build_doris_config"))
-    PlatformHookRegistry.register_option_specs(
+    _register_specs(
         "doris",
-        PlatformOptionSpec(
-            name="host",
-            help="Doris FE node hostname",
-            default="localhost",
-        ),
-        PlatformOptionSpec(
-            name="port",
-            parser=int,
-            help="Doris MySQL protocol port",
-            default=9030,
-        ),
-        PlatformOptionSpec(
-            name="http_port",
-            parser=int,
-            help="Doris Stream Load HTTP port (FE)",
-            default=8030,
-        ),
-        PlatformOptionSpec(
-            name="be_http_port",
-            parser=int,
-            help="Doris BE HTTP port for stream load redirects",
-            default=8040,
-        ),
-        PlatformOptionSpec(
-            name="database",
-            help="Doris database name (auto-generated if not specified)",
-        ),
-        PlatformOptionSpec(
-            name="username",
-            help="Doris username",
-            default="root",
-        ),
-        PlatformOptionSpec(
-            name="password",
-            help="Doris password",
-        ),
+        ("host", "Doris FE node hostname", {"default": "localhost"}),
+        ("port", "Doris MySQL protocol port", {"parser": int, "default": 9030}),
+        ("http_port", "Doris Stream Load HTTP port (FE)", {"parser": int, "default": 8030}),
+        ("be_http_port", "Doris BE HTTP port for stream load redirects", {"parser": int, "default": 8040}),
+        ("database", "Doris database name (auto-generated if not specified)"),
+        ("username", "Doris username", {"default": "root"}),
+        ("password", "Doris password"),
     )
 
     # SingleStore (lazy - uses singlestoredb SDK)
     PlatformHookRegistry.register_config_builder(
         "singlestore", _make_lazy_config_builder(".singlestore", "_build_singlestore_config")
     )
-    PlatformHookRegistry.register_option_specs(
+    _register_specs(
         "singlestore",
-        PlatformOptionSpec(
-            name="host",
-            help="SingleStore server hostname or Helios endpoint",
-            default="localhost",
-        ),
-        PlatformOptionSpec(
-            name="port",
-            help="SingleStore MySQL protocol port",
-            default="3306",
-        ),
-        PlatformOptionSpec(
-            name="database",
-            help="SingleStore database name (auto-generated if not specified)",
-        ),
-        PlatformOptionSpec(
-            name="username",
-            help="SingleStore username",
-            default="root",
-        ),
-        PlatformOptionSpec(
-            name="password",
-            help="SingleStore password",
-        ),
+        ("host", "SingleStore server hostname or Helios endpoint", {"default": "localhost"}),
+        ("port", "SingleStore MySQL protocol port", {"default": "3306"}),
+        ("database", "SingleStore database name (auto-generated if not specified)"),
+        ("username", "SingleStore username", {"default": "root"}),
+        ("password", "SingleStore password"),
     )
 
     # ========================================================================
@@ -1634,196 +1106,95 @@ try:
     # runtime when the adapter is instantiated.
 
     # Polars DataFrame
-    PlatformHookRegistry.register_option_specs(
+    _register_specs(
         "polars-df",
-        PlatformOptionSpec(
-            name="streaming",
-            help="Enable streaming mode for large datasets",
-            parser=parse_bool,
-            default="false",
-        ),
-        PlatformOptionSpec(
-            name="rechunk",
-            help="Rechunk data for better memory layout",
-            parser=parse_bool,
-            default="true",
-        ),
-        PlatformOptionSpec(
-            name="n_rows",
-            help="Limit number of rows to read (for testing)",
-            parser=int,
-        ),
+        ("streaming", "Enable streaming mode for large datasets", {"parser": parse_bool, "default": "false"}),
+        ("rechunk", "Rechunk data for better memory layout", {"parser": parse_bool, "default": "true"}),
+        ("n_rows", "Limit number of rows to read (for testing)", {"parser": int}),
     )
 
     # Pandas DataFrame
-    PlatformHookRegistry.register_option_specs(
+    _register_specs(
         "pandas-df",
-        PlatformOptionSpec(
-            name="dtype_backend",
-            help="Backend for nullable dtypes",
-            choices=("numpy", "numpy_nullable", "pyarrow"),
-            default="numpy_nullable",
+        (
+            "dtype_backend",
+            "Backend for nullable dtypes",
+            {"choices": ("numpy", "numpy_nullable", "pyarrow"), "default": "numpy_nullable"},
         ),
     )
 
     # Modin DataFrame
-    PlatformHookRegistry.register_option_specs(
+    _register_specs(
         "modin-df",
-        PlatformOptionSpec(
-            name="engine",
-            help="Modin execution engine",
-            choices=("ray", "dask"),
-            default="ray",
-        ),
+        ("engine", "Modin execution engine", {"choices": ("ray", "dask"), "default": "ray"}),
     )
 
     # cuDF DataFrame
-    PlatformHookRegistry.register_option_specs(
+    _register_specs(
         "cudf-df",
-        PlatformOptionSpec(
-            name="device_id",
-            help="CUDA device ID to use",
-            parser=int,
-            default="0",
-        ),
-        PlatformOptionSpec(
-            name="spill_to_host",
-            help="Enable GPU memory spilling to host RAM",
-            parser=parse_bool,
-            default="true",
-        ),
+        ("device_id", "CUDA device ID to use", {"parser": int, "default": "0"}),
+        ("spill_to_host", "Enable GPU memory spilling to host RAM", {"parser": parse_bool, "default": "true"}),
     )
 
     # Dask DataFrame
-    PlatformHookRegistry.register_option_specs(
+    _register_specs(
         "dask-df",
-        PlatformOptionSpec(
-            name="n_workers",
-            help="Number of worker processes",
-            parser=int,
-        ),
-        PlatformOptionSpec(
-            name="threads_per_worker",
-            help="Threads per worker process",
-            parser=int,
-        ),
-        PlatformOptionSpec(
-            name="use_distributed",
-            help="Use distributed scheduler (enables dashboard)",
-            parser=parse_bool,
-            default=True,
-        ),
-        PlatformOptionSpec(
-            name="scheduler_address",
-            help="Connect to existing scheduler (e.g., 'tcp://...')",
-        ),
-        PlatformOptionSpec(
-            name="memory_limit",
-            help="Memory limit per local Dask worker (e.g., '4GB')",
-        ),
-        PlatformOptionSpec(
-            name="spill_directory",
-            help="Directory for Dask spill files; explicit directories are not deleted by close()",
-        ),
+        ("n_workers", "Number of worker processes", {"parser": int}),
+        ("threads_per_worker", "Threads per worker process", {"parser": int}),
+        ("use_distributed", "Use distributed scheduler (enables dashboard)", {"parser": parse_bool, "default": True}),
+        ("scheduler_address", "Connect to existing scheduler (e.g., 'tcp://...')"),
+        ("memory_limit", "Memory limit per local Dask worker (e.g., '4GB')"),
+        ("spill_directory", "Directory for Dask spill files; explicit directories are not deleted by close()"),
     )
 
     # DataFusion DataFrame
-    PlatformHookRegistry.register_option_specs(
+    _register_specs(
         "datafusion-df",
-        PlatformOptionSpec(
-            name="target_partitions",
-            help="Number of target partitions for parallelism (default: CPU count)",
-            parser=int,
+        ("target_partitions", "Number of target partitions for parallelism (default: CPU count)", {"parser": int}),
+        ("repartition_joins", "Enable automatic repartitioning for joins", {"parser": parse_bool, "default": "true"}),
+        (
+            "parquet_pushdown",
+            "Enable predicate/projection pushdown for Parquet files",
+            {"parser": parse_bool, "default": "true"},
         ),
-        PlatformOptionSpec(
-            name="repartition_joins",
-            help="Enable automatic repartitioning for joins",
-            parser=parse_bool,
-            default="true",
-        ),
-        PlatformOptionSpec(
-            name="parquet_pushdown",
-            help="Enable predicate/projection pushdown for Parquet files",
-            parser=parse_bool,
-            default="true",
-        ),
-        PlatformOptionSpec(
-            name="batch_size",
-            help="Batch size for query execution",
-            parser=int,
-            default="8192",
-        ),
-        PlatformOptionSpec(
-            name="memory_limit",
-            help="Memory limit for fair spill pool (e.g., '8G', '16GB')",
-        ),
-        PlatformOptionSpec(
-            name="temp_dir",
-            help="Temporary directory for disk spilling (default: system temp)",
-        ),
+        ("batch_size", "Batch size for query execution", {"parser": int, "default": "8192"}),
+        ("memory_limit", "Memory limit for fair spill pool (e.g., '8G', '16GB')"),
+        ("temp_dir", "Temporary directory for disk spilling (default: system temp)"),
     )
     # SQLite (embedded — stdlib sqlite3, no heavy SDK imports)
-    PlatformHookRegistry.register_option_specs(
+    _register_specs(
         "sqlite",
-        PlatformOptionSpec(
-            name="database_path",
-            help="Path to the SQLite database file (auto-generated from --benchmark/--scale when omitted)",
-        ),
-        PlatformOptionSpec(
-            name="timeout",
-            help="SQLite connection timeout in seconds",
-            parser=float,
-            default="30.0",
-        ),
-        PlatformOptionSpec(
-            name="check_same_thread",
-            help="Enforce that connections are used on the creating thread only",
-            parser=parse_bool,
-            default="false",
+        ("database_path", "Path to the SQLite database file (auto-generated from --benchmark/--scale when omitted)"),
+        ("timeout", "SQLite connection timeout in seconds", {"parser": float, "default": "30.0"}),
+        (
+            "check_same_thread",
+            "Enforce that connections are used on the creating thread only",
+            {"parser": parse_bool, "default": "false"},
         ),
     )
 
     # Apache Gluten + Velox (lazy - uses pyspark + Gluten bundle jar)
-    PlatformHookRegistry.register_option_specs(
+    _register_specs(
         "velox",
-        PlatformOptionSpec(
-            name="deployment",
-            help="Deployment mode: 'local' (in-process SparkSession, Linux only) or 'remote' (Spark-Connect server)",
-            choices=("local", "remote"),
-            default="local",
+        (
+            "deployment",
+            "Deployment mode: 'local' (in-process SparkSession, Linux only) or 'remote' (Spark-Connect server)",
+            {"choices": ("local", "remote"), "default": "local"},
         ),
-        PlatformOptionSpec(
-            name="endpoint",
-            help="Spark-Connect endpoint for remote mode (e.g., sc://localhost:50051)",
-            default="sc://localhost:50051",
+        (
+            "endpoint",
+            "Spark-Connect endpoint for remote mode (e.g., sc://localhost:50051)",
+            {"default": "sc://localhost:50051"},
         ),
-        PlatformOptionSpec(
-            name="gluten_jar_path",
-            help="Absolute path to the Gluten Velox bundle jar (required for local mode)",
-            aliases=("jar",),
+        (
+            "gluten_jar_path",
+            "Absolute path to the Gluten Velox bundle jar (required for local mode)",
+            {"aliases": ("jar",)},
         ),
-        PlatformOptionSpec(
-            name="offheap_size",
-            help="Off-heap memory for Velox native engine (e.g., '8g', '16g')",
-            default="8g",
-        ),
-        PlatformOptionSpec(
-            name="driver_memory",
-            help="Spark driver JVM heap memory (e.g., '4g')",
-            default="4g",
-        ),
-        PlatformOptionSpec(
-            name="shuffle_partitions",
-            help="Number of shuffle partitions",
-            parser=int,
-            default="200",
-        ),
-        PlatformOptionSpec(
-            name="adaptive_enabled",
-            help="Enable Spark Adaptive Query Execution",
-            parser=parse_bool,
-            default="true",
-        ),
+        ("offheap_size", "Off-heap memory for Velox native engine (e.g., '8g', '16g')", {"default": "8g"}),
+        ("driver_memory", "Spark driver JVM heap memory (e.g., '4g')", {"default": "4g"}),
+        ("shuffle_partitions", "Number of shuffle partitions", {"parser": int, "default": "200"}),
+        ("adaptive_enabled", "Enable Spark Adaptive Query Execution", {"parser": parse_bool, "default": "true"}),
     )
 
 except ImportError:
