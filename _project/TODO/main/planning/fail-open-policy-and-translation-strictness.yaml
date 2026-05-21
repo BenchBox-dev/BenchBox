@@ -1,0 +1,187 @@
+id: fail-open-policy-and-translation-strictness
+title: "Architecture hardening: define fail-open vs fail-closed policy for translation and validation"
+worktree: main
+priority: Medium-High
+status: "Not Started"
+category: Correctness
+
+deps:
+  needs:
+    - architecture-contract-map-and-support-taxonomy
+    - result-schema-policy-and-explorer-input-gate
+
+description: |
+  BenchBox intentionally fails open in some interactive paths: SQL translation
+  can return original SQL when SQLGlot is unavailable or translation fails, and
+  validation defaults can leave checks disabled. That resilience is useful for
+  local experimentation, but publishing, CI, compatibility governance, and
+  result comparison need explicit uncertainty or fail-closed behavior.
+
+  This item defines mode-specific policy and adds strict translation metadata
+  without globally making graceful fallback fatal.
+
+work:
+  - id: w0
+    summary: "Revalidate current fail-open paths and tests that require graceful fallback"
+    status: pending
+    notes: |
+      Commit a compact summary of checked SHA, fail-open sites, existing tests
+      asserting fallback, and result fields that can record uncertainty.
+
+      Minimum evidence to re-check:
+        - benchbox/utils/dialect_utils.py translation fallback.
+        - benchbox/platforms/base/dialect_translation.py fallback behavior.
+        - benchbox/core/runner/runner.py validation defaults.
+        - tests/integration/test_tpcds_duckdb_dialect.py graceful fallback tests.
+        - result schema fields for validation/translation metadata.
+
+  - id: w1
+    summary: "Decision gate: define mode policy for interactive, CI, publishing, and governance"
+    needs: [w0]
+    status: pending
+    notes: |
+      Record policy in docs/reference/public-contracts.md. Required decision:
+        - interactive/local mode may fail open with warnings,
+        - CI and compat governance should fail closed or record uncertainty,
+        - publishing/explorer ingestion should reject or label uncertain results,
+        - validation_status must distinguish PASSED from NOT_RUN/UNCERTAIN.
+
+      If any of these defaults are not chosen, document the reason explicitly.
+
+  - id: w2
+    summary: "Add translation outcome metadata to result bundles"
+    needs: [w1]
+    status: pending
+    notes: |
+      Add structured metadata that records source dialect, target dialect,
+      translator used, success/fallback status, warning/error message category,
+      and whether strict mode was active.
+
+      Coordinate with the result schema policy TODO before changing schema
+      version or public bundle fields.
+
+  - id: w3
+    summary: "Add strict translation mode for CI, publishing, and compat tests"
+    needs: [w1]
+    status: pending
+    notes: |
+      Strict mode should fail closed on translation failure or missing required
+      translator. Keep graceful fallback for interactive/local mode where tests
+      and docs require it.
+
+      The mode must be reachable through the runner/CLI path used by publishing
+      and compatibility checks, not just a utility function argument.
+
+  - id: w4
+    summary: "Add golden or representative translation tests for risky dialect paths"
+    needs: [w3]
+    status: pending
+    notes: |
+      Add focused tests for known post-translation fixups and failure cases.
+      Tests should assert translation outcome metadata, strict-mode behavior,
+      and graceful-mode warnings.
+
+      Do not attempt full dialect exhaustiveness in this TODO.
+
+  - id: w5
+    summary: "Fix contradictory validation documentation and result status semantics"
+    needs: [w1]
+    status: pending
+    notes: |
+      Ensure validation docs and DataFrame notes do not imply actual validation
+      ran when default validation flags are disabled. Update result semantics so
+      unchecked runs are labeled NOT_RUN or UNCERTAIN, not PASSED.
+
+deferred:
+  - summary: "Make validation enabled by default for every benchmark"
+    reason: "Potentially expensive and behavior-changing; decide after mode policy and result labeling are correct."
+  - summary: "Golden-file every SQL dialect translation"
+    reason: "This TODO starts with representative risky paths and strict-mode wiring."
+
+metadata:
+  tags:
+    - correctness
+    - sql-translation
+    - validation
+    - publishing
+  estimated_effort: "3-6 days"
+  created_date: "2026-05-21"
+  last_updated: "2026-05-21T00:00:00Z"
+
+impact:
+  business_value: |
+    Prevents uncertain SQL translation or skipped validation from becoming
+    published correctness claims.
+  user_impact: |
+    Local users retain forgiving behavior, while public/CI results get explicit
+    safety labels or failures.
+  technical_debt: |
+    Replaces scattered fallback behavior with a mode-aware correctness policy.
+
+files_affected:
+  modified:
+    - "benchbox/utils/dialect_utils.py"
+    - "benchbox/platforms/base/dialect_translation.py"
+    - "benchbox/core/runner/"
+    - "benchbox/core/results/"
+    - "tests/unit/utils/"
+    - "tests/unit/core/results/"
+    - "tests/integration/test_tpcds_duckdb_dialect.py"
+    - "tests/integration/validation/"
+    - "docs/reference/public-contracts.md"
+    - "docs/development/result-integrity-validation.md"
+
+must_preserve:
+  - "Do not break tests that intentionally assert graceful fallback in interactive/local paths."
+  - "Do not label unchecked validation as PASSED."
+  - "Do not change public result schema fields without coordinating with result-schema-policy-and-explorer-input-gate."
+
+approach: |
+  Make fallback behavior mode-aware instead of globally fatal. Add metadata so
+  downstream consumers can distinguish successful translation from fallback,
+  and make strict mode available to CI, publishing, and governance paths.
+
+anti_patterns:
+  - "DO NOT globally raise on every translation failure -- tests and local workflows rely on graceful fallback -- add strict mode for gates instead."
+  - "DO NOT bury translation failure in logs only -- result bundles and gates need structured metadata -- record outcome explicitly."
+  - "DO NOT treat validation disabled as validation passed -- that is a public correctness claim -- use NOT_RUN or UNCERTAIN."
+
+verification:
+  - description: "Run focused dialect translation tests."
+    command: "uv run -- python -m pytest tests -k 'dialect or translation' --tb=short"
+    expected_output: "Graceful and strict translation tests pass."
+  - description: "Run focused result validation tests."
+    command: "uv run -- python -m pytest tests -k 'validation_status or result_integrity' --tb=short"
+    expected_output: "Validation status semantics are enforced."
+
+scope_limit:
+  only_modify:
+    - "benchbox/utils/dialect_utils.py"
+    - "benchbox/platforms/base/dialect_translation.py"
+    - "benchbox/core/runner/"
+    - "benchbox/core/results/"
+    - "tests/unit/utils/"
+    - "tests/unit/core/results/"
+    - "tests/integration/test_tpcds_duckdb_dialect.py"
+    - "tests/integration/validation/"
+    - "docs/reference/public-contracts.md"
+    - "docs/development/result-integrity-validation.md"
+    - "_project/TODO/"
+    - "_project/DONE/"
+  do_not_modify:
+    - "benchbox/mcp/"
+    - "_project/scripts/explorer_pipeline/"
+
+prior_art:
+  - "benchbox/utils/dialect_utils.py: existing fail-open translator -- preserve interactive resilience behind policy."
+  - "docs/development/result-integrity-validation.md: existing validation contract docs -- update rather than introduce a competing validation guide."
+  - "benchbox/core/results/schema.py: public result field definitions -- coordinate schema changes through central result policy."
+
+success_metrics:
+  - "Fail-open/fail-closed behavior is documented by mode."
+  - "Translation fallback is visible in result metadata."
+  - "Publishing/CI/governance paths can enforce strict translation or record uncertainty."
+
+open_questions:
+  - "Should publishing reject fallback-translated results or publish them with a visible uncertainty label?"
+  - "Should strict translation be opt-in by CLI flag, implied by publishing, or both?"

@@ -1,0 +1,198 @@
+id: result-schema-policy-and-explorer-input-gate
+title: "Architecture hardening: centralize result schema policy and add explorer input gates"
+worktree: main
+priority: High
+status: "Not Started"
+category: Results
+
+deps:
+  needs:
+    - architecture-contract-map-and-support-taxonomy
+
+description: |
+  Result bundles are already a product boundary consumed by the CLI, hosted
+  results, public submissions, and explorer pipeline. The current policy is
+  fragmented: runtime loading is strict, normalization handles legacy shapes,
+  public submission accepts forward-compatible 2.x, and the explorer parser
+  reads broad optional fields without an input schema gate.
+
+  This item centralizes consumer-specific result-schema policy without erasing
+  the different intents of producer/runtime, normalizer, submission, and
+  explorer consumers.
+
+work:
+  - id: w0
+    summary: "Revalidate current result-schema policy sites and consumer intent"
+    status: pending
+    notes: |
+      Commit a compact summary containing checked SHA, current SCHEMA_VERSION,
+      accepted versions by consumer, and any line drift.
+
+      Minimum evidence to re-check:
+        - benchbox/core/results/schema.py: SCHEMA_VERSION.
+        - benchbox/core/results/loader.py: strict runtime accept list.
+        - benchbox/core/results/normalizer.py: legacy normalization behavior.
+        - scripts/validate_submission.py: public submission acceptance.
+        - _project/scripts/explorer_pipeline/transformer.py: input parsing.
+        - docs/reference/hosted-results-contract.md and docs/contributing-results.md.
+
+  - id: w1
+    summary: "Create one result schema policy module with consumer-specific acceptance rules"
+    needs: [w0]
+    status: pending
+    notes: |
+      Add a small policy module under benchbox/core/results/ that exposes named
+      rules for producer/runtime, loader, normalizer, public submission, and
+      explorer input. Preserve each consumer's intent; do not force one global
+      allowlist if that changes behavior.
+
+      The policy must make these cases explicit: 2.0, 2.1, unknown 2.x, 1.x,
+      missing schema_version, and malformed schema_version.
+
+  - id: w2
+    summary: "Update loader, normalizer, and submission validator to call the central policy"
+    needs: [w1]
+    status: pending
+    notes: |
+      Replace duplicated version checks with named policy calls. Preserve:
+        - Runtime loader strictness for unknown versions unless explicitly changed.
+        - Normalizer ability to upgrade known legacy shapes.
+        - Public submission forward-acceptance only if the new policy declares it.
+
+      Any behavior change must be documented in docs/reference/public-contracts.md
+      and docs/reference/hosted-results-contract.md.
+
+  - id: w3
+    summary: "Add an explorer input bundle gate before broad transformer parsing"
+    needs: [w1]
+    status: pending
+    notes: |
+      Gate the explorer pipeline before _project/scripts/explorer_pipeline/transformer.py
+      starts broad .get() parsing. Unknown or unsupported versions must fail
+      with an actionable error that names the accepted explorer input policy.
+
+      Do not rewrite the whole transformer in this TODO. The target is an
+      early, explicit gate that prevents silent field drops.
+
+  - id: w4
+    summary: "Add schema-policy tests for 2.0, 2.1, unknown 2.x, 1.x, missing, and malformed versions"
+    needs: [w2, w3]
+    status: pending
+    notes: |
+      Include unit tests for the policy module plus integration-style tests
+      proving loader, normalizer, submission validation, and explorer gate call
+      the policy they claim to use.
+
+      Tests must document expected behavior per consumer. A passing test that
+      only asserts "raises something" is not enough.
+
+  - id: w5
+    summary: "Update result-format and hosted-results docs to declare schema v2.1 status"
+    needs: [w4]
+    status: pending
+    notes: |
+      Reconcile docs/reference/result-formats.md, docs/contributing-results.md,
+      and docs/reference/hosted-results-contract.md so v1.x is clearly marked
+      legacy and v2.1 is the current schema unless the code says otherwise.
+
+deferred:
+  - summary: "Build a full one-way migration framework for every future schema version"
+    reason: "This TODO defines policy and gates first; broad migration machinery should be designed after the next schema change is known."
+  - summary: "Rewrite explorer transformer to use typed models throughout"
+    reason: "Valuable but larger than the immediate input-gate risk."
+
+metadata:
+  tags:
+    - results
+    - schema
+    - explorer
+    - hosted-results
+  estimated_effort: "3-5 days"
+  created_date: "2026-05-21"
+  last_updated: "2026-05-21T00:00:00Z"
+
+impact:
+  business_value: |
+    Makes published and hosted result artifacts reliable as long-lived product
+    data instead of incidental JSON files.
+  user_impact: |
+    Users get explicit errors for unsupported result bundles instead of explorer
+    blanks or silent data loss.
+  technical_debt: |
+    Removes duplicated version policy and makes future schema changes auditable.
+
+files_affected:
+  added:
+    - "benchbox/core/results/schema_policy.py"
+    - "tests/unit/core/results/test_schema_policy.py"
+  modified:
+    - "benchbox/core/results/schema.py"
+    - "benchbox/core/results/loader.py"
+    - "benchbox/core/results/normalizer.py"
+    - "scripts/validate_submission.py"
+    - "_project/scripts/explorer_pipeline/transformer.py"
+    - "tests/unit/core/results/"
+    - "tests/unit/explorer/"
+    - "tests/integration/test_submission_validation.py"
+    - "docs/reference/result-formats.md"
+    - "docs/reference/hosted-results-contract.md"
+    - "docs/contributing-results.md"
+    - "docs/reference/public-contracts.md"
+
+must_preserve:
+  - "Do not weaken runtime loader strictness without an explicit contract-map update."
+  - "Do not remove legacy normalization paths that public submissions still depend on."
+  - "Do not make explorer failures cryptic; unsupported-version errors must name accepted versions and the consumer policy."
+
+approach: |
+  Model result schema as multiple consumer policies sharing one implementation.
+  This preserves the useful distinction between strict runtime loading, legacy
+  normalization, public submission forward-acceptance, and explorer input
+  safety while ending duplicated accept lists.
+
+anti_patterns:
+  - "DO NOT replace all version checks with one global ACCEPTED_SCHEMA_VERSIONS list -- the consumers intentionally have different risk postures -- expose named policies instead."
+  - "DO NOT fix explorer by adding more .get defaults -- that hides incompatible bundles -- gate the input before projection."
+  - "DO NOT update docs to say v2.1 is current unless tests prove producer and consumer policy agree."
+
+verification:
+  - description: "Run focused result schema policy tests."
+    command: "uv run -- python -m pytest tests/unit/core/results -q"
+    expected_output: "Result schema and normalizer policy tests pass."
+  - description: "Run focused submission/explorer tests touched by the policy gate."
+    command: "uv run -- python -m pytest tests -k 'submission or explorer or schema_policy' --tb=short"
+    expected_output: "All focused policy consumer tests pass."
+  - description: "Validate TODO graph after completing this item."
+    command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph"
+    expected_output: "Dependency graph is valid."
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/results/"
+    - "scripts/validate_submission.py"
+    - "_project/scripts/explorer_pipeline/"
+    - "tests/unit/core/results/"
+    - "tests/unit/explorer/"
+    - "tests/integration/test_submission_validation.py"
+    - "docs/reference/"
+    - "docs/contributing-results.md"
+    - "_project/TODO/"
+    - "_project/DONE/"
+  do_not_modify:
+    - "benchbox/platforms/"
+    - "benchbox/core/runner/"
+    - "benchbox/mcp/"
+
+prior_art:
+  - "docs/reference/hosted-results-contract.md: current hosted-result contract -- extend rather than invent a second public artifact policy."
+  - "_project/DONE/main/planning/define-hosted-results-contract-and-governance-model.yaml: prior governance framing -- preserve trust/visibility separation."
+  - "benchbox/core/results/normalizer.py: existing legacy normalization behavior -- preserve useful compatibility while centralizing version rules."
+
+success_metrics:
+  - "Every result-bundle consumer has a named schema acceptance policy."
+  - "Explorer rejects unsupported input bundles before broad optional-field projection."
+  - "Docs and code agree on current schema version and legacy status."
+
+open_questions:
+  - "Should public submissions accept any future 2.x indefinitely, or only known minor versions with a compatibility declaration?"
+  - "Should explorer consume raw producer bundles or normalized bundles only?"

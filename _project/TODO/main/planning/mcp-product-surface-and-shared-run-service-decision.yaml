@@ -1,0 +1,178 @@
+id: mcp-product-surface-and-shared-run-service-decision
+title: "Architecture hardening: decide MCP fidelity and avoid CLI-internal coupling"
+worktree: main
+priority: Medium-High
+status: "Not Started"
+category: MCP
+
+deps:
+  needs:
+    - architecture-contract-map-and-support-taxonomy
+
+description: |
+  MCP is intentionally not routed through CLI internals today. A completed
+  project decision moved MCP onto the public BaseBenchmark.run_with_platform
+  API, while MCP's exposed parameters remain narrower than CLI and docs appear
+  behind actual tool options. The architecture question is product scope, not a
+  simple "call the CLI orchestrator" fix.
+
+  This item decides whether MCP is a smoke/control-plane surface or a
+  CLI-equivalent execution surface. If it becomes CLI-equivalent, introduce a
+  shared core execution service below both CLI and MCP rather than coupling MCP
+  to CLI internals.
+
+work:
+  - id: w0
+    summary: "Revalidate MCP public API decision, current params, CLI params, and docs drift"
+    status: pending
+    notes: |
+      Commit a compact summary of checked SHA, current MCP params, CLI params
+      considered equivalent, and docs gaps.
+
+      Minimum evidence to re-check:
+        - _project/DONE/mcp-integration/active/refactor-mcp-use-public-api.yaml.
+        - benchbox/base.py BaseBenchmark.run_with_platform documentation.
+        - benchbox/mcp/tools/benchmark.py run tool parameters and implementation.
+        - benchbox/cli/orchestrator.py and benchbox/cli/commands/run.py option plumbing.
+        - docs/reference/mcp.md.
+
+  - id: w1
+    summary: "Decision gate: classify MCP as smoke/control-plane or CLI-equivalent"
+    needs: [w0]
+    status: pending
+    notes: |
+      Record the decision in docs/reference/public-contracts.md and
+      docs/reference/mcp.md. The decision must state:
+        - Which run options MCP intentionally supports.
+        - Which CLI options MCP intentionally omits.
+        - Whether omissions are product scope or implementation debt.
+        - Whether MCP results should be comparable to CLI-generated result bundles.
+
+  - id: w2
+    summary: "Implement the selected MCP fidelity path without CLI-internal coupling"
+    needs: [w1]
+    status: pending
+    notes: |
+      If w1 chooses smoke/control-plane: align MCP docs with actual tool params
+      including mode, capture_plans, dry_run, and validate_only. Add tests that
+      prove omitted CLI-only options fail or are absent intentionally with clear
+      docs.
+
+      If w1 chooses CLI-equivalent: create a service owned by core/runtime or
+      another non-CLI package that both CLI and MCP can call. The service must
+      handle adapter resolution, phase mapping, seeds, compression, parallel
+      cores, benchmark options, dry-run/validate-only, and result export
+      consistently.
+
+      Do not import benchbox.cli from benchbox.mcp.
+
+  - id: w3
+    summary: "Add MCP-vs-CLI contract tests for the selected fidelity tier"
+    needs: [w2]
+    status: pending
+    notes: |
+      If smoke/control-plane, test that the documented subset is accurate. If
+      CLI-equivalent, test that one small dry-run/smoke configuration produces
+      equivalent planned phases and result-bundle metadata through CLI and MCP.
+
+  - id: w4
+    summary: "Update MCP docs and examples from actual tool schema"
+    needs: [w3]
+    status: pending
+    notes: |
+      Docs must be generated from, or tested against, the MCP tool parameter
+      schema so new options like mode, capture_plans, dry_run, and validate_only
+      cannot drift unnoticed.
+
+deferred:
+  - summary: "Expose every CLI flag through MCP"
+    reason: "Only valid if the explicit fidelity decision chooses CLI-equivalent."
+
+metadata:
+  tags:
+    - mcp
+    - public-api
+    - orchestration
+  estimated_effort: "2-5 days depending on decision"
+  created_date: "2026-05-21"
+  last_updated: "2026-05-21T00:00:00Z"
+
+impact:
+  business_value: |
+    Clarifies whether MCP is a lightweight control surface or a full product API,
+    avoiding quiet feature gaps for automation users.
+  user_impact: |
+    MCP users get accurate docs and predictable behavior instead of assuming CLI
+    parity where none was promised.
+  technical_debt: |
+    Prevents a third orchestration fork while preserving the prior decision to
+    avoid CLI-internal coupling.
+
+files_affected:
+  added:
+    - "tests/unit/mcp/test_run_surface_contract.py"
+  modified:
+    - "benchbox/mcp/tools/benchmark.py"
+    - "benchbox/base.py"
+    - "benchbox/cli/orchestrator.py"
+    - "benchbox/cli/commands/run.py"
+    - "benchbox/core/run_service.py"
+    - "benchbox/core/runner/"
+    - "docs/reference/mcp.md"
+    - "docs/reference/public-contracts.md"
+
+must_preserve:
+  - "Do not import CLI command modules from benchbox.mcp."
+  - "Do not undo the completed decision to use public run_with_platform unless an ADR explicitly supersedes it."
+  - "Do not broaden MCP parameters without updating docs and tests in the same change."
+
+approach: |
+  Make the product-tier decision first. If MCP is intentionally narrower, make
+  that explicit and test docs. If parity is required, create a shared service
+  below CLI and MCP rather than binding MCP to CLI command code.
+
+anti_patterns:
+  - "DO NOT route MCP through BenchmarkOrchestrator just because it has more flags -- that reintroduces CLI coupling -- create a non-CLI service if parity is required."
+  - "DO NOT call MCP smoke-only in conversation while docs imply general benchmark execution -- choose one tier and document it."
+  - "DO NOT add MCP params without schema-derived or tested docs -- docs drift is the known failure mode."
+
+verification:
+  - description: "Run focused MCP tool tests."
+    command: "uv run -- python -m pytest tests -k 'mcp and benchmark' --tb=short"
+    expected_output: "MCP benchmark surface tests pass."
+  - description: "Run docs/schema drift test added for MCP params."
+    command: "uv run -- python -m pytest tests -k 'mcp and docs' --tb=short"
+    expected_output: "MCP docs match actual tool parameter schema."
+
+scope_limit:
+  only_modify:
+    - "benchbox/mcp/"
+    - "benchbox/base.py"
+    - "benchbox/core/run_service.py"
+    - "benchbox/core/runner/"
+    - "benchbox/cli/orchestrator.py"
+    - "benchbox/cli/commands/run.py"
+    - "tests/unit/mcp/"
+    - "tests/unit/cli/"
+    - "docs/reference/mcp.md"
+    - "docs/reference/public-contracts.md"
+    - "_project/TODO/"
+    - "_project/DONE/"
+  do_not_modify:
+    - "benchbox/platforms/"
+    - "benchbox/sql_compat/"
+    - "_project/scripts/explorer_pipeline/"
+
+prior_art:
+  - "_project/DONE/mcp-integration/active/refactor-mcp-use-public-api.yaml: completed decision to use public benchmark API -- preserve unless superseded."
+  - "benchbox/base.py: BaseBenchmark.run_with_platform documented for orchestration tools -- use as current public API evidence."
+  - "benchbox/cli/orchestrator.py: CLI option plumbing -- compare behavior, but do not import as MCP dependency without a new decision."
+
+success_metrics:
+  - "MCP has an explicit product tier in the public contract map."
+  - "MCP docs list actual run tool parameters and intentionally omitted CLI capabilities."
+  - "No new dependency from benchbox.mcp to benchbox.cli command internals is introduced."
+
+open_questions:
+  - "Should MCP-generated result bundles be eligible for the same publication and explorer paths as CLI bundles?"
+  - "Is MCP primarily an agent control plane, an end-user API, or both?"
