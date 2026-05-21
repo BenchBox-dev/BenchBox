@@ -51,7 +51,7 @@ def q1_1_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = (
+    return (
         lineorder.join(date, left_on="lo_orderdate", right_on="d_datekey")
         .filter(
             (col("d_year") == lit(year))
@@ -61,8 +61,6 @@ def q1_1_expression_impl(ctx: DataFrameContext) -> Any:
         )
         .select((col("lo_extendedprice") * col("lo_discount")).sum().alias("revenue"))
     )
-
-    return result
 
 
 def q1_1_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -113,7 +111,7 @@ def q1_2_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = (
+    return (
         lineorder.join(date, left_on="lo_orderdate", right_on="d_datekey")
         .filter(
             (col("d_yearmonthnum") == lit(year_month))
@@ -124,8 +122,6 @@ def q1_2_expression_impl(ctx: DataFrameContext) -> Any:
         )
         .select((col("lo_extendedprice") * col("lo_discount")).sum().alias("revenue"))
     )
-
-    return result
 
 
 def q1_2_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -179,7 +175,7 @@ def q1_3_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = (
+    return (
         lineorder.join(date, left_on="lo_orderdate", right_on="d_datekey")
         .filter(
             (col("d_weeknuminyear") == lit(week))
@@ -191,8 +187,6 @@ def q1_3_expression_impl(ctx: DataFrameContext) -> Any:
         )
         .select((col("lo_extendedprice") * col("lo_discount")).sum().alias("revenue"))
     )
-
-    return result
 
 
 def q1_3_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -252,7 +246,7 @@ def q2_1_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = (
+    return (
         lineorder.join(date, left_on="lo_orderdate", right_on="d_datekey")
         .join(part, left_on="lo_partkey", right_on="p_partkey")
         .join(supplier, left_on="lo_suppkey", right_on="s_suppkey")
@@ -261,8 +255,6 @@ def q2_1_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("lo_revenue").sum().alias("revenue"))
         .sort(["d_year", "p_brand1"])
     )
-
-    return result
 
 
 def q2_1_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -282,13 +274,11 @@ def q2_1_pandas_impl(ctx: DataFrameContext) -> Any:
 
     filtered = merged[(merged["p_category"] == category) & (merged["s_region"] == region)]
 
-    result = (
+    return (
         filtered.groupby(["d_year", "p_brand1"], as_index=False)
         .agg(revenue=("lo_revenue", "sum"))
         .sort_values(["d_year", "p_brand1"])
     )
-
-    return result
 
 
 def q2_2_expression_impl(ctx: DataFrameContext) -> Any:
@@ -310,7 +300,7 @@ def q2_2_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = (
+    return (
         lineorder.join(date, left_on="lo_orderdate", right_on="d_datekey")
         .join(part, left_on="lo_partkey", right_on="p_partkey")
         .join(supplier, left_on="lo_suppkey", right_on="s_suppkey")
@@ -321,8 +311,6 @@ def q2_2_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("lo_revenue").sum().alias("revenue"))
         .sort(["d_year", "p_brand1"])
     )
-
-    return result
 
 
 def q2_2_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -345,13 +333,11 @@ def q2_2_pandas_impl(ctx: DataFrameContext) -> Any:
         (merged["p_brand1"] >= brand_min) & (merged["p_brand1"] <= brand_max) & (merged["s_region"] == region)
     ]
 
-    result = (
+    return (
         filtered.groupby(["d_year", "p_brand1"], as_index=False)
         .agg(revenue=("lo_revenue", "sum"))
         .sort_values(["d_year", "p_brand1"])
     )
-
-    return result
 
 
 def q2_3_expression_impl(ctx: DataFrameContext) -> Any:
@@ -372,7 +358,7 @@ def q2_3_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = (
+    return (
         lineorder.join(date, left_on="lo_orderdate", right_on="d_datekey")
         .join(part, left_on="lo_partkey", right_on="p_partkey")
         .join(supplier, left_on="lo_suppkey", right_on="s_suppkey")
@@ -381,8 +367,6 @@ def q2_3_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("lo_revenue").sum().alias("revenue"))
         .sort(["d_year", "p_brand1"])
     )
-
-    return result
 
 
 def q2_3_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -402,13 +386,11 @@ def q2_3_pandas_impl(ctx: DataFrameContext) -> Any:
 
     filtered = merged[(merged["p_brand1"] == brand) & (merged["s_region"] == region)]
 
-    result = (
+    return (
         filtered.groupby(["d_year", "p_brand1"], as_index=False)
         .agg(revenue=("lo_revenue", "sum"))
         .sort_values(["d_year", "p_brand1"])
     )
-
-    return result
 
 
 # =============================================================================
@@ -437,7 +419,7 @@ def q3_1_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = (
+    return (
         lineorder.join(customer, left_on="lo_custkey", right_on="c_custkey")
         .join(supplier, left_on="lo_suppkey", right_on="s_suppkey")
         .join(date, left_on="lo_orderdate", right_on="d_datekey")
@@ -451,8 +433,6 @@ def q3_1_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("lo_revenue").sum().alias("revenue"))
         .sort(["d_year", "revenue"], descending=[False, True])
     )
-
-    return result
 
 
 def q3_1_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -479,13 +459,11 @@ def q3_1_pandas_impl(ctx: DataFrameContext) -> Any:
         & (merged["d_year"] <= year_max)
     ]
 
-    result = (
+    return (
         filtered.groupby(["c_nation", "s_nation", "d_year"], as_index=False)
         .agg(revenue=("lo_revenue", "sum"))
         .sort_values(["d_year", "revenue"], ascending=[True, False])
     )
-
-    return result
 
 
 def q3_2_expression_impl(ctx: DataFrameContext) -> Any:
@@ -508,7 +486,7 @@ def q3_2_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = (
+    return (
         lineorder.join(customer, left_on="lo_custkey", right_on="c_custkey")
         .join(supplier, left_on="lo_suppkey", right_on="s_suppkey")
         .join(date, left_on="lo_orderdate", right_on="d_datekey")
@@ -522,8 +500,6 @@ def q3_2_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("lo_revenue").sum().alias("revenue"))
         .sort(["d_year", "revenue"], descending=[False, True])
     )
-
-    return result
 
 
 def q3_2_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -550,13 +526,11 @@ def q3_2_pandas_impl(ctx: DataFrameContext) -> Any:
         & (merged["d_year"] <= year_max)
     ]
 
-    result = (
+    return (
         filtered.groupby(["c_city", "s_city", "d_year"], as_index=False)
         .agg(revenue=("lo_revenue", "sum"))
         .sort_values(["d_year", "revenue"], ascending=[True, False])
     )
-
-    return result
 
 
 def q3_3_expression_impl(ctx: DataFrameContext) -> Any:
@@ -581,7 +555,7 @@ def q3_3_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = (
+    return (
         lineorder.join(customer, left_on="lo_custkey", right_on="c_custkey")
         .join(supplier, left_on="lo_suppkey", right_on="s_suppkey")
         .join(date, left_on="lo_orderdate", right_on="d_datekey")
@@ -595,8 +569,6 @@ def q3_3_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("lo_revenue").sum().alias("revenue"))
         .sort(["d_year", "revenue"], descending=[False, True])
     )
-
-    return result
 
 
 def q3_3_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -625,13 +597,11 @@ def q3_3_pandas_impl(ctx: DataFrameContext) -> Any:
         & (merged["d_year"] <= year_max)
     ]
 
-    result = (
+    return (
         filtered.groupby(["c_city", "s_city", "d_year"], as_index=False)
         .agg(revenue=("lo_revenue", "sum"))
         .sort_values(["d_year", "revenue"], ascending=[True, False])
     )
-
-    return result
 
 
 def q3_4_expression_impl(ctx: DataFrameContext) -> Any:
@@ -655,7 +625,7 @@ def q3_4_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = (
+    return (
         lineorder.join(customer, left_on="lo_custkey", right_on="c_custkey")
         .join(supplier, left_on="lo_suppkey", right_on="s_suppkey")
         .join(date, left_on="lo_orderdate", right_on="d_datekey")
@@ -668,8 +638,6 @@ def q3_4_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("lo_revenue").sum().alias("revenue"))
         .sort(["d_year", "revenue"], descending=[False, True])
     )
-
-    return result
 
 
 def q3_4_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -696,13 +664,11 @@ def q3_4_pandas_impl(ctx: DataFrameContext) -> Any:
         & (merged["d_yearmonth"] == year_month)
     ]
 
-    result = (
+    return (
         filtered.groupby(["c_city", "s_city", "d_year"], as_index=False)
         .agg(revenue=("lo_revenue", "sum"))
         .sort_values(["d_year", "revenue"], ascending=[True, False])
     )
-
-    return result
 
 
 # =============================================================================
@@ -731,7 +697,7 @@ def q4_1_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = (
+    return (
         lineorder.join(date, left_on="lo_orderdate", right_on="d_datekey")
         .join(customer, left_on="lo_custkey", right_on="c_custkey")
         .join(supplier, left_on="lo_suppkey", right_on="s_suppkey")
@@ -745,8 +711,6 @@ def q4_1_expression_impl(ctx: DataFrameContext) -> Any:
         .agg((col("lo_revenue") - col("lo_supplycost")).sum().alias("profit"))
         .sort(["d_year", "c_nation"])
     )
-
-    return result
 
 
 def q4_1_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -776,13 +740,11 @@ def q4_1_pandas_impl(ctx: DataFrameContext) -> Any:
     filtered = filtered.copy()
     filtered["profit"] = filtered["lo_revenue"] - filtered["lo_supplycost"]
 
-    result = (
+    return (
         filtered.groupby(["d_year", "c_nation"], as_index=False)
         .agg(profit=("profit", "sum"))
         .sort_values(["d_year", "c_nation"])
     )
-
-    return result
 
 
 def q4_2_expression_impl(ctx: DataFrameContext) -> Any:
@@ -807,7 +769,7 @@ def q4_2_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = (
+    return (
         lineorder.join(date, left_on="lo_orderdate", right_on="d_datekey")
         .join(customer, left_on="lo_custkey", right_on="c_custkey")
         .join(supplier, left_on="lo_suppkey", right_on="s_suppkey")
@@ -822,8 +784,6 @@ def q4_2_expression_impl(ctx: DataFrameContext) -> Any:
         .agg((col("lo_revenue") - col("lo_supplycost")).sum().alias("profit"))
         .sort(["d_year", "s_nation", "p_category"])
     )
-
-    return result
 
 
 def q4_2_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -856,13 +816,11 @@ def q4_2_pandas_impl(ctx: DataFrameContext) -> Any:
     filtered = filtered.copy()
     filtered["profit"] = filtered["lo_revenue"] - filtered["lo_supplycost"]
 
-    result = (
+    return (
         filtered.groupby(["d_year", "s_nation", "p_category"], as_index=False)
         .agg(profit=("profit", "sum"))
         .sort_values(["d_year", "s_nation", "p_category"])
     )
-
-    return result
 
 
 def q4_3_expression_impl(ctx: DataFrameContext) -> Any:
@@ -886,7 +844,7 @@ def q4_3_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = (
+    return (
         lineorder.join(date, left_on="lo_orderdate", right_on="d_datekey")
         .join(customer, left_on="lo_custkey", right_on="c_custkey")
         .join(supplier, left_on="lo_suppkey", right_on="s_suppkey")
@@ -901,8 +859,6 @@ def q4_3_expression_impl(ctx: DataFrameContext) -> Any:
         .agg((col("lo_revenue") - col("lo_supplycost")).sum().alias("profit"))
         .sort(["d_year", "s_city", "p_brand1"])
     )
-
-    return result
 
 
 def q4_3_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -934,13 +890,11 @@ def q4_3_pandas_impl(ctx: DataFrameContext) -> Any:
     filtered = filtered.copy()
     filtered["profit"] = filtered["lo_revenue"] - filtered["lo_supplycost"]
 
-    result = (
+    return (
         filtered.groupby(["d_year", "s_city", "p_brand1"], as_index=False)
         .agg(profit=("profit", "sum"))
         .sort_values(["d_year", "s_city", "p_brand1"])
     )
-
-    return result
 
 
 # =============================================================================
