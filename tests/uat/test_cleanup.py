@@ -11,6 +11,19 @@ from tests.uat import cleanup
 pytestmark = pytest.mark.fast
 
 
+def test_source_reuse_graph_comes_from_registry_metadata():
+    graph = cleanup.source_reuse_graph()
+
+    assert graph["tpch"] == (
+        "tpch",
+        "read_primitives",
+        "write_primitives",
+        "transaction_primitives",
+        "ai_primitives",
+    )
+    assert graph["tpcds"] == ("tpcds", "tpcds_obt")
+
+
 def test_can_prune_blocks_when_consumer_pending():
     pending = [cleanup.CellKey("duckdb", "read_primitives", 0.01)]
     decision = cleanup.can_prune(
@@ -56,8 +69,8 @@ def test_can_prune_unknown_source_only_blocks_on_self_consumers():
         pending_cells=pending,
         completed_cells=[],
     )
-    # ssb has no entry in SOURCE_REUSE_GRAPH; only the same-name consumer
-    # blocks pruning.
+    # ssb has no registry data-source consumers; only the same-name
+    # consumer blocks pruning.
     assert decision.safe_to_prune is False
 
 
