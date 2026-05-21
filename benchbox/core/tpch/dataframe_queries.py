@@ -23,6 +23,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+from csv import reader
 from datetime import date
 from typing import Any
 
@@ -1995,282 +1996,60 @@ def q22_pandas_impl(ctx: DataFrameContext) -> Any:
 # Create the TPC-H DataFrame query registry
 TPCH_DATAFRAME_QUERIES = QueryRegistry("TPC-H DataFrame")
 
-# Register Q1 - Pricing Summary Report
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q1",
-        query_name="Pricing Summary Report",
-        description="Pricing summary statistics for shipped lineitems",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY, QueryCategory.FILTER],
-        expression_impl=q1_expression_impl,
-        pandas_impl=q1_pandas_impl,
-        sql_equivalent="SELECT l_returnflag, l_linestatus, sum(l_quantity)...",
-        expected_row_count=4,  # 2x2 combinations of flags
-    )
-)
+_CATEGORY_CODES = {
+    "AG": QueryCategory.AGGREGATE,
+    "FI": QueryCategory.FILTER,
+    "GB": QueryCategory.GROUP_BY,
+    "JO": QueryCategory.JOIN,
+    "SO": QueryCategory.SORT,
+    "SQ": QueryCategory.SUBQUERY,
+}
 
-# Register Q3 - Shipping Priority
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q3",
-        query_name="Shipping Priority",
-        description="Top 10 unshipped orders with highest value",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.SORT],
-        expression_impl=q3_expression_impl,
-        pandas_impl=q3_pandas_impl,
-        expected_row_count=10,
-    )
-)
+_QUERY_METADATA = """\
+Q1|Pricing Summary Report|Pricing summary statistics for shipped lineitems|AG,GB,FI|q1|SELECT l_returnflag, l_linestatus, sum(l_quantity)...|4
+Q3|Shipping Priority|Top 10 unshipped orders with highest value|JO,AG,SO|q3||10
+Q4|Order Priority Checking|Orders by priority with late lineitems|JO,AG,SQ|q4||5
+Q5|Local Supplier Volume|Revenue from orders in same nation within region|JO,AG,FI|q5||
+Q6|Forecasting Revenue Change|Revenue increase from eliminating discounts|AG,FI|q6||1
+Q10|Returned Item Reporting|Customers with returned parts and revenue impact|JO,AG,SO|q10||20
+Q12|Shipping Modes and Order Priority|Effect of shipping modes on order priority|JO,AG,FI|q12||2
+Q14|Promotion Effect|Effect of promotions on revenue|JO,AG,FI|q14||1
+Q7|Volume Shipping|Value of goods shipped between nations|JO,AG,FI|q7||
+Q8|National Market Share|Market share of a nation within a region|JO,AG,FI|q8||
+Q9|Product Type Profit Measure|Profit on a given line of parts|JO,AG,FI|q9||
+Q13|Customer Distribution|Distribution of customers by order count|JO,AG,SQ|q13||
+Q18|Large Volume Customer|Customers with large orders|JO,AG,SQ|q18||100
+Q19|Discounted Revenue|Revenue for parts with specific conditions|JO,AG,FI|q19||1
+Q2|Minimum Cost Supplier|Find supplier with minimum cost for parts in region|JO,SQ,SO|q2||100
+Q11|Important Stock Identification|Find most important stock in a nation|JO,AG,SQ|q11||
+Q15|Top Supplier|Determine top supplier based on revenue|JO,AG,SQ|q15||
+Q16|Parts/Supplier Relationship|Count suppliers per part, excluding complaints|JO,AG,SQ|q16||
+Q17|Small-Quantity-Order Revenue|Revenue from eliminating small quantity orders|JO,AG,SQ|q17||1
+Q20|Potential Part Promotion|Suppliers with excess inventory of parts|JO,SQ,FI|q20||
+Q21|Suppliers Who Kept Orders Waiting|Suppliers who delayed orders they could fill|JO,AG,SQ|q21||100
+Q22|Global Sales Opportunity|Identify customers likely to make purchases|AG,SQ,FI|q22||
+"""
 
-# Register Q4 - Order Priority Checking
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q4",
-        query_name="Order Priority Checking",
-        description="Orders by priority with late lineitems",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.SUBQUERY],
-        expression_impl=q4_expression_impl,
-        pandas_impl=q4_pandas_impl,
-        expected_row_count=5,  # 5 priority levels
-    )
-)
 
-# Register Q5 - Local Supplier Volume
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q5",
-        query_name="Local Supplier Volume",
-        description="Revenue from orders in same nation within region",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=q5_expression_impl,
-        pandas_impl=q5_pandas_impl,
-    )
-)
+def _impl_for(stem: str, family: str) -> Any:
+    return globals()[f"{stem}_{family}_impl"]
 
-# Register Q6 - Forecasting Revenue Change
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q6",
-        query_name="Forecasting Revenue Change",
-        description="Revenue increase from eliminating discounts",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=q6_expression_impl,
-        pandas_impl=q6_pandas_impl,
-        expected_row_count=1,
-    )
-)
 
-# Register Q10 - Returned Item Reporting
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q10",
-        query_name="Returned Item Reporting",
-        description="Customers with returned parts and revenue impact",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.SORT],
-        expression_impl=q10_expression_impl,
-        pandas_impl=q10_pandas_impl,
-        expected_row_count=20,
+for query_id, query_name, description, category_codes, impl_stem, sql_equivalent, expected_row_count in reader(
+    _QUERY_METADATA.splitlines(), delimiter="|"
+):
+    TPCH_DATAFRAME_QUERIES.register(
+        DataFrameQuery(
+            query_id=query_id,
+            query_name=query_name,
+            description=description,
+            categories=[_CATEGORY_CODES[code] for code in category_codes.split(",")],
+            expression_impl=_impl_for(impl_stem, "expression"),
+            pandas_impl=_impl_for(impl_stem, "pandas"),
+            sql_equivalent=sql_equivalent or None,
+            expected_row_count=int(expected_row_count) if expected_row_count else None,
+        )
     )
-)
-
-# Register Q12 - Shipping Modes and Order Priority
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q12",
-        query_name="Shipping Modes and Order Priority",
-        description="Effect of shipping modes on order priority",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=q12_expression_impl,
-        pandas_impl=q12_pandas_impl,
-        expected_row_count=2,  # 2 ship modes
-    )
-)
-
-# Register Q14 - Promotion Effect
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q14",
-        query_name="Promotion Effect",
-        description="Effect of promotions on revenue",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=q14_expression_impl,
-        pandas_impl=q14_pandas_impl,
-        expected_row_count=1,
-    )
-)
-
-# Register Q7 - Volume Shipping
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q7",
-        query_name="Volume Shipping",
-        description="Value of goods shipped between nations",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=q7_expression_impl,
-        pandas_impl=q7_pandas_impl,
-    )
-)
-
-# Register Q8 - National Market Share
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q8",
-        query_name="National Market Share",
-        description="Market share of a nation within a region",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=q8_expression_impl,
-        pandas_impl=q8_pandas_impl,
-    )
-)
-
-# Register Q9 - Product Type Profit Measure
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q9",
-        query_name="Product Type Profit Measure",
-        description="Profit on a given line of parts",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=q9_expression_impl,
-        pandas_impl=q9_pandas_impl,
-    )
-)
-
-# Register Q13 - Customer Distribution
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q13",
-        query_name="Customer Distribution",
-        description="Distribution of customers by order count",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.SUBQUERY],
-        expression_impl=q13_expression_impl,
-        pandas_impl=q13_pandas_impl,
-    )
-)
-
-# Register Q18 - Large Volume Customer
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q18",
-        query_name="Large Volume Customer",
-        description="Customers with large orders",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.SUBQUERY],
-        expression_impl=q18_expression_impl,
-        pandas_impl=q18_pandas_impl,
-        expected_row_count=100,
-    )
-)
-
-# Register Q19 - Discounted Revenue
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q19",
-        query_name="Discounted Revenue",
-        description="Revenue for parts with specific conditions",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=q19_expression_impl,
-        pandas_impl=q19_pandas_impl,
-        expected_row_count=1,
-    )
-)
-
-# Register Q2 - Minimum Cost Supplier
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q2",
-        query_name="Minimum Cost Supplier",
-        description="Find supplier with minimum cost for parts in region",
-        categories=[QueryCategory.JOIN, QueryCategory.SUBQUERY, QueryCategory.SORT],
-        expression_impl=q2_expression_impl,
-        pandas_impl=q2_pandas_impl,
-        expected_row_count=100,
-    )
-)
-
-# Register Q11 - Important Stock Identification
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q11",
-        query_name="Important Stock Identification",
-        description="Find most important stock in a nation",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.SUBQUERY],
-        expression_impl=q11_expression_impl,
-        pandas_impl=q11_pandas_impl,
-    )
-)
-
-# Register Q15 - Top Supplier
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q15",
-        query_name="Top Supplier",
-        description="Determine top supplier based on revenue",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.SUBQUERY],
-        expression_impl=q15_expression_impl,
-        pandas_impl=q15_pandas_impl,
-    )
-)
-
-# Register Q16 - Parts/Supplier Relationship
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q16",
-        query_name="Parts/Supplier Relationship",
-        description="Count suppliers per part, excluding complaints",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.SUBQUERY],
-        expression_impl=q16_expression_impl,
-        pandas_impl=q16_pandas_impl,
-    )
-)
-
-# Register Q17 - Small-Quantity-Order Revenue
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q17",
-        query_name="Small-Quantity-Order Revenue",
-        description="Revenue from eliminating small quantity orders",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.SUBQUERY],
-        expression_impl=q17_expression_impl,
-        pandas_impl=q17_pandas_impl,
-        expected_row_count=1,
-    )
-)
-
-# Register Q20 - Potential Part Promotion
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q20",
-        query_name="Potential Part Promotion",
-        description="Suppliers with excess inventory of parts",
-        categories=[QueryCategory.JOIN, QueryCategory.SUBQUERY, QueryCategory.FILTER],
-        expression_impl=q20_expression_impl,
-        pandas_impl=q20_pandas_impl,
-    )
-)
-
-# Register Q21 - Suppliers Who Kept Orders Waiting
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q21",
-        query_name="Suppliers Who Kept Orders Waiting",
-        description="Suppliers who delayed orders they could fill",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.SUBQUERY],
-        expression_impl=q21_expression_impl,
-        pandas_impl=q21_pandas_impl,
-        expected_row_count=100,
-    )
-)
-
-# Register Q22 - Global Sales Opportunity
-TPCH_DATAFRAME_QUERIES.register(
-    DataFrameQuery(
-        query_id="Q22",
-        query_name="Global Sales Opportunity",
-        description="Identify customers likely to make purchases",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.SUBQUERY, QueryCategory.FILTER],
-        expression_impl=q22_expression_impl,
-        pandas_impl=q22_pandas_impl,
-    )
-)
 
 
 def get_tpch_dataframe_queries() -> QueryRegistry:
