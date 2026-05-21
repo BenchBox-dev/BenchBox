@@ -385,7 +385,7 @@ work:
   summary: "Retire the frozen-config ceremony; replace with plain # HISTORICAL header; delete .frozen-hashes.json and the
     three-test guard"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     F13 + blind-spot
     `2026-05-05-080138-uat-frozen-config-replay-not-runnable.md`. The

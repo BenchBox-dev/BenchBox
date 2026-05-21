@@ -108,8 +108,8 @@ tests/uat/
 │   └── report.py                  # TSV roll-up + cross-scale coverage assertion
 ├── orchestrator.py                # composes phases per YAML phases: list (uat-sweep entry point)
 ├── configs/                       # tracked YAML configs
-│   ├── README.md                  # content policy (frozen vs editable)
-│   ├── uat-2026-05-02.yaml        # frozen replay (W10 deliverable)
+│   ├── README.md                  # content policy (historical vs editable)
+│   ├── uat-2026-05-02.yaml        # historical replay (W10 deliverable)
 │   └── stress-default.yaml        # canned preset for `make uat-stress` (W9 deliverable)
 └── test_*.py                      # fast-test coverage (port maps, ladder pruning, schema, etc.)
 ```
@@ -453,11 +453,11 @@ the framework's port is updated in the same PR.
 
 ## 6. Replay artifact spec — `tests/uat/configs/uat-2026-05-02.yaml`
 
-Encode the 2026-05-02 sweep as a frozen replay config:
+Encode the 2026-05-02 sweep as a historical replay config:
 
 ```yaml
 name: "uat-2026-05-02"
-description: "Frozen replay of the 2026-05-02 results-explorer multi-scale corpus sweep"
+description: "Historical replay of the 2026-05-02 results-explorer multi-scale corpus sweep"
 
 phases: [preflight, enumerate, execute, validate, package, explorer_smoke, report]
 
@@ -523,9 +523,10 @@ from column 8 to column 9 to stay correct.
 Wall-clock match is impossible (dry-run prints intent without
 invoking benchbox); structural parity is the bar.
 
-**Frozen status.** This config is immutable historical record. The
-file's first line includes `# FROZEN — do not edit. Clone to a new
-file for new sweeps.` Section 9 expands on the content policy.
+**Historical status.** This config is historical evidence. The file's
+first line includes `# HISTORICAL — record of the 2026-05-02 sweep. Do
+not edit; if behaviour drifts from this config, fix the framework OR
+clone to a dated successor.` Section 9 expands on the content policy.
 
 ## 7. Open questions for the user
 
@@ -555,9 +556,9 @@ defaults). Anything unaddressed defaults to the "Default" line below.
      when this TODO completes; bash script becomes a thin delegator
      in W11.
 
-4. **`tests/uat/configs/uat-2026-05-02.yaml` — frozen replay
+4. **`tests/uat/configs/uat-2026-05-02.yaml` — historical replay
    (immutable historical record) or starting template (editable)?**
-   - Default: frozen replay. New sweep configs cloned from it via
+   - Default: historical replay. New sweep configs cloned from it via
      `cp tests/uat/configs/uat-2026-05-02.yaml tests/uat/configs/
      uat-NEW.yaml`. Section 9 codifies this.
    - Consequence of "starting template": reduces config sprawl but
@@ -621,7 +622,7 @@ schema validation).
 
 **Counter.** The 2026-05-02 sweep parameters need to be replayable
 deterministically. A Python script is mutable code; a YAML config
-under version control is the historical record. Section 9's frozen
+under version control is the historical record. Section 9's historical
 content policy depends on YAML being declarative data, not code. The
 schema doubles as documentation: a sweep author reads the schema in
 Section 3 and knows what the framework can express.
@@ -697,20 +698,20 @@ ran with implicit shared design; the retrospective is the cost.
 The `tests/uat/configs/` directory holds two kinds of YAML files,
 distinguished by file-header comment:
 
-### 9.1 Frozen replay configs
+### 9.1 Historical replay configs
 
 ```yaml
-# FROZEN — do not edit. Clone to a new file for new sweeps.
+# HISTORICAL — record of the 2026-05-02 sweep. Do not edit; if behaviour
+# drifts from this config, fix the framework OR clone to a dated successor.
 name: "uat-2026-05-02"
 ...
 ```
 
-- Immutable historical record.
-- Edits rejected at PR time by `tests/uat/test_frozen_configs.py`,
-  which computes a hash of every file with the `# FROZEN` header and
-  compares to a checked-in `tests/uat/configs/.frozen-hashes.json`.
+- Historical evidence; avoid editing in place.
 - New sweep authors run `cp tests/uat/configs/uat-2026-05-02.yaml
   tests/uat/configs/uat-<new>.yaml` and edit the copy.
+- There is no hash ceremony. Reviews should reject gratuitous edits,
+  but the framework does not maintain a separate frozen-file guard.
 
 ### 9.2 Editable templates
 
@@ -729,13 +730,13 @@ name: "stress-default"
 
 | Action | Header | Reviewer expectation |
 |---|---|---|
-| Add a new frozen replay (post-sweep snapshot) | `# FROZEN` | Verify the `name:` field encodes the sweep's date/identity. |
+| Add a new historical replay (post-sweep snapshot) | `# HISTORICAL` | Verify the `name:` field encodes the sweep's date/identity. |
 | Add a new editable template | `# TEMPLATE` | Verify the template's `phases:` list and defaults match a real reuse case. |
-| Edit a `# FROZEN` file | (rejected) | PR fails `test_frozen_configs.py`; resubmit as a clone. |
+| Edit a `# HISTORICAL` file | (manual review) | Prefer a dated successor unless the framework contract itself drifted. |
 | Edit a `# TEMPLATE` file | `# TEMPLATE` | Standard review; no special protocol. |
 
-The hash check is mechanical; the conceptual policy is "frozen
-configs are evidence, editable templates are starting points."
+The conceptual policy is "historical configs are evidence, editable
+templates are starting points."
 
 ## 10. What UAT does NOT assert
 
@@ -768,7 +769,7 @@ cost.
 | `scripts/validate_submission.py` | Unchanged; only invoked transitively via the rollup | (no change) |
 | `~/Developer/benchmark_runs/logs/uat_20260502/` | Snapshot a copy of `matrix_summary.tsv` to `tests/uat/fixtures/uat-2026-05-02-matrix-summary.tsv` for the W10 parity test | W10 |
 | `_project/handoffs/results-explorer-uat-retrospective-20260502.md` | No retrofit; historical document | (no change) |
-| `tests/uat/configs/uat-2026-05-02.yaml` | New file at W10; FROZEN | W10 |
+| `tests/uat/configs/uat-2026-05-02.yaml` | New file at W10; HISTORICAL | W10 |
 | `tests/uat/configs/stress-default.yaml` | New file at W9; TEMPLATE | W9 |
 | `Makefile` | Add `uat-cell` (W3), `uat-execute` (W4), `uat-validate` (W5), `uat-package` (W6), `uat-explorer-smoke` (W7), `uat-report` (W8), `uat-sweep`/`uat-stress` (W9) | W3-W9 |
 | `CLAUDE.md` Pre-approved Commands | Add `make uat-*` entries | W11 |
@@ -790,7 +791,7 @@ One PR per work unit, vertical slices. No monolithic delivery.
 | W7 | `tests/uat/phases/explorer_smoke.py`, fast test | Fast | `make uat-explorer-smoke` |
 | W8 | `tests/uat/phases/report.py`, fast test | Fast | `make uat-report` |
 | W9 | `tests/uat/orchestrator.py`, `tests/uat/configs/stress-default.yaml`, fast test for orchestrator | Fast | `make uat-sweep`, `make uat-stress` |
-| W10 | `tests/uat/configs/uat-2026-05-02.yaml`, `tests/uat/fixtures/uat-2026-05-02-matrix-summary.tsv`, `tests/uat/test_replay_2026_05_02.py`, `tests/uat/test_frozen_configs.py` | Slow + fast | (none) |
+| W10 | `tests/uat/configs/uat-2026-05-02.yaml`, `tests/uat/fixtures/uat-2026-05-02-matrix-summary.tsv`, `tests/uat/test_replay_2026_05_02.py` | Slow + fast | (none) |
 | W11 | `docs/operations/uat-framework.md`, `tests/uat/README.md`, `CLAUDE.md` updates, optional bash-script delegation | (no new tests) | (none) |
 
 **Verification at each W.** Per the parent TODO's `verification:` block,
