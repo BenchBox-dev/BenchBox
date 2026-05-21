@@ -166,7 +166,7 @@ def q14_v4_expression_impl(ctx: DataFrameContext) -> Any:
     # Step 2: join with part
     step2 = step1.join(part, left_on="l_partkey", right_on="p_partkey")
     # Step 3: calculate promo revenue
-    result = step2.select(
+    return step2.select(
         (
             lit(100.0)
             * (col("l_extendedprice") * (lit(1) - col("l_discount")))
@@ -175,7 +175,6 @@ def q14_v4_expression_impl(ctx: DataFrameContext) -> Any:
             / (col("l_extendedprice") * (lit(1) - col("l_discount"))).sum()
         ).alias("promo_revenue")
     )
-    return result
 
 
 def q14_v4_pandas_impl(ctx: DataFrameContext) -> Any:

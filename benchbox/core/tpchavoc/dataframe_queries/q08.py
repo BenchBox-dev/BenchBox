@@ -62,7 +62,7 @@ def q8_v2_expression_impl(ctx: DataFrameContext) -> Any:
     filtered_part = part.filter(col("p_type") == lit(target_type))
     filtered_orders = orders.filter((col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") <= lit(end_date)))
 
-    result = (
+    return (
         filtered_part.join(lineitem, left_on="p_partkey", right_on="l_partkey")
         .join(supplier, left_on="l_suppkey", right_on="s_suppkey")
         .join(n2, left_on="s_nationkey", right_on="n2_nationkey")
@@ -84,7 +84,6 @@ def q8_v2_expression_impl(ctx: DataFrameContext) -> Any:
         .select("o_year", "mkt_share")
         .sort("o_year")
     )
-    return result
 
 
 def q8_v2_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -223,7 +222,7 @@ def q8_v5_expression_impl(ctx: DataFrameContext) -> Any:
 
     n2 = nation.select(col("n_nationkey").alias("n2_nationkey"), col("n_name").alias("nation"))
 
-    result = (
+    return (
         part.filter(col("p_type") == lit(target_type))
         .join(lineitem, left_on="p_partkey", right_on="l_partkey")
         .join(supplier, left_on="l_suppkey", right_on="s_suppkey")
@@ -248,7 +247,6 @@ def q8_v5_expression_impl(ctx: DataFrameContext) -> Any:
         .select("o_year", "mkt_share")
         .sort("o_year")
     )
-    return result
 
 
 def q8_v5_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -362,7 +360,7 @@ def q8_v7_expression_impl(ctx: DataFrameContext) -> Any:
     n2 = nation.select(col("n_nationkey").alias("n2_nationkey"), col("n_name").alias("nation"))
 
     # Swapped: start from lineitem→part instead of part→lineitem
-    result = (
+    return (
         lineitem.join(part.filter(col("p_type") == lit(target_type)), left_on="l_partkey", right_on="p_partkey")
         .join(supplier, left_on="l_suppkey", right_on="s_suppkey")
         .join(n2, left_on="s_nationkey", right_on="n2_nationkey")
@@ -385,7 +383,6 @@ def q8_v7_expression_impl(ctx: DataFrameContext) -> Any:
         .select("o_year", "mkt_share")
         .sort("o_year")
     )
-    return result
 
 
 def q8_v7_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -430,7 +427,7 @@ def q8_v9_expression_impl(ctx: DataFrameContext) -> Any:
 
     n2 = nation.select(col("n_nationkey").alias("n2_nationkey"), col("n_name").alias("nation"))
 
-    result = (
+    return (
         part.filter(col("p_type") == lit(target_type))
         .join(lineitem, left_on="p_partkey", right_on="l_partkey")
         .join(supplier, left_on="l_suppkey", right_on="s_suppkey")
@@ -454,7 +451,6 @@ def q8_v9_expression_impl(ctx: DataFrameContext) -> Any:
         .select("o_year", "mkt_share")
         .sort("o_year", descending=False)
     )
-    return result
 
 
 def q8_v9_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -487,7 +483,7 @@ def q8_v10_expression_impl(ctx: DataFrameContext) -> Any:
     n2 = nation.select(col("n_nationkey").alias("n2_nationkey"), col("n_name").alias("nation"))
     volume_alt = col("l_extendedprice") - col("l_extendedprice") * col("l_discount")
 
-    result = (
+    return (
         part.filter(col("p_type") == lit(target_type))
         .join(lineitem, left_on="p_partkey", right_on="l_partkey")
         .join(supplier, left_on="l_suppkey", right_on="s_suppkey")
@@ -511,7 +507,6 @@ def q8_v10_expression_impl(ctx: DataFrameContext) -> Any:
         .select("o_year", "mkt_share")
         .sort("o_year")
     )
-    return result
 
 
 def q8_v10_pandas_impl(ctx: DataFrameContext) -> Any:

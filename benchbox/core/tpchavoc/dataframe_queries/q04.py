@@ -54,13 +54,12 @@ def q4_v2_expression_impl(ctx: DataFrameContext) -> Any:
     # Pre-filter lineitem
     late_orders = lineitem.filter(col("l_commitdate") < col("l_receiptdate")).select("l_orderkey").unique()
 
-    result = (
+    return (
         filtered_orders.join(late_orders, left_on="o_orderkey", right_on="l_orderkey", how="semi")
         .group_by("o_orderpriority")
         .agg(col("o_orderkey").count().alias("order_count"))
         .sort("o_orderpriority")
     )
-    return result
 
 
 def q4_v2_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -112,7 +111,7 @@ def q4_v3_expression_impl(ctx: DataFrameContext) -> Any:
         .unique()
     )
 
-    result = (
+    return (
         orders.select("o_orderkey", "o_orderdate", "o_orderpriority")
         .filter((col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") < lit(end_date)))
         .join(late_orders, left_on="o_orderkey", right_on="l_orderkey", how="semi")
@@ -120,7 +119,6 @@ def q4_v3_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("o_orderkey").count().alias("order_count"))
         .sort("o_orderpriority")
     )
-    return result
 
 
 def q4_v3_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -220,14 +218,13 @@ def q4_v5_expression_impl(ctx: DataFrameContext) -> Any:
     lineitem_with_flag = lineitem.with_columns((col("l_commitdate") < col("l_receiptdate")).alias("is_late"))
     late_orders = lineitem_with_flag.filter(col("is_late")).select("l_orderkey").unique()
 
-    result = (
+    return (
         orders.filter((col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") < lit(end_date)))
         .join(late_orders, left_on="o_orderkey", right_on="l_orderkey", how="semi")
         .group_by("o_orderpriority")
         .agg(col("o_orderkey").count().alias("order_count"))
         .sort("o_orderpriority")
     )
-    return result
 
 
 def q4_v5_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -299,7 +296,7 @@ def q4_v7_expression_impl(ctx: DataFrameContext) -> Any:
     # Use inner join + unique instead of semi-join (equivalent result)
     late_orders = lineitem.filter(col("l_commitdate") < col("l_receiptdate")).select("l_orderkey").unique()
 
-    result = (
+    return (
         orders.filter((col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") < lit(end_date)))
         .join(late_orders, left_on="o_orderkey", right_on="l_orderkey")
         .select("o_orderkey", "o_orderpriority")
@@ -308,7 +305,6 @@ def q4_v7_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("o_orderkey").count().alias("order_count"))
         .sort("o_orderpriority")
     )
-    return result
 
 
 def q4_v7_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -350,14 +346,13 @@ def q4_v8_expression_impl(ctx: DataFrameContext) -> Any:
     late_orders = lineitem.filter(col("l_commitdate") < col("l_receiptdate")).select("l_orderkey").unique()
 
     date_filter = (col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") < lit(end_date))
-    result = (
+    return (
         orders.filter(date_filter)
         .join(late_orders, left_on="o_orderkey", right_on="l_orderkey", how="semi")
         .group_by("o_orderpriority")
         .agg(col("o_orderkey").count().alias("order_count"))
         .sort("o_orderpriority")
     )
-    return result
 
 
 def q4_v8_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -398,14 +393,13 @@ def q4_v9_expression_impl(ctx: DataFrameContext) -> Any:
 
     late_orders = lineitem.filter(col("l_commitdate") < col("l_receiptdate")).select("l_orderkey").unique()
 
-    result = (
+    return (
         orders.filter((col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") < lit(end_date)))
         .join(late_orders, left_on="o_orderkey", right_on="l_orderkey", how="semi")
         .group_by("o_orderpriority")
         .agg(col("o_orderkey").count().alias("order_count"))
         .sort("o_orderpriority", descending=False)
     )
-    return result
 
 
 def q4_v9_pandas_impl(ctx: DataFrameContext) -> Any:

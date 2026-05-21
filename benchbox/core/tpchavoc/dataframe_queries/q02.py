@@ -65,7 +65,7 @@ def q2_v2_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("ps_supplycost").min().alias("min_cost"))
     )
 
-    result = (
+    return (
         filtered_part.join(partsupp, left_on="p_partkey", right_on="ps_partkey")
         .join(supplier, left_on="ps_suppkey", right_on="s_suppkey")
         .join(nation, left_on="s_nationkey", right_on="n_nationkey")
@@ -85,7 +85,6 @@ def q2_v2_expression_impl(ctx: DataFrameContext) -> Any:
         .sort(["s_acctbal", "n_name", "s_name", "p_partkey"], descending=[True, False, False, False])
         .limit(100)
     )
-    return result
 
 
 def q2_v2_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -118,12 +117,11 @@ def q2_v2_pandas_impl(ctx: DataFrameContext) -> Any:
     joined = joined.merge(min_cost, left_on="p_partkey", right_on="ps_partkey")
     joined = joined[joined["ps_supplycost"] == joined["min_cost"]]
 
-    result = (
+    return (
         joined[["s_acctbal", "s_name", "n_name", "p_partkey", "p_mfgr", "s_address", "s_phone", "s_comment"]]
         .sort_values(["s_acctbal", "n_name", "s_name", "p_partkey"], ascending=[False, True, True, True])
         .head(100)
     )
-    return result
 
 
 # ---------------------------------------------------------------------------
@@ -159,7 +157,7 @@ def q3_v3_expression_impl_q2(ctx: DataFrameContext) -> Any:
         .agg(col("ps_supplycost").min().alias("min_cost"))
     )
 
-    result = (
+    return (
         part.filter((col("p_size") == lit(size)) & col("p_type").str.ends_with(type_suffix))
         .join(partsupp, left_on="p_partkey", right_on="ps_partkey")
         .join(supplier, left_on="ps_suppkey", right_on="s_suppkey")
@@ -171,7 +169,6 @@ def q3_v3_expression_impl_q2(ctx: DataFrameContext) -> Any:
         .sort(["s_acctbal", "n_name", "s_name", "p_partkey"], descending=[True, False, False, False])
         .limit(100)
     )
-    return result
 
 
 def q2_v3_expression_impl(ctx: DataFrameContext) -> Any:
@@ -253,12 +250,11 @@ def q2_v4_expression_impl(ctx: DataFrameContext) -> Any:
     with_nation = with_supplier.join(nation_in_region, left_on="s_nationkey", right_on="n_nationkey")
     with_min = with_nation.join(min_cost_per_part, left_on="p_partkey", right_on="ps_partkey")
     at_min_cost = with_min.filter(col("ps_supplycost") == col("min_cost"))
-    result = (
+    return (
         at_min_cost.select("s_acctbal", "s_name", "n_name", "p_partkey", "p_mfgr", "s_address", "s_phone", "s_comment")
         .sort(["s_acctbal", "n_name", "s_name", "p_partkey"], descending=[True, False, False, False])
         .limit(100)
     )
-    return result
 
 
 def q2_v4_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -320,7 +316,7 @@ def q2_v5_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("ps_supplycost").min().alias("min_cost"))
     )
 
-    result = (
+    return (
         part.filter((col("p_size") == lit(size)) & col("p_type").str.ends_with(type_suffix))
         .join(partsupp, left_on="p_partkey", right_on="ps_partkey")
         .join(supplier, left_on="ps_suppkey", right_on="s_suppkey")
@@ -333,7 +329,6 @@ def q2_v5_expression_impl(ctx: DataFrameContext) -> Any:
         .sort(["s_acctbal", "n_name", "s_name", "p_partkey"], descending=[True, False, False, False])
         .limit(100)
     )
-    return result
 
 
 def q2_v5_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -444,7 +439,7 @@ def q2_v7_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("ps_supplycost").min().alias("min_cost"))
     )
 
-    result = (
+    return (
         part.filter((col("p_size") == lit(size)) & col("p_type").str.ends_with(type_suffix))
         .join(partsupp, left_on="p_partkey", right_on="ps_partkey")
         .join(supplier, left_on="ps_suppkey", right_on="s_suppkey")
@@ -457,7 +452,6 @@ def q2_v7_expression_impl(ctx: DataFrameContext) -> Any:
         .sort(["s_acctbal", "n_name", "s_name", "p_partkey"], descending=[True, False, False, False])
         .limit(100)
     )
-    return result
 
 
 def q2_v7_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -565,7 +559,7 @@ def q2_v9_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("ps_supplycost").min().alias("min_cost"))
     )
 
-    result = (
+    return (
         part.filter((col("p_size") == lit(size)) & col("p_type").str.ends_with(type_suffix))
         .join(partsupp, left_on="p_partkey", right_on="ps_partkey")
         .join(supplier, left_on="ps_suppkey", right_on="s_suppkey")
@@ -581,7 +575,6 @@ def q2_v9_expression_impl(ctx: DataFrameContext) -> Any:
         )
         .limit(100)
     )
-    return result
 
 
 def q2_v9_pandas_impl(ctx: DataFrameContext) -> Any:
