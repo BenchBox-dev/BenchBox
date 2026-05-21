@@ -1,11 +1,5 @@
 """Platform/benchmark matrix machinery for the UAT framework.
 
-This is the Python port of the bash machinery in
-`scripts/local_stress_test.sh`. It is deliberately a structural mirror so
-that the parity test (`tests/uat/test_matrix.py::test_bash_parity`) can
-assert that every key in the bash case statements has a matching entry
-here, and vice versa.
-
 Sequential platform execution discipline. Per UAT W3 line 222 (in
 `_project/handoffs/results-explorer-uat-retrospective-20260502.md`),
 parallel platforms contaminate timings. Callers must iterate platforms
@@ -22,8 +16,7 @@ from typing import Iterable
 from benchbox.core.benchmark_registry import CATEGORY_ORDER
 from benchbox.core.platform_registry import PlatformRegistry
 
-# Platform → "host:port" for TCP reachability probes. Mirrors
-# `get_platform_port` in scripts/local_stress_test.sh.
+# Platform -> "host:port" for TCP reachability probes.
 PLATFORM_PORTS: dict[str, str] = {
     "lakesail": "localhost:50051",
     "singlestore": "localhost:13306",
@@ -43,8 +36,7 @@ PLATFORM_PORTS: dict[str, str] = {
     "velox": "localhost:50051",
 }
 
-# Platform → list of `--platform-option` argv to append. Mirrors
-# `get_platform_extra_opts` in scripts/local_stress_test.sh:164-173.
+# Platform -> list of `--platform-option` argv to append.
 PLATFORM_EXTRA_OPTS: dict[str, list[str]] = {
     "questdb": ["--platform-option", "http_port=19000"],
     "starrocks": [
@@ -77,8 +69,8 @@ PLATFORM_EXTRA_OPTS: dict[str, list[str]] = {
 
 # Platform → local managed Docker credentials appended only when the caller is
 # running a UAT-managed Docker stack. Keep this separate from
-# PLATFORM_EXTRA_OPTS because that mapping is a parity mirror of
-# scripts/local_stress_test.sh.
+# PLATFORM_EXTRA_OPTS because that mapping applies even when UAT probes
+# externally managed local platforms.
 LOCAL_MANAGED_PLATFORM_EXTRA_OPTS: dict[str, list[str]] = {
     "pg-duckdb": ["--platform-option", "password=benchbox"],
     "pg-mooncake": ["--platform-option", "password=benchbox"],
@@ -86,8 +78,7 @@ LOCAL_MANAGED_PLATFORM_EXTRA_OPTS: dict[str, list[str]] = {
     "postgresql": ["--platform-option", "password=benchbox"],
 }
 
-# Platform → extra benchbox CLI flags (not --platform-option). Mirrors
-# `get_platform_cli_flags` in scripts/local_stress_test.sh:187-192.
+# Platform -> extra benchbox CLI flags (not --platform-option).
 # velox: Docker Desktop's 11.7 GB ceiling cannot fit 3xSF=1 TPC-H passes
 # inside a Spark/Velox container; one warmup + one measurement run is
 # sufficient for functional verification.
@@ -95,8 +86,7 @@ PLATFORM_CLI_FLAGS: dict[str, list[str]] = {
     "velox": ["--iterations", "1"],
 }
 
-# Platform → uv extra name (`uv run --extra X`). Mirrors
-# `get_platform_uv_extra` in scripts/local_stress_test.sh:548-555.
+# Platform -> uv extra name (`uv run --extra X`).
 PLATFORM_UV_EXTRA: dict[str, str] = {
     "clickhouse-local": "clickhouse-local",
     "lakesail": "lakesail",
@@ -104,7 +94,7 @@ PLATFORM_UV_EXTRA: dict[str, str] = {
     "influxdb": "influxdb",
 }
 
-# Platform groupings (mirrors lines 127-137 of the bash script).
+# Platform groupings.
 # Consumed by both the UAT framework and the integration matrix test;
 # align with both before changing.
 LOCAL_SQL_PLATFORMS: tuple[str, ...] = ("duckdb", "sqlite", "datafusion")
@@ -237,12 +227,7 @@ def invalidate_reachability_cache_after_lifecycle_change() -> None:
 
 
 def tcp_probe(host: str, port: int, timeout_s: float = 2.0) -> bool:
-    """Return True iff a TCP connection to (host, port) succeeds within timeout.
-
-    Mirrors `tcp_probe` in scripts/local_stress_test.sh:201-210, which uses
-    nc when available and falls back to bash /dev/tcp. The Python port uses
-    socket.create_connection with the same 2-second default timeout.
-    """
+    """Return True iff a TCP connection to (host, port) succeeds within timeout."""
     try:
         with socket.create_connection((host, port), timeout=timeout_s):
             return True
@@ -251,16 +236,12 @@ def tcp_probe(host: str, port: int, timeout_s: float = 2.0) -> bool:
 
 
 def platform_is_reachable(platform: str) -> bool:
-    """Return True iff `platform` has no port mapping or its port is open.
-
-    Mirrors `platform_is_reachable` in scripts/local_stress_test.sh:213-227.
-    Cached per platform name (matching the bash sentinel-file semantics).
-    """
+    """Return True iff `platform` has no port mapping or its port is open."""
     if platform in _REACHABILITY_CACHE:
         return _REACHABILITY_CACHE[platform]
     addr = PLATFORM_PORTS.get(platform)
     if addr is None:
-        # No probe configured → assume reachable (bash behaviour).
+        # No probe configured -> assume reachable.
         _REACHABILITY_CACHE[platform] = True
         return True
     host, _, port_s = addr.partition(":")
@@ -293,13 +274,7 @@ class BenchmarkInfo:
 
 
 def load_benchmarks() -> dict[str, BenchmarkInfo]:
-    """Read the benchmark registry directly (no eval, no shell-out).
-
-    The bash script imports the same registry via
-    `uv run --no-sync -- python -c '...'` (lines 232-263); the Python
-    port imports it as a library. A registry rename surfaces as an
-    ImportError here, not as a silent skip.
-    """
+    """Read the benchmark registry directly."""
     from benchbox.core.benchmark_registry import BENCHMARK_METADATA
 
     out: dict[str, BenchmarkInfo] = {}
@@ -356,11 +331,10 @@ def resolve_benchmarks(
 def smoke_scale_for(benchmark_id: str, info: BenchmarkInfo | None = None) -> float:
     """Return the per-benchmark smoke-test scale.
 
-    Mirrors the inline Python in scripts/local_stress_test.sh:240-245:
-    `min_scale` if set; `default_scale` otherwise. TPC-DS is forced to
-    0.01 because the registry default is 1.0 for methodology reasons but
-    the local smoke suite intentionally exercises patched subscale
-    support.
+    Use `min_scale` when set and `default_scale` otherwise. TPC-DS is
+    forced to 0.01 because the registry default is 1.0 for methodology
+    reasons but the local smoke suite intentionally exercises patched
+    subscale support.
     """
     if info is None:
         info = load_benchmarks()[benchmark_id]
@@ -377,11 +351,6 @@ def filter_scales_by_registry(
     info: BenchmarkInfo | None = None,
 ) -> list[float]:
     """Drop requested scales that fall outside the registry's scale_options.
-
-    Fix forward from bash, per the parent TODO's W2 note: the bash script
-    honours `min_scale` via the smoke-scale lookup but does not enforce
-    the upper bound on a `--scale` override. This Python port enforces
-    both bounds.
 
     A requested scale is kept when it appears in `scale_options` OR
     `scale_options` is empty (bench has no declared options). The result
@@ -406,7 +375,7 @@ def uv_run_argv(platform: str) -> list[str]:
 
     Platforms with a registered uv extra use `uv run --extra X --`;
     others use `uv run --no-sync --` to avoid per-invocation sync
-    overhead. Matches scripts/local_stress_test.sh:449-452.
+    overhead.
     """
     extra = PLATFORM_UV_EXTRA.get(platform)
     if extra is not None:
@@ -427,8 +396,7 @@ def benchbox_run_argv(
     """Build the full `uv run -- benchbox run ...` argv for a single cell.
 
     Combines uv extras, platform `--platform-option` blocks, platform CLI
-    flags, and any caller-provided extra argv. The shape mirrors
-    scripts/local_stress_test.sh:453-464 exactly.
+    flags, and any caller-provided extra argv.
     """
     argv = uv_run_argv(platform)
     argv += [

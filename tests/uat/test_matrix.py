@@ -1,15 +1,7 @@
-"""Fast-test coverage for tests/uat/matrix.py.
-
-Includes the structural-parity assertion against
-`scripts/local_stress_test.sh` required by the parent TODO's W2: every
-key in the bash case statements must appear in the Python dict (and
-vice versa) with the same value.
-"""
+"""Fast-test coverage for tests/uat/matrix.py."""
 
 from __future__ import annotations
 
-import re
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -19,89 +11,6 @@ from benchbox.core.platform_registry import PlatformRegistry
 from tests.uat import matrix
 
 pytestmark = pytest.mark.fast
-
-
-# ---------------------------------------------------------------------------
-# Bash-parity helpers and assertions.
-# ---------------------------------------------------------------------------
-
-REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-BASH_SCRIPT = REPO_ROOT / "scripts" / "local_stress_test.sh"
-
-
-def _parse_bash_case(text: str, fn_name: str) -> dict[str, str]:
-    """Extract `case "$1" in <key>) echo "...";; ... esac` mapping for fn_name."""
-    fn_match = re.search(
-        rf"^\s*{fn_name}\s*\(\s*\)\s*\{{\s*$",
-        text,
-        flags=re.MULTILINE,
-    )
-    if not fn_match:
-        raise AssertionError(f"Did not find function {fn_name} in bash script")
-    body_start = fn_match.end()
-    case_match = re.search(r'case\s+"\$1"\s+in', text[body_start:])
-    assert case_match, f"No case statement in {fn_name}"
-    body_after_case = text[body_start + case_match.end() :]
-    esac_match = re.search(r"\besac\b", body_after_case)
-    assert esac_match, f"No esac in {fn_name}"
-    body = body_after_case[: esac_match.start()]
-    out: dict[str, str] = {}
-    for line in body.splitlines():
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-        m = re.match(r'([\w-]+(?:\|[\w-]+)*)\)\s*echo\s+"(.*)"\s*;;\s*$', line)
-        if not m:
-            continue
-        keys = m.group(1).split("|")
-        value = m.group(2)
-        for key in keys:
-            if key == "*":
-                continue
-            out[key] = value
-    return out
-
-
-def _bash_case_keys() -> dict[str, dict[str, str]]:
-    text = BASH_SCRIPT.read_text()
-    return {
-        "get_platform_port": _parse_bash_case(text, "get_platform_port"),
-        "get_platform_extra_opts": _parse_bash_case(text, "get_platform_extra_opts"),
-        "get_platform_cli_flags": _parse_bash_case(text, "get_platform_cli_flags"),
-        "get_platform_uv_extra": _parse_bash_case(text, "get_platform_uv_extra"),
-    }
-
-
-def test_bash_parity_platform_ports():
-    bash = _bash_case_keys()["get_platform_port"]
-    assert set(bash) == set(matrix.PLATFORM_PORTS)
-    for key, value in bash.items():
-        assert matrix.PLATFORM_PORTS[key] == value
-
-
-def test_bash_parity_extra_opts():
-    bash = _bash_case_keys()["get_platform_extra_opts"]
-    py_keys = set(matrix.PLATFORM_EXTRA_OPTS)
-    assert set(bash) == py_keys
-    for key, value in bash.items():
-        # Bash echoes a single space-separated string; Python stores argv list.
-        assert " ".join(matrix.PLATFORM_EXTRA_OPTS[key]) == value
-
-
-def test_bash_parity_cli_flags():
-    bash = _bash_case_keys()["get_platform_cli_flags"]
-    py_keys = set(matrix.PLATFORM_CLI_FLAGS)
-    assert set(bash) == py_keys
-    for key, value in bash.items():
-        assert " ".join(matrix.PLATFORM_CLI_FLAGS[key]) == value
-
-
-def test_bash_parity_uv_extra():
-    bash = _bash_case_keys()["get_platform_uv_extra"]
-    py_keys = set(matrix.PLATFORM_UV_EXTRA)
-    assert set(bash) == py_keys
-    for key, value in bash.items():
-        assert matrix.PLATFORM_UV_EXTRA[key] == value
 
 
 # ---------------------------------------------------------------------------

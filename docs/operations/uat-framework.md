@@ -235,14 +235,6 @@ cp tests/uat/configs/uat-2026-05-02.yaml tests/uat/configs/uat-<new>.yaml
 # edit `name:`, then run `make uat-sweep CONFIG=tests/uat/configs/uat-<new>.yaml`
 ```
 
-## Relationship to scripts/local_stress_test.sh
-
-The bash script remains operative for muscle-memory continuity.
-`make uat-stress` is the preferred path going forward; both honour
-the same `PLATFORM=`, `BENCHMARK=`, `SCALE=` env-var inputs. A
-deprecation cycle is out of scope for this TODO and will file as a
-separate decision after `make uat-stress` proves adoption.
-
 ## Sequential platform execution
 
 Per UAT W3 line 222 in

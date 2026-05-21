@@ -1718,7 +1718,7 @@ uat-sweep:
 		$(if $(DRY_RUN),--dry-run,)
 
 # make uat-stress [PLATFORM=] [BENCHMARK=] [SCALE=] [CONFIG=]
-# Canned stress preset; feature parity with scripts/local_stress_test.sh.
+# Canned stress preset using the UAT framework matrix runner.
 uat-stress:
 	@uv run --no-sync -- python -m tests.uat._cli stress \
 		$(if $(CONFIG),--config "$(CONFIG)",) \

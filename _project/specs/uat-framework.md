@@ -5,7 +5,7 @@
 > **Triggering finding:** `_project/blind-spots/2026-05-03-130000-stress-script-uat-driver-drift.md`
 > **Sibling spec (consumed, not duplicated):** `_project/specs/uat-methodology-blind-spot-remediation.md`
 > **Author inputs:**
->   - `scripts/local_stress_test.sh` (the existing-but-incomplete framework)
+>   - retired stress-test shell workflow (superseded by `make uat-stress`)
 >   - `_project/handoffs/results-explorer-uat-retrospective-20260502.md` (the bespoke driver this spec replaces)
 >   - `scripts/uat_validator_rollup.py` (Finding 2 deliverable; consumed as phase)
 >   - `_project/DONE/main/active/uat-template-success-metric-terminal-state-and-gating.yaml` (Finding 3 vocab)
@@ -14,9 +14,9 @@
 
 ### 1.1 The drift gap
 
-`scripts/local_stress_test.sh` and the 2026-05-02 UAT driver are two
-parallel surfaces for matrix-shape execution that drift. The bash
-script already ships:
+The retired shell stress workflow and the 2026-05-02 UAT driver were two
+parallel surfaces for matrix-shape execution that drifted. The framework
+consolidates the reusable pieces:
 
 - timeout/gtimeout/perl-fallback wrappers (lines 90-123, 359-429)
 - registry enumeration via `benchbox.core.benchmark_registry`
@@ -37,11 +37,10 @@ The 2026-05-02 sweep needed all of that plus:
 - submission packaging with explicit terminal-state declaration
 - explorer build + Playwright smoke
 
-None of the second list lived in the bash script and none was reusable
-afterwards — it survives only as artifacts under
-`~/Developer/benchmark_runs/logs/uat_20260502/` plus the retrospective
-prose. The next sweep starts from the same place and reinvents the
-same machinery.
+None of the second list was reusable afterwards. It survived only as
+artifacts under `~/Developer/benchmark_runs/logs/uat_20260502/` plus
+the retrospective prose. The framework makes that machinery reusable
+through one typed config/orchestrator path.
 
 ### 1.2 Why this is separate from the methodology spec
 
@@ -75,10 +74,6 @@ group, no validate/package/explorer phases).
   facets are ready.
 - Throughput-phase coverage — the 2026-05-02 sweep ran load,power
   only; throughput multiplies wall-clock cost.
-- Removal of `scripts/local_stress_test.sh` — W11 documents the
-  migration path but does not delete; deprecation is a separate
-  decision after `make uat-stress` proves adoption across two-plus
-  subsequent UATs.
 - A `benchbox uat` CLI subcommand — UAT is a project-developer
   concern, `benchbox` is a project-user concern. `make` targets are
   the developer entrypoint for `worktree-*`, `blind-spots-*`,
@@ -93,7 +88,7 @@ tests/uat/
 ├── matrix.py                      # platform/benchmark enumeration + reachability
 ├── runner.py                      # single-cell execution (subprocess + timeout + log capture)
 ├── config.py                      # YAML schema validation, dataclass-style config object
-├── timeouts.py                    # signal-based timeout wrapper (replaces bash perl fallback)
+├── timeouts.py                    # signal-based timeout wrapper
 ├── cleanup.py                     # reuse-aware datagen/databases cleanup
 ├── docker_assets.py               # UAT-owned Docker compose lifecycle helpers
 ├── ladder.py                      # scale-ladder + early-stop logic
@@ -121,7 +116,7 @@ tests/uat/
 | `matrix.py` | Port maps, `--platform-option` tables, CLI flags, uv-extra map, TCP probe with cache, registry-driven benchmark enumeration | 250 |
 | `runner.py` | Build `benchbox run` argv per cell; capture stdout+stderr to per-run log; extract result-JSON path | 120 |
 | `config.py` | Load YAML, validate against schema (Section 3), expose typed access | 180 |
-| `timeouts.py` | Signal-based timeout (POSIX `signal.alarm` + `os.killpg`); replaces bash perl wrapper | 80 |
+| `timeouts.py` | Signal-based timeout (POSIX process-group kill ladder) | 80 |
 | `cleanup.py` | Track cell completions; prune `databases/` at safe reuse boundaries; preserve `datagen/` | 150 |
 | `docker_assets.py` | Map Docker-backed UAT platforms to compose files; build safe project-scoped compose commands | 180 |
 | `ladder.py` | Per-(platform, benchmark) rung order; wall-clock and exit-code early-stop; pruning bookkeeping | 100 |
@@ -134,9 +129,7 @@ tests/uat/
 | `phases/report.py` | Read each phase's outputs; emit `matrix_summary.tsv`; cross-scale coverage check | 130 |
 | `orchestrator.py` | Walk YAML `phases:` list in order; surface phase failures; respect `dry_run:` toggle | 100 |
 
-Total: ~1,500 LOC across 13 modules + tests. The bash script is 600
-lines; the framework is roughly the bash script plus the seven
-phases the bash script lacks.
+Total: ~1,500 LOC across 13 modules + tests.
 
 ## 3. YAML config schema
 
@@ -363,21 +356,21 @@ Sweep authors opt in explicitly.
 | `make uat-report` | `LOGS_DIR=` | Standalone TSV roll-up. (W8) |
 | `make uat-sweep` | `CONFIG=` (and optional `DRY_RUN=1`) | Full sweep: walks `phases:` list. (W9) |
 | `python -m tests.uat._cli preflight` | `--config <path>` | Advisory disk-budget estimate plus current preflight status. |
-| `make uat-stress` | `PLATFORM=`, `BENCHMARK=`, `SCALE=` (all optional) | Canned preset; feature parity with `scripts/local_stress_test.sh` for stress-test use. (W9) |
+| `make uat-stress` | `PLATFORM=`, `BENCHMARK=`, `SCALE=` (all optional) | Canned preset for framework-owned stress-test use. (W9) |
 
 **Invocation contract.**
 
 - All targets accept `BENCHBOX_OUTPUT_DIR` for runs root, defaulting
-  to `~/Developer/benchmark_runs/` (matches the bash script).
+  to `~/Developer/benchmark_runs/`.
 - All targets exit non-zero on phase failure; the report phase exit
   code is the highest non-zero seen across phases.
 - Logs land under `output.logs_dir_template` resolved from the YAML
   (or, for single-cell debugging, under `~/Developer/benchmark_runs/
   logs/uat_<date>/`).
-- `make uat-stress` accepts the same `PLATFORM=`, `BENCHMARK=`,
-  `SCALE=` env-var inputs as today's bash script for muscle-memory
-  continuity. Internally it loads `tests/uat/configs/stress-default.yaml`
-  and applies a closed set of env-var overrides defined below.
+- `make uat-stress` accepts `PLATFORM=`, `BENCHMARK=`, and `SCALE=`
+  make variables for focused stress runs. Internally it loads
+  `tests/uat/configs/stress-default.yaml` and applies a closed set of
+  overrides defined below.
 
 **Env-var override contract for `make uat-stress`.** Only three
 overrides are recognised; any other `MAKE_VAR=` is ignored (no
@@ -392,8 +385,7 @@ silent passthrough):
 If `PLATFORM` and `BENCHMARK` are both set, the YAML's `groups`
 fields are both cleared and `include` lists are both replaced.
 If `SCALE` and YAML's `scales.rungs` are both present, `SCALE`
-wins (this is the documented muscle-memory behaviour: the bash
-`--scale` flag also overrides per-benchmark smoke scales).
+wins.
 
 Other targets (`make uat-cell`, `make uat-execute`, `make
 uat-sweep`, etc.) do not honour these env vars; they read the
@@ -407,39 +399,13 @@ command signature. This is enforced by
 internal `benchbox/cli/commands/submit.py` validator refactor and fails
 on click command/option or submit signature drift.
 
-## 5. Migration plan for `scripts/local_stress_test.sh`
+## 5. Stress Workflow Retirement
 
-**Default outcome: leave untouched.** The bash script remains
-operative for the duration of this TODO. Users with muscle memory
-keep working. `make uat-stress` is documented as the preferred path
-in `docs/operations/uat-framework.md` (W11) but adoption is opt-in.
-
-**Opt-in delegation (W11 user choice).** Sweep author may, with
-explicit user approval at W11, refactor the bash script to delegate
-to `make uat-stress`:
-
-```bash
-#!/usr/bin/env bash
-# scripts/local_stress_test.sh — thin delegator (opt-in)
-exec make -s -C "$(git rev-parse --show-toplevel)" uat-stress "$@"
-```
-
-The argv-to-env-var translation lives in the Makefile target
-(`make uat-stress` already accepts `PLATFORM=`, `BENCHMARK=`,
-`SCALE=`).
-
-**Removal: out of scope.** A separate `deprecate-local-stress-test`
-TODO files only after `make uat-stress` proves adoption across
-two-plus subsequent UATs (per anti-pattern in the parent TODO).
-
-**Drift detection during the transition.** While both surfaces
-coexist, the W2 port of port maps / `--platform-option` tables /
-CLI flags / uv-extra map MUST match the bash script exactly. The
-fast-test for `tests/uat/test_matrix.py` includes a structural
-parity assertion: every key in the bash script's case statements
-must appear in the Python dict (and vice versa) with the same value.
-If the bash script is updated post-merge, the parity test fails and
-the framework's port is updated in the same PR.
+`make uat-stress` is the sole local stress-test entrypoint. It loads
+`tests/uat/configs/stress-default.yaml`, applies the closed
+`PLATFORM=`, `BENCHMARK=`, and `SCALE=` override set described above,
+and runs through the same typed config/orchestrator path as every other
+UAT sweep. The retired shell workflow has no compatibility shim.
 
 ## 6. Replay artifact spec — `tests/uat/configs/uat-2026-05-02.yaml`
 
@@ -537,14 +503,9 @@ defaults). Anything unaddressed defaults to the "Default" line below.
    - Consequence of yes: file a sub-TODO for an independent reviewer
      pass before W2 unlocks.
 
-3. **Should `make uat-stress` eventually replace
-   `scripts/local_stress_test.sh`, or coexist indefinitely?**
-   - Default: coexist. W11 documents the migration path; a separate
-     deprecation TODO files only after adoption proves out across
-     two-plus subsequent UATs.
-   - Consequence of "replace": file `deprecate-local-stress-test`
-     when this TODO completes; bash script becomes a thin delegator
-     in W11.
+3. **Should `make uat-stress` replace the retired shell workflow?**
+   - Decision: yes. The framework owns stress-test matrix iteration;
+     no thin delegator or compatibility shim remains.
 
 4. **`tests/uat/configs/uat-2026-05-02.yaml` — historical replay
    (immutable historical record) or starting template (editable)?**
@@ -575,17 +536,16 @@ ends it.
 
 ### 8.1 Against building a Python framework at all
 
-> "Convention plus a small wrap-script is sufficient. The bash script
-> works for stress; the next sweep author can read the script for
-> patterns and write a new bespoke driver. Framework adds engineering
-> cost and a YAML schema to learn for marginal benefit."
+> "Convention plus a small wrapper is sufficient. The next sweep author
+> can read prior run artifacts for patterns and write a new bespoke
+> driver. Framework adds engineering cost and a YAML schema to learn for
+> marginal benefit."
 
-**Counter.** The bash script IS the framework that already exists; it
-just lacks half the phases. The 2026-05-02 sweep author DID read the
-script for patterns and still re-invented its timeout wrapper. The
-"read for patterns" path empirically produces drift, not reuse. The
-framework is the next iteration of the bash script, not a new
-abstraction.
+**Counter.** The 2026-05-02 sweep author did read prior artifacts and
+still re-invented timeout handling, matrix reporting, validation
+rollups, and packaging. The "read for patterns" path empirically
+produces drift, not reuse. The framework is the reusable boundary for
+that machinery, not a new abstraction for its own sake.
 
 ### 8.2 Against `tests/uat/` location
 
@@ -754,7 +714,7 @@ cost.
 
 | Artifact | Action | Owner |
 |---|---|---|
-| `scripts/local_stress_test.sh` | Leave untouched (default); thin-delegate at W11 (opt-in) | W11 |
+| retired shell stress workflow | Removed; `make uat-stress` is the sole local stress entrypoint | W11 |
 | `scripts/uat_validator_rollup.py` | Unchanged; framework consumes its public CLI | (no change) |
 | `scripts/validate_submission.py` | Unchanged; only invoked transitively via the rollup | (no change) |
 | `~/Developer/benchmark_runs/logs/uat_20260502/` | Snapshot a copy of `matrix_summary.tsv` to `tests/uat/fixtures/uat-2026-05-02-matrix-summary.tsv` for the W10 parity test | W10 |
@@ -794,15 +754,15 @@ make uat-cell PLATFORM=duckdb BENCHMARK=tpch SCALE=0.01
 make uat-stress PLATFORM=duckdb BENCHMARK=tpch
 make uat-sweep CONFIG=tests/uat/configs/uat-2026-05-02.yaml DRY_RUN=1
 uv run -- python -m pytest -m fast -q
-git diff origin/develop -- scripts/local_stress_test.sh   # empty unless W11 delegates
+test ! -f scripts/local_stress_test.sh
 uv run -- python -m pytest tests/uat/test_no_cli_surface_drift.py -q
 ```
 
 ## 13. Open risks, watched but not blocking
 
-- **Risk: Python timeout wrapper drifts from the bash perl wrapper.**
-  Mitigation: the W2 fast test exercises the timeout wrapper with a
-  3-second sleep and a 1-second cap; same exit-code semantics
+- **Risk: timeout wrapper semantics drift.**
+  Mitigation: the fast test exercises the timeout wrapper with a
+  3-second sleep and a 1-second cap; exit-code semantics remain
   (124 on timeout).
 - **Risk: registry-driven enumeration races a registry rename.**
   Mitigation: the framework imports `benchbox.core.benchmark_registry`
@@ -827,6 +787,6 @@ uv run -- python -m pytest tests/uat/test_no_cli_surface_drift.py -q
 - Sibling spec (consumed): `_project/specs/uat-methodology-blind-spot-remediation.md`
 - 2026-05-02 sweep retrospective: `_project/handoffs/results-explorer-uat-retrospective-20260502.md`
 - Methodology helper (consumed): `scripts/uat_validator_rollup.py`
-- Bash framework (translated, not modified): `scripts/local_stress_test.sh`
+- Retired shell stress workflow: superseded by `make uat-stress`
 - Self-bias caveat: `_project/blind-spots/2026-05-03-084354-stress-test-self-bias.md`
 - Spec ergonomics caveat: `_project/blind-spots/2026-05-03-084923-spec-approval-ergonomics.md`

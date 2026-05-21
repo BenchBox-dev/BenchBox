@@ -1,8 +1,7 @@
 """Single-cell `benchbox run` execution.
 
-Mirrors the bash `run_benchmark` function in
-scripts/local_stress_test.sh:433-493 — build the argv, capture output
-to a per-run log, read the quiet result-JSON path on success.
+Build the argv, capture output to a per-run log, and read the quiet
+result-JSON path on success.
 
 Sequential platform execution discipline (UAT W3 line 222 in
 _project/handoffs/results-explorer-uat-retrospective-20260502.md):
@@ -121,10 +120,7 @@ def run_cell(
     local_managed_platform: bool = False,
     now: _dt.datetime | None = None,
 ) -> CellResult:
-    """Run a single cell end-to-end and return the cell result.
-
-    Mirrors scripts/local_stress_test.sh:433-493.
-    """
+    """Run a single cell end-to-end and return the cell result."""
     now = now or _dt.datetime.now()
     log_dir = Path(log_dir) if log_dir is not None else _default_log_dir(now)
     log_dir.mkdir(parents=True, exist_ok=True)
