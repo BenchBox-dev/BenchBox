@@ -302,7 +302,7 @@ work:
 - id: w4
   summary: "Carve benchbox/validation/bundle.py; delete the 798-LOC byte-identical fixture; thin entrypoint scripts"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     Eliminates the largest single duplication in the project: the
     byte-identical `tests/fixtures/published_results_validator.py` (798

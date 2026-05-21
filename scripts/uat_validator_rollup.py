@@ -41,14 +41,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
-# scripts/ is a sibling; both this file and validate_submission.py live there.
-_SCRIPTS_DIR = Path(__file__).resolve().parent
-if str(_SCRIPTS_DIR) not in sys.path:
-    sys.path.insert(0, str(_SCRIPTS_DIR))
-
-from validate_submission import discover_bundles, validate_bundles  # noqa: E402
-
-CLI_REFUSED_COMPLIANCE_CLASSES = {"unofficial_subscale", "unofficial_nonstandard"}
+from benchbox.validation.bundle import CLI_REFUSED_COMPLIANCE_CLASSES, discover_bundles, validate_bundles
 
 TSV_HEADER = "platform\tbenchmark\tscale\tresult_path\tvalidator_status\terror_count\twarning_count\tfirst_error"
 

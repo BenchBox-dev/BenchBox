@@ -21,13 +21,13 @@ from pathlib import Path
 
 from benchbox.core.results.loader import load_result_file
 from benchbox.core.results.status import result_non_clean_reason
+from benchbox.validation.bundle import COMPANION_SUFFIXES
 
 from .store import PublicationRecord, PublicationStore, build_reference
 
 logger = logging.getLogger(__name__)
 
 VALID_LABELS = ("maintainer-run", "community-submission", "ci", "local", "unofficial-research")
-COMPANION_SUFFIXES = (".plans.json", ".tuning.json")
 
 
 @dataclass

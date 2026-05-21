@@ -30,6 +30,7 @@ from benchbox.core.results.environment import (
 )
 from benchbox.core.results.query_normalizer import normalize_query_id
 from benchbox.core.results.schema_policy import CURRENT_SCHEMA_VERSION, RUNTIME_SCHEMA_POLICY
+from benchbox.validation.bundle import REQUIRED_TOP_KEYS
 
 if TYPE_CHECKING:
     from benchbox.core.results.models import BenchmarkResults
@@ -185,7 +186,7 @@ class SchemaV2Validator:
     Optional keys: environment, tables, errors, cost, export
     """
 
-    REQUIRED_KEYS = ("version", "run", "benchmark", "platform", "summary", "queries")
+    REQUIRED_KEYS = REQUIRED_TOP_KEYS
     OPTIONAL_KEYS = (
         "environment",
         "tables",

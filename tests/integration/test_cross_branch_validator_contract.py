@@ -14,16 +14,11 @@ This test exercises the writer → validator round-trip end-to-end so any
 future drift between the two sides of the contract fails CI on develop
 before it reaches contributors.
 
-Vendoring: the validator is vendored at
-`tests/fixtures/published_results_validator.py` rather than fetched
-live via `git show origin/published-results:...` so the test stays
-deterministic (no network, no branch-state assumptions) and runs in
-the fast lane. The vendored copy MUST stay byte-identical to
-`scripts/validate_submission.py` on develop AND to
-`scripts/validate_submission.py` on `published-results`. The
-`test_vendored_validator_matches_develop_script` drift guard fails CI
-if step 1 (sync to develop's script) is skipped; sync to
-`published-results` is operational discipline (open the parallel PR).
+The validation implementation lives in `benchbox.validation.bundle` and
+is mirrored to the `published-results` branch alongside the thin
+`scripts/validate_submission.py` wrapper. These tests import the library
+directly so the writer/validator contract stays deterministic without a
+byte-identical fixture copy under `tests/`.
 """
 
 from __future__ import annotations
@@ -31,22 +26,23 @@ from __future__ import annotations
 import hashlib
 import importlib
 import json
-import subprocess
-import sys
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from click.testing import CliRunner
 
+from benchbox.validation.bundle import format_summary, validate_bundles
+
 pytestmark = [
     pytest.mark.integration,
     pytest.mark.fast,
 ]
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-VENDORED_VALIDATOR = REPO_ROOT / "tests" / "fixtures" / "published_results_validator.py"
-DEVELOP_VALIDATOR = REPO_ROOT / "scripts" / "validate_submission.py"
+
+def _run_validator(paths: list[Path]) -> tuple[int, str]:
+    results = validate_bundles(paths)
+    return (1 if any(not result.ok for result in results) else 0), format_summary(results)
 
 
 def _fake_result() -> SimpleNamespace:
@@ -86,7 +82,7 @@ def _minimal_schema_v2_bundle() -> dict:
 
 def test_writer_emits_hash_format_validator_accepts(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """End-to-end contract: `benchbox submit` must produce a bundle
-    that the (vendored) published-results validator accepts."""
+    that the shared published-results validator accepts."""
     sub = importlib.import_module("benchbox.cli.commands.submit")
 
     src = tmp_path / "tpch_duckdb.json"
@@ -101,15 +97,9 @@ def test_writer_emits_hash_format_validator_accepts(monkeypatch: pytest.MonkeyPa
     bundle_path = out_dir / "bundle" / src.name
     assert bundle_path.is_file()
 
-    proc = subprocess.run(
-        [sys.executable, str(VENDORED_VALIDATOR), str(bundle_path)],
-        capture_output=True,
-        text=True,
-        cwd=tmp_path,
-    )
-    output = proc.stdout + proc.stderr
+    rc, output = _run_validator([bundle_path])
 
-    assert proc.returncode == 0, (
+    assert rc == 0, (
         f"Vendored published-results validator rejected develop's bundle. "
         f"This is the same class of release-blocker as the 2026-04-29 dry-run. "
         f"Output:\n{output}"
@@ -135,15 +125,9 @@ def test_writer_companion_hashes_validator_accepts(monkeypatch: pytest.MonkeyPat
 
     bundle_path = out_dir / "bundle" / src.name
 
-    proc = subprocess.run(
-        [sys.executable, str(VENDORED_VALIDATOR), str(bundle_path)],
-        capture_output=True,
-        text=True,
-        cwd=tmp_path,
-    )
-    output = proc.stdout + proc.stderr
+    rc, output = _run_validator([bundle_path])
 
-    assert proc.returncode == 0, f"Validator rejected bundle with companions. Output:\n{output}"
+    assert rc == 0, f"Validator rejected bundle with companions. Output:\n{output}"
     assert "0 error(s)" in output, output
 
 
@@ -176,15 +160,9 @@ def test_validator_rejects_symlinked_bundle(tmp_path: Path) -> None:
     }
     (bundle_dir / "submission-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
 
-    proc = subprocess.run(
-        [sys.executable, str(VENDORED_VALIDATOR), str(symlink_path)],
-        capture_output=True,
-        text=True,
-        cwd=tmp_path,
-    )
-    output = proc.stdout + proc.stderr
+    rc, output = _run_validator([symlink_path])
 
-    assert proc.returncode != 0, f"Validator wrongly accepted a symlinked bundle. Output:\n{output}"
+    assert rc != 0, f"Validator wrongly accepted a symlinked bundle. Output:\n{output}"
     assert "symlink" in output.lower(), f"Expected a symlink-specific error. Output:\n{output}"
 
 
@@ -199,31 +177,11 @@ def test_validator_surfaces_both_missing_manifest_fields(tmp_path: Path) -> None
     # Sits beside the bundle where the validator discovers it.
     (bundle_dir / "submission-manifest.json").write_text("{}", encoding="utf-8")
 
-    proc = subprocess.run(
-        [sys.executable, str(VENDORED_VALIDATOR), str(bundle_path)],
-        capture_output=True,
-        text=True,
-        cwd=tmp_path,
-    )
-    output = proc.stdout + proc.stderr
+    _rc, output = _run_validator([bundle_path])
 
     # Both fields are missing — both warnings should surface in one pass.
     assert "bundle_file" in output, output
     assert "bundle_hash" in output, output
-
-
-def test_vendored_validator_matches_develop_script() -> None:
-    """Drift guard: vendored fixture MUST stay byte-identical to
-    `scripts/validate_submission.py`. If you changed one, change both
-    AND open a parallel PR onto `published-results`."""
-    vendored = VENDORED_VALIDATOR.read_bytes()
-    develop = DEVELOP_VALIDATOR.read_bytes()
-    assert vendored == develop, (
-        "Vendored published-results validator has drifted from "
-        "scripts/validate_submission.py on develop. Re-sync the fixture "
-        "AND open a PR onto `published-results` with the same change. "
-        "See the docstring at the top of this file for the resync workflow."
-    )
 
 
 def test_validator_prefers_per_bundle_manifest_over_legacy(tmp_path: Path) -> None:
@@ -254,15 +212,9 @@ def test_validator_prefers_per_bundle_manifest_over_legacy(tmp_path: Path) -> No
     (bundle_dir / "tpch_duckdb.manifest.json").write_text(json.dumps(per_bundle_manifest), encoding="utf-8")
     (bundle_dir / "submission-manifest.json").write_text(json.dumps(legacy_manifest), encoding="utf-8")
 
-    proc = subprocess.run(
-        [sys.executable, str(VENDORED_VALIDATOR), str(bundle_path)],
-        capture_output=True,
-        text=True,
-        cwd=tmp_path,
-    )
-    output = proc.stdout + proc.stderr
+    rc, output = _run_validator([bundle_path])
 
-    assert proc.returncode == 0, f"Validator must accept bundle when per-bundle manifest matches. Output:\n{output}"
+    assert rc == 0, f"Validator must accept bundle when per-bundle manifest matches. Output:\n{output}"
     assert "Bundle hash mismatch" not in output, output
 
 
@@ -288,14 +240,8 @@ def test_validator_skips_per_bundle_manifest_during_discovery(tmp_path: Path) ->
 
     # Pass BOTH paths explicitly, mirroring how the published-results
     # workflow may pass changed files.
-    proc = subprocess.run(
-        [sys.executable, str(VENDORED_VALIDATOR), str(bundle_path), str(manifest_path)],
-        capture_output=True,
-        text=True,
-        cwd=tmp_path,
-    )
-    output = proc.stdout + proc.stderr
+    rc, output = _run_validator([bundle_path, manifest_path])
 
-    assert proc.returncode == 0, f"Validator must skip explicit-path *.manifest.json files. Output:\n{output}"
+    assert rc == 0, f"Validator must skip explicit-path *.manifest.json files. Output:\n{output}"
     # Validate exactly one bundle was processed even though two paths were passed.
     assert "Validated 1 bundle(s)" in output or "1 bundle" in output, output
