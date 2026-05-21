@@ -86,6 +86,17 @@ CORE_BENCHMARK_CLASS_NAMES: dict[str, str] = {
     bid: _CORE_CLASS_NAME_OVERRIDES.get(bid, f"{name}Benchmark") for bid, name in BENCHMARK_CLASS_NAMES.items()
 }
 
+# Benchmarks with runtime data-sharing declarations. The registry imports only
+# this narrow set during metadata normalization to avoid eager-loading every
+# benchmark at discovery time.
+BENCHMARK_DATA_SOURCE_PROBE_IDS: tuple[str, ...] = (
+    "read_primitives",
+    "write_primitives",
+    "transaction_primitives",
+    "ai_primitives",
+    "tpcds_obt",
+)
+
 TPC_OFFICIAL_SCALE_OPTIONS: tuple[float, ...] = (
     1.0,
     10.0,
@@ -474,6 +485,56 @@ def _validate_benchmark_support_status() -> None:
         raise ValueError("Invalid benchmark support_status metadata: " + "; ".join(details))
 
 
+def _default_scale_for_metadata_probe(benchmark_id: str) -> float:
+    meta = BENCHMARK_METADATA[benchmark_id]
+    default_scale = meta.get("default_scale")
+    if default_scale is not None:
+        return float(default_scale)
+    scale_options = meta.get("scale_options") or ()
+    if scale_options:
+        return float(scale_options[0])
+    return 1.0
+
+
+def _benchmark_data_source_from_instance(benchmark_id: str) -> str | None:
+    class_name = CORE_BENCHMARK_CLASS_NAMES[benchmark_id]
+    module = importlib.import_module(f"benchbox.core.{benchmark_id}.benchmark")
+    benchmark_class = getattr(module, class_name)
+    instance = benchmark_class(scale_factor=_default_scale_for_metadata_probe(benchmark_id))
+    getter = getattr(instance, "get_data_source_benchmark", None)
+    if getter is None:
+        return None
+    data_source = getter()
+    if data_source is None:
+        return None
+    return str(data_source)
+
+
+def _populate_benchmark_data_sources() -> None:
+    for meta in BENCHMARK_METADATA.values():
+        meta.setdefault("data_source", None)
+    for benchmark_id in BENCHMARK_DATA_SOURCE_PROBE_IDS:
+        BENCHMARK_METADATA[benchmark_id]["data_source"] = _benchmark_data_source_from_instance(benchmark_id)
+
+
+def _validate_benchmark_data_sources() -> None:
+    missing = sorted(name for name, meta in BENCHMARK_METADATA.items() if "data_source" not in meta)
+    invalid = sorted(
+        f"{name}={meta.get('data_source')!r}"
+        for name, meta in BENCHMARK_METADATA.items()
+        if meta.get("data_source") is not None and not isinstance(meta.get("data_source"), str)
+    )
+    if missing or invalid:
+        details: list[str] = []
+        if missing:
+            details.append(f"missing data_source for: {', '.join(missing)}")
+        if invalid:
+            details.append(f"invalid data_source entries: {', '.join(invalid)}")
+        raise ValueError("Invalid benchmark data_source metadata: " + "; ".join(details))
+
+
+_populate_benchmark_data_sources()
+_validate_benchmark_data_sources()
 _validate_benchmark_support_status()
 
 

@@ -644,7 +644,7 @@ work:
 - id: w15
   summary: "Add data_source to BENCHMARK_METADATA; delete cleanup.SOURCE_REUSE_GRAPH; verify tpcds_obt claim"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     F9 + blind-spot
     `2026-05-05-154307-uat-tpcds-obt-reuse-graph-asymmetry.md`.
@@ -676,6 +676,18 @@ work:
 
     Resolves: blind-spot
       `2026-05-05-154307-uat-tpcds-obt-reuse-graph-asymmetry.md`.
+
+    Completed evidence (2026-05-21):
+      - `benchbox/core/tpcds_obt/benchmark.py` confirms TPC-DS OBT
+        generates/reads base TPC-DS data from `tpcds_source_dir` and
+        transforms it into OBT output, so the reuse claim is real.
+      - `TPCDSOBTBenchmark.get_data_source_benchmark()` now declares
+        `"tpcds"`.
+      - `BENCHMARK_METADATA` now has `data_source` on every entry and
+        populates the known runtime sharing declarations from benchmark
+        instances during registry metadata normalization.
+      - UAT cleanup now derives the source-consumer graph from registry
+        metadata; the test-local hardcoded reuse graph is gone.
 
     Deps: w0.
 

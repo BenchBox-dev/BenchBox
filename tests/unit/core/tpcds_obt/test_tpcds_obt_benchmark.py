@@ -169,6 +169,12 @@ class TestDataFrameMode:
         assert normalize_benchmark_id("tpcds_obt") == "tpcds_obt"
 
 
+def test_get_data_source_benchmark_declares_tpcds() -> None:
+    benchmark = TPCDSOBTBenchmark(scale_factor=1.0)
+
+    assert benchmark.get_data_source_benchmark() == "tpcds"
+
+
 def test_get_query_and_execute_query(tmp_path: Path) -> None:
     benchmark = TPCDSOBTBenchmark(scale_factor=1.0, output_dir=tmp_path / "out", force_regenerate=True)
 

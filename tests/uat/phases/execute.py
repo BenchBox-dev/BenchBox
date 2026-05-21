@@ -24,7 +24,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 
 from tests.uat import docker_assets
-from tests.uat.cleanup import SOURCE_REUSE_GRAPH, CellKey, can_prune, prune_database_dir
+from tests.uat.cleanup import CellKey, can_prune, prune_database_dir, source_reuse_graph
 from tests.uat.config import UATConfig
 from tests.uat.ladder import LadderRung, plan_ladder
 from tests.uat.matrix import invalidate_reachability_cache_after_lifecycle_change, platform_is_reachable
@@ -122,8 +122,8 @@ def run_execute(
     for key in by_pb:
         by_pb[key].sort(key=lambda c: c.scale)
 
-    # Reorder by_pb so that for each platform, sources from
-    # SOURCE_REUSE_GRAPH come before their consumers. Without this,
+    # Reorder by_pb so that for each platform, registry-declared data
+    # sources come before their consumers. Without this,
     # `include: [read_primitives, tpch]` (or a future registry change
     # that moves consumer-categories ahead of sources) would attempt to
     # run a consumer before the source has loaded its DB.
@@ -520,12 +520,13 @@ def _reorder_for_topology(
 ) -> dict[tuple[str, str], list[Cell]]:
     """Reorder by_pb so for each platform, sources precede their consumers.
 
-    Reuse graph from `cleanup.SOURCE_REUSE_GRAPH` (e.g. tpch is a source
-    for read_primitives etc.). The topological sort is stable: benchmarks
-    not constrained by the graph keep their original relative order.
+    Reuse graph from registry `data_source` metadata (e.g. tpch is a
+    source for read_primitives etc.). The topological sort is stable:
+    benchmarks not constrained by the graph keep their original relative
+    order.
     """
     consumer_to_sources: dict[str, list[str]] = {}
-    for source, consumers in SOURCE_REUSE_GRAPH.items():
+    for source, consumers in source_reuse_graph().items():
         for c in consumers:
             if c == source:
                 continue
@@ -580,7 +581,7 @@ def _topological_sort(
     while pending:
         ready = next((b for b in benchmarks if b in pending and indegree[b] == 0), None)
         if ready is None:
-            # SOURCE_REUSE_GRAPH is expected to be acyclic, but preserve
+            # The registry-derived reuse graph is expected to be acyclic, but preserve
             # deterministic progress if a future edit introduces a cycle.
             ready = next(b for b in benchmarks if b in pending)
         pending.remove(ready)

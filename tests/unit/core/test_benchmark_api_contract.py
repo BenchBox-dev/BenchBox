@@ -17,6 +17,7 @@ from benchbox.core.base_benchmark import (
 from benchbox.core.benchmark_loader import BENCHMARK_LOADER_API_SURFACE
 from benchbox.core.benchmark_registry import (
     BENCHMARK_CLASS_NAMES,
+    BENCHMARK_DATA_SOURCE_PROBE_IDS,
     BENCHMARK_METADATA,
     BENCHMARK_SUPPORT_STATUS_VALUES,
     CORE_BENCHMARK_CLASS_NAMES,
@@ -125,6 +126,25 @@ def test_benchmark_support_status_metadata_matches_contract_map() -> None:
     contract_doc = PUBLIC_CONTRACTS_DOC.read_text()
     assert "Benchmark support status: **5** stable, **12** beta, **5** experimental" in contract_doc
     assert "support status counts are stable=5, beta=12, experimental=5" in contract_doc
+
+
+def test_benchmark_data_source_metadata_matches_runtime_declarations() -> None:
+    """Every registry entry has a data_source key; runtime sharing declarations populate known consumers."""
+
+    assert all("data_source" in meta for meta in BENCHMARK_METADATA.values())
+    assert BENCHMARK_DATA_SOURCE_PROBE_IDS == (
+        "read_primitives",
+        "write_primitives",
+        "transaction_primitives",
+        "ai_primitives",
+        "tpcds_obt",
+    )
+    assert BENCHMARK_METADATA["read_primitives"]["data_source"] == "tpch"
+    assert BENCHMARK_METADATA["write_primitives"]["data_source"] == "tpch"
+    assert BENCHMARK_METADATA["transaction_primitives"]["data_source"] == "tpch"
+    assert BENCHMARK_METADATA["ai_primitives"]["data_source"] == "tpch"
+    assert BENCHMARK_METADATA["tpcds_obt"]["data_source"] == "tpcds"
+    assert BENCHMARK_METADATA["tpch"]["data_source"] is None
 
 
 def test_benchmark_api_import_boundary_excludes_platform_adapter_imports() -> None:

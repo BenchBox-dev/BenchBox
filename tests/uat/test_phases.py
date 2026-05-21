@@ -776,7 +776,7 @@ def test_topological_sort_moves_source_before_consumer():
 
 
 def test_topological_sort_stable_when_no_constraint():
-    """Benchmarks unconstrained by SOURCE_REUSE_GRAPH keep input order."""
+    """Benchmarks unconstrained by the reuse graph keep input order."""
     out = exec_phase._topological_sort(["clickbench", "ssb", "h2odb"], {})
     assert out == ["clickbench", "ssb", "h2odb"]
 

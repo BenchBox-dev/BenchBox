@@ -231,6 +231,10 @@ class TPCDSOBTBenchmark(BaseBenchmark):
             self._query_manager = TPCDSOBTQueryManager()
         return self._query_manager
 
+    def get_data_source_benchmark(self) -> str:
+        """TPC-DS OBT transforms canonical TPC-DS source data."""
+        return "tpcds"
+
     def generate_data(
         self,
         tables: list[str] | None = None,
