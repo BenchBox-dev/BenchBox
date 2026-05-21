@@ -63,6 +63,10 @@ cleanup:
   docker_fixed_container_name_policy: "fail"
 ```
 
+`preserve_datagen: false` is deliberately rejected by the config
+validator; UAT may prune loaded databases at safe reuse boundaries, but
+it does not delete generated source data.
+
 With `docker_manage_platforms: true`, the execute phase starts a
 project-scoped compose stack before each Docker-backed platform, runs all
 cells for that platform, then tears down that same UAT-owned project in a

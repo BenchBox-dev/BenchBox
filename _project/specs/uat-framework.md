@@ -216,7 +216,9 @@ execute:
                                  # contaminate timings.
 
 cleanup:
-  preserve_datagen: true         # optional, bool, default true.
+  preserve_datagen: true         # optional, bool, default true. Reserved
+                                 # safety knob; false is rejected because
+                                 # UAT never deletes generated source data.
   prune_databases: true          # optional, bool, default true. Prune
                                  # at safe reuse boundaries.
   docker_manage_platforms: false # optional, bool, default false.
@@ -286,8 +288,6 @@ validate:
   validator_clean_rate_floor: 0.80   # optional, float, default 0.80.
                                      # If rate < floor, validate phase
                                      # exit is non-zero (advisory).
-  rollup_extra_args: []              # optional, list[str]. Forwarded
-                                     # to scripts/uat_validator_rollup.py.
 
 # Package phase ---------------------------------------------------------
 package:
@@ -300,20 +300,12 @@ package:
   service: null                          # optional, str|null. Required
                                          # when state=cloud-uploaded;
                                          # passed as --service.
-  pr_target_branch: "published-results"  # optional, str. Used by
-                                         # draft-pr and
-                                         # merged-to-published-results
-                                         # states.
 
 # Explorer smoke phase --------------------------------------------------
 explorer_smoke:
-  build_args: []                       # optional, list[str]. Extra args
-                                       # to `uv run -- python _project/scripts/explorer_publish.py build`.
   playwright_browsers: ["chromium"]    # optional, list[str], default
                                        # ["chromium"]. Subset of
                                        # chromium, firefox, webkit.
-  performance_marks: true              # optional, bool, default true.
-                                       # Capture performance log.
 
 # Report phase ----------------------------------------------------------
 report:

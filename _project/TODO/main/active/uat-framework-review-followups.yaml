@@ -506,7 +506,7 @@ work:
 - id: w10
   summary: "Reconcile orphan YAML fields; delete only fields still proven unused on current develop"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Closes blind-spot `2026-05-05-154305-uat-orphan-yaml-fields.md`
     and F10 without deleting live cleanup controls introduced after the
