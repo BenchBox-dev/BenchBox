@@ -222,6 +222,10 @@ planning.
 | `platform` | string or null | No | `null` | Optional platform for dialect-specific query lookup. |
 | `mode` | string or null | No | `null` | `sql` or `dataframe`; inferred from platform when omitted. |
 
+Public benchmark query details include registry `support_status` in
+`benchmark_info`. Internal/repo-only benchmark details remain addressable by
+explicit ID where previously supported, but do not expose support-status claims.
+
 ### Results Tools
 
 #### `get_results`
