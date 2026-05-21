@@ -38,6 +38,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+from csv import reader
 from datetime import date
 from typing import TYPE_CHECKING, Any
 
@@ -5496,1273 +5497,194 @@ def asof_join_basic_pandas_impl(ctx: DataFrameContext) -> Any:
 
 REGISTRY = QueryRegistry(benchmark="Read Primitives")
 
-# Register all queries
-_QUERIES = [
-    # Aggregation queries
-    DataFrameQuery(
-        query_id="aggregation_distinct",
-        query_name="Distinct Aggregation",
-        description="Distinct count of high cardinality key on a large table",
-        categories=[QueryCategory.AGGREGATE],
-        expression_impl=aggregation_distinct_expression_impl,
-        pandas_impl=aggregation_distinct_pandas_impl,
-        sql_equivalent="SELECT COUNT(DISTINCT o_custkey) FROM orders WHERE o_orderdate >= DATE '1995-01-01'",
-    ),
-    DataFrameQuery(
-        query_id="aggregation_distinct_groupby",
-        query_name="Distinct Aggregation with Group By",
-        description="Distinct count of high cardinality keys in low cardinality groups",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=aggregation_distinct_groupby_expression_impl,
-        pandas_impl=aggregation_distinct_groupby_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="approx_count_distinct_simple",
-        query_name="Approximate Distinct Count",
-        description="HLL distinct count on a high-cardinality key (sketch on Polars/PySpark/DataFusion; exact on Pandas/Modin/cuDF/Dask)",
-        categories=[QueryCategory.AGGREGATE],
-        expression_impl=approx_count_distinct_simple_expression_impl,
-        pandas_impl=approx_count_distinct_simple_pandas_impl,
-        sql_equivalent="SELECT APPROX_COUNT_DISTINCT(o_custkey) FROM orders WHERE o_orderdate >= DATE '1995-01-01'",
-    ),
-    DataFrameQuery(
-        query_id="approx_count_distinct_groupby",
-        query_name="Approximate Distinct Count with Group By",
-        description="HLL distinct counts per low-cardinality group (sketch on Polars/PySpark/DataFusion; exact on Pandas/Modin/cuDF/Dask)",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=approx_count_distinct_groupby_expression_impl,
-        pandas_impl=approx_count_distinct_groupby_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="aggregation_groupby_large",
-        query_name="Large Cardinality Group By",
-        description="Aggregates within high cardinality grouping",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=aggregation_groupby_large_expression_impl,
-        pandas_impl=aggregation_groupby_large_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="aggregation_groupby_small",
-        query_name="Small Cardinality Group By",
-        description="Aggregates within low cardinality grouping",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=aggregation_groupby_small_expression_impl,
-        pandas_impl=aggregation_groupby_small_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="aggregation_materialize",
-        query_name="Nested Aggregation",
-        description="Nested aggregation requiring CTE materialization",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.SUBQUERY],
-        expression_impl=aggregation_materialize_expression_impl,
-        pandas_impl=aggregation_materialize_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="aggregation_materialize_subquery",
-        query_name="Subquery Materialization",
-        description="Complex nested aggregation with joins",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.SUBQUERY, QueryCategory.JOIN],
-        expression_impl=aggregation_materialize_subquery_expression_impl,
-        pandas_impl=aggregation_materialize_subquery_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="aggregation_partition",
-        query_name="Partition Key Aggregation",
-        description="Aggregates over the partition key",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=aggregation_partition_expression_impl,
-        pandas_impl=aggregation_partition_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="aggregation_selective",
-        query_name="Selective Aggregation",
-        description="Aggregate on a small subset of rows",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=aggregation_selective_expression_impl,
-        pandas_impl=aggregation_selective_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="aggregation_simple",
-        query_name="Simple Aggregation",
-        description="Aggregate over all rows in table",
-        categories=[QueryCategory.AGGREGATE],
-        expression_impl=aggregation_simple_expression_impl,
-        pandas_impl=aggregation_simple_pandas_impl,
-    ),
-    # Filter queries
-    DataFrameQuery(
-        query_id="filter_selective",
-        query_name="High Selectivity Filter",
-        description="High selectivity filter - few rows match",
-        categories=[QueryCategory.FILTER],
-        expression_impl=filter_selective_expression_impl,
-        pandas_impl=filter_selective_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="filter_non_selective",
-        query_name="Low Selectivity Filter",
-        description="Low selectivity filter - many rows match",
-        categories=[QueryCategory.FILTER],
-        expression_impl=filter_non_selective_expression_impl,
-        pandas_impl=filter_non_selective_pandas_impl,
-    ),
-    # Count/Limit queries
-    DataFrameQuery(
-        query_id="count_star",
-        query_name="Count Star",
-        description="Metadata-based count optimization vs full table scan",
-        categories=[QueryCategory.AGGREGATE],
-        expression_impl=count_star_expression_impl,
-        pandas_impl=count_star_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="decimal_arithmetic",
-        query_name="Decimal Arithmetic",
-        description="Decimal precision arithmetic with complex expressions",
-        categories=[QueryCategory.PROJECTION],
-        expression_impl=decimal_arithmetic_expression_impl,
-        pandas_impl=decimal_arithmetic_pandas_impl,
-    ),
-    # Order By queries
-    DataFrameQuery(
-        query_id="orderby_simple",
-        query_name="Simple Order By",
-        description="Simple ORDER BY single column",
-        categories=[QueryCategory.SORT],
-        expression_impl=orderby_simple_expression_impl,
-        pandas_impl=orderby_simple_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="orderby_multi",
-        query_name="Multi-Column Order By",
-        description="ORDER BY multiple columns",
-        categories=[QueryCategory.SORT],
-        expression_impl=orderby_multi_expression_impl,
-        pandas_impl=orderby_multi_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="orderby_desc",
-        query_name="Descending Order By",
-        description="ORDER BY with descending sort",
-        categories=[QueryCategory.SORT],
-        expression_impl=orderby_desc_expression_impl,
-        pandas_impl=orderby_desc_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="topn",
-        query_name="Top-N Query",
-        description="Top-N query with ORDER BY and LIMIT",
-        categories=[QueryCategory.SORT],
-        expression_impl=topn_expression_impl,
-        pandas_impl=topn_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="limit",
-        query_name="Simple Limit",
-        description="Simple LIMIT without ORDER BY",
-        categories=[QueryCategory.SCAN],
-        expression_impl=limit_expression_impl,
-        pandas_impl=limit_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="limit_ordered",
-        query_name="Ordered Limit",
-        description="LIMIT clause with ordering on large result set",
-        categories=[QueryCategory.SORT],
-        expression_impl=limit_ordered_expression_impl,
-        pandas_impl=limit_ordered_pandas_impl,
-    ),
-    # String queries
-    DataFrameQuery(
-        query_id="string_like",
-        query_name="String LIKE",
-        description="String LIKE pattern matching",
-        categories=[QueryCategory.FILTER],
-        expression_impl=string_like_expression_impl,
-        pandas_impl=string_like_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="string_starts_with",
-        query_name="String Starts With",
-        description="String starts_with pattern matching",
-        categories=[QueryCategory.FILTER],
-        expression_impl=string_starts_with_expression_impl,
-        pandas_impl=string_starts_with_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="string_ends_with",
-        query_name="String Ends With",
-        description="String ends_with pattern matching",
-        categories=[QueryCategory.FILTER],
-        expression_impl=string_ends_with_expression_impl,
-        pandas_impl=string_ends_with_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="string_concat",
-        query_name="String Concatenation",
-        description="String concatenation",
-        categories=[QueryCategory.PROJECTION],
-        expression_impl=string_concat_expression_impl,
-        pandas_impl=string_concat_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="string_substring",
-        query_name="String Substring",
-        description="String substring extraction",
-        categories=[QueryCategory.PROJECTION],
-        expression_impl=string_substring_expression_impl,
-        pandas_impl=string_substring_pandas_impl,
-    ),
-    # Window queries
-    DataFrameQuery(
-        query_id="window_row_number",
-        query_name="Window ROW_NUMBER",
-        description="Window function ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ...)",
-        categories=[QueryCategory.WINDOW],
-        expression_impl=window_row_number_expression_impl,
-        pandas_impl=window_row_number_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="window_rank",
-        query_name="Window RANK",
-        description="Window function RANK() OVER (PARTITION BY ... ORDER BY ...)",
-        categories=[QueryCategory.WINDOW],
-        expression_impl=window_rank_expression_impl,
-        pandas_impl=window_rank_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="window_sum",
-        query_name="Window SUM",
-        description="Window function SUM() OVER (PARTITION BY ...)",
-        categories=[QueryCategory.WINDOW, QueryCategory.AGGREGATE],
-        expression_impl=window_sum_expression_impl,
-        pandas_impl=window_sum_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="window_running_sum",
-        query_name="Window Running Sum",
-        description="Window function SUM() OVER (ORDER BY ...) - cumulative sum",
-        categories=[QueryCategory.WINDOW, QueryCategory.AGGREGATE],
-        expression_impl=window_running_sum_expression_impl,
-        pandas_impl=window_running_sum_pandas_impl,
-    ),
-    # Join queries
-    DataFrameQuery(
-        query_id="broadcast_join_two_tables",
-        query_name="Broadcast Join (2 tables)",
-        description="One small table broadcast to join with one large table",
-        categories=[QueryCategory.JOIN],
-        expression_impl=broadcast_join_two_tables_expression_impl,
-        pandas_impl=broadcast_join_two_tables_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="broadcast_join_three_tables",
-        query_name="Broadcast Join (3 tables)",
-        description="Two small tables broadcast to join with one large table",
-        categories=[QueryCategory.JOIN, QueryCategory.MULTI_JOIN],
-        expression_impl=broadcast_join_three_tables_expression_impl,
-        pandas_impl=broadcast_join_three_tables_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="predicate_ordering_aggregation",
-        query_name="Predicate Ordering with Aggregation",
-        description="Order filter predicates by selectivity for aggregation",
-        categories=[QueryCategory.FILTER, QueryCategory.AGGREGATE],
-        expression_impl=predicate_ordering_aggregation_expression_impl,
-        pandas_impl=predicate_ordering_aggregation_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="shuffle_join",
-        query_name="Shuffle Join",
-        description="Data is redistributed based on the join keys",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE],
-        expression_impl=shuffle_join_expression_impl,
-        pandas_impl=shuffle_join_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="empty_build_join",
-        query_name="Empty Build Side Join",
-        description="Join when build side produces no rows (edge case handling)",
-        categories=[QueryCategory.JOIN],
-        expression_impl=empty_build_join_expression_impl,
-        pandas_impl=empty_build_join_pandas_impl,
-    ),
-    # Additional Filter queries
-    DataFrameQuery(
-        query_id="filter_bigint_selective",
-        query_name="Bigint Selective Filter",
-        description="Equality predicate with high selectivity on integer column",
-        categories=[QueryCategory.FILTER],
-        expression_impl=filter_bigint_selective_expression_impl,
-        pandas_impl=filter_bigint_selective_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="filter_bigint_non_selective",
-        query_name="Bigint Non-Selective Filter",
-        description="Range predicate with low selectivity on large table",
-        categories=[QueryCategory.FILTER, QueryCategory.AGGREGATE],
-        expression_impl=filter_bigint_non_selective_expression_impl,
-        pandas_impl=filter_bigint_non_selective_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="filter_bigint_in_list_selective",
-        query_name="Bigint IN List Filter",
-        description="IN-list predicate with highly selective integer values",
-        categories=[QueryCategory.FILTER],
-        expression_impl=filter_bigint_in_list_expression_impl,
-        pandas_impl=filter_bigint_in_list_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="filter_decimal_selective",
-        query_name="Decimal Selective Filter",
-        description="Compound equality predicate with multiple decimal columns",
-        categories=[QueryCategory.FILTER],
-        expression_impl=filter_decimal_selective_expression_impl,
-        pandas_impl=filter_decimal_selective_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="filter_decimal_non_selective",
-        query_name="Decimal Non-Selective Filter",
-        description="Range predicate on decimal column with low selectivity",
-        categories=[QueryCategory.FILTER, QueryCategory.AGGREGATE],
-        expression_impl=filter_decimal_non_selective_expression_impl,
-        pandas_impl=filter_decimal_non_selective_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="filter_string_selective",
-        query_name="String Selective Filter",
-        description="Exact string equality with high selectivity on varchar column",
-        categories=[QueryCategory.FILTER],
-        expression_impl=filter_string_selective_expression_impl,
-        pandas_impl=filter_string_selective_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="filter_string_non_selective",
-        query_name="String Non-Selective Filter",
-        description="String comparison with low selectivity (most rows match)",
-        categories=[QueryCategory.FILTER, QueryCategory.AGGREGATE],
-        expression_impl=filter_string_non_selective_expression_impl,
-        pandas_impl=filter_string_non_selective_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="filter_in_predicate_selective",
-        query_name="IN Predicate with Subquery",
-        description="IN predicate with subquery and selective filtering",
-        categories=[QueryCategory.FILTER, QueryCategory.SUBQUERY],
-        expression_impl=filter_in_predicate_subquery_expression_impl,
-        pandas_impl=filter_in_predicate_subquery_pandas_impl,
-    ),
-    # Additional GroupBy queries
-    DataFrameQuery(
-        query_id="groupby_bigint_highndv",
-        query_name="High NDV GroupBy",
-        description="GROUP BY with high distinct value count (many groups)",
-        categories=[QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-        expression_impl=groupby_highndv_expression_impl,
-        pandas_impl=groupby_highndv_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="groupby_bigint_lowndv",
-        query_name="Low NDV GroupBy",
-        description="GROUP BY with low distinct value count (few groups)",
-        categories=[QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-        expression_impl=groupby_lowndv_expression_impl,
-        pandas_impl=groupby_lowndv_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="groupby_bigint_pk",
-        query_name="Primary Key GroupBy",
-        description="GROUP BY on primary key (one row per group)",
-        categories=[QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-        expression_impl=groupby_pk_expression_impl,
-        pandas_impl=groupby_pk_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="groupby_decimal_highndv",
-        query_name="High NDV Decimal GroupBy",
-        description="GROUP BY with high cardinality decimal column",
-        categories=[QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-        expression_impl=groupby_decimal_highndv_expression_impl,
-        pandas_impl=groupby_decimal_highndv_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="groupby_decimal_lowndv",
-        query_name="Low NDV Decimal GroupBy",
-        description="GROUP BY with low cardinality decimal column",
-        categories=[QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-        expression_impl=groupby_decimal_lowndv_expression_impl,
-        pandas_impl=groupby_decimal_lowndv_pandas_impl,
-    ),
-    # Additional OrderBy queries
-    DataFrameQuery(
-        query_id="orderby_all",
-        query_name="Full Table Order By",
-        description="Sort on full table with simple integer ordering",
-        categories=[QueryCategory.SORT],
-        expression_impl=orderby_all_expression_impl,
-        pandas_impl=orderby_all_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="orderby_bigint",
-        query_name="Bigint Order By",
-        description="Sort with aggregation results on integer column",
-        categories=[QueryCategory.SORT, QueryCategory.AGGREGATE],
-        expression_impl=orderby_bigint_expression_impl,
-        pandas_impl=orderby_bigint_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="orderby_bigint_expression",
-        query_name="Expression Order By",
-        description="Sort on computed expressions with DESC ordering",
-        categories=[QueryCategory.SORT, QueryCategory.PROJECTION],
-        expression_impl=orderby_expression_expression_impl,
-        pandas_impl=orderby_expression_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="orderby_multicol",
-        query_name="Multi-Column Complex Order By",
-        description="Complex multi-column sort with string, date, and decimal columns",
-        categories=[QueryCategory.SORT],
-        expression_impl=orderby_multicol_expression_impl,
-        pandas_impl=orderby_multicol_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="orderby_shortstrings",
-        query_name="Short Strings Order By",
-        description="Sort on short string columns with DISTINCT operation",
-        categories=[QueryCategory.SORT],
-        expression_impl=orderby_shortstrings_expression_impl,
-        pandas_impl=orderby_shortstrings_pandas_impl,
-    ),
-    # Additional Shuffle/Join queries
-    DataFrameQuery(
-        query_id="shuffle_inner_join_one_to_many_string_with_groupby",
-        query_name="Inner Join with GroupBy",
-        description="Standard inner join with one-to-many relationship",
-        categories=[QueryCategory.JOIN, QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-        expression_impl=shuffle_inner_join_groupby_expression_impl,
-        pandas_impl=shuffle_inner_join_groupby_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="shuffle_left_join_one_to_many_string_with_groupby",
-        query_name="Left Join with GroupBy",
-        description="LEFT JOIN with preservation of all left-side rows",
-        categories=[QueryCategory.JOIN, QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-        expression_impl=shuffle_left_join_groupby_expression_impl,
-        pandas_impl=shuffle_left_join_groupby_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="shuffle_full_join_one_to_many_string_with_groupby",
-        query_name="Full Outer Join with GroupBy",
-        description="FULL OUTER JOIN with string grouping and aggregation",
-        categories=[QueryCategory.JOIN, QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-        expression_impl=shuffle_full_join_groupby_expression_impl,
-        pandas_impl=shuffle_full_join_groupby_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="shuffle_1mb_rows",
-        query_name="Self Join with Hash Collision",
-        description="Self-join with hash collision handling on large table",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE],
-        expression_impl=shuffle_self_join_expression_impl,
-        pandas_impl=shuffle_self_join_pandas_impl,
-    ),
-    # Additional String queries
-    DataFrameQuery(
-        query_id="string_equal_predicate",
-        query_name="String Equality",
-        description="Exact string equality with selective matching",
-        categories=[QueryCategory.FILTER, QueryCategory.AGGREGATE],
-        expression_impl=string_equal_expression_impl,
-        pandas_impl=string_equal_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="string_equal_predicate_lower",
-        query_name="String Equality (Case Insensitive)",
-        description="Equality predicate after applying case conversion",
-        categories=[QueryCategory.FILTER, QueryCategory.AGGREGATE],
-        expression_impl=string_equal_lower_expression_impl,
-        pandas_impl=string_equal_lower_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="string_in_predicate",
-        query_name="String IN Predicate",
-        description="IN predicate with string values",
-        categories=[QueryCategory.FILTER, QueryCategory.AGGREGATE],
-        expression_impl=string_in_predicate_expression_impl,
-        pandas_impl=string_in_predicate_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="string_like_predicate_center",
-        query_name="String LIKE Center",
-        description="Case sensitive matching pattern in any location",
-        categories=[QueryCategory.FILTER, QueryCategory.AGGREGATE],
-        expression_impl=string_like_center_expression_impl,
-        pandas_impl=string_like_center_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="string_like_predicate_end",
-        query_name="String LIKE Suffix",
-        description="Case sensitive matching suffix pattern",
-        categories=[QueryCategory.FILTER, QueryCategory.AGGREGATE],
-        expression_impl=string_like_suffix_expression_impl,
-        pandas_impl=string_like_suffix_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="string_like_predicate_start",
-        query_name="String LIKE Prefix",
-        description="Case sensitive matching prefix pattern",
-        categories=[QueryCategory.FILTER, QueryCategory.AGGREGATE],
-        expression_impl=string_like_prefix_expression_impl,
-        pandas_impl=string_like_prefix_pandas_impl,
-    ),
-    # Additional Window queries
-    DataFrameQuery(
-        query_id="window_growing_frame",
-        query_name="Window Growing Frame",
-        description="Running sum window aggregation with growing frame size",
-        categories=[QueryCategory.WINDOW, QueryCategory.AGGREGATE],
-        expression_impl=window_growing_frame_expression_impl,
-        pandas_impl=window_growing_frame_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="window_lead_lag_same_frame",
-        query_name="Window Lead/Lag",
-        description="Offset window functions over the same frame",
-        categories=[QueryCategory.WINDOW],
-        expression_impl=window_lead_lag_expression_impl,
-        pandas_impl=window_lead_lag_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="window_multiple_orderings",
-        query_name="Window Dense Rank",
-        description="Window function DENSE_RANK() OVER (PARTITION BY ... ORDER BY ...)",
-        categories=[QueryCategory.WINDOW],
-        expression_impl=window_dense_rank_expression_impl,
-        pandas_impl=window_dense_rank_pandas_impl,
-    ),
-    # Additional Predicate queries
-    DataFrameQuery(
-        query_id="predicate_ordering_aggregation_groupby",
-        query_name="Predicate Ordering with GroupBy",
-        description="Order filter predicates by selectivity for aggregation within a low cardinality grouping",
-        categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-        expression_impl=predicate_ordering_groupby_expression_impl,
-        pandas_impl=predicate_ordering_groupby_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="predicate_ordering_costs",
-        query_name="Predicate Ordering Costs",
-        description="Order filter predicates by selectivity with result projection only",
-        categories=[QueryCategory.FILTER, QueryCategory.PROJECTION],
-        expression_impl=predicate_ordering_costs_expression_impl,
-        pandas_impl=predicate_ordering_costs_pandas_impl,
-    ),
-    # Additional Broadcast/Exchange queries
-    DataFrameQuery(
-        query_id="broadcast_join_four_tables",
-        query_name="Broadcast Join (4 tables)",
-        description="Three small tables broadcast to join with one large table",
-        categories=[QueryCategory.JOIN, QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE],
-        expression_impl=broadcast_join_four_tables_expression_impl,
-        pandas_impl=broadcast_join_four_tables_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="exchange_broadcast",
-        query_name="Exchange Broadcast",
-        description="One small table is copied to all nodes that have the large table",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE],
-        expression_impl=exchange_broadcast_expression_impl,
-        pandas_impl=exchange_broadcast_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="exchange_merge",
-        query_name="Exchange Merge",
-        description="Sorted data from multiple nodes is combined while keeping the sort order",
-        categories=[QueryCategory.JOIN, QueryCategory.SORT],
-        expression_impl=exchange_merge_expression_impl,
-        pandas_impl=exchange_merge_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="exchange_shuffle",
-        query_name="Exchange Shuffle",
-        description="Data is redistributed based on the join keys so matching rows end up on the same node",
-        categories=[QueryCategory.JOIN],
-        expression_impl=exchange_shuffle_expression_impl,
-        pandas_impl=exchange_shuffle_pandas_impl,
-    ),
-    # TopN queries
-    DataFrameQuery(
-        query_id="topn_aggregate_2columns",
-        query_name="TopN with Aggregation",
-        description="Top 10 limit returning 2 columns after aggregation and computed ordering",
-        categories=[QueryCategory.SORT, QueryCategory.AGGREGATE],
-        expression_impl=topn_aggregate_expression_impl,
-        pandas_impl=topn_aggregate_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="topn_ordered_allcols",
-        query_name="TopN All Columns",
-        description="Top-10 limit returning all columns after ordering over all table rows",
-        categories=[QueryCategory.SORT, QueryCategory.SCAN],
-        expression_impl=topn_allcols_expression_impl,
-        pandas_impl=topn_allcols_pandas_impl,
-    ),
-    # Statistical queries
-    DataFrameQuery(
-        query_id="statistical_variance_stddev",
-        query_name="Variance and StdDev",
-        description="Variance and standard deviation calculations",
-        categories=[QueryCategory.AGGREGATE],
-        expression_impl=statistical_variance_expression_impl,
-        pandas_impl=statistical_variance_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="statistical_correlation",
-        query_name="Correlation Analysis",
-        description="Correlation analysis between numeric columns",
-        categories=[QueryCategory.AGGREGATE],
-        expression_impl=statistical_correlation_expression_impl,
-        pandas_impl=statistical_correlation_pandas_impl,
-    ),
-    # Long predicate query
-    DataFrameQuery(
-        query_id="long_predicate",
-        query_name="Long Predicate",
-        description="Query with many conjunctive predicates across multiple tables",
-        categories=[QueryCategory.FILTER, QueryCategory.JOIN, QueryCategory.MULTI_JOIN],
-        expression_impl=long_predicate_expression_impl,
-        pandas_impl=long_predicate_pandas_impl,
-    ),
-    # Min/Max By queries
-    DataFrameQuery(
-        query_id="max_by_simple",
-        query_name="MAX_BY Simple",
-        description="Find the customer with the highest account balance in each nation",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.JOIN],
-        expression_impl=max_by_simple_expression_impl,
-        pandas_impl=max_by_simple_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="min_by_simple",
-        query_name="MIN_BY Simple",
-        description="Find the customer with the lowest account balance in each nation",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.JOIN],
-        expression_impl=min_by_simple_expression_impl,
-        pandas_impl=min_by_simple_pandas_impl,
-    ),
-    # Array queries (semi-structured)
-    DataFrameQuery(
-        query_id="array_agg_simple",
-        query_name="Array Aggregation",
-        description="Aggregate part keys into arrays per supplier",
-        categories=[QueryCategory.AGGREGATE],
-        expression_impl=array_agg_simple_expression_impl,
-        pandas_impl=array_agg_simple_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="array_agg_distinct",
-        query_name="Distinct Array Aggregation",
-        description="Distinct array aggregation",
-        categories=[QueryCategory.AGGREGATE],
-        expression_impl=array_agg_distinct_expression_impl,
-        pandas_impl=array_agg_distinct_pandas_impl,
-    ),
-    # Additional filter queries
-    DataFrameQuery(
-        query_id="filter_decimal_in_list_selective",
-        query_name="Decimal IN List Filter",
-        description="IN-list predicate with decimal values and selectivity",
-        categories=[QueryCategory.FILTER],
-        expression_impl=filter_decimal_in_list_expression_impl,
-        pandas_impl=filter_decimal_in_list_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="filter_string_like",
-        query_name="String LIKE Filter",
-        description="LIKE predicate with substring pattern matching",
-        categories=[QueryCategory.FILTER],
-        expression_impl=filter_string_like_expression_impl,
-        pandas_impl=filter_string_like_pandas_impl,
-    ),
-    # Additional orderby queries
-    DataFrameQuery(
-        query_id="orderby_decimal16",
-        query_name="Decimal Order By",
-        description="Multi-column sort with mixed ASC/DESC on decimal columns",
-        categories=[QueryCategory.SORT],
-        expression_impl=orderby_decimal_expression_impl,
-        pandas_impl=orderby_decimal_pandas_impl,
-    ),
-    # Min/Max runtime filter
-    DataFrameQuery(
-        query_id="min_max_runtime_filter",
-        query_name="Min/Max Runtime Filter",
-        description="Bloom filter and runtime filter effectiveness for join optimization",
-        categories=[QueryCategory.FILTER, QueryCategory.JOIN],
-        expression_impl=min_max_runtime_filter_expression_impl,
-        pandas_impl=min_max_runtime_filter_pandas_impl,
-    ),
-    # Max/Min By complex queries
-    DataFrameQuery(
-        query_id="max_by_complex",
-        query_name="MAX_BY Complex",
-        description="Find the most expensive order for each customer segment",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.JOIN],
-        expression_impl=max_by_complex_expression_impl,
-        pandas_impl=max_by_complex_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="min_by_complex",
-        query_name="MIN_BY Complex",
-        description="Find the cheapest part for each brand",
-        categories=[QueryCategory.AGGREGATE],
-        expression_impl=min_by_complex_expression_impl,
-        pandas_impl=min_by_complex_pandas_impl,
-    ),
-    # Modern SQL: ANY_VALUE queries
-    DataFrameQuery(
-        query_id="any_value_simple",
-        query_name="ANY_VALUE Simple",
-        description="Select any customer name per market segment (faster than MIN/MAX)",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=any_value_simple_expression_impl,
-        pandas_impl=any_value_simple_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="any_value_with_filter",
-        query_name="ANY_VALUE with Filter",
-        description="Any value with additional aggregates",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=any_value_with_filter_expression_impl,
-        pandas_impl=any_value_with_filter_pandas_impl,
-    ),
-    # Modern SQL: GROUP BY ALL queries
-    DataFrameQuery(
-        query_id="groupby_all_simple",
-        query_name="GROUP BY ALL Simple",
-        description="Automatic grouping by all non-aggregate columns",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=groupby_all_simple_expression_impl,
-        pandas_impl=groupby_all_simple_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="groupby_all_complex",
-        query_name="GROUP BY ALL Complex",
-        description="GROUP BY ALL with multiple non-aggregate expressions",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=groupby_all_complex_expression_impl,
-        pandas_impl=groupby_all_complex_pandas_impl,
-    ),
-    # Modern SQL: ORDER BY ALL queries
-    DataFrameQuery(
-        query_id="orderby_all_simple",
-        query_name="ORDER BY ALL Simple",
-        description="Order by all columns in SELECT list",
-        categories=[QueryCategory.SORT, QueryCategory.JOIN, QueryCategory.AGGREGATE],
-        expression_impl=orderby_all_simple_expression_impl,
-        pandas_impl=orderby_all_simple_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="orderby_all_desc",
-        query_name="ORDER BY ALL Descending",
-        description="ORDER BY ALL with descending direction",
-        categories=[QueryCategory.SORT, QueryCategory.AGGREGATE],
-        expression_impl=orderby_all_desc_expression_impl,
-        pandas_impl=orderby_all_desc_pandas_impl,
-    ),
-    # Max/Min By with ties queries
-    DataFrameQuery(
-        query_id="max_by_with_ties",
-        query_name="MAX_BY with Ties",
-        description="Find the supplier with the highest supply cost for each part",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.JOIN, QueryCategory.MULTI_JOIN],
-        expression_impl=max_by_with_ties_expression_impl,
-        pandas_impl=max_by_with_ties_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="min_by_with_ties",
-        query_name="MIN_BY with Ties",
-        description="Find the supplier with the lowest supply cost for each part",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.JOIN, QueryCategory.MULTI_JOIN],
-        expression_impl=min_by_with_ties_expression_impl,
-        pandas_impl=min_by_with_ties_pandas_impl,
-    ),
-    # Additional predicate queries
-    DataFrameQuery(
-        query_id="predicate_ordering_subquery",
-        query_name="Predicate Ordering with Subquery",
-        description="Order filter predicates by selectivity with subquery predicate",
-        categories=[QueryCategory.FILTER, QueryCategory.SUBQUERY, QueryCategory.JOIN],
-        expression_impl=predicate_ordering_subquery_expression_impl,
-        pandas_impl=predicate_ordering_subquery_pandas_impl,
-    ),
-    # Shuffle with UNION ALL
-    DataFrameQuery(
-        query_id="shuffle_inner_join_union_all_with_groupby",
-        query_name="Union All with GroupBy",
-        description="Complex join with UNION ALL and different data sources",
-        categories=[QueryCategory.JOIN, QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-        expression_impl=shuffle_union_all_groupby_expression_impl,
-        pandas_impl=shuffle_union_all_groupby_pandas_impl,
-    ),
-    # Statistical percentiles
-    DataFrameQuery(
-        query_id="statistical_percentiles",
-        query_name="Statistical Percentiles",
-        description="Percentile calculation functions for distribution analysis",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=statistical_percentiles_expression_impl,
-        pandas_impl=statistical_percentiles_pandas_impl,
-    ),
-    # Case-insensitive string matching
-    DataFrameQuery(
-        query_id="string_ilike_predicate_start",
-        query_name="String ILIKE Prefix",
-        description="Case insensitive matching prefix pattern",
-        categories=[QueryCategory.FILTER, QueryCategory.AGGREGATE],
-        expression_impl=string_ilike_start_expression_impl,
-        pandas_impl=string_ilike_start_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="string_ilike_predicate_end",
-        query_name="String ILIKE Suffix",
-        description="Case insensitive matching suffix pattern",
-        categories=[QueryCategory.FILTER, QueryCategory.AGGREGATE],
-        expression_impl=string_ilike_end_expression_impl,
-        pandas_impl=string_ilike_end_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="string_like_predicate_multi",
-        query_name="String LIKE Multi",
-        description="Case sensitive matching multipart pattern",
-        categories=[QueryCategory.FILTER, QueryCategory.AGGREGATE],
-        expression_impl=string_like_multi_expression_impl,
-        pandas_impl=string_like_multi_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="string_ilike_predicate_multi",
-        query_name="String ILIKE Multi",
-        description="Case insensitive matching multipart pattern",
-        categories=[QueryCategory.FILTER, QueryCategory.AGGREGATE],
-        expression_impl=string_ilike_multi_expression_impl,
-        pandas_impl=string_ilike_multi_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="string_like_predicate_center_insensitive",
-        query_name="String ILIKE Center",
-        description="Case insensitive matching pattern in any location",
-        categories=[QueryCategory.FILTER, QueryCategory.AGGREGATE],
-        expression_impl=string_like_center_insensitive_expression_impl,
-        pandas_impl=string_like_center_insensitive_pandas_impl,
-    ),
-    # Additional window queries
-    DataFrameQuery(
-        query_id="window_moving_frame",
-        query_name="Window Moving Frame",
-        description="Window aggregations with complex moving frame definitions",
-        categories=[QueryCategory.WINDOW, QueryCategory.AGGREGATE],
-        expression_impl=window_moving_frame_expression_impl,
-        pandas_impl=window_moving_frame_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="window_unbounded_frame",
-        query_name="Window Unbounded Frame",
-        description="Window aggregations with the same unbounded frame definition",
-        categories=[QueryCategory.WINDOW],
-        expression_impl=window_unbounded_frame_expression_impl,
-        pandas_impl=window_unbounded_frame_pandas_impl,
-    ),
-    # Intrinsic queries
-    DataFrameQuery(
-        query_id="approx_quantile_groupby",
-        query_name="Approximate Median",
-        description="Approximate statistical function (PERCENTILE_CONT for median)",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=approx_quantile_groupby_expression_impl,
-        pandas_impl=approx_quantile_groupby_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="intrinsic_to_date",
-        query_name="Date Conversion Filter",
-        description="Date parsing and conversion function performance",
-        categories=[QueryCategory.FILTER, QueryCategory.AGGREGATE],
-        expression_impl=intrinsic_to_date_expression_impl,
-        pandas_impl=intrinsic_to_date_pandas_impl,
-    ),
-    # Fulltext queries (using string pattern matching as DataFrame equivalent)
-    DataFrameQuery(
-        query_id="fulltext_simple_search",
-        query_name="Simple Text Search",
-        description="Basic full-text search using string pattern matching",
-        categories=[QueryCategory.FILTER],
-        expression_impl=fulltext_simple_search_expression_impl,
-        pandas_impl=fulltext_simple_search_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="fulltext_boolean_search",
-        query_name="Boolean Text Search",
-        description="Boolean text search with AND/NOT operators",
-        categories=[QueryCategory.FILTER, QueryCategory.SORT],
-        expression_impl=fulltext_boolean_search_expression_impl,
-        pandas_impl=fulltext_boolean_search_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="fulltext_phrase_search",
-        query_name="Phrase Text Search",
-        description="Phrase-based text search with ranking",
-        categories=[QueryCategory.FILTER, QueryCategory.SORT],
-        expression_impl=fulltext_phrase_search_expression_impl,
-        pandas_impl=fulltext_phrase_search_pandas_impl,
-    ),
-    # OLAP queries (CUBE/ROLLUP multi-dimensional aggregation)
-    DataFrameQuery(
-        query_id="olap_cube_analysis",
-        query_name="OLAP CUBE Analysis",
-        description="CUBE operation for multidimensional analysis",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY, QueryCategory.JOIN],
-        expression_impl=olap_cube_analysis_expression_impl,
-        pandas_impl=olap_cube_analysis_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="olap_rollup_analysis",
-        query_name="OLAP ROLLUP Analysis",
-        description="ROLLUP operation for hierarchical aggregation",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY, QueryCategory.JOIN, QueryCategory.SORT],
-        expression_impl=olap_rollup_analysis_expression_impl,
-        pandas_impl=olap_rollup_analysis_pandas_impl,
-    ),
-    # Pivot/Unpivot queries
-    DataFrameQuery(
-        query_id="pivot_basic",
-        query_name="Basic Pivot",
-        description="Pivot ship modes into columns",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=pivot_basic_expression_impl,
-        pandas_impl=pivot_basic_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="unpivot_basic",
-        query_name="Basic Unpivot",
-        description="Unpivot part dimensions into rows",
-        categories=[QueryCategory.PROJECTION],
-        expression_impl=unpivot_basic_expression_impl,
-        pandas_impl=unpivot_basic_pandas_impl,
-    ),
-    # Optimizer probe queries - test optimizer behavior with "naive" query patterns
-    DataFrameQuery(
-        query_id="optimizer_distinct_elimination",
-        query_name="Optimizer: Distinct Elimination",
-        description="Test DISTINCT elimination when result is already unique",
-        categories=[QueryCategory.FILTER, QueryCategory.PROJECTION],
-        expression_impl=optimizer_distinct_elimination_expression_impl,
-        pandas_impl=optimizer_distinct_elimination_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="optimizer_common_subexpression",
-        query_name="Optimizer: Common Subexpression",
-        description="Test Common Subexpression Elimination (CSE)",
-        categories=[QueryCategory.PROJECTION, QueryCategory.FILTER],
-        expression_impl=optimizer_common_subexpression_expression_impl,
-        pandas_impl=optimizer_common_subexpression_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="optimizer_predicate_pushdown",
-        query_name="Optimizer: Predicate Pushdown",
-        description="Test predicate pushdown through joins",
-        categories=[QueryCategory.JOIN, QueryCategory.FILTER],
-        expression_impl=optimizer_predicate_pushdown_expression_impl,
-        pandas_impl=optimizer_predicate_pushdown_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="optimizer_join_reordering",
-        query_name="Optimizer: Join Reordering",
-        description="Test join reordering based on cardinality",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=optimizer_join_reordering_expression_impl,
-        pandas_impl=optimizer_join_reordering_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="optimizer_limit_pushdown",
-        query_name="Optimizer: Limit Pushdown",
-        description="Test limit pushdown through operations",
-        categories=[QueryCategory.JOIN, QueryCategory.SORT],
-        expression_impl=optimizer_limit_pushdown_expression_impl,
-        pandas_impl=optimizer_limit_pushdown_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="optimizer_aggregate_pushdown",
-        query_name="Optimizer: Aggregate Pushdown",
-        description="Test aggregate pushdown before join",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=optimizer_aggregate_pushdown_expression_impl,
-        pandas_impl=optimizer_aggregate_pushdown_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="optimizer_constant_folding",
-        query_name="Optimizer: Constant Folding",
-        description="Test constant folding at compile time",
-        categories=[QueryCategory.PROJECTION],
-        expression_impl=optimizer_constant_folding_expression_impl,
-        pandas_impl=optimizer_constant_folding_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="optimizer_column_pruning",
-        query_name="Optimizer: Column Pruning",
-        description="Test column pruning at scan",
-        categories=[QueryCategory.JOIN, QueryCategory.FILTER, QueryCategory.PROJECTION],
-        expression_impl=optimizer_column_pruning_expression_impl,
-        pandas_impl=optimizer_column_pruning_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="optimizer_union_optimization",
-        query_name="Optimizer: Union Optimization",
-        description="Test union optimization with multiple scans",
-        categories=[QueryCategory.SORT],
-        expression_impl=optimizer_union_optimization_expression_impl,
-        pandas_impl=optimizer_union_optimization_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="optimizer_runtime_filter",
-        query_name="Optimizer: Runtime Filter",
-        description="Test runtime filter / dynamic partition pruning",
-        categories=[QueryCategory.JOIN, QueryCategory.FILTER],
-        expression_impl=optimizer_runtime_filter_expression_impl,
-        pandas_impl=optimizer_runtime_filter_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="optimizer_groupjoin",
-        query_name="Optimizer: Group-Join Fusion",
-        description="Test join+aggregate fusion into a single grouped-join pass",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=optimizer_groupjoin_expression_impl,
-        pandas_impl=optimizer_groupjoin_pandas_impl,
-    ),
-    # QUALIFY queries - window function filtering
-    DataFrameQuery(
-        query_id="qualify_row_number",
-        query_name="QUALIFY ROW_NUMBER",
-        description="Find top N orders per customer using ROW_NUMBER",
-        categories=[QueryCategory.JOIN, QueryCategory.WINDOW, QueryCategory.FILTER],
-        expression_impl=qualify_row_number_expression_impl,
-        pandas_impl=qualify_row_number_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="qualify_dense_rank",
-        query_name="QUALIFY DENSE_RANK",
-        description="Find top N parts by price per category using DENSE_RANK",
-        categories=[QueryCategory.WINDOW, QueryCategory.FILTER],
-        expression_impl=qualify_dense_rank_expression_impl,
-        pandas_impl=qualify_dense_rank_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="qualify_ntile",
-        query_name="QUALIFY NTILE",
-        description="Find orders in top quartile per segment using NTILE",
-        categories=[QueryCategory.JOIN, QueryCategory.WINDOW, QueryCategory.FILTER],
-        expression_impl=qualify_ntile_expression_impl,
-        pandas_impl=qualify_ntile_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="qualify_percentile",
-        query_name="QUALIFY PERCENT_RANK",
-        description="Find orders in top 10% per priority using PERCENT_RANK",
-        categories=[QueryCategory.WINDOW, QueryCategory.FILTER],
-        expression_impl=qualify_percentile_expression_impl,
-        pandas_impl=qualify_percentile_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="qualify_cume_dist",
-        query_name="QUALIFY CUME_DIST",
-        description="Find lineitems in top 5% quantity per shipdate using CUME_DIST",
-        categories=[QueryCategory.WINDOW, QueryCategory.FILTER],
-        expression_impl=qualify_cume_dist_expression_impl,
-        pandas_impl=qualify_cume_dist_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="qualify_lag_lead",
-        query_name="QUALIFY LAG/LEAD",
-        description="Find orders with increasing price using LAG",
-        categories=[QueryCategory.JOIN, QueryCategory.WINDOW, QueryCategory.FILTER],
-        expression_impl=qualify_lag_lead_expression_impl,
-        pandas_impl=qualify_lag_lead_pandas_impl,
-    ),
-    # Struct queries
-    DataFrameQuery(
-        query_id="struct_construction",
-        query_name="Struct Construction",
-        description="Construct struct from columns",
-        categories=[QueryCategory.PROJECTION],
-        expression_impl=struct_construction_expression_impl,
-        pandas_impl=struct_construction_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="struct_access",
-        query_name="Struct Field Access",
-        description="Access struct fields by name",
-        categories=[QueryCategory.PROJECTION, QueryCategory.FILTER],
-        expression_impl=struct_access_expression_impl,
-        pandas_impl=struct_access_pandas_impl,
-    ),
-    # Array queries
-    DataFrameQuery(
-        query_id="array_contains",
-        query_name="Array Contains",
-        description="Check if array contains a specific value",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=array_contains_expression_impl,
-        pandas_impl=array_contains_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="array_distinct",
-        query_name="Array Distinct",
-        description="Get distinct elements from array",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=array_distinct_expression_impl,
-        pandas_impl=array_distinct_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="array_length",
-        query_name="Array Length",
-        description="Get array length/cardinality",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY, QueryCategory.SORT],
-        expression_impl=array_length_expression_impl,
-        pandas_impl=array_length_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="array_min_max",
-        query_name="Array Min/Max",
-        description="Get min and max from array",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=array_min_max_expression_impl,
-        pandas_impl=array_min_max_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="array_of_struct",
-        query_name="Array of Struct",
-        description="Create array of structs from grouped data",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY, QueryCategory.JOIN],
-        expression_impl=array_of_struct_expression_impl,
-        pandas_impl=array_of_struct_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="array_slice",
-        query_name="Array Slice",
-        description="Get slice/subset of array",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY, QueryCategory.FILTER],
-        expression_impl=array_slice_expression_impl,
-        pandas_impl=array_slice_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="array_sort",
-        query_name="Array Sort",
-        description="Sort array elements",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=array_sort_expression_impl,
-        pandas_impl=array_sort_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="array_unnest",
-        query_name="Array Unnest",
-        description="Unnest/explode array back to rows",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=array_unnest_expression_impl,
-        pandas_impl=array_unnest_pandas_impl,
-    ),
-    # Map queries
-    DataFrameQuery(
-        query_id="map_construction",
-        query_name="Map Construction",
-        description="Construct map from key-value pairs",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=map_construction_expression_impl,
-        pandas_impl=map_construction_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="map_access",
-        query_name="Map Access",
-        description="Access map values by key",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY, QueryCategory.PROJECTION],
-        expression_impl=map_access_expression_impl,
-        pandas_impl=map_access_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="map_keys_values",
-        query_name="Map Keys/Values",
-        description="Extract keys and values from map",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=map_keys_values_expression_impl,
-        pandas_impl=map_keys_values_pandas_impl,
-    ),
-    # Higher-order function queries
-    DataFrameQuery(
-        query_id="list_filter",
-        query_name="List Filter",
-        description="Filter array elements by condition",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=list_filter_expression_impl,
-        pandas_impl=list_filter_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="list_transform",
-        query_name="List Transform",
-        description="Transform each array element",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=list_transform_expression_impl,
-        pandas_impl=list_transform_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="list_reduce",
-        query_name="List Reduce",
-        description="Reduce array to single value",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=list_reduce_expression_impl,
-        pandas_impl=list_reduce_pandas_impl,
-    ),
-    # JSON queries
-    DataFrameQuery(
-        query_id="json_extract_simple",
-        query_name="JSON Extract Simple",
-        description="Extract from JSON with simple path expressions",
-        categories=[QueryCategory.PROJECTION, QueryCategory.FILTER],
-        expression_impl=json_extract_simple_expression_impl,
-        pandas_impl=json_extract_simple_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="json_extract_nested",
-        query_name="JSON Extract Nested",
-        description="Extract from JSON with complex path expressions",
-        categories=[QueryCategory.PROJECTION, QueryCategory.FILTER],
-        expression_impl=json_extract_nested_expression_impl,
-        pandas_impl=json_extract_nested_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="json_aggregates",
-        query_name="JSON Aggregates",
-        description="Create JSON arrays and objects from aggregations",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY, QueryCategory.FILTER],
-        expression_impl=json_aggregates_expression_impl,
-        pandas_impl=json_aggregates_pandas_impl,
-    ),
-    # Timeseries query
-    DataFrameQuery(
-        query_id="timeseries_trend_analysis",
-        query_name="Timeseries Trend Analysis",
-        description="Time series aggregation with month-over-month analysis",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY, QueryCategory.WINDOW, QueryCategory.SORT],
-        expression_impl=timeseries_trend_analysis_expression_impl,
-        pandas_impl=timeseries_trend_analysis_pandas_impl,
-    ),
-    # ASOF join query
-    DataFrameQuery(
-        query_id="asof_join_basic",
-        query_name="ASOF Join Basic",
-        description="ASOF join to find closest prior order for shipments",
-        categories=[QueryCategory.JOIN, QueryCategory.FILTER],
-        expression_impl=asof_join_basic_expression_impl,
-        pandas_impl=asof_join_basic_pandas_impl,
-    ),
-]
+_CATEGORY_CODES = {
+    "A": QueryCategory.AGGREGATE,
+    "C": QueryCategory.SCAN,
+    "F": QueryCategory.FILTER,
+    "G": QueryCategory.GROUP_BY,
+    "J": QueryCategory.JOIN,
+    "M": QueryCategory.MULTI_JOIN,
+    "P": QueryCategory.PROJECTION,
+    "Q": QueryCategory.SUBQUERY,
+    "S": QueryCategory.SORT,
+    "W": QueryCategory.WINDOW,
+}
+
+_QUERY_METADATA = """\
+aggregation_distinct|Distinct Aggregation|Distinct count of high cardinality key on a large table|A||SELECT COUNT(DISTINCT o_custkey) FROM orders WHERE o_orderdate >= DATE '1995-01-01'
+aggregation_distinct_groupby|Distinct Aggregation with Group By|Distinct count of high cardinality keys in low cardinality groups|A,G||
+approx_count_distinct_simple|Approximate Distinct Count|HLL distinct count on a high-cardinality key (sketch on Polars/PySpark/DataFusion; exact on Pandas/Modin/cuDF/Dask)|A||SELECT APPROX_COUNT_DISTINCT(o_custkey) FROM orders WHERE o_orderdate >= DATE '1995-01-01'
+approx_count_distinct_groupby|Approximate Distinct Count with Group By|HLL distinct counts per low-cardinality group (sketch on Polars/PySpark/DataFusion; exact on Pandas/Modin/cuDF/Dask)|A,G||
+aggregation_groupby_large|Large Cardinality Group By|Aggregates within high cardinality grouping|A,G||
+aggregation_groupby_small|Small Cardinality Group By|Aggregates within low cardinality grouping|A,G||
+aggregation_materialize|Nested Aggregation|Nested aggregation requiring CTE materialization|A,Q||
+aggregation_materialize_subquery|Subquery Materialization|Complex nested aggregation with joins|A,Q,J||
+aggregation_partition|Partition Key Aggregation|Aggregates over the partition key|A,G||
+aggregation_selective|Selective Aggregation|Aggregate on a small subset of rows|A,F||
+aggregation_simple|Simple Aggregation|Aggregate over all rows in table|A||
+filter_selective|High Selectivity Filter|High selectivity filter - few rows match|F||
+filter_non_selective|Low Selectivity Filter|Low selectivity filter - many rows match|F||
+count_star|Count Star|Metadata-based count optimization vs full table scan|A||
+decimal_arithmetic|Decimal Arithmetic|Decimal precision arithmetic with complex expressions|P||
+orderby_simple|Simple Order By|Simple ORDER BY single column|S||
+orderby_multi|Multi-Column Order By|ORDER BY multiple columns|S||
+orderby_desc|Descending Order By|ORDER BY with descending sort|S||
+topn|Top-N Query|Top-N query with ORDER BY and LIMIT|S||
+limit|Simple Limit|Simple LIMIT without ORDER BY|C||
+limit_ordered|Ordered Limit|LIMIT clause with ordering on large result set|S||
+string_like|String LIKE|String LIKE pattern matching|F||
+string_starts_with|String Starts With|String starts_with pattern matching|F||
+string_ends_with|String Ends With|String ends_with pattern matching|F||
+string_concat|String Concatenation|String concatenation|P||
+string_substring|String Substring|String substring extraction|P||
+window_row_number|Window ROW_NUMBER|Window function ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ...)|W||
+window_rank|Window RANK|Window function RANK() OVER (PARTITION BY ... ORDER BY ...)|W||
+window_sum|Window SUM|Window function SUM() OVER (PARTITION BY ...)|W,A||
+window_running_sum|Window Running Sum|Window function SUM() OVER (ORDER BY ...) - cumulative sum|W,A||
+broadcast_join_two_tables|Broadcast Join (2 tables)|One small table broadcast to join with one large table|J||
+broadcast_join_three_tables|Broadcast Join (3 tables)|Two small tables broadcast to join with one large table|J,M||
+predicate_ordering_aggregation|Predicate Ordering with Aggregation|Order filter predicates by selectivity for aggregation|F,A||
+shuffle_join|Shuffle Join|Data is redistributed based on the join keys|J,A||
+empty_build_join|Empty Build Side Join|Join when build side produces no rows (edge case handling)|J||
+filter_bigint_selective|Bigint Selective Filter|Equality predicate with high selectivity on integer column|F||
+filter_bigint_non_selective|Bigint Non-Selective Filter|Range predicate with low selectivity on large table|F,A||
+filter_bigint_in_list_selective|Bigint IN List Filter|IN-list predicate with highly selective integer values|F|filter_bigint_in_list|
+filter_decimal_selective|Decimal Selective Filter|Compound equality predicate with multiple decimal columns|F||
+filter_decimal_non_selective|Decimal Non-Selective Filter|Range predicate on decimal column with low selectivity|F,A||
+filter_string_selective|String Selective Filter|Exact string equality with high selectivity on varchar column|F||
+filter_string_non_selective|String Non-Selective Filter|String comparison with low selectivity (most rows match)|F,A||
+filter_in_predicate_selective|IN Predicate with Subquery|IN predicate with subquery and selective filtering|F,Q|filter_in_predicate_subquery|
+groupby_bigint_highndv|High NDV GroupBy|GROUP BY with high distinct value count (many groups)|G,A|groupby_highndv|
+groupby_bigint_lowndv|Low NDV GroupBy|GROUP BY with low distinct value count (few groups)|G,A|groupby_lowndv|
+groupby_bigint_pk|Primary Key GroupBy|GROUP BY on primary key (one row per group)|G,A|groupby_pk|
+groupby_decimal_highndv|High NDV Decimal GroupBy|GROUP BY with high cardinality decimal column|G,A||
+groupby_decimal_lowndv|Low NDV Decimal GroupBy|GROUP BY with low cardinality decimal column|G,A||
+orderby_all|Full Table Order By|Sort on full table with simple integer ordering|S||
+orderby_bigint|Bigint Order By|Sort with aggregation results on integer column|S,A||
+orderby_bigint_expression|Expression Order By|Sort on computed expressions with DESC ordering|S,P|orderby_expression|
+orderby_multicol|Multi-Column Complex Order By|Complex multi-column sort with string, date, and decimal columns|S||
+orderby_shortstrings|Short Strings Order By|Sort on short string columns with DISTINCT operation|S||
+shuffle_inner_join_one_to_many_string_with_groupby|Inner Join with GroupBy|Standard inner join with one-to-many relationship|J,G,A|shuffle_inner_join_groupby|
+shuffle_left_join_one_to_many_string_with_groupby|Left Join with GroupBy|LEFT JOIN with preservation of all left-side rows|J,G,A|shuffle_left_join_groupby|
+shuffle_full_join_one_to_many_string_with_groupby|Full Outer Join with GroupBy|FULL OUTER JOIN with string grouping and aggregation|J,G,A|shuffle_full_join_groupby|
+shuffle_1mb_rows|Self Join with Hash Collision|Self-join with hash collision handling on large table|J,A|shuffle_self_join|
+string_equal_predicate|String Equality|Exact string equality with selective matching|F,A|string_equal|
+string_equal_predicate_lower|String Equality (Case Insensitive)|Equality predicate after applying case conversion|F,A|string_equal_lower|
+string_in_predicate|String IN Predicate|IN predicate with string values|F,A||
+string_like_predicate_center|String LIKE Center|Case sensitive matching pattern in any location|F,A|string_like_center|
+string_like_predicate_end|String LIKE Suffix|Case sensitive matching suffix pattern|F,A|string_like_suffix|
+string_like_predicate_start|String LIKE Prefix|Case sensitive matching prefix pattern|F,A|string_like_prefix|
+window_growing_frame|Window Growing Frame|Running sum window aggregation with growing frame size|W,A||
+window_lead_lag_same_frame|Window Lead/Lag|Offset window functions over the same frame|W|window_lead_lag|
+window_multiple_orderings|Window Dense Rank|Window function DENSE_RANK() OVER (PARTITION BY ... ORDER BY ...)|W|window_dense_rank|
+predicate_ordering_aggregation_groupby|Predicate Ordering with GroupBy|Order filter predicates by selectivity for aggregation within a low cardinality grouping|F,G,A|predicate_ordering_groupby|
+predicate_ordering_costs|Predicate Ordering Costs|Order filter predicates by selectivity with result projection only|F,P||
+broadcast_join_four_tables|Broadcast Join (4 tables)|Three small tables broadcast to join with one large table|J,M,A||
+exchange_broadcast|Exchange Broadcast|One small table is copied to all nodes that have the large table|J,A||
+exchange_merge|Exchange Merge|Sorted data from multiple nodes is combined while keeping the sort order|J,S||
+exchange_shuffle|Exchange Shuffle|Data is redistributed based on the join keys so matching rows end up on the same node|J||
+topn_aggregate_2columns|TopN with Aggregation|Top 10 limit returning 2 columns after aggregation and computed ordering|S,A|topn_aggregate|
+topn_ordered_allcols|TopN All Columns|Top-10 limit returning all columns after ordering over all table rows|S,C|topn_allcols|
+statistical_variance_stddev|Variance and StdDev|Variance and standard deviation calculations|A|statistical_variance|
+statistical_correlation|Correlation Analysis|Correlation analysis between numeric columns|A||
+long_predicate|Long Predicate|Query with many conjunctive predicates across multiple tables|F,J,M||
+max_by_simple|MAX_BY Simple|Find the customer with the highest account balance in each nation|A,J||
+min_by_simple|MIN_BY Simple|Find the customer with the lowest account balance in each nation|A,J||
+array_agg_simple|Array Aggregation|Aggregate part keys into arrays per supplier|A||
+array_agg_distinct|Distinct Array Aggregation|Distinct array aggregation|A||
+filter_decimal_in_list_selective|Decimal IN List Filter|IN-list predicate with decimal values and selectivity|F|filter_decimal_in_list|
+filter_string_like|String LIKE Filter|LIKE predicate with substring pattern matching|F||
+orderby_decimal16|Decimal Order By|Multi-column sort with mixed ASC/DESC on decimal columns|S|orderby_decimal|
+min_max_runtime_filter|Min/Max Runtime Filter|Bloom filter and runtime filter effectiveness for join optimization|F,J||
+max_by_complex|MAX_BY Complex|Find the most expensive order for each customer segment|A,J||
+min_by_complex|MIN_BY Complex|Find the cheapest part for each brand|A||
+any_value_simple|ANY_VALUE Simple|Select any customer name per market segment (faster than MIN/MAX)|A,G||
+any_value_with_filter|ANY_VALUE with Filter|Any value with additional aggregates|A,G||
+groupby_all_simple|GROUP BY ALL Simple|Automatic grouping by all non-aggregate columns|A,G||
+groupby_all_complex|GROUP BY ALL Complex|GROUP BY ALL with multiple non-aggregate expressions|A,G||
+orderby_all_simple|ORDER BY ALL Simple|Order by all columns in SELECT list|S,J,A||
+orderby_all_desc|ORDER BY ALL Descending|ORDER BY ALL with descending direction|S,A||
+max_by_with_ties|MAX_BY with Ties|Find the supplier with the highest supply cost for each part|A,J,M||
+min_by_with_ties|MIN_BY with Ties|Find the supplier with the lowest supply cost for each part|A,J,M||
+predicate_ordering_subquery|Predicate Ordering with Subquery|Order filter predicates by selectivity with subquery predicate|F,Q,J||
+shuffle_inner_join_union_all_with_groupby|Union All with GroupBy|Complex join with UNION ALL and different data sources|J,G,A|shuffle_union_all_groupby|
+statistical_percentiles|Statistical Percentiles|Percentile calculation functions for distribution analysis|A,G||
+string_ilike_predicate_start|String ILIKE Prefix|Case insensitive matching prefix pattern|F,A|string_ilike_start|
+string_ilike_predicate_end|String ILIKE Suffix|Case insensitive matching suffix pattern|F,A|string_ilike_end|
+string_like_predicate_multi|String LIKE Multi|Case sensitive matching multipart pattern|F,A|string_like_multi|
+string_ilike_predicate_multi|String ILIKE Multi|Case insensitive matching multipart pattern|F,A|string_ilike_multi|
+string_like_predicate_center_insensitive|String ILIKE Center|Case insensitive matching pattern in any location|F,A|string_like_center_insensitive|
+window_moving_frame|Window Moving Frame|Window aggregations with complex moving frame definitions|W,A||
+window_unbounded_frame|Window Unbounded Frame|Window aggregations with the same unbounded frame definition|W||
+approx_quantile_groupby|Approximate Median|Approximate statistical function (PERCENTILE_CONT for median)|A,G||
+intrinsic_to_date|Date Conversion Filter|Date parsing and conversion function performance|F,A||
+fulltext_simple_search|Simple Text Search|Basic full-text search using string pattern matching|F||
+fulltext_boolean_search|Boolean Text Search|Boolean text search with AND/NOT operators|F,S||
+fulltext_phrase_search|Phrase Text Search|Phrase-based text search with ranking|F,S||
+olap_cube_analysis|OLAP CUBE Analysis|CUBE operation for multidimensional analysis|A,G,J||
+olap_rollup_analysis|OLAP ROLLUP Analysis|ROLLUP operation for hierarchical aggregation|A,G,J,S||
+pivot_basic|Basic Pivot|Pivot ship modes into columns|A,G||
+unpivot_basic|Basic Unpivot|Unpivot part dimensions into rows|P||
+optimizer_distinct_elimination|Optimizer: Distinct Elimination|Test DISTINCT elimination when result is already unique|F,P||
+optimizer_common_subexpression|Optimizer: Common Subexpression|Test Common Subexpression Elimination (CSE)|P,F||
+optimizer_predicate_pushdown|Optimizer: Predicate Pushdown|Test predicate pushdown through joins|J,F||
+optimizer_join_reordering|Optimizer: Join Reordering|Test join reordering based on cardinality|J,A,G||
+optimizer_limit_pushdown|Optimizer: Limit Pushdown|Test limit pushdown through operations|J,S||
+optimizer_aggregate_pushdown|Optimizer: Aggregate Pushdown|Test aggregate pushdown before join|J,A,G||
+optimizer_constant_folding|Optimizer: Constant Folding|Test constant folding at compile time|P||
+optimizer_column_pruning|Optimizer: Column Pruning|Test column pruning at scan|J,F,P||
+optimizer_union_optimization|Optimizer: Union Optimization|Test union optimization with multiple scans|S||
+optimizer_runtime_filter|Optimizer: Runtime Filter|Test runtime filter / dynamic partition pruning|J,F||
+optimizer_groupjoin|Optimizer: Group-Join Fusion|Test join+aggregate fusion into a single grouped-join pass|J,A,G||
+qualify_row_number|QUALIFY ROW_NUMBER|Find top N orders per customer using ROW_NUMBER|J,W,F||
+qualify_dense_rank|QUALIFY DENSE_RANK|Find top N parts by price per category using DENSE_RANK|W,F||
+qualify_ntile|QUALIFY NTILE|Find orders in top quartile per segment using NTILE|J,W,F||
+qualify_percentile|QUALIFY PERCENT_RANK|Find orders in top 10% per priority using PERCENT_RANK|W,F||
+qualify_cume_dist|QUALIFY CUME_DIST|Find lineitems in top 5% quantity per shipdate using CUME_DIST|W,F||
+qualify_lag_lead|QUALIFY LAG/LEAD|Find orders with increasing price using LAG|J,W,F||
+struct_construction|Struct Construction|Construct struct from columns|P||
+struct_access|Struct Field Access|Access struct fields by name|P,F||
+array_contains|Array Contains|Check if array contains a specific value|A,G||
+array_distinct|Array Distinct|Get distinct elements from array|A,G||
+array_length|Array Length|Get array length/cardinality|A,G,S||
+array_min_max|Array Min/Max|Get min and max from array|A,G||
+array_of_struct|Array of Struct|Create array of structs from grouped data|A,G,J||
+array_slice|Array Slice|Get slice/subset of array|A,G,F||
+array_sort|Array Sort|Sort array elements|A,G||
+array_unnest|Array Unnest|Unnest/explode array back to rows|A,G||
+map_construction|Map Construction|Construct map from key-value pairs|A,G||
+map_access|Map Access|Access map values by key|A,G,P||
+map_keys_values|Map Keys/Values|Extract keys and values from map|A,G||
+list_filter|List Filter|Filter array elements by condition|A,G||
+list_transform|List Transform|Transform each array element|A,G||
+list_reduce|List Reduce|Reduce array to single value|A,G||
+json_extract_simple|JSON Extract Simple|Extract from JSON with simple path expressions|P,F||
+json_extract_nested|JSON Extract Nested|Extract from JSON with complex path expressions|P,F||
+json_aggregates|JSON Aggregates|Create JSON arrays and objects from aggregations|A,G,F||
+timeseries_trend_analysis|Timeseries Trend Analysis|Time series aggregation with month-over-month analysis|A,G,W,S||
+asof_join_basic|ASOF Join Basic|ASOF join to find closest prior order for shipments|J,F||
+"""
+
+
+def _impl_for(impl_base: str, family: str) -> Any:
+    return globals()[f"{impl_base}_{family}_impl"]
+
+
+def _make_query(row: list[str]) -> DataFrameQuery:
+    query_id, query_name, description, category_codes, impl_base, sql_equivalent = row
+    impl_base = impl_base or query_id
+    return DataFrameQuery(
+        query_id=query_id,
+        query_name=query_name,
+        description=description,
+        categories=[_CATEGORY_CODES[code] for code in category_codes.split(",")],
+        expression_impl=_impl_for(impl_base, "expression"),
+        pandas_impl=_impl_for(impl_base, "pandas"),
+        sql_equivalent=sql_equivalent or None,
+    )
+
+
+_QUERIES = [_make_query(row) for row in reader(_QUERY_METADATA.splitlines(), delimiter="|")]
 
 # Register all queries
 for query in _QUERIES:
