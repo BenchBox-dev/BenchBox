@@ -2,7 +2,8 @@ id: benchmark-api-and-core-boundary-cleanup
 title: "Architecture hardening: classify benchmark APIs and reduce core boundary drift"
 worktree: main
 priority: Medium
-status: "Not Started"
+status: Completed
+completed_date: "2026-05-21"
 category: Core Architecture
 
 deps:
@@ -24,75 +25,85 @@ description: |
 work:
   - id: w0
     summary: "Revalidate benchmark API surfaces, wrapper tests, registries, and core boundary issues"
-    status: pending
+    status: done
     notes: |
-      Commit a compact summary of checked SHA, BaseBenchmark classes,
-      subclasses, wrapper tests, lazy registries, and loader entry points.
-
-      Minimum evidence to re-check:
-        - benchbox/base.py public BaseBenchmark and run_with_platform.
-        - benchbox/core/base_benchmark.py legacy/secondary BaseBenchmark.
-        - tests/unit/test_wrapper_facades_fast.py.
-        - benchbox/__init__.py lazy benchmark registry.
-        - benchbox/core/benchmark_loader.py.
-        - docs/reference/backward-compatibility.md benchmark API entries.
+      Completed evidence at checked SHA
+      1d454632ba73911bc4ff0cf0a3fb8ec22227a7a8:
+        - benchbox/base.py remains the beta-public BaseBenchmark surface;
+          run_with_platform remains the beta-public adapter execution hook.
+        - benchbox/core/base_benchmark.py remains a distinct deprecated
+          internal compatibility base, not an alias.
+        - Production imports of the deprecated core base are limited to
+          benchbox/core/datavault/benchmark.py and
+          benchbox/core/tpcds_obt/benchmark.py.
+        - tests/unit/test_wrapper_facades_fast.py asserts wrapper behavior;
+          wrapper reachability is not accidental.
+        - benchbox/__init__.py exposes 21 top-level benchmark facades: 7 eager
+          imports and 14 lazy _BENCHMARK_REGISTRY entries.
+        - benchbox/core/benchmark_loader.py resolves 23 core benchmark families
+          from registry-backed CORE_BENCHMARK_CLASS_NAMES.
+        - docs/reference/backward-compatibility.md now records the remaining
+          core-base migration target explicitly.
 
   - id: w1
     summary: "Decision gate: define wrapper-vs-CLI-vs-loader public API contract"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
-      Record whether benchbox.TPCH(...), benchbox.base.BaseBenchmark,
-      BaseBenchmark.run_with_platform, CLI, MCP, and core loaders are public,
-      beta-public, internal, deprecated, or generated.
+      Decision recorded in docs/reference/public-contracts.md:
+        - CLI, top-level benchmark wrappers, benchbox.base.BaseBenchmark,
+          BaseBenchmark.run_with_platform, registry metadata, and MCP remain
+          beta-public surfaces.
+        - benchbox.core.benchmark_loader is internal.
+        - benchbox.core.base_benchmark.BaseBenchmark is deprecated internal
+          compatibility.
 
-      Do not collapse wrappers unless the decision explicitly deprecates a
-      tested public facade and adds a migration path.
+      No wrapper facade was collapsed or deprecated.
 
   - id: w2
     summary: "Retire, alias, or justify benchbox/core/base_benchmark.py"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      The second base class must become one of:
-        - removed after migrating remaining users,
-        - thin compatibility alias with deprecation,
-        - documented internal base with a distinct purpose and tests.
-
-      Update docs/reference/backward-compatibility.md accordingly.
+      Justified as a documented deprecated internal compatibility base. It is
+      retained only for datavault and tpcds_obt until those implementations
+      migrate to benchbox.base.BaseBenchmark. Runtime modules expose surface
+      markers and docs/reference/backward-compatibility.md carries the target.
 
   - id: w3
     summary: "Reconcile benchmark registry, wrapper, and loader counts"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      Add a generated or tested count check so wrappers, lazy registry entries,
-      core loader discoverability, docs, and MCP/CLI surfaces cannot drift
-      silently. The output should distinguish public wrapper availability from
-      internal benchmark family support.
+      Added tests/unit/core/test_benchmark_api_contract.py to lock:
+        - 23 registry metadata entries.
+        - 23 loader-resolved core families.
+        - 22 public discovery entries.
+        - 21 top-level Python benchmark facades.
+        - 14 lazy facades and 7 eager facades.
+        - 2 core-only benchmark IDs: ai_primitives and joinorder_synthetic.
 
   - id: w4
     summary: "Design the benchmark-family plugin seam as an ADR before extraction"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      Write a short ADR or design note describing where benchmark-family logic
-      should live, what a family plugin owns, how phases are supplied, how
-      result schema fields are shared, and how TPC-H/TPC-DS compatibility is
-      preserved.
-
-      Do not begin a large extraction in this TODO unless the seam is limited to
-      interfaces and one pilot family.
+      Added docs/design/future-state/benchmark-family-plugin-seam/README.md and
+      linked it from the future-state index. The design keeps wrappers and
+      result bundles stable, defines family-owned versus shared-runtime
+      responsibilities, and requires one pilot family before any broad package
+      extraction.
 
   - id: w5
     summary: "Add an import-boundary check for core modules that depend on platform adapters"
     needs: [w4]
-    status: pending
+    status: done
     notes: |
-      Identify and either fix or explicitly exempt core-to-platform dependency
-      inversions such as tuning code importing a specific platform adapter. The
-      check should be narrow enough to avoid blocking intentional optional
-      plugin registration.
+      Added a narrow AST import-boundary check over benchbox/base.py,
+      benchbox/core/base_benchmark.py, benchbox/core/benchmark_loader.py,
+      benchbox/core/__init__.py, and benchbox/core/tuning/. The check forbids
+      concrete benchbox.platforms imports in those benchmark API and tuning
+      boundary files while avoiding unrelated existing core/platform couplings.
 
 deferred:
   - summary: "Split all of benchbox/core into engine and benchmark packages"
@@ -122,17 +133,17 @@ impact:
     into explicit engine and benchmark-family boundaries.
 
 files_affected:
+  added:
+    - "tests/unit/core/test_benchmark_api_contract.py"
+    - "docs/design/future-state/benchmark-family-plugin-seam/README.md"
   modified:
     - "benchbox/base.py"
     - "benchbox/core/base_benchmark.py"
     - "benchbox/core/benchmark_loader.py"
-    - "benchbox/core/__init__.py"
-    - "benchbox/core/tuning/"
-    - "benchbox/__init__.py"
-    - "tests/unit/test_wrapper_facades_fast.py"
     - "docs/reference/backward-compatibility.md"
     - "docs/reference/public-contracts.md"
     - "docs/design/"
+    - "_project/DONE/main/planning/benchmark-api-and-core-boundary-cleanup.yaml"
 
 must_preserve:
   - "Do not break top-level wrapper facade tests unless an explicit deprecation path lands in the same PR."
@@ -156,6 +167,34 @@ verification:
   - description: "Run import-boundary check added by this item."
     command: "uv run -- python -m pytest tests -k 'import_boundary or core_boundary' --tb=short"
     expected_output: "Core/platform dependency boundary tests pass or known exemptions are documented."
+
+verification_notes: |
+  Completed:
+    - uv run -- python -m pytest tests/unit/core/test_benchmark_api_contract.py -q
+      -> 3 passed.
+    - uv run -- python -m pytest tests/unit/test_wrapper_facades_fast.py tests
+      -k 'benchmark_loader or base_benchmark' --tb=short
+      -> 39 passed, 5 existing live_velox marker warnings.
+    - uv run -- python -m pytest tests -k 'import_boundary or core_boundary'
+      --tb=short
+      -> 1 passed, 5 existing live_velox marker warnings.
+    - uv run -- ruff check benchbox/base.py benchbox/core/base_benchmark.py
+      benchbox/core/benchmark_loader.py
+      tests/unit/core/test_benchmark_api_contract.py
+      -> passed.
+    - uv run -- ruff format --check benchbox/base.py
+      benchbox/core/base_benchmark.py benchbox/core/benchmark_loader.py
+      tests/unit/core/test_benchmark_api_contract.py
+      -> passed.
+    - make docs-validate
+      -> passed.
+    - make docs-build
+      -> passed with 5 existing warnings.
+
+  Attempted:
+    - make docs-check
+      -> docs-linkcheck failed on an unrelated external ClickHouse URL timeout;
+      docs-validate and docs-build passed separately.
 
 scope_limit:
   only_modify:

@@ -1,4 +1,8 @@
-"""Base abstract class for all benchmark implementations in BenchBox.
+"""Deprecated internal base class for older benchmark implementations.
+
+New public benchmark wrappers should inherit from ``benchbox.base.BaseBenchmark``.
+This module remains as an internal compatibility surface while existing core
+benchmark implementations finish migrating to the public base.
 
 Copyright 2026 Joe Harris / BenchBox Project
 
@@ -12,6 +16,9 @@ from types import TracebackType
 from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
 from benchbox.core.tuning import BenchmarkTunings
+
+BENCHMARK_API_SURFACE = "deprecated"
+BENCHMARK_API_DECISION = "retained-internal-compatibility-base"
 
 if TYPE_CHECKING:
     from benchbox.core.results.models import BenchmarkResults
@@ -27,6 +34,9 @@ class BaseBenchmark(abc.ABC):
     metadata access, resource management, and defines abstract methods for
     benchmark-specific operations.
     """
+
+    api_surface = BENCHMARK_API_SURFACE
+    compatibility_marker = BENCHMARK_API_DECISION
 
     def __init__(self, scale_factor: float = 1.0, **config: Union[str, int, float, bool]) -> None:
         """
