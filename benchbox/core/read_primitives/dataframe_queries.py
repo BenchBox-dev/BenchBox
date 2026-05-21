@@ -154,11 +154,9 @@ def aggregation_distinct_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = orders.filter(col("o_orderdate") >= lit(date(1995, 1, 1))).select(
+    return orders.filter(col("o_orderdate") >= lit(date(1995, 1, 1))).select(
         col("o_custkey").n_unique().alias("unique_customers")
     )
-
-    return result
 
 
 def approx_count_distinct_simple_expression_impl(ctx: DataFrameContext) -> Any:
@@ -173,11 +171,9 @@ def approx_count_distinct_simple_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = orders.filter(col("o_orderdate") >= lit(date(1995, 1, 1))).select(
+    return orders.filter(col("o_orderdate") >= lit(date(1995, 1, 1))).select(
         col("o_custkey").approx_n_unique().alias("unique_customers")
     )
-
-    return result
 
 
 def approx_count_distinct_groupby_expression_impl(ctx: DataFrameContext) -> Any:
@@ -191,12 +187,10 @@ def approx_count_distinct_groupby_expression_impl(ctx: DataFrameContext) -> Any:
     lineitem = ctx.get_table("lineitem")
     col = ctx.col
 
-    result = lineitem.group_by("l_returnflag", "l_linestatus").agg(
+    return lineitem.group_by("l_returnflag", "l_linestatus").agg(
         col("l_orderkey").approx_n_unique().alias("unique_orders"),
         col("l_partkey").approx_n_unique().alias("unique_parts"),
     )
-
-    return result
 
 
 def aggregation_groupby_impl(
@@ -282,9 +276,7 @@ def aggregation_materialize_expression_impl(ctx: DataFrameContext) -> Any:
     order_totals = orders.group_by("o_custkey").agg(col("o_totalprice").sum().alias("customer_total"))
 
     # Second aggregation: average of customer totals
-    result = order_totals.select(col("customer_total").mean().alias("avg_customer_spending"))
-
-    return result
+    return order_totals.select(col("customer_total").mean().alias("avg_customer_spending"))
 
 
 def aggregation_materialize_subquery_expression_impl(ctx: DataFrameContext) -> Any:
@@ -304,9 +296,7 @@ def aggregation_materialize_subquery_expression_impl(ctx: DataFrameContext) -> A
     )
 
     # Average by segment
-    result = order_totals.group_by("c_mktsegment").agg(col("order_total").mean().alias("avg_segment_order"))
-
-    return result
+    return order_totals.group_by("c_mktsegment").agg(col("order_total").mean().alias("avg_segment_order"))
 
 
 def aggregation_partition_expression_impl(ctx: DataFrameContext) -> Any:
@@ -315,7 +305,7 @@ def aggregation_partition_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = (
+    return (
         lineitem.filter((col("l_shipdate") >= lit(date(1995, 1, 1))) & (col("l_shipdate") < lit(date(1996, 1, 1))))
         .group_by("l_shipdate", "l_shipmode")
         .agg(
@@ -324,8 +314,6 @@ def aggregation_partition_expression_impl(ctx: DataFrameContext) -> Any:
         )
     )
 
-    return result
-
 
 def aggregation_selective_expression_impl(ctx: DataFrameContext) -> Any:
     """Aggregate on a small subset of rows."""
@@ -333,11 +321,9 @@ def aggregation_selective_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = lineitem.filter((col("l_discount") > lit(0.05)) & (col("l_quantity") < lit(24))).select(
+    return lineitem.filter((col("l_discount") > lit(0.05)) & (col("l_quantity") < lit(24))).select(
         (col("l_extendedprice") * col("l_discount")).sum().alias("total_discount_amount")
     )
-
-    return result
 
 
 def aggregation_simple_expression_impl(ctx: DataFrameContext) -> Any:
@@ -345,12 +331,10 @@ def aggregation_simple_expression_impl(ctx: DataFrameContext) -> Any:
     orders = ctx.get_table("orders")
     col = ctx.col
 
-    result = orders.select(
+    return orders.select(
         col("o_orderkey").count().alias("total_orders"),
         col("o_totalprice").sum().alias("total_revenue"),
     )
-
-    return result
 
 
 def filter_selective_expression_impl(ctx: DataFrameContext) -> Any:
@@ -359,11 +343,9 @@ def filter_selective_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = lineitem.filter(
+    return lineitem.filter(
         (col("l_quantity") > lit(45)) & (col("l_extendedprice") > lit(50000)) & (col("l_discount") < lit(0.05))
     ).select("l_orderkey", "l_partkey", "l_quantity", "l_extendedprice")
-
-    return result
 
 
 def filter_non_selective_expression_impl(ctx: DataFrameContext) -> Any:
@@ -372,11 +354,9 @@ def filter_non_selective_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = lineitem.filter(col("l_quantity") > lit(1)).select(
+    return lineitem.filter(col("l_quantity") > lit(1)).select(
         "l_orderkey", "l_partkey", "l_quantity", "l_extendedprice"
     )
-
-    return result
 
 
 def count_star_expression_impl(ctx: DataFrameContext) -> Any:
@@ -384,9 +364,7 @@ def count_star_expression_impl(ctx: DataFrameContext) -> Any:
     lineitem = ctx.get_table("lineitem")
     col = ctx.col
 
-    result = lineitem.select(col("l_orderkey").count().alias("total_lineitems"))
-
-    return result
+    return lineitem.select(col("l_orderkey").count().alias("total_lineitems"))
 
 
 def decimal_arithmetic_expression_impl(ctx: DataFrameContext) -> Any:
@@ -395,7 +373,7 @@ def decimal_arithmetic_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = (
+    return (
         lineitem.filter(col("l_quantity") > lit(0))
         .select(
             col("l_orderkey"),
@@ -405,58 +383,46 @@ def decimal_arithmetic_expression_impl(ctx: DataFrameContext) -> Any:
         .limit(1000)
     )
 
-    return result
-
 
 def orderby_simple_expression_impl(ctx: DataFrameContext) -> Any:
     """Simple ORDER BY single column."""
     orders = ctx.get_table("orders")
 
-    result = orders.select("o_orderkey", "o_orderdate", "o_totalprice").sort("o_orderdate").limit(100)
-
-    return result
+    return orders.select("o_orderkey", "o_orderdate", "o_totalprice").sort("o_orderdate").limit(100)
 
 
 def orderby_multi_expression_impl(ctx: DataFrameContext) -> Any:
     """ORDER BY multiple columns."""
     lineitem = ctx.get_table("lineitem")
 
-    result = (
+    return (
         lineitem.select("l_orderkey", "l_linenumber", "l_shipdate", "l_quantity")
         .sort(["l_shipdate", "l_orderkey", "l_linenumber"])
         .limit(100)
     )
-
-    return result
 
 
 def orderby_desc_expression_impl(ctx: DataFrameContext) -> Any:
     """ORDER BY with descending sort."""
     orders = ctx.get_table("orders")
 
-    result = orders.select("o_orderkey", "o_totalprice", "o_orderdate").sort("o_totalprice", descending=True).limit(100)
-
-    return result
+    return orders.select("o_orderkey", "o_totalprice", "o_orderdate").sort("o_totalprice", descending=True).limit(100)
 
 
 def topn_expression_impl(ctx: DataFrameContext) -> Any:
     """Top-N query with ORDER BY and LIMIT."""
     lineitem = ctx.get_table("lineitem")
 
-    result = (
+    return (
         lineitem.select("l_orderkey", "l_partkey", "l_extendedprice").sort("l_extendedprice", descending=True).limit(10)
     )
-
-    return result
 
 
 def limit_expression_impl(ctx: DataFrameContext) -> Any:
     """Simple LIMIT without ORDER BY."""
     lineitem = ctx.get_table("lineitem")
 
-    result = lineitem.select("l_orderkey", "l_partkey", "l_suppkey", "l_quantity").limit(1000)
-
-    return result
+    return lineitem.select("l_orderkey", "l_partkey", "l_suppkey", "l_quantity").limit(1000)
 
 
 def string_like_expression_impl(ctx: DataFrameContext) -> Any:
@@ -464,9 +430,7 @@ def string_like_expression_impl(ctx: DataFrameContext) -> Any:
     part = ctx.get_table("part")
     col = ctx.col
 
-    result = part.filter(col("p_name").str.contains("blue")).select("p_partkey", "p_name", "p_type")
-
-    return result
+    return part.filter(col("p_name").str.contains("blue")).select("p_partkey", "p_name", "p_type")
 
 
 def string_starts_with_expression_impl(ctx: DataFrameContext) -> Any:
@@ -474,9 +438,7 @@ def string_starts_with_expression_impl(ctx: DataFrameContext) -> Any:
     part = ctx.get_table("part")
     col = ctx.col
 
-    result = part.filter(col("p_type").str.starts_with("STANDARD")).select("p_partkey", "p_name", "p_type")
-
-    return result
+    return part.filter(col("p_type").str.starts_with("STANDARD")).select("p_partkey", "p_name", "p_type")
 
 
 def string_ends_with_expression_impl(ctx: DataFrameContext) -> Any:
@@ -484,9 +446,7 @@ def string_ends_with_expression_impl(ctx: DataFrameContext) -> Any:
     part = ctx.get_table("part")
     col = ctx.col
 
-    result = part.filter(col("p_type").str.ends_with("BRASS")).select("p_partkey", "p_name", "p_type")
-
-    return result
+    return part.filter(col("p_type").str.ends_with("BRASS")).select("p_partkey", "p_name", "p_type")
 
 
 def string_concat_expression_impl(ctx: DataFrameContext) -> Any:
@@ -495,12 +455,10 @@ def string_concat_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = customer.select(
+    return customer.select(
         col("c_custkey"),
         (col("c_name") + lit(" - ") + col("c_mktsegment")).alias("customer_info"),
     ).limit(100)
-
-    return result
 
 
 def string_substring_expression_impl(ctx: DataFrameContext) -> Any:
@@ -508,12 +466,10 @@ def string_substring_expression_impl(ctx: DataFrameContext) -> Any:
     customer = ctx.get_table("customer")
     col = ctx.col
 
-    result = customer.select(
+    return customer.select(
         col("c_custkey"),
         col("c_phone").str.slice(0, 3).alias("country_code"),
     ).limit(100)
-
-    return result
 
 
 def window_row_number_expression_impl(ctx: DataFrameContext) -> Any:
@@ -521,7 +477,7 @@ def window_row_number_expression_impl(ctx: DataFrameContext) -> Any:
     lineitem = ctx.get_table("lineitem")
     col = ctx.col
 
-    result = (
+    return (
         lineitem.with_columns(
             ctx.window_row_number(
                 order_by=[("l_extendedprice", False)],
@@ -532,15 +488,13 @@ def window_row_number_expression_impl(ctx: DataFrameContext) -> Any:
         .select("l_orderkey", "l_linenumber", "l_extendedprice", "row_num")
     )
 
-    return result
-
 
 def window_rank_expression_impl(ctx: DataFrameContext) -> Any:
     """Window function RANK() OVER (PARTITION BY ... ORDER BY ...)."""
     lineitem = ctx.get_table("lineitem")
     col = ctx.col
 
-    result = (
+    return (
         lineitem.with_columns(
             ctx.window_rank(
                 order_by=[("l_quantity", False)],
@@ -551,32 +505,26 @@ def window_rank_expression_impl(ctx: DataFrameContext) -> Any:
         .select("l_orderkey", "l_returnflag", "l_quantity", "qty_rank")
     )
 
-    return result
-
 
 def window_sum_expression_impl(ctx: DataFrameContext) -> Any:
     """Window function SUM() OVER (PARTITION BY ...)."""
     lineitem = ctx.get_table("lineitem")
 
-    result = lineitem.with_columns(
+    return lineitem.with_columns(
         ctx.window_sum("l_extendedprice", partition_by=["l_orderkey"]).alias("order_total")
     ).select("l_orderkey", "l_linenumber", "l_extendedprice", "order_total")
-
-    return result
 
 
 def window_running_sum_expression_impl(ctx: DataFrameContext) -> Any:
     """Window function SUM() OVER (ORDER BY ...) - cumulative sum."""
     orders = ctx.get_table("orders")
 
-    result = (
+    return (
         orders.sort("o_orderdate")
         .with_columns(ctx.window_sum("o_totalprice", order_by=[("o_orderdate", True)]).alias("cumulative_revenue"))
         .select("o_orderkey", "o_orderdate", "o_totalprice", "cumulative_revenue")
         .limit(100)
     )
-
-    return result
 
 
 def broadcast_join_two_tables_expression_impl(ctx: DataFrameContext) -> Any:
@@ -585,11 +533,9 @@ def broadcast_join_two_tables_expression_impl(ctx: DataFrameContext) -> Any:
     nation = ctx.get_table("nation")
     col = ctx.col
 
-    result = supplier.join(nation, left_on="s_nationkey", right_on="n_nationkey").select(
+    return supplier.join(nation, left_on="s_nationkey", right_on="n_nationkey").select(
         col("s_suppkey").count().alias("supplier_count")
     )
-
-    return result
 
 
 def broadcast_join_three_tables_expression_impl(ctx: DataFrameContext) -> Any:
@@ -599,14 +545,12 @@ def broadcast_join_three_tables_expression_impl(ctx: DataFrameContext) -> Any:
     region = ctx.get_table("region")
     col = ctx.col
 
-    result = (
+    return (
         supplier.join(nation, left_on="s_nationkey", right_on="n_nationkey")
         .join(region, left_on="n_regionkey", right_on="r_regionkey")
         .group_by("r_name", "n_name")
         .agg(col("s_suppkey").count().alias("supplier_count"))
     )
-
-    return result
 
 
 def predicate_ordering_aggregation_expression_impl(ctx: DataFrameContext) -> Any:
@@ -615,15 +559,13 @@ def predicate_ordering_aggregation_expression_impl(ctx: DataFrameContext) -> Any
     col = ctx.col
     lit = ctx.lit
 
-    result = lineitem.filter(
+    return lineitem.filter(
         (col("l_shipdate") >= lit(date(1994, 1, 1)))
         & (col("l_shipdate") < lit(date(1995, 1, 1)))
         & (col("l_discount") >= lit(0.05))
         & (col("l_discount") <= lit(0.07))
         & (col("l_quantity") < lit(24))
     ).select(col("l_extendedprice").sum().alias("total_price"))
-
-    return result
 
 
 def shuffle_join_expression_impl(ctx: DataFrameContext) -> Any:
@@ -632,13 +574,11 @@ def shuffle_join_expression_impl(ctx: DataFrameContext) -> Any:
     lineitem = ctx.get_table("lineitem")
     col = ctx.col
 
-    result = (
+    return (
         orders.join(lineitem, left_on="o_orderkey", right_on="l_orderkey")
         .group_by("o_orderkey")
         .agg(col("l_quantity").sum().alias("total_qty"))
     )
-
-    return result
 
 
 def empty_build_join_expression_impl(ctx: DataFrameContext) -> Any:
@@ -651,11 +591,9 @@ def empty_build_join_expression_impl(ctx: DataFrameContext) -> Any:
     # Create empty orders set (no orders with negative price)
     empty_orders = orders.filter(col("o_totalprice") < lit(0)).select("o_orderkey")
 
-    result = lineitem.join(empty_orders, left_on="l_orderkey", right_on="o_orderkey", how="left").select(
+    return lineitem.join(empty_orders, left_on="l_orderkey", right_on="o_orderkey", how="left").select(
         "l_orderkey", "l_partkey", "l_quantity"
     )
-
-    return result
 
 
 # -----------------------------------------------------------------------------
@@ -669,11 +607,9 @@ def filter_bigint_selective_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = orders.filter(col("o_orderkey") == lit(1234567)).select(
+    return orders.filter(col("o_orderkey") == lit(1234567)).select(
         "o_orderkey", "o_custkey", "o_orderdate", "o_totalprice"
     )
-
-    return result
 
 
 def filter_bigint_non_selective_expression_impl(ctx: DataFrameContext) -> Any:
@@ -682,9 +618,7 @@ def filter_bigint_non_selective_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = lineitem.filter(col("l_orderkey") > lit(1000)).select(col("l_orderkey").count().alias("count"))
-
-    return result
+    return lineitem.filter(col("l_orderkey") > lit(1000)).select(col("l_orderkey").count().alias("count"))
 
 
 def filter_bigint_in_list_expression_impl(ctx: DataFrameContext) -> Any:
@@ -692,11 +626,9 @@ def filter_bigint_in_list_expression_impl(ctx: DataFrameContext) -> Any:
     orders = ctx.get_table("orders")
     col = ctx.col
 
-    result = orders.filter(col("o_orderkey").is_in([1, 100, 1000, 10000, 100000])).select(
+    return orders.filter(col("o_orderkey").is_in([1, 100, 1000, 10000, 100000])).select(
         "o_orderkey", "o_custkey", "o_orderdate", "o_totalprice"
     )
-
-    return result
 
 
 def filter_decimal_selective_expression_impl(ctx: DataFrameContext) -> Any:
@@ -705,11 +637,9 @@ def filter_decimal_selective_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = lineitem.filter((col("l_extendedprice") == lit(12345.67)) & (col("l_discount") == lit(0.05))).select(
+    return lineitem.filter((col("l_extendedprice") == lit(12345.67)) & (col("l_discount") == lit(0.05))).select(
         "l_orderkey", "l_partkey", "l_extendedprice", "l_discount"
     )
-
-    return result
 
 
 def filter_decimal_non_selective_expression_impl(ctx: DataFrameContext) -> Any:
@@ -718,9 +648,7 @@ def filter_decimal_non_selective_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = lineitem.filter(col("l_extendedprice") > lit(1000.00)).select(col("l_orderkey").count().alias("count"))
-
-    return result
+    return lineitem.filter(col("l_extendedprice") > lit(1000.00)).select(col("l_orderkey").count().alias("count"))
 
 
 def filter_string_selective_expression_impl(ctx: DataFrameContext) -> Any:
@@ -729,11 +657,9 @@ def filter_string_selective_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = customer.filter(col("c_name") == lit("Customer#000001234")).select(
+    return customer.filter(col("c_name") == lit("Customer#000001234")).select(
         "c_custkey", "c_name", "c_address", "c_phone"
     )
-
-    return result
 
 
 def filter_string_non_selective_expression_impl(ctx: DataFrameContext) -> Any:
@@ -742,9 +668,7 @@ def filter_string_non_selective_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = customer.filter(col("c_mktsegment") >= lit("A")).select(col("c_custkey").count().alias("count"))
-
-    return result
+    return customer.filter(col("c_mktsegment") >= lit("A")).select(col("c_custkey").count().alias("count"))
 
 
 def filter_in_predicate_subquery_expression_impl(ctx: DataFrameContext) -> Any:
@@ -757,11 +681,9 @@ def filter_in_predicate_subquery_expression_impl(ctx: DataFrameContext) -> Any:
     # Get partkeys with high quantity
     high_qty_parts = lineitem.filter(col("l_quantity") > lit(45)).select("l_partkey").unique()
 
-    result = part.join(high_qty_parts, left_on="p_partkey", right_on="l_partkey", how="semi").select(
+    return part.join(high_qty_parts, left_on="p_partkey", right_on="l_partkey", how="semi").select(
         "p_partkey", "p_name", "p_type", "p_size"
     )
-
-    return result
 
 
 # -----------------------------------------------------------------------------
@@ -774,9 +696,7 @@ def groupby_highndv_expression_impl(ctx: DataFrameContext) -> Any:
     lineitem = ctx.get_table("lineitem")
     col = ctx.col
 
-    result = lineitem.group_by("l_orderkey").agg(col("l_linenumber").count().alias("line_count"))
-
-    return result
+    return lineitem.group_by("l_orderkey").agg(col("l_linenumber").count().alias("line_count"))
 
 
 def groupby_lowndv_expression_impl(ctx: DataFrameContext) -> Any:
@@ -784,9 +704,7 @@ def groupby_lowndv_expression_impl(ctx: DataFrameContext) -> Any:
     orders = ctx.get_table("orders")
     col = ctx.col
 
-    result = orders.group_by("o_orderpriority").agg(col("o_orderkey").count().alias("order_count"))
-
-    return result
+    return orders.group_by("o_orderpriority").agg(col("o_orderkey").count().alias("order_count"))
 
 
 def groupby_pk_expression_impl(ctx: DataFrameContext) -> Any:
@@ -794,9 +712,7 @@ def groupby_pk_expression_impl(ctx: DataFrameContext) -> Any:
     customer = ctx.get_table("customer")
     col = ctx.col
 
-    result = customer.group_by("c_custkey").agg(col("c_name").max().alias("customer_name"))
-
-    return result
+    return customer.group_by("c_custkey").agg(col("c_name").max().alias("customer_name"))
 
 
 def groupby_decimal_highndv_expression_impl(ctx: DataFrameContext) -> Any:
@@ -804,9 +720,7 @@ def groupby_decimal_highndv_expression_impl(ctx: DataFrameContext) -> Any:
     lineitem = ctx.get_table("lineitem")
     col = ctx.col
 
-    result = lineitem.group_by("l_extendedprice").agg(col("l_orderkey").count().alias("price_frequency"))
-
-    return result
+    return lineitem.group_by("l_extendedprice").agg(col("l_orderkey").count().alias("price_frequency"))
 
 
 def groupby_decimal_lowndv_expression_impl(ctx: DataFrameContext) -> Any:
@@ -814,12 +728,10 @@ def groupby_decimal_lowndv_expression_impl(ctx: DataFrameContext) -> Any:
     lineitem = ctx.get_table("lineitem")
     col = ctx.col
 
-    result = lineitem.group_by("l_discount").agg(
+    return lineitem.group_by("l_discount").agg(
         col("l_orderkey").count().alias("discount_frequency"),
         col("l_quantity").mean().alias("avg_qty"),
     )
-
-    return result
 
 
 # -----------------------------------------------------------------------------
@@ -831,11 +743,9 @@ def orderby_all_expression_impl(ctx: DataFrameContext) -> Any:
     """Sort on full table with simple integer ordering."""
     customer = ctx.get_table("customer")
 
-    result = customer.sort("c_custkey").select(
+    return customer.sort("c_custkey").select(
         "c_custkey", "c_name", "c_address", "c_nationkey", "c_phone", "c_acctbal", "c_mktsegment"
     )
-
-    return result
 
 
 def orderby_bigint_expression_impl(ctx: DataFrameContext) -> Any:
@@ -843,9 +753,7 @@ def orderby_bigint_expression_impl(ctx: DataFrameContext) -> Any:
     lineitem = ctx.get_table("lineitem")
     col = ctx.col
 
-    result = lineitem.group_by("l_orderkey").agg(col("l_quantity").sum().alias("total_qty")).sort("l_orderkey")
-
-    return result
+    return lineitem.group_by("l_orderkey").agg(col("l_quantity").sum().alias("total_qty")).sort("l_orderkey")
 
 
 def orderby_expression_expression_impl(ctx: DataFrameContext) -> Any:
@@ -853,21 +761,19 @@ def orderby_expression_expression_impl(ctx: DataFrameContext) -> Any:
     lineitem = ctx.get_table("lineitem")
     col = ctx.col
 
-    result = (
+    return (
         lineitem.with_columns((col("l_quantity") * col("l_extendedprice")).alias("total_value"))
         .sort("total_value", descending=True)
         .select("l_orderkey", "l_partkey", "total_value")
         .limit(100)
     )
 
-    return result
-
 
 def orderby_multicol_expression_impl(ctx: DataFrameContext) -> Any:
     """Complex multi-column sort with string, date, and decimal columns."""
     orders = ctx.get_table("orders")
 
-    result = (
+    return (
         orders.sort(
             ["o_orderpriority", "o_orderdate", "o_totalprice"],
             descending=[False, True, True],
@@ -876,16 +782,12 @@ def orderby_multicol_expression_impl(ctx: DataFrameContext) -> Any:
         .limit(100)
     )
 
-    return result
-
 
 def orderby_shortstrings_expression_impl(ctx: DataFrameContext) -> Any:
     """Sort on short string columns with DISTINCT operation."""
     lineitem = ctx.get_table("lineitem")
 
-    result = lineitem.select("l_returnflag", "l_linestatus").unique().sort(["l_returnflag", "l_linestatus"])
-
-    return result
+    return lineitem.select("l_returnflag", "l_linestatus").unique().sort(["l_returnflag", "l_linestatus"])
 
 
 # -----------------------------------------------------------------------------
@@ -899,7 +801,7 @@ def shuffle_inner_join_groupby_expression_impl(ctx: DataFrameContext) -> Any:
     orders = ctx.get_table("orders")
     col = ctx.col
 
-    result = (
+    return (
         customer.join(orders, left_on="c_custkey", right_on="o_custkey")
         .group_by("c_mktsegment")
         .agg(
@@ -908,8 +810,6 @@ def shuffle_inner_join_groupby_expression_impl(ctx: DataFrameContext) -> Any:
         )
     )
 
-    return result
-
 
 def shuffle_left_join_groupby_expression_impl(ctx: DataFrameContext) -> Any:
     """LEFT JOIN with preservation of all left-side rows."""
@@ -917,7 +817,7 @@ def shuffle_left_join_groupby_expression_impl(ctx: DataFrameContext) -> Any:
     orders = ctx.get_table("orders")
     col = ctx.col
 
-    result = (
+    return (
         customer.join(orders, left_on="c_custkey", right_on="o_custkey", how="left")
         .group_by("c_mktsegment")
         .agg(
@@ -926,8 +826,6 @@ def shuffle_left_join_groupby_expression_impl(ctx: DataFrameContext) -> Any:
         )
     )
 
-    return result
-
 
 def shuffle_full_join_groupby_expression_impl(ctx: DataFrameContext) -> Any:
     """FULL OUTER JOIN with string grouping and aggregation."""
@@ -935,7 +833,7 @@ def shuffle_full_join_groupby_expression_impl(ctx: DataFrameContext) -> Any:
     orders = ctx.get_table("orders")
     col = ctx.col
 
-    result = (
+    return (
         customer.join(orders, left_on="c_custkey", right_on="o_custkey", how="outer")
         .group_by("c_mktsegment")
         .agg(
@@ -944,8 +842,6 @@ def shuffle_full_join_groupby_expression_impl(ctx: DataFrameContext) -> Any:
         )
     )
 
-    return result
-
 
 def shuffle_self_join_expression_impl(ctx: DataFrameContext) -> Any:
     """Self-join with hash collision handling on large table."""
@@ -953,7 +849,7 @@ def shuffle_self_join_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
 
     # Self-join on partkey and shipdate
-    result = (
+    return (
         lineitem.join(
             lineitem.select("l_orderkey", "l_partkey", "l_shipdate").rename({"l_orderkey": "l_orderkey_2"}),
             on=["l_partkey", "l_shipdate"],
@@ -963,8 +859,6 @@ def shuffle_self_join_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("l_orderkey_2").count().alias("match_count"))
         .limit(10000)
     )
-
-    return result
 
 
 # -----------------------------------------------------------------------------
@@ -978,9 +872,7 @@ def string_equal_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = part.filter(col("p_brand") == lit("Brand#23")).select(col("p_partkey").count().alias("count"))
-
-    return result
+    return part.filter(col("p_brand") == lit("Brand#23")).select(col("p_partkey").count().alias("count"))
 
 
 def string_equal_lower_expression_impl(ctx: DataFrameContext) -> Any:
@@ -989,11 +881,9 @@ def string_equal_lower_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = part.filter(col("p_brand").str.to_lowercase() == lit("brand#23")).select(
+    return part.filter(col("p_brand").str.to_lowercase() == lit("brand#23")).select(
         col("p_partkey").count().alias("count")
     )
-
-    return result
 
 
 def string_in_predicate_expression_impl(ctx: DataFrameContext) -> Any:
@@ -1001,11 +891,9 @@ def string_in_predicate_expression_impl(ctx: DataFrameContext) -> Any:
     orders = ctx.get_table("orders")
     col = ctx.col
 
-    result = orders.filter(col("o_orderpriority").is_in(["1-URGENT", "2-HIGH"])).select(
+    return orders.filter(col("o_orderpriority").is_in(["1-URGENT", "2-HIGH"])).select(
         col("o_orderkey").count().alias("count")
     )
-
-    return result
 
 
 def string_like_center_expression_impl(ctx: DataFrameContext) -> Any:
@@ -1013,9 +901,7 @@ def string_like_center_expression_impl(ctx: DataFrameContext) -> Any:
     part = ctx.get_table("part")
     col = ctx.col
 
-    result = part.filter(col("p_name").str.contains("STEEL")).select(col("p_partkey").count().alias("count"))
-
-    return result
+    return part.filter(col("p_name").str.contains("STEEL")).select(col("p_partkey").count().alias("count"))
 
 
 def string_like_suffix_expression_impl(ctx: DataFrameContext) -> Any:
@@ -1023,9 +909,7 @@ def string_like_suffix_expression_impl(ctx: DataFrameContext) -> Any:
     part = ctx.get_table("part")
     col = ctx.col
 
-    result = part.filter(col("p_name").str.ends_with("COPPER")).select(col("p_partkey").count().alias("count"))
-
-    return result
+    return part.filter(col("p_name").str.ends_with("COPPER")).select(col("p_partkey").count().alias("count"))
 
 
 def string_like_prefix_expression_impl(ctx: DataFrameContext) -> Any:
@@ -1033,9 +917,7 @@ def string_like_prefix_expression_impl(ctx: DataFrameContext) -> Any:
     part = ctx.get_table("part")
     col = ctx.col
 
-    result = part.filter(col("p_name").str.starts_with("STANDARD")).select(col("p_partkey").count().alias("count"))
-
-    return result
+    return part.filter(col("p_name").str.starts_with("STANDARD")).select(col("p_partkey").count().alias("count"))
 
 
 # -----------------------------------------------------------------------------
@@ -1049,7 +931,7 @@ def window_growing_frame_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = (
+    return (
         lineitem.filter(col("l_orderkey") <= lit(1000))
         .sort(["l_orderkey", "l_linenumber"])
         .with_columns(
@@ -1062,8 +944,6 @@ def window_growing_frame_expression_impl(ctx: DataFrameContext) -> Any:
         .select("l_orderkey", "l_linenumber", "l_quantity", "running_quantity")
     )
 
-    return result
-
 
 def window_lead_lag_expression_impl(ctx: DataFrameContext) -> Any:
     """Offset window functions over the same frame."""
@@ -1071,7 +951,7 @@ def window_lead_lag_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = (
+    return (
         orders.filter((col("o_orderdate") >= lit(date(1995, 1, 1))) & (col("o_orderdate") < lit(date(1996, 1, 1))))
         .sort(["o_custkey", "o_orderdate"])
         .with_columns(
@@ -1087,8 +967,6 @@ def window_lead_lag_expression_impl(ctx: DataFrameContext) -> Any:
         .select("o_orderkey", "o_orderdate", "o_totalprice", "prev_order_price", "next_order_price")
     )
 
-    return result
-
 
 def window_dense_rank_expression_impl(ctx: DataFrameContext) -> Any:
     """Window function DENSE_RANK() OVER (PARTITION BY ... ORDER BY ...)."""
@@ -1096,7 +974,7 @@ def window_dense_rank_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = (
+    return (
         lineitem.filter(col("l_orderkey") <= lit(10000))
         .with_columns(
             ctx.window_dense_rank(
@@ -1107,8 +985,6 @@ def window_dense_rank_expression_impl(ctx: DataFrameContext) -> Any:
         .sort(["l_orderkey", "price_rank"])
         .select("l_orderkey", "l_partkey", "l_quantity", "l_extendedprice", "price_rank")
     )
-
-    return result
 
 
 # -----------------------------------------------------------------------------
@@ -1122,7 +998,7 @@ def predicate_ordering_groupby_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = (
+    return (
         lineitem.filter(
             (col("l_shipdate") <= lit(date(1998, 9, 1)))
             & (col("l_discount") > lit(0.05))
@@ -1134,8 +1010,6 @@ def predicate_ordering_groupby_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("l_quantity").sum().alias("total_qty"))
     )
 
-    return result
-
 
 def predicate_ordering_costs_expression_impl(ctx: DataFrameContext) -> Any:
     """Order filter predicates by selectivity with result projection only."""
@@ -1143,7 +1017,7 @@ def predicate_ordering_costs_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = (
+    return (
         lineitem.filter(
             (col("l_quantity") > lit(45))
             & (col("l_extendedprice") > lit(50000))
@@ -1156,8 +1030,6 @@ def predicate_ordering_costs_expression_impl(ctx: DataFrameContext) -> Any:
         )
         .limit(100)
     )
-
-    return result
 
 
 # -----------------------------------------------------------------------------
@@ -1175,7 +1047,7 @@ def broadcast_join_four_tables_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = (
+    return (
         partsupp.join(supplier, left_on="ps_suppkey", right_on="s_suppkey")
         .join(nation, left_on="s_nationkey", right_on="n_nationkey")
         .join(region, left_on="n_regionkey", right_on="r_regionkey")
@@ -1184,8 +1056,6 @@ def broadcast_join_four_tables_expression_impl(ctx: DataFrameContext) -> Any:
         .group_by("r_name", "p_type")
         .agg((col("ps_supplycost") * col("ps_availqty")).sum().alias("total_value"))
     )
-
-    return result
 
 
 def exchange_broadcast_expression_impl(ctx: DataFrameContext) -> Any:
@@ -1198,13 +1068,11 @@ def exchange_broadcast_expression_impl(ctx: DataFrameContext) -> Any:
     # Small parts filtered from part table
     small_parts = part.filter(col("p_size") == lit(1)).select("p_partkey")
 
-    result = (
+    return (
         lineitem.join(small_parts, left_on="l_partkey", right_on="p_partkey")
         .group_by("l_orderkey")
         .agg(col("l_quantity").sum().alias("total_qty"))
     )
-
-    return result
 
 
 def exchange_merge_expression_impl(ctx: DataFrameContext) -> Any:
@@ -1212,13 +1080,11 @@ def exchange_merge_expression_impl(ctx: DataFrameContext) -> Any:
     orders = ctx.get_table("orders")
     lineitem = ctx.get_table("lineitem")
 
-    result = (
+    return (
         orders.join(lineitem, left_on="o_orderkey", right_on="l_orderkey")
         .select("o_orderkey", "l_linenumber", "l_quantity")
         .sort(["o_orderkey", "l_linenumber"])
     )
-
-    return result
 
 
 def exchange_shuffle_expression_impl(ctx: DataFrameContext) -> Any:
@@ -1238,13 +1104,11 @@ def exchange_shuffle_expression_impl(ctx: DataFrameContext) -> Any:
         col("ps_suppkey").alias("supp2"),
     )
 
-    result = (
+    return (
         ps1.join(ps2, left_on="ps_partkey", right_on="ps_partkey_2")
         .filter((col("supp1") < col("supp2")) & (col("cost1") > lit(100)))
         .select("ps_partkey", "supp1", "supp2")
     )
-
-    return result
 
 
 # -----------------------------------------------------------------------------
@@ -1257,23 +1121,19 @@ def topn_aggregate_expression_impl(ctx: DataFrameContext) -> Any:
     lineitem = ctx.get_table("lineitem")
     col = ctx.col
 
-    result = (
+    return (
         lineitem.group_by("l_orderkey")
         .agg(col("l_quantity").sum().alias("total_quantity"))
         .sort("total_quantity", descending=True)
         .limit(10)
     )
 
-    return result
-
 
 def topn_allcols_expression_impl(ctx: DataFrameContext) -> Any:
     """Top-10 limit returning all columns after ordering over all table rows."""
     lineitem = ctx.get_table("lineitem")
 
-    result = lineitem.sort("l_extendedprice", descending=True).limit(10)
-
-    return result
+    return lineitem.sort("l_extendedprice", descending=True).limit(10)
 
 
 # -----------------------------------------------------------------------------
@@ -1287,7 +1147,7 @@ def statistical_variance_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = (
+    return (
         orders.filter(col("o_orderdate") >= lit(date(1995, 1, 1)))
         .group_by("o_orderpriority")
         .agg(
@@ -1297,8 +1157,6 @@ def statistical_variance_expression_impl(ctx: DataFrameContext) -> Any:
             col("o_totalprice").std().alias("price_stddev"),
         )
     )
-
-    return result
 
 
 def statistical_correlation_expression_impl(ctx: DataFrameContext) -> Any:
@@ -1312,7 +1170,7 @@ def statistical_correlation_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Calculate correlation between quantity and price
-    result = filtered.select(
+    return filtered.select(
         col("l_quantity").mean().alias("avg_quantity"),
         col("l_extendedprice").mean().alias("avg_price"),
         # Correlation requires special handling - use pearson_corr where available
@@ -1321,8 +1179,6 @@ def statistical_correlation_expression_impl(ctx: DataFrameContext) -> Any:
             - col("l_quantity").mean() * col("l_extendedprice").mean()
         ).alias("covariance_approx"),
     )
-
-    return result
 
 
 # -----------------------------------------------------------------------------
@@ -1338,7 +1194,7 @@ def long_predicate_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = (
+    return (
         lineitem.join(orders, left_on="l_orderkey", right_on="o_orderkey")
         .join(customer, left_on="o_custkey", right_on="c_custkey")
         .filter(
@@ -1356,8 +1212,6 @@ def long_predicate_expression_impl(ctx: DataFrameContext) -> Any:
         )
         .select(col("l_orderkey").count().alias("count"))
     )
-
-    return result
 
 
 # -----------------------------------------------------------------------------
@@ -1378,15 +1232,13 @@ def max_by_simple_expression_impl(ctx: DataFrameContext) -> Any:
     max_balances = with_nation.group_by("n_name").agg(col("c_acctbal").max().alias("max_balance"))
 
     # Rejoin to get customer name
-    result = (
+    return (
         with_nation.join(max_balances, on="n_name")
         .filter(col("c_acctbal") == col("max_balance"))
         .select("n_name", "c_name", "max_balance")
         .unique(subset=["n_name"])
         .sort("max_balance", descending=True)
     )
-
-    return result
 
 
 def min_by_simple_expression_impl(ctx: DataFrameContext) -> Any:
@@ -1399,15 +1251,13 @@ def min_by_simple_expression_impl(ctx: DataFrameContext) -> Any:
 
     min_balances = with_nation.group_by("n_name").agg(col("c_acctbal").min().alias("min_balance"))
 
-    result = (
+    return (
         with_nation.join(min_balances, on="n_name")
         .filter(col("c_acctbal") == col("min_balance"))
         .select("n_name", "c_name", "min_balance")
         .unique(subset=["n_name"])
         .sort("min_balance")
     )
-
-    return result
 
 
 # -----------------------------------------------------------------------------
@@ -1420,7 +1270,7 @@ def array_agg_simple_expression_impl(ctx: DataFrameContext) -> Any:
     partsupp = ctx.get_table("partsupp")
     col = ctx.col
 
-    result = (
+    return (
         partsupp.group_by("ps_suppkey")
         .agg(
             col("ps_partkey").sort_by("ps_partkey").alias("supplied_parts"),
@@ -1430,19 +1280,15 @@ def array_agg_simple_expression_impl(ctx: DataFrameContext) -> Any:
         .limit(100)
     )
 
-    return result
-
 
 def array_agg_distinct_expression_impl(ctx: DataFrameContext) -> Any:
     """Distinct array aggregation."""
     customer = ctx.get_table("customer")
     col = ctx.col
 
-    result = customer.group_by("c_mktsegment").agg(
+    return customer.group_by("c_mktsegment").agg(
         col("c_nationkey").unique().sort().alias("nation_keys"),
     )
-
-    return result
 
 
 # =============================================================================
@@ -1455,9 +1301,7 @@ def aggregation_distinct_pandas_impl(ctx: DataFrameContext) -> Any:
     orders = ctx.get_table("orders")
 
     filtered = orders[orders["o_orderdate"] >= date(1995, 1, 1)]
-    result = filtered[["o_custkey"]].nunique().to_frame(name="unique_customers").reset_index(drop=True)
-
-    return result
+    return filtered[["o_custkey"]].nunique().to_frame(name="unique_customers").reset_index(drop=True)
 
 
 def aggregation_distinct_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1487,9 +1331,7 @@ def approx_count_distinct_simple_pandas_impl(ctx: DataFrameContext) -> Any:
     if _is_dask_context(ctx):
         return ctx.scalar_to_df({"unique_customers": filtered["o_custkey"].nunique_approx().compute()})
 
-    result = filtered[["o_custkey"]].nunique().to_frame(name="unique_customers").reset_index(drop=True)
-
-    return result
+    return filtered[["o_custkey"]].nunique().to_frame(name="unique_customers").reset_index(drop=True)
 
 
 def approx_count_distinct_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1545,9 +1387,7 @@ def aggregation_materialize_pandas_impl(ctx: DataFrameContext) -> Any:
     order_totals = orders.groupby("o_custkey", as_index=False).agg(customer_total=("o_totalprice", "sum"))
 
     # Second aggregation - use ctx.scalar_to_df for platform compatibility
-    result = ctx.scalar_to_df({"avg_customer_spending": order_totals["customer_total"].mean()})
-
-    return result
+    return ctx.scalar_to_df({"avg_customer_spending": order_totals["customer_total"].mean()})
 
 
 def aggregation_materialize_subquery_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1569,9 +1409,7 @@ def aggregation_materialize_subquery_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Second aggregation by segment
-    result = order_totals.groupby("c_mktsegment", as_index=False).agg(avg_segment_order=("order_total", "mean"))
-
-    return result
+    return order_totals.groupby("c_mktsegment", as_index=False).agg(avg_segment_order=("order_total", "mean"))
 
 
 def aggregation_partition_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1580,12 +1418,10 @@ def aggregation_partition_pandas_impl(ctx: DataFrameContext) -> Any:
 
     filtered = lineitem[(lineitem["l_shipdate"] >= date(1995, 1, 1)) & (lineitem["l_shipdate"] < date(1996, 1, 1))]
 
-    result = filtered.groupby(["l_shipdate", "l_shipmode"], as_index=False).agg(
+    return filtered.groupby(["l_shipdate", "l_shipmode"], as_index=False).agg(
         daily_quantity=("l_quantity", "sum"),
         shipment_count=("l_orderkey", "count"),
     )
-
-    return result
 
 
 def aggregation_selective_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1594,52 +1430,42 @@ def aggregation_selective_pandas_impl(ctx: DataFrameContext) -> Any:
 
     filtered = lineitem[(lineitem["l_discount"] > 0.05) & (lineitem["l_quantity"] < 24)]
     total = (filtered["l_extendedprice"] * filtered["l_discount"]).sum()
-    result = ctx.scalar_to_df({"total_discount_amount": total})
-
-    return result
+    return ctx.scalar_to_df({"total_discount_amount": total})
 
 
 def aggregation_simple_pandas_impl(ctx: DataFrameContext) -> Any:
     """Aggregate over all rows in table."""
     orders = ctx.get_table("orders")
 
-    result = ctx.scalar_to_df(
+    return ctx.scalar_to_df(
         {
             "total_orders": len(orders),
             "total_revenue": orders["o_totalprice"].sum(),
         }
     )
 
-    return result
-
 
 def filter_selective_pandas_impl(ctx: DataFrameContext) -> Any:
     """High selectivity filter - few rows match."""
     lineitem = ctx.get_table("lineitem")
 
-    result = lineitem[
+    return lineitem[
         (lineitem["l_quantity"] > 45) & (lineitem["l_extendedprice"] > 50000) & (lineitem["l_discount"] < 0.05)
     ][["l_orderkey", "l_partkey", "l_quantity", "l_extendedprice"]]
-
-    return result
 
 
 def filter_non_selective_pandas_impl(ctx: DataFrameContext) -> Any:
     """Low selectivity filter - many rows match."""
     lineitem = ctx.get_table("lineitem")
 
-    result = lineitem[lineitem["l_quantity"] > 1][["l_orderkey", "l_partkey", "l_quantity", "l_extendedprice"]]
-
-    return result
+    return lineitem[lineitem["l_quantity"] > 1][["l_orderkey", "l_partkey", "l_quantity", "l_extendedprice"]]
 
 
 def count_star_pandas_impl(ctx: DataFrameContext) -> Any:
     """Metadata-based count optimization vs full table scan performance."""
     lineitem = ctx.get_table("lineitem")
 
-    result = ctx.scalar_to_df({"total_lineitems": len(lineitem)})
-
-    return result
+    return ctx.scalar_to_df({"total_lineitems": len(lineitem)})
 
 
 def decimal_arithmetic_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1650,87 +1476,67 @@ def decimal_arithmetic_pandas_impl(ctx: DataFrameContext) -> Any:
     filtered["final_price"] = filtered["l_extendedprice"] * (1 - filtered["l_discount"]) * (1 + filtered["l_tax"])
     filtered["unit_price"] = filtered["l_extendedprice"] / filtered["l_quantity"]
 
-    result = filtered[["l_orderkey", "final_price", "unit_price"]].head(1000)
-
-    return result
+    return filtered[["l_orderkey", "final_price", "unit_price"]].head(1000)
 
 
 def orderby_simple_pandas_impl(ctx: DataFrameContext) -> Any:
     """Simple ORDER BY single column."""
     orders = ctx.get_table("orders")
 
-    result = orders[["o_orderkey", "o_orderdate", "o_totalprice"]].sort_values("o_orderdate").head(100)
-
-    return result
+    return orders[["o_orderkey", "o_orderdate", "o_totalprice"]].sort_values("o_orderdate").head(100)
 
 
 def orderby_multi_pandas_impl(ctx: DataFrameContext) -> Any:
     """ORDER BY multiple columns."""
     lineitem = ctx.get_table("lineitem")
 
-    result = (
+    return (
         lineitem[["l_orderkey", "l_linenumber", "l_shipdate", "l_quantity"]]
         .sort_values(["l_shipdate", "l_orderkey", "l_linenumber"])
         .head(100)
     )
-
-    return result
 
 
 def orderby_desc_pandas_impl(ctx: DataFrameContext) -> Any:
     """ORDER BY with descending sort."""
     orders = ctx.get_table("orders")
 
-    result = (
-        orders[["o_orderkey", "o_totalprice", "o_orderdate"]].sort_values("o_totalprice", ascending=False).head(100)
-    )
-
-    return result
+    return orders[["o_orderkey", "o_totalprice", "o_orderdate"]].sort_values("o_totalprice", ascending=False).head(100)
 
 
 def topn_pandas_impl(ctx: DataFrameContext) -> Any:
     """Top-N query with ORDER BY and LIMIT."""
     lineitem = ctx.get_table("lineitem")
 
-    result = lineitem.nlargest(10, "l_extendedprice")[["l_orderkey", "l_partkey", "l_extendedprice"]]
-
-    return result
+    return lineitem.nlargest(10, "l_extendedprice")[["l_orderkey", "l_partkey", "l_extendedprice"]]
 
 
 def limit_pandas_impl(ctx: DataFrameContext) -> Any:
     """Simple LIMIT without ORDER BY."""
     lineitem = ctx.get_table("lineitem")
 
-    result = lineitem[["l_orderkey", "l_partkey", "l_suppkey", "l_quantity"]].head(1000)
-
-    return result
+    return lineitem[["l_orderkey", "l_partkey", "l_suppkey", "l_quantity"]].head(1000)
 
 
 def string_like_pandas_impl(ctx: DataFrameContext) -> Any:
     """String LIKE pattern matching."""
     part = ctx.get_table("part")
 
-    result = part[part["p_name"].str.contains("blue", na=False)][["p_partkey", "p_name", "p_type"]]
-
-    return result
+    return part[part["p_name"].str.contains("blue", na=False)][["p_partkey", "p_name", "p_type"]]
 
 
 def string_starts_with_pandas_impl(ctx: DataFrameContext) -> Any:
     """String starts_with pattern matching."""
     part = ctx.get_table("part")
 
-    result = part[part["p_type"].str.startswith("STANDARD", na=False)][["p_partkey", "p_name", "p_type"]]
-
-    return result
+    return part[part["p_type"].str.startswith("STANDARD", na=False)][["p_partkey", "p_name", "p_type"]]
 
 
 def string_ends_with_pandas_impl(ctx: DataFrameContext) -> Any:
     """String ends_with pattern matching."""
     part = ctx.get_table("part")
 
-    result = part[part["p_type"].str.endswith("BRASS", na=False)][["p_partkey", "p_name", "p_type"]]
-
-    return result
+    return part[part["p_type"].str.endswith("BRASS", na=False)][["p_partkey", "p_name", "p_type"]]
 
 
 def string_concat_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1739,9 +1545,7 @@ def string_concat_pandas_impl(ctx: DataFrameContext) -> Any:
 
     result = customer.copy()
     result["customer_info"] = result["c_name"] + " - " + result["c_mktsegment"]
-    result = result[["c_custkey", "customer_info"]].head(100)
-
-    return result
+    return result[["c_custkey", "customer_info"]].head(100)
 
 
 def string_substring_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1750,9 +1554,7 @@ def string_substring_pandas_impl(ctx: DataFrameContext) -> Any:
 
     result = customer.copy()
     result["country_code"] = result["c_phone"].str[:3]
-    result = result[["c_custkey", "country_code"]].head(100)
-
-    return result
+    return result[["c_custkey", "country_code"]].head(100)
 
 
 def window_row_number_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1763,9 +1565,7 @@ def window_row_number_pandas_impl(ctx: DataFrameContext) -> Any:
     sorted_df = lineitem.sort_values(["l_orderkey", "l_extendedprice"], ascending=[True, False])
     sorted_df["row_num"] = sorted_df.groupby("l_orderkey").cumcount() + 1
 
-    result = sorted_df[sorted_df["row_num"] <= 3][["l_orderkey", "l_linenumber", "l_extendedprice", "row_num"]]
-
-    return result
+    return sorted_df[sorted_df["row_num"] <= 3][["l_orderkey", "l_linenumber", "l_extendedprice", "row_num"]]
 
 
 def window_rank_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1776,9 +1576,7 @@ def window_rank_pandas_impl(ctx: DataFrameContext) -> Any:
     lineitem = lineitem.copy()
     lineitem["qty_rank"] = lineitem.groupby("l_returnflag")["l_quantity"].rank(method="min", ascending=False)
 
-    result = lineitem[lineitem["qty_rank"] <= 5][["l_orderkey", "l_returnflag", "l_quantity", "qty_rank"]]
-
-    return result
+    return lineitem[lineitem["qty_rank"] <= 5][["l_orderkey", "l_returnflag", "l_quantity", "qty_rank"]]
 
 
 def window_sum_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1788,9 +1586,7 @@ def window_sum_pandas_impl(ctx: DataFrameContext) -> Any:
     lineitem = lineitem.copy()
     lineitem["order_total"] = lineitem.groupby("l_orderkey")["l_extendedprice"].transform("sum")
 
-    result = lineitem[["l_orderkey", "l_linenumber", "l_extendedprice", "order_total"]]
-
-    return result
+    return lineitem[["l_orderkey", "l_linenumber", "l_extendedprice", "order_total"]]
 
 
 def window_running_sum_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1800,9 +1596,7 @@ def window_running_sum_pandas_impl(ctx: DataFrameContext) -> Any:
     sorted_orders = orders.sort_values("o_orderdate").copy()
     sorted_orders["cumulative_revenue"] = sorted_orders["o_totalprice"].cumsum()
 
-    result = sorted_orders[["o_orderkey", "o_orderdate", "o_totalprice", "cumulative_revenue"]].head(100)
-
-    return result
+    return sorted_orders[["o_orderkey", "o_orderdate", "o_totalprice", "cumulative_revenue"]].head(100)
 
 
 def broadcast_join_two_tables_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1811,9 +1605,7 @@ def broadcast_join_two_tables_pandas_impl(ctx: DataFrameContext) -> Any:
     nation = ctx.get_table("nation")
 
     merged = supplier.merge(nation, left_on="s_nationkey", right_on="n_nationkey")
-    result = ctx.scalar_to_df({"supplier_count": len(merged)})
-
-    return result
+    return ctx.scalar_to_df({"supplier_count": len(merged)})
 
 
 def broadcast_join_three_tables_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1825,9 +1617,7 @@ def broadcast_join_three_tables_pandas_impl(ctx: DataFrameContext) -> Any:
     merged = supplier.merge(nation, left_on="s_nationkey", right_on="n_nationkey")
     merged = merged.merge(region, left_on="n_regionkey", right_on="r_regionkey")
 
-    result = merged.groupby(["r_name", "n_name"], as_index=False).agg(supplier_count=("s_suppkey", "count"))
-
-    return result
+    return merged.groupby(["r_name", "n_name"], as_index=False).agg(supplier_count=("s_suppkey", "count"))
 
 
 def predicate_ordering_aggregation_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1842,9 +1632,7 @@ def predicate_ordering_aggregation_pandas_impl(ctx: DataFrameContext) -> Any:
         & (lineitem["l_quantity"] < 24)
     ]
 
-    result = ctx.scalar_to_df({"total_price": filtered["l_extendedprice"].sum()})
-
-    return result
+    return ctx.scalar_to_df({"total_price": filtered["l_extendedprice"].sum()})
 
 
 def shuffle_join_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1853,9 +1641,7 @@ def shuffle_join_pandas_impl(ctx: DataFrameContext) -> Any:
     lineitem = ctx.get_table("lineitem")
 
     merged = orders.merge(lineitem, left_on="o_orderkey", right_on="l_orderkey")
-    result = merged.groupby("o_orderkey", as_index=False).agg(total_qty=("l_quantity", "sum"))
-
-    return result
+    return merged.groupby("o_orderkey", as_index=False).agg(total_qty=("l_quantity", "sum"))
 
 
 def empty_build_join_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1864,11 +1650,9 @@ def empty_build_join_pandas_impl(ctx: DataFrameContext) -> Any:
     orders = ctx.get_table("orders")
 
     empty_orders = orders[orders["o_totalprice"] < 0][["o_orderkey"]]
-    result = lineitem.merge(empty_orders, left_on="l_orderkey", right_on="o_orderkey", how="left")[
+    return lineitem.merge(empty_orders, left_on="l_orderkey", right_on="o_orderkey", how="left")[
         ["l_orderkey", "l_partkey", "l_quantity"]
     ]
-
-    return result
 
 
 # -----------------------------------------------------------------------------
@@ -1880,9 +1664,7 @@ def filter_bigint_selective_pandas_impl(ctx: DataFrameContext) -> Any:
     """Equality predicate with high selectivity on integer column."""
     orders = ctx.get_table("orders")
 
-    result = orders[orders["o_orderkey"] == 1234567][["o_orderkey", "o_custkey", "o_orderdate", "o_totalprice"]]
-
-    return result
+    return orders[orders["o_orderkey"] == 1234567][["o_orderkey", "o_custkey", "o_orderdate", "o_totalprice"]]
 
 
 def filter_bigint_non_selective_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1890,31 +1672,25 @@ def filter_bigint_non_selective_pandas_impl(ctx: DataFrameContext) -> Any:
     lineitem = ctx.get_table("lineitem")
 
     count = len(lineitem[lineitem["l_orderkey"] > 1000])
-    result = ctx.scalar_to_df({"count": count})
-
-    return result
+    return ctx.scalar_to_df({"count": count})
 
 
 def filter_bigint_in_list_pandas_impl(ctx: DataFrameContext) -> Any:
     """IN-list predicate with highly selective integer values."""
     orders = ctx.get_table("orders")
 
-    result = orders[orders["o_orderkey"].isin([1, 100, 1000, 10000, 100000])][
+    return orders[orders["o_orderkey"].isin([1, 100, 1000, 10000, 100000])][
         ["o_orderkey", "o_custkey", "o_orderdate", "o_totalprice"]
     ]
-
-    return result
 
 
 def filter_decimal_selective_pandas_impl(ctx: DataFrameContext) -> Any:
     """Compound equality predicate with multiple decimal columns."""
     lineitem = ctx.get_table("lineitem")
 
-    result = lineitem[(lineitem["l_extendedprice"] == 12345.67) & (lineitem["l_discount"] == 0.05)][
+    return lineitem[(lineitem["l_extendedprice"] == 12345.67) & (lineitem["l_discount"] == 0.05)][
         ["l_orderkey", "l_partkey", "l_extendedprice", "l_discount"]
     ]
-
-    return result
 
 
 def filter_decimal_non_selective_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1922,18 +1698,14 @@ def filter_decimal_non_selective_pandas_impl(ctx: DataFrameContext) -> Any:
     lineitem = ctx.get_table("lineitem")
 
     count = len(lineitem[lineitem["l_extendedprice"] > 1000.00])
-    result = ctx.scalar_to_df({"count": count})
-
-    return result
+    return ctx.scalar_to_df({"count": count})
 
 
 def filter_string_selective_pandas_impl(ctx: DataFrameContext) -> Any:
     """Exact string equality with high selectivity on varchar column."""
     customer = ctx.get_table("customer")
 
-    result = customer[customer["c_name"] == "Customer#000001234"][["c_custkey", "c_name", "c_address", "c_phone"]]
-
-    return result
+    return customer[customer["c_name"] == "Customer#000001234"][["c_custkey", "c_name", "c_address", "c_phone"]]
 
 
 def filter_string_non_selective_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1941,9 +1713,7 @@ def filter_string_non_selective_pandas_impl(ctx: DataFrameContext) -> Any:
     customer = ctx.get_table("customer")
 
     count = len(customer[customer["c_mktsegment"] >= "A"])
-    result = ctx.scalar_to_df({"count": count})
-
-    return result
+    return ctx.scalar_to_df({"count": count})
 
 
 def filter_in_predicate_subquery_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1952,9 +1722,7 @@ def filter_in_predicate_subquery_pandas_impl(ctx: DataFrameContext) -> Any:
     lineitem = ctx.get_table("lineitem")
 
     high_qty_parts = lineitem[lineitem["l_quantity"] > 45]["l_partkey"].unique()
-    result = part[part["p_partkey"].isin(high_qty_parts)][["p_partkey", "p_name", "p_type", "p_size"]]
-
-    return result
+    return part[part["p_partkey"].isin(high_qty_parts)][["p_partkey", "p_name", "p_type", "p_size"]]
 
 
 # -----------------------------------------------------------------------------
@@ -1966,48 +1734,38 @@ def groupby_highndv_pandas_impl(ctx: DataFrameContext) -> Any:
     """GROUP BY with high distinct value count (many groups)."""
     lineitem = ctx.get_table("lineitem")
 
-    result = lineitem.groupby("l_orderkey", as_index=False).agg(line_count=("l_linenumber", "count"))
-
-    return result
+    return lineitem.groupby("l_orderkey", as_index=False).agg(line_count=("l_linenumber", "count"))
 
 
 def groupby_lowndv_pandas_impl(ctx: DataFrameContext) -> Any:
     """GROUP BY with low distinct value count (few groups)."""
     orders = ctx.get_table("orders")
 
-    result = orders.groupby("o_orderpriority", as_index=False).agg(order_count=("o_orderkey", "count"))
-
-    return result
+    return orders.groupby("o_orderpriority", as_index=False).agg(order_count=("o_orderkey", "count"))
 
 
 def groupby_pk_pandas_impl(ctx: DataFrameContext) -> Any:
     """GROUP BY on primary key (one row per group)."""
     customer = ctx.get_table("customer")
 
-    result = customer.groupby("c_custkey", as_index=False).agg(customer_name=("c_name", "max"))
-
-    return result
+    return customer.groupby("c_custkey", as_index=False).agg(customer_name=("c_name", "max"))
 
 
 def groupby_decimal_highndv_pandas_impl(ctx: DataFrameContext) -> Any:
     """GROUP BY with high cardinality decimal column."""
     lineitem = ctx.get_table("lineitem")
 
-    result = lineitem.groupby("l_extendedprice", as_index=False).agg(price_frequency=("l_orderkey", "count"))
-
-    return result
+    return lineitem.groupby("l_extendedprice", as_index=False).agg(price_frequency=("l_orderkey", "count"))
 
 
 def groupby_decimal_lowndv_pandas_impl(ctx: DataFrameContext) -> Any:
     """GROUP BY with low cardinality decimal column."""
     lineitem = ctx.get_table("lineitem")
 
-    result = lineitem.groupby("l_discount", as_index=False).agg(
+    return lineitem.groupby("l_discount", as_index=False).agg(
         discount_frequency=("l_orderkey", "count"),
         avg_qty=("l_quantity", "mean"),
     )
-
-    return result
 
 
 # -----------------------------------------------------------------------------
@@ -2019,22 +1777,16 @@ def orderby_all_pandas_impl(ctx: DataFrameContext) -> Any:
     """Sort on full table with simple integer ordering."""
     customer = ctx.get_table("customer")
 
-    result = customer.sort_values("c_custkey")[
+    return customer.sort_values("c_custkey")[
         ["c_custkey", "c_name", "c_address", "c_nationkey", "c_phone", "c_acctbal", "c_mktsegment"]
     ]
-
-    return result
 
 
 def orderby_bigint_pandas_impl(ctx: DataFrameContext) -> Any:
     """Sort with aggregation results on integer column."""
     lineitem = ctx.get_table("lineitem")
 
-    result = (
-        lineitem.groupby("l_orderkey", as_index=False).agg(total_qty=("l_quantity", "sum")).sort_values("l_orderkey")
-    )
-
-    return result
+    return lineitem.groupby("l_orderkey", as_index=False).agg(total_qty=("l_quantity", "sum")).sort_values("l_orderkey")
 
 
 def orderby_expression_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -2043,30 +1795,24 @@ def orderby_expression_pandas_impl(ctx: DataFrameContext) -> Any:
 
     df = lineitem.copy()
     df["total_value"] = df["l_quantity"] * df["l_extendedprice"]
-    result = df.sort_values("total_value", ascending=False)[["l_orderkey", "l_partkey", "total_value"]].head(100)
-
-    return result
+    return df.sort_values("total_value", ascending=False)[["l_orderkey", "l_partkey", "total_value"]].head(100)
 
 
 def orderby_multicol_pandas_impl(ctx: DataFrameContext) -> Any:
     """Complex multi-column sort with string, date, and decimal columns."""
     orders = ctx.get_table("orders")
 
-    result = orders.sort_values(
+    return orders.sort_values(
         ["o_orderpriority", "o_orderdate", "o_totalprice"],
         ascending=[True, False, False],
     )[["o_orderkey", "o_custkey", "o_orderpriority", "o_orderdate", "o_totalprice"]].head(100)
-
-    return result
 
 
 def orderby_shortstrings_pandas_impl(ctx: DataFrameContext) -> Any:
     """Sort on short string columns with DISTINCT operation."""
     lineitem = ctx.get_table("lineitem")
 
-    result = lineitem[["l_returnflag", "l_linestatus"]].drop_duplicates().sort_values(["l_returnflag", "l_linestatus"])
-
-    return result
+    return lineitem[["l_returnflag", "l_linestatus"]].drop_duplicates().sort_values(["l_returnflag", "l_linestatus"])
 
 
 # -----------------------------------------------------------------------------
@@ -2080,12 +1826,10 @@ def shuffle_inner_join_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
     orders = ctx.get_table("orders")
 
     merged = customer.merge(orders, left_on="c_custkey", right_on="o_custkey")
-    result = merged.groupby("c_mktsegment", as_index=False).agg(
+    return merged.groupby("c_mktsegment", as_index=False).agg(
         order_count=("o_orderkey", "count"),
         total_revenue=("o_totalprice", "sum"),
     )
-
-    return result
 
 
 def shuffle_left_join_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -2094,12 +1838,10 @@ def shuffle_left_join_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
     orders = ctx.get_table("orders")
 
     merged = customer.merge(orders, left_on="c_custkey", right_on="o_custkey", how="left")
-    result = merged.groupby("c_mktsegment", as_index=False).agg(
+    return merged.groupby("c_mktsegment", as_index=False).agg(
         order_count=("o_orderkey", "count"),
         total_rows=("c_custkey", "count"),
     )
-
-    return result
 
 
 def shuffle_full_join_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -2108,12 +1850,10 @@ def shuffle_full_join_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
     orders = ctx.get_table("orders")
 
     merged = customer.merge(orders, left_on="c_custkey", right_on="o_custkey", how="outer")
-    result = merged.groupby("c_mktsegment", as_index=False).agg(
+    return merged.groupby("c_mktsegment", as_index=False).agg(
         order_count=("o_orderkey", "count"),
         customer_count=("c_custkey", "count"),
     )
-
-    return result
 
 
 def shuffle_self_join_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -2127,9 +1867,7 @@ def shuffle_self_join_pandas_impl(ctx: DataFrameContext) -> Any:
 
     merged = df1.merge(df2, on=["l_partkey", "l_shipdate"])
     filtered = merged[merged["l_orderkey"] != merged["l_orderkey_2"]]
-    result = filtered.groupby("l_orderkey", as_index=False).agg(match_count=("l_orderkey_2", "count")).head(10000)
-
-    return result
+    return filtered.groupby("l_orderkey", as_index=False).agg(match_count=("l_orderkey_2", "count")).head(10000)
 
 
 # -----------------------------------------------------------------------------
@@ -2142,9 +1880,7 @@ def string_equal_pandas_impl(ctx: DataFrameContext) -> Any:
     part = ctx.get_table("part")
 
     count = len(part[part["p_brand"] == "Brand#23"])
-    result = ctx.scalar_to_df({"count": count})
-
-    return result
+    return ctx.scalar_to_df({"count": count})
 
 
 def string_equal_lower_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -2152,9 +1888,7 @@ def string_equal_lower_pandas_impl(ctx: DataFrameContext) -> Any:
     part = ctx.get_table("part")
 
     count = len(part[part["p_brand"].str.lower() == "brand#23"])
-    result = ctx.scalar_to_df({"count": count})
-
-    return result
+    return ctx.scalar_to_df({"count": count})
 
 
 def string_in_predicate_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -2162,9 +1896,7 @@ def string_in_predicate_pandas_impl(ctx: DataFrameContext) -> Any:
     orders = ctx.get_table("orders")
 
     count = len(orders[orders["o_orderpriority"].isin(["1-URGENT", "2-HIGH"])])
-    result = ctx.scalar_to_df({"count": count})
-
-    return result
+    return ctx.scalar_to_df({"count": count})
 
 
 def string_like_center_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -2172,9 +1904,7 @@ def string_like_center_pandas_impl(ctx: DataFrameContext) -> Any:
     part = ctx.get_table("part")
 
     count = len(part[part["p_name"].str.contains("STEEL", na=False)])
-    result = ctx.scalar_to_df({"count": count})
-
-    return result
+    return ctx.scalar_to_df({"count": count})
 
 
 def string_like_suffix_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -2182,9 +1912,7 @@ def string_like_suffix_pandas_impl(ctx: DataFrameContext) -> Any:
     part = ctx.get_table("part")
 
     count = len(part[part["p_name"].str.endswith("COPPER", na=False)])
-    result = ctx.scalar_to_df({"count": count})
-
-    return result
+    return ctx.scalar_to_df({"count": count})
 
 
 def string_like_prefix_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -2192,9 +1920,7 @@ def string_like_prefix_pandas_impl(ctx: DataFrameContext) -> Any:
     part = ctx.get_table("part")
 
     count = len(part[part["p_name"].str.startswith("STANDARD", na=False)])
-    result = ctx.scalar_to_df({"count": count})
-
-    return result
+    return ctx.scalar_to_df({"count": count})
 
 
 # -----------------------------------------------------------------------------
@@ -2210,9 +1936,7 @@ def window_growing_frame_pandas_impl(ctx: DataFrameContext) -> Any:
     df = df.sort_values(["l_orderkey", "l_linenumber"])
     df["running_quantity"] = df.groupby("l_orderkey")["l_quantity"].cumsum()
 
-    result = df[["l_orderkey", "l_linenumber", "l_quantity", "running_quantity"]]
-
-    return result
+    return df[["l_orderkey", "l_linenumber", "l_quantity", "running_quantity"]]
 
 
 def window_lead_lag_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -2224,9 +1948,7 @@ def window_lead_lag_pandas_impl(ctx: DataFrameContext) -> Any:
     df["prev_order_price"] = df.groupby("o_custkey")["o_totalprice"].shift(1)
     df["next_order_price"] = df.groupby("o_custkey")["o_totalprice"].shift(-1)
 
-    result = df[["o_orderkey", "o_orderdate", "o_totalprice", "prev_order_price", "next_order_price"]]
-
-    return result
+    return df[["o_orderkey", "o_orderdate", "o_totalprice", "prev_order_price", "next_order_price"]]
 
 
 def window_dense_rank_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -2237,9 +1959,7 @@ def window_dense_rank_pandas_impl(ctx: DataFrameContext) -> Any:
     df["price_rank"] = df.groupby("l_orderkey")["l_extendedprice"].rank(method="dense", ascending=False)
     df = df.sort_values(["l_orderkey", "price_rank"])
 
-    result = df[["l_orderkey", "l_partkey", "l_quantity", "l_extendedprice", "price_rank"]]
-
-    return result
+    return df[["l_orderkey", "l_partkey", "l_quantity", "l_extendedprice", "price_rank"]]
 
 
 # -----------------------------------------------------------------------------
@@ -2259,16 +1979,14 @@ def predicate_ordering_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
         & (lineitem["l_quantity"] <= 30)
     ]
 
-    result = filtered.groupby("l_returnflag", as_index=False).agg(total_qty=("l_quantity", "sum"))
-
-    return result
+    return filtered.groupby("l_returnflag", as_index=False).agg(total_qty=("l_quantity", "sum"))
 
 
 def predicate_ordering_costs_pandas_impl(ctx: DataFrameContext) -> Any:
     """Order filter predicates by selectivity with result projection only."""
     lineitem = ctx.get_table("lineitem")
 
-    result = lineitem[
+    return lineitem[
         (lineitem["l_quantity"] > 45)
         & (lineitem["l_extendedprice"] > 50000)
         & (lineitem["l_discount"] < 0.05)
@@ -2277,8 +1995,6 @@ def predicate_ordering_costs_pandas_impl(ctx: DataFrameContext) -> Any:
     ][["l_orderkey", "l_partkey", "l_quantity", "l_extendedprice", "l_discount", "l_shipinstruct", "l_shipmode"]].head(
         100
     )
-
-    return result
 
 
 # -----------------------------------------------------------------------------
@@ -2302,9 +2018,7 @@ def broadcast_join_four_tables_pandas_impl(ctx: DataFrameContext) -> Any:
 
     filtered = filtered.copy()
     filtered["total_value"] = filtered["ps_supplycost"] * filtered["ps_availqty"]
-    result = filtered.groupby(["r_name", "p_type"], as_index=False).agg(total_value=("total_value", "sum"))
-
-    return result
+    return filtered.groupby(["r_name", "p_type"], as_index=False).agg(total_value=("total_value", "sum"))
 
 
 def exchange_broadcast_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -2315,9 +2029,7 @@ def exchange_broadcast_pandas_impl(ctx: DataFrameContext) -> Any:
     small_parts = part[part["p_size"] == 1][["p_partkey"]]
     merged = lineitem.merge(small_parts, left_on="l_partkey", right_on="p_partkey")
 
-    result = merged.groupby("l_orderkey", as_index=False).agg(total_qty=("l_quantity", "sum"))
-
-    return result
+    return merged.groupby("l_orderkey", as_index=False).agg(total_qty=("l_quantity", "sum"))
 
 
 def exchange_merge_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -2326,9 +2038,7 @@ def exchange_merge_pandas_impl(ctx: DataFrameContext) -> Any:
     lineitem = ctx.get_table("lineitem")
 
     merged = orders.merge(lineitem, left_on="o_orderkey", right_on="l_orderkey")
-    result = merged[["o_orderkey", "l_linenumber", "l_quantity"]].sort_values(["o_orderkey", "l_linenumber"])
-
-    return result
+    return merged[["o_orderkey", "l_linenumber", "l_quantity"]].sort_values(["o_orderkey", "l_linenumber"])
 
 
 def exchange_shuffle_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -2341,9 +2051,7 @@ def exchange_shuffle_pandas_impl(ctx: DataFrameContext) -> Any:
     ps2 = partsupp[["ps_partkey", "ps_suppkey"]].rename(columns={"ps_suppkey": "supp2"})
 
     merged = ps1.merge(ps2, on="ps_partkey")
-    result = merged[(merged["supp1"] < merged["supp2"]) & (merged["cost1"] > 100)][["ps_partkey", "supp1", "supp2"]]
-
-    return result
+    return merged[(merged["supp1"] < merged["supp2"]) & (merged["cost1"] > 100)][["ps_partkey", "supp1", "supp2"]]
 
 
 # -----------------------------------------------------------------------------
@@ -2355,22 +2063,18 @@ def topn_aggregate_pandas_impl(ctx: DataFrameContext) -> Any:
     """Top 10 limit returning 2 columns after aggregation and computed ordering."""
     lineitem = ctx.get_table("lineitem")
 
-    result = (
+    return (
         lineitem.groupby("l_orderkey", as_index=False)
         .agg(total_quantity=("l_quantity", "sum"))
         .nlargest(10, "total_quantity")
     )
-
-    return result
 
 
 def topn_allcols_pandas_impl(ctx: DataFrameContext) -> Any:
     """Top-10 limit returning all columns after ordering over all table rows."""
     lineitem = ctx.get_table("lineitem")
 
-    result = lineitem.nlargest(10, "l_extendedprice")
-
-    return result
+    return lineitem.nlargest(10, "l_extendedprice")
 
 
 # -----------------------------------------------------------------------------
@@ -2383,14 +2087,12 @@ def statistical_variance_pandas_impl(ctx: DataFrameContext) -> Any:
     orders = ctx.get_table("orders")
 
     filtered = orders[orders["o_orderdate"] >= date(1995, 1, 1)]
-    result = filtered.groupby("o_orderpriority", as_index=False).agg(
+    return filtered.groupby("o_orderpriority", as_index=False).agg(
         order_count=("o_orderkey", "count"),
         avg_price=("o_totalprice", "mean"),
         price_variance=("o_totalprice", "var"),
         price_stddev=("o_totalprice", "std"),
     )
-
-    return result
 
 
 def statistical_correlation_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -2399,15 +2101,13 @@ def statistical_correlation_pandas_impl(ctx: DataFrameContext) -> Any:
 
     filtered = lineitem[(lineitem["l_shipdate"] >= date(1995, 1, 1)) & (lineitem["l_shipdate"] < date(1996, 1, 1))]
 
-    result = ctx.scalar_to_df(
+    return ctx.scalar_to_df(
         {
             "avg_quantity": filtered["l_quantity"].mean(),
             "avg_price": filtered["l_extendedprice"].mean(),
             "qty_price_correlation": filtered["l_quantity"].corr(filtered["l_extendedprice"]),
         }
     )
-
-    return result
 
 
 # -----------------------------------------------------------------------------
@@ -2438,9 +2138,7 @@ def long_predicate_pandas_impl(ctx: DataFrameContext) -> Any:
         & (merged["c_nationkey"].isin([1, 2, 3, 4, 5]))
     ]
 
-    result = ctx.scalar_to_df({"count": len(filtered)})
-
-    return result
+    return ctx.scalar_to_df({"count": len(filtered)})
 
 
 # -----------------------------------------------------------------------------
@@ -2458,9 +2156,7 @@ def max_by_simple_pandas_impl(ctx: DataFrameContext) -> Any:
     # Get max balance per nation
     max_idx = merged.groupby("n_name")["c_acctbal"].idxmax()
     result = merged.loc[max_idx][["n_name", "c_name", "c_acctbal"]].rename(columns={"c_acctbal": "max_balance"})
-    result = result.sort_values("max_balance", ascending=False)
-
-    return result
+    return result.sort_values("max_balance", ascending=False)
 
 
 def min_by_simple_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -2473,9 +2169,7 @@ def min_by_simple_pandas_impl(ctx: DataFrameContext) -> Any:
     # Get min balance per nation
     min_idx = merged.groupby("n_name")["c_acctbal"].idxmin()
     result = merged.loc[min_idx][["n_name", "c_name", "c_acctbal"]].rename(columns={"c_acctbal": "min_balance"})
-    result = result.sort_values("min_balance")
-
-    return result
+    return result.sort_values("min_balance")
 
 
 # -----------------------------------------------------------------------------
@@ -2491,20 +2185,16 @@ def array_agg_simple_pandas_impl(ctx: DataFrameContext) -> Any:
         supplied_parts=("ps_partkey", lambda x: sorted(x)),
         part_count=("ps_partkey", "count"),
     )
-    result = result[result["part_count"] <= 10].head(100)
-
-    return result
+    return result[result["part_count"] <= 10].head(100)
 
 
 def array_agg_distinct_pandas_impl(ctx: DataFrameContext) -> Any:
     """Distinct array aggregation."""
     customer = ctx.get_table("customer")
 
-    result = customer.groupby("c_mktsegment", as_index=False).agg(
+    return customer.groupby("c_mktsegment", as_index=False).agg(
         nation_keys=("c_nationkey", lambda x: sorted(set(x))),
     )
-
-    return result
 
 
 # -----------------------------------------------------------------------------
@@ -2516,18 +2206,14 @@ def limit_ordered_expression_impl(ctx: DataFrameContext) -> Any:
     """LIMIT clause with ordering on large result set."""
     lineitem = ctx.get_table("lineitem")
 
-    result = lineitem.sort(["l_orderkey", "l_linenumber"]).limit(100)
-
-    return result
+    return lineitem.sort(["l_orderkey", "l_linenumber"]).limit(100)
 
 
 def limit_ordered_pandas_impl(ctx: DataFrameContext) -> Any:
     """LIMIT clause with ordering on large result set."""
     lineitem = ctx.get_table("lineitem")
 
-    result = lineitem.sort_values(["l_orderkey", "l_linenumber"]).head(100)
-
-    return result
+    return lineitem.sort_values(["l_orderkey", "l_linenumber"]).head(100)
 
 
 # -----------------------------------------------------------------------------
@@ -2540,22 +2226,18 @@ def filter_decimal_in_list_expression_impl(ctx: DataFrameContext) -> Any:
     lineitem = ctx.get_table("lineitem")
     col = ctx.col
 
-    result = lineitem.filter(col("l_extendedprice").is_in([1000.00, 5000.00, 10000.00, 50000.00])).select(
+    return lineitem.filter(col("l_extendedprice").is_in([1000.00, 5000.00, 10000.00, 50000.00])).select(
         "l_orderkey", "l_partkey", "l_extendedprice", "l_quantity"
     )
-
-    return result
 
 
 def filter_decimal_in_list_pandas_impl(ctx: DataFrameContext) -> Any:
     """IN-list predicate with decimal values and selectivity."""
     lineitem = ctx.get_table("lineitem")
 
-    result = lineitem[lineitem["l_extendedprice"].isin([1000.00, 5000.00, 10000.00, 50000.00])][
+    return lineitem[lineitem["l_extendedprice"].isin([1000.00, 5000.00, 10000.00, 50000.00])][
         ["l_orderkey", "l_partkey", "l_extendedprice", "l_quantity"]
     ]
-
-    return result
 
 
 # -----------------------------------------------------------------------------
@@ -2568,18 +2250,14 @@ def filter_string_like_expression_impl(ctx: DataFrameContext) -> Any:
     part = ctx.get_table("part")
     col = ctx.col
 
-    result = part.filter(col("p_name").str.contains("COPPER")).select("p_partkey", "p_name", "p_type", "p_size")
-
-    return result
+    return part.filter(col("p_name").str.contains("COPPER")).select("p_partkey", "p_name", "p_type", "p_size")
 
 
 def filter_string_like_pandas_impl(ctx: DataFrameContext) -> Any:
     """LIKE predicate with substring pattern matching."""
     part = ctx.get_table("part")
 
-    result = part[part["p_name"].str.contains("COPPER", na=False)][["p_partkey", "p_name", "p_type", "p_size"]]
-
-    return result
+    return part[part["p_name"].str.contains("COPPER", na=False)][["p_partkey", "p_name", "p_type", "p_size"]]
 
 
 # -----------------------------------------------------------------------------
@@ -2591,24 +2269,20 @@ def orderby_decimal_expression_impl(ctx: DataFrameContext) -> Any:
     """Multi-column sort with mixed ASC/DESC on decimal columns."""
     lineitem = ctx.get_table("lineitem")
 
-    result = (
+    return (
         lineitem.sort(["l_extendedprice", "l_discount"], descending=[True, False])
         .select("l_orderkey", "l_extendedprice", "l_discount")
         .limit(100)
     )
-
-    return result
 
 
 def orderby_decimal_pandas_impl(ctx: DataFrameContext) -> Any:
     """Multi-column sort with mixed ASC/DESC on decimal columns."""
     lineitem = ctx.get_table("lineitem")
 
-    result = lineitem.sort_values(["l_extendedprice", "l_discount"], ascending=[False, True])[
+    return lineitem.sort_values(["l_extendedprice", "l_discount"], ascending=[False, True])[
         ["l_orderkey", "l_extendedprice", "l_discount"]
     ].head(100)
-
-    return result
 
 
 # -----------------------------------------------------------------------------
@@ -2628,11 +2302,9 @@ def min_max_runtime_filter_expression_impl(ctx: DataFrameContext) -> Any:
         (col("o_orderdate") >= lit(date(1995, 1, 1))) & (col("o_orderdate") <= lit(date(1995, 3, 31)))
     ).select("o_orderkey")
 
-    result = lineitem.join(date_filtered_orders, left_on="l_orderkey", right_on="o_orderkey", how="semi").select(
+    return lineitem.join(date_filtered_orders, left_on="l_orderkey", right_on="o_orderkey", how="semi").select(
         "l_orderkey", "l_partkey", "l_quantity", "l_extendedprice"
     )
-
-    return result
 
 
 def min_max_runtime_filter_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -2644,11 +2316,9 @@ def min_max_runtime_filter_pandas_impl(ctx: DataFrameContext) -> Any:
         (orders["o_orderdate"] >= date(1995, 1, 1)) & (orders["o_orderdate"] <= date(1995, 3, 31))
     ]["o_orderkey"].unique()
 
-    result = lineitem[lineitem["l_orderkey"].isin(date_filtered_orders)][
+    return lineitem[lineitem["l_orderkey"].isin(date_filtered_orders)][
         ["l_orderkey", "l_partkey", "l_quantity", "l_extendedprice"]
     ]
-
-    return result
 
 
 # -----------------------------------------------------------------------------
@@ -2665,15 +2335,13 @@ def max_by_complex_expression_impl(ctx: DataFrameContext) -> Any:
     merged = orders.join(customer, left_on="o_custkey", right_on="c_custkey")
     max_prices = merged.group_by("c_mktsegment").agg(col("o_totalprice").max().alias("max_order_value"))
 
-    result = (
+    return (
         merged.join(max_prices, on="c_mktsegment")
         .filter(col("o_totalprice") == col("max_order_value"))
         .select("c_mktsegment", "o_orderkey", "o_orderdate", "max_order_value")
         .unique(subset=["c_mktsegment"])
         .sort("max_order_value", descending=True)
     )
-
-    return result
 
 
 def max_by_complex_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -2686,9 +2354,7 @@ def max_by_complex_pandas_impl(ctx: DataFrameContext) -> Any:
     result = merged.loc[max_idx][["c_mktsegment", "o_orderkey", "o_orderdate", "o_totalprice"]].rename(
         columns={"o_totalprice": "max_order_value"}
     )
-    result = result.sort_values("max_order_value", ascending=False)
-
-    return result
+    return result.sort_values("max_order_value", ascending=False)
 
 
 def min_by_complex_expression_impl(ctx: DataFrameContext) -> Any:
@@ -2698,15 +2364,13 @@ def min_by_complex_expression_impl(ctx: DataFrameContext) -> Any:
 
     min_prices = part.group_by("p_brand").agg(col("p_retailprice").min().alias("min_price"))
 
-    result = (
+    return (
         part.join(min_prices, on="p_brand")
         .filter(col("p_retailprice") == col("min_price"))
         .select("p_brand", "p_name", "p_type", "min_price")
         .unique(subset=["p_brand"])
         .sort("min_price")
     )
-
-    return result
 
 
 def min_by_complex_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -2717,9 +2381,7 @@ def min_by_complex_pandas_impl(ctx: DataFrameContext) -> Any:
     result = part.loc[min_idx][["p_brand", "p_name", "p_type", "p_retailprice"]].rename(
         columns={"p_retailprice": "min_price"}
     )
-    result = result.sort_values("min_price")
-
-    return result
+    return result.sort_values("min_price")
 
 
 # -----------------------------------------------------------------------------
@@ -2732,24 +2394,20 @@ def any_value_simple_expression_impl(ctx: DataFrameContext) -> Any:
     customer = ctx.get_table("customer")
     col = ctx.col
 
-    result = customer.group_by("c_mktsegment").agg(
+    return customer.group_by("c_mktsegment").agg(
         col("c_name").first().alias("sample_customer"),
         col("c_custkey").count().alias("customer_count"),
     )
-
-    return result
 
 
 def any_value_simple_pandas_impl(ctx: DataFrameContext) -> Any:
     """Select any customer name per market segment (faster than MIN/MAX)."""
     customer = ctx.get_table("customer")
 
-    result = customer.groupby("c_mktsegment", as_index=False).agg(
+    return customer.groupby("c_mktsegment", as_index=False).agg(
         sample_customer=("c_name", "first"),
         customer_count=("c_custkey", "count"),
     )
-
-    return result
 
 
 def any_value_with_filter_expression_impl(ctx: DataFrameContext) -> Any:
@@ -2757,26 +2415,22 @@ def any_value_with_filter_expression_impl(ctx: DataFrameContext) -> Any:
     nation = ctx.get_table("nation")
     col = ctx.col
 
-    result = nation.group_by("n_regionkey").agg(
+    return nation.group_by("n_regionkey").agg(
         col("n_name").first().alias("sample_nation"),
         col("n_comment").first().alias("sample_comment"),
         col("n_nationkey").count().alias("nation_count"),
     )
-
-    return result
 
 
 def any_value_with_filter_pandas_impl(ctx: DataFrameContext) -> Any:
     """Any value with additional aggregates."""
     nation = ctx.get_table("nation")
 
-    result = nation.groupby("n_regionkey", as_index=False).agg(
+    return nation.groupby("n_regionkey", as_index=False).agg(
         sample_nation=("n_name", "first"),
         sample_comment=("n_comment", "first"),
         nation_count=("n_nationkey", "count"),
     )
-
-    return result
 
 
 # -----------------------------------------------------------------------------
@@ -2791,24 +2445,20 @@ def groupby_all_simple_expression_impl(ctx: DataFrameContext) -> Any:
     lineitem = ctx.get_table("lineitem")
     col = ctx.col
 
-    result = lineitem.group_by("l_returnflag", "l_linestatus").agg(
+    return lineitem.group_by("l_returnflag", "l_linestatus").agg(
         col("l_quantity").sum().alias("total_qty"),
         col("l_extendedprice").mean().alias("avg_price"),
     )
-
-    return result
 
 
 def groupby_all_simple_pandas_impl(ctx: DataFrameContext) -> Any:
     """Automatic grouping by all non-aggregate columns."""
     lineitem = ctx.get_table("lineitem")
 
-    result = lineitem.groupby(["l_returnflag", "l_linestatus"], as_index=False).agg(
+    return lineitem.groupby(["l_returnflag", "l_linestatus"], as_index=False).agg(
         total_qty=("l_quantity", "sum"),
         avg_price=("l_extendedprice", "mean"),
     )
-
-    return result
 
 
 def groupby_all_complex_expression_impl(ctx: DataFrameContext) -> Any:
@@ -2818,7 +2468,7 @@ def groupby_all_complex_expression_impl(ctx: DataFrameContext) -> Any:
     lit = ctx.lit
 
     filtered = orders.filter(col("o_orderdate") >= lit(date(1995, 1, 1)))
-    result = (
+    return (
         filtered.with_columns(col("o_orderdate").dt.truncate("1mo").alias("order_month"))
         .group_by("order_month", "o_orderpriority")
         .agg(
@@ -2828,8 +2478,6 @@ def groupby_all_complex_expression_impl(ctx: DataFrameContext) -> Any:
         .sort(["order_month", "o_orderpriority"])
     )
 
-    return result
-
 
 def groupby_all_complex_pandas_impl(ctx: DataFrameContext) -> Any:
     """GROUP BY ALL with multiple non-aggregate expressions."""
@@ -2838,7 +2486,7 @@ def groupby_all_complex_pandas_impl(ctx: DataFrameContext) -> Any:
     filtered = orders[orders["o_orderdate"] >= date(1995, 1, 1)].copy()
     filtered["order_month"] = filtered["o_orderdate"].dt.to_period("M")
 
-    result = (
+    return (
         filtered.groupby(["order_month", "o_orderpriority"], as_index=False)
         .agg(
             order_count=("o_orderkey", "count"),
@@ -2846,8 +2494,6 @@ def groupby_all_complex_pandas_impl(ctx: DataFrameContext) -> Any:
         )
         .sort_values(["order_month", "o_orderpriority"])
     )
-
-    return result
 
 
 # -----------------------------------------------------------------------------
@@ -2862,15 +2508,13 @@ def orderby_all_simple_expression_impl(ctx: DataFrameContext) -> Any:
     region = ctx.get_table("region")
     col = ctx.col
 
-    result = (
+    return (
         supplier.join(nation, left_on="s_nationkey", right_on="n_nationkey")
         .join(region, left_on="n_regionkey", right_on="r_regionkey")
         .group_by("r_name", "n_name")
         .agg(col("s_suppkey").count().alias("supplier_count"))
         .sort(["r_name", "n_name", "supplier_count"])
     )
-
-    return result
 
 
 def orderby_all_simple_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -2882,13 +2526,11 @@ def orderby_all_simple_pandas_impl(ctx: DataFrameContext) -> Any:
     merged = supplier.merge(nation, left_on="s_nationkey", right_on="n_nationkey")
     merged = merged.merge(region, left_on="n_regionkey", right_on="r_regionkey")
 
-    result = (
+    return (
         merged.groupby(["r_name", "n_name"], as_index=False)
         .agg(supplier_count=("s_suppkey", "count"))
         .sort_values(["r_name", "n_name", "supplier_count"])
     )
-
-    return result
 
 
 def orderby_all_desc_expression_impl(ctx: DataFrameContext) -> Any:
@@ -2896,28 +2538,24 @@ def orderby_all_desc_expression_impl(ctx: DataFrameContext) -> Any:
     part = ctx.get_table("part")
     col = ctx.col
 
-    result = (
+    return (
         part.group_by("p_brand", "p_type")
         .agg(col("p_retailprice").mean().alias("avg_price"))
         .sort(["p_brand", "p_type", "avg_price"], descending=True)
         .limit(100)
     )
 
-    return result
-
 
 def orderby_all_desc_pandas_impl(ctx: DataFrameContext) -> Any:
     """ORDER BY ALL with descending direction."""
     part = ctx.get_table("part")
 
-    result = (
+    return (
         part.groupby(["p_brand", "p_type"], as_index=False)
         .agg(avg_price=("p_retailprice", "mean"))
         .sort_values(["p_brand", "p_type", "avg_price"], ascending=False)
         .head(100)
     )
-
-    return result
 
 
 # -----------------------------------------------------------------------------
@@ -2940,7 +2578,7 @@ def max_by_with_ties_expression_impl(ctx: DataFrameContext) -> Any:
 
     max_costs = merged.group_by("ps_partkey", "p_name").agg(col("ps_supplycost").max().alias("max_supply_cost"))
 
-    result = (
+    return (
         merged.join(max_costs, on=["ps_partkey", "p_name"])
         .filter(col("ps_supplycost") == col("max_supply_cost"))
         .select("ps_partkey", "p_name", "s_name", "max_supply_cost")
@@ -2948,8 +2586,6 @@ def max_by_with_ties_expression_impl(ctx: DataFrameContext) -> Any:
         .sort("max_supply_cost", descending=True)
         .limit(100)
     )
-
-    return result
 
 
 def max_by_with_ties_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -2965,9 +2601,7 @@ def max_by_with_ties_pandas_impl(ctx: DataFrameContext) -> Any:
     result = merged.loc[max_idx][["p_partkey", "p_name", "s_name", "ps_supplycost"]].rename(
         columns={"ps_supplycost": "max_supply_cost", "s_name": "supplier_name"}
     )
-    result = result.sort_values("max_supply_cost", ascending=False).head(100)
-
-    return result
+    return result.sort_values("max_supply_cost", ascending=False).head(100)
 
 
 def min_by_with_ties_expression_impl(ctx: DataFrameContext) -> Any:
@@ -2985,7 +2619,7 @@ def min_by_with_ties_expression_impl(ctx: DataFrameContext) -> Any:
 
     min_costs = merged.group_by("ps_partkey", "p_name").agg(col("ps_supplycost").min().alias("min_supply_cost"))
 
-    result = (
+    return (
         merged.join(min_costs, on=["ps_partkey", "p_name"])
         .filter(col("ps_supplycost") == col("min_supply_cost"))
         .select("ps_partkey", "p_name", "s_name", "min_supply_cost")
@@ -2993,8 +2627,6 @@ def min_by_with_ties_expression_impl(ctx: DataFrameContext) -> Any:
         .sort("min_supply_cost")
         .limit(100)
     )
-
-    return result
 
 
 def min_by_with_ties_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -3010,9 +2642,7 @@ def min_by_with_ties_pandas_impl(ctx: DataFrameContext) -> Any:
     result = merged.loc[min_idx][["p_partkey", "p_name", "s_name", "ps_supplycost"]].rename(
         columns={"ps_supplycost": "min_supply_cost", "s_name": "supplier_name"}
     )
-    result = result.sort_values("min_supply_cost").head(100)
-
-    return result
+    return result.sort_values("min_supply_cost").head(100)
 
 
 # -----------------------------------------------------------------------------
@@ -3032,13 +2662,11 @@ def predicate_ordering_subquery_expression_impl(ctx: DataFrameContext) -> Any:
         (col("c_mktsegment") == lit("BUILDING")) & (col("c_nationkey") == lit(1))
     ).select("c_custkey")
 
-    result = (
+    return (
         orders.filter((col("o_totalprice") > lit(100000)) & (col("o_orderdate") >= lit(date(1995, 1, 1))))
         .join(building_customers, left_on="o_custkey", right_on="c_custkey", how="semi")
         .select("o_orderkey", "o_totalprice")
     )
-
-    return result
 
 
 def predicate_ordering_subquery_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -3051,9 +2679,7 @@ def predicate_ordering_subquery_pandas_impl(ctx: DataFrameContext) -> Any:
     ].unique()
 
     filtered_orders = orders[(orders["o_totalprice"] > 100000) & (orders["o_orderdate"] >= date(1995, 1, 1))]
-    result = filtered_orders[filtered_orders["o_custkey"].isin(building_customers)][["o_orderkey", "o_totalprice"]]
-
-    return result
+    return filtered_orders[filtered_orders["o_custkey"].isin(building_customers)][["o_orderkey", "o_totalprice"]]
 
 
 # -----------------------------------------------------------------------------
@@ -3084,11 +2710,9 @@ def shuffle_union_all_groupby_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Combine and aggregate
-    result = (
+    return (
         orders_source.vstack(lineitem_orders).group_by("source_type").agg(col("cust_id").count().alias("record_count"))
     )
-
-    return result
 
 
 def shuffle_union_all_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -3109,9 +2733,7 @@ def shuffle_union_all_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
 
     # Combine using ctx.concat for platform compatibility
     combined = ctx.concat([orders_source, lineitem_source])
-    result = combined.groupby("source_type", as_index=False).agg(record_count=("cust_id", "count"))
-
-    return result
+    return combined.groupby("source_type", as_index=False).agg(record_count=("cust_id", "count"))
 
 
 # -----------------------------------------------------------------------------
@@ -3124,7 +2746,7 @@ def statistical_percentiles_expression_impl(ctx: DataFrameContext) -> Any:
     lineitem = ctx.get_table("lineitem")
     col = ctx.col
 
-    result = lineitem.group_by("l_returnflag", "l_linestatus").agg(
+    return lineitem.group_by("l_returnflag", "l_linestatus").agg(
         col("l_orderkey").count().alias("record_count"),
         col("l_quantity").quantile(0.25).alias("quantity_q1"),
         col("l_quantity").quantile(0.5).alias("quantity_median"),
@@ -3132,22 +2754,18 @@ def statistical_percentiles_expression_impl(ctx: DataFrameContext) -> Any:
         col("l_extendedprice").quantile(0.95).alias("price_p95"),
     )
 
-    return result
-
 
 def statistical_percentiles_pandas_impl(ctx: DataFrameContext) -> Any:
     """Percentile calculation functions for distribution analysis."""
     lineitem = ctx.get_table("lineitem")
 
-    result = lineitem.groupby(["l_returnflag", "l_linestatus"], as_index=False).agg(
+    return lineitem.groupby(["l_returnflag", "l_linestatus"], as_index=False).agg(
         record_count=("l_orderkey", "count"),
         quantity_q1=("l_quantity", lambda x: x.quantile(0.25)),
         quantity_median=("l_quantity", "median"),
         quantity_q3=("l_quantity", lambda x: x.quantile(0.75)),
         price_p95=("l_extendedprice", lambda x: x.quantile(0.95)),
     )
-
-    return result
 
 
 # -----------------------------------------------------------------------------
@@ -3160,11 +2778,9 @@ def string_ilike_start_expression_impl(ctx: DataFrameContext) -> Any:
     part = ctx.get_table("part")
     col = ctx.col
 
-    result = part.filter(col("p_name").str.to_lowercase().str.starts_with("standard")).select(
+    return part.filter(col("p_name").str.to_lowercase().str.starts_with("standard")).select(
         col("p_partkey").count().alias("count")
     )
-
-    return result
 
 
 def string_ilike_start_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -3172,9 +2788,7 @@ def string_ilike_start_pandas_impl(ctx: DataFrameContext) -> Any:
     part = ctx.get_table("part")
 
     count = len(part[part["p_name"].str.lower().str.startswith("standard", na=False)])
-    result = ctx.scalar_to_df({"count": count})
-
-    return result
+    return ctx.scalar_to_df({"count": count})
 
 
 def string_ilike_end_expression_impl(ctx: DataFrameContext) -> Any:
@@ -3182,11 +2796,9 @@ def string_ilike_end_expression_impl(ctx: DataFrameContext) -> Any:
     part = ctx.get_table("part")
     col = ctx.col
 
-    result = part.filter(col("p_name").str.to_lowercase().str.ends_with("copper")).select(
+    return part.filter(col("p_name").str.to_lowercase().str.ends_with("copper")).select(
         col("p_partkey").count().alias("count")
     )
-
-    return result
 
 
 def string_ilike_end_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -3194,9 +2806,7 @@ def string_ilike_end_pandas_impl(ctx: DataFrameContext) -> Any:
     part = ctx.get_table("part")
 
     count = len(part[part["p_name"].str.lower().str.endswith("copper", na=False)])
-    result = ctx.scalar_to_df({"count": count})
-
-    return result
+    return ctx.scalar_to_df({"count": count})
 
 
 def string_like_multi_expression_impl(ctx: DataFrameContext) -> Any:
@@ -3204,11 +2814,9 @@ def string_like_multi_expression_impl(ctx: DataFrameContext) -> Any:
     part = ctx.get_table("part")
     col = ctx.col
 
-    result = part.filter(col("p_name").str.contains("STEEL") & col("p_name").str.contains("BRASS")).select(
+    return part.filter(col("p_name").str.contains("STEEL") & col("p_name").str.contains("BRASS")).select(
         col("p_partkey").count().alias("count")
     )
-
-    return result
 
 
 def string_like_multi_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -3216,9 +2824,7 @@ def string_like_multi_pandas_impl(ctx: DataFrameContext) -> Any:
     part = ctx.get_table("part")
 
     count = len(part[part["p_name"].str.contains("STEEL", na=False) & part["p_name"].str.contains("BRASS", na=False)])
-    result = ctx.scalar_to_df({"count": count})
-
-    return result
+    return ctx.scalar_to_df({"count": count})
 
 
 def string_ilike_multi_expression_impl(ctx: DataFrameContext) -> Any:
@@ -3227,11 +2833,9 @@ def string_ilike_multi_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
 
     lower_name = col("p_name").str.to_lowercase()
-    result = part.filter(lower_name.str.contains("steel") & lower_name.str.contains("brass")).select(
+    return part.filter(lower_name.str.contains("steel") & lower_name.str.contains("brass")).select(
         col("p_partkey").count().alias("count")
     )
-
-    return result
 
 
 def string_ilike_multi_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -3240,9 +2844,7 @@ def string_ilike_multi_pandas_impl(ctx: DataFrameContext) -> Any:
 
     lower_name = part["p_name"].str.lower()
     count = len(part[lower_name.str.contains("steel", na=False) & lower_name.str.contains("brass", na=False)])
-    result = ctx.scalar_to_df({"count": count})
-
-    return result
+    return ctx.scalar_to_df({"count": count})
 
 
 def string_like_center_insensitive_expression_impl(ctx: DataFrameContext) -> Any:
@@ -3250,11 +2852,9 @@ def string_like_center_insensitive_expression_impl(ctx: DataFrameContext) -> Any
     part = ctx.get_table("part")
     col = ctx.col
 
-    result = part.filter(col("p_name").str.to_lowercase().str.contains("steel")).select(
+    return part.filter(col("p_name").str.to_lowercase().str.contains("steel")).select(
         col("p_partkey").count().alias("count")
     )
-
-    return result
 
 
 def string_like_center_insensitive_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -3262,9 +2862,7 @@ def string_like_center_insensitive_pandas_impl(ctx: DataFrameContext) -> Any:
     part = ctx.get_table("part")
 
     count = len(part[part["p_name"].str.lower().str.contains("steel", na=False)])
-    result = ctx.scalar_to_df({"count": count})
-
-    return result
+    return ctx.scalar_to_df({"count": count})
 
 
 # -----------------------------------------------------------------------------
@@ -3278,7 +2876,7 @@ def window_moving_frame_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = (
+    return (
         orders.filter((col("o_orderdate") >= lit(date(1995, 1, 1))) & (col("o_orderdate") < lit(date(1996, 1, 1))))
         .sort("o_orderdate")
         .with_columns(
@@ -3291,8 +2889,6 @@ def window_moving_frame_expression_impl(ctx: DataFrameContext) -> Any:
         .sort("o_orderdate")
     )
 
-    return result
-
 
 def window_moving_frame_pandas_impl(ctx: DataFrameContext) -> Any:
     """Window aggregations with complex moving frame definitions."""
@@ -3303,9 +2899,7 @@ def window_moving_frame_pandas_impl(ctx: DataFrameContext) -> Any:
     # Rolling average with 6 order window
     filtered["moving_avg"] = filtered["o_totalprice"].rolling(window=6, min_periods=1).mean()
 
-    result = filtered[["o_orderkey", "o_orderdate", "o_totalprice", "moving_avg"]]
-
-    return result
+    return filtered[["o_orderkey", "o_orderdate", "o_totalprice", "moving_avg"]]
 
 
 def window_unbounded_frame_expression_impl(ctx: DataFrameContext) -> Any:
@@ -3314,7 +2908,7 @@ def window_unbounded_frame_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = (
+    return (
         lineitem.filter((col("l_orderkey") >= lit(1)) & (col("l_orderkey") <= lit(5000)))
         .sort(["l_orderkey", "l_linenumber"])
         .with_columns(
@@ -3325,8 +2919,6 @@ def window_unbounded_frame_expression_impl(ctx: DataFrameContext) -> Any:
         )
         .select("l_orderkey", "l_linenumber", "l_shipdate", "l_quantity", "first_line_qty", "last_line_qty")
     )
-
-    return result
 
 
 def window_unbounded_frame_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -3339,9 +2931,7 @@ def window_unbounded_frame_pandas_impl(ctx: DataFrameContext) -> Any:
     filtered["first_line_qty"] = filtered.groupby("l_orderkey")["l_quantity"].transform("first")
     filtered["last_line_qty"] = filtered.groupby("l_orderkey")["l_quantity"].transform("last")
 
-    result = filtered[["l_orderkey", "l_linenumber", "l_shipdate", "l_quantity", "first_line_qty", "last_line_qty"]]
-
-    return result
+    return filtered[["l_orderkey", "l_linenumber", "l_shipdate", "l_quantity", "first_line_qty", "last_line_qty"]]
 
 
 # =============================================================================
@@ -3366,9 +2956,7 @@ def approx_quantile_groupby_expression_impl(ctx: DataFrameContext) -> Any:
     lineitem = ctx.get_table("lineitem")
     col = ctx.col
 
-    result = lineitem.group_by("l_shipmode").agg(col("l_quantity").quantile(0.5).alias("median_quantity"))
-
-    return result
+    return lineitem.group_by("l_shipmode").agg(col("l_quantity").quantile(0.5).alias("median_quantity"))
 
 
 def approx_quantile_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -3383,9 +2971,7 @@ def approx_quantile_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
     """
     lineitem = ctx.get_table("lineitem")
 
-    result = lineitem.groupby("l_shipmode", as_index=False).agg(median_quantity=("l_quantity", "median"))
-
-    return result
+    return lineitem.groupby("l_shipmode", as_index=False).agg(median_quantity=("l_quantity", "median"))
 
 
 def intrinsic_to_date_expression_impl(ctx: DataFrameContext) -> Any:
@@ -3395,11 +2981,9 @@ def intrinsic_to_date_expression_impl(ctx: DataFrameContext) -> Any:
     lit = ctx.lit
 
     # Filter for specific date and count
-    result = orders.filter(col("o_orderdate") == lit(date(1995, 3, 15))).select(
+    return orders.filter(col("o_orderdate") == lit(date(1995, 3, 15))).select(
         col("o_orderkey").count().alias("orders_by_month")
     )
-
-    return result
 
 
 def intrinsic_to_date_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -3408,9 +2992,7 @@ def intrinsic_to_date_pandas_impl(ctx: DataFrameContext) -> Any:
 
     target_date = date(1995, 3, 15)
     count = len(orders[orders["o_orderdate"] == target_date])
-    result = ctx.scalar_to_df({"orders_by_month": count})
-
-    return result
+    return ctx.scalar_to_df({"orders_by_month": count})
 
 
 # =============================================================================
@@ -3427,7 +3009,7 @@ def fulltext_simple_search_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
 
     # Search for parts containing "STEEL" or "COPPER" in name or comment
-    result = (
+    return (
         part.filter(
             col("p_name").str.contains("STEEL")
             | col("p_name").str.contains("COPPER")
@@ -3437,8 +3019,6 @@ def fulltext_simple_search_expression_impl(ctx: DataFrameContext) -> Any:
         .select("p_partkey", "p_name", "p_mfgr", "p_comment")
         .limit(100)
     )
-
-    return result
 
 
 def fulltext_simple_search_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -3452,9 +3032,7 @@ def fulltext_simple_search_pandas_impl(ctx: DataFrameContext) -> Any:
         | part["p_comment"].str.contains("STEEL", case=True, na=False)
         | part["p_comment"].str.contains("COPPER", case=True, na=False)
     )
-    result = part[mask][["p_partkey", "p_name", "p_mfgr", "p_comment"]].head(100)
-
-    return result
+    return part[mask][["p_partkey", "p_name", "p_mfgr", "p_comment"]].head(100)
 
 
 def fulltext_boolean_search_expression_impl(ctx: DataFrameContext) -> Any:
@@ -3464,15 +3042,13 @@ def fulltext_boolean_search_expression_impl(ctx: DataFrameContext) -> Any:
 
     # Must contain "BUILDING", must NOT contain "FURNITURE"
     # Also compute a simple relevance score (1 for match, 0 for no match)
-    result = (
+    return (
         customer.filter(col("c_comment").str.contains("BUILDING") & ~col("c_comment").str.contains("FURNITURE"))
         .with_columns(col("c_comment").str.contains("BUILDING").cast(int).alias("relevance_score"))
         .select("c_custkey", "c_name", "c_comment", "relevance_score")
         .sort("relevance_score", descending=True)
         .limit(50)
     )
-
-    return result
 
 
 def fulltext_boolean_search_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -3486,13 +3062,11 @@ def fulltext_boolean_search_pandas_impl(ctx: DataFrameContext) -> Any:
     filtered = customer[contains_building & ~contains_furniture].copy()
     filtered["relevance_score"] = 1  # Simple relevance: all matches score 1
 
-    result = (
+    return (
         filtered[["c_custkey", "c_name", "c_comment", "relevance_score"]]
         .sort_values("relevance_score", ascending=False)
         .head(50)
     )
-
-    return result
 
 
 def fulltext_phrase_search_expression_impl(ctx: DataFrameContext) -> Any:
@@ -3501,7 +3075,7 @@ def fulltext_phrase_search_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
 
     # Search for exact phrase "Customer Complaints" (case-insensitive for robustness)
-    result = (
+    return (
         supplier.filter(col("s_comment").str.to_lowercase().str.contains("customer complaints"))
         .with_columns(
             col("s_comment")
@@ -3514,8 +3088,6 @@ def fulltext_phrase_search_expression_impl(ctx: DataFrameContext) -> Any:
         .sort("phrase_match_score", descending=True)
     )
 
-    return result
-
 
 def fulltext_phrase_search_pandas_impl(ctx: DataFrameContext) -> Any:
     """Phrase-based text search for exact phrase match."""
@@ -3527,11 +3099,9 @@ def fulltext_phrase_search_pandas_impl(ctx: DataFrameContext) -> Any:
     filtered = supplier[phrase_match].copy()
     filtered["phrase_match_score"] = 1  # All matches score 1
 
-    result = filtered[["s_suppkey", "s_name", "s_comment", "phrase_match_score"]].sort_values(
+    return filtered[["s_suppkey", "s_name", "s_comment", "phrase_match_score"]].sort_values(
         "phrase_match_score", ascending=False
     )
-
-    return result
 
 
 # =============================================================================
@@ -3567,13 +3137,11 @@ def olap_cube_analysis_expression_impl(ctx: DataFrameContext) -> Any:
 
     # Simple groupby aggregation (CUBE approximation - just the most detailed level)
     # Full CUBE would require union of all dimension combinations
-    result = joined.group_by("n_name", "r_name").agg(
+    return joined.group_by("n_name", "r_name").agg(
         col("o_orderkey").count().alias("order_count"),
         col("o_totalprice").sum().alias("total_revenue"),
         col("o_totalprice").mean().alias("avg_order_value"),
     )
-
-    return result
 
 
 def olap_cube_analysis_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -3595,13 +3163,11 @@ def olap_cube_analysis_pandas_impl(ctx: DataFrameContext) -> Any:
     merged = merged.merge(region, left_on="n_regionkey", right_on="r_regionkey")
 
     # Groupby aggregation (simplified CUBE - most detailed level)
-    result = merged.groupby(["n_name", "r_name"], as_index=False).agg(
+    return merged.groupby(["n_name", "r_name"], as_index=False).agg(
         order_count=("o_orderkey", "count"),
         total_revenue=("o_totalprice", "sum"),
         avg_order_value=("o_totalprice", "mean"),
     )
-
-    return result
 
 
 def olap_rollup_analysis_expression_impl(ctx: DataFrameContext) -> Any:
@@ -3625,7 +3191,7 @@ def olap_rollup_analysis_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Hierarchical aggregation (simplified ROLLUP - most detailed level)
-    result = (
+    return (
         joined.group_by("r_name", "n_name", "c_mktsegment")
         .agg(
             col("c_custkey").n_unique().alias("customer_count"),
@@ -3635,8 +3201,6 @@ def olap_rollup_analysis_expression_impl(ctx: DataFrameContext) -> Any:
         )
         .sort("r_name", "n_name", "c_mktsegment", nulls_last=True)
     )
-
-    return result
 
 
 def olap_rollup_analysis_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -3663,9 +3227,7 @@ def olap_rollup_analysis_pandas_impl(ctx: DataFrameContext) -> Any:
         avg_order_value=("o_totalprice", "mean"),
     )
 
-    result = result.sort_values(["r_name", "n_name", "c_mktsegment"], na_position="last")
-
-    return result
+    return result.sort_values(["r_name", "n_name", "c_mktsegment"], na_position="last")
 
 
 # =============================================================================
@@ -3688,14 +3250,12 @@ def pivot_basic_expression_impl(ctx: DataFrameContext) -> Any:
     ).select("l_returnflag", "l_shipmode", "l_quantity")
 
     # Pivot: sum l_quantity for each l_shipmode per l_returnflag
-    result = filtered.group_by("l_returnflag").agg(
+    return filtered.group_by("l_returnflag").agg(
         col("l_quantity").filter(col("l_shipmode") == lit("AIR")).sum().alias("AIR"),
         col("l_quantity").filter(col("l_shipmode") == lit("RAIL")).sum().alias("RAIL"),
         col("l_quantity").filter(col("l_shipmode") == lit("SHIP")).sum().alias("SHIP"),
         col("l_quantity").filter(col("l_shipmode") == lit("TRUCK")).sum().alias("TRUCK"),
     )
-
-    return result
 
 
 def pivot_basic_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -3711,15 +3271,13 @@ def pivot_basic_pandas_impl(ctx: DataFrameContext) -> Any:
     ]
 
     # Pivot
-    result = filtered.pivot_table(
+    return filtered.pivot_table(
         index="l_returnflag",
         columns="l_shipmode",
         values="l_quantity",
         aggfunc="sum",
         fill_value=0,
     ).reset_index()
-
-    return result
 
 
 def unpivot_basic_expression_impl(ctx: DataFrameContext) -> Any:
@@ -3739,14 +3297,12 @@ def unpivot_basic_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Melt (unpivot) - convert p_size and p_retailprice to dimension_name/dimension_value rows
-    result = filtered.melt(
+    return filtered.melt(
         id_vars=["p_partkey"],
         value_vars=["p_size", "p_retailprice"],
         variable_name="dimension_name",
         value_name="dimension_value",
     )
-
-    return result
 
 
 def unpivot_basic_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -3761,14 +3317,12 @@ def unpivot_basic_pandas_impl(ctx: DataFrameContext) -> Any:
     filtered["p_size"] = filtered["p_size"].astype(float)
 
     # Melt (unpivot)
-    result = filtered.melt(
+    return filtered.melt(
         id_vars=["p_partkey"],
         value_vars=["p_size", "p_retailprice"],
         var_name="dimension_name",
         value_name="dimension_value",
     )
-
-    return result
 
 
 # =============================================================================
@@ -3796,13 +3350,11 @@ def optimizer_distinct_elimination_expression_impl(ctx: DataFrameContext) -> Any
     lit = ctx.lit
 
     # Apply DISTINCT even though o_orderkey is unique (optimizer should eliminate)
-    result = (
+    return (
         orders.filter((col("o_orderdate") >= lit(date(1995, 1, 1))) & (col("o_orderdate") < lit(date(1996, 1, 1))))
         .select("o_orderkey", "o_custkey", "o_orderdate", "o_totalprice")
         .unique()  # Should be eliminated by optimizer since o_orderkey is unique
     )
-
-    return result
 
 
 def optimizer_distinct_elimination_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -3810,9 +3362,7 @@ def optimizer_distinct_elimination_pandas_impl(ctx: DataFrameContext) -> Any:
     orders = ctx.get_table("orders")
 
     filtered = orders[(orders["o_orderdate"] >= date(1995, 1, 1)) & (orders["o_orderdate"] < date(1996, 1, 1))]
-    result = filtered[["o_orderkey", "o_custkey", "o_orderdate", "o_totalprice"]].drop_duplicates()
-
-    return result
+    return filtered[["o_orderkey", "o_custkey", "o_orderdate", "o_totalprice"]].drop_duplicates()
 
 
 def optimizer_common_subexpression_expression_impl(ctx: DataFrameContext) -> Any:
@@ -3826,7 +3376,7 @@ def optimizer_common_subexpression_expression_impl(ctx: DataFrameContext) -> Any
 
     # Define the complex expression (will be repeated)
     # DO NOT name it once and reuse - let optimizer find the common subexpression
-    result = (
+    return (
         lineitem.filter(col("l_quantity") > lit(0))
         .select(
             "l_orderkey",
@@ -3845,8 +3395,6 @@ def optimizer_common_subexpression_expression_impl(ctx: DataFrameContext) -> Any
         .limit(100)
     )
 
-    return result
-
 
 def optimizer_common_subexpression_pandas_impl(ctx: DataFrameContext) -> Any:
     """Test Common Subexpression Elimination (CSE)."""
@@ -3860,11 +3408,9 @@ def optimizer_common_subexpression_pandas_impl(ctx: DataFrameContext) -> Any:
     filtered["revenue_with_tax"] = expr
     filtered["revenue_copy"] = expr
 
-    result = filtered[filtered["revenue_with_tax"] > 1000][
+    return filtered[filtered["revenue_with_tax"] > 1000][
         ["l_orderkey", "l_partkey", "l_suppkey", "l_linenumber", "revenue_with_tax", "revenue_copy"]
     ].head(100)
-
-    return result
 
 
 def optimizer_predicate_pushdown_expression_impl(ctx: DataFrameContext) -> Any:
@@ -3878,15 +3424,13 @@ def optimizer_predicate_pushdown_expression_impl(ctx: DataFrameContext) -> Any:
     lit = ctx.lit
 
     # Join first, THEN filter (optimizer should push predicates down)
-    result = (
+    return (
         customer.join(orders, col("c_custkey") == col("o_custkey"))
         .filter(col("c_nationkey") == lit(15))  # Predicate on customer - should push before join
         .filter(col("o_orderdate") >= lit(date(1995, 1, 1)))  # Predicate on orders - should push before join
         .select("c_name", "c_mktsegment", "o_orderdate", "o_totalprice")
         .limit(100)
     )
-
-    return result
 
 
 def optimizer_predicate_pushdown_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -3897,9 +3441,7 @@ def optimizer_predicate_pushdown_pandas_impl(ctx: DataFrameContext) -> Any:
     # Join first, then filter (pandas doesn't optimize, but tests the pattern)
     merged = customer.merge(orders, left_on="c_custkey", right_on="o_custkey")
     filtered = merged[(merged["c_nationkey"] == 15) & (merged["o_orderdate"] >= date(1995, 1, 1))]
-    result = filtered[["c_name", "c_mktsegment", "o_orderdate", "o_totalprice"]].head(100)
-
-    return result
+    return filtered[["c_name", "c_mktsegment", "o_orderdate", "o_totalprice"]].head(100)
 
 
 def optimizer_join_reordering_expression_impl(ctx: DataFrameContext) -> Any:
@@ -3915,7 +3457,7 @@ def optimizer_join_reordering_expression_impl(ctx: DataFrameContext) -> Any:
 
     # Join in "bad" order: orders (largest) -> customer -> nation (smallest)
     # Good optimizer should reorder to nation -> customer -> orders
-    result = (
+    return (
         orders.filter(col("o_orderdate") >= lit(date(1995, 1, 1)))
         .join(customer, col("o_custkey") == col("c_custkey"))
         .join(nation, col("c_nationkey") == col("n_nationkey"))
@@ -3925,8 +3467,6 @@ def optimizer_join_reordering_expression_impl(ctx: DataFrameContext) -> Any:
             col("o_totalprice").sum().alias("total_value"),
         )
     )
-
-    return result
 
 
 def optimizer_join_reordering_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -3940,12 +3480,10 @@ def optimizer_join_reordering_pandas_impl(ctx: DataFrameContext) -> Any:
     merged = filtered.merge(customer, left_on="o_custkey", right_on="c_custkey")
     merged = merged.merge(nation, left_on="c_nationkey", right_on="n_nationkey")
 
-    result = merged.groupby(["n_name", "c_name"], as_index=False).agg(
+    return merged.groupby(["n_name", "c_name"], as_index=False).agg(
         order_count=("o_orderkey", "count"),
         total_value=("o_totalprice", "sum"),
     )
-
-    return result
 
 
 def optimizer_limit_pushdown_expression_impl(ctx: DataFrameContext) -> Any:
@@ -3959,15 +3497,13 @@ def optimizer_limit_pushdown_expression_impl(ctx: DataFrameContext) -> Any:
     lit = ctx.lit
 
     # Join and sort, then limit at the end only
-    result = (
+    return (
         customer.join(orders, col("c_custkey") == col("o_custkey"))
         .filter(col("o_orderdate") >= lit(date(1995, 1, 1)))
         .select("c_name", "c_mktsegment", "o_orderdate", "o_totalprice", "o_orderpriority")
         .sort("o_totalprice", descending=True)
         .limit(100)  # Optimizer should push partial limit into join
     )
-
-    return result
 
 
 def optimizer_limit_pushdown_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -3977,13 +3513,11 @@ def optimizer_limit_pushdown_pandas_impl(ctx: DataFrameContext) -> Any:
 
     merged = customer.merge(orders, left_on="c_custkey", right_on="o_custkey")
     filtered = merged[merged["o_orderdate"] >= date(1995, 1, 1)]
-    result = (
+    return (
         filtered[["c_name", "c_mktsegment", "o_orderdate", "o_totalprice", "o_orderpriority"]]
         .sort_values("o_totalprice", ascending=False)
         .head(100)
     )
-
-    return result
 
 
 def optimizer_aggregate_pushdown_expression_impl(ctx: DataFrameContext) -> Any:
@@ -3997,7 +3531,7 @@ def optimizer_aggregate_pushdown_expression_impl(ctx: DataFrameContext) -> Any:
     lit = ctx.lit
 
     # Join first, then aggregate (optimizer can push partial agg before join)
-    result = (
+    return (
         customer.join(orders, col("c_custkey") == col("o_custkey"))
         .filter(col("o_orderdate") >= lit(date(1995, 1, 1)))
         .group_by("c_custkey", "c_name", "c_mktsegment")
@@ -4008,8 +3542,6 @@ def optimizer_aggregate_pushdown_expression_impl(ctx: DataFrameContext) -> Any:
         )
     )
 
-    return result
-
 
 def optimizer_aggregate_pushdown_pandas_impl(ctx: DataFrameContext) -> Any:
     """Test aggregate pushdown before join."""
@@ -4019,13 +3551,11 @@ def optimizer_aggregate_pushdown_pandas_impl(ctx: DataFrameContext) -> Any:
     merged = customer.merge(orders, left_on="c_custkey", right_on="o_custkey")
     filtered = merged[merged["o_orderdate"] >= date(1995, 1, 1)]
 
-    result = filtered.groupby(["c_custkey", "c_name", "c_mktsegment"], as_index=False).agg(
+    return filtered.groupby(["c_custkey", "c_name", "c_mktsegment"], as_index=False).agg(
         order_count=("o_orderkey", "count"),
         total_spent=("o_totalprice", "sum"),
         avg_order=("o_totalprice", "mean"),
     )
-
-    return result
 
 
 def optimizer_constant_folding_expression_impl(ctx: DataFrameContext) -> Any:
@@ -4038,7 +3568,7 @@ def optimizer_constant_folding_expression_impl(ctx: DataFrameContext) -> Any:
     lit = ctx.lit
 
     # Use Spark expressions for constants (optimizer should fold lit(2)*lit(3)+lit(4) to lit(10))
-    result = (
+    return (
         lineitem.filter(col("l_quantity") > lit(0))
         .select(
             "l_orderkey",
@@ -4050,8 +3580,6 @@ def optimizer_constant_folding_expression_impl(ctx: DataFrameContext) -> Any:
         .limit(1000)
     )
 
-    return result
-
 
 def optimizer_constant_folding_pandas_impl(ctx: DataFrameContext) -> Any:
     """Test constant folding optimization."""
@@ -4062,9 +3590,7 @@ def optimizer_constant_folding_pandas_impl(ctx: DataFrameContext) -> Any:
     filtered["scaled_quantity"] = filtered["l_quantity"] * (2 * 3 + 4)
     filtered["discounted_unit_price"] = filtered["l_extendedprice"] * (1 - 0.1) / 10
 
-    result = filtered[["l_orderkey", "l_quantity", "scaled_quantity", "discounted_unit_price"]].head(1000)
-
-    return result
+    return filtered[["l_orderkey", "l_quantity", "scaled_quantity", "discounted_unit_price"]].head(1000)
 
 
 def optimizer_column_pruning_expression_impl(ctx: DataFrameContext) -> Any:
@@ -4079,7 +3605,7 @@ def optimizer_column_pruning_expression_impl(ctx: DataFrameContext) -> Any:
     lit = ctx.lit
 
     # Don't select early - let optimizer prune columns
-    result = (
+    return (
         customer.join(orders, col("c_custkey") == col("o_custkey"))
         .join(lineitem, col("o_orderkey") == col("l_orderkey"))
         .filter(col("o_orderdate") >= lit(date(1995, 1, 1)))
@@ -4088,8 +3614,6 @@ def optimizer_column_pruning_expression_impl(ctx: DataFrameContext) -> Any:
         .unique()
         .limit(100)
     )
-
-    return result
 
 
 def optimizer_column_pruning_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -4102,9 +3626,7 @@ def optimizer_column_pruning_pandas_impl(ctx: DataFrameContext) -> Any:
     merged = merged.merge(lineitem, left_on="o_orderkey", right_on="l_orderkey")
     filtered = merged[(merged["o_orderdate"] >= date(1995, 1, 1)) & (merged["l_quantity"] > 10)]
 
-    result = filtered[["c_name"]].drop_duplicates().head(100)
-
-    return result
+    return filtered[["c_name"]].drop_duplicates().head(100)
 
 
 def optimizer_union_optimization_expression_impl(ctx: DataFrameContext) -> Any:
@@ -4128,9 +3650,7 @@ def optimizer_union_optimization_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Union and sort
-    result = ctx.concat([urgent, high, medium]).sort("o_totalprice", descending=True).limit(100)
-
-    return result
+    return ctx.concat([urgent, high, medium]).sort("o_totalprice", descending=True).limit(100)
 
 
 def optimizer_union_optimization_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -4143,9 +3663,7 @@ def optimizer_union_optimization_pandas_impl(ctx: DataFrameContext) -> Any:
     medium = orders[orders["o_orderpriority"] == "3-MEDIUM"][cols]
 
     combined = ctx.concat([urgent, high, medium])
-    result = combined.sort_values("o_totalprice", ascending=False).head(100)
-
-    return result
+    return combined.sort_values("o_totalprice", ascending=False).head(100)
 
 
 def optimizer_runtime_filter_expression_impl(ctx: DataFrameContext) -> Any:
@@ -4161,7 +3679,7 @@ def optimizer_runtime_filter_expression_impl(ctx: DataFrameContext) -> Any:
     # Selective filter on part table - Spark can use this to generate runtime filter
     selective_parts = part.filter(col("p_brand") == lit("Brand#23")).filter(col("p_container") == lit("MED BOX"))
 
-    result = (
+    return (
         lineitem.join(selective_parts, col("l_partkey") == col("p_partkey"))
         .select(
             "l_orderkey",
@@ -4173,8 +3691,6 @@ def optimizer_runtime_filter_expression_impl(ctx: DataFrameContext) -> Any:
         .limit(100)
     )
 
-    return result
-
 
 def optimizer_runtime_filter_pandas_impl(ctx: DataFrameContext) -> Any:
     """Test runtime filter / dynamic partition pruning."""
@@ -4185,9 +3701,7 @@ def optimizer_runtime_filter_pandas_impl(ctx: DataFrameContext) -> Any:
     selective_parts = part[(part["p_brand"] == "Brand#23") & (part["p_container"] == "MED BOX")]
 
     merged = lineitem.merge(selective_parts, left_on="l_partkey", right_on="p_partkey")
-    result = merged[["l_orderkey", "l_quantity", "l_extendedprice", "p_partkey", "p_name"]].head(100)
-
-    return result
+    return merged[["l_orderkey", "l_quantity", "l_extendedprice", "p_partkey", "p_name"]].head(100)
 
 
 def optimizer_groupjoin_expression_impl(ctx: DataFrameContext) -> Any:
@@ -4202,7 +3716,7 @@ def optimizer_groupjoin_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    result = (
+    return (
         orders.join(lineitem, col("o_orderkey") == col("l_orderkey"))
         .group_by("o_orderkey", "o_custkey", "o_orderdate")
         .agg(
@@ -4212,8 +3726,6 @@ def optimizer_groupjoin_expression_impl(ctx: DataFrameContext) -> Any:
         .sort("revenue", descending=True)
         .limit(100)
     )
-
-    return result
 
 
 def optimizer_groupjoin_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -4225,14 +3737,12 @@ def optimizer_groupjoin_pandas_impl(ctx: DataFrameContext) -> Any:
     merged = merged.copy()
     merged["revenue"] = merged["l_extendedprice"] * (1 - merged["l_discount"])
 
-    result = (
+    return (
         merged.groupby(["o_orderkey", "o_custkey", "o_orderdate"], as_index=False)
         .agg(line_count=("l_linenumber", "count"), revenue=("revenue", "sum"))
         .nlargest(100, "revenue")
         .reset_index(drop=True)
     )
-
-    return result
 
 
 # =============================================================================
@@ -4258,7 +3768,7 @@ def qualify_row_number_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Add row number and filter (QUALIFY equivalent)
-    result = (
+    return (
         joined.with_columns(
             ctx.window_row_number(
                 order_by=[("o_totalprice", False)],
@@ -4269,8 +3779,6 @@ def qualify_row_number_expression_impl(ctx: DataFrameContext) -> Any:
         .select("c_custkey", "c_name", "o_orderkey", "o_orderdate", "o_totalprice", "order_rank")
         .sort("c_custkey", "order_rank")
     )
-
-    return result
 
 
 def qualify_row_number_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -4287,9 +3795,7 @@ def qualify_row_number_pandas_impl(ctx: DataFrameContext) -> Any:
 
     # Filter (QUALIFY equivalent)
     cols = ["c_custkey", "c_name", "o_orderkey", "o_orderdate", "o_totalprice", "order_rank"]
-    result = filtered[filtered["order_rank"] <= 3][cols].sort_values(["c_custkey", "order_rank"]).reset_index(drop=True)
-
-    return result
+    return filtered[filtered["order_rank"] <= 3][cols].sort_values(["c_custkey", "order_rank"]).reset_index(drop=True)
 
 
 def qualify_dense_rank_expression_impl(ctx: DataFrameContext) -> Any:
@@ -4302,7 +3808,7 @@ def qualify_dense_rank_expression_impl(ctx: DataFrameContext) -> Any:
     lit = ctx.lit
 
     # Add dense rank and filter (QUALIFY equivalent)
-    result = (
+    return (
         part.with_columns(
             ctx.window_dense_rank(
                 order_by=[("p_retailprice", False)],
@@ -4313,8 +3819,6 @@ def qualify_dense_rank_expression_impl(ctx: DataFrameContext) -> Any:
         .select("p_type", "p_name", "p_retailprice", "price_rank")
         .sort("p_type", "price_rank")
     )
-
-    return result
 
 
 def qualify_dense_rank_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -4327,13 +3831,11 @@ def qualify_dense_rank_pandas_impl(ctx: DataFrameContext) -> Any:
     df["price_rank"] = df.groupby("p_type")["p_retailprice"].rank(method="dense", ascending=False)
 
     # Filter (QUALIFY equivalent)
-    result = (
+    return (
         df[df["price_rank"] <= 2][["p_type", "p_name", "p_retailprice", "price_rank"]]
         .sort_values(["p_type", "price_rank"])
         .reset_index(drop=True)
     )
-
-    return result
 
 
 def qualify_ntile_expression_impl(ctx: DataFrameContext) -> Any:
@@ -4352,7 +3854,7 @@ def qualify_ntile_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Add ntile(4) and filter for quartile 4 (top 25%)
-    result = (
+    return (
         joined.with_columns(
             ctx.window_ntile(
                 4,
@@ -4364,8 +3866,6 @@ def qualify_ntile_expression_impl(ctx: DataFrameContext) -> Any:
         .select("c_mktsegment", "o_orderkey", "o_totalprice", "quartile")
         .sort(col("c_mktsegment"), col("o_totalprice").desc())
     )
-
-    return result
 
 
 def qualify_ntile_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -4393,13 +3893,11 @@ def qualify_ntile_pandas_impl(ctx: DataFrameContext) -> Any:
     filtered = filtered.groupby("c_mktsegment", group_keys=False).apply(assign_quartile, include_groups=False)
 
     # Filter for top quartile
-    result = (
+    return (
         filtered[filtered["quartile"] == 4][["c_mktsegment", "o_orderkey", "o_totalprice", "quartile"]]
         .sort_values(["c_mktsegment", "o_totalprice"], ascending=[True, False])
         .reset_index(drop=True)
     )
-
-    return result
 
 
 def qualify_percentile_expression_impl(ctx: DataFrameContext) -> Any:
@@ -4415,7 +3913,7 @@ def qualify_percentile_expression_impl(ctx: DataFrameContext) -> Any:
     filtered = orders.filter(col("o_orderdate") >= lit(date(1995, 1, 1)))
 
     # Add percent_rank and filter for top 10%
-    result = (
+    return (
         filtered.with_columns(
             ctx.window_percent_rank(
                 order_by=[("o_totalprice", True)],
@@ -4426,8 +3924,6 @@ def qualify_percentile_expression_impl(ctx: DataFrameContext) -> Any:
         .select("o_orderpriority", "o_orderkey", "o_totalprice", "price_percentile")
         .sort(col("o_orderpriority"), col("o_totalprice").desc())
     )
-
-    return result
 
 
 def qualify_percentile_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -4441,15 +3937,13 @@ def qualify_percentile_pandas_impl(ctx: DataFrameContext) -> Any:
     filtered["price_percentile"] = filtered.groupby("o_orderpriority")["o_totalprice"].rank(pct=True)
 
     # Filter for top 10%
-    result = (
+    return (
         filtered[filtered["price_percentile"] >= 0.9][
             ["o_orderpriority", "o_orderkey", "o_totalprice", "price_percentile"]
         ]
         .sort_values(["o_orderpriority", "o_totalprice"], ascending=[True, False])
         .reset_index(drop=True)
     )
-
-    return result
 
 
 def qualify_cume_dist_expression_impl(ctx: DataFrameContext) -> Any:
@@ -4467,7 +3961,7 @@ def qualify_cume_dist_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Add cume_dist and filter for top 5%
-    result = (
+    return (
         filtered.with_columns(
             ctx.window_cume_dist(
                 order_by=[("l_quantity", True)],
@@ -4478,8 +3972,6 @@ def qualify_cume_dist_expression_impl(ctx: DataFrameContext) -> Any:
         .select("l_shipdate", "l_orderkey", "l_linenumber", "l_quantity", "quantity_cumulative_dist")
         .sort(col("l_shipdate"), col("l_quantity").desc())
     )
-
-    return result
 
 
 def qualify_cume_dist_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -4502,15 +3994,13 @@ def qualify_cume_dist_pandas_impl(ctx: DataFrameContext) -> Any:
     filtered = filtered.groupby("l_shipdate", group_keys=False).apply(calc_cume_dist, include_groups=False)
 
     # Filter for top 5%
-    result = (
+    return (
         filtered[filtered["quantity_cumulative_dist"] >= 0.95][
             ["l_shipdate", "l_orderkey", "l_linenumber", "l_quantity", "quantity_cumulative_dist"]
         ]
         .sort_values(["l_shipdate", "l_quantity"], ascending=[True, False])
         .reset_index(drop=True)
     )
-
-    return result
 
 
 def qualify_lag_lead_expression_impl(ctx: DataFrameContext) -> Any:
@@ -4529,7 +4019,7 @@ def qualify_lag_lead_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Add lag and filter where price increased
-    result = (
+    return (
         joined.with_columns(
             ctx.window_lag(
                 "o_totalprice",
@@ -4542,8 +4032,6 @@ def qualify_lag_lead_expression_impl(ctx: DataFrameContext) -> Any:
         .select("c_custkey", "c_name", "o_orderkey", "o_orderdate", "o_totalprice", "prev_order_price")
         .sort("c_custkey", "o_orderdate")
     )
-
-    return result
 
 
 def qualify_lag_lead_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -4560,15 +4048,13 @@ def qualify_lag_lead_pandas_impl(ctx: DataFrameContext) -> Any:
     filtered["prev_order_price"] = filtered.groupby("c_custkey")["o_totalprice"].shift(1)
 
     # Filter where price increased
-    result = (
+    return (
         filtered[filtered["o_totalprice"] > filtered["prev_order_price"]][
             ["c_custkey", "c_name", "o_orderkey", "o_orderdate", "o_totalprice", "prev_order_price"]
         ]
         .sort_values(["c_custkey", "o_orderdate"])
         .reset_index(drop=True)
     )
-
-    return result
 
 
 # =============================================================================
@@ -4587,7 +4073,7 @@ def struct_construction_expression_impl(ctx: DataFrameContext) -> Any:
     lit = ctx.lit
     struct = ctx.struct
 
-    result = (
+    return (
         customer.filter(col("c_nationkey") == lit(1))
         .select(
             "c_custkey",
@@ -4596,8 +4082,6 @@ def struct_construction_expression_impl(ctx: DataFrameContext) -> Any:
         )
         .limit(100)
     )
-
-    return result
 
 
 def struct_construction_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -4611,9 +4095,7 @@ def struct_construction_pandas_impl(ctx: DataFrameContext) -> Any:
         lambda row: {"c_name": row["c_name"], "c_address": row["c_address"], "c_phone": row["c_phone"]}, axis=1
     )
 
-    result = filtered[["c_custkey", "contact_info", "c_acctbal"]].head(100).reset_index(drop=True)
-
-    return result
+    return filtered[["c_custkey", "contact_info", "c_acctbal"]].head(100).reset_index(drop=True)
 
 
 def struct_access_expression_impl(ctx: DataFrameContext) -> Any:
@@ -4635,7 +4117,7 @@ def struct_access_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Access struct fields
-    result = (
+    return (
         with_struct.select(
             "c_custkey",
             col("info").struct.field("name").alias("name"),
@@ -4644,8 +4126,6 @@ def struct_access_expression_impl(ctx: DataFrameContext) -> Any:
         .filter(col("balance") > lit(5000))
         .limit(100)
     )
-
-    return result
 
 
 def struct_access_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -4664,9 +4144,7 @@ def struct_access_pandas_impl(ctx: DataFrameContext) -> Any:
     filtered["balance"] = filtered["info"].apply(lambda x: x["balance"])
 
     # Filter and select
-    result = filtered[filtered["balance"] > 5000][["c_custkey", "name", "balance"]].head(100).reset_index(drop=True)
-
-    return result
+    return filtered[filtered["balance"] > 5000][["c_custkey", "name", "balance"]].head(100).reset_index(drop=True)
 
 
 # =============================================================================
@@ -4688,9 +4166,7 @@ def array_contains_expression_impl(ctx: DataFrameContext) -> Any:
     supplier_parts = partsupp.group_by("ps_suppkey").agg(col("ps_partkey").list().alias("parts"))
 
     # Check if contains part 100
-    result = supplier_parts.with_columns(col("parts").list.contains(lit(100)).alias("has_part_100")).limit(100)
-
-    return result
+    return supplier_parts.with_columns(col("parts").list.contains(lit(100)).alias("has_part_100")).limit(100)
 
 
 def array_contains_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -4704,9 +4180,7 @@ def array_contains_pandas_impl(ctx: DataFrameContext) -> Any:
     # Check if 100 is in each list
     supplier_parts["has_part_100"] = supplier_parts["parts"].apply(lambda x: 100 in x)
 
-    result = supplier_parts.head(100).reset_index(drop=True)
-
-    return result
+    return supplier_parts.head(100).reset_index(drop=True)
 
 
 def array_distinct_expression_impl(ctx: DataFrameContext) -> Any:
@@ -4721,9 +4195,7 @@ def array_distinct_expression_impl(ctx: DataFrameContext) -> Any:
     ship_modes = lineitem.group_by("l_orderkey").agg(col("l_shipmode").list().alias("modes"))
 
     # Get unique modes
-    result = ship_modes.with_columns(col("modes").list.unique().alias("unique_modes")).limit(100)
-
-    return result
+    return ship_modes.with_columns(col("modes").list.unique().alias("unique_modes")).limit(100)
 
 
 def array_distinct_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -4737,9 +4209,7 @@ def array_distinct_pandas_impl(ctx: DataFrameContext) -> Any:
     # Get unique modes
     ship_modes["unique_modes"] = ship_modes["modes"].apply(lambda x: list(set(x)))
 
-    result = ship_modes.head(100).reset_index(drop=True)
-
-    return result
+    return ship_modes.head(100).reset_index(drop=True)
 
 
 def array_length_expression_impl(ctx: DataFrameContext) -> Any:
@@ -4754,11 +4224,9 @@ def array_length_expression_impl(ctx: DataFrameContext) -> Any:
     supplier_parts = partsupp.group_by("ps_suppkey").agg(col("ps_partkey").list().alias("parts"))
 
     # Get count and sort
-    result = (
+    return (
         supplier_parts.with_columns(col("parts").list.len().alias("num_parts")).sort(col("num_parts").desc()).limit(100)
     )
-
-    return result
 
 
 def array_length_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -4773,9 +4241,7 @@ def array_length_pandas_impl(ctx: DataFrameContext) -> Any:
     supplier_parts["num_parts"] = supplier_parts["parts"].apply(len)
 
     # Sort by num_parts descending
-    result = supplier_parts.sort_values("num_parts", ascending=False).head(100).reset_index(drop=True)
-
-    return result
+    return supplier_parts.sort_values("num_parts", ascending=False).head(100).reset_index(drop=True)
 
 
 def array_min_max_expression_impl(ctx: DataFrameContext) -> Any:
@@ -4790,11 +4256,9 @@ def array_min_max_expression_impl(ctx: DataFrameContext) -> Any:
     order_prices = orders.group_by("o_custkey").agg(col("o_totalprice").list().alias("prices"))
 
     # Get min and max from array
-    result = order_prices.with_columns(
+    return order_prices.with_columns(
         col("prices").list.min().alias("min_order"), col("prices").list.max().alias("max_order")
     ).limit(100)
-
-    return result
 
 
 def array_min_max_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -4809,9 +4273,7 @@ def array_min_max_pandas_impl(ctx: DataFrameContext) -> Any:
     order_prices["min_order"] = order_prices["prices"].apply(min)
     order_prices["max_order"] = order_prices["prices"].apply(max)
 
-    result = order_prices.head(100).reset_index(drop=True)
-
-    return result
+    return order_prices.head(100).reset_index(drop=True)
 
 
 def array_of_struct_expression_impl(ctx: DataFrameContext) -> Any:
@@ -4830,7 +4292,7 @@ def array_of_struct_expression_impl(ctx: DataFrameContext) -> Any:
     joined = lineitem.join(filtered_orders, col("l_orderkey") == col("o_orderkey"))
 
     # Create struct and aggregate into array
-    result = (
+    return (
         joined.group_by("o_orderkey")
         .agg(
             struct(col("l_linenumber"), col("l_partkey"), col("l_quantity"), col("l_extendedprice"))
@@ -4839,8 +4301,6 @@ def array_of_struct_expression_impl(ctx: DataFrameContext) -> Any:
         )
         .limit(50)
     )
-
-    return result
 
 
 def array_of_struct_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -4884,14 +4344,12 @@ def array_slice_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Filter for customers with at least 5 orders and get top 3
-    result = (
+    return (
         order_prices.filter(col("cnt") >= 5)
         .with_columns(col("prices").list.slice(0, 3).alias("top_3_orders"))
         .select("o_custkey", "top_3_orders")
         .limit(100)
     )
-
-    return result
 
 
 def array_slice_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -4906,9 +4364,7 @@ def array_slice_pandas_impl(ctx: DataFrameContext) -> Any:
     order_prices = order_prices[order_prices["prices"].apply(len) >= 5].copy()
     order_prices["top_3_orders"] = order_prices["prices"].apply(lambda x: x[:3])
 
-    result = order_prices[["o_custkey", "top_3_orders"]].head(100).reset_index(drop=True)
-
-    return result
+    return order_prices[["o_custkey", "top_3_orders"]].head(100).reset_index(drop=True)
 
 
 def array_sort_expression_impl(ctx: DataFrameContext) -> Any:
@@ -4923,9 +4379,7 @@ def array_sort_expression_impl(ctx: DataFrameContext) -> Any:
     part_sizes = part.group_by("p_brand").agg(col("p_size").list().alias("sizes"))
 
     # Sort the array
-    result = part_sizes.with_columns(col("sizes").list.sort().alias("sorted_sizes")).limit(50)
-
-    return result
+    return part_sizes.with_columns(col("sizes").list.sort().alias("sorted_sizes")).limit(50)
 
 
 def array_sort_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -4939,9 +4393,7 @@ def array_sort_pandas_impl(ctx: DataFrameContext) -> Any:
     # Sort each array
     part_sizes["sorted_sizes"] = part_sizes["sizes"].apply(sorted)
 
-    result = part_sizes.head(50).reset_index(drop=True)
-
-    return result
+    return part_sizes.head(50).reset_index(drop=True)
 
 
 def array_unnest_expression_impl(ctx: DataFrameContext) -> Any:
@@ -4958,9 +4410,7 @@ def array_unnest_expression_impl(ctx: DataFrameContext) -> Any:
     supplier_parts = filtered.group_by("ps_suppkey").agg(col("ps_partkey").list().alias("parts"))
 
     # Explode array back to rows
-    result = supplier_parts.explode("parts").rename({"parts": "part_key"})
-
-    return result
+    return supplier_parts.explode("parts").rename({"parts": "part_key"})
 
 
 def array_unnest_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -5005,9 +4455,7 @@ def map_construction_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Convert entries to map
-    result = result.with_columns(map_from_entries("entries").alias("part_costs")).select("ps_suppkey", "part_costs")
-
-    return result
+    return result.with_columns(map_from_entries("entries").alias("part_costs")).select("ps_suppkey", "part_costs")
 
 
 def map_construction_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -5047,13 +4495,11 @@ def map_access_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Access map elements
-    result = with_map.select(
+    return with_map.select(
         "ps_suppkey",
         col("part_costs").map.get(lit("1")).alias("cost_for_part_1"),
         col("part_costs").map.get(lit("5")).alias("cost_for_part_5"),
     ).limit(10)
-
-    return result
 
 
 def map_access_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -5073,9 +4519,7 @@ def map_access_pandas_impl(ctx: DataFrameContext) -> Any:
     result["cost_for_part_1"] = result["part_costs"].apply(lambda m: m.get("1"))
     result["cost_for_part_5"] = result["part_costs"].apply(lambda m: m.get("5"))
 
-    result = result[["ps_suppkey", "cost_for_part_1", "cost_for_part_5"]].head(10).reset_index(drop=True)
-
-    return result
+    return result[["ps_suppkey", "cost_for_part_1", "cost_for_part_5"]].head(10).reset_index(drop=True)
 
 
 def map_keys_values_expression_impl(ctx: DataFrameContext) -> Any:
@@ -5098,13 +4542,11 @@ def map_keys_values_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Extract keys and values
-    result = with_map.select(
+    return with_map.select(
         "ps_suppkey",
         col("part_costs").map.keys().alias("part_ids"),
         col("part_costs").map.values().alias("costs"),
     )
-
-    return result
 
 
 def map_keys_values_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -5124,9 +4566,7 @@ def map_keys_values_pandas_impl(ctx: DataFrameContext) -> Any:
     result["part_ids"] = result["part_costs"].apply(lambda m: list(m.keys()))
     result["costs"] = result["part_costs"].apply(lambda m: list(m.values()))
 
-    result = result[["ps_suppkey", "part_ids", "costs"]].reset_index(drop=True)
-
-    return result
+    return result[["ps_suppkey", "part_ids", "costs"]].reset_index(drop=True)
 
 
 # =============================================================================
@@ -5149,11 +4589,9 @@ def list_filter_expression_impl(ctx: DataFrameContext) -> Any:
     order_prices = orders.group_by("o_custkey").agg(col("o_totalprice").list().alias("prices"))
 
     # Filter to keep only large orders (> 100000)
-    result = order_prices.with_columns(
+    return order_prices.with_columns(
         col("prices").list.eval(elem.filter(elem > lit(100000))).alias("large_orders")
     ).limit(100)
-
-    return result
 
 
 def list_filter_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -5167,9 +4605,7 @@ def list_filter_pandas_impl(ctx: DataFrameContext) -> Any:
     # Filter to keep only large orders
     order_prices["large_orders"] = order_prices["prices"].apply(lambda x: [p for p in x if p > 100000])
 
-    result = order_prices.head(100).reset_index(drop=True)
-
-    return result
+    return order_prices.head(100).reset_index(drop=True)
 
 
 def list_transform_expression_impl(ctx: DataFrameContext) -> Any:
@@ -5186,9 +4622,7 @@ def list_transform_expression_impl(ctx: DataFrameContext) -> Any:
     part_prices = part.group_by("p_brand").agg(col("p_retailprice").list().alias("prices"))
 
     # Transform to apply 10% markup
-    result = part_prices.with_columns(col("prices").list.eval(elem * lit(1.1)).alias("prices_with_tax")).limit(50)
-
-    return result
+    return part_prices.with_columns(col("prices").list.eval(elem * lit(1.1)).alias("prices_with_tax")).limit(50)
 
 
 def list_transform_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -5202,9 +4636,7 @@ def list_transform_pandas_impl(ctx: DataFrameContext) -> Any:
     # Transform with 10% markup
     part_prices["prices_with_tax"] = part_prices["prices"].apply(lambda x: [p * 1.1 for p in x])
 
-    result = part_prices.head(50).reset_index(drop=True)
-
-    return result
+    return part_prices.head(50).reset_index(drop=True)
 
 
 def list_reduce_expression_impl(ctx: DataFrameContext) -> Any:
@@ -5219,9 +4651,7 @@ def list_reduce_expression_impl(ctx: DataFrameContext) -> Any:
     quantities = lineitem.group_by("l_orderkey").agg(col("l_quantity").list().alias("qtys"))
 
     # Reduce to sum (most frameworks don't have general reduce, use sum)
-    result = quantities.with_columns(col("qtys").list.sum().alias("total_qty")).limit(100)
-
-    return result
+    return quantities.with_columns(col("qtys").list.sum().alias("total_qty")).limit(100)
 
 
 def list_reduce_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -5235,9 +4665,7 @@ def list_reduce_pandas_impl(ctx: DataFrameContext) -> Any:
     # Reduce to sum
     quantities["total_qty"] = quantities["qtys"].apply(sum)
 
-    result = quantities.head(100).reset_index(drop=True)
-
-    return result
+    return quantities.head(100).reset_index(drop=True)
 
 
 # =============================================================================
@@ -5259,7 +4687,7 @@ def json_extract_simple_expression_impl(ctx: DataFrameContext) -> Any:
 
     # Use order comment field - extract words as "JSON path" simulation
     # This demonstrates the pattern even without native JSON
-    result = (
+    return (
         orders.with_columns(
             col("o_comment").str.split(" ").list.get(0).alias("first_word"),
             col("o_comment").str.len_chars().alias("comment_length"),
@@ -5268,8 +4696,6 @@ def json_extract_simple_expression_impl(ctx: DataFrameContext) -> Any:
         .select("o_orderkey", "o_comment", "first_word", "comment_length")
         .limit(1000)
     )
-
-    return result
 
 
 def json_extract_simple_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -5281,13 +4707,11 @@ def json_extract_simple_pandas_impl(ctx: DataFrameContext) -> Any:
     df["first_word"] = df["o_comment"].str.split(" ").str[0]
     df["comment_length"] = df["o_comment"].str.len()
 
-    result = (
+    return (
         df[df["comment_length"] > 10][["o_orderkey", "o_comment", "first_word", "comment_length"]]
         .head(1000)
         .reset_index(drop=True)
     )
-
-    return result
 
 
 def json_extract_nested_expression_impl(ctx: DataFrameContext) -> Any:
@@ -5300,7 +4724,7 @@ def json_extract_nested_expression_impl(ctx: DataFrameContext) -> Any:
     lit = ctx.lit
 
     # Simulate nested extraction with string split operations
-    result = (
+    return (
         customer.with_columns(
             col("c_comment").str.split(" ").list.get(0).alias("segment_word"),
             col("c_comment").str.split(",").list.get(0).alias("first_segment"),
@@ -5310,8 +4734,6 @@ def json_extract_nested_expression_impl(ctx: DataFrameContext) -> Any:
         .select("c_custkey", "segment_word", "first_segment", "comment_len")
         .limit(500)
     )
-
-    return result
 
 
 def json_extract_nested_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -5324,13 +4746,11 @@ def json_extract_nested_pandas_impl(ctx: DataFrameContext) -> Any:
     df["first_segment"] = df["c_comment"].str.split(",").str[0]
     df["comment_len"] = df["c_comment"].str.len()
 
-    result = (
+    return (
         df[df["comment_len"] > 20][["c_custkey", "segment_word", "first_segment", "comment_len"]]
         .head(500)
         .reset_index(drop=True)
     )
-
-    return result
 
 
 def json_aggregates_expression_impl(ctx: DataFrameContext) -> Any:
@@ -5342,7 +4762,7 @@ def json_aggregates_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
 
     # Filter and aggregate into list structures (JSON array equivalent)
-    result = (
+    return (
         part.filter(col("p_type").str.contains("STEEL"))
         .group_by("p_brand")
         .agg(
@@ -5352,8 +4772,6 @@ def json_aggregates_expression_impl(ctx: DataFrameContext) -> Any:
         )
         .limit(100)
     )
-
-    return result
 
 
 def json_aggregates_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -5398,7 +4816,7 @@ def timeseries_trend_analysis_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Add month-over-month metrics using ctx.window_lag
-    result = (
+    return (
         monthly.with_columns(
             ctx.window_lag("monthly_revenue", offset=1, order_by=[("order_month", True)]).alias("prev_month_revenue")
         )
@@ -5409,8 +4827,6 @@ def timeseries_trend_analysis_expression_impl(ctx: DataFrameContext) -> Any:
         )
         .sort("order_month")
     )
-
-    return result
 
 
 def timeseries_trend_analysis_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -5458,15 +4874,13 @@ def asof_join_basic_expression_impl(ctx: DataFrameContext) -> Any:
 
     # Join with orders using equi-join on orderkey (left_on/right_on, not expression join)
     # True ASOF would find the closest prior order by date
-    result = (
+    return (
         filtered_lineitem.join(orders, left_on="l_orderkey", right_on="o_orderkey")
         .filter(col("l_shipdate") >= col("o_orderdate"))
         .with_columns((col("l_shipdate") - col("o_orderdate")).dt.total_days().alias("days_to_ship"))
         .select("l_orderkey", "l_shipdate", "o_orderdate", "o_totalprice", "days_to_ship")
         .limit(100)
     )
-
-    return result
 
 
 def asof_join_basic_pandas_impl(ctx: DataFrameContext) -> Any:
