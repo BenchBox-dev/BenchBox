@@ -453,7 +453,7 @@ work:
   summary: "Drop enumerate from the canonical phase list; orchestrator no-op branch deleted; corrected 2026-05-02 historical
     config"
   needs: [w6]
-  status: pending
+  status: done
   notes: |
     F1: `enumerate` does no real work in the orchestrator — its
     effect is realised inside `execute.py:54`. Folding it removes

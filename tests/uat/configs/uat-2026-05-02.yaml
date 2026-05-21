@@ -12,7 +12,6 @@ description: "Historical replay of the 2026-05-02 results-explorer multi-scale c
 
 phases:
   - preflight
-  - enumerate
   - execute
   - validate
   - package

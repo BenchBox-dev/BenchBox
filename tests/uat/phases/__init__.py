@@ -1,1 +1,1 @@
-"""Composable UAT phases — preflight, enumerate, execute, validate, package, explorer_smoke, report."""
+"""Composable UAT phases plus enumerate helpers used by execute."""

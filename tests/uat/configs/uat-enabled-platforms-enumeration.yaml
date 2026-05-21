@@ -3,7 +3,6 @@ description: "Coverage-sweep shape for enabled platform/benchmark compatibility 
 
 phases:
   - preflight
-  - enumerate
   - execute
   - report
 
