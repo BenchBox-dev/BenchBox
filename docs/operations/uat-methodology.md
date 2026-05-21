@@ -5,36 +5,30 @@ multi-bundle corpus, e.g. the 2026-05-02 multi-platform sweep).
 
 ## Validator-clean rate roll-up
 
-`scripts/uat_validator_rollup.py` walks a results directory, runs
-`scripts/validate_submission.py` on each bundle, and emits a TSV with one
-row per bundle plus per-platform / per-benchmark validator-clean rates.
-Use it instead of reconciling W3 success counts against a packaging log
-by hand.
+The UAT validate phase walks a results directory or explicit result-path
+list, runs `benchbox.validation.bundle` on each bundle in-process, and
+emits a TSV with one row per bundle plus per-platform / per-benchmark
+validator-clean rates. Use `make uat-validate` instead of reconciling
+execute success counts against a packaging log by hand.
 
 ### When to run it
 
 Any UAT that captures more than one result JSON (a "corpus-shaped" UAT).
-Single-bundle UATs already get the same signal from the W5 submission
-step. Run it after W3 (to surface bundle quality alongside the run-side
-pass count) and again at W7 (to feed the final report's per-platform /
-per-benchmark numbers).
+Single-bundle UATs already get the same signal from submission dry-run
+validation. Run it after execute (to surface bundle quality alongside
+the run-side pass count) and again before final reporting when you need
+fresh per-platform / per-benchmark numbers.
 
 ### Invocation
 
 ```bash
 # Roll up an entire sweep results directory:
-uv run -- python scripts/uat_validator_rollup.py \
-    ~/Developer/benchmark_runs/results --output uat-rollup.tsv
+make uat-validate RESULTS_DIR=~/Developer/benchmark_runs/results OUTPUT_TSV=uat-rollup.tsv
 
-# Restrict to bundles produced after a sweep_start sentinel:
-uv run -- python scripts/uat_validator_rollup.py \
-    ~/Developer/benchmark_runs/results \
-    --newer ~/Developer/benchmark_runs/logs/uat_20260502/.sweep_start \
-    --output uat-rollup.tsv
-
-# Stream to stdout:
-uv run -- python scripts/uat_validator_rollup.py \
-    tests/fixtures/uat_rollup --output -
+# Direct module form, useful inside scripts:
+uv run -- python -m tests.uat._cli validate \
+    --results-dir ~/Developer/benchmark_runs/results \
+    --output-tsv uat-rollup.tsv
 ```
 
 ### TSV columns
@@ -52,7 +46,7 @@ uv run -- python scripts/uat_validator_rollup.py \
 
 ### Status values
 
-- `clean` — `validate_submission.py` produced 0 errors and 0 warnings.
+- `clean` — `benchbox.validation.bundle` produced 0 errors and 0 warnings.
 - `warning_only` — 0 errors, ≥1 warning. Submittable, but worth a glance.
 - `error` — ≥1 error. Bundle would be rejected by published-results CI.
 - `refused-by-cli` — `benchbox submit` refuses the bundle on its

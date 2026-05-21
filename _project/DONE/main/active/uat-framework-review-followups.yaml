@@ -2,7 +2,8 @@ id: uat-framework-review-followups
 title: "UAT framework: address all findings from post-PR-205 simplification review"
 worktree: main
 priority: "Medium-High"
-status: "In Progress"
+status: Completed
+completed_date: "2026-05-21"
 category: "Testing and Quality Assurance"
 
 deps:
@@ -848,7 +849,7 @@ work:
   - w16
   - w17
   - w18
-  status: pending
+  status: done
   notes: |
     Final pass to make the docs match the post-refactor reality. The
     earlier work units update spec sections opportunistically; this

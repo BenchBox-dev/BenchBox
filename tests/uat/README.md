@@ -12,7 +12,7 @@ tests/uat/
 ├── _cli.py                        # argparse entry points for every make uat-* target
 ├── matrix.py                      # platform/benchmark dicts + reachability + registry import
 ├── runner.py                      # single-cell execution
-├── config.py                      # YAML schema validation
+├── config.py                      # typed YAML schema validation
 ├── timeouts.py                    # signal-based subprocess timeout
 ├── ladder.py                      # scale-ladder + early-stop
 ├── cleanup.py                     # reuse-aware database pruning
@@ -20,7 +20,7 @@ tests/uat/
 ├── orchestrator.py                # sweep orchestration (make uat-sweep entry point)
 ├── phases/
 │   ├── preflight.py
-│   ├── enumerate.py
+│   ├── enumerate.py               # cell helper used by execute; not a configured phase
 │   ├── execute.py
 │   ├── validate.py
 │   ├── package.py
@@ -28,8 +28,7 @@ tests/uat/
 │   └── report.py
 ├── configs/
 │   ├── stress-default.yaml        # TEMPLATE preset for `make uat-stress`
-│   ├── uat-2026-05-02.yaml        # FROZEN replay of the historical sweep
-│   └── .frozen-hashes.json        # SHA-256 enforcement for FROZEN files
+│   └── uat-2026-05-02.yaml        # HISTORICAL replay of the sweep
 ├── fixtures/
 │   └── uat-2026-05-02-matrix-summary-header.tsv
 ├── test_*.py                      # fast-test coverage (mark.fast)
@@ -40,10 +39,10 @@ tests/uat/
 
 1. Create `tests/uat/phases/<name>.py` with a top-level `run_<name>`
    function that takes a `UATConfig` (or just the inputs it needs) and
-   returns a dataclass with an `exit_code()` method.
+   returns a `tests.uat.phases.PhaseResult`-compatible dataclass.
 2. Add `<name>` to `tests/uat/config.py::VALID_PHASES`.
 3. Wire the phase into `tests/uat/orchestrator.py::run_sweep`.
-4. Add a `<name>_main` argparse entry in `tests/uat/_cli.py`.
+4. Add an argparse subparser handler in `tests/uat/_cli.py`.
 5. Add a `make uat-<name>` target to the Makefile.
 6. Add fast tests to `tests/uat/test_<name>.py`.
 
@@ -122,22 +121,24 @@ starts with the UAT prefix (`benchbox-uat` by default). It also reports
 non-UAT Docker resources with creation time and a manual cleanup command,
 but it never deletes them automatically.
 
-## Frozen-config hashes
+## Historical configs
 
-When you add a new FROZEN config:
+Historical configs start with `# HISTORICAL` and are treated as evidence.
+Avoid editing them in place unless framework behavior changed and the
+same PR updates the relevant tests/docs. Prefer cloning to a dated
+successor for a new sweep:
 
 ```bash
-python3 -c "import hashlib; from pathlib import Path; \
-  print(hashlib.sha256(Path('tests/uat/configs/<name>.yaml').read_bytes()).hexdigest())"
+cp tests/uat/configs/uat-2026-05-02.yaml tests/uat/configs/uat-<new>.yaml
 ```
 
-Add the entry to `tests/uat/configs/.frozen-hashes.json` and commit
-both files together. `tests/uat/test_frozen_configs.py` enforces
-hash equality at PR time.
+Editable presets start with `# TEMPLATE` and may be changed through
+ordinary review. There is no frozen-hash file or hash-enforcement test.
 
 ## Dependencies
 
-The framework imports BenchBox registry and validation library code
-directly (no eval, no shell-out). The validate phase uses
-`benchbox.validation.bundle` in process. It does not import or modify
-code under `results-explorer/` or `results-data/`.
+The framework imports registry truth directly from `benchbox.core.*`
+helpers and validates result bundles in-process through
+`benchbox.validation.bundle`. It does not shell out to validator scripts.
+Explorer smoke still uses the Results Explorer build and Playwright
+entrypoints; package still delegates to `benchbox submit`.
