@@ -55,6 +55,38 @@ PROHIBITED_EAGER_IMPORTS = {
     "pyspark",
 }
 
+OPTIONAL_DISTRIBUTION_IMPORT_NAMES = {
+    "chdb": {"chdb"},
+    "clickhouse-connect": {"clickhouse_connect"},
+    "clickhouse-driver": {"clickhouse_driver"},
+    "dask": {"dask", "distributed"},
+    "databricks-connect": {"databricks"},
+    "databricks-sdk": {"databricks"},
+    "databricks-sql-connector": {"databricks"},
+    "datafusion": {"datafusion"},
+    "delta-spark": {"delta"},
+    "deltalake": {"deltalake"},
+    "firebolt-sdk": {"firebolt"},
+    "google-cloud-bigquery": {"google"},
+    "google-cloud-dataproc": {"google"},
+    "google-cloud-storage": {"google"},
+    "influxdb3-python": {"influxdb_client_3"},
+    "modin": {"modin"},
+    "polars": {"polars"},
+    "presto-python-client": {"prestodb"},
+    "pyathena": {"pyathena"},
+    "pyiceberg": {"pyiceberg"},
+    "pymysql": {"pymysql"},
+    "pyodbc": {"pyodbc"},
+    "pyspark": {"pyspark"},
+    "redshift-connector": {"redshift_connector"},
+    "singlestoredb": {"singlestoredb"},
+    "snowflake-connector-python": {"snowflake"},
+    "snowflake-snowpark-python": {"snowflake"},
+    "trino": {"trino"},
+    "vortex-data": {"vortex"},
+}
+
 
 def _pyproject() -> dict:
     return tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
@@ -152,10 +184,22 @@ def _import_names_for_distributions(
     distribution_names: set[str], package_distributions: dict[str, list[str]]
 ) -> set[str]:
     import_names = set()
+    for distribution_name in distribution_names:
+        import_names.add(distribution_name.replace("-", "_"))
+        import_names.update(OPTIONAL_DISTRIBUTION_IMPORT_NAMES.get(distribution_name, set()))
     for import_name, distributions in package_distributions.items():
         if any(canonicalize_name(distribution) in distribution_names for distribution in distributions):
             import_names.add(import_name)
     return import_names
+
+
+def test_optional_import_name_mapping_does_not_depend_on_installed_extras() -> None:
+    import_names = _import_names_for_distributions(
+        {"clickhouse-connect", "clickhouse-driver", "datafusion", "polars", "snowflake-connector-python"},
+        {},
+    )
+
+    assert {"clickhouse_connect", "clickhouse_driver", "datafusion", "polars", "snowflake"} <= import_names
 
 
 def test_pandas_is_core_dependency_while_top_level_import_path_requires_it() -> None:

@@ -6,6 +6,11 @@ Checks both directions that matter for release safety:
   sites and is not an explicit CLI/plugin/guarded-optional exception.
 * imported-but-undeclared: source imports a third-party module that has no
   matching pyproject.toml declaration.
+
+The scan intentionally covers release-visible source plus tests, scripts, and
+docs configuration. A dependency used only by tests still counts as "used" for
+this audit; classification between core, optional, and test-only dependencies is
+covered by separate package metadata guardrails.
 """
 
 from __future__ import annotations

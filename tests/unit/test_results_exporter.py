@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
+from importlib import import_module
 from pathlib import Path
 
 import pytest
@@ -64,6 +65,16 @@ def _assert_canonical_json_file(path: Path) -> None:
     assert not raw.endswith(b"\n\n")
     assert raw == _eof_fixed(raw)
     assert raw == canonical_json_bytes(json.loads(raw))
+
+
+def test_significant_improvement_assessment_constant_matches_compare_gate():
+    compare_module = import_module("benchbox.cli.commands.compare")
+
+    assert (
+        compare_module.SIGNIFICANT_IMPROVEMENT_ASSESSMENT
+        == exporter_module.SIGNIFICANT_IMPROVEMENT_ASSESSMENT
+        == "significant_improvement"
+    )
 
 
 def test_exporter_serializes_execution_phases(tmp_path):

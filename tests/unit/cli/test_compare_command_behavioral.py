@@ -232,12 +232,58 @@ class TestCheckRegression:
                 "average_query_time": {"baseline": 0.010, "current": 0.007, "change_percent": -29.81},
             },
             "query_comparisons": [
-                {"query_id": "18", "baseline_time_ms": 10.0, "current_time_ms": 12.0, "change_percent": 20.0},
-                {"query_id": "8", "baseline_time_ms": 9.0, "current_time_ms": 11.0, "change_percent": 22.22},
+                {"query_id": "18", "baseline_time_ms": 10.0, "current_time_ms": 11.4, "change_percent": 14.0},
+                {"query_id": "8", "baseline_time_ms": 10.0, "current_time_ms": 11.5, "change_percent": 15.0},
             ],
         }
 
         assert _check_regression(comparison, 0.10) is False
+
+    def test_bounded_micro_regressions_require_significant_assessment(self):
+        from benchbox.cli.commands.compare import _evaluate_regression_gate
+
+        comparison = {
+            "summary": {
+                "total_queries_compared": 22,
+                "overall_assessment": "improvement",
+            },
+            "performance_changes": {
+                "total_execution_time": {"change_percent": -30.0},
+                "average_query_time": {"change_percent": -30.0},
+            },
+            "query_comparisons": [
+                {"query_id": "8", "baseline_time_ms": 10.0, "current_time_ms": 11.5, "change_percent": 15.0},
+            ],
+        }
+
+        decision = _evaluate_regression_gate(comparison, 0.10)
+
+        assert decision["failed"] is True
+        assert (
+            decision["rule"] == "per-query regression exceeded the threshold without significant aggregate improvement"
+        )
+
+    def test_significant_assessment_requires_all_aggregate_metrics_over_threshold(self):
+        from benchbox.cli.commands.compare import _evaluate_regression_gate
+
+        comparison = {
+            "summary": {
+                "total_queries_compared": 22,
+                "overall_assessment": "significant_improvement",
+            },
+            "performance_changes": {
+                "total_execution_time": {"change_percent": -30.0},
+                "average_query_time": {"change_percent": -5.0},
+            },
+            "query_comparisons": [
+                {"query_id": "8", "baseline_time_ms": 10.0, "current_time_ms": 11.5, "change_percent": 15.0},
+            ],
+        }
+
+        decision = _evaluate_regression_gate(comparison, 0.10)
+
+        assert decision["failed"] is True
+        assert decision["rule"] == "aggregate improvement was not strong enough to waive bounded per-query noise"
 
     def test_significant_aggregate_improvement_still_fails_above_percent_cap(self):
         from benchbox.cli.commands.compare import _check_regression
@@ -259,7 +305,7 @@ class TestCheckRegression:
         assert _check_regression(comparison, 0.10) is True
 
     def test_significant_aggregate_improvement_still_fails_material_query_regression(self):
-        from benchbox.cli.commands.compare import _check_regression
+        from benchbox.cli.commands.compare import _evaluate_regression_gate
 
         comparison = {
             "summary": {
@@ -271,11 +317,37 @@ class TestCheckRegression:
                 "average_query_time": {"change_percent": -30.0},
             },
             "query_comparisons": [
-                {"query_id": "8", "baseline_time_ms": 9.0, "current_time_ms": 12.0, "change_percent": 33.33},
+                {"query_id": "8", "baseline_time_ms": 12.0, "current_time_ms": 14.5, "change_percent": 20.83},
             ],
         }
 
-        assert _check_regression(comparison, 0.10) is True
+        decision = _evaluate_regression_gate(comparison, 0.10)
+
+        assert decision["failed"] is True
+        assert decision["rule"] == "per-query absolute slowdown exceeded the bounded-noise cap"
+
+    def test_significant_aggregate_improvement_still_fails_total_query_slowdown_budget(self):
+        from benchbox.cli.commands.compare import _evaluate_regression_gate
+
+        comparison = {
+            "summary": {
+                "total_queries_compared": 22,
+                "overall_assessment": "significant_improvement",
+            },
+            "performance_changes": {
+                "total_execution_time": {"change_percent": -30.0},
+                "average_query_time": {"change_percent": -30.0},
+            },
+            "query_comparisons": [
+                {"query_id": "8", "baseline_time_ms": 10.0, "current_time_ms": 11.6, "change_percent": 16.0},
+                {"query_id": "18", "baseline_time_ms": 10.0, "current_time_ms": 11.6, "change_percent": 16.0},
+            ],
+        }
+
+        decision = _evaluate_regression_gate(comparison, 0.10)
+
+        assert decision["failed"] is True
+        assert decision["rule"] == "total per-query slowdown exceeded the bounded-noise budget"
 
     def test_significant_aggregate_improvement_still_fails_too_many_query_regressions(self):
         from benchbox.cli.commands.compare import _check_regression

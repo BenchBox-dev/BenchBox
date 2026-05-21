@@ -8,8 +8,9 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import functools
 import importlib
-from typing import Optional, Type
+from typing import Any, Literal, Optional, Type
 
 from benchbox.utils.runtime_env import DriverResolution, ensure_driver_version
 
@@ -330,44 +331,51 @@ __all__ = [
 ]
 
 
-def get_adapter(*args, **kwargs):
+def _adapter_factory_function(name: str):
+    function = getattr(importlib.import_module(".adapter_factory", __package__), name)
+    globals()[name].__wrapped__ = function
+    functools.update_wrapper(globals()[name], function)
+    return function
+
+
+def get_adapter(
+    platform: str,
+    mode: Optional[Literal["sql", "dataframe"]] = None,
+    deployment: Optional[str] = None,
+    **config: Any,
+) -> Any:
     """Lazy wrapper for the unified adapter factory."""
 
-    from benchbox.platforms.adapter_factory import get_adapter as _get_adapter
+    _get_adapter = _adapter_factory_function("get_adapter")
+    return _get_adapter(platform, mode=mode, deployment=deployment, **config)
 
-    return _get_adapter(*args, **kwargs)
 
-
-def is_dataframe_mode(*args, **kwargs):
+def is_dataframe_mode(platform: str, mode: Optional[str] = None) -> bool:
     """Lazy wrapper for adapter_factory.is_dataframe_mode."""
 
-    from benchbox.platforms.adapter_factory import is_dataframe_mode as _is_dataframe_mode
+    _is_dataframe_mode = _adapter_factory_function("is_dataframe_mode")
+    return _is_dataframe_mode(platform, mode=mode)
 
-    return _is_dataframe_mode(*args, **kwargs)
 
-
-def get_available_modes(*args, **kwargs):
+def get_available_modes(platform: str) -> list[str]:
     """Lazy wrapper for adapter_factory.get_available_modes."""
 
-    from benchbox.platforms.adapter_factory import get_available_modes as _get_available_modes
+    _get_available_modes = _adapter_factory_function("get_available_modes")
+    return _get_available_modes(platform)
 
-    return _get_available_modes(*args, **kwargs)
 
-
-def get_available_deployments(*args, **kwargs):
+def get_available_deployments(platform: str) -> list[str]:
     """Lazy wrapper for adapter_factory.get_available_deployments."""
 
-    from benchbox.platforms.adapter_factory import get_available_deployments as _get_available_deployments
+    _get_available_deployments = _adapter_factory_function("get_available_deployments")
+    return _get_available_deployments(platform)
 
-    return _get_available_deployments(*args, **kwargs)
 
-
-def get_default_deployment(*args, **kwargs):
+def get_default_deployment(platform: str) -> Optional[str]:
     """Lazy wrapper for adapter_factory.get_default_deployment."""
 
-    from benchbox.platforms.adapter_factory import get_default_deployment as _get_default_deployment
-
-    return _get_default_deployment(*args, **kwargs)
+    _get_default_deployment = _adapter_factory_function("get_default_deployment")
+    return _get_default_deployment(platform)
 
 
 def get_platform_adapter(platform_name: str, **config) -> PlatformAdapter:
