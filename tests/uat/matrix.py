@@ -102,9 +102,10 @@ PLATFORM_UV_EXTRA: dict[str, str] = {
 }
 
 # Platform groupings (mirrors lines 127-137 of the bash script).
-FAST_NATIVE_PLATFORMS: tuple[str, ...] = (
-    "duckdb",
-    "datafusion",
+# Consumed by both the UAT framework and the integration matrix test;
+# align with both before changing.
+LOCAL_SQL_PLATFORMS: tuple[str, ...] = ("duckdb", "sqlite", "datafusion")
+FAST_NATIVE_PLATFORMS: tuple[str, ...] = tuple(platform for platform in LOCAL_SQL_PLATFORMS if platform != "sqlite") + (
     "clickhouse-local",
 )
 FAST_DOCKER_PLATFORMS: tuple[str, ...] = (
@@ -113,7 +114,9 @@ FAST_DOCKER_PLATFORMS: tuple[str, ...] = (
     "cedardb",
     "starrocks",
 )
-SLOW_NATIVE_PLATFORMS: tuple[str, ...] = ("sqlite", "spark")
+SLOW_NATIVE_PLATFORMS: tuple[str, ...] = tuple(platform for platform in LOCAL_SQL_PLATFORMS if platform == "sqlite") + (
+    "spark",
+)
 SLOW_DOCKER_PLATFORMS: tuple[str, ...] = (
     "postgresql",
     "presto",

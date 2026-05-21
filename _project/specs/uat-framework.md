@@ -737,7 +737,29 @@ name: "stress-default"
 The hash check is mechanical; the conceptual policy is "frozen
 configs are evidence, editable templates are starting points."
 
-## 10. Migration of existing artifacts
+## 10. What UAT does NOT assert
+
+The UAT framework is a release-gate orchestration layer: it proves that
+configured platform/benchmark cells can be enumerated, executed,
+validated, packaged, reported, and cleaned up under the current operator
+workflow. It does not replace deeper benchmark-correctness suites.
+
+In particular, UAT does not assert query cardinality, per-query
+measurement coverage, or stored answer row-count invariants for every
+local SQL platform. Those checks remain in
+`tests/integration/test_local_platform_benchmark_matrix.py`, which runs
+real local platform x benchmark cases under the integration/stress
+markers and validates the result payload against expected query and
+row-count behavior. Keep that test when changing UAT: it covers a
+different contract than the UAT execute/report phases.
+
+The shared local-SQL platform set lives in `tests/uat/matrix.py` as
+`LOCAL_SQL_PLATFORMS` so UAT platform grouping and the integration
+matrix cannot drift silently. Changes to that tuple must account for
+both release-gate ergonomics and the heavier invariant test's runtime
+cost.
+
+## 11. Migration of existing artifacts
 
 | Artifact | Action | Owner |
 |---|---|---|
@@ -753,7 +775,7 @@ configs are evidence, editable templates are starting points."
 | `docs/operations/uat-framework.md` | New operator guide | W11 |
 | `tests/uat/README.md` | New developer guide | W11 |
 
-## 11. Implementation sequencing and PR cadence
+## 12. Implementation sequencing and PR cadence
 
 One PR per work unit, vertical slices. No monolithic delivery.
 
@@ -785,7 +807,7 @@ git diff origin/develop -- scripts/local_stress_test.sh   # empty unless W11 del
 uv run -- python -m pytest tests/uat/test_no_cli_surface_drift.py -q
 ```
 
-## 12. Open risks, watched but not blocking
+## 13. Open risks, watched but not blocking
 
 - **Risk: Python timeout wrapper drifts from the bash perl wrapper.**
   Mitigation: the W2 fast test exercises the timeout wrapper with a

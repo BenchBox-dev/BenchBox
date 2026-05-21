@@ -764,7 +764,7 @@ work:
 - id: w18
   summary: "Add spec §10 documenting what UAT does NOT assert; dedupe LOCAL_SQL_PLATFORMS"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     De-duplication candidate #2 from the review. The integration test
     `tests/integration/test_local_platform_benchmark_matrix.py` is a
