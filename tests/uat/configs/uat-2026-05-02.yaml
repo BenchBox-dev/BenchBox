@@ -1,14 +1,14 @@
-# FROZEN — do not edit. Clone to a new file for new sweeps.
+# HISTORICAL — record of the 2026-05-02 sweep. Do not edit; if behaviour
+# drifts from this config, fix the framework OR clone to a dated successor.
 #
 # Replay of the 2026-05-02 results-explorer multi-scale corpus sweep.
 # Source: _project/handoffs/results-explorer-uat-retrospective-20260502.md.
-# This file is an immutable historical record. The W10 structural-parity
+# This file is a historical record. The W10 structural-parity
 # test runs `make uat-sweep CONFIG=... DRY_RUN=1` against this YAML and
-# asserts the resulting matrix_summary.tsv has the same column shape and
-# row count (within ladder-pruning tolerance) as the 2026-05-02 retrospective.
+# asserts the report header shape matches the 2026-05-02 retrospective.
 
 name: "uat-2026-05-02"
-description: "Frozen replay of the 2026-05-02 results-explorer multi-scale corpus sweep"
+description: "Historical replay of the 2026-05-02 results-explorer multi-scale corpus sweep"
 
 phases:
   - preflight

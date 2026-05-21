@@ -18,10 +18,10 @@ pytestmark = pytest.mark.slow
 
 
 def test_replay_dry_run_produces_expected_columns(tmp_path: Path):
-    """Run the orchestrator in dry-run mode against the frozen config.
+    """Run the orchestrator in dry-run mode against the historical config.
 
-    Asserts the matrix_summary.tsv has the same columns as the fixture
-    snapshot of the historical 2026-05-02 retrospective.
+    Asserts the report header shape matches the fixture snapshot of the
+    historical 2026-05-02 retrospective. This is not a row-count replay.
     """
     from tests.uat.config import load_config
     from tests.uat.orchestrator import run_sweep
@@ -48,7 +48,7 @@ def test_replay_dry_run_produces_expected_columns(tmp_path: Path):
 
 
 def test_replay_config_has_expected_shape():
-    """Cheap structural smoke: the frozen config keys match the retrospective."""
+    """Cheap structural smoke: the historical config keys match the retrospective."""
     import yaml
 
     raw = yaml.safe_load(CONFIG.read_text(encoding="utf-8"))
