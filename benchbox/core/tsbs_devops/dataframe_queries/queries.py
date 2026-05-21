@@ -22,6 +22,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+from csv import reader
 from typing import Any
 
 from benchbox.core.dataframe.context import DataFrameContext
@@ -781,223 +782,58 @@ def q18_pandas_impl(ctx: DataFrameContext) -> Any:
 # Query Registration
 # =============================================================================
 
+_CATEGORY_CODES = {
+    "AG": QueryCategory.AGGREGATE,
+    "AN": QueryCategory.ANALYTICAL,
+    "FI": QueryCategory.FILTER,
+    "GB": QueryCategory.GROUP_BY,
+    "JO": QueryCategory.JOIN,
+    "PR": QueryCategory.PROJECTION,
+    "SC": QueryCategory.SCAN,
+    "SO": QueryCategory.SORT,
+    "SQ": QueryCategory.SUBQUERY,
+}
+
+_QUERY_METADATA = """\
+Q1|Single Host 12hr|CPU usage for a single host over 12 hours (time-series scan)|SC,FI,SO|q1
+Q2|Single Host 1hr|CPU usage with iowait for a single host over 1 hour|SC,FI,SO|q2
+Q3|CPU Max All 1hr|Max CPU user/system across all hosts in 1 hour window|FI,GB,AG|q3
+Q4|CPU Max All 8hr|Max CPU user/system/iowait across all hosts in 8 hour window|FI,GB,AG|q4
+Q5|Double GroupBy 1hr|CPU avg/max grouped by hostname and minute bucket using DATE_TRUNC|FI,GB,AG,AN|q5
+Q6|Double GroupBy 5min|CPU avg grouped by hostname and second bucket (fine-grained)|FI,GB,AG,AN|q6
+Q7|High CPU 1hr|DISTINCT hostnames with CPU usage > 90% in 1 hour|FI,PR|q7
+Q8|High CPU 12hr Sustained|Hosts with sustained high CPU (>90%) using HAVING COUNT > 10|FI,GB,AG|q8
+Q9|Memory by Host|Memory AVG/MAX used% and MIN available per host|FI,GB,AG|q9
+Q10|Low Memory Hosts|Hosts with MIN available_percent < 10 using HAVING|FI,GB,AG|q10
+Q11|Disk IOPS|Disk read/write IOPS per host and device|FI,GB,AG|q11
+Q12|Disk Latency|Average disk latency with CASE WHEN safe division|FI,GB,AG,AN|q12
+Q13|Network Throughput|Network bytes sent/received per host and interface|FI,GB,AG|q13
+Q14|Network Errors|Network errors and drops with HAVING SUM > 0|FI,GB,AG|q14
+Q15|Resource Utilization|Combined CPU+memory utilization via JOIN on hostname and minute|FI,JO,GB,AG|q15
+Q16|Last Point per Host|Most recent CPU metrics per host using self-join subquery pattern|FI,JO,SQ|q16
+Q17|Metrics by Region|CPU metrics filtered by region via tags JOIN|FI,JO,GB,AG|q17
+Q18|Metrics by Service|CPU metrics grouped by service with host count via tags JOIN|FI,JO,GB,AG|q18
+"""
+
+
+def _impl_for(stem: str, family: str) -> Any:
+    return globals()[f"{stem}_{family}_impl"]
+
 
 def _register_all_queries() -> None:
-    """Register all 18 TSBS DevOps DataFrame queries."""
-    # Single Host
-    register_query(
-        DataFrameQuery(
-            query_id="Q1",
-            query_name="Single Host 12hr",
-            description="CPU usage for a single host over 12 hours (time-series scan)",
-            categories=[QueryCategory.SCAN, QueryCategory.FILTER, QueryCategory.SORT],
-            expression_impl=q1_expression_impl,
-            pandas_impl=q1_pandas_impl,
+    for query_id, query_name, description, category_codes, impl_stem in reader(
+        _QUERY_METADATA.splitlines(), delimiter="|"
+    ):
+        register_query(
+            DataFrameQuery(
+                query_id=query_id,
+                query_name=query_name,
+                description=description,
+                categories=[_CATEGORY_CODES[code] for code in category_codes.split(",")],
+                expression_impl=_impl_for(impl_stem, "expression"),
+                pandas_impl=_impl_for(impl_stem, "pandas"),
+            )
         )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q2",
-            query_name="Single Host 1hr",
-            description="CPU usage with iowait for a single host over 1 hour",
-            categories=[QueryCategory.SCAN, QueryCategory.FILTER, QueryCategory.SORT],
-            expression_impl=q2_expression_impl,
-            pandas_impl=q2_pandas_impl,
-        )
-    )
-
-    # Aggregation
-    register_query(
-        DataFrameQuery(
-            query_id="Q3",
-            query_name="CPU Max All 1hr",
-            description="Max CPU user/system across all hosts in 1 hour window",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-            expression_impl=q3_expression_impl,
-            pandas_impl=q3_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q4",
-            query_name="CPU Max All 8hr",
-            description="Max CPU user/system/iowait across all hosts in 8 hour window",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-            expression_impl=q4_expression_impl,
-            pandas_impl=q4_pandas_impl,
-        )
-    )
-
-    # GroupBy
-    register_query(
-        DataFrameQuery(
-            query_id="Q5",
-            query_name="Double GroupBy 1hr",
-            description="CPU avg/max grouped by hostname and minute bucket using DATE_TRUNC",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=q5_expression_impl,
-            pandas_impl=q5_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q6",
-            query_name="Double GroupBy 5min",
-            description="CPU avg grouped by hostname and second bucket (fine-grained)",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=q6_expression_impl,
-            pandas_impl=q6_pandas_impl,
-        )
-    )
-
-    # Threshold
-    register_query(
-        DataFrameQuery(
-            query_id="Q7",
-            query_name="High CPU 1hr",
-            description="DISTINCT hostnames with CPU usage > 90% in 1 hour",
-            categories=[QueryCategory.FILTER, QueryCategory.PROJECTION],
-            expression_impl=q7_expression_impl,
-            pandas_impl=q7_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q8",
-            query_name="High CPU 12hr Sustained",
-            description="Hosts with sustained high CPU (>90%) using HAVING COUNT > 10",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-            expression_impl=q8_expression_impl,
-            pandas_impl=q8_pandas_impl,
-        )
-    )
-
-    # Memory
-    register_query(
-        DataFrameQuery(
-            query_id="Q9",
-            query_name="Memory by Host",
-            description="Memory AVG/MAX used% and MIN available per host",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-            expression_impl=q9_expression_impl,
-            pandas_impl=q9_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q10",
-            query_name="Low Memory Hosts",
-            description="Hosts with MIN available_percent < 10 using HAVING",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-            expression_impl=q10_expression_impl,
-            pandas_impl=q10_pandas_impl,
-        )
-    )
-
-    # Disk
-    register_query(
-        DataFrameQuery(
-            query_id="Q11",
-            query_name="Disk IOPS",
-            description="Disk read/write IOPS per host and device",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-            expression_impl=q11_expression_impl,
-            pandas_impl=q11_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q12",
-            query_name="Disk Latency",
-            description="Average disk latency with CASE WHEN safe division",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=q12_expression_impl,
-            pandas_impl=q12_pandas_impl,
-        )
-    )
-
-    # Network
-    register_query(
-        DataFrameQuery(
-            query_id="Q13",
-            query_name="Network Throughput",
-            description="Network bytes sent/received per host and interface",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-            expression_impl=q13_expression_impl,
-            pandas_impl=q13_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q14",
-            query_name="Network Errors",
-            description="Network errors and drops with HAVING SUM > 0",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-            expression_impl=q14_expression_impl,
-            pandas_impl=q14_pandas_impl,
-        )
-    )
-
-    # Combined
-    register_query(
-        DataFrameQuery(
-            query_id="Q15",
-            query_name="Resource Utilization",
-            description="Combined CPU+memory utilization via JOIN on hostname and minute",
-            categories=[QueryCategory.FILTER, QueryCategory.JOIN, QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-            expression_impl=q15_expression_impl,
-            pandas_impl=q15_pandas_impl,
-        )
-    )
-
-    # LastPoint
-    register_query(
-        DataFrameQuery(
-            query_id="Q16",
-            query_name="Last Point per Host",
-            description="Most recent CPU metrics per host using self-join subquery pattern",
-            categories=[QueryCategory.FILTER, QueryCategory.JOIN, QueryCategory.SUBQUERY],
-            expression_impl=q16_expression_impl,
-            pandas_impl=q16_pandas_impl,
-        )
-    )
-
-    # Tags
-    register_query(
-        DataFrameQuery(
-            query_id="Q17",
-            query_name="Metrics by Region",
-            description="CPU metrics filtered by region via tags JOIN",
-            categories=[QueryCategory.FILTER, QueryCategory.JOIN, QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-            expression_impl=q17_expression_impl,
-            pandas_impl=q17_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q18",
-            query_name="Metrics by Service",
-            description="CPU metrics grouped by service with host count via tags JOIN",
-            categories=[QueryCategory.FILTER, QueryCategory.JOIN, QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-            expression_impl=q18_expression_impl,
-            pandas_impl=q18_pandas_impl,
-        )
-    )
 
 
 _register_all_queries()
