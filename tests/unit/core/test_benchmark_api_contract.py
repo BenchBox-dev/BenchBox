@@ -18,7 +18,11 @@ from benchbox.core.benchmark_loader import BENCHMARK_LOADER_API_SURFACE
 from benchbox.core.benchmark_registry import (
     BENCHMARK_CLASS_NAMES,
     BENCHMARK_METADATA,
+    BENCHMARK_SUPPORT_STATUS_VALUES,
     CORE_BENCHMARK_CLASS_NAMES,
+    get_benchmark_registry_summary,
+    get_benchmark_support_status,
+    get_benchmarks_by_support_status,
     list_loader_benchmark_ids,
     list_public_benchmark_ids,
 )
@@ -34,8 +38,18 @@ CORE_ONLY_BENCHMARK_IDS = {"ai_primitives", "joinorder_synthetic"}
 BENCHMARK_API_COUNT_MARKER = (
     "Benchmark API snapshot: **23** registry entries; **23** loader-resolved core families; "
     "**22** public discovery entries; **21** top-level Python benchmark facades; "
-    "**14** lazy facades; **7** eager facades; **2** core-only benchmark IDs."
+    "**14** lazy facades; **7** eager facades; **2** core-only benchmark IDs. "
+    "Benchmark support status: **5** stable, **12** beta, **5** experimental, **1** repo-only, "
+    "**0** deprecated, **0** document-only."
 )
+BENCHMARK_SUPPORT_STATUS_COUNTS = {
+    "stable": 5,
+    "beta": 12,
+    "experimental": 5,
+    "repo_only": 1,
+    "deprecated": 0,
+    "document_only": 0,
+}
 
 
 def test_benchmark_api_surface_markers_match_contract_map() -> None:
@@ -83,6 +97,34 @@ def test_benchmark_registry_wrapper_and_loader_counts_match_contract_map() -> No
     assert set(list_public_benchmark_ids()) == set(BENCHMARK_METADATA) - {"joinorder_synthetic"}
 
     assert BENCHMARK_API_COUNT_MARKER in PUBLIC_CONTRACTS_DOC.read_text()
+
+
+def test_benchmark_support_status_metadata_matches_contract_map() -> None:
+    """Every benchmark has one product-support status distinct from visibility and capability."""
+
+    valid = set(BENCHMARK_SUPPORT_STATUS_VALUES)
+    for benchmark_id, meta in BENCHMARK_METADATA.items():
+        assert set(meta).intersection({"support_status"}) == {"support_status"}
+        assert meta["support_status"] in valid, f"{benchmark_id} has invalid support_status"
+
+    summary = get_benchmark_registry_summary()
+    assert summary["support_status"] == BENCHMARK_SUPPORT_STATUS_COUNTS
+    assert summary["surface"] == {"internal": 1, "public": 22}
+    assert summary["public"] == len(list_public_benchmark_ids())
+    assert summary["loader"] == len(list_loader_benchmark_ids())
+
+    assert get_benchmark_support_status("tpch") == "stable"
+    assert get_benchmark_support_status("joinorder_synthetic") == "repo_only"
+    assert get_benchmark_support_status("missing") is None
+    assert get_benchmarks_by_support_status("repo_only") == ["joinorder_synthetic"]
+    assert "joinorder_synthetic" not in list_public_benchmark_ids()
+
+    with pytest.raises(ValueError, match="Unknown benchmark support_status"):
+        get_benchmarks_by_support_status("unknown")  # type: ignore[arg-type]
+
+    contract_doc = PUBLIC_CONTRACTS_DOC.read_text()
+    assert "Benchmark support status: **5** stable, **12** beta, **5** experimental" in contract_doc
+    assert "support status counts are stable=5, beta=12, experimental=5" in contract_doc
 
 
 def test_benchmark_api_import_boundary_excludes_platform_adapter_imports() -> None:

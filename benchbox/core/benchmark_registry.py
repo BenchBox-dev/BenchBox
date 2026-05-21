@@ -12,7 +12,19 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import importlib
-from typing import Any
+from collections import Counter
+from typing import Any, Literal, cast
+
+BenchmarkSupportStatus = Literal["stable", "beta", "experimental", "repo_only", "deprecated", "document_only"]
+
+BENCHMARK_SUPPORT_STATUS_VALUES: tuple[BenchmarkSupportStatus, ...] = (
+    "stable",
+    "beta",
+    "experimental",
+    "repo_only",
+    "deprecated",
+    "document_only",
+)
 
 # Category ordering for display (most popular first)
 CATEGORY_ORDER = ["TPC", "Primitives", "Industry", "Academic", "Time Series", "Real World", "AI/ML", "Experimental"]
@@ -95,6 +107,7 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "display_name": "TPC-H",
         "description": "Decision Support Benchmark",
         "category": "TPC",
+        "support_status": "stable",
         "num_queries": 22,
         "query_description": "22 analytical queries",
         "supports_streams": True,
@@ -109,6 +122,7 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "display_name": "TPC-DS",
         "description": "Decision Support Benchmark",
         "category": "TPC",
+        "support_status": "stable",
         "num_queries": 99,
         "query_description": "99 analytical queries",
         "supports_streams": True,
@@ -125,6 +139,7 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "display_name": "TPC-DS-OBT",
         "description": "Single-table TPC-DS (One Big Table) benchmark",
         "category": "Experimental",
+        "support_status": "experimental",
         "num_queries": 17,
         "query_description": "OBT-adapted analytical queries",
         "supports_streams": False,
@@ -139,6 +154,7 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "display_name": "TPC-DI",
         "description": "Data Integration Benchmark",
         "category": "TPC",
+        "support_status": "beta",
         "num_queries": 38,  # ETL operations
         "query_description": "ETL Pipeline",
         "supports_streams": False,
@@ -153,6 +169,7 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "display_name": "SSB",
         "description": "Star Schema Benchmark",
         "category": "Academic",
+        "support_status": "stable",
         "num_queries": 13,
         "query_description": "13 queries",
         "supports_streams": False,
@@ -167,6 +184,7 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "display_name": "ClickBench",
         "description": "Analytics benchmark",
         "category": "Industry",
+        "support_status": "stable",
         "num_queries": 43,
         "query_description": "43 queries",
         "supports_streams": False,
@@ -181,6 +199,7 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "display_name": "H2ODB",
         "description": "Data science benchmark",
         "category": "Industry",
+        "support_status": "beta",
         "num_queries": 10,
         "query_description": "Multiple ML workloads",
         "supports_streams": False,
@@ -195,6 +214,7 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "display_name": "AMPLab",
         "description": "Big data benchmark suite",
         "category": "Academic",
+        "support_status": "beta",
         "num_queries": 8,
         "query_description": "Multiple workloads",
         "supports_streams": False,
@@ -209,6 +229,7 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "display_name": "Read Primitives",
         "description": "Read operation benchmarks testing SELECT queries",
         "category": "Primitives",
+        "support_status": "beta",
         "num_queries": 136,
         "query_description": "Multiple read test queries",
         "supports_streams": False,
@@ -223,6 +244,7 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "display_name": "Write Primitives",
         "description": "Database write operations benchmark",
         "category": "Primitives",
+        "support_status": "beta",
         "num_queries": 12,
         "query_description": "12 write operations (INSERT, UPDATE, DELETE, BULK_LOAD, MERGE, DDL, TRANSACTION)",
         "supports_streams": False,
@@ -237,6 +259,7 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "display_name": "Metadata",
         "description": "Database catalog introspection benchmark",
         "category": "Primitives",
+        "support_status": "beta",
         "num_queries": 62,
         "query_description": "62 catalog queries in the full SQL catalog; DataFrame mode runs platform-specific metadata operation subsets",
         "supports_streams": False,
@@ -251,6 +274,7 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "display_name": "Transactions",
         "description": "ACID transaction testing benchmark",
         "category": "Primitives",
+        "support_status": "beta",
         "num_queries": 12,
         "query_description": "12 transaction operations",
         "supports_streams": False,
@@ -265,6 +289,7 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "display_name": "AI Primitives",
         "description": "AI/ML function benchmarks (Snowflake Cortex, BigQuery ML, Databricks AI)",
         "category": "Primitives",
+        "support_status": "experimental",
         "num_queries": 16,
         "query_description": "16 AI/ML function queries",
         "supports_streams": False,
@@ -279,6 +304,7 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "display_name": "JoinOrder",
         "description": "Canonical IMDb 2013 Join Order Benchmark",
         "category": "Academic",
+        "support_status": "stable",
         "num_queries": 113,
         "query_description": "113 queries",
         "supports_streams": False,
@@ -296,6 +322,7 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "display_name": "JoinOrder Synthetic",
         "description": "Uniformly-random Join Order schema smoke-test data",
         "category": "Academic",
+        "support_status": "repo_only",
         "num_queries": 13,
         "query_description": "13 synthetic smoke queries",
         "supports_streams": False,
@@ -312,6 +339,7 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "display_name": "CoffeeShop",
         "description": "Order line benchmark with regional weighting",
         "category": "Industry",
+        "support_status": "beta",
         "num_queries": 11,
         "query_description": "11 analytics queries",
         "supports_streams": False,
@@ -326,6 +354,7 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "display_name": "TPC-Havoc",
         "description": "TPC-H syntax variants for optimizer testing",
         "category": "Experimental",
+        "support_status": "experimental",
         "num_queries": 220,
         "query_description": "220 query variants (22 queries x 10 variants)",
         "supports_streams": False,
@@ -340,6 +369,7 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "display_name": "TPC-H Skew",
         "description": "TPC-H with configurable data skew distributions",
         "category": "Experimental",
+        "support_status": "experimental",
         "num_queries": 22,
         "query_description": "22 TPC-H queries on skewed data (Zipfian, normal, exponential)",
         "supports_streams": True,
@@ -354,6 +384,7 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "display_name": "TSBS DevOps",
         "description": "Time Series Benchmark Suite for DevOps monitoring",
         "category": "Time Series",
+        "support_status": "beta",
         "num_queries": 18,
         "query_description": "18 time-series queries (CPU, memory, disk, network)",
         "supports_streams": False,
@@ -368,6 +399,7 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "display_name": "NYC Taxi",
         "description": "NYC TLC trip data for OLAP analytics",
         "category": "Real World",
+        "support_status": "beta",
         "num_queries": 25,
         "query_description": "25 OLAP queries (temporal, geographic, financial)",
         "supports_streams": False,
@@ -382,6 +414,7 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "display_name": "Flight Data",
         "description": "US BTS On-Time Performance data for aviation analytics",
         "category": "Real World",
+        "support_status": "beta",
         "num_queries": 20,
         "query_description": "20 OLAP queries (on-time, delays, routes, temporal, carriers)",
         "supports_streams": False,
@@ -396,6 +429,7 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "display_name": "TPC-H Data Vault",
         "description": "TPC-H adapted for Data Vault 2.0 modeling",
         "category": "Experimental",
+        "support_status": "experimental",
         "num_queries": 22,
         "query_description": "22 analytical queries (TPC-H adapted for Hub-Link-Satellite model)",
         "supports_streams": False,
@@ -410,6 +444,7 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "display_name": "Vector Search",
         "description": "Vector similarity search benchmark (kNN, ANN, filtered)",
         "category": "AI/ML",
+        "support_status": "beta",
         "num_queries": 6,
         "query_description": "6 queries (kNN cosine/L2, filtered, recall@k, ANN, multi-category)",
         "supports_streams": False,
@@ -421,6 +456,25 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "supports_dataframe": False,
     },
 }
+
+
+def _validate_benchmark_support_status() -> None:
+    missing = sorted(name for name, meta in BENCHMARK_METADATA.items() if "support_status" not in meta)
+    invalid = sorted(
+        f"{name}={meta.get('support_status')!r}"
+        for name, meta in BENCHMARK_METADATA.items()
+        if meta.get("support_status") not in BENCHMARK_SUPPORT_STATUS_VALUES
+    )
+    if missing or invalid:
+        details: list[str] = []
+        if missing:
+            details.append(f"missing support_status for: {', '.join(missing)}")
+        if invalid:
+            details.append(f"invalid support_status entries: {', '.join(invalid)}")
+        raise ValueError("Invalid benchmark support_status metadata: " + "; ".join(details))
+
+
+_validate_benchmark_support_status()
 
 
 def get_all_benchmarks() -> dict[str, dict[str, Any]]:
@@ -550,6 +604,40 @@ def list_loader_benchmark_ids() -> list[str]:
         List of benchmark identifiers loadable via benchbox.core.benchmark_loader.
     """
     return list(CORE_BENCHMARK_CLASS_NAMES.keys())
+
+
+def get_benchmark_support_status(benchmark_id: str) -> BenchmarkSupportStatus | None:
+    """Return the registry-declared product support status for a benchmark."""
+    meta = get_benchmark_metadata(benchmark_id)
+    if meta is None:
+        return None
+    return cast(BenchmarkSupportStatus, meta["support_status"])
+
+
+def get_benchmarks_by_support_status(status: BenchmarkSupportStatus) -> list[str]:
+    """Return benchmark IDs classified with *status*."""
+    if status not in BENCHMARK_SUPPORT_STATUS_VALUES:
+        raise ValueError(
+            f"Unknown benchmark support_status {status!r}. "
+            f"Expected one of: {', '.join(BENCHMARK_SUPPORT_STATUS_VALUES)}"
+        )
+    return sorted(name for name, meta in BENCHMARK_METADATA.items() if meta["support_status"] == status)
+
+
+def get_benchmark_registry_summary() -> dict[str, Any]:
+    """Return count summaries for benchmark contract and docs drift checks."""
+    support_counts = Counter(
+        cast(BenchmarkSupportStatus, meta["support_status"]) for meta in BENCHMARK_METADATA.values()
+    )
+    surface_counts = Counter(str(meta.get("surface", "public")) for meta in BENCHMARK_METADATA.values())
+    return {
+        "total": len(BENCHMARK_METADATA),
+        "loader": len(list_loader_benchmark_ids()),
+        "public": len(list_public_benchmark_ids()),
+        "dataframe_supported": sum(1 for meta in BENCHMARK_METADATA.values() if meta.get("supports_dataframe", False)),
+        "support_status": {status: support_counts.get(status, 0) for status in BENCHMARK_SUPPORT_STATUS_VALUES},
+        "surface": dict(sorted(surface_counts.items())),
+    }
 
 
 def get_benchmarks_by_category(category: str) -> dict[str, dict[str, Any]]:

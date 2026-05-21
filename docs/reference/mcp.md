@@ -182,6 +182,9 @@ or a shared non-CLI execution service below both CLI and MCP.
 #### `list_available`
 
 List platforms, benchmarks, chart templates, or all discovery data.
+Benchmark rows include `support_status` from
+`benchbox.core.benchmark_registry`; MCP does not maintain a separate support
+classification.
 
 | Name | Type | Required | Default | Description |
 |---|---|---:|---|---|
@@ -192,6 +195,9 @@ List platforms, benchmarks, chart templates, or all discovery data.
 | Name | Type | Required | Default | Description |
 |---|---|---:|---|---|
 | `benchmark` | string | Yes | - | Benchmark identifier. |
+
+Returns benchmark metadata including `support_status`, category, query/schema
+information, scale-factor constraints, and DataFrame capability.
 
 #### `system_profile`
 

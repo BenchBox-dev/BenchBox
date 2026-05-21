@@ -172,6 +172,7 @@ class TestGetQueryDetailsTool:
 
         assert "benchmark_info" in result
         assert "display_name" in result["benchmark_info"]
+        assert result["benchmark_info"]["support_status"] == "stable"
 
 
 # ---------------------------------------------------------------------------
@@ -263,8 +264,18 @@ class TestListBenchmarksTool:
         for bm in result["benchmarks"]:
             assert "name" in bm
             assert "display_name" in bm
+            assert "support_status" in bm
             assert "query_count" in bm
             assert "scale_factors" in bm
+
+    def test_benchmark_entries_project_support_status(self, tool_functions):
+        """MCP benchmark discovery reports registry support status."""
+        fn = tool_functions["list_available"]
+        result = fn(category="benchmarks")
+        benchmarks = {bm["name"]: bm for bm in result["benchmarks"]}
+
+        assert benchmarks["tpch"]["support_status"] == "stable"
+        assert benchmarks["ai_primitives"]["support_status"] == "experimental"
 
     def test_categories_grouping(self, tool_functions):
         """Response includes category grouping."""
@@ -290,6 +301,7 @@ class TestGetBenchmarkInfoTool:
 
         assert "error" not in result
         assert result.get("name") == "tpch" or result.get("benchmark") == "tpch"
+        assert result["support_status"] == "stable"
 
     def test_unknown_benchmark_returns_error(self, tool_functions):
         """Unknown benchmark returns error."""

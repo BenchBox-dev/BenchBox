@@ -67,22 +67,19 @@ Allowed values:
 | `deprecated` | Temporarily retained compatibility surface. | Retained until target review/removal window. | Migration path required. | Listed with deprecation status or hidden after warning window. | Exposed only if existing clients need it. | Compatibility tests until removal. | Removal follows registry target and release notes. |
 | `document_only` | Documented external concept or planned support with no runtime implementation. | No package promise. | Docs must say it is not executable support. | Not listed as runnable. | Not exposed. | Link/static doc checks only. | No runtime breakage claim. |
 
-Platform registry metadata now carries exactly one `support_status` for every
-platform. Benchmark registry metadata does not yet carry benchmark-level
-`support_status`; `benchmark-support-status-and-discovery-policy` owns that
-migration. Until it lands, benchmark support-level claims in user-facing docs
-must either avoid exact status counts or explicitly identify themselves as
-editorial summaries.
+Platform and benchmark registry metadata now carry exactly one `support_status`
+for every runtime entry. Benchmark support status is distinct from benchmark
+`surface` visibility and from capability flags such as `supports_dataframe`.
 
 ## Count and Drift Policy
 
-Benchmark API snapshot: **23** registry entries; **23** loader-resolved core families; **22** public discovery entries; **21** top-level Python benchmark facades; **14** lazy facades; **7** eager facades; **2** core-only benchmark IDs.
+Benchmark API snapshot: **23** registry entries; **23** loader-resolved core families; **22** public discovery entries; **21** top-level Python benchmark facades; **14** lazy facades; **7** eager facades; **2** core-only benchmark IDs. Benchmark support status: **5** stable, **12** beta, **5** experimental, **1** repo-only, **0** deprecated, **0** document-only.
 
-Evidence snapshot at `8937681`:
+Evidence snapshot updated by `benchmark-support-status-and-discovery-policy`:
 
 | Source | Current evidence | Contract implication |
 |---|---|---|
-| `benchbox.core.benchmark_registry` | 23 benchmark metadata entries and 23 loader-resolved IDs. | Benchmark count claims must derive from registry metadata or avoid exact counts. |
+| `benchbox.core.benchmark_registry` | 23 benchmark metadata entries and 23 loader-resolved IDs; support status counts are stable=5, beta=12, experimental=5, repo_only=1, deprecated=0, document_only=0. | Benchmark count and support claims must derive from registry metadata or avoid exact counts. |
 | `benchbox.core.platform_registry.PlatformRegistry.get_all_platform_metadata()` | 50 platform metadata entries: 45 SQL-capable, 19 DataFrame-capable, 14 dual-mode. | README and platform docs must not carry unqualified hand-maintained platform counts. |
 | `benchbox.core.results.schema_policy` | Current result schema version: `2.1`; runtime/explorer accepted versions: `2.0`, `2.1`; public submission accepts numeric `2.x`. | Result schema version claims must update with the named consumer policy or defer to this policy module. |
 | `README.md` before this TODO | Landing-page bullets claimed 22 benchmarks, 42 SQL platforms, and 9 DataFrame platforms. | Exact counts were stale relative to registry metadata; README now links to this policy instead of being authoritative. |
@@ -98,7 +95,7 @@ Each public claim class has one owner and one preferred verification gate:
 | Claim class | Owner | Source of truth | Verification gate |
 |---|---|---|---|
 | Platform counts, platform support status, and optional import health | platform-runtime | `benchbox/core/platform_registry.py` | Platform registry tests and generated platform docs checks. |
-| Benchmark counts, benchmark wrapper/loader/discovery reachability, and future benchmark support status | benchmark-api | `benchbox/core/benchmark_registry.py`, `benchbox/__init__.py`, `benchbox/core/benchmark_loader.py` | `tests/unit/core/test_benchmark_api_contract.py` plus the pending benchmark support-status migration. |
+| Benchmark counts, benchmark wrapper/loader/discovery reachability, and benchmark support status | benchmark-api | `benchbox/core/benchmark_registry.py`, `benchbox/__init__.py`, `benchbox/core/benchmark_loader.py` | `tests/unit/core/test_benchmark_api_contract.py` plus focused MCP discovery checks. |
 | Result schema versions and consumer acceptance policy | results | `benchbox/core/results/schema_policy.py`, result docs | Result schema policy, loader, submission, explorer, and hosted-results contract tests. |
 | MCP run parameters and product-surface limits | mcp | `benchbox/mcp/`, `docs/reference/mcp.md` | `tests/unit/mcp/test_run_surface_contract.py` and focused MCP tool tests. |
 | SQL compatibility DDL rewrite governance | sql-compat | `benchbox/sql_compat/`, adapter DDL rewrite sites | `make compat-docs-check` and DDL drift inventory checks. |

@@ -248,6 +248,7 @@ def register_benchmark_tools(mcp: FastMCP, *, results_dir: Path) -> None:
             response["benchmark_info"] = {
                 "display_name": meta.get("display_name", benchmark_lower),
                 "category": meta.get("category", "unknown"),
+                "support_status": meta["support_status"],
             }
 
             return response

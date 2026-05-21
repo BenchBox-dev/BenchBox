@@ -34,6 +34,7 @@ class TestBenchmarkResources:
                     "display_name": meta.get("display_name", name),
                     "description": meta.get("description", ""),
                     "category": meta.get("category", "unknown"),
+                    "support_status": meta.get("support_status", "unknown"),
                     "query_count": meta.get("num_queries", 0),
                 }
             )
@@ -47,6 +48,17 @@ class TestBenchmarkResources:
         assert "count" in parsed
         assert parsed["count"] > 0
 
+    def test_list_benchmarks_resource_projects_support_status(self):
+        """Resource benchmark list should expose registry support status."""
+        from benchbox.mcp.resources.registry import _build_benchmarks_list
+
+        parsed = json.loads(_build_benchmarks_list())
+        benchmarks = {row["name"]: row for row in parsed["benchmarks"]}
+
+        assert benchmarks["tpch"]["support_status"] == "stable"
+        assert benchmarks["ai_primitives"]["support_status"] == "experimental"
+        assert "joinorder_synthetic" not in benchmarks
+
     def test_get_benchmark_resource_tpch(self):
         """Test getting TPC-H benchmark resource."""
         from benchbox.core.benchmark_registry import get_all_benchmarks
@@ -58,12 +70,23 @@ class TestBenchmarkResources:
             "name": "tpch",
             "display_name": meta.get("display_name"),
             "description": meta.get("description"),
+            "support_status": meta.get("support_status"),
             "query_count": meta.get("num_queries"),
         }
 
         assert result["name"] == "tpch"
         assert result["display_name"] == "TPC-H"
+        assert result["support_status"] == "stable"
         assert result["query_count"] == 22
+
+    def test_get_benchmark_resource_projects_support_status(self):
+        """Detailed benchmark resource should expose registry support status."""
+        from benchbox.mcp.resources.registry import _build_benchmark_detail
+
+        parsed = json.loads(_build_benchmark_detail("tpch"))
+
+        assert parsed["name"] == "tpch"
+        assert parsed["support_status"] == "stable"
 
 
 class TestPlatformResources:
