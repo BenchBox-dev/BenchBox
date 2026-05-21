@@ -143,7 +143,7 @@ def q1_expression_impl(ctx: DataFrameContext) -> Any:
     params = get_tpch_parameters(1)
     cutoff_date = params["cutoff_date"]
 
-    result = (
+    return (
         lineitem.filter(col("l_shipdate") <= lit(cutoff_date))
         .group_by("l_returnflag", "l_linestatus")
         .agg(
@@ -158,8 +158,6 @@ def q1_expression_impl(ctx: DataFrameContext) -> Any:
         )
         .sort("l_returnflag", "l_linestatus")
     )
-
-    return result
 
 
 def q3_expression_impl(ctx: DataFrameContext) -> Any:
@@ -180,7 +178,7 @@ def q3_expression_impl(ctx: DataFrameContext) -> Any:
 
     # Join customer -> orders -> lineitem
     # Filter by segment, order date, and ship date
-    result = (
+    return (
         customer.filter(col("c_mktsegment") == lit(segment))
         .join(orders, left_on="c_custkey", right_on="o_custkey")
         .filter(col("o_orderdate") < lit(order_date))
@@ -191,8 +189,6 @@ def q3_expression_impl(ctx: DataFrameContext) -> Any:
         .sort(["revenue", "o_orderdate"], descending=[True, False])
         .limit(10)
     )
-
-    return result
 
 
 def q4_expression_impl(ctx: DataFrameContext) -> Any:
@@ -213,15 +209,13 @@ def q4_expression_impl(ctx: DataFrameContext) -> Any:
     # Find orders with late lineitems using semi-join pattern
     late_orders = lineitem.filter(col("l_commitdate") < col("l_receiptdate")).select("l_orderkey").unique()
 
-    result = (
+    return (
         orders.filter((col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") < lit(end_date)))
         .join(late_orders, left_on="o_orderkey", right_on="l_orderkey", how="semi")
         .group_by("o_orderpriority")
         .agg(col("o_orderkey").count().alias("order_count"))
         .sort("o_orderpriority")
     )
-
-    return result
 
 
 def q5_expression_impl(ctx: DataFrameContext) -> Any:
@@ -244,7 +238,7 @@ def q5_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    result = (
+    return (
         region.filter(col("r_name") == lit(region_name))
         .join(nation, left_on="r_regionkey", right_on="n_regionkey")
         .join(customer, left_on="n_nationkey", right_on="c_nationkey")
@@ -260,8 +254,6 @@ def q5_expression_impl(ctx: DataFrameContext) -> Any:
         .agg((col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"))
         .sort("revenue", descending=True)
     )
-
-    return result
 
 
 def q6_expression_impl(ctx: DataFrameContext) -> Any:
@@ -280,7 +272,7 @@ def q6_expression_impl(ctx: DataFrameContext) -> Any:
     discount_high = params["discount_high"]
     quantity_limit = params["quantity_limit"]
 
-    result = (
+    return (
         lineitem.filter(
             (col("l_shipdate") >= lit(start_date))
             & (col("l_shipdate") < lit(end_date))
@@ -291,8 +283,6 @@ def q6_expression_impl(ctx: DataFrameContext) -> Any:
         .select((col("l_extendedprice") * col("l_discount")).alias("revenue"))
         .sum()
     )
-
-    return result
 
 
 def q10_expression_impl(ctx: DataFrameContext) -> Any:
@@ -311,7 +301,7 @@ def q10_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    result = (
+    return (
         customer.join(orders, left_on="c_custkey", right_on="o_custkey")
         .filter((col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") < lit(end_date)))
         .join(lineitem, left_on="o_orderkey", right_on="l_orderkey")
@@ -331,8 +321,6 @@ def q10_expression_impl(ctx: DataFrameContext) -> Any:
         .limit(20)
     )
 
-    return result
-
 
 def q12_expression_impl(ctx: DataFrameContext) -> Any:
     """TPC-H Q12: Shipping Modes and Order Priority (Expression Family).
@@ -351,7 +339,7 @@ def q12_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    result = (
+    return (
         lineitem.filter(
             (col("l_shipmode").is_in([shipmode1, shipmode2]))
             & (col("l_commitdate") < col("l_receiptdate"))
@@ -374,8 +362,6 @@ def q12_expression_impl(ctx: DataFrameContext) -> Any:
         .sort("l_shipmode")
     )
 
-    return result
-
 
 def q14_expression_impl(ctx: DataFrameContext) -> Any:
     """TPC-H Q14: Promotion Effect (Expression Family).
@@ -391,7 +377,7 @@ def q14_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    result = (
+    return (
         lineitem.filter((col("l_shipdate") >= lit(start_date)) & (col("l_shipdate") < lit(end_date)))
         .join(part, left_on="l_partkey", right_on="p_partkey")
         .select(
@@ -404,8 +390,6 @@ def q14_expression_impl(ctx: DataFrameContext) -> Any:
             ).alias("promo_revenue")
         )
     )
-
-    return result
 
 
 def q7_expression_impl(ctx: DataFrameContext) -> Any:
@@ -431,7 +415,7 @@ def q7_expression_impl(ctx: DataFrameContext) -> Any:
     n1 = nation.select(col("n_nationkey").alias("n1_nationkey"), col("n_name").alias("supp_nation"))
     n2 = nation.select(col("n_nationkey").alias("n2_nationkey"), col("n_name").alias("cust_nation"))
 
-    result = (
+    return (
         supplier.join(n1, left_on="s_nationkey", right_on="n1_nationkey")
         .join(lineitem, left_on="s_suppkey", right_on="l_suppkey")
         .filter((col("l_shipdate") >= lit(start_date)) & (col("l_shipdate") <= lit(end_date)))
@@ -450,8 +434,6 @@ def q7_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("volume").sum().alias("revenue"))
         .sort("supp_nation", "cust_nation", "l_year")
     )
-
-    return result
 
 
 def q8_expression_impl(ctx: DataFrameContext) -> Any:
@@ -479,7 +461,7 @@ def q8_expression_impl(ctx: DataFrameContext) -> Any:
     # Alias nation for supplier nation
     n2 = nation.select(col("n_nationkey").alias("n2_nationkey"), col("n_name").alias("nation"))
 
-    result = (
+    return (
         part.filter(col("p_type") == lit(target_type))
         .join(lineitem, left_on="p_partkey", right_on="l_partkey")
         .join(supplier, left_on="l_suppkey", right_on="s_suppkey")
@@ -504,8 +486,6 @@ def q8_expression_impl(ctx: DataFrameContext) -> Any:
         .sort("o_year")
     )
 
-    return result
-
 
 def q9_expression_impl(ctx: DataFrameContext) -> Any:
     """TPC-H Q9: Product Type Profit Measure (Expression Family).
@@ -524,7 +504,7 @@ def q9_expression_impl(ctx: DataFrameContext) -> Any:
     params = get_tpch_parameters(9)
     color = params["color"]
 
-    result = (
+    return (
         part.filter(col("p_name").str.contains(color))
         .join(lineitem, left_on="p_partkey", right_on="l_partkey")
         .join(supplier, left_on="l_suppkey", right_on="s_suppkey")
@@ -545,8 +525,6 @@ def q9_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("amount").sum().alias("sum_profit"))
         .sort(["nation", "o_year"], descending=[False, True])
     )
-
-    return result
 
 
 def q13_expression_impl(ctx: DataFrameContext) -> Any:
@@ -576,13 +554,11 @@ def q13_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Count customers per order count
-    result = (
+    return (
         customer_orders.group_by("c_count")
         .agg(col("c_custkey").count().alias("custdist"))
         .sort(["custdist", "c_count"], descending=[True, True])
     )
-
-    return result
 
 
 def q18_expression_impl(ctx: DataFrameContext) -> Any:
@@ -607,7 +583,7 @@ def q18_expression_impl(ctx: DataFrameContext) -> Any:
         .select("l_orderkey")
     )
 
-    result = (
+    return (
         customer.join(orders, left_on="c_custkey", right_on="o_custkey")
         .join(large_orders, left_on="o_orderkey", right_on="l_orderkey", how="semi")
         .join(lineitem, left_on="o_orderkey", right_on="l_orderkey")
@@ -616,8 +592,6 @@ def q18_expression_impl(ctx: DataFrameContext) -> Any:
         .sort(["o_totalprice", "o_orderdate"], descending=[True, False])
         .limit(100)
     )
-
-    return result
 
 
 def q19_expression_impl(ctx: DataFrameContext) -> Any:
@@ -644,7 +618,7 @@ def q19_expression_impl(ctx: DataFrameContext) -> Any:
     ship_modes = ["AIR", "AIR REG"]
 
     # Join and apply complex OR conditions
-    result = (
+    return (
         lineitem.join(part, left_on="l_partkey", right_on="p_partkey")
         .filter(
             col("l_shipmode").is_in(ship_modes)
@@ -680,8 +654,6 @@ def q19_expression_impl(ctx: DataFrameContext) -> Any:
         .sum()
     )
 
-    return result
-
 
 def q2_expression_impl(ctx: DataFrameContext) -> Any:
     """TPC-H Q2: Minimum Cost Supplier (Expression Family).
@@ -713,7 +685,7 @@ def q2_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Main query joining with minimum costs
-    result = (
+    return (
         part.filter((col("p_size") == lit(size)) & col("p_type").str.ends_with(type_suffix))
         .join(partsupp, left_on="p_partkey", right_on="ps_partkey")
         .join(supplier, left_on="ps_suppkey", right_on="s_suppkey")
@@ -735,8 +707,6 @@ def q2_expression_impl(ctx: DataFrameContext) -> Any:
         .sort(["s_acctbal", "n_name", "s_name", "p_partkey"], descending=[True, False, False, False])
         .limit(100)
     )
-
-    return result
 
 
 def q11_expression_impl(ctx: DataFrameContext) -> Any:
@@ -767,14 +737,12 @@ def q11_expression_impl(ctx: DataFrameContext) -> Any:
     threshold = total_value * fraction
 
     # Find parts above threshold
-    result = (
+    return (
         nation_stock.group_by("ps_partkey")
         .agg(col("value").sum().alias("value"))
         .filter(col("value") > lit(threshold))
         .sort("value", descending=True)
     )
-
-    return result
 
 
 def q15_expression_impl(ctx: DataFrameContext) -> Any:
@@ -802,14 +770,12 @@ def q15_expression_impl(ctx: DataFrameContext) -> Any:
     max_revenue = ctx.scalar(revenue.select(col("total_revenue").max().alias("max_rev")))
 
     # Join with suppliers having maximum revenue
-    result = (
+    return (
         supplier.join(revenue, left_on="s_suppkey", right_on="supplier_no")
         .filter(col("total_revenue") == lit(max_revenue))
         .select("s_suppkey", "s_name", "s_address", "s_phone", "total_revenue")
         .sort("s_suppkey")
     )
-
-    return result
 
 
 def q16_expression_impl(ctx: DataFrameContext) -> Any:
@@ -833,7 +799,7 @@ def q16_expression_impl(ctx: DataFrameContext) -> Any:
     complaint_suppliers = supplier.filter(col("s_comment").str.contains("Customer.*Complaints")).select("s_suppkey")
 
     # Main query
-    result = (
+    return (
         part.filter(
             (col("p_brand") != lit(brand)) & ~col("p_type").str.starts_with(type_prefix) & col("p_size").is_in(sizes)
         )
@@ -843,8 +809,6 @@ def q16_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(col("ps_suppkey").n_unique().alias("supplier_cnt"))
         .sort(["supplier_cnt", "p_brand", "p_type", "p_size"], descending=[True, False, False, False])
     )
-
-    return result
 
 
 def q17_expression_impl(ctx: DataFrameContext) -> Any:
@@ -865,15 +829,13 @@ def q17_expression_impl(ctx: DataFrameContext) -> Any:
     avg_qty_per_part = lineitem.group_by("l_partkey").agg((col("l_quantity").mean() * lit(0.2)).alias("avg_qty"))
 
     # Main query
-    result = (
+    return (
         part.filter((col("p_brand") == lit(brand)) & (col("p_container") == lit(container)))
         .join(lineitem, left_on="p_partkey", right_on="l_partkey")
         .join(avg_qty_per_part, left_on="p_partkey", right_on="l_partkey")
         .filter(col("l_quantity") < col("avg_qty"))
         .select((col("l_extendedprice").sum() / lit(7.0)).alias("avg_yearly"))
     )
-
-    return result
 
 
 def q20_expression_impl(ctx: DataFrameContext) -> Any:
@@ -915,15 +877,13 @@ def q20_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Main query
-    result = (
+    return (
         supplier.join(nation, left_on="s_nationkey", right_on="n_nationkey")
         .filter(col("n_name") == lit(nation_name))
         .join(excess_partsupps, left_on="s_suppkey", right_on="ps_suppkey", how="semi")
         .select("s_name", "s_address")
         .sort("s_name")
     )
-
-    return result
 
 
 def q21_expression_impl(ctx: DataFrameContext) -> Any:
@@ -986,7 +946,7 @@ def q21_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Step 5: Join candidates with counts and apply EXISTS/NOT EXISTS as filters
-    result = (
+    return (
         candidates.join(suppliers_per_order, left_on="l_orderkey", right_on="supp_orderkey")
         .join(late_suppliers_per_order, left_on="l_orderkey", right_on="late_orderkey")
         # EXISTS: order has multiple suppliers
@@ -1000,8 +960,6 @@ def q21_expression_impl(ctx: DataFrameContext) -> Any:
         .sort(["numwait", "s_name"], descending=[True, False])
         .limit(100)
     )
-
-    return result
 
 
 def q22_expression_impl(ctx: DataFrameContext) -> Any:
@@ -1032,15 +990,13 @@ def q22_expression_impl(ctx: DataFrameContext) -> Any:
     customers_with_orders = orders.select("o_custkey").unique()
 
     # Main query
-    result = (
+    return (
         customer_with_code.filter(col("cntrycode").is_in(country_codes) & (col("c_acctbal") > lit(avg_balance)))
         .join(customers_with_orders, left_on="c_custkey", right_on="o_custkey", how="anti")
         .group_by("cntrycode")
         .agg(col("c_custkey").count().alias("numcust"), col("c_acctbal").sum().alias("totacctbal"))
         .sort("cntrycode")
     )
-
-    return result
 
 
 # =============================================================================
@@ -1064,7 +1020,7 @@ def q1_pandas_impl(ctx: DataFrameContext) -> Any:
     filtered["charge"] = filtered["disc_price"] * (1 + filtered["l_tax"])
 
     # Aggregate
-    result = (
+    return (
         filtered.groupby(["l_returnflag", "l_linestatus"], as_index=False)
         .agg(
             sum_qty=("l_quantity", "sum"),
@@ -1078,8 +1034,6 @@ def q1_pandas_impl(ctx: DataFrameContext) -> Any:
         )
         .sort_values(["l_returnflag", "l_linestatus"])
     )
-
-    return result
 
 
 def q6_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1143,14 +1097,12 @@ def q3_pandas_impl(ctx: DataFrameContext) -> Any:
     joined["revenue"] = joined["l_extendedprice"] * (1 - joined["l_discount"])
 
     # Aggregate
-    result = (
+    return (
         joined.groupby(["l_orderkey", "o_orderdate", "o_shippriority"], as_index=False)
         .agg(revenue=("revenue", "sum"))
         .sort_values(["revenue", "o_orderdate"], ascending=[False, True])
         .head(10)
     )
-
-    return result
 
 
 def q4_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1173,13 +1125,11 @@ def q4_pandas_impl(ctx: DataFrameContext) -> Any:
     filtered_orders = filtered_orders[filtered_orders["o_orderkey"].isin(late_orderkeys)]
 
     # Count by priority
-    result = (
+    return (
         filtered_orders.groupby("o_orderpriority", as_index=False)
         .agg(order_count=("o_orderkey", "count"))
         .sort_values("o_orderpriority")
     )
-
-    return result
 
 
 def q5_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1222,11 +1172,9 @@ def q5_pandas_impl(ctx: DataFrameContext) -> Any:
     joined["revenue"] = joined["l_extendedprice"] * (1 - joined["l_discount"])
 
     # Aggregate by nation
-    result = (
+    return (
         joined.groupby("n_name", as_index=False).agg(revenue=("revenue", "sum")).sort_values("revenue", ascending=False)
     )
-
-    return result
 
 
 def q10_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1258,7 +1206,7 @@ def q10_pandas_impl(ctx: DataFrameContext) -> Any:
     joined["revenue"] = joined["l_extendedprice"] * (1 - joined["l_discount"])
 
     # Aggregate
-    result = (
+    return (
         joined.groupby(
             ["c_custkey", "c_name", "c_acctbal", "c_phone", "n_name", "c_address", "c_comment"], as_index=False
         )
@@ -1266,8 +1214,6 @@ def q10_pandas_impl(ctx: DataFrameContext) -> Any:
         .sort_values("revenue", ascending=False)
         .head(20)
     )
-
-    return result
 
 
 def q2_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1319,13 +1265,11 @@ def q2_pandas_impl(ctx: DataFrameContext) -> Any:
     part_supplier = part_supplier[part_supplier["ps_supplycost"] == part_supplier["min_cost"]]
 
     # Select and sort
-    result = (
+    return (
         part_supplier[["s_acctbal", "s_name", "n_name", "p_partkey", "p_mfgr", "s_address", "s_phone", "s_comment"]]
         .sort_values(["s_acctbal", "n_name", "s_name", "p_partkey"], ascending=[False, True, True, True])
         .head(100)
     )
-
-    return result
 
 
 def q7_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1378,13 +1322,11 @@ def q7_pandas_impl(ctx: DataFrameContext) -> Any:
     joined["volume"] = joined["l_extendedprice"] * (1 - joined["l_discount"])
 
     # Aggregate
-    result = (
+    return (
         joined.groupby(["supp_nation", "cust_nation", "l_year"], as_index=False)
         .agg(revenue=("volume", "sum"))
         .sort_values(["supp_nation", "cust_nation", "l_year"])
     )
-
-    return result
 
 
 def q8_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1453,9 +1395,7 @@ def q8_pandas_impl(ctx: DataFrameContext) -> Any:
     result = yearly.merge(brazil_volume, on="o_year", how="left")
     result["nation_volume"] = result["nation_volume"].fillna(0)
     result["mkt_share"] = result["nation_volume"] / result["total_volume"]
-    result = result[["o_year", "mkt_share"]].sort_values("o_year")
-
-    return result
+    return result[["o_year", "mkt_share"]].sort_values("o_year")
 
 
 def q9_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1498,14 +1438,12 @@ def q9_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Aggregate
-    result = (
+    return (
         joined.groupby(["n_name", "o_year"], as_index=False)
         .agg(sum_profit=("amount", "sum"))
         .rename(columns={"n_name": "nation"})
         .sort_values(["nation", "o_year"], ascending=[True, False])
     )
-
-    return result
 
 
 def q11_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1538,9 +1476,7 @@ def q11_pandas_impl(ctx: DataFrameContext) -> Any:
     # Aggregate by part and filter by threshold
     # Use explicit comparison instead of .query() for Dask compatibility
     aggregated = joined.groupby("ps_partkey", as_index=False).agg(value=("value", "sum"))
-    result = aggregated[aggregated["value"] > threshold].sort_values("value", ascending=False)
-
-    return result
+    return aggregated[aggregated["value"] > threshold].sort_values("value", ascending=False)
 
 
 def q12_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1572,13 +1508,11 @@ def q12_pandas_impl(ctx: DataFrameContext) -> Any:
     joined["low_priority"] = (~joined["o_orderpriority"].isin(["1-URGENT", "2-HIGH"])).astype(int)
 
     # Aggregate
-    result = (
+    return (
         joined.groupby("l_shipmode", as_index=False)
         .agg(high_line_count=("high_priority", "sum"), low_line_count=("low_priority", "sum"))
         .sort_values("l_shipmode")
     )
-
-    return result
 
 
 def q13_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1600,13 +1534,11 @@ def q13_pandas_impl(ctx: DataFrameContext) -> Any:
     order_counts = customer_orders.groupby("c_custkey", as_index=False).agg(c_count=("o_orderkey", "count"))
 
     # Count customers per order count
-    result = (
+    return (
         order_counts.groupby("c_count", as_index=False)
         .agg(custdist=("c_custkey", "count"))
         .sort_values(["custdist", "c_count"], ascending=[False, False])
     )
-
-    return result
 
 
 def q14_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1667,11 +1599,9 @@ def q15_pandas_impl(ctx: DataFrameContext) -> Any:
 
     # Join with suppliers having maximum revenue
     top_suppliers = revenue[revenue["total_revenue"] == max_revenue]
-    result = supplier.merge(top_suppliers, left_on="s_suppkey", right_on="supplier_no")[
+    return supplier.merge(top_suppliers, left_on="s_suppkey", right_on="supplier_no")[
         ["s_suppkey", "s_name", "s_address", "s_phone", "total_revenue"]
     ].sort_values("s_suppkey")
-
-    return result
 
 
 def q16_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1702,13 +1632,11 @@ def q16_pandas_impl(ctx: DataFrameContext) -> Any:
     joined = joined[~joined["ps_suppkey"].isin(complaint_suppliers)]
 
     # Count unique suppliers per part combination
-    result = (
+    return (
         joined.groupby(["p_brand", "p_type", "p_size"], as_index=False)
         .agg(supplier_cnt=("ps_suppkey", "nunique"))
         .sort_values(["supplier_cnt", "p_brand", "p_type", "p_size"], ascending=[False, True, True, True])
     )
-
-    return result
 
 
 def q17_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1769,14 +1697,12 @@ def q18_pandas_impl(ctx: DataFrameContext) -> Any:
     joined = joined.merge(lineitem, left_on="o_orderkey", right_on="l_orderkey")
 
     # Aggregate
-    result = (
+    return (
         joined.groupby(["c_name", "c_custkey", "o_orderkey", "o_orderdate", "o_totalprice"], as_index=False)
         .agg(sum_qty=("l_quantity", "sum"))
         .sort_values(["o_totalprice", "o_orderdate"], ascending=[False, True])
         .head(100)
     )
-
-    return result
 
 
 def q19_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1878,11 +1804,9 @@ def q20_pandas_impl(ctx: DataFrameContext) -> Any:
 
     # Join supplier -> nation, filter by nation and excess suppliers
     supplier_nation = supplier.merge(nation, left_on="s_nationkey", right_on="n_nationkey")
-    result = supplier_nation[
+    return supplier_nation[
         (supplier_nation["n_name"] == nation_name) & (supplier_nation["s_suppkey"].isin(excess_suppliers))
     ][["s_name", "s_address"]].sort_values("s_name")
-
-    return result
 
 
 def q21_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1942,14 +1866,12 @@ def q21_pandas_impl(ctx: DataFrameContext) -> Any:
     supplier_late_orders = supplier_late_orders.drop(columns=["_exclude"])
 
     # Count and return
-    result = (
+    return (
         supplier_late_orders.groupby("s_name", as_index=False)
         .agg(numwait=("l_orderkey", "count"))
         .sort_values(["numwait", "s_name"], ascending=[False, True])
         .head(100)
     )
-
-    return result
 
 
 def q22_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1980,13 +1902,11 @@ def q22_pandas_impl(ctx: DataFrameContext) -> Any:
     ]
 
     # Aggregate
-    result = (
+    return (
         result_customers.groupby("cntrycode", as_index=False)
         .agg(numcust=("c_custkey", "count"), totacctbal=("c_acctbal", "sum"))
         .sort_values("cntrycode")
     )
-
-    return result
 
 
 # =============================================================================
