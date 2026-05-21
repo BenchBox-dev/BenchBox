@@ -1,13 +1,14 @@
-"""DataFrame benchmark lifecycle runner.
+"""Deprecated internal compatibility runner for DataFrame benchmark lifecycle.
 
-This module provides the execution lifecycle for DataFrame mode benchmarks,
-separate from the SQL mode runner. It handles:
-- Data loading into DataFrames (CSV/TBL/Parquet)
-- Query execution via DataFrame operations
-- Result collection and formatting
+Production DataFrame execution is routed by ``benchbox.core.runner.runner`` to
+``adapter.run_benchmark()``, implemented for DataFrame adapters by
+``benchbox.platforms.dataframe.benchmark_mixin.BenchmarkExecutionMixin``. This
+module is retained as a deprecated internal compatibility runner while older
+tests and helper imports are migrated.
 
-Unlike SQL mode which uses database connections, DataFrame mode works
-entirely in-memory with platform-specific DataFrame libraries.
+The mode-detection helpers remain internal utility compatibility points for
+CLI/dry-run paths. New DataFrame lifecycle behavior should be added to the
+adapter mixin path, not here.
 
 Copyright 2026 Joe Harris / BenchBox Project
 
@@ -57,6 +58,10 @@ from benchbox.utils.verbosity import VerbositySettings
 logger = logging.getLogger(__name__)
 
 console = quiet_console
+
+DATAFRAME_RUNNER_API_SURFACE = "deprecated"
+DATAFRAME_RUNNER_LIFECYCLE = "deprecated-internal-compatibility-runner"
+DATAFRAME_PRODUCTION_EXECUTION_PATH = "adapter.run_benchmark+BenchmarkExecutionMixin"
 
 
 def _benchmark_defines_hook(benchmark_instance: Any | None, hook_name: str) -> bool:

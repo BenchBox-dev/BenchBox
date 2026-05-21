@@ -46,23 +46,29 @@ The `PlatformAdapter` base class (`benchbox/platforms/base/adapter.py`) provides
 
 ### DataFrame Execution Path
 
-DataFrame benchmarks use a parallel execution path:
+DataFrame benchmarks use the same lifecycle orchestrator entry point as SQL,
+then branch to the DataFrame adapter mixin:
 
 ```
 CLI (run command with --platform *-df)
-  → run_dataframe_benchmark() (core/runner/dataframe_runner.py)
-    → DataFrameContext (core/dataframe/context.py)
-      → ExpressionFamilyAdapter or PandasFamilyAdapter
-        → BenchmarkResults
+  → run_benchmark_lifecycle() (core/runner/runner.py)
+    → adapter.run_benchmark()
+      → BenchmarkExecutionMixin.run_benchmark() (platforms/dataframe/benchmark_mixin.py)
+        → ExpressionFamilyAdapter or PandasFamilyAdapter
+          → BenchmarkResults
 ```
 
 | Type | Location | Purpose |
 |------|----------|---------|
 | `DataFrameContext` | `core.dataframe.context` | Protocol for table access and column references |
+| `BenchmarkExecutionMixin` | `platforms.dataframe.benchmark_mixin` | Production DataFrame lifecycle implementation behind `adapter.run_benchmark()` |
 | `ExpressionFamilyAdapter` | `platforms.dataframe.expression_family` | Base for Polars, PySpark, DataFusion, LakeSail |
 | `PandasFamilyAdapter` | `platforms.dataframe.pandas_family` | Base for Pandas, Modin, cuDF, Dask |
 
 The **family-based** adapter architecture means adding a new expression-style platform (e.g., Polars-like API) requires only implementing a thin adapter on top of `ExpressionFamilyAdapter`, inheriting query translation, tuning, and execution logic.
+
+`core/runner/dataframe_runner.py` is retained as a deprecated internal
+compatibility runner; it is not the production DataFrame lifecycle path.
 
 ## Benchmark Layer
 
