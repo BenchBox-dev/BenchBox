@@ -426,7 +426,7 @@ work:
 - id: w7
   summary: "Single helper for preflight kwargs; both invocation paths use it; delete _cli.execute_main inline preflight block"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Closes blind-spot
     `2026-05-05-154306-uat-noisy-neighbor-invocation-divergence.md`

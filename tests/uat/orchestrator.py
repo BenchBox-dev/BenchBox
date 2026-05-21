@@ -198,14 +198,7 @@ def run_sweep(  # noqa: C901
             continue
         if phase == "preflight":
             result = preflight_phase.run_preflight(
-                free_space_path=config.preflight.free_space_path or str(benchmark_runs_dir),
-                free_space_min_gib=config.preflight.free_space_min_gib,
-                docker_required=config.preflight.docker_required or config.cleanup.docker_manage_platforms,
-                noisy_neighbor_warn_load=config.preflight.noisy_neighbor_warn_load,
-                local_platforms_check=config.preflight.local_platforms_check,
-                requested_platforms=preflight_phase.requested_platforms_from_config(config),
-                benchmark_runs_dir=benchmark_runs_dir,
-                disk_budget_config=config,
+                **preflight_phase.preflight_kwargs_from_config(config, benchmark_runs_dir=benchmark_runs_dir)
             )
             disk_budget_summary = getattr(result, "disk_budget_summary", None)
             if disk_budget_summary:

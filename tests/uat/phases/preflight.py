@@ -13,7 +13,7 @@ import subprocess
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from tests.uat.config import UATConfig
@@ -108,6 +108,28 @@ def requested_platforms_from_config(config: UATConfig) -> tuple[str, ...]:
             exclude=config.platforms.exclude,
         )
     )
+
+
+def preflight_kwargs_from_config(
+    config: UATConfig,
+    *,
+    benchmark_runs_dir: str | Path | None = None,
+) -> dict[str, Any]:
+    """Build the canonical run_preflight kwargs for a validated config."""
+    if benchmark_runs_dir is None:
+        from tests.uat.phases.execute import default_benchmark_runs_dir
+
+        benchmark_runs_dir = default_benchmark_runs_dir(config)
+    return {
+        "free_space_path": config.preflight.free_space_path or str(benchmark_runs_dir),
+        "free_space_min_gib": config.preflight.free_space_min_gib,
+        "docker_required": config.preflight.docker_required or config.cleanup.docker_manage_platforms,
+        "noisy_neighbor_warn_load": config.preflight.noisy_neighbor_warn_load,
+        "local_platforms_check": config.preflight.local_platforms_check,
+        "requested_platforms": requested_platforms_from_config(config),
+        "benchmark_runs_dir": benchmark_runs_dir,
+        "disk_budget_config": config,
+    }
 
 
 def run_preflight(
