@@ -28,19 +28,18 @@ from rich.prompt import Confirm, Prompt
 from rich.table import Table
 
 from benchbox.cli.shared import console
-from benchbox.core.results.exporter import ResultExporter
+from benchbox.core.results.exporter import SIGNIFICANT_IMPROVEMENT_ASSESSMENT, ResultExporter
 from benchbox.core.results.loader import (
     ResultLoadError,
     UnsupportedSchemaError,
     load_result_file,
 )
 
-_SIGNIFICANT_IMPROVEMENT_ASSESSMENT = "significant_improvement"
 _MAX_BOUNDED_QUERY_REGRESSIONS = 2
 _MAX_BOUNDED_QUERY_REGRESSION_FRACTION = 0.10
 _MAX_BOUNDED_QUERY_REGRESSION_MULTIPLIER = 2.5
 _MAX_BOUNDED_QUERY_SLOWDOWN_MS = 2.0
-_MAX_BOUNDED_TOTAL_QUERY_SLOWDOWN_MS = 4.0
+_MAX_BOUNDED_TOTAL_QUERY_SLOWDOWN_MS = 3.0
 
 
 class ResultFileMetadata:
@@ -1449,7 +1448,7 @@ def _bounded_query_regressions_allowed(
 
     summary = comparison.get("summary", {})
     assessment = str(summary.get("overall_assessment", "")).lower()
-    if assessment != _SIGNIFICANT_IMPROVEMENT_ASSESSMENT:
+    if assessment != SIGNIFICANT_IMPROVEMENT_ASSESSMENT:
         return False, "per-query regression exceeded the threshold without significant aggregate improvement"
 
     aggregate_changes = _aggregate_change_percentages(comparison)
@@ -1463,6 +1462,7 @@ def _bounded_query_regressions_allowed(
     if query_count <= 0 or len(query_regressions) / query_count > _MAX_BOUNDED_QUERY_REGRESSION_FRACTION:
         return False, "per-query regressions exceeded the bounded-noise fraction"
 
+    # Keep the waiver stricter when callers choose a stricter regression threshold.
     max_allowed_change = threshold_pct * _MAX_BOUNDED_QUERY_REGRESSION_MULTIPLIER
     if any(regression["change_percent"] > max_allowed_change for regression in query_regressions):
         return False, "per-query regression percent exceeded the bounded-noise cap"

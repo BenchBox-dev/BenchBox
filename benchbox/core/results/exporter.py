@@ -51,6 +51,8 @@ from benchbox.utils.cloud_storage import create_path_handler, is_cloud_path
 
 logger = logging.getLogger(__name__)
 
+SIGNIFICANT_IMPROVEMENT_ASSESSMENT = "significant_improvement"
+
 ResultLike = BenchmarkResults
 QueryResultLike = "QueryResult | dict[str, Any]"
 
@@ -756,7 +758,7 @@ class ResultExporter:
         avg_change = sum(time_changes) / len(time_changes)
 
         if avg_change < -10:
-            return "significant_improvement"
+            return SIGNIFICANT_IMPROVEMENT_ASSESSMENT
         if avg_change < -5:
             return "improvement"
         if avg_change > 10:
