@@ -5,6 +5,7 @@ Covers W3-relevant fields only. W4 expands.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -31,6 +32,14 @@ def test_validate_config_minimal():
     assert cfg.preflight.free_space_min_gib == 5.0
     assert cfg.cleanup.docker_manage_platforms is False
     assert cfg.cleanup.docker_platform_switch == "off"
+    assert cfg.platforms.groups is None
+    assert cfg.benchmarks.groups is None
+    assert cfg.scales.rungs == (0.01,)
+    assert cfg.validate.validator_clean_rate_floor == 0.80
+    assert cfg.package.submit_terminal_state is None
+    assert cfg.explorer_smoke.playwright_browsers == ("chromium",)
+    assert cfg.report.matrix_summary_tsv == "matrix_summary.tsv"
+    assert cfg.compatibility.release_gate_runtime_envelopes is False
 
 
 def test_validate_config_rejects_parallel_platforms():
@@ -46,6 +55,16 @@ def test_validate_config_rejects_unknown_phase():
 def test_validate_config_rejects_missing_name():
     with pytest.raises(config.ConfigError, match="`name:`"):
         config.validate_config({})
+
+
+def test_validate_config_rejects_unknown_root_field():
+    with pytest.raises(config.ConfigError, match="Unknown field\\(s\\) in `root`: moonshot"):
+        config.validate_config({"name": "smoke", "moonshot": True})
+
+
+def test_validate_config_rejects_unknown_section_field():
+    with pytest.raises(config.ConfigError, match="Unknown field\\(s\\) in `platforms`: moonshot"):
+        config.validate_config({"name": "smoke", "platforms": {"moonshot": True}})
 
 
 def test_validate_config_rejects_zero_timeout():
@@ -101,6 +120,21 @@ def test_validate_config_accepts_managed_docker_cleanup_contract():
 def test_validate_config_rejects_quoted_cleanup_booleans(field: str, cleanup: dict[str, object]):
     with pytest.raises(config.ConfigError, match=rf"cleanup\.{field}` must be a bool"):
         config.validate_config({"name": "smoke", "cleanup": cleanup})
+
+
+@pytest.mark.parametrize(
+    ("section", "payload", "field"),
+    [
+        ("root", {"dry_run": "false"}, "dry_run"),
+        ("execute", {"execute": {"early_stop_on_failure": "false"}}, "early_stop_on_failure"),
+        ("execute", {"execute": {"skip_unreachable": "false"}}, "skip_unreachable"),
+        ("preflight", {"preflight": {"docker_required": "false"}}, "docker_required"),
+        ("preflight", {"preflight": {"local_platforms_check": "false"}}, "local_platforms_check"),
+    ],
+)
+def test_validate_config_rejects_quoted_booleans(section: str, payload: dict[str, object], field: str):
+    with pytest.raises(config.ConfigError, match=rf"{section}\.{field}` must be a bool"):
+        config.validate_config({"name": "smoke", **payload})
 
 
 def test_validate_config_rejects_invalid_docker_cleanup_mode():
@@ -167,7 +201,7 @@ def test_load_config_missing_file(tmp_path: Path):
         config.load_config(tmp_path / "nope.yaml")
 
 
-def test_apply_stress_overrides_platform_and_benchmark():
+def test_stress_override_uses_dataclass_replace_for_platform_and_benchmark():
     cfg = config.validate_config(
         {
             "name": "stress",
@@ -175,16 +209,20 @@ def test_apply_stress_overrides_platform_and_benchmark():
             "benchmarks": {"groups": ["all"]},
         }
     )
-    overridden = config.apply_stress_overrides(cfg, platform="duckdb", benchmark="tpch")
-    assert overridden.raw["platforms"]["groups"] == []
-    assert overridden.raw["platforms"]["include"] == ["duckdb"]
-    assert overridden.raw["benchmarks"]["include"] == ["tpch"]
+    overridden = replace(
+        cfg,
+        platforms=replace(cfg.platforms, groups=(), include=("duckdb",)),
+        benchmarks=replace(cfg.benchmarks, groups=(), include=("tpch",)),
+    )
+    assert overridden.platforms.groups == ()
+    assert overridden.platforms.include == ("duckdb",)
+    assert overridden.benchmarks.include == ("tpch",)
     # Original config not mutated
-    assert cfg.raw["platforms"]["groups"] == ["all"]
+    assert cfg.platforms.groups == ("all",)
 
 
-def test_apply_stress_overrides_scale_clears_rungs():
+def test_stress_override_scale_sets_override_without_mutating_rungs():
     cfg = config.validate_config({"name": "stress", "scales": {"rungs": [0.01, 0.1, 1.0]}})
-    overridden = config.apply_stress_overrides(cfg, scale=0.1)
-    assert "rungs" not in overridden.raw["scales"]
-    assert overridden.raw["scales"]["override"] == 0.1
+    overridden = replace(cfg, scales=replace(cfg.scales, override=0.1))
+    assert overridden.scales.rungs == (0.01, 0.1, 1.0)
+    assert overridden.scales.override == 0.1

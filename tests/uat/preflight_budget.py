@@ -106,7 +106,7 @@ def estimate_peak_disk(config: UATConfig, *, table_path: Path | None = None) -> 
     growth are counted per cell. Unknown cells are reported separately;
     callers must not treat them as a hard gate.
     """
-    return estimate_cells(enumerate_cells(config.raw), table=load_budget_table(table_path))
+    return estimate_cells(enumerate_cells(config), table=load_budget_table(table_path))
 
 
 def estimate_cells(cells: Iterable[Cell], *, table: BudgetTable) -> DiskBudget:
