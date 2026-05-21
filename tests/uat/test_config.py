@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -20,6 +21,19 @@ def _write(tmp_path: Path, payload: dict) -> Path:
     p = tmp_path / "uat.yaml"
     p.write_text(yaml.safe_dump(payload), encoding="utf-8")
     return p
+
+
+def _leaf_field_paths(payload: Any, *, prefix: str = "") -> set[str]:
+    if not isinstance(payload, dict):
+        return {prefix}
+    paths: set[str] = set()
+    for key, value in payload.items():
+        path = f"{prefix}.{key}" if prefix else str(key)
+        if isinstance(value, dict):
+            paths.update(_leaf_field_paths(value, prefix=path))
+        else:
+            paths.add(path)
+    return paths
 
 
 def test_validate_config_minimal():
@@ -199,6 +213,47 @@ def test_load_config_round_trip(tmp_path: Path):
 def test_load_config_missing_file(tmp_path: Path):
     with pytest.raises(config.ConfigError, match="not found"):
         config.load_config(tmp_path / "nope.yaml")
+
+
+def test_stress_default_fields_have_reader_or_reserved_contract():
+    payload = yaml.safe_load(Path("tests/uat/configs/stress-default.yaml").read_text(encoding="utf-8"))
+    evidence = {
+        "name": ("tests/uat/config.py", 'name = payload.get("name")'),
+        "description": ("tests/uat/config.py", 'description=str(payload.get("description", ""))'),
+        "phases": ("tests/uat/config.py", '_validate_phases(payload.get("phases")'),
+        "platforms.groups": ("tests/uat/phases/enumerate.py", "config.platforms.groups"),
+        "benchmarks.groups": ("tests/uat/phases/enumerate.py", "config.benchmarks.groups"),
+        "scales.rungs": ("tests/uat/phases/enumerate.py", "config.scales.rungs"),
+        "execute.per_cell_timeout_s": ("tests/uat/phases/execute.py", "config.execute.per_cell_timeout_s"),
+        "execute.early_stop_after_s": ("tests/uat/phases/execute.py", "config.execute.early_stop_after_s"),
+        "execute.early_stop_on_failure": ("tests/uat/phases/execute.py", "config.execute.early_stop_on_failure"),
+        "execute.phases_arg": ("tests/uat/phases/execute.py", "config.execute.phases_arg"),
+        "execute.skip_unreachable": ("tests/uat/phases/execute.py", "config.execute.skip_unreachable"),
+        "preflight.free_space_min_gib": ("tests/uat/phases/preflight.py", "config.preflight.free_space_min_gib"),
+        "preflight.free_space_path": ("tests/uat/phases/preflight.py", "config.preflight.free_space_path"),
+        "cleanup.preserve_datagen": ("tests/uat/config.py", "preserve_datagen: false` is not supported"),
+        "cleanup.prune_databases": ("tests/uat/orchestrator.py", "config.cleanup.prune_databases"),
+        "cleanup.docker_manage_platforms": ("tests/uat/phases/execute.py", "config.cleanup.docker_manage_platforms"),
+        "cleanup.docker_platform_switch": ("tests/uat/phases/execute.py", "config.cleanup.docker_platform_switch"),
+        "cleanup.docker_project_prefix": ("tests/uat/phases/execute.py", "config.cleanup.docker_project_prefix"),
+        "cleanup.docker_start_timeout_s": ("tests/uat/phases/execute.py", "config.cleanup.docker_start_timeout_s"),
+        "cleanup.docker_fixed_container_name_policy": (
+            "tests/uat/phases/execute.py",
+            "config.cleanup.docker_fixed_container_name_policy",
+        ),
+        "report.matrix_summary_tsv": ("tests/uat/orchestrator.py", "config.report.matrix_summary_tsv"),
+        "output.logs_dir_template": ("tests/uat/phases/execute.py", "config.output.logs_dir_template"),
+        "output.submissions_dir_template": (
+            "tests/uat/orchestrator.py",
+            "config.output.submissions_dir_template",
+        ),
+    }
+
+    fields = _leaf_field_paths(payload)
+    assert fields == set(evidence)
+    for field, (path, snippet) in evidence.items():
+        text = Path(path).read_text(encoding="utf-8")
+        assert snippet in text, f"{field} lost its reader/reserved-field evidence in {path}"
 
 
 def test_stress_override_uses_dataclass_replace_for_platform_and_benchmark():

@@ -1,10 +1,8 @@
 # TEMPLATE — copy and edit for sweep-specific runs.
 #
-# Default stress preset. Feature parity with scripts/local_stress_test.sh
-# for the stress-test use case: one scale, no validate/package/explorer
-# phases. PLATFORM=, BENCHMARK=, SCALE= make-vars override the matrix
-# fields per the `apply_stress_overrides` contract documented in
-# `_project/specs/uat-framework.md` Section 4.
+# Default stress preset for the framework-owned stress-test use case:
+# one scale, no validate/package/explorer phases. PLATFORM=, BENCHMARK=,
+# and SCALE= make-vars override the typed matrix config at CLI dispatch.
 
 name: "stress-default"
 description: "Stress preset — verify 'does it run?' across the (platform, benchmark) matrix"
