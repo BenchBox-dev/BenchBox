@@ -20,6 +20,9 @@ import pytest
 from benchbox.core.results.models import BenchmarkResults
 from benchbox.core.results.platform_info import PlatformInfoInput
 from benchbox.core.runner.dataframe_runner import (
+    DATAFRAME_PRODUCTION_EXECUTION_PATH,
+    DATAFRAME_RUNNER_API_SURFACE,
+    DATAFRAME_RUNNER_LIFECYCLE,
     DataFramePhases,
     DataFrameRunOptions,
     _get_queries_for_benchmark,
@@ -33,6 +36,13 @@ pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
+
+
+def test_dataframe_runner_lifecycle_is_deprecated_internal_compatibility():
+    """The standalone runner is not the production DataFrame execution path."""
+    assert DATAFRAME_RUNNER_API_SURFACE == "deprecated"
+    assert DATAFRAME_RUNNER_LIFECYCLE == "deprecated-internal-compatibility-runner"
+    assert DATAFRAME_PRODUCTION_EXECUTION_PATH == "adapter.run_benchmark+BenchmarkExecutionMixin"
 
 
 class TestIsDataFrameExecution:

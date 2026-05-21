@@ -2,7 +2,8 @@ id: dataframe-runner-lifecycle-and-bundle-parity
 title: "Architecture hardening: retire or revive old DataFrame runner and add exported-bundle parity"
 worktree: main
 priority: Medium-High
-status: "Not Started"
+status: Completed
+completed_date: "2026-05-21"
 category: DataFrame
 
 deps:
@@ -25,8 +26,26 @@ description: |
 work:
   - id: w0
     summary: "Revalidate current SQL and DataFrame execution paths and parity coverage"
-    status: pending
+    status: done
     notes: |
+      Completed 2026-05-21 at checked SHA
+      8604d0a413f6c3d4bd7db211bb472c2370a932c3.
+
+      Revalidation summary:
+        - `benchbox/core/runner/runner.py` routes DataFrame execute and
+          load-only branches through `adapter.run_benchmark()` with
+          `DataFramePhases` and `DataFrameRunOptions`.
+        - `benchbox/platforms/dataframe/benchmark_mixin.py` is the production
+          DataFrame lifecycle owner for result construction, phase status,
+          query execution, skip summaries, and plan-capture counters.
+        - `benchbox/core/runner/dataframe_runner.py` is not called by the
+          production lifecycle runner; remaining references are docs, tests, and
+          internal helper imports in CLI/dry-run/monitoring paths.
+        - `docs/design/architecture.md` pointed at the old runner before this
+          change.
+        - `tests/unit/core/results/test_result_parity.py` had synthetic
+          payload parity only; exported JSON parity was added here.
+
       Commit a compact summary of checked SHA, production execution path, old
       runner call sites, docs references, and existing parity tests.
 
@@ -41,8 +60,19 @@ work:
   - id: w1
     summary: "Decision gate: classify core/runner/dataframe_runner.py lifecycle"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
+      Decision: `benchbox/core/runner/dataframe_runner.py` is a deprecated
+      internal compatibility runner. Production DataFrame execution is the
+      adapter-mixin path:
+      `run_benchmark_lifecycle()` -> `adapter.run_benchmark()` ->
+      `BenchmarkExecutionMixin.run_benchmark()`.
+
+      Production behavior tests are DataFrame mixin/adapter lifecycle tests and
+      exported bundle parity. `tests/unit/core/runner/test_dataframe_runner.py`
+      and `tests/unit/core/runner/test_dataframe_runner_lifecycle.py` are
+      compatibility tests for the deprecated standalone runner.
+
       Choose exactly one status and record it in
       docs/reference/backward-compatibility.md and docs/reference/public-contracts.md:
         - supported public/internal runner,
@@ -56,8 +86,15 @@ work:
   - id: w2
     summary: "Apply the selected dataframe_runner.py lifecycle path"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
+      Added module lifecycle constants and docstring guidance to
+      `benchbox/core/runner/dataframe_runner.py`, registered the lifecycle in
+      `docs/reference/backward-compatibility.md`, and updated
+      `docs/reference/public-contracts.md` plus
+      `docs/design/architecture.md` to direct production DataFrame execution to
+      `adapter.run_benchmark()` and `BenchmarkExecutionMixin`.
+
       If w1 chooses deprecation or compatibility fossil: update docs so
       DataFrame execution is described through adapter.run_benchmark and the
       DataFrame benchmark mixin. Keep only narrow compatibility tests for
@@ -76,8 +113,17 @@ work:
   - id: w3
     summary: "Add one real SQL-vs-DataFrame exported-bundle parity contract test"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
+      Added `test_exported_sql_and_dataframe_bundles_share_cross_mode_contract`
+      in `tests/unit/core/results/test_result_parity.py`. The test creates a
+      SQL result through a concrete `PlatformAdapter.run_benchmark()` path,
+      creates a DataFrame result through `BenchmarkExecutionMixin.run_benchmark()`,
+      exports both through `ResultExporter`, reloads the JSON payloads, and
+      compares schema version, benchmark/config identity, phases, query IDs,
+      rows, validation, errors, execution metadata keys, and timing field
+      names/units without comparing exact timing values.
+
       Pick the smallest reliable benchmark/platform pair available in fast or
       focused integration tests. Compare exported bundle fields, not synthetic
       dataclass construction alone.
@@ -98,8 +144,13 @@ work:
   - id: w4
     summary: "Document cross-mode invariants and known allowed differences"
     needs: [w3]
-    status: pending
+    status: done
     notes: |
+      Documented SQL/DataFrame result bundle invariants and allowed differences
+      in `docs/reference/public-contracts.md`. Allowed differences include
+      execution mode, platform metadata, benchmark-managed DataFrame loading
+      status such as `SKIPPED`, and exact timing values.
+
       Add a short section to docs/reference/public-contracts.md or a dedicated
       result contract doc that states which fields must match between SQL and
       DataFrame runs, which may differ, and why.
@@ -133,15 +184,12 @@ impact:
 files_affected:
   modified:
     - "benchbox/core/runner/dataframe_runner.py"
-    - "benchbox/platforms/dataframe/"
-    - "benchbox/core/runner/runner.py"
-    - "tests/unit/core/runner/"
-    - "tests/unit/core/results/"
-    - "tests/unit/core/dataframe/"
-    - "tests/integration/validation/"
+    - "tests/unit/core/runner/test_dataframe_runner.py"
+    - "tests/unit/core/results/test_result_parity.py"
     - "docs/reference/backward-compatibility.md"
     - "docs/reference/public-contracts.md"
     - "docs/design/architecture.md"
+    - "_project/DONE/main/planning/dataframe-runner-lifecycle-and-bundle-parity.yaml"
 
 must_preserve:
   - "Do not break production DataFrame platforms: polars-df, pandas-df, datafusion-df, and dask-df."

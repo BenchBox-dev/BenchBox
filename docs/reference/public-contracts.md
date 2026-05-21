@@ -36,9 +36,11 @@ the map is unchanged.
 | `benchbox.core.base_benchmark.BaseBenchmark` | `deprecated` | core-runtime | Documented internal compatibility base retained for the remaining `datavault` and `tpcds_obt` core implementations; not an alias and not the extension path for new benchmarks. | Remove only after those implementations migrate to `benchbox.base.BaseBenchmark` and the compatibility registry target is satisfied. | Backward-compatibility registry review, benchmark loader/runtime tests, benchmark API contract tests. | `benchbox/core/base_benchmark.py`, `docs/reference/backward-compatibility.md` |
 | Adapter subclassing hooks and base mixins | `beta-public` | platform-runtime | Adapter authors can depend on documented `PlatformAdapter` hooks, ABC signatures, and adapter authoring docs. | Adapter refactor map update, migration note, and representative adapter tests. | `tests/unit/platforms/test_abc_conformance.py`, focused adapter tests. | `benchbox/platforms/base/`, `docs/development/adapter-refactor-map.md`, `docs/development/adding-new-platforms.md` |
 | `PlatformAdapter` lifecycle | `beta-public` | platform-runtime | Adapter instances are serial execution objects. One instance may be reused for multiple benchmark runs sequentially; `run_benchmark()` resets run-scoped caches at run start and restores run-config plan-capture overrides at run end. Concurrent calls on one adapter instance are not supported. | A concurrency or service-mode promotion needs a contract-map update and a shared run-context design before claiming support. | `tests/unit/platforms/test_adapter_lifecycle.py`, focused adapter lifecycle tests. | `benchbox/platforms/base/adapter.py`, `benchbox/platforms/base/result_capture.py`, `docs/development/adapter-refactor-map.md` |
+| DataFrame adapter execution path | `beta-public` | dataframe-runtime | Production DataFrame execution routes through `benchbox.core.runner.runner` to `adapter.run_benchmark()`, implemented by `BenchmarkExecutionMixin` for production DataFrame platforms such as `polars-df`, `pandas-df`, `datafusion-df`, and `dask-df`. | Changes need DataFrame mixin tests, result-bundle parity coverage, and same-PR docs. | DataFrame mixin tests plus exported SQL/DataFrame result parity. | `benchbox/core/runner/runner.py`, `benchbox/platforms/dataframe/benchmark_mixin.py`, `tests/unit/core/results/test_result_parity.py` |
+| `benchbox.core.runner.dataframe_runner.run_dataframe_benchmark` | `deprecated` | dataframe-runtime | Deprecated internal compatibility runner retained for old tests and helper imports. It is not the production DataFrame lifecycle path. | Backward-compatibility registry review after one beta cycle; migrate remaining behavior to `BenchmarkExecutionMixin` before removal. | Compatibility tests only. | `benchbox/core/runner/dataframe_runner.py`, `tests/unit/core/runner/test_dataframe_runner.py`, `tests/unit/core/runner/test_dataframe_runner_lifecycle.py` |
 | Platform registry metadata | `beta-public` | platform-runtime | Registry metadata is the source for platform discovery, capabilities, dependency hints, and future support status. | Same-PR metadata/docs migration; aliases require compatibility note. | Platform registry tests and docs drift checks. | `benchbox/core/platform_registry.py` |
 | MCP tools | `beta-public` | mcp | Tool schemas and documented parameters are supported as a smoke/control-plane automation surface, not a CLI-equivalent execution surface. MCP result bundles are schema-comparable to CLI bundles, but MCP must not import CLI command internals or imply CLI option parity. | MCP reference update and contract tests; product-tier or option-parity changes need a decision note and, for CLI equivalence, a shared non-CLI run service below CLI and MCP. | `tests/unit/mcp/test_run_surface_contract.py`, `tests/unit/mcp/`, MCP docs/schema checks. | `benchbox/mcp/`, `docs/reference/mcp.md`, `benchbox/base.py` |
-| Result JSON bundles | `beta-public` | results | Schema-versioned result bundles are product data consumed by CLI, submission validation, hosted results, and explorer. | Schema policy and hosted-results contract update before changing accepted versions or field semantics. | Result schema policy, loader, normalizer, submission, and explorer tests. | `benchbox/core/results/schema_policy.py`, `benchbox/core/results/schema.py`, `docs/reference/result-formats.md`, `docs/reference/hosted-results-contract.md` |
+| Result JSON bundles | `beta-public` | results | Schema-versioned result bundles are product data consumed by CLI, submission validation, hosted results, explorer, and SQL/DataFrame comparisons. SQL and DataFrame bundles must preserve the cross-mode invariants below. | Schema policy and hosted-results contract update before changing accepted versions, field semantics, or cross-mode parity guarantees. | Result schema policy, loader, normalizer, submission, explorer, and exported SQL/DataFrame parity tests. | `benchbox/core/results/schema_policy.py`, `benchbox/core/results/schema.py`, `docs/reference/result-formats.md`, `docs/reference/hosted-results-contract.md`, `tests/unit/core/results/test_result_parity.py` |
 | Explorer read model and generated browser inputs | `generated` | results-explorer | Browser data stores are generated from accepted result bundles; generated outputs should be reproducible from source bundles and pipeline code. | Read-model version bump or pipeline contract update. | Explorer pipeline contract tests and browser release gates. | `_project/scripts/explorer_pipeline/`, results explorer generated data |
 | Public submission validator behavior | `beta-public` | hosted-results | PR-based public result submissions must receive deterministic validation errors and privacy/trust handling. | Hosted-results contract update and validator tests. | `validate-submission` workflow, submission validator tests. | `scripts/validate_submission.py`, `docs/contributing-results.md`, `docs/reference/hosted-results-contract.md` |
 | SQL compatibility rule catalog | `internal` | sql-compat | Hybrid governance catalog: every source-detected adapter CREATE TABLE rewrite must be runtime-dispatched by `BaseDdlOptimizer`, registered as `governance_only`, or explicitly exempted. | sql_compat README and contract-map update before changing the governance guarantee. | `make compat-docs-check`, `uv run -- python -m benchbox.sql_compat.inventory --check-ddl-drift`. | `benchbox/sql_compat/`, `benchbox/platforms/`, `docs/compat/` |
@@ -102,6 +104,63 @@ drift checker requires before CI can call DDL governance clean. `compat_lint CLE
 means the source scanner found no unregistered or uninspectable adapter
 CREATE TABLE rewrite behavior. It does not mean every DDL rewrite flows through
 `BaseDdlOptimizer`.
+
+## DataFrame Runner Lifecycle Decision
+
+Checked for `dataframe-runner-lifecycle-and-bundle-parity` at
+`8604d0a413f6c3d4bd7db211bb472c2370a932c3`.
+
+Production DataFrame execution is `run_benchmark_lifecycle()` ->
+`adapter.run_benchmark()` -> `BenchmarkExecutionMixin.run_benchmark()`.
+`benchbox.core.runner.dataframe_runner.run_dataframe_benchmark()` is a
+deprecated internal compatibility runner. The module still provides internal
+mode/query helpers used by CLI/dry-run code, but new lifecycle behavior belongs
+in `benchbox/platforms/dataframe/benchmark_mixin.py`.
+
+Production behavior tests are the DataFrame mixin and adapter lifecycle tests,
+plus exported result parity in `tests/unit/core/results/test_result_parity.py`.
+`tests/unit/core/runner/test_dataframe_runner.py` and
+`tests/unit/core/runner/test_dataframe_runner_lifecycle.py` are compatibility
+tests for the deprecated standalone runner until the beta review window closes.
+
+Evidence rechecked:
+
+| Evidence | Finding |
+|---|---|
+| `benchbox/core/runner/runner.py` | DataFrame adapter branches call `adapter.run_benchmark(..., phases=DataFramePhases, options=DataFrameRunOptions)` for execute and load-only paths. |
+| `benchbox/platforms/dataframe/benchmark_mixin.py` | The mixin owns production DataFrame result construction, phase status, query execution, skip summaries, and plan-capture counters. |
+| `benchbox/core/runner/dataframe_runner.py` | Standalone runner duplicates older result construction and is not called by production lifecycle execution. |
+| `docs/design/architecture.md` | DataFrame architecture now points at the adapter mixin path instead of the deprecated standalone runner. |
+| `tests/unit/core/results/test_result_parity.py` | Exported JSON bundle parity is enforced after writing through `ResultExporter`. |
+
+## SQL/DataFrame Result Bundle Invariants
+
+SQL and DataFrame runs may use different engines and execution models, but their
+exported result bundles must remain schema-comparable.
+
+Fields that must match for the same benchmark, scale, query subset, and run
+configuration:
+
+- Result schema version.
+- Benchmark identity: `benchmark.id`, `benchmark.name`, `benchmark.scale_factor`, and test type.
+- Reproducibility config, excluding execution-mode-specific values: compression, seed, phases, and query subset.
+- Presence of the standard phase keys.
+- Query IDs in exported `queries`.
+- Row counts when both modes report them.
+- Validation state and absence/presence of exported error records.
+- Execution metadata key shape.
+- Timing field names and units: run-level milliseconds and query-level `ms`.
+
+Allowed differences:
+
+- `execution.mode` and `config.mode` are expected to be `sql` vs `dataframe`.
+- Platform name, version, client version, family, and driver metadata can differ.
+- Phase status may differ when the DataFrame benchmark owns loading; for example,
+  SQL can report `data_loading=SUCCESS` or `COMPLETED` while DataFrame reports
+  `SKIPPED`.
+- Optional `tables` blocks can be absent when a DataFrame benchmark manages or
+  skips generic loading.
+- Exact timing values must not be compared across modes.
 
 ## Evidence Snapshot
 
