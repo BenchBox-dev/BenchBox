@@ -30,6 +30,7 @@ def _sample_benchmarks() -> dict[str, dict[str, object]]:
             "query_description": "22 SQL queries",
             "category": "TPC",
             "num_queries": 22,
+            "support_status": "stable",
             "complexity": "medium",
             "estimated_time_range": (2, 10),
             "scale_options": [0.01, 0.1, 1.0],
@@ -42,6 +43,7 @@ def _sample_benchmarks() -> dict[str, dict[str, object]]:
             "query_description": "43 SQL queries",
             "category": "Industry",
             "num_queries": 43,
+            "support_status": "stable",
             "complexity": "high",
             "estimated_time_range": (5, 15),
             "scale_options": [0.01, 0.1],
@@ -54,6 +56,7 @@ def _sample_benchmarks() -> dict[str, dict[str, object]]:
             "query_description": "Metadata primitives",
             "category": "Primitives",
             "num_queries": 0,
+            "support_status": "beta",
             "complexity": "low",
             "estimated_time_range": (1, 2),
             "scale_options": [1.0],
@@ -66,6 +69,7 @@ def _sample_benchmarks() -> dict[str, dict[str, object]]:
             "query_description": "113 queries",
             "category": "Academic",
             "num_queries": 113,
+            "support_status": "stable",
             "complexity": "high",
             "estimated_time_range": (30, 90),
             "scale_options": [1.0],
@@ -79,6 +83,7 @@ def _sample_benchmarks() -> dict[str, dict[str, object]]:
             "query_description": "13 synthetic smoke queries",
             "category": "Academic",
             "num_queries": 13,
+            "support_status": "repo_only",
             "complexity": "medium",
             "estimated_time_range": (2, 10),
             "scale_options": [0.01, 0.1, 1.0],
@@ -109,6 +114,30 @@ def test_display_all_benchmarks_shows_controls_and_filters(monkeypatch: pytest.M
     assert "[p]review" in output
 
 
+def test_tree_benchmark_listing_labels_support_status(monkeypatch: pytest.MonkeyPatch, manager: BenchmarkManager):
+    console, stream = _capture_console()
+    monkeypatch.setattr(bench_mod, "console", console)
+
+    manager.list_available_benchmarks()
+
+    output = stream.getvalue()
+    assert "Support: Stable" in output
+    assert "Support: Beta" in output
+    assert "JoinOrder Synthetic" not in output
+
+
+def test_display_all_benchmarks_labels_support_status(monkeypatch: pytest.MonkeyPatch, manager: BenchmarkManager):
+    console, stream = _capture_console()
+    monkeypatch.setattr(bench_mod, "console", console)
+
+    shown = manager._display_all_benchmarks(filter_category="Primitives")
+
+    assert list(shown) == ["metadata_primitives"]
+    output = stream.getvalue()
+    assert "Status" in output
+    assert "Beta" in output
+
+
 def test_display_all_benchmarks_hides_internal_surfaces(monkeypatch: pytest.MonkeyPatch, manager: BenchmarkManager):
     console, stream = _capture_console()
     monkeypatch.setattr(bench_mod, "console", console)
@@ -119,6 +148,17 @@ def test_display_all_benchmarks_hides_internal_surfaces(monkeypatch: pytest.Monk
     output = stream.getvalue()
     assert "JoinOrder" in output
     assert "JoinOrder Synthetic" not in output
+
+
+def test_preview_labels_support_status(monkeypatch: pytest.MonkeyPatch, manager: BenchmarkManager):
+    console, stream = _capture_console()
+    monkeypatch.setattr(bench_mod, "console", console)
+
+    manager._show_benchmark_preview("metadata_primitives", manager.benchmarks["metadata_primitives"])
+
+    output = stream.getvalue()
+    assert "Support Status" in output
+    assert "Beta" in output
 
 
 def test_internal_benchmarks_remain_directly_addressable(manager: BenchmarkManager):
@@ -221,6 +261,27 @@ def test_select_specific_benchmark_short_circuits_single_option(
 
     assert selected == "tpch"
     assert "Selected TPC-H" in stream.getvalue()
+
+
+def test_select_specific_benchmark_table_labels_support_status(
+    monkeypatch: pytest.MonkeyPatch, manager: BenchmarkManager
+):
+    console, stream = _capture_console()
+    monkeypatch.setattr(bench_mod, "console", console)
+    monkeypatch.setattr(bench_mod.Prompt, "ask", lambda *_args, **_kwargs: "2")
+
+    selected = manager._select_specific_benchmark(
+        {
+            "tpch": manager.benchmarks["tpch"],
+            "metadata_primitives": manager.benchmarks["metadata_primitives"],
+        }
+    )
+
+    assert selected == "metadata_primitives"
+    output = stream.getvalue()
+    assert "Status" in output
+    assert "Stable" in output
+    assert "Beta" in output
 
 
 def test_configure_benchmark_builds_config_from_prompted_values(

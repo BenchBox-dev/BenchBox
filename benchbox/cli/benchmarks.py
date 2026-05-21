@@ -32,6 +32,15 @@ from benchbox.utils.verbosity import VerbositySettings
 logger = logging.getLogger(__name__)
 console = quiet_console
 
+_SUPPORT_STATUS_LABELS = {
+    "stable": "Stable",
+    "beta": "Beta",
+    "experimental": "Experimental",
+    "repo_only": "Repo-only",
+    "deprecated": "Deprecated",
+    "document_only": "Document-only",
+}
+
 
 class BenchmarkManager:
     """Benchmark selection and configuration management with intelligent guidance."""
@@ -72,6 +81,11 @@ class BenchmarkManager:
             if self._is_public_benchmark(bench_id, bench_info)
         }
 
+    def _support_status_label(self, benchmark_info: dict[str, Any]) -> str:
+        """Return the user-facing product support label for a benchmark."""
+        status = str(benchmark_info["support_status"])
+        return _SUPPORT_STATUS_LABELS.get(status, status.replace("_", "-"))
+
     def validate_scale_factor(self, benchmark_id: str, scale_factor: float) -> None:
         """Validate scale factor against benchmark requirements.
 
@@ -101,6 +115,7 @@ class BenchmarkManager:
             for bench_id, bench_info in benchmarks:
                 desc = bench_info["query_description"] if bench_info["num_queries"] > 0 else bench_info["description"]
                 bench_tree = category_tree.add(f"[green]{bench_info['display_name']}[/green] - {desc}")
+                bench_tree.add(f"Support: {self._support_status_label(bench_info)}")
                 bench_tree.add(f"Complexity: {bench_info['complexity']}")
                 bench_tree.add(
                     f"Estimated Time: {bench_info['estimated_time_range'][0]}-{bench_info['estimated_time_range'][1]} min"
@@ -168,6 +183,7 @@ class BenchmarkManager:
         table.add_column("ID", style="cyan bold", width=3, justify="right")
         table.add_column("Category", style="blue", width=14)
         table.add_column("Name", style="green bold", width=16)
+        table.add_column("Status", style="cyan", width=13)
         table.add_column("Queries", style="yellow", width=7, justify="right")
         table.add_column("Complexity", style="magenta", width=10)
         table.add_column("Description", style="white", width=50)
@@ -186,6 +202,7 @@ class BenchmarkManager:
                 str(i),
                 bench_info["category"],
                 bench_info["display_name"],
+                self._support_status_label(bench_info),
                 query_text,
                 bench_info["complexity"],
                 bench_info["description"],
@@ -231,6 +248,9 @@ class BenchmarkManager:
         # Category and classification
         preview_text.append("Category: ", style="cyan")
         preview_text.append(f"{benchmark_info['category']}\n", style="white")
+
+        preview_text.append("Support Status: ", style="cyan")
+        preview_text.append(f"{self._support_status_label(benchmark_info)}\n", style="white")
 
         preview_text.append("Complexity: ", style="cyan")
         preview_text.append(f"{benchmark_info['complexity']}\n", style="white")
@@ -545,6 +565,7 @@ class BenchmarkManager:
         table = Table(title="Available Benchmarks")
         table.add_column("ID", style="cyan", width=3)
         table.add_column("Name", style="green")
+        table.add_column("Status", style="cyan")
         table.add_column("Queries", style="yellow")
         table.add_column("Complexity", style="blue")
         table.add_column("Est. Time", style="magenta")
@@ -558,6 +579,7 @@ class BenchmarkManager:
             table.add_row(
                 str(i + 1),
                 bench_info["display_name"],
+                self._support_status_label(bench_info),
                 query_text,
                 bench_info["complexity"],
                 f"{time_range[0]}-{time_range[1]} min",

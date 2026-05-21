@@ -174,6 +174,19 @@ class TestGetQueryDetailsTool:
         assert "display_name" in result["benchmark_info"]
         assert result["benchmark_info"]["support_status"] == "stable"
 
+    def test_internal_benchmark_info_omits_support_status(self):
+        """Explicit-ID MCP query details must not expose repo-only support tiers."""
+        from benchbox.core.benchmark_registry import BENCHMARK_METADATA
+        from benchbox.mcp.tools.benchmark import _build_query_details_benchmark_info
+
+        info = _build_query_details_benchmark_info(
+            "joinorder_synthetic",
+            BENCHMARK_METADATA["joinorder_synthetic"],
+        )
+
+        assert info["display_name"] == "JoinOrder Synthetic"
+        assert "support_status" not in info
+
 
 # ---------------------------------------------------------------------------
 # list_available with category="platforms" (consolidated list_platforms)
