@@ -91,6 +91,7 @@ def _get_benchmark_info_impl(benchmark: str) -> dict[str, Any]:
         "display_name": meta.get("display_name", benchmark_lower),
         "description": meta.get("description", f"{benchmark} benchmark"),
         "category": meta.get("category", "unknown"),
+        "support_status": meta["support_status"],
         "queries": {
             "count": meta.get("num_queries", len(queries)),
             "ids": [q["id"] for q in queries][:30],
@@ -345,6 +346,7 @@ def _list_benchmarks_impl() -> dict[str, Any]:
             "display_name": meta.get("display_name", name),
             "description": meta.get("description", f"{name} benchmark"),
             "category": meta.get("category", "unknown"),
+            "support_status": meta["support_status"],
             "query_count": meta.get("num_queries", 0),
             "scale_factors": {
                 "default": meta.get("default_scale", 0.01),

@@ -64,6 +64,18 @@ class TestListBenchmarksTool:
             assert "description" in meta
             assert "num_queries" in meta or meta.get("num_queries") == 0
             assert "category" in meta
+            assert "support_status" in meta
+
+    def test_list_benchmarks_projects_registry_support_status(self):
+        """MCP benchmark discovery should consume registry support status."""
+        from benchbox.mcp.tools.discovery import _list_benchmarks_impl
+
+        result = _list_benchmarks_impl()
+        benchmarks = {row["name"]: row for row in result["benchmarks"]}
+
+        assert benchmarks["tpch"]["support_status"] == "stable"
+        assert benchmarks["ai_primitives"]["support_status"] == "experimental"
+        assert "joinorder_synthetic" not in benchmarks
 
 
 class TestGetBenchmarkInfoTool:
@@ -79,6 +91,16 @@ class TestGetBenchmarkInfoTool:
         meta = benchmarks["tpch"]
         assert meta["display_name"] == "TPC-H"
         assert meta["num_queries"] == 22
+        assert meta["support_status"] == "stable"
+
+    def test_get_benchmark_info_projects_support_status(self):
+        """Detailed MCP benchmark info should expose registry support status."""
+        from benchbox.mcp.tools.discovery import _get_benchmark_info_impl
+
+        result = _get_benchmark_info_impl("tpch")
+
+        assert result["name"] == "tpch"
+        assert result["support_status"] == "stable"
 
     def test_get_tpcds_info(self):
         """Test getting TPC-DS benchmark info."""

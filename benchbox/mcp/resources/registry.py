@@ -38,6 +38,7 @@ def _build_benchmarks_list() -> str:
             "display_name": meta.get("display_name", name),
             "description": meta.get("description", ""),
             "category": meta.get("category", "unknown"),
+            "support_status": meta["support_status"],
             "query_count": meta.get("num_queries", 0),
         }
         for name, meta in all_benchmarks.items()
@@ -84,6 +85,7 @@ def _build_benchmark_detail(name: str) -> str:
             "display_name": meta.get("display_name", benchmark_lower),
             "description": meta.get("description", ""),
             "category": meta.get("category", "unknown"),
+            "support_status": meta["support_status"],
             "query_count": meta.get("num_queries", len(query_ids)),
             "query_ids": query_ids,
             "scale_factors": {
