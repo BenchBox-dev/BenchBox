@@ -21,6 +21,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+from csv import reader
 from typing import Any
 
 import pandas as pd
@@ -1010,111 +1011,46 @@ def q12a_pandas_impl(ctx: DataFrameContext) -> Any:
 
 JOINORDER_DATAFRAME_QUERIES = QueryRegistry("JoinOrder DataFrame")
 
+_CATEGORY_CODES = {
+    "AG": QueryCategory.AGGREGATE,
+    "FI": QueryCategory.FILTER,
+    "JO": QueryCategory.JOIN,
+    "MJ": QueryCategory.MULTI_JOIN,
+}
+
+_QUERY_METADATA = """\
+1a|Production Companies Top 250|Production companies with top 250 ranked movies (5 tables)|JO,AG,FI|q1a
+1b|Production Companies Bottom 10|Variant of 1a with bottom 10 rank predicate (5 tables)|JO,AG,FI|q1b
+2a|German Company Character Name Movies|Movies from German companies with character-name-in-title keyword (5 tables)|JO,AG,FI|q2a
+3a|Scandinavian/German Sequel Movies|Sequel movies from Scandinavian/German countries after 1990 (4 tables)|JO,AG,FI|q3a
+4a|Sequel Movies with High Rating|Sequel movies with rating > 2.0 after 1990 (5 tables)|JO,AG,FI|q4a
+5a|European Theatrical Movies|European theatrical movies from France production companies after 2005 (5 tables)|JO,AG,FI|q5a
+6a|Superhero Movies with Robert Downey Jr.|Superhero/action movies featuring Robert Downey Jr. after 2000 (5 tables)|JO,AG,FI|q6a
+7a|Biography Movies with Person Criteria|Biography movies with specific person criteria (8 tables)|MJ,AG,FI|q7a
+8a|Japanese Dubbed Movies|Japanese dubbed movies by specific actress criteria (7 tables)|MJ,AG,FI|q8a
+9a|American Voice Actress Movies|American voice actress movies (8 tables)|MJ,AG,FI|q9a
+10a|American Producer Movies|Movies with American producers after 1990 (7 tables)|MJ,AG,FI|q10a
+11a|Non-Polish Sequel Movies with Follow Links|Sequel movies from Film/Warner companies with follow links (9 tables)|MJ,AG,FI|q11a
+12a|Drama/Horror US Movies with High Ratings|US drama/horror movies with high ratings using double info_type join (8 tables)|MJ,AG,FI|q12a
+"""
+
+
+def _impl_for(stem: str, family: str) -> Any:
+    return globals()[f"{stem}_{family}_impl"]
+
+
 _QUERIES = [
     DataFrameQuery(
-        query_id="1a",
-        query_name="Production Companies Top 250",
-        description="Production companies with top 250 ranked movies (5 tables)",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=q1a_expression_impl,
-        pandas_impl=q1a_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="1b",
-        query_name="Production Companies Bottom 10",
-        description="Variant of 1a with bottom 10 rank predicate (5 tables)",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=q1b_expression_impl,
-        pandas_impl=q1b_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="2a",
-        query_name="German Company Character Name Movies",
-        description="Movies from German companies with character-name-in-title keyword (5 tables)",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=q2a_expression_impl,
-        pandas_impl=q2a_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="3a",
-        query_name="Scandinavian/German Sequel Movies",
-        description="Sequel movies from Scandinavian/German countries after 1990 (4 tables)",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=q3a_expression_impl,
-        pandas_impl=q3a_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="4a",
-        query_name="Sequel Movies with High Rating",
-        description="Sequel movies with rating > 2.0 after 1990 (5 tables)",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=q4a_expression_impl,
-        pandas_impl=q4a_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="5a",
-        query_name="European Theatrical Movies",
-        description="European theatrical movies from France production companies after 2005 (5 tables)",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=q5a_expression_impl,
-        pandas_impl=q5a_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="6a",
-        query_name="Superhero Movies with Robert Downey Jr.",
-        description="Superhero/action movies featuring Robert Downey Jr. after 2000 (5 tables)",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=q6a_expression_impl,
-        pandas_impl=q6a_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="7a",
-        query_name="Biography Movies with Person Criteria",
-        description="Biography movies with specific person criteria (8 tables)",
-        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=q7a_expression_impl,
-        pandas_impl=q7a_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="8a",
-        query_name="Japanese Dubbed Movies",
-        description="Japanese dubbed movies by specific actress criteria (7 tables)",
-        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=q8a_expression_impl,
-        pandas_impl=q8a_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="9a",
-        query_name="American Voice Actress Movies",
-        description="American voice actress movies (8 tables)",
-        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=q9a_expression_impl,
-        pandas_impl=q9a_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="10a",
-        query_name="American Producer Movies",
-        description="Movies with American producers after 1990 (7 tables)",
-        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=q10a_expression_impl,
-        pandas_impl=q10a_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="11a",
-        query_name="Non-Polish Sequel Movies with Follow Links",
-        description="Sequel movies from Film/Warner companies with follow links (9 tables)",
-        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=q11a_expression_impl,
-        pandas_impl=q11a_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="12a",
-        query_name="Drama/Horror US Movies with High Ratings",
-        description="US drama/horror movies with high ratings using double info_type join (8 tables)",
-        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=q12a_expression_impl,
-        pandas_impl=q12a_pandas_impl,
-    ),
+        query_id=query_id,
+        query_name=query_name,
+        description=description,
+        categories=[_CATEGORY_CODES[code] for code in category_codes.split(",")],
+        expression_impl=_impl_for(impl_stem, "expression"),
+        pandas_impl=_impl_for(impl_stem, "pandas"),
+    )
+    for query_id, query_name, description, category_codes, impl_stem in reader(
+        _QUERY_METADATA.splitlines(), delimiter="|"
+    )
 ]
 
 for _query in _QUERIES:
