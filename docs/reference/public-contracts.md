@@ -38,7 +38,7 @@ the map is unchanged.
 | `PlatformAdapter` lifecycle | `beta-public` | platform-runtime | Adapter instances are serial execution objects. One instance may be reused for multiple benchmark runs sequentially; `run_benchmark()` resets run-scoped caches at run start and restores run-config plan-capture overrides at run end. Concurrent calls on one adapter instance are not supported. | A concurrency or service-mode promotion needs a contract-map update and a shared run-context design before claiming support. | `tests/unit/platforms/test_adapter_lifecycle.py`, focused adapter lifecycle tests. | `benchbox/platforms/base/adapter.py`, `benchbox/platforms/base/result_capture.py`, `docs/development/adapter-refactor-map.md` |
 | DataFrame adapter execution path | `beta-public` | dataframe-runtime | Production DataFrame execution routes through `benchbox.core.runner.runner` to `adapter.run_benchmark()`, implemented by `BenchmarkExecutionMixin` for production DataFrame platforms such as `polars-df`, `pandas-df`, `datafusion-df`, and `dask-df`. | Changes need DataFrame mixin tests, result-bundle parity coverage, and same-PR docs. | DataFrame mixin tests plus exported SQL/DataFrame result parity. | `benchbox/core/runner/runner.py`, `benchbox/platforms/dataframe/benchmark_mixin.py`, `tests/unit/core/results/test_result_parity.py` |
 | `benchbox.core.runner.dataframe_runner.run_dataframe_benchmark` | `deprecated` | dataframe-runtime | Deprecated internal compatibility runner retained for old tests and helper imports. It is not the production DataFrame lifecycle path. | Backward-compatibility registry review after one beta cycle; migrate remaining behavior to `BenchmarkExecutionMixin` before removal. | Compatibility tests only. | `benchbox/core/runner/dataframe_runner.py`, `tests/unit/core/runner/test_dataframe_runner.py`, `tests/unit/core/runner/test_dataframe_runner_lifecycle.py` |
-| Platform registry metadata | `beta-public` | platform-runtime | Registry metadata is the source for platform discovery, capabilities, dependency hints, and future support status. | Same-PR metadata/docs migration; aliases require compatibility note. | Platform registry tests and docs drift checks. | `benchbox/core/platform_registry.py` |
+| Platform registry metadata | `beta-public` | platform-runtime | Registry metadata is the source for platform discovery, capabilities, dependency hints, and platform support status. | Same-PR metadata/docs migration; aliases require compatibility note. | Platform registry tests and docs drift checks. | `benchbox/core/platform_registry.py` |
 | MCP tools | `beta-public` | mcp | Tool schemas and documented parameters are supported as a smoke/control-plane automation surface, not a CLI-equivalent execution surface. MCP result bundles are schema-comparable to CLI bundles, but MCP must not import CLI command internals or imply CLI option parity. | MCP reference update and contract tests; product-tier or option-parity changes need a decision note and, for CLI equivalence, a shared non-CLI run service below CLI and MCP. | `tests/unit/mcp/test_run_surface_contract.py`, `tests/unit/mcp/`, MCP docs/schema checks. | `benchbox/mcp/`, `docs/reference/mcp.md`, `benchbox/base.py` |
 | Result JSON bundles | `beta-public` | results | Schema-versioned result bundles are product data consumed by CLI, submission validation, hosted results, explorer, and SQL/DataFrame comparisons. SQL and DataFrame bundles must preserve the cross-mode invariants below. | Schema policy and hosted-results contract update before changing accepted versions, field semantics, or cross-mode parity guarantees. | Result schema policy, loader, normalizer, submission, explorer, and exported SQL/DataFrame parity tests. | `benchbox/core/results/schema_policy.py`, `benchbox/core/results/schema.py`, `docs/reference/result-formats.md`, `docs/reference/hosted-results-contract.md`, `tests/unit/core/results/test_result_parity.py` |
 | Explorer read model and generated browser inputs | `generated` | results-explorer | Browser data stores are generated from accepted result bundles; generated outputs should be reproducible from source bundles and pipeline code. | Read-model version bump or pipeline contract update. | Explorer pipeline contract tests and browser release gates. | `_project/scripts/explorer_pipeline/`, results explorer generated data |
@@ -67,9 +67,11 @@ Allowed values:
 | `deprecated` | Temporarily retained compatibility surface. | Retained until target review/removal window. | Migration path required. | Listed with deprecation status or hidden after warning window. | Exposed only if existing clients need it. | Compatibility tests until removal. | Removal follows registry target and release notes. |
 | `document_only` | Documented external concept or planned support with no runtime implementation. | No package promise. | Docs must say it is not executable support. | Not listed as runnable. | Not exposed. | Link/static doc checks only. | No runtime breakage claim. |
 
-Follow-up migrations should add exactly one `support_status` to every platform
-and benchmark registry entry. Until that lands, count claims in user-facing docs
-must either be generated/checked from registry metadata or explicitly marked as
+Platform registry metadata now carries exactly one `support_status` for every
+platform. Benchmark registry metadata does not yet carry benchmark-level
+`support_status`; `benchmark-support-status-and-discovery-policy` owns that
+migration. Until it lands, benchmark support-level claims in user-facing docs
+must either avoid exact status counts or explicitly identify themselves as
 editorial summaries.
 
 ## Count and Drift Policy
@@ -85,10 +87,26 @@ Evidence snapshot at `8937681`:
 | `benchbox.core.results.schema_policy` | Current result schema version: `2.1`; runtime/explorer accepted versions: `2.0`, `2.1`; public submission accepts numeric `2.x`. | Result schema version claims must update with the named consumer policy or defer to this policy module. |
 | `README.md` before this TODO | Landing-page bullets claimed 22 benchmarks, 42 SQL platforms, and 9 DataFrame platforms. | Exact counts were stale relative to registry metadata; README now links to this policy instead of being authoritative. |
 
-Authoritative count statements should come from registry metadata once the
-support-status migration lands. Editorial lists may remain in narrative docs,
-but they must not claim to be exhaustive unless a generated or tested check keeps
-them synchronized.
+Authoritative count statements should come from the relevant registry metadata.
+Editorial lists may remain in narrative docs, but they must not claim to be
+exhaustive unless a generated or tested check keeps them synchronized.
+
+## Drift Check Ownership
+
+Each public claim class has one owner and one preferred verification gate:
+
+| Claim class | Owner | Source of truth | Verification gate |
+|---|---|---|---|
+| Platform counts, platform support status, and optional import health | platform-runtime | `benchbox/core/platform_registry.py` | Platform registry tests and generated platform docs checks. |
+| Benchmark counts, benchmark wrapper/loader/discovery reachability, and future benchmark support status | benchmark-api | `benchbox/core/benchmark_registry.py`, `benchbox/__init__.py`, `benchbox/core/benchmark_loader.py` | `tests/unit/core/test_benchmark_api_contract.py` plus the pending benchmark support-status migration. |
+| Result schema versions and consumer acceptance policy | results | `benchbox/core/results/schema_policy.py`, result docs | Result schema policy, loader, submission, explorer, and hosted-results contract tests. |
+| MCP run parameters and product-surface limits | mcp | `benchbox/mcp/`, `docs/reference/mcp.md` | `tests/unit/mcp/test_run_surface_contract.py` and focused MCP tool tests. |
+| SQL compatibility DDL rewrite governance | sql-compat | `benchbox/sql_compat/`, adapter DDL rewrite sites | `make compat-docs-check` and DDL drift inventory checks. |
+
+The contract map is the routing layer for these gates, not the sole source of
+every generated table. A PR that changes a claim class should update the owning
+source and its gate first, then update this map only when the public contract or
+ownership boundary changes.
 
 ## SQL Compatibility Governance Decision
 

@@ -90,16 +90,18 @@ work:
       broken.
 
   - id: w3
-    summary: "Generate platform and benchmark count tables from registry metadata"
+    summary: "Generate platform count and support-status tables from registry metadata"
     needs: [w1]
     status: done
     notes: |
-      Replace hand-maintained count claims where feasible. Generated tables
-      should include support_status, SQL/DataFrame capability, dependency group,
-      and whether the platform is exposed in CLI/MCP/docs.
+      Replace hand-maintained platform count claims where feasible. Generated
+      tables should include support_status, SQL/DataFrame capability, dependency
+      group, and whether the platform is exposed in CLI/MCP/docs.
 
       Add a docs drift check so README and comparison matrix counts cannot
-      disagree with registry metadata silently.
+      disagree with platform registry metadata silently. Benchmark count and
+      benchmark support-status ownership stays with the benchmark API follow-up
+      because benchmark metadata lives in `benchbox/core/benchmark_registry.py`.
 
   - id: w4
     summary: "Create a new-platform acceptance checklist covering files, tests, docs, compat, and UAT"
@@ -234,6 +236,7 @@ success_metrics:
   - "Optional import diagnostics distinguish missing dependency from adapter import bug."
   - "README and platform matrix counts are generated from or checked against registry metadata."
   - "New-platform acceptance checklist names required files, tests, docs, compat rules, and UAT scope."
+  - "Benchmark support-status migration is not implied by platform registry support-status coverage."
 
 open_questions:
   - "Should deprecated platforms stay visible in CLI help by default?"
