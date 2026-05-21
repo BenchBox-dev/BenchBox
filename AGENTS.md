@@ -258,8 +258,10 @@ before adding base responsibilities.
 
 Every adapter CREATE TABLE rewrite must be registered in
 `benchbox/sql_compat/rules/ddl_optimize/<platform>_ddl_rewrites.py` under
-`Phase.DDL_OPTIMIZE`; adapters inherit `BaseDdlOptimizer`.
-`compat_lint --check-ddl-drift` enforces this.
+`Phase.DDL_OPTIMIZE`; adapters either inherit `BaseDdlOptimizer` for runtime
+dispatch or mark the rule `governance_only=True` for a local rewrite path.
+`make compat-docs-check` runs the generated docs drift gate and
+`uv run -- python -m benchbox.sql_compat.inventory --check-ddl-drift`.
 
 ## Dependency Upper Bounds
 

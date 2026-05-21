@@ -4,15 +4,16 @@
 
 Every rule registered in `benchbox.sql_compat` is listed below. The registry is the authoritative source of compatibility policy; this document is regenerated from it. See [adr-sql-compat-phase-aware-pipeline.md](../development/adr/adr-sql-compat-phase-aware-pipeline.md) for the design.
 
-**Total registered rules:** 331
+**Total registered rules:** 333
 
-**Platforms covered:** 28
+**Platforms covered:** 29
 
 ## Phase coverage by platform
 
 | platform | benchmark_gate | query_source | query_adapter | schema_emit | ddl_optimize | execution_filter | total |
 |---|---|---|---|---|---|---|---|
-| bigquery | - | - | - | 2 | - | - | 2 |
+| athena | - | - | - | - | 1 | - | 1 |
+| bigquery | - | - | - | 2 | 1 | - | 3 |
 | clickhouse | - | 13 | 3 | 4 | 1 | - | 21 |
 | databend | - | - | - | - | 1 | - | 1 |
 | databricks | - | - | - | 2 | 1 | - | 3 |
@@ -43,12 +44,19 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 
 ## Rules by platform
 
+### athena
+
+| phase | scope | action | support | failure mode | rule_id |
+|---|---|---|---|---|---|
+| ddl_optimize | platform-wide | rewrite_ddl | REWRITTEN | SYNTAX_ERROR | `ddl_optimize.athena.all.convert_to_external_table` |
+
 ### bigquery
 
 | phase | scope | action | support | failure mode | rule_id |
 |---|---|---|---|---|---|
 | schema_emit | benchmark=transaction_primitives | rewrite_ddl | INFORMATIONAL | SILENT_CORRUPTION | `schema_emit.bigquery.transaction_primitives.pk_not_enforced` |
 | schema_emit | benchmark=write_primitives | rewrite_ddl | INFORMATIONAL | SILENT_CORRUPTION | `schema_emit.bigquery.write_primitives.pk_not_enforced` |
+| ddl_optimize | platform-wide | rewrite_ddl | REWRITTEN | SYNTAX_ERROR | `ddl_optimize.bigquery.all.convert_to_bigquery_table` |
 
 ### clickhouse
 
