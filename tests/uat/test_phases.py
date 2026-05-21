@@ -110,6 +110,29 @@ def test_enumerate_records_compatibility_pruned_cells():
     assert result.candidate_count == len(result.cells) + len(result.compatibility_pruned)
 
 
+def test_enumerate_uses_registry_supports_dataframe_without_name_fallback():
+    raw = {
+        "platforms": {"include": ["polars-df"]},
+        "benchmarks": {"include": ["vector_search"]},
+        "scales": {"rungs": [0.01]},
+    }
+    benchmarks = {
+        "vector_search": matrix.BenchmarkInfo(
+            benchmark_id="vector_search",
+            category="AI/ML",
+            default_scale=0.01,
+            min_scale=0.01,
+            scale_options=(0.01,),
+            supports_dataframe=True,
+        )
+    }
+
+    result = enum_phase.enumerate_cells_with_pruning(raw, benchmarks=benchmarks)
+
+    assert [(c.platform, c.benchmark, c.scale) for c in result.cells] == [("polars-df", "vector_search", 0.01)]
+    assert result.compatibility_pruned == ()
+
+
 def test_enumerate_records_registry_benchmark_gates():
     raw = {
         "platforms": {"include": ["lakesail"]},

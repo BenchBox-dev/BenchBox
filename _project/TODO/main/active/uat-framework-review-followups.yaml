@@ -573,7 +573,7 @@ work:
 - id: w12
   summary: "Delete KNOWN_SQL_ONLY_BENCHMARKS OR-shortcut; phases/enumerate.py uses registry truth directly"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     F12. The constant at `tests/uat/matrix.py:233` is documented as a
     "fallback" but actually runs as an OR-shortcut before the registry

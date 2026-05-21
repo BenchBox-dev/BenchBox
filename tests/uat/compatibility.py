@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from benchbox.core.platform_registry import PlatformRegistry
-from tests.uat.matrix import DATAFRAME_PLATFORMS, KNOWN_SQL_ONLY_BENCHMARKS, BenchmarkInfo
+from tests.uat.matrix import DATAFRAME_PLATFORMS, BenchmarkInfo
 
 
 @dataclass(frozen=True)
@@ -25,7 +25,7 @@ DATAFRAME_SQL_ONLY_RULE = CompatibilityRule(
     rule_id="uat.compat.dataframe.sql_only_benchmark",
     status="blocked",
     reason="DataFrame platforms cannot execute SQL-only benchmark implementations.",
-    evidence=("tests/uat/matrix.py:KNOWN_SQL_ONLY_BENCHMARKS and benchmark registry `supports_dataframe` metadata"),
+    evidence="benchmark registry `supports_dataframe` metadata",
 )
 
 _JOINORDER_RUNTIME_ENVELOPE_REASON = (
@@ -72,7 +72,7 @@ def compatibility_rule_for(
     include_release_gate_runtime_envelopes: bool = False,
 ) -> CompatibilityRule | None:
     """Return the rule that blocks a platform/benchmark pair, if any."""
-    if platform in DATAFRAME_PLATFORMS and _is_sql_only_benchmark(benchmark, info):
+    if platform in DATAFRAME_PLATFORMS and _is_sql_only_benchmark(info):
         return DATAFRAME_SQL_ONLY_RULE
     if include_release_gate_runtime_envelopes:
         runtime_envelope_reason = _PG_FAMILY_RELEASE_GATE_RUNTIME_ENVELOPES.get((platform, benchmark))
@@ -96,7 +96,5 @@ def compatibility_rule_for(
     return None
 
 
-def _is_sql_only_benchmark(benchmark: str, info: BenchmarkInfo) -> bool:
-    if benchmark in KNOWN_SQL_ONLY_BENCHMARKS:
-        return True
+def _is_sql_only_benchmark(info: BenchmarkInfo) -> bool:
     return not info.supports_dataframe

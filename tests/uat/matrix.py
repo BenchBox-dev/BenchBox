@@ -239,12 +239,6 @@ def platform_is_reachable(platform: str) -> bool:
 # Benchmark enumeration via the registry.
 # ---------------------------------------------------------------------------
 
-# Benchmarks the bash script flags as SQL-only (no DataFrame execution).
-# Source of truth is `BENCHMARK_METADATA[bid]['supports_dataframe']`; this
-# constant exists for clarity in tests and matches the bash hardcoded
-# fallback (lines 274-275).
-KNOWN_SQL_ONLY_BENCHMARKS: tuple[str, ...] = ("ai_primitives", "vector_search")
-
 
 @dataclass(frozen=True)
 class BenchmarkInfo:
