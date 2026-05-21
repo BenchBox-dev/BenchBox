@@ -3,7 +3,6 @@ description: "Managed Docker smoke for PostgreSQL-extension UAT credential propa
 
 phases:
   - preflight
-  - enumerate
   - execute
   - report
 

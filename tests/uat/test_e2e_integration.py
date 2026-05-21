@@ -61,7 +61,7 @@ def test_e2e_two_platforms_three_benchmarks_with_cleanup_and_report(
     cfg = validate_config(
         {
             "name": "e2e",
-            "phases": ["enumerate", "execute", "report"],
+            "phases": ["execute", "report"],
             "platforms": {"include": ["duckdb", "sqlite"]},
             # Deliberately put consumers ahead of source — topology must reorder.
             "benchmarks": {"include": ["read_primitives", "write_primitives", "tpch"]},
@@ -90,7 +90,7 @@ def test_e2e_two_platforms_three_benchmarks_with_cleanup_and_report(
     )
 
     assert result.aborted_phase is None, result.abort_reason
-    assert result.phase_exit_codes == {"enumerate": 0, "execute": 0, "report": 0}
+    assert result.phase_exit_codes == {"execute": 0, "report": 0}
 
     benches_per_platform: dict[str, list[str]] = {}
     for plat, bench, _scale in invocations:
@@ -131,7 +131,7 @@ def test_e2e_validator_status_reaches_cross_scale_check(tmp_path: Path, monkeypa
     cfg = validate_config(
         {
             "name": "e2e-validator",
-            "phases": ["enumerate", "execute", "validate", "report"],
+            "phases": ["execute", "validate", "report"],
             "platforms": {"include": ["duckdb"]},
             "benchmarks": {"include": ["tpch"]},
             "scales": {"rungs": [0.01, 0.1]},

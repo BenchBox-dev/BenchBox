@@ -153,14 +153,12 @@ description: "..."              # optional, str. One-line description.
 # Phase composition -----------------------------------------------------
 phases:                          # required, list[str]. Order matters.
   - preflight
-  - enumerate
   - execute
   - validate
   - package
   - explorer_smoke
   - report
-# Allowed: preflight, enumerate, execute, validate, package,
-#          explorer_smoke, report.
+# Allowed: preflight, execute, validate, package, explorer_smoke, report.
 # Stress preset omits validate/package/explorer_smoke.
 
 dry_run: false                   # optional, bool, default false. When
@@ -459,7 +457,7 @@ Encode the 2026-05-02 sweep as a historical replay config:
 name: "uat-2026-05-02"
 description: "Historical replay of the 2026-05-02 results-explorer multi-scale corpus sweep"
 
-phases: [preflight, enumerate, execute, validate, package, explorer_smoke, report]
+phases: [preflight, execute, validate, package, explorer_smoke, report]
 
 platforms:
   groups: ["sql", "dataframe"]

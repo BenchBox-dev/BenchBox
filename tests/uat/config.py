@@ -17,7 +17,6 @@ from typing import Any
 
 VALID_PHASES: tuple[str, ...] = (
     "preflight",
-    "enumerate",
     "execute",
     "validate",
     "package",
@@ -90,7 +89,7 @@ class UATConfig:
 
     name: str
     description: str = ""
-    phases: tuple[str, ...] = ("preflight", "enumerate", "execute", "report")
+    phases: tuple[str, ...] = ("preflight", "execute", "report")
     dry_run: bool = False
     execute: ExecuteConfig = field(default_factory=ExecuteConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
@@ -307,7 +306,7 @@ def validate_config(raw: dict[str, Any]) -> UATConfig:
     name = raw.get("name")
     if not name or not isinstance(name, str):
         raise ConfigError("`name:` is required and must be a non-empty string")
-    phases = _validate_phases(raw.get("phases") or ["preflight", "enumerate", "execute", "report"])
+    phases = _validate_phases(raw.get("phases") or ["preflight", "execute", "report"])
     execute = _validate_execute(raw.get("execute") or {})
     output = _validate_output(raw.get("output") or {})
     preflight = _validate_preflight(raw.get("preflight"))

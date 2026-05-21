@@ -22,13 +22,13 @@ def test_dry_run_records_zero_per_phase(tmp_path: Path):
         {
             "name": "smoke",
             "dry_run": True,
-            "phases": ["preflight", "enumerate", "execute", "report"],
+            "phases": ["preflight", "execute", "report"],
         }
     )
     result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path)
     assert result.aborted_phase is None
     assert all(c == 0 for c in result.phase_exit_codes.values())
-    assert set(result.phase_exit_codes) == {"preflight", "enumerate", "execute", "report"}
+    assert set(result.phase_exit_codes) == {"preflight", "execute", "report"}
 
 
 def test_preflight_abort_short_circuits(tmp_path: Path):
@@ -77,44 +77,18 @@ def test_stress_docker_managed_yaml_loads():
     assert cfg.preflight.docker_required is True
 
 
-def test_dry_run_still_runs_enumerate(tmp_path: Path):
-    """dry_run should NOT short-circuit enumerate; a malformed config must fail at PR time."""
+def test_enumerate_is_not_a_public_phase():
+    with pytest.raises(ValueError, match="Unknown phase"):
+        validate_config({"name": "smoke", "phases": ["enumerate", "execute"]})
+
+
+def test_dry_run_passes_without_public_enumerate(tmp_path: Path):
+    """A valid dry_run sweep no longer exposes enumerate as its own phase."""
     cfg = validate_config(
         {
             "name": "smoke",
             "dry_run": True,
-            "phases": ["enumerate", "execute"],
-            "platforms": {"groups": ["does-not-exist"]},
-        }
-    )
-    result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path)
-    assert result.aborted_phase == "enumerate"
-    assert result.phase_exit_codes["enumerate"] == 2
-
-
-def test_dry_run_enumerate_type_error_returns_structured_abort(tmp_path: Path):
-    """Malformed list-like fields should abort enumerate instead of escaping run_sweep."""
-    cfg = validate_config(
-        {
-            "name": "smoke",
-            "dry_run": True,
-            "phases": ["enumerate", "execute"],
-            "platforms": {"groups": 1},
-        }
-    )
-    result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path)
-    assert result.aborted_phase == "enumerate"
-    assert result.phase_exit_codes["enumerate"] == 2
-    assert result.exit_code() == 2
-
-
-def test_dry_run_passes_with_valid_enumerate(tmp_path: Path):
-    """A valid dry_run sweep should still pass through enumerate cleanly."""
-    cfg = validate_config(
-        {
-            "name": "smoke",
-            "dry_run": True,
-            "phases": ["enumerate", "execute", "report"],
+            "phases": ["execute", "report"],
             "platforms": {"include": ["duckdb"]},
             "benchmarks": {"include": ["tpch"]},
             "scales": {"rungs": [0.01]},
@@ -123,6 +97,7 @@ def test_dry_run_passes_with_valid_enumerate(tmp_path: Path):
     result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path)
     assert result.aborted_phase is None
     assert all(c == 0 for c in result.phase_exit_codes.values())
+    assert "enumerate" not in result.phase_exit_codes
 
 
 def test_explorer_smoke_uses_package_submissions_dir(tmp_path: Path):

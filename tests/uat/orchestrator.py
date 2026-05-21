@@ -21,7 +21,6 @@ from typing import Any
 
 from tests.uat.config import UATConfig, apply_stress_overrides, load_config
 from tests.uat.phases import (
-    enumerate as enumerate_phase,
     execute as exec_phase,
     preflight as preflight_phase,
     report as report_phase,
@@ -194,12 +193,7 @@ def run_sweep(  # noqa: C901
     submissions_dir: Path | None = None
 
     for phase in config.phases:
-        if config.dry_run and phase != "enumerate":
-            # Enumerate is cheap and pure (no subprocesses, no FS writes
-            # for the cells themselves). Run it even in dry_run so a
-            # malformed config — unknown platform group, retired
-            # benchmark in a frozen YAML — surfaces as a non-zero
-            # phase exit instead of silently passing through.
+        if config.dry_run:
             phase_exit_codes[phase] = 0
             continue
         if phase == "preflight":
@@ -229,18 +223,6 @@ def run_sweep(  # noqa: C901
                         abort_reason=abort_reason,
                         attempted=attempted,
                     )
-                break
-        elif phase == "enumerate":
-            # Materialise the cell list eagerly so a malformed config
-            # (unknown platform group, missing benchmark) fails here
-            # rather than at execute or — under dry_run — never at all.
-            try:
-                enumerate_phase.enumerate_cells(config.raw)
-                phase_exit_codes[phase] = 0
-            except (ValueError, KeyError, TypeError) as exc:
-                phase_exit_codes[phase] = 2
-                aborted_phase = phase
-                abort_reason = str(exc)
                 break
         elif phase == "execute":
             base_runner = (
