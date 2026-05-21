@@ -10,7 +10,7 @@ from unittest.mock import patch
 import pytest
 
 from tests.uat import docker_assets, matrix
-from tests.uat.config import UATConfig, validate_config
+from tests.uat.config import ExecuteConfig, UATConfig, validate_config
 from tests.uat.phases import (
     enumerate as enum_phase,
     execute as exec_phase,
@@ -320,6 +320,18 @@ def test_execute_walks_ladder_and_prunes_after_slow_rung(tmp_path):
     pruned_scales = {c.scale for c in outcome.pruned}
     assert scales_run == {0.01, 0.1}
     assert 1.0 in pruned_scales
+
+
+def test_execute_asserts_if_parallel_platforms_bypasses_yaml_validation(tmp_path):
+    cfg = UATConfig(name="parallel-bypass", execute=ExecuteConfig(parallel_platforms=True))
+
+    with pytest.raises(AssertionError, match="parallel_platforms must remain False"):
+        exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=_stub_runner_factory({}, {}),
+        )
 
 
 def test_execute_skips_unreachable_platform(tmp_path):
