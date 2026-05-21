@@ -19,6 +19,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+from csv import reader
 from datetime import date
 from typing import Any
 
@@ -679,143 +680,49 @@ def qc2_pandas_impl(ctx: DataFrameContext) -> Any:
 # Query Registration
 # =============================================================================
 
+_CATEGORY_CODES = {
+    "AG": QueryCategory.AGGREGATE,
+    "AN": QueryCategory.ANALYTICAL,
+    "FI": QueryCategory.FILTER,
+    "GB": QueryCategory.GROUP_BY,
+    "JO": QueryCategory.JOIN,
+    "SO": QueryCategory.SORT,
+    "WI": QueryCategory.WINDOW,
+}
+
+_QUERY_METADATA = """\
+SA1|Daily Revenue by Region|Daily revenue and order volume by region with NULLIF avg order value|FI,JO,GB,AG|sa1
+SA2|Top Products by Revenue|Top products by revenue for a given year with JOIN to dim_products|FI,JO,GB,SO|sa2
+SA3|Monthly Performance|Monthly orders, items sold, revenue with NULLIF derived metrics|FI,GB,AG,AN|sa3
+SA4|Revenue Share by Region|Revenue share by region using SUM OVER() window function|FI,JO,GB,WI|sa4
+SA5|Top Locations|Top-performing locations by revenue with multi-column GROUP BY|FI,JO,GB,SO|sa5
+PR1|Product Mix|Product mix by subcategory with date validity check on dim_products|FI,JO,GB,AG|pr1
+PR2|Price Band Distribution|Price-band distribution using multi-way CASE WHEN binning|FI,GB,AG,AN|pr2
+TR1|Quarterly Trends|Quarterly revenue and order growth using FLOOR quarter calculation|FI,GB,AG,AN|tr1
+TM1|Day-Part Cadence|Order cadence by day-part (Morning/Midday/Afternoon/Evening) for a region|FI,JO,GB,AN|tm1
+QC1|Lines per Order|Average lines and items per order with NULLIF protection|FI,AG|qc1
+QC2|Seasonal Revenue|Seasonal revenue comparison across regions using CASE WHEN month mapping|FI,JO,GB,AN|qc2
+"""
+
+
+def _impl_for(stem: str, family: str) -> Any:
+    return globals()[f"{stem}_{family}_impl"]
+
 
 def _register_all_queries() -> None:
-    """Register all 11 CoffeeShop DataFrame queries."""
-    # Sales Analysis
-    register_query(
-        DataFrameQuery(
-            query_id="SA1",
-            query_name="Daily Revenue by Region",
-            description="Daily revenue and order volume by region with NULLIF avg order value",
-            categories=[QueryCategory.FILTER, QueryCategory.JOIN, QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-            expression_impl=sa1_expression_impl,
-            pandas_impl=sa1_pandas_impl,
+    for query_id, query_name, description, category_codes, impl_stem in reader(
+        _QUERY_METADATA.splitlines(), delimiter="|"
+    ):
+        register_query(
+            DataFrameQuery(
+                query_id=query_id,
+                query_name=query_name,
+                description=description,
+                categories=[_CATEGORY_CODES[code] for code in category_codes.split(",")],
+                expression_impl=_impl_for(impl_stem, "expression"),
+                pandas_impl=_impl_for(impl_stem, "pandas"),
+            )
         )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="SA2",
-            query_name="Top Products by Revenue",
-            description="Top products by revenue for a given year with JOIN to dim_products",
-            categories=[QueryCategory.FILTER, QueryCategory.JOIN, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=sa2_expression_impl,
-            pandas_impl=sa2_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="SA3",
-            query_name="Monthly Performance",
-            description="Monthly orders, items sold, revenue with NULLIF derived metrics",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=sa3_expression_impl,
-            pandas_impl=sa3_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="SA4",
-            query_name="Revenue Share by Region",
-            description="Revenue share by region using SUM OVER() window function",
-            categories=[QueryCategory.FILTER, QueryCategory.JOIN, QueryCategory.GROUP_BY, QueryCategory.WINDOW],
-            expression_impl=sa4_expression_impl,
-            pandas_impl=sa4_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="SA5",
-            query_name="Top Locations",
-            description="Top-performing locations by revenue with multi-column GROUP BY",
-            categories=[QueryCategory.FILTER, QueryCategory.JOIN, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=sa5_expression_impl,
-            pandas_impl=sa5_pandas_impl,
-        )
-    )
-
-    # Product Analysis
-    register_query(
-        DataFrameQuery(
-            query_id="PR1",
-            query_name="Product Mix",
-            description="Product mix by subcategory with date validity check on dim_products",
-            categories=[QueryCategory.FILTER, QueryCategory.JOIN, QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-            expression_impl=pr1_expression_impl,
-            pandas_impl=pr1_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="PR2",
-            query_name="Price Band Distribution",
-            description="Price-band distribution using multi-way CASE WHEN binning",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=pr2_expression_impl,
-            pandas_impl=pr2_pandas_impl,
-        )
-    )
-
-    # Trend Analysis
-    register_query(
-        DataFrameQuery(
-            query_id="TR1",
-            query_name="Quarterly Trends",
-            description="Quarterly revenue and order growth using FLOOR quarter calculation",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=tr1_expression_impl,
-            pandas_impl=tr1_pandas_impl,
-        )
-    )
-
-    # Time Analysis
-    register_query(
-        DataFrameQuery(
-            query_id="TM1",
-            query_name="Day-Part Cadence",
-            description="Order cadence by day-part (Morning/Midday/Afternoon/Evening) for a region",
-            categories=[QueryCategory.FILTER, QueryCategory.JOIN, QueryCategory.GROUP_BY, QueryCategory.ANALYTICAL],
-            expression_impl=tm1_expression_impl,
-            pandas_impl=tm1_pandas_impl,
-        )
-    )
-
-    # Quality Checks
-    register_query(
-        DataFrameQuery(
-            query_id="QC1",
-            query_name="Lines per Order",
-            description="Average lines and items per order with NULLIF protection",
-            categories=[QueryCategory.FILTER, QueryCategory.AGGREGATE],
-            expression_impl=qc1_expression_impl,
-            pandas_impl=qc1_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="QC2",
-            query_name="Seasonal Revenue",
-            description="Seasonal revenue comparison across regions using CASE WHEN month mapping",
-            categories=[QueryCategory.FILTER, QueryCategory.JOIN, QueryCategory.GROUP_BY, QueryCategory.ANALYTICAL],
-            expression_impl=qc2_expression_impl,
-            pandas_impl=qc2_pandas_impl,
-        )
-    )
 
 
 _register_all_queries()
