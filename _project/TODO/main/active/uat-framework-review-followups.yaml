@@ -614,7 +614,7 @@ work:
 - id: w14
   summary: "Pass --quiet to benchbox run; take last stdout line as result path; delete the regex"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     F5. `tests/uat/runner.py:24-26` regex
     `(?:/[^\s]+/)?benchmark_runs/results/[^\s]+\.json` mirrors the

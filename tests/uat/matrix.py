@@ -414,6 +414,7 @@ def benchbox_run_argv(
         "--scale",
         str(scale),
         "--non-interactive",
+        "--quiet",
         "--phases",
         phases,
     ]
