@@ -23,6 +23,11 @@ BenchBox is currently in **beta**.
 
 ## Scope
 
+Public surface tiers and support status vocabulary live in
+[`public-contracts.md`](public-contracts.md). This registry is narrower: it
+tracks compatibility shims and deprecated/internal lifecycle surfaces that keep
+old behavior working.
+
 A code element belongs in this registry if it keeps old behavior working, including:
 - Legacy parameter or field handling
 - Backward-compatible aliases or re-exports
