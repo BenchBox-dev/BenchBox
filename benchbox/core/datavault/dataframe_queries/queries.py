@@ -134,14 +134,13 @@ def q2_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Filter to only minimum-cost suppliers
-    result = (
+    return (
         part_supplier.join(min_cost, left_on="p_partkey", right_on="p_partkey")
         .filter(col("ps_supplycost") == col("min_cost"))
         .select("s_acctbal", "s_name", "n_name", "p_partkey", "p_mfgr", "s_address", "s_phone", "s_comment")
         .sort([("s_acctbal", "desc"), ("n_name", "asc"), ("s_name", "asc"), ("p_partkey", "asc")])
         .limit(100)
     )
-    return result
 
 
 def q2_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1037,10 +1036,9 @@ def q14_expression_impl(ctx: DataFrameContext) -> Any:
     revenue_expr = col("l_extendedprice") * (lit(1) - col("l_discount"))
     promo_expr = ctx.when(col("p_type").str.starts_with("PROMO")).then(revenue_expr).otherwise(lit(0))
 
-    result = df.agg(
+    return df.agg(
         (promo_expr.sum() * lit(100.0) / revenue_expr.sum()).alias("promo_revenue"),
     )
-    return result
 
 
 def q14_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1094,14 +1092,13 @@ def q15_expression_impl(ctx: DataFrameContext) -> Any:
 
     max_rev = ctx.scalar(revenue.agg(col("total_revenue").max().alias("max_rev")), "max_rev")
 
-    result = (
+    return (
         hs.join(ss, left_on="hk_supplier", right_on="hk_supplier")
         .join(revenue, left_on="hk_supplier", right_on="hk_supplier")
         .filter(col("total_revenue") == lit(max_rev))
         .select("s_suppkey", "s_name", "s_address", "s_phone", "total_revenue")
         .sort("s_suppkey")
     )
-    return result
 
 
 def q15_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1213,12 +1210,11 @@ def q17_expression_impl(ctx: DataFrameContext) -> Any:
     # Average quantity per part
     avg_qty = df.group_by("hk_part").agg((col("l_quantity").mean() * lit(0.2)).alias("avg_qty"))
 
-    result = (
+    return (
         df.join(avg_qty, left_on="hk_part", right_on="hk_part")
         .filter(col("l_quantity") < col("avg_qty"))
         .agg((col("l_extendedprice").sum() / lit(7.0)).alias("avg_yearly"))
     )
-    return result
 
 
 def q17_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1367,10 +1363,9 @@ def q19_expression_impl(ctx: DataFrameContext) -> Any:
         & deliver
     )
 
-    result = df.filter(cond1 | cond2 | cond3).agg(
+    return df.filter(cond1 | cond2 | cond3).agg(
         (col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"),
     )
-    return result
 
 
 def q19_pandas_impl(ctx: DataFrameContext) -> Any:
