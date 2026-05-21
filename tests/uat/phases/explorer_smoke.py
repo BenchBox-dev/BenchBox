@@ -16,6 +16,8 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from tests.uat.phases import PhaseResult
+
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 EXPLORER_DIR = REPO_ROOT / "results-explorer"
 EXTERNAL_CORPUS_SMOKE_TAG = "@uat-external-corpus"
@@ -30,7 +32,7 @@ EXPLORER_BUILD_ARGV = (
 
 
 @dataclass(frozen=True)
-class ExplorerSmokeResult:
+class ExplorerSmokeResult(PhaseResult):
     build_returncode: int
     smoke_returncode: int
     build_log: Path | None
@@ -39,6 +41,8 @@ class ExplorerSmokeResult:
     skip_reason: str | None
 
     def exit_code(self) -> int:
+        if self.aborted:
+            return 2
         if self.skipped:
             return 0
         if self.build_returncode != 0:
@@ -95,6 +99,7 @@ def run_explorer_smoke(
     log_dir.mkdir(parents=True, exist_ok=True)
     if not has_node():
         return ExplorerSmokeResult(
+            phase="explorer_smoke",
             build_returncode=0,
             smoke_returncode=0,
             build_log=None,
@@ -119,6 +124,7 @@ def run_explorer_smoke(
         build = runner(explorer_build_argv, stdout=fh, stderr=fh, check=False)
     if getattr(build, "returncode", 0) != 0:
         return ExplorerSmokeResult(
+            phase="explorer_smoke",
             build_returncode=build.returncode,
             smoke_returncode=0,
             build_log=build_log,
@@ -137,6 +143,7 @@ def run_explorer_smoke(
         runner=runner,
     )
     return ExplorerSmokeResult(
+        phase="explorer_smoke",
         build_returncode=build.returncode,
         smoke_returncode=smoke_returncode,
         build_log=build_log,

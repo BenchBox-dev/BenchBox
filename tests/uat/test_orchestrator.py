@@ -41,7 +41,7 @@ def test_preflight_abort_short_circuits(tmp_path: Path):
     fake_result = type(
         "Stub",
         (),
-        {"aborted": True, "abort_reason": "no disk", "warnings": ()},
+        {"aborted": True, "abort_reason": "no disk", "warnings": (), "exit_code": lambda self: 2},
     )()
     with patch.object(
         orchestrator.preflight_phase,
@@ -122,12 +122,16 @@ def test_explorer_smoke_uses_package_submissions_dir(tmp_path: Path):
         log_path=tmp_path / "cell.log",
         result_path=tmp_path / "result.json",
     )
-    execute_outcome = type("ExecuteOutcome", (), {"results": (cell,), "aborted": False, "abort_reason": None})()
+    execute_outcome = type(
+        "ExecuteOutcome",
+        (),
+        {"results": (cell,), "aborted": False, "abort_reason": None, "exit_code": lambda self: 0},
+    )()
     captured: dict[str, Path] = {}
 
     def fake_package(config, *, result_paths, submissions_dir):
         captured["package_dir"] = submissions_dir
-        return type("PackageResult", (), {"exit_code": lambda self: 0})()
+        return type("PackageResult", (), {"aborted": False, "abort_reason": None, "exit_code": lambda self: 0})()
 
     def fake_explorer_smoke(**kwargs):
         captured["bundles_dir"] = kwargs["bundles_dir"]
@@ -157,11 +161,22 @@ def test_orchestrator_uses_output_root_for_preflight_execute_and_cleanup(tmp_pat
             "output": {"benchmark_runs_dir_template": str(root)},
         }
     )
-    fake_preflight = type("Preflight", (), {"aborted": False, "abort_reason": None, "warnings": ()})()
+    fake_preflight = type(
+        "Preflight",
+        (),
+        {"aborted": False, "abort_reason": None, "warnings": (), "exit_code": lambda self: 0},
+    )()
     fake_execute = type(
         "ExecuteOutcome",
         (),
-        {"results": (), "pruned": (), "skipped_unreachable": (), "aborted": False, "abort_reason": None},
+        {
+            "results": (),
+            "pruned": (),
+            "skipped_unreachable": (),
+            "aborted": False,
+            "abort_reason": None,
+            "exit_code": lambda self: 0,
+        },
     )()
     captured: dict[str, Path | str] = {}
 
@@ -219,6 +234,7 @@ def test_orchestrator_cells_jsonl_marks_timed_out_cells(tmp_path: Path):
             "skipped_unreachable": (),
             "aborted": False,
             "abort_reason": None,
+            "exit_code": lambda self: 1,
         },
     )()
 
@@ -271,6 +287,7 @@ def test_orchestrator_writes_compatibility_pruned_jsonl_and_report_count(tmp_pat
             "compatibility_pruned": (pruned,),
             "aborted": False,
             "abort_reason": None,
+            "exit_code": lambda self: 0,
         },
     )()
 
@@ -309,7 +326,13 @@ def test_resume_manifest_written_on_disk_floor_abort(tmp_path: Path):
     fake_preflight = type(
         "Preflight",
         (),
-        {"aborted": False, "abort_reason": None, "warnings": (), "disk_budget_summary": None},
+        {
+            "aborted": False,
+            "abort_reason": None,
+            "warnings": (),
+            "disk_budget_summary": None,
+            "exit_code": lambda self: 0,
+        },
     )()
 
     with (
@@ -350,7 +373,13 @@ def test_resume_manifest_written_on_execute_free_space_abort(tmp_path: Path):
     fake_preflight = type(
         "Preflight",
         (),
-        {"aborted": False, "abort_reason": None, "warnings": (), "disk_budget_summary": None},
+        {
+            "aborted": False,
+            "abort_reason": None,
+            "warnings": (),
+            "disk_budget_summary": None,
+            "exit_code": lambda self: 0,
+        },
     )()
     fake_execute = type(
         "ExecuteOutcome",

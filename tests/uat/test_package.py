@@ -41,13 +41,15 @@ def test_package_local_stage_invokes_output_mode(tmp_path: Path):
 
 def test_package_cloud_uploaded_requires_service(tmp_path: Path):
     cfg = validate_config({"name": "x", "package": {"submit_terminal_state": "cloud-uploaded"}})
-    with pytest.raises(package.PackagePhaseError, match="package.service"):
-        package.run_package(
-            cfg,
-            result_paths=[tmp_path / "r.json"],
-            submissions_dir=tmp_path / "subs",
-            runner=_fake_runner_factory([]),
-        )
+    result = package.run_package(
+        cfg,
+        result_paths=[tmp_path / "r.json"],
+        submissions_dir=tmp_path / "subs",
+        runner=_fake_runner_factory([]),
+    )
+    assert result.aborted is True
+    assert result.exit_code() == 2
+    assert "package.service" in (result.abort_reason or "")
 
 
 def test_package_cloud_uploaded_invokes_service(tmp_path: Path):
@@ -74,24 +76,28 @@ def test_package_cloud_uploaded_invokes_service(tmp_path: Path):
 
 def test_package_missing_terminal_state_raises(tmp_path: Path):
     cfg = validate_config({"name": "x"})
-    with pytest.raises(package.PackagePhaseError, match="submit_terminal_state"):
-        package.run_package(
-            cfg,
-            result_paths=[],
-            submissions_dir=tmp_path,
-            runner=_fake_runner_factory([]),
-        )
+    result = package.run_package(
+        cfg,
+        result_paths=[],
+        submissions_dir=tmp_path,
+        runner=_fake_runner_factory([]),
+    )
+    assert result.aborted is True
+    assert result.exit_code() == 2
+    assert "submit_terminal_state" in (result.abort_reason or "")
 
 
 def test_package_invalid_terminal_state_raises(tmp_path: Path):
     cfg = validate_config({"name": "x", "package": {"submit_terminal_state": "merged-mainline"}})
-    with pytest.raises(package.PackagePhaseError, match="not in"):
-        package.run_package(
-            cfg,
-            result_paths=[],
-            submissions_dir=tmp_path,
-            runner=_fake_runner_factory([]),
-        )
+    result = package.run_package(
+        cfg,
+        result_paths=[],
+        submissions_dir=tmp_path,
+        runner=_fake_runner_factory([]),
+    )
+    assert result.aborted is True
+    assert result.exit_code() == 2
+    assert "not in" in (result.abort_reason or "")
 
 
 def test_package_counts_failures(tmp_path: Path):

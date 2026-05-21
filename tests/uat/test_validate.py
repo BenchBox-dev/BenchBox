@@ -67,6 +67,18 @@ def test_has_rollup_script_in_repo():
     assert validate.has_rollup_script() is True
 
 
+def test_run_validate_missing_rollup_script_returns_aborted_result(tmp_path: Path):
+    out = validate.run_validate(
+        tmp_path / "results",
+        output_tsv=tmp_path / "rollup.tsv",
+        rollup_script=tmp_path / "missing.py",
+    )
+
+    assert out.aborted is True
+    assert out.exit_code() == 2
+    assert "validator rollup helper not found" in (out.abort_reason or "")
+
+
 def test_run_validate_surfaces_nonzero_subprocess_via_exit_code(tmp_path: Path):
     """Validator non-zero exit must NOT raise when a TSV is still produced."""
     tsv = tmp_path / "rollup.tsv"
@@ -147,8 +159,8 @@ def test_parse_validator_status_by_path_handles_missing_columns(tmp_path: Path):
     assert validate.parse_validator_status_by_path(tsv) == {}
 
 
-def test_run_validate_raises_when_subprocess_fails_and_no_tsv(tmp_path: Path):
-    """No TSV → ValidatePhaseError, never CalledProcessError."""
+def test_run_validate_aborts_when_subprocess_fails_and_no_tsv(tmp_path: Path):
+    """No TSV returns an aborted phase result, never CalledProcessError."""
     missing_tsv = tmp_path / "rollup.tsv"
 
     def fake_runner(argv, check):
@@ -157,12 +169,15 @@ def test_run_validate_raises_when_subprocess_fails_and_no_tsv(tmp_path: Path):
 
         return Completed()
 
-    with pytest.raises(validate.ValidatePhaseError, match="exited 5"):
-        validate.run_validate(
-            tmp_path / "results",
-            output_tsv=missing_tsv,
-            runner=fake_runner,
-        )
+    result = validate.run_validate(
+        tmp_path / "results",
+        output_tsv=missing_tsv,
+        runner=fake_runner,
+    )
+
+    assert result.aborted is True
+    assert result.exit_code() == 2
+    assert "exited 5" in (result.abort_reason or "")
 
 
 def test_run_validate_ignores_stale_tsv_when_subprocess_fails(tmp_path: Path):
@@ -176,10 +191,13 @@ def test_run_validate_ignores_stale_tsv_when_subprocess_fails(tmp_path: Path):
 
         return Completed()
 
-    with pytest.raises(validate.ValidatePhaseError, match="exited 5"):
-        validate.run_validate(
-            tmp_path / "results",
-            output_tsv=stale_tsv,
-            runner=fake_runner,
-        )
+    result = validate.run_validate(
+        tmp_path / "results",
+        output_tsv=stale_tsv,
+        runner=fake_runner,
+    )
+
+    assert result.aborted is True
+    assert result.exit_code() == 2
+    assert "exited 5" in (result.abort_reason or "")
     assert not stale_tsv.exists()

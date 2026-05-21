@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
+from tests.uat.phases import PhaseResult
 from tests.uat.runner import CellResult
 
 REPORT_HEADER = (
@@ -22,7 +23,7 @@ REPORT_HEADER = (
 
 
 @dataclass(frozen=True)
-class ReportSummary:
+class ReportSummary(PhaseResult):
     tsv_path: Path
     rows: int
     pass_count: int
@@ -37,6 +38,8 @@ class ReportSummary:
     cross_scale_floor_breached: bool
 
     def exit_code(self) -> int:
+        if self.aborted:
+            return 2
         return 1 if self.cross_scale_floor_breached else 0
 
 
@@ -141,6 +144,7 @@ def write_report(
     floor_breached = cross_scale_floor is not None and clean_pairs < cross_scale_floor
 
     return ReportSummary(
+        phase="report",
         tsv_path=output_path,
         rows=len(rows),
         pass_count=pass_count,

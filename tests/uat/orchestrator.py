@@ -203,7 +203,7 @@ def run_sweep(  # noqa: C901
             disk_budget_summary = getattr(result, "disk_budget_summary", None)
             if disk_budget_summary:
                 print(disk_budget_summary, file=sys.stderr)
-            phase_exit_codes[phase] = 2 if result.aborted else 0
+            phase_exit_codes[phase] = result.exit_code()
             if result.aborted:
                 aborted_phase = phase
                 abort_reason = result.abort_reason
@@ -300,9 +300,9 @@ def run_sweep(  # noqa: C901
                         attempted=execute_outcome.results,
                     )
                 break
-            phase_exit_codes[phase] = 0 if all(r.status == "passed" for r in execute_outcome.results) else 1
+            phase_exit_codes[phase] = execute_outcome.exit_code()
         elif phase == "validate":
-            from tests.uat.phases.validate import ValidatePhaseError, run_validate
+            from tests.uat.phases.validate import run_validate
 
             if execute_outcome is None:
                 phase_exit_codes[phase] = 2
@@ -311,18 +311,16 @@ def run_sweep(  # noqa: C901
                 break
             result_paths = [r.result_path for r in execute_outcome.results if r.result_path]
             output_tsv = log_dir / "validator_rollup.tsv"
-            try:
-                vr = run_validate(
-                    result_paths,
-                    output_tsv=output_tsv,
-                    floor=config.validate.validator_clean_rate_floor,
-                )
-                phase_exit_codes[phase] = vr.exit_code()
-                validator_rollup_tsv = vr.rollup_tsv_path
-            except (FileNotFoundError, ValidatePhaseError) as exc:
-                phase_exit_codes[phase] = 2
+            vr = run_validate(
+                result_paths,
+                output_tsv=output_tsv,
+                floor=config.validate.validator_clean_rate_floor,
+            )
+            phase_exit_codes[phase] = vr.exit_code()
+            validator_rollup_tsv = vr.rollup_tsv_path
+            if vr.aborted:
                 aborted_phase = phase
-                abort_reason = str(exc)
+                abort_reason = vr.abort_reason
                 break
         elif phase == "package":
             from tests.uat.phases.package import run_package
@@ -344,6 +342,10 @@ def run_sweep(  # noqa: C901
                 submissions_dir=submissions_dir,
             )
             phase_exit_codes[phase] = pr.exit_code()
+            if pr.aborted:
+                aborted_phase = phase
+                abort_reason = pr.abort_reason
+                break
         elif phase == "explorer_smoke":
             from tests.uat.phases.explorer_smoke import run_explorer_smoke
 

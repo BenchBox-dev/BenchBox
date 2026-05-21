@@ -16,13 +16,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
+from tests.uat.phases import PhaseResult
+
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 ROLLUP_SCRIPT = REPO_ROOT / "scripts" / "uat_validator_rollup.py"
 TSV_HEADER = "platform\tbenchmark\tscale\tresult_path\tvalidator_status\terror_count\twarning_count\tfirst_error"
 
 
 @dataclass(frozen=True)
-class ValidateResult:
+class ValidateResult(PhaseResult):
     rollup_tsv_path: Path
     clean_count: int
     warning_count: int
@@ -35,15 +37,13 @@ class ValidateResult:
     script_returncode: int = 0
 
     def exit_code(self) -> int:
+        if self.aborted:
+            return 2
         if self.script_returncode != 0:
             return self.script_returncode
         if self.floor_breached:
             return 1
         return 0
-
-
-class ValidatePhaseError(RuntimeError):
-    """Raised when the validator subprocess fails before producing a TSV."""
 
 
 def run_validate(
@@ -60,15 +60,16 @@ def run_validate(
     Does NOT raise on non-zero validator exit. The returncode is surfaced
     through `ValidateResult.script_returncode` and folded into
     `exit_code()` so the orchestrator can keep the phase contract uniform
-    (set phase_exit_codes, never propagate CalledProcessError).
-    Raises `ValidatePhaseError` only when the subprocess fails AND no TSV
-    was produced — in that case there is nothing to parse.
+    (set phase_exit_codes, never propagate CalledProcessError). Failures
+    that leave no TSV return an aborted `ValidateResult`.
     """
     if runner is None:
         runner = subprocess.run
     script = rollup_script or ROLLUP_SCRIPT
     if not script.exists():
-        raise FileNotFoundError(f"validator rollup helper not found at {script}")
+        return _aborted_validate_result(
+            output_tsv, floor=floor, reason=f"validator rollup helper not found at {script}"
+        )
     output_tsv.parent.mkdir(parents=True, exist_ok=True)
     if output_tsv.exists():
         output_tsv.unlink()
@@ -92,11 +93,17 @@ def run_validate(
     completed = runner(argv, check=False)
     rc = getattr(completed, "returncode", 0)
     if rc != 0 and not output_tsv.exists():
-        raise ValidatePhaseError(f"validator subprocess exited {rc} without producing {output_tsv}")
+        return _aborted_validate_result(
+            output_tsv,
+            floor=floor,
+            reason=f"validator subprocess exited {rc} without producing {output_tsv}",
+            script_returncode=rc,
+        )
     parsed = parse_rollup(output_tsv, floor=floor)
     if rc == 0:
         return parsed
     return ValidateResult(
+        phase="validate",
         rollup_tsv_path=parsed.rollup_tsv_path,
         clean_count=parsed.clean_count,
         warning_count=parsed.warning_count,
@@ -139,7 +146,12 @@ def _run_validate_paths(
         if script_returncode == 0 and rc != 0:
             script_returncode = rc
         if rc != 0 and not tmp_tsv.exists():
-            raise ValidatePhaseError(f"validator subprocess exited {rc} without producing {tmp_tsv}")
+            return _aborted_validate_result(
+                output_tsv,
+                floor=floor,
+                reason=f"validator subprocess exited {rc} without producing {tmp_tsv}",
+                script_returncode=rc,
+            )
         rows.extend(_rollup_body_rows(tmp_tsv))
         tmp_tsv.unlink(missing_ok=True)
 
@@ -148,6 +160,7 @@ def _run_validate_paths(
     if script_returncode == 0:
         return parsed
     return ValidateResult(
+        phase="validate",
         rollup_tsv_path=parsed.rollup_tsv_path,
         clean_count=parsed.clean_count,
         warning_count=parsed.warning_count,
@@ -202,6 +215,7 @@ def parse_rollup(rollup_tsv: Path, *, floor: float = 0.80) -> ValidateResult:
         clean_rate = clean / denom if denom > 0 else 0.0
     floor_breached = clean_rate < floor
     return ValidateResult(
+        phase="validate",
         rollup_tsv_path=rollup_tsv,
         clean_count=clean,
         warning_count=warning,
@@ -211,6 +225,30 @@ def parse_rollup(rollup_tsv: Path, *, floor: float = 0.80) -> ValidateResult:
         clean_rate=clean_rate,
         floor=floor,
         floor_breached=floor_breached,
+    )
+
+
+def _aborted_validate_result(
+    rollup_tsv: Path,
+    *,
+    floor: float,
+    reason: str,
+    script_returncode: int = 2,
+) -> ValidateResult:
+    return ValidateResult(
+        phase="validate",
+        aborted=True,
+        abort_reason=reason,
+        rollup_tsv_path=rollup_tsv,
+        clean_count=0,
+        warning_count=0,
+        error_count=0,
+        refused_count=0,
+        total=0,
+        clean_rate=0.0,
+        floor=floor,
+        floor_breached=False,
+        script_returncode=script_returncode,
     )
 
 

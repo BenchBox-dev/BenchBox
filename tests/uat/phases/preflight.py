@@ -24,6 +24,7 @@ from tests.uat.matrix import (
     platform_is_reachable,
     resolve_platforms,
 )
+from tests.uat.phases import PhaseResult
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -52,12 +53,10 @@ ReachabilityChecker = Callable[[str], bool]
 
 
 @dataclass(frozen=True)
-class PreflightResult:
+class PreflightResult(PhaseResult):
     free_space_gib: float
     docker_reachable: bool
     host_load_1m: float | None
-    aborted: bool
-    abort_reason: str | None
     warnings: tuple[str, ...]
     local_platforms_checked: tuple[str, ...] = ()
     local_platforms_attempted: tuple[str, ...] = ()
@@ -193,6 +192,7 @@ def run_preflight(
             abort_reason = local_abort
 
     return PreflightResult(
+        phase="preflight",
         free_space_gib=free_gib,
         docker_reachable=docker_ok,
         host_load_1m=load_1m,
