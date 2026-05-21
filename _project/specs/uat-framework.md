@@ -410,9 +410,12 @@ uat-sweep`, etc.) do not honour these env vars; they read the
 YAML config verbatim. The override mechanism is specific to the
 canned stress preset.
 
-**No `benchbox` CLI surface change.** `git diff origin/develop --
-benchbox/cli/` must produce no diff over the lifetime of this TODO.
-This is enforced by the verification block in the parent TODO.
+**No `benchbox` CLI surface change.** UAT follow-up work must not change
+user-visible `benchbox` commands, options, or the `benchbox submit`
+command signature. This is enforced by
+`tests/uat/test_no_cli_surface_drift.py`, which permits only the
+internal `benchbox/cli/commands/submit.py` validator refactor and fails
+on click command/option or submit signature drift.
 
 ## 5. Migration plan for `scripts/local_stress_test.sh`
 
@@ -779,7 +782,7 @@ make uat-stress PLATFORM=duckdb BENCHMARK=tpch
 make uat-sweep CONFIG=tests/uat/configs/uat-2026-05-02.yaml DRY_RUN=1
 uv run -- python -m pytest -m fast -q
 git diff origin/develop -- scripts/local_stress_test.sh   # empty unless W11 delegates
-git diff origin/develop -- benchbox/cli/                  # empty
+uv run -- python -m pytest tests/uat/test_no_cli_surface_drift.py -q
 ```
 
 ## 12. Open risks, watched but not blocking

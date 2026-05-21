@@ -705,7 +705,7 @@ work:
 - id: w17
   summary: "Add fast-marked CLI surface guard with a submit-validator internal exception"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     F14 + blind-spot
     `2026-05-05-154308-uat-cli-surface-constraint-no-enforcement.md`.
