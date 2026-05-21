@@ -40,6 +40,14 @@ class TestDetectSchemaVersion:
         data = {"version": "1.0"}
         assert detect_schema_version(data) == "1.x"
 
+    def test_returns_1x_for_unknown_v2_version(self):
+        data = {"version": "2.99"}
+        assert detect_schema_version(data) == "1.x"
+
+    def test_returns_1x_for_malformed_version(self):
+        data = {"version": "2.x"}
+        assert detect_schema_version(data) == "1.x"
+
 
 class TestNormalizeResultDictV2:
     """Tests for normalize_result_dict with v2.x schema."""

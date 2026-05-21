@@ -183,6 +183,45 @@ class TestMalformedJson:
             transformer.to_manifest_entry(bad_file)
 
 
+class TestSchemaGate:
+    @pytest.mark.parametrize("version", ["2.99", "1.0", "2.x"])
+    def test_unsupported_schema_rejected_before_manifest_projection(self, tmp_path: Path, version: str) -> None:
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["version"] = version
+        bundle = tmp_path / "unsupported_schema.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        with pytest.raises(ValueError) as exc_info:
+            transformer.to_manifest_entry(bundle)
+
+        message = str(exc_info.value)
+        assert "explorer input schema policy" in message
+        assert "schema versions 2.0 and 2.1" in message
+        assert "Re-export or normalize" in message
+
+    def test_missing_schema_rejected_before_detail_projection(self, tmp_path: Path) -> None:
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        del data["version"]
+        bundle = tmp_path / "missing_schema.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        with pytest.raises(ValueError) as exc_info:
+            transformer.to_detail_result(bundle, "missing-schema")
+
+        assert "<missing>" in str(exc_info.value)
+        assert "explorer input schema policy" in str(exc_info.value)
+
+    def test_preloaded_data_uses_same_schema_gate(self, bundle_file: Path) -> None:
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["version"] = "2.99"
+
+        transformer = BundleTransformer()
+        with pytest.raises(ValueError, match="explorer input schema policy"):
+            transformer.result_id_from_bundle(bundle_file, data=data, raw=b"{}")
+
+
 class TestZeroDurationQuery:
     def test_zero_ms_preserved(self, tmp_path: Path) -> None:
         """A query with ms=0.0 must not be silently skipped or replaced."""

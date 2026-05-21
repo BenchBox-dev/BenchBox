@@ -46,6 +46,7 @@ from benchbox.core.results.schema import (
     build_result_payload,
     build_tuning_payload,
 )
+from benchbox.core.results.schema_policy import is_loader_supported_result_schema
 from benchbox.core.runtime_paths import resolve_results_dir
 from benchbox.utils.cloud_storage import create_path_handler, is_cloud_path
 
@@ -541,7 +542,7 @@ class ResultExporter:
                     data = json.load(handle)
 
                 version = data.get("version")
-                if version not in ("2.0", "2.1"):
+                if not is_loader_supported_result_schema(data):
                     continue
 
                 # Schema v2.x format

@@ -405,6 +405,26 @@ The CLI packages a **submission bundle** consisting of:
 | Companion files | Any files referenced in the bundle (query plans, etc.), if present |
 | Submission manifest | A `submission.json` sidecar with contributor metadata |
 
+#### Result bundle schema policy
+
+The canonical bundle is schema-v2 JSON. The current BenchBox producer writes
+top-level `"version": "2.1"`. Public PR submission validation accepts numeric
+schema version family `2.x` so a future producer minor can be submitted before
+the hosted contract document is updated, but it rejects missing or malformed
+versions.
+
+Downstream consumers are stricter than public ingest:
+
+| Consumer | Accepted versions | Failure behavior |
+|---|---|---|
+| Runtime loader | `"2.0"`, `"2.1"` | Rejects with the runtime loader schema policy and asks for re-export. |
+| Explorer static pipeline | `"2.0"`, `"2.1"` | Rejects before manifest/detail projection to avoid silent field drops. |
+| Normalizer | `"2.0"`, `"2.1"` as v2; other shapes as legacy | Uses best-effort legacy extraction for v1.x and unknown shapes. |
+
+Any change to accepted versions or field semantics must update
+`benchbox.core.results.schema_policy`, this contract, and the public contract
+map in the same PR.
+
 The submission manifest schema:
 
 ```json

@@ -155,3 +155,34 @@ def test_round_trip_rejects_tampered_bundle(tmp_path: Path, populated_corpus: Pa
     # The error must name the offending file and indicate a hash mismatch.
     assert "hash mismatch" in proc.stdout.lower(), proc.stdout
     assert bundle.name in proc.stdout, proc.stdout
+
+
+def test_validator_accepts_forward_numeric_schema_v2_family(tmp_path: Path) -> None:
+    """Public submissions accept future numeric 2.x versions by policy."""
+    source_dir = tmp_path / "fresh"
+    source_dir.mkdir()
+    bundle = _write_bundle(source_dir, "tpch_sf001_duckdb_future_v2", "future-v2")
+    payload = json.loads(bundle.read_text(encoding="utf-8"))
+    payload["version"] = "2.99"
+    bundle.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+    proc = _run_validator([bundle])
+
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "FAIL" not in proc.stdout, proc.stdout
+
+
+def test_validator_rejects_malformed_schema_v2_family(tmp_path: Path) -> None:
+    """Malformed versions should not pass just because they start with ``2.``."""
+    source_dir = tmp_path / "fresh"
+    source_dir.mkdir()
+    bundle = _write_bundle(source_dir, "tpch_sf001_duckdb_malformed_v2", "malformed-v2")
+    payload = json.loads(bundle.read_text(encoding="utf-8"))
+    payload["version"] = "2.x"
+    bundle.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+    proc = _run_validator([bundle])
+
+    assert proc.returncode != 0, proc.stdout + proc.stderr
+    assert "public submission schema policy" in proc.stdout
+    assert "numeric schema version family 2.x" in proc.stdout

@@ -240,6 +240,38 @@ class TestLoadResultFile:
         with pytest.raises(UnsupportedSchemaError, match="Unsupported schema version"):
             load_result_file(result_file)
 
+    @pytest.mark.parametrize(
+        ("version", "message"),
+        [
+            ("2.99", "runtime loader schema policy"),
+            ("2.x", "runtime loader schema policy"),
+            (None, "<missing>"),
+        ],
+    )
+    def test_load_result_file_reports_loader_policy_for_unsupported_versions(
+        self,
+        tmp_path,
+        version,
+        message,
+    ):
+        """Unsupported versions should name the strict runtime loader policy."""
+        result_file = tmp_path / "unsupported_schema.json"
+        data = {
+            "benchmark": {"id": "tpch", "name": "TPC-H"},
+            "run": {"id": "test", "timestamp": "2026-05-21T00:00:00", "total_duration_ms": 1},
+        }
+        if version is not None:
+            data["version"] = version
+
+        with open(result_file, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+
+        with pytest.raises(UnsupportedSchemaError) as exc_info:
+            load_result_file(result_file)
+
+        assert message in str(exc_info.value)
+        assert "schema versions 2.0 and 2.1" in str(exc_info.value)
+
 
 class TestReconstructBenchmarkResults:
     """Tests for reconstruct_benchmark_results() function."""
