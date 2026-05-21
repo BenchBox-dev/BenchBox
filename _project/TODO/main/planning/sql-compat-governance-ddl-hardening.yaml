@@ -1,0 +1,205 @@
+id: sql-compat-governance-ddl-hardening
+title: "Architecture hardening: make SQL compatibility governance match actual DDL behavior"
+worktree: main
+priority: High
+status: "Not Started"
+category: SQL Compatibility
+
+deps:
+  needs:
+    - architecture-contract-map-and-support-taxonomy
+
+description: |
+  The SQL compatibility architecture is a strong investment, but the DDL
+  governance claim is currently stronger than enforcement. Some adapters
+  perform local CREATE TABLE rewrites outside registered ddl_optimize rules,
+  while the drift detector is based on method/function-name patterns and can
+  report clean despite known behavior.
+
+  This item decides whether sql_compat is authoritative execution machinery or
+  an audit catalogue, then makes DDL drift detection and docs match that
+  decision.
+
+work:
+  - id: w0
+    summary: "Revalidate DDL rewrite behavior, detector patterns, and CI coverage"
+    status: pending
+    notes: |
+      Commit a compact summary of checked SHA, adapters inspected, current
+      compat_lint output, and whether CI runs the relevant checks.
+
+      Minimum evidence to re-check:
+        - benchbox/platforms/base/ddl_optimizer.py.
+        - benchbox/platforms/bigquery.py CREATE TABLE rewrite behavior.
+        - benchbox/platforms/athena.py CREATE TABLE rewrite behavior.
+        - benchbox/sql_compat/inventory.py drift detector patterns.
+        - benchbox/sql_compat/rules/ddl_optimize/.
+        - .github/workflows/pr.yml and Makefile compat targets.
+
+  - id: w1
+    summary: "Decision gate: classify sql_compat as authoritative execution, audit catalogue, or hybrid"
+    needs: [w0]
+    status: pending
+    notes: |
+      Record the decision in docs/reference/public-contracts.md and the
+      sql_compat README. The decision must answer:
+        - Must every adapter DDL rewrite be registered?
+        - Are governance_only rules allowed to represent runtime behavior?
+        - When may an adapter perform local rewrites outside BaseDdlOptimizer?
+        - What does compat_lint CLEAN actually guarantee?
+
+      Do not implement detector changes until this decision is explicit.
+
+  - id: w2
+    summary: "Register or explicitly exempt BigQuery and Athena CREATE TABLE behavior"
+    needs: [w1]
+    status: pending
+    notes: |
+      If sql_compat is authoritative or hybrid, add/adjust ddl_optimize rule
+      entries and adapter wiring so BigQuery/Athena CREATE TABLE behavior is
+      represented. If local rewrites are intentionally exempt, add explicit
+      exemption metadata with rationale and tests so drift checks do not imply
+      false coverage.
+
+  - id: w3
+    summary: "Replace name-based DDL drift detection with behavior or signature detection"
+    needs: [w1]
+    status: pending
+    notes: |
+      Detect CREATE TABLE rewrite behavior regardless of method name. The
+      detector should catch inline .replace(), regex substitutions, helper
+      functions, and BaseDdlOptimizer dispatch where practical.
+
+      The output must distinguish:
+        - registered runtime behavior,
+        - registered governance-only intent,
+        - explicit exemptions,
+        - unregistered detected behavior,
+        - unknown/uninspectable behavior.
+
+  - id: w4
+    summary: "Repair the benchmark-gate detector false alarm"
+    needs: [w1]
+    status: pending
+    notes: |
+      The mandatory-site detector must accept the current supported benchmark
+      gate shape or the runtime code must move to the detector's required
+      shape. Do not leave compat_lint reporting a detector validation failure
+      while DDL drift says clean.
+
+  - id: w5
+    summary: "Add representative DDL behavior tests per affected platform"
+    needs: [w2, w3]
+    status: pending
+    notes: |
+      Add tests with representative CREATE TABLE input for BigQuery, Athena,
+      SingleStore/BaseDdlOptimizer, and one platform with no DDL rewrite. Tests
+      should assert both runtime output and governance inventory status.
+
+  - id: w6
+    summary: "Wire the corrected governance checks into CI or downgrade docs claims"
+    needs: [w3, w4, w5]
+    status: pending
+    notes: |
+      If the check is reliable, make it part of the PR gate. If the project
+      intentionally keeps it advisory, update AGENTS.md and sql_compat docs so
+      they no longer claim enforcement.
+
+deferred:
+  - summary: "Route every SQL transform through sql_compat resolver.build_plan"
+    reason: "The runtime resolver may be future infrastructure, but forcing it into production is larger than closing the DDL governance gap."
+
+metadata:
+  tags:
+    - sql-compat
+    - ddl
+    - governance
+    - ci
+  estimated_effort: "4-7 days"
+  created_date: "2026-05-21"
+  last_updated: "2026-05-21T00:00:00Z"
+
+impact:
+  business_value: |
+    Prevents false confidence in cross-platform SQL behavior, which is central
+    to BenchBox credibility.
+  user_impact: |
+    Users and contributors get reliable guidance about whether platform SQL
+    quirks are intentionally handled or accidental.
+  technical_debt: |
+    Converts fragile inventory greps into behavior-aware governance.
+
+files_affected:
+  modified:
+    - "benchbox/sql_compat/"
+    - "benchbox/platforms/bigquery.py"
+    - "benchbox/platforms/athena.py"
+    - "benchbox/platforms/base/ddl_optimizer.py"
+    - "tests/unit/sql_compat/"
+    - "tests/unit/core/sql_compat/"
+    - "tests/integration/test_compat_lint_clean.py"
+    - "Makefile"
+    - ".github/workflows/pr.yml"
+    - "AGENTS.md"
+    - "docs/reference/public-contracts.md"
+
+must_preserve:
+  - "Do not make optional platform imports eager while scanning for DDL behavior."
+  - "Do not break currently passing adapter DDL generation for BigQuery, Athena, or SingleStore."
+  - "Do not claim compat_lint enforcement in docs unless the corrected check is actually run by CI."
+
+approach: |
+  Start with policy, then align code. If the project wants sql_compat as an
+  audit catalogue, make docs and check output say that. If it wants
+  authoritative governance, register or exempt the real DDL behavior and make
+  drift detection behavior-aware enough to earn CI status.
+
+anti_patterns:
+  - "DO NOT add BigQuery/Athena rule files without proving the adapter uses or is covered by them -- that preserves the false-clean failure mode -- test runtime output and inventory together."
+  - "DO NOT turn optional adapter import failures into hard import errors -- sql_compat scanning must respect lazy optional dependencies -- inspect source/signatures where possible."
+  - "DO NOT silence the benchmark-gate detector error without a regression test -- false alarms are part of the governance trust problem."
+
+verification:
+  - description: "Run compat lint with DDL drift enabled."
+    command: "uv run -- python -m benchbox.sql_compat.inventory --check-ddl-drift"
+    expected_output: "DDL drift status reflects registered, exempt, or detected behavior without false-clean output."
+  - description: "Run focused SQL compatibility governance tests."
+    command: "uv run -- python -m pytest tests -k 'sql_compat or ddl_drift or ddl_optimize' --tb=short"
+    expected_output: "Focused SQL compatibility tests pass."
+  - description: "Run CI-equivalent docs/check target if added."
+    command: "make compat-docs-check"
+    expected_output: "Generated SQL compatibility docs are clean."
+
+scope_limit:
+  only_modify:
+    - "benchbox/sql_compat/"
+    - "benchbox/platforms/bigquery.py"
+    - "benchbox/platforms/athena.py"
+    - "benchbox/platforms/base/"
+    - "tests/unit/sql_compat/"
+    - "tests/unit/core/sql_compat/"
+    - "tests/integration/test_compat_lint_clean.py"
+    - "Makefile"
+    - ".github/workflows/"
+    - "AGENTS.md"
+    - "docs/"
+    - "_project/TODO/"
+    - "_project/DONE/"
+  do_not_modify:
+    - "benchbox/core/results/"
+    - "benchbox/mcp/"
+    - "_project/scripts/explorer_pipeline/"
+
+prior_art:
+  - "benchbox/platforms/base/ddl_optimizer.py: existing DDL optimizer protocol -- extend or document its limits."
+  - "benchbox/sql_compat/rules/ddl_optimize/: existing registered intent catalogue -- reuse for platform behavior."
+  - "Makefile: compat-docs-check target -- reuse as the CI/doc drift gate where feasible."
+
+success_metrics:
+  - "compat_lint CLEAN means the documented guarantee and the implemented detector agree."
+  - "BigQuery and Athena DDL rewrites are registered, explicitly exempt, or removed."
+  - "A known benchmark-gate pattern no longer triggers a detector false alarm."
+
+open_questions:
+  - "Should governance_only rules be allowed to describe behavior that is not dispatched at runtime?"
+  - "Should adapters be allowed to keep local DDL rewrites for performance or SDK-specific reasons if they declare exemptions?"
