@@ -93,508 +93,196 @@ BENCHBOX_RESULTS_DIR=/tmp/results BENCHBOX_LOG_LEVEL=DEBUG benchbox-mcp
 
 ## Tools
 
-Tools are executable actions that can be invoked by AI assistants.
+Tools are executable actions that can be invoked by AI assistants. BenchBox MCP
+is a **beta-public smoke/control-plane surface**, not a CLI-equivalent
+execution surface. It exposes a documented subset of benchmark execution,
+validation, dry-run preview, result reads, analytics, and chart generation
+through public BenchBox APIs. MCP must not import `benchbox.cli` command
+internals.
+
+MCP run results are exported through `ResultExporter` as normal result JSON
+bundles and include `execution_context.entry_point = "mcp"` when the result
+object supports execution context metadata. They are schema-level comparable to
+CLI result bundles, but MCP does not claim option parity with `benchbox run`.
+
+### Actual Tool Inventory
+
+| Tool | Category | Writes | Purpose |
+|---|---|---:|---|
+| `list_available` | discovery | No | List platforms, benchmarks, chart templates, or all discovery data. |
+| `get_benchmark_info` | discovery | No | Return benchmark metadata, queries, schema, and scale-factor information. |
+| `system_profile` | discovery | No | Return CPU, memory, disk, Python, package, and BenchBox environment facts. |
+| `check_dependencies` | discovery | No | Report platform dependency availability and install guidance. |
+| `run_benchmark` | execution | Yes | Run, dry-run, or validate a benchmark through the MCP control-plane subset. |
+| `get_query_details` | execution aid | No | Return SQL or DataFrame query details for a benchmark/query/platform. |
+| `get_results` | results | Optional | List result files, read one result, or export a result in another format. |
+| `analyze_results` | analytics | No | Compare result files, detect regressions, calculate trends, or aggregate runs. |
+| `get_query_plan` | analytics | No | Read captured query plans from a result bundle. |
+| `validate_results` | analytics | No | Validate result JSON integrity, completeness, and believability. |
+| `suggest_charts` | visualization | No | Suggest useful chart types for one or more result files. |
+| `generate_chart` | visualization | Yes | Generate ASCII chart output from result files. |
+
+### Run Surface Contract
+
+`run_benchmark` is the only benchmark execution tool. Dry-run preview and
+configuration validation are modes on this tool (`dry_run=true` and
+`validate_only=true`), not separate MCP tools.
+
+**MCP run parameter schema**
+
+| Name | Type | Required | Default | Description |
+|---|---|---:|---|---|
+| `platform` | string | Yes | - | Target platform, for example `duckdb`, `snowflake`, or `polars-df`. |
+| `benchmark` | string | Yes | - | Benchmark identifier, for example `tpch`, `tpcds`, or `joinorder`. |
+| `scale_factor` | number | No | `0.01` | Data scale factor; benchmark-specific defaults and constraints may still apply. |
+| `queries` | string or null | No | `null` | Comma-separated query IDs, for example `1,3,6`. |
+| `phases` | string or null | No | `null` | Comma-separated phases; execution defaults to `load,power` when omitted. |
+| `mode` | string or null | No | `null` | Execution mode: `sql`, `dataframe`, or `data_only`. |
+| `capture_plans` | boolean | No | `false` | Capture query plans where the selected platform supports them. |
+| `dry_run` | boolean | No | `false` | Preview the run plan without executing queries. |
+| `validate_only` | boolean | No | `false` | Validate platform, benchmark, scale, and mode without executing. |
+
+**Behavior**
+
+- `validate_only=true` returns configuration validity, resolved execution mode,
+  errors, and warnings.
+- `dry_run=true` uses the core dry-run executor and returns the plan/resources
+  preview the MCP subset can model; it currently reports the default
+  load/power plan rather than applying the `phases` parameter.
+- `mode=data_only` generates benchmark data without running queries.
+- `phases` applies to normal execution and maps to the benchmark execution type
+  used by `BaseBenchmark.run_with_platform()`.
+- Normal execution uses `BaseBenchmark.run_with_platform()` through public
+  benchmark and adapter APIs.
+- MCP execution intentionally suppresses console output and returns structured
+  JSON for agent clients.
+
+**Intentionally omitted CLI-only controls**
+
+These `benchbox run` options are currently product-scope omissions, not
+undocumented MCP parameters. Adding any of them requires a new contract decision
+or a shared non-CLI execution service below both CLI and MCP.
+
+| CLI surface | MCP status | Reason |
+|---|---|---|
+| `--output` | Omitted | MCP result roots are server configuration (`--results-dir`, env vars). |
+| `--platform-option` | Omitted | Platform-specific key/value plumbing is CLI orchestration surface. |
+| `--benchmark-option` | Omitted | Benchmark-specific key/value plumbing is CLI orchestration surface. |
+| `--tuning`, `--table-mode`, `--sorted-ingestion-*` | Omitted | Tuning/table layout workflows are CLI-equivalent scope. |
+| `--force` | Omitted | Regeneration/upload forcing needs broader lifecycle service semantics. |
+| `--official`, `--seed`, `--iterations` | Omitted | TPC compliance and repeated measurement policy remain CLI scope. |
+| `--compression`, `--table-format`, `--presort` | Omitted | Output/data-format policy is not exposed through MCP run control. |
+| `--validation`, `--plan-config` | Omitted | MCP exposes only `validate_only` and `capture_plans` booleans. |
+| `--no-monitoring`, `--no-progress`, `--quiet`, `--verbose` | Omitted | MCP already runs as structured, quiet server-side execution. |
+| `--global-cache`, `--publish`, `--publish-target`, `--publish-label` | Omitted | Cache and publication workflows are not MCP run controls. |
+| interactive prompts and `--non-interactive` | Omitted | MCP requests are non-interactive by protocol. |
 
 ### Discovery Tools
 
-#### `list_platforms`
+#### `list_available`
 
-List all available database platforms.
+List platforms, benchmarks, chart templates, or all discovery data.
 
-**Returns:**
-- `platforms`: List of platform objects with:
-  - `name`: Platform identifier
-  - `display_name`: Human-readable name
-  - `category`: Platform category (analytical, cloud, embedded, dataframe)
-  - `available`: Whether dependencies are installed
-  - `supports_sql`: SQL query support
-  - `supports_dataframe`: DataFrame API support
-- `count`: Total number of platforms
-- `summary`: Aggregated statistics
-
-**Example:**
-```json
-{
-  "platforms": [
-    {
-      "name": "duckdb",
-      "display_name": "DuckDB",
-      "category": "embedded",
-      "available": true,
-      "supports_sql": true,
-      "supports_dataframe": false
-    }
-  ],
-  "count": 15,
-  "summary": {"available": 8, "sql_platforms": 12, "dataframe_platforms": 5}
-}
-```
-
----
-
-#### `list_benchmarks`
-
-List all available benchmarks.
-
-**Returns:**
-- `benchmarks`: List of benchmark objects with:
-  - `name`: Benchmark identifier
-  - `display_name`: Human-readable name
-  - `query_count`: Number of queries
-  - `scale_factors`: Supported scale factors
-  - `dataframe_support`: Whether DataFrame mode is supported
-- `count`: Total number of benchmarks
-- `categories`: Benchmarks grouped by category
-
----
+| Name | Type | Required | Default | Description |
+|---|---|---:|---|---|
+| `category` | string | No | `all` | `platforms`, `benchmarks`, `charts`, or `all`. |
 
 #### `get_benchmark_info`
 
-Get detailed information about a specific benchmark.
-
-**Parameters:**
-| Name | Type | Required | Description |
-|------|------|----------|-------------|
-| `benchmark` | string | Yes | Benchmark name (e.g., 'tpch', 'tpcds') |
-
-**Returns:**
-- `name`: Benchmark identifier
-- `queries`: Query information including IDs and count
-- `schema`: Table information
-- `scale_factors`: Supported scale factors with defaults
-
----
+| Name | Type | Required | Default | Description |
+|---|---|---:|---|---|
+| `benchmark` | string | Yes | - | Benchmark identifier. |
 
 #### `system_profile`
 
-Get system profile information for capacity planning.
-
-**Returns:**
-- `cpu`: Core count, thread count, architecture
-- `memory`: Total and available memory in GB
-- `disk`: Disk usage for key paths
-- `python`: Python version and implementation
-- `packages`: Versions of key packages (polars, pandas, duckdb, pyarrow)
-- `benchbox`: BenchBox version
-- `recommendations`: Suggested maximum scale factor based on resources
-
----
-
-### Benchmark Tools
-
-#### `run_benchmark`
-
-Run a benchmark on a database platform.
-
-**Parameters:**
-| Name | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `platform` | string | Yes | - | Target platform (e.g., 'duckdb', 'polars-df') |
-| `benchmark` | string | Yes | - | Benchmark name (e.g., 'tpch', 'tpcds') |
-| `scale_factor` | float | No | 0.01 | Data scale factor |
-| `queries` | string | No | None | Comma-separated query IDs (e.g., "1,3,6") |
-| `phases` | string | No | "load,power" | Comma-separated phases |
-
-**Returns:**
-- `execution_id`: Unique run identifier
-- `status`: "completed", "failed", or "no_results"
-- `execution_time_seconds`: Total runtime
-- `summary`: Query counts and total runtime
-- `queries`: Per-query results (limited to 20)
-
-**Example:**
-```json
-{
-  "execution_id": "mcp_a1b2c3d4",
-  "status": "completed",
-  "platform": "duckdb",
-  "benchmark": "tpch",
-  "scale_factor": 0.01,
-  "execution_time_seconds": 5.23,
-  "summary": {
-    "total_queries": 22,
-    "successful_queries": 22,
-    "failed_queries": 0,
-    "total_execution_time": 1.234
-  }
-}
-```
-
----
-
-#### `dry_run`
-
-Preview what a benchmark run would do without executing.
-
-**Parameters:**
-| Name | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `platform` | string | Yes | - | Target platform |
-| `benchmark` | string | Yes | - | Benchmark name |
-| `scale_factor` | float | No | 0.01 | Data scale factor |
-| `queries` | string | No | None | Optional query subset |
-
-**Returns:**
-- `status`: Always "dry_run"
-- `execution_mode`: Execution mode ("sql" or "dataframe")
-- `execution_plan`: Phases and queries that would run
-  - `phases`: List of phases (e.g., ["load", "power"])
-  - `total_queries`: Number of queries to execute
-  - `query_ids`: List of query IDs (truncated to 30)
-  - `test_execution_type`: Execution type (e.g., "standard")
-  - `execution_context`: Context description
-- `resource_estimates`: Estimated resource requirements
-  - `data_size_gb`: Estimated data size in GB
-  - `memory_recommended_gb`: Recommended memory in GB
-  - `disk_space_recommended_gb`: Recommended disk space in GB
-  - `cpu_cores_available`: Available CPU cores on system
-  - `memory_gb_available`: Available memory on system in GB
-- `notes`: Important considerations
-- `warnings`: Platform availability warnings (if any)
-
----
-
-#### `validate_config`
-
-Validate a benchmark configuration before running.
-
-**Parameters:**
-| Name | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `platform` | string | Yes | - | Target platform |
-| `benchmark` | string | Yes | - | Benchmark name |
-| `scale_factor` | float | No | 1.0 | Data scale factor |
-
-**Returns:**
-- `valid`: Boolean indicating if configuration is valid
-- `errors`: List of validation errors
-- `warnings`: List of warnings
-- `recommendations`: Configuration recommendations
-
----
-
-### Results Tools
-
-#### `list_recent_runs`
-
-List recent benchmark runs.
-
-**Parameters:**
-| Name | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `limit` | int | No | 10 | Maximum results to return |
-| `platform` | string | No | None | Filter by platform |
-| `benchmark` | string | No | None | Filter by benchmark |
-
-**Returns:**
-- `runs`: List of run metadata
-- `count`: Number of runs returned
-- `total_available`: Total runs in results directory
-
----
-
-#### `get_results`
-
-Get detailed results from a benchmark run.
-
-**Parameters:**
-| Name | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `result_file` | string | Yes | - | Result filename from `list_recent_runs` |
-| `include_queries` | bool | No | true | Include per-query details |
-
-**Returns:**
-- `platform`: Platform configuration
-- `benchmark`: Benchmark name
-- `summary`: Execution summary
-- `queries`: Per-query timing details
-
----
-
-#### `compare_results`
-
-Compare two benchmark runs to identify performance changes.
-
-**Parameters:**
-| Name | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `file1` | string | Yes | - | Baseline result file |
-| `file2` | string | Yes | - | Comparison result file |
-| `threshold_percent` | float | No | 10.0 | Change threshold for highlighting |
-
-**Returns:**
-- `baseline`: Baseline run metadata
-- `comparison`: Comparison run metadata
-- `summary`: Regression/improvement counts
-- `regressions`: Query IDs that regressed
-- `improvements`: Query IDs that improved
-- `query_comparisons`: Per-query delta details
-
----
-
-#### `export_summary`
-
-Export a formatted summary of benchmark results.
-
-**Parameters:**
-| Name | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `result_file` | string | Yes | - | Result filename |
-| `format` | string | No | "text" | Output format: 'text', 'markdown', or 'json' |
-
-**Returns:**
-- `format`: Output format used
-- `content`: Formatted summary string
-
----
-
-#### `export_results`
-
-Export benchmark results to different formats.
-
-**Parameters:**
-| Name | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `result_file` | string | Yes | - | Result filename |
-| `format` | string | No | "json" | Output format: 'json', 'csv', or 'html' |
-| `output_path` | string | No | None | File path to write output (relative to results dir) |
-
-**Returns:**
-- `status`: "exported"
-- `format`: Format used
-- `content`: Formatted content (if output_path not specified)
-- `output_path`: Path to written file (if output_path specified)
-- `size_bytes`: Size of exported content
-
----
-
-#### `generate_data`
-
-Generate benchmark data without running queries.
-
-**Parameters:**
-| Name | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `benchmark` | string | Yes | - | Benchmark name (e.g., 'tpch', 'tpcds') |
-| `scale_factor` | float | No | 0.01 | Data scale factor |
-| `format` | string | No | "parquet" | Data format: 'parquet' or 'csv' |
-| `force` | bool | No | false | Force regeneration if data exists |
-
-**Returns:**
-- `status`: "generated" or "exists"
-- `data_path`: Path to generated data
-- `file_count`: Number of files generated
-- `total_size_mb`: Total data size in MB
-
----
+No parameters. Returns host and package information useful for capacity
+planning.
 
 #### `check_dependencies`
 
-Check platform dependencies and installation status.
-
-**Parameters:**
 | Name | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `platform` | string | No | None | Specific platform to check (checks all if not provided) |
-| `verbose` | bool | No | false | Include detailed package information |
+|---|---|---:|---|---|
+| `platform` | string or null | No | `null` | Specific platform to check; omitted checks all platforms. |
+| `verbose` | boolean | No | `false` | Include detailed package information. |
 
-**Returns:**
-- `platforms`: Dictionary of platform status with availability and missing packages
-- `summary`: Total, available, and missing dependency counts
-- `recommendations`: Installation suggestions
-- `quick_status`: Quick status for single platform queries
+### Benchmark Query Tools
 
----
+#### `get_query_details`
+
+| Name | Type | Required | Default | Description |
+|---|---|---:|---|---|
+| `benchmark` | string | Yes | - | Benchmark identifier. |
+| `query_id` | string | Yes | - | Query identifier, for example `1`, `Q1`, or `17`. |
+| `platform` | string or null | No | `null` | Optional platform for dialect-specific query lookup. |
+| `mode` | string or null | No | `null` | `sql` or `dataframe`; inferred from platform when omitted. |
+
+### Results Tools
+
+#### `get_results`
+
+`get_results` combines recent-run listing, result reading, and result export.
+
+| Name | Type | Required | Default | Description |
+|---|---|---:|---|---|
+| `result_file` | string or null | No | `null` | Result filename; omitted lists recent runs. |
+| `format` | string | No | `details` | `list`, `details`, `json`, `csv`, `html`, `text`, or `markdown`. |
+| `output_path` | string or null | No | `null` | Export path relative to the configured results dir. |
+| `limit` | integer | No | `10` | Max recent runs when listing. |
+| `platform` | string or null | No | `null` | Platform filter when listing. |
+| `benchmark` | string or null | No | `null` | Benchmark filter when listing. |
+| `include_queries` | boolean | No | `true` | Include query details when reading one result. |
 
 ### Analytics Tools
 
+#### `analyze_results`
+
+| Name | Type | Required | Default | Description |
+|---|---|---:|---|---|
+| `analysis` | string | No | `compare` | `compare`, `regressions`, `trends`, or `aggregate`. |
+| `file1` | string or null | No | `null` | Baseline result file for `compare`. |
+| `file2` | string or null | No | `null` | Comparison result file for `compare`. |
+| `platform` | string or null | No | `null` | Platform filter for non-compare analyses. |
+| `benchmark` | string or null | No | `null` | Benchmark filter for non-compare analyses. |
+| `threshold_percent` | number | No | `10.0` | Regression/change threshold. |
+| `metric` | string | No | `geometric_mean` | Trend metric: `geometric_mean`, `p50`, `p95`, `p99`, or `total_time`. |
+| `group_by` | string | No | `platform` | Aggregate grouping: `platform`, `benchmark`, or `date`. |
+| `limit` | integer | No | `10` | Max runs to analyze where applicable. |
+
 #### `get_query_plan`
 
-Get query execution plan from benchmark results.
-
-**Parameters:**
 | Name | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `result_file` | string | Yes | - | Result filename containing query plans |
-| `query_id` | string | Yes | - | Query identifier (e.g., '1', 'Q1', 'q05') |
-| `format` | string | No | "tree" | Output format: 'tree', 'json', or 'summary' |
-
-**Returns:**
-- `status`: "success" or "no_plan"
-- `query_id`: Requested query ID
-- `plan`: Query plan in requested format
-- `runtime_ms`: Query runtime
-
-**Note:** Query plans must be captured using `--capture-plans` during benchmark execution.
-
----
-
-#### `detect_regressions`
-
-Automatically detect performance regressions across recent runs.
-
-**Parameters:**
-| Name | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `platform` | string | No | None | Filter by platform |
-| `benchmark` | string | No | None | Filter by benchmark |
-| `threshold_percent` | float | No | 10.0 | Regression threshold percentage |
-| `lookback_runs` | int | No | 5 | Number of recent runs to analyze |
-
-**Returns:**
-- `comparison`: Baseline and current run metadata
-- `summary`: Regression and improvement counts
-- `regressions`: List of regressed queries with severity
-- `improvements`: List of improved queries
-- `recommendations`: Suggested actions
-
----
+|---|---|---:|---|---|
+| `result_file` | string | Yes | - | Result filename containing captured query plans. |
+| `query_id` | string | Yes | - | Query identifier. |
+| `format` | string | No | `tree` | `tree`, `json`, or `summary`. |
 
 #### `validate_results`
 
-Validate integrity, completeness, and believability of benchmark result JSON files. Runs a three-tier validation pipeline (structural, completeness, believability) with 20 checks total.
-
-**Parameters:**
 | Name | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `result_file` | string | No* | "" | Path to a single result JSON file |
-| `directory` | string | No* | "" | Path to a directory of result JSON files (batch mode) |
-| `verbose` | bool | No | false | Include PASS checks in output (default: WARN+FAIL only) |
+|---|---|---:|---|---|
+| `result_file` | string | No* | `""` | Path to one result JSON file. |
+| `directory` | string | No* | `""` | Directory of result JSON files for batch validation. |
+| `verbose` | boolean | No | `false` | Include PASS checks in output. |
 
-*One of `result_file` or `directory` must be provided.
-
-**Returns (single file):**
-- `file`: Result file path
-- `benchmark_id`: Benchmark identifier
-- `platform`: Platform name
-- `scale_factor`: Scale factor
-- `overall_status`: "PASS", "WARN", or "FAIL"
-- `summary`: Check counts by status
-- `checks`: List of check results with category, name, status, message, and details
-
-**Returns (directory):**
-- `total`: Number of files validated
-- `pass`: Count of files with PASS status
-- `warn`: Count of files with WARN status
-- `fail`: Count of files with FAIL status
-- `files`: List of per-file summaries (file, benchmark_id, platform, overall_status)
-
-**Example:**
-```json
-{
-  "file": "tpch_duckdb_sf1_20260401.json",
-  "benchmark_id": "tpch",
-  "platform": "DuckDB",
-  "scale_factor": 1.0,
-  "overall_status": "PASS",
-  "summary": {"PASS": 20, "WARN": 0, "FAIL": 0},
-  "checks": []
-}
-```
-
-**Severity levels:**
-- **FAIL**: Mathematical impossibility or data corruption (e.g., passed + failed != total)
-- **WARN**: Suspicious but plausible (e.g., timing outlier > 30 minutes, missing tables)
-
----
+*Provide either `result_file` or `directory`.
 
 ### Visualization Tools
 
 #### `suggest_charts`
 
-Analyze results and suggest appropriate chart types.
-
-**Parameters:**
-| Name | Type | Required | Description |
-|------|------|----------|-------------|
-| `result_files` | string | Yes | Comma-separated list of result filenames |
-
-**Returns:**
-- `suggestions`: List of chart recommendations with priority and reasoning
-- `primary`: Best chart type recommendation with reason
-- `data_profile`: Analysis of result data (result_count, platforms, has_cost_data, etc.)
-- `source_files`: Input files used
-
----
+| Name | Type | Required | Default | Description |
+|---|---|---:|---|---|
+| `result_files` | string | Yes | - | Comma-separated result filenames. |
 
 #### `generate_chart`
 
-Generate charts from benchmark results.
-
-**Parameters:**
 | Name | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `result_files` | string | Yes | - | Comma-separated list of result filenames |
-| `chart_type` | string | No | "performance_bar" | Chart type: performance_bar, power_bar, distribution_box, query_heatmap, query_histogram, cost_scatter, time_series, comparison_bar, diverging_bar, summary_box, percentile_ladder, normalized_speedup, stacked_phase, sparkline_table, cdf_chart, rank_table |
-| `template` | string | No | None | Template: default, flagship, head_to_head, trends, cost_optimization, comparison, latency_deep_dive, regression_triage, executive_summary |
-| `output_dir` | string | No | None | Output directory (relative to charts dir) |
-| `format` | string | No | "ascii" | Output format: 'ascii' for terminal-friendly text output |
-
-**Returns:**
-- `status`: "generated"
-- `chart_type`: Generated chart type (or `template` if using template)
-- `format`: "ascii"
-- `content`: ASCII chart rendered inline
-- `source_files`: Input files used
-- `note`: Usage instructions
-
-**Examples:**
-
-```bash
-# Single chart
-generate_chart(result_files="run1.json", chart_type="performance_bar")
-
-# Template (multiple charts combined with separators)
-generate_chart(result_files="run1.json,run2.json", template="head_to_head")
-
-# Platform comparison
-generate_chart(result_files="duckdb.json,polars.json", chart_type="query_heatmap")
-```
-
-**Output Features:**
-- ANSI colors for terminal display (copy-paste preserves formatting)
-- Unicode box-drawing characters for clean visualization
-- Best/worst highlighting, legends, and scale indicators
-- Template output combines multiple charts with `────────` separators
-
----
-
-### Historical Analysis Tools
-
-#### `get_performance_trends`
-
-Get performance trends over multiple benchmark runs.
-
-**Parameters:**
-| Name | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `platform` | string | No | None | Filter by platform |
-| `benchmark` | string | No | None | Filter by benchmark |
-| `metric` | string | No | "geometric_mean" | Performance metric: 'geometric_mean', 'p50', 'p95', 'p99', 'total_time' |
-| `limit` | int | No | 10 | Maximum runs to analyze |
-
-**Returns:**
-- `metric`: Metric used
-- `summary`: Run count, first/last run timestamps, trend direction
-- `data_points`: Time-series performance data
-
----
-
-#### `aggregate_results`
-
-Aggregate multiple benchmark results into summary statistics.
-
-**Parameters:**
-| Name | Type | Required | Default | Description |
-|------|------|----------|---------|-------------|
-| `platform` | string | No | None | Filter by platform |
-| `benchmark` | string | No | None | Filter by benchmark |
-| `group_by` | string | No | "platform" | Grouping dimension: 'platform', 'benchmark', or 'date' |
-
-**Returns:**
-- `group_by`: Grouping used
-- `summary`: Total groups and runs
-- `aggregates`: Statistical summaries per group (mean, std, min, max, percentiles)
+|---|---|---:|---|---|
+| `result_files` | string | Yes | - | Comma-separated result filenames. |
+| `chart_type` | string | No | `performance_bar` | Chart type for single-chart output. |
+| `template` | string or null | No | `null` | Template name for multi-chart output. |
+| `output_dir` | string or null | No | `null` | Output directory relative to charts dir. |
+| `format` | string | No | `ascii` | Output format; current MCP output is ASCII. |
 
 ---
 
