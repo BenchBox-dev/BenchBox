@@ -21,10 +21,16 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sys
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
+
+try:
+    from benchbox.core.results.schema_policy import PUBLIC_SUBMISSION_SCHEMA_POLICY
+except ImportError:  # pragma: no cover - exercised on the slim published-results branch.
+    PUBLIC_SUBMISSION_SCHEMA_POLICY = None
 
 # ---------------------------------------------------------------------------
 # Schema-v2 required top-level keys
@@ -36,8 +42,10 @@ REQUIRED_BENCHMARK_KEYS = {"id", "scale_factor"}
 REQUIRED_PLATFORM_KEYS = {"name"}
 REQUIRED_QUERY_KEYS = {"id", "ms"}
 
-# Accepted schema version prefixes (2.x family).
+# Standalone fallback used when this script is vendored to published-results
+# without the full BenchBox package.
 ACCEPTED_VERSION_PREFIX = "2."
+NUMERIC_SCHEMA_VERSION_RE = re.compile(r"^\d+\.\d+(?:\.\d+)?$")
 
 # Companion file suffixes - skipped during bundle discovery.
 COMPANION_SUFFIXES = (".plans.json", ".tuning.json")
@@ -185,8 +193,21 @@ def _capture_metadata(data: dict, vr: ValidationResult) -> None:
 
 
 def _validate_version(version: Any, vr: ValidationResult) -> None:
-    if not isinstance(version, str) or not version.startswith(ACCEPTED_VERSION_PREFIX):
-        vr.error(f"Unsupported schema version: {version!r} (expected 2.x)")
+    if PUBLIC_SUBMISSION_SCHEMA_POLICY is not None:
+        decision = PUBLIC_SUBMISSION_SCHEMA_POLICY.evaluate(version)
+        if not decision.accepted:
+            vr.error(decision.error_message())
+        return
+
+    if (
+        not isinstance(version, str)
+        or not NUMERIC_SCHEMA_VERSION_RE.fullmatch(version.strip())
+        or not version.strip().startswith(ACCEPTED_VERSION_PREFIX)
+    ):
+        vr.error(
+            f"Unsupported schema version for public submission schema policy: {version!r}. "
+            "public submission schema policy accepts numeric schema version family 2.x."
+        )
 
 
 def _validate_run_section(run: Any, vr: ValidationResult) -> None:
