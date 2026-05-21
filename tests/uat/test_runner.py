@@ -48,39 +48,33 @@ def _write_result_json(path: Path, *, failed: int = 0, compliance_class: str | N
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
-def test_extract_result_path_picks_last_match():
+def test_last_nonempty_output_line_picks_last_subprocess_line():
     log = """\
+# uv run -- benchbox run --quiet
+# BENCHBOX_OUTPUT_DIR=/tmp/shared-runs
 [info] running...
-benchmark_runs/results/duckdb_tpch_20260502.json
 [trace] retry...
 /Users/joe/Developer/benchmark_runs/results/duckdb_tpch_20260502_FINAL.json
-[done]
 """
-    out = runner.extract_result_path(log)
-    assert out is not None
-    assert out.endswith("FINAL.json")
+    out = runner.last_nonempty_output_line(log)
+    assert out == "/Users/joe/Developer/benchmark_runs/results/duckdb_tpch_20260502_FINAL.json"
 
 
-def test_extract_result_path_accepts_custom_runs_root():
+def test_last_nonempty_output_line_accepts_custom_runs_root():
     log = "/tmp/shared-runs/results/duckdb_tpch_custom_root.json\n"
-    assert runner.extract_result_path(log) == "/tmp/shared-runs/results/duckdb_tpch_custom_root.json"
+    assert runner.last_nonempty_output_line(log) == "/tmp/shared-runs/results/duckdb_tpch_custom_root.json"
 
 
-def test_extract_result_path_accepts_rich_wrapped_result_path():
+def test_last_nonempty_output_line_returns_none_when_only_uat_comments():
     log = """\
-Exported JSON:
-/Users/joe/Developer/benchmark_runs/results/joinorder_sf1_duckdb_sql_20260511_13
-4905_62698da0.json
+# uv run -- benchbox run --quiet
+# BENCHBOX_OUTPUT_DIR=/tmp/shared-runs
 """
-    assert (
-        runner.extract_result_path(log)
-        == "/Users/joe/Developer/benchmark_runs/results/joinorder_sf1_duckdb_sql_20260511_134905_62698da0.json"
-    )
+    assert runner.last_nonempty_output_line(log) is None
 
 
-def test_extract_result_path_returns_none_when_missing():
-    log = "[info] running\n[error] failed before result capture\n"
-    assert runner.extract_result_path(log) is None
+def test_last_nonempty_output_line_returns_none_when_missing():
+    assert runner.last_nonempty_output_line("") is None
 
 
 def test_run_cell_writes_log_and_returns_result(tmp_path: Path):
@@ -120,9 +114,14 @@ def test_run_cell_sets_benchbox_output_dir_for_subprocess(tmp_path: Path):
     def fake_run_with_timeout(argv, timeout_s, *, stdout=None, stderr=None, env=None, cwd=None):
         captured["env"] = env
         captured["argv"] = argv
-        if stdout is not None:
-            stdout.write(f"{result_path}\n")
-        return TimeoutResult(exit_code=0, timed_out=False, elapsed_s=0.1)
+        if stderr is not None:
+            stderr.write("[warning] ignored stderr after quiet stdout\n")
+        return TimeoutResult(
+            exit_code=0,
+            timed_out=False,
+            elapsed_s=0.1,
+            stdout=f"{result_path}\n".encode(),
+        )
 
     def fake_benchbox_run_argv(*args, extra_args=(), **kwargs):
         return [*fake_argv, *extra_args]
@@ -145,7 +144,9 @@ def test_run_cell_sets_benchbox_output_dir_for_subprocess(tmp_path: Path):
     assert result.result_path == result_path
     assert captured["env"]["BENCHBOX_OUTPUT_DIR"] == str(tmp_path / "shared-runs")
     assert captured["argv"][-2:] == ["--output", str(tmp_path / "shared-runs" / "datagen")]
-    assert "BENCHBOX_OUTPUT_DIR=" in result.log_path.read_text()
+    log_text = result.log_path.read_text()
+    assert "BENCHBOX_OUTPUT_DIR=" in log_text
+    assert "ignored stderr" in log_text
 
 
 @pytest.mark.parametrize("local_managed_platform", [False, True])
@@ -176,7 +177,7 @@ def test_run_cell_defaults_benchbox_output_dir_to_shared(monkeypatch, tmp_path: 
 
     def fake_run_with_timeout(argv, timeout_s, *, stdout=None, stderr=None, env=None, cwd=None):
         captured["env"] = env
-        return TimeoutResult(exit_code=0, timed_out=False, elapsed_s=0.1)
+        return TimeoutResult(exit_code=0, timed_out=False, elapsed_s=0.1, stdout=b"")
 
     with (
         patch.object(runner, "benchbox_run_argv", return_value=fake_argv),

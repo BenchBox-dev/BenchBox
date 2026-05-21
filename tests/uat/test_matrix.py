@@ -237,6 +237,7 @@ def test_uv_run_argv_extra_uses_extra_flag():
 
 def test_benchbox_run_argv_includes_platform_extras():
     argv = matrix.benchbox_run_argv("starrocks", "tpch", 0.01)
+    assert "--quiet" in argv
     assert "--platform" in argv and "starrocks" in argv
     assert "--platform-option" in argv
     # The starrocks-specific port=19030 must be there.
