@@ -19,7 +19,11 @@ if TYPE_CHECKING:
     from tests.uat.config import UATConfig
 
 from tests.uat import docker_assets
-from tests.uat.matrix import platform_is_reachable, reset_reachability_cache, resolve_platforms
+from tests.uat.matrix import (
+    invalidate_reachability_cache_after_lifecycle_change,
+    platform_is_reachable,
+    resolve_platforms,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -203,7 +207,7 @@ def _check_local_platforms(
             )
         attempted.append(platform)
         returncode = bring_up_runner(platform)
-        reset_reachability_cache()
+        invalidate_reachability_cache_after_lifecycle_change()
         if returncode != 0:
             return (
                 checked,
