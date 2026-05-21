@@ -2,7 +2,8 @@ id: result-schema-policy-and-explorer-input-gate
 title: "Architecture hardening: centralize result schema policy and add explorer input gates"
 worktree: main
 priority: High
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-05-21"
 category: Results
 
 deps:
@@ -23,8 +24,36 @@ description: |
 work:
   - id: w0
     summary: "Revalidate current result-schema policy sites and consumer intent"
-    status: pending
+    status: done
     notes: |
+      Completed 2026-05-21 at checked SHA 8ab19cf2b19d1022e828de16c299bfa8e14c34d0.
+
+      Revalidation summary before edits:
+        - benchbox/core/results/schema.py declared SCHEMA_VERSION = "2.1" and
+          locally accepted only "2.0" and "2.1" in SchemaV2Validator.
+        - benchbox/core/results/loader.py strictly considered/loaded only
+          top-level version "2.0" and "2.1".
+        - benchbox/core/results/normalizer.py treated known "2.0"/"2.1"
+          as v2 and mapped missing/1.x/unknown shapes to "1.x" legacy
+          normalization.
+        - scripts/validate_submission.py accepted any "2." prefix for public
+          submissions; this PR preserves forward numeric 2.x acceptance and
+          rejects malformed values.
+        - _project/scripts/explorer_pipeline/transformer.py parsed bundles
+          with broad .get() access and no version gate before this TODO.
+        - docs/reference/hosted-results-contract.md and docs/contributing-results.md
+          referred to schema-v2 bundles but did not name the consumer-specific
+          acceptance policy.
+
+      Central policy after edits:
+        - Producer/exporter current schema: 2.1.
+        - Runtime schema validator, runtime loader, exporter listing, and
+          explorer input: 2.0 and 2.1 only.
+        - Normalizer: 2.0 and 2.1 as v2; all other shapes through legacy
+          best-effort fallback.
+        - Public submission validator: numeric schema family 2.x; malformed
+          versions such as "2.x" are rejected.
+
       Commit a compact summary containing checked SHA, current SCHEMA_VERSION,
       accepted versions by consumer, and any line drift.
 
@@ -39,7 +68,7 @@ work:
   - id: w1
     summary: "Create one result schema policy module with consumer-specific acceptance rules"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Add a small policy module under benchbox/core/results/ that exposes named
       rules for producer/runtime, loader, normalizer, public submission, and
@@ -52,7 +81,7 @@ work:
   - id: w2
     summary: "Update loader, normalizer, and submission validator to call the central policy"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Replace duplicated version checks with named policy calls. Preserve:
         - Runtime loader strictness for unknown versions unless explicitly changed.
@@ -62,10 +91,14 @@ work:
       Any behavior change must be documented in docs/reference/public-contracts.md
       and docs/reference/hosted-results-contract.md.
 
+      Implementation note: tests/fixtures/published_results_validator.py was
+      synced byte-for-byte with scripts/validate_submission.py because the
+      existing cross-branch validator drift guard requires it.
+
   - id: w3
     summary: "Add an explorer input bundle gate before broad transformer parsing"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Gate the explorer pipeline before _project/scripts/explorer_pipeline/transformer.py
       starts broad .get() parsing. Unknown or unsupported versions must fail
@@ -77,7 +110,7 @@ work:
   - id: w4
     summary: "Add schema-policy tests for 2.0, 2.1, unknown 2.x, 1.x, missing, and malformed versions"
     needs: [w2, w3]
-    status: pending
+    status: done
     notes: |
       Include unit tests for the policy module plus integration-style tests
       proving loader, normalizer, submission validation, and explorer gate call
@@ -86,10 +119,14 @@ work:
       Tests must document expected behavior per consumer. A passing test that
       only asserts "raises something" is not enough.
 
+      Implementation note: tests/unit/core/results/test_query_plan_serialization.py
+      was updated to assert the new named runtime schema policy message from
+      SchemaV2Validator.
+
   - id: w5
     summary: "Update result-format and hosted-results docs to declare schema v2.1 status"
     needs: [w4]
-    status: pending
+    status: done
     notes: |
       Reconcile docs/reference/result-formats.md, docs/contributing-results.md,
       and docs/reference/hosted-results-contract.md so v1.x is clearly marked

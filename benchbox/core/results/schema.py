@@ -29,11 +29,12 @@ from benchbox.core.results.environment import (
     build_platform_metadata_payload,
 )
 from benchbox.core.results.query_normalizer import normalize_query_id
+from benchbox.core.results.schema_policy import CURRENT_SCHEMA_VERSION, RUNTIME_SCHEMA_POLICY
 
 if TYPE_CHECKING:
     from benchbox.core.results.models import BenchmarkResults
 
-SCHEMA_VERSION = "2.1"
+SCHEMA_VERSION = CURRENT_SCHEMA_VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -210,12 +211,10 @@ class SchemaV2Validator:
         if missing_top:
             raise SchemaV2ValidationError(f"schema v2.0 payload missing keys: {missing_top}")
 
-        # Validate version (accept 2.0 and 2.1 as valid)
-        valid_versions = ("2.0", "2.1")
-        if payload.get("version") not in valid_versions:
-            raise SchemaV2ValidationError(
-                f"invalid schema version {payload.get('version')} (expected one of {valid_versions})"
-            )
+        # Validate version using the named runtime policy.
+        version_decision = RUNTIME_SCHEMA_POLICY.evaluate(payload.get("version"))
+        if not version_decision.accepted:
+            raise SchemaV2ValidationError(version_decision.error_message())
 
         # Validate run block
         run = payload.get("run", {})

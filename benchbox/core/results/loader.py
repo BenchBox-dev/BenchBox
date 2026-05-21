@@ -23,6 +23,7 @@ from benchbox.core.results.models import (
     NativeComparisonEntry,
     SetupPhase,
 )
+from benchbox.core.results.schema_policy import LOADER_SCHEMA_POLICY, is_loader_supported_result_schema
 
 logger = logging.getLogger(__name__)
 
@@ -75,9 +76,8 @@ def find_latest_result(
             with open(filepath, encoding="utf-8") as f:
                 data = json.load(f)
 
-            # Only consider v2.0/v2.1 files
-            version = data.get("version")
-            if version not in ("2.0", "2.1"):
+            # Only consider files accepted by the runtime loader policy.
+            if not is_loader_supported_result_schema(data):
                 continue
 
             # Extract metadata for filtering (v2.0 format)
@@ -140,14 +140,10 @@ def load_result_file(filepath: Path | str) -> tuple[BenchmarkResults, dict[str, 
     except OSError as e:
         raise ResultLoadError(f"Failed to read result file: {e}") from e
 
-    # Check schema version - v2.0 and v2.1 are supported
-    version = data.get("version")
-    if version not in ("2.0", "2.1"):
-        raise UnsupportedSchemaError(
-            f"Unsupported schema version: {version}. "
-            f"Only schema v2.0 and v2.1 are supported. "
-            f"Please re-export the result using the current version of BenchBox."
-        )
+    # Check schema version through the named runtime loader policy.
+    version_decision = LOADER_SCHEMA_POLICY.evaluate(data.get("version"))
+    if not version_decision.accepted:
+        raise UnsupportedSchemaError(version_decision.error_message())
 
     # Load companion files if they exist
     plans_data = _load_companion_file(filepath_obj, ".plans.json")

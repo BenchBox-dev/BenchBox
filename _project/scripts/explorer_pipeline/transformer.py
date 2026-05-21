@@ -14,8 +14,6 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, cast
 
-from benchbox.core.cost.models import CostScope, CostStatus, DeploymentMetadata, NormalizedCost
-from benchbox.core.cost.pricing import PRICING_VERSION
 from _project.scripts.explorer_pipeline.models import (
     DetailResult,
     ManifestEntry,
@@ -26,6 +24,9 @@ from _project.scripts.explorer_pipeline.models import (
     ranking_exclusion_reason,
     timing_eligibility,
 )
+from benchbox.core.cost.models import CostScope, CostStatus, DeploymentMetadata, NormalizedCost
+from benchbox.core.cost.pricing import PRICING_VERSION
+from benchbox.core.results.schema_policy import EXPLORER_INPUT_SCHEMA_POLICY
 from benchbox.core.results.status import bundle_failed_query_count, normalize_validation_status
 
 logger = logging.getLogger(__name__)
@@ -53,7 +54,16 @@ def _load_bundle(bundle_path: Path) -> tuple[dict[str, Any], bytes]:
     a content hash without a second file read.
     """
     raw = bundle_path.read_bytes()
-    return json.loads(raw), raw
+    data = json.loads(raw)
+    _ensure_explorer_input_schema(data)
+    return data, raw
+
+
+def _ensure_explorer_input_schema(data: dict[str, Any]) -> None:
+    """Reject unsupported bundles before explorer field projection starts."""
+    decision = EXPLORER_INPUT_SCHEMA_POLICY.evaluate(data.get("version"))
+    if not decision.accepted:
+        raise ValueError(decision.error_message())
 
 
 def _sha256_prefix(raw: bytes, length: int = 8) -> str:
@@ -722,8 +732,10 @@ class BundleTransformer:
                 and *raw* are supplied, no file I/O occurs (zero disk reads).
         """
         if data is not None and raw is not None:
+            _ensure_explorer_input_schema(data)
             bundle_data, file_raw = data, raw
         elif data is not None:
+            _ensure_explorer_input_schema(data)
             bundle_data, file_raw = data, bundle_path.read_bytes()
         else:
             bundle_data, file_raw = _load_bundle(bundle_path)
@@ -747,6 +759,7 @@ class BundleTransformer:
     ) -> ManifestEntry:
         """Extract manifest entry from a result bundle JSON file."""
         bundle_data = data if data is not None else self.load_bundle(bundle_path)
+        _ensure_explorer_input_schema(bundle_data)
         rid = result_id or self.result_id_from_bundle(bundle_path, data=bundle_data)
 
         benchmark = bundle_data.get("benchmark", {}).get("id", "unknown")
@@ -824,6 +837,7 @@ class BundleTransformer:
     ) -> DetailResult:
         """Extract full detail from a result bundle JSON file."""
         bundle_data = data if data is not None else self.load_bundle(bundle_path)
+        _ensure_explorer_input_schema(bundle_data)
 
         benchmark = bundle_data.get("benchmark", {}).get("id", "unknown")
         scale_factor = float(bundle_data.get("benchmark", {}).get("scale_factor", 0.0))
