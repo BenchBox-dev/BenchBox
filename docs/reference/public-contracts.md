@@ -29,10 +29,11 @@ the map is unchanged.
 | Surface | Current tier | Owner | Compatibility promise | Deprecation path | Verification gate | Source of truth |
 |---|---|---|---|---|---|---|
 | CLI commands and documented options | `beta-public` | cli-runtime | Documented commands and option meanings are supported for beta users; option breadth can change with docs/tests. | Release notes plus docs update; backward-compatible aliases when practical. | CLI unit tests, generated CLI reference checks, `make pr-preflight`. | `benchbox/cli/commands/`, `docs/reference/cli/` |
-| Top-level Python wrapper facades, for example `benchbox.TPCH(...)` | `beta-public` | benchmark-api | Wrapper imports and facade methods covered by `tests/unit/test_wrapper_facades_fast.py` remain supported. | Registry row in `docs/reference/backward-compatibility.md`, migration to canonical API, beta-cycle review. | `uv run -- python -m pytest tests/unit/test_wrapper_facades_fast.py -q` | `benchbox/__init__.py`, top-level wrapper modules, wrapper facade tests |
+| Top-level Python wrapper facades, for example `benchbox.TPCH(...)` | `beta-public` | benchmark-api | Wrapper imports and facade methods covered by `tests/unit/test_wrapper_facades_fast.py` remain supported. Current count: 21 exported top-level benchmark facades from 23 registry class-name mappings; `ai_primitives` and `joinorder_synthetic` are core-only. | Registry row in `docs/reference/backward-compatibility.md`, migration to canonical API, beta-cycle review. | `uv run -- python -m pytest tests/unit/test_wrapper_facades_fast.py -q`, benchmark API contract count test. | `benchbox/__init__.py`, top-level wrapper modules, wrapper facade tests |
 | `benchbox.base.BaseBenchmark` | `beta-public` | core-runtime | Public base for wrapper benchmarks and orchestration helpers; result helper compatibility is tracked. | Compatibility registry row when kwargs, result helpers, or method contracts change. | Runtime contract and wrapper tests. | `benchbox/base.py`, `docs/reference/backward-compatibility.md` |
 | `BaseBenchmark.run_with_platform` | `beta-public` | core-runtime | Standard programmatic execution hook for CLI-adjacent tools and MCP; callers pass an adapter and run options. | ADR or contract-map update before replacing it as the orchestration API. | MCP benchmark tests plus runtime contract tests. | `benchbox/base.py`, `_project/DONE/mcp-integration/active/refactor-mcp-use-public-api.yaml` |
-| `benchbox.core.base_benchmark.BaseBenchmark` | `deprecated` | core-runtime | Internal compatibility base retained while remaining core benchmarks migrate. | Remove only after the compatibility registry target is satisfied. | Backward-compatibility registry review and benchmark loader/runtime tests. | `benchbox/core/base_benchmark.py`, `docs/reference/backward-compatibility.md` |
+| `benchbox.core.benchmark_loader` | `internal` | benchmark-api | Registry-backed runtime loader for CLI/core orchestration. It is not a public Python API and should not be imported by external callers. | Promote only through a contract-map update and migration docs. | Loader/registry parity tests and benchmark API contract tests. | `benchbox/core/benchmark_loader.py`, `benchbox/core/benchmark_registry.py` |
+| `benchbox.core.base_benchmark.BaseBenchmark` | `deprecated` | core-runtime | Documented internal compatibility base retained for the remaining `datavault` and `tpcds_obt` core implementations; not an alias and not the extension path for new benchmarks. | Remove only after those implementations migrate to `benchbox.base.BaseBenchmark` and the compatibility registry target is satisfied. | Backward-compatibility registry review, benchmark loader/runtime tests, benchmark API contract tests. | `benchbox/core/base_benchmark.py`, `docs/reference/backward-compatibility.md` |
 | Adapter subclassing hooks and base mixins | `beta-public` | platform-runtime | Adapter authors can depend on documented `PlatformAdapter` hooks, ABC signatures, and adapter authoring docs. | Adapter refactor map update, migration note, and representative adapter tests. | `tests/unit/platforms/test_abc_conformance.py`, focused adapter tests. | `benchbox/platforms/base/`, `docs/development/adapter-refactor-map.md`, `docs/development/adding-new-platforms.md` |
 | `PlatformAdapter` lifecycle | `beta-public` | platform-runtime | Adapter instances are serial execution objects. One instance may be reused for multiple benchmark runs sequentially; `run_benchmark()` resets run-scoped caches at run start and restores run-config plan-capture overrides at run end. Concurrent calls on one adapter instance are not supported. | A concurrency or service-mode promotion needs a contract-map update and a shared run-context design before claiming support. | `tests/unit/platforms/test_adapter_lifecycle.py`, focused adapter lifecycle tests. | `benchbox/platforms/base/adapter.py`, `benchbox/platforms/base/result_capture.py`, `docs/development/adapter-refactor-map.md` |
 | Platform registry metadata | `beta-public` | platform-runtime | Registry metadata is the source for platform discovery, capabilities, dependency hints, and future support status. | Same-PR metadata/docs migration; aliases require compatibility note. | Platform registry tests and docs drift checks. | `benchbox/core/platform_registry.py` |
@@ -70,6 +71,8 @@ must either be generated/checked from registry metadata or explicitly marked as
 editorial summaries.
 
 ## Count and Drift Policy
+
+Benchmark API snapshot: **23** registry entries; **23** loader-resolved core families; **22** public discovery entries; **21** top-level Python benchmark facades; **14** lazy facades; **7** eager facades; **2** core-only benchmark IDs.
 
 Evidence snapshot at `8937681`:
 
@@ -115,3 +118,17 @@ editing:
 | `benchbox/base.py:476` | `run_with_platform` remains the programmatic execution hook used by orchestration tools. |
 | `benchbox/core/platform_registry.py:85-89` | Platform registry declares itself the metadata and adapter-registration source of truth. |
 | `benchbox/core/benchmark_registry.py:1-5` | Benchmark registry declares itself the shared benchmark metadata source for CLI and MCP. |
+
+## Benchmark API Evidence Snapshot
+
+Checked SHA: `1d454632ba73911bc4ff0cf0a3fb8ec22227a7a8`
+
+| Evidence | Finding |
+|---|---|
+| `benchbox/base.py` | Public `BaseBenchmark` remains the beta-public base for top-level wrappers and orchestration helpers; `run_with_platform()` remains the beta-public adapter execution hook. |
+| `benchbox/core/base_benchmark.py` | Deprecated internal compatibility base remains distinct; only `benchbox/core/datavault/benchmark.py` and `benchbox/core/tpcds_obt/benchmark.py` import it in production code. |
+| `tests/unit/test_wrapper_facades_fast.py` | Wrapper methods are asserted behavior and should not be treated as accidental duplicate reachability. |
+| `benchbox/__init__.py` | Top-level package exposes 21 benchmark facades: 7 eager imports and 14 lazy `_BENCHMARK_REGISTRY` entries. |
+| `benchbox/core/benchmark_loader.py` | Loader is registry-backed and internal; it resolves 23 core benchmark families from `CORE_BENCHMARK_CLASS_NAMES`. |
+| `benchbox/core/benchmark_registry.py` | Registry has 23 benchmark metadata entries; public discovery hides only `joinorder_synthetic`, leaving 22 public entries. |
+| `docs/reference/backward-compatibility.md` | Compatibility row now records the legacy core base as a retained internal base with a migration target rather than a public extension path. |

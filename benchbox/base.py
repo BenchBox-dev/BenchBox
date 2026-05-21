@@ -16,6 +16,9 @@ from benchbox.utils.cloud_storage import create_path_handler
 from benchbox.utils.scale_factor import format_scale_factor
 from benchbox.utils.verbosity import VerbosityMixin, compute_verbosity
 
+BENCHMARK_API_SURFACE = "beta-public"
+RUN_WITH_PLATFORM_API_SURFACE = "beta-public"
+
 if TYPE_CHECKING:
     import sqlglot
 
@@ -33,6 +36,9 @@ class BaseBenchmark(VerbosityMixin, ABC):
 
     All benchmarks inherit from this class.
     """
+
+    api_surface = BENCHMARK_API_SURFACE
+    run_with_platform_api_surface = RUN_WITH_PLATFORM_API_SURFACE
 
     def __init__(
         self,

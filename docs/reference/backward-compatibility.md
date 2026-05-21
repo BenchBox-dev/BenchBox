@@ -77,7 +77,7 @@ Maintain live rows below. Do not leave compatibility changes untracked.
 | Location | Compatibility Marker | Status | Target Removal | Rationale | Owner |
 | --- | --- | --- | --- | --- | --- |
 | `benchbox/base.py` | `BaseBenchmark.create_enhanced_benchmark_result()` continues accepting legacy kwargs (`table_statistics`, `data_loading_time`, `phases`, `execution_metadata`) while delegating to shared result factory | active | Beta compatibility review | Preserve stable result-shape behavior for adapters and wrapper benchmarks while runtime internals are unified | core-runtime |
-| `benchbox/core/base_benchmark.py` | Internal base class retained for existing benchmarks, with result creation delegated to shared result factory | deprecate | After all core benchmarks migrate to `benchbox.base.BaseBenchmark` | Avoid breaking remaining internal benchmark classes during staged runtime harmonization | core-runtime |
+| `benchbox/core/base_benchmark.py` | Deprecated internal base class retained for the remaining `datavault` and `tpcds_obt` core implementations, with result creation delegated to shared result factory | deprecate | After `benchbox/core/datavault/benchmark.py` and `benchbox/core/tpcds_obt/benchmark.py` migrate to `benchbox.base.BaseBenchmark` | Avoid breaking remaining internal benchmark classes during staged runtime harmonization; not a public extension path for new benchmark families | core-runtime |
 
 ## Runtime Harmonization Notes (2026-02-26)
 
@@ -87,6 +87,20 @@ Maintain live rows below. Do not leave compatibility changes untracked.
 - Cleanup boundary for this workstream:
   - Keep top-level wrapper classes in `benchbox/*.py` as-is.
   - Keep `benchbox.core.base_benchmark.BaseBenchmark` until a dedicated migration/removal item is approved.
+
+## Benchmark API Boundary Notes (2026-05-21)
+
+- Top-level wrapper facades remain beta-public. The current package exposes 21
+  top-level benchmark facades: 7 eager imports and 14 lazy registry entries.
+- `ai_primitives` and `joinorder_synthetic` remain core-only benchmark IDs.
+  `joinorder_synthetic` is also hidden from public discovery by registry
+  `surface: internal`.
+- `benchbox.core.benchmark_loader` is an internal loader, not an external Python
+  API. It resolves 23 core benchmark families from the shared benchmark
+  registry.
+- `benchbox.core.base_benchmark.BaseBenchmark` is justified as a deprecated
+  internal compatibility base for `datavault` and `tpcds_obt`; new benchmark
+  work should use `benchbox.base.BaseBenchmark`.
 
 ## Final Removal Report (2026-02-18)
 

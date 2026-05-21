@@ -1,5 +1,9 @@
 """Benchmark loading functionality.
 
+This module is an internal runtime loader. Public callers should use the CLI,
+top-level benchmark wrappers, or ``benchbox.base.BaseBenchmark`` orchestration
+hooks instead of importing loader internals directly.
+
 Copyright 2026 Joe Harris / BenchBox Project
 
 Licensed under the MIT License. See LICENSE file in the project root for details.
@@ -16,6 +20,8 @@ from benchbox.core.benchmark_registry import (
     validate_scale_factor,
 )
 from benchbox.core.schemas import BenchmarkConfig, SystemProfile
+
+BENCHMARK_LOADER_API_SURFACE = "internal"
 
 
 def get_benchmark_instance(config: BenchmarkConfig, system_profile: SystemProfile | None) -> Any:
