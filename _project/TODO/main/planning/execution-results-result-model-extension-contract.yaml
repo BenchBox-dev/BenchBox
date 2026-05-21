@@ -1,0 +1,240 @@
+id: execution-results-result-model-extension-contract
+title: "Execution/results hardening: define result-model extension contract before platform-specific field migration"
+worktree: main
+priority: Medium-High
+status: "Not Started"
+category: Results
+
+deps:
+  needs:
+    - architecture-contract-map-and-support-taxonomy
+    - result-schema-policy-and-explorer-input-gate
+
+description: |
+  Independent verification partially confirmed that `BenchmarkResults` is doing
+  too much, but also found that the original critic overstated the facts. The
+  dataclass currently has 78 fields, not roughly 205. It has several platform
+  metadata dictionaries, `_benchmark_id_override`, and a platform-specific
+  `native_comparison` field. The claimed `migration` top-level model field is
+  not a `BenchmarkResults` field; schema-v2 exports migration as a phase when
+  `ExecutionPhases.migration` is present, while a separate pg_mooncake script
+  emits a top-level `migration` block.
+
+  The suggested fix, moving platform-specific results into
+  `platform_extensions: dict[str, Any]`, is therefore directionally useful but
+  risky. Result JSON is a product boundary consumed by runtime loaders, CLI
+  compare/export/show, MCP tools, public submissions, hosted result bundles,
+  and the explorer pipeline. This TODO creates the migration contract and a
+  narrow extension policy before any field move.
+
+work:
+  - id: w0
+    summary: "Revalidate BenchmarkResults field count, platform-specific fields, and schema consumers"
+    status: pending
+    notes: |
+      Re-run the current-tree evidence before proposing schema or model changes.
+      Capture checked SHA, commands, and compact results in the implementation
+      PR body or TODO notes; do not commit raw stdout.
+
+      Required checks:
+        - `uv run -- python - <<'PY'` snippet using `dataclasses.fields(BenchmarkResults)` to print field count and platform/native/migration-related fields.
+        - `rg -n "native_comparison|\\[\\\"migration\\\"\\]|platform_info|platform_metadata|platform_raw|BenchmarkResults\\(|build_result_payload|reconstruct_benchmark_results|load_result_file|ResultExporter|PUBLIC_SUBMISSION_SCHEMA_POLICY" benchbox _project scripts tests docs/reference --glob '!build/**' --glob '!docs/_build/**' --glob '!.venv/**'`.
+        - Inspect `benchbox/core/results/schema.py`, `benchbox/core/results/loader.py`, `benchbox/core/results/exporter.py`, `benchbox/mcp/tools/benchmark.py`, `benchbox/mcp/tools/results.py`, and `_project/scripts/explorer_pipeline/`.
+
+      Decision gate: do not move or remove any serialized result key in the
+      implementation PR unless the migration policy explicitly classifies the
+      change as backward-compatible or includes a same-PR migration/loader gate.
+
+  - id: w1
+    summary: "Write a result-model extension policy covering platform-specific data and schema-v2 compatibility"
+    needs: [w0]
+    status: pending
+    notes: |
+      Add a policy section to docs/reference/public-contracts.md or a focused
+      result-schema doc that answers:
+        - where platform-specific structured data should live in the internal
+          model;
+        - where it should serialize in schema-v2 payloads;
+        - when top-level schema keys are allowed;
+        - when a new `platform_extensions` block is acceptable;
+        - how loader, normalizer, public submission, and explorer consumers
+          must handle unknown extension keys;
+        - what evidence is required before moving an existing field.
+
+      The policy must distinguish internal dataclass fields from exported JSON
+      keys. Do not let a model cleanup imply a schema break.
+
+  - id: w2
+    summary: "Create an extension inventory and migration matrix for current platform-specific fields"
+    needs: [w1]
+    status: pending
+    notes: |
+      Build a concise inventory covering at least:
+        - `native_comparison` and its `comparisons.native_duckdb` export;
+        - `ExecutionPhases.migration` and `phases.migration` export;
+        - the standalone pg_mooncake migration script's top-level `migration`
+          payload;
+        - `platform_info`, `platform_metadata`, `platform_raw_config`,
+          `platform_raw_metadata`;
+        - `platform_deployment`, `platform_cloud`, `platform_compute`,
+          `platform_storage`;
+        - `execution_context` and `_benchmark_id_override`.
+
+      For each row record current owner, exported key, loader reconstruction
+      behavior, downstream consumers, and recommended action:
+        - keep;
+        - alias;
+        - move internally only;
+        - migrate exported schema with compatibility;
+        - reject as not worth it.
+
+  - id: w3
+    summary: "Add consumer tests or fixtures that lock current extension behavior before migration"
+    needs: [w2]
+    status: pending
+    notes: |
+      Before changing model shape, add focused tests or fixtures that prove
+      current behavior for `comparisons.native_duckdb`, `phases.migration`, and
+      platform metadata blocks through:
+        - `build_result_payload()`;
+        - `reconstruct_benchmark_results()`;
+        - public submission validation where applicable;
+        - explorer pipeline transformation where applicable.
+
+      If the matrix chooses no field migration yet, this work still protects
+      future refactors by making the current contract explicit.
+
+  - id: w4
+    summary: "Implement only the lowest-risk internal extension cleanup approved by the matrix"
+    needs: [w3]
+    status: pending
+    notes: |
+      Choose one narrow change from the w2 matrix that does not break exported
+      result JSON. Examples:
+        - add an internal `platform_extensions` field while continuing to
+          serialize existing keys unchanged;
+        - route one new platform-specific result through an extension block
+          without moving existing keys;
+        - add loader passthrough for unknown extension blocks while preserving
+          known fields.
+
+      If every field move is risky, record that as the outcome and stop after
+      policy, inventory, and tests. A "no migration yet" result is acceptable
+      if it is evidence-backed.
+
+deferred:
+  - summary: "Move all existing platform-specific result fields into `platform_extensions`"
+    reason: "This is the risky change the TODO is designed to evaluate; do it only after policy, inventory, and consumer tests prove compatibility."
+  - summary: "Bump result schema major version for a broad model cleanup"
+    reason: "Result schema policy currently supports schema-v2 consumers; a major break requires a separate migration plan."
+
+metadata:
+  tags:
+    - architecture-review-followup
+    - results
+    - schema
+    - benchmark-results
+    - compatibility
+  estimated_effort: "2-3 days"
+  created_date: "2026-05-21"
+  last_updated: "2026-05-21T00:00:00Z"
+  source: "Independent verification of execution/results architecture finding #6"
+
+impact:
+  business_value: |
+    Protects public result bundles and hosted submissions while making future
+    platform-specific result extensions more disciplined.
+  user_impact: |
+    Users and downstream tools avoid surprise schema breaks while maintainers
+    get a clear path for adding platform-specific result data.
+  technical_debt: |
+    Separates model-cleanup desire from schema compatibility requirements and
+    records a migration matrix for the overloaded result object.
+
+files_affected:
+  modified:
+    - "benchbox/core/results/models.py"
+    - "benchbox/core/results/schema.py"
+    - "benchbox/core/results/loader.py"
+    - "benchbox/core/results/schema_policy.py"
+    - "benchbox/core/results/normalizer.py"
+    - "benchbox/mcp/tools/benchmark.py"
+    - "benchbox/mcp/tools/results.py"
+    - "_project/scripts/explorer_pipeline/"
+    - "scripts/benchmark_mooncake_migration.py"
+    - "tests/unit/core/results/"
+    - "tests/unit/core/explorer_pipeline/"
+    - "tests/unit/cli/commands/test_submit.py"
+    - "docs/reference/public-contracts.md"
+    - "docs/reference/result-formats.md"
+
+prior_art:
+  - "docs/reference/public-contracts.md: result JSON bundle contract tier - extend before moving exported fields."
+  - "benchbox/core/results/schema_policy.py: consumer-specific schema acceptance - preserve these risk postures."
+  - "benchbox/core/results/schema.py: current schema-v2 payload builder - exported keys are the compatibility boundary."
+  - "benchbox/core/results/loader.py: reconstruction contract for historical result files - test before moving fields."
+  - "_project/scripts/explorer_pipeline/transformer.py: hosted/explorer consumer - include in downstream compatibility checks."
+  - "scripts/benchmark_mooncake_migration.py: standalone top-level migration payload - decide whether to align or leave separate."
+
+must_preserve:
+  - "Existing schema-v2 result bundles remain loadable by `load_result_file()`."
+  - "Public submission validation remains compatible with accepted schema-v2 bundles."
+  - "Explorer pipeline input gate behavior from result-schema-policy work is not weakened."
+  - "No existing top-level exported key is removed without same-PR compatibility and docs updates."
+  - "Do not conflate internal dataclass cleanup with exported JSON schema cleanup."
+
+approach: |
+  Treat `BenchmarkResults` cleanup as a compatibility design problem, not a
+  mechanical field move. First document the extension policy, then inventory
+  current fields and consumers, then add contract tests, and only then make a
+  minimal internal-only or backward-compatible change.
+
+anti_patterns:
+  - "DO NOT move `native_comparison` or migration fields into `platform_extensions` in one step without loader, explorer, MCP, and public-submission tests."
+  - "DO NOT add a catch-all dict that bypasses schema-v2 validation policy."
+  - "DO NOT treat the dataclass field count as the user-facing problem -- exported result compatibility is the primary risk."
+  - "DO NOT delete `_benchmark_id_override` until result filename, loader, and builder behavior have an explicit replacement."
+
+verification:
+  - description: "Focused result schema/model tests pass."
+    command: "uv run -- python -m pytest tests/unit/core/results -q"
+    expected_output: "Result model, loader, schema, and normalizer tests pass."
+  - description: "Explorer and submission consumers remain compatible."
+    command: "uv run -- python -m pytest tests/unit/core/explorer_pipeline tests/unit/cli/commands/test_submit.py --tb=short"
+    expected_output: "Explorer pipeline and submission command tests pass."
+  - description: "Published bundle validator still accepts existing corpus."
+    command: "uv run -- python scripts/validate_submission.py results-data/bundles/"
+    expected_output: "Existing public result bundles validate."
+  - description: "TODO graph remains valid after implementation."
+    command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate && uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph"
+    expected_output: "TODO validation and graph checks pass."
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/results/"
+    - "benchbox/mcp/tools/benchmark.py"
+    - "benchbox/mcp/tools/results.py"
+    - "_project/scripts/explorer_pipeline/"
+    - "scripts/benchmark_mooncake_migration.py"
+    - "tests/unit/core/results/"
+    - "tests/unit/core/explorer_pipeline/"
+    - "tests/unit/cli/commands/test_submit.py"
+    - "docs/reference/public-contracts.md"
+    - "docs/reference/result-formats.md"
+    - "_project/TODO/"
+    - "_project/DONE/"
+  do_not_modify:
+    - "benchbox/core/runner/"
+    - "benchbox/platforms/"
+    - "results-data/"
+
+success_metrics:
+  - "Result extension policy names allowed locations for platform-specific data and unknown extension handling."
+  - "Every current platform-specific result field has a migration-matrix row and downstream consumer classification."
+  - "Contract tests lock current behavior before any model-shape change."
+  - "Any implemented cleanup is backward-compatible at the exported JSON boundary."
+
+open_questions:
+  - "Should `platform_extensions` be an internal-only field first, or should schema-v2 gain an explicit exported extension block?"
+  - "Should the standalone pg_mooncake migration script be converted to canonical `phases.migration`, or intentionally remain separate?"
+  - "What deprecation window should apply before removing compatibility aliases from result loaders?"
