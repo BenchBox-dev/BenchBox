@@ -20,6 +20,7 @@ from benchbox.platforms.base import (
     ConnectionConfig,
     PlatformAdapter,
 )
+from benchbox.utils.dialect_utils import SQLTranslationError, SqlTranslationOutcome
 from tests.fixtures.result_dict_fixtures import make_benchmark_results
 
 pytestmark = [
@@ -223,6 +224,23 @@ class BenchmarkWithVersionAwareQueries:
             }
         )
         return {"Q1": "SELECT 1"}
+
+
+class BenchmarkWithStrictTranslationFailure:
+    """Benchmark stub whose dialect-aware path raises the strict translation exception."""
+
+    def get_queries(self, dialect: str | None = None, base_dialect: str | None = None) -> dict[str, str]:
+        if dialect is None:
+            return {"Q1": "SELECT fallback"}
+        outcome = SqlTranslationOutcome(
+            source_dialect=base_dialect or "ansi",
+            target_dialect=dialect,
+            translator="test",
+            status="failed",
+            strict_mode=True,
+            error_category="translation_failed",
+        )
+        raise SQLTranslationError("strict translation failed", outcome)
 
 
 class TestConnectionConfig:
@@ -3202,3 +3220,14 @@ class TestDialectQuerySelection:
 
         assert queries == {"Q1": "SELECT 1"}
         assert benchmark.calls == [{"dialect": "mock_dialect", "platform_version": "1.0.0"}]
+
+    def test_get_dialect_queries_preserves_strict_translation_failures(self):
+        adapter = MockPlatformAdapterWithDialect()
+        benchmark = BenchmarkWithStrictTranslationFailure()
+
+        with pytest.raises(SQLTranslationError):
+            adapter._get_dialect_queries(
+                benchmark,
+                benchmark_slug="tpch",
+                connection=Mock(name="strict_translation_connection"),
+            )

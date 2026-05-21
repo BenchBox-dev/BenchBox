@@ -27,7 +27,7 @@ from _project.scripts.explorer_pipeline.models import (
 from benchbox.core.cost.models import CostScope, CostStatus, DeploymentMetadata, NormalizedCost
 from benchbox.core.cost.pricing import PRICING_VERSION
 from benchbox.core.results.schema_policy import EXPLORER_INPUT_SCHEMA_POLICY
-from benchbox.core.results.status import bundle_failed_query_count, normalize_validation_status
+from benchbox.core.results.status import bundle_failed_query_count, bundle_non_clean_reason, normalize_validation_status
 
 logger = logging.getLogger(__name__)
 
@@ -215,16 +215,27 @@ def _validation_status(data: dict[str, Any]) -> str | None:
         normalized = normalize_validation_status(val)
         if failed_queries and normalized in {None, "passed"}:
             return "partial"
+        if _translation_uncertain(data, normalized):
+            return "uncertain"
         return normalized
     if isinstance(val, dict):
         s = val.get("status")
         normalized = normalize_validation_status(s)
         if failed_queries and normalized in {None, "passed"}:
             return "partial"
+        if _translation_uncertain(data, normalized):
+            return "uncertain"
         return normalized
     if failed_queries:
         return "partial"
     return None
+
+
+def _translation_uncertain(data: dict[str, Any], validation_status: str | None) -> bool:
+    if validation_status not in {None, "passed"}:
+        return False
+    reason = bundle_non_clean_reason(data)
+    return bool(reason and reason.startswith("translation_status="))
 
 
 def _unavailable_normalized_cost() -> NormalizedCost:

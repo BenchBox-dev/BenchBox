@@ -83,6 +83,7 @@ benchbox run [OPTIONS]
   - `disabled`: No validation
   - `full`: All validation checks enabled (preflight, postgen, postload, platform check)
   - `preflight`, `postgen`, `postload`, `check-platforms`: Individual validation types
+- `--strict-translation`: Fail instead of falling back when SQL dialect translation cannot produce target SQL
 
 **Platform-Specific Configuration:**
 - `--platform-option KEY=VALUE`: Platform-specific option (can be used multiple times)

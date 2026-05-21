@@ -288,6 +288,12 @@ def _resolve_strict_translation_mode(options: Mapping[str, Any]) -> bool:
             if key in platform_options:
                 return _coerce_bool_option(platform_options[key])
 
+    benchmark_options = options.get("benchmark_options")
+    if isinstance(benchmark_options, Mapping):
+        for key in ("strict_translation", "translation_strict", "sql_translation_strict"):
+            if key in benchmark_options:
+                return _coerce_bool_option(benchmark_options[key])
+
     return False
 
 

@@ -351,6 +351,27 @@ def test_mode_is_execution_type():
     assert payload.get("execution", {}).get("mode") in ("sql", "dataframe")
 
 
+def test_sql_translation_metadata_is_allowed_conditional_execution_metadata():
+    sql_result = _build_result("sql")
+    sql_result.execution_metadata = {
+        **(sql_result.execution_metadata or {}),
+        "translation": {
+            "status": "success",
+            "strict_mode": True,
+            "attempt_count": 1,
+            "fallback_count": 0,
+            "failed_count": 0,
+        },
+    }
+
+    sql_payload = build_result_payload(sql_result)
+    df_payload = build_result_payload(_build_result("dataframe"))
+
+    assert set(sql_payload["execution"]) - set(df_payload["execution"]) == {"translation"}
+    assert set(df_payload["execution"]) - set(sql_payload["execution"]) == set()
+    assert sql_payload["execution"]["translation"]["status"] == "success"
+
+
 def test_phases_block_complete():
     payload = build_result_payload(_build_result("sql"))
     for phase in (

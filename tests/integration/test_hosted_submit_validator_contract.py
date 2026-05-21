@@ -72,7 +72,7 @@ def _minimal_schema_v2_bundle() -> dict:
         },
         "benchmark": {"id": "tpch", "scale_factor": 0.01},
         "platform": {"name": "duckdb"},
-        "summary": {"queries": {"total": 22}},
+        "summary": {"validation": "passed", "queries": {"total": 22, "passed": 22, "failed": 0}},
         "queries": [{"id": "Q1", "ms": 100.0}],
     }
 

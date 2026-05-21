@@ -44,13 +44,17 @@ _FAKE_BUNDLE = {
 }
 
 
+def _write_payload(path: Path, name: str, payload: dict) -> Path:
+    target = path / f"{name}.json"
+    target.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    return target
+
+
 def _write_bundle(path: Path, name: str, marker: str) -> Path:
     """Write a deterministic dummy bundle whose contents differ by `marker`."""
     bundle = {**_FAKE_BUNDLE}
     bundle["run"] = {**_FAKE_BUNDLE["run"], "id": f"run-{marker}"}
-    target = path / f"{name}.json"
-    target.write_text(json.dumps(bundle, indent=2) + "\n", encoding="utf-8")
-    return target
+    return _write_payload(path, name, bundle)
 
 
 def _run_validator(bundle_paths: list[Path]) -> subprocess.CompletedProcess[str]:
@@ -186,3 +190,45 @@ def test_validator_rejects_malformed_schema_v2_family(tmp_path: Path) -> None:
     assert proc.returncode != 0, proc.stdout + proc.stderr
     assert "public submission schema policy" in proc.stdout
     assert "numeric schema version family 2.x" in proc.stdout
+
+
+@pytest.mark.parametrize("validation_status", ["not_run", "uncertain"])
+def test_validator_rejects_non_clean_public_validation_status(tmp_path: Path, validation_status: str) -> None:
+    source_dir = tmp_path / "fresh"
+    source_dir.mkdir()
+    payload = {**_FAKE_BUNDLE, "summary": {**_FAKE_BUNDLE["summary"], "validation": validation_status}}
+    bundle = _write_payload(source_dir, f"tpch_sf001_duckdb_{validation_status}", payload)
+
+    proc = _run_validator([bundle])
+
+    assert proc.returncode != 0, proc.stdout + proc.stderr
+    assert "summary.validation must be 'passed'" in proc.stdout
+
+
+def test_validator_rejects_missing_public_validation_status(tmp_path: Path) -> None:
+    source_dir = tmp_path / "fresh"
+    source_dir.mkdir()
+    summary = {**_FAKE_BUNDLE["summary"]}
+    summary.pop("validation")
+    payload = {**_FAKE_BUNDLE, "summary": summary}
+    bundle = _write_payload(source_dir, "tpch_sf001_duckdb_missing_validation", payload)
+
+    proc = _run_validator([bundle])
+
+    assert proc.returncode != 0, proc.stdout + proc.stderr
+    assert "summary.validation is required" in proc.stdout
+
+
+def test_validator_rejects_translation_fallback_public_submission(tmp_path: Path) -> None:
+    source_dir = tmp_path / "fresh"
+    source_dir.mkdir()
+    payload = {
+        **_FAKE_BUNDLE,
+        "execution": {"mode": "sql", "translation": {"status": "fallback", "strict_mode": False}},
+    }
+    bundle = _write_payload(source_dir, "tpch_sf001_duckdb_translation_fallback", payload)
+
+    proc = _run_validator([bundle])
+
+    assert proc.returncode != 0, proc.stdout + proc.stderr
+    assert "execution.translation.status='fallback'" in proc.stdout

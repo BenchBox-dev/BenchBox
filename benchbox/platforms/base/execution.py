@@ -50,6 +50,7 @@ from benchbox.platforms.base.connection_wrappers import (
     PlatformAdapterConnection,
     _make_stream_cursor,
 )
+from benchbox.utils.dialect_utils import SQLTranslationError
 from benchbox.utils.printing import quiet_console
 
 
@@ -1150,6 +1151,8 @@ class TestDriversMixin:
                     return benchmark.get_queries(**query_kwargs)
                 else:
                     return benchmark.get_queries()
+            except SQLTranslationError:
+                raise
             except Exception:
                 return benchmark.get_queries()
         return benchmark.get_queries()
