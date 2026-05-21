@@ -22,6 +22,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+from csv import reader
 from typing import Any
 
 from benchbox.core.dataframe.context import DataFrameContext
@@ -417,105 +418,47 @@ def q5_pandas_impl(ctx: DataFrameContext) -> Any:
 # Query Registration
 # =============================================================================
 
+_CATEGORY_CODES = {
+    "AG": QueryCategory.AGGREGATE,
+    "AN": QueryCategory.ANALYTICAL,
+    "FI": QueryCategory.FILTER,
+    "GB": QueryCategory.GROUP_BY,
+    "JO": QueryCategory.JOIN,
+    "PR": QueryCategory.PROJECTION,
+    "SC": QueryCategory.SCAN,
+    "SO": QueryCategory.SORT,
+}
+
+_QUERY_METADATA = """\
+Q1|Scan Query|Filter rankings by pageRank threshold|SC,FI|q1
+Q1a|Scan Aggregation|COUNT, AVG, MAX of pageRank with threshold filter|FI,AG|q1a
+Q2|Join Query|Join uservisits to rankings with date range, GROUP BY sourceIP|FI,JO,GB,SO|q2
+Q2a|Join with Filter|Join uservisits to rankings with pageRank filter|FI,JO,SO|q2a
+Q3|Text Search|Text search on searchWord with HAVING on visit_count|FI,GB,AG,AN|q3
+Q3a|Document Analysis|Text analysis on documents with keyword matching via CASE WHEN|FI,PR,AN|q3a
+Q4|Country/Language Analytics|Country and language analytics with HAVING and COUNT DISTINCT|FI,GB,AG,AN|q4
+Q5|Cross-Table Analytics|Join uservisits+rankings, GROUP BY country with HAVING and COUNT DISTINCT|FI,JO,GB,AG,AN|q5
+"""
+
+
+def _impl_for(stem: str, family: str) -> Any:
+    return globals()[f"{stem}_{family}_impl"]
+
 
 def _register_all_queries() -> None:
-    """Register all 8 AMPLab DataFrame queries."""
-    register_query(
-        DataFrameQuery(
-            query_id="Q1",
-            query_name="Scan Query",
-            description="Filter rankings by pageRank threshold",
-            categories=[QueryCategory.SCAN, QueryCategory.FILTER],
-            expression_impl=q1_expression_impl,
-            pandas_impl=q1_pandas_impl,
+    for query_id, query_name, description, category_codes, impl_stem in reader(
+        _QUERY_METADATA.splitlines(), delimiter="|"
+    ):
+        register_query(
+            DataFrameQuery(
+                query_id=query_id,
+                query_name=query_name,
+                description=description,
+                categories=[_CATEGORY_CODES[code] for code in category_codes.split(",")],
+                expression_impl=_impl_for(impl_stem, "expression"),
+                pandas_impl=_impl_for(impl_stem, "pandas"),
+            )
         )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q1a",
-            query_name="Scan Aggregation",
-            description="COUNT, AVG, MAX of pageRank with threshold filter",
-            categories=[QueryCategory.FILTER, QueryCategory.AGGREGATE],
-            expression_impl=q1a_expression_impl,
-            pandas_impl=q1a_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q2",
-            query_name="Join Query",
-            description="Join uservisits to rankings with date range, GROUP BY sourceIP",
-            categories=[QueryCategory.FILTER, QueryCategory.JOIN, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q2_expression_impl,
-            pandas_impl=q2_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q2a",
-            query_name="Join with Filter",
-            description="Join uservisits to rankings with pageRank filter",
-            categories=[QueryCategory.FILTER, QueryCategory.JOIN, QueryCategory.SORT],
-            expression_impl=q2a_expression_impl,
-            pandas_impl=q2a_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q3",
-            query_name="Text Search",
-            description="Text search on searchWord with HAVING on visit_count",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=q3_expression_impl,
-            pandas_impl=q3_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q3a",
-            query_name="Document Analysis",
-            description="Text analysis on documents with keyword matching via CASE WHEN",
-            categories=[QueryCategory.FILTER, QueryCategory.PROJECTION, QueryCategory.ANALYTICAL],
-            expression_impl=q3a_expression_impl,
-            pandas_impl=q3a_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q4",
-            query_name="Country/Language Analytics",
-            description="Country and language analytics with HAVING and COUNT DISTINCT",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=q4_expression_impl,
-            pandas_impl=q4_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q5",
-            query_name="Cross-Table Analytics",
-            description="Join uservisits+rankings, GROUP BY country with HAVING and COUNT DISTINCT",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.JOIN,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=q5_expression_impl,
-            pandas_impl=q5_pandas_impl,
-        )
-    )
 
 
 _register_all_queries()
