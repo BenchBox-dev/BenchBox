@@ -22,6 +22,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+from csv import reader
 from typing import Any
 
 from benchbox.core.dataframe.context import DataFrameContext
@@ -1264,336 +1265,61 @@ def q25_pandas_impl(ctx: DataFrameContext) -> Any:
 # Query Registration
 # =============================================================================
 
+_CATEGORY_CODES = {
+    "AG": QueryCategory.AGGREGATE,
+    "AN": QueryCategory.ANALYTICAL,
+    "FI": QueryCategory.FILTER,
+    "GB": QueryCategory.GROUP_BY,
+    "JO": QueryCategory.JOIN,
+    "MJ": QueryCategory.MULTI_JOIN,
+    "SC": QueryCategory.SCAN,
+    "SO": QueryCategory.SORT,
+}
+
+_QUERY_METADATA = """Q1|Trips per Hour|Hourly trip count distribution using EXTRACT(HOUR)|FI,GB,AG,AN
+Q2|Trips per Day|Daily trip count using DATE_TRUNC('day')|FI,GB,AG,AN
+Q3|Trips per Month|Monthly trip count and total revenue using DATE_TRUNC('month')|FI,GB,AG,AN
+Q4|Trips by Day of Week|Day-of-week distribution with avg distance and fare|FI,GB,AG,AN
+Q5|Top Pickup Zones|Top 20 pickup zones by trip count with LEFT JOIN to taxi_zones|FI,JO,GB,SO
+Q6|Top Dropoff Zones|Top 20 dropoff zones by trip count with LEFT JOIN to taxi_zones|FI,JO,GB,SO
+Q7|Top Routes|Top 50 routes (pickup->dropoff) with double LEFT JOIN to taxi_zones|FI,MJ,GB,SO
+Q8|Borough Summary|Borough-level trip count, revenue, distance, and tip averages|FI,JO,GB,SO
+Q9|Revenue by Payment Type|Revenue and tip analysis by payment type with NULLIF protection|FI,GB,AG,AN
+Q10|Fare Distribution|Fare distribution in $5 buckets using FLOOR bucketing|FI,GB,AG,AN
+Q11|Tip Analysis|Tip analysis by hour for credit card payments with conditional avg|FI,GB,AG,AN
+Q12|Surcharge Revenue|Monthly surcharge revenue breakdown (extra, MTA tax, improvement, congestion, tolls)|FI,GB,AG,AN
+Q13|Distance Distribution|Trip distance distribution in 1-mile buckets|FI,GB,AG
+Q14|Passenger Count Analysis|Metrics by passenger count (1-6) with NULLIF fare-per-mile|FI,GB,AG,AN
+Q15|Trip Duration Analysis|Duration distribution in 5-min buckets using timestamp arithmetic|FI,GB,AG,AN
+Q16|Rate Code Summary|Trip metrics by rate code (Standard, JFK, Newark, etc.)|FI,GB,AG
+Q17|Airport Trips|Airport trip analysis (JFK/Newark) with zone join|FI,JO,GB,SO
+Q18|Vendor Comparison|Vendor-level trip metrics comparison|FI,GB,AG
+Q19|Hourly Zone Heatmap|2D grouping by hour and pickup zone for heatmap visualization|FI,GB,SO,AN
+Q20|Weekday/Weekend Comparison|Weekday vs weekend metrics by hour using CASE WHEN on day-of-week|FI,GB,SO,AN
+Q21|Rush Hour Analysis|Morning rush, evening rush, and off-peak period comparison|FI,GB,AG,AN
+Q22|Monthly Year-over-Year|Year and month grouping for YoY comparison over 2-year window|FI,GB,AG,AN
+Q23|Single-Day Summary|Scalar aggregation for a single day (no GROUP BY)|FI,AG
+Q24|Zone Detail|Detailed metrics for a specific zone with INNER JOIN|FI,JO,GB,AG
+Q25|Full Scan Count|COUNT(*) baseline full table scan|SC,AG
+"""
+
+
+def _impl_for(query_id: str, family: str) -> Any:
+    return globals()[f"q{query_id[1:]}_{family}_impl"]
+
 
 def _register_all_queries() -> None:
-    """Register all 25 NYC Taxi DataFrame queries."""
-    # Temporal (Q1-Q4)
-    register_query(
-        DataFrameQuery(
-            query_id="Q1",
-            query_name="Trips per Hour",
-            description="Hourly trip count distribution using EXTRACT(HOUR)",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=q1_expression_impl,
-            pandas_impl=q1_pandas_impl,
+    for query_id, query_name, description, category_codes in reader(_QUERY_METADATA.splitlines(), delimiter="|"):
+        register_query(
+            DataFrameQuery(
+                query_id=query_id,
+                query_name=query_name,
+                description=description,
+                categories=[_CATEGORY_CODES[code] for code in category_codes.split(",")],
+                expression_impl=_impl_for(query_id, "expression"),
+                pandas_impl=_impl_for(query_id, "pandas"),
+            )
         )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q2",
-            query_name="Trips per Day",
-            description="Daily trip count using DATE_TRUNC('day')",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=q2_expression_impl,
-            pandas_impl=q2_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q3",
-            query_name="Trips per Month",
-            description="Monthly trip count and total revenue using DATE_TRUNC('month')",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=q3_expression_impl,
-            pandas_impl=q3_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q4",
-            query_name="Trips by Day of Week",
-            description="Day-of-week distribution with avg distance and fare",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=q4_expression_impl,
-            pandas_impl=q4_pandas_impl,
-        )
-    )
-
-    # Geographic (Q5-Q8)
-    register_query(
-        DataFrameQuery(
-            query_id="Q5",
-            query_name="Top Pickup Zones",
-            description="Top 20 pickup zones by trip count with LEFT JOIN to taxi_zones",
-            categories=[QueryCategory.FILTER, QueryCategory.JOIN, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q5_expression_impl,
-            pandas_impl=q5_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q6",
-            query_name="Top Dropoff Zones",
-            description="Top 20 dropoff zones by trip count with LEFT JOIN to taxi_zones",
-            categories=[QueryCategory.FILTER, QueryCategory.JOIN, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q6_expression_impl,
-            pandas_impl=q6_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q7",
-            query_name="Top Routes",
-            description="Top 50 routes (pickup->dropoff) with double LEFT JOIN to taxi_zones",
-            categories=[QueryCategory.FILTER, QueryCategory.MULTI_JOIN, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q7_expression_impl,
-            pandas_impl=q7_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q8",
-            query_name="Borough Summary",
-            description="Borough-level trip count, revenue, distance, and tip averages",
-            categories=[QueryCategory.FILTER, QueryCategory.JOIN, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q8_expression_impl,
-            pandas_impl=q8_pandas_impl,
-        )
-    )
-
-    # Financial (Q9-Q12)
-    register_query(
-        DataFrameQuery(
-            query_id="Q9",
-            query_name="Revenue by Payment Type",
-            description="Revenue and tip analysis by payment type with NULLIF protection",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=q9_expression_impl,
-            pandas_impl=q9_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q10",
-            query_name="Fare Distribution",
-            description="Fare distribution in $5 buckets using FLOOR bucketing",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=q10_expression_impl,
-            pandas_impl=q10_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q11",
-            query_name="Tip Analysis",
-            description="Tip analysis by hour for credit card payments with conditional avg",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=q11_expression_impl,
-            pandas_impl=q11_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q12",
-            query_name="Surcharge Revenue",
-            description="Monthly surcharge revenue breakdown (extra, MTA tax, improvement, congestion, tolls)",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=q12_expression_impl,
-            pandas_impl=q12_pandas_impl,
-        )
-    )
-
-    # Characteristics (Q13-Q15)
-    register_query(
-        DataFrameQuery(
-            query_id="Q13",
-            query_name="Distance Distribution",
-            description="Trip distance distribution in 1-mile buckets",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-            expression_impl=q13_expression_impl,
-            pandas_impl=q13_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q14",
-            query_name="Passenger Count Analysis",
-            description="Metrics by passenger count (1-6) with NULLIF fare-per-mile",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=q14_expression_impl,
-            pandas_impl=q14_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q15",
-            query_name="Trip Duration Analysis",
-            description="Duration distribution in 5-min buckets using timestamp arithmetic",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=q15_expression_impl,
-            pandas_impl=q15_pandas_impl,
-        )
-    )
-
-    # Rates (Q16-Q17)
-    register_query(
-        DataFrameQuery(
-            query_id="Q16",
-            query_name="Rate Code Summary",
-            description="Trip metrics by rate code (Standard, JFK, Newark, etc.)",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-            expression_impl=q16_expression_impl,
-            pandas_impl=q16_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q17",
-            query_name="Airport Trips",
-            description="Airport trip analysis (JFK/Newark) with zone join",
-            categories=[QueryCategory.FILTER, QueryCategory.JOIN, QueryCategory.GROUP_BY, QueryCategory.SORT],
-            expression_impl=q17_expression_impl,
-            pandas_impl=q17_pandas_impl,
-        )
-    )
-
-    # Vendor (Q18)
-    register_query(
-        DataFrameQuery(
-            query_id="Q18",
-            query_name="Vendor Comparison",
-            description="Vendor-level trip metrics comparison",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-            expression_impl=q18_expression_impl,
-            pandas_impl=q18_pandas_impl,
-        )
-    )
-
-    # Complex (Q19-Q22)
-    register_query(
-        DataFrameQuery(
-            query_id="Q19",
-            query_name="Hourly Zone Heatmap",
-            description="2D grouping by hour and pickup zone for heatmap visualization",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT, QueryCategory.ANALYTICAL],
-            expression_impl=q19_expression_impl,
-            pandas_impl=q19_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q20",
-            query_name="Weekday/Weekend Comparison",
-            description="Weekday vs weekend metrics by hour using CASE WHEN on day-of-week",
-            categories=[QueryCategory.FILTER, QueryCategory.GROUP_BY, QueryCategory.SORT, QueryCategory.ANALYTICAL],
-            expression_impl=q20_expression_impl,
-            pandas_impl=q20_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q21",
-            query_name="Rush Hour Analysis",
-            description="Morning rush, evening rush, and off-peak period comparison",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=q21_expression_impl,
-            pandas_impl=q21_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q22",
-            query_name="Monthly Year-over-Year",
-            description="Year and month grouping for YoY comparison over 2-year window",
-            categories=[
-                QueryCategory.FILTER,
-                QueryCategory.GROUP_BY,
-                QueryCategory.AGGREGATE,
-                QueryCategory.ANALYTICAL,
-            ],
-            expression_impl=q22_expression_impl,
-            pandas_impl=q22_pandas_impl,
-        )
-    )
-
-    # Point (Q23-Q24)
-    register_query(
-        DataFrameQuery(
-            query_id="Q23",
-            query_name="Single-Day Summary",
-            description="Scalar aggregation for a single day (no GROUP BY)",
-            categories=[QueryCategory.FILTER, QueryCategory.AGGREGATE],
-            expression_impl=q23_expression_impl,
-            pandas_impl=q23_pandas_impl,
-        )
-    )
-    register_query(
-        DataFrameQuery(
-            query_id="Q24",
-            query_name="Zone Detail",
-            description="Detailed metrics for a specific zone with INNER JOIN",
-            categories=[QueryCategory.FILTER, QueryCategory.JOIN, QueryCategory.GROUP_BY, QueryCategory.AGGREGATE],
-            expression_impl=q24_expression_impl,
-            pandas_impl=q24_pandas_impl,
-        )
-    )
-
-    # Baseline (Q25)
-    register_query(
-        DataFrameQuery(
-            query_id="Q25",
-            query_name="Full Scan Count",
-            description="COUNT(*) baseline full table scan",
-            categories=[QueryCategory.SCAN, QueryCategory.AGGREGATE],
-            expression_impl=q25_expression_impl,
-            pandas_impl=q25_pandas_impl,
-        )
-    )
 
 
 _register_all_queries()
