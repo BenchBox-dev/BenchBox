@@ -178,6 +178,18 @@ class PlatformAdapter(
         self._sorted_ingestion_total_apply_seconds: float = 0.0
         self._reset_plan_capture_stats()
 
+    def _reset_run_scoped_state(self) -> None:
+        """Reset mutable state that belongs to one benchmark execution."""
+        self.database_was_reused = False
+        self._last_power_test_result = None
+        self._last_throughput_test_result = None
+        self._sorted_ingestion_applied_tables = []
+        self._sorted_ingestion_total_apply_seconds = 0.0
+        self._reset_plan_capture_stats()
+        if self.dry_run_mode:
+            self.captured_sql = []
+            self.query_counter = 0
+
     @staticmethod
     @abstractmethod
     def add_cli_arguments(parser) -> None:
@@ -417,7 +429,12 @@ class PlatformAdapter(
         """Run complete benchmark with enhanced phase tracking."""
         start_time = mono_time()
         execution_id = str(uuid.uuid4())[:8]
-        self._reset_plan_capture_stats()
+        self._reset_run_scoped_state()
+        plan_capture_config = {
+            "capture_plans": self.capture_plans,
+            "strict_plan_capture": self.strict_plan_capture,
+            "plan_capture_timeout_seconds": self.plan_capture_timeout_seconds,
+        }
         if "capture_plans" in run_config:
             self.capture_plans = bool(run_config.get("capture_plans"))
         if "strict_plan_capture" in run_config:
@@ -589,6 +606,9 @@ class PlatformAdapter(
             )
 
         finally:
+            self.capture_plans = plan_capture_config["capture_plans"]
+            self.strict_plan_capture = plan_capture_config["strict_plan_capture"]
+            self.plan_capture_timeout_seconds = plan_capture_config["plan_capture_timeout_seconds"]
             if hasattr(self, "connection") and self.connection:
                 self.close_connection(self.connection)
                 self.connection = None

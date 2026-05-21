@@ -57,6 +57,27 @@ class NewDatabaseAdapter(PlatformAdapter):
     # Implement required abstract methods...
 ```
 
+### Lifecycle and Run-Scoped State
+
+BenchBox treats `PlatformAdapter` instances as serial execution objects. Reusing
+one adapter instance for multiple benchmark runs is supported only
+sequentially; concurrent `run_benchmark()` calls on the same adapter instance
+are not supported.
+
+The base adapter resets its run-scoped caches at the start of each run,
+including database-reuse decisions, cached power/throughput phase results,
+sorted-ingestion metadata, plan-capture counters, and captured SQL buffers when
+explicit dry-run mode is active. Run-config plan-capture overrides
+(`capture_plans`, `strict_plan_capture`, and `plan_capture_timeout_seconds`)
+are restored after the run.
+
+Adapter authors should keep connection handles, phase-result caches,
+plan-capture counters, skipped-query tracking, and dry-run SQL capture out of
+class-level state. Store them on the adapter only when they are truly
+adapter-scoped and can be reset or overwritten before each run. If an adapter
+needs concurrent execution, design a per-run context first and update the public
+contract map before claiming support.
+
 ### Required Dependencies
 
 Add platform dependencies to `pyproject.toml` via the `[project.optional-dependencies]` table:

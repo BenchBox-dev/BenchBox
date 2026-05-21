@@ -1,0 +1,180 @@
+id: adapter-run-context-and-reuse-contract
+title: "Architecture hardening: document adapter lifecycle and isolate run-scoped state if needed"
+worktree: main
+priority: Medium-High
+status: Completed
+completed_date: "2026-05-21"
+category: Platform Architecture
+
+deps:
+  needs:
+  - architecture-contract-map-and-support-taxonomy
+
+description: |
+  Adapter instances currently behave as serial, run-scoped objects that hold
+  connection state, plan-capture flags, dry-run state, execution metadata, and
+  phase result caches. That is acceptable if documented and tested. It becomes
+  fragile if service-mode reuse or concurrent execution is a near-term product
+  goal.
+
+  This item decides the adapter lifecycle contract, adds a sequential reuse
+  regression test for the current model, and only introduces AdapterRunContext
+  if the project chooses reusable/concurrent adapters.
+
+work:
+- id: w0
+  summary: "Revalidate adapter instance state and phase cache flow"
+  status: done
+  notes: |
+    Completed evidence at checked SHA
+    062f860969c52b2b936cc1966e77355967d5f7c7:
+      - benchbox/platforms/base/adapter.py initialized adapter-scoped config and
+        mutable run state together: connection, database_was_reused,
+        dry_run_mode/captured_sql, plan-capture settings/counters,
+        _last_throughput_test_result, and sorted-ingestion counters.
+      - run_enhanced_benchmark reset plan-capture counters but did not reset
+        database_was_reused, cached phase results, sorted-ingestion counters, or
+        plan_first_n iteration counts before each run.
+      - benchbox/platforms/base/execution.py writes _last_power_test_result and
+        _last_throughput_test_result for phase construction.
+      - benchbox/platforms/base/result_capture.py consumes and clears cached
+        phase results during _build_execution_phases.
+      - Existing tests covered individual exception resets and dry-run helpers,
+        but not full sequential adapter reuse through run_benchmark.
+
+- id: w1
+  summary: "Decision gate: serial run-scoped adapters or reusable/concurrent adapters"
+  needs: [w0]
+  status: done
+  notes: |
+    Decision recorded in docs/reference/public-contracts.md and
+    docs/development/adapter-refactor-map.md: PlatformAdapter instances are
+    serial execution objects. One instance may run multiple benchmarks
+    sequentially. Concurrent run_benchmark calls on one adapter are not
+    supported.
+
+    The base adapter owns the active per-run connection and closes it in
+    finally. Cached phase results, database reuse decisions, sorted-ingestion
+    counters, plan-capture counters, and dry-run captured SQL are run-scoped and
+    reset at run start. Run-config plan-capture overrides are per-run and
+    restored at run end; direct adapter attributes such as dry_run_mode and
+    table_mode remain adapter-scoped caller controls.
+
+- id: w2
+  summary: "Implement the selected adapter lifecycle path"
+  needs: [w1]
+  status: done
+  notes: |
+    Implemented the serial lifecycle path. Added
+    PlatformAdapter._reset_run_scoped_state() and call it at the start of
+    run_enhanced_benchmark. The reset covers database reuse state, cached
+    power/throughput phase results, sorted-ingestion metadata, plan-capture
+    stats, plan_first_n iteration counters, and stale captured SQL when
+    explicit dry-run mode is active.
+
+    No AdapterRunContext was introduced because concurrent adapter reuse was
+    not selected for this product tier. run_config plan-capture overrides are
+    restored in finally so they do not leak into sequential runs.
+
+- id: w3
+  summary: "Add adapter authoring guidance and subclass override guardrails"
+  needs: [w2]
+  status: done
+  notes: |
+    Added docs/development/adding-new-platforms.md lifecycle guidance and an
+    adapter lifecycle section in docs/development/adapter-refactor-map.md.
+    Added tests/unit/platforms/test_adapter_lifecycle.py with a local fake
+    adapter; it avoids cloud/native optional dependencies and proves sequential
+    reuse does not carry stale run state.
+
+deferred:
+- summary: "Make all existing adapters concurrency-safe"
+  reason: "Only required if the lifecycle decision chooses concurrent adapter reuse."
+- summary: "Split every base mixin in this TODO"
+  reason: "This item targets run-scoped state, not a broad adapter-base redesign."
+
+metadata:
+  tags:
+  - adapters
+  - lifecycle
+  - concurrency
+  - platform-authoring
+  estimated_effort: "2-6 days depending on decision"
+  created_date: "2026-05-21"
+  last_updated: "2026-05-21T00:00:00Z"
+
+impact:
+  business_value: |
+    Prevents hard-to-debug stale state if BenchBox grows toward service-mode or
+    concurrent orchestration.
+  user_impact: |
+    Maintainers and platform authors know whether adapter instances are safe to
+    reuse and under what conditions.
+  technical_debt: |
+    Turns implicit mutable adapter state into an explicit lifecycle contract.
+
+files_affected:
+  added:
+  - "tests/unit/platforms/test_adapter_lifecycle.py"
+  modified:
+  - "benchbox/platforms/base/adapter.py"
+  - "benchbox/platforms/base/result_capture.py"
+  - "docs/development/adapter-refactor-map.md"
+  - "docs/development/adding-new-platforms.md"
+  - "docs/reference/public-contracts.md"
+  - "_project/DONE/main/planning/adapter-run-context-and-reuse-contract.yaml"
+
+must_preserve:
+- "Do not break existing adapter subclass override points documented in adapter-refactor-map.md."
+- "Do not require cloud/native optional dependencies for lifecycle tests."
+- "Do not promise concurrent adapter reuse unless tests prove the base path and representative adapters are safe."
+
+approach: |
+  Decide lifecycle before refactoring. If serial/run-scoped is the contract,
+  document it and add sequential reuse protection. If reusable/concurrent is a
+  product requirement, introduce a run context deliberately and slice the state
+  migration.
+
+anti_patterns:
+- "DO NOT introduce AdapterRunContext just because mutable state exists -- serial run-scoped adapters may be acceptable --
+  make the lifecycle decision first."
+- "DO NOT leave phase caches on self while claiming concurrency support -- that is the stale-state failure mode -- move caches
+  into per-run context if concurrency is supported."
+- "DO NOT use live cloud platforms for lifecycle tests -- optional dependencies make the guard brittle -- use fake or local
+  adapters."
+
+verification:
+- description: "Run focused adapter lifecycle tests."
+  command: "uv run -- python -m pytest tests/unit/platforms -k 'adapter_lifecycle or run_context' --tb=short"
+  expected_output: "Adapter lifecycle tests pass."
+- description: "Run a fast local smoke benchmark if adapter base code changed."
+  command: "uv run -- python -m pytest -m fast -k 'duckdb or dataframe' --tb=short"
+  expected_output: "Fast local smoke tests pass."
+
+scope_limit:
+  only_modify:
+  - "benchbox/platforms/base/"
+  - "tests/unit/platforms/"
+  - "docs/development/"
+  - "docs/reference/public-contracts.md"
+  - "_project/TODO/"
+  - "_project/DONE/"
+  do_not_modify:
+  - "benchbox/sql_compat/"
+  - "benchbox/mcp/"
+  - "_project/scripts/explorer_pipeline/"
+
+prior_art:
+- "docs/development/adapter-refactor-map.md: documents stable facade/subclass risk -- use this as guardrail before moving
+  base responsibilities."
+- "benchbox/platforms/base/result_capture.py: existing phase cache consumption/reset -- target for regression coverage."
+- "tests/unit/platforms/: existing local/fake adapter test patterns -- prefer over live platform dependencies."
+
+success_metrics:
+- "Adapter lifecycle is explicitly documented as serial/run-scoped or reusable/concurrent."
+- "A sequential reuse test guards stale phase state."
+- "Adapter authors have clear rules for run-scoped state."
+
+open_questions:
+- "Is service-mode or concurrent execution a pre-1.0 requirement?"
+- "Should connection objects be per adapter or per run for local SQL platforms?"
