@@ -313,6 +313,29 @@ class TestPlatformRegistry:
         assert caps.supports_dataframe
         assert caps.default_mode == "dataframe"
 
+    def test_platform_taxonomy_helpers_derive_from_capabilities(self):
+        sql_platforms = PlatformRegistry.get_sql_platforms()
+        dataframe_platforms = PlatformRegistry.get_dataframe_platforms()
+        self_hosted_platforms = PlatformRegistry.get_self_hosted_platforms()
+
+        assert "duckdb" in sql_platforms
+        assert "polars" not in sql_platforms
+        assert "clickhouse" not in sql_platforms
+        assert "clickhouse" in PlatformRegistry.get_sql_platforms(include_deprecated=True)
+
+        assert {"polars", "pandas", "dask", "datafusion", "pyspark"}.issubset(dataframe_platforms)
+        assert "duckdb" not in dataframe_platforms
+
+        assert {
+            "clickhouse-server",
+            "postgresql",
+            "presto",
+            "trino",
+            "influxdb",
+            "velox",
+        }.issubset(self_hosted_platforms)
+        assert "clickhouse" not in self_hosted_platforms
+
     def test_known_paid_platforms_expose_cost_class(self):
         """Prompt safety gates rely on the coarse paid/free registry tag."""
         for platform_name, expected_cost_class in KNOWN_PAID_PLATFORM_COST_CLASSES.items():
