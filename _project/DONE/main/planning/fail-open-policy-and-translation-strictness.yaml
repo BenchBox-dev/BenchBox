@@ -2,7 +2,7 @@ id: fail-open-policy-and-translation-strictness
 title: "Architecture hardening: define fail-open vs fail-closed policy for translation and validation"
 worktree: main
 priority: Medium-High
-status: "Not Started"
+status: "Completed"
 category: Correctness
 
 deps:
@@ -23,74 +23,74 @@ description: |
 work:
   - id: w0
     summary: "Revalidate current fail-open paths and tests that require graceful fallback"
-    status: pending
+    status: done
     notes: |
-      Commit a compact summary of checked SHA, fail-open sites, existing tests
-      asserting fallback, and result fields that can record uncertainty.
-
-      Minimum evidence to re-check:
-        - benchbox/utils/dialect_utils.py translation fallback.
-        - benchbox/platforms/base/dialect_translation.py fallback behavior.
-        - benchbox/core/runner/runner.py validation defaults.
-        - tests/integration/test_tpcds_duckdb_dialect.py graceful fallback tests.
-        - result schema fields for validation/translation metadata.
+      Checked SHA before edits: f255be364a7913864c308579ebef85f4cbff2707.
+      Revalidated fail-open sites:
+        - benchbox/utils/dialect_utils.py returned source SQL on SQLGlot import
+          or translation failure.
+        - benchbox/platforms/base/dialect_translation.py returned source SQL
+          for adapter/multi-statement translation failures.
+        - benchbox/core/runner/runner.py converted only UNKNOWN/blank
+          validation to NOT_RUN, leaving default PASSED placeholders intact.
+        - tests/integration/test_tpcds_duckdb_dialect.py asserts malformed SQL
+          translation stays graceful in local/default mode.
+        - result bundles already had execution and summary.validation surfaces
+          suitable for additive translation metadata and uncertainty labels.
 
   - id: w1
     summary: "Decision gate: define mode policy for interactive, CI, publishing, and governance"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
-      Record policy in docs/reference/public-contracts.md. Required decision:
-        - interactive/local mode may fail open with warnings,
-        - CI and compat governance should fail closed or record uncertainty,
-        - publishing/explorer ingestion should reject or label uncertain results,
-        - validation_status must distinguish PASSED from NOT_RUN/UNCERTAIN.
-
-      If any of these defaults are not chosen, document the reason explicitly.
+      Recorded policy in docs/reference/public-contracts.md:
+        - interactive/local remains fail-open with warnings and bundle metadata,
+        - CI/compat governance can fail closed through strict translation mode,
+        - publishing/explorer consumers must reject or label non-clean
+          NOT_RUN/NOT_VALIDATED/UNKNOWN/UNCERTAIN statuses,
+        - validation_status PASSED is reserved for runs with validation evidence.
 
   - id: w2
     summary: "Add translation outcome metadata to result bundles"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      Add structured metadata that records source dialect, target dialect,
-      translator used, success/fallback status, warning/error message category,
-      and whether strict mode was active.
-
-      Coordinate with the result schema policy TODO before changing schema
-      version or public bundle fields.
+      Added additive execution.translation metadata without a schema-version
+      bump: aggregate status, strict_mode, attempt/success/fallback/failed
+      counts, translators, source/target dialects, warning/error categories,
+      and compact grouped outcomes. Loader reconstruction preserves it.
 
   - id: w3
     summary: "Add strict translation mode for CI, publishing, and compat tests"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      Strict mode should fail closed on translation failure or missing required
-      translator. Keep graceful fallback for interactive/local mode where tests
-      and docs require it.
-
-      The mode must be reachable through the runner/CLI path used by publishing
-      and compatibility checks, not just a utility function argument.
+      Added sql_translation_context(strict=True) plus lifecycle-runner wiring.
+      Runner reads strict_translation, translation_strict, or
+      sql_translation_strict from benchmark options or platform_options, so CLI
+      platform-option paths can request fail-closed behavior.
 
   - id: w4
     summary: "Add golden or representative translation tests for risky dialect paths"
     needs: [w3]
-    status: pending
+    status: done
     notes: |
-      Add focused tests for known post-translation fixups and failure cases.
-      Tests should assert translation outcome metadata, strict-mode behavior,
-      and graceful-mode warnings.
-
-      Do not attempt full dialect exhaustiveness in this TODO.
+      Added unit tests for successful outcome metadata, graceful fallback
+      metadata, strict-mode failure, compact summary grouping, bundle export
+      metadata, and non-clean status policy. Added a TPC-DS integration test
+      asserting strict translation fails closed while the existing graceful
+      fallback integration test remains intact.
 
   - id: w5
     summary: "Fix contradictory validation documentation and result status semantics"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      Ensure validation docs and DataFrame notes do not imply actual validation
-      ran when default validation flags are disabled. Update result semantics so
-      unchecked runs are labeled NOT_RUN or UNCERTAIN, not PASSED.
+      Lifecycle finalization now converts default PASSED placeholders with no
+      validation records/details to NOT_RUN. Translation fallback on otherwise
+      clean results marks validation_status UNCERTAIN. Shared result status
+      policy treats not_run, not_validated, unknown, and uncertain as non-clean.
+      Updated result-integrity docs with explicit status semantics.
 
 deferred:
   - summary: "Make validation enabled by default for every benchmark"
@@ -106,7 +106,7 @@ metadata:
     - publishing
   estimated_effort: "3-6 days"
   created_date: "2026-05-21"
-  last_updated: "2026-05-21T00:00:00Z"
+  last_updated: "2026-05-21T07:15:00Z"
 
 impact:
   business_value: |

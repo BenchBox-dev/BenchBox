@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-NON_CLEAN_VALIDATION_STATUSES: frozenset[str] = frozenset({"failed", "interrupted", "partial", "error"})
+NON_CLEAN_VALIDATION_STATUSES: frozenset[str] = frozenset(
+    {"failed", "interrupted", "partial", "error", "not_run", "not_validated", "uncertain", "unknown"}
+)
 
 
 def normalize_validation_status(value: Any) -> str | None:

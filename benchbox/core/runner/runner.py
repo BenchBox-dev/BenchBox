@@ -58,6 +58,11 @@ from benchbox.platforms.base.runtime_metadata import (
 )
 from benchbox.platforms.dataframe.benchmark_mixin import DataFramePhases, DataFrameRunOptions
 from benchbox.utils.cloud_storage import create_path_handler
+from benchbox.utils.dialect_utils import (
+    SqlTranslationOutcome,
+    sql_translation_context,
+    summarize_sql_translation_outcomes,
+)
 from benchbox.utils.format_converters import ConversionOptions
 from benchbox.utils.printing import emit
 from benchbox.utils.verbosity import VerbosityMixin, VerbositySettings
@@ -211,7 +216,8 @@ def _finalize_validation_metadata(
 
     if not records:
         current_status = (result.validation_status or "UNKNOWN").upper()
-        if current_status in {"", "UNKNOWN", None}:
+        has_validation_evidence = bool(result.validation_details)
+        if current_status in {"", "UNKNOWN", None} or (current_status == "PASSED" and not has_validation_evidence):
             result.validation_status = "NOT_RUN"
         result.validation_details = result.validation_details or {}
         result.validation_details.setdefault("stages", [])
@@ -257,6 +263,55 @@ def _finalize_validation_metadata(
         result.validation_status = aggregate_status
     else:
         result.validation_status = current_status
+
+    return result
+
+
+def _coerce_bool_option(value: Any) -> bool:
+    """Coerce CLI/config option values into booleans."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on", "strict"}
+    return bool(value)
+
+
+def _resolve_strict_translation_mode(options: Mapping[str, Any]) -> bool:
+    """Resolve strict SQL translation mode from benchmark or platform options."""
+    for key in ("strict_translation", "translation_strict", "sql_translation_strict"):
+        if key in options:
+            return _coerce_bool_option(options[key])
+
+    platform_options = options.get("platform_options")
+    if isinstance(platform_options, Mapping):
+        for key in ("strict_translation", "translation_strict", "sql_translation_strict"):
+            if key in platform_options:
+                return _coerce_bool_option(platform_options[key])
+
+    return False
+
+
+def _attach_translation_metadata(
+    result: BenchmarkResults,
+    outcomes: list[SqlTranslationOutcome],
+    *,
+    strict_mode: bool,
+) -> BenchmarkResults:
+    """Attach SQL translation outcome metadata and mark fallback results uncertain."""
+    summary = summarize_sql_translation_outcomes(outcomes, strict_mode=strict_mode)
+    if not summary:
+        return result
+
+    if not isinstance(result.execution_metadata, dict):
+        result.execution_metadata = {}
+    result.execution_metadata["translation"] = summary
+
+    if summary.get("status") in {"fallback", "failed"} and (result.validation_status or "").upper() == "PASSED":
+        result.validation_status = "UNCERTAIN"
+        result.validation_details = result.validation_details or {}
+        warnings = result.validation_details.setdefault("warnings", [])
+        if isinstance(warnings, list):
+            warnings.append("SQL translation fell back to source SQL; result correctness is uncertain.")
 
     return result
 
@@ -1097,6 +1152,7 @@ def run_benchmark_lifecycle(
 
     options_map = getattr(benchmark_config, "options", {}) or {}
     verbosity_settings = _resolve_verbosity_settings(verbosity, options_map)
+    strict_translation = _resolve_strict_translation_mode(options_map)
 
     validate_scale_factor(benchmark_config.name, benchmark_config.scale_factor)
     benchmark = benchmark_instance or get_benchmark_instance(benchmark_config, system_profile)
@@ -1148,21 +1204,22 @@ def run_benchmark_lifecycle(
     should_run_load_only = test_type == "load_only" or (phases.load and not phases.execute and adapter is not None)
 
     if should_run_load_only:
-        result_obj = _run_load_only_mode(
-            benchmark=benchmark,
-            benchmark_config=benchmark_config,
-            system_profile=system_profile,
-            adapter=adapter,
-            platform_config=platform_config,
-            validation_opts=validation_opts,
-            table_mode=table_mode,
-            options=options,
-            verbosity_settings=verbosity_settings,
-            monitor=monitor,
-            output_root=output_root,
-            is_dataframe_adapter=is_dataframe_adapter,
-            validation_records=validation_records,
-        )
+        with sql_translation_context(strict=strict_translation) as translation_outcomes:
+            result_obj = _run_load_only_mode(
+                benchmark=benchmark,
+                benchmark_config=benchmark_config,
+                system_profile=system_profile,
+                adapter=adapter,
+                platform_config=platform_config,
+                validation_opts=validation_opts,
+                table_mode=table_mode,
+                options=options,
+                verbosity_settings=verbosity_settings,
+                monitor=monitor,
+                output_root=output_root,
+                is_dataframe_adapter=is_dataframe_adapter,
+                validation_records=validation_records,
+            )
         result_obj = _finalize_validation_metadata(result_obj, validation_records)
         result_obj = _enrich_driver_runtime_metadata(result_obj, adapter=adapter, database_config=database_config)
         result_obj = _enrich_normalized_runtime_metadata(
@@ -1172,7 +1229,7 @@ def run_benchmark_lifecycle(
         )
         if execution_context is not None:
             result_obj.execution_context = execution_context.model_dump()
-        return result_obj
+        return _attach_translation_metadata(result_obj, translation_outcomes, strict_mode=strict_translation)
 
     if adapter is None or (not phases.execute and not phases.load):
         return _build_setup_only_result(
@@ -1198,26 +1255,27 @@ def run_benchmark_lifecycle(
         table_format=table_format,
     )
 
-    result_obj = _execute_via_adapter(
-        adapter=adapter,
-        benchmark=benchmark,
-        benchmark_config=benchmark_config,
-        system_profile=system_profile,
-        run_config=run_config,
-        options=options,
-        phases=phases,
-        verbosity_settings=verbosity_settings,
-        monitor=monitor,
-        output_root=output_root,
-        is_dataframe_adapter=is_dataframe_adapter,
-    )
+    with sql_translation_context(strict=strict_translation) as translation_outcomes:
+        result_obj = _execute_via_adapter(
+            adapter=adapter,
+            benchmark=benchmark,
+            benchmark_config=benchmark_config,
+            system_profile=system_profile,
+            run_config=run_config,
+            options=options,
+            phases=phases,
+            verbosity_settings=verbosity_settings,
+            monitor=monitor,
+            output_root=output_root,
+            is_dataframe_adapter=is_dataframe_adapter,
+        )
 
     if validation_opts.enable_postload_validation and not is_dataframe_adapter:
         postload_result = _run_postload_validation(adapter, benchmark_config, platform_config)
         if postload_result is not None:
             validation_records.append(("post_load", postload_result))
 
-    return _finalize_lifecycle_result(
+    finalized = _finalize_lifecycle_result(
         result_obj,
         validation_records,
         adapter=adapter,
@@ -1227,6 +1285,7 @@ def run_benchmark_lifecycle(
         resource_monitor=resource_monitor,
         execution_context=execution_context,
     )
+    return _attach_translation_metadata(finalized, translation_outcomes, strict_mode=strict_translation)
 
 
 def _flatten_manifest_v2_entries(table_formats: Any, preferred_formats: list[str] | None = None) -> list[Any]:
