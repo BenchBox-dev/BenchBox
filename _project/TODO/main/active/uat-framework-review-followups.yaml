@@ -550,7 +550,7 @@ work:
 - id: w11
   summary: "Drop the constructor's parallel_platforms=False hardcode; keep YAML validator + runtime assert; add bypass test"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     F6. The triple-guard is two-and-a-half: site (2) at
     `config.py:113` unconditionally overwrites the dataclass field,

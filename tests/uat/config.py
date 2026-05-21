@@ -276,7 +276,8 @@ def _validate_execute(payload: dict[str, Any]) -> ExecuteConfig:
         ),
         "execute",
     )
-    if payload.get("parallel_platforms") is True:
+    parallel_platforms = _require_bool(payload, "parallel_platforms", default=False, section="execute")
+    if parallel_platforms:
         raise ConfigError(
             "`execute.parallel_platforms: true` is forbidden — UAT W3 line 222: "
             "concurrent platform runs contaminate timings"
@@ -298,7 +299,7 @@ def _validate_execute(payload: dict[str, Any]) -> ExecuteConfig:
         compression=payload.get("compression"),
         extra_args=extra_args,
         skip_unreachable=_require_bool(payload, "skip_unreachable", default=True, section="execute"),
-        parallel_platforms=False,
+        parallel_platforms=parallel_platforms,
     )
 
 
