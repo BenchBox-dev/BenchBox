@@ -17,6 +17,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+from csv import reader
 from datetime import date
 from typing import Any
 
@@ -1413,168 +1414,55 @@ def market_share_pandas_impl(ctx: DataFrameContext) -> Any:
 
 FLIGHTDATA_DATAFRAME_QUERIES = QueryRegistry("FlightData DataFrame")
 
-_QUERIES = [
-    DataFrameQuery(
-        query_id="ontime-by-carrier",
-        query_name="On-Time Rate by Carrier",
-        description="On-time arrival percentage by airline carrier",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=ontime_by_carrier_expression_impl,
-        pandas_impl=ontime_by_carrier_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="delay-by-airport",
-        query_name="Average Departure Delay by Origin Airport",
-        description="Average departure delay in minutes by origin airport",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.GROUP_BY, QueryCategory.FILTER],
-        expression_impl=delay_by_airport_expression_impl,
-        pandas_impl=delay_by_airport_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="delay-by-hour",
-        query_name="Delay Pattern by Departure Hour",
-        description="Average delay minutes by scheduled departure hour",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=delay_by_hour_expression_impl,
-        pandas_impl=delay_by_hour_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="best-routes",
-        query_name="Best Performing Routes by On-Time Rate",
-        description="Routes with highest on-time arrival percentage (min 50 flights)",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.GROUP_BY, QueryCategory.FILTER],
-        expression_impl=best_routes_expression_impl,
-        pandas_impl=best_routes_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="improvement-trend",
-        query_name="On-Time Performance Trend Over Years",
-        description="Annual on-time arrival percentage trend",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=improvement_trend_expression_impl,
-        pandas_impl=improvement_trend_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="delay-causes",
-        query_name="Delay Cause Breakdown",
-        description="Distribution of delay causes across all delayed flights",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.FILTER],
-        expression_impl=delay_causes_expression_impl,
-        pandas_impl=delay_causes_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="cascade-delays",
-        query_name="Late Aircraft (Cascade) Delay Patterns",
-        description="Flights delayed due to late incoming aircraft by carrier",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=cascade_delays_expression_impl,
-        pandas_impl=cascade_delays_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="weather-impact",
-        query_name="Weather Delay Impact by Month",
-        description="Average weather delay by month showing seasonal patterns",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=weather_impact_expression_impl,
-        pandas_impl=weather_impact_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="recovery-time",
-        query_name="Delay Recovery Analysis",
-        description="How much of departure delay is recovered in flight",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=recovery_time_expression_impl,
-        pandas_impl=recovery_time_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="busiest-routes",
-        query_name="Busiest Routes by Flight Count",
-        description="Top 25 routes ranked by total flight count",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.GROUP_BY, QueryCategory.SORT],
-        expression_impl=busiest_routes_expression_impl,
-        pandas_impl=busiest_routes_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="route-reliability",
-        query_name="Route Reliability Ranking",
-        description="Routes ranked by reliability (on-time + low cancellation)",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.GROUP_BY, QueryCategory.FILTER],
-        expression_impl=route_reliability_expression_impl,
-        pandas_impl=route_reliability_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="distance-delay",
-        query_name="Distance vs Delay Correlation",
-        description="Average delay grouped by flight distance buckets",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=distance_delay_expression_impl,
-        pandas_impl=distance_delay_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="hub-connectivity",
-        query_name="Hub Airport Connectivity",
-        description="Number of unique destinations served from each origin airport",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=hub_connectivity_expression_impl,
-        pandas_impl=hub_connectivity_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="day-of-week",
-        query_name="Flight Patterns by Day of Week",
-        description="Flight volume and delay patterns by day of week",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=day_of_week_expression_impl,
-        pandas_impl=day_of_week_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="seasonal-trends",
-        query_name="Seasonal Performance Trends",
-        description="Monthly flight volume and performance aggregated across all years",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=seasonal_trends_expression_impl,
-        pandas_impl=seasonal_trends_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="holiday-impact",
-        query_name="Holiday Period Delay Impact",
-        description="Compare performance during major holiday periods vs normal days",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY, QueryCategory.FILTER],
-        expression_impl=holiday_impact_expression_impl,
-        pandas_impl=holiday_impact_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="time-of-day",
-        query_name="Hourly Congestion Pattern",
-        description="Flight volume and delay by scheduled departure hour of day",
-        categories=[QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=time_of_day_expression_impl,
-        pandas_impl=time_of_day_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="carrier-ranking",
-        query_name="Carrier On-Time Performance Ranking",
-        description="Full carrier scorecard: on-time, delays, cancellations",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.GROUP_BY, QueryCategory.FILTER],
-        expression_impl=carrier_ranking_expression_impl,
-        pandas_impl=carrier_ranking_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="cancellation-rate",
-        query_name="Cancellation Rates by Carrier and Cause",
-        description="Cancellation frequency and reason breakdown by carrier",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.GROUP_BY],
-        expression_impl=cancellation_rate_expression_impl,
-        pandas_impl=cancellation_rate_pandas_impl,
-    ),
-    DataFrameQuery(
-        query_id="market-share",
-        query_name="Carrier Market Share by Route",
-        description="Top carriers ranked by flight volume and market share",
-        categories=[QueryCategory.JOIN, QueryCategory.AGGREGATE, QueryCategory.GROUP_BY, QueryCategory.SORT],
-        expression_impl=market_share_expression_impl,
-        pandas_impl=market_share_pandas_impl,
-    ),
-]
+_CATEGORY_CODES = {
+    "AG": QueryCategory.AGGREGATE,
+    "FI": QueryCategory.FILTER,
+    "GB": QueryCategory.GROUP_BY,
+    "JO": QueryCategory.JOIN,
+    "SO": QueryCategory.SORT,
+}
+
+_QUERY_METADATA = """\
+ontime-by-carrier|On-Time Rate by Carrier|On-time arrival percentage by airline carrier|JO,AG,GB|ontime_by_carrier
+delay-by-airport|Average Departure Delay by Origin Airport|Average departure delay in minutes by origin airport|JO,AG,GB,FI|delay_by_airport
+delay-by-hour|Delay Pattern by Departure Hour|Average delay minutes by scheduled departure hour|AG,GB|delay_by_hour
+best-routes|Best Performing Routes by On-Time Rate|Routes with highest on-time arrival percentage (min 50 flights)|JO,AG,GB,FI|best_routes
+improvement-trend|On-Time Performance Trend Over Years|Annual on-time arrival percentage trend|AG,GB|improvement_trend
+delay-causes|Delay Cause Breakdown|Distribution of delay causes across all delayed flights|AG,FI|delay_causes
+cascade-delays|Late Aircraft (Cascade) Delay Patterns|Flights delayed due to late incoming aircraft by carrier|JO,AG,GB|cascade_delays
+weather-impact|Weather Delay Impact by Month|Average weather delay by month showing seasonal patterns|AG,GB|weather_impact
+recovery-time|Delay Recovery Analysis|How much of departure delay is recovered in flight|AG,GB|recovery_time
+busiest-routes|Busiest Routes by Flight Count|Top 25 routes ranked by total flight count|JO,AG,GB,SO|busiest_routes
+route-reliability|Route Reliability Ranking|Routes ranked by reliability (on-time + low cancellation)|JO,AG,GB,FI|route_reliability
+distance-delay|Distance vs Delay Correlation|Average delay grouped by flight distance buckets|AG,GB|distance_delay
+hub-connectivity|Hub Airport Connectivity|Number of unique destinations served from each origin airport|JO,AG,GB|hub_connectivity
+day-of-week|Flight Patterns by Day of Week|Flight volume and delay patterns by day of week|AG,GB|day_of_week
+seasonal-trends|Seasonal Performance Trends|Monthly flight volume and performance aggregated across all years|AG,GB|seasonal_trends
+holiday-impact|Holiday Period Delay Impact|Compare performance during major holiday periods vs normal days|AG,GB,FI|holiday_impact
+time-of-day|Hourly Congestion Pattern|Flight volume and delay by scheduled departure hour of day|AG,GB|time_of_day
+carrier-ranking|Carrier On-Time Performance Ranking|Full carrier scorecard: on-time, delays, cancellations|JO,AG,GB,FI|carrier_ranking
+cancellation-rate|Cancellation Rates by Carrier and Cause|Cancellation frequency and reason breakdown by carrier|JO,AG,GB|cancellation_rate
+market-share|Carrier Market Share by Route|Top carriers ranked by flight volume and market share|JO,AG,GB,SO|market_share
+"""
+
+
+def _impl_for(stem: str, family: str) -> Any:
+    return globals()[f"{stem}_{family}_impl"]
+
+
+def _make_query(row: list[str]) -> DataFrameQuery:
+    query_id, query_name, description, category_codes, impl_stem = row
+    return DataFrameQuery(
+        query_id=query_id,
+        query_name=query_name,
+        description=description,
+        categories=[_CATEGORY_CODES[code] for code in category_codes.split(",")],
+        expression_impl=_impl_for(impl_stem, "expression"),
+        pandas_impl=_impl_for(impl_stem, "pandas"),
+    )
+
+
+_QUERIES = [_make_query(row) for row in reader(_QUERY_METADATA.splitlines(), delimiter="|")]
 
 for _query in _QUERIES:
     FLIGHTDATA_DATAFRAME_QUERIES.register(_query)
