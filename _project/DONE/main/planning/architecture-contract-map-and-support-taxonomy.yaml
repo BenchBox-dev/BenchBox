@@ -106,7 +106,9 @@ work:
 
 deferred:
 - summary: "Fully migrate every platform registry entry to support_status"
-  reason: "Belongs in platform-support-status-and-extension-health after the taxonomy is accepted."
+  reason: "Completed by platform-support-status-and-extension-health after the taxonomy was accepted."
+- summary: "Fully migrate every benchmark registry entry to support_status"
+  reason: "Belongs in benchmark-support-status-and-discovery-policy; platform migration did not cover benchmark metadata."
 - summary: "Rewrite architecture.md around the new contract map"
   reason: "Do after this map lands and downstream TODOs resolve their product-surface decisions."
 
@@ -140,7 +142,11 @@ files_affected:
   - "docs/reference/backward-compatibility.md"
   - "docs/design/future-state/"
   - ".github/"
+  - "tests/unit/core/"
+  - "tests/unit/mcp/"
+  - "tests/unit/core/results/"
   - "_project/TODO/"
+  - "_project/scripts/"
 
 must_preserve:
 - "Do not downgrade existing public wrapper tests or imply wrappers are unsupported without an explicit deprecation decision."
@@ -165,8 +171,8 @@ verification:
   command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate"
   expected_output: "Validation passes or reports only pre-existing unrelated TODO issues."
 - description: "Run targeted docs checks added by this work."
-  command: "uv run -- python -m pytest tests -k 'contract or docs_drift' --tb=short"
-  expected_output: "New or updated contract/drift checks pass."
+  command: "uv run -- python -m pytest tests/unit/core/test_benchmark_api_contract.py tests/unit/core/test_platform_registry.py tests/unit/core/results/test_schema_policy.py tests/unit/mcp/test_run_surface_contract.py --tb=short"
+  expected_output: "Contract, count, support-status, schema-policy, and MCP run-surface checks pass or skip only for missing optional MCP SDK."
 
 scope_limit:
   only_modify:
@@ -174,8 +180,13 @@ scope_limit:
   - "docs/reference/"
   - "docs/design/future-state/"
   - ".github/"
+  - "tests/unit/core/"
+  - "tests/unit/mcp/"
+  - "tests/unit/core/results/"
   - "_project/TODO/"
   - "_project/DONE/"
+  - "_project/scripts/"
+  - "Makefile"
   do_not_modify:
   - "benchbox/platforms/"
   - "benchbox/core/results/"
@@ -190,6 +201,7 @@ success_metrics:
 - "Every reviewed public surface has one tier, one owner, and one verification gate."
 - "Platform and benchmark counts in docs derive from one authoritative source or are marked non-authoritative."
 - "Future architecture reviews can cite the contract map instead of rebuilding the surface inventory."
+- "Drift-check ownership is routed to the source that owns each public claim class."
 
 open_questions:
 - "Should benchbox.experimental remain packaged in wheels, move to an extra, or become repo-only before 1.0?"
