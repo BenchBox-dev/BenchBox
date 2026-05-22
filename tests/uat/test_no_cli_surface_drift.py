@@ -11,7 +11,15 @@ import pytest
 pytestmark = pytest.mark.fast
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-ALLOWED_INTERNAL_CLI_FILES = {"benchbox/cli/commands/submit.py"}
+ALLOWED_INTERNAL_CLI_FILES = {
+    "benchbox/cli/commands/submit.py",
+    "benchbox/cli/commands/visualize.py",
+}
+FORBIDDEN_CLI_SURFACE_SNIPPETS = ("@click.option", "@click.command")
+FORBIDDEN_CLI_SURFACE_DEFS = {
+    "benchbox/cli/commands/submit.py": "def submit(",
+    "benchbox/cli/commands/visualize.py": "def visualize(",
+}
 
 
 def test_uat_did_not_modify_benchbox_cli_surface():
@@ -21,16 +29,19 @@ def test_uat_did_not_modify_benchbox_cli_surface():
 
     assert not unexpected, f"Unexpected benchbox CLI file changes: {sorted(unexpected)}"
 
-    submit_diff = _git("diff", "--unified=0", base, "--", "benchbox/cli/commands/submit.py").stdout
-    changed_lines = [
-        line for line in submit_diff.splitlines() if line.startswith(("+", "-")) and not line.startswith(("+++", "---"))
-    ]
-    forbidden = [
-        line
-        for line in changed_lines
-        if "@click.option" in line or "@click.command" in line or line[1:].lstrip().startswith("def submit(")
-    ]
-    assert not forbidden, f"Unexpected submit CLI surface changes: {forbidden}"
+    forbidden = []
+    for path in sorted(ALLOWED_INTERNAL_CLI_FILES):
+        diff = _git("diff", "--unified=0", base, "--", path).stdout
+        changed_lines = [
+            line for line in diff.splitlines() if line.startswith(("+", "-")) and not line.startswith(("+++", "---"))
+        ]
+        forbidden.extend(
+            line
+            for line in changed_lines
+            if any(snippet in line for snippet in FORBIDDEN_CLI_SURFACE_SNIPPETS)
+            or line[1:].lstrip().startswith(FORBIDDEN_CLI_SURFACE_DEFS[path])
+        )
+    assert not forbidden, f"Unexpected CLI surface changes: {forbidden}"
 
 
 def _verified_base_ref() -> str:

@@ -419,6 +419,29 @@ class TestSuggestCharts:
         assert "cost_scatter" in chart_types
         assert result["data_profile"]["has_cost_data"] is True
 
+    def test_power_run_suggests_power_bar(self, tmp_path):
+        """Power-run result files should include power_bar in MCP suggestions."""
+        results_dir = tmp_path / "benchmark_runs" / "results"
+        results_dir.mkdir(parents=True)
+
+        result_file = results_dir / "power_result.json"
+        result_file.write_text("""{
+            "version": "2.1",
+            "benchmark": {"id": "joinorder", "name": "JoinOrder", "scale_factor": 1, "test_type": "power"},
+            "platform": {"name": "DuckDB"},
+            "summary": {"queries": {"total": 1, "passed": 1, "failed": 0}, "timing": {"total_ms": 100}},
+            "queries": [{"id": "1a", "ms": 12.0, "status": "SUCCESS"}]
+        }""")
+
+        tools = _get_viz_tool_functions(results_dir=results_dir)
+        suggest_charts = tools.get("suggest_charts")
+        result = suggest_charts(result_files="power_result.json")
+
+        chart_types = [suggestion["chart_type"] for suggestion in result["suggestions"]]
+        assert "power_bar" in chart_types
+        assert result["primary"]["chart_type"] == "power_bar"
+        assert result["data_profile"]["has_power_data"] is True
+
     def test_multiple_results_with_timestamps_suggests_time_series(self, tmp_path):
         """Test that 3+ results with timestamps include time_series suggestion."""
         results_dir = tmp_path / "benchmark_runs" / "results"
@@ -526,6 +549,33 @@ class TestGenerateChartIntegration:
 
         assert result["error"] is True
         assert "VALIDATION_ERROR" in result["error_code"]
+
+    def test_known_inapplicable_chart_is_not_reported_as_unsupported(self, tmp_path):
+        """Known charts without required data should report not-applicable, not unsupported."""
+        results_dir = tmp_path / "benchmark_runs" / "results"
+        results_dir.mkdir(parents=True)
+
+        result_file = results_dir / "test_result.json"
+        result_file.write_text("""{
+            "benchmark": {"name": "TPC-H", "scale_factor": 1},
+            "platform": {"name": "DuckDB"},
+            "config": {"mode": "sql"},
+            "results": {
+                "queries": {"details": [{"id": "Q1", "execution_time_ms": 100}]},
+                "timing": {"total_ms": 1000, "avg_ms": 100}
+            }
+        }""")
+
+        tools = _get_viz_tool_functions(results_dir=results_dir)
+        generate_chart = tools.get("generate_chart")
+
+        result = generate_chart(result_files="test_result.json", chart_type="stacked_phase")
+
+        assert result["error"] is True
+        assert "VALIDATION_ERROR" in result["error_code"]
+        assert "not applicable" in result["message"]
+        assert "Unsupported chart type" not in result["message"]
+        assert result["details"]["skip"]["chart_type"] == "stacked_phase"
 
     def test_rejects_pairwise_chart_without_two_results(self, tmp_path):
         """Pairwise chart types require exactly two result files."""
