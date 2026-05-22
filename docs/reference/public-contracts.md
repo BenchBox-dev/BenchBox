@@ -223,6 +223,9 @@ source/target dialects, warning/error categories, and compact grouped outcomes.
 `summary.validation="passed"` is reserved for runs with evidence that validation
 actually ran. When no validation record or validation details exist, lifecycle
 finalization labels the result `not_run` instead of `passed`.
+Post-load validation that is not applicable because an adapter does not expose
+connection validation hooks records no validation stage; exceptions after a
+validation attempt remain failed validation stages.
 
 ## Evidence Snapshot
 

@@ -2,7 +2,7 @@ id: execution-results-driver-metadata-and-validation-semantics
 title: "Execution/results hardening: unify driver metadata propagation and validation applicability semantics"
 worktree: main
 priority: High
-status: "Not Started"
+status: "Completed"
 category: Results
 
 deps:
@@ -33,7 +33,7 @@ description: |
 work:
   - id: w0
     summary: "Revalidate driver metadata call sites and post-load validation consumers"
-    status: pending
+    status: done
     notes: |
       Re-run source checks before editing and capture a compact summary with
       checked SHA, command, and counts. Do not commit raw stdout.
@@ -47,10 +47,17 @@ work:
       promise a failed stage for validation-not-applicable, preserve that public
       behavior and document why this TODO should not change it.
 
+      Completed 2026-05-22 at checked SHA
+      `f997b0aebc354f69bf32ca6b431dd4bd7e177404`: driver metadata rg returned
+      28 lines, post-load validation rg returned 55 lines. Public contracts
+      reserve `summary.validation="passed"` for actual validation evidence and
+      say missing validation records finalize as `not_run`; no contract requires
+      unsupported connection validation to record a failed stage.
+
   - id: w1
     summary: "Extend the shared driver metadata helper to preserve runner platform_info behavior"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Update `benchbox/core/results/driver_metadata.py` so the shared helper
       can also populate `result.platform_info` using the same `setdefault()`
@@ -68,7 +75,7 @@ work:
   - id: w2
     summary: "Route runner lifecycle metadata enrichment through the shared helper"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Replace the runner-local duplication in
       `_enrich_driver_runtime_metadata()` with calls to
@@ -83,7 +90,7 @@ work:
   - id: w3
     summary: "Define validation applicability semantics and update post-load validation behavior"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Decide and implement one explicit semantic rule:
         - not applicable: return `None`, do not add a validation stage;
@@ -101,7 +108,7 @@ work:
   - id: w4
     summary: "Add metadata and validation regression tests for lifecycle and CLI parity"
     needs: [w2, w3]
-    status: pending
+    status: done
     notes: |
       Cover:
         - CLI/orchestrator path and runner lifecycle path produce the same
@@ -131,6 +138,7 @@ metadata:
   estimated_effort: "1-2 days"
   created_date: "2026-05-21"
   last_updated: "2026-05-21T00:00:00Z"
+  completed_date: "2026-05-22"
   source: "Independent verification of execution/results architecture findings #2 and #7"
 
 impact:

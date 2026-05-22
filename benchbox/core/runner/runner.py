@@ -24,6 +24,7 @@ from benchbox.core.constants import (
     GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS,
     GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS,
 )
+from benchbox.core.results.driver_metadata import apply_driver_metadata
 from benchbox.core.results.models import (
     BenchmarkResults,
 )
@@ -182,12 +183,7 @@ def _run_postload_validation(
     from benchbox.core.validation import DatabaseValidationEngine, ValidationResult
 
     if not hasattr(adapter, "create_connection") or not hasattr(adapter, "close_connection"):
-        return ValidationResult(
-            is_valid=False,
-            errors=["Platform adapter does not support connection-based validation"],
-            warnings=[],
-            details={"benchmark": benchmark_config.name},
-        )
+        return None
 
     connection = None
     try:
@@ -322,89 +318,14 @@ def _attach_translation_metadata(
     return result
 
 
-_DRIVER_STR_FIELDS = [
-    "driver_package",
-    "driver_version_requested",
-    "driver_version_resolved",
-    "driver_version_actual",
-    "driver_runtime_strategy",
-    "driver_runtime_path",
-    "driver_runtime_python_executable",
-]
-
-# Config attribute names differ from local field names for a few fields.
-_CONFIG_FIELD_MAP: dict[str, str] = {
-    "driver_version_requested": "driver_version",
-    "driver_auto_install_used": "driver_auto_install",
-}
-
-# execution_metadata fields that use setdefault (preserve existing); others overwrite.
-_EXEC_META_SETDEFAULT = {"driver_package", "driver_version_requested", "driver_auto_install_used"}
-
-
-def _apply_driver_meta_to_dicts(meta: dict[str, Any], result: BenchmarkResults) -> None:
-    """Push resolved driver metadata into execution_metadata and platform_info dicts."""
-    execution_metadata = result.execution_metadata if isinstance(result.execution_metadata, dict) else None
-    if execution_metadata is not None:
-        for field in _DRIVER_STR_FIELDS + ["driver_auto_install_used"]:
-            value = meta[field]
-            if value or field == "driver_auto_install_used":
-                if field in _EXEC_META_SETDEFAULT:
-                    execution_metadata.setdefault(field, value)
-                else:
-                    execution_metadata[field] = value
-
-    platform_info = result.platform_info if isinstance(result.platform_info, dict) else None
-    if platform_info is not None:
-        for field in _DRIVER_STR_FIELDS:
-            if meta[field]:
-                platform_info.setdefault(field, meta[field])
-
-
 def _enrich_driver_runtime_metadata(
     result: BenchmarkResults,
     *,
     adapter: Any | None,
     database_config: DatabaseConfig | None,
 ) -> BenchmarkResults:
-    """Attach resolved driver runtime metadata to result objects.
-
-    Lifecycle runs can return BenchmarkResults built through benchmark helpers
-    that normalize ``platform_info`` and drop custom top-level fields. Persist
-    driver metadata explicitly on result and execution metadata to keep exports
-    consistent across all adapters.
-    """
-    meta: dict[str, Any] = dict.fromkeys(_DRIVER_STR_FIELDS)
-    meta["driver_auto_install_used"] = False
-
-    if adapter is not None:
-        for field in _DRIVER_STR_FIELDS:
-            meta[field] = getattr(adapter, field, None) or meta[field]
-        meta["driver_auto_install_used"] = getattr(adapter, "driver_auto_install_used", False)
-
-    if database_config is not None:
-        for field in _DRIVER_STR_FIELDS:
-            if not meta[field]:
-                config_attr = _CONFIG_FIELD_MAP.get(field, field)
-                meta[field] = getattr(database_config, config_attr, None)
-        # driver_version_resolved also falls back to driver_version
-        if not meta["driver_version_resolved"]:
-            meta["driver_version_resolved"] = database_config.driver_version
-        if not meta["driver_auto_install_used"]:
-            meta["driver_auto_install_used"] = database_config.driver_auto_install
-
-        resolved = meta["driver_version_resolved"]
-        if resolved and database_config.driver_version_resolved != resolved:
-            database_config.driver_version_resolved = resolved
-
-    # Apply to result object
-    for field in _DRIVER_STR_FIELDS:
-        setattr(result, field, meta[field])
-    result.driver_auto_install = meta["driver_auto_install_used"]
-
-    # Apply to execution_metadata and platform_info dicts
-    _apply_driver_meta_to_dicts(meta, result)
-
+    """Attach resolved driver runtime metadata to result objects."""
+    apply_driver_metadata(result, database_config=database_config, platform_adapter=adapter)
     return result
 
 
