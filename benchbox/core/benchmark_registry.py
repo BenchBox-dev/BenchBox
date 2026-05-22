@@ -85,6 +85,10 @@ _CORE_CLASS_NAME_OVERRIDES: dict[str, str] = {
 CORE_BENCHMARK_CLASS_NAMES: dict[str, str] = {
     bid: _CORE_CLASS_NAME_OVERRIDES.get(bid, f"{name}Benchmark") for bid, name in BENCHMARK_CLASS_NAMES.items()
 }
+_BENCHMARK_ID_BY_CLASS_NAME: dict[str, str] = {
+    **{class_name: benchmark_id for benchmark_id, class_name in BENCHMARK_CLASS_NAMES.items()},
+    **{class_name: benchmark_id for benchmark_id, class_name in CORE_BENCHMARK_CLASS_NAMES.items()},
+}
 
 # Benchmarks with runtime data-sharing declarations. The registry imports only
 # this narrow set during metadata normalization to avoid eager-loading every
@@ -597,6 +601,11 @@ def get_core_benchmark_class_name(benchmark_id: str) -> str | None:
     return CORE_BENCHMARK_CLASS_NAMES.get(benchmark_id.lower())
 
 
+def get_benchmark_id_for_class_name(class_name: str) -> str | None:
+    """Return the canonical benchmark ID for a public or core benchmark class."""
+    return _BENCHMARK_ID_BY_CLASS_NAME.get(class_name)
+
+
 def get_benchmark_class(benchmark_id: str):
     """Get the benchmark class from the benchbox module.
 
@@ -758,10 +767,10 @@ def validate_scale_factor(
     Raises:
         ScaleFactorNotSupportedError: If the benchmark declares
             ``scale_options`` and ``scale_factor`` is not in that list.
-        ValueError: If the legacy ``min_scale`` lower bound is violated
-            (subclass-compatible — ``ScaleFactorNotSupportedError``
-            inherits from ``ValueError`` so existing handlers keep
-            working).
+        ValueError: If ``benchmark_id`` is unknown or the legacy ``min_scale``
+            lower bound is violated (subclass-compatible —
+            ``ScaleFactorNotSupportedError`` inherits from ``ValueError`` so
+            existing handlers keep working).
     """
     from benchbox.core.errors import ScaleFactorNotSupportedError
 
@@ -774,7 +783,8 @@ def validate_scale_factor(
 
     meta = get_benchmark_metadata(benchmark_id)
     if meta is None:
-        return  # Unknown benchmark, skip validation
+        available = ", ".join(list_benchmark_ids())
+        raise ValueError(f"Unknown benchmark '{benchmark_id}'. Available: {available}")
 
     scale_options = meta.get("scale_options")
     if scale_options:

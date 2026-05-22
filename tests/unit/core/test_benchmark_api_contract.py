@@ -21,6 +21,7 @@ from benchbox.core.benchmark_registry import (
     BENCHMARK_METADATA,
     BENCHMARK_SUPPORT_STATUS_VALUES,
     CORE_BENCHMARK_CLASS_NAMES,
+    get_benchmark_id_for_class_name,
     get_benchmark_registry_summary,
     get_benchmark_support_status,
     get_benchmarks_by_support_status,
@@ -98,6 +99,16 @@ def test_benchmark_registry_wrapper_and_loader_counts_match_contract_map() -> No
     assert set(list_public_benchmark_ids()) == set(BENCHMARK_METADATA) - {"joinorder_synthetic"}
 
     assert BENCHMARK_API_COUNT_MARKER in PUBLIC_CONTRACTS_DOC.read_text()
+
+
+def test_benchmark_class_reverse_lookup_matches_registry_maps() -> None:
+    """Public and core benchmark class names should map back to one canonical ID."""
+
+    for benchmark_id, class_name in BENCHMARK_CLASS_NAMES.items():
+        assert get_benchmark_id_for_class_name(class_name) == benchmark_id
+    for benchmark_id, class_name in CORE_BENCHMARK_CLASS_NAMES.items():
+        assert get_benchmark_id_for_class_name(class_name) == benchmark_id
+    assert get_benchmark_id_for_class_name("CustomDownstreamBenchmark") is None
 
 
 def test_benchmark_support_status_metadata_matches_contract_map() -> None:
