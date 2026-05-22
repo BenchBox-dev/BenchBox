@@ -1,0 +1,41 @@
+variants:
+- id: 1
+  description: 'Scalar subqueries: Use scalar subqueries for avg calculation'
+  sql: |
+    select sum(l_extendedprice) / 7.0 as avg_yearly from lineitem, part where p_partkey = l_partkey and p_brand = 'Brand#23' and p_container = 'MED BOX' and l_quantity < (select 0.2 * avg(l_quantity) from lineitem where l_partkey = p_partkey)
+- id: 2
+  description: 'HAVING clause: Use HAVING for post-aggregation filtering'
+  sql: |
+    with avg_qty as (select l_partkey, 0.2 * avg(l_quantity) as threshold from lineitem group by l_partkey) select sum(l_extendedprice) / 7.0 as avg_yearly from lineitem, part, avg_qty where p_partkey = l_partkey and p_brand = 'Brand#23' and p_container = 'MED BOX' and avg_qty.l_partkey = l_partkey and l_quantity < avg_qty.threshold
+- id: 3
+  description: 'Explicit JOINs: Replace comma-separated tables with explicit JOINs'
+  sql: |
+    select sum(l_extendedprice) / 7.0 as avg_yearly from lineitem l inner join part p on p.p_partkey = l.l_partkey inner join (select l_partkey, 0.2 * avg(l_quantity) as threshold from lineitem group by l_partkey) avg_calc on l.l_partkey = avg_calc.l_partkey where p.p_brand = 'Brand#23' and p.p_container = 'MED BOX' and l.l_quantity < avg_calc.threshold
+- id: 4
+  description: 'UNION ALL: Split query by conditions'
+  sql: |
+    select sum(revenue) / 7.0 as avg_yearly from (select l_extendedprice as revenue from lineitem, part where p_partkey = l_partkey and p_brand = 'Brand#23' and p_container = 'MED BOX' and l_quantity < (select 0.2 * avg(l_quantity) from lineitem where l_partkey = p_partkey) union all select 0 as revenue from dual where false) combined
+- id: 5
+  description: 'CTE: Use common table expressions for modular design'
+  sql: |
+    with part_thresholds as (select l_partkey, 0.2 * avg(l_quantity) as avg_threshold from lineitem group by l_partkey), qualified_parts as (select p_partkey from part where p_brand = 'Brand#23' and p_container = 'MED BOX') select sum(l_extendedprice) / 7.0 as avg_yearly from lineitem l inner join qualified_parts qp on l.l_partkey = qp.p_partkey inner join part_thresholds pt on l.l_partkey = pt.l_partkey where l.l_quantity < pt.avg_threshold
+- id: 6
+  description: 'Derived table: Use derived tables for subqueries'
+  sql: |
+    select sum(lineitem_data.l_extendedprice) / 7.0 as avg_yearly from (select l.l_extendedprice, l.l_quantity, l.l_partkey from lineitem l, part p, (select l_partkey as pk, 0.2 * avg(l_quantity) as threshold from lineitem group by l_partkey) avg_data where p.p_partkey = l.l_partkey and p.p_brand = 'Brand#23' and p.p_container = 'MED BOX' and avg_data.pk = l.l_partkey and l.l_quantity < avg_data.threshold) lineitem_data
+- id: 7
+  description: 'FILTER clause (OLAP): Use FILTER for conditional aggregation'
+  sql: |
+    select sum(l_extendedprice) filter (where l_quantity < (select 0.2 * avg(l_quantity) from lineitem where l_partkey = p_partkey)) / 7.0 as avg_yearly from lineitem, part where p_partkey = l_partkey and p_brand = 'Brand#23' and p_container = 'MED BOX'
+- id: 8
+  description: 'EXISTS pattern: Use EXISTS for membership testing'
+  sql: |
+    select sum(l_extendedprice) / 7.0 as avg_yearly from lineitem, part where p_partkey = l_partkey and p_brand = 'Brand#23' and p_container = 'MED BOX' and exists (select 1 from (select l_partkey, 0.2 * avg(l_quantity) as threshold from lineitem group by l_partkey) avg_calc where avg_calc.l_partkey = l_partkey and l_quantity < avg_calc.threshold)
+- id: 9
+  description: 'Window functions (OLAP): Use window functions for ranking'
+  sql: |
+    with lineitem_with_avg as (select l_extendedprice, l_quantity, l_partkey, 0.2 * avg(l_quantity) over (partition by l_partkey) as avg_threshold from lineitem) select sum(lwa.l_extendedprice) / 7.0 as avg_yearly from lineitem_with_avg lwa, part p where p.p_partkey = lwa.l_partkey and p.p_brand = 'Brand#23' and p.p_container = 'MED BOX' and lwa.l_quantity < lwa.avg_threshold
+- id: 10
+  description: 'CASE expressions: Use CASE for conditional logic'
+  sql: |
+    select sum(case when l_quantity < (select 0.2 * avg(l_quantity) from lineitem where l_partkey = p_partkey) then l_extendedprice else 0 end) / 7.0 as avg_yearly from lineitem, part where p_partkey = l_partkey and case when p_brand = 'Brand#23' then 1 else 0 end = 1 and case when p_container = 'MED BOX' then 1 else 0 end = 1

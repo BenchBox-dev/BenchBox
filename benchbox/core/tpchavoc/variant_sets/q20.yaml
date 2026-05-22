@@ -1,0 +1,41 @@
+variants:
+- id: 1
+  description: Q20 Variant 1
+  sql: |
+    select s_name, s_address from supplier, nation where s_suppkey in (select ps_suppkey from partsupp where ps_partkey in (select p_partkey from part where p_name like 'forest%') and ps_availqty > (select 0.5 * sum(l_quantity) from lineitem where l_partkey = ps_partkey and l_suppkey = ps_suppkey and l_shipdate >= date '1994-01-01' and l_shipdate < date '1995-01-01')) and s_nationkey = n_nationkey and n_name = 'CANADA' order by s_name -- Variant 1
+- id: 2
+  description: Q20 Variant 2
+  sql: |
+    select s_name, s_address from supplier, nation where s_suppkey in (select ps_suppkey from partsupp where ps_partkey in (select p_partkey from part where p_name like 'forest%') and ps_availqty > (select 0.5 * sum(l_quantity) from lineitem where l_partkey = ps_partkey and l_suppkey = ps_suppkey and l_shipdate >= date '1994-01-01' and l_shipdate < date '1995-01-01')) and s_nationkey = n_nationkey and n_name = 'CANADA' order by s_name -- Variant 2
+- id: 3
+  description: Q20 Variant 3
+  sql: |
+    select s_name, s_address from supplier, nation where s_suppkey in (select ps_suppkey from partsupp where ps_partkey in (select p_partkey from part where p_name like 'forest%') and ps_availqty > (select 0.5 * sum(l_quantity) from lineitem where l_partkey = ps_partkey and l_suppkey = ps_suppkey and l_shipdate >= date '1994-01-01' and l_shipdate < date '1995-01-01')) and s_nationkey = n_nationkey and n_name = 'CANADA' order by s_name -- Variant 3
+- id: 4
+  description: Q20 Variant 4
+  sql: |
+    select s_name, s_address from supplier, nation where s_suppkey in (select ps_suppkey from partsupp where ps_partkey in (select p_partkey from part where p_name like 'forest%') and ps_availqty > (select 0.5 * sum(l_quantity) from lineitem where l_partkey = ps_partkey and l_suppkey = ps_suppkey and l_shipdate >= date '1994-01-01' and l_shipdate < date '1995-01-01')) and s_nationkey = n_nationkey and n_name = 'CANADA' order by s_name -- Variant 4
+- id: 5
+  description: Q20 Variant 5
+  sql: |
+    select s_name, s_address from supplier, nation where s_suppkey in (select ps_suppkey from partsupp where ps_partkey in (select p_partkey from part where p_name like 'forest%') and ps_availqty > (select 0.5 * sum(l_quantity) from lineitem where l_partkey = ps_partkey and l_suppkey = ps_suppkey and l_shipdate >= date '1994-01-01' and l_shipdate < date '1995-01-01')) and s_nationkey = n_nationkey and n_name = 'CANADA' order by s_name -- Variant 5
+- id: 6
+  description: Q20 Variant 6
+  sql: |
+    select s_name, s_address from supplier, nation where s_suppkey in (select ps_suppkey from partsupp where ps_partkey in (select p_partkey from part where p_name like 'forest%') and ps_availqty > (select 0.5 * sum(l_quantity) from lineitem where l_partkey = ps_partkey and l_suppkey = ps_suppkey and l_shipdate >= date '1994-01-01' and l_shipdate < date '1995-01-01')) and s_nationkey = n_nationkey and n_name = 'CANADA' order by s_name -- Variant 6
+- id: 7
+  description: Q20 Variant 7
+  sql: |
+    select s_name, s_address from supplier, nation where s_suppkey in (select ps_suppkey from partsupp where ps_partkey in (select p_partkey from part where p_name like 'forest%') and ps_availqty > (select 0.5 * sum(l_quantity) from lineitem where l_partkey = ps_partkey and l_suppkey = ps_suppkey and l_shipdate >= date '1994-01-01' and l_shipdate < date '1995-01-01')) and s_nationkey = n_nationkey and n_name = 'CANADA' order by s_name -- Variant 7
+- id: 8
+  description: Q20 Variant 8
+  sql: |
+    select s_name, s_address from supplier, nation where s_suppkey in (select ps_suppkey from partsupp where ps_partkey in (select p_partkey from part where p_name like 'forest%') and ps_availqty > (select 0.5 * sum(l_quantity) from lineitem where l_partkey = ps_partkey and l_suppkey = ps_suppkey and l_shipdate >= date '1994-01-01' and l_shipdate < date '1995-01-01')) and s_nationkey = n_nationkey and n_name = 'CANADA' order by s_name -- Variant 8
+- id: 9
+  description: Q20 Variant 9
+  sql: |
+    select s_name, s_address from supplier, nation where s_suppkey in (select ps_suppkey from partsupp where ps_partkey in (select p_partkey from part where p_name like 'forest%') and ps_availqty > (select 0.5 * sum(l_quantity) from lineitem where l_partkey = ps_partkey and l_suppkey = ps_suppkey and l_shipdate >= date '1994-01-01' and l_shipdate < date '1995-01-01')) and s_nationkey = n_nationkey and n_name = 'CANADA' order by s_name -- Variant 9
+- id: 10
+  description: Q20 Variant 10
+  sql: |
+    select s_name, s_address from supplier, nation where s_suppkey in (select ps_suppkey from partsupp where ps_partkey in (select p_partkey from part where p_name like 'forest%') and ps_availqty > (select 0.5 * sum(l_quantity) from lineitem where l_partkey = ps_partkey and l_suppkey = ps_suppkey and l_shipdate >= date '1994-01-01' and l_shipdate < date '1995-01-01')) and s_nationkey = n_nationkey and n_name = 'CANADA' order by s_name -- Variant 10
