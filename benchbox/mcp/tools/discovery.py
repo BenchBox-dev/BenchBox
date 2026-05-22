@@ -373,6 +373,7 @@ def _list_benchmarks_impl() -> dict[str, Any]:
 
 def _list_chart_templates_impl() -> dict[str, Any]:
     """List available chart templates for visualization."""
+    from benchbox.core.visualization.chart_types import CHART_TYPE_DESCRIPTIONS
     from benchbox.core.visualization.templates import list_templates
 
     templates = list_templates()
@@ -386,14 +387,10 @@ def _list_chart_templates_impl() -> dict[str, Any]:
             }
             for t in templates
         ],
-        "chart_types": {
-            "performance_bar": "Bar chart comparing total runtime",
-            "distribution_box": "Box plot of query time distribution",
-            "query_heatmap": "Heatmap of per-query times across platforms",
-            "cost_scatter": "Cost vs performance scatter plot",
-            "time_series": "Performance trend over time",
-        },
-        "supported_formats": ["html"],
+        "chart_types": dict(CHART_TYPE_DESCRIPTIONS),
+        "chart_type_coverage": "complete_semantic_registry",
+        "chart_namespace": "benchbox_result_aware_semantic_ids",
+        "supported_formats": ["ascii"],
     }
 
 

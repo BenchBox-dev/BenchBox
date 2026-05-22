@@ -7,6 +7,9 @@ from typing import Any
 
 from benchbox.core.visualization.exceptions import VisualizationError
 
+RESULT_AWARE_ONLY_CHART_TYPES = frozenset({"power_bar"})
+"""Semantic chart IDs that require normalized BenchBox results instead of raw primitive data."""
+
 
 def export_ascii(
     ascii_content: str,
@@ -316,6 +319,9 @@ _CHART_BUILDERS: dict[str, Any] = {
     "summary_box": _build_summary_box,
 }
 
+PRIMITIVE_ASCII_CHART_TYPES: tuple[str, ...] = tuple(_CHART_BUILDERS)
+"""Data-first ASCII chart IDs supported by render_ascii_chart()."""
+
 
 def render_ascii_chart(
     chart_type: str,
@@ -327,9 +333,8 @@ def render_ascii_chart(
     """Render data as an ASCII chart.
 
     Args:
-        chart_type: Type of chart (performance_bar, distribution_box, query_heatmap,
-                    query_histogram, cost_scatter, time_series, comparison_bar,
-                    diverging_bar, summary_box).
+        chart_type: Data-first chart type. Result-aware semantic chart IDs such
+                    as power_bar are rendered through render_ascii_chart_from_results().
         data: Chart data in the appropriate format for the chart type.
         title: Optional chart title.
         options: ChartOptions instance.
@@ -347,6 +352,11 @@ def render_ascii_chart(
 
     builder = _CHART_BUILDERS.get(chart_type)
     if builder is None:
+        if chart_type in RESULT_AWARE_ONLY_CHART_TYPES:
+            raise VisualizationError(
+                f"ASCII chart type '{chart_type}' requires normalized BenchBox results; "
+                "use render_ascii_chart_from_results()."
+            )
         raise VisualizationError(f"Unsupported ASCII chart type: {chart_type}")
 
     chart = builder(data, title, opts, kwargs)

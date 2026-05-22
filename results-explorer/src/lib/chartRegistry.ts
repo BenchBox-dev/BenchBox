@@ -1,7 +1,7 @@
 /**
  * chartRegistry.ts - Explorer chart type registry.
  *
- * Mirrors the canonical 16-entry list in
+ * Mirrors the canonical semantic chart list in
  * ``benchbox/core/visualization/chart_types.py`` (_CHART_SPECS).
  *
  * Policy: new chart types are added to ``chart_types.py`` first; this
@@ -308,7 +308,7 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
   },
 ] as const;
 
-/** All 16 canonical chart type IDs - must match chart_types.py ALL_CHART_TYPES. */
+/** Canonical chart type IDs - must match chart_types.py ALL_CHART_TYPES. */
 export const ALL_CHART_IDS: readonly string[] = CHART_REGISTRY.map((e) => e.id);
 
 /** Quick-lookup map from id → entry. */
