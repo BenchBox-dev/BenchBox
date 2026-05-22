@@ -11,6 +11,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import csv
+import inspect
 import logging
 from pathlib import Path
 from typing import Any
@@ -38,6 +39,30 @@ class SimpleBenchmarkMixin:
 
     _benchmark_label: str
     _table_load_order: list[str]
+    _REQUIRED_ATTRIBUTES = ("_benchmark_label", "_table_load_order")
+    _REQUIRED_METHODS = ("get_query", "execute_query", "get_create_tables_sql", "_get_table_schema")
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        """Validate that concrete consumers provide the simple benchmark contract."""
+        super().__init_subclass__(**kwargs)
+        if cls.__name__.endswith(("Mixin", "Base")):
+            return
+        missing_attributes = [
+            attribute_name
+            for attribute_name in SimpleBenchmarkMixin._REQUIRED_ATTRIBUTES
+            if not hasattr(cls, attribute_name)
+        ]
+        missing_methods = [
+            method_name
+            for method_name in SimpleBenchmarkMixin._REQUIRED_METHODS
+            if not callable(member := inspect.getattr_static(cls, method_name, None))
+            or getattr(member, "__isabstractmethod__", False)
+        ]
+        if missing_attributes or missing_methods:
+            missing = ", ".join([*missing_attributes, *missing_methods])
+            raise TypeError(
+                f"{cls.__name__} uses SimpleBenchmarkMixin but is missing required contract members: {missing}"
+            )
 
     def run_benchmark(self, connection: Any, queries: list[str] | None = None, iterations: int = 1) -> dict[str, Any]:
         """Run the complete benchmark with shared query-iteration logic.
