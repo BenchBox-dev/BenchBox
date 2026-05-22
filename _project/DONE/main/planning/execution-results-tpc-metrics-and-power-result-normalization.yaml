@@ -2,7 +2,7 @@ id: execution-results-tpc-metrics-and-power-result-normalization
 title: "Execution/results hardening: retire legacy TPC metrics and normalize power-result conversion"
 worktree: main
 priority: Medium-High
-status: "Not Started"
+status: "Completed"
 category: Results
 
 deps:
@@ -30,96 +30,69 @@ description: |
 work:
   - id: w0
     summary: "Revalidate TPC metrics import graph, unique legacy surface, and power-result conversion count"
-    status: pending
+    status: done
     notes: |
-      Re-run the verification against the implementation branch before editing.
-      Capture the checked SHA, commands, and compact result summary in the
-      implementation PR body or TODO notes; do not commit raw stdout logs.
-
-      Required checks:
-        - `wc -l benchbox/core/tpc_metrics.py benchbox/core/results/metrics.py`.
-        - `rg -n "^from benchbox\\.core\\.tpc_metrics import|^import benchbox\\.core\\.tpc_metrics|from benchbox\\.core import tpc_metrics|benchbox\\.core\\.tpc_metrics" benchbox tests pyproject.toml --glob '!build/**' --glob '!docs/_build/**' --glob '!.venv/**'`.
-        - `rg -n "^from benchbox\\.core\\.results\\.metrics import|TPCMetricsCalculator" benchbox tests --glob '!build/**' --glob '!docs/_build/**' --glob '!.venv/**'`.
-        - `rg -n "platform_result = \\{|\\\"test_type\\\": \\\"power\\\"|power_test_error" benchbox/platforms/base/execution.py`.
-
-      Decision gate: if any production importer of `benchbox.core.tpc_metrics`
-      appears, stop and re-scope from deletion to compatibility migration.
+      Revalidated against checked SHA
+      `7a4262f8f6457e97b334e6132c9e58b2640c785f`. `wc -l` reported
+      `benchbox/core/tpc_metrics.py` at 877 lines and
+      `benchbox/core/results/metrics.py` at 211 lines. The legacy import grep
+      found only `tests/unit/core/test_tpc_metrics.py`; no production importer
+      exists in the current tree. The canonical results metrics grep found
+      production and test use of `benchbox.core.results.metrics` /
+      `TPCMetricsCalculator`. The power conversion grep found the duplicated
+      TPC-H/TPC-DS normal result blocks and `power_test_error` sentinels in
+      `benchbox/platforms/base/execution.py`.
 
   - id: w1
     summary: "Audit legacy tpc_metrics.py for behavior not present in results.metrics"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
-      Compare `PowerMetrics`, `ThroughputMetrics`, `CompositeMetrics`,
-      `MetricsValidator`, `StatisticalAnalyzer`, `MetricsReporter`, and
-      `TPCMetricsCalculator.calculate_full_metrics()` against
-      `benchbox/core/results/metrics.py` and current result-building code.
-
-      Produce a small decision table:
-        - behavior already covered by `results.metrics` or result schema code;
-        - behavior useful but uncalled, with proposed destination;
-        - behavior obsolete or incompatible with current schema-v2 policy.
-
-      Decision gate: only delete the legacy module if the table shows no unique
-      production-useful behavior or the unique behavior is first folded into
-      the canonical results path with focused tests.
+      Audit decision table:
+        - Power@Size, Throughput@Size, and composite Qph formulas are covered
+          by `benchbox/core/results/metrics.py`; focused tests now pin the
+          legacy formula expectations on the canonical calculator.
+        - `PowerMetrics`, `ThroughputMetrics`, `CompositeMetrics`,
+          `MetricsValidator`, and `calculate_full_metrics()` are unimported
+          legacy object/reporting surfaces, not part of current schema-v2
+          result construction.
+        - `StatisticalAnalyzer` and `MetricsReporter` may be useful product
+          ideas, but they are uncalled internal reporting helpers and should be
+          promoted only through a separate CLI/reporting TODO.
+      No unique production-useful behavior required migration before deleting
+      the legacy module.
 
   - id: w2
     summary: "Retire or fold the legacy TPC metrics module through an explicit compatibility decision"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      Preferred path: delete `benchbox/core/tpc_metrics.py` and
-      `tests/unit/core/test_tpc_metrics.py`, then rely on
-      `tests/unit/core/results/test_metrics.py` and result-builder tests for
-      canonical metric coverage.
-
-      Conditional path: if w1 identifies still-useful validation/reporting
-      behavior, move the smallest needed surface into
-      `benchbox/core/results/metrics.py` or a more specific results helper,
-      then remove the legacy module after preserving behavior with tests.
-
-      Update public-contract/backward-compat docs only if the audit finds this
-      import path was intentionally public or beta-public. Current evidence
-      suggests it is internal, but w0 must re-check before deletion.
+      Deleted `benchbox/core/tpc_metrics.py` and
+      `tests/unit/core/test_tpc_metrics.py`. No public/backward-compat docs
+      were changed because the revalidated import graph did not show an
+      intentionally supported import path. Removed the stale mutation-tool
+      exclusion for the deleted module from `pyproject.toml` as a narrow scope
+      exception found during self-review.
 
   - id: w3
     summary: "Extract power-test result conversion and sentinel construction helpers"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
-      In `benchbox/platforms/base/execution.py`, introduce narrowly scoped
-      helpers for converting a TPC power query result dict into the platform
-      adapter query-result shape and for building `power_test_error` sentinels.
-
-      The helper must preserve:
-        - `query_id`;
-        - `execution_time_seconds`;
-        - `status`;
-        - `rows_returned`;
-        - `test_type: power`;
-        - `stream_id`;
-        - `position`;
-        - `iteration`;
-        - `run_type`;
-        - failure `error` messages.
-
-      Do not change throughput or maintenance result conversion in this TODO
-      except for naming symmetry if a tiny local helper genuinely reduces
-      duplication without broad refactor.
+      Added `_power_query_result()` and `_power_test_error_result()` in
+      `benchbox/platforms/base/execution.py` and replaced the duplicated
+      TPC-H/TPC-DS power conversion blocks and sentinels. Throughput,
+      maintenance, and generic power conversion paths were left unchanged.
 
   - id: w4
     summary: "Add focused regression tests for canonical TPC metrics and power-result conversion"
     needs: [w2, w3]
-    status: pending
+    status: done
     notes: |
-      Add or adjust tests so the canonical metrics calculator covers Power@Size,
-      Throughput@Size, Qph, and geometric mean behavior previously tested
-      through the legacy module. Add base-adapter tests proving the new
-      conversion helper preserves warmup, measurement, and sentinel fields.
-
-      If the legacy module is deleted, tests must fail on any remaining import
-      of `benchbox.core.tpc_metrics` from production or tests.
+      Added canonical formula coverage in
+      `tests/unit/core/results/test_metrics.py` and conversion-helper coverage
+      in `tests/unit/platforms/test_base_adapter.py`. The final import grep is
+      expected to terminate with no matches for `benchbox.core.tpc_metrics`.
 
 deferred:
   - summary: "Rewrite all TPC-H/TPC-DS power and throughput execution drivers around one shared result adapter"
@@ -136,6 +109,7 @@ metadata:
   estimated_effort: "1-2 days"
   created_date: "2026-05-21"
   last_updated: "2026-05-21T00:00:00Z"
+  completed_date: "2026-05-22"
   source: "Independent verification of execution/results architecture findings #1 and #5"
 
 impact:

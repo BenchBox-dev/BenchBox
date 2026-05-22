@@ -837,7 +837,6 @@ exclude_functions = [
     "benchbox/core/results/schema.py:_build_config_block",            # 13 - config serialization needs per-field precedence and compression merge rules
     "benchbox/core/results/schema.py:_build_phases_block",            # 13 - phase serialization mirrors heterogeneous setup/power/throughput structures
     "benchbox/core/schemas.py:to_cli_args",                           # 13 - CLI reconstruction is proportional to optional flag formatting rules
-    "benchbox/core/tpc_metrics.py:validate_throughput_test_results",  # 13 - TPC throughput validation is a set of independent spec checks
     "benchbox/core/tpc_validation.py:validate",                       # 13 - validator subclasses apply one rule per completeness/result/schema concern
     "benchbox/core/tpcdi/queries.py:resolve_query_order",             # 13 - Kahn topological sort with query-only dependency filtering is algorithmic
     "benchbox/core/tpcds/generator/streaming.py:_generate_parent_table_chunk_with_children",  # 13 - TPC-DS parent/child chunk generation couples subprocess, compression, and manifest updates
