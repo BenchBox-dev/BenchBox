@@ -1,0 +1,270 @@
+id: visualization-suggestions-and-render-orchestration
+title: "Visualization hardening: centralize chart suggestions and render orchestration across CLI and MCP"
+worktree: main
+priority: High
+status: "Not Started"
+category: Visualization
+
+deps:
+  needs:
+    - architecture-contract-map-and-support-taxonomy
+    - visualization-chart-registry-and-exporter-contract
+
+description: |
+  Independent verification confirmed that result-aware chart recommendation and
+  rendering orchestration are duplicated between CLI, MCP, and a private
+  `ResultPlotter` method.
+
+  The current local evidence at SHA a63ae1a76 showed:
+
+    - `benchbox/mcp/tools/visualization.py:_build_chart_suggestions()` emits a
+      rich MCP suggestion list but never recommends `power_bar`.
+    - `benchbox/core/visualization/result_plotter.py:_suggest_chart_types()`
+      includes `power_bar`, but no production path calls it; tests pin behavior
+      that users do not see.
+    - CLI template/type rendering in `benchbox/cli/commands/visualize.py` and
+      MCP template/type rendering in `benchbox/mcp/tools/visualization.py`
+      duplicate source loading, template iteration, skip handling, and
+      pairwise validation with different rules.
+    - `render_ascii_chart_from_results()` returns `None` both for missing
+      handlers and known-but-inapplicable chart/data combinations. MCP validates
+      unknown chart types before rendering, but still reports post-render
+      `None` as "Unsupported chart type", which is misleading for valid charts
+      such as `stacked_phase` with no phase data.
+
+  This TODO creates a single core result-aware recommendation and render-set
+  orchestration layer, then makes CLI and MCP format that shared outcome
+  instead of reimplementing the workflow.
+
+work:
+  - id: w0
+    summary: "Revalidate suggestion coverage, production callers, and ambiguous None paths"
+    status: pending
+    notes: |
+      Re-run evidence on the implementation branch and record checked SHA plus
+      a compact summary. Do not commit raw command transcripts.
+
+      Required checks:
+        - `rg -n "_build_chart_suggestions|_suggest_chart_types\\(|_select_primary_chart|render_ascii_chart_from_results\\(|Unsupported chart type|requires_two_results|strict_pairwise_validation" benchbox tests --glob '*.py' --glob '!build/**' --glob '!docs/_build/**' --glob '!.venv/**'`.
+        - `uv run -- python - <<'PY'` snippet that constructs representative
+          normalized-result stubs and prints the union of
+          `_build_chart_suggestions()` chart IDs; compare with `ALL_CHART_TYPES`.
+        - `uv run -- python - <<'PY'` snippet that verifies known
+          inapplicable charts such as `stacked_phase` with no phase data return
+          `None`, while unknown chart types also return `None`.
+        - Inspect tests that call `ResultPlotter._suggest_chart_types()` and
+          confirm whether any production caller has appeared.
+
+      Decision gate: if the registry TODO has already added structured
+      applicability metadata, use it here rather than creating another profile
+      schema.
+
+  - id: w1
+    summary: "Define a shared result data profile used by suggestion and applicability decisions"
+    needs: [w0]
+    status: pending
+    notes: |
+      Add a small core helper or dataclass that summarizes the normalized
+      result set:
+        - number of results;
+        - platforms;
+        - total query count;
+        - any query data;
+        - any `power_at_size` or power-run result;
+        - any cost data;
+        - any timestamps;
+        - any phase data;
+        - pairwise eligibility;
+        - benchmark/test-type signals needed by `power_bar`.
+
+      Candidate destination: `benchbox/core/visualization/suggestions.py` or
+      `benchbox/core/visualization/orchestration.py`. Keep it independent from
+      MCP types and Click/Rich console code.
+
+  - id: w2
+    summary: "Replace divergent suggesters with one core recommendation function"
+    needs: [w1]
+    status: pending
+    notes: |
+      Implement one function that returns structured chart recommendations with
+      at least `chart_type`, `reason`, `priority`, and optional applicability
+      details. MCP can serialize this directly. CLI can use it for future auto
+      behavior or keep current `auto == all` behavior while the dead private
+      method is removed/deprecated.
+
+      Required behavior:
+        - recommend `power_bar` when any result has `power_at_size` or is a
+          power-run result;
+        - preserve existing MCP priorities where still correct;
+        - never recommend a chart ID not present in the semantic registry;
+        - include pairwise-only charts only when exactly two results are present;
+        - expose enough profile details for MCP `suggest_charts` to keep its
+          current response shape.
+
+  - id: w3
+    summary: "Create a shared render outcome for explicit chart lists and templates"
+    needs: [w1]
+    status: pending
+    notes: |
+      Extract the common "render these chart types against these results"
+      workflow into a core function returning a structured outcome. The outcome
+      should include:
+        - rendered chart content entries with chart type and content;
+        - skipped chart types with structured reasons;
+        - validation errors for unknown types or wrong result counts;
+        - template metadata when a template was used;
+        - a flag for strict pairwise enforcement.
+
+      CLI should format the outcome to Rich/console. MCP should serialize it to
+      JSON. The core function must not import Click, Rich, FastMCP, or MCP error
+      helpers.
+
+  - id: w4
+    summary: "Disambiguate unknown chart types from valid-but-inapplicable chart/data combinations"
+    needs: [w3]
+    status: pending
+    notes: |
+      Preserve early unknown-type validation through `CHART_TYPE_SPECS`. After
+      a known chart type renders `None`, classify the skip/error as not
+      applicable for the provided data.
+
+      MCP error text should stop saying "Unsupported chart type" for known
+      chart IDs. Include profile details or a structured skip reason when
+      possible, for example missing phase data, missing query timings, or wrong
+      result count.
+
+      Tests should include at least one known inapplicable chart such as
+      `stacked_phase` without phases and one unknown chart type.
+
+  - id: w5
+    summary: "Route CLI and MCP through the shared orchestration and update tests"
+    needs: [w2, w3, w4]
+    status: pending
+    notes: |
+      Update `benchbox/cli/commands/visualize.py` and
+      `benchbox/mcp/tools/visualization.py` so they share:
+        - template resolution;
+        - chart list resolution;
+        - pairwise requirements;
+        - skip tracking;
+        - not-applicable messaging;
+        - suggestion coverage.
+
+      Remove or deprecate `ResultPlotter._suggest_chart_types()` once no tests
+      need a production-dead private method. If kept for compatibility, make it
+      delegate to the shared suggester.
+
+deferred:
+  - summary: "Change CLI `--chart-type auto` from rendering all charts to rendering only recommended charts"
+    reason: "That is a user-visible behavior change; this TODO may prepare the shared suggester but should not change CLI auto semantics unless explicitly approved."
+  - summary: "Add file-output support to MCP chart generation"
+    reason: "The current MCP implementation returns inline ASCII; this TODO only centralizes orchestration and messaging."
+  - summary: "Redesign chart templates"
+    reason: "Templates should be routed through shared orchestration, not redesigned here."
+
+metadata:
+  tags:
+    - architecture-review-followup
+    - visualization
+    - mcp
+    - cli
+    - suggestions
+    - templates
+  estimated_effort: "2-3 days"
+  created_date: "2026-05-21"
+  last_updated: "2026-05-21T00:00:00Z"
+  source: "Independent verification of visualization architecture findings M1, M2, M3, and M4"
+
+impact:
+  business_value: |
+    Gives users and agents consistent chart advice and error messages across
+    CLI and MCP.
+  user_impact: |
+    Agents can discover `power_bar`, and valid-but-inapplicable charts report
+    missing data rather than falsely claiming unsupported chart types.
+  technical_debt: |
+    Removes duplicated render orchestration and production-dead suggestion
+    logic from the visualization subsystem.
+
+files_affected:
+  added:
+    - "benchbox/core/visualization/suggestions.py"
+    - "benchbox/core/visualization/orchestration.py"
+  modified:
+    - "benchbox/core/visualization/result_plotter.py"
+    - "benchbox/core/visualization/ascii_runtime.py"
+    - "benchbox/core/visualization/chart_types.py"
+    - "benchbox/core/visualization/templates.py"
+    - "benchbox/cli/commands/visualize.py"
+    - "benchbox/mcp/tools/visualization.py"
+    - "tests/unit/visualization/test_visualize_cli.py"
+    - "tests/unit/visualization/test_chart_type_registry.py"
+    - "tests/unit/visualization/test_power_run_charting.py"
+    - "tests/unit/visualization/ascii/test_ascii_charts.py"
+    - "tests/unit/mcp/test_visualization_tools.py"
+
+prior_art:
+  - "benchbox/core/visualization/result_plotter.py: normalization and currently dead private suggester - delegate or delete private suggestion behavior."
+  - "benchbox/mcp/tools/visualization.py: current agent-facing suggestion and render surface - preserve response compatibility where possible."
+  - "benchbox/cli/commands/visualize.py: current console rendering behavior - preserve `auto` and template semantics unless explicitly changed."
+  - "benchbox/core/visualization/templates.py: named chart bundles - reuse rather than duplicating template iteration."
+  - "benchbox/core/visualization/utils.py: existing shared subtitle and power-run helpers - reuse for profile extraction."
+  - "benchbox/core/visualization/chart_types.py: `requires_two_results` metadata - use instead of hard-coding pairwise chart names."
+
+must_preserve:
+  - "CLI `visualize --chart-type all` and default `auto` continue to render the expected chart set unless the implementation records an explicit behavior-change decision."
+  - "MCP `suggest_charts` response keeps chart suggestions, data profile, and primary recommendation fields unless client compatibility is updated."
+  - "MCP `generate_chart` keeps returning inline ASCII content for successful ASCII renders."
+  - "Pairwise-only charts still require exactly two results when invoked explicitly."
+  - "Template rendering continues to skip inapplicable charts rather than failing the entire template when at least one chart renders."
+
+approach: |
+  Build one core profile, one core suggester, and one core render-set outcome.
+  Keep UI-specific formatting at the edges: CLI prints, MCP serializes. Make
+  not-applicable a first-class outcome rather than overloading it with unknown
+  chart-type handling.
+
+anti_patterns:
+  - "DO NOT add another MCP-only suggestion branch for `power_bar` without removing the divergent suggestion model."
+  - "DO NOT import MCP or Click/Rich types into core visualization orchestration."
+  - "DO NOT rely on `None` alone to mean both unknown chart and not-applicable chart."
+  - "DO NOT delete tests for `power_bar` suggestions unless replacement tests cover the production path."
+
+verification:
+  - description: "Focused CLI and MCP visualization tests pass."
+    command: "uv run -- python -m pytest tests/unit/visualization/test_visualize_cli.py tests/unit/visualization/test_power_run_charting.py tests/unit/mcp/test_visualization_tools.py -q"
+    expected_output: "CLI and MCP chart rendering/suggestion tests pass."
+  - description: "Suggestion coverage check confirms `power_bar` can be recommended."
+    command: "uv run -- python -m pytest tests/unit/mcp/test_visualization_tools.py tests/unit/visualization/test_power_run_charting.py -k 'power_bar or suggest' -q"
+    expected_output: "Production-facing suggestion tests prove power-result inputs can recommend power_bar."
+  - description: "Known inapplicable chart no longer reports as unsupported through MCP tests."
+    command: "uv run -- python -m pytest tests/unit/mcp/test_visualization_tools.py -k 'inapplicable or unsupported or chart' -q"
+    expected_output: "Unknown chart and known-but-inapplicable chart cases are distinct."
+  - description: "TODO graph remains valid after implementation."
+    command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate && uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph"
+    expected_output: "TODO validation and graph checks pass."
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/visualization/"
+    - "benchbox/cli/commands/visualize.py"
+    - "benchbox/mcp/tools/visualization.py"
+    - "tests/unit/visualization/"
+    - "tests/unit/mcp/"
+    - "docs/reference/public-contracts.md"
+  do_not_modify:
+    - "results-explorer/"
+    - "benchmark execution paths"
+    - "result schema serialization"
+    - "textcharts package source under .venv/"
+
+success_metrics:
+  - "`power_bar` appears in production MCP suggestions for power-result inputs."
+  - "The private `ResultPlotter._suggest_chart_types()` is removed, delegated, or clearly deprecated."
+  - "CLI and MCP use one shared render outcome for templates and explicit chart lists."
+  - "MCP distinguishes unknown chart types from known charts missing required data."
+
+open_questions:
+  - "Should CLI `auto` eventually mean recommended charts instead of all charts?"
+  - "Should skipped chart reasons be stable MCP contract fields or best-effort diagnostics?"
+  - "Should chart applicability metadata live in the registry TODO's source of truth or in a separate profile module?"
