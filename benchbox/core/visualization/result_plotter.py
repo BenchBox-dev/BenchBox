@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -15,7 +16,7 @@ from benchbox.core.results.loader import find_latest_result
 from benchbox.core.results.models import BenchmarkResults
 from benchbox.core.results.normalizer import normalize_result_dict
 from benchbox.core.visualization.exceptions import VisualizationError
-from benchbox.core.visualization.utils import is_power_run_result
+from benchbox.core.visualization.utils import is_power_run_result, natural_query_sort_key
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +110,6 @@ class ResultPlotter:
         multi-version comparisons, regardless of run timestamp or file order.
         Non-versioned labels sort last, preserving their relative order.
         """
-        import re
 
         def _version_key(result: NormalizedResult) -> tuple:
             m = re.search(r"(\d+)\.(\d+)(?:\.(\d+))?(?:-(\w+))?", result.platform)
@@ -307,13 +307,7 @@ class ResultPlotter:
     @staticmethod
     def _natural_sort_key(s: str) -> tuple[float, str]:
         """Sort key for natural ordering of query IDs."""
-        import re
-
-        match = re.match(r"^(\D*)(\d+)(.*)$", s)
-        if match:
-            prefix, num, suffix = match.groups()
-            return (float(num), prefix + suffix)
-        return (float("inf"), s)
+        return natural_query_sort_key(s)
 
     def group_by(self, field: str) -> dict[str, ResultPlotter]:
         """Split results by a field (platform or benchmark) for batch rendering."""
