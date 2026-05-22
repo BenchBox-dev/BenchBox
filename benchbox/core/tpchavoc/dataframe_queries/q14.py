@@ -20,6 +20,7 @@ from benchbox.core.tpch.dataframe_queries import (
     q14_expression_impl as _q14_expr_base,
     q14_pandas_impl as _q14_pandas_base,
 )
+from benchbox.core.tpchavoc.dataframe_queries.loader import load_variant_specs
 
 # ---------------------------------------------------------------------------
 # v1: baseline - delegate directly to TPC-H base implementation
@@ -542,31 +543,7 @@ def q14_v10_pandas_impl(ctx: DataFrameContext) -> Any:
 # Registry
 # ---------------------------------------------------------------------------
 
-_IMPL_PAIRS = [
-    (q14_v1_expression_impl, q14_v1_pandas_impl),
-    (q14_v2_expression_impl, q14_v2_pandas_impl),
-    (q14_v3_expression_impl, q14_v3_pandas_impl),
-    (q14_v4_expression_impl, q14_v4_pandas_impl),
-    (q14_v5_expression_impl, q14_v5_pandas_impl),
-    (q14_v6_expression_impl, q14_v6_pandas_impl),
-    (q14_v7_expression_impl, q14_v7_pandas_impl),
-    (q14_v8_expression_impl, q14_v8_pandas_impl),
-    (q14_v9_expression_impl, q14_v9_pandas_impl),
-    (q14_v10_expression_impl, q14_v10_pandas_impl),
-]
-
-_DESCRIPTIONS = [
-    "Baseline: direct delegation to TPC-H Q14 implementation",
-    "Pre-filter: filter lineitem by date before joining part",
-    "Column prune: select only needed columns before joining",
-    "Intermediate vars: explicit DataFrames for filter, join, compute steps",
-    "Pre-compute derived: add revenue and is_promo columns before final select",
-    "Chained style: maximum method chaining, no named intermediates",
-    "Join reorder: start from part, join lineitem (reversed join direction)",
-    "Filter combination: separate promo and non-promo parts for dual totals",
-    "Explicit sort: end_date predicate checked first (different predicate ordering)",
-    "Alternative formula: price - price*disc instead of price*(1-disc)",
-]
+_IMPL_PAIRS, _DESCRIPTIONS = load_variant_specs(__file__, globals())
 
 Q14_VARIANTS: list[DataFrameQuery] = [
     DataFrameQuery(

@@ -19,6 +19,7 @@ from benchbox.core.tpch.dataframe_queries import (
     q6_expression_impl as _q6_expr_base,
     q6_pandas_impl as _q6_pandas_base,
 )
+from benchbox.core.tpchavoc.dataframe_queries.loader import load_variant_specs
 
 # ---------------------------------------------------------------------------
 # v1: baseline
@@ -511,31 +512,7 @@ def q6_v10_pandas_impl(ctx: DataFrameContext) -> Any:
 # Registry
 # ---------------------------------------------------------------------------
 
-_IMPL_PAIRS = [
-    (q6_v1_expression_impl, q6_v1_pandas_impl),
-    (q6_v2_expression_impl, q6_v2_pandas_impl),
-    (q6_v3_expression_impl, q6_v3_pandas_impl),
-    (q6_v4_expression_impl, q6_v4_pandas_impl),
-    (q6_v5_expression_impl, q6_v5_pandas_impl),
-    (q6_v6_expression_impl, q6_v6_pandas_impl),
-    (q6_v7_expression_impl, q6_v7_pandas_impl),
-    (q6_v8_expression_impl, q6_v8_pandas_impl),
-    (q6_v9_expression_impl, q6_v9_pandas_impl),
-    (q6_v10_expression_impl, q6_v10_pandas_impl),
-]
-
-_DESCRIPTIONS = [
-    "Baseline: direct delegation to TPC-H Q6 implementation",
-    "Pre-filter: apply each WHERE predicate separately before revenue computation",
-    "Column prune: select only needed columns before filtering",
-    "Intermediate vars: named DataFrames for date, discount, quantity filter steps",
-    "Pre-compute derived: add revenue column before summing",
-    "Chained style: maximum method chaining, no named intermediates",
-    "Aggregation alternative: discount+quantity filter first, then date filter",
-    "Filter combination: two compound predicates ANDed together",
-    "Explicit select: explicit revenue column selection before sum",
-    "Alternative formula: commuted discount*price instead of price*discount",
-]
+_IMPL_PAIRS, _DESCRIPTIONS = load_variant_specs(__file__, globals())
 
 Q6_VARIANTS: list[DataFrameQuery] = [
     DataFrameQuery(

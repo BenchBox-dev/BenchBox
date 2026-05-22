@@ -19,6 +19,7 @@ from benchbox.core.tpch.dataframe_queries import (
     q3_expression_impl as _q3_expr_base,
     q3_pandas_impl as _q3_pandas_base,
 )
+from benchbox.core.tpchavoc.dataframe_queries.loader import load_variant_specs
 
 # ---------------------------------------------------------------------------
 # v1: baseline
@@ -511,31 +512,7 @@ def q3_v10_pandas_impl(ctx: DataFrameContext) -> Any:
 # Registry
 # ---------------------------------------------------------------------------
 
-_IMPL_PAIRS = [
-    (q3_v1_expression_impl, q3_v1_pandas_impl),
-    (q3_v2_expression_impl, q3_v2_pandas_impl),
-    (q3_v3_expression_impl, q3_v3_pandas_impl),
-    (q3_v4_expression_impl, q3_v4_pandas_impl),
-    (q3_v5_expression_impl, q3_v5_pandas_impl),
-    (q3_v6_expression_impl, q3_v6_pandas_impl),
-    (q3_v7_expression_impl, q3_v7_pandas_impl),
-    (q3_v8_expression_impl, q3_v8_pandas_impl),
-    (q3_v9_expression_impl, q3_v9_pandas_impl),
-    (q3_v10_expression_impl, q3_v10_pandas_impl),
-]
-
-_DESCRIPTIONS = [
-    "Baseline: direct delegation to TPC-H Q3 implementation",
-    "Pre-filter: filter customer, orders, lineitem before joining",
-    "Column prune: select only needed columns from each table",
-    "Intermediate vars: named DataFrames for each join and filter step",
-    "Pre-compute derived: add revenue column before groupby",
-    "Chained style: maximum method chaining, no named intermediates",
-    "Join reorder: start from orders→lineitem, then join customer",
-    "Filter combination: combine order_date and shipdate predicates after all joins",
-    "Explicit sort: descending=[True, False] explicitly specified",
-    "Alternative formula: price - price*disc instead of price*(1-disc)",
-]
+_IMPL_PAIRS, _DESCRIPTIONS = load_variant_specs(__file__, globals())
 
 Q3_VARIANTS: list[DataFrameQuery] = [
     DataFrameQuery(

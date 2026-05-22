@@ -19,6 +19,7 @@ from benchbox.core.tpch.dataframe_queries import (
     q8_expression_impl as _q8_expr_base,
     q8_pandas_impl as _q8_pandas_base,
 )
+from benchbox.core.tpchavoc.dataframe_queries.loader import load_variant_specs
 
 # ---------------------------------------------------------------------------
 # v1: baseline
@@ -557,31 +558,7 @@ def q8_v10_pandas_impl(ctx: DataFrameContext) -> Any:
 # Registry
 # ---------------------------------------------------------------------------
 
-_IMPL_PAIRS = [
-    (q8_v1_expression_impl, q8_v1_pandas_impl),
-    (q8_v2_expression_impl, q8_v2_pandas_impl),
-    (q8_v3_expression_impl, q8_v3_pandas_impl),
-    (q8_v4_expression_impl, q8_v4_pandas_impl),
-    (q8_v5_expression_impl, q8_v5_pandas_impl),
-    (q8_v6_expression_impl, q8_v6_pandas_impl),
-    (q8_v7_expression_impl, q8_v7_pandas_impl),
-    (q8_v8_expression_impl, q8_v8_pandas_impl),
-    (q8_v9_expression_impl, q8_v9_pandas_impl),
-    (q8_v10_expression_impl, q8_v10_pandas_impl),
-]
-
-_DESCRIPTIONS = [
-    "Baseline: direct delegation to TPC-H Q8 implementation",
-    "Pre-filter: filter part and orders by date before joining",
-    "Column prune: delegate to base (complex 7-way join, pruning covered by base)",
-    "Intermediate vars: named DataFrames for each join and filter step",
-    "Pre-compute derived: add volume column before group_by",
-    "Chained style: maximum method chaining",
-    "Join reorder: start from lineitem→part instead of part→lineitem",
-    "Filter combination: pre-filter part and orders before join chain",
-    "Explicit sort: descending=False explicitly specified",
-    "Alternative formula: volume = price - price*disc",
-]
+_IMPL_PAIRS, _DESCRIPTIONS = load_variant_specs(__file__, globals())
 
 Q8_VARIANTS: list[DataFrameQuery] = [
     DataFrameQuery(

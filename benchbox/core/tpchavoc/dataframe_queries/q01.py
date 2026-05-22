@@ -19,6 +19,7 @@ from benchbox.core.tpch.dataframe_queries import (
     q1_expression_impl as _q1_expr_base,
     q1_pandas_impl as _q1_pandas_base,
 )
+from benchbox.core.tpchavoc.dataframe_queries.loader import load_variant_specs
 
 # ---------------------------------------------------------------------------
 # v1: baseline - delegate directly to TPC-H base implementation
@@ -599,31 +600,7 @@ def q1_v10_pandas_impl(ctx: DataFrameContext) -> Any:
 # Registry
 # ---------------------------------------------------------------------------
 
-_IMPL_PAIRS = [
-    (q1_v1_expression_impl, q1_v1_pandas_impl),
-    (q1_v2_expression_impl, q1_v2_pandas_impl),
-    (q1_v3_expression_impl, q1_v3_pandas_impl),
-    (q1_v4_expression_impl, q1_v4_pandas_impl),
-    (q1_v5_expression_impl, q1_v5_pandas_impl),
-    (q1_v6_expression_impl, q1_v6_pandas_impl),
-    (q1_v7_expression_impl, q1_v7_pandas_impl),
-    (q1_v8_expression_impl, q1_v8_pandas_impl),
-    (q1_v9_expression_impl, q1_v9_pandas_impl),
-    (q1_v10_expression_impl, q1_v10_pandas_impl),
-]
-
-_DESCRIPTIONS = [
-    "Baseline: direct delegation to TPC-H Q1 implementation",
-    "Pre-filter: apply date predicate before aggregation setup",
-    "Column prune: select only needed columns before operations",
-    "Intermediate vars: explicit DataFrames for filter, agg, sort steps",
-    "Pre-compute derived: add disc_price/charge columns before groupby",
-    "Chained style: maximum method chaining, no named intermediates",
-    "Aggregation alternative: reversed group-by key order, re-sort correctly",
-    "Filter combination: compound predicate with extra no-op guards",
-    "Explicit sort: pass descending=[False, False] explicitly",
-    "Alternative formula: price - price*disc instead of price*(1-disc)",
-]
+_IMPL_PAIRS, _DESCRIPTIONS = load_variant_specs(__file__, globals())
 
 Q1_VARIANTS: list[DataFrameQuery] = [
     DataFrameQuery(

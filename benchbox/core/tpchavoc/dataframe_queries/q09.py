@@ -19,6 +19,7 @@ from benchbox.core.tpch.dataframe_queries import (
     q9_expression_impl as _q9_expr_base,
     q9_pandas_impl as _q9_pandas_base,
 )
+from benchbox.core.tpchavoc.dataframe_queries.loader import load_variant_specs
 
 # ---------------------------------------------------------------------------
 # v1: baseline
@@ -490,31 +491,7 @@ def q9_v10_pandas_impl(ctx: DataFrameContext) -> Any:
 # Registry
 # ---------------------------------------------------------------------------
 
-_IMPL_PAIRS = [
-    (q9_v1_expression_impl, q9_v1_pandas_impl),
-    (q9_v2_expression_impl, q9_v2_pandas_impl),
-    (q9_v3_expression_impl, q9_v3_pandas_impl),
-    (q9_v4_expression_impl, q9_v4_pandas_impl),
-    (q9_v5_expression_impl, q9_v5_pandas_impl),
-    (q9_v6_expression_impl, q9_v6_pandas_impl),
-    (q9_v7_expression_impl, q9_v7_pandas_impl),
-    (q9_v8_expression_impl, q9_v8_pandas_impl),
-    (q9_v9_expression_impl, q9_v9_pandas_impl),
-    (q9_v10_expression_impl, q9_v10_pandas_impl),
-]
-
-_DESCRIPTIONS = [
-    "Baseline: direct delegation to TPC-H Q9 implementation",
-    "Pre-filter: filter part by color before joining",
-    "Column prune: select only needed columns from each table",
-    "Intermediate vars: named DataFrames for each join step",
-    "Pre-compute derived: disc_price and supply_cost before amount computation",
-    "Chained style: maximum method chaining",
-    "Join reorder: start from lineitem→part instead of part→lineitem",
-    "Filter combination: use regex=False for plain substring match",
-    "Explicit sort: descending=[False, True] explicitly specified",
-    "Alternative formula: (price - price*disc) - supply_cost*qty",
-]
+_IMPL_PAIRS, _DESCRIPTIONS = load_variant_specs(__file__, globals())
 
 Q9_VARIANTS: list[DataFrameQuery] = [
     DataFrameQuery(

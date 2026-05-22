@@ -19,6 +19,7 @@ from benchbox.core.tpch.dataframe_queries import (
     q4_expression_impl as _q4_expr_base,
     q4_pandas_impl as _q4_pandas_base,
 )
+from benchbox.core.tpchavoc.dataframe_queries.loader import load_variant_specs
 
 # ---------------------------------------------------------------------------
 # v1: baseline
@@ -459,31 +460,7 @@ def q4_v10_pandas_impl(ctx: DataFrameContext) -> Any:
 # Registry
 # ---------------------------------------------------------------------------
 
-_IMPL_PAIRS = [
-    (q4_v1_expression_impl, q4_v1_pandas_impl),
-    (q4_v2_expression_impl, q4_v2_pandas_impl),
-    (q4_v3_expression_impl, q4_v3_pandas_impl),
-    (q4_v4_expression_impl, q4_v4_pandas_impl),
-    (q4_v5_expression_impl, q4_v5_pandas_impl),
-    (q4_v6_expression_impl, q4_v6_pandas_impl),
-    (q4_v7_expression_impl, q4_v7_pandas_impl),
-    (q4_v8_expression_impl, q4_v8_pandas_impl),
-    (q4_v9_expression_impl, q4_v9_pandas_impl),
-    (q4_v10_expression_impl, q4_v10_pandas_impl),
-]
-
-_DESCRIPTIONS = [
-    "Baseline: direct delegation to TPC-H Q4 implementation",
-    "Pre-filter: pre-filter orders and lineitem before semi-join",
-    "Column prune: select only needed columns before semi-join",
-    "Intermediate vars: named DataFrames for each step",
-    "Pre-compute derived: compute late flag column before filtering",
-    "Chained style: maximum method chaining",
-    "Join reorder: use inner join + unique instead of semi-join",
-    "Filter combination: combine date range into single predicate variable",
-    "Explicit sort: descending=False explicitly specified",
-    "Alternative formula: use size() instead of count() aggregation",
-]
+_IMPL_PAIRS, _DESCRIPTIONS = load_variant_specs(__file__, globals())
 
 Q4_VARIANTS: list[DataFrameQuery] = [
     DataFrameQuery(

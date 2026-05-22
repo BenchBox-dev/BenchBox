@@ -20,6 +20,7 @@ from benchbox.core.tpch.dataframe_queries import (
     q15_expression_impl as _q15_expr_base,
     q15_pandas_impl as _q15_pandas_base,
 )
+from benchbox.core.tpchavoc.dataframe_queries.loader import load_variant_specs
 
 # ---------------------------------------------------------------------------
 # v1: baseline - delegate directly to TPC-H base implementation
@@ -547,31 +548,7 @@ def q15_v10_pandas_impl(ctx: DataFrameContext) -> Any:
 # Registry
 # ---------------------------------------------------------------------------
 
-_IMPL_PAIRS = [
-    (q15_v1_expression_impl, q15_v1_pandas_impl),
-    (q15_v2_expression_impl, q15_v2_pandas_impl),
-    (q15_v3_expression_impl, q15_v3_pandas_impl),
-    (q15_v4_expression_impl, q15_v4_pandas_impl),
-    (q15_v5_expression_impl, q15_v5_pandas_impl),
-    (q15_v6_expression_impl, q15_v6_pandas_impl),
-    (q15_v7_expression_impl, q15_v7_pandas_impl),
-    (q15_v8_expression_impl, q15_v8_pandas_impl),
-    (q15_v9_expression_impl, q15_v9_pandas_impl),
-    (q15_v10_expression_impl, q15_v10_pandas_impl),
-]
-
-_DESCRIPTIONS = [
-    "Baseline: direct delegation to TPC-H Q15 implementation",
-    "Pre-filter: filter lineitem by date before revenue aggregation",
-    "Column prune: select only needed columns before computing revenue",
-    "Intermediate vars: explicit named DataFrames for each step",
-    "Pre-compute derived: add line_revenue column before groupby",
-    "Chained style: maximum method chaining, no named intermediates",
-    "Join reorder: filter revenue to max first, then join supplier (reversed join)",
-    "Filter combination: apply date range as two separate filter calls",
-    "Explicit sort: descending=[False] passed explicitly",
-    "Alternative formula: price - price*disc instead of price*(1-disc)",
-]
+_IMPL_PAIRS, _DESCRIPTIONS = load_variant_specs(__file__, globals())
 
 Q15_VARIANTS: list[DataFrameQuery] = [
     DataFrameQuery(
