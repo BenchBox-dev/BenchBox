@@ -13,7 +13,10 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from pathlib import Path
 from typing import Any, Optional
+
+import yaml
 
 from .interface import BenchmarkTunings, TableTuning, TuningType
 
@@ -100,44 +103,19 @@ class ValidationResult:
         return self.errors + self.warnings + self.info
 
 
+def _load_validation_specs() -> dict[str, list[str]]:
+    with (Path(__file__).with_name("validation_specs.yaml")).open(encoding="utf-8") as handle:
+        return yaml.safe_load(handle) or {}
+
+
+_VALIDATION_SPECS = _load_validation_specs()
+
 # SQL data type categorization for tuning appropriateness
-TEMPORAL_TYPES = {"DATE", "DATETIME", "TIMESTAMP", "TIME", "TIMESTAMPTZ", "INTERVAL"}
-
-NUMERIC_TYPES = {
-    "INTEGER",
-    "INT",
-    "BIGINT",
-    "SMALLINT",
-    "TINYINT",
-    "DECIMAL",
-    "NUMERIC",
-    "FLOAT",
-    "DOUBLE",
-    "REAL",
-    "MONEY",
-}
-
-STRING_TYPES = {"VARCHAR", "CHAR", "TEXT", "STRING", "CLOB", "NVARCHAR", "NCHAR"}
-
-HIGH_CARDINALITY_INDICATORS = {
-    "_id",
-    "_key",
-    "_code",
-    "_number",
-    "uuid",
-    "guid",
-    "hash",
-}
-
-LOW_CARDINALITY_INDICATORS = {
-    "status",
-    "type",
-    "category",
-    "flag",
-    "level",
-    "priority",
-    "rating",
-}
+TEMPORAL_TYPES = set(_VALIDATION_SPECS["temporal_types"])
+NUMERIC_TYPES = set(_VALIDATION_SPECS["numeric_types"])
+STRING_TYPES = set(_VALIDATION_SPECS["string_types"])
+HIGH_CARDINALITY_INDICATORS = set(_VALIDATION_SPECS["high_cardinality_indicators"])
+LOW_CARDINALITY_INDICATORS = set(_VALIDATION_SPECS["low_cardinality_indicators"])
 
 
 def validate_columns_exist(

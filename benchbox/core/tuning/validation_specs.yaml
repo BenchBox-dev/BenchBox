@@ -1,0 +1,43 @@
+temporal_types:
+- DATE
+- DATETIME
+- INTERVAL
+- TIME
+- TIMESTAMP
+- TIMESTAMPTZ
+numeric_types:
+- BIGINT
+- DECIMAL
+- DOUBLE
+- FLOAT
+- INT
+- INTEGER
+- MONEY
+- NUMERIC
+- REAL
+- SMALLINT
+- TINYINT
+string_types:
+- CHAR
+- CLOB
+- NCHAR
+- NVARCHAR
+- STRING
+- TEXT
+- VARCHAR
+high_cardinality_indicators:
+- _code
+- _id
+- _key
+- _number
+- guid
+- hash
+- uuid
+low_cardinality_indicators:
+- category
+- flag
+- level
+- priority
+- rating
+- status
+- type
