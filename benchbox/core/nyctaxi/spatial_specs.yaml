@@ -1,0 +1,445 @@
+taxi_zone_centroids:
+  1:
+  - -74.1745
+  - 40.6895
+  2:
+  - -73.82
+  - 40.61
+  3:
+  - -73.85
+  - 40.865
+  4:
+  - -73.98
+  - 40.725
+  12:
+  - -74.017
+  - 40.703
+  13:
+  - -74.016
+  - 40.711
+  43:
+  - -73.9654
+  - 40.7829
+  45:
+  - -73.997
+  - 40.715
+  79:
+  - -73.985
+  - 40.728
+  86:
+  - -74.009
+  - 40.71
+  87:
+  - -74.013
+  - 40.705
+  89:
+  - -73.99
+  - 40.74
+  112:
+  - -73.983
+  - 40.737
+  116:
+  - -74.0
+  - 40.733
+  125:
+  - -73.995
+  - 40.758
+  142:
+  - -73.984
+  - 40.772
+  143:
+  - -73.988
+  - 40.774
+  161:
+  - -73.985
+  - 40.755
+  162:
+  - -73.973
+  - 40.756
+  163:
+  - -73.981
+  - 40.762
+  164:
+  - -73.987
+  - 40.751
+  170:
+  - -73.978
+  - 40.747
+  186:
+  - -73.993
+  - 40.75
+  209:
+  - -74.0
+  - 40.723
+  230:
+  - -73.987
+  - 40.758
+  231:
+  - -74.007
+  - 40.716
+  236:
+  - -73.955
+  - 40.775
+  237:
+  - -73.963
+  - 40.768
+  238:
+  - -73.97
+  - 40.788
+  239:
+  - -73.978
+  - 40.781
+  261:
+  - -74.013
+  - 40.711
+  132:
+  - -73.7781
+  - 40.6413
+  138:
+  - -73.874
+  - 40.7769
+  65:
+  - -73.986
+  - 40.693
+  249:
+  - -73.957
+  - 40.718
+spatial_schema_extension:
+  taxi_zones_spatial:
+    description: NYC TLC taxi zones with polygon geometries
+    columns:
+      location_id:
+        type: INTEGER
+        description: Unique zone identifier
+      borough:
+        type: VARCHAR(64)
+        description: NYC borough name
+      zone:
+        type: VARCHAR(128)
+        description: Zone name
+      service_zone:
+        type: VARCHAR(64)
+        description: Service zone type
+      centroid_lon:
+        type: DOUBLE
+        description: Centroid longitude
+      centroid_lat:
+        type: DOUBLE
+        description: Centroid latitude
+    primary_key:
+    - location_id
+spatial_queries:
+  duckdb:
+    spatial-distance-top-routes:
+      id: S1
+      name: Distance-Based Top Routes
+      description: Top routes by straight-line distance using ST_Distance
+      category: spatial
+      platform: duckdb
+      requires:
+      - spatial
+      sql: "\n            SELECT\n                t.pickup_location_id,\n                t.dropoff_location_id,\n                p.zone as pickup_zone,\n\
+        \                d.zone as dropoff_zone,\n                COUNT(*) as trip_count,\n                AVG(t.trip_distance) as avg_trip_distance,\n\
+        \                AVG(ST_Distance(\n                    ST_Point(p.centroid_lon, p.centroid_lat),\n                    ST_Point(d.centroid_lon,\
+        \ d.centroid_lat)\n                ) * 111.32) as avg_straight_line_km\n            FROM trips t\n            JOIN taxi_zones_spatial\
+        \ p ON t.pickup_location_id = p.location_id\n            JOIN taxi_zones_spatial d ON t.dropoff_location_id = d.location_id\n        \
+        \    WHERE t.pickup_datetime >= '{start_date}'\n              AND t.pickup_datetime < '{end_date}'\n            GROUP BY t.pickup_location_id,\
+        \ t.dropoff_location_id, p.zone, d.zone\n            HAVING COUNT(*) > 100\n            ORDER BY avg_straight_line_km DESC\n         \
+        \   LIMIT 20\n        "
+      params:
+        duration_days: 30
+    spatial-borough-centroids:
+      id: S2
+      name: Borough Centroid Analysis
+      description: Average pickup/dropoff centroids by borough
+      category: spatial
+      platform: duckdb
+      requires:
+      - spatial
+      sql: "\n            SELECT\n                z.borough,\n                COUNT(*) as trip_count,\n                AVG(z.centroid_lon) as\
+        \ avg_pickup_lon,\n                AVG(z.centroid_lat) as avg_pickup_lat,\n                ST_AsText(ST_Centroid(ST_Collect(\n       \
+        \             ST_Point(z.centroid_lon, z.centroid_lat)\n                ))) as borough_centroid_wkt\n            FROM trips t\n      \
+        \      JOIN taxi_zones_spatial z ON t.pickup_location_id = z.location_id\n            WHERE t.pickup_datetime >= '{start_date}'\n    \
+        \          AND t.pickup_datetime < '{end_date}'\n            GROUP BY z.borough\n            ORDER BY trip_count DESC\n        "
+      params:
+        duration_days: 30
+    spatial-radius-search:
+      id: S3
+      name: Radius Search from Times Square
+      description: Find trips within radius of Times Square
+      category: spatial
+      platform: duckdb
+      requires:
+      - spatial
+      sql: "\n            SELECT\n                z.zone,\n                z.borough,\n                COUNT(*) as trip_count,\n             \
+        \   ST_Distance(\n                    ST_Point(z.centroid_lon, z.centroid_lat),\n                    ST_Point(-73.9857, 40.7580)\n   \
+        \             ) * 111.32 as distance_from_times_sq_km\n            FROM trips t\n            JOIN taxi_zones_spatial z ON t.pickup_location_id\
+        \ = z.location_id\n            WHERE t.pickup_datetime >= '{start_date}'\n              AND t.pickup_datetime < '{end_date}'\n       \
+        \       AND ST_Distance(\n                  ST_Point(z.centroid_lon, z.centroid_lat),\n                  ST_Point(-73.9857, 40.7580)\n\
+        \              ) * 111.32 < 5.0\n            GROUP BY z.zone, z.borough, z.centroid_lon, z.centroid_lat\n            ORDER BY distance_from_times_sq_km\n\
+        \        "
+      params:
+        duration_days: 7
+    spatial-airport-distance:
+      id: S4
+      name: Airport Distance Analysis
+      description: Trip distances to/from airports (JFK, LGA, EWR)
+      category: spatial
+      platform: duckdb
+      requires:
+      - spatial
+      sql: "\n            WITH airport_zones AS (\n                SELECT location_id, zone, centroid_lon, centroid_lat\n                FROM\
+        \ taxi_zones_spatial\n                WHERE location_id IN (1, 132, 138)  -- EWR, JFK, LGA\n            )\n            SELECT\n      \
+        \          a.zone as airport,\n                z.borough as origin_borough,\n                COUNT(*) as trip_count,\n               \
+        \ AVG(t.trip_distance) as avg_trip_miles,\n                AVG(ST_Distance(\n                    ST_Point(z.centroid_lon, z.centroid_lat),\n\
+        \                    ST_Point(a.centroid_lon, a.centroid_lat)\n                ) * 111.32) as avg_straight_line_km,\n                AVG(t.total_amount)\
+        \ as avg_fare\n            FROM trips t\n            JOIN taxi_zones_spatial z ON t.pickup_location_id = z.location_id\n            JOIN\
+        \ airport_zones a ON t.dropoff_location_id = a.location_id\n            WHERE t.pickup_datetime >= '{start_date}'\n              AND t.pickup_datetime\
+        \ < '{end_date}'\n            GROUP BY a.zone, z.borough\n            ORDER BY trip_count DESC\n            LIMIT 20\n        "
+      params:
+        duration_days: 30
+    spatial-cross-borough:
+      id: S5
+      name: Cross-Borough Trip Distances
+      description: Analyze trips crossing borough boundaries
+      category: spatial
+      platform: duckdb
+      requires:
+      - spatial
+      sql: "\n            SELECT\n                p.borough as pickup_borough,\n                d.borough as dropoff_borough,\n              \
+        \  COUNT(*) as trip_count,\n                AVG(t.trip_distance) as avg_trip_miles,\n                AVG(ST_Distance(\n              \
+        \      ST_Point(p.centroid_lon, p.centroid_lat),\n                    ST_Point(d.centroid_lon, d.centroid_lat)\n                ) * 111.32)\
+        \ as avg_straight_line_km,\n                AVG(t.trip_distance / NULLIF(ST_Distance(\n                    ST_Point(p.centroid_lon, p.centroid_lat),\n\
+        \                    ST_Point(d.centroid_lon, d.centroid_lat)\n                ) * 111.32 * 0.621371, 0)) as route_efficiency\n      \
+        \      FROM trips t\n            JOIN taxi_zones_spatial p ON t.pickup_location_id = p.location_id\n            JOIN taxi_zones_spatial\
+        \ d ON t.dropoff_location_id = d.location_id\n            WHERE t.pickup_datetime >= '{start_date}'\n              AND t.pickup_datetime\
+        \ < '{end_date}'\n              AND p.borough != d.borough\n            GROUP BY p.borough, d.borough\n            HAVING COUNT(*) > 1000\n\
+        \            ORDER BY trip_count DESC\n        "
+      params:
+        duration_days: 30
+    spatial-zone-clustering:
+      id: S6
+      name: Zone Spatial Clustering
+      description: Cluster zones by geographic proximity and trip patterns
+      category: spatial
+      platform: duckdb
+      requires:
+      - spatial
+      sql: "\n            WITH zone_stats AS (\n                SELECT\n                    z.location_id,\n                    z.zone,\n    \
+        \                z.borough,\n                    z.centroid_lon,\n                    z.centroid_lat,\n                    COUNT(*) as\
+        \ pickup_count,\n                    AVG(t.total_amount) as avg_fare\n                FROM trips t\n                JOIN taxi_zones_spatial\
+        \ z ON t.pickup_location_id = z.location_id\n                WHERE t.pickup_datetime >= '{start_date}'\n                  AND t.pickup_datetime\
+        \ < '{end_date}'\n                GROUP BY z.location_id, z.zone, z.borough, z.centroid_lon, z.centroid_lat\n            )\n         \
+        \   SELECT\n                z1.zone as zone1,\n                z2.zone as zone2,\n                z1.borough,\n                ST_Distance(\n\
+        \                    ST_Point(z1.centroid_lon, z1.centroid_lat),\n                    ST_Point(z2.centroid_lon, z2.centroid_lat)\n   \
+        \             ) * 111.32 as distance_km,\n                ABS(z1.pickup_count - z2.pickup_count) as pickup_diff,\n                ABS(z1.avg_fare\
+        \ - z2.avg_fare) as fare_diff\n            FROM zone_stats z1\n            JOIN zone_stats z2 ON z1.location_id < z2.location_id\n   \
+        \             AND z1.borough = z2.borough\n            WHERE ST_Distance(\n                ST_Point(z1.centroid_lon, z1.centroid_lat),\n\
+        \                ST_Point(z2.centroid_lon, z2.centroid_lat)\n            ) * 111.32 < 2.0\n            ORDER BY distance_km\n        \
+        \    LIMIT 50\n        "
+      params:
+        duration_days: 30
+    spatial-manhattan-grid:
+      id: S7
+      name: Manhattan Grid Analysis
+      description: Spatial grid analysis of Manhattan pickups
+      category: spatial
+      platform: duckdb
+      requires:
+      - spatial
+      sql: "\n            SELECT\n                FLOOR(z.centroid_lon * 100) / 100 as lon_bucket,\n                FLOOR(z.centroid_lat * 100)\
+        \ / 100 as lat_bucket,\n                COUNT(*) as trip_count,\n                AVG(t.total_amount) as avg_fare,\n                AVG(t.tip_amount)\
+        \ as avg_tip,\n                SUM(t.total_amount) as total_revenue\n            FROM trips t\n            JOIN taxi_zones_spatial z ON\
+        \ t.pickup_location_id = z.location_id\n            WHERE t.pickup_datetime >= '{start_date}'\n              AND t.pickup_datetime < '{end_date}'\n\
+        \              AND z.borough = 'Manhattan'\n            GROUP BY FLOOR(z.centroid_lon * 100) / 100, FLOOR(z.centroid_lat * 100) / 100\n\
+        \            ORDER BY trip_count DESC\n            LIMIT 50\n        "
+      params:
+        duration_days: 30
+    spatial-boundary-box:
+      id: S8
+      name: Bounding Box Query
+      description: Find trips within a bounding box (Midtown)
+      category: spatial
+      platform: duckdb
+      requires:
+      - spatial
+      sql: "\n            SELECT\n                z.zone,\n                COUNT(*) as trip_count,\n                AVG(t.total_amount) as avg_fare,\n\
+        \                AVG(t.trip_distance) as avg_distance\n            FROM trips t\n            JOIN taxi_zones_spatial z ON t.pickup_location_id\
+        \ = z.location_id\n            WHERE t.pickup_datetime >= '{start_date}'\n              AND t.pickup_datetime < '{end_date}'\n       \
+        \       AND z.centroid_lon BETWEEN -74.01 AND -73.97\n              AND z.centroid_lat BETWEEN 40.75 AND 40.77\n            GROUP BY z.zone\n\
+        \            ORDER BY trip_count DESC\n        "
+      params:
+        duration_days: 7
+    spatial-nearest-zones:
+      id: S9
+      name: Nearest Zone Analysis
+      description: Find nearest zones to each high-traffic zone
+      category: spatial
+      platform: duckdb
+      requires:
+      - spatial
+      sql: "\n            WITH high_traffic AS (\n                SELECT\n                    z.location_id,\n                    z.zone,\n  \
+        \                  z.centroid_lon,\n                    z.centroid_lat,\n                    COUNT(*) as trip_count\n                FROM\
+        \ trips t\n                JOIN taxi_zones_spatial z ON t.pickup_location_id = z.location_id\n                WHERE t.pickup_datetime\
+        \ >= '{start_date}'\n                  AND t.pickup_datetime < '{end_date}'\n                GROUP BY z.location_id, z.zone, z.centroid_lon,\
+        \ z.centroid_lat\n                HAVING COUNT(*) > 10000\n            )\n            SELECT\n                h.zone as source_zone,\n\
+        \                h.trip_count as source_trips,\n                z.zone as nearest_zone,\n                ST_Distance(\n              \
+        \      ST_Point(h.centroid_lon, h.centroid_lat),\n                    ST_Point(z.centroid_lon, z.centroid_lat)\n                ) * 111.32\
+        \ as distance_km\n            FROM high_traffic h\n            JOIN taxi_zones_spatial z ON h.location_id != z.location_id\n         \
+        \   WHERE ST_Distance(\n                ST_Point(h.centroid_lon, h.centroid_lat),\n                ST_Point(z.centroid_lon, z.centroid_lat)\n\
+        \            ) * 111.32 < 1.0\n            ORDER BY h.trip_count DESC, distance_km\n            LIMIT 50\n        "
+      params:
+        duration_days: 30
+    spatial-trip-direction:
+      id: S10
+      name: Trip Direction Analysis
+      description: Analyze trip directions (N/S/E/W) by time of day
+      category: spatial
+      platform: duckdb
+      requires:
+      - spatial
+      sql: "\n            SELECT\n                EXTRACT(HOUR FROM t.pickup_datetime) as hour,\n                CASE\n                    WHEN\
+        \ d.centroid_lat > p.centroid_lat + 0.01 THEN 'north'\n                    WHEN d.centroid_lat < p.centroid_lat - 0.01 THEN 'south'\n\
+        \                    WHEN d.centroid_lon > p.centroid_lon + 0.01 THEN 'east'\n                    WHEN d.centroid_lon < p.centroid_lon\
+        \ - 0.01 THEN 'west'\n                    ELSE 'local'\n                END as direction,\n                COUNT(*) as trip_count,\n \
+        \               AVG(t.trip_distance) as avg_distance,\n                AVG(t.total_amount) as avg_fare\n            FROM trips t\n   \
+        \         JOIN taxi_zones_spatial p ON t.pickup_location_id = p.location_id\n            JOIN taxi_zones_spatial d ON t.dropoff_location_id\
+        \ = d.location_id\n            WHERE t.pickup_datetime >= '{start_date}'\n              AND t.pickup_datetime < '{end_date}'\n       \
+        \     GROUP BY EXTRACT(HOUR FROM t.pickup_datetime),\n                CASE\n                    WHEN d.centroid_lat > p.centroid_lat +\
+        \ 0.01 THEN 'north'\n                    WHEN d.centroid_lat < p.centroid_lat - 0.01 THEN 'south'\n                    WHEN d.centroid_lon\
+        \ > p.centroid_lon + 0.01 THEN 'east'\n                    WHEN d.centroid_lon < p.centroid_lon - 0.01 THEN 'west'\n                 \
+        \   ELSE 'local'\n                END\n            ORDER BY hour, trip_count DESC\n        "
+      params:
+        duration_days: 7
+  postgres:
+    spatial-distance-top-routes:
+      id: S1
+      name: Distance-Based Top Routes
+      description: Top routes by straight-line distance using ST_Distance
+      category: spatial
+      platform: postgres
+      requires:
+      - postgis
+      sql: "\n            SELECT\n                t.pickup_location_id,\n                t.dropoff_location_id,\n                p.zone as pickup_zone,\n\
+        \                d.zone as dropoff_zone,\n                COUNT(*) as trip_count,\n                AVG(t.trip_distance) as avg_trip_distance,\n\
+        \                AVG(ST_Distance(\n                    ST_SetSRID(ST_MakePoint(p.centroid_lon, p.centroid_lat), 4326)::geography,\n  \
+        \                  ST_SetSRID(ST_MakePoint(d.centroid_lon, d.centroid_lat), 4326)::geography\n                ) / 1000) as avg_straight_line_km\n\
+        \            FROM trips t\n            JOIN taxi_zones_spatial p ON t.pickup_location_id = p.location_id\n            JOIN taxi_zones_spatial\
+        \ d ON t.dropoff_location_id = d.location_id\n            WHERE t.pickup_datetime >= '{start_date}'\n              AND t.pickup_datetime\
+        \ < '{end_date}'\n            GROUP BY t.pickup_location_id, t.dropoff_location_id, p.zone, d.zone\n            HAVING COUNT(*) > 100\n\
+        \            ORDER BY avg_straight_line_km DESC\n            LIMIT 20\n        "
+      params:
+        duration_days: 30
+    spatial-radius-search:
+      id: S3
+      name: Radius Search from Times Square
+      description: Find trips within radius of Times Square using ST_DWithin
+      category: spatial
+      platform: postgres
+      requires:
+      - postgis
+      sql: "\n            SELECT\n                z.zone,\n                z.borough,\n                COUNT(*) as trip_count,\n             \
+        \   ST_Distance(\n                    ST_SetSRID(ST_MakePoint(z.centroid_lon, z.centroid_lat), 4326)::geography,\n                   \
+        \ ST_SetSRID(ST_MakePoint(-73.9857, 40.7580), 4326)::geography\n                ) / 1000 as distance_from_times_sq_km\n            FROM\
+        \ trips t\n            JOIN taxi_zones_spatial z ON t.pickup_location_id = z.location_id\n            WHERE t.pickup_datetime >= '{start_date}'\n\
+        \              AND t.pickup_datetime < '{end_date}'\n              AND ST_DWithin(\n                  ST_SetSRID(ST_MakePoint(z.centroid_lon,\
+        \ z.centroid_lat), 4326)::geography,\n                  ST_SetSRID(ST_MakePoint(-73.9857, 40.7580), 4326)::geography,\n              \
+        \    5000\n              )\n            GROUP BY z.zone, z.borough, z.centroid_lon, z.centroid_lat\n            ORDER BY distance_from_times_sq_km\n\
+        \        "
+      params:
+        duration_days: 7
+    spatial-airport-distance:
+      id: S4
+      name: Airport Distance Analysis
+      description: Trip distances to/from airports using PostGIS geography
+      category: spatial
+      platform: postgres
+      requires:
+      - postgis
+      sql: "\n            WITH airport_zones AS (\n                SELECT location_id, zone, centroid_lon, centroid_lat\n                FROM\
+        \ taxi_zones_spatial\n                WHERE location_id IN (1, 132, 138)\n            )\n            SELECT\n                a.zone as\
+        \ airport,\n                z.borough as origin_borough,\n                COUNT(*) as trip_count,\n                AVG(t.trip_distance)\
+        \ as avg_trip_miles,\n                AVG(ST_Distance(\n                    ST_SetSRID(ST_MakePoint(z.centroid_lon, z.centroid_lat), 4326)::geography,\n\
+        \                    ST_SetSRID(ST_MakePoint(a.centroid_lon, a.centroid_lat), 4326)::geography\n                ) / 1000) as avg_straight_line_km,\n\
+        \                AVG(t.total_amount) as avg_fare\n            FROM trips t\n            JOIN taxi_zones_spatial z ON t.pickup_location_id\
+        \ = z.location_id\n            JOIN airport_zones a ON t.dropoff_location_id = a.location_id\n            WHERE t.pickup_datetime >= '{start_date}'\n\
+        \              AND t.pickup_datetime < '{end_date}'\n            GROUP BY a.zone, z.borough\n            ORDER BY trip_count DESC\n  \
+        \          LIMIT 20\n        "
+      params:
+        duration_days: 30
+    spatial-convex-hull:
+      id: S11
+      name: Borough Convex Hull
+      description: Calculate convex hull of pickup locations per borough
+      category: spatial
+      platform: postgres
+      requires:
+      - postgis
+      sql: "\n            SELECT\n                z.borough,\n                COUNT(*) as trip_count,\n                ST_AsText(ST_ConvexHull(ST_Collect(\n\
+        \                    ST_SetSRID(ST_MakePoint(z.centroid_lon, z.centroid_lat), 4326)\n                ))) as convex_hull_wkt,\n       \
+        \         ST_Area(ST_ConvexHull(ST_Collect(\n                    ST_SetSRID(ST_MakePoint(z.centroid_lon, z.centroid_lat), 4326)::geography\n\
+        \                ))) / 1000000 as area_sq_km\n            FROM trips t\n            JOIN taxi_zones_spatial z ON t.pickup_location_id\
+        \ = z.location_id\n            WHERE t.pickup_datetime >= '{start_date}'\n              AND t.pickup_datetime < '{end_date}'\n       \
+        \     GROUP BY z.borough\n            ORDER BY trip_count DESC\n        "
+      params:
+        duration_days: 30
+  clickhouse:
+    spatial-distance-top-routes:
+      id: S1
+      name: Distance-Based Top Routes
+      description: Top routes by great-circle distance using geoDistance
+      category: spatial
+      platform: clickhouse
+      requires: []
+      sql: "\n            SELECT\n                t.pickup_location_id,\n                t.dropoff_location_id,\n                p.zone as pickup_zone,\n\
+        \                d.zone as dropoff_zone,\n                COUNT(*) as trip_count,\n                AVG(t.trip_distance) as avg_trip_distance,\n\
+        \                AVG(geoDistance(p.centroid_lon, p.centroid_lat, d.centroid_lon, d.centroid_lat) / 1000) as avg_straight_line_km\n   \
+        \         FROM trips t\n            JOIN taxi_zones_spatial p ON t.pickup_location_id = p.location_id\n            JOIN taxi_zones_spatial\
+        \ d ON t.dropoff_location_id = d.location_id\n            WHERE t.pickup_datetime >= '{start_date}'\n              AND t.pickup_datetime\
+        \ < '{end_date}'\n            GROUP BY t.pickup_location_id, t.dropoff_location_id, p.zone, d.zone\n            HAVING COUNT(*) > 100\n\
+        \            ORDER BY avg_straight_line_km DESC\n            LIMIT 20\n        "
+      params:
+        duration_days: 30
+    spatial-radius-search:
+      id: S3
+      name: Radius Search from Times Square
+      description: Find trips within radius using greatCircleDistance
+      category: spatial
+      platform: clickhouse
+      requires: []
+      sql: "\n            SELECT\n                z.zone,\n                z.borough,\n                COUNT(*) as trip_count,\n             \
+        \   geoDistance(-73.9857, 40.7580, z.centroid_lon, z.centroid_lat) / 1000 as distance_from_times_sq_km\n            FROM trips t\n   \
+        \         JOIN taxi_zones_spatial z ON t.pickup_location_id = z.location_id\n            WHERE t.pickup_datetime >= '{start_date}'\n \
+        \             AND t.pickup_datetime < '{end_date}'\n              AND geoDistance(-73.9857, 40.7580, z.centroid_lon, z.centroid_lat) <\
+        \ 5000\n            GROUP BY z.zone, z.borough, z.centroid_lon, z.centroid_lat\n            ORDER BY distance_from_times_sq_km\n     \
+        \   "
+      params:
+        duration_days: 7
+    spatial-geohash-aggregation:
+      id: S12
+      name: GeoHash Aggregation
+      description: Aggregate trips by geohash for efficient spatial bucketing
+      category: spatial
+      platform: clickhouse
+      requires: []
+      sql: "\n            SELECT\n                geohashEncode(z.centroid_lon, z.centroid_lat, 5) as geohash,\n                COUNT(*) as trip_count,\n\
+        \                AVG(t.total_amount) as avg_fare,\n                AVG(t.trip_distance) as avg_distance,\n                uniq(z.zone)\
+        \ as zone_count\n            FROM trips t\n            JOIN taxi_zones_spatial z ON t.pickup_location_id = z.location_id\n           \
+        \ WHERE t.pickup_datetime >= '{start_date}'\n              AND t.pickup_datetime < '{end_date}'\n            GROUP BY geohashEncode(z.centroid_lon,\
+        \ z.centroid_lat, 5)\n            ORDER BY trip_count DESC\n            LIMIT 50\n        "
+      params:
+        duration_days: 30
+    spatial-h3-aggregation:
+      id: S13
+      name: H3 Index Aggregation
+      description: Aggregate trips using Uber's H3 hexagonal indexing
+      category: spatial
+      platform: clickhouse
+      requires: []
+      sql: "\n            SELECT\n                geoToH3(z.centroid_lon, z.centroid_lat, 7) as h3_index,\n                COUNT(*) as trip_count,\n\
+        \                AVG(t.total_amount) as avg_fare,\n                SUM(t.total_amount) as total_revenue,\n                uniq(z.zone)\
+        \ as zone_count\n            FROM trips t\n            JOIN taxi_zones_spatial z ON t.pickup_location_id = z.location_id\n           \
+        \ WHERE t.pickup_datetime >= '{start_date}'\n              AND t.pickup_datetime < '{end_date}'\n            GROUP BY geoToH3(z.centroid_lon,\
+        \ z.centroid_lat, 7)\n            ORDER BY trip_count DESC\n            LIMIT 50\n        "
+      params:
+        duration_days: 30
