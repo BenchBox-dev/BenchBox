@@ -216,7 +216,7 @@ class TestBenchmarkPreview:
                 }
 
         with (
-            patch("benchbox.core.benchmark_loader.get_benchmark_class", return_value=StubBenchmark),
+            patch("benchbox.core.benchmark_loader.get_core_benchmark_class", return_value=StubBenchmark),
             patch("benchbox.cli.benchmarks.console") as mock_console,
         ):
             manager._show_sample_queries("joinorder", limit=1)
@@ -236,7 +236,7 @@ class TestBenchmarkPreview:
                 self.queries = {}
 
         with (
-            patch("benchbox.core.benchmark_loader.get_benchmark_class", return_value=StubBenchmark),
+            patch("benchbox.core.benchmark_loader.get_core_benchmark_class", return_value=StubBenchmark),
             patch("benchbox.cli.benchmarks.console") as mock_console,
         ):
             manager._show_sample_queries("tpch")
@@ -248,7 +248,7 @@ class TestBenchmarkPreview:
         manager = BenchmarkManager()
 
         with (
-            patch("benchbox.core.benchmark_loader.get_benchmark_class", side_effect=RuntimeError("boom")),
+            patch("benchbox.core.benchmark_loader.get_core_benchmark_class", side_effect=RuntimeError("boom")),
             patch("benchbox.cli.benchmarks.console") as mock_console,
         ):
             manager._show_sample_queries("tpch")

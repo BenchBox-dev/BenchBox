@@ -217,7 +217,7 @@ class TestConvertCommandSchemaLookup:
 
     def test_get_schemas_uses_manifest_benchmark(self, mock_manifest_v2):
         """Test that benchmark is auto-detected from manifest."""
-        with patch("benchbox.core.benchmark_loader.get_benchmark_class") as mock_get_benchmark:
+        with patch("benchbox.core.benchmark_loader.get_core_benchmark_class") as mock_get_benchmark:
             mock_benchmark = MagicMock()
             mock_benchmark.return_value.get_schema.return_value = {"columns": [{"name": "id", "type": "INTEGER"}]}
             mock_get_benchmark.return_value = mock_benchmark

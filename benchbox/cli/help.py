@@ -415,12 +415,12 @@ class BenchBoxCommand(click.Command):
         )
 
         # Eagerly import all benchmark modules so their specs register
-        from benchbox.core.benchmark_loader import get_benchmark_class
+        from benchbox.core.benchmark_loader import get_core_benchmark_class
 
         found_any = False
         for bench_id in sorted(list_loader_benchmark_ids()):
             try:
-                get_benchmark_class(bench_id)
+                get_core_benchmark_class(bench_id)
             except ValueError:
                 continue
 

@@ -212,7 +212,7 @@ def test_show_sample_queries_handles_empty_query_registry(monkeypatch: pytest.Mo
         def __init__(self, scale_factor: float):
             self.scale_factor = scale_factor
 
-    monkeypatch.setattr("benchbox.core.benchmark_loader.get_benchmark_class", lambda _bench: _Benchmark)
+    monkeypatch.setattr("benchbox.core.benchmark_loader.get_core_benchmark_class", lambda _bench: _Benchmark)
 
     manager._show_sample_queries("tpch")
 
@@ -229,7 +229,7 @@ def test_show_sample_queries_truncates_long_sql(monkeypatch: pytest.MonkeyPatch,
         def __init__(self, scale_factor: float):
             self.scale_factor = scale_factor
 
-    monkeypatch.setattr("benchbox.core.benchmark_loader.get_benchmark_class", lambda _bench: _Benchmark)
+    monkeypatch.setattr("benchbox.core.benchmark_loader.get_core_benchmark_class", lambda _bench: _Benchmark)
 
     manager._show_sample_queries("tpch", limit=1)
 

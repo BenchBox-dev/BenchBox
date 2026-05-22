@@ -22,7 +22,7 @@ from enum import Enum
 from threading import Lock
 from typing import Any
 
-from benchbox.core.benchmark_registry import get_benchmark_class
+from benchbox.core.benchmark_registry import get_public_benchmark_class
 
 logger = logging.getLogger(__name__)
 
@@ -334,7 +334,7 @@ async def run_benchmark_async(
 
         # Get benchmark class using public API
         benchmark_lower = state.benchmark.lower()
-        benchmark_class = get_benchmark_class(benchmark_lower)
+        benchmark_class = get_public_benchmark_class(benchmark_lower)
 
         if benchmark_class is None:
             tracker.update_status(
