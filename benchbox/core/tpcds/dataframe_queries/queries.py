@@ -575,6 +575,72 @@ def _web_multi_warehouse_pandas(
     )
 
 
+def _inventory_item_expression(
+    ctx: DataFrameContext,
+    query_id: int,
+    source_table: str,
+    source_key: str,
+    price_param_names: tuple[str, str],
+    price_defaults: tuple[int, int],
+    inventory_first: bool,
+) -> Any:
+    params = get_parameters(query_id)
+    year = params.get("year", 2000)
+    month_start = params.get("month_start", 1)
+    month_end = params.get("month_end", 6)
+    price_min = params.get(price_param_names[0], price_defaults[0])
+    price_max = params.get(price_param_names[1], price_defaults[1])
+    col, lit = ctx.col, ctx.lit
+    price_filter = (col("i_current_price") >= lit(price_min)) & (col("i_current_price") <= lit(price_max))
+    date_filter = (col("d_year") == lit(year)) & (col("d_moy") >= lit(month_start)) & (col("d_moy") <= lit(month_end))
+    inventory_filter = (col("inv_quantity_on_hand") >= lit(100)) & (col("inv_quantity_on_hand") <= lit(500))
+    return (
+        ctx.get_table("item")
+        .join(ctx.get_table("inventory"), left_on="i_item_sk", right_on="inv_item_sk")
+        .join(ctx.get_table("date_dim"), left_on="inv_date_sk", right_on="d_date_sk")
+        .join(ctx.get_table(source_table), left_on="i_item_sk", right_on=source_key)
+        .filter(price_filter & (inventory_filter & date_filter if inventory_first else date_filter & inventory_filter))
+        .select("i_item_id", "i_item_desc", "i_current_price")
+        .unique()
+        .sort("i_item_id")
+        .limit(100)
+    )
+
+
+def _inventory_item_pandas(
+    ctx: DataFrameContext,
+    query_id: int,
+    source_table: str,
+    source_key: str,
+    price_param_names: tuple[str, str],
+    price_defaults: tuple[int, int],
+    _inventory_first: bool,
+) -> Any:
+    params = get_parameters(query_id)
+    year = params.get("year", 2000)
+    month_start = params.get("month_start", 1)
+    month_end = params.get("month_end", 6)
+    price_min = params.get(price_param_names[0], price_defaults[0])
+    price_max = params.get(price_param_names[1], price_defaults[1])
+
+    item = ctx.get_table("item")
+    inventory = ctx.get_table("inventory")
+    date_dim = ctx.get_table("date_dim")
+    source = ctx.get_table(source_table)
+
+    item_filtered = item[(item["i_current_price"] >= price_min) & (item["i_current_price"] <= price_max)]
+    inv_filtered = inventory[(inventory["inv_quantity_on_hand"] >= 100) & (inventory["inv_quantity_on_hand"] <= 500)]
+    date_filtered = date_dim[
+        (date_dim["d_year"] == year) & (date_dim["d_moy"] >= month_start) & (date_dim["d_moy"] <= month_end)
+    ]
+    merged = item_filtered.merge(inv_filtered, left_on="i_item_sk", right_on="inv_item_sk")
+    merged = merged.merge(date_filtered, left_on="inv_date_sk", right_on="d_date_sk")
+    merged = merged[merged["i_item_sk"].isin(_to_list(source[source_key].unique()))]
+    return (
+        merged[["i_item_id", "i_item_desc", "i_current_price"]].drop_duplicates().sort_values(["i_item_id"]).head(100)
+    )
+
+
 _HELPER_QUERY_SPECS = [
     (
         7,
@@ -734,6 +800,20 @@ _HELPER_QUERY_SPECS = [
         _excess_discount_expression,
         _excess_discount_pandas,
         ("catalog_sales", "cs_item_sk", "cs_sold_date_sk", "cs_ext_discount_amt", 977),
+    ),
+    (
+        37,
+        "Item Inventory Analysis",
+        _inventory_item_expression,
+        _inventory_item_pandas,
+        ("catalog_sales", "cs_item_sk", ("current_price_min", "current_price_max"), (68, 98), True),
+    ),
+    (
+        82,
+        "Store Sales Inventory",
+        _inventory_item_expression,
+        _inventory_item_pandas,
+        ("store_sales", "ss_item_sk", ("price_min", "price_max"), (62, 92), False),
     ),
     (
         92,
@@ -1696,171 +1776,9 @@ def q15_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-def q82_expression_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q82: Store Sales Inventory (Expression Family).
-
-    Reports items in inventory with specific price and date constraints.
-
-    Tables: store_sales, item, inventory, date_dim
-    Pattern: Multi-join -> filter -> distinct
-    """
-    params = get_parameters(82)
-    year = params.get("year", 2000)
-    month_start = params.get("month_start", 1)
-    month_end = params.get("month_end", 6)
-    price_min = params.get("price_min", 62)
-    price_max = params.get("price_max", 92)
-
-    item = ctx.get_table("item")
-    inventory = ctx.get_table("inventory")
-    date_dim = ctx.get_table("date_dim")
-    store_sales = ctx.get_table("store_sales")
-    col = ctx.col
-    lit = ctx.lit
-
-    return (
-        item.join(inventory, left_on="i_item_sk", right_on="inv_item_sk")
-        .join(date_dim, left_on="inv_date_sk", right_on="d_date_sk")
-        .join(store_sales, left_on="i_item_sk", right_on="ss_item_sk")
-        .filter(
-            (col("i_current_price") >= lit(price_min))
-            & (col("i_current_price") <= lit(price_max))
-            & (col("d_year") == lit(year))
-            & (col("d_moy") >= lit(month_start))
-            & (col("d_moy") <= lit(month_end))
-            & (col("inv_quantity_on_hand") >= lit(100))
-            & (col("inv_quantity_on_hand") <= lit(500))
-        )
-        .select("i_item_id", "i_item_desc", "i_current_price")
-        .unique()
-        .sort("i_item_id")
-        .limit(100)
-    )
-
-
-def q82_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q82: Store Sales Inventory (Pandas Family)."""
-    params = get_parameters(82)
-    year = params.get("year", 2000)
-    month_start = params.get("month_start", 1)
-    month_end = params.get("month_end", 6)
-    price_min = params.get("price_min", 62)
-    price_max = params.get("price_max", 92)
-
-    item = ctx.get_table("item")
-    inventory = ctx.get_table("inventory")
-    date_dim = ctx.get_table("date_dim")
-    store_sales = ctx.get_table("store_sales")
-
-    # Filter early to reduce data volume before joins
-    item_filtered = item[(item["i_current_price"] >= price_min) & (item["i_current_price"] <= price_max)]
-
-    inv_filtered = inventory[(inventory["inv_quantity_on_hand"] >= 100) & (inventory["inv_quantity_on_hand"] <= 500)]
-
-    date_filtered = date_dim[
-        (date_dim["d_year"] == year) & (date_dim["d_moy"] >= month_start) & (date_dim["d_moy"] <= month_end)
-    ]
-
-    # Get items that exist in store_sales (semi-join via unique item_sk set)
-    ss_items = _to_list(store_sales["ss_item_sk"].unique())
-
-    # Join filtered tables
-    merged = item_filtered.merge(inv_filtered, left_on="i_item_sk", right_on="inv_item_sk")
-    merged = merged.merge(date_filtered, left_on="inv_date_sk", right_on="d_date_sk")
-
-    # Apply semi-join filter for store_sales existence
-    merged = merged[merged["i_item_sk"].isin(ss_items)]
-
-    # Distinct and sort
-    return (
-        merged[["i_item_id", "i_item_desc", "i_current_price"]].drop_duplicates().sort_values(["i_item_id"]).head(100)
-    )
-
-
 # =============================================================================
 # Complex Queries - Window functions, UNION, and advanced patterns
 # =============================================================================
-
-
-def q37_expression_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q37: Item Inventory Analysis (Expression Family).
-
-    Reports items in inventory within price and date constraints.
-
-    Tables: item, inventory, date_dim, catalog_sales
-    Pattern: Multi-join -> filter -> distinct
-    """
-    params = get_parameters(37)
-    year = params.get("year", 2000)
-    month_start = params.get("month_start", 1)
-    month_end = params.get("month_end", 6)
-    price_min = params.get("current_price_min", 68)
-    price_max = params.get("current_price_max", 98)
-
-    item = ctx.get_table("item")
-    inventory = ctx.get_table("inventory")
-    date_dim = ctx.get_table("date_dim")
-    catalog_sales = ctx.get_table("catalog_sales")
-    col = ctx.col
-    lit = ctx.lit
-
-    return (
-        item.join(inventory, left_on="i_item_sk", right_on="inv_item_sk")
-        .join(date_dim, left_on="inv_date_sk", right_on="d_date_sk")
-        .join(catalog_sales, left_on="i_item_sk", right_on="cs_item_sk")
-        .filter(
-            (col("i_current_price") >= lit(price_min))
-            & (col("i_current_price") <= lit(price_max))
-            & (col("inv_quantity_on_hand") >= lit(100))
-            & (col("inv_quantity_on_hand") <= lit(500))
-            & (col("d_year") == lit(year))
-            & (col("d_moy") >= lit(month_start))
-            & (col("d_moy") <= lit(month_end))
-        )
-        .select("i_item_id", "i_item_desc", "i_current_price")
-        .unique()
-        .sort("i_item_id")
-        .limit(100)
-    )
-
-
-def q37_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q37: Item Inventory Analysis (Pandas Family)."""
-    params = get_parameters(37)
-    year = params.get("year", 2000)
-    month_start = params.get("month_start", 1)
-    month_end = params.get("month_end", 6)
-    price_min = params.get("current_price_min", 68)
-    price_max = params.get("current_price_max", 98)
-
-    item = ctx.get_table("item")
-    inventory = ctx.get_table("inventory")
-    date_dim = ctx.get_table("date_dim")
-    catalog_sales = ctx.get_table("catalog_sales")
-
-    # Filter early to reduce data volume before joins
-    item_filtered = item[(item["i_current_price"] >= price_min) & (item["i_current_price"] <= price_max)]
-
-    inv_filtered = inventory[(inventory["inv_quantity_on_hand"] >= 100) & (inventory["inv_quantity_on_hand"] <= 500)]
-
-    date_filtered = date_dim[
-        (date_dim["d_year"] == year) & (date_dim["d_moy"] >= month_start) & (date_dim["d_moy"] <= month_end)
-    ]
-
-    # Get items that exist in catalog_sales (semi-join via unique item_sk set)
-    cs_items = _to_list(catalog_sales["cs_item_sk"].unique())
-
-    # Join filtered tables
-    merged = item_filtered.merge(inv_filtered, left_on="i_item_sk", right_on="inv_item_sk")
-    merged = merged.merge(date_filtered, left_on="inv_date_sk", right_on="d_date_sk")
-
-    # Apply semi-join filter for catalog_sales existence
-    merged = merged[merged["i_item_sk"].isin(cs_items)]
-
-    # Distinct and sort
-    return (
-        merged[["i_item_id", "i_item_desc", "i_current_price"]].drop_duplicates().sort_values(["i_item_id"]).head(100)
-    )
 
 
 def q46_expression_impl(ctx: DataFrameContext) -> Any:
