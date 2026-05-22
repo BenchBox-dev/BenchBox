@@ -40,6 +40,8 @@ the map is unchanged.
 | `benchbox.core.runner.dataframe_runner.run_dataframe_benchmark` | `deprecated` | dataframe-runtime | Deprecated internal compatibility runner retained for old tests and helper imports. It is not the production DataFrame lifecycle path. | Backward-compatibility registry review after one beta cycle; migrate remaining behavior to `BenchmarkExecutionMixin` before removal. | Compatibility tests only. | `benchbox/core/runner/dataframe_runner.py`, `tests/unit/core/runner/test_dataframe_runner.py`, `tests/unit/core/runner/test_dataframe_runner_lifecycle.py` |
 | Platform registry metadata | `beta-public` | platform-runtime | Registry metadata is the source for platform discovery, capabilities, dependency hints, and platform support status. | Same-PR metadata/docs migration; aliases require compatibility note. | Platform registry tests and docs drift checks. | `benchbox/core/platform_registry.py` |
 | MCP tools | `beta-public` | mcp | Tool schemas and documented parameters are supported as a smoke/control-plane automation surface, not a CLI-equivalent execution surface. MCP result bundles are schema-comparable to CLI bundles, but MCP must not import CLI command internals or imply CLI option parity. | MCP reference update and contract tests; product-tier or option-parity changes need a decision note and, for CLI equivalence, a shared non-CLI run service below CLI and MCP. | `tests/unit/mcp/test_run_surface_contract.py`, `tests/unit/mcp/`, MCP docs/schema checks. | `benchbox/mcp/`, `docs/reference/mcp.md`, `benchbox/base.py` |
+| Visualization semantic chart IDs | `beta-public` | visualization | Result-aware chart IDs accepted by CLI, MCP, templates, ASCII runtime dispatch, and Results Explorer must derive from the semantic registry. Raw textcharts primitive IDs are a separate dependency namespace. | Same-PR registry, template, discovery, Explorer, and parity-fixture updates; deprecate IDs rather than silently removing them. | Visualization registry tests, exporter tests, Explorer registry parity tests, and parity-fixture drift checks. | `benchbox/core/visualization/chart_types.py`, `benchbox/core/visualization/ascii_runtime.py`, `benchbox/core/visualization/templates.py`, `results-explorer/src/lib/chartRegistry.ts`, `tests/parity/fixtures/chart_ids.json` |
+| `benchbox.core.visualization.render_ascii_chart` | `beta-public` | visualization | Compatibility data-first ASCII primitive renderer for callers that already have chart-specific data objects. It intentionally has narrower coverage than the result-aware semantic renderer and excludes `power_bar`, which needs normalized BenchBox result context. | Promote a missing semantic chart only when a data-first payload contract exists; otherwise keep the explicit result-aware-only error. | `tests/unit/core/visualization/test_visualization_exporters.py`, visualization registry parity tests. | `benchbox/core/visualization/exporters.py` |
 | Result JSON bundles | `beta-public` | results | Schema-versioned result bundles are product data consumed by CLI, submission validation, hosted results, explorer, and SQL/DataFrame comparisons. SQL and DataFrame bundles must preserve the cross-mode invariants below. | Schema policy and hosted-results contract update before changing accepted versions, field semantics, or cross-mode parity guarantees. | Result schema policy, loader, normalizer, submission, explorer, and exported SQL/DataFrame parity tests. | `benchbox/core/results/schema_policy.py`, `benchbox/core/results/schema.py`, `docs/reference/result-formats.md`, `docs/reference/hosted-results-contract.md`, `tests/unit/core/results/test_result_parity.py` |
 | Explorer read model and generated browser inputs | `generated` | results-explorer | Browser data stores are generated from accepted result bundles; generated outputs should be reproducible from source bundles and pipeline code. | Read-model version bump or pipeline contract update. | Explorer pipeline contract tests and browser release gates. | `_project/scripts/explorer_pipeline/`, results explorer generated data |
 | Public submission validator behavior | `beta-public` | hosted-results | PR-based public result submissions must receive deterministic validation errors and privacy/trust handling. | Hosted-results contract update and validator tests. | `validate-submission` workflow, submission validator tests. | `scripts/validate_submission.py`, `docs/contributing-results.md`, `docs/reference/hosted-results-contract.md` |
@@ -104,6 +106,25 @@ The contract map is the routing layer for these gates, not the sole source of
 every generated table. A PR that changes a claim class should update the owning
 source and its gate first, then update this map only when the public contract or
 ownership boundary changes.
+
+## Visualization Chart Contract
+
+`benchbox/core/visualization/chart_types.py` is the semantic result-aware chart
+registry for CLI, MCP, templates, ASCII runtime dispatch, and Results Explorer.
+Adding a semantic chart ID starts there, then updates the result-aware runtime
+handler in `benchbox/core/visualization/ascii_runtime.py`, any templates that
+should include it, `results-explorer/src/lib/chartRegistry.ts`, and generated
+parity fixtures from `make parity-fixtures`. Registry tests must report missing
+and extra IDs by name, not only by count.
+
+`benchbox.core.visualization.render_ascii_chart` is a compatibility data-first
+renderer for callers that already hold primitive chart payloads. It intentionally
+does not cover `power_bar`, because `power_bar` needs normalized BenchBox result
+context and is rendered through `render_ascii_chart_from_results()`. Raw
+textcharts primitive IDs such as `bar` or `heatmap` are dependency internals, not
+BenchBox semantic chart IDs. Textcharts dependency updates should be validated by
+the visualization registry tests plus the runtime drift snippet that compares
+`ALL_CHART_TYPES`, `_CHART_TYPE_DISPATCH`, and the primitive exporter registry.
 
 ## SQL Compatibility Governance Decision
 
