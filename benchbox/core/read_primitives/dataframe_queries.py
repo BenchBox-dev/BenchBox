@@ -228,43 +228,84 @@ def aggregation_groupby_impl(
     raise TypeError(f"Unsupported table type for grouped aggregation: {type(table)!r}")
 
 
-def aggregation_distinct_groupby_expression_impl(ctx: DataFrameContext) -> Any:
-    """Distinct count of high cardinality keys in low cardinality groups."""
-    return aggregation_groupby_impl(
-        ctx,
-        table_name="lineitem",
-        group_cols=("l_returnflag", "l_linestatus"),
-        agg_specs=(
-            ("l_orderkey", "nunique", "unique_orders"),
-            ("l_partkey", "nunique", "unique_parts"),
-        ),
+def _expr_grouped_list(ctx: DataFrameContext, table_name: str, group_col: str, value_col: str, alias: str) -> Any:
+    return ctx.get_table(table_name).group_by(group_col).agg(ctx.col(value_col).list().alias(alias))
+
+
+def _pandas_grouped_list(table: Any, group_col: str, value_col: str, alias: str) -> Any:
+    result = table.groupby(group_col)[value_col].apply(list).reset_index()
+    result.columns = [group_col, alias]
+    return result
+
+
+def _partsupp_map_expression(ctx: DataFrameContext, max_suppkey: int) -> Any:
+    col, lit = ctx.col, ctx.lit
+    return (
+        ctx.get_table("partsupp")
+        .filter(col("ps_suppkey") <= lit(max_suppkey))
+        .group_by("ps_suppkey")
+        .agg(ctx.struct(col("ps_partkey").cast("str"), col("ps_supplycost")).list().alias("entries"))
+        .with_columns(ctx.map_from_entries("entries").alias("part_costs"))
     )
 
 
-def aggregation_groupby_large_expression_impl(ctx: DataFrameContext) -> Any:
-    """Aggregates within high cardinality grouping."""
-    return aggregation_groupby_impl(
-        ctx,
-        table_name="lineitem",
-        group_cols=("l_orderkey", "l_partkey", "l_suppkey"),
-        agg_specs=(
-            ("l_quantity", "sum", "total_qty"),
-            ("l_extendedprice", "mean", "avg_price"),
-        ),
+def _partsupp_map_pandas(ctx: DataFrameContext, max_suppkey: int) -> Any:
+    filtered = ctx.get_table("partsupp")
+    filtered = filtered[filtered["ps_suppkey"] <= max_suppkey]
+    result = filtered.groupby("ps_suppkey").apply(
+        lambda group: {str(row["ps_partkey"]): row["ps_supplycost"] for _, row in group.iterrows()},
+        include_groups=False,
     )
+    result = result.reset_index()
+    result.columns = ["ps_suppkey", "part_costs"]
+    return result
 
 
-def aggregation_groupby_small_expression_impl(ctx: DataFrameContext) -> Any:
-    """Aggregates within low cardinality grouping."""
-    return aggregation_groupby_impl(
-        ctx,
-        table_name="nation",
-        group_cols=("n_regionkey",),
-        agg_specs=(
-            ("n_nationkey", "count", "nation_count"),
-            ("n_name", "max", "last_nation"),
-        ),
-    )
+def _make_groupby_impl(
+    name: str, table_name: str, group_cols: tuple[str, ...], agg_specs: tuple[tuple[str, str, str], ...]
+) -> Any:
+    def impl(ctx: DataFrameContext) -> Any:
+        return aggregation_groupby_impl(ctx, table_name=table_name, group_cols=group_cols, agg_specs=agg_specs)
+
+    impl.__name__ = name
+    impl.__qualname__ = name
+    return impl
+
+
+for _stem, _table_name, _group_cols, _agg_specs in (
+    (
+        "aggregation_distinct_groupby",
+        "lineitem",
+        ("l_returnflag", "l_linestatus"),
+        (("l_orderkey", "nunique", "unique_orders"), ("l_partkey", "nunique", "unique_parts")),
+    ),
+    (
+        "aggregation_groupby_large",
+        "lineitem",
+        ("l_orderkey", "l_partkey", "l_suppkey"),
+        (("l_quantity", "sum", "total_qty"), ("l_extendedprice", "mean", "avg_price")),
+    ),
+    (
+        "aggregation_groupby_small",
+        "nation",
+        ("n_regionkey",),
+        (("n_nationkey", "count", "nation_count"), ("n_name", "max", "last_nation")),
+    ),
+    ("groupby_highndv", "lineitem", ("l_orderkey",), (("l_linenumber", "count", "line_count"),)),
+    ("groupby_lowndv", "orders", ("o_orderpriority",), (("o_orderkey", "count", "order_count"),)),
+    ("groupby_pk", "customer", ("c_custkey",), (("c_name", "max", "customer_name"),)),
+    ("groupby_decimal_highndv", "lineitem", ("l_extendedprice",), (("l_orderkey", "count", "price_frequency"),)),
+    (
+        "groupby_decimal_lowndv",
+        "lineitem",
+        ("l_discount",),
+        (("l_orderkey", "count", "discount_frequency"), ("l_quantity", "mean", "avg_qty")),
+    ),
+):
+    for _family in ("expression", "pandas"):
+        globals()[f"{_stem}_{_family}_impl"] = _make_groupby_impl(
+            f"{_stem}_{_family}_impl", _table_name, _group_cols, _agg_specs
+        )
 
 
 def aggregation_materialize_expression_impl(ctx: DataFrameContext) -> Any:
@@ -683,54 +724,6 @@ def filter_in_predicate_subquery_expression_impl(ctx: DataFrameContext) -> Any:
 
     return part.join(high_qty_parts, left_on="p_partkey", right_on="l_partkey", how="semi").select(
         "p_partkey", "p_name", "p_type", "p_size"
-    )
-
-
-# -----------------------------------------------------------------------------
-# Additional GroupBy queries
-# -----------------------------------------------------------------------------
-
-
-def groupby_highndv_expression_impl(ctx: DataFrameContext) -> Any:
-    """GROUP BY with high distinct value count (many groups)."""
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-
-    return lineitem.group_by("l_orderkey").agg(col("l_linenumber").count().alias("line_count"))
-
-
-def groupby_lowndv_expression_impl(ctx: DataFrameContext) -> Any:
-    """GROUP BY with low distinct value count (few groups)."""
-    orders = ctx.get_table("orders")
-    col = ctx.col
-
-    return orders.group_by("o_orderpriority").agg(col("o_orderkey").count().alias("order_count"))
-
-
-def groupby_pk_expression_impl(ctx: DataFrameContext) -> Any:
-    """GROUP BY on primary key (one row per group)."""
-    customer = ctx.get_table("customer")
-    col = ctx.col
-
-    return customer.group_by("c_custkey").agg(col("c_name").max().alias("customer_name"))
-
-
-def groupby_decimal_highndv_expression_impl(ctx: DataFrameContext) -> Any:
-    """GROUP BY with high cardinality decimal column."""
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-
-    return lineitem.group_by("l_extendedprice").agg(col("l_orderkey").count().alias("price_frequency"))
-
-
-def groupby_decimal_lowndv_expression_impl(ctx: DataFrameContext) -> Any:
-    """GROUP BY with low cardinality decimal column."""
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-
-    return lineitem.group_by("l_discount").agg(
-        col("l_orderkey").count().alias("discount_frequency"),
-        col("l_quantity").mean().alias("avg_qty"),
     )
 
 
@@ -1304,19 +1297,6 @@ def aggregation_distinct_pandas_impl(ctx: DataFrameContext) -> Any:
     return filtered[["o_custkey"]].nunique().to_frame(name="unique_customers").reset_index(drop=True)
 
 
-def aggregation_distinct_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Distinct count of high cardinality keys in low cardinality groups."""
-    return aggregation_groupby_impl(
-        ctx,
-        table_name="lineitem",
-        group_cols=("l_returnflag", "l_linestatus"),
-        agg_specs=(
-            ("l_orderkey", "nunique", "unique_orders"),
-            ("l_partkey", "nunique", "unique_parts"),
-        ),
-    )
-
-
 def approx_count_distinct_simple_pandas_impl(ctx: DataFrameContext) -> Any:
     """Approximate distinct count fallback for the pandas family.
 
@@ -1342,41 +1322,7 @@ def approx_count_distinct_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
     `nunique_approx()`, but no groupby equivalent in the dask-expr API,
     so this query remains an exact fallback for the pandas family.
     """
-    return aggregation_groupby_impl(
-        ctx,
-        table_name="lineitem",
-        group_cols=("l_returnflag", "l_linestatus"),
-        agg_specs=(
-            ("l_orderkey", "nunique", "unique_orders"),
-            ("l_partkey", "nunique", "unique_parts"),
-        ),
-    )
-
-
-def aggregation_groupby_large_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Aggregates within high cardinality grouping."""
-    return aggregation_groupby_impl(
-        ctx,
-        table_name="lineitem",
-        group_cols=("l_orderkey", "l_partkey", "l_suppkey"),
-        agg_specs=(
-            ("l_quantity", "sum", "total_qty"),
-            ("l_extendedprice", "mean", "avg_price"),
-        ),
-    )
-
-
-def aggregation_groupby_small_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Aggregates within low cardinality grouping."""
-    return aggregation_groupby_impl(
-        ctx,
-        table_name="nation",
-        group_cols=("n_regionkey",),
-        agg_specs=(
-            ("n_nationkey", "count", "nation_count"),
-            ("n_name", "max", "last_nation"),
-        ),
-    )
+    return globals()["aggregation_distinct_groupby_pandas_impl"](ctx)
 
 
 def aggregation_materialize_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1723,49 +1669,6 @@ def filter_in_predicate_subquery_pandas_impl(ctx: DataFrameContext) -> Any:
 
     high_qty_parts = lineitem[lineitem["l_quantity"] > 45]["l_partkey"].unique()
     return part[part["p_partkey"].isin(high_qty_parts)][["p_partkey", "p_name", "p_type", "p_size"]]
-
-
-# -----------------------------------------------------------------------------
-# Additional GroupBy queries (Pandas)
-# -----------------------------------------------------------------------------
-
-
-def groupby_highndv_pandas_impl(ctx: DataFrameContext) -> Any:
-    """GROUP BY with high distinct value count (many groups)."""
-    lineitem = ctx.get_table("lineitem")
-
-    return lineitem.groupby("l_orderkey", as_index=False).agg(line_count=("l_linenumber", "count"))
-
-
-def groupby_lowndv_pandas_impl(ctx: DataFrameContext) -> Any:
-    """GROUP BY with low distinct value count (few groups)."""
-    orders = ctx.get_table("orders")
-
-    return orders.groupby("o_orderpriority", as_index=False).agg(order_count=("o_orderkey", "count"))
-
-
-def groupby_pk_pandas_impl(ctx: DataFrameContext) -> Any:
-    """GROUP BY on primary key (one row per group)."""
-    customer = ctx.get_table("customer")
-
-    return customer.groupby("c_custkey", as_index=False).agg(customer_name=("c_name", "max"))
-
-
-def groupby_decimal_highndv_pandas_impl(ctx: DataFrameContext) -> Any:
-    """GROUP BY with high cardinality decimal column."""
-    lineitem = ctx.get_table("lineitem")
-
-    return lineitem.groupby("l_extendedprice", as_index=False).agg(price_frequency=("l_orderkey", "count"))
-
-
-def groupby_decimal_lowndv_pandas_impl(ctx: DataFrameContext) -> Any:
-    """GROUP BY with low cardinality decimal column."""
-    lineitem = ctx.get_table("lineitem")
-
-    return lineitem.groupby("l_discount", as_index=False).agg(
-        discount_frequency=("l_orderkey", "count"),
-        avg_qty=("l_quantity", "mean"),
-    )
 
 
 # -----------------------------------------------------------------------------
@@ -4158,24 +4061,19 @@ def array_contains_expression_impl(ctx: DataFrameContext) -> Any:
 
     Expression-family implementation using array aggregation and contains.
     """
-    partsupp = ctx.get_table("partsupp")
     col = ctx.col
     lit = ctx.lit
 
-    # Aggregate parts per supplier
-    supplier_parts = partsupp.group_by("ps_suppkey").agg(col("ps_partkey").list().alias("parts"))
-
-    # Check if contains part 100
-    return supplier_parts.with_columns(col("parts").list.contains(lit(100)).alias("has_part_100")).limit(100)
+    return (
+        _expr_grouped_list(ctx, "partsupp", "ps_suppkey", "ps_partkey", "parts")
+        .with_columns(col("parts").list.contains(lit(100)).alias("has_part_100"))
+        .limit(100)
+    )
 
 
 def array_contains_pandas_impl(ctx: DataFrameContext) -> Any:
     """Check if array contains a value."""
-    partsupp = ctx.get_table("partsupp")
-
-    # Aggregate parts per supplier into lists
-    supplier_parts = partsupp.groupby("ps_suppkey")["ps_partkey"].apply(list).reset_index()
-    supplier_parts.columns = ["ps_suppkey", "parts"]
+    supplier_parts = _pandas_grouped_list(ctx.get_table("partsupp"), "ps_suppkey", "ps_partkey", "parts")
 
     # Check if 100 is in each list
     supplier_parts["has_part_100"] = supplier_parts["parts"].apply(lambda x: 100 in x)
@@ -4188,23 +4086,18 @@ def array_distinct_expression_impl(ctx: DataFrameContext) -> Any:
 
     Expression-family implementation using array aggregation and unique.
     """
-    lineitem = ctx.get_table("lineitem")
     col = ctx.col
 
-    # Aggregate ship modes per order
-    ship_modes = lineitem.group_by("l_orderkey").agg(col("l_shipmode").list().alias("modes"))
-
-    # Get unique modes
-    return ship_modes.with_columns(col("modes").list.unique().alias("unique_modes")).limit(100)
+    return (
+        _expr_grouped_list(ctx, "lineitem", "l_orderkey", "l_shipmode", "modes")
+        .with_columns(col("modes").list.unique().alias("unique_modes"))
+        .limit(100)
+    )
 
 
 def array_distinct_pandas_impl(ctx: DataFrameContext) -> Any:
     """Get distinct array elements."""
-    lineitem = ctx.get_table("lineitem")
-
-    # Aggregate ship modes per order
-    ship_modes = lineitem.groupby("l_orderkey")["l_shipmode"].apply(list).reset_index()
-    ship_modes.columns = ["l_orderkey", "modes"]
+    ship_modes = _pandas_grouped_list(ctx.get_table("lineitem"), "l_orderkey", "l_shipmode", "modes")
 
     # Get unique modes
     ship_modes["unique_modes"] = ship_modes["modes"].apply(lambda x: list(set(x)))
@@ -4217,25 +4110,19 @@ def array_length_expression_impl(ctx: DataFrameContext) -> Any:
 
     Expression-family implementation using array aggregation and length.
     """
-    partsupp = ctx.get_table("partsupp")
     col = ctx.col
 
-    # Aggregate parts per supplier
-    supplier_parts = partsupp.group_by("ps_suppkey").agg(col("ps_partkey").list().alias("parts"))
-
-    # Get count and sort
     return (
-        supplier_parts.with_columns(col("parts").list.len().alias("num_parts")).sort(col("num_parts").desc()).limit(100)
+        _expr_grouped_list(ctx, "partsupp", "ps_suppkey", "ps_partkey", "parts")
+        .with_columns(col("parts").list.len().alias("num_parts"))
+        .sort(col("num_parts").desc())
+        .limit(100)
     )
 
 
 def array_length_pandas_impl(ctx: DataFrameContext) -> Any:
     """Get array length/cardinality."""
-    partsupp = ctx.get_table("partsupp")
-
-    # Aggregate parts per supplier
-    supplier_parts = partsupp.groupby("ps_suppkey")["ps_partkey"].apply(list).reset_index()
-    supplier_parts.columns = ["ps_suppkey", "parts"]
+    supplier_parts = _pandas_grouped_list(ctx.get_table("partsupp"), "ps_suppkey", "ps_partkey", "parts")
 
     # Get length
     supplier_parts["num_parts"] = supplier_parts["parts"].apply(len)
@@ -4249,25 +4136,18 @@ def array_min_max_expression_impl(ctx: DataFrameContext) -> Any:
 
     Expression-family implementation using array aggregation and min/max.
     """
-    orders = ctx.get_table("orders")
     col = ctx.col
 
-    # Aggregate prices per customer
-    order_prices = orders.group_by("o_custkey").agg(col("o_totalprice").list().alias("prices"))
-
-    # Get min and max from array
-    return order_prices.with_columns(
-        col("prices").list.min().alias("min_order"), col("prices").list.max().alias("max_order")
-    ).limit(100)
+    return (
+        _expr_grouped_list(ctx, "orders", "o_custkey", "o_totalprice", "prices")
+        .with_columns(col("prices").list.min().alias("min_order"), col("prices").list.max().alias("max_order"))
+        .limit(100)
+    )
 
 
 def array_min_max_pandas_impl(ctx: DataFrameContext) -> Any:
     """Get min/max from array."""
-    orders = ctx.get_table("orders")
-
-    # Aggregate prices per customer
-    order_prices = orders.groupby("o_custkey")["o_totalprice"].apply(list).reset_index()
-    order_prices.columns = ["o_custkey", "prices"]
+    order_prices = _pandas_grouped_list(ctx.get_table("orders"), "o_custkey", "o_totalprice", "prices")
 
     # Get min and max
     order_prices["min_order"] = order_prices["prices"].apply(min)
@@ -4372,23 +4252,18 @@ def array_sort_expression_impl(ctx: DataFrameContext) -> Any:
 
     Expression-family implementation using array sorting.
     """
-    part = ctx.get_table("part")
     col = ctx.col
 
-    # Aggregate sizes per brand
-    part_sizes = part.group_by("p_brand").agg(col("p_size").list().alias("sizes"))
-
-    # Sort the array
-    return part_sizes.with_columns(col("sizes").list.sort().alias("sorted_sizes")).limit(50)
+    return (
+        _expr_grouped_list(ctx, "part", "p_brand", "p_size", "sizes")
+        .with_columns(col("sizes").list.sort().alias("sorted_sizes"))
+        .limit(50)
+    )
 
 
 def array_sort_pandas_impl(ctx: DataFrameContext) -> Any:
     """Sort array elements."""
-    part = ctx.get_table("part")
-
-    # Aggregate sizes per brand
-    part_sizes = part.groupby("p_brand")["p_size"].apply(list).reset_index()
-    part_sizes.columns = ["p_brand", "sizes"]
+    part_sizes = _pandas_grouped_list(ctx.get_table("part"), "p_brand", "p_size", "sizes")
 
     # Sort each array
     part_sizes["sorted_sizes"] = part_sizes["sizes"].apply(sorted)
@@ -4415,12 +4290,9 @@ def array_unnest_expression_impl(ctx: DataFrameContext) -> Any:
 
 def array_unnest_pandas_impl(ctx: DataFrameContext) -> Any:
     """Unnest/explode array back to rows."""
-    partsupp = ctx.get_table("partsupp")
-
     # Filter and aggregate
-    filtered = partsupp[partsupp["ps_suppkey"] <= 10]
-    supplier_parts = filtered.groupby("ps_suppkey")["ps_partkey"].apply(list).reset_index()
-    supplier_parts.columns = ["ps_suppkey", "parts"]
+    partsupp = ctx.get_table("partsupp")
+    supplier_parts = _pandas_grouped_list(partsupp[partsupp["ps_suppkey"] <= 10], "ps_suppkey", "ps_partkey", "parts")
 
     # Explode
     result = supplier_parts.explode("parts").reset_index(drop=True)
@@ -4440,39 +4312,12 @@ def map_construction_expression_impl(ctx: DataFrameContext) -> Any:
 
     Expression-family implementation using map construction.
     """
-    partsupp = ctx.get_table("partsupp")
-    col = ctx.col
-    lit = ctx.lit
-    map_from_entries = ctx.map_from_entries
-    struct = ctx.struct
-
-    # Filter and create map per supplier
-    filtered = partsupp.filter(col("ps_suppkey") <= lit(10))
-
-    # Group and aggregate as list of struct, then convert to map
-    result = filtered.group_by("ps_suppkey").agg(
-        struct(col("ps_partkey").cast("str"), col("ps_supplycost")).list().alias("entries")
-    )
-
-    # Convert entries to map
-    return result.with_columns(map_from_entries("entries").alias("part_costs")).select("ps_suppkey", "part_costs")
+    return _partsupp_map_expression(ctx, 10).select("ps_suppkey", "part_costs")
 
 
 def map_construction_pandas_impl(ctx: DataFrameContext) -> Any:
     """Construct map from key-value pairs."""
-    partsupp = ctx.get_table("partsupp")
-
-    # Filter
-    filtered = partsupp[partsupp["ps_suppkey"] <= 10]
-
-    # Create dict per supplier
-    def to_map(group):
-        return {str(row["ps_partkey"]): row["ps_supplycost"] for _, row in group.iterrows()}
-
-    result = filtered.groupby("ps_suppkey").apply(to_map, include_groups=False).reset_index()
-    result.columns = ["ps_suppkey", "part_costs"]
-
-    return result
+    return _partsupp_map_pandas(ctx, 10)
 
 
 def map_access_expression_impl(ctx: DataFrameContext) -> Any:
@@ -4480,40 +4325,24 @@ def map_access_expression_impl(ctx: DataFrameContext) -> Any:
 
     Expression-family implementation using map element access.
     """
-    partsupp = ctx.get_table("partsupp")
     col = ctx.col
     lit = ctx.lit
-    map_from_entries = ctx.map_from_entries
-    struct = ctx.struct
-
-    # Create maps
-    filtered = partsupp.filter(col("ps_suppkey") <= lit(10))
-    with_map = (
-        filtered.group_by("ps_suppkey")
-        .agg(struct(col("ps_partkey").cast("str"), col("ps_supplycost")).list().alias("entries"))
-        .with_columns(map_from_entries("entries").alias("part_costs"))
-    )
 
     # Access map elements
-    return with_map.select(
-        "ps_suppkey",
-        col("part_costs").map.get(lit("1")).alias("cost_for_part_1"),
-        col("part_costs").map.get(lit("5")).alias("cost_for_part_5"),
-    ).limit(10)
+    return (
+        _partsupp_map_expression(ctx, 10)
+        .select(
+            "ps_suppkey",
+            col("part_costs").map.get(lit("1")).alias("cost_for_part_1"),
+            col("part_costs").map.get(lit("5")).alias("cost_for_part_5"),
+        )
+        .limit(10)
+    )
 
 
 def map_access_pandas_impl(ctx: DataFrameContext) -> Any:
     """Access map values by key."""
-    partsupp = ctx.get_table("partsupp")
-
-    # Create maps
-    filtered = partsupp[partsupp["ps_suppkey"] <= 10]
-
-    def to_map(group):
-        return {str(row["ps_partkey"]): row["ps_supplycost"] for _, row in group.iterrows()}
-
-    result = filtered.groupby("ps_suppkey").apply(to_map, include_groups=False).reset_index()
-    result.columns = ["ps_suppkey", "part_costs"]
+    result = _partsupp_map_pandas(ctx, 10)
 
     # Access map elements
     result["cost_for_part_1"] = result["part_costs"].apply(lambda m: m.get("1"))
@@ -4527,22 +4356,10 @@ def map_keys_values_expression_impl(ctx: DataFrameContext) -> Any:
 
     Expression-family implementation using map keys/values extraction.
     """
-    partsupp = ctx.get_table("partsupp")
     col = ctx.col
-    lit = ctx.lit
-    map_from_entries = ctx.map_from_entries
-    struct = ctx.struct
-
-    # Create maps
-    filtered = partsupp.filter(col("ps_suppkey") <= lit(5))
-    with_map = (
-        filtered.group_by("ps_suppkey")
-        .agg(struct(col("ps_partkey").cast("str"), col("ps_supplycost")).list().alias("entries"))
-        .with_columns(map_from_entries("entries").alias("part_costs"))
-    )
 
     # Extract keys and values
-    return with_map.select(
+    return _partsupp_map_expression(ctx, 5).select(
         "ps_suppkey",
         col("part_costs").map.keys().alias("part_ids"),
         col("part_costs").map.values().alias("costs"),
@@ -4551,16 +4368,7 @@ def map_keys_values_expression_impl(ctx: DataFrameContext) -> Any:
 
 def map_keys_values_pandas_impl(ctx: DataFrameContext) -> Any:
     """Extract map keys and values."""
-    partsupp = ctx.get_table("partsupp")
-
-    # Create maps
-    filtered = partsupp[partsupp["ps_suppkey"] <= 5]
-
-    def to_map(group):
-        return {str(row["ps_partkey"]): row["ps_supplycost"] for _, row in group.iterrows()}
-
-    result = filtered.groupby("ps_suppkey").apply(to_map, include_groups=False).reset_index()
-    result.columns = ["ps_suppkey", "part_costs"]
+    result = _partsupp_map_pandas(ctx, 5)
 
     # Extract keys and values
     result["part_ids"] = result["part_costs"].apply(lambda m: list(m.keys()))
@@ -4580,27 +4388,20 @@ def list_filter_expression_impl(ctx: DataFrameContext) -> Any:
 
     Expression-family implementation using list filter.
     """
-    orders = ctx.get_table("orders")
     col = ctx.col
     lit = ctx.lit
     elem = ctx.element()
 
-    # Aggregate prices per customer
-    order_prices = orders.group_by("o_custkey").agg(col("o_totalprice").list().alias("prices"))
-
-    # Filter to keep only large orders (> 100000)
-    return order_prices.with_columns(
-        col("prices").list.eval(elem.filter(elem > lit(100000))).alias("large_orders")
-    ).limit(100)
+    return (
+        _expr_grouped_list(ctx, "orders", "o_custkey", "o_totalprice", "prices")
+        .with_columns(col("prices").list.eval(elem.filter(elem > lit(100000))).alias("large_orders"))
+        .limit(100)
+    )
 
 
 def list_filter_pandas_impl(ctx: DataFrameContext) -> Any:
     """Filter array elements by condition."""
-    orders = ctx.get_table("orders")
-
-    # Aggregate prices per customer
-    order_prices = orders.groupby("o_custkey")["o_totalprice"].apply(list).reset_index()
-    order_prices.columns = ["o_custkey", "prices"]
+    order_prices = _pandas_grouped_list(ctx.get_table("orders"), "o_custkey", "o_totalprice", "prices")
 
     # Filter to keep only large orders
     order_prices["large_orders"] = order_prices["prices"].apply(lambda x: [p for p in x if p > 100000])
@@ -4613,25 +4414,20 @@ def list_transform_expression_impl(ctx: DataFrameContext) -> Any:
 
     Expression-family implementation using list transform.
     """
-    part = ctx.get_table("part")
     col = ctx.col
     lit = ctx.lit
     elem = ctx.element()
 
-    # Aggregate prices per brand
-    part_prices = part.group_by("p_brand").agg(col("p_retailprice").list().alias("prices"))
-
-    # Transform to apply 10% markup
-    return part_prices.with_columns(col("prices").list.eval(elem * lit(1.1)).alias("prices_with_tax")).limit(50)
+    return (
+        _expr_grouped_list(ctx, "part", "p_brand", "p_retailprice", "prices")
+        .with_columns(col("prices").list.eval(elem * lit(1.1)).alias("prices_with_tax"))
+        .limit(50)
+    )
 
 
 def list_transform_pandas_impl(ctx: DataFrameContext) -> Any:
     """Transform each array element."""
-    part = ctx.get_table("part")
-
-    # Aggregate prices per brand
-    part_prices = part.groupby("p_brand")["p_retailprice"].apply(list).reset_index()
-    part_prices.columns = ["p_brand", "prices"]
+    part_prices = _pandas_grouped_list(ctx.get_table("part"), "p_brand", "p_retailprice", "prices")
 
     # Transform with 10% markup
     part_prices["prices_with_tax"] = part_prices["prices"].apply(lambda x: [p * 1.1 for p in x])
@@ -4644,23 +4440,18 @@ def list_reduce_expression_impl(ctx: DataFrameContext) -> Any:
 
     Expression-family implementation using list sum (as reduce equivalent).
     """
-    lineitem = ctx.get_table("lineitem")
     col = ctx.col
 
-    # Aggregate quantities per order
-    quantities = lineitem.group_by("l_orderkey").agg(col("l_quantity").list().alias("qtys"))
-
-    # Reduce to sum (most frameworks don't have general reduce, use sum)
-    return quantities.with_columns(col("qtys").list.sum().alias("total_qty")).limit(100)
+    return (
+        _expr_grouped_list(ctx, "lineitem", "l_orderkey", "l_quantity", "qtys")
+        .with_columns(col("qtys").list.sum().alias("total_qty"))
+        .limit(100)
+    )
 
 
 def list_reduce_pandas_impl(ctx: DataFrameContext) -> Any:
     """Reduce array to single value."""
-    lineitem = ctx.get_table("lineitem")
-
-    # Aggregate quantities per order
-    quantities = lineitem.groupby("l_orderkey")["l_quantity"].apply(list).reset_index()
-    quantities.columns = ["l_orderkey", "qtys"]
+    quantities = _pandas_grouped_list(ctx.get_table("lineitem"), "l_orderkey", "l_quantity", "qtys")
 
     # Reduce to sum
     quantities["total_qty"] = quantities["qtys"].apply(sum)
