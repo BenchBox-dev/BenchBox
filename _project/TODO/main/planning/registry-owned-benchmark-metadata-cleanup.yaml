@@ -1,0 +1,201 @@
+id: registry-owned-benchmark-metadata-cleanup
+title: "Move benchmark estimates and data-source metadata into the registry"
+worktree: main
+priority: Medium-High
+status: "Not Started"
+category: Core Functionality
+
+deps:
+  needs: []
+
+description: |
+  Independent verification at checked SHA e60986923 confirmed the registry is a
+  real single source of truth for benchmark listing/discovery, but found three
+  remaining drift/cost pockets around metadata:
+
+  1. `benchbox/cli/benchmarks.py` has local `_estimate_memory_usage()` and
+     `_estimate_execution_time()` dictionaries. The execution-time dictionary
+     duplicates registry `estimated_time_range`, and verification found one
+     actual drift: `coffeeshop` is `(2, 8)` locally but `(3, 12)` in the
+     registry. The original critic's missing-list details were partially stale:
+     current local memory/time dicts have 18 entries and miss
+     `ai_primitives`, `flightdata`, `tpchavoc`, `transaction_primitives`, and
+     `vector_search`; `datavault` and `tpcds_obt` are present in both local
+     dicts.
+
+  2. `benchbox/core/benchmark_registry.py` populates `data_source` metadata at
+     import time by constructing exactly five probe benchmarks:
+     `read_primitives`, `write_primitives`, `transaction_primitives`,
+     `ai_primitives`, and `tpcds_obt`. Fresh-process verification measured
+     registry import at 0.841s on this machine with those five constructor
+     calls. The exact timing is environment-dependent, but the import-time
+     instantiation count is structural and actionable.
+
+  3. `benchbox/mcp/tools/discovery.py` derives behavior from registry helpers
+     but its `get_benchmark_info()` docstring repeats a prose benchmark list
+     beginning `tpch, tpcds, ssb, clickbench...`, which can drift from the
+     registry-owned list.
+
+work:
+  - id: w0
+    summary: "Revalidate metadata drift, import-time probe count, and MCP docstring duplication"
+    status: pending
+    notes: |
+      Re-run compact read-only checks on the implementation branch:
+        - Parse CLI estimate dicts with `ast` and compare coverage/drift against
+          `BENCHMARK_METADATA`.
+        - Monkeypatch fresh-process `importlib.import_module` to count registry
+          data-source probe constructors.
+        - Grep MCP discovery docstrings for hard-coded benchmark-list prose.
+      Summarize command, checked SHA, PASS/FAIL, counts, and drift rows in the
+      PR; keep raw stdout in `/tmp`.
+
+  - id: w1
+    summary: "Add registry metadata fields for base memory and static data source"
+    needs: [w0]
+    status: pending
+    notes: |
+      Add `base_memory_gb` and static `data_source` fields to
+      `BENCHMARK_METADATA` for every benchmark. Preserve `estimated_time_range`
+      as the execution-time source. Choose explicit values for currently
+      missing CLI entries instead of inheriting silent defaults. If uncertainty
+      remains for a benchmark, document the estimate rationale in a concise
+      comment or TODO note rather than hiding it in CLI fallback behavior.
+
+  - id: w2
+    summary: "Remove import-time data-source instantiation from the registry"
+    needs: [w1]
+    status: pending
+    notes: |
+      Replace `_populate_benchmark_data_sources()` constructor probing with
+      static metadata validation. Keep a test that instantiates the narrow set
+      of data-source benchmarks and asserts their `get_data_source_benchmark()`
+      method agrees with static metadata, but run that in tests rather than at
+      module import.
+
+  - id: w3
+    summary: "Drive CLI memory and execution-time estimates from registry metadata"
+    needs: [w1]
+    status: pending
+    notes: |
+      Delete the CLI-local estimate dicts. `_estimate_execution_time()` should
+      use `estimated_time_range`; `_estimate_memory_usage()` should use
+      `base_memory_gb`. Missing metadata should fail a registry validation test
+      instead of falling back silently. Preserve user-facing units and scale
+      formula behavior unless separately justified.
+
+  - id: w4
+    summary: "Trim MCP benchmark docstring hints to registry-owned wording"
+    needs: [w1]
+    status: pending
+    notes: |
+      Replace the repeated prose list with wording such as "any registered
+      benchmark ID; call `list_available('benchmarks')` to enumerate." Do not
+      add generated docstring machinery unless needed; the issue is the stale
+      list, not MCP runtime behavior.
+
+  - id: w5
+    summary: "Add metadata completeness and no-drift tests"
+    needs: [w2, w3, w4]
+    status: pending
+    notes: |
+      Extend registry/contract tests so every benchmark has
+      `estimated_time_range`, `base_memory_gb`, and `data_source`; CLI estimate
+      helpers read those fields; static `data_source` matches the runtime
+      getter for the known data-sharing benchmarks; and MCP docstring examples
+      do not repeat the registry list.
+
+metadata:
+  tags:
+    - benchmark-registry
+    - cli
+    - mcp
+    - metadata
+    - architecture-followup
+  estimated_effort: "1-2 days"
+  created_date: "2026-05-22"
+  last_updated: "2026-05-22T00:00:00Z"
+
+impact:
+  business_value: |
+    Keeps user-facing benchmark guidance aligned with registry metadata and
+    reduces CLI/MCP discovery drift.
+  user_impact: |
+    Users get more accurate memory/time estimates and faster/import-cleaner
+    discovery paths.
+  technical_debt: |
+    Removes two local CLI dicts and one import-time probing mechanism that
+    duplicate static benchmark metadata.
+
+files_affected:
+  modified:
+    - "benchbox/core/benchmark_registry.py"
+    - "benchbox/cli/benchmarks.py"
+    - "benchbox/mcp/tools/discovery.py"
+    - "tests/unit/core/test_loader_registry_parity.py"
+    - "tests/unit/core/test_benchmark_api_contract.py"
+    - "tests/unit/mcp/test_discovery.py"
+
+prior_art:
+  - "benchbox/core/benchmark_registry.py: BENCHMARK_METADATA and validation helpers - extend as the metadata source of truth."
+  - "benchbox/cli/benchmarks.py: _estimate_memory_usage and _estimate_execution_time - replace local dicts with registry lookups."
+  - "tests/unit/core/test_loader_registry_parity.py: registry key-set parity - extend to new metadata completeness checks."
+  - "benchbox/mcp/tools/discovery.py: runtime discovery imports registry helpers - preserve behavior while trimming hard-coded prose."
+
+must_preserve:
+  - "CLI benchmark selection remains registry-backed and keeps current user-facing estimate formatting."
+  - "Data-source relationships remain visible in benchmark metadata and agree with benchmark instance methods."
+  - "MCP runtime discovery continues to derive benchmark lists from the registry."
+  - "No benchmark classes are instantiated during registry import."
+
+approach: |
+  Move the remaining static facts into `BENCHMARK_METADATA`, then make CLI and
+  MCP consume registry-owned data or neutral wording. Keep the runtime
+  data-source getter as a test oracle for now, but do not pay constructor cost
+  during ordinary imports.
+
+anti_patterns:
+  - "DO NOT copy the CLI estimate dicts into a second registry-adjacent dict - because metadata should live on each benchmark entry."
+  - "DO NOT keep silent default estimates for missing registry metadata - because that hides new benchmark drift."
+  - "DO NOT instantiate benchmark classes at registry import time to compute static metadata."
+  - "DO NOT replace the MCP prose list with another hard-coded subset."
+
+verification:
+  - description: "Registry parity and metadata completeness tests pass."
+    command: "uv run -- python -m pytest tests/unit/core/test_loader_registry_parity.py tests/unit/core/test_benchmark_api_contract.py -q"
+    expected_output: "All selected registry tests pass."
+  - description: "CLI estimate behavior is covered by focused tests."
+    command: "uv run -- python -m pytest tests/unit/cli/test_benchmark_manager_behavioral.py tests/unit/cli/test_benchmark_selection.py -q"
+    expected_output: "Focused CLI benchmark manager tests pass after adding estimate metadata coverage."
+  - description: "MCP discovery tests pass after docstring wording changes."
+    command: "uv run -- python -m pytest tests/unit/mcp/test_discovery_tools.py -q"
+    expected_output: "MCP discovery tests pass."
+  - description: "Fast suite remains green after metadata changes."
+    command: "uv run -- python -m pytest -m fast -q"
+    expected_output: "Fast tests pass."
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/benchmark_registry.py"
+    - "benchbox/cli/benchmarks.py"
+    - "benchbox/mcp/tools/discovery.py"
+    - "tests/unit/core/test_loader_registry_parity.py"
+    - "tests/unit/core/test_benchmark_api_contract.py"
+    - "tests/unit/mcp/"
+    - "_project/TODO/"
+    - "_project/DONE/"
+  do_not_modify:
+    - "benchbox/base.py"
+    - "benchbox/platforms/"
+    - "landing/"
+    - "benchmark_runs/"
+
+success_metrics:
+  - "Every benchmark has registry-owned `estimated_time_range`, `base_memory_gb`, and `data_source` metadata."
+  - "CLI estimate helpers contain no per-benchmark local dicts."
+  - "Fresh registry import performs zero benchmark constructor probes for metadata."
+  - "MCP benchmark info docstring no longer repeats a hand-maintained benchmark list."
+
+open_questions:
+  - "Should `base_memory_gb` represent generation memory, query execution memory, or current CLI guidance semantics? Preserve current CLI semantics unless a product decision says otherwise."
+  - "Should the data-source runtime getter become deprecated after static metadata is validated?"
