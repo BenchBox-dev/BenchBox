@@ -11,7 +11,9 @@ name: Sync results-data to published-results
 #
 # The mirror PR is intentionally a draft — it never auto-merges. Maintainers
 # review and flip ready when the develop-side change is ready to be visible
-# on the public corpus branch.
+# on the public corpus branch. Validator changes mirror both the thin
+# `scripts/validate_submission.py` entrypoint and its shared
+# `benchbox/validation/bundle.py` implementation.
 
 on:
   push:
@@ -24,6 +26,7 @@ on:
       - "results-data/README.md"
       - "results-data/validate_corpus.py"
       - "scripts/validate_submission.py"
+      - "benchbox/validation/bundle.py"
       - "scripts/generate_corpus_inventory.py"
   workflow_dispatch:
 
@@ -74,6 +77,7 @@ jobs:
             'results-data/bundles' 'results-data/corpus-inventory.json' \
             'results-data/CORPUS_NOTES.md' 'results-data/SEED_CORPUS_SPEC.md' \
             'results-data/README.md' 'results-data/validate_corpus.py' \
+            'benchbox/validation/bundle.py' \
             'scripts/validate_submission.py' 'scripts/generate_corpus_inventory.py')
 
           if [[ ${#DIFFED[@]} -eq 0 ]]; then
@@ -117,6 +121,7 @@ jobs:
             'results-data/SEED_CORPUS_SPEC.md'
             'results-data/README.md'
             'results-data/validate_corpus.py'
+            'benchbox/validation/bundle.py'
             'scripts/validate_submission.py'
             'scripts/generate_corpus_inventory.py'
           )
@@ -149,7 +154,7 @@ jobs:
             exit 0
           fi
 
-          git add results-data scripts || true
+          git add results-data scripts benchbox/validation || true
 
           # The heredoc body inherits the YAML block-scalar's 10-space
           # indentation — strip it before using the file as a commit message.

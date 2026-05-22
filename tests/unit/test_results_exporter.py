@@ -19,7 +19,7 @@ from benchbox.core.results.models import (
     SetupPhase,
     TableCreationStats,
 )
-from scripts.validate_submission import ValidationResult, _validate_bundle
+from benchbox.validation.bundle import ValidationResult, _validate_bundle
 
 pytestmark = [
     pytest.mark.unit,

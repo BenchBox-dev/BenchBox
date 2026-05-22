@@ -1,20 +1,11 @@
-#!/usr/bin/env python3
 """Validate submission bundles in results-data/bundles/.
 
 Used by CI to check that PRs adding result bundles conform to schema-v2,
 have sane timing data, valid platform/benchmark names, and (when a
-submission manifest is present) matching SHA-256 hashes.
-
-Exit codes:
-    0 - all bundles valid
-    1 - one or more validation errors
-
-Usage:
-    # Validate all bundles
-    uv run -- python scripts/validate_submission.py results-data/bundles/
-
-    # Validate specific files (e.g. only changed files from a PR)
-    uv run -- python scripts/validate_submission.py path/to/bundle1.json path/to/bundle2.json
+submission manifest is present) matching SHA-256 hashes. The public
+CLI wrapper is `scripts/validate_submission.py`; this module is the
+shared implementation used by both develop and the slim published-results
+branch.
 """
 
 from __future__ import annotations
@@ -22,7 +13,6 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import sys
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
@@ -36,13 +26,13 @@ except ImportError:  # pragma: no cover - exercised on the slim published-result
 # Schema-v2 required top-level keys
 # ---------------------------------------------------------------------------
 
-REQUIRED_TOP_KEYS = {"version", "run", "benchmark", "platform", "summary", "queries"}
+REQUIRED_TOP_KEYS = ("version", "run", "benchmark", "platform", "summary", "queries")
 REQUIRED_RUN_KEYS = {"id", "timestamp", "total_duration_ms"}
 REQUIRED_BENCHMARK_KEYS = {"id", "scale_factor"}
 REQUIRED_PLATFORM_KEYS = {"name"}
 REQUIRED_QUERY_KEYS = {"id", "ms"}
 
-# Standalone fallback used when this script is vendored to published-results
+# Standalone fallback used when this module is mirrored to published-results
 # without the full BenchBox package.
 ACCEPTED_VERSION_PREFIX = "2."
 NUMERIC_SCHEMA_VERSION_RE = re.compile(r"^\d+\.\d+(?:\.\d+)?$")
@@ -53,6 +43,7 @@ SUBMISSION_MANIFEST_FILENAME = "submission-manifest.json"
 SUBMISSION_MANIFEST_SUFFIX = ".manifest.json"
 PUBLIC_CLEAN_VALIDATION_STATUS = "passed"
 PUBLIC_NON_CLEAN_TRANSLATION_STATUSES = {"fallback", "failed"}
+CLI_REFUSED_COMPLIANCE_CLASSES = frozenset({"unofficial_nonstandard", "unofficial_subscale"})
 
 # Known benchmarks and platforms - warn (not fail) on unknown values.
 KNOWN_BENCHMARKS = {
@@ -532,7 +523,7 @@ def _validate_bundle(data: dict, vr: ValidationResult) -> None:
     """Run all validation checks on a parsed bundle dict."""
     _capture_metadata(data, vr)
 
-    missing_top = REQUIRED_TOP_KEYS - set(data.keys())
+    missing_top = set(REQUIRED_TOP_KEYS) - set(data.keys())
     if missing_top:
         vr.error(f"Missing required top-level keys: {sorted(missing_top)}")
         return  # Can't continue without structure
@@ -549,9 +540,12 @@ def _validate_bundle(data: dict, vr: ValidationResult) -> None:
 
 def _hash_file(file_path: Path) -> str:
     """SHA-256 of a single file's contents."""
-    h = hashlib.sha256()
-    h.update(file_path.read_bytes())
-    return h.hexdigest()
+    return _hash_bytes(file_path.read_bytes())
+
+
+def _hash_bytes(data: bytes) -> str:
+    """SHA-256 of already-materialized bytes."""
+    return hashlib.sha256(data).hexdigest()
 
 
 def _is_safe_bundle_filename(name: str) -> bool:
@@ -799,58 +793,3 @@ def format_pr_comment(results: list[ValidationResult]) -> str:
             lines.append("")
 
     return "\n".join(lines)
-
-
-# ---------------------------------------------------------------------------
-# CLI entrypoint
-# ---------------------------------------------------------------------------
-
-
-def main(argv: list[str] | None = None) -> int:
-    args = argv if argv is not None else sys.argv[1:]
-
-    # Parse optional --pr-comment <path> flag.
-    pr_comment_path: Path | None = None
-    positional: list[str] = []
-    i = 0
-    while i < len(args):
-        if args[i] == "--pr-comment" and i + 1 < len(args):
-            pr_comment_path = Path(args[i + 1])
-            i += 2
-        else:
-            positional.append(args[i])
-            i += 1
-
-    if not positional:
-        print("Usage: validate_submission.py [--pr-comment <path>] <dir-or-files...>", file=sys.stderr)
-        return 1
-
-    paths: list[Path] = []
-    for arg in positional:
-        p = Path(arg)
-        if p.is_dir():
-            paths.extend(discover_bundles(p))
-        elif p.is_file():
-            paths.append(p)
-        else:
-            print(f"Warning: {arg} does not exist, skipping", file=sys.stderr)
-
-    if not paths:
-        print("No bundle files found.", file=sys.stderr)
-        return 1
-
-    results = validate_bundles(paths)
-    print(format_summary(results))
-
-    if pr_comment_path is not None:
-        try:
-            pr_comment_path.write_text(format_pr_comment(results), encoding="utf-8")
-        except OSError as exc:
-            print(f"Warning: failed to write PR comment file: {exc}", file=sys.stderr)
-
-    has_errors = any(not vr.ok for vr in results)
-    return 1 if has_errors else 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())

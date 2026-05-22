@@ -6,7 +6,9 @@ import json
 from pathlib import Path
 
 import pytest
-from uat_validator_rollup import (
+
+from benchbox.validation.bundle import discover_bundles
+from scripts.uat_validator_rollup import (
     CLI_REFUSED_COMPLIANCE_CLASSES,
     TSV_HEADER,
     build_rows,
@@ -14,7 +16,6 @@ from uat_validator_rollup import (
     main,
     render_tsv,
 )
-from validate_submission import discover_bundles
 
 pytestmark = [
     pytest.mark.unit,

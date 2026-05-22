@@ -1,4 +1,4 @@
-"""Tests for scripts/validate_submission.py."""
+"""Tests for public submission bundle validation."""
 
 from __future__ import annotations
 
@@ -7,16 +7,17 @@ import json
 from pathlib import Path
 
 import pytest
-from validate_submission import (
+
+from benchbox.validation.bundle import (
     ValidationResult,
     _validate_bundle,
     _validate_manifest_hash,
     discover_bundles,
     format_pr_comment,
     format_summary,
-    main,
     validate_bundles,
 )
+from scripts.validate_submission import main
 
 pytestmark = [
     pytest.mark.unit,
