@@ -373,7 +373,7 @@ def _list_benchmarks_impl() -> dict[str, Any]:
 
 def _list_chart_templates_impl() -> dict[str, Any]:
     """List available chart templates for visualization."""
-    from benchbox.core.visualization.chart_types import CHART_TYPE_DESCRIPTIONS
+    from benchbox.core.visualization.chart_types import ALL_CHART_TYPES, CHART_TYPE_DESCRIPTIONS
     from benchbox.core.visualization.templates import list_templates
 
     templates = list_templates()
@@ -390,6 +390,10 @@ def _list_chart_templates_impl() -> dict[str, Any]:
         "chart_types": dict(CHART_TYPE_DESCRIPTIONS),
         "chart_type_coverage": "complete_semantic_registry",
         "chart_namespace": "benchbox_result_aware_semantic_ids",
+        "semantic_chart_ids": list(ALL_CHART_TYPES),
+        "external_chart_namespaces": {
+            "textcharts": "Separate raw primitive MCP server namespace when installed/configured; not accepted as BenchBox chart_type values."
+        },
         "supported_formats": ["ascii"],
     }
 

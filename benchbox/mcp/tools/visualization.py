@@ -24,6 +24,36 @@ from benchbox.mcp.tools.path_utils import resolve_result_file_path
 
 logger = logging.getLogger(__name__)
 
+BENCHBOX_CHART_NAMESPACE_NOTE = (
+    "BenchBox chart_type values are result-aware semantic chart IDs from "
+    "benchbox.core.visualization.chart_types. They are not raw textcharts primitive "
+    "tool names such as bar or heatmap."
+)
+
+
+def _semantic_chart_id_help() -> str:
+    return ", ".join(CHART_TYPE_DESCRIPTIONS)
+
+
+def _template_name_help() -> str:
+    from benchbox.core.visualization.templates import list_templates
+
+    return ", ".join(t.name for t in list_templates())
+
+
+MCP_SUGGEST_CHARTS_DESCRIPTION = (
+    "Analyze BenchBox result files and suggest result-aware semantic chart IDs. "
+    f"{BENCHBOX_CHART_NAMESPACE_NOTE} "
+    f"Current semantic chart IDs: {_semantic_chart_id_help()}."
+)
+
+MCP_GENERATE_CHART_DESCRIPTION = (
+    "Generate ASCII chart output from BenchBox result files using semantic chart IDs or chart templates. "
+    f"{BENCHBOX_CHART_NAMESPACE_NOTE} "
+    f"Current semantic chart IDs: {_semantic_chart_id_help()}. "
+    f"Current templates: {_template_name_help()}."
+)
+
 # Tool annotations for read-only visualization info tools
 VIZ_READONLY_ANNOTATIONS = ToolAnnotations(
     title="Visualization information",
@@ -450,7 +480,7 @@ def register_visualization_tools(
     configured_results_dir = Path(results_dir)
     configured_charts_dir = Path(charts_dir)
 
-    @mcp.tool(annotations=VIZ_READONLY_ANNOTATIONS)
+    @mcp.tool(description=MCP_SUGGEST_CHARTS_DESCRIPTION, annotations=VIZ_READONLY_ANNOTATIONS)
     def suggest_charts(result_files: str) -> dict[str, Any]:
         """Analyze results and suggest appropriate chart types.
 
@@ -475,7 +505,7 @@ def register_visualization_tools(
 
         return _suggest_charts_impl(file_list, resolved_paths)
 
-    @mcp.tool(annotations=VIZ_GENERATE_ANNOTATIONS)
+    @mcp.tool(description=MCP_GENERATE_CHART_DESCRIPTION, annotations=VIZ_GENERATE_ANNOTATIONS)
     def generate_chart(
         result_files: str,
         chart_type: str = "performance_bar",
@@ -487,8 +517,8 @@ def register_visualization_tools(
 
         Args:
             result_files: Comma-separated list of result filenames
-            chart_type: Chart type from CHART_TYPE_DESCRIPTIONS (e.g. performance_bar, query_heatmap, comparison_bar, percentile_ladder)
-            template: Template for chart sets: default, flagship, head_to_head, trends, cost_optimization, comparison, latency_deep_dive, regression_triage, executive_summary
+            chart_type: Semantic BenchBox chart ID from CHART_TYPE_DESCRIPTIONS
+            template: Template name from benchbox.core.visualization.templates
             output_dir: Custom output directory (relative to charts dir)
             format: Output format: 'ascii' for terminal-friendly text output
 

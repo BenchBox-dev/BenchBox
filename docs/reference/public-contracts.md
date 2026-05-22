@@ -126,6 +126,13 @@ BenchBox semantic chart IDs. Textcharts dependency updates should be validated b
 the visualization registry tests plus the runtime drift snippet that compares
 `ALL_CHART_TYPES`, `_CHART_TYPE_DISPATCH`, and the primitive exporter registry.
 
+BenchBox MCP exposes only the result-aware `suggest_charts` and `generate_chart`
+tools. It does not register or proxy the external `textcharts-mcp` server.
+When a user configures both servers, `textcharts_*` tools are a separate raw
+primitive rendering namespace; BenchBox MCP `chart_type` values remain semantic
+IDs from the registry above, and template names come from
+`benchbox.core.visualization.templates`.
+
 ## SQL Compatibility Governance Decision
 
 Decision from `sql-compat-governance-ddl-hardening`: `sql_compat` is a hybrid
