@@ -1,0 +1,445 @@
+default_params:
+  1:
+    year: 2000
+    state: TN
+    agg_field: sr_return_amt
+  2:
+    year: 2001
+  3:
+    month: 11
+    manufact_id: 128
+    agg_column: ss_ext_sales_price
+  4:
+    year: 2001
+  5:
+    year: 2000
+  6:
+    year: 2001
+    month: 1
+  7:
+    year: 2000
+    gender: M
+    marital_status: S
+    education: College
+    channel_promo: channel_demo
+  8:
+    year: 1998
+    zip_codes:
+    - '24128'
+    - '76232'
+    - '65084'
+    - '87816'
+    - '83926'
+  9:
+    quantity_ranges:
+    - - 1
+      - 20
+    - - 21
+      - 40
+    - - 41
+      - 60
+    - - 61
+      - 80
+    - - 81
+      - 100
+  10:
+    year: 2002
+    month: 2
+    gender: F
+  11:
+    year: 2001
+  12:
+    year: 1999
+    month: 2
+    item_categories:
+    - Sports
+    - Books
+    - Home
+  13:
+    year: 2001
+    marital_status: M
+    education: Advanced Degree
+  14:
+    year: 1999
+    day: 11
+  15:
+    year: 2001
+    quarter: 2
+    zip_prefix: '85'
+  16:
+    year: 2002
+    months:
+    - 3
+    call_center: Bill Bowden
+    county: Williamson County
+    state: TN
+  17:
+    year: 2001
+    quarter: 1
+    state: OK
+  18:
+    year: 2001
+    states:
+    - TX
+    - OH
+    - TX
+    - OR
+    - NM
+    - KY
+    - VA
+    cd_gender: M
+    cd_marital_status: S
+    cd_education_status: College
+  19:
+    year: 1999
+    month: 11
+    manager_id: 8
+  20:
+    year: 1999
+    month: 2
+    item_categories:
+    - Sports
+    - Books
+    - Home
+  21:
+    year: 2000
+    month: 1
+    warehouse_id: 2
+  22:
+    year: 2001
+    months:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+  23:
+    year: 2000
+  24:
+    market_id: 8
+    color: chiffon
+  25:
+    year: 2001
+    quarters:
+    - 1
+    - 2
+    - 3
+  26:
+    year: 2000
+    gender: M
+    marital_status: S
+    education: College
+    promo_channel: channel_demo
+  27:
+    year: 2002
+    gender: M
+    marital_status: S
+    education: College
+    state: TN
+  28:
+    quantity_ranges:
+    - - 0
+      - 5
+    - - 6
+      - 10
+    - - 11
+      - 15
+    - - 16
+      - 20
+    - - 21
+      - 25
+    - - 26
+      - 30
+  29:
+    year: 1999
+    months:
+    - 1
+    - 2
+    - 3
+  30:
+    year: 2002
+    state: GA
+  31:
+    year: 2000
+    gmt_offset: -5.0
+  32:
+    year: 2000
+    days: 90
+  33:
+    year: 1998
+    categories:
+    - Books
+    manufacturer_id: 88
+    gmt_offset: -5.0
+  34:
+    year: 1998
+    county: Williamson County
+    state: TN
+  35:
+    year: 2002
+    years:
+    - 1999
+    - 2000
+    - 2001
+    - 2002
+  36:
+    year: 2001
+    state: TN
+  37:
+    year: 2000
+    month_start: 1
+    month_end: 6
+    current_price_min: 68
+    current_price_max: 98
+  38:
+    year: 2002
+  39:
+    year: 2001
+    months:
+    - 1
+    - 2
+  40:
+    year: 2000
+  41:
+    manufact_ids:
+    - 738
+    - 129
+    - 830
+    - 540
+  42:
+    month: 11
+    year: 2000
+  43:
+    year: 2000
+    gmt_offset: -5.0
+  44:
+    year: 2001
+    store_sk: 4
+    null_col: ss_addr_sk
+  45:
+    year: 2001
+    quarters:
+    - 1
+    - 2
+    - 3
+    zip_codes:
+    - '85669'
+    - '86197'
+    - '88274'
+    - '83405'
+    - '86475'
+  46:
+    year: 2001
+    cities:
+    - Fairview
+    - Midway
+    - Fairview
+    - Fairview
+    - Fairview
+  47:
+    year: 2000
+  48:
+    year: 2000
+  49:
+    year: 2001
+  50:
+    year: 2001
+    days: 30
+    channel: store channel
+  51:
+    year: 2001
+    months:
+    - 1
+    - 2
+    - 3
+    - 4
+  52:
+    month: 11
+    year: 2000
+  53:
+    month: 11
+    manufacturer_ids:
+    - 88
+    - 33
+    - 160
+    - 129
+  54:
+    year: 2000
+    month: 4
+  55:
+    year: 1999
+    month: 11
+    manager_id: 28
+  56:
+    year: 2001
+    colors:
+    - slate
+    - blanched
+    - burnished
+    gmt_offset: -5.0
+  57:
+    year: 1999
+  58:
+    year: 2000
+    day: 1
+  59:
+    year: 1999
+    d_month_seq: 1212
+  60:
+    year: 2001
+    categories:
+    - Music
+    gmt_offset: -5.0
+  61:
+    year: 1998
+    month: 11
+    gmt_offset: -5.0
+    category: Jewelry
+  62:
+    year: 1999
+    months:
+    - 11
+    - 12
+  63:
+    month: 11
+    manufacturer_ids:
+    - 88
+    - 33
+    - 160
+    - 129
+  64:
+    year: 1999
+    income_band: 38128
+  65:
+    year: 2000
+  66:
+    year: 2001
+    month_start: 1
+    month_end: 4
+    ship_carriers:
+    - DIAMOND
+    - AIRBORNE
+    web_names:
+    - pri
+  67:
+    year: 2001
+  68:
+    year: 2001
+    cities:
+    - Midway
+    - Fairview
+  69:
+    year: 2001
+    month: 4
+    states:
+    - KY
+    - GA
+    - NM
+  70:
+    year: 2001
+  71:
+    year: 1999
+    month: 11
+    brand: 'amalgexporti #1'
+    manager_id: 1
+  72:
+    year: 1999
+    buy_potential: '>10000'
+    marital_status: D
+  73:
+    year: 1999
+    county: Williamson County
+    state: TN
+  74:
+    year: 2001
+  75:
+    year: 1999
+    category: Books
+  76:
+    year: 2001
+    channel: store
+  77:
+    year: 2001
+    channel_type: store channel
+  78:
+    year: 2000
+  79:
+    year: 2000
+    household_dep_count: 6
+  80:
+    year: 2000
+  81:
+    year: 2000
+    state: GA
+  82:
+    year: 2000
+    month_start: 1
+    month_end: 6
+    price_min: 62
+    price_max: 92
+  83:
+    year: 2000
+    dates:
+    - '2000-06-30'
+    - '2000-09-27'
+    - '2000-11-17'
+  84:
+    income_band: 38128
+    city: Edgewood
+  85:
+    year: 1998
+  86:
+    year: 2001
+  87:
+    year: 2001
+    month: 4
+  88:
+    year: 1998
+  89:
+    year: 1999
+    class_id: 1
+    category_id: 1
+  90:
+    year: 2001
+    hours:
+    - - 8
+      - 9
+    - - 19
+      - 20
+  91:
+    year: 1998
+    month: 11
+  92:
+    year: 2000
+    days: 90
+  93:
+    reason: reason 28
+  94:
+    year: 1999
+    states:
+    - TX
+    - OR
+    - AZ
+  95:
+    year: 1999
+    states:
+    - TX
+    - OR
+    - AZ
+  96:
+    hours:
+    - - 8
+      - 9
+  97:
+    year: 2002
+    month: 4
+  98:
+    year: 1999
+    categories:
+    - Sports
+    - Books
+    - Home
+  99:
+    year: 1999
+    month: 2
