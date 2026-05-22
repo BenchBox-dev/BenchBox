@@ -520,6 +520,76 @@ for _spec in (
     _make_filtered_select_impl(*_spec)
 
 
+def _extreme_source(ctx: DataFrameContext, base: str, joins: tuple[tuple[str, str, str], ...]) -> Any:
+    table = ctx.get_table(base)
+    for other, left_on, right_on in joins:
+        other_table = ctx.get_table(other)
+        table = (
+            table.merge(other_table, left_on=left_on, right_on=right_on)
+            if hasattr(table, "merge")
+            else table.join(other_table, left_on=left_on, right_on=right_on)
+        )
+    return table
+
+
+def _make_extreme_row_impls(
+    name: str,
+    doc: str,
+    base: str,
+    joins: tuple[tuple[str, str, str], ...],
+    groups: tuple[str, ...],
+    pd_groups: tuple[str, ...],
+    value: str,
+    agg: str,
+    alias: str,
+    expr_select: tuple[str, ...],
+    expr_unique: tuple[str, ...],
+    pd_select: tuple[str, ...],
+    pd_rename: dict[str, str],
+    desc: bool = False,
+    limit: int | None = None,
+) -> None:
+    group_key = groups[0] if len(groups) == 1 else list(groups)
+    pd_group_key = pd_groups[0] if len(pd_groups) == 1 else list(pd_groups)
+
+    def expression_impl(ctx: DataFrameContext) -> Any:
+        table = _extreme_source(ctx, base, joins)
+        extrema = table.group_by(*groups).agg(getattr(ctx.col(value), agg)().alias(alias))
+        result = table.join(extrema, on=group_key).filter(ctx.col(value) == ctx.col(alias)).select(*expr_select)
+        result = result.unique(subset=expr_unique[0] if len(expr_unique) == 1 else list(expr_unique)).sort(
+            alias, descending=desc
+        )
+        return result.limit(limit) if limit is not None else result
+
+    def pandas_impl(ctx: DataFrameContext) -> Any:
+        table = _extreme_source(ctx, base, joins)
+        idx_func = "idxmax" if agg == "max" else "idxmin"
+        result = table.loc[getattr(table.groupby(pd_group_key)[value], idx_func)()][list(pd_select)].rename(
+            columns=pd_rename
+        )
+        result = result.sort_values(alias, ascending=not desc)
+        return result.head(limit) if limit is not None else result
+
+    for family, impl in (("expression", expression_impl), ("pandas", pandas_impl)):
+        impl.__name__ = f"{name}_{family}_impl"
+        impl.__qualname__ = impl.__name__
+        impl.__doc__ = doc
+        globals()[impl.__name__] = impl
+
+
+# fmt: off
+for _spec in (
+    ("max_by_simple", "Find the customer with the highest account balance in each nation.", "customer", (("nation", "c_nationkey", "n_nationkey"),), ("n_name",), ("n_name",), "c_acctbal", "max", "max_balance", ("n_name", "c_name", "max_balance"), ("n_name",), ("n_name", "c_name", "c_acctbal"), {"c_acctbal": "max_balance"}, True, None),
+    ("min_by_simple", "Find the customer with the lowest account balance in each nation.", "customer", (("nation", "c_nationkey", "n_nationkey"),), ("n_name",), ("n_name",), "c_acctbal", "min", "min_balance", ("n_name", "c_name", "min_balance"), ("n_name",), ("n_name", "c_name", "c_acctbal"), {"c_acctbal": "min_balance"}, False, None),
+    ("max_by_complex", "Find the most expensive order for each customer segment.", "orders", (("customer", "o_custkey", "c_custkey"),), ("c_mktsegment",), ("c_mktsegment",), "o_totalprice", "max", "max_order_value", ("c_mktsegment", "o_orderkey", "o_orderdate", "max_order_value"), ("c_mktsegment",), ("c_mktsegment", "o_orderkey", "o_orderdate", "o_totalprice"), {"o_totalprice": "max_order_value"}, True, None),
+    ("min_by_complex", "Find the cheapest part for each brand.", "part", (), ("p_brand",), ("p_brand",), "p_retailprice", "min", "min_price", ("p_brand", "p_name", "p_type", "min_price"), ("p_brand",), ("p_brand", "p_name", "p_type", "p_retailprice"), {"p_retailprice": "min_price"}, False, None),
+    ("max_by_with_ties", "Find the supplier with the highest supply cost for each part.", "partsupp", (("part", "ps_partkey", "p_partkey"), ("supplier", "ps_suppkey", "s_suppkey")), ("ps_partkey", "p_name"), ("p_partkey", "p_name"), "ps_supplycost", "max", "max_supply_cost", ("ps_partkey", "p_name", "s_name", "max_supply_cost"), ("ps_partkey",), ("p_partkey", "p_name", "s_name", "ps_supplycost"), {"ps_supplycost": "max_supply_cost", "s_name": "supplier_name"}, True, 100),
+    ("min_by_with_ties", "Find the supplier with the lowest supply cost for each part.", "partsupp", (("part", "ps_partkey", "p_partkey"), ("supplier", "ps_suppkey", "s_suppkey")), ("ps_partkey", "p_name"), ("p_partkey", "p_name"), "ps_supplycost", "min", "min_supply_cost", ("ps_partkey", "p_name", "s_name", "min_supply_cost"), ("ps_partkey",), ("p_partkey", "p_name", "s_name", "ps_supplycost"), {"ps_supplycost": "min_supply_cost", "s_name": "supplier_name"}, False, 100),
+):
+    _make_extreme_row_impls(*_spec)
+# fmt: on
+
+
 def aggregation_materialize_expression_impl(ctx: DataFrameContext) -> Any:
     """Nested aggregation requiring CTE materialization."""
     orders = ctx.get_table("orders")
@@ -1243,52 +1313,6 @@ def long_predicate_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 # -----------------------------------------------------------------------------
-# Min/Max By queries
-# -----------------------------------------------------------------------------
-
-
-def max_by_simple_expression_impl(ctx: DataFrameContext) -> Any:
-    """Find the customer with the highest account balance in each nation."""
-    customer = ctx.get_table("customer")
-    nation = ctx.get_table("nation")
-    col = ctx.col
-
-    # Join and find max balance per nation, then get customer with that balance
-    with_nation = customer.join(nation, left_on="c_nationkey", right_on="n_nationkey")
-
-    # Group by nation and find max balance
-    max_balances = with_nation.group_by("n_name").agg(col("c_acctbal").max().alias("max_balance"))
-
-    # Rejoin to get customer name
-    return (
-        with_nation.join(max_balances, on="n_name")
-        .filter(col("c_acctbal") == col("max_balance"))
-        .select("n_name", "c_name", "max_balance")
-        .unique(subset=["n_name"])
-        .sort("max_balance", descending=True)
-    )
-
-
-def min_by_simple_expression_impl(ctx: DataFrameContext) -> Any:
-    """Find the customer with the lowest account balance in each nation."""
-    customer = ctx.get_table("customer")
-    nation = ctx.get_table("nation")
-    col = ctx.col
-
-    with_nation = customer.join(nation, left_on="c_nationkey", right_on="n_nationkey")
-
-    min_balances = with_nation.group_by("n_name").agg(col("c_acctbal").min().alias("min_balance"))
-
-    return (
-        with_nation.join(min_balances, on="n_name")
-        .filter(col("c_acctbal") == col("min_balance"))
-        .select("n_name", "c_name", "min_balance")
-        .unique(subset=["n_name"])
-        .sort("min_balance")
-    )
-
-
-# -----------------------------------------------------------------------------
 # Array operations (semi-structured data)
 # -----------------------------------------------------------------------------
 
@@ -1932,37 +1956,6 @@ def long_predicate_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 # -----------------------------------------------------------------------------
-# Min/Max By queries (Pandas)
-# -----------------------------------------------------------------------------
-
-
-def max_by_simple_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Find the customer with the highest account balance in each nation."""
-    customer = ctx.get_table("customer")
-    nation = ctx.get_table("nation")
-
-    merged = customer.merge(nation, left_on="c_nationkey", right_on="n_nationkey")
-
-    # Get max balance per nation
-    max_idx = merged.groupby("n_name")["c_acctbal"].idxmax()
-    result = merged.loc[max_idx][["n_name", "c_name", "c_acctbal"]].rename(columns={"c_acctbal": "max_balance"})
-    return result.sort_values("max_balance", ascending=False)
-
-
-def min_by_simple_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Find the customer with the lowest account balance in each nation."""
-    customer = ctx.get_table("customer")
-    nation = ctx.get_table("nation")
-
-    merged = customer.merge(nation, left_on="c_nationkey", right_on="n_nationkey")
-
-    # Get min balance per nation
-    min_idx = merged.groupby("n_name")["c_acctbal"].idxmin()
-    result = merged.loc[min_idx][["n_name", "c_name", "c_acctbal"]].rename(columns={"c_acctbal": "min_balance"})
-    return result.sort_values("min_balance")
-
-
-# -----------------------------------------------------------------------------
 # Array operations (Pandas)
 # -----------------------------------------------------------------------------
 
@@ -2075,69 +2068,6 @@ def min_max_runtime_filter_pandas_impl(ctx: DataFrameContext) -> Any:
     return lineitem[lineitem["l_orderkey"].isin(date_filtered_orders)][
         ["l_orderkey", "l_partkey", "l_quantity", "l_extendedprice"]
     ]
-
-
-# -----------------------------------------------------------------------------
-# Max/Min By complex queries
-# -----------------------------------------------------------------------------
-
-
-def max_by_complex_expression_impl(ctx: DataFrameContext) -> Any:
-    """Find the most expensive order for each customer segment."""
-    orders = ctx.get_table("orders")
-    customer = ctx.get_table("customer")
-    col = ctx.col
-
-    merged = orders.join(customer, left_on="o_custkey", right_on="c_custkey")
-    max_prices = merged.group_by("c_mktsegment").agg(col("o_totalprice").max().alias("max_order_value"))
-
-    return (
-        merged.join(max_prices, on="c_mktsegment")
-        .filter(col("o_totalprice") == col("max_order_value"))
-        .select("c_mktsegment", "o_orderkey", "o_orderdate", "max_order_value")
-        .unique(subset=["c_mktsegment"])
-        .sort("max_order_value", descending=True)
-    )
-
-
-def max_by_complex_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Find the most expensive order for each customer segment."""
-    orders = ctx.get_table("orders")
-    customer = ctx.get_table("customer")
-
-    merged = orders.merge(customer, left_on="o_custkey", right_on="c_custkey")
-    max_idx = merged.groupby("c_mktsegment")["o_totalprice"].idxmax()
-    result = merged.loc[max_idx][["c_mktsegment", "o_orderkey", "o_orderdate", "o_totalprice"]].rename(
-        columns={"o_totalprice": "max_order_value"}
-    )
-    return result.sort_values("max_order_value", ascending=False)
-
-
-def min_by_complex_expression_impl(ctx: DataFrameContext) -> Any:
-    """Find the cheapest part for each brand."""
-    part = ctx.get_table("part")
-    col = ctx.col
-
-    min_prices = part.group_by("p_brand").agg(col("p_retailprice").min().alias("min_price"))
-
-    return (
-        part.join(min_prices, on="p_brand")
-        .filter(col("p_retailprice") == col("min_price"))
-        .select("p_brand", "p_name", "p_type", "min_price")
-        .unique(subset=["p_brand"])
-        .sort("min_price")
-    )
-
-
-def min_by_complex_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Find the cheapest part for each brand."""
-    part = ctx.get_table("part")
-
-    min_idx = part.groupby("p_brand")["p_retailprice"].idxmin()
-    result = part.loc[min_idx][["p_brand", "p_name", "p_type", "p_retailprice"]].rename(
-        columns={"p_retailprice": "min_price"}
-    )
-    return result.sort_values("min_price")
 
 
 # -----------------------------------------------------------------------------
@@ -2312,93 +2242,6 @@ def orderby_all_desc_pandas_impl(ctx: DataFrameContext) -> Any:
         .sort_values(["p_brand", "p_type", "avg_price"], ascending=False)
         .head(100)
     )
-
-
-# -----------------------------------------------------------------------------
-# Max/Min By with ties queries
-# -----------------------------------------------------------------------------
-
-
-def max_by_with_ties_expression_impl(ctx: DataFrameContext) -> Any:
-    """Find the supplier with the highest supply cost for each part."""
-    partsupp = ctx.get_table("partsupp")
-    part = ctx.get_table("part")
-    supplier = ctx.get_table("supplier")
-    col = ctx.col
-
-    # Note: Polars drops right join keys, so after join(left_on="ps_partkey", right_on="p_partkey")
-    # the result has ps_partkey (not p_partkey). Use ps_partkey throughout.
-    merged = partsupp.join(part, left_on="ps_partkey", right_on="p_partkey").join(
-        supplier, left_on="ps_suppkey", right_on="s_suppkey"
-    )
-
-    max_costs = merged.group_by("ps_partkey", "p_name").agg(col("ps_supplycost").max().alias("max_supply_cost"))
-
-    return (
-        merged.join(max_costs, on=["ps_partkey", "p_name"])
-        .filter(col("ps_supplycost") == col("max_supply_cost"))
-        .select("ps_partkey", "p_name", "s_name", "max_supply_cost")
-        .unique(subset=["ps_partkey"])
-        .sort("max_supply_cost", descending=True)
-        .limit(100)
-    )
-
-
-def max_by_with_ties_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Find the supplier with the highest supply cost for each part."""
-    partsupp = ctx.get_table("partsupp")
-    part = ctx.get_table("part")
-    supplier = ctx.get_table("supplier")
-
-    merged = partsupp.merge(part, left_on="ps_partkey", right_on="p_partkey")
-    merged = merged.merge(supplier, left_on="ps_suppkey", right_on="s_suppkey")
-
-    max_idx = merged.groupby(["p_partkey", "p_name"])["ps_supplycost"].idxmax()
-    result = merged.loc[max_idx][["p_partkey", "p_name", "s_name", "ps_supplycost"]].rename(
-        columns={"ps_supplycost": "max_supply_cost", "s_name": "supplier_name"}
-    )
-    return result.sort_values("max_supply_cost", ascending=False).head(100)
-
-
-def min_by_with_ties_expression_impl(ctx: DataFrameContext) -> Any:
-    """Find the supplier with the lowest supply cost for each part."""
-    partsupp = ctx.get_table("partsupp")
-    part = ctx.get_table("part")
-    supplier = ctx.get_table("supplier")
-    col = ctx.col
-
-    # Note: Polars drops right join keys, so after join(left_on="ps_partkey", right_on="p_partkey")
-    # the result has ps_partkey (not p_partkey). Use ps_partkey throughout.
-    merged = partsupp.join(part, left_on="ps_partkey", right_on="p_partkey").join(
-        supplier, left_on="ps_suppkey", right_on="s_suppkey"
-    )
-
-    min_costs = merged.group_by("ps_partkey", "p_name").agg(col("ps_supplycost").min().alias("min_supply_cost"))
-
-    return (
-        merged.join(min_costs, on=["ps_partkey", "p_name"])
-        .filter(col("ps_supplycost") == col("min_supply_cost"))
-        .select("ps_partkey", "p_name", "s_name", "min_supply_cost")
-        .unique(subset=["ps_partkey"])
-        .sort("min_supply_cost")
-        .limit(100)
-    )
-
-
-def min_by_with_ties_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Find the supplier with the lowest supply cost for each part."""
-    partsupp = ctx.get_table("partsupp")
-    part = ctx.get_table("part")
-    supplier = ctx.get_table("supplier")
-
-    merged = partsupp.merge(part, left_on="ps_partkey", right_on="p_partkey")
-    merged = merged.merge(supplier, left_on="ps_suppkey", right_on="s_suppkey")
-
-    min_idx = merged.groupby(["p_partkey", "p_name"])["ps_supplycost"].idxmin()
-    result = merged.loc[min_idx][["p_partkey", "p_name", "s_name", "ps_supplycost"]].rename(
-        columns={"ps_supplycost": "min_supply_cost", "s_name": "supplier_name"}
-    )
-    return result.sort_values("min_supply_cost").head(100)
 
 
 # -----------------------------------------------------------------------------
