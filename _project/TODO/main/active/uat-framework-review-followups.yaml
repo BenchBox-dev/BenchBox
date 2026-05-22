@@ -483,7 +483,7 @@ work:
 - id: w9
   summary: "Migrate _cli.py from 8 main_* functions + hand-rolled if-chain to argparse.add_subparsers"
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     F8. Mechanical refactor; no behaviour change for users.
 
