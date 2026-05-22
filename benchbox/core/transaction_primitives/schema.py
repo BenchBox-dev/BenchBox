@@ -1,17 +1,9 @@
-"""Transaction Primitives benchmark schema definitions.
+"""Transaction Primitives benchmark schema definitions."""
 
-This module defines the schema for the Transaction Primitives benchmark, including:
-- Base TPC-H tables (reused from tpch.schema)
-- Staging tables for transaction operations
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-This implementation is derived from TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance Council
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
-
+from pathlib import Path
 from typing import Any, cast
+
+import yaml
 
 # Import base TPC-H tables
 from benchbox.core.tpch.schema import (
@@ -25,60 +17,19 @@ from benchbox.core.tpch.schema import (
     SUPPLIER,
 )
 
-# Staging table for transaction operations on ORDERS
-TXN_ORDERS = {
-    "name": "txn_orders",
-    "columns": [
-        {"name": "o_orderkey", "type": "INTEGER", "primary_key": True},
-        {"name": "o_custkey", "type": "INTEGER"},
-        {"name": "o_orderstatus", "type": "VARCHAR(1)"},
-        {"name": "o_totalprice", "type": "DECIMAL(15,2)"},
-        {"name": "o_orderdate", "type": "DATE"},
-        {"name": "o_orderpriority", "type": "VARCHAR(15)"},
-        {"name": "o_clerk", "type": "VARCHAR(15)"},
-        {"name": "o_shippriority", "type": "INTEGER"},
-        {"name": "o_comment", "type": "VARCHAR(79)"},
-    ],
-}
 
-# Staging table for transaction operations on LINEITEM
-TXN_LINEITEM = {
-    "name": "txn_lineitem",
-    "columns": [
-        {"name": "l_orderkey", "type": "INTEGER"},
-        {"name": "l_partkey", "type": "INTEGER"},
-        {"name": "l_suppkey", "type": "INTEGER"},
-        {"name": "l_linenumber", "type": "INTEGER"},
-        {"name": "l_quantity", "type": "DECIMAL(15,2)"},
-        {"name": "l_extendedprice", "type": "DECIMAL(15,2)"},
-        {"name": "l_discount", "type": "DECIMAL(15,2)"},
-        {"name": "l_tax", "type": "DECIMAL(15,2)"},
-        {"name": "l_returnflag", "type": "VARCHAR(1)"},
-        {"name": "l_linestatus", "type": "VARCHAR(1)"},
-        {"name": "l_shipdate", "type": "DATE"},
-        {"name": "l_commitdate", "type": "DATE"},
-        {"name": "l_receiptdate", "type": "DATE"},
-        {"name": "l_shipinstruct", "type": "VARCHAR(25)"},
-        {"name": "l_shipmode", "type": "VARCHAR(10)"},
-        {"name": "l_comment", "type": "VARCHAR(44)"},
-    ],
-    "primary_key": ["l_orderkey", "l_linenumber"],
-}
+def _load_schema_specs() -> dict[str, Any]:
+    with (Path(__file__).with_name("schema_specs.yaml")).open(encoding="utf-8") as handle:
+        return yaml.safe_load(handle) or {}
 
-# Staging table for CUSTOMER transaction operations
-TXN_CUSTOMER = {
-    "name": "txn_customer",
-    "columns": [
-        {"name": "c_custkey", "type": "INTEGER", "primary_key": True},
-        {"name": "c_name", "type": "VARCHAR(25)"},
-        {"name": "c_address", "type": "VARCHAR(40)"},
-        {"name": "c_nationkey", "type": "INTEGER"},
-        {"name": "c_phone", "type": "VARCHAR(15)"},
-        {"name": "c_acctbal", "type": "DECIMAL(15,2)"},
-        {"name": "c_mktsegment", "type": "VARCHAR(10)"},
-        {"name": "c_comment", "type": "VARCHAR(117)"},
-    ],
-}
+
+_SCHEMA_SPECS = _load_schema_specs()
+_STAGING_DEFS = {entry["id"]: entry for entry in _SCHEMA_SPECS["staging_tables"]}
+globals().update({symbol: entry["schema"] for symbol, entry in _STAGING_DEFS.items()})
+TXN_ORDERS = cast(dict[str, Any], globals()["TXN_ORDERS"])
+TXN_LINEITEM = cast(dict[str, Any], globals()["TXN_LINEITEM"])
+TXN_CUSTOMER = cast(dict[str, Any], globals()["TXN_CUSTOMER"])
+_STAGING_TABLE_ORDER = list(_SCHEMA_SPECS["staging_table_order"])
 
 # All tables in transaction primitives schema
 TABLES = {
@@ -98,11 +49,7 @@ TABLES = {
 }
 
 # Tables that need to be created (excluding base TPC-H tables)
-STAGING_TABLES = {
-    "txn_orders": TXN_ORDERS,
-    "txn_lineitem": TXN_LINEITEM,
-    "txn_customer": TXN_CUSTOMER,
-}
+STAGING_TABLES = {entry["key"]: globals()[symbol] for symbol, entry in _STAGING_DEFS.items()}
 
 
 def _supports_primary_keys(dialect: str) -> bool:
@@ -181,14 +128,8 @@ def get_all_staging_tables_sql(dialect: str = "standard") -> str:
         Complete SQL schema creation script for staging tables
     """
     # Order tables by dependencies (independent tables first)
-    table_order = [
-        "txn_orders",
-        "txn_lineitem",
-        "txn_customer",
-    ]
-
     sql_statements: list[str] = []
-    for table_name in table_order:
+    for table_name in _STAGING_TABLE_ORDER:
         sql_statements.append(get_create_table_sql(table_name, dialect))
 
     return "\n\n".join(sql_statements)
