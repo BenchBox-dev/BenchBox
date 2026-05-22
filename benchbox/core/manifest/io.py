@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from benchbox.core.manifest.models import (
     ConvertedFileEntry,
     FileEntry,
@@ -247,16 +249,14 @@ def _manifest_v1_to_dict(manifest: ManifestV1) -> dict:
     return result
 
 
-_FILE_OPTIONAL_FIELDS = ["converted_from", "converted_at", "compression", "row_groups", "conversion_options"]
-_MANIFEST_OPTIONAL_FIELDS = [
-    "benchmark",
-    "scale_factor",
-    "format_preference",
-    "compression",
-    "parallel",
-    "created_at",
-    "generator_version",
-]
+def _load_io_specs() -> dict[str, Any]:
+    with (Path(__file__).with_name("io_specs.yaml")).open(encoding="utf-8") as handle:
+        return yaml.safe_load(handle) or {}
+
+
+_IO_SPECS = _load_io_specs()
+_FILE_OPTIONAL_FIELDS = _IO_SPECS["file_optional_fields"]
+_MANIFEST_OPTIONAL_FIELDS = _IO_SPECS["manifest_optional_fields"]
 
 
 def _manifest_v2_to_dict(manifest: ManifestV2) -> dict:
