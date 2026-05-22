@@ -21,7 +21,10 @@ from __future__ import annotations
 
 from csv import reader
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any
+
+import yaml
 
 from benchbox.core.dataframe.compat import _to_list
 from benchbox.core.dataframe.context import DataFrameContext
@@ -868,6 +871,245 @@ for _qid, _title, _expr_helper, _pandas_helper, _helper_args in _HELPER_QUERY_SP
     globals()[f"q{_qid}_pandas_impl"] = _make_helper_impl(_qid, _title, "pandas", _pandas_helper, _helper_args)
 
 
+_JoinedAggCondition = tuple[Any, ...]
+_JoinedAggValue = Any
+
+
+def _load_query_specs() -> dict[str, list[dict[str, Any]]]:
+    with (Path(__file__).with_name("query_specs.yaml")).open(encoding="utf-8") as handle:
+        payload = yaml.safe_load(handle) or {}
+    if not isinstance(payload, dict):
+        raise ValueError("TPC-DS DataFrame query specs must be a mapping")
+    return payload
+
+
+def _resolve_joined_agg_value(params: Any, value: _JoinedAggValue) -> Any:
+    if isinstance(value, dict) and "param" in value:
+        resolved = params.get(value["param"], value.get("default"))
+        offsets = value.get("offsets")
+        return [resolved + offset for offset in offsets] if offsets is not None else resolved
+    return value
+
+
+def _combine_conditions(conditions: list[Any], operator: str) -> Any:
+    if not conditions:
+        return None
+    predicate = conditions[0]
+    for condition in conditions[1:]:
+        predicate = predicate | condition if operator == "or" else predicate & condition
+    return predicate
+
+
+def _joined_agg_expr_condition(ctx: DataFrameContext, params: Any, condition: _JoinedAggCondition) -> Any:
+    op = condition[0]
+    col = ctx.col
+    lit = ctx.lit
+    if op in {"and", "or"}:
+        return _combine_conditions(
+            [_joined_agg_expr_condition(ctx, params, child) for child in condition[1:]],
+            op,
+        )
+    column = condition[1]
+    if op == "eq":
+        return col(column) == lit(_resolve_joined_agg_value(params, condition[2]))
+    if op == "gt":
+        return col(column) > lit(_resolve_joined_agg_value(params, condition[2]))
+    if op == "between":
+        return col(column).is_between(
+            _resolve_joined_agg_value(params, condition[2]),
+            _resolve_joined_agg_value(params, condition[3]),
+        )
+    if op == "in":
+        return col(column).is_in(list(_resolve_joined_agg_value(params, condition[2])))
+    if op == "prefix_eq":
+        return col(column).cast_string().str.slice(0, condition[2]) == lit(
+            _resolve_joined_agg_value(params, condition[3])
+        )
+    if op == "starts_with":
+        return col(column).str.starts_with(_resolve_joined_agg_value(params, condition[2]))
+    raise ValueError(f"Unsupported joined aggregate condition: {op}")
+
+
+def _joined_agg_pandas_condition(frame: Any, params: Any, condition: _JoinedAggCondition) -> Any:
+    op = condition[0]
+    if op in {"and", "or"}:
+        return _combine_conditions(
+            [_joined_agg_pandas_condition(frame, params, child) for child in condition[1:]],
+            op,
+        )
+    column = condition[1]
+    if op == "eq":
+        return frame[column] == _resolve_joined_agg_value(params, condition[2])
+    if op == "gt":
+        return frame[column] > _resolve_joined_agg_value(params, condition[2])
+    if op == "between":
+        return (frame[column] >= _resolve_joined_agg_value(params, condition[2])) & (
+            frame[column] <= _resolve_joined_agg_value(params, condition[3])
+        )
+    if op == "in":
+        return frame[column].isin(list(_resolve_joined_agg_value(params, condition[2])))
+    if op == "prefix_eq":
+        return frame[column].astype(str).str[: condition[2]] == _resolve_joined_agg_value(params, condition[3])
+    if op == "starts_with":
+        return frame[column].str.startswith(_resolve_joined_agg_value(params, condition[2]))
+    raise ValueError(f"Unsupported joined aggregate condition: {op}")
+
+
+def _joined_agg_expression_impl(ctx: DataFrameContext, spec: dict[str, Any]) -> Any:
+    params = get_parameters(spec["query_id"])
+    frame = ctx.get_table(spec["base"])
+    for join in spec["joins"]:
+        table_name, left_on, right_on, *rest = join
+        kwargs = {"how": rest[0]} if rest else {}
+        frame = frame.join(ctx.get_table(table_name), left_on=left_on, right_on=right_on, **kwargs)
+    predicate = _joined_agg_expr_condition(ctx, params, ("and", *spec.get("filters", ())))
+    if predicate is not None:
+        frame = frame.filter(predicate)
+    result = frame.group_by(*spec["group_by"]).agg(
+        *(getattr(ctx.col(source), func)().alias(alias) for alias, source, func in spec["aggs"])
+    )
+    post_filter = spec.get("post_filter")
+    if post_filter is not None:
+        result = result.filter(_joined_agg_expr_condition(ctx, params, post_filter))
+    result = result.sort(
+        list(spec["sort_by"]), descending=list(spec.get("descending", (False,) * len(spec["sort_by"])))
+    )
+    limit = spec.get("limit", 100)
+    return result if limit is None else result.limit(limit)
+
+
+def _joined_agg_pandas_impl(ctx: DataFrameContext, spec: dict[str, Any]) -> Any:
+    params = get_parameters(spec["query_id"])
+    frame = ctx.get_table(spec["base"])
+    for join in spec["joins"]:
+        table_name, left_on, right_on, *rest = join
+        kwargs = {"how": rest[0]} if rest else {}
+        frame = frame.merge(ctx.get_table(table_name), left_on=left_on, right_on=right_on, **kwargs)
+    predicate = _joined_agg_pandas_condition(frame, params, ("and", *spec.get("filters", ())))
+    if predicate is not None:
+        frame = frame[predicate]
+    result = frame.groupby(list(spec["group_by"]), as_index=False).agg(
+        **{alias: (source, func) for alias, source, func in spec["aggs"]}
+    )
+    post_filter = spec.get("post_filter")
+    if post_filter is not None:
+        result = result[_joined_agg_pandas_condition(result, params, post_filter)]
+    descending = spec.get("descending", (False,) * len(spec["sort_by"]))
+    result = result.sort_values(list(spec["sort_by"]), ascending=[not value for value in descending])
+    limit = spec.get("limit", 100)
+    return result if limit is None else result.head(limit)
+
+
+def _make_joined_agg_impl(query_id: int, title: str, family: str, spec: dict[str, Any]) -> Any:
+    engine = _joined_agg_expression_impl if family == "expression" else _joined_agg_pandas_impl
+
+    def impl(ctx: DataFrameContext) -> Any:
+        return engine(ctx, spec)
+
+    impl.__name__ = f"q{query_id}_{family}_impl"
+    impl.__qualname__ = impl.__name__
+    impl.__doc__ = f"TPC-DS Q{query_id}: {title} ({family.title()} Family)."
+    return impl
+
+
+_QUERY_SPECS = _load_query_specs()
+
+
+def _state_average_returns_expression_impl(ctx: DataFrameContext, spec: dict[str, Any]) -> Any:
+    params = get_parameters(spec["query_id"])
+    year = params.get("year", spec["year_default"])
+    state = params.get("state", spec["state_default"])
+    col = ctx.col
+    lit = ctx.lit
+
+    returns = ctx.get_table(spec["return_table"])
+    date_dim = ctx.get_table("date_dim")
+    customer_address = ctx.get_table("customer_address")
+    customer = ctx.get_table("customer")
+
+    ctr = (
+        returns.join(date_dim, left_on=spec["return_date_key"], right_on="d_date_sk")
+        .join(customer_address, left_on=spec["return_addr_key"], right_on="ca_address_sk")
+        .filter(col("d_year") == lit(year))
+        .group_by(
+            col(spec["return_customer_key"]).alias("ctr_customer_sk"),
+            col("ca_state").alias("ctr_state"),
+        )
+        .agg(col(spec["return_amount"]).sum().alias("ctr_total_return"))
+    )
+    state_avg = ctr.group_by("ctr_state").agg(col("ctr_total_return").mean().alias("state_avg"))
+    ca_filtered = customer_address.filter(col("ca_state") == lit(state))
+    result = (
+        ctr.join(state_avg, on="ctr_state")
+        .filter(col("ctr_total_return") > col("state_avg") * 1.2)
+        .join(customer, left_on="ctr_customer_sk", right_on="c_customer_sk")
+        .join(ca_filtered, left_on="c_current_addr_sk", right_on="ca_address_sk")
+    )
+    select_exprs = [
+        col(item["column"]).alias(item["alias"]) if isinstance(item, dict) else item
+        for item in spec["expression_select"]
+    ]
+    return (
+        result.select(*select_exprs)
+        .sort(*[item["alias"] if isinstance(item, dict) else item for item in spec["expression_select"]])
+        .limit(100)
+    )
+
+
+def _state_average_returns_pandas_impl(ctx: DataFrameContext, spec: dict[str, Any]) -> Any:
+    params = get_parameters(spec["query_id"])
+    year = params.get("year", spec["year_default"])
+    state = params.get("state", spec["state_default"])
+
+    returns = ctx.get_table(spec["return_table"])
+    date_dim = ctx.get_table("date_dim")
+    customer_address = ctx.get_table("customer_address")
+    customer = ctx.get_table("customer")
+
+    merged = returns.merge(date_dim, left_on=spec["return_date_key"], right_on="d_date_sk")
+    merged = merged.merge(customer_address, left_on=spec["return_addr_key"], right_on="ca_address_sk")
+    merged = merged[merged["d_year"] == year]
+    ctr = merged.groupby([spec["return_customer_key"], "ca_state"], as_index=False).agg(
+        ctr_total_return=(spec["return_amount"], "sum")
+    )
+    ctr = ctr.rename(columns={spec["return_customer_key"]: "ctr_customer_sk", "ca_state": "ctr_state"})
+    state_avg = ctr.groupby("ctr_state", as_index=False).agg(state_avg=("ctr_total_return", "mean"))
+    ctr_filtered = ctr.merge(state_avg, on="ctr_state")
+    ctr_filtered = ctr_filtered[ctr_filtered["ctr_total_return"] > ctr_filtered["state_avg"] * 1.2]
+    ca_filtered = customer_address[customer_address["ca_state"] == state]
+    result = ctr_filtered.merge(customer, left_on="ctr_customer_sk", right_on="c_customer_sk")
+    result = result.merge(ca_filtered, left_on="c_current_addr_sk", right_on="ca_address_sk")
+    cols = [column for column in spec["pandas_select"] if column in result.columns]
+    return result[cols].sort_values(cols).head(100)
+
+
+def _make_state_average_returns_impl(query_id: int, title: str, family: str, spec: dict[str, Any]) -> Any:
+    engine = _state_average_returns_expression_impl if family == "expression" else _state_average_returns_pandas_impl
+
+    def impl(ctx: DataFrameContext) -> Any:
+        return engine(ctx, spec)
+
+    impl.__name__ = f"q{query_id}_{family}_impl"
+    impl.__qualname__ = impl.__name__
+    impl.__doc__ = f"TPC-DS Q{query_id}: {title} ({family.title()} Family)."
+    return impl
+
+
+for _spec in _QUERY_SPECS["joined_aggregate"]:
+    _query_id = _spec["query_id"]
+    _query_title = _spec["title"]
+    globals()[f"q{_query_id}_expression_impl"] = _make_joined_agg_impl(_query_id, _query_title, "expression", _spec)
+    globals()[f"q{_query_id}_pandas_impl"] = _make_joined_agg_impl(_query_id, _query_title, "pandas", _spec)
+
+for _spec in _QUERY_SPECS["state_average_returns"]:
+    _query_id = _spec["query_id"]
+    _query_title = _spec["title"]
+    globals()[f"q{_query_id}_expression_impl"] = _make_state_average_returns_impl(
+        _query_id, _query_title, "expression", _spec
+    )
+    globals()[f"q{_query_id}_pandas_impl"] = _make_state_average_returns_impl(_query_id, _query_title, "pandas", _spec)
+
+
 def q19_expression_impl(ctx: DataFrameContext) -> Any:
     """TPC-DS Q19: Store Sales Item/Customer Analysis (Expression Family).
 
@@ -953,61 +1195,6 @@ def q19_pandas_impl(ctx: DataFrameContext) -> Any:
             ["ext_price", "i_brand", "i_brand_id", "i_manufact_id", "i_manufact"],
             ascending=[False, True, True, True, True],
         )
-        .head(100)
-    )
-
-
-def q43_expression_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q43: Store Sales Day Analysis (Expression Family).
-
-    Reports store sales by day of week for a specific year and time zone.
-
-    Tables: date_dim, store_sales, store
-    Pattern: 3-way join -> filter -> group by -> aggregate -> order by
-    """
-    params = get_parameters(43)
-    year = params.get("year", 2000)
-    gmt_offset = params.get("gmt_offset", -5.0)
-
-    date_dim = ctx.get_table("date_dim")
-    store_sales = ctx.get_table("store_sales")
-    store = ctx.get_table("store")
-    col = ctx.col
-    lit = ctx.lit
-
-    return (
-        date_dim.join(store_sales, left_on="d_date_sk", right_on="ss_sold_date_sk")
-        .join(store, left_on="ss_store_sk", right_on="s_store_sk")
-        .filter((col("s_gmt_offset") == lit(gmt_offset)) & (col("d_year") == lit(year)))
-        .group_by("s_store_name", "s_store_id", "d_day_name")
-        .agg(col("ss_sales_price").sum().alias("total_sales"))
-        .sort("s_store_name", "s_store_id", "d_day_name")
-        .limit(100)
-    )
-
-
-def q43_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q43: Store Sales Day Analysis (Pandas Family)."""
-    params = get_parameters(43)
-    year = params.get("year", 2000)
-    gmt_offset = params.get("gmt_offset", -5.0)
-
-    date_dim = ctx.get_table("date_dim")
-    store_sales = ctx.get_table("store_sales")
-    store = ctx.get_table("store")
-
-    # Join tables
-    merged = date_dim.merge(store_sales, left_on="d_date_sk", right_on="ss_sold_date_sk")
-    merged = merged.merge(store, left_on="ss_store_sk", right_on="s_store_sk")
-
-    # Filter
-    filtered = merged[(merged["s_gmt_offset"] == gmt_offset) & (merged["d_year"] == year)]
-
-    # Group and aggregate
-    return (
-        filtered.groupby(["s_store_name", "s_store_id", "d_day_name"], as_index=False)
-        .agg(total_sales=("ss_sales_price", "sum"))
-        .sort_values(["s_store_name", "s_store_id", "d_day_name"])
         .head(100)
     )
 
@@ -1177,374 +1364,6 @@ def q25_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-def q65_expression_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q65: Store Sales Item Profit (Expression Family).
-
-    Reports store sales item revenue analysis.
-
-    Tables: store_sales, store, item, date_dim
-    Pattern: 4-way join -> filter -> group by -> aggregate -> having -> order by
-    """
-    params = get_parameters(65)
-    year = params.get("year", 2000)
-
-    store_sales = ctx.get_table("store_sales")
-    store = ctx.get_table("store")
-    item = ctx.get_table("item")
-    date_dim = ctx.get_table("date_dim")
-    col = ctx.col
-    lit = ctx.lit
-
-    # Main sales aggregation
-    sales_agg = (
-        store_sales.join(store, left_on="ss_store_sk", right_on="s_store_sk")
-        .join(item, left_on="ss_item_sk", right_on="i_item_sk")
-        .join(date_dim, left_on="ss_sold_date_sk", right_on="d_date_sk")
-        .filter((col("d_year") == lit(year)) & (col("d_dom").is_between(1, 15)))
-        .group_by("s_store_name", "i_item_desc")
-        .agg(col("ss_sales_price").sum().alias("revenue"))
-        .sort(["revenue", "s_store_name", "i_item_desc"], descending=[True, False, False])
-        .limit(100)
-    )
-
-    return sales_agg
-
-
-def q65_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q65: Store Sales Item Profit (Pandas Family)."""
-    params = get_parameters(65)
-    year = params.get("year", 2000)
-
-    store_sales = ctx.get_table("store_sales")
-    store = ctx.get_table("store")
-    item = ctx.get_table("item")
-    date_dim = ctx.get_table("date_dim")
-
-    # Join tables
-    merged = store_sales.merge(store, left_on="ss_store_sk", right_on="s_store_sk")
-    merged = merged.merge(item, left_on="ss_item_sk", right_on="i_item_sk")
-    merged = merged.merge(date_dim, left_on="ss_sold_date_sk", right_on="d_date_sk")
-
-    # Filter
-    filtered = merged[(merged["d_year"] == year) & (merged["d_dom"] >= 1) & (merged["d_dom"] <= 15)]
-
-    # Group and aggregate
-    return (
-        filtered.groupby(["s_store_name", "i_item_desc"], as_index=False)
-        .agg(revenue=("ss_sales_price", "sum"))
-        .sort_values(["revenue", "s_store_name", "i_item_desc"], ascending=[False, True, True])
-        .head(100)
-    )
-
-
-def q68_expression_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q68: Store Sales Customer Household (Expression Family).
-
-    Reports customer household purchases by city.
-
-    Tables: store_sales, date_dim, store, household_demographics, customer_address
-    Pattern: 5-way join -> filter -> group by -> aggregate -> order by
-    """
-    params = get_parameters(68)
-    year = params.get("year", 2001)
-    cities = params.get("cities", ["Midway", "Fairview"])
-
-    store_sales = ctx.get_table("store_sales")
-    date_dim = ctx.get_table("date_dim")
-    store = ctx.get_table("store")
-    household_demographics = ctx.get_table("household_demographics")
-    customer_address = ctx.get_table("customer_address")
-    col = ctx.col
-    lit = ctx.lit
-
-    return (
-        store_sales.join(date_dim, left_on="ss_sold_date_sk", right_on="d_date_sk")
-        .join(store, left_on="ss_store_sk", right_on="s_store_sk")
-        .join(household_demographics, left_on="ss_hdemo_sk", right_on="hd_demo_sk")
-        .join(customer_address, left_on="ss_addr_sk", right_on="ca_address_sk")
-        .filter(
-            (col("d_year") == lit(year))
-            & (col("d_dom").is_between(1, 2))
-            & col("ca_city").is_in(cities)
-            & ((col("hd_dep_count") == lit(4)) | (col("hd_vehicle_count") == lit(3)))
-        )
-        .group_by("ss_ticket_number", "ss_customer_sk", "ss_addr_sk", "ca_city")
-        .agg(
-            col("ss_ext_sales_price").sum().alias("extended_price"),
-            col("ss_ext_list_price").sum().alias("list_price"),
-            col("ss_ext_tax").sum().alias("extended_tax"),
-        )
-        .sort("ss_ticket_number")
-        .limit(100)
-    )
-
-
-def q68_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q68: Store Sales Customer Household (Pandas Family)."""
-    params = get_parameters(68)
-    year = params.get("year", 2001)
-    cities = params.get("cities", ["Midway", "Fairview"])
-
-    store_sales = ctx.get_table("store_sales")
-    date_dim = ctx.get_table("date_dim")
-    store = ctx.get_table("store")
-    household_demographics = ctx.get_table("household_demographics")
-    customer_address = ctx.get_table("customer_address")
-
-    # Join tables
-    merged = store_sales.merge(date_dim, left_on="ss_sold_date_sk", right_on="d_date_sk")
-    merged = merged.merge(store, left_on="ss_store_sk", right_on="s_store_sk")
-    merged = merged.merge(household_demographics, left_on="ss_hdemo_sk", right_on="hd_demo_sk")
-    merged = merged.merge(customer_address, left_on="ss_addr_sk", right_on="ca_address_sk")
-
-    # Filter
-    filtered = merged[
-        (merged["d_year"] == year)
-        & (merged["d_dom"] >= 1)
-        & (merged["d_dom"] <= 2)
-        & (merged["ca_city"].isin(cities))
-        & ((merged["hd_dep_count"] == 4) | (merged["hd_vehicle_count"] == 3))
-    ]
-
-    # Group and aggregate
-    return (
-        filtered.groupby(["ss_ticket_number", "ss_customer_sk", "ss_addr_sk", "ca_city"], as_index=False)
-        .agg(
-            extended_price=("ss_ext_sales_price", "sum"),
-            list_price=("ss_ext_list_price", "sum"),
-            extended_tax=("ss_ext_tax", "sum"),
-        )
-        .sort_values(["ss_ticket_number"])
-        .head(100)
-    )
-
-
-def q73_expression_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q73: Store Sales Household Vehicle (Expression Family).
-
-    Reports customer household purchases by vehicle count.
-
-    Tables: store_sales, date_dim, store, household_demographics, customer
-    Pattern: 5-way join -> filter -> group by -> aggregate -> having -> order by
-    """
-    params = get_parameters(73)
-    year = params.get("year", 1999)
-    county = params.get("county", "Williamson County")
-
-    store_sales = ctx.get_table("store_sales")
-    date_dim = ctx.get_table("date_dim")
-    store = ctx.get_table("store")
-    household_demographics = ctx.get_table("household_demographics")
-    customer = ctx.get_table("customer")
-    col = ctx.col
-    lit = ctx.lit
-
-    return (
-        store_sales.join(date_dim, left_on="ss_sold_date_sk", right_on="d_date_sk")
-        .join(store, left_on="ss_store_sk", right_on="s_store_sk")
-        .join(household_demographics, left_on="ss_hdemo_sk", right_on="hd_demo_sk")
-        .join(customer, left_on="ss_customer_sk", right_on="c_customer_sk")
-        .filter(
-            (col("d_year").is_in([year, year + 1, year + 2]))
-            & (col("d_dom").is_between(1, 2))
-            & (col("s_county") == lit(county))
-            & ((col("hd_buy_potential") == lit(">10000")) | (col("hd_buy_potential") == lit("Unknown")))
-            & (col("hd_vehicle_count") > lit(0))
-        )
-        .group_by("c_last_name", "c_first_name", "c_salutation", "c_preferred_cust_flag", "ss_ticket_number")
-        .agg(col("ss_ticket_number").count().alias("cnt"))
-        .filter((col("cnt") >= lit(1)) & (col("cnt") <= lit(5)))
-        .sort("c_last_name", "c_first_name")
-        .limit(100)
-    )
-
-
-def q73_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q73: Store Sales Household Vehicle (Pandas Family)."""
-    params = get_parameters(73)
-    year = params.get("year", 1999)
-    county = params.get("county", "Williamson County")
-
-    store_sales = ctx.get_table("store_sales")
-    date_dim = ctx.get_table("date_dim")
-    store = ctx.get_table("store")
-    household_demographics = ctx.get_table("household_demographics")
-    customer = ctx.get_table("customer")
-
-    # Join tables
-    merged = store_sales.merge(date_dim, left_on="ss_sold_date_sk", right_on="d_date_sk")
-    merged = merged.merge(store, left_on="ss_store_sk", right_on="s_store_sk")
-    merged = merged.merge(household_demographics, left_on="ss_hdemo_sk", right_on="hd_demo_sk")
-    merged = merged.merge(customer, left_on="ss_customer_sk", right_on="c_customer_sk")
-
-    # Filter
-    filtered = merged[
-        (merged["d_year"].isin([year, year + 1, year + 2]))
-        & (merged["d_dom"] >= 1)
-        & (merged["d_dom"] <= 2)
-        & (merged["s_county"] == county)
-        & ((merged["hd_buy_potential"] == ">10000") | (merged["hd_buy_potential"] == "Unknown"))
-        & (merged["hd_vehicle_count"] > 0)
-    ]
-
-    # Group and aggregate
-    grouped = filtered.groupby(
-        ["c_last_name", "c_first_name", "c_salutation", "c_preferred_cust_flag", "ss_ticket_number"], as_index=False
-    ).agg(cnt=("ss_ticket_number", "count"))
-
-    # Having clause
-    return grouped[(grouped["cnt"] >= 1) & (grouped["cnt"] <= 5)].sort_values(["c_last_name", "c_first_name"]).head(100)
-
-
-def q79_expression_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q79: Store Sales Customer/Store Profit (Expression Family).
-
-    Reports customer profit by store for specific household demographics.
-
-    Tables: store_sales, date_dim, store, household_demographics, customer
-    Pattern: 5-way join -> filter -> group by -> aggregate -> order by
-    """
-    params = get_parameters(79)
-    year = params.get("year", 2000)
-    household_dep_count = params.get("household_dep_count", 6)
-
-    store_sales = ctx.get_table("store_sales")
-    date_dim = ctx.get_table("date_dim")
-    store = ctx.get_table("store")
-    household_demographics = ctx.get_table("household_demographics")
-    customer = ctx.get_table("customer")
-    col = ctx.col
-    lit = ctx.lit
-
-    return (
-        store_sales.join(date_dim, left_on="ss_sold_date_sk", right_on="d_date_sk")
-        .join(store, left_on="ss_store_sk", right_on="s_store_sk")
-        .join(household_demographics, left_on="ss_hdemo_sk", right_on="hd_demo_sk")
-        .join(customer, left_on="ss_customer_sk", right_on="c_customer_sk")
-        .filter(
-            (col("d_year") == lit(year))
-            & (col("d_dom").is_between(1, 2))
-            & ((col("hd_dep_count") == lit(household_dep_count)) | (col("hd_vehicle_count") > lit(0)))
-        )
-        .group_by("c_last_name", "c_first_name", "ss_ticket_number", "s_city")
-        .agg(
-            col("ss_coupon_amt").sum().alias("amt"),
-            col("ss_net_profit").sum().alias("profit"),
-        )
-        .sort(["c_last_name", "c_first_name", "s_city", "profit"], descending=[False, False, False, True])
-        .limit(100)
-    )
-
-
-def q79_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q79: Store Sales Customer/Store Profit (Pandas Family)."""
-    params = get_parameters(79)
-    year = params.get("year", 2000)
-    household_dep_count = params.get("household_dep_count", 6)
-
-    store_sales = ctx.get_table("store_sales")
-    date_dim = ctx.get_table("date_dim")
-    store = ctx.get_table("store")
-    household_demographics = ctx.get_table("household_demographics")
-    customer = ctx.get_table("customer")
-
-    # Join tables
-    merged = store_sales.merge(date_dim, left_on="ss_sold_date_sk", right_on="d_date_sk")
-    merged = merged.merge(store, left_on="ss_store_sk", right_on="s_store_sk")
-    merged = merged.merge(household_demographics, left_on="ss_hdemo_sk", right_on="hd_demo_sk")
-    merged = merged.merge(customer, left_on="ss_customer_sk", right_on="c_customer_sk")
-
-    # Filter
-    filtered = merged[
-        (merged["d_year"] == year)
-        & (merged["d_dom"] >= 1)
-        & (merged["d_dom"] <= 2)
-        & ((merged["hd_dep_count"] == household_dep_count) | (merged["hd_vehicle_count"] > 0))
-    ]
-
-    # Group and aggregate
-    return (
-        filtered.groupby(["c_last_name", "c_first_name", "ss_ticket_number", "s_city"], as_index=False)
-        .agg(
-            amt=("ss_coupon_amt", "sum"),
-            profit=("ss_net_profit", "sum"),
-        )
-        .sort_values(["c_last_name", "c_first_name", "s_city", "profit"], ascending=[True, True, True, False])
-        .head(100)
-    )
-
-
-def q89_expression_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q89: Store Item Sales Profit (Expression Family).
-
-    Reports monthly store sales average and deviation.
-
-    Tables: store_sales, date_dim, store, item
-    Pattern: 4-way join -> filter -> group by -> aggregate -> having -> order by
-    """
-    params = get_parameters(89)
-    year = params.get("year", 1999)
-
-    store_sales = ctx.get_table("store_sales")
-    date_dim = ctx.get_table("date_dim")
-    store = ctx.get_table("store")
-    item = ctx.get_table("item")
-    col = ctx.col
-    lit = ctx.lit
-
-    return (
-        store_sales.join(date_dim, left_on="ss_sold_date_sk", right_on="d_date_sk")
-        .join(store, left_on="ss_store_sk", right_on="s_store_sk")
-        .join(item, left_on="ss_item_sk", right_on="i_item_sk")
-        .filter(
-            (col("d_year") == lit(year))
-            & (
-                ((col("i_category") == lit("Books")) & (col("i_class") == lit("business")))
-                | ((col("i_category") == lit("Electronics")) & (col("i_class") == lit("portable")))
-            )
-        )
-        .group_by("i_category", "i_class", "i_brand", "s_store_name", "s_company_name", "d_moy")
-        .agg(col("ss_sales_price").sum().alias("sum_sales"))
-        .sort("sum_sales", "s_store_name", "i_category")
-        .limit(100)
-    )
-
-
-def q89_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q89: Store Item Sales Profit (Pandas Family)."""
-    params = get_parameters(89)
-    year = params.get("year", 1999)
-
-    store_sales = ctx.get_table("store_sales")
-    date_dim = ctx.get_table("date_dim")
-    store = ctx.get_table("store")
-    item = ctx.get_table("item")
-
-    # Join tables
-    merged = store_sales.merge(date_dim, left_on="ss_sold_date_sk", right_on="d_date_sk")
-    merged = merged.merge(store, left_on="ss_store_sk", right_on="s_store_sk")
-    merged = merged.merge(item, left_on="ss_item_sk", right_on="i_item_sk")
-
-    # Filter
-    filtered = merged[
-        (merged["d_year"] == year)
-        & (
-            ((merged["i_category"] == "Books") & (merged["i_class"] == "business"))
-            | ((merged["i_category"] == "Electronics") & (merged["i_class"] == "portable"))
-        )
-    ]
-
-    # Group and aggregate
-    return (
-        filtered.groupby(
-            ["i_category", "i_class", "i_brand", "s_store_name", "s_company_name", "d_moy"], as_index=False
-        )
-        .agg(sum_sales=("ss_sales_price", "sum"))
-        .sort_values(["sum_sales", "s_store_name", "i_category"])
-        .head(100)
-    )
-
-
 # =============================================================================
 # Moderate Queries - CTEs, subqueries, and more complex patterns
 # =============================================================================
@@ -1707,230 +1526,9 @@ def q6_pandas_impl(ctx: DataFrameContext) -> Any:
     return grouped[grouped["cnt"] >= 10].sort_values(["cnt", "i_item_id"]).head(100)
 
 
-def q15_expression_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q15: Catalog Sales Analysis (Expression Family).
-
-    Reports catalog sales for customers in specific zip code ranges.
-
-    Tables: catalog_sales, customer, customer_address, date_dim
-    Pattern: Multi-join -> filter -> group by -> aggregate
-    """
-
-    params = get_parameters(15)
-    year = params.get("year", 2001)
-    quarter = params.get("quarter", 2)
-    zip_prefix = params.get("zip_prefix", "85")
-
-    catalog_sales = ctx.get_table("catalog_sales")
-    customer = ctx.get_table("customer")
-    customer_address = ctx.get_table("customer_address")
-    date_dim = ctx.get_table("date_dim")
-    col = ctx.col
-    lit = ctx.lit
-
-    return (
-        catalog_sales.join(customer, left_on="cs_bill_customer_sk", right_on="c_customer_sk")
-        .join(customer_address, left_on="c_current_addr_sk", right_on="ca_address_sk")
-        .join(date_dim, left_on="cs_sold_date_sk", right_on="d_date_sk")
-        .filter(
-            (col("d_qoy") == lit(quarter))
-            & (col("d_year") == lit(year))
-            & (col("ca_zip").cast_string().str.slice(0, 2) == lit(zip_prefix))
-        )
-        .group_by("ca_zip")
-        .agg(col("cs_sales_price").sum().alias("total_sales"))
-        .sort("ca_zip")
-        .limit(100)
-    )
-
-
-def q15_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q15: Catalog Sales Analysis (Pandas Family)."""
-    params = get_parameters(15)
-    year = params.get("year", 2001)
-    quarter = params.get("quarter", 2)
-    zip_prefix = params.get("zip_prefix", "85")
-
-    catalog_sales = ctx.get_table("catalog_sales")
-    customer = ctx.get_table("customer")
-    customer_address = ctx.get_table("customer_address")
-    date_dim = ctx.get_table("date_dim")
-
-    # Join tables
-    merged = catalog_sales.merge(customer, left_on="cs_bill_customer_sk", right_on="c_customer_sk")
-    merged = merged.merge(customer_address, left_on="c_current_addr_sk", right_on="ca_address_sk")
-    merged = merged.merge(date_dim, left_on="cs_sold_date_sk", right_on="d_date_sk")
-
-    # Filter
-    # Note: Use .astype(str) before .str accessor as ca_zip may not be string type
-    filtered = merged[
-        (merged["d_qoy"] == quarter) & (merged["d_year"] == year) & (merged["ca_zip"].astype(str).str[:2] == zip_prefix)
-    ]
-
-    # Group and aggregate
-    return (
-        filtered.groupby(["ca_zip"], as_index=False)
-        .agg(total_sales=("cs_sales_price", "sum"))
-        .sort_values(["ca_zip"])
-        .head(100)
-    )
-
-
 # =============================================================================
 # Complex Queries - Window functions, UNION, and advanced patterns
 # =============================================================================
-
-
-def q46_expression_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q46: Store Sales Household Analysis (Expression Family).
-
-    Reports store sales by customer household across cities.
-
-    Tables: store_sales, date_dim, store, household_demographics, customer_address, customer
-    Pattern: Multi-join -> filter -> group by -> aggregate -> order by
-    """
-    params = get_parameters(46)
-    year = params.get("year", 2001)
-    cities = params.get("cities", ["Fairview", "Midway", "Fairview", "Fairview", "Fairview"])
-
-    store_sales = ctx.get_table("store_sales")
-    date_dim = ctx.get_table("date_dim")
-    store = ctx.get_table("store")
-    household_demographics = ctx.get_table("household_demographics")
-    customer_address = ctx.get_table("customer_address")
-    customer = ctx.get_table("customer")
-    col = ctx.col
-    lit = ctx.lit
-
-    return (
-        store_sales.join(date_dim, left_on="ss_sold_date_sk", right_on="d_date_sk")
-        .join(store, left_on="ss_store_sk", right_on="s_store_sk")
-        .join(household_demographics, left_on="ss_hdemo_sk", right_on="hd_demo_sk")
-        .join(customer_address, left_on="ss_addr_sk", right_on="ca_address_sk")
-        .join(customer, left_on="ss_customer_sk", right_on="c_customer_sk")
-        .filter(
-            (col("d_year") == lit(year))
-            & (col("d_dom").is_between(1, 2))
-            & col("ca_city").is_in(cities)
-            & ((col("hd_dep_count") == lit(5)) | (col("hd_vehicle_count") == lit(3)))
-        )
-        .group_by("c_last_name", "c_first_name", "ca_city", "ss_ticket_number", "ss_coupon_amt", "ss_net_profit")
-        .agg(col("ss_ext_sales_price").sum().alias("bought_city"))
-        .sort("c_last_name", "c_first_name", "ca_city", "ss_ticket_number")
-        .limit(100)
-    )
-
-
-def q46_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q46: Store Sales Household Analysis (Pandas Family)."""
-    params = get_parameters(46)
-    year = params.get("year", 2001)
-    cities = params.get("cities", ["Fairview", "Midway", "Fairview", "Fairview", "Fairview"])
-
-    store_sales = ctx.get_table("store_sales")
-    date_dim = ctx.get_table("date_dim")
-    store = ctx.get_table("store")
-    household_demographics = ctx.get_table("household_demographics")
-    customer_address = ctx.get_table("customer_address")
-    customer = ctx.get_table("customer")
-
-    # Join tables
-    merged = store_sales.merge(date_dim, left_on="ss_sold_date_sk", right_on="d_date_sk")
-    merged = merged.merge(store, left_on="ss_store_sk", right_on="s_store_sk")
-    merged = merged.merge(household_demographics, left_on="ss_hdemo_sk", right_on="hd_demo_sk")
-    merged = merged.merge(customer_address, left_on="ss_addr_sk", right_on="ca_address_sk")
-    merged = merged.merge(customer, left_on="ss_customer_sk", right_on="c_customer_sk")
-
-    # Filter
-    filtered = merged[
-        (merged["d_year"] == year)
-        & (merged["d_dom"] >= 1)
-        & (merged["d_dom"] <= 2)
-        & (merged["ca_city"].isin(cities))
-        & ((merged["hd_dep_count"] == 5) | (merged["hd_vehicle_count"] == 3))
-    ]
-
-    # Group and aggregate
-    return (
-        filtered.groupby(
-            ["c_last_name", "c_first_name", "ca_city", "ss_ticket_number", "ss_coupon_amt", "ss_net_profit"],
-            as_index=False,
-        )
-        .agg(bought_city=("ss_ext_sales_price", "sum"))
-        .sort_values(["c_last_name", "c_first_name", "ca_city", "ss_ticket_number"])
-        .head(100)
-    )
-
-
-def q50_expression_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q50: Store Sales Returns Analysis (Expression Family).
-
-    Analyzes store sales return patterns.
-
-    Tables: store_sales, store_returns, store, date_dim
-    Pattern: Multi-join -> filter -> group by -> aggregate -> order by
-    """
-    params = get_parameters(50)
-    year = params.get("year", 2001)
-
-    store_sales = ctx.get_table("store_sales")
-    store_returns = ctx.get_table("store_returns")
-    store = ctx.get_table("store")
-    date_dim = ctx.get_table("date_dim")
-    col = ctx.col
-    lit = ctx.lit
-
-    return (
-        store_sales.join(
-            store_returns,
-            left_on=["ss_item_sk", "ss_customer_sk", "ss_ticket_number"],
-            right_on=["sr_item_sk", "sr_customer_sk", "sr_ticket_number"],
-        )
-        .join(store, left_on="ss_store_sk", right_on="s_store_sk")
-        .join(date_dim, left_on="sr_returned_date_sk", right_on="d_date_sk")
-        .filter((col("d_year") == lit(year)) & (col("d_moy") == lit(8)))
-        .group_by("s_store_name", "s_company_id", "s_street_number", "s_street_name", "s_street_type")
-        .agg(
-            col("sr_return_amt").sum().alias("return_amt"),
-            col("sr_net_loss").sum().alias("net_loss"),
-        )
-        .sort(["s_store_name", "s_company_id", "return_amt"], descending=[False, False, True])
-        .limit(100)
-    )
-
-
-def q50_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q50: Store Sales Returns Analysis (Pandas Family)."""
-    params = get_parameters(50)
-    year = params.get("year", 2001)
-
-    store_sales = ctx.get_table("store_sales")
-    store_returns = ctx.get_table("store_returns")
-    store = ctx.get_table("store")
-    date_dim = ctx.get_table("date_dim")
-
-    # Join tables
-    merged = store_sales.merge(
-        store_returns,
-        left_on=["ss_item_sk", "ss_customer_sk", "ss_ticket_number"],
-        right_on=["sr_item_sk", "sr_customer_sk", "sr_ticket_number"],
-    )
-    merged = merged.merge(store, left_on="ss_store_sk", right_on="s_store_sk")
-    merged = merged.merge(date_dim, left_on="sr_returned_date_sk", right_on="d_date_sk")
-
-    # Filter
-    filtered = merged[(merged["d_year"] == year) & (merged["d_moy"] == 8)]
-
-    # Group and aggregate
-    return (
-        filtered.groupby(
-            ["s_store_name", "s_company_id", "s_street_number", "s_street_name", "s_street_type"],
-            as_index=False,
-        )
-        .agg(return_amt=("sr_return_amt", "sum"), net_loss=("sr_net_loss", "sum"))
-        .sort_values(["s_store_name", "s_company_id", "return_amt"], ascending=[True, True, False])
-        .head(100)
-    )
 
 
 def q72_expression_impl(ctx: DataFrameContext) -> Any:
@@ -2944,388 +2542,6 @@ def q90_pandas_impl(ctx: DataFrameContext) -> Any:
     ratio = am_count / pm_count if pm_count > 0 else None
 
     return pd.DataFrame({"am_pm_ratio": [ratio]})
-
-
-def q91_expression_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q91: Call Center Returns Analysis (Expression Family).
-
-    Reports catalog returns by call center with demographic filtering.
-
-    Tables: call_center, catalog_returns, date_dim, customer, customer_address,
-            customer_demographics, household_demographics
-    Pattern: Multi-join -> demographics filter -> group by -> aggregate
-    """
-    params = get_parameters(91)
-    year = params.get("year", 1998)
-    month = params.get("month", 11)
-    buy_potential = params.get("buy_potential", "Unknown")
-    gmt_offset = params.get("gmt_offset", -7)
-
-    call_center = ctx.get_table("call_center")
-    catalog_returns = ctx.get_table("catalog_returns")
-    date_dim = ctx.get_table("date_dim")
-    customer = ctx.get_table("customer")
-    customer_address = ctx.get_table("customer_address")
-    customer_demographics = ctx.get_table("customer_demographics")
-    household_demographics = ctx.get_table("household_demographics")
-    col = ctx.col
-    lit = ctx.lit
-
-    return (
-        catalog_returns.join(call_center, left_on="cr_call_center_sk", right_on="cc_call_center_sk")
-        .join(date_dim, left_on="cr_returned_date_sk", right_on="d_date_sk")
-        .join(customer, left_on="cr_returning_customer_sk", right_on="c_customer_sk")
-        .join(customer_demographics, left_on="c_current_cdemo_sk", right_on="cd_demo_sk")
-        .join(household_demographics, left_on="c_current_hdemo_sk", right_on="hd_demo_sk")
-        .join(customer_address, left_on="c_current_addr_sk", right_on="ca_address_sk")
-        .filter(
-            (col("d_year") == lit(year))
-            & (col("d_moy") == lit(month))
-            & (
-                ((col("cd_marital_status") == lit("M")) & (col("cd_education_status") == lit("Unknown")))
-                | ((col("cd_marital_status") == lit("W")) & (col("cd_education_status") == lit("Advanced Degree")))
-            )
-            & col("hd_buy_potential").str.starts_with(buy_potential)
-            & (col("ca_gmt_offset") == lit(gmt_offset))
-        )
-        .group_by(
-            "cc_call_center_id",
-            "cc_name",
-            "cc_manager",
-            "cd_marital_status",
-            "cd_education_status",
-        )
-        .agg(col("cr_net_loss").sum().alias("returns_loss"))
-        .sort("returns_loss", descending=True)
-    )
-
-
-def q91_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q91: Call Center Returns Analysis (Pandas Family)."""
-    params = get_parameters(91)
-    year = params.get("year", 1998)
-    month = params.get("month", 11)
-    buy_potential = params.get("buy_potential", "Unknown")
-    gmt_offset = params.get("gmt_offset", -7)
-
-    call_center = ctx.get_table("call_center")
-    catalog_returns = ctx.get_table("catalog_returns")
-    date_dim = ctx.get_table("date_dim")
-    customer = ctx.get_table("customer")
-    customer_address = ctx.get_table("customer_address")
-    customer_demographics = ctx.get_table("customer_demographics")
-    household_demographics = ctx.get_table("household_demographics")
-
-    # Join tables
-    merged = catalog_returns.merge(call_center, left_on="cr_call_center_sk", right_on="cc_call_center_sk")
-    merged = merged.merge(date_dim, left_on="cr_returned_date_sk", right_on="d_date_sk")
-    merged = merged.merge(customer, left_on="cr_returning_customer_sk", right_on="c_customer_sk")
-    merged = merged.merge(customer_demographics, left_on="c_current_cdemo_sk", right_on="cd_demo_sk")
-    merged = merged.merge(household_demographics, left_on="c_current_hdemo_sk", right_on="hd_demo_sk")
-    merged = merged.merge(customer_address, left_on="c_current_addr_sk", right_on="ca_address_sk")
-
-    # Demographics conditions
-    demo_cond = ((merged["cd_marital_status"] == "M") & (merged["cd_education_status"] == "Unknown")) | (
-        (merged["cd_marital_status"] == "W") & (merged["cd_education_status"] == "Advanced Degree")
-    )
-
-    # Filter
-    filtered = merged[
-        (merged["d_year"] == year)
-        & (merged["d_moy"] == month)
-        & demo_cond
-        & merged["hd_buy_potential"].str.startswith(buy_potential)
-        & (merged["ca_gmt_offset"] == gmt_offset)
-    ]
-
-    # Group and aggregate
-    return (
-        filtered.groupby(
-            ["cc_call_center_id", "cc_name", "cc_manager", "cd_marital_status", "cd_education_status"],
-            as_index=False,
-        )
-        .agg(returns_loss=("cr_net_loss", "sum"))
-        .sort_values("returns_loss", ascending=False)
-    )
-
-
-def q30_expression_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q30: Web Returns Customer Analysis (Expression Family).
-
-    Identifies customers whose web return amounts exceed 1.2x the average
-    return amount for their state.
-
-    Tables: web_returns, date_dim, customer_address, customer
-    Pattern: CTE (aggregate by customer/state) -> correlated filter (> state avg) -> join customer
-    """
-    params = get_parameters(30)
-    year = params.get("year", 2002)
-    state = params.get("state", "GA")
-
-    web_returns = ctx.get_table("web_returns")
-    date_dim = ctx.get_table("date_dim")
-    customer_address = ctx.get_table("customer_address")
-    customer = ctx.get_table("customer")
-    col = ctx.col
-    lit = ctx.lit
-
-    # CTE: customer_total_return - aggregate returns by customer and state
-    ctr = (
-        web_returns.join(date_dim, left_on="wr_returned_date_sk", right_on="d_date_sk")
-        .join(customer_address, left_on="wr_returning_addr_sk", right_on="ca_address_sk")
-        .filter(col("d_year") == lit(year))
-        .group_by(
-            col("wr_returning_customer_sk").alias("ctr_customer_sk"),
-            col("ca_state").alias("ctr_state"),
-        )
-        .agg(col("wr_return_amt").sum().alias("ctr_total_return"))
-    )
-
-    # Calculate state averages
-    state_avg = ctr.group_by("ctr_state").agg(col("ctr_total_return").mean().alias("state_avg"))
-
-    # Join ctr with state averages and filter
-    ctr_with_avg = ctr.join(state_avg, on="ctr_state")
-    ctr_filtered = ctr_with_avg.filter(col("ctr_total_return") > col("state_avg") * 1.2)
-
-    # Get customers in the target state
-    ca_filtered = customer_address.filter(col("ca_state") == lit(state))
-
-    # Join with customer
-    return (
-        ctr_filtered.join(customer, left_on="ctr_customer_sk", right_on="c_customer_sk")
-        .join(ca_filtered, left_on="c_current_addr_sk", right_on="ca_address_sk")
-        .select(
-            "c_customer_id",
-            "c_salutation",
-            "c_first_name",
-            "c_last_name",
-            "c_preferred_cust_flag",
-            "c_birth_day",
-            "c_birth_month",
-            "c_birth_year",
-            "c_birth_country",
-            "c_login",
-            "c_email_address",
-            "c_last_review_date_sk",
-            "ctr_total_return",
-        )
-        .sort(
-            "c_customer_id",
-            "c_salutation",
-            "c_first_name",
-            "c_last_name",
-            "c_preferred_cust_flag",
-            "c_birth_day",
-            "c_birth_month",
-            "c_birth_year",
-            "c_birth_country",
-            "c_login",
-            "c_email_address",
-            "c_last_review_date_sk",
-            "ctr_total_return",
-        )
-        .limit(100)
-    )
-
-
-def q30_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q30: Web Returns Customer Analysis (Pandas Family)."""
-    params = get_parameters(30)
-    year = params.get("year", 2002)
-    state = params.get("state", "GA")
-
-    web_returns = ctx.get_table("web_returns")
-    date_dim = ctx.get_table("date_dim")
-    customer_address = ctx.get_table("customer_address")
-    customer = ctx.get_table("customer")
-
-    # CTE: customer_total_return
-    merged = web_returns.merge(date_dim, left_on="wr_returned_date_sk", right_on="d_date_sk")
-    merged = merged.merge(customer_address, left_on="wr_returning_addr_sk", right_on="ca_address_sk")
-    merged = merged[merged["d_year"] == year]
-
-    ctr = merged.groupby(["wr_returning_customer_sk", "ca_state"], as_index=False).agg(
-        ctr_total_return=("wr_return_amt", "sum")
-    )
-    ctr = ctr.rename(columns={"wr_returning_customer_sk": "ctr_customer_sk", "ca_state": "ctr_state"})
-
-    # Calculate state averages
-    state_avg = ctr.groupby("ctr_state", as_index=False).agg(state_avg=("ctr_total_return", "mean"))
-
-    # Join and filter
-    ctr_with_avg = ctr.merge(state_avg, on="ctr_state")
-    ctr_filtered = ctr_with_avg[ctr_with_avg["ctr_total_return"] > ctr_with_avg["state_avg"] * 1.2]
-
-    # Get customers in target state
-    ca_filtered = customer_address[customer_address["ca_state"] == state]
-
-    # Join with customer
-    result = ctr_filtered.merge(customer, left_on="ctr_customer_sk", right_on="c_customer_sk")
-    result = result.merge(ca_filtered, left_on="c_current_addr_sk", right_on="ca_address_sk")
-
-    # Select and sort
-    cols = [
-        "c_customer_id",
-        "c_salutation",
-        "c_first_name",
-        "c_last_name",
-        "c_preferred_cust_flag",
-        "c_birth_day",
-        "c_birth_month",
-        "c_birth_year",
-        "c_birth_country",
-        "c_login",
-        "c_email_address",
-        "c_last_review_date_sk",
-        "ctr_total_return",
-    ]
-    return result[cols].sort_values(cols).head(100)
-
-
-def q81_expression_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q81: Catalog Returns Customer Analysis (Expression Family).
-
-    Identifies customers whose catalog return amounts exceed 1.2x the average
-    return amount for their state.
-
-    Tables: catalog_returns, date_dim, customer_address, customer
-    Pattern: CTE (aggregate by customer/state) -> correlated filter (> state avg) -> join customer
-    """
-    params = get_parameters(81)
-    year = params.get("year", 2000)
-    state = params.get("state", "GA")
-
-    catalog_returns = ctx.get_table("catalog_returns")
-    date_dim = ctx.get_table("date_dim")
-    customer_address = ctx.get_table("customer_address")
-    customer = ctx.get_table("customer")
-    col = ctx.col
-    lit = ctx.lit
-
-    # CTE: customer_total_return - aggregate returns by customer and state
-    ctr = (
-        catalog_returns.join(date_dim, left_on="cr_returned_date_sk", right_on="d_date_sk")
-        .join(customer_address, left_on="cr_returning_addr_sk", right_on="ca_address_sk")
-        .filter(col("d_year") == lit(year))
-        .group_by(
-            col("cr_returning_customer_sk").alias("ctr_customer_sk"),
-            col("ca_state").alias("ctr_state"),
-        )
-        .agg(col("cr_return_amt_inc_tax").sum().alias("ctr_total_return"))
-    )
-
-    # Calculate state averages
-    state_avg = ctr.group_by("ctr_state").agg(col("ctr_total_return").mean().alias("state_avg"))
-
-    # Join ctr with state averages and filter
-    ctr_with_avg = ctr.join(state_avg, on="ctr_state")
-    ctr_filtered = ctr_with_avg.filter(col("ctr_total_return") > col("state_avg") * 1.2)
-
-    # Get customers in the target state
-    ca_filtered = customer_address.filter(col("ca_state") == lit(state))
-
-    # Join with customer
-    return (
-        ctr_filtered.join(customer, left_on="ctr_customer_sk", right_on="c_customer_sk")
-        .join(ca_filtered, left_on="c_current_addr_sk", right_on="ca_address_sk")
-        .select(
-            "c_customer_id",
-            "c_salutation",
-            "c_first_name",
-            "c_last_name",
-            "ca_street_number",
-            "ca_street_name",
-            "ca_street_type",
-            "ca_suite_number",
-            "ca_city",
-            "ca_county",
-            col("ca_state").alias("ca_state_out"),
-            "ca_zip",
-            "ca_country",
-            "ca_gmt_offset",
-            "ca_location_type",
-            "ctr_total_return",
-        )
-        .sort(
-            "c_customer_id",
-            "c_salutation",
-            "c_first_name",
-            "c_last_name",
-            "ca_street_number",
-            "ca_street_name",
-            "ca_street_type",
-            "ca_suite_number",
-            "ca_city",
-            "ca_county",
-            "ca_state_out",
-            "ca_zip",
-            "ca_country",
-            "ca_gmt_offset",
-            "ca_location_type",
-            "ctr_total_return",
-        )
-        .limit(100)
-    )
-
-
-def q81_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q81: Catalog Returns Customer Analysis (Pandas Family)."""
-    params = get_parameters(81)
-    year = params.get("year", 2000)
-    state = params.get("state", "GA")
-
-    catalog_returns = ctx.get_table("catalog_returns")
-    date_dim = ctx.get_table("date_dim")
-    customer_address = ctx.get_table("customer_address")
-    customer = ctx.get_table("customer")
-
-    # CTE: customer_total_return
-    merged = catalog_returns.merge(date_dim, left_on="cr_returned_date_sk", right_on="d_date_sk")
-    merged = merged.merge(customer_address, left_on="cr_returning_addr_sk", right_on="ca_address_sk")
-    merged = merged[merged["d_year"] == year]
-
-    ctr = merged.groupby(["cr_returning_customer_sk", "ca_state"], as_index=False).agg(
-        ctr_total_return=("cr_return_amt_inc_tax", "sum")
-    )
-    ctr = ctr.rename(columns={"cr_returning_customer_sk": "ctr_customer_sk", "ca_state": "ctr_state"})
-
-    # Calculate state averages
-    state_avg = ctr.groupby("ctr_state", as_index=False).agg(state_avg=("ctr_total_return", "mean"))
-
-    # Join and filter
-    ctr_with_avg = ctr.merge(state_avg, on="ctr_state")
-    ctr_filtered = ctr_with_avg[ctr_with_avg["ctr_total_return"] > ctr_with_avg["state_avg"] * 1.2]
-
-    # Get customers in target state
-    ca_filtered = customer_address[customer_address["ca_state"] == state]
-
-    # Join with customer
-    result = ctr_filtered.merge(customer, left_on="ctr_customer_sk", right_on="c_customer_sk")
-    result = result.merge(ca_filtered, left_on="c_current_addr_sk", right_on="ca_address_sk")
-
-    # Select and sort
-    cols = [
-        "c_customer_id",
-        "c_salutation",
-        "c_first_name",
-        "c_last_name",
-        "ca_street_number",
-        "ca_street_name",
-        "ca_street_type",
-        "ca_suite_number",
-        "ca_city",
-        "ca_county",
-        "ca_state_y",
-        "ca_zip",
-        "ca_country",
-        "ca_gmt_offset",
-        "ca_location_type",
-        "ctr_total_return",
-    ]
-    # Handle column name conflicts from merge
-    available_cols = [c for c in cols if c in result.columns]
-    return result[available_cols].sort_values(available_cols).head(100)
 
 
 # =============================================================================
