@@ -12,47 +12,28 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
+
+import yaml
 
 logger = logging.getLogger(__name__)
 
 
+def _load_specs() -> dict[str, Any]:
+    with (Path(__file__).with_name("specs.yaml")).open(encoding="utf-8") as handle:
+        return yaml.safe_load(handle) or {}
+
+
+_SPECS = _load_specs()
+
+
 # Platform-specific pricing (USD per 1000 tokens)
 # These are approximate and should be updated as pricing changes
-PLATFORM_PRICING: dict[str, dict[str, float]] = {
-    "snowflake": {
-        # Snowflake Cortex pricing (approximate, varies by region/tier)
-        "llama3-8b": 0.0003,
-        "llama3-70b": 0.001,
-        "mistral-large": 0.001,
-        "snowflake-arctic": 0.0005,
-        "sentiment": 0.0001,
-        "summarize": 0.0003,
-        "translate": 0.0002,
-        "embed-text-768": 0.0001,
-        "embed-text-1024": 0.00015,
-        "default": 0.0005,
-    },
-    "bigquery": {
-        # BigQuery ML + Vertex AI pricing (approximate)
-        "gemini-pro": 0.00025,
-        "palm-2": 0.0003,
-        "text-bison": 0.0003,
-        "embedding": 0.0001,
-        "default": 0.0003,
-    },
-    "databricks": {
-        # Databricks Foundation Model APIs pricing (approximate)
-        "databricks-meta-llama-3-1-70b-instruct": 0.001,
-        "databricks-meta-llama-3-1-8b-instruct": 0.0003,
-        "databricks-bge-large-en": 0.0001,
-        "databricks-gte-large-en": 0.0001,
-        "default": 0.0005,
-    },
-}
+PLATFORM_PRICING: dict[str, dict[str, float]] = _SPECS["platform_pricing"]
 
 # Default pricing for unknown platforms
-DEFAULT_PRICING = {"default": 0.001}
+DEFAULT_PRICING = _SPECS["default_pricing"]
 
 
 @dataclass
