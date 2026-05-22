@@ -5,7 +5,10 @@ to benchmark results after execution.
 """
 
 import logging
+from pathlib import Path
 from typing import Any, Optional
+
+import yaml
 
 from benchbox.core.cost.calculator import CostCalculator
 from benchbox.core.cost.models import PhaseCost
@@ -14,25 +17,13 @@ from benchbox.core.results.models import BenchmarkResults
 logger = logging.getLogger(__name__)
 
 
+def _load_cost_specs() -> dict[str, Any]:
+    with (Path(__file__).with_name("cost_specs.yaml")).open(encoding="utf-8") as handle:
+        return yaml.safe_load(handle) or {}
+
+
 # Required platform configuration fields for cost calculation
-PLATFORM_CONFIG_REQUIREMENTS = {
-    "snowflake": {
-        "required": ["edition", "cloud", "region"],
-        "optional": ["warehouse_size"],
-    },
-    "bigquery": {
-        "required": ["location"],
-        "optional": [],
-    },
-    "redshift": {
-        "required": ["node_type", "node_count", "region"],
-        "optional": [],
-    },
-    "databricks": {
-        "required": ["cloud", "tier", "workload_type", "cluster_size_dbu_per_hour"],
-        "optional": ["warehouse_size"],
-    },
-}
+PLATFORM_CONFIG_REQUIREMENTS = _load_cost_specs()["platform_config_requirements"]
 
 
 def validate_platform_config(platform: str, config: dict[str, Any]) -> tuple[bool, list[str]]:
