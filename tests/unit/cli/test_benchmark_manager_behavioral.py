@@ -33,6 +33,7 @@ def _sample_benchmarks() -> dict[str, dict[str, object]]:
             "support_status": "stable",
             "complexity": "medium",
             "estimated_time_range": (2, 10),
+            "base_memory_gb": 1.0,
             "scale_options": [0.01, 0.1, 1.0],
             "default_scale": 0.01,
             "supports_streams": True,
@@ -46,6 +47,7 @@ def _sample_benchmarks() -> dict[str, dict[str, object]]:
             "support_status": "stable",
             "complexity": "high",
             "estimated_time_range": (5, 15),
+            "base_memory_gb": 15.0,
             "scale_options": [0.01, 0.1],
             "default_scale": 0.01,
             "supports_streams": False,
@@ -59,6 +61,7 @@ def _sample_benchmarks() -> dict[str, dict[str, object]]:
             "support_status": "beta",
             "complexity": "low",
             "estimated_time_range": (1, 2),
+            "base_memory_gb": 0.01,
             "scale_options": [1.0],
             "default_scale": 1.0,
             "supports_streams": False,
@@ -72,6 +75,7 @@ def _sample_benchmarks() -> dict[str, dict[str, object]]:
             "support_status": "stable",
             "complexity": "high",
             "estimated_time_range": (30, 90),
+            "base_memory_gb": 5.0,
             "scale_options": [1.0],
             "default_scale": 1.0,
             "supports_streams": False,
@@ -86,6 +90,7 @@ def _sample_benchmarks() -> dict[str, dict[str, object]]:
             "support_status": "repo_only",
             "complexity": "medium",
             "estimated_time_range": (2, 10),
+            "base_memory_gb": 1.0,
             "scale_options": [0.01, 0.1, 1.0],
             "default_scale": 1.0,
             "supports_streams": False,
@@ -164,6 +169,13 @@ def test_preview_labels_support_status(monkeypatch: pytest.MonkeyPatch, manager:
 def test_internal_benchmarks_remain_directly_addressable(manager: BenchmarkManager):
     assert "joinorder_synthetic" in manager.benchmarks
     assert "joinorder_synthetic" not in manager._get_public_benchmarks()
+
+
+def test_resource_estimates_use_registry_metadata() -> None:
+    manager = BenchmarkManager()
+
+    assert manager._estimate_memory_usage("vector_search", 0.1) == pytest.approx(0.1)
+    assert manager._estimate_execution_time("coffeeshop", 1.0) == pytest.approx(7.5)
 
 
 def test_display_all_benchmarks_warns_when_filters_match_nothing(

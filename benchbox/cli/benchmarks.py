@@ -823,52 +823,12 @@ class BenchmarkManager:
 
     def _estimate_memory_usage(self, benchmark_id: str, scale: float) -> float:
         """Estimate memory usage for a given benchmark and scale."""
-        base_memory = {
-            "tpch": 1.0,
-            "tpcds": 2.5,
-            "tpcdi": 1.5,
-            "ssb": 0.8,
-            "clickbench": 15.0,
-            "h2odb": 2.0,
-            "amplab": 1.2,
-            "read_primitives": 0.1,
-            "metadata_primitives": 0.01,  # No data generation, queries catalog metadata
-            "joinorder": 5.0,  # Canonical IMDb JOB: 74M rows across 21 Parquet tables
-            "joinorder_synthetic": 1.0,
-            "coffeeshop": 1.0,
-            "write_primitives": 1.0,  # Same as TPC-H since it reuses TPC-H data
-            "datavault": 3.0,  # ~3x TPC-H due to denormalization (21 tables from 8)
-            "tpcds_obt": 2.5,  # Similar to TPC-DS
-            "tpch_skew": 1.0,  # Same as TPC-H with skew transformation overhead
-            "tsbs_devops": 0.8,  # Time-series data with high row counts
-            "nyctaxi": 1.0,  # Large trip dataset with joins to zone table
-        }
-        base = base_memory.get(benchmark_id, 1.0)
+        base = float(self.benchmarks[benchmark_id]["base_memory_gb"])
         return base * scale
 
     def _estimate_execution_time(self, benchmark_id: str, scale: float) -> float:
         """Estimate execution time in minutes for full benchmark."""
-        time_ranges = {
-            "tpch": (2, 10),
-            "tpcds": (10, 60),
-            "tpcdi": (5, 30),
-            "ssb": (1, 5),
-            "clickbench": (5, 15),
-            "h2odb": (3, 15),
-            "amplab": (3, 15),
-            "read_primitives": (1, 3),
-            "metadata_primitives": (1, 2),  # Fast catalog queries, no data generation
-            "joinorder": (30, 90),  # Full canonical JOB data and 113-query suite
-            "joinorder_synthetic": (2, 10),
-            "coffeeshop": (2, 8),
-            "write_primitives": (2, 5),
-            "datavault": (5, 30),  # TPC-H generation + DuckDB transform + complex joins
-            "tpcds_obt": (5, 20),  # TPC-DS generation + OBT join
-            "tpch_skew": (2, 15),  # TPC-H + skew transformation
-            "tsbs_devops": (2, 10),  # Time-series data generation + queries
-            "nyctaxi": (5, 30),  # Data download/generation + 25 OLAP queries
-        }
-        low, high = time_ranges.get(benchmark_id, (2, 10))
+        low, high = self.benchmarks[benchmark_id]["estimated_time_range"]
         base_avg = (low + high) / 2
         return base_avg * (0.5 + 0.5 * scale)
 

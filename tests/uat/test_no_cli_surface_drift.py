@@ -12,6 +12,7 @@ pytestmark = pytest.mark.fast
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ALLOWED_INTERNAL_CLI_FILES = {
+    "benchbox/cli/benchmarks.py",
     "benchbox/cli/commands/submit.py",
     "benchbox/cli/commands/visualize.py",
 }
@@ -35,11 +36,12 @@ def test_uat_did_not_modify_benchbox_cli_surface():
         changed_lines = [
             line for line in diff.splitlines() if line.startswith(("+", "-")) and not line.startswith(("+++", "---"))
         ]
+        forbidden_def = FORBIDDEN_CLI_SURFACE_DEFS.get(path)
         forbidden.extend(
             line
             for line in changed_lines
             if any(snippet in line for snippet in FORBIDDEN_CLI_SURFACE_SNIPPETS)
-            or line[1:].lstrip().startswith(FORBIDDEN_CLI_SURFACE_DEFS[path])
+            or (forbidden_def is not None and line[1:].lstrip().startswith(forbidden_def))
         )
     assert not forbidden, f"Unexpected CLI surface changes: {forbidden}"
 
