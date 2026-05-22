@@ -308,6 +308,218 @@ for _stem, _table_name, _group_cols, _agg_specs in (
         )
 
 
+def _expr_count_filter_predicate(ctx: DataFrameContext, column_name: str, op: str, value: Any, lower: bool) -> Any:
+    expr = ctx.col(column_name)
+    if lower:
+        expr = expr.str.to_lowercase()
+    if op == "eq":
+        return expr == ctx.lit(value)
+    if op == "ge":
+        return expr >= ctx.lit(value)
+    if op == "gt":
+        return expr > ctx.lit(value)
+    if op == "lt":
+        return expr < ctx.lit(value)
+    if op == "in":
+        return expr.is_in(value)
+    if op == "contains":
+        return expr.str.contains(value)
+    if op == "starts":
+        return expr.str.starts_with(value)
+    if op == "ends":
+        return expr.str.ends_with(value)
+    if op == "all_contains":
+        first, *rest = value
+        predicate = expr.str.contains(first)
+        for item in rest:
+            predicate = predicate & expr.str.contains(item)
+        return predicate
+    raise ValueError(f"Unsupported count-filter operation: {op}")
+
+
+def _pandas_count_filter_mask(table: Any, column_name: str, op: str, value: Any, lower: bool) -> Any:
+    series = table[column_name]
+    if lower:
+        series = series.str.lower()
+    if op == "eq":
+        return series == value
+    if op == "ge":
+        return series >= value
+    if op == "gt":
+        return series > value
+    if op == "lt":
+        return series < value
+    if op == "in":
+        return series.isin(value)
+    if op == "contains":
+        return series.str.contains(value, na=False)
+    if op == "starts":
+        return series.str.startswith(value, na=False)
+    if op == "ends":
+        return series.str.endswith(value, na=False)
+    if op == "all_contains":
+        first, *rest = value
+        mask = series.str.contains(first, na=False)
+        for item in rest:
+            mask = mask & series.str.contains(item, na=False)
+        return mask
+    raise ValueError(f"Unsupported count-filter operation: {op}")
+
+
+def _make_count_filter_impl(
+    name: str,
+    table_name: str,
+    column_name: str,
+    op: str,
+    value: Any,
+    count_col: str,
+    alias: str,
+    lower: bool = False,
+) -> None:
+    def expression_impl(ctx: DataFrameContext) -> Any:
+        table = ctx.get_table(table_name)
+        return table.filter(_expr_count_filter_predicate(ctx, column_name, op, value, lower)).select(
+            ctx.col(count_col).count().alias(alias)
+        )
+
+    def pandas_impl(ctx: DataFrameContext) -> Any:
+        table = ctx.get_table(table_name)
+        return ctx.scalar_to_df({alias: len(table[_pandas_count_filter_mask(table, column_name, op, value, lower)])})
+
+    for family, impl in (("expression", expression_impl), ("pandas", pandas_impl)):
+        impl.__name__ = f"{name}_{family}_impl"
+        impl.__qualname__ = impl.__name__
+        globals()[impl.__name__] = impl
+
+
+for _spec in (
+    ("filter_bigint_non_selective", "lineitem", "l_orderkey", "gt", 1000, "l_orderkey", "count", False),
+    ("filter_decimal_non_selective", "lineitem", "l_extendedprice", "gt", 1000.00, "l_orderkey", "count", False),
+    ("filter_string_non_selective", "customer", "c_mktsegment", "ge", "A", "c_custkey", "count", False),
+    ("string_equal", "part", "p_brand", "eq", "Brand#23", "p_partkey", "count", False),
+    ("string_equal_lower", "part", "p_brand", "eq", "brand#23", "p_partkey", "count", True),
+    ("string_in_predicate", "orders", "o_orderpriority", "in", ["1-URGENT", "2-HIGH"], "o_orderkey", "count", False),
+    ("string_like_center", "part", "p_name", "contains", "STEEL", "p_partkey", "count", False),
+    ("string_like_suffix", "part", "p_name", "ends", "COPPER", "p_partkey", "count", False),
+    ("string_like_prefix", "part", "p_name", "starts", "STANDARD", "p_partkey", "count", False),
+    ("string_ilike_start", "part", "p_name", "starts", "standard", "p_partkey", "count", True),
+    ("string_ilike_end", "part", "p_name", "ends", "copper", "p_partkey", "count", True),
+    ("string_like_multi", "part", "p_name", "all_contains", ("STEEL", "BRASS"), "p_partkey", "count", False),
+    ("string_ilike_multi", "part", "p_name", "all_contains", ("steel", "brass"), "p_partkey", "count", True),
+    ("string_like_center_insensitive", "part", "p_name", "contains", "steel", "p_partkey", "count", True),
+    ("intrinsic_to_date", "orders", "o_orderdate", "eq", date(1995, 3, 15), "o_orderkey", "orders_by_month", False),
+):
+    _make_count_filter_impl(*_spec)
+
+
+def _expr_combined_filter(ctx: DataFrameContext, conditions: tuple[tuple[str, str, Any, bool], ...]) -> Any:
+    first, *rest = conditions
+    predicate = _expr_count_filter_predicate(ctx, *first)
+    for condition in rest:
+        predicate = predicate & _expr_count_filter_predicate(ctx, *condition)
+    return predicate
+
+
+def _pandas_combined_filter(table: Any, conditions: tuple[tuple[str, str, Any, bool], ...]) -> Any:
+    first, *rest = conditions
+    mask = _pandas_count_filter_mask(table, *first)
+    for condition in rest:
+        mask = mask & _pandas_count_filter_mask(table, *condition)
+    return mask
+
+
+def _make_filtered_select_impl(
+    name: str,
+    table_name: str,
+    conditions: tuple[tuple[str, str, Any, bool], ...],
+    columns: tuple[str, ...],
+    limit: int | None = None,
+) -> None:
+    def expression_impl(ctx: DataFrameContext) -> Any:
+        table = ctx.get_table(table_name)
+        if conditions:
+            table = table.filter(_expr_combined_filter(ctx, conditions))
+        result = table.select(*columns)
+        return result.limit(limit) if limit is not None else result
+
+    def pandas_impl(ctx: DataFrameContext) -> Any:
+        table = ctx.get_table(table_name)
+        if conditions:
+            table = table[_pandas_combined_filter(table, conditions)]
+        result = table[list(columns)]
+        return result.head(limit) if limit is not None else result
+
+    for family, impl in (("expression", expression_impl), ("pandas", pandas_impl)):
+        impl.__name__ = f"{name}_{family}_impl"
+        impl.__qualname__ = impl.__name__
+        globals()[impl.__name__] = impl
+
+
+for _spec in (
+    (
+        "filter_selective",
+        "lineitem",
+        (("l_quantity", "gt", 45, False), ("l_extendedprice", "gt", 50000, False), ("l_discount", "lt", 0.05, False)),
+        ("l_orderkey", "l_partkey", "l_quantity", "l_extendedprice"),
+        None,
+    ),
+    (
+        "filter_non_selective",
+        "lineitem",
+        (("l_quantity", "gt", 1, False),),
+        ("l_orderkey", "l_partkey", "l_quantity", "l_extendedprice"),
+        None,
+    ),
+    (
+        "filter_bigint_selective",
+        "orders",
+        (("o_orderkey", "eq", 1234567, False),),
+        ("o_orderkey", "o_custkey", "o_orderdate", "o_totalprice"),
+        None,
+    ),
+    (
+        "filter_bigint_in_list",
+        "orders",
+        (("o_orderkey", "in", [1, 100, 1000, 10000, 100000], False),),
+        ("o_orderkey", "o_custkey", "o_orderdate", "o_totalprice"),
+        None,
+    ),
+    (
+        "filter_decimal_selective",
+        "lineitem",
+        (("l_extendedprice", "eq", 12345.67, False), ("l_discount", "eq", 0.05, False)),
+        ("l_orderkey", "l_partkey", "l_extendedprice", "l_discount"),
+        None,
+    ),
+    (
+        "filter_decimal_in_list",
+        "lineitem",
+        (("l_extendedprice", "in", [1000.00, 5000.00, 10000.00, 50000.00], False),),
+        ("l_orderkey", "l_partkey", "l_extendedprice", "l_quantity"),
+        None,
+    ),
+    (
+        "filter_string_selective",
+        "customer",
+        (("c_name", "eq", "Customer#000001234", False),),
+        ("c_custkey", "c_name", "c_address", "c_phone"),
+        None,
+    ),
+    (
+        "filter_string_like",
+        "part",
+        (("p_name", "contains", "COPPER", False),),
+        ("p_partkey", "p_name", "p_type", "p_size"),
+        None,
+    ),
+    ("limit", "lineitem", (), ("l_orderkey", "l_partkey", "l_suppkey", "l_quantity"), 1000),
+    ("string_like", "part", (("p_name", "contains", "blue", False),), ("p_partkey", "p_name", "p_type"), None),
+    ("string_starts_with", "part", (("p_type", "starts", "STANDARD", False),), ("p_partkey", "p_name", "p_type"), None),
+    ("string_ends_with", "part", (("p_type", "ends", "BRASS", False),), ("p_partkey", "p_name", "p_type"), None),
+):
+    _make_filtered_select_impl(*_spec)
+
+
 def aggregation_materialize_expression_impl(ctx: DataFrameContext) -> Any:
     """Nested aggregation requiring CTE materialization."""
     orders = ctx.get_table("orders")
@@ -378,28 +590,6 @@ def aggregation_simple_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-def filter_selective_expression_impl(ctx: DataFrameContext) -> Any:
-    """High selectivity filter - few rows match."""
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-    lit = ctx.lit
-
-    return lineitem.filter(
-        (col("l_quantity") > lit(45)) & (col("l_extendedprice") > lit(50000)) & (col("l_discount") < lit(0.05))
-    ).select("l_orderkey", "l_partkey", "l_quantity", "l_extendedprice")
-
-
-def filter_non_selective_expression_impl(ctx: DataFrameContext) -> Any:
-    """Low selectivity filter - many rows match."""
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-    lit = ctx.lit
-
-    return lineitem.filter(col("l_quantity") > lit(1)).select(
-        "l_orderkey", "l_partkey", "l_quantity", "l_extendedprice"
-    )
-
-
 def count_star_expression_impl(ctx: DataFrameContext) -> Any:
     """Metadata-based count optimization vs full table scan performance."""
     lineitem = ctx.get_table("lineitem")
@@ -457,37 +647,6 @@ def topn_expression_impl(ctx: DataFrameContext) -> Any:
     return (
         lineitem.select("l_orderkey", "l_partkey", "l_extendedprice").sort("l_extendedprice", descending=True).limit(10)
     )
-
-
-def limit_expression_impl(ctx: DataFrameContext) -> Any:
-    """Simple LIMIT without ORDER BY."""
-    lineitem = ctx.get_table("lineitem")
-
-    return lineitem.select("l_orderkey", "l_partkey", "l_suppkey", "l_quantity").limit(1000)
-
-
-def string_like_expression_impl(ctx: DataFrameContext) -> Any:
-    """String LIKE pattern matching."""
-    part = ctx.get_table("part")
-    col = ctx.col
-
-    return part.filter(col("p_name").str.contains("blue")).select("p_partkey", "p_name", "p_type")
-
-
-def string_starts_with_expression_impl(ctx: DataFrameContext) -> Any:
-    """String starts_with pattern matching."""
-    part = ctx.get_table("part")
-    col = ctx.col
-
-    return part.filter(col("p_type").str.starts_with("STANDARD")).select("p_partkey", "p_name", "p_type")
-
-
-def string_ends_with_expression_impl(ctx: DataFrameContext) -> Any:
-    """String ends_with pattern matching."""
-    part = ctx.get_table("part")
-    col = ctx.col
-
-    return part.filter(col("p_type").str.ends_with("BRASS")).select("p_partkey", "p_name", "p_type")
 
 
 def string_concat_expression_impl(ctx: DataFrameContext) -> Any:
@@ -642,76 +801,6 @@ def empty_build_join_expression_impl(ctx: DataFrameContext) -> Any:
 # -----------------------------------------------------------------------------
 
 
-def filter_bigint_selective_expression_impl(ctx: DataFrameContext) -> Any:
-    """Equality predicate with high selectivity on integer column."""
-    orders = ctx.get_table("orders")
-    col = ctx.col
-    lit = ctx.lit
-
-    return orders.filter(col("o_orderkey") == lit(1234567)).select(
-        "o_orderkey", "o_custkey", "o_orderdate", "o_totalprice"
-    )
-
-
-def filter_bigint_non_selective_expression_impl(ctx: DataFrameContext) -> Any:
-    """Range predicate with low selectivity on large table."""
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-    lit = ctx.lit
-
-    return lineitem.filter(col("l_orderkey") > lit(1000)).select(col("l_orderkey").count().alias("count"))
-
-
-def filter_bigint_in_list_expression_impl(ctx: DataFrameContext) -> Any:
-    """IN-list predicate with highly selective integer values."""
-    orders = ctx.get_table("orders")
-    col = ctx.col
-
-    return orders.filter(col("o_orderkey").is_in([1, 100, 1000, 10000, 100000])).select(
-        "o_orderkey", "o_custkey", "o_orderdate", "o_totalprice"
-    )
-
-
-def filter_decimal_selective_expression_impl(ctx: DataFrameContext) -> Any:
-    """Compound equality predicate with multiple decimal columns."""
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-    lit = ctx.lit
-
-    return lineitem.filter((col("l_extendedprice") == lit(12345.67)) & (col("l_discount") == lit(0.05))).select(
-        "l_orderkey", "l_partkey", "l_extendedprice", "l_discount"
-    )
-
-
-def filter_decimal_non_selective_expression_impl(ctx: DataFrameContext) -> Any:
-    """Range predicate on decimal column with low selectivity."""
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-    lit = ctx.lit
-
-    return lineitem.filter(col("l_extendedprice") > lit(1000.00)).select(col("l_orderkey").count().alias("count"))
-
-
-def filter_string_selective_expression_impl(ctx: DataFrameContext) -> Any:
-    """Exact string equality with high selectivity on varchar column."""
-    customer = ctx.get_table("customer")
-    col = ctx.col
-    lit = ctx.lit
-
-    return customer.filter(col("c_name") == lit("Customer#000001234")).select(
-        "c_custkey", "c_name", "c_address", "c_phone"
-    )
-
-
-def filter_string_non_selective_expression_impl(ctx: DataFrameContext) -> Any:
-    """String comparison with low selectivity (most rows match)."""
-    customer = ctx.get_table("customer")
-    col = ctx.col
-    lit = ctx.lit
-
-    return customer.filter(col("c_mktsegment") >= lit("A")).select(col("c_custkey").count().alias("count"))
-
-
 def filter_in_predicate_subquery_expression_impl(ctx: DataFrameContext) -> Any:
     """IN predicate with subquery and selective filtering."""
     part = ctx.get_table("part")
@@ -857,60 +946,6 @@ def shuffle_self_join_expression_impl(ctx: DataFrameContext) -> Any:
 # -----------------------------------------------------------------------------
 # Additional String queries
 # -----------------------------------------------------------------------------
-
-
-def string_equal_expression_impl(ctx: DataFrameContext) -> Any:
-    """Exact string equality with selective matching."""
-    part = ctx.get_table("part")
-    col = ctx.col
-    lit = ctx.lit
-
-    return part.filter(col("p_brand") == lit("Brand#23")).select(col("p_partkey").count().alias("count"))
-
-
-def string_equal_lower_expression_impl(ctx: DataFrameContext) -> Any:
-    """Equality predicate after applying case conversion."""
-    part = ctx.get_table("part")
-    col = ctx.col
-    lit = ctx.lit
-
-    return part.filter(col("p_brand").str.to_lowercase() == lit("brand#23")).select(
-        col("p_partkey").count().alias("count")
-    )
-
-
-def string_in_predicate_expression_impl(ctx: DataFrameContext) -> Any:
-    """IN predicate with string values."""
-    orders = ctx.get_table("orders")
-    col = ctx.col
-
-    return orders.filter(col("o_orderpriority").is_in(["1-URGENT", "2-HIGH"])).select(
-        col("o_orderkey").count().alias("count")
-    )
-
-
-def string_like_center_expression_impl(ctx: DataFrameContext) -> Any:
-    """Case sensitive matching pattern in any location."""
-    part = ctx.get_table("part")
-    col = ctx.col
-
-    return part.filter(col("p_name").str.contains("STEEL")).select(col("p_partkey").count().alias("count"))
-
-
-def string_like_suffix_expression_impl(ctx: DataFrameContext) -> Any:
-    """Case sensitive matching suffix pattern."""
-    part = ctx.get_table("part")
-    col = ctx.col
-
-    return part.filter(col("p_name").str.ends_with("COPPER")).select(col("p_partkey").count().alias("count"))
-
-
-def string_like_prefix_expression_impl(ctx: DataFrameContext) -> Any:
-    """Case sensitive matching prefix pattern."""
-    part = ctx.get_table("part")
-    col = ctx.col
-
-    return part.filter(col("p_name").str.starts_with("STANDARD")).select(col("p_partkey").count().alias("count"))
 
 
 # -----------------------------------------------------------------------------
@@ -1391,22 +1426,6 @@ def aggregation_simple_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-def filter_selective_pandas_impl(ctx: DataFrameContext) -> Any:
-    """High selectivity filter - few rows match."""
-    lineitem = ctx.get_table("lineitem")
-
-    return lineitem[
-        (lineitem["l_quantity"] > 45) & (lineitem["l_extendedprice"] > 50000) & (lineitem["l_discount"] < 0.05)
-    ][["l_orderkey", "l_partkey", "l_quantity", "l_extendedprice"]]
-
-
-def filter_non_selective_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Low selectivity filter - many rows match."""
-    lineitem = ctx.get_table("lineitem")
-
-    return lineitem[lineitem["l_quantity"] > 1][["l_orderkey", "l_partkey", "l_quantity", "l_extendedprice"]]
-
-
 def count_star_pandas_impl(ctx: DataFrameContext) -> Any:
     """Metadata-based count optimization vs full table scan performance."""
     lineitem = ctx.get_table("lineitem")
@@ -1455,34 +1474,6 @@ def topn_pandas_impl(ctx: DataFrameContext) -> Any:
     lineitem = ctx.get_table("lineitem")
 
     return lineitem.nlargest(10, "l_extendedprice")[["l_orderkey", "l_partkey", "l_extendedprice"]]
-
-
-def limit_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Simple LIMIT without ORDER BY."""
-    lineitem = ctx.get_table("lineitem")
-
-    return lineitem[["l_orderkey", "l_partkey", "l_suppkey", "l_quantity"]].head(1000)
-
-
-def string_like_pandas_impl(ctx: DataFrameContext) -> Any:
-    """String LIKE pattern matching."""
-    part = ctx.get_table("part")
-
-    return part[part["p_name"].str.contains("blue", na=False)][["p_partkey", "p_name", "p_type"]]
-
-
-def string_starts_with_pandas_impl(ctx: DataFrameContext) -> Any:
-    """String starts_with pattern matching."""
-    part = ctx.get_table("part")
-
-    return part[part["p_type"].str.startswith("STANDARD", na=False)][["p_partkey", "p_name", "p_type"]]
-
-
-def string_ends_with_pandas_impl(ctx: DataFrameContext) -> Any:
-    """String ends_with pattern matching."""
-    part = ctx.get_table("part")
-
-    return part[part["p_type"].str.endswith("BRASS", na=False)][["p_partkey", "p_name", "p_type"]]
 
 
 def string_concat_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1606,62 +1597,6 @@ def empty_build_join_pandas_impl(ctx: DataFrameContext) -> Any:
 # -----------------------------------------------------------------------------
 
 
-def filter_bigint_selective_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Equality predicate with high selectivity on integer column."""
-    orders = ctx.get_table("orders")
-
-    return orders[orders["o_orderkey"] == 1234567][["o_orderkey", "o_custkey", "o_orderdate", "o_totalprice"]]
-
-
-def filter_bigint_non_selective_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Range predicate with low selectivity on large table."""
-    lineitem = ctx.get_table("lineitem")
-
-    count = len(lineitem[lineitem["l_orderkey"] > 1000])
-    return ctx.scalar_to_df({"count": count})
-
-
-def filter_bigint_in_list_pandas_impl(ctx: DataFrameContext) -> Any:
-    """IN-list predicate with highly selective integer values."""
-    orders = ctx.get_table("orders")
-
-    return orders[orders["o_orderkey"].isin([1, 100, 1000, 10000, 100000])][
-        ["o_orderkey", "o_custkey", "o_orderdate", "o_totalprice"]
-    ]
-
-
-def filter_decimal_selective_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Compound equality predicate with multiple decimal columns."""
-    lineitem = ctx.get_table("lineitem")
-
-    return lineitem[(lineitem["l_extendedprice"] == 12345.67) & (lineitem["l_discount"] == 0.05)][
-        ["l_orderkey", "l_partkey", "l_extendedprice", "l_discount"]
-    ]
-
-
-def filter_decimal_non_selective_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Range predicate on decimal column with low selectivity."""
-    lineitem = ctx.get_table("lineitem")
-
-    count = len(lineitem[lineitem["l_extendedprice"] > 1000.00])
-    return ctx.scalar_to_df({"count": count})
-
-
-def filter_string_selective_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Exact string equality with high selectivity on varchar column."""
-    customer = ctx.get_table("customer")
-
-    return customer[customer["c_name"] == "Customer#000001234"][["c_custkey", "c_name", "c_address", "c_phone"]]
-
-
-def filter_string_non_selective_pandas_impl(ctx: DataFrameContext) -> Any:
-    """String comparison with low selectivity (most rows match)."""
-    customer = ctx.get_table("customer")
-
-    count = len(customer[customer["c_mktsegment"] >= "A"])
-    return ctx.scalar_to_df({"count": count})
-
-
 def filter_in_predicate_subquery_pandas_impl(ctx: DataFrameContext) -> Any:
     """IN predicate with subquery and selective filtering."""
     part = ctx.get_table("part")
@@ -1776,54 +1711,6 @@ def shuffle_self_join_pandas_impl(ctx: DataFrameContext) -> Any:
 # -----------------------------------------------------------------------------
 # Additional String queries (Pandas)
 # -----------------------------------------------------------------------------
-
-
-def string_equal_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Exact string equality with selective matching."""
-    part = ctx.get_table("part")
-
-    count = len(part[part["p_brand"] == "Brand#23"])
-    return ctx.scalar_to_df({"count": count})
-
-
-def string_equal_lower_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Equality predicate after applying case conversion."""
-    part = ctx.get_table("part")
-
-    count = len(part[part["p_brand"].str.lower() == "brand#23"])
-    return ctx.scalar_to_df({"count": count})
-
-
-def string_in_predicate_pandas_impl(ctx: DataFrameContext) -> Any:
-    """IN predicate with string values."""
-    orders = ctx.get_table("orders")
-
-    count = len(orders[orders["o_orderpriority"].isin(["1-URGENT", "2-HIGH"])])
-    return ctx.scalar_to_df({"count": count})
-
-
-def string_like_center_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Case sensitive matching pattern in any location."""
-    part = ctx.get_table("part")
-
-    count = len(part[part["p_name"].str.contains("STEEL", na=False)])
-    return ctx.scalar_to_df({"count": count})
-
-
-def string_like_suffix_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Case sensitive matching suffix pattern."""
-    part = ctx.get_table("part")
-
-    count = len(part[part["p_name"].str.endswith("COPPER", na=False)])
-    return ctx.scalar_to_df({"count": count})
-
-
-def string_like_prefix_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Case sensitive matching prefix pattern."""
-    part = ctx.get_table("part")
-
-    count = len(part[part["p_name"].str.startswith("STANDARD", na=False)])
-    return ctx.scalar_to_df({"count": count})
 
 
 # -----------------------------------------------------------------------------
@@ -2124,43 +2011,9 @@ def limit_ordered_pandas_impl(ctx: DataFrameContext) -> Any:
 # -----------------------------------------------------------------------------
 
 
-def filter_decimal_in_list_expression_impl(ctx: DataFrameContext) -> Any:
-    """IN-list predicate with decimal values and selectivity."""
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-
-    return lineitem.filter(col("l_extendedprice").is_in([1000.00, 5000.00, 10000.00, 50000.00])).select(
-        "l_orderkey", "l_partkey", "l_extendedprice", "l_quantity"
-    )
-
-
-def filter_decimal_in_list_pandas_impl(ctx: DataFrameContext) -> Any:
-    """IN-list predicate with decimal values and selectivity."""
-    lineitem = ctx.get_table("lineitem")
-
-    return lineitem[lineitem["l_extendedprice"].isin([1000.00, 5000.00, 10000.00, 50000.00])][
-        ["l_orderkey", "l_partkey", "l_extendedprice", "l_quantity"]
-    ]
-
-
 # -----------------------------------------------------------------------------
 # String LIKE filter queries (LIKE pattern)
 # -----------------------------------------------------------------------------
-
-
-def filter_string_like_expression_impl(ctx: DataFrameContext) -> Any:
-    """LIKE predicate with substring pattern matching."""
-    part = ctx.get_table("part")
-    col = ctx.col
-
-    return part.filter(col("p_name").str.contains("COPPER")).select("p_partkey", "p_name", "p_type", "p_size")
-
-
-def filter_string_like_pandas_impl(ctx: DataFrameContext) -> Any:
-    """LIKE predicate with substring pattern matching."""
-    part = ctx.get_table("part")
-
-    return part[part["p_name"].str.contains("COPPER", na=False)][["p_partkey", "p_name", "p_type", "p_size"]]
 
 
 # -----------------------------------------------------------------------------
@@ -2676,98 +2529,6 @@ def statistical_percentiles_pandas_impl(ctx: DataFrameContext) -> Any:
 # -----------------------------------------------------------------------------
 
 
-def string_ilike_start_expression_impl(ctx: DataFrameContext) -> Any:
-    """Case insensitive matching prefix pattern."""
-    part = ctx.get_table("part")
-    col = ctx.col
-
-    return part.filter(col("p_name").str.to_lowercase().str.starts_with("standard")).select(
-        col("p_partkey").count().alias("count")
-    )
-
-
-def string_ilike_start_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Case insensitive matching prefix pattern."""
-    part = ctx.get_table("part")
-
-    count = len(part[part["p_name"].str.lower().str.startswith("standard", na=False)])
-    return ctx.scalar_to_df({"count": count})
-
-
-def string_ilike_end_expression_impl(ctx: DataFrameContext) -> Any:
-    """Case insensitive matching suffix pattern."""
-    part = ctx.get_table("part")
-    col = ctx.col
-
-    return part.filter(col("p_name").str.to_lowercase().str.ends_with("copper")).select(
-        col("p_partkey").count().alias("count")
-    )
-
-
-def string_ilike_end_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Case insensitive matching suffix pattern."""
-    part = ctx.get_table("part")
-
-    count = len(part[part["p_name"].str.lower().str.endswith("copper", na=False)])
-    return ctx.scalar_to_df({"count": count})
-
-
-def string_like_multi_expression_impl(ctx: DataFrameContext) -> Any:
-    """Case sensitive matching multipart pattern."""
-    part = ctx.get_table("part")
-    col = ctx.col
-
-    return part.filter(col("p_name").str.contains("STEEL") & col("p_name").str.contains("BRASS")).select(
-        col("p_partkey").count().alias("count")
-    )
-
-
-def string_like_multi_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Case sensitive matching multipart pattern."""
-    part = ctx.get_table("part")
-
-    count = len(part[part["p_name"].str.contains("STEEL", na=False) & part["p_name"].str.contains("BRASS", na=False)])
-    return ctx.scalar_to_df({"count": count})
-
-
-def string_ilike_multi_expression_impl(ctx: DataFrameContext) -> Any:
-    """Case insensitive matching multipart pattern."""
-    part = ctx.get_table("part")
-    col = ctx.col
-
-    lower_name = col("p_name").str.to_lowercase()
-    return part.filter(lower_name.str.contains("steel") & lower_name.str.contains("brass")).select(
-        col("p_partkey").count().alias("count")
-    )
-
-
-def string_ilike_multi_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Case insensitive matching multipart pattern."""
-    part = ctx.get_table("part")
-
-    lower_name = part["p_name"].str.lower()
-    count = len(part[lower_name.str.contains("steel", na=False) & lower_name.str.contains("brass", na=False)])
-    return ctx.scalar_to_df({"count": count})
-
-
-def string_like_center_insensitive_expression_impl(ctx: DataFrameContext) -> Any:
-    """Case insensitive matching pattern in any location."""
-    part = ctx.get_table("part")
-    col = ctx.col
-
-    return part.filter(col("p_name").str.to_lowercase().str.contains("steel")).select(
-        col("p_partkey").count().alias("count")
-    )
-
-
-def string_like_center_insensitive_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Case insensitive matching pattern in any location."""
-    part = ctx.get_table("part")
-
-    count = len(part[part["p_name"].str.lower().str.contains("steel", na=False)])
-    return ctx.scalar_to_df({"count": count})
-
-
 # -----------------------------------------------------------------------------
 # Additional Window queries
 # -----------------------------------------------------------------------------
@@ -2875,27 +2636,6 @@ def approx_quantile_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
     lineitem = ctx.get_table("lineitem")
 
     return lineitem.groupby("l_shipmode", as_index=False).agg(median_quantity=("l_quantity", "median"))
-
-
-def intrinsic_to_date_expression_impl(ctx: DataFrameContext) -> Any:
-    """Count orders matching a specific date."""
-    orders = ctx.get_table("orders")
-    col = ctx.col
-    lit = ctx.lit
-
-    # Filter for specific date and count
-    return orders.filter(col("o_orderdate") == lit(date(1995, 3, 15))).select(
-        col("o_orderkey").count().alias("orders_by_month")
-    )
-
-
-def intrinsic_to_date_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Count orders matching a specific date."""
-    orders = ctx.get_table("orders")
-
-    target_date = date(1995, 3, 15)
-    count = len(orders[orders["o_orderdate"] == target_date])
-    return ctx.scalar_to_df({"orders_by_month": count})
 
 
 # =============================================================================
