@@ -361,144 +361,169 @@ def _three_channel_item_sales_pandas(
     )
 
 
-def q3_expression_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q3: Date/Item Brand Sales Analysis (Expression Family).
-
-    Reports sales for items by brand for a specific month and manufacturer,
-    grouped by year, brand ID, and brand name.
-
-    Tables: date_dim, store_sales, item
-    Pattern: 3-way join -> filter -> group by -> aggregate -> order by
-    """
-    return _date_item_sales_expression(
-        ctx,
+_HELPER_QUERY_SPECS = [
+    (
         3,
-        (("i_manufact_id", "manufact_id", 128), ("d_moy", "month", 11)),
-        ("d_year", "i_brand", "i_brand_id"),
-        "ss_ext_sales_price",
-        "sum_agg",
-        ("d_year", "sum_agg", "i_brand_id"),
-        (False, True, False),
-    )
-
-
-def q3_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q3: Date/Item Brand Sales Analysis (Pandas Family)."""
-    return _date_item_sales_pandas(
-        ctx,
-        3,
-        (("i_manufact_id", "manufact_id", 128), ("d_moy", "month", 11)),
-        ("d_year", "i_brand", "i_brand_id"),
-        "ss_ext_sales_price",
-        "sum_agg",
-        ("d_year", "sum_agg", "i_brand_id"),
-        (False, True, False),
-    )
-
-
-def q42_expression_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q42: Date/Item Category Sales (Expression Family).
-
-    Reports sales by item category for a specific month and year,
-    for items managed by a specific manager.
-
-    Tables: date_dim, store_sales, item
-    Pattern: 3-way join -> filter -> group by -> aggregate -> order by
-    """
-    return _date_item_sales_expression(
-        ctx,
+        "Date/Item Brand Sales Analysis",
+        _date_item_sales_expression,
+        _date_item_sales_pandas,
+        (
+            (("i_manufact_id", "manufact_id", 128), ("d_moy", "month", 11)),
+            ("d_year", "i_brand", "i_brand_id"),
+            "ss_ext_sales_price",
+            "sum_agg",
+            ("d_year", "sum_agg", "i_brand_id"),
+            (False, True, False),
+        ),
+    ),
+    (
         42,
-        (("i_manager_id", None, 1), ("d_moy", "month", 11), ("d_year", "year", 2000)),
-        ("d_year", "i_category_id", "i_category"),
-        "ss_ext_sales_price",
-        "sum_sales",
-        ("sum_sales", "d_year", "i_category_id", "i_category"),
-        (True, False, False, False),
-    )
-
-
-def q42_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q42: Date/Item Category Sales (Pandas Family)."""
-    return _date_item_sales_pandas(
-        ctx,
-        42,
-        (("i_manager_id", None, 1), ("d_moy", "month", 11), ("d_year", "year", 2000)),
-        ("d_year", "i_category_id", "i_category"),
-        "ss_ext_sales_price",
-        "sum_sales",
-        ("sum_sales", "d_year", "i_category_id", "i_category"),
-        (True, False, False, False),
-    )
-
-
-def q52_expression_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q52: Date/Brand Extended Sales (Expression Family).
-
-    Reports extended sales price by brand for a specific month and year,
-    for items managed by a specific manager.
-
-    Tables: date_dim, store_sales, item
-    Pattern: 3-way join -> filter -> group by -> aggregate -> order by
-    """
-    return _date_item_sales_expression(
-        ctx,
+        "Date/Item Category Sales",
+        _date_item_sales_expression,
+        _date_item_sales_pandas,
+        (
+            (("i_manager_id", None, 1), ("d_moy", "month", 11), ("d_year", "year", 2000)),
+            ("d_year", "i_category_id", "i_category"),
+            "ss_ext_sales_price",
+            "sum_sales",
+            ("sum_sales", "d_year", "i_category_id", "i_category"),
+            (True, False, False, False),
+        ),
+    ),
+    (
         52,
-        (("i_manager_id", None, 1), ("d_moy", "month", 11), ("d_year", "year", 2000)),
-        ("d_year", "i_brand", "i_brand_id"),
-        "ss_ext_sales_price",
-        "ext_price",
-        ("d_year", "ext_price", "i_brand_id"),
-        (False, True, False),
-    )
-
-
-def q52_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q52: Date/Brand Extended Sales (Pandas Family)."""
-    return _date_item_sales_pandas(
-        ctx,
-        52,
-        (("i_manager_id", None, 1), ("d_moy", "month", 11), ("d_year", "year", 2000)),
-        ("d_year", "i_brand", "i_brand_id"),
-        "ss_ext_sales_price",
-        "ext_price",
-        ("d_year", "ext_price", "i_brand_id"),
-        (False, True, False),
-    )
-
-
-def q55_expression_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q55: Brand Manager Sales (Expression Family).
-
-    Reports brand sales for items managed by a specific manager
-    for a specific month and year.
-
-    Tables: date_dim, store_sales, item
-    Pattern: 3-way join -> filter -> group by -> aggregate -> order by
-    """
-    return _date_item_sales_expression(
-        ctx,
+        "Date/Brand Extended Sales",
+        _date_item_sales_expression,
+        _date_item_sales_pandas,
+        (
+            (("i_manager_id", None, 1), ("d_moy", "month", 11), ("d_year", "year", 2000)),
+            ("d_year", "i_brand", "i_brand_id"),
+            "ss_ext_sales_price",
+            "ext_price",
+            ("d_year", "ext_price", "i_brand_id"),
+            (False, True, False),
+        ),
+    ),
+    (
         55,
-        (("i_manager_id", "manager_id", 28), ("d_moy", "month", 11), ("d_year", "year", 1999)),
-        ("i_brand_id", "i_brand"),
-        "ss_ext_sales_price",
-        "ext_price",
-        ("ext_price", "i_brand_id"),
-        (True, False),
-    )
+        "Brand Manager Sales",
+        _date_item_sales_expression,
+        _date_item_sales_pandas,
+        (
+            (("i_manager_id", "manager_id", 28), ("d_moy", "month", 11), ("d_year", "year", 1999)),
+            ("i_brand_id", "i_brand"),
+            "ss_ext_sales_price",
+            "ext_price",
+            ("ext_price", "i_brand_id"),
+            (True, False),
+        ),
+    ),
+    (
+        53,
+        "Store Manufacturer Sales",
+        _manufacturer_month_expression,
+        _manufacturer_month_pandas,
+        ("ss_sales_price", "sum_sales"),
+    ),
+    (
+        63,
+        "Store Manufacturer Profit",
+        _manufacturer_month_expression,
+        _manufacturer_month_pandas,
+        ("ss_net_profit", "sum_profit"),
+    ),
+    (
+        98,
+        "Store Sales Item Band",
+        _item_category_sales_expression,
+        _item_category_sales_pandas,
+        (
+            "store_sales",
+            "ss_item_sk",
+            "ss_sold_date_sk",
+            "ss_ext_sales_price",
+            "categories",
+            1,
+            ("i_item_desc", "i_category", "i_class", "i_current_price"),
+            ("i_category", "i_class", "itemrevenue", "i_item_desc"),
+        ),
+    ),
+    (
+        12,
+        "Web Sales Item Analysis",
+        _item_category_sales_expression,
+        _item_category_sales_pandas,
+        (
+            "web_sales",
+            "ws_item_sk",
+            "ws_sold_date_sk",
+            "ws_ext_sales_price",
+            "item_categories",
+            2,
+            ("i_item_id", "i_item_desc", "i_category", "i_class", "i_current_price"),
+            ("i_category", "i_class", "itemrevenue", "i_item_id"),
+        ),
+    ),
+    (
+        20,
+        "Catalog Sales Item Analysis",
+        _item_category_sales_expression,
+        _item_category_sales_pandas,
+        (
+            "catalog_sales",
+            "cs_item_sk",
+            "cs_sold_date_sk",
+            "cs_ext_sales_price",
+            "item_categories",
+            2,
+            ("i_item_id", "i_item_desc", "i_category", "i_class", "i_current_price"),
+            ("i_category", "i_class", "itemrevenue", "i_item_id"),
+        ),
+    ),
+    (
+        32,
+        "Catalog Sales Excess Discount",
+        _excess_discount_expression,
+        _excess_discount_pandas,
+        ("catalog_sales", "cs_item_sk", "cs_sold_date_sk", "cs_ext_discount_amt", 977),
+    ),
+    (
+        92,
+        "Web Sales Excess Discount",
+        _excess_discount_expression,
+        _excess_discount_pandas,
+        ("web_sales", "ws_item_sk", "ws_sold_date_sk", "ws_ext_discount_amt", 350),
+    ),
+    (
+        56,
+        "Three-Channel Sales by Item (Color)",
+        _three_channel_item_sales_expression,
+        _three_channel_item_sales_pandas,
+        ("i_color", "colors", ["pale", "chiffon", "thistle"], 1, ("total_sales", "i_item_id")),
+    ),
+    (
+        60,
+        "Three-Channel Sales by Item (Category)",
+        _three_channel_item_sales_expression,
+        _three_channel_item_sales_pandas,
+        ("i_category", "category", "Children", 8, ("i_item_id", "total_sales")),
+    ),
+]
 
 
-def q55_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q55: Brand Manager Sales (Pandas Family)."""
-    return _date_item_sales_pandas(
-        ctx,
-        55,
-        (("i_manager_id", "manager_id", 28), ("d_moy", "month", 11), ("d_year", "year", 1999)),
-        ("i_brand_id", "i_brand"),
-        "ss_ext_sales_price",
-        "ext_price",
-        ("ext_price", "i_brand_id"),
-        (True, False),
-    )
+def _make_helper_impl(query_id: int, title: str, family: str, helper: Any, helper_args: tuple[Any, ...]) -> Any:
+    def impl(ctx: DataFrameContext) -> Any:
+        return helper(ctx, query_id, *helper_args)
+
+    impl.__name__ = f"q{query_id}_{family}_impl"
+    impl.__qualname__ = impl.__name__
+    impl.__doc__ = f"TPC-DS Q{query_id}: {title} ({family.title()} Family)."
+    return impl
+
+
+for _qid, _title, _expr_helper, _pandas_helper, _helper_args in _HELPER_QUERY_SPECS:
+    globals()[f"q{_qid}_expression_impl"] = _make_helper_impl(_qid, _title, "expression", _expr_helper, _helper_args)
+    globals()[f"q{_qid}_pandas_impl"] = _make_helper_impl(_qid, _title, "pandas", _pandas_helper, _helper_args)
 
 
 def q19_expression_impl(ctx: DataFrameContext) -> Any:
@@ -893,38 +918,6 @@ def q25_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-def q53_expression_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q53: Store Manufacturer Sales (Expression Family).
-
-    Reports store sales by manufacturer for specific months.
-
-    Tables: store_sales, item, date_dim, store
-    Pattern: 4-way join -> filter -> group by -> aggregate -> order by
-    """
-    return _manufacturer_month_expression(ctx, 53, "ss_sales_price", "sum_sales")
-
-
-def q53_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q53: Store Manufacturer Sales (Pandas Family)."""
-    return _manufacturer_month_pandas(ctx, 53, "ss_sales_price", "sum_sales")
-
-
-def q63_expression_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q63: Store Manufacturer Profit (Expression Family).
-
-    Reports store profit by manufacturer for specific months.
-
-    Tables: store_sales, item, date_dim, store
-    Pattern: 4-way join -> filter -> group by -> aggregate -> order by
-    """
-    return _manufacturer_month_expression(ctx, 63, "ss_net_profit", "sum_profit")
-
-
-def q63_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q63: Store Manufacturer Profit (Pandas Family)."""
-    return _manufacturer_month_pandas(ctx, 63, "ss_net_profit", "sum_profit")
-
-
 def q65_expression_impl(ctx: DataFrameContext) -> Any:
     """TPC-DS Q65: Store Sales Item Profit (Expression Family).
 
@@ -1293,44 +1286,6 @@ def q89_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-def q98_expression_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q98: Store Sales Item Band (Expression Family).
-
-    Reports store sales by item category for specific categories.
-
-    Tables: store_sales, item, date_dim
-    Pattern: 3-way join -> filter -> group by -> aggregate -> order by
-    """
-    return _item_category_sales_expression(
-        ctx,
-        98,
-        "store_sales",
-        "ss_item_sk",
-        "ss_sold_date_sk",
-        "ss_ext_sales_price",
-        "categories",
-        1,
-        ("i_item_desc", "i_category", "i_class", "i_current_price"),
-        ("i_category", "i_class", "itemrevenue", "i_item_desc"),
-    )
-
-
-def q98_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q98: Store Sales Item Band (Pandas Family)."""
-    return _item_category_sales_pandas(
-        ctx,
-        98,
-        "store_sales",
-        "ss_item_sk",
-        "ss_sold_date_sk",
-        "ss_ext_sales_price",
-        "categories",
-        1,
-        ("i_item_desc", "i_category", "i_class", "i_current_price"),
-        ("i_category", "i_class", "itemrevenue", "i_item_desc"),
-    )
-
-
 # =============================================================================
 # Moderate Queries - CTEs, subqueries, and more complex patterns
 # =============================================================================
@@ -1493,44 +1448,6 @@ def q6_pandas_impl(ctx: DataFrameContext) -> Any:
     return grouped[grouped["cnt"] >= 10].sort_values(["cnt", "i_item_id"]).head(100)
 
 
-def q12_expression_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q12: Web Sales Item Analysis (Expression Family).
-
-    Reports web sales by item category for specific categories and date range.
-
-    Tables: web_sales, item, date_dim
-    Pattern: Join -> filter -> group by -> aggregate with revenue percent
-    """
-    return _item_category_sales_expression(
-        ctx,
-        12,
-        "web_sales",
-        "ws_item_sk",
-        "ws_sold_date_sk",
-        "ws_ext_sales_price",
-        "item_categories",
-        2,
-        ("i_item_id", "i_item_desc", "i_category", "i_class", "i_current_price"),
-        ("i_category", "i_class", "itemrevenue", "i_item_id"),
-    )
-
-
-def q12_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q12: Web Sales Item Analysis (Pandas Family)."""
-    return _item_category_sales_pandas(
-        ctx,
-        12,
-        "web_sales",
-        "ws_item_sk",
-        "ws_sold_date_sk",
-        "ws_ext_sales_price",
-        "item_categories",
-        2,
-        ("i_item_id", "i_item_desc", "i_category", "i_class", "i_current_price"),
-        ("i_category", "i_class", "itemrevenue", "i_item_id"),
-    )
-
-
 def q15_expression_impl(ctx: DataFrameContext) -> Any:
     """TPC-DS Q15: Catalog Sales Analysis (Expression Family).
 
@@ -1597,44 +1514,6 @@ def q15_pandas_impl(ctx: DataFrameContext) -> Any:
         .agg(total_sales=("cs_sales_price", "sum"))
         .sort_values(["ca_zip"])
         .head(100)
-    )
-
-
-def q20_expression_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q20: Catalog Sales Item Analysis (Expression Family).
-
-    Reports catalog sales by item category for specific categories.
-
-    Tables: catalog_sales, item, date_dim
-    Pattern: Join -> filter -> group by -> aggregate
-    """
-    return _item_category_sales_expression(
-        ctx,
-        20,
-        "catalog_sales",
-        "cs_item_sk",
-        "cs_sold_date_sk",
-        "cs_ext_sales_price",
-        "item_categories",
-        2,
-        ("i_item_id", "i_item_desc", "i_category", "i_class", "i_current_price"),
-        ("i_category", "i_class", "itemrevenue", "i_item_id"),
-    )
-
-
-def q20_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q20: Catalog Sales Item Analysis (Pandas Family)."""
-    return _item_category_sales_pandas(
-        ctx,
-        20,
-        "catalog_sales",
-        "cs_item_sk",
-        "cs_sold_date_sk",
-        "cs_ext_sales_price",
-        "item_categories",
-        2,
-        ("i_item_id", "i_item_desc", "i_category", "i_class", "i_current_price"),
-        ("i_category", "i_class", "itemrevenue", "i_item_id"),
     )
 
 
@@ -1721,26 +1600,6 @@ def q26_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-def q32_expression_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q32: Catalog Sales Excess Discount (Expression Family).
-
-    Finds items sold with excess discount compared to average.
-
-    Tables: catalog_sales, item, date_dim
-    Pattern: Subquery -> filter by computed threshold
-    """
-    return _excess_discount_expression(
-        ctx, 32, "catalog_sales", "cs_item_sk", "cs_sold_date_sk", "cs_ext_discount_amt", 977
-    )
-
-
-def q32_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q32: Catalog Sales Excess Discount (Pandas Family)."""
-    return _excess_discount_pandas(
-        ctx, 32, "catalog_sales", "cs_item_sk", "cs_sold_date_sk", "cs_ext_discount_amt", 977
-    )
-
-
 def q82_expression_impl(ctx: DataFrameContext) -> Any:
     """TPC-DS Q82: Store Sales Inventory (Expression Family).
 
@@ -1820,24 +1679,6 @@ def q82_pandas_impl(ctx: DataFrameContext) -> Any:
     return (
         merged[["i_item_id", "i_item_desc", "i_current_price"]].drop_duplicates().sort_values(["i_item_id"]).head(100)
     )
-
-
-def q92_expression_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q92: Web Sales Discount (Expression Family).
-
-    Finds web items sold with excess discount.
-
-    Tables: web_sales, item, date_dim
-    Pattern: Subquery -> filter by threshold
-    """
-    return _excess_discount_expression(
-        ctx, 92, "web_sales", "ws_item_sk", "ws_sold_date_sk", "ws_ext_discount_amt", 350
-    )
-
-
-def q92_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q92: Web Sales Discount (Pandas Family)."""
-    return _excess_discount_pandas(ctx, 92, "web_sales", "ws_item_sk", "ws_sold_date_sk", "ws_ext_discount_amt", 350)
 
 
 # =============================================================================
@@ -4143,120 +3984,88 @@ def q51_pandas_impl(ctx: DataFrameContext) -> Any:
 # =============================================================================
 
 
-def q47_expression_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q47: Store Sales Rolling Average (Expression Family).
-
-    Computes monthly sales with 3-month rolling average using window functions.
-    Uses self-join pattern for previous/next month values.
-    """
-    params = get_parameters(47)
+def _rolling_average_expression_impl(
+    ctx: DataFrameContext,
+    *,
+    query_id: int,
+    sales_table: str,
+    date_sk_col: str,
+    item_sk_col: str,
+    sales_price_col: str,
+    channel_table: str,
+    channel_join_key_left: str,
+    channel_join_key_right: str,
+    channel_cols: list[str],
+) -> Any:
+    params = get_parameters(query_id)
     year = params.get("year", 1999)
-
     col = ctx.col
     lit = ctx.lit
-
-    # Get tables
-    store_sales = ctx.get_table("store_sales")
+    sales = ctx.get_table(sales_table)
     date_dim = ctx.get_table("date_dim")
     item = ctx.get_table("item")
-    store = ctx.get_table("store")
-
-    # Filter dates: current year +/- 1 month
+    channel = ctx.get_table(channel_table)
     dates = date_dim.filter(
         (col("d_year") == lit(year))
         | ((col("d_year") == lit(year - 1)) & (col("d_moy") == 12))
         | ((col("d_year") == lit(year + 1)) & (col("d_moy") == 1))
     )
-
-    # Base aggregation
+    partition_keys = ["i_category", "i_brand", *channel_cols]
     base = (
-        store_sales.join(dates, left_on="ss_sold_date_sk", right_on="d_date_sk")
-        .join(item, left_on="ss_item_sk", right_on="i_item_sk")
-        .join(store, left_on="ss_store_sk", right_on="s_store_sk")
-        .group_by(["i_category", "i_brand", "s_store_name", "s_company_name", "d_year", "d_moy"])
-        .agg(col("ss_sales_price").sum().alias("sum_sales"))
+        sales.join(dates, left_on=date_sk_col, right_on="d_date_sk")
+        .join(item, left_on=item_sk_col, right_on="i_item_sk")
+        .join(channel, left_on=channel_join_key_left, right_on=channel_join_key_right)
+        .group_by([*partition_keys, "d_year", "d_moy"])
+        .agg(col(sales_price_col).sum().alias("sum_sales"))
     )
-
-    # Add rank within partition for month ordering
     v1 = base.with_columns(
-        col("d_year")
-        .rank(method="ordinal")  # Just use as proxy for month order
-        .over(["i_category", "i_brand", "s_store_name", "s_company_name"])
-        .alias("rn")
+        col("sum_sales").mean().over([*partition_keys, "d_year"]).alias("avg_monthly_sales"),
+        ((col("d_year") * 100) + col("d_moy")).rank(method="ordinal").over(partition_keys).alias("rn"),
     )
-
-    # Add average monthly sales (within year) and rank for month order
-    v1 = v1.with_columns(
-        col("sum_sales")
-        .mean()
-        .over(["i_category", "i_brand", "s_store_name", "s_company_name", "d_year"])
-        .alias("avg_monthly_sales"),
-        # Use combined year*100+moy for proper ordering
-        ((col("d_year") * 100) + col("d_moy"))
-        .rank(method="ordinal")
-        .over(["i_category", "i_brand", "s_store_name", "s_company_name"])
-        .alias("rn"),
-    )
-
-    # Self-join for lag/lead (previous/next month)
-    v1_lag = v1.select(
-        col("i_category"),
-        col("i_brand"),
-        col("s_store_name"),
-        col("s_company_name"),
-        col("rn"),
-        col("sum_sales").alias("psum"),
-    )
-
-    v1_lead = v1.select(
-        col("i_category"),
-        col("i_brand"),
-        col("s_store_name"),
-        col("s_company_name"),
-        col("rn"),
-        col("sum_sales").alias("nsum"),
-    )
-
-    # Join: v1.rn = v1_lag.rn + 1 and v1.rn = v1_lead.rn - 1
+    lag_select = [col(key) for key in partition_keys] + [col("rn"), col("sum_sales").alias("psum")]
+    lead_select = [col(key) for key in partition_keys] + [col("rn"), col("sum_sales").alias("nsum")]
     result = (
-        v1.join(
-            v1_lag,
-            on=["i_category", "i_brand", "s_store_name", "s_company_name"],
-            suffix="_lag",
-        )
+        v1.join(v1.select(lag_select), on=partition_keys, suffix="_lag")
         .filter(col("rn") == col("rn_lag") + 1)
-        .join(
-            v1_lead,
-            on=["i_category", "i_brand", "s_store_name", "s_company_name"],
-            suffix="_lead",
-        )
+        .join(v1.select(lead_select), on=partition_keys, suffix="_lead")
         .filter(col("rn") == col("rn_lead") - 1)
+        .filter(
+            (col("d_year") == lit(year))
+            & (col("avg_monthly_sales") > 0)
+            & ((col("sum_sales") - col("avg_monthly_sales")).abs() / col("avg_monthly_sales") > 0.1)
+        )
     )
-
-    # Filter for year and avg_monthly_sales > 0 and deviation > 0.1
-    result = result.filter(
-        (col("d_year") == lit(year))
-        & (col("avg_monthly_sales") > 0)
-        & ((col("sum_sales") - col("avg_monthly_sales")).abs() / col("avg_monthly_sales") > 0.1)
-    )
-
-    # Select and sort
     return (
         result.select(
-            col("i_category"),
-            col("i_brand"),
-            col("s_store_name"),
-            col("s_company_name"),
-            col("d_year"),
-            col("d_moy"),
-            col("avg_monthly_sales"),
-            col("sum_sales"),
-            col("psum"),
-            col("nsum"),
+            [col(key) for key in partition_keys]
+            + [
+                col("d_year"),
+                col("d_moy"),
+                col("avg_monthly_sales"),
+                col("sum_sales"),
+                col("psum"),
+                col("nsum"),
+            ]
         )
         .with_columns((col("sum_sales") - col("avg_monthly_sales")).alias("diff"))
         .sort(["diff", "avg_monthly_sales"])
         .head(100)
+    )
+
+
+def q47_expression_impl(ctx: DataFrameContext) -> Any:
+    """TPC-DS Q47: Store Sales Rolling Average (Expression Family)."""
+    return _rolling_average_expression_impl(
+        ctx,
+        query_id=47,
+        sales_table="store_sales",
+        date_sk_col="ss_sold_date_sk",
+        item_sk_col="ss_item_sk",
+        sales_price_col="ss_sales_price",
+        channel_table="store",
+        channel_join_key_left="ss_store_sk",
+        channel_join_key_right="s_store_sk",
+        channel_cols=["s_store_name", "s_company_name"],
     )
 
 
@@ -4372,95 +4181,18 @@ def q47_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def q57_expression_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q57: Catalog Sales Rolling Average (Expression Family).
-
-    Similar to Q47 but for catalog_sales with call_center dimension.
-    """
-
-    params = get_parameters(57)
-    year = params.get("year", 1999)
-
-    col = ctx.col
-    lit = ctx.lit
-
-    # Get tables
-    catalog_sales = ctx.get_table("catalog_sales")
-    date_dim = ctx.get_table("date_dim")
-    item = ctx.get_table("item")
-    call_center = ctx.get_table("call_center")
-
-    # Filter dates
-    dates = date_dim.filter(
-        (col("d_year") == lit(year))
-        | ((col("d_year") == lit(year - 1)) & (col("d_moy") == 12))
-        | ((col("d_year") == lit(year + 1)) & (col("d_moy") == 1))
-    )
-
-    # Base aggregation
-    base = (
-        catalog_sales.join(dates, left_on="cs_sold_date_sk", right_on="d_date_sk")
-        .join(item, left_on="cs_item_sk", right_on="i_item_sk")
-        .join(call_center, left_on="cs_call_center_sk", right_on="cc_call_center_sk")
-        .group_by(["i_category", "i_brand", "cc_name", "d_year", "d_moy"])
-        .agg(col("cs_sales_price").sum().alias("sum_sales"))
-    )
-
-    # Add rank and average
-    v1 = base.with_columns(
-        col("sum_sales").mean().over(["i_category", "i_brand", "cc_name", "d_year"]).alias("avg_monthly_sales"),
-        ((col("d_year") * 100) + col("d_moy"))
-        .rank(method="ordinal")
-        .over(["i_category", "i_brand", "cc_name"])
-        .alias("rn"),
-    )
-
-    # Self-join for lag/lead
-    v1_lag = v1.select(
-        col("i_category"),
-        col("i_brand"),
-        col("cc_name"),
-        col("rn"),
-        col("sum_sales").alias("psum"),
-    )
-
-    v1_lead = v1.select(
-        col("i_category"),
-        col("i_brand"),
-        col("cc_name"),
-        col("rn"),
-        col("sum_sales").alias("nsum"),
-    )
-
-    result = (
-        v1.join(v1_lag, on=["i_category", "i_brand", "cc_name"], suffix="_lag")
-        .filter(col("rn") == col("rn_lag") + 1)
-        .join(v1_lead, on=["i_category", "i_brand", "cc_name"], suffix="_lead")
-        .filter(col("rn") == col("rn_lead") - 1)
-    )
-
-    # Filter
-    result = result.filter(
-        (col("d_year") == lit(year))
-        & (col("avg_monthly_sales") > 0)
-        & ((col("sum_sales") - col("avg_monthly_sales")).abs() / col("avg_monthly_sales") > 0.1)
-    )
-
-    # Select and sort
-    return (
-        result.select(
-            col("i_category"),
-            col("i_brand"),
-            col("cc_name"),
-            col("d_year"),
-            col("d_moy"),
-            col("avg_monthly_sales"),
-            col("sum_sales"),
-            col("psum"),
-            col("nsum"),
-        )
-        .with_columns((col("sum_sales") - col("avg_monthly_sales")).alias("diff"))
-        .sort(["diff", "avg_monthly_sales"])
-        .head(100)
+    """TPC-DS Q57: Catalog Sales Rolling Average (Expression Family)."""
+    return _rolling_average_expression_impl(
+        ctx,
+        query_id=57,
+        sales_table="catalog_sales",
+        date_sk_col="cs_sold_date_sk",
+        item_sk_col="cs_item_sk",
+        sales_price_col="cs_sales_price",
+        channel_table="call_center",
+        channel_join_key_left="cs_call_center_sk",
+        channel_join_key_right="cc_call_center_sk",
+        channel_cols=["cc_name"],
     )
 
 
@@ -5308,53 +5040,6 @@ def q33_pandas_impl(ctx: DataFrameContext) -> Any:
         .agg(total_sales=("total_sales", "sum"))
         .sort_values("total_sales")
         .head(100)
-    )
-
-
-# =============================================================================
-# Q56: Three-Channel Sales by Item (Color Filter)
-# =============================================================================
-
-
-def q56_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q56: Three-channel sales by item with color filter (Polars).
-
-    Union store, catalog, and web sales filtered by item colors and GMT offset,
-    aggregate by item_id.
-    """
-
-    return _three_channel_item_sales_expression(
-        ctx, 56, "i_color", "colors", ["pale", "chiffon", "thistle"], 1, ("total_sales", "i_item_id")
-    )
-
-
-def q56_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q56: Three-channel sales by item with color filter (Pandas)."""
-    return _three_channel_item_sales_pandas(
-        ctx, 56, "i_color", "colors", ["pale", "chiffon", "thistle"], 1, ("total_sales", "i_item_id")
-    )
-
-
-# =============================================================================
-# Q60: Three-Channel Sales by Item (Category Filter)
-# =============================================================================
-
-
-def q60_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q60: Three-channel sales by item with category filter (Polars).
-
-    Similar to Q56 but filtered by item category instead of color.
-    """
-
-    return _three_channel_item_sales_expression(
-        ctx, 60, "i_category", "category", "Children", 8, ("i_item_id", "total_sales")
-    )
-
-
-def q60_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q60: Three-channel sales by item with category filter (Pandas)."""
-    return _three_channel_item_sales_pandas(
-        ctx, 60, "i_category", "category", "Children", 8, ("i_item_id", "total_sales")
     )
 
 
