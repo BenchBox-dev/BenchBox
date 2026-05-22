@@ -264,7 +264,7 @@ def register_discovery_tools(mcp: FastMCP) -> None:
         """Get detailed information about a specific benchmark.
 
         Args:
-            benchmark: Benchmark name (tpch, tpcds, ssb, clickbench, nyctaxi, tsbs_devops, h2odb, amplab, coffeeshop, tpch_skew, datavault, tpcdi, write_primitives, read_primitives, and more)
+            benchmark: Any registered benchmark ID; call list_available("benchmarks") to enumerate.
 
         Returns:
             Detailed benchmark information including queries and schema.

@@ -131,6 +131,8 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "min_scale": 0.01,
         "complexity": "Medium",
         "estimated_time_range": (2, 10),  # minutes
+        "base_memory_gb": 1.0,
+        "data_source": None,
         "supports_dataframe": True,
     },
     "tpcds": {
@@ -148,6 +150,8 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         # for development use, but remain unofficial.
         "complexity": "High",
         "estimated_time_range": (10, 60),
+        "base_memory_gb": 2.5,
+        "data_source": None,
         "supports_dataframe": True,
     },
     "tpcds_obt": {
@@ -163,6 +167,8 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "min_scale": 1.0,
         "complexity": "Medium",
         "estimated_time_range": (5, 20),
+        "base_memory_gb": 2.5,
+        "data_source": "tpcds",
         "supports_dataframe": True,
     },
     "tpcdi": {
@@ -178,6 +184,8 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "min_scale": 0.01,
         "complexity": "High",
         "estimated_time_range": (5, 30),
+        "base_memory_gb": 1.5,
+        "data_source": None,
         "supports_dataframe": True,
     },
     "ssb": {
@@ -193,6 +201,8 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "min_scale": 0.01,
         "complexity": "Low",
         "estimated_time_range": (1, 5),
+        "base_memory_gb": 0.8,
+        "data_source": None,
         "supports_dataframe": True,
     },
     "clickbench": {
@@ -208,6 +218,8 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "min_scale": 1.0,
         "complexity": "Medium",
         "estimated_time_range": (5, 15),
+        "base_memory_gb": 15.0,
+        "data_source": None,
         "supports_dataframe": True,
     },
     "h2odb": {
@@ -223,6 +235,8 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "min_scale": 0.01,
         "complexity": "Medium",
         "estimated_time_range": (3, 15),
+        "base_memory_gb": 2.0,
+        "data_source": None,
         "supports_dataframe": True,
     },
     "amplab": {
@@ -238,6 +252,8 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "min_scale": 0.01,
         "complexity": "Medium",
         "estimated_time_range": (3, 15),
+        "base_memory_gb": 1.2,
+        "data_source": None,
         "supports_dataframe": True,
     },
     "read_primitives": {
@@ -253,6 +269,8 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "min_scale": 0.01,
         "complexity": "Low",
         "estimated_time_range": (1, 3),
+        "base_memory_gb": 0.1,
+        "data_source": "tpch",
         "supports_dataframe": True,
     },
     "write_primitives": {
@@ -268,6 +286,8 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "min_scale": 0.01,
         "complexity": "Medium",
         "estimated_time_range": (2, 5),
+        "base_memory_gb": 1.0,
+        "data_source": "tpch",
         "supports_dataframe": True,
     },
     "metadata_primitives": {
@@ -283,6 +303,8 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "min_scale": 1.0,
         "complexity": "Low",
         "estimated_time_range": (1, 2),
+        "base_memory_gb": 0.01,
+        "data_source": None,
         "supports_dataframe": True,
     },
     "transaction_primitives": {
@@ -298,6 +320,8 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "min_scale": 0.01,
         "complexity": "Medium",
         "estimated_time_range": (2, 5),
+        "base_memory_gb": 1.0,
+        "data_source": "tpch",
         "supports_dataframe": True,
     },
     "ai_primitives": {
@@ -313,6 +337,8 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "min_scale": 0.01,
         "complexity": "Medium",
         "estimated_time_range": (3, 15),
+        "base_memory_gb": 1.0,
+        "data_source": "tpch",
         "supports_dataframe": False,
     },
     "joinorder": {
@@ -328,6 +354,7 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "min_scale": 1.0,
         "complexity": "High",
         "estimated_time_range": (30, 90),
+        "base_memory_gb": 5.0,
         "supports_dataframe": True,
         "surface": "public",
         "data_source": "canonical",
@@ -346,6 +373,7 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "min_scale": 0.001,
         "complexity": "Medium",
         "estimated_time_range": (2, 10),
+        "base_memory_gb": 1.0,
         "supports_dataframe": True,
         "surface": "internal",
         "data_source": "synthetic",
@@ -363,6 +391,8 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "min_scale": 0.001,
         "complexity": "Medium",
         "estimated_time_range": (3, 12),
+        "base_memory_gb": 1.0,
+        "data_source": None,
         "supports_dataframe": True,
     },
     "tpchavoc": {
@@ -378,6 +408,8 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "min_scale": 0.01,
         "complexity": "High",
         "estimated_time_range": (15, 60),
+        "base_memory_gb": 1.0,
+        "data_source": None,
         "supports_dataframe": True,
     },
     "tpch_skew": {
@@ -393,6 +425,8 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "min_scale": 0.01,
         "complexity": "Medium",
         "estimated_time_range": (2, 15),
+        "base_memory_gb": 1.0,
+        "data_source": None,
         "supports_dataframe": True,
     },
     "tsbs_devops": {
@@ -408,6 +442,8 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "min_scale": 0.01,
         "complexity": "Medium",
         "estimated_time_range": (2, 10),
+        "base_memory_gb": 0.8,
+        "data_source": None,
         "supports_dataframe": True,
     },
     "nyctaxi": {
@@ -423,6 +459,8 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "min_scale": 0.01,
         "complexity": "Medium",
         "estimated_time_range": (5, 30),
+        "base_memory_gb": 1.0,
+        "data_source": None,
         "supports_dataframe": True,
     },
     "flightdata": {
@@ -438,6 +476,8 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "min_scale": 0.01,
         "complexity": "Medium",
         "estimated_time_range": (5, 30),
+        "base_memory_gb": 1.0,
+        "data_source": None,
         "supports_dataframe": True,
     },
     "datavault": {
@@ -453,6 +493,8 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "min_scale": 0.01,
         "complexity": "High",
         "estimated_time_range": (5, 30),
+        "base_memory_gb": 3.0,
+        "data_source": None,
         "supports_dataframe": True,
     },
     "vector_search": {
@@ -468,6 +510,8 @@ BENCHMARK_METADATA: dict[str, dict[str, Any]] = {
         "min_scale": 0.01,
         "complexity": "Medium",
         "estimated_time_range": (1, 10),
+        "base_memory_gb": 1.0,
+        "data_source": None,
         "supports_dataframe": False,
     },
 }
@@ -489,38 +533,6 @@ def _validate_benchmark_support_status() -> None:
         raise ValueError("Invalid benchmark support_status metadata: " + "; ".join(details))
 
 
-def _default_scale_for_metadata_probe(benchmark_id: str) -> float:
-    meta = BENCHMARK_METADATA[benchmark_id]
-    default_scale = meta.get("default_scale")
-    if default_scale is not None:
-        return float(default_scale)
-    scale_options = meta.get("scale_options") or ()
-    if scale_options:
-        return float(scale_options[0])
-    return 1.0
-
-
-def _benchmark_data_source_from_instance(benchmark_id: str) -> str | None:
-    class_name = CORE_BENCHMARK_CLASS_NAMES[benchmark_id]
-    module = importlib.import_module(f"benchbox.core.{benchmark_id}.benchmark")
-    benchmark_class = getattr(module, class_name)
-    instance = benchmark_class(scale_factor=_default_scale_for_metadata_probe(benchmark_id))
-    getter = getattr(instance, "get_data_source_benchmark", None)
-    if getter is None:
-        return None
-    data_source = getter()
-    if data_source is None:
-        return None
-    return str(data_source)
-
-
-def _populate_benchmark_data_sources() -> None:
-    for meta in BENCHMARK_METADATA.values():
-        meta.setdefault("data_source", None)
-    for benchmark_id in BENCHMARK_DATA_SOURCE_PROBE_IDS:
-        BENCHMARK_METADATA[benchmark_id]["data_source"] = _benchmark_data_source_from_instance(benchmark_id)
-
-
 def _validate_benchmark_data_sources() -> None:
     missing = sorted(name for name, meta in BENCHMARK_METADATA.items() if "data_source" not in meta)
     invalid = sorted(
@@ -537,8 +549,48 @@ def _validate_benchmark_data_sources() -> None:
         raise ValueError("Invalid benchmark data_source metadata: " + "; ".join(details))
 
 
-_populate_benchmark_data_sources()
+def _validate_benchmark_estimate_metadata() -> None:
+    missing = sorted(
+        name
+        for name, meta in BENCHMARK_METADATA.items()
+        if "estimated_time_range" not in meta or "base_memory_gb" not in meta
+    )
+    invalid = sorted(
+        name
+        for name, meta in BENCHMARK_METADATA.items()
+        if (
+            "estimated_time_range" in meta
+            and "base_memory_gb" in meta
+            and (
+                not _is_valid_time_range(meta.get("estimated_time_range"))
+                or not _is_valid_base_memory(meta.get("base_memory_gb"))
+            )
+        )
+    )
+    if missing or invalid:
+        details: list[str] = []
+        if missing:
+            details.append(f"missing estimate metadata for: {', '.join(missing)}")
+        if invalid:
+            details.append(f"invalid estimate metadata for: {', '.join(invalid)}")
+        raise ValueError("Invalid benchmark estimate metadata: " + "; ".join(details))
+
+
+def _is_valid_time_range(value: Any) -> bool:
+    return (
+        isinstance(value, tuple)
+        and len(value) == 2
+        and all(isinstance(item, (int, float)) and item >= 0 for item in value)
+        and float(value[0]) <= float(value[1])
+    )
+
+
+def _is_valid_base_memory(value: Any) -> bool:
+    return isinstance(value, (int, float)) and value > 0
+
+
 _validate_benchmark_data_sources()
+_validate_benchmark_estimate_metadata()
 _validate_benchmark_support_status()
 
 

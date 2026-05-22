@@ -6,6 +6,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 """
 
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -119,6 +120,14 @@ class TestGetBenchmarkInfoTool:
 
         benchmarks = get_all_benchmarks()
         assert "nonexistent_benchmark" not in benchmarks
+
+    def test_get_benchmark_info_docstring_does_not_repeat_registry_list(self):
+        """Human-facing MCP hints should point callers at registry-backed discovery."""
+
+        source = Path("benchbox/mcp/tools/discovery.py").read_text(encoding="utf-8")
+
+        assert "tpch, tpcds, ssb, clickbench" not in source
+        assert 'list_available("benchmarks")' in source
 
 
 class TestSystemProfileTool:
