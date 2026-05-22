@@ -16,7 +16,6 @@
 version: 1
 operations:
 - id: insert_single_row
-  category: insert
   description: Tests single row INSERT performance with all columns specified
   write_sql: "INSERT INTO insert_ops_lineitem\nVALUES (\n  9000001, 1, 1, 1,\n  10.0, 1000.0, 0.05, 0.02,\n  'N', 'O',\n  DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20',\n  'DELIVER IN PERSON', 'TRUCK', 'test insert'\n)\n"
   validation_queries:
@@ -26,7 +25,6 @@ operations:
   cleanup_sql: "DELETE FROM insert_ops_lineitem WHERE l_orderkey = 9000001\n"
   expected_rows_affected: 1
 - id: insert_batch_values_10
-  category: insert
   description: Tests small batch INSERT using VALUES clause with 10 rows
   write_sql: "INSERT INTO insert_ops_lineitem VALUES\n  (9000010, 1, 1, 1, 10.0, 1000.0, 0.05, 0.02, 'N', 'O', DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20', 'DELIVER IN PERSON', 'TRUCK', 'batch 1'),\n  (9000011, 2, 2, 1, 20.0, 2000.0, 0.05, 0.02, 'N', 'O', DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20', 'DELIVER IN PERSON', 'TRUCK', 'batch 2'),\n  (9000012, 3, 3, 1, 30.0, 3000.0, 0.05, 0.02, 'N', 'O', DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20', 'DELIVER IN PERSON', 'TRUCK', 'batch 3'),\n  (9000013, 4, 4, 1, 40.0, 4000.0, 0.05, 0.02, 'N', 'O', DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20', 'DELIVER IN PERSON', 'TRUCK', 'batch 4'),\n  (9000014, 5, 5, 1, 50.0, 5000.0, 0.05, 0.02, 'N', 'O', DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20', 'DELIVER IN PERSON', 'TRUCK', 'batch 5'),\n  (9000015, 6, 6, 1, 60.0, 6000.0, 0.05, 0.02, 'N', 'O', DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20', 'DELIVER IN PERSON', 'TRUCK', 'batch 6'),\n  (9000016, 7, 7, 1, 70.0, 7000.0, 0.05, 0.02, 'N', 'O', DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20', 'DELIVER IN PERSON', 'TRUCK', 'batch 7'),\n  (9000017, 8, 8, 1, 80.0, 8000.0, 0.05, 0.02, 'N', 'O', DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20', 'DELIVER IN PERSON', 'TRUCK', 'batch 8'),\n  (9000018, 9, 9, 1, 90.0, 9000.0, 0.05, 0.02, 'N', 'O', DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20', 'DELIVER IN PERSON', 'TRUCK', 'batch 9'),\n  (9000019, 10, 10, 1, 100.0, 10000.0, 0.05, 0.02, 'N', 'O', DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20', 'DELIVER IN PERSON', 'TRUCK', 'batch 10')\n"
   validation_queries:
@@ -36,7 +34,6 @@ operations:
   cleanup_sql: "DELETE FROM insert_ops_lineitem WHERE l_orderkey BETWEEN 9000010 AND 9000019\n"
   expected_rows_affected: 10
 - id: insert_select_simple
-  category: insert
   description: Tests INSERT INTO...SELECT with simple WHERE filter
   write_sql: "DELETE FROM insert_ops_lineitem WHERE l_orderkey BETWEEN 1 AND 10;\nINSERT INTO insert_ops_lineitem\nSELECT * FROM lineitem\nWHERE l_orderkey BETWEEN 1 AND 10\n"
   validation_queries:
@@ -46,11 +43,9 @@ operations:
     expected_rows_min: 1
     expected_rows_max: 200
   cleanup_sql: "DELETE FROM insert_ops_lineitem WHERE l_orderkey BETWEEN 1 AND 10\n"
-  expected_rows_affected: null
-  platform_overrides:
+  platform_overrides: &skip_starrocks
     starrocks: null
 - id: insert_batch_values_100
-  category: insert
   description: Tests medium batch INSERT using VALUES clause with 100 rows to measure batch overhead
   write_sql: "INSERT INTO insert_ops_lineitem\nSELECT 9000100 + n, 1, 1, 1, 10.0 * n, 1000.0 * n, 0.05, 0.02, 'N', 'O',\n       DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20',\n       'DELIVER IN PERSON', 'TRUCK', 'batch_' || CAST(n AS VARCHAR)\nFROM (SELECT unnest(generate_series(0, 99)) AS n) t\n"
   validation_queries:
@@ -59,10 +54,8 @@ operations:
     expected_rows: 1
   cleanup_sql: "DELETE FROM insert_ops_lineitem WHERE l_orderkey BETWEEN 9000100 AND 9000199\n"
   expected_rows_affected: 100
-  platform_overrides:
-    starrocks: null
+  platform_overrides: *skip_starrocks
 - id: insert_batch_values_1000
-  category: insert
   description: Tests large batch INSERT with 1000 rows to measure large batch processing and memory overhead
   write_sql: "INSERT INTO insert_ops_lineitem\nSELECT 9001000 + n, 1, 1, 1, 10.0 * n, 1000.0 * n, 0.05, 0.02, 'N', 'O',\n       DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20',\n       'DELIVER IN PERSON', 'TRUCK', 'large_batch_' || CAST(n AS VARCHAR)\nFROM (SELECT unnest(generate_series(0, 999)) AS n) t\n"
   validation_queries:
@@ -71,10 +64,8 @@ operations:
     expected_rows: 1
   cleanup_sql: "DELETE FROM insert_ops_lineitem WHERE l_orderkey BETWEEN 9001000 AND 9001999\n"
   expected_rows_affected: 1000
-  platform_overrides:
-    starrocks: null
+  platform_overrides: *skip_starrocks
 - id: insert_select_with_join
-  category: insert
   description: Tests INSERT INTO...SELECT with JOIN to measure join overhead during data insertion
   write_sql: "INSERT INTO insert_ops_orders_summary (o_orderkey, o_custkey, o_orderdate, o_totalprice, customer_name)\nSELECT o.o_orderkey, o.o_custkey, o.o_orderdate, o.o_totalprice, c.c_name\nFROM orders o\nJOIN customer c ON o.o_custkey = c.c_custkey\nWHERE o.o_orderkey BETWEEN 1 AND 100\n"
   validation_queries:
@@ -83,9 +74,7 @@ operations:
     expected_rows: 1
     expected_rows_min: 1
   cleanup_sql: "DELETE FROM insert_ops_orders_summary WHERE o_orderkey BETWEEN 1 AND 100\n"
-  expected_rows_affected: null
 - id: insert_select_aggregated
-  category: insert
   description: Tests INSERT INTO...SELECT with GROUP BY aggregation to measure aggregation overhead
   write_sql: "INSERT INTO insert_ops_orders_summary (o_custkey, o_totalprice, order_count)\nSELECT o_custkey, SUM(o_totalprice), COUNT(*)\nFROM orders\nWHERE o_orderkey <= 1000\nGROUP BY o_custkey\n"
   validation_queries:
@@ -94,9 +83,7 @@ operations:
     expected_rows: 1
     expected_rows_min: 1
   cleanup_sql: "DELETE FROM insert_ops_orders_summary\n"
-  expected_rows_affected: null
 - id: insert_select_from_multiple
-  category: insert
   description: Tests INSERT INTO...SELECT from 3 plus tables with multiple JOINs to measure complex query overhead
   write_sql: "INSERT INTO insert_ops_lineitem_enriched\n  (l_orderkey, l_partkey, l_suppkey, l_quantity, l_extendedprice,\n   o_orderdate, c_name, s_name, p_name)\nSELECT l.l_orderkey, l.l_partkey, l.l_suppkey, l.l_quantity, l.l_extendedprice,\n       o.o_orderdate, c.c_name, s.s_name, p.p_name\nFROM lineitem l\nJOIN orders o ON l.l_orderkey = o.o_orderkey\nJOIN customer c ON o.o_custkey = c.c_custkey\nJOIN supplier s ON l.l_suppkey = s.s_suppkey\nJOIN part p ON l.l_partkey = p.p_partkey\nWHERE l.l_orderkey BETWEEN 1 AND 50\n"
   validation_queries:
@@ -105,9 +92,7 @@ operations:
     expected_rows: 1
     expected_rows_min: 1
   cleanup_sql: "DELETE FROM insert_ops_lineitem_enriched WHERE l_orderkey BETWEEN 1 AND 50\n"
-  expected_rows_affected: null
 - id: insert_with_default_values
-  category: insert
   description: Tests INSERT with DEFAULT keyword to measure default value processing overhead
   write_sql: "INSERT INTO write_ops_log (log_id, operation_id, operation_category, timestamp, rows_affected, duration_ms, success)\nVALUES (1, 'test_insert', 'insert', CURRENT_TIMESTAMP, 0, 0.0, true)\n"
   validation_queries:
@@ -116,9 +101,7 @@ operations:
     expected_rows: 1
     expected_rows_min: 1
   cleanup_sql: "DELETE FROM write_ops_log WHERE operation_id = 'test_insert' AND operation_category = 'insert'\n"
-  expected_rows_affected: null
 - id: insert_select_union
-  category: insert
   description: Tests INSERT INTO...SELECT with UNION to measure set operation overhead during insertion
   write_sql: "DELETE FROM insert_ops_orders WHERE o_orderkey BETWEEN 1 AND 50;\nINSERT INTO insert_ops_orders\nSELECT * FROM orders WHERE o_orderkey BETWEEN 1 AND 25\nUNION ALL\nSELECT * FROM orders WHERE o_orderkey BETWEEN 26 AND 50\n"
   validation_queries:
@@ -127,9 +110,7 @@ operations:
     expected_rows: 1
     expected_rows_min: 1
   cleanup_sql: "DELETE FROM insert_ops_orders WHERE o_orderkey BETWEEN 1 AND 50\n"
-  expected_rows_affected: null
 - id: insert_on_conflict_ignore
-  category: insert
   description: Tests INSERT with conflict handling using ON CONFLICT DO NOTHING to measure constraint checking overhead
   write_sql: "INSERT INTO insert_ops_orders\nSELECT * FROM orders WHERE o_orderkey BETWEEN 1 AND 10\nON CONFLICT (o_orderkey) DO NOTHING\n"
   validation_queries:
@@ -137,14 +118,12 @@ operations:
     sql: "SELECT COUNT(*) as cnt\nFROM insert_ops_orders\nWHERE o_orderkey BETWEEN 1 AND 10\n"
     expected_rows: 1
   cleanup_sql: "DELETE FROM insert_ops_orders WHERE o_orderkey BETWEEN 1 AND 10\n"
-  expected_rows_affected: null
   platform_overrides:
     duckdb: "INSERT OR IGNORE INTO insert_ops_orders\nSELECT * FROM orders WHERE o_orderkey BETWEEN 1 AND 10\n"
     sqlite: "INSERT OR IGNORE INTO insert_ops_orders\nSELECT * FROM orders WHERE o_orderkey BETWEEN 1 AND 10\n"
     datafusion: null
     starrocks: null
 - id: insert_returning_clause
-  category: insert
   description: Tests INSERT...RETURNING to measure overhead of returning inserted row data
   write_sql: "INSERT INTO insert_ops_lineitem\nVALUES (9000500, 1, 1, 1, 10.0, 1000.0, 0.05, 0.02, 'N', 'O',\n        DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20',\n        'DELIVER IN PERSON', 'TRUCK', 'returning_test')\nRETURNING l_orderkey, l_partkey, l_quantity\n"
   validation_queries:
@@ -153,13 +132,12 @@ operations:
     expected_rows: 1
   cleanup_sql: "DELETE FROM insert_ops_lineitem WHERE l_orderkey = 9000500\n"
   expected_rows_affected: 1
-  platform_overrides:
+  platform_overrides: &skip_returning_platforms
     mysql: null
     bigquery: null
     datafusion: null
     starrocks: null
 - id: update_single_row_pk
-  category: update
   description: Tests single row UPDATE by primary key to measure index lookup plus update cost
   write_sql: "UPDATE update_ops_orders\nSET o_totalprice = o_totalprice * 1.1,\n    o_comment = 'updated_single'\nWHERE o_orderkey = (SELECT MIN(o_orderkey) FROM update_ops_orders)\n"
   validation_queries:
@@ -168,54 +146,41 @@ operations:
     expected_rows: 1
   cleanup_sql: "UPDATE update_ops_orders\nSET o_totalprice = o_totalprice / 1.1,\n    o_comment = ''\nWHERE o_comment = 'updated_single'\n"
   expected_rows_affected: 1
-  platform_overrides:
+  platform_overrides: &skip_datafusion
     datafusion: null
 - id: update_selective_10pct
-  category: update
   description: Tests UPDATE affecting approximately 10 percent of table rows to measure selective update performance
   write_sql: "UPDATE update_ops_orders\nSET o_comment = 'selective_10pct'\nWHERE o_orderkey <= (\n  SELECT CAST(MAX(o_orderkey) * 0.1 AS INTEGER)\n  FROM update_ops_orders\n)\n"
   validation_queries:
   - id: count_updated
     sql: SELECT COUNT(*) as cnt FROM update_ops_orders WHERE o_comment = 'selective_10pct'
   cleanup_sql: "UPDATE update_ops_orders\nSET o_comment = ''\nWHERE o_comment = 'selective_10pct'\n"
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: update_with_subquery
-  category: update
   description: Tests UPDATE with correlated subquery to measure subquery execution cost per row
   write_sql: "UPDATE update_ops_orders\nSET o_totalprice = (\n  SELECT SUM(l_extendedprice * (1 - l_discount))\n  FROM lineitem\n  WHERE l_orderkey = update_ops_orders.o_orderkey\n)\nWHERE EXISTS (\n  SELECT 1 FROM lineitem WHERE l_orderkey = update_ops_orders.o_orderkey\n)\nAND o_orderkey <= (SELECT MIN(o_orderkey) + 100 FROM update_ops_orders)\n"
   validation_queries:
   - id: verify_calculation
     sql: "SELECT COUNT(*) as cnt\nFROM update_ops_orders o\nWHERE o_orderkey <= (SELECT MIN(o_orderkey) + 100 FROM update_ops_orders)\n"
   cleanup_sql: "-- Recalculate to restore\nUPDATE update_ops_orders\nSET o_totalprice = (\n  SELECT SUM(l_extendedprice * (1 - l_discount))\n  FROM lineitem\n  WHERE l_orderkey = update_ops_orders.o_orderkey\n)\nWHERE o_orderkey <= (SELECT MIN(o_orderkey) + 100 FROM update_ops_orders)\n"
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: update_bulk_50pct
-  category: update
   description: Tests UPDATE affecting approximately 50 percent of table rows to measure large-scale update performance
   write_sql: "UPDATE update_ops_orders\nSET o_comment = 'bulk_50pct_update'\nWHERE o_orderkey <= (\n  SELECT CAST(MAX(o_orderkey) * 0.5 AS INTEGER)\n  FROM update_ops_orders\n)\n"
   validation_queries:
   - id: count_updated_50pct
     sql: SELECT COUNT(*) as cnt FROM update_ops_orders WHERE o_comment = 'bulk_50pct_update'
   cleanup_sql: "UPDATE update_ops_orders SET o_comment = '' WHERE o_comment = 'bulk_50pct_update'\n"
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: update_bulk_all
-  category: update
   description: Tests UPDATE of entire table to measure full table scan and update overhead
   write_sql: "UPDATE update_ops_orders\nSET o_comment = 'bulk_all_update'\n"
   validation_queries:
   - id: verify_all_updated
     sql: SELECT COUNT(*) as cnt FROM update_ops_orders WHERE o_comment = 'bulk_all_update'
   cleanup_sql: "UPDATE update_ops_orders SET o_comment = ''\n"
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: update_with_join
-  category: update
   description: Tests UPDATE with JOIN syntax to measure join overhead during updates
   write_sql: "UPDATE update_ops_orders\nSET o_comment = 'joined_update'\nFROM customer\nWHERE update_ops_orders.o_custkey = customer.c_custkey\n  AND customer.c_mktsegment = 'BUILDING'\n  AND update_ops_orders.o_orderkey <= (SELECT MIN(o_orderkey) + 100 FROM update_ops_orders)\n"
   validation_queries:
@@ -223,12 +188,10 @@ operations:
     sql: SELECT COUNT(*) as cnt FROM update_ops_orders WHERE o_comment = 'joined_update'
     expected_rows_min: 0
   cleanup_sql: "UPDATE update_ops_orders SET o_comment = '' WHERE o_comment = 'joined_update'\n"
-  expected_rows_affected: null
   platform_overrides:
     mysql: "UPDATE update_ops_orders\nJOIN customer ON update_ops_orders.o_custkey = customer.c_custkey\nSET update_ops_orders.o_comment = 'joined_update'\nWHERE customer.c_mktsegment = 'BUILDING'\n  AND update_ops_orders.o_orderkey <= (SELECT MIN(o_orderkey) + 100 FROM update_ops_orders)\n"
     datafusion: null
 - id: update_from_select
-  category: update
   description: Tests UPDATE...FROM...WHERE EXISTS to measure correlated EXISTS overhead
   write_sql: "UPDATE update_ops_orders\nSET o_comment = 'exists_update'\nWHERE EXISTS (\n  SELECT 1 FROM lineitem\n  WHERE lineitem.l_orderkey = update_ops_orders.o_orderkey\n    AND lineitem.l_quantity > 40\n)\nAND o_orderkey <= (SELECT MIN(o_orderkey) + 100 FROM update_ops_orders)\n"
   validation_queries:
@@ -236,11 +199,8 @@ operations:
     sql: SELECT COUNT(*) as cnt FROM update_ops_orders WHERE o_comment = 'exists_update'
     expected_rows_min: 0
   cleanup_sql: "UPDATE update_ops_orders SET o_comment = '' WHERE o_comment = 'exists_update'\n"
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: update_set_multiple_columns
-  category: update
   description: Tests UPDATE of 5 plus columns to measure multi-column update overhead
   write_sql: "UPDATE update_ops_orders\nSET o_totalprice = o_totalprice * 1.05,\n    o_orderpriority = '1-URGENT',\n    o_comment = 'multi_col_update',\n    o_shippriority = 1,\n    o_clerk = 'Clerk#000000001'\nWHERE o_orderkey = (SELECT MIN(o_orderkey) FROM update_ops_orders)\n"
   validation_queries:
@@ -249,10 +209,8 @@ operations:
     expected_rows: 1
   cleanup_sql: "UPDATE update_ops_orders\nSET o_totalprice = o_totalprice / 1.05,\n    o_orderpriority = '5-LOW',\n    o_comment = '',\n    o_shippriority = 0,\n    o_clerk = 'Clerk#000000000'\nWHERE o_comment = 'multi_col_update'\n"
   expected_rows_affected: 1
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: update_with_case_expression
-  category: update
   description: Tests UPDATE using CASE WHEN expression to measure conditional logic overhead
   write_sql: "UPDATE update_ops_orders\nSET o_orderpriority = CASE\n  WHEN o_totalprice < 100000 THEN '5-LOW'\n  WHEN o_totalprice < 200000 THEN '4-NOT SPECIFIED'\n  WHEN o_totalprice < 300000 THEN '3-MEDIUM'\n  WHEN o_totalprice < 400000 THEN '2-HIGH'\n  ELSE '1-URGENT'\nEND,\no_comment = 'case_update'\nWHERE o_orderkey <= (SELECT MIN(o_orderkey) + 100 FROM update_ops_orders)\n"
   validation_queries:
@@ -260,11 +218,8 @@ operations:
     sql: SELECT COUNT(*) as cnt FROM update_ops_orders WHERE o_comment = 'case_update'
     expected_rows_min: 1
   cleanup_sql: "UPDATE update_ops_orders SET o_orderpriority = '5-LOW', o_comment = '' WHERE o_comment = 'case_update'\n"
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: update_computed_column
-  category: update
   description: Tests UPDATE with mathematical expressions to measure computation overhead
   write_sql: "UPDATE update_ops_orders\nSET o_totalprice = o_totalprice * 1.1 + 50.0 - (o_totalprice * 0.02),\n    o_comment = 'computed_update'\nWHERE o_orderkey BETWEEN (SELECT MIN(o_orderkey) FROM update_ops_orders) AND (SELECT MIN(o_orderkey) + 50 FROM update_ops_orders)\n"
   validation_queries:
@@ -272,11 +227,8 @@ operations:
     sql: SELECT COUNT(*) as cnt FROM update_ops_orders WHERE o_comment = 'computed_update'
     expected_rows_min: 1
   cleanup_sql: "UPDATE update_ops_orders\nSET o_totalprice = (o_totalprice + (o_totalprice * 0.02) - 50.0) / 1.1,\n    o_comment = ''\nWHERE o_comment = 'computed_update'\n"
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: update_string_manipulation
-  category: update
   description: Tests UPDATE with string functions CONCAT SUBSTRING to measure string processing overhead
   write_sql: "UPDATE update_ops_orders\nSET o_comment = CONCAT('Updated:', SUBSTRING(o_orderpriority, 1, 5), '|', CAST(o_orderkey AS VARCHAR))\nWHERE o_orderkey BETWEEN (SELECT MIN(o_orderkey) FROM update_ops_orders) AND (SELECT MIN(o_orderkey) + 50 FROM update_ops_orders)\n"
   validation_queries:
@@ -284,11 +236,8 @@ operations:
     sql: "SELECT COUNT(*) as cnt\nFROM update_ops_orders\nWHERE o_comment LIKE 'Updated:%'\n"
     expected_rows_min: 1
   cleanup_sql: "UPDATE update_ops_orders SET o_comment = '' WHERE o_comment LIKE 'Updated:%'\n"
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: update_date_arithmetic
-  category: update
   description: Tests UPDATE with date calculations to measure temporal operation overhead
   write_sql: "UPDATE update_ops_orders\nSET o_orderdate = o_orderdate + INTERVAL '7' DAY,\n    o_comment = 'date_update'\nWHERE o_orderkey BETWEEN (SELECT MIN(o_orderkey) FROM update_ops_orders) AND (SELECT MIN(o_orderkey) + 50 FROM update_ops_orders)\n"
   validation_queries:
@@ -296,11 +245,8 @@ operations:
     sql: SELECT COUNT(*) as cnt FROM update_ops_orders WHERE o_comment = 'date_update'
     expected_rows_min: 1
   cleanup_sql: "UPDATE update_ops_orders\nSET o_orderdate = o_orderdate - INTERVAL '7' DAY,\n    o_comment = ''\nWHERE o_comment = 'date_update'\n"
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: update_conditional_multi_column
-  category: update
   description: Tests complex conditional UPDATE with multiple column updates to measure combined overhead
   write_sql: "UPDATE update_ops_orders\nSET o_totalprice = CASE\n    WHEN o_orderpriority = '1-URGENT' THEN o_totalprice * 1.2\n    WHEN o_orderpriority = '2-HIGH' THEN o_totalprice * 1.1\n    ELSE o_totalprice\n  END,\n  o_orderpriority = CASE\n    WHEN o_totalprice > 250000 THEN '1-URGENT'\n    ELSE o_orderpriority\n  END,\n  o_comment = 'complex_conditional'\nWHERE o_orderkey <= (SELECT MIN(o_orderkey) + 100 FROM update_ops_orders)\n"
   validation_queries:
@@ -308,11 +254,8 @@ operations:
     sql: SELECT COUNT(*) as cnt FROM update_ops_orders WHERE o_comment = 'complex_conditional'
     expected_rows_min: 1
   cleanup_sql: "UPDATE update_ops_orders\nSET o_totalprice = CASE\n    WHEN o_orderpriority = '1-URGENT' THEN o_totalprice / 1.2\n    WHEN o_orderpriority = '2-HIGH' THEN o_totalprice / 1.1\n    ELSE o_totalprice\n  END,\n  o_orderpriority = '5-LOW',\n  o_comment = ''\nWHERE o_comment = 'complex_conditional'\n"
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: update_with_aggregate
-  category: update
   description: Tests UPDATE using aggregated subquery to measure aggregation overhead per row
   write_sql: "UPDATE update_ops_orders\nSET o_totalprice = (\n  SELECT AVG(l_extendedprice)\n  FROM lineitem\n  WHERE l_orderkey = update_ops_orders.o_orderkey\n),\no_comment = 'agg_update'\nWHERE EXISTS (SELECT 1 FROM lineitem WHERE l_orderkey = update_ops_orders.o_orderkey)\n  AND o_orderkey <= (SELECT MIN(o_orderkey) + 50 FROM update_ops_orders)\n"
   validation_queries:
@@ -320,11 +263,8 @@ operations:
     sql: SELECT COUNT(*) as cnt FROM update_ops_orders WHERE o_comment = 'agg_update'
     expected_rows_min: 1
   cleanup_sql: "UPDATE update_ops_orders\nSET o_totalprice = (\n  SELECT SUM(l_extendedprice * (1 - l_discount))\n  FROM lineitem\n  WHERE l_orderkey = update_ops_orders.o_orderkey\n),\no_comment = ''\nWHERE o_comment = 'agg_update'\n"
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: update_returning
-  category: update
   description: Tests UPDATE...RETURNING to measure overhead of returning updated row data
   write_sql: "UPDATE update_ops_orders\nSET o_totalprice = o_totalprice * 1.15,\n    o_comment = 'returning_update'\nWHERE o_orderkey = (SELECT MIN(o_orderkey) FROM update_ops_orders)\nRETURNING o_orderkey, o_totalprice, o_comment\n"
   validation_queries:
@@ -333,13 +273,8 @@ operations:
     expected_rows: 1
   cleanup_sql: "UPDATE update_ops_orders\nSET o_totalprice = o_totalprice / 1.15,\n    o_comment = ''\nWHERE o_comment = 'returning_update'\n"
   expected_rows_affected: 1
-  platform_overrides:
-    mysql: null
-    bigquery: null
-    datafusion: null
-    starrocks: null
+  platform_overrides: *skip_returning_platforms
 - id: delete_single_row_pk
-  category: delete
   description: Tests single row DELETE by primary key to measure index-based deletion
   write_sql: "DELETE FROM delete_ops_orders\nWHERE o_orderkey = (SELECT MAX(o_orderkey) FROM delete_ops_orders)\n"
   validation_queries:
@@ -348,12 +283,9 @@ operations:
     expected_rows: null
     expected_rows_min: 0
     expected_rows_max: 1
-  cleanup_sql: null
   expected_rows_affected: 1
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: delete_selective_10pct
-  category: delete
   description: Tests DELETE affecting approximately 10 percent of rows to measure selective deletion performance
   write_sql: "DELETE FROM delete_ops_orders\nWHERE o_orderkey > (\n  SELECT CAST(MAX(o_orderkey) * 0.9 AS INTEGER)\n  FROM delete_ops_orders\n)\n"
   validation_queries:
@@ -362,12 +294,8 @@ operations:
     expected_rows: null
     expected_rows_min: 0
     expected_rows_max: 1
-  cleanup_sql: null
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: delete_with_subquery
-  category: delete
   description: Tests DELETE with WHERE...IN subquery to measure subquery evaluation overhead
   write_sql: "DELETE FROM delete_ops_orders\nWHERE o_orderkey IN (\n  SELECT o_orderkey\n  FROM delete_ops_orders\n  WHERE o_orderpriority = '1-URGENT'\n  LIMIT 10\n)\n"
   validation_queries:
@@ -375,12 +303,8 @@ operations:
     sql: SELECT COUNT(*) as cnt FROM delete_ops_orders
     expected_rows: 1
     expected_rows_min: 0
-  cleanup_sql: null
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: delete_with_join
-  category: delete
   description: Tests DELETE with JOIN to measure join-based deletion performance
   write_sql: "DELETE FROM delete_ops_orders\nWHERE EXISTS (\n  SELECT 1 FROM customer\n  WHERE customer.c_custkey = delete_ops_orders.o_custkey\n    AND customer.c_mktsegment = 'AUTOMOBILE'\n)\nAND delete_ops_orders.o_orderkey <= (SELECT MIN(o_orderkey) + 20 FROM delete_ops_orders)\n"
   validation_queries:
@@ -388,13 +312,10 @@ operations:
     sql: SELECT COUNT(*) as cnt FROM delete_ops_orders
     expected_rows: 1
     expected_rows_min: 0
-  cleanup_sql: null
-  expected_rows_affected: null
   platform_overrides:
     mysql: "DELETE delete_ops_orders FROM delete_ops_orders\nJOIN customer ON customer.c_custkey = delete_ops_orders.o_custkey\nWHERE customer.c_mktsegment = 'AUTOMOBILE'\n  AND delete_ops_orders.o_orderkey <= (SELECT MIN(o_orderkey) + 20 FROM delete_ops_orders)\n"
     datafusion: null
 - id: delete_bulk_25pct
-  category: delete
   description: Tests DELETE affecting approximately 25 percent of rows to measure medium bulk deletion
   write_sql: "DELETE FROM delete_ops_orders\nWHERE o_orderkey > (\n  SELECT CAST(MAX(o_orderkey) * 0.75 AS INTEGER)\n  FROM delete_ops_orders\n)\n"
   validation_queries:
@@ -402,12 +323,8 @@ operations:
     sql: SELECT COUNT(*) as cnt FROM delete_ops_orders
     expected_rows: 1
     expected_rows_min: 0
-  cleanup_sql: null
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: delete_bulk_50pct
-  category: delete
   description: Tests DELETE affecting approximately 50 percent of rows to measure large bulk deletion
   write_sql: "DELETE FROM delete_ops_orders\nWHERE o_orderkey > (\n  SELECT CAST(MAX(o_orderkey) * 0.5 AS INTEGER)\n  FROM delete_ops_orders\n)\n"
   validation_queries:
@@ -415,12 +332,8 @@ operations:
     sql: SELECT COUNT(*) as cnt FROM delete_ops_orders
     expected_rows: 1
     expected_rows_min: 0
-  cleanup_sql: null
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: delete_bulk_75pct
-  category: delete
   description: Tests DELETE affecting approximately 75 percent of rows to measure very large bulk deletion
   write_sql: "DELETE FROM delete_ops_orders\nWHERE o_orderkey > (\n  SELECT CAST(MAX(o_orderkey) * 0.25 AS INTEGER)\n  FROM delete_ops_orders\n)\n"
   validation_queries:
@@ -428,12 +341,8 @@ operations:
     sql: SELECT COUNT(*) as cnt FROM delete_ops_orders
     expected_rows: 1
     expected_rows_min: 0
-  cleanup_sql: null
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: delete_with_not_exists
-  category: delete
   description: Tests DELETE using NOT EXISTS to measure anti-join deletion performance
   write_sql: "DELETE FROM delete_ops_orders\nWHERE NOT EXISTS (\n  SELECT 1 FROM lineitem\n  WHERE lineitem.l_orderkey = delete_ops_orders.o_orderkey\n)\nAND delete_ops_orders.o_orderkey <= (SELECT MIN(o_orderkey) + 50 FROM delete_ops_orders)\n"
   validation_queries:
@@ -441,12 +350,8 @@ operations:
     sql: SELECT COUNT(*) as cnt FROM delete_ops_orders
     expected_rows: 1
     expected_rows_min: 0
-  cleanup_sql: null
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: delete_with_aggregation
-  category: delete
   description: Tests DELETE using aggregate in WHERE clause to measure aggregation evaluation overhead
   write_sql: "DELETE FROM delete_ops_orders\nWHERE o_totalprice < (\n  SELECT AVG(o_totalprice) FROM delete_ops_orders\n)\nAND delete_ops_orders.o_orderkey <= (SELECT MIN(o_orderkey) + 30 FROM delete_ops_orders)\n"
   validation_queries:
@@ -454,12 +359,8 @@ operations:
     sql: SELECT COUNT(*) as cnt FROM delete_ops_orders
     expected_rows: 1
     expected_rows_min: 0
-  cleanup_sql: null
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: delete_returning
-  category: delete
   description: Tests DELETE...RETURNING to measure overhead of returning deleted row data
   write_sql: "DELETE FROM delete_ops_orders\nWHERE o_orderkey = (SELECT MAX(o_orderkey) FROM delete_ops_orders)\nRETURNING o_orderkey, o_custkey, o_totalprice\n"
   validation_queries:
@@ -467,15 +368,9 @@ operations:
     sql: SELECT COUNT(*) as cnt FROM delete_ops_orders
     expected_rows: 1
     expected_rows_min: 0
-  cleanup_sql: null
   expected_rows_affected: 1
-  platform_overrides:
-    mysql: null
-    bigquery: null
-    datafusion: null
-    starrocks: null
+  platform_overrides: *skip_returning_platforms
 - id: delete_cascade_simulation
-  category: delete
   description: Tests multi-table DELETE simulation to measure cascading deletion overhead
   write_sql: "DELETE FROM delete_ops_lineitem\nWHERE l_orderkey IN (\n  SELECT o_orderkey FROM delete_ops_orders\n  WHERE o_orderpriority = '1-URGENT'\n  LIMIT 5\n)\n"
   validation_queries:
@@ -483,31 +378,24 @@ operations:
     sql: "SELECT COUNT(*) as cnt\nFROM delete_ops_lineitem l\nWHERE l_orderkey IN (\n  SELECT o_orderkey FROM delete_ops_orders\n  WHERE o_orderpriority = '1-URGENT'\n  LIMIT 5\n)\n"
     expected_rows: 1
     expected_rows_min: 0
-  cleanup_sql: null
-  expected_rows_affected: null
-  platform_overrides:
+  platform_overrides: &skip_datafusion_starrocks
     datafusion: null
     starrocks: null
 - id: delete_all_truncate_comparison
-  category: delete
   description: Tests DELETE star versus TRUNCATE to measure full table deletion methods
   write_sql: "DELETE FROM delete_ops_lineitem\n"
   validation_queries:
   - id: verify_all_deleted
     sql: SELECT COUNT(*) as cnt FROM delete_ops_lineitem
     expected_rows: 1
-  cleanup_sql: null
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
-    starrocks: null
+  platform_overrides: *skip_datafusion_starrocks
 - id: bulk_load_csv_small_uncompressed
   category: bulk_load
   description: Tests bulk load from small CSV file 1K rows uncompressed to measure baseline CSV parsing overhead
   file_dependencies:
   - csv_small_1k.csv
   write_sql: "TRUNCATE TABLE bulk_load_ops_target;\nCOPY bulk_load_ops_target FROM '{file_path}/csv_small_1k.csv' WITH (FORMAT CSV, HEADER true)\n"
-  validation_queries:
+  validation_queries: &bulk_load_row_count_validation
   - id: verify_row_count
     sql: SELECT COUNT(*) as cnt FROM bulk_load_ops_target
     expected_rows: 1
@@ -524,10 +412,7 @@ operations:
   file_dependencies:
   - csv_small_1k.csv.gz
   write_sql: "TRUNCATE TABLE bulk_load_ops_target;\nCOPY bulk_load_ops_target FROM '{file_path}/csv_small_1k.csv.gz' WITH (FORMAT CSV, HEADER true, COMPRESSION 'gzip')\n"
-  validation_queries:
-  - id: verify_row_count
-    sql: SELECT COUNT(*) as cnt FROM bulk_load_ops_target
-    expected_rows: 1
+  validation_queries: *bulk_load_row_count_validation
   cleanup_sql: "TRUNCATE TABLE bulk_load_ops_target\n"
   expected_rows_affected: 1000
   platform_overrides:
@@ -539,10 +424,7 @@ operations:
   file_dependencies:
   - csv_small_1k.csv.zst
   write_sql: "TRUNCATE TABLE bulk_load_ops_target;\nCOPY bulk_load_ops_target FROM '{file_path}/csv_small_1k.csv.zst' WITH (FORMAT CSV, HEADER true, COMPRESSION 'zstd')\n"
-  validation_queries:
-  - id: verify_row_count
-    sql: SELECT COUNT(*) as cnt FROM bulk_load_ops_target
-    expected_rows: 1
+  validation_queries: *bulk_load_row_count_validation
   cleanup_sql: "TRUNCATE TABLE bulk_load_ops_target\n"
   expected_rows_affected: 1000
   platform_overrides:
@@ -554,10 +436,7 @@ operations:
   file_dependencies:
   - csv_small_1k.csv.gz
   write_sql: "TRUNCATE TABLE bulk_load_ops_target;\nCOPY bulk_load_ops_target FROM '{file_path}/csv_small_1k.csv.gz' (FORMAT CSV, HEADER true, COMPRESSION 'gzip')\n"
-  validation_queries:
-  - id: verify_row_count
-    sql: SELECT COUNT(*) as cnt FROM bulk_load_ops_target
-    expected_rows: 1
+  validation_queries: *bulk_load_row_count_validation
   cleanup_sql: "TRUNCATE TABLE bulk_load_ops_target\n"
   expected_rows_affected: 1000
   platform_overrides:
@@ -569,10 +448,7 @@ operations:
   file_dependencies:
   - csv_medium_100k.csv
   write_sql: "TRUNCATE TABLE bulk_load_ops_target;\nCOPY bulk_load_ops_target FROM '{file_path}/csv_medium_100k.csv' WITH (FORMAT CSV, HEADER true)\n"
-  validation_queries:
-  - id: verify_row_count
-    sql: SELECT COUNT(*) as cnt FROM bulk_load_ops_target
-    expected_rows: 1
+  validation_queries: *bulk_load_row_count_validation
   cleanup_sql: "TRUNCATE TABLE bulk_load_ops_target\n"
   expected_rows_affected: 100000
   platform_overrides:
@@ -585,10 +461,7 @@ operations:
   file_dependencies:
   - csv_medium_100k.csv.gz
   write_sql: "TRUNCATE TABLE bulk_load_ops_target;\nCOPY bulk_load_ops_target FROM '{file_path}/csv_medium_100k.csv.gz' WITH (FORMAT CSV, HEADER true, COMPRESSION 'gzip')\n"
-  validation_queries:
-  - id: verify_row_count
-    sql: SELECT COUNT(*) as cnt FROM bulk_load_ops_target
-    expected_rows: 1
+  validation_queries: *bulk_load_row_count_validation
   cleanup_sql: "TRUNCATE TABLE bulk_load_ops_target\n"
   expected_rows_affected: 100000
   platform_overrides:
@@ -600,10 +473,7 @@ operations:
   file_dependencies:
   - csv_medium_100k.csv.zst
   write_sql: "TRUNCATE TABLE bulk_load_ops_target;\nCOPY bulk_load_ops_target FROM '{file_path}/csv_medium_100k.csv.zst' WITH (FORMAT CSV, HEADER true, COMPRESSION 'zstd')\n"
-  validation_queries:
-  - id: verify_row_count
-    sql: SELECT COUNT(*) as cnt FROM bulk_load_ops_target
-    expected_rows: 1
+  validation_queries: *bulk_load_row_count_validation
   cleanup_sql: "TRUNCATE TABLE bulk_load_ops_target\n"
   expected_rows_affected: 100000
   platform_overrides:
@@ -615,10 +485,7 @@ operations:
   file_dependencies:
   - csv_medium_100k.csv.gz
   write_sql: "TRUNCATE TABLE bulk_load_ops_target;\nCOPY bulk_load_ops_target FROM '{file_path}/csv_medium_100k.csv.gz' (FORMAT CSV, HEADER true, COMPRESSION 'gzip')\n"
-  validation_queries:
-  - id: verify_row_count
-    sql: SELECT COUNT(*) as cnt FROM bulk_load_ops_target
-    expected_rows: 1
+  validation_queries: *bulk_load_row_count_validation
   cleanup_sql: "TRUNCATE TABLE bulk_load_ops_target\n"
   expected_rows_affected: 100000
   platform_overrides:
@@ -630,10 +497,7 @@ operations:
   file_dependencies:
   - csv_large_1m.csv
   write_sql: "TRUNCATE TABLE bulk_load_ops_target;\nCOPY bulk_load_ops_target FROM '{file_path}/csv_large_1m.csv' WITH (FORMAT CSV, HEADER true)\n"
-  validation_queries:
-  - id: verify_row_count
-    sql: SELECT COUNT(*) as cnt FROM bulk_load_ops_target
-    expected_rows: 1
+  validation_queries: *bulk_load_row_count_validation
   cleanup_sql: "TRUNCATE TABLE bulk_load_ops_target\n"
   expected_rows_affected: 1000000
   platform_overrides:
@@ -646,10 +510,7 @@ operations:
   file_dependencies:
   - csv_large_1m.csv.gz
   write_sql: "TRUNCATE TABLE bulk_load_ops_target;\nCOPY bulk_load_ops_target FROM '{file_path}/csv_large_1m.csv.gz' WITH (FORMAT CSV, HEADER true, COMPRESSION 'gzip')\n"
-  validation_queries:
-  - id: verify_row_count
-    sql: SELECT COUNT(*) as cnt FROM bulk_load_ops_target
-    expected_rows: 1
+  validation_queries: *bulk_load_row_count_validation
   cleanup_sql: "TRUNCATE TABLE bulk_load_ops_target\n"
   expected_rows_affected: 1000000
   platform_overrides:
@@ -661,10 +522,7 @@ operations:
   file_dependencies:
   - csv_large_1m.csv.zst
   write_sql: "TRUNCATE TABLE bulk_load_ops_target;\nCOPY bulk_load_ops_target FROM '{file_path}/csv_large_1m.csv.zst' WITH (FORMAT CSV, HEADER true, COMPRESSION 'zstd')\n"
-  validation_queries:
-  - id: verify_row_count
-    sql: SELECT COUNT(*) as cnt FROM bulk_load_ops_target
-    expected_rows: 1
+  validation_queries: *bulk_load_row_count_validation
   cleanup_sql: "TRUNCATE TABLE bulk_load_ops_target\n"
   expected_rows_affected: 1000000
   platform_overrides:
@@ -676,10 +534,7 @@ operations:
   file_dependencies:
   - csv_large_1m.csv.gz
   write_sql: "TRUNCATE TABLE bulk_load_ops_target;\nCOPY bulk_load_ops_target FROM '{file_path}/csv_large_1m.csv.gz' (FORMAT CSV, HEADER true, COMPRESSION 'gzip')\n"
-  validation_queries:
-  - id: verify_row_count
-    sql: SELECT COUNT(*) as cnt FROM bulk_load_ops_target
-    expected_rows: 1
+  validation_queries: *bulk_load_row_count_validation
   cleanup_sql: "TRUNCATE TABLE bulk_load_ops_target\n"
   expected_rows_affected: 1000000
   platform_overrides:
@@ -691,168 +546,120 @@ operations:
   file_dependencies:
   - parquet_small_1k.parquet
   write_sql: "TRUNCATE TABLE bulk_load_ops_target;\nCOPY bulk_load_ops_target FROM '{file_path}/parquet_small_1k.parquet' (FORMAT PARQUET)\n"
-  validation_queries:
-  - id: verify_row_count
-    sql: SELECT COUNT(*) as cnt FROM bulk_load_ops_target
-    expected_rows: 1
+  validation_queries: *bulk_load_row_count_validation
   cleanup_sql: "TRUNCATE TABLE bulk_load_ops_target\n"
   expected_rows_affected: 1000
-  platform_overrides:
-    starrocks: null
+  platform_overrides: *skip_starrocks
 - id: bulk_load_parquet_small_snappy
   category: bulk_load
   description: Tests bulk load from small Parquet file 1K rows snappy compressed to measure Snappy decompression overhead
   file_dependencies:
   - parquet_small_1k_snappy.parquet
   write_sql: "TRUNCATE TABLE bulk_load_ops_target;\nCOPY bulk_load_ops_target FROM '{file_path}/parquet_small_1k_snappy.parquet' (FORMAT PARQUET)\n"
-  validation_queries:
-  - id: verify_row_count
-    sql: SELECT COUNT(*) as cnt FROM bulk_load_ops_target
-    expected_rows: 1
+  validation_queries: *bulk_load_row_count_validation
   cleanup_sql: "TRUNCATE TABLE bulk_load_ops_target\n"
   expected_rows_affected: 1000
-  platform_overrides:
-    starrocks: null
+  platform_overrides: *skip_starrocks
 - id: bulk_load_parquet_small_gzip
   category: bulk_load
   description: Tests bulk load from small Parquet file 1K rows gzip compressed to measure gzip in Parquet context
   file_dependencies:
   - parquet_small_1k_gzip.parquet
   write_sql: "TRUNCATE TABLE bulk_load_ops_target;\nCOPY bulk_load_ops_target FROM '{file_path}/parquet_small_1k_gzip.parquet' (FORMAT PARQUET)\n"
-  validation_queries:
-  - id: verify_row_count
-    sql: SELECT COUNT(*) as cnt FROM bulk_load_ops_target
-    expected_rows: 1
+  validation_queries: *bulk_load_row_count_validation
   cleanup_sql: "TRUNCATE TABLE bulk_load_ops_target\n"
   expected_rows_affected: 1000
-  platform_overrides:
-    starrocks: null
+  platform_overrides: *skip_starrocks
 - id: bulk_load_parquet_small_zstd
   category: bulk_load
   description: Tests bulk load from small Parquet file 1K rows zstd compressed to measure zstd in Parquet context
   file_dependencies:
   - parquet_small_1k_zstd.parquet
   write_sql: "TRUNCATE TABLE bulk_load_ops_target;\nCOPY bulk_load_ops_target FROM '{file_path}/parquet_small_1k_zstd.parquet' (FORMAT PARQUET)\n"
-  validation_queries:
-  - id: verify_row_count
-    sql: SELECT COUNT(*) as cnt FROM bulk_load_ops_target
-    expected_rows: 1
+  validation_queries: *bulk_load_row_count_validation
   cleanup_sql: "TRUNCATE TABLE bulk_load_ops_target\n"
   expected_rows_affected: 1000
-  platform_overrides:
-    starrocks: null
+  platform_overrides: *skip_starrocks
 - id: bulk_load_parquet_medium_uncompressed
   category: bulk_load
   description: Tests bulk load from medium Parquet file 100K rows uncompressed to measure columnar format efficiency
   file_dependencies:
   - parquet_medium_100k.parquet
   write_sql: "TRUNCATE TABLE bulk_load_ops_target;\nCOPY bulk_load_ops_target FROM '{file_path}/parquet_medium_100k.parquet' (FORMAT PARQUET)\n"
-  validation_queries:
-  - id: verify_row_count
-    sql: SELECT COUNT(*) as cnt FROM bulk_load_ops_target
-    expected_rows: 1
+  validation_queries: *bulk_load_row_count_validation
   cleanup_sql: "TRUNCATE TABLE bulk_load_ops_target\n"
   expected_rows_affected: 100000
-  platform_overrides:
-    starrocks: null
+  platform_overrides: *skip_starrocks
 - id: bulk_load_parquet_medium_snappy
   category: bulk_load
   description: Tests bulk load from medium Parquet file 100K rows snappy compressed to measure Snappy efficiency
   file_dependencies:
   - parquet_medium_100k_snappy.parquet
   write_sql: "TRUNCATE TABLE bulk_load_ops_target;\nCOPY bulk_load_ops_target FROM '{file_path}/parquet_medium_100k_snappy.parquet' (FORMAT PARQUET)\n"
-  validation_queries:
-  - id: verify_row_count
-    sql: SELECT COUNT(*) as cnt FROM bulk_load_ops_target
-    expected_rows: 1
+  validation_queries: *bulk_load_row_count_validation
   cleanup_sql: "TRUNCATE TABLE bulk_load_ops_target\n"
   expected_rows_affected: 100000
-  platform_overrides:
-    starrocks: null
+  platform_overrides: *skip_starrocks
 - id: bulk_load_parquet_medium_gzip
   category: bulk_load
   description: Tests bulk load from medium Parquet file 100K rows gzip compressed to measure compression trade-offs
   file_dependencies:
   - parquet_medium_100k_gzip.parquet
   write_sql: "TRUNCATE TABLE bulk_load_ops_target;\nCOPY bulk_load_ops_target FROM '{file_path}/parquet_medium_100k_gzip.parquet' (FORMAT PARQUET)\n"
-  validation_queries:
-  - id: verify_row_count
-    sql: SELECT COUNT(*) as cnt FROM bulk_load_ops_target
-    expected_rows: 1
+  validation_queries: *bulk_load_row_count_validation
   cleanup_sql: "TRUNCATE TABLE bulk_load_ops_target\n"
   expected_rows_affected: 100000
-  platform_overrides:
-    starrocks: null
+  platform_overrides: *skip_starrocks
 - id: bulk_load_parquet_medium_zstd
   category: bulk_load
   description: Tests bulk load from medium Parquet file 100K rows zstd compressed to measure zstd columnar efficiency
   file_dependencies:
   - parquet_medium_100k_zstd.parquet
   write_sql: "TRUNCATE TABLE bulk_load_ops_target;\nCOPY bulk_load_ops_target FROM '{file_path}/parquet_medium_100k_zstd.parquet' (FORMAT PARQUET)\n"
-  validation_queries:
-  - id: verify_row_count
-    sql: SELECT COUNT(*) as cnt FROM bulk_load_ops_target
-    expected_rows: 1
+  validation_queries: *bulk_load_row_count_validation
   cleanup_sql: "TRUNCATE TABLE bulk_load_ops_target\n"
   expected_rows_affected: 100000
-  platform_overrides:
-    starrocks: null
+  platform_overrides: *skip_starrocks
 - id: bulk_load_parquet_large_uncompressed
   category: bulk_load
   description: Tests bulk load from large Parquet file 1M rows uncompressed to measure large columnar dataset processing
   file_dependencies:
   - parquet_large_1m.parquet
   write_sql: "TRUNCATE TABLE bulk_load_ops_target;\nCOPY bulk_load_ops_target FROM '{file_path}/parquet_large_1m.parquet' (FORMAT PARQUET)\n"
-  validation_queries:
-  - id: verify_row_count
-    sql: SELECT COUNT(*) as cnt FROM bulk_load_ops_target
-    expected_rows: 1
+  validation_queries: *bulk_load_row_count_validation
   cleanup_sql: "TRUNCATE TABLE bulk_load_ops_target\n"
   expected_rows_affected: 1000000
-  platform_overrides:
-    starrocks: null
+  platform_overrides: *skip_starrocks
 - id: bulk_load_parquet_large_snappy
   category: bulk_load
   description: Tests bulk load from large Parquet file 1M rows snappy compressed to measure Snappy on large data
   file_dependencies:
   - parquet_large_1m_snappy.parquet
   write_sql: "TRUNCATE TABLE bulk_load_ops_target;\nCOPY bulk_load_ops_target FROM '{file_path}/parquet_large_1m_snappy.parquet' (FORMAT PARQUET)\n"
-  validation_queries:
-  - id: verify_row_count
-    sql: SELECT COUNT(*) as cnt FROM bulk_load_ops_target
-    expected_rows: 1
+  validation_queries: *bulk_load_row_count_validation
   cleanup_sql: "TRUNCATE TABLE bulk_load_ops_target\n"
   expected_rows_affected: 1000000
-  platform_overrides:
-    starrocks: null
+  platform_overrides: *skip_starrocks
 - id: bulk_load_parquet_large_gzip
   category: bulk_load
   description: Tests bulk load from large Parquet file 1M rows gzip compressed to measure gzip on large data
   file_dependencies:
   - parquet_large_1m_gzip.parquet
   write_sql: "TRUNCATE TABLE bulk_load_ops_target;\nCOPY bulk_load_ops_target FROM '{file_path}/parquet_large_1m_gzip.parquet' (FORMAT PARQUET)\n"
-  validation_queries:
-  - id: verify_row_count
-    sql: SELECT COUNT(*) as cnt FROM bulk_load_ops_target
-    expected_rows: 1
+  validation_queries: *bulk_load_row_count_validation
   cleanup_sql: "TRUNCATE TABLE bulk_load_ops_target\n"
   expected_rows_affected: 1000000
-  platform_overrides:
-    starrocks: null
+  platform_overrides: *skip_starrocks
 - id: bulk_load_parquet_large_zstd
   category: bulk_load
   description: Tests bulk load from large Parquet file 1M rows zstd compressed to measure zstd on large data
   file_dependencies:
   - parquet_large_1m_zstd.parquet
   write_sql: "TRUNCATE TABLE bulk_load_ops_target;\nCOPY bulk_load_ops_target FROM '{file_path}/parquet_large_1m_zstd.parquet' (FORMAT PARQUET)\n"
-  validation_queries:
-  - id: verify_row_count
-    sql: SELECT COUNT(*) as cnt FROM bulk_load_ops_target
-    expected_rows: 1
+  validation_queries: *bulk_load_row_count_validation
   cleanup_sql: "TRUNCATE TABLE bulk_load_ops_target\n"
   expected_rows_affected: 1000000
-  platform_overrides:
-    starrocks: null
+  platform_overrides: *skip_starrocks
 - id: bulk_load_column_subset
   category: bulk_load
   description: Tests bulk load with column subset selection to measure partial schema load overhead
@@ -895,7 +702,6 @@ operations:
     expected_rows: 1
     expected_rows_min: 1
   cleanup_sql: "TRUNCATE TABLE bulk_load_ops_target\n"
-  expected_rows_affected: null
   platform_overrides:
     duckdb: "TRUNCATE TABLE bulk_load_ops_target;\nCOPY bulk_load_ops_target FROM '{file_path}/csv_with_errors.csv'\n(FORMAT CSV, HEADER true, IGNORE_ERRORS true)\n"
     datafusion: null
@@ -929,10 +735,7 @@ operations:
     sql: SELECT COUNT(*) as cnt FROM bulk_load_ops_target
     expected_rows: 1
   cleanup_sql: "TRUNCATE TABLE bulk_load_ops_target\n"
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
-    starrocks: null
+  platform_overrides: *skip_datafusion_starrocks
 - id: bulk_load_append_mode
   category: bulk_load
   description: Tests bulk load in append mode without TRUNCATE to measure incremental load overhead
@@ -1042,7 +845,6 @@ operations:
     duckdb: "TRUNCATE TABLE bulk_load_ops_target;\nCOPY bulk_load_ops_target FROM '{file_path}/csv_custom_dates.csv'\n(FORMAT CSV, HEADER true, DATEFORMAT '%Y/%m/%d')\n"
     starrocks: null
 - id: merge_simple_upsert_small
-  category: merge
   description: Tests simple MERGE upsert with 10 rows to measure baseline MERGE overhead
   write_sql: "MERGE INTO merge_ops_target AS target\nUSING (\n  SELECT * FROM orders WHERE o_orderkey BETWEEN 1 AND 10\n) AS source\nON target.o_orderkey = source.o_orderkey\nWHEN MATCHED THEN\n  UPDATE SET o_totalprice = source.o_totalprice,\n             o_comment = 'merged_update'\nWHEN NOT MATCHED THEN INSERT\n"
   validation_queries:
@@ -1051,11 +853,8 @@ operations:
     expected_rows: 1
     expected_rows_min: 1
   cleanup_sql: "DELETE FROM merge_ops_target WHERE o_orderkey BETWEEN 1 AND 10\n"
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: merge_upsert_with_delete
-  category: merge
   description: Tests MERGE with DELETE clause for unmatched target rows to measure tri-directional merge overhead
   write_sql: "MERGE INTO merge_ops_target AS target\nUSING (\n  SELECT * FROM orders WHERE o_orderkey BETWEEN 1 AND 20\n) AS source\nON target.o_orderkey = source.o_orderkey\nWHEN MATCHED THEN\n  UPDATE SET o_comment = 'merge_matched'\nWHEN NOT MATCHED BY TARGET THEN INSERT\nWHEN NOT MATCHED BY SOURCE AND target.o_orderkey <= 25 THEN\n  DELETE\n"
   validation_queries:
@@ -1063,48 +862,32 @@ operations:
     sql: "SELECT COUNT(*) as cnt FROM merge_ops_target\nWHERE o_orderkey BETWEEN 1 AND 25\n"
     expected_rows: 1
     expected_rows_min: 1
-  cleanup_sql: null
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: merge_overlap_10pct
-  category: merge
   description: Tests MERGE with approximately 10 percent row overlap to measure low collision overhead
   write_sql: "MERGE INTO merge_ops_target AS target\nUSING (\n  SELECT * FROM orders\n  WHERE o_orderkey > (\n    SELECT CAST(MAX(o_orderkey) * 0.9 AS INTEGER) FROM merge_ops_target\n  )\n) AS source\nON target.o_orderkey = source.o_orderkey\nWHEN MATCHED THEN\n  UPDATE SET o_comment = 'merge_10pct'\nWHEN NOT MATCHED THEN INSERT\n"
   validation_queries:
   - id: verify_merge_overlap
     sql: SELECT COUNT(*) as cnt FROM merge_ops_target WHERE o_comment = 'merge_10pct'
     expected_rows_min: 0
-  cleanup_sql: null
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: merge_overlap_50pct
-  category: merge
   description: Tests MERGE with approximately 50 percent row overlap to measure medium collision overhead
   write_sql: "MERGE INTO merge_ops_target AS target\nUSING (\n  SELECT * FROM orders\n  WHERE o_orderkey > (\n    SELECT CAST(MAX(o_orderkey) * 0.5 AS INTEGER) FROM merge_ops_target\n  )\n) AS source\nON target.o_orderkey = source.o_orderkey\nWHEN MATCHED THEN\n  UPDATE SET o_comment = 'merge_50pct'\nWHEN NOT MATCHED THEN INSERT\n"
   validation_queries:
   - id: verify_merge_50pct
     sql: SELECT COUNT(*) as cnt FROM merge_ops_target WHERE o_comment = 'merge_50pct'
     expected_rows_min: 0
-  cleanup_sql: null
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: merge_overlap_90pct
-  category: merge
   description: Tests MERGE with approximately 90 percent row overlap to measure high collision overhead
   write_sql: "MERGE INTO merge_ops_target AS target\nUSING (\n  SELECT * FROM orders\n  WHERE o_orderkey <= (\n    SELECT CAST(MAX(o_orderkey) * 0.95 AS INTEGER) FROM merge_ops_target\n  )\n) AS source\nON target.o_orderkey = source.o_orderkey\nWHEN MATCHED THEN\n  UPDATE SET o_comment = 'merge_90pct'\nWHEN NOT MATCHED THEN INSERT\n"
   validation_queries:
   - id: verify_merge_90pct
     sql: SELECT COUNT(*) as cnt FROM merge_ops_target WHERE o_comment = 'merge_90pct'
     expected_rows_min: 1
-  cleanup_sql: null
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: merge_no_overlap_all_insert
-  category: merge
   description: Tests MERGE with zero overlap all inserts to measure pure insert path performance
   write_sql: "MERGE INTO merge_ops_source AS target\nUSING (\n  SELECT * FROM orders WHERE o_orderkey BETWEEN 1 AND 100\n) AS source\nON target.o_orderkey = source.o_orderkey\nWHEN MATCHED THEN\n  UPDATE SET o_comment = 'merge_matched'\nWHEN NOT MATCHED THEN INSERT\n"
   validation_queries:
@@ -1113,11 +896,8 @@ operations:
     expected_rows: 1
     expected_rows_min: 1
   cleanup_sql: "DELETE FROM merge_ops_source WHERE o_orderkey BETWEEN 1 AND 100\n"
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: merge_full_overlap_all_update
-  category: merge
   description: Tests MERGE with full overlap all updates to measure pure update path performance
   write_sql: "MERGE INTO merge_ops_target AS target\nUSING (\n  SELECT o_orderkey, o_totalprice * 1.1 AS o_totalprice, 'merge_all_update' AS o_comment\n  FROM merge_ops_target\n  WHERE o_orderkey <= (SELECT MIN(o_orderkey) + 100 FROM merge_ops_target)\n) AS source\nON target.o_orderkey = source.o_orderkey\nWHEN MATCHED THEN\n  UPDATE SET o_totalprice = source.o_totalprice,\n             o_comment = source.o_comment\n"
   validation_queries:
@@ -1126,11 +906,8 @@ operations:
     expected_rows: 1
     expected_rows_min: 1
   cleanup_sql: "UPDATE merge_ops_target\nSET o_totalprice = o_totalprice / 1.1,\n    o_comment = ''\nWHERE o_comment = 'merge_all_update'\n"
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: merge_with_join_condition
-  category: merge
   description: Tests MERGE with complex join condition involving multiple columns to measure matching overhead
   write_sql: "MERGE INTO merge_ops_lineitem_target AS target\nUSING (\n  SELECT l.*, o.o_custkey\n  FROM lineitem l\n  JOIN orders o ON l.l_orderkey = o.o_orderkey\n  WHERE l.l_orderkey BETWEEN 1 AND 10\n) AS source\nON target.l_orderkey = source.l_orderkey\n   AND target.l_linenumber = source.l_linenumber\nWHEN MATCHED THEN\n  UPDATE SET l_comment = 'merge_multi_key'\nWHEN NOT MATCHED THEN\n  INSERT VALUES (source.l_orderkey, source.l_partkey, source.l_suppkey, source.l_linenumber,\n                 source.l_quantity, source.l_extendedprice, source.l_discount, source.l_tax,\n                 source.l_returnflag, source.l_linestatus, source.l_shipdate, source.l_commitdate,\n                 source.l_receiptdate, source.l_shipinstruct, source.l_shipmode, source.l_comment)\n"
   validation_queries:
@@ -1139,11 +916,8 @@ operations:
     expected_rows: 1
     expected_rows_min: 1
   cleanup_sql: "DELETE FROM merge_ops_lineitem_target WHERE l_orderkey BETWEEN 1 AND 10\n"
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: merge_from_subquery_aggregated
-  category: merge
   description: Tests MERGE with aggregated subquery source to measure aggregation plus merge overhead
   write_sql: "MERGE INTO merge_ops_summary_target AS target\nUSING (\n  SELECT o_custkey, SUM(o_totalprice) AS total_price, COUNT(*) AS order_count\n  FROM orders\n  WHERE o_orderkey <= 500\n  GROUP BY o_custkey\n) AS source\nON target.o_custkey = source.o_custkey\nWHEN MATCHED THEN\n  UPDATE SET o_totalprice = source.total_price,\n             order_count = source.order_count\nWHEN NOT MATCHED THEN\n  INSERT VALUES (NULL, source.o_custkey, NULL, source.total_price, NULL, source.order_count)\n"
   validation_queries:
@@ -1152,11 +926,8 @@ operations:
     expected_rows: 1
     expected_rows_min: 1
   cleanup_sql: "DELETE FROM merge_ops_summary_target\n"
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: merge_conditional_update
-  category: merge
   description: Tests MERGE with conditional WHEN MATCHED clause to measure predicate evaluation overhead
   write_sql: "MERGE INTO merge_ops_target AS target\nUSING (\n  SELECT * FROM orders WHERE o_orderkey BETWEEN 1 AND 50\n) AS source\nON target.o_orderkey = source.o_orderkey\nWHEN MATCHED AND source.o_totalprice > 100000 THEN\n  UPDATE SET o_comment = 'merge_high_value',\n             o_orderpriority = '1-URGENT'\nWHEN MATCHED THEN\n  UPDATE SET o_comment = 'merge_low_value'\nWHEN NOT MATCHED THEN INSERT\n"
   validation_queries:
@@ -1165,11 +936,8 @@ operations:
     expected_rows: 1
     expected_rows_min: 1
   cleanup_sql: "UPDATE merge_ops_target SET o_comment = '', o_orderpriority = '5-LOW'\nWHERE o_comment LIKE 'merge_%'\n"
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: merge_conditional_insert
-  category: merge
   description: Tests MERGE with conditional WHEN NOT MATCHED clause to measure insert filtering overhead
   write_sql: "MERGE INTO merge_ops_source AS target\nUSING (\n  SELECT * FROM orders WHERE o_orderkey BETWEEN 1 AND 100\n) AS source\nON target.o_orderkey = source.o_orderkey\nWHEN MATCHED THEN\n  UPDATE SET o_comment = 'merge_matched'\nWHEN NOT MATCHED AND source.o_totalprice > 50000 THEN\n  INSERT VALUES (source.o_orderkey, source.o_custkey, source.o_orderstatus,\n                 source.o_totalprice, source.o_orderdate, source.o_orderpriority,\n                 source.o_clerk, source.o_shippriority, 'high_value_insert')\n"
   validation_queries:
@@ -1178,11 +946,8 @@ operations:
     expected_rows: 1
     expected_rows_min: 0
   cleanup_sql: "DELETE FROM merge_ops_source WHERE o_orderkey BETWEEN 1 AND 100\n"
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: merge_multi_column_update
-  category: merge
   description: Tests MERGE updating 5 plus columns to measure multi-column update overhead in MERGE
   write_sql: "MERGE INTO merge_ops_target AS target\nUSING (\n  SELECT\n    o_orderkey,\n    o_totalprice * 1.05 AS o_totalprice,\n    '1-URGENT' AS o_orderpriority,\n    'Clerk#000000999' AS o_clerk,\n    o_shippriority + 1 AS o_shippriority,\n    'merge_multi_col' AS o_comment\n  FROM merge_ops_target\n  WHERE o_orderkey <= (SELECT MIN(o_orderkey) + 50 FROM merge_ops_target)\n) AS source\nON target.o_orderkey = source.o_orderkey\nWHEN MATCHED THEN\n  UPDATE SET\n    o_totalprice = source.o_totalprice,\n    o_orderpriority = source.o_orderpriority,\n    o_clerk = source.o_clerk,\n    o_shippriority = source.o_shippriority,\n    o_comment = source.o_comment\n"
   validation_queries:
@@ -1191,11 +956,8 @@ operations:
     expected_rows: 1
     expected_rows_min: 1
   cleanup_sql: "UPDATE merge_ops_target\nSET o_totalprice = o_totalprice / 1.05,\n    o_orderpriority = '5-LOW',\n    o_clerk = 'Clerk#000000001',\n    o_shippriority = 0,\n    o_comment = ''\nWHERE o_comment = 'merge_multi_col'\n"
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: merge_computed_values
-  category: merge
   description: Tests MERGE with computed values using expressions to measure computation overhead
   write_sql: "MERGE INTO merge_ops_target AS target\nUSING (\n  SELECT\n    o_orderkey,\n    o_totalprice * 1.15 + 100.0 AS computed_price,\n    CASE\n      WHEN o_totalprice < 100000 THEN '5-LOW'\n      WHEN o_totalprice < 250000 THEN '3-MEDIUM'\n      ELSE '1-URGENT'\n    END AS computed_priority\n  FROM orders\n  WHERE o_orderkey BETWEEN 1 AND 50\n) AS source\nON target.o_orderkey = source.o_orderkey\nWHEN MATCHED THEN\n  UPDATE SET o_totalprice = source.computed_price,\n             o_orderpriority = source.computed_priority,\n             o_comment = 'merge_computed'\nWHEN NOT MATCHED THEN\n  INSERT VALUES (source.o_orderkey, 1, 'O', source.computed_price, CURRENT_DATE,\n                 source.computed_priority, 'Clerk#000000001', 0, 'merge_computed')\n"
   validation_queries:
@@ -1204,11 +966,8 @@ operations:
     expected_rows: 1
     expected_rows_min: 1
   cleanup_sql: "UPDATE merge_ops_target\nSET o_totalprice = (o_totalprice - 100.0) / 1.15,\n    o_orderpriority = '5-LOW',\n    o_comment = ''\nWHERE o_comment = 'merge_computed'\n"
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: merge_string_operations
-  category: merge
   description: Tests MERGE with string manipulation functions to measure string processing overhead
   write_sql: "MERGE INTO merge_ops_target AS target\nUSING (\n  SELECT\n    o_orderkey,\n    CONCAT('ORDER-', CAST(o_orderkey AS VARCHAR), '-', o_orderpriority) AS computed_comment\n  FROM orders\n  WHERE o_orderkey BETWEEN 1 AND 50\n) AS source\nON target.o_orderkey = source.o_orderkey\nWHEN MATCHED THEN\n  UPDATE SET o_comment = source.computed_comment\n"
   validation_queries:
@@ -1217,11 +976,8 @@ operations:
     expected_rows: 1
     expected_rows_min: 1
   cleanup_sql: "UPDATE merge_ops_target SET o_comment = '' WHERE o_comment LIKE 'ORDER-%'\n"
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: merge_date_arithmetic
-  category: merge
   description: Tests MERGE with date calculations to measure temporal operation overhead in MERGE
   write_sql: "MERGE INTO merge_ops_target AS target\nUSING (\n  SELECT\n    o_orderkey,\n    o_orderdate + INTERVAL '30' DAY AS shifted_date,\n    'merge_date_shift' AS marker\n  FROM orders\n  WHERE o_orderkey BETWEEN 1 AND 50\n) AS source\nON target.o_orderkey = source.o_orderkey\nWHEN MATCHED THEN\n  UPDATE SET o_orderdate = source.shifted_date,\n             o_comment = source.marker\n"
   validation_queries:
@@ -1230,11 +986,8 @@ operations:
     expected_rows: 1
     expected_rows_min: 1
   cleanup_sql: "UPDATE merge_ops_target\nSET o_orderdate = o_orderdate - INTERVAL '30' DAY,\n    o_comment = ''\nWHERE o_comment = 'merge_date_shift'\n"
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: merge_with_cte_source
-  category: merge
   description: Tests MERGE with CTE as source to measure CTE materialization overhead
   write_sql: "WITH enriched_orders AS (\n  SELECT\n    o.o_orderkey,\n    o.o_totalprice,\n    c.c_name,\n    c.c_mktsegment\n  FROM orders o\n  JOIN customer c ON o.o_custkey = c.c_custkey\n  WHERE o.o_orderkey BETWEEN 1 AND 50\n)\nMERGE INTO merge_ops_summary_target AS target\nUSING enriched_orders AS source\nON target.o_orderkey = source.o_orderkey\nWHEN MATCHED THEN\n  UPDATE SET o_totalprice = source.o_totalprice,\n             customer_name = source.c_name\nWHEN NOT MATCHED THEN\n  INSERT VALUES (source.o_orderkey, NULL, NULL, source.o_totalprice, source.c_name, NULL)\n"
   validation_queries:
@@ -1243,11 +996,8 @@ operations:
     expected_rows: 1
     expected_rows_min: 1
   cleanup_sql: "DELETE FROM merge_ops_summary_target WHERE o_orderkey BETWEEN 1 AND 50\n"
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: merge_returning_clause
-  category: merge
   description: Tests MERGE...RETURNING to measure overhead of returning merged row data
   write_sql: "MERGE INTO merge_ops_target AS target\nUSING (\n  SELECT * FROM orders WHERE o_orderkey BETWEEN 1 AND 10\n) AS source\nON target.o_orderkey = source.o_orderkey\nWHEN MATCHED THEN\n  UPDATE SET o_comment = 'merge_returning'\nWHEN NOT MATCHED THEN INSERT\nRETURNING o_orderkey, o_totalprice, o_comment\n"
   validation_queries:
@@ -1256,14 +1006,8 @@ operations:
     expected_rows: 1
     expected_rows_min: 1
   cleanup_sql: "DELETE FROM merge_ops_target WHERE o_orderkey BETWEEN 1 AND 10\n"
-  expected_rows_affected: null
-  platform_overrides:
-    mysql: null
-    bigquery: null
-    datafusion: null
-    starrocks: null
+  platform_overrides: *skip_returning_platforms
 - id: merge_error_handling
-  category: merge
   description: Tests MERGE with potential constraint violations to measure error handling overhead
   write_sql: "MERGE INTO merge_ops_target AS target\nUSING (\n  SELECT * FROM orders WHERE o_orderkey BETWEEN 1 AND 50\n  UNION ALL\n  SELECT * FROM orders WHERE o_orderkey BETWEEN 45 AND 55\n) AS source\nON target.o_orderkey = source.o_orderkey\nWHEN MATCHED THEN\n  UPDATE SET o_comment = 'merge_with_dups'\nWHEN NOT MATCHED THEN INSERT\n"
   validation_queries:
@@ -1272,11 +1016,8 @@ operations:
     expected_rows: 1
     expected_rows_min: 1
   cleanup_sql: "DELETE FROM merge_ops_target WHERE o_orderkey BETWEEN 1 AND 55\n"
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: delete_gdpr_suppliers_1pct
-  category: delete
   description: Tests GDPR-compliant deletion with IN subquery to measure deletion-by-list performance (1% of suppliers)
   write_sql: "DELETE FROM delete_ops_lineitem\nWHERE l_suppkey IN (\n  SELECT DISTINCT l_suppkey\n  FROM lineitem\n  WHERE l_suppkey <= (SELECT MAX(l_suppkey) * 0.01 FROM lineitem)\n)\n"
   validation_queries:
@@ -1285,12 +1026,8 @@ operations:
     expected_rows: 1
     expected_rows_min: 1
   cleanup_sql: "INSERT INTO delete_ops_lineitem\nSELECT * FROM lineitem\nWHERE l_suppkey <= (SELECT MAX(l_suppkey) * 0.01 FROM lineitem)\n"
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
-    starrocks: null
+  platform_overrides: *skip_datafusion_starrocks
 - id: delete_gdpr_suppliers_5pct
-  category: delete
   description: Tests GDPR-compliant deletion with IN subquery at medium scale to measure deletion-by-list performance (5% of suppliers)
   write_sql: "DELETE FROM delete_ops_lineitem\nWHERE l_suppkey IN (\n  SELECT DISTINCT l_suppkey\n  FROM lineitem\n  WHERE l_suppkey <= (SELECT MAX(l_suppkey) * 0.05 FROM lineitem)\n)\n"
   validation_queries:
@@ -1299,12 +1036,8 @@ operations:
     expected_rows: 1
     expected_rows_min: 1
   cleanup_sql: "INSERT INTO delete_ops_lineitem\nSELECT * FROM lineitem\nWHERE l_suppkey <= (SELECT MAX(l_suppkey) * 0.05 FROM lineitem)\n"
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
-    starrocks: null
+  platform_overrides: *skip_datafusion_starrocks
 - id: merge_etl_aggregation_pattern
-  category: merge
   description: Tests ETL aggregation pattern with running totals and aggregate computations to measure aggregation overhead in MERGE
   write_sql: "MERGE INTO merge_ops_target AS target\nUSING (\n  SELECT\n    l_orderkey,\n    SUM(l_extendedprice * (1 - l_discount)) as computed_revenue,\n    MAX(l_shipdate) as latest_ship_date,\n    COUNT(*) as line_count\n  FROM lineitem\n  WHERE l_orderkey BETWEEN 1 AND 1000\n  GROUP BY l_orderkey\n) AS source\nON target.o_orderkey = source.l_orderkey\nWHEN MATCHED THEN\n  UPDATE SET\n    o_totalprice = target.o_totalprice + source.computed_revenue,\n    o_comment = 'etl_agg_lines_' || CAST(source.line_count AS VARCHAR)\nWHEN NOT MATCHED THEN\n  INSERT VALUES (source.l_orderkey, 1, 'O', source.computed_revenue, DATE '1998-01-01', '1-URGENT', 'Clerk#000000001', 0, 'etl_new')\n"
   validation_queries:
@@ -1317,11 +1050,8 @@ operations:
     expected_rows: 1
     expected_rows_min: 1
   cleanup_sql: "DELETE FROM merge_ops_target\nWHERE o_comment LIKE 'etl_agg%' OR o_comment = 'etl_new'\n"
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: merge_deduplication_window_function
-  category: merge
   description: Tests MERGE with window function deduplication using ROW_NUMBER to measure duplicate elimination overhead
   write_sql: "MERGE INTO merge_ops_target AS target\nUSING (\n  SELECT\n    o_orderkey,\n    o_custkey,\n    o_orderstatus,\n    o_totalprice,\n    o_orderdate,\n    o_orderpriority,\n    o_clerk,\n    o_shippriority,\n    o_comment,\n    ROW_NUMBER() OVER (\n      PARTITION BY o_orderkey\n      ORDER BY o_orderdate DESC, o_totalprice DESC\n    ) as rn\n  FROM orders\n  WHERE o_orderkey BETWEEN 1 AND 500\n) AS source\nON target.o_orderkey = source.o_orderkey\nWHEN MATCHED AND source.rn = 1 THEN\n  UPDATE SET\n    o_totalprice = source.o_totalprice,\n    o_comment = 'dedup_update'\nWHEN NOT MATCHED AND source.rn = 1 THEN\n  INSERT VALUES (\n    source.o_orderkey, source.o_custkey, source.o_orderstatus,\n    source.o_totalprice, source.o_orderdate, source.o_orderpriority,\n    source.o_clerk, source.o_shippriority, 'dedup_insert'\n  )\n"
   validation_queries:
@@ -1334,11 +1064,8 @@ operations:
     expected_rows: 1
     expected_rows_min: 1
   cleanup_sql: "DELETE FROM merge_ops_target\nWHERE o_comment IN ('dedup_update', 'dedup_insert')\n"
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: ddl_create_table_simple
-  category: ddl
   description: Tests CREATE TABLE with simple schema with 5 columns and no constraints
   requires_setup: false
   write_sql: "CREATE TABLE test_simple (\n  id INTEGER,\n  name VARCHAR(100),\n  value DECIMAL(15,2),\n  created DATE,\n  status VARCHAR(10)\n)\n"
@@ -1349,7 +1076,6 @@ operations:
   cleanup_sql: "DROP TABLE IF EXISTS test_simple\n"
   expected_rows_affected: 0
 - id: ddl_truncate_table_small
-  category: ddl
   requires_setup: false
   description: Tests TRUNCATE TABLE on small staging table to measure fast delete baseline
   write_sql: "TRUNCATE TABLE ddl_truncate_target\n"
@@ -1357,12 +1083,8 @@ operations:
   - id: verify_empty
     sql: SELECT * FROM ddl_truncate_target
     expected_rows: 0
-  cleanup_sql: null
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: ddl_create_table_as_select_simple
-  category: ddl
   description: Tests CREATE TABLE AS SELECT with simple SELECT to measure table creation from query results
   requires_setup: false
   write_sql: "CREATE TABLE orders_1995 AS\nSELECT *\nFROM orders\nWHERE o_orderdate >= DATE '1995-01-01'\n  AND o_orderdate < DATE '1996-01-01'\n"
@@ -1373,9 +1095,7 @@ operations:
     expected_rows_min: 0
     expected_rows_max: 10
   cleanup_sql: "DROP TABLE IF EXISTS orders_1995\n"
-  expected_rows_affected: null
 - id: ddl_create_table_with_constraints
-  category: ddl
   description: Tests CREATE TABLE with PRIMARY KEY and NOT NULL constraints to measure constraint overhead
   requires_setup: false
   write_sql: "CREATE TABLE test_constrained (\n  id INTEGER PRIMARY KEY,\n  name VARCHAR(100) NOT NULL,\n  value DECIMAL(15,2) NOT NULL,\n  created DATE NOT NULL,\n  status VARCHAR(10)\n)\n"
@@ -1385,10 +1105,8 @@ operations:
     expected_rows: 1
   cleanup_sql: "DROP TABLE IF EXISTS test_constrained\n"
   expected_rows_affected: 0
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: ddl_create_table_with_index
-  category: ddl
   description: Tests CREATE TABLE followed by CREATE INDEX to measure index creation overhead
   requires_setup: false
   write_sql: "CREATE TABLE test_indexed (\n  id INTEGER,\n  name VARCHAR(100),\n  value DECIMAL(15,2)\n);\nCREATE INDEX idx_test_value ON test_indexed(value)\n"
@@ -1398,11 +1116,8 @@ operations:
     expected_rows: 1
   cleanup_sql: "DROP TABLE IF EXISTS test_indexed\n"
   expected_rows_affected: 0
-  platform_overrides:
-    datafusion: null
-    starrocks: null
+  platform_overrides: *skip_datafusion_starrocks
 - id: ddl_alter_table_add_column
-  category: ddl
   description: Tests ALTER TABLE ADD COLUMN to measure schema modification overhead
   requires_setup: false
   write_sql: "CREATE TABLE test_alter (\n  id INTEGER,\n  name VARCHAR(100)\n);\nALTER TABLE test_alter ADD COLUMN created DATE\n"
@@ -1412,10 +1127,8 @@ operations:
     expected_rows: 1
   cleanup_sql: "DROP TABLE IF EXISTS test_alter\n"
   expected_rows_affected: 0
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: ddl_alter_table_drop_column
-  category: ddl
   description: Tests ALTER TABLE DROP COLUMN to measure column removal overhead
   requires_setup: false
   write_sql: "CREATE TABLE test_drop_col (\n  id INTEGER,\n  name VARCHAR(100),\n  temp_col VARCHAR(50)\n);\nALTER TABLE test_drop_col DROP COLUMN temp_col\n"
@@ -1425,10 +1138,8 @@ operations:
     expected_rows: 1
   cleanup_sql: "DROP TABLE IF EXISTS test_drop_col\n"
   expected_rows_affected: 0
-  platform_overrides:
-    datafusion: null
+  platform_overrides: *skip_datafusion
 - id: ddl_alter_table_rename_column
-  category: ddl
   description: Tests ALTER TABLE RENAME COLUMN to measure column renaming overhead
   requires_setup: false
   write_sql: "CREATE TABLE test_rename_col (\n  id INTEGER,\n  old_name VARCHAR(100)\n);\nALTER TABLE test_rename_col RENAME COLUMN old_name TO new_name\n"
@@ -1443,7 +1154,6 @@ operations:
     starrocks: null
     datafusion: null
 - id: ddl_create_index_on_existing
-  category: ddl
   description: Tests CREATE INDEX on populated table to measure index building on existing data
   requires_setup: false
   write_sql: "CREATE TABLE test_idx_existing AS SELECT * FROM orders WHERE o_orderkey <= 100;\nCREATE INDEX idx_existing_price ON test_idx_existing(o_totalprice)\n"
@@ -1453,12 +1163,8 @@ operations:
     expected_rows: 1
     expected_rows_min: 1
   cleanup_sql: "DROP TABLE IF EXISTS test_idx_existing\n"
-  expected_rows_affected: null
-  platform_overrides:
-    datafusion: null
-    starrocks: null
+  platform_overrides: *skip_datafusion_starrocks
 - id: ddl_drop_index
-  category: ddl
   description: Tests DROP INDEX to measure index removal overhead
   requires_setup: false
   write_sql: "CREATE TABLE test_drop_idx (id INTEGER, value DECIMAL(15,2));\nCREATE INDEX idx_test_drop ON test_drop_idx(value);\nDROP INDEX idx_test_drop\n"
@@ -1473,7 +1179,6 @@ operations:
     datafusion: null
     starrocks: null
 - id: ddl_create_view_simple
-  category: ddl
   description: Tests CREATE VIEW with simple SELECT to measure view creation overhead
   requires_setup: false
   write_sql: "CREATE VIEW orders_view AS\nSELECT o_orderkey, o_custkey, o_totalprice, o_orderdate\nFROM orders\nWHERE o_orderkey <= 1000\n"
@@ -1484,7 +1189,6 @@ operations:
   cleanup_sql: "DROP VIEW IF EXISTS orders_view\n"
   expected_rows_affected: 0
 - id: ddl_drop_table
-  category: ddl
   description: Tests DROP TABLE to measure table removal overhead
   requires_setup: false
   write_sql: "CREATE TABLE test_drop AS SELECT * FROM orders WHERE o_orderkey <= 50;\nDROP TABLE test_drop\n"
@@ -1492,10 +1196,7 @@ operations:
   - id: table_dropped
     sql: "SELECT COUNT(*) as cnt\nFROM information_schema.tables\nWHERE table_name = 'test_drop'\n"
     expected_rows: 1
-  cleanup_sql: null
-  expected_rows_affected: null
 - id: sketch_ddl_create_persistent_table
-  category: sketch
   description: Tests CREATE/DROP overhead for a sketch persistence table with BINARY columns
   requires_setup: false
   write_sql: "INSTALL datasketches FROM community;\nLOAD datasketches;\nDROP TABLE IF EXISTS sketch_ops_daily_users;\nCREATE TABLE sketch_ops_daily_users (\n  activity_date DATE,\n  region VARCHAR(25),\n  user_sketch BLOB,\n  rev_sketch BLOB\n);\n"
@@ -1504,7 +1205,6 @@ operations:
     sql: "SELECT COUNT(*) as cnt\nFROM information_schema.tables\nWHERE table_name = 'sketch_ops_daily_users'\n"
     expected_rows: 1
   cleanup_sql: "DROP TABLE IF EXISTS sketch_ops_daily_users\n"
-  expected_rows_affected: null
   platform_overrides:
     databricks: "DROP TABLE IF EXISTS sketch_ops_daily_users;\nCREATE TABLE sketch_ops_daily_users (\n  activity_date DATE,\n  region STRING,\n  user_sketch BINARY,\n  rev_sketch BINARY\n) USING DELTA;\n"
     snowflake: "DROP TABLE IF EXISTS sketch_ops_daily_users;\nCREATE TABLE sketch_ops_daily_users (\n  activity_date DATE,\n  region VARCHAR(25),\n  user_sketch BINARY,\n  rev_sketch BINARY\n);\n"
@@ -1515,7 +1215,6 @@ operations:
     sqlite: null
     starrocks: null
 - id: sketch_insert_theta_per_partition
-  category: sketch
   description: Builds per-partition Theta sketches over l_orderkey + l_extendedprice and persists them
   requires_setup: false
   write_sql: "INSTALL datasketches FROM community;\nLOAD datasketches;\nDROP TABLE IF EXISTS sketch_ops_daily_users;\nCREATE TABLE sketch_ops_daily_users (\n  activity_date DATE,\n  region VARCHAR(25),\n  user_sketch BLOB,\n  rev_sketch BLOB\n);\nINSERT INTO sketch_ops_daily_users\nSELECT\n  l_shipdate AS activity_date,\n  l_returnflag AS region,\n  datasketch_theta(l_orderkey) AS user_sketch,\n  datasketch_theta(CAST(l_extendedprice AS INTEGER)) AS rev_sketch\nFROM lineitem\nGROUP BY l_shipdate, l_returnflag;\n"
@@ -1524,7 +1223,6 @@ operations:
     sql: "SELECT COUNT(*) as partitions FROM sketch_ops_daily_users\n"
     expected_rows_min: 1
   cleanup_sql: "DROP TABLE IF EXISTS sketch_ops_daily_users\n"
-  expected_rows_affected: null
   platform_overrides:
     databricks: "DROP TABLE IF EXISTS sketch_ops_daily_users;\nCREATE TABLE sketch_ops_daily_users (\n  activity_date DATE, region STRING, user_sketch BINARY, rev_sketch BINARY\n) USING DELTA;\nINSERT INTO sketch_ops_daily_users\nSELECT l_shipdate, l_returnflag,\n       theta_sketch_agg(l_orderkey),\n       theta_sketch_agg(CAST(l_extendedprice AS INT))\nFROM lineitem GROUP BY l_shipdate, l_returnflag;\n"
     snowflake: "DROP TABLE IF EXISTS sketch_ops_daily_users;\nCREATE TABLE sketch_ops_daily_users (\n  activity_date DATE, region VARCHAR(25), user_sketch BINARY, rev_sketch BINARY\n);\nINSERT INTO sketch_ops_daily_users\nSELECT l_shipdate, l_returnflag,\n       DATASKETCHES_THETA_ACCUMULATE(l_orderkey),\n       DATASKETCHES_THETA_ACCUMULATE(CAST(l_extendedprice AS INTEGER))\nFROM lineitem GROUP BY l_shipdate, l_returnflag;\n"
@@ -1535,7 +1233,6 @@ operations:
     sqlite: null
     starrocks: null
 - id: sketch_insert_kll_per_partition
-  category: sketch
   description: Builds per-partition KLL quantile sketches over l_extendedprice
   requires_setup: false
   write_sql: "INSTALL datasketches FROM community;\nLOAD datasketches;\nDROP TABLE IF EXISTS sketch_ops_kll_partitions;\nCREATE TABLE sketch_ops_kll_partitions (\n  activity_date DATE,\n  region VARCHAR(25),\n  price_sketch BLOB\n);\nINSERT INTO sketch_ops_kll_partitions\nSELECT\n  l_shipdate,\n  l_returnflag,\n  datasketch_kll(200, l_extendedprice)\nFROM lineitem\nGROUP BY l_shipdate, l_returnflag;\n"
@@ -1544,7 +1241,6 @@ operations:
     sql: "SELECT COUNT(*) as partitions FROM sketch_ops_kll_partitions\n"
     expected_rows_min: 1
   cleanup_sql: "DROP TABLE IF EXISTS sketch_ops_kll_partitions\n"
-  expected_rows_affected: null
   platform_overrides:
     databricks: "DROP TABLE IF EXISTS sketch_ops_kll_partitions;\nCREATE TABLE sketch_ops_kll_partitions (\n  activity_date DATE, region STRING, price_sketch BINARY\n) USING DELTA;\nINSERT INTO sketch_ops_kll_partitions\nSELECT l_shipdate, l_returnflag, kll_sketch_agg_double(CAST(l_extendedprice AS DOUBLE))\nFROM lineitem GROUP BY l_shipdate, l_returnflag;\n"
     snowflake: "DROP TABLE IF EXISTS sketch_ops_kll_partitions;\nCREATE TABLE sketch_ops_kll_partitions (\n  activity_date DATE, region VARCHAR(25), price_sketch BINARY\n);\nINSERT INTO sketch_ops_kll_partitions\nSELECT l_shipdate, l_returnflag,\n       DATASKETCHES_KLL_ACCUMULATE(CAST(l_extendedprice AS DOUBLE))\nFROM lineitem GROUP BY l_shipdate, l_returnflag;\n"
@@ -1555,7 +1251,6 @@ operations:
     sqlite: null
     starrocks: null
 - id: sketch_insert_topk_per_shard
-  category: sketch
   description: Builds per-shard frequent-items (Top-K accumulator) sketches over l_shipmode
   requires_setup: false
   write_sql: "INSTALL datasketches FROM community;\nLOAD datasketches;\nDROP TABLE IF EXISTS sketch_ops_topk;\nCREATE TABLE sketch_ops_topk (\n  shard_id INTEGER,\n  topk_sketch BLOB\n);\nINSERT INTO sketch_ops_topk\nSELECT\n  CAST(l_orderkey % 8 AS INTEGER) AS shard_id,\n  datasketch_frequent_items(8, l_shipmode) AS topk_sketch\nFROM lineitem\nGROUP BY l_orderkey % 8;\n"
@@ -1564,7 +1259,6 @@ operations:
     sql: "SELECT COUNT(*) as shards FROM sketch_ops_topk\n"
     expected_rows_min: 1
   cleanup_sql: "DROP TABLE IF EXISTS sketch_ops_topk\n"
-  expected_rows_affected: null
   platform_overrides:
     databricks: "DROP TABLE IF EXISTS sketch_ops_topk;\nCREATE TABLE sketch_ops_topk (\n  shard_id INT, topk_sketch BINARY\n) USING DELTA;\nINSERT INTO sketch_ops_topk\nSELECT CAST(l_orderkey % 8 AS INT),\n       approx_top_k_accumulate(l_shipmode)\nFROM lineitem GROUP BY l_orderkey % 8;\n"
     snowflake: "DROP TABLE IF EXISTS sketch_ops_topk;\nCREATE TABLE sketch_ops_topk (\n  shard_id INTEGER, topk_sketch BINARY\n);\nINSERT INTO sketch_ops_topk\nSELECT MOD(l_orderkey, 8),\n       APPROX_TOP_K_ACCUMULATE(l_shipmode, 1024)\nFROM lineitem GROUP BY MOD(l_orderkey, 8);\n"
@@ -1575,7 +1269,6 @@ operations:
     sqlite: null
     starrocks: null
 - id: sketch_query_theta_union_merge
-  category: sketch
   description: ★ Headline — populate theta sketches per partition, then merge across all partitions in a single query and emit an approximate distinct count (compare to aggregation_distinct in read_primitives). BigQuery substitutes HLL_COUNT for Theta (no native Theta surface) — the persist + merge + requery shape is identical, but the underlying sketch family differs.
   requires_setup: false
   write_sql: "INSTALL datasketches FROM community;\nLOAD datasketches;\nDROP TABLE IF EXISTS sketch_ops_daily_users;\nCREATE TABLE sketch_ops_daily_users (\n  activity_date DATE, region VARCHAR(25), user_sketch BLOB, rev_sketch BLOB\n);\nINSERT INTO sketch_ops_daily_users\nSELECT l_shipdate, l_returnflag,\n       datasketch_theta(l_orderkey),\n       datasketch_theta(CAST(l_extendedprice AS INTEGER))\nFROM lineitem\nGROUP BY l_shipdate, l_returnflag;\nSELECT datasketch_theta_estimate(datasketch_theta(user_sketch)) AS distinct_orders\nFROM sketch_ops_daily_users;\n"
@@ -1614,7 +1307,6 @@ operations:
       sqlite: null
       starrocks: null
   cleanup_sql: "DROP TABLE IF EXISTS sketch_ops_daily_users\n"
-  expected_rows_affected: null
   platform_overrides:
     databricks: "DROP TABLE IF EXISTS sketch_ops_daily_users;\nCREATE TABLE sketch_ops_daily_users (\n  activity_date DATE, region STRING, user_sketch BINARY, rev_sketch BINARY\n) USING DELTA;\nINSERT INTO sketch_ops_daily_users\nSELECT l_shipdate, l_returnflag, theta_sketch_agg(l_orderkey),\n       theta_sketch_agg(CAST(l_extendedprice AS INT))\nFROM lineitem GROUP BY l_shipdate, l_returnflag;\nSELECT theta_sketch_estimate(theta_union_agg(user_sketch)) AS distinct_orders\nFROM sketch_ops_daily_users;\n"
     snowflake: "DROP TABLE IF EXISTS sketch_ops_daily_users;\nCREATE TABLE sketch_ops_daily_users (\n  activity_date DATE, region VARCHAR(25), user_sketch BINARY, rev_sketch BINARY\n);\nINSERT INTO sketch_ops_daily_users\nSELECT l_shipdate, l_returnflag, DATASKETCHES_THETA_ACCUMULATE(l_orderkey),\n       DATASKETCHES_THETA_ACCUMULATE(CAST(l_extendedprice AS INTEGER))\nFROM lineitem GROUP BY l_shipdate, l_returnflag;\nSELECT DATASKETCHES_THETA_ESTIMATE(DATASKETCHES_THETA_COMBINE(user_sketch)) AS distinct_orders\nFROM sketch_ops_daily_users;\n"
@@ -1625,7 +1317,6 @@ operations:
     sqlite: null
     starrocks: null
 - id: sketch_query_kll_quantiles_merge
-  category: sketch
   description: ★ Headline — populate KLL sketches per partition, merge across partitions, extract median price (compare to statistical_percentiles in read_primitives)
   requires_setup: false
   write_sql: "INSTALL datasketches FROM community;\nLOAD datasketches;\nDROP TABLE IF EXISTS sketch_ops_kll_partitions;\nCREATE TABLE sketch_ops_kll_partitions (\n  activity_date DATE, region VARCHAR(25), price_sketch BLOB\n);\nINSERT INTO sketch_ops_kll_partitions\nSELECT l_shipdate, l_returnflag, datasketch_kll(200, l_extendedprice)\nFROM lineitem GROUP BY l_shipdate, l_returnflag;\nSELECT datasketch_kll_quantile(datasketch_kll(200, price_sketch::sketch_kll_double), 0.5::DOUBLE, true) AS median_price\nFROM sketch_ops_kll_partitions;\n"
@@ -1664,7 +1355,6 @@ operations:
       sqlite: null
       starrocks: null
   cleanup_sql: "DROP TABLE IF EXISTS sketch_ops_kll_partitions\n"
-  expected_rows_affected: null
   platform_overrides:
     databricks: "DROP TABLE IF EXISTS sketch_ops_kll_partitions;\nCREATE TABLE sketch_ops_kll_partitions (\n  activity_date DATE, region STRING, price_sketch BINARY\n) USING DELTA;\nINSERT INTO sketch_ops_kll_partitions\nSELECT l_shipdate, l_returnflag, kll_sketch_agg_double(CAST(l_extendedprice AS DOUBLE))\nFROM lineitem GROUP BY l_shipdate, l_returnflag;\nSELECT kll_sketch_get_quantile_double(kll_merge_agg_double(price_sketch), 0.5) AS median_price\nFROM sketch_ops_kll_partitions;\n"
     snowflake: "DROP TABLE IF EXISTS sketch_ops_kll_partitions;\nCREATE TABLE sketch_ops_kll_partitions (\n  activity_date DATE, region VARCHAR(25), price_sketch BINARY\n);\nINSERT INTO sketch_ops_kll_partitions\nSELECT l_shipdate, l_returnflag,\n       DATASKETCHES_KLL_ACCUMULATE(CAST(l_extendedprice AS DOUBLE))\nFROM lineitem GROUP BY l_shipdate, l_returnflag;\nSELECT DATASKETCHES_KLL_GET_QUANTILE(DATASKETCHES_KLL_COMBINE(price_sketch), 0.5) AS median_price\nFROM sketch_ops_kll_partitions;\n"
@@ -1675,7 +1365,6 @@ operations:
     sqlite: null
     starrocks: null
 - id: sketch_query_topk_combine
-  category: sketch
   description: ★ Headline — populate per-shard frequent-items sketches, combine across shards, count the frequent items (cross-reference approx_top_k_lineitem latency in read_primitives)
   requires_setup: false
   write_sql: "INSTALL datasketches FROM community;\nLOAD datasketches;\nDROP TABLE IF EXISTS sketch_ops_topk;\nCREATE TABLE sketch_ops_topk (shard_id INTEGER, topk_sketch BLOB);\nINSERT INTO sketch_ops_topk\nSELECT CAST(l_orderkey % 8 AS INTEGER),\n       datasketch_frequent_items(8, l_shipmode)\nFROM lineitem GROUP BY l_orderkey % 8;\nSELECT LENGTH(datasketch_frequent_items_get_frequent(\n  datasketch_frequent_items(8, topk_sketch), 'NO_FALSE_POSITIVES'\n)) AS frequent_count\nFROM sketch_ops_topk;\n"
@@ -1713,7 +1402,6 @@ operations:
       sqlite: null
       starrocks: null
   cleanup_sql: "DROP TABLE IF EXISTS sketch_ops_topk\n"
-  expected_rows_affected: null
   platform_overrides:
     databricks: "DROP TABLE IF EXISTS sketch_ops_topk;\nCREATE TABLE sketch_ops_topk (shard_id INT, topk_sketch BINARY) USING DELTA;\nINSERT INTO sketch_ops_topk\nSELECT CAST(l_orderkey % 8 AS INT),\n       approx_top_k_accumulate(l_shipmode)\nFROM lineitem GROUP BY l_orderkey % 8;\nSELECT SIZE(approx_top_k_estimate(approx_top_k_combine(topk_sketch))) AS frequent_count\nFROM sketch_ops_topk;\n"
     snowflake: "DROP TABLE IF EXISTS sketch_ops_topk;\nCREATE TABLE sketch_ops_topk (shard_id INTEGER, topk_sketch BINARY);\nINSERT INTO sketch_ops_topk\nSELECT MOD(l_orderkey, 8),\n       APPROX_TOP_K_ACCUMULATE(l_shipmode, 1024)\nFROM lineitem GROUP BY MOD(l_orderkey, 8);\nSELECT ARRAY_SIZE(APPROX_TOP_K_ESTIMATE(APPROX_TOP_K_COMBINE(topk_sketch))) AS frequent_count\nFROM sketch_ops_topk;\n"
@@ -1724,7 +1412,6 @@ operations:
     sqlite: null
     starrocks: null
 - id: sketch_drop_persistent_table
-  category: sketch
   description: Tests DROP TABLE on a sketch-bearing BINARY-column table to measure cleanup overhead
   requires_setup: false
   write_sql: "INSTALL datasketches FROM community;\nLOAD datasketches;\nDROP TABLE IF EXISTS sketch_ops_daily_users;\nCREATE TABLE sketch_ops_daily_users (\n  activity_date DATE, region VARCHAR(25), user_sketch BLOB, rev_sketch BLOB\n);\nDROP TABLE sketch_ops_daily_users;\n"
@@ -1732,8 +1419,6 @@ operations:
   - id: table_dropped
     sql: "SELECT COUNT(*) as cnt\nFROM information_schema.tables\nWHERE table_name = 'sketch_ops_daily_users'\n"
     expected_rows: 1
-  cleanup_sql: null
-  expected_rows_affected: null
   platform_overrides:
     databricks: "DROP TABLE IF EXISTS sketch_ops_daily_users;\nCREATE TABLE sketch_ops_daily_users (\n  activity_date DATE, region STRING, user_sketch BINARY, rev_sketch BINARY\n) USING DELTA;\nDROP TABLE sketch_ops_daily_users;\n"
     snowflake: "DROP TABLE IF EXISTS sketch_ops_daily_users;\nCREATE TABLE sketch_ops_daily_users (\n  activity_date DATE, region VARCHAR(25), user_sketch BINARY, rev_sketch BINARY\n);\nDROP TABLE sketch_ops_daily_users;\n"
@@ -1744,7 +1429,6 @@ operations:
     sqlite: null
     starrocks: null
 - id: sketch_cpc_create_persistent_table
-  category: sketch
   description: Tests CREATE/DROP overhead for a CPC sketch table (DuckDB-only)
   requires_setup: false
   write_sql: "INSTALL datasketches FROM community;\nLOAD datasketches;\nDROP TABLE IF EXISTS sketch_cpc_partitions;\nCREATE TABLE sketch_cpc_partitions (\n  activity_date DATE,\n  region VARCHAR(25),\n  user_sketch BLOB\n);\n"
@@ -1753,8 +1437,7 @@ operations:
     sql: "SELECT COUNT(*) as cnt FROM information_schema.tables\nWHERE table_name = 'sketch_cpc_partitions'\n"
     expected_rows: 1
   cleanup_sql: "DROP TABLE IF EXISTS sketch_cpc_partitions\n"
-  expected_rows_affected: null
-  platform_overrides:
+  platform_overrides: &skip_duckdb_only_sketch_platforms
     databricks: null
     snowflake: null
     bigquery: null
@@ -1765,7 +1448,6 @@ operations:
     starrocks: null
     trino: null
 - id: sketch_cpc_insert_per_partition
-  category: sketch
   description: Builds per-partition CPC sketches over l_orderkey (DuckDB-only)
   requires_setup: false
   write_sql: "INSTALL datasketches FROM community;\nLOAD datasketches;\nDROP TABLE IF EXISTS sketch_cpc_partitions;\nCREATE TABLE sketch_cpc_partitions (\n  activity_date DATE,\n  region VARCHAR(25),\n  user_sketch BLOB\n);\nINSERT INTO sketch_cpc_partitions\nSELECT l_shipdate, l_returnflag, datasketch_cpc(11, l_orderkey)\nFROM lineitem GROUP BY l_shipdate, l_returnflag;\n"
@@ -1774,19 +1456,8 @@ operations:
     sql: "SELECT COUNT(*) as partitions FROM sketch_cpc_partitions\n"
     expected_rows_min: 1
   cleanup_sql: "DROP TABLE IF EXISTS sketch_cpc_partitions\n"
-  expected_rows_affected: null
-  platform_overrides:
-    databricks: null
-    snowflake: null
-    bigquery: null
-    clickhouse: null
-    datafusion: null
-    redshift: null
-    sqlite: null
-    starrocks: null
-    trino: null
+  platform_overrides: *skip_duckdb_only_sketch_platforms
 - id: sketch_cpc_query_union_merge
-  category: sketch
   description: Headline CPC — populate per-partition CPC sketches, union them across partitions, emit distinct estimate (DuckDB-only). Side-by-side with sketch_query_theta_union_merge for HLL-family algorithm comparison and storage-cost tradeoff.
   requires_setup: false
   write_sql: "INSTALL datasketches FROM community;\nLOAD datasketches;\nDROP TABLE IF EXISTS sketch_cpc_partitions;\nCREATE TABLE sketch_cpc_partitions (\n  activity_date DATE, region VARCHAR(25), user_sketch BLOB\n);\nINSERT INTO sketch_cpc_partitions\nSELECT l_shipdate, l_returnflag, datasketch_cpc(11, l_orderkey)\nFROM lineitem GROUP BY l_shipdate, l_returnflag;\nSELECT datasketch_cpc_estimate(datasketch_cpc_union(11, user_sketch::sketch_cpc)) AS distinct_orders\nFROM sketch_cpc_partitions;\n"
@@ -1800,19 +1471,8 @@ operations:
     expected_value_min: 400
     expected_value_max: 4000
   cleanup_sql: "DROP TABLE IF EXISTS sketch_cpc_partitions\n"
-  expected_rows_affected: null
-  platform_overrides:
-    databricks: null
-    snowflake: null
-    bigquery: null
-    clickhouse: null
-    datafusion: null
-    redshift: null
-    sqlite: null
-    starrocks: null
-    trino: null
+  platform_overrides: *skip_duckdb_only_sketch_platforms
 - id: sketch_cpc_drop_persistent_table
-  category: sketch
   description: Tests DROP TABLE on a CPC-bearing BLOB-column table (DuckDB-only)
   requires_setup: false
   write_sql: "INSTALL datasketches FROM community;\nLOAD datasketches;\nDROP TABLE IF EXISTS sketch_cpc_partitions;\nCREATE TABLE sketch_cpc_partitions (\n  activity_date DATE, region VARCHAR(25), user_sketch BLOB\n);\nDROP TABLE sketch_cpc_partitions;\n"
@@ -1820,20 +1480,8 @@ operations:
   - id: cpc_table_dropped
     sql: "SELECT COUNT(*) as cnt FROM information_schema.tables\nWHERE table_name = 'sketch_cpc_partitions'\n"
     expected_rows: 1
-  cleanup_sql: null
-  expected_rows_affected: null
-  platform_overrides:
-    databricks: null
-    snowflake: null
-    bigquery: null
-    clickhouse: null
-    datafusion: null
-    redshift: null
-    sqlite: null
-    starrocks: null
-    trino: null
+  platform_overrides: *skip_duckdb_only_sketch_platforms
 - id: sketch_req_create_persistent_table
-  category: sketch
   description: Tests CREATE/DROP overhead for a REQ sketch table (DuckDB-only)
   requires_setup: false
   write_sql: "INSTALL datasketches FROM community;\nLOAD datasketches;\nDROP TABLE IF EXISTS sketch_req_partitions;\nCREATE TABLE sketch_req_partitions (\n  activity_date DATE,\n  region VARCHAR(25),\n  price_sketch BLOB\n);\n"
@@ -1842,19 +1490,8 @@ operations:
     sql: "SELECT COUNT(*) as cnt FROM information_schema.tables\nWHERE table_name = 'sketch_req_partitions'\n"
     expected_rows: 1
   cleanup_sql: "DROP TABLE IF EXISTS sketch_req_partitions\n"
-  expected_rows_affected: null
-  platform_overrides:
-    databricks: null
-    snowflake: null
-    bigquery: null
-    clickhouse: null
-    datafusion: null
-    redshift: null
-    sqlite: null
-    starrocks: null
-    trino: null
+  platform_overrides: *skip_duckdb_only_sketch_platforms
 - id: sketch_req_insert_per_partition
-  category: sketch
   description: Builds per-partition REQ quantile sketches over l_extendedprice (DuckDB-only)
   requires_setup: false
   write_sql: "INSTALL datasketches FROM community;\nLOAD datasketches;\nDROP TABLE IF EXISTS sketch_req_partitions;\nCREATE TABLE sketch_req_partitions (\n  activity_date DATE,\n  region VARCHAR(25),\n  price_sketch BLOB\n);\nINSERT INTO sketch_req_partitions\nSELECT l_shipdate, l_returnflag, datasketch_req(12, l_extendedprice::FLOAT)\nFROM lineitem GROUP BY l_shipdate, l_returnflag;\n"
@@ -1863,19 +1500,8 @@ operations:
     sql: "SELECT COUNT(*) as partitions FROM sketch_req_partitions\n"
     expected_rows_min: 1
   cleanup_sql: "DROP TABLE IF EXISTS sketch_req_partitions\n"
-  expected_rows_affected: null
-  platform_overrides:
-    databricks: null
-    snowflake: null
-    bigquery: null
-    clickhouse: null
-    datafusion: null
-    redshift: null
-    sqlite: null
-    starrocks: null
-    trino: null
+  platform_overrides: *skip_duckdb_only_sketch_platforms
 - id: sketch_req_query_quantile_merge
-  category: sketch
   description: Headline REQ — populate per-partition REQ sketches, merge across partitions, extract median (DuckDB-only). Side-by-side with sketch_query_kll_quantiles_merge for relative-error vs normalized-rank error comparison.
   requires_setup: false
   write_sql: "INSTALL datasketches FROM community;\nLOAD datasketches;\nDROP TABLE IF EXISTS sketch_req_partitions;\nCREATE TABLE sketch_req_partitions (\n  activity_date DATE, region VARCHAR(25), price_sketch BLOB\n);\nINSERT INTO sketch_req_partitions\nSELECT l_shipdate, l_returnflag, datasketch_req(12, l_extendedprice::FLOAT)\nFROM lineitem GROUP BY l_shipdate, l_returnflag;\nSELECT datasketch_req_quantile(datasketch_req(12, price_sketch::sketch_req_float), 0.5::DOUBLE, true) AS median_price\nFROM sketch_req_partitions;\n"
@@ -1889,19 +1515,8 @@ operations:
     expected_value_min: 1000
     expected_value_max: 8000
   cleanup_sql: "DROP TABLE IF EXISTS sketch_req_partitions\n"
-  expected_rows_affected: null
-  platform_overrides:
-    databricks: null
-    snowflake: null
-    bigquery: null
-    clickhouse: null
-    datafusion: null
-    redshift: null
-    sqlite: null
-    starrocks: null
-    trino: null
+  platform_overrides: *skip_duckdb_only_sketch_platforms
 - id: sketch_req_drop_persistent_table
-  category: sketch
   description: Tests DROP TABLE on a REQ-bearing BLOB-column table (DuckDB-only)
   requires_setup: false
   write_sql: "INSTALL datasketches FROM community;\nLOAD datasketches;\nDROP TABLE IF EXISTS sketch_req_partitions;\nCREATE TABLE sketch_req_partitions (\n  activity_date DATE, region VARCHAR(25), price_sketch BLOB\n);\nDROP TABLE sketch_req_partitions;\n"
@@ -1909,20 +1524,8 @@ operations:
   - id: req_table_dropped
     sql: "SELECT COUNT(*) as cnt FROM information_schema.tables\nWHERE table_name = 'sketch_req_partitions'\n"
     expected_rows: 1
-  cleanup_sql: null
-  expected_rows_affected: null
-  platform_overrides:
-    databricks: null
-    snowflake: null
-    bigquery: null
-    clickhouse: null
-    datafusion: null
-    redshift: null
-    sqlite: null
-    starrocks: null
-    trino: null
+  platform_overrides: *skip_duckdb_only_sketch_platforms
 - id: sketch_query_theta_union_merge_lgk10
-  category: sketch
   description: Theta sweep variant — lg_k=10 (1024 entries, ~5KB serialized, ~3.1% RSE). Smaller and lossier than the default lg_k=12.
   requires_setup: false
   write_sql: "INSTALL datasketches FROM community;\nLOAD datasketches;\nDROP TABLE IF EXISTS sketch_ops_daily_users;\nCREATE TABLE sketch_ops_daily_users (\n  activity_date DATE, region VARCHAR(25), user_sketch BLOB, rev_sketch BLOB\n);\nINSERT INTO sketch_ops_daily_users\nSELECT l_shipdate, l_returnflag,\n       datasketch_theta(10, l_orderkey),\n       datasketch_theta(10, CAST(l_extendedprice AS INTEGER))\nFROM lineitem GROUP BY l_shipdate, l_returnflag;\nSELECT datasketch_theta_estimate(datasketch_theta(10, user_sketch::sketch_theta_uint64)) AS distinct_orders\nFROM sketch_ops_daily_users;\n"
@@ -1936,8 +1539,7 @@ operations:
     expected_value_min: 1000
     expected_value_max: 12000
   cleanup_sql: "DROP TABLE IF EXISTS sketch_ops_daily_users\n"
-  expected_rows_affected: null
-  platform_overrides:
+  platform_overrides: &skip_sketch_sweep_platforms
     databricks: null
     snowflake: null
     bigquery: null
@@ -1947,7 +1549,6 @@ operations:
     sqlite: null
     starrocks: null
 - id: sketch_query_theta_union_merge_lgk14
-  category: sketch
   description: Theta sweep variant — lg_k=14 (16384 entries, ~64KB serialized, ~0.8% RSE). Larger and tighter than default lg_k=12.
   requires_setup: false
   write_sql: "INSTALL datasketches FROM community;\nLOAD datasketches;\nDROP TABLE IF EXISTS sketch_ops_daily_users;\nCREATE TABLE sketch_ops_daily_users (\n  activity_date DATE, region VARCHAR(25), user_sketch BLOB, rev_sketch BLOB\n);\nINSERT INTO sketch_ops_daily_users\nSELECT l_shipdate, l_returnflag,\n       datasketch_theta(14, l_orderkey),\n       datasketch_theta(14, CAST(l_extendedprice AS INTEGER))\nFROM lineitem GROUP BY l_shipdate, l_returnflag;\nSELECT datasketch_theta_estimate(datasketch_theta(14, user_sketch::sketch_theta_uint64)) AS distinct_orders\nFROM sketch_ops_daily_users;\n"
@@ -1961,18 +1562,8 @@ operations:
     expected_value_min: 16000
     expected_value_max: 130000
   cleanup_sql: "DROP TABLE IF EXISTS sketch_ops_daily_users\n"
-  expected_rows_affected: null
-  platform_overrides:
-    databricks: null
-    snowflake: null
-    bigquery: null
-    clickhouse: null
-    datafusion: null
-    redshift: null
-    sqlite: null
-    starrocks: null
+  platform_overrides: *skip_sketch_sweep_platforms
 - id: sketch_query_kll_quantiles_merge_k100
-  category: sketch
   description: KLL sweep variant — k=100 (~1.5KB, ~1.65% normalized rank error). Smaller and lossier than default k=200.
   requires_setup: false
   write_sql: "INSTALL datasketches FROM community;\nLOAD datasketches;\nDROP TABLE IF EXISTS sketch_ops_kll_partitions;\nCREATE TABLE sketch_ops_kll_partitions (\n  activity_date DATE, region VARCHAR(25), price_sketch BLOB\n);\nINSERT INTO sketch_ops_kll_partitions\nSELECT l_shipdate, l_returnflag, datasketch_kll(100, l_extendedprice)\nFROM lineitem GROUP BY l_shipdate, l_returnflag;\nSELECT datasketch_kll_quantile(datasketch_kll(100, price_sketch::sketch_kll_double), 0.5::DOUBLE, true) AS median_price\nFROM sketch_ops_kll_partitions;\n"
@@ -1986,18 +1577,8 @@ operations:
     expected_value_min: 500
     expected_value_max: 5000
   cleanup_sql: "DROP TABLE IF EXISTS sketch_ops_kll_partitions\n"
-  expected_rows_affected: null
-  platform_overrides:
-    databricks: null
-    snowflake: null
-    bigquery: null
-    clickhouse: null
-    datafusion: null
-    redshift: null
-    sqlite: null
-    starrocks: null
+  platform_overrides: *skip_sketch_sweep_platforms
 - id: sketch_query_kll_quantiles_merge_k1000
-  category: sketch
   description: KLL sweep variant — k=1000 (~15KB, ~0.59% normalized rank error). Larger and tighter than default k=200.
   requires_setup: false
   write_sql: "INSTALL datasketches FROM community;\nLOAD datasketches;\nDROP TABLE IF EXISTS sketch_ops_kll_partitions;\nCREATE TABLE sketch_ops_kll_partitions (\n  activity_date DATE, region VARCHAR(25), price_sketch BLOB\n);\nINSERT INTO sketch_ops_kll_partitions\nSELECT l_shipdate, l_returnflag, datasketch_kll(1000, l_extendedprice)\nFROM lineitem GROUP BY l_shipdate, l_returnflag;\nSELECT datasketch_kll_quantile(datasketch_kll(1000, price_sketch::sketch_kll_double), 0.5::DOUBLE, true) AS median_price\nFROM sketch_ops_kll_partitions;\n"
@@ -2011,18 +1592,8 @@ operations:
     expected_value_min: 5000
     expected_value_max: 40000
   cleanup_sql: "DROP TABLE IF EXISTS sketch_ops_kll_partitions\n"
-  expected_rows_affected: null
-  platform_overrides:
-    databricks: null
-    snowflake: null
-    bigquery: null
-    clickhouse: null
-    datafusion: null
-    redshift: null
-    sqlite: null
-    starrocks: null
+  platform_overrides: *skip_sketch_sweep_platforms
 - id: sketch_query_topk_combine_lgmm8
-  category: sketch
   description: Top-K sweep variant — explicit lg_max_map_size=8 (256 buckets, ~600B). Same parameter as the default headline op; provided for sweep-symmetry comparisons.
   requires_setup: false
   write_sql: "INSTALL datasketches FROM community;\nLOAD datasketches;\nDROP TABLE IF EXISTS sketch_ops_topk;\nCREATE TABLE sketch_ops_topk (shard_id INTEGER, topk_sketch BLOB);\nINSERT INTO sketch_ops_topk\nSELECT CAST(l_orderkey % 8 AS INTEGER),\n       datasketch_frequent_items(8, l_shipmode)\nFROM lineitem GROUP BY l_orderkey % 8;\nSELECT LENGTH(datasketch_frequent_items_get_frequent(\n  datasketch_frequent_items(8, topk_sketch), 'NO_FALSE_POSITIVES'\n)) AS frequent_count\nFROM sketch_ops_topk;\n"
@@ -2036,18 +1607,8 @@ operations:
     expected_value_min: 200
     expected_value_max: 2000
   cleanup_sql: "DROP TABLE IF EXISTS sketch_ops_topk\n"
-  expected_rows_affected: null
-  platform_overrides:
-    databricks: null
-    snowflake: null
-    bigquery: null
-    clickhouse: null
-    datafusion: null
-    redshift: null
-    sqlite: null
-    starrocks: null
+  platform_overrides: *skip_sketch_sweep_platforms
 - id: sketch_query_topk_combine_lgmm10
-  category: sketch
   description: Top-K sweep variant — lg_max_map_size=10 (1024 buckets, ~2KB). Larger than default lgmm=8; should still report 7 frequent items deterministically (lineitem has 7 distinct shipmodes).
   requires_setup: false
   write_sql: "INSTALL datasketches FROM community;\nLOAD datasketches;\nDROP TABLE IF EXISTS sketch_ops_topk;\nCREATE TABLE sketch_ops_topk (shard_id INTEGER, topk_sketch BLOB);\nINSERT INTO sketch_ops_topk\nSELECT CAST(l_orderkey % 8 AS INTEGER),\n       datasketch_frequent_items(10, l_shipmode)\nFROM lineitem GROUP BY l_orderkey % 8;\nSELECT LENGTH(datasketch_frequent_items_get_frequent(\n  datasketch_frequent_items(10, topk_sketch), 'NO_FALSE_POSITIVES'\n)) AS frequent_count\nFROM sketch_ops_topk;\n"
@@ -2061,18 +1622,8 @@ operations:
     expected_value_min: 500
     expected_value_max: 5000
   cleanup_sql: "DROP TABLE IF EXISTS sketch_ops_topk\n"
-  expected_rows_affected: null
-  platform_overrides:
-    databricks: null
-    snowflake: null
-    bigquery: null
-    clickhouse: null
-    datafusion: null
-    redshift: null
-    sqlite: null
-    starrocks: null
+  platform_overrides: *skip_sketch_sweep_platforms
 - id: sketch_df_hll_persist_merge
-  category: sketch
   description: ★ Headline DataFrame — PySpark HLL persist+merge cycle. Builds per-group HLL sketches of l_orderkey via `F.hll_sketch_agg`, persists state to Parquet, then merges via `F.hll_union_agg` and extracts the distinct-count estimate via `F.hll_sketch_estimate`. Pairs with the SQL-side `sketch_query_theta_union_merge` so users can compare DataFrame and SQL paths against the same true-distinct=15000 baseline at SF=0.01.
   requires_setup: false
   write_sql: ''
@@ -2092,11 +1643,7 @@ operations:
     sql: "-- Aggregate-state validation runs against the merge-extract\n-- scalar in `metrics.aggregate_value`, not against this SQL.\n-- The placeholder SELECT keeps the loader's \"validation has SQL\"\n-- contract honored without committing to a SQL execution path.\nSELECT 1\n"
     expected_value_min: 14250
     expected_value_max: 15750
-  cleanup_sql: null
-  expected_rows_affected: null
-  platform_overrides: {}
 - id: sketch_df_topk_persist_merge
-  category: sketch
   description: ★ Headline DataFrame — PySpark Top-K persist+merge cycle. Spark 4.1+ only — `F.approx_top_k_accumulate` is the per-group state builder; `F.approx_top_k_combine` + `F.approx_top_k_estimate` perform the merge+extract. Reports the count of frequent items (lineitem has 7 distinct l_shipmodes; SF=0.01 returns 7 deterministically). Skipped cleanly on Spark 3.5.x via `pyspark_supports_approx_top_k` runtime guard.
   requires_setup: false
   write_sql: ''
@@ -2115,6 +1662,3 @@ operations:
     sql: "SELECT 1\n"
     expected_value_min: 6
     expected_value_max: 8
-  cleanup_sql: null
-  expected_rows_affected: null
-  platform_overrides: {}
