@@ -157,6 +157,7 @@ def test_execute_and_sweep_use_same_preflight_kwargs(tmp_path, monkeypatch):
             warnings=(),
             aborted=True,
             abort_reason="stop after capturing preflight kwargs",
+            exit_code=lambda: 2,
         )
 
     monkeypatch.setattr("tests.uat.phases.preflight.run_preflight", fake_run_preflight)
@@ -327,6 +328,7 @@ def test_execute_main_reads_cleanup_config_for_standalone_path(tmp_path, monkeyp
                 "docker_events": (),
                 "aborted": False,
                 "abort_reason": None,
+                "exit_code": lambda self: 0,
             },
         )()
 

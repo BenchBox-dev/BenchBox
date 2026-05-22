@@ -28,6 +28,7 @@ from tests.uat.cleanup import CellKey, can_prune, prune_database_dir, source_reu
 from tests.uat.config import UATConfig
 from tests.uat.ladder import LadderRung, plan_ladder
 from tests.uat.matrix import invalidate_reachability_cache_after_lifecycle_change, platform_is_reachable
+from tests.uat.phases import PhaseResult
 from tests.uat.phases.enumerate import (
     Cell,
     CompatibilityPrunedCell,
@@ -51,7 +52,7 @@ class DockerLifecycleEvent:
 
 
 @dataclass(frozen=True)
-class ExecuteOutcome:
+class ExecuteOutcome(PhaseResult):
     """Aggregated outcome of run_execute."""
 
     results: tuple[CellResult, ...]
@@ -59,8 +60,11 @@ class ExecuteOutcome:
     skipped_unreachable: tuple[Cell, ...]
     compatibility_pruned: tuple[CompatibilityPrunedCell, ...] = ()
     docker_events: tuple[DockerLifecycleEvent, ...] = ()
-    aborted: bool = False
-    abort_reason: str | None = None
+
+    def exit_code(self) -> int:
+        if self.aborted:
+            return 2
+        return 0 if all(result.status == "passed" for result in self.results) else 1
 
 
 @dataclass(frozen=True)
@@ -205,6 +209,7 @@ def run_execute(
         last_completed_platform = platform
 
     return ExecuteOutcome(
+        phase="execute",
         results=tuple(results),
         pruned=tuple(pruned),
         skipped_unreachable=tuple(skipped_unreachable),

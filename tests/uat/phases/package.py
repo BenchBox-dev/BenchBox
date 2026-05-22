@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from tests.uat.config import VALID_TERMINAL_STATES, UATConfig
+from tests.uat.phases import PhaseResult
 from tests.uat.runner import SubmitTerminalState, classify_for_submit
 
 # Terminal states whose PR-opening flow is not yet implemented; the
@@ -34,7 +35,7 @@ PR_STUB_TERMINAL_STATES: frozenset[str] = frozenset({"draft-pr", "merged-to-publ
 
 
 @dataclass(frozen=True)
-class PackageResult:
+class PackageResult(PhaseResult):
     terminal_state: str
     submissions_dir: Path
     invocations: tuple[tuple[str, ...], ...]
@@ -42,6 +43,8 @@ class PackageResult:
     failure_count: int
 
     def exit_code(self) -> int:
+        if self.aborted:
+            return 2
         return 0 if self.failure_count == 0 else 1
 
 
@@ -106,8 +109,20 @@ def run_package(
         def warn(msg: str) -> None:
             print(msg, file=sys.stderr)
 
-    state = _resolve_state(config)
-    service = _resolve_service(config, state)
+    try:
+        state = _resolve_state(config)
+        service = _resolve_service(config, state)
+    except PackagePhaseError as exc:
+        return PackageResult(
+            phase="package",
+            aborted=True,
+            abort_reason=str(exc),
+            terminal_state=config.package.submit_terminal_state or "",
+            submissions_dir=submissions_dir,
+            invocations=(),
+            success_count=0,
+            failure_count=0,
+        )
     if state in PR_STUB_TERMINAL_STATES:
         warn(
             f"[package] WARNING: submit_terminal_state={state!r} is a stub — "
@@ -146,6 +161,7 @@ def run_package(
             failure += 1
 
     return PackageResult(
+        phase="package",
         terminal_state=state,
         submissions_dir=submissions_dir,
         invocations=tuple(invocations),

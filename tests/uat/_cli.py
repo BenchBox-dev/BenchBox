@@ -461,8 +461,7 @@ def execute_main(argv: list[str] | None = None) -> int:
     print(json.dumps(summary, indent=2))
     if outcome.aborted:
         print(f"[execute] ABORT: {outcome.abort_reason}", file=sys.stderr)
-        return 2
-    return 0 if summary["failed"] == 0 and summary["timed_out"] == 0 else 1
+    return outcome.exit_code()
 
 
 def docker_cleanup_main(argv: list[str] | None = None) -> int:

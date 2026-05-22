@@ -220,7 +220,7 @@ work:
 - id: w2
   summary: "Define PhaseResult ABC; every phase returns one; orchestrator drops inline exit-code logic"
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     Removes the non-uniform exit-code conventions documented in F7 of
     the review.
