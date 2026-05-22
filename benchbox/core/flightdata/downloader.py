@@ -39,57 +39,39 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from benchbox.utils.compression_mixin import CompressionMixin
 from benchbox.utils.datagen_manifest import DataGenerationManifest, resolve_compression_metadata
 from benchbox.utils.verbosity import VerbosityMixin, compute_verbosity
 
 logger = logging.getLogger(__name__)
 
+
+def _load_downloader_specs() -> dict[str, Any]:
+    with (Path(__file__).with_name("downloader_specs.yaml")).open(encoding="utf-8") as handle:
+        return yaml.safe_load(handle) or {}
+
+
+_DOWNLOADER_SPECS = _load_downloader_specs()
+_DATA_COVERAGE = _DOWNLOADER_SPECS["data_coverage"]
+_FLIGHT_SHARDS = _DOWNLOADER_SPECS["flight_shards"]
+
 # BTS TranStats On-Time Performance download URL template
 # Format: YEAR_MONTH (e.g., 2023_1 for January 2023)
-BTS_BASE_URL = (
-    "https://transtats.bts.gov/PREZIP/On_Time_Reporting_Carrier_On_Time_Performance_1987_present_{year}_{month}.zip"
-)
+BTS_BASE_URL = _DOWNLOADER_SPECS["bts_base_url"]
 
 # Data coverage
-FIRST_AVAILABLE_YEAR = 1987
-LAST_AVAILABLE_YEAR = 2024
-APPROXIMATE_MONTHLY_FLIGHTS = 600_000  # ~600K flights per month in recent years
-MONTHS_PER_SCALE_FACTOR = 41
-FLIGHTS_SHARD_ROW_TARGET = 1_000_000
-FLIGHTS_SHARD_DIRNAME = "flights"
-FLIGHTS_SHARD_PREFIX = "flights_"
+FIRST_AVAILABLE_YEAR = int(_DATA_COVERAGE["first_available_year"])
+LAST_AVAILABLE_YEAR = int(_DATA_COVERAGE["last_available_year"])
+APPROXIMATE_MONTHLY_FLIGHTS = int(_DATA_COVERAGE["approximate_monthly_flights"])
+MONTHS_PER_SCALE_FACTOR = int(_DATA_COVERAGE["months_per_scale_factor"])
+FLIGHTS_SHARD_ROW_TARGET = int(_FLIGHT_SHARDS["row_target"])
+FLIGHTS_SHARD_DIRNAME = _FLIGHT_SHARDS["dirname"]
+FLIGHTS_SHARD_PREFIX = _FLIGHT_SHARDS["prefix"]
 
 # BTS CSV field names (subset used in BenchBox schema)
-BTS_FIELD_NAMES = [
-    "FlightDate",
-    "Year",
-    "Month",
-    "DayofMonth",
-    "DayOfWeek",
-    "Reporting_Airline",
-    "Flight_Number_Reporting_Airline",
-    "Origin",
-    "Dest",
-    "CRSDepTime",
-    "DepTime",
-    "DepDelay",
-    "CRSArrTime",
-    "ArrTime",
-    "ArrDelay",
-    "Cancelled",
-    "CancellationCode",
-    "Diverted",
-    "CRSElapsedTime",
-    "ActualElapsedTime",
-    "AirTime",
-    "Distance",
-    "CarrierDelay",
-    "WeatherDelay",
-    "NASDelay",
-    "SecurityDelay",
-    "LateAircraftDelay",
-]
+BTS_FIELD_NAMES = _DOWNLOADER_SPECS["bts_field_names"]
 
 
 def _scale_to_months(scale_factor: float) -> int:
