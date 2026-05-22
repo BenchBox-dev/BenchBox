@@ -23,6 +23,8 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, NoReturn
 
+import yaml
+
 from benchbox.utils.cloud_storage import CloudStorageGeneratorMixin, create_path_handler
 from benchbox.utils.compression_mixin import CompressionMixin
 from benchbox.utils.data_validation import BenchmarkDataValidator
@@ -33,28 +35,15 @@ from benchbox.utils.stale_artifact_pruning import TableArtifactPattern, prune_st
 from benchbox.utils.tpc_compilation import CompilationStatus, ensure_tpc_binaries
 from benchbox.utils.verbosity import VerbosityMixin, compute_verbosity
 
-# TPC-H table codes for -T flag (single table generation)
-_TPCH_TABLE_CODES = {
-    "customer": "c",
-    "lineitem": "L",
-    "nation": "n",
-    "orders": "O",
-    "part": "P",
-    "partsupp": "S",
-    "region": "r",
-    "supplier": "s",
-}
 
-_TPCH_BASE_ROW_COUNTS = {
-    "customer": 150_000,
-    "lineitem": 6_001_215,
-    "nation": 25,
-    "orders": 1_500_000,
-    "part": 200_000,
-    "partsupp": 800_000,
-    "region": 5,
-    "supplier": 10_000,
-}
+def _load_generator_specs() -> dict[str, Any]:
+    with (Path(__file__).with_name("generator_specs.yaml")).open(encoding="utf-8") as handle:
+        return yaml.safe_load(handle) or {}
+
+
+_GENERATOR_SPECS = _load_generator_specs()
+_TPCH_TABLE_CODES = dict(_GENERATOR_SPECS["table_codes"])
+_TPCH_BASE_ROW_COUNTS = dict(_GENERATOR_SPECS["base_row_counts"])
 
 
 class TPCHDataGenerator(CompressionMixin, CloudStorageGeneratorMixin, VerbosityMixin):
