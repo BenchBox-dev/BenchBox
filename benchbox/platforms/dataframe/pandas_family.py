@@ -926,8 +926,7 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
         """
         by_list = [by] if isinstance(by, str) else list(by)
         # Use size() then reset_index() with name parameter (works on Pandas)
-        result = df.groupby(by_list).size().reset_index(name=name)  # type: ignore[attr-defined]
-        return result  # type: ignore[return-value]
+        return df.groupby(by_list).size().reset_index(name=name)  # type: ignore[attr-defined, return-value]
 
     # =========================================================================
     # GroupBy Aggregation (Platform-Specific)

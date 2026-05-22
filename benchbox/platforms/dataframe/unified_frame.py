@@ -3274,9 +3274,7 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
         # The right_expr.native gives us the computed PySpark Column
         condition = self._df[left_col] == right_expr.native
 
-        result = self._df.join(renamed_other, condition, spark_how)
-
-        return result
+        return self._df.join(renamed_other, condition, spark_how)
 
     def _pyspark_join_multi_expr(
         self,
@@ -3360,9 +3358,7 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
         for cond in conditions[1:]:
             combined_condition = combined_condition & cond
 
-        result = self._df.join(renamed_other, combined_condition, spark_how)
-
-        return result
+        return self._df.join(renamed_other, combined_condition, spark_how)
 
     def _polars_join_with_exprs(
         self,
