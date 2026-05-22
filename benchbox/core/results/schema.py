@@ -198,6 +198,7 @@ class SchemaV2Validator:
         "execution",
         "config",
         "phases",
+        "comparisons",
     )
 
     RUN_REQUIRED = ("id", "timestamp", "total_duration_ms", "query_time_ms")

@@ -144,6 +144,12 @@ Consumer policy is intentionally split by use case:
 | `deployment` | object | Optional normalized deployment metadata |
 | `cloud`, `compute`, `storage` | object | Optional normalized environment facets |
 
+Platform-specific extensions should stay inside the existing schema-v2 blocks
+where possible. Current canonical locations are `platform.*` for platform
+facets and raw platform metadata, `phases.<stage>` for lifecycle-stage
+summaries, and `comparisons.*` for cross-engine comparison data. New top-level
+keys require a public-contract update and consumer tests.
+
 #### Run Block
 | Field | Type | Description |
 |-------|------|-------------|

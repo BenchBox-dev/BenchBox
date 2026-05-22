@@ -66,6 +66,47 @@ class TestToManifestEntry:
 
         assert entry.result_id == explicit_id
 
+    def test_current_result_extension_blocks_are_ingested_without_projection_breakage(self, tmp_path: Path) -> None:
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["platform"].update(
+            {
+                "deployment": {"deployment_type": "local", "endpoint_class": "localhost_port"},
+                "cloud": {"provider": "none"},
+                "compute": {"instance_type": "developer-laptop"},
+                "storage": {"storage_type": "local_disk"},
+                "raw_config": {"host": "localhost", "port": 5432},
+                "raw_metadata": {"server_version": "16.2"},
+            }
+        )
+        data["phases"] = {
+            "migration": {
+                "status": "COMPLETED",
+                "duration_ms": 2500,
+                "tables_migrated": 8,
+                "tables_failed": 0,
+            }
+        }
+        data["comparisons"] = {
+            "native_duckdb": {
+                "generated_at": "2026-05-22T12:00:00",
+                "scale_factor": 0.01,
+                "total_queries": 1,
+                "mean_delta_ms": 12.5,
+                "max_delta_ms": 12.5,
+                "queries": [{"id": "Q1", "pg_duckdb_ms": 42.5, "duckdb_ms": 30.0, "delta_ms": 12.5}],
+            }
+        }
+        bundle = tmp_path / "extension_bundle.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        entry = transformer.to_manifest_entry(bundle)
+        detail = transformer.to_detail_result(bundle, entry.result_id)
+
+        assert entry.platform_version == "1.2.0"
+        assert detail.phase_durations == {"migration": 2.5}
+        assert detail.environment["os"] == "macOS 15.3.0"
+
 
 class TestToDetailResult:
     def test_basic_fields(self, bundle_file: Path) -> None:
