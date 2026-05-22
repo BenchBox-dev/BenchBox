@@ -52,27 +52,64 @@ def get_flightdata_parameters() -> dict[str, Any]:
     return params
 
 
+def _date_condition(col: Any, lit: Any, extra: Any = None) -> Any:
+    p = get_flightdata_parameters()
+    date_condition = (col("flight_date") >= lit(p["start_date"])) & (col("flight_date") < lit(p["end_date"]))
+    condition = date_condition
+    if extra is not None:
+        extras = extra(col, lit)
+        if not isinstance(extras, tuple):
+            extras = (extras,)
+        condition = extras[0]
+        extras = extras[1:]
+        for extra_condition in extras:
+            condition = condition & extra_condition
+        condition = condition & date_condition
+    return condition
+
+
+def _date_window(ctx: DataFrameContext, extra: Any = None) -> tuple[Any, Any, Any]:
+    flights = ctx.get_table("flights")
+    col, lit = ctx.col, ctx.lit
+    condition = _date_condition(col, lit, extra)
+    return flights.filter(condition), col, lit
+
+
+def _pandas_window(ctx: DataFrameContext, *, source: Any = None, copy: bool = False, extra: Any = None) -> Any:
+    p = get_flightdata_parameters()
+    flights = ctx.get_table("flights") if source is None else source
+    condition = (flights["flight_date"] >= p["start_date"]) & (flights["flight_date"] < p["end_date"])
+    if extra is not None:
+        condition &= extra(flights)
+    filtered = flights[condition]
+    return filtered.copy() if copy else filtered
+
+
+def _airline_names(ctx: DataFrameContext) -> Any:
+    col = ctx.col
+    return ctx.get_table("airlines").select(col("code").alias("a_code"), col("name").alias("airline_name"))
+
+
+def _pandas_airline_names(ctx: DataFrameContext) -> Any:
+    return (
+        ctx.get_table("flights")
+        .merge(ctx.get_table("airlines"), left_on="reporting_airline", right_on="code", how="left")
+        .rename(columns={"name": "airline_name"})
+    )
+
+
 # ===========================================================================
 # Expression Family (Polars, DataFusion, PySpark)
 # ===========================================================================
 
 
 def ontime_by_carrier_expression_impl(ctx: DataFrameContext) -> Any:
-    """On-time arrival percentage by airline carrier."""
     flights = ctx.get_table("flights")
-    airlines = ctx.get_table("airlines")
     col, lit = ctx.col, ctx.lit
-    p = get_flightdata_parameters()
-
-    airlines_a = airlines.select(col("code").alias("a_code"), col("name").alias("airline_name"))
 
     return (
-        flights.join(airlines_a, left_on="reporting_airline", right_on="a_code", how="left")
-        .filter(
-            (col("cancelled") == lit(0))
-            & (col("flight_date") >= lit(p["start_date"]))
-            & (col("flight_date") < lit(p["end_date"]))
-        )
+        flights.join(_airline_names(ctx), left_on="reporting_airline", right_on="a_code", how="left")
+        .filter(_date_condition(col, lit, lambda col, lit: col("cancelled") == lit(0)))
         .group_by("reporting_airline", "airline_name")
         .agg(
             col("flight_id").count().alias("total_flights"),
@@ -85,11 +122,9 @@ def ontime_by_carrier_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def delay_by_airport_expression_impl(ctx: DataFrameContext) -> Any:
-    """Average departure delay by origin airport (min 100 flights)."""
     flights = ctx.get_table("flights")
-    airports = ctx.get_table("airports")
     col, lit = ctx.col, ctx.lit
-    p = get_flightdata_parameters()
+    airports = ctx.get_table("airports")
 
     ap = airports.select(
         col("code").alias("ap_code"),
@@ -101,10 +136,9 @@ def delay_by_airport_expression_impl(ctx: DataFrameContext) -> Any:
     return (
         flights.join(ap, left_on="origin", right_on="ap_code", how="left")
         .filter(
-            (col("cancelled") == lit(0))
-            & col("dep_delay").is_not_null()
-            & (col("flight_date") >= lit(p["start_date"]))
-            & (col("flight_date") < lit(p["end_date"]))
+            _date_condition(
+                ctx.col, ctx.lit, lambda col, lit: (col("cancelled") == lit(0), col("dep_delay").is_not_null())
+            )
         )
         .group_by("origin", "airport_name", "city", "state")
         .agg(
@@ -120,20 +154,17 @@ def delay_by_airport_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def delay_by_hour_expression_impl(ctx: DataFrameContext) -> Any:
-    """Average delay by scheduled departure hour."""
-    flights = ctx.get_table("flights")
-    col, lit = ctx.col, ctx.lit
-    p = get_flightdata_parameters()
+    flights, col, lit = _date_window(
+        ctx,
+        lambda col, lit: (
+            col("cancelled") == lit(0),
+            col("dep_delay").is_not_null(),
+            col("crs_dep_time").is_not_null(),
+        ),
+    )
 
     return (
-        flights.filter(
-            (col("cancelled") == lit(0))
-            & col("dep_delay").is_not_null()
-            & col("crs_dep_time").is_not_null()
-            & (col("flight_date") >= lit(p["start_date"]))
-            & (col("flight_date") < lit(p["end_date"]))
-        )
-        .with_columns((col("crs_dep_time") / lit(100)).floor().cast(int).alias("dep_hour"))
+        flights.with_columns((col("crs_dep_time") / lit(100)).floor().cast(int).alias("dep_hour"))
         .group_by("dep_hour")
         .agg(
             col("flight_id").count().alias("total_flights"),
@@ -147,11 +178,9 @@ def delay_by_hour_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def best_routes_expression_impl(ctx: DataFrameContext) -> Any:
-    """Routes with highest on-time rate (min 50 flights)."""
     flights = ctx.get_table("flights")
-    airports = ctx.get_table("airports")
     col, lit = ctx.col, ctx.lit
-    p = get_flightdata_parameters()
+    airports = ctx.get_table("airports")
 
     ao = airports.select(col("code").alias("ao_code"), col("city").alias("origin_city"))
     ad = airports.select(col("code").alias("ad_code"), col("city").alias("dest_city"))
@@ -160,10 +189,9 @@ def best_routes_expression_impl(ctx: DataFrameContext) -> Any:
         flights.join(ao, left_on="origin", right_on="ao_code", how="left")
         .join(ad, left_on="dest", right_on="ad_code", how="left")
         .filter(
-            (col("cancelled") == lit(0))
-            & col("arr_delay").is_not_null()
-            & (col("flight_date") >= lit(p["start_date"]))
-            & (col("flight_date") < lit(p["end_date"]))
+            _date_condition(
+                ctx.col, ctx.lit, lambda col, lit: (col("cancelled") == lit(0), col("arr_delay").is_not_null())
+            )
         )
         .group_by("origin", "dest", "origin_city", "dest_city")
         .agg(
@@ -181,14 +209,10 @@ def best_routes_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def improvement_trend_expression_impl(ctx: DataFrameContext) -> Any:
-    """Annual on-time performance trend."""
-    flights = ctx.get_table("flights")
-    col, lit = ctx.col, ctx.lit
-    p = get_flightdata_parameters()
+    flights, col, lit = _date_window(ctx)
 
     return (
-        flights.filter((col("flight_date") >= lit(p["start_date"])) & (col("flight_date") < lit(p["end_date"])))
-        .group_by("year")
+        flights.group_by("year")
         .agg(
             col("flight_id").count().alias("total_flights"),
             (col("cancelled") == lit(1)).cast(int).sum().alias("cancelled_flights"),
@@ -206,17 +230,9 @@ def improvement_trend_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def delay_causes_expression_impl(ctx: DataFrameContext) -> Any:
-    """Distribution of delay causes across all delayed flights."""
-    flights = ctx.get_table("flights")
-    col, lit = ctx.col, ctx.lit
-    p = get_flightdata_parameters()
+    flights, col, lit = _date_window(ctx, lambda col, lit: (col("cancelled") == lit(0), col("arr_delay") > lit(15)))
 
-    return flights.filter(
-        (col("cancelled") == lit(0))
-        & (col("arr_delay") > lit(15))
-        & (col("flight_date") >= lit(p["start_date"]))
-        & (col("flight_date") < lit(p["end_date"]))
-    ).select(
+    return flights.select(
         col("flight_id").count().alias("total_delayed_flights"),
         (col("carrier_delay") > lit(0)).cast(int).sum().alias("carrier_delay_count"),
         col("carrier_delay").filter(col("carrier_delay") > lit(0)).mean().round(2).alias("avg_carrier_delay"),
@@ -236,21 +252,12 @@ def delay_causes_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def cascade_delays_expression_impl(ctx: DataFrameContext) -> Any:
-    """Late aircraft delay patterns by carrier."""
     flights = ctx.get_table("flights")
-    airlines = ctx.get_table("airlines")
     col, lit = ctx.col, ctx.lit
-    p = get_flightdata_parameters()
-
-    airlines_a = airlines.select(col("code").alias("a_code"), col("name").alias("airline_name"))
 
     return (
-        flights.join(airlines_a, left_on="reporting_airline", right_on="a_code", how="left")
-        .filter(
-            (col("cancelled") == lit(0))
-            & (col("flight_date") >= lit(p["start_date"]))
-            & (col("flight_date") < lit(p["end_date"]))
-        )
+        flights.join(_airline_names(ctx), left_on="reporting_airline", right_on="a_code", how="left")
+        .filter(_date_condition(col, lit, lambda col, lit: col("cancelled") == lit(0)))
         .group_by("reporting_airline", "airline_name")
         .agg(
             col("flight_id").count().alias("total_flights"),
@@ -268,18 +275,10 @@ def cascade_delays_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def weather_impact_expression_impl(ctx: DataFrameContext) -> Any:
-    """Weather delay by month (seasonal patterns)."""
-    flights = ctx.get_table("flights")
-    col, lit = ctx.col, ctx.lit
-    p = get_flightdata_parameters()
+    flights, col, lit = _date_window(ctx, lambda col, lit: col("cancelled") == lit(0))
 
     return (
-        flights.filter(
-            (col("cancelled") == lit(0))
-            & (col("flight_date") >= lit(p["start_date"]))
-            & (col("flight_date") < lit(p["end_date"]))
-        )
-        .group_by("month")
+        flights.group_by("month")
         .agg(
             col("flight_id").count().alias("total_flights"),
             (col("weather_delay") > lit(0)).cast(int).sum().alias("weather_delayed"),
@@ -294,20 +293,17 @@ def weather_impact_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def recovery_time_expression_impl(ctx: DataFrameContext) -> Any:
-    """Delay recovery analysis by departure delay bucket."""
-    flights = ctx.get_table("flights")
-    col, lit = ctx.col, ctx.lit
-    p = get_flightdata_parameters()
+    flights, col, lit = _date_window(
+        ctx,
+        lambda col, lit: (
+            col("cancelled") == lit(0),
+            col("dep_delay").is_not_null(),
+            col("arr_delay").is_not_null(),
+        ),
+    )
 
     return (
-        flights.filter(
-            (col("cancelled") == lit(0))
-            & col("dep_delay").is_not_null()
-            & col("arr_delay").is_not_null()
-            & (col("flight_date") >= lit(p["start_date"]))
-            & (col("flight_date") < lit(p["end_date"]))
-        )
-        .with_columns(
+        flights.with_columns(
             (col("dep_delay") - col("arr_delay")).alias("minutes_recovered"),
             (col("arr_delay") < col("dep_delay")).cast(int).alias("recovered_flag"),
             # Delay bucket mapping to string labels
@@ -335,11 +331,9 @@ def recovery_time_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def busiest_routes_expression_impl(ctx: DataFrameContext) -> Any:
-    """Top 25 routes by flight count."""
     flights = ctx.get_table("flights")
-    airports = ctx.get_table("airports")
     col, lit = ctx.col, ctx.lit
-    p = get_flightdata_parameters()
+    airports = ctx.get_table("airports")
 
     ao = airports.select(
         col("code").alias("ao_code"),
@@ -355,11 +349,7 @@ def busiest_routes_expression_impl(ctx: DataFrameContext) -> Any:
     return (
         flights.join(ao, left_on="origin", right_on="ao_code", how="left")
         .join(ad, left_on="dest", right_on="ad_code", how="left")
-        .filter(
-            (col("cancelled") == lit(0))
-            & (col("flight_date") >= lit(p["start_date"]))
-            & (col("flight_date") < lit(p["end_date"]))
-        )
+        .filter(_date_condition(col, lit, lambda col, lit: col("cancelled") == lit(0)))
         .group_by("origin", "dest", "origin_city", "origin_state", "dest_city", "dest_state")
         .agg(
             col("flight_id").count().alias("total_flights"),
@@ -375,11 +365,9 @@ def busiest_routes_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def route_reliability_expression_impl(ctx: DataFrameContext) -> Any:
-    """Routes ranked by reliability (min 100 scheduled)."""
     flights = ctx.get_table("flights")
-    airports = ctx.get_table("airports")
     col, lit = ctx.col, ctx.lit
-    p = get_flightdata_parameters()
+    airports = ctx.get_table("airports")
 
     ao = airports.select(col("code").alias("ao_code"), col("city").alias("origin_city"))
     ad = airports.select(col("code").alias("ad_code"), col("city").alias("dest_city"))
@@ -387,7 +375,7 @@ def route_reliability_expression_impl(ctx: DataFrameContext) -> Any:
     return (
         flights.join(ao, left_on="origin", right_on="ao_code", how="left")
         .join(ad, left_on="dest", right_on="ad_code", how="left")
-        .filter((col("flight_date") >= lit(p["start_date"])) & (col("flight_date") < lit(p["end_date"])))
+        .filter(_date_condition(col, lit))
         .group_by("origin", "dest", "origin_city", "dest_city")
         .agg(
             col("flight_id").count().alias("total_scheduled"),
@@ -408,19 +396,10 @@ def route_reliability_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def distance_delay_expression_impl(ctx: DataFrameContext) -> Any:
-    """Average delay by flight distance bucket."""
-    flights = ctx.get_table("flights")
-    col, lit = ctx.col, ctx.lit
-    p = get_flightdata_parameters()
+    flights, col, lit = _date_window(ctx, lambda col, lit: (col("cancelled") == lit(0), col("arr_delay").is_not_null()))
 
     return (
-        flights.filter(
-            (col("cancelled") == lit(0))
-            & col("arr_delay").is_not_null()
-            & (col("flight_date") >= lit(p["start_date"]))
-            & (col("flight_date") < lit(p["end_date"]))
-        )
-        .with_columns(
+        flights.with_columns(
             # Distance bucket mapping to string labels
             ctx.when(col("distance") < lit(250))
             .then(lit("Short-haul (<250 mi)"))
@@ -448,11 +427,9 @@ def distance_delay_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def hub_connectivity_expression_impl(ctx: DataFrameContext) -> Any:
-    """Hub airport connectivity (unique destinations, carriers)."""
     flights = ctx.get_table("flights")
-    airports = ctx.get_table("airports")
     col, lit = ctx.col, ctx.lit
-    p = get_flightdata_parameters()
+    airports = ctx.get_table("airports")
 
     ap = airports.select(
         col("code").alias("ap_code"),
@@ -463,11 +440,7 @@ def hub_connectivity_expression_impl(ctx: DataFrameContext) -> Any:
 
     return (
         flights.join(ap, left_on="origin", right_on="ap_code", how="left")
-        .filter(
-            (col("cancelled") == lit(0))
-            & (col("flight_date") >= lit(p["start_date"]))
-            & (col("flight_date") < lit(p["end_date"]))
-        )
+        .filter(_date_condition(col, lit, lambda col, lit: col("cancelled") == lit(0)))
         .group_by("origin", "airport_name", "city", "state")
         .agg(
             col("dest").n_unique().alias("unique_destinations"),
@@ -481,14 +454,10 @@ def hub_connectivity_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def day_of_week_expression_impl(ctx: DataFrameContext) -> Any:
-    """Flight patterns by day of week."""
-    flights = ctx.get_table("flights")
-    col, lit = ctx.col, ctx.lit
-    p = get_flightdata_parameters()
+    flights, col, lit = _date_window(ctx)
 
     return (
-        flights.filter((col("flight_date") >= lit(p["start_date"])) & (col("flight_date") < lit(p["end_date"])))
-        .with_columns(
+        flights.with_columns(
             ctx.when(col("day_of_week") == lit(1))
             .then(lit("Monday"))
             .when(col("day_of_week") == lit(2))
@@ -520,14 +489,10 @@ def day_of_week_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def seasonal_trends_expression_impl(ctx: DataFrameContext) -> Any:
-    """Monthly flight volume and performance aggregated across all years."""
-    flights = ctx.get_table("flights")
-    col, lit = ctx.col, ctx.lit
-    p = get_flightdata_parameters()
+    flights, col, lit = _date_window(ctx)
 
     return (
-        flights.filter((col("flight_date") >= lit(p["start_date"])) & (col("flight_date") < lit(p["end_date"])))
-        .with_columns(
+        flights.with_columns(
             ctx.when(col("month") == lit(1))
             .then(lit("January"))
             .when(col("month") == lit(2))
@@ -571,10 +536,7 @@ def seasonal_trends_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def holiday_impact_expression_impl(ctx: DataFrameContext) -> Any:
-    """Holiday period delay impact."""
-    flights = ctx.get_table("flights")
-    col, lit = ctx.col, ctx.lit
-    p = get_flightdata_parameters()
+    flights, col, lit = _date_window(ctx)
 
     # Encode each holiday period as a numeric id (0=regular, 1=thanksgiving, etc.)
     thanksgiving = (col("month") == lit(11)) & (col("day_of_month") >= lit(21)) & (col("day_of_month") <= lit(27))
@@ -597,8 +559,7 @@ def holiday_impact_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     return (
-        flights.filter((col("flight_date") >= lit(p["start_date"])) & (col("flight_date") < lit(p["end_date"])))
-        .with_columns(
+        flights.with_columns(
             # Holiday period mapping to string labels
             ctx.when(thanksgiving)
             .then(lit("Thanksgiving Week"))
@@ -632,18 +593,10 @@ def holiday_impact_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def time_of_day_expression_impl(ctx: DataFrameContext) -> Any:
-    """Flight volume and delay by scheduled departure hour."""
-    flights = ctx.get_table("flights")
-    col, lit = ctx.col, ctx.lit
-    p = get_flightdata_parameters()
+    flights, col, lit = _date_window(ctx, lambda col, _lit: col("crs_dep_time").is_not_null())
 
     return (
-        flights.filter(
-            col("crs_dep_time").is_not_null()
-            & (col("flight_date") >= lit(p["start_date"]))
-            & (col("flight_date") < lit(p["end_date"]))
-        )
-        .with_columns((col("crs_dep_time") / lit(100)).floor().cast(int).alias("hour_of_day"))
+        flights.with_columns((col("crs_dep_time") / lit(100)).floor().cast(int).alias("hour_of_day"))
         .group_by("hour_of_day")
         .agg(
             col("flight_id").count().alias("total_flights"),
@@ -660,17 +613,12 @@ def time_of_day_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def carrier_ranking_expression_impl(ctx: DataFrameContext) -> Any:
-    """Full carrier scorecard (min 1000 scheduled flights)."""
     flights = ctx.get_table("flights")
-    airlines = ctx.get_table("airlines")
     col, lit = ctx.col, ctx.lit
-    p = get_flightdata_parameters()
-
-    airlines_a = airlines.select(col("code").alias("a_code"), col("name").alias("airline_name"))
 
     return (
-        flights.join(airlines_a, left_on="reporting_airline", right_on="a_code", how="left")
-        .filter((col("flight_date") >= lit(p["start_date"])) & (col("flight_date") < lit(p["end_date"])))
+        flights.join(_airline_names(ctx), left_on="reporting_airline", right_on="a_code", how="left")
+        .filter(_date_condition(col, lit))
         .group_by("reporting_airline", "airline_name")
         .agg(
             col("flight_id").count().alias("total_scheduled"),
@@ -693,17 +641,12 @@ def carrier_ranking_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def cancellation_rate_expression_impl(ctx: DataFrameContext) -> Any:
-    """Cancellation rates by carrier (min 100 flights)."""
     flights = ctx.get_table("flights")
-    airlines = ctx.get_table("airlines")
     col, lit = ctx.col, ctx.lit
-    p = get_flightdata_parameters()
-
-    airlines_a = airlines.select(col("code").alias("a_code"), col("name").alias("airline_name"))
 
     return (
-        flights.join(airlines_a, left_on="reporting_airline", right_on="a_code", how="left")
-        .filter((col("flight_date") >= lit(p["start_date"])) & (col("flight_date") < lit(p["end_date"])))
+        flights.join(_airline_names(ctx), left_on="reporting_airline", right_on="a_code", how="left")
+        .filter(_date_condition(col, lit))
         .group_by("reporting_airline", "airline_name")
         .agg(
             col("flight_id").count().alias("total_flights"),
@@ -722,22 +665,13 @@ def cancellation_rate_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def market_share_expression_impl(ctx: DataFrameContext) -> Any:
-    """Carrier market share (CTE pattern via window sum)."""
     flights = ctx.get_table("flights")
-    airlines = ctx.get_table("airlines")
     col, lit = ctx.col, ctx.lit
-    p = get_flightdata_parameters()
-
-    airlines_a = airlines.select(col("code").alias("a_code"), col("name").alias("airline_name"))
 
     # carrier_totals equivalent
     carrier_totals = (
-        flights.join(airlines_a, left_on="reporting_airline", right_on="a_code", how="left")
-        .filter(
-            (col("cancelled") == lit(0))
-            & (col("flight_date") >= lit(p["start_date"]))
-            & (col("flight_date") < lit(p["end_date"]))
-        )
+        flights.join(_airline_names(ctx), left_on="reporting_airline", right_on="a_code", how="left")
+        .filter(_date_condition(col, lit, lambda col, lit: col("cancelled") == lit(0)))
         .with_columns((col("origin") + lit("-") + col("dest")).alias("route"))
         .group_by("reporting_airline", "airline_name")
         .agg(
@@ -763,18 +697,9 @@ def market_share_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def ontime_by_carrier_pandas_impl(ctx: DataFrameContext) -> Any:
-    """On-time arrival percentage by airline carrier (pandas)."""
-    flights = ctx.get_table("flights")
-    airlines = ctx.get_table("airlines")
-    p = get_flightdata_parameters()
-
-    merged = flights.merge(airlines, left_on="reporting_airline", right_on="code", how="left")
-    merged = merged.rename(columns={"name": "airline_name"})
-    filtered = merged[
-        (merged["cancelled"] == 0)
-        & (merged["flight_date"] >= p["start_date"])
-        & (merged["flight_date"] < p["end_date"])
-    ].copy()
+    filtered = _pandas_window(
+        ctx, source=_pandas_airline_names(ctx), copy=True, extra=lambda flights: flights["cancelled"] == 0
+    )
 
     filtered["_ontime"] = (filtered["arr_delay"] <= 15).astype(int)
     filtered["_delayed_val"] = filtered["arr_delay"].where(filtered["arr_delay"] > 0)
@@ -790,19 +715,13 @@ def ontime_by_carrier_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def delay_by_airport_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Average departure delay by origin airport (pandas)."""
-    flights = ctx.get_table("flights")
     airports = ctx.get_table("airports")
-    p = get_flightdata_parameters()
 
-    merged = flights.merge(airports, left_on="origin", right_on="code", how="left")
+    merged = ctx.get_table("flights").merge(airports, left_on="origin", right_on="code", how="left")
     merged = merged.rename(columns={"name": "airport_name"})
-    filtered = merged[
-        (merged["cancelled"] == 0)
-        & merged["dep_delay"].notna()
-        & (merged["flight_date"] >= p["start_date"])
-        & (merged["flight_date"] < p["end_date"])
-    ].copy()
+    filtered = _pandas_window(
+        ctx, source=merged, copy=True, extra=lambda flights: (flights["cancelled"] == 0) & flights["dep_delay"].notna()
+    )
     filtered["_delayed"] = (filtered["dep_delay"] > 15).astype(int)
 
     result = filtered.groupby(["origin", "airport_name", "city", "state"], as_index=False).agg(
@@ -818,17 +737,13 @@ def delay_by_airport_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def delay_by_hour_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Average delay by scheduled departure hour (pandas)."""
-    flights = ctx.get_table("flights")
-    p = get_flightdata_parameters()
-
-    filtered = flights[
-        (flights["cancelled"] == 0)
+    filtered = _pandas_window(
+        ctx,
+        copy=True,
+        extra=lambda flights: (flights["cancelled"] == 0)
         & flights["dep_delay"].notna()
-        & flights["crs_dep_time"].notna()
-        & (flights["flight_date"] >= p["start_date"])
-        & (flights["flight_date"] < p["end_date"])
-    ].copy()
+        & flights["crs_dep_time"].notna(),
+    )
     filtered["dep_hour"] = (filtered["crs_dep_time"] // 100).astype(int)
     filtered["_delayed"] = (filtered["dep_delay"] > 15).astype(int)
 
@@ -845,21 +760,13 @@ def delay_by_hour_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def best_routes_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Routes with highest on-time rate (pandas)."""
-    flights = ctx.get_table("flights")
     airports = ctx.get_table("airports")
-    p = get_flightdata_parameters()
 
     ao = airports[["code", "city"]].rename(columns={"code": "ao_code", "city": "origin_city"})
     ad = airports[["code", "city"]].rename(columns={"code": "ad_code", "city": "dest_city"})
 
     filtered = (
-        flights[
-            (flights["cancelled"] == 0)
-            & flights["arr_delay"].notna()
-            & (flights["flight_date"] >= p["start_date"])
-            & (flights["flight_date"] < p["end_date"])
-        ]
+        _pandas_window(ctx, extra=lambda flights: (flights["cancelled"] == 0) & flights["arr_delay"].notna())
         .merge(ao, left_on="origin", right_on="ao_code", how="left")
         .merge(ad, left_on="dest", right_on="ad_code", how="left")
     ).copy()
@@ -881,11 +788,7 @@ def best_routes_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def improvement_trend_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Annual on-time performance trend (pandas)."""
-    flights = ctx.get_table("flights")
-    p = get_flightdata_parameters()
-
-    filtered = flights[(flights["flight_date"] >= p["start_date"]) & (flights["flight_date"] < p["end_date"])].copy()
+    filtered = _pandas_window(ctx, copy=True)
     filtered["_cancelled"] = (filtered["cancelled"] == 1).astype(int)
     filtered["_ontime"] = ((filtered["cancelled"] == 0) & (filtered["arr_delay"] <= 15)).astype(int)
     filtered["_non_cancelled"] = (filtered["cancelled"] == 0).astype(int)
@@ -905,16 +808,7 @@ def improvement_trend_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def delay_causes_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Distribution of delay causes (pandas)."""
-    flights = ctx.get_table("flights")
-    p = get_flightdata_parameters()
-
-    filtered = flights[
-        (flights["cancelled"] == 0)
-        & (flights["arr_delay"] > 15)
-        & (flights["flight_date"] >= p["start_date"])
-        & (flights["flight_date"] < p["end_date"])
-    ]
+    filtered = _pandas_window(ctx, extra=lambda flights: (flights["cancelled"] == 0) & (flights["arr_delay"] > 15))
 
     def _cond_mean(series: Any, cond: Any) -> float:
         return float(series.where(cond).mean())
@@ -941,18 +835,9 @@ def delay_causes_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def cascade_delays_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Late aircraft cascade delay patterns (pandas)."""
-    flights = ctx.get_table("flights")
-    airlines = ctx.get_table("airlines")
-    p = get_flightdata_parameters()
-
-    merged = flights.merge(airlines, left_on="reporting_airline", right_on="code", how="left")
-    merged = merged.rename(columns={"name": "airline_name"})
-    filtered = merged[
-        (merged["cancelled"] == 0)
-        & (merged["flight_date"] >= p["start_date"])
-        & (merged["flight_date"] < p["end_date"])
-    ].copy()
+    filtered = _pandas_window(
+        ctx, source=_pandas_airline_names(ctx), copy=True, extra=lambda flights: flights["cancelled"] == 0
+    )
     filtered["_cascade"] = (filtered["late_aircraft_delay"] > 0).astype(int)
     filtered["_cascade_val"] = filtered["late_aircraft_delay"].where(filtered["late_aircraft_delay"] > 0)
     filtered["_cascade_total"] = filtered["late_aircraft_delay"].fillna(0)
@@ -970,15 +855,7 @@ def cascade_delays_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def weather_impact_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Weather delay by month (pandas)."""
-    flights = ctx.get_table("flights")
-    p = get_flightdata_parameters()
-
-    filtered = flights[
-        (flights["cancelled"] == 0)
-        & (flights["flight_date"] >= p["start_date"])
-        & (flights["flight_date"] < p["end_date"])
-    ].copy()
+    filtered = _pandas_window(ctx, copy=True, extra=lambda flights: flights["cancelled"] == 0)
     filtered["_weather_flag"] = (filtered["weather_delay"] > 0).astype(int)
     filtered["_weather_val"] = filtered["weather_delay"].where(filtered["weather_delay"] > 0)
     filtered["_weather_total"] = filtered["weather_delay"].fillna(0)
@@ -996,17 +873,11 @@ def weather_impact_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def recovery_time_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Delay recovery analysis by departure delay bucket (pandas)."""
-    flights = ctx.get_table("flights")
-    p = get_flightdata_parameters()
-
-    filtered = flights[
-        (flights["cancelled"] == 0)
-        & flights["dep_delay"].notna()
-        & flights["arr_delay"].notna()
-        & (flights["flight_date"] >= p["start_date"])
-        & (flights["flight_date"] < p["end_date"])
-    ].copy()
+    filtered = _pandas_window(
+        ctx,
+        copy=True,
+        extra=lambda flights: (flights["cancelled"] == 0) & flights["dep_delay"].notna() & flights["arr_delay"].notna(),
+    )
 
     # Build delay bucket labels
     filtered["delay_bucket"] = "60+ min departure delay"
@@ -1034,10 +905,7 @@ def recovery_time_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def busiest_routes_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Top 25 routes by flight count (pandas)."""
-    flights = ctx.get_table("flights")
     airports = ctx.get_table("airports")
-    p = get_flightdata_parameters()
 
     ao = airports[["code", "city", "state"]].rename(
         columns={"code": "ao_code", "city": "origin_city", "state": "origin_state"}
@@ -1047,11 +915,7 @@ def busiest_routes_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
     filtered = (
-        flights[
-            (flights["cancelled"] == 0)
-            & (flights["flight_date"] >= p["start_date"])
-            & (flights["flight_date"] < p["end_date"])
-        ]
+        _pandas_window(ctx, extra=lambda flights: flights["cancelled"] == 0)
         .merge(ao, left_on="origin", right_on="ao_code", how="left")
         .merge(ad, left_on="dest", right_on="ad_code", how="left")
     ).copy()
@@ -1077,16 +941,13 @@ def busiest_routes_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def route_reliability_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Routes ranked by reliability (pandas)."""
-    flights = ctx.get_table("flights")
     airports = ctx.get_table("airports")
-    p = get_flightdata_parameters()
 
     ao = airports[["code", "city"]].rename(columns={"code": "ao_code", "city": "origin_city"})
     ad = airports[["code", "city"]].rename(columns={"code": "ad_code", "city": "dest_city"})
 
     filtered = (
-        flights[(flights["flight_date"] >= p["start_date"]) & (flights["flight_date"] < p["end_date"])]
+        _pandas_window(ctx)
         .merge(ao, left_on="origin", right_on="ao_code", how="left")
         .merge(ad, left_on="dest", right_on="ad_code", how="left")
     ).copy()
@@ -1114,16 +975,9 @@ def route_reliability_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def distance_delay_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Average delay by flight distance bucket (pandas)."""
-    flights = ctx.get_table("flights")
-    p = get_flightdata_parameters()
-
-    filtered = flights[
-        (flights["cancelled"] == 0)
-        & flights["arr_delay"].notna()
-        & (flights["flight_date"] >= p["start_date"])
-        & (flights["flight_date"] < p["end_date"])
-    ].copy()
+    filtered = _pandas_window(
+        ctx, copy=True, extra=lambda flights: (flights["cancelled"] == 0) & flights["arr_delay"].notna()
+    )
 
     filtered["distance_bucket"] = "Ultra-long (2000+ mi)"
     filtered.loc[filtered["distance"] < 2000, "distance_bucket"] = "Cross-country (1000-1999 mi)"
@@ -1148,18 +1002,11 @@ def distance_delay_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def hub_connectivity_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Hub airport connectivity (pandas)."""
-    flights = ctx.get_table("flights")
     airports = ctx.get_table("airports")
-    p = get_flightdata_parameters()
 
-    merged = flights.merge(airports, left_on="origin", right_on="code", how="left")
+    merged = ctx.get_table("flights").merge(airports, left_on="origin", right_on="code", how="left")
     merged = merged.rename(columns={"name": "airport_name"})
-    filtered = merged[
-        (merged["cancelled"] == 0)
-        & (merged["flight_date"] >= p["start_date"])
-        & (merged["flight_date"] < p["end_date"])
-    ]
+    filtered = _pandas_window(ctx, source=merged, extra=lambda flights: flights["cancelled"] == 0)
 
     result = filtered.groupby(["origin", "airport_name", "city", "state"], as_index=False).agg(
         unique_destinations=("dest", "nunique"),
@@ -1172,11 +1019,7 @@ def hub_connectivity_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def day_of_week_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Flight patterns by day of week (pandas)."""
-    flights = ctx.get_table("flights")
-    p = get_flightdata_parameters()
-
-    filtered = flights[(flights["flight_date"] >= p["start_date"]) & (flights["flight_date"] < p["end_date"])].copy()
+    filtered = _pandas_window(ctx, copy=True)
     day_names = {1: "Monday", 2: "Tuesday", 3: "Wednesday", 4: "Thursday", 5: "Friday", 6: "Saturday", 7: "Sunday"}
     filtered["day_name"] = filtered["day_of_week"].map(day_names)
     filtered["_cancelled"] = (filtered["cancelled"] == 1).astype(int)
@@ -1200,11 +1043,7 @@ def day_of_week_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def seasonal_trends_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Seasonal performance trends by month (pandas)."""
-    flights = ctx.get_table("flights")
-    p = get_flightdata_parameters()
-
-    filtered = flights[(flights["flight_date"] >= p["start_date"]) & (flights["flight_date"] < p["end_date"])].copy()
+    filtered = _pandas_window(ctx, copy=True)
     month_names = {
         1: "January",
         2: "February",
@@ -1239,11 +1078,7 @@ def seasonal_trends_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def holiday_impact_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Holiday period delay impact (pandas)."""
-    flights = ctx.get_table("flights")
-    p = get_flightdata_parameters()
-
-    filtered = flights[(flights["flight_date"] >= p["start_date"]) & (flights["flight_date"] < p["end_date"])].copy()
+    filtered = _pandas_window(ctx, copy=True)
 
     # Assign period labels using reverse-priority masking
     filtered["period"] = "Regular Day"
@@ -1285,15 +1120,7 @@ def holiday_impact_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def time_of_day_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Hourly congestion pattern (pandas)."""
-    flights = ctx.get_table("flights")
-    p = get_flightdata_parameters()
-
-    filtered = flights[
-        flights["crs_dep_time"].notna()
-        & (flights["flight_date"] >= p["start_date"])
-        & (flights["flight_date"] < p["end_date"])
-    ].copy()
+    filtered = _pandas_window(ctx, copy=True, extra=lambda flights: flights["crs_dep_time"].notna())
     filtered["hour_of_day"] = (filtered["crs_dep_time"] // 100).astype(int)
     filtered["_dep_delay_nc"] = filtered["dep_delay"].where(filtered["cancelled"] == 0)
     filtered["_arr_delay_nc"] = filtered["arr_delay"].where(filtered["cancelled"] == 0)
@@ -1316,14 +1143,7 @@ def time_of_day_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def carrier_ranking_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Full carrier scorecard (pandas)."""
-    flights = ctx.get_table("flights")
-    airlines = ctx.get_table("airlines")
-    p = get_flightdata_parameters()
-
-    merged = flights.merge(airlines, left_on="reporting_airline", right_on="code", how="left")
-    merged = merged.rename(columns={"name": "airline_name"})
-    filtered = merged[(merged["flight_date"] >= p["start_date"]) & (merged["flight_date"] < p["end_date"])].copy()
+    filtered = _pandas_window(ctx, source=_pandas_airline_names(ctx), copy=True)
     filtered["_operated"] = (filtered["cancelled"] == 0).astype(int)
     filtered["_cancelled"] = (filtered["cancelled"] == 1).astype(int)
     filtered["_dep_delay_nc"] = filtered["dep_delay"].where(filtered["cancelled"] == 0)
@@ -1355,14 +1175,7 @@ def carrier_ranking_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def cancellation_rate_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Cancellation rates by carrier (pandas)."""
-    flights = ctx.get_table("flights")
-    airlines = ctx.get_table("airlines")
-    p = get_flightdata_parameters()
-
-    merged = flights.merge(airlines, left_on="reporting_airline", right_on="code", how="left")
-    merged = merged.rename(columns={"name": "airline_name"})
-    filtered = merged[(merged["flight_date"] >= p["start_date"]) & (merged["flight_date"] < p["end_date"])].copy()
+    filtered = _pandas_window(ctx, source=_pandas_airline_names(ctx), copy=True)
     filtered["_cancelled"] = (filtered["cancelled"] == 1).astype(int)
     filtered["_code_a"] = (filtered["cancellation_code"] == "A").astype(int)
     filtered["_code_b"] = (filtered["cancellation_code"] == "B").astype(int)
@@ -1383,18 +1196,9 @@ def cancellation_rate_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 def market_share_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Carrier market share (pandas)."""
-    flights = ctx.get_table("flights")
-    airlines = ctx.get_table("airlines")
-    p = get_flightdata_parameters()
-
-    merged = flights.merge(airlines, left_on="reporting_airline", right_on="code", how="left")
-    merged = merged.rename(columns={"name": "airline_name"})
-    filtered = merged[
-        (merged["cancelled"] == 0)
-        & (merged["flight_date"] >= p["start_date"])
-        & (merged["flight_date"] < p["end_date"])
-    ].copy()
+    filtered = _pandas_window(
+        ctx, source=_pandas_airline_names(ctx), copy=True, extra=lambda flights: flights["cancelled"] == 0
+    )
     filtered["route"] = filtered["origin"] + "-" + filtered["dest"]
 
     result = filtered.groupby(["reporting_airline", "airline_name"], as_index=False).agg(
