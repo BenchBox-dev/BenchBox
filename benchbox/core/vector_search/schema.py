@@ -1,76 +1,25 @@
-"""Vector search benchmark schema definitions.
-
-Two tables:
-- vectors: the searchable corpus (id, embedding, category, doc_id)
-- vector_queries: pre-generated query vectors used in benchmark queries
-
-The embedding column type is dialect-specific because each platform uses its
-own array/vector type syntax.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+"""Vector search benchmark schema definitions."""
 
 from __future__ import annotations
 
-# ---------------------------------------------------------------------------
-# Table definitions
-# ---------------------------------------------------------------------------
+from pathlib import Path
+from typing import Any
 
-VECTORS: dict = {
-    "name": "vectors",
-    "columns": [
-        {"name": "id", "type": "BIGINT", "primary_key": True},
-        {"name": "embedding", "type": "FLOAT_ARRAY"},  # resolved per dialect
-        {"name": "category", "type": "VARCHAR(50)"},
-        {"name": "doc_id", "type": "VARCHAR(100)"},
-    ],
-}
+import yaml
 
-VECTOR_QUERIES: dict = {
-    "name": "vector_queries",
-    "columns": [
-        {"name": "query_id", "type": "INTEGER", "primary_key": True},
-        {"name": "query_vector", "type": "FLOAT_ARRAY"},  # resolved per dialect
-    ],
-}
 
-TABLES: dict[str, dict] = {
-    "vectors": VECTORS,
-    "vector_queries": VECTOR_QUERIES,
-}
+def _load_schema_specs() -> dict[str, Any]:
+    with (Path(__file__).with_name("schema_specs.yaml")).open(encoding="utf-8") as handle:
+        return yaml.safe_load(handle) or {}
 
-# ---------------------------------------------------------------------------
-# Dialect-specific embedding type strings
-# ---------------------------------------------------------------------------
 
-_EMBEDDING_TYPE_MAP: dict[str, str] = {
-    # DuckDB: fixed-size float array (native, no extension needed)
-    "duckdb": "FLOAT[{dim}]",
-    # PostgreSQL + pgvector extension
-    "postgresql": "VECTOR({dim})",
-    "postgres": "VECTOR({dim})",
-    # Snowflake native vector type
-    "snowflake": "VECTOR(FLOAT, {dim})",
-    # ClickHouse native array
-    "clickhouse": "Array(Float32)",
-    # BigQuery
-    "bigquery": "ARRAY<FLOAT64>",
-    # StarRocks / Doris: ARRAY<FLOAT> without dimension (sized arrays unsupported)
-    "starrocks": "ARRAY<FLOAT>",
-    "doris": "ARRAY<FLOAT>",
-    # Spark-family engines support arrays but not fixed-size array type syntax.
-    "spark": "ARRAY<FLOAT>",
-    "lakesail": "ARRAY<FLOAT>",
-    "pyspark": "ARRAY<FLOAT>",
-    "velox": "ARRAY<FLOAT>",
-    "databricks": "ARRAY<FLOAT>",
-    # SingleStore: native VECTOR type (SingleStore 8.5+)
-    "mysql": "VECTOR({dim}, F32)",
-    # Default/fallback: use DuckDB syntax for OLAP databases
-    "default": "FLOAT[{dim}]",
-}
+_SCHEMA_SPECS = _load_schema_specs()
+_TABLE_DEFS = {entry["id"]: entry for entry in _SCHEMA_SPECS["tables"]}
+globals().update({symbol: entry["schema"] for symbol, entry in _TABLE_DEFS.items()})
+
+TABLES: dict[str, dict] = {entry["key"]: globals()[symbol] for symbol, entry in _TABLE_DEFS.items()}
+_TABLE_ORDER = list(_SCHEMA_SPECS["table_order"])
+_EMBEDDING_TYPE_MAP = dict(_SCHEMA_SPECS["embedding_type_map"])
 
 
 def get_embedding_type(dialect: str = "duckdb", dimensions: int = 128) -> str:
@@ -85,11 +34,6 @@ def get_embedding_type(dialect: str = "duckdb", dimensions: int = 128) -> str:
     """
     template = _EMBEDDING_TYPE_MAP.get(dialect.lower(), _EMBEDDING_TYPE_MAP["default"])
     return template.format(dim=dimensions)
-
-
-# ---------------------------------------------------------------------------
-# DDL generation
-# ---------------------------------------------------------------------------
 
 
 def get_create_table_sql(
@@ -146,4 +90,4 @@ def get_all_create_table_sql(
     Returns:
         Complete DDL script (two CREATE TABLE statements).
     """
-    return "\n\n".join(get_create_table_sql(t, dialect, dimensions, enable_primary_keys) for t in TABLES)
+    return "\n\n".join(get_create_table_sql(t, dialect, dimensions, enable_primary_keys) for t in _TABLE_ORDER)
