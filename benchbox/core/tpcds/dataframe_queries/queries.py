@@ -20,6 +20,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 from csv import reader
+from datetime import datetime, timedelta
 from typing import Any
 
 from benchbox.core.dataframe.compat import _to_list
@@ -361,7 +362,237 @@ def _three_channel_item_sales_pandas(
     )
 
 
+def _promotion_sales_expression(
+    ctx: DataFrameContext,
+    query_id: int,
+    sales_table: str,
+    cdemo_key: str,
+    date_key: str,
+    item_key: str,
+    promo_key: str,
+    quantity_col: str,
+    list_price_col: str,
+    coupon_col: str,
+    sales_price_col: str,
+) -> Any:
+    params = get_parameters(query_id)
+    year = params.get("year", 2000)
+    col, lit = ctx.col, ctx.lit
+    return (
+        ctx.get_table(sales_table)
+        .join(ctx.get_table("customer_demographics"), left_on=cdemo_key, right_on="cd_demo_sk")
+        .join(ctx.get_table("date_dim"), left_on=date_key, right_on="d_date_sk")
+        .join(ctx.get_table("item"), left_on=item_key, right_on="i_item_sk")
+        .join(ctx.get_table("promotion"), left_on=promo_key, right_on="p_promo_sk")
+        .filter(
+            (col("cd_gender") == lit("M"))
+            & (col("cd_marital_status") == lit("S"))
+            & (col("cd_education_status") == lit("College"))
+            & ((col("p_channel_email") == lit("N")) | (col("p_channel_event") == lit("N")))
+            & (col("d_year") == lit(year))
+        )
+        .group_by("i_item_id")
+        .agg(
+            col(quantity_col).mean().alias("agg1"),
+            col(list_price_col).mean().alias("agg2"),
+            col(coupon_col).mean().alias("agg3"),
+            col(sales_price_col).mean().alias("agg4"),
+        )
+        .sort("i_item_id")
+        .limit(100)
+    )
+
+
+def _promotion_sales_pandas(
+    ctx: DataFrameContext,
+    query_id: int,
+    sales_table: str,
+    cdemo_key: str,
+    date_key: str,
+    item_key: str,
+    promo_key: str,
+    quantity_col: str,
+    list_price_col: str,
+    coupon_col: str,
+    sales_price_col: str,
+) -> Any:
+    params = get_parameters(query_id)
+    year = params.get("year", 2000)
+    merged = ctx.get_table(sales_table).merge(
+        ctx.get_table("customer_demographics"), left_on=cdemo_key, right_on="cd_demo_sk"
+    )
+    merged = merged.merge(ctx.get_table("date_dim"), left_on=date_key, right_on="d_date_sk")
+    merged = merged.merge(ctx.get_table("item"), left_on=item_key, right_on="i_item_sk")
+    merged = merged.merge(ctx.get_table("promotion"), left_on=promo_key, right_on="p_promo_sk")
+    filtered = merged[
+        (merged["cd_gender"] == "M")
+        & (merged["cd_marital_status"] == "S")
+        & (merged["cd_education_status"] == "College")
+        & ((merged["p_channel_email"] == "N") | (merged["p_channel_event"] == "N"))
+        & (merged["d_year"] == year)
+    ]
+    return (
+        filtered.groupby(["i_item_id"], as_index=False)
+        .agg(
+            agg1=(quantity_col, "mean"),
+            agg2=(list_price_col, "mean"),
+            agg3=(coupon_col, "mean"),
+            agg4=(sales_price_col, "mean"),
+        )
+        .sort_values(["i_item_id"])
+        .head(100)
+    )
+
+
+def _web_multi_warehouse_orders_expression(ctx: DataFrameContext, web_sales: Any, optimized: bool) -> Any:
+    col, lit = ctx.col, ctx.lit
+    if optimized and getattr(ctx, "platform", "polars") != "datafusion":
+        return (
+            web_sales.group_by("ws_order_number")
+            .agg(col("ws_warehouse_sk").n_unique().alias("num_warehouses"))
+            .filter(col("num_warehouses") > lit(1))
+            .select("ws_order_number")
+        )
+    order_warehouses = web_sales.select(["ws_order_number", "ws_warehouse_sk"]).unique()
+    return (
+        order_warehouses.join(
+            order_warehouses.rename({"ws_warehouse_sk": "ws_warehouse_sk_2"}),
+            on="ws_order_number",
+        )
+        .filter(col("ws_warehouse_sk") != col("ws_warehouse_sk_2"))
+        .select(["ws_order_number"])
+        .unique()
+    )
+
+
+def _web_multi_warehouse_expression(
+    ctx: DataFrameContext,
+    query_id: int,
+    return_mode: str,
+    optimized_multi_warehouse: bool,
+) -> Any:
+    params = get_parameters(query_id)
+    year = params.get("year", 1999)
+    month = params.get("month", 2)
+    states = params.get("states", ["TX", "OR", "AZ"])
+    col, lit = ctx.col, ctx.lit
+
+    web_sales = ctx.get_table("web_sales")
+    web_returns = ctx.get_table("web_returns")
+    date_dim = ctx.get_table("date_dim")
+    customer_address = ctx.get_table("customer_address")
+    web_site = ctx.get_table("web_site")
+
+    start_date = datetime(year, month, 1).date()
+    end_date = start_date + timedelta(days=60)
+    date_filtered = date_dim.filter((col("d_date") >= lit(start_date)) & (col("d_date") <= lit(end_date)))
+    ca_filtered = customer_address.filter(col("ca_state").is_in(states))
+    ws_filtered = web_site.filter(col("web_company_name") == lit("pri"))
+    multi_warehouse_orders = _web_multi_warehouse_orders_expression(ctx, web_sales, optimized_multi_warehouse)
+
+    if return_mode == "semi":
+        returned_orders = (
+            web_returns.select(["wr_order_number"])
+            .join(multi_warehouse_orders, left_on="wr_order_number", right_on="ws_order_number")
+            .select(["wr_order_number"])
+            .unique()
+        )
+    else:
+        returned_orders = web_returns.select(["wr_order_number"]).unique()
+
+    result = (
+        web_sales.join(date_filtered, left_on="ws_ship_date_sk", right_on="d_date_sk")
+        .join(ca_filtered, left_on="ws_ship_addr_sk", right_on="ca_address_sk")
+        .join(ws_filtered, left_on="ws_web_site_sk", right_on="web_site_sk")
+        .join(multi_warehouse_orders, on="ws_order_number", how="semi")
+        .join(returned_orders, left_on="ws_order_number", right_on="wr_order_number", how=return_mode)
+    )
+    return result.select(
+        [
+            col("ws_order_number").n_unique().alias("order count"),
+            ctx.sum("ws_ext_ship_cost").alias("total shipping cost"),
+            ctx.sum("ws_net_profit").alias("total net profit"),
+        ]
+    )
+
+
+def _web_multi_warehouse_pandas(
+    ctx: DataFrameContext,
+    query_id: int,
+    return_mode: str,
+    _optimized_multi_warehouse: bool,
+) -> Any:
+    import pandas as pd
+
+    params = get_parameters(query_id)
+    year = params.get("year", 1999)
+    month = params.get("month", 2)
+    states = params.get("states", ["TX", "OR", "AZ"])
+
+    web_sales = ctx.get_table("web_sales")
+    web_returns = ctx.get_table("web_returns")
+    date_dim = ctx.get_table("date_dim")
+    customer_address = ctx.get_table("customer_address")
+    web_site = ctx.get_table("web_site")
+
+    start_date = datetime(year, month, 1).date()
+    if return_mode == "anti":
+        start_date = pd.Timestamp(datetime(year, month, 1))
+    end_date = start_date + timedelta(days=60)
+    date_filtered = date_dim[(date_dim["d_date"] >= start_date) & (date_dim["d_date"] <= end_date)][["d_date_sk"]]
+    ca_filtered = customer_address[customer_address["ca_state"].isin(states)]
+    ws_filtered = web_site[web_site["web_company_name"] == "pri"]
+
+    order_warehouses = web_sales[["ws_order_number", "ws_warehouse_sk"]].drop_duplicates()
+    ow_count = ctx.groupby_size(order_warehouses, "ws_order_number", name="wh_count")
+    multi_warehouse_orders = ow_count[ow_count["wh_count"] > 1][["ws_order_number"]]
+
+    result = web_sales.merge(date_filtered, left_on="ws_ship_date_sk", right_on="d_date_sk")
+    result = result.merge(ca_filtered[["ca_address_sk"]], left_on="ws_ship_addr_sk", right_on="ca_address_sk")
+    result = result.merge(ws_filtered[["web_site_sk"]], left_on="ws_web_site_sk", right_on="web_site_sk")
+    result = result.merge(multi_warehouse_orders, on="ws_order_number")
+
+    returned_orders = web_returns[["wr_order_number"]].drop_duplicates()
+    if return_mode == "anti":
+        result = result.merge(
+            returned_orders, left_on="ws_order_number", right_on="wr_order_number", how="left", indicator=True
+        )
+        result = result[result["_merge"] == "left_only"]
+    else:
+        returned_multi_wh = returned_orders.merge(
+            multi_warehouse_orders,
+            left_on="wr_order_number",
+            right_on="ws_order_number",
+        )[["wr_order_number"]]
+        result = result.merge(returned_multi_wh, left_on="ws_order_number", right_on="wr_order_number")
+
+    return pd.DataFrame(
+        {
+            "order count": [result["ws_order_number"].nunique()],
+            "total shipping cost": [result["ws_ext_ship_cost"].sum()],
+            "total net profit": [result["ws_net_profit"].sum()],
+        }
+    )
+
+
 _HELPER_QUERY_SPECS = [
+    (
+        7,
+        "Promotion Analysis",
+        _promotion_sales_expression,
+        _promotion_sales_pandas,
+        (
+            "store_sales",
+            "ss_cdemo_sk",
+            "ss_sold_date_sk",
+            "ss_item_sk",
+            "ss_promo_sk",
+            "ss_quantity",
+            "ss_list_price",
+            "ss_coupon_amt",
+            "ss_sales_price",
+        ),
+    ),
     (
         3,
         "Date/Item Brand Sales Analysis",
@@ -481,6 +712,23 @@ _HELPER_QUERY_SPECS = [
         ),
     ),
     (
+        26,
+        "Catalog Sales Promo Analysis",
+        _promotion_sales_expression,
+        _promotion_sales_pandas,
+        (
+            "catalog_sales",
+            "cs_bill_cdemo_sk",
+            "cs_sold_date_sk",
+            "cs_item_sk",
+            "cs_promo_sk",
+            "cs_quantity",
+            "cs_list_price",
+            "cs_coupon_amt",
+            "cs_sales_price",
+        ),
+    ),
+    (
         32,
         "Catalog Sales Excess Discount",
         _excess_discount_expression,
@@ -493,6 +741,20 @@ _HELPER_QUERY_SPECS = [
         _excess_discount_expression,
         _excess_discount_pandas,
         ("web_sales", "ws_item_sk", "ws_sold_date_sk", "ws_ext_discount_amt", 350),
+    ),
+    (
+        94,
+        "Web Orders from Multiple Warehouses Not Returned",
+        _web_multi_warehouse_expression,
+        _web_multi_warehouse_pandas,
+        ("anti", False),
+    ),
+    (
+        95,
+        "Web Orders from Multiple Warehouses with Returns",
+        _web_multi_warehouse_expression,
+        _web_multi_warehouse_pandas,
+        ("semi", True),
     ),
     (
         56,
@@ -734,89 +996,6 @@ def q96_pandas_impl(ctx: DataFrameContext) -> Any:
     # Count
     count = len(filtered)
     return pd.DataFrame({"count": [count]})
-
-
-def q7_expression_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q7: Promotion Analysis (Expression Family).
-
-    Reports promotional impact on store sales for specific customer demographics.
-
-    Tables: store_sales, customer_demographics, date_dim, item, promotion
-    Pattern: 5-way join -> filter -> group by -> aggregate -> order by
-    """
-    params = get_parameters(7)
-    year = params.get("year", 2000)
-
-    store_sales = ctx.get_table("store_sales")
-    customer_demographics = ctx.get_table("customer_demographics")
-    date_dim = ctx.get_table("date_dim")
-    item = ctx.get_table("item")
-    promotion = ctx.get_table("promotion")
-    col = ctx.col
-    lit = ctx.lit
-
-    return (
-        store_sales.join(customer_demographics, left_on="ss_cdemo_sk", right_on="cd_demo_sk")
-        .join(date_dim, left_on="ss_sold_date_sk", right_on="d_date_sk")
-        .join(item, left_on="ss_item_sk", right_on="i_item_sk")
-        .join(promotion, left_on="ss_promo_sk", right_on="p_promo_sk")
-        .filter(
-            (col("cd_gender") == lit("M"))
-            & (col("cd_marital_status") == lit("S"))
-            & (col("cd_education_status") == lit("College"))
-            & ((col("p_channel_email") == lit("N")) | (col("p_channel_event") == lit("N")))
-            & (col("d_year") == lit(year))
-        )
-        .group_by("i_item_id")
-        .agg(
-            col("ss_quantity").mean().alias("agg1"),
-            col("ss_list_price").mean().alias("agg2"),
-            col("ss_coupon_amt").mean().alias("agg3"),
-            col("ss_sales_price").mean().alias("agg4"),
-        )
-        .sort("i_item_id")
-        .limit(100)
-    )
-
-
-def q7_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q7: Promotion Analysis (Pandas Family)."""
-    params = get_parameters(7)
-    year = params.get("year", 2000)
-
-    store_sales = ctx.get_table("store_sales")
-    customer_demographics = ctx.get_table("customer_demographics")
-    date_dim = ctx.get_table("date_dim")
-    item = ctx.get_table("item")
-    promotion = ctx.get_table("promotion")
-
-    # Join tables
-    merged = store_sales.merge(customer_demographics, left_on="ss_cdemo_sk", right_on="cd_demo_sk")
-    merged = merged.merge(date_dim, left_on="ss_sold_date_sk", right_on="d_date_sk")
-    merged = merged.merge(item, left_on="ss_item_sk", right_on="i_item_sk")
-    merged = merged.merge(promotion, left_on="ss_promo_sk", right_on="p_promo_sk")
-
-    # Filter
-    filtered = merged[
-        (merged["cd_gender"] == "M")
-        & (merged["cd_marital_status"] == "S")
-        & (merged["cd_education_status"] == "College")
-        & ((merged["p_channel_email"] == "N") | (merged["p_channel_event"] == "N"))
-        & (merged["d_year"] == year)
-    ]
-
-    # Group and aggregate
-    return (
-        filtered.groupby(["i_item_id"], as_index=False)
-        .agg(
-            agg1=("ss_quantity", "mean"),
-            agg2=("ss_list_price", "mean"),
-            agg3=("ss_coupon_amt", "mean"),
-            agg4=("ss_sales_price", "mean"),
-        )
-        .sort_values(["i_item_id"])
-        .head(100)
-    )
 
 
 def q25_expression_impl(ctx: DataFrameContext) -> Any:
@@ -1513,89 +1692,6 @@ def q15_pandas_impl(ctx: DataFrameContext) -> Any:
         filtered.groupby(["ca_zip"], as_index=False)
         .agg(total_sales=("cs_sales_price", "sum"))
         .sort_values(["ca_zip"])
-        .head(100)
-    )
-
-
-def q26_expression_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q26: Catalog Sales Promo Analysis (Expression Family).
-
-    Reports catalog sales promotion effectiveness by customer demographics.
-
-    Tables: catalog_sales, customer_demographics, date_dim, item, promotion
-    Pattern: Multi-join -> filter -> group by -> aggregate
-    """
-    params = get_parameters(26)
-    year = params.get("year", 2000)
-
-    catalog_sales = ctx.get_table("catalog_sales")
-    customer_demographics = ctx.get_table("customer_demographics")
-    date_dim = ctx.get_table("date_dim")
-    item = ctx.get_table("item")
-    promotion = ctx.get_table("promotion")
-    col = ctx.col
-    lit = ctx.lit
-
-    return (
-        catalog_sales.join(customer_demographics, left_on="cs_bill_cdemo_sk", right_on="cd_demo_sk")
-        .join(date_dim, left_on="cs_sold_date_sk", right_on="d_date_sk")
-        .join(item, left_on="cs_item_sk", right_on="i_item_sk")
-        .join(promotion, left_on="cs_promo_sk", right_on="p_promo_sk")
-        .filter(
-            (col("cd_gender") == lit("M"))
-            & (col("cd_marital_status") == lit("S"))
-            & (col("cd_education_status") == lit("College"))
-            & ((col("p_channel_email") == lit("N")) | (col("p_channel_event") == lit("N")))
-            & (col("d_year") == lit(year))
-        )
-        .group_by("i_item_id")
-        .agg(
-            col("cs_quantity").mean().alias("agg1"),
-            col("cs_list_price").mean().alias("agg2"),
-            col("cs_coupon_amt").mean().alias("agg3"),
-            col("cs_sales_price").mean().alias("agg4"),
-        )
-        .sort("i_item_id")
-        .limit(100)
-    )
-
-
-def q26_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-DS Q26: Catalog Sales Promo Analysis (Pandas Family)."""
-    params = get_parameters(26)
-    year = params.get("year", 2000)
-
-    catalog_sales = ctx.get_table("catalog_sales")
-    customer_demographics = ctx.get_table("customer_demographics")
-    date_dim = ctx.get_table("date_dim")
-    item = ctx.get_table("item")
-    promotion = ctx.get_table("promotion")
-
-    # Join tables
-    merged = catalog_sales.merge(customer_demographics, left_on="cs_bill_cdemo_sk", right_on="cd_demo_sk")
-    merged = merged.merge(date_dim, left_on="cs_sold_date_sk", right_on="d_date_sk")
-    merged = merged.merge(item, left_on="cs_item_sk", right_on="i_item_sk")
-    merged = merged.merge(promotion, left_on="cs_promo_sk", right_on="p_promo_sk")
-
-    # Filter
-    filtered = merged[
-        (merged["cd_gender"] == "M")
-        & (merged["cd_marital_status"] == "S")
-        & (merged["cd_education_status"] == "College")
-        & ((merged["p_channel_email"] == "N") | (merged["p_channel_event"] == "N"))
-        & (merged["d_year"] == year)
-    ]
-
-    # Group and aggregate
-    return (
-        filtered.groupby(["i_item_id"], as_index=False)
-        .agg(
-            agg1=("cs_quantity", "mean"),
-            agg2=("cs_list_price", "mean"),
-            agg3=("cs_coupon_amt", "mean"),
-            agg4=("cs_sales_price", "mean"),
-        )
-        .sort_values(["i_item_id"])
         .head(100)
     )
 
@@ -9193,145 +9289,6 @@ def q93_pandas_impl(ctx: DataFrameContext) -> Any:
 
 
 # =============================================================================
-# Q94: Web Orders from Multiple Warehouses Not Returned
-# =============================================================================
-
-
-def q94_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q94: Web orders shipped from multiple warehouses not returned (Polars).
-
-    Similar to Q16 but for web channel. Finds web orders shipped from
-    different warehouses that were not returned.
-
-    Tables: web_sales, web_returns, date_dim, customer_address, web_site
-    """
-    from datetime import datetime, timedelta
-
-    params = get_parameters(94)
-    year = params.get("year", 1999)
-    month = params.get("month", 2)
-    states = params.get("states", ["TX", "OR", "AZ"])
-
-    web_sales = ctx.get_table("web_sales")
-    web_returns = ctx.get_table("web_returns")
-    date_dim = ctx.get_table("date_dim")
-    customer_address = ctx.get_table("customer_address")
-    web_site = ctx.get_table("web_site")
-    col = ctx.col
-    lit = ctx.lit
-
-    # Date filter
-    start_date = datetime(year, month, 1).date()
-    end_date = start_date + timedelta(days=60)
-
-    date_filtered = date_dim.filter((col("d_date") >= lit(start_date)) & (col("d_date") <= lit(end_date)))
-
-    # Filter customer_address by states
-    ca_filtered = customer_address.filter(col("ca_state").is_in(states))
-
-    # Filter web_site by company
-    ws_filtered = web_site.filter(col("web_company_name") == lit("pri"))
-
-    # Get orders that are NOT returned
-    returned_orders = web_returns.select(["wr_order_number"]).unique()
-
-    # Find orders shipped from multiple warehouses
-    order_warehouses = web_sales.select(["ws_order_number", "ws_warehouse_sk"]).unique()
-
-    # Self-join to find orders with different warehouses
-    multi_warehouse_orders = (
-        order_warehouses.join(
-            order_warehouses.rename({"ws_warehouse_sk": "ws_warehouse_sk_2"}),
-            on="ws_order_number",
-        )
-        .filter(col("ws_warehouse_sk") != col("ws_warehouse_sk_2"))
-        .select(["ws_order_number"])
-        .unique()
-    )
-
-    # Main query
-    result = (
-        web_sales.join(date_filtered, left_on="ws_ship_date_sk", right_on="d_date_sk")
-        .join(ca_filtered, left_on="ws_ship_addr_sk", right_on="ca_address_sk")
-        .join(ws_filtered, left_on="ws_web_site_sk", right_on="web_site_sk")
-        .join(multi_warehouse_orders, on="ws_order_number", how="semi")
-        .join(returned_orders, left_on="ws_order_number", right_on="wr_order_number", how="anti")
-    )
-
-    # Aggregate
-    return result.select(
-        [
-            col("ws_order_number").n_unique().alias("order count"),
-            ctx.sum("ws_ext_ship_cost").alias("total shipping cost"),
-            ctx.sum("ws_net_profit").alias("total net profit"),
-        ]
-    )
-
-
-def q94_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q94: Web orders shipped from multiple warehouses not returned (Pandas)."""
-    from datetime import datetime, timedelta
-
-    import pandas as pd
-
-    params = get_parameters(94)
-    year = params.get("year", 1999)
-    month = params.get("month", 2)
-    states = params.get("states", ["TX", "OR", "AZ"])
-
-    web_sales = ctx.get_table("web_sales")
-    web_returns = ctx.get_table("web_returns")
-    date_dim = ctx.get_table("date_dim")
-    customer_address = ctx.get_table("customer_address")
-    web_site = ctx.get_table("web_site")
-
-    # Date filter
-    start_date = pd.Timestamp(datetime(year, month, 1))
-    end_date = start_date + timedelta(days=60)
-
-    date_filtered = date_dim[(date_dim["d_date"] >= start_date) & (date_dim["d_date"] <= end_date)][["d_date_sk"]]
-
-    # Filter dimensions
-    ca_filtered = customer_address[customer_address["ca_state"].isin(states)]
-    ws_filtered = web_site[web_site["web_company_name"] == "pri"]
-
-    # Get returned orders
-    returned_orders = web_returns[["wr_order_number"]].drop_duplicates()
-
-    # Find orders with multiple warehouses (use ctx.groupby_size for Dask compatibility)
-    order_warehouses = web_sales[["ws_order_number", "ws_warehouse_sk"]].drop_duplicates()
-    ow_count = ctx.groupby_size(order_warehouses, "ws_order_number", name="wh_count")
-    multi_warehouse_orders = ow_count[ow_count["wh_count"] > 1][["ws_order_number"]]
-
-    # Main join
-    result = web_sales.merge(date_filtered, left_on="ws_ship_date_sk", right_on="d_date_sk")
-    result = result.merge(ca_filtered[["ca_address_sk"]], left_on="ws_ship_addr_sk", right_on="ca_address_sk")
-    result = result.merge(ws_filtered[["web_site_sk"]], left_on="ws_web_site_sk", right_on="web_site_sk")
-
-    # Semi-join with multi-warehouse orders
-    result = result.merge(multi_warehouse_orders, on="ws_order_number")
-
-    # Anti-join with returned orders
-    result = result.merge(
-        returned_orders, left_on="ws_order_number", right_on="wr_order_number", how="left", indicator=True
-    )
-    result = result[result["_merge"] == "left_only"]
-
-    # Aggregate
-    order_count = result["ws_order_number"].nunique()
-    total_shipping = result["ws_ext_ship_cost"].sum()
-    total_profit = result["ws_net_profit"].sum()
-
-    return pd.DataFrame(
-        {
-            "order count": [order_count],
-            "total shipping cost": [total_shipping],
-            "total net profit": [total_profit],
-        }
-    )
-
-
-# =============================================================================
 # Q80: Three-Channel Sales-Returns with ROLLUP
 # =============================================================================
 
@@ -10809,161 +10766,6 @@ def q61_pandas_impl(ctx: DataFrameContext) -> Any:
             "promotions": [promotions],
             "total": [total],
             "promo_pct": [promotions / total * 100 if total else 0],
-        }
-    )
-
-
-# =============================================================================
-# Q95: Web Orders from Multiple Warehouses WITH Returns
-# =============================================================================
-
-
-def q95_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q95: Web orders from multiple warehouses WITH returns (Polars).
-
-    Similar to Q94 but finds orders that WERE returned (instead of not returned).
-    Uses semi-join instead of anti-join for returns.
-
-    Tables: web_sales, web_returns, date_dim, customer_address, web_site
-    """
-    from datetime import datetime, timedelta
-
-    params = get_parameters(95)
-    year = params.get("year", 1999)
-    month = params.get("month", 2)
-    states = params.get("states", ["TX", "OR", "AZ"])
-
-    col = ctx.col
-    lit = ctx.lit
-
-    web_sales = ctx.get_table("web_sales")
-    web_returns = ctx.get_table("web_returns")
-    date_dim = ctx.get_table("date_dim")
-    customer_address = ctx.get_table("customer_address")
-    web_site = ctx.get_table("web_site")
-
-    # Date filter
-    start_date = datetime(year, month, 1).date()
-    end_date = start_date + timedelta(days=60)
-
-    date_filtered = date_dim.filter((col("d_date") >= lit(start_date)) & (col("d_date") <= lit(end_date)))
-
-    # Filter customer_address by states
-    ca_filtered = customer_address.filter(col("ca_state").is_in(states))
-
-    # Filter web_site by company
-    ws_filtered = web_site.filter(col("web_company_name") == lit("pri"))
-
-    # Find orders shipped from multiple warehouses (CTE ws_wh)
-    # Platform-specific optimization: Polars is faster with n_unique,
-    # DataFusion is faster with self-join pattern
-    platform = getattr(ctx, "platform", "polars")
-    if platform == "datafusion":
-        # DataFusion: self-join pattern is 5x faster
-        order_warehouses = web_sales.select(["ws_order_number", "ws_warehouse_sk"]).unique()
-        multi_warehouse_orders = (
-            order_warehouses.join(
-                order_warehouses.rename({"ws_warehouse_sk": "ws_warehouse_sk_2"}),
-                on="ws_order_number",
-            )
-            .filter(col("ws_warehouse_sk") != col("ws_warehouse_sk_2"))
-            .select(["ws_order_number"])
-            .unique()
-        )
-    else:
-        # Polars/others: n_unique pattern is 7x faster
-        multi_warehouse_orders = (
-            web_sales.group_by("ws_order_number")
-            .agg(col("ws_warehouse_sk").n_unique().alias("num_warehouses"))
-            .filter(col("num_warehouses") > lit(1))
-            .select("ws_order_number")
-        )
-
-    # Get returned orders that are also multi-warehouse
-    returned_orders = (
-        web_returns.select(["wr_order_number"])
-        .join(multi_warehouse_orders, left_on="wr_order_number", right_on="ws_order_number")
-        .select(["wr_order_number"])
-        .unique()
-    )
-
-    # Main query
-    result = (
-        web_sales.join(date_filtered, left_on="ws_ship_date_sk", right_on="d_date_sk")
-        .join(ca_filtered, left_on="ws_ship_addr_sk", right_on="ca_address_sk")
-        .join(ws_filtered, left_on="ws_web_site_sk", right_on="web_site_sk")
-        # Semi-join: orders in multi_warehouse AND returned
-        .join(multi_warehouse_orders, on="ws_order_number", how="semi")
-        .join(returned_orders, left_on="ws_order_number", right_on="wr_order_number", how="semi")
-    )
-
-    # Aggregate
-    return result.select(
-        [
-            col("ws_order_number").n_unique().alias("order count"),
-            ctx.sum("ws_ext_ship_cost").alias("total shipping cost"),
-            ctx.sum("ws_net_profit").alias("total net profit"),
-        ]
-    )
-
-
-def q95_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q95: Web orders from multiple warehouses WITH returns (Pandas)."""
-    from datetime import datetime, timedelta
-
-    import pandas as pd
-
-    params = get_parameters(95)
-    year = params.get("year", 1999)
-    month = params.get("month", 2)
-    states = params.get("states", ["TX", "OR", "AZ"])
-
-    web_sales = ctx.get_table("web_sales")
-    web_returns = ctx.get_table("web_returns")
-    date_dim = ctx.get_table("date_dim")
-    customer_address = ctx.get_table("customer_address")
-    web_site = ctx.get_table("web_site")
-
-    # Date filter
-    start_date = datetime(year, month, 1).date()
-    end_date = start_date + timedelta(days=60)
-
-    date_filtered = date_dim[(date_dim["d_date"] >= start_date) & (date_dim["d_date"] <= end_date)]
-    ca_filtered = customer_address[customer_address["ca_state"].isin(states)]
-    ws_filtered = web_site[web_site["web_company_name"] == "pri"]
-
-    # Find orders with multiple warehouses (use ctx.groupby_size for Dask compatibility)
-    order_warehouses = web_sales[["ws_order_number", "ws_warehouse_sk"]].drop_duplicates()
-    ow_count = ctx.groupby_size(order_warehouses, "ws_order_number", name="wh_count")
-    multi_warehouse_orders = ow_count[ow_count["wh_count"] > 1][["ws_order_number"]]
-
-    # Get returned orders that are also multi-warehouse
-    returned_orders = web_returns[["wr_order_number"]].drop_duplicates()
-    returned_multi_wh = returned_orders.merge(
-        multi_warehouse_orders,
-        left_on="wr_order_number",
-        right_on="ws_order_number",
-    )[["wr_order_number"]]
-
-    # Main join
-    result = web_sales.merge(date_filtered[["d_date_sk"]], left_on="ws_ship_date_sk", right_on="d_date_sk")
-    result = result.merge(ca_filtered[["ca_address_sk"]], left_on="ws_ship_addr_sk", right_on="ca_address_sk")
-    result = result.merge(ws_filtered[["web_site_sk"]], left_on="ws_web_site_sk", right_on="web_site_sk")
-
-    # Semi-join with multi-warehouse AND returned
-    result = result.merge(multi_warehouse_orders, on="ws_order_number")
-    result = result.merge(returned_multi_wh, left_on="ws_order_number", right_on="wr_order_number")
-
-    # Aggregate
-    order_count = result["ws_order_number"].nunique()
-    total_shipping = result["ws_ext_ship_cost"].sum()
-    total_profit = result["ws_net_profit"].sum()
-
-    return pd.DataFrame(
-        {
-            "order count": [order_count],
-            "total shipping cost": [total_shipping],
-            "total net profit": [total_profit],
         }
     )
 
