@@ -1,13 +1,13 @@
 # UAT Framework — Design Document
 
-> **Status:** awaiting user approval before W2 (Python implementation begins).
+> **Status:** implemented; maintained as the UAT framework design contract.
 > **Source TODO:** `_project/TODO/main/planning/uat-framework-tests-uat-runner.yaml`
 > **Triggering finding:** `_project/blind-spots/2026-05-03-130000-stress-script-uat-driver-drift.md`
 > **Sibling spec (consumed, not duplicated):** `_project/specs/uat-methodology-blind-spot-remediation.md`
 > **Author inputs:**
 >   - retired stress-test shell workflow (superseded by `make uat-stress`)
 >   - `_project/handoffs/results-explorer-uat-retrospective-20260502.md` (the bespoke driver this spec replaces)
->   - `scripts/uat_validator_rollup.py` (Finding 2 deliverable; consumed as phase)
+>   - `benchbox.validation.bundle` (shared public bundle validator consumed by the validate phase)
 >   - `_project/DONE/main/active/uat-template-success-metric-terminal-state-and-gating.yaml` (Finding 3 vocab)
 
 ## 1. Reframe — what this spec is and is not
@@ -33,7 +33,7 @@ The 2026-05-02 sweep needed all of that plus:
   at safe boundaries)
 - sentinel file at sweep start for `find -newer` queries
 - matrix-summary TSV
-- validator-clean-rate roll-up (now in `scripts/uat_validator_rollup.py`)
+- validator-clean-rate roll-up (now in-process via `benchbox.validation.bundle`)
 - submission packaging with explicit terminal-state declaration
 - explorer build + Playwright smoke
 
@@ -54,7 +54,7 @@ This spec resolves *how UAT machinery is built and reused*. Sibling,
 not competitor. The two methodology TODOs ship the inputs this
 framework consumes:
 
-- `scripts/uat_validator_rollup.py` — invoked by `make uat-validate`
+- `benchbox.validation.bundle` — invoked in-process by `make uat-validate`
 - `submit_terminal_state` four-word vocab — read from YAML by
   `make uat-package`
 
@@ -87,7 +87,7 @@ tests/uat/
 ├── README.md                      # developer guide (W11 deliverable)
 ├── matrix.py                      # platform/benchmark enumeration + reachability
 ├── runner.py                      # single-cell execution (subprocess + timeout + log capture)
-├── config.py                      # YAML schema validation, dataclass-style config object
+├── config.py                      # typed YAML schema validation
 ├── timeouts.py                    # signal-based timeout wrapper
 ├── cleanup.py                     # reuse-aware datagen/databases cleanup
 ├── docker_assets.py               # UAT-owned Docker compose lifecycle helpers
@@ -95,9 +95,9 @@ tests/uat/
 ├── phases/
 │   ├── __init__.py
 │   ├── preflight.py               # disk, docker, noisy-neighbor scan
-│   ├── enumerate.py               # registry-driven matrix with min/max scale enforcement
+│   ├── enumerate.py               # registry-driven cell helper used by execute
 │   ├── execute.py                 # iterates ladder, invokes runner per cell, applies cleanup
-│   ├── validate.py                # subprocess wrapper around scripts/uat_validator_rollup.py
+│   ├── validate.py                # in-process bundle validation + validator TSV
 │   ├── package.py                 # invokes benchbox submit per submit_terminal_state
 │   ├── explorer_smoke.py          # uv run -- python _project/scripts/explorer_publish.py build + Playwright via results-explorer/scripts/serve-browser-tests.mjs
 │   └── report.py                  # TSV roll-up + cross-scale coverage assertion
@@ -115,15 +115,15 @@ tests/uat/
 |---|---|---|
 | `matrix.py` | Port maps, `--platform-option` tables, CLI flags, uv-extra map, TCP probe with cache, registry-driven benchmark enumeration | 250 |
 | `runner.py` | Build `benchbox run` argv per cell; capture stdout+stderr to per-run log; extract result-JSON path | 120 |
-| `config.py` | Load YAML, validate against schema (Section 3), expose typed access | 180 |
+| `config.py` | Load YAML, validate against schema (Section 3), expose typed dataclass access | 180 |
 | `timeouts.py` | Signal-based timeout (POSIX process-group kill ladder) | 80 |
 | `cleanup.py` | Track cell completions; prune `databases/` at safe reuse boundaries; preserve `datagen/` | 150 |
 | `docker_assets.py` | Map Docker-backed UAT platforms to compose files; build safe project-scoped compose commands | 180 |
 | `ladder.py` | Per-(platform, benchmark) rung order; wall-clock and exit-code early-stop; pruning bookkeeping | 100 |
 | `phases/preflight.py` | Disk space (configurable cutoff), docker reachability, host load reading | 80 |
-| `phases/enumerate.py` | Resolve final cell list given config filters and registry truth; honour min/max scale | 100 |
+| `phases/enumerate.py` | Resolve final cell list for execute given config filters and registry truth; honour min/max scale | 100 |
 | `phases/execute.py` | Sequential iteration over (platform, benchmark, rung); invokes runner+ladder+cleanup; owns Docker platform-boundary lifecycle | 220 |
-| `phases/validate.py` | `subprocess.run(["uv","run","--","python","scripts/uat_validator_rollup.py", ...])`; consume TSV | 60 |
+| `phases/validate.py` | Call `benchbox.validation.bundle` in-process; write validator TSV; compute clean-rate floor | 100 |
 | `phases/package.py` | Read `submit_terminal_state`; invoke `benchbox submit --output` or `--service`; for `draft-pr`/`merged-to-published-results`, open PR vs `published-results` (auto-merge per state) | 130 |
 | `phases/explorer_smoke.py` | `uv run -- python _project/scripts/explorer_publish.py build` + `node results-explorer/scripts/serve-browser-tests.mjs` | 60 |
 | `phases/report.py` | Read each phase's outputs; emit `matrix_summary.tsv`; cross-scale coverage check | 130 |
@@ -715,8 +715,9 @@ cost.
 | Artifact | Action | Owner |
 |---|---|---|
 | retired shell stress workflow | Removed; `make uat-stress` is the sole local stress entrypoint | W11 |
-| `scripts/uat_validator_rollup.py` | Unchanged; framework consumes its public CLI | (no change) |
-| `scripts/validate_submission.py` | Unchanged; only invoked transitively via the rollup | (no change) |
+| `scripts/uat_validator_rollup.py` | Removed; `tests/uat/phases/validate.py` owns the roll-up in-process | follow-up W5 |
+| `scripts/validate_submission.py` | Thin CLI wrapper around `benchbox.validation.bundle`; still used by published-results CI | follow-up W4 |
+| `benchbox/validation/bundle.py` | Shared public bundle validator mirrored to `published-results` with the script wrapper | follow-up W4 |
 | `~/Developer/benchmark_runs/logs/uat_20260502/` | Snapshot a copy of `matrix_summary.tsv` to `tests/uat/fixtures/uat-2026-05-02-matrix-summary.tsv` for the W10 parity test | W10 |
 | `_project/handoffs/results-explorer-uat-retrospective-20260502.md` | No retrofit; historical document | (no change) |
 | `tests/uat/configs/uat-2026-05-02.yaml` | New file at W10; HISTORICAL | W10 |
@@ -755,6 +756,8 @@ make uat-stress PLATFORM=duckdb BENCHMARK=tpch
 make uat-sweep CONFIG=tests/uat/configs/uat-2026-05-02.yaml DRY_RUN=1
 uv run -- python -m pytest -m fast -q
 test ! -f scripts/local_stress_test.sh
+test ! -f scripts/uat_validator_rollup.py
+uv run -- python -m tests.uat._cli --help
 uv run -- python -m pytest tests/uat/test_no_cli_surface_drift.py -q
 ```
 
@@ -786,7 +789,7 @@ uv run -- python -m pytest tests/uat/test_no_cli_surface_drift.py -q
 - Source blind-spot: `_project/blind-spots/2026-05-03-130000-stress-script-uat-driver-drift.md`
 - Sibling spec (consumed): `_project/specs/uat-methodology-blind-spot-remediation.md`
 - 2026-05-02 sweep retrospective: `_project/handoffs/results-explorer-uat-retrospective-20260502.md`
-- Methodology helper (consumed): `scripts/uat_validator_rollup.py`
+- Bundle validator (consumed): `benchbox.validation.bundle`
 - Retired shell stress workflow: superseded by `make uat-stress`
 - Self-bias caveat: `_project/blind-spots/2026-05-03-084354-stress-test-self-bias.md`
 - Spec ergonomics caveat: `_project/blind-spots/2026-05-03-084923-spec-approval-ergonomics.md`

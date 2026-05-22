@@ -1,9 +1,10 @@
 # UAT Framework — Operator Guide
 
-The UAT framework lives at `tests/uat/`. It composes seven phases —
-preflight, enumerate, execute, validate, package, explorer-smoke,
-report — driven by YAML configs under `tests/uat/configs/`. Configs
-declare what to run; the framework runs it.
+The UAT framework lives at `tests/uat/`. It composes six configured
+phases — preflight, execute, validate, package, explorer-smoke, report —
+driven by YAML configs under `tests/uat/configs/`. Configs declare what
+to run; the framework runs it. Cell enumeration is internal to the
+execute phase, not a public phase.
 
 This is **operator** documentation — what to type, what to read.
 The design contract is `_project/specs/uat-framework.md`. The
@@ -23,6 +24,7 @@ developer guide for hacking on the framework itself is
 | Explorer build + Playwright smoke | `make uat-explorer-smoke BUNDLES_DIR=<path> OUTPUT_DIR=<path> LOG_DIR=<path>` |
 | TSV roll-up from a cells JSONL | `make uat-report CELLS_JSONL=<path> OUTPUT_TSV=<path>` |
 | Single-phase execute (already-validated config) | `make uat-execute CONFIG=<path>` |
+| Discover subcommands and options | `uv run -- python -m tests.uat._cli --help` |
 
 ## Output artefacts
 
@@ -223,12 +225,13 @@ candidate, executed, compatibility-pruned, early-stop-pruned, passed, failed,
 and timed-out counts. Early-stop pruning is separate from compatibility
 pruning and must not be treated as a pass or a compatibility exclusion.
 
-## Frozen vs editable configs
+## Historical vs editable configs
 
-Files under `tests/uat/configs/` are either FROZEN historical replays
-(first line `# FROZEN`) or editable templates (first line `# TEMPLATE`).
-Hashes for FROZEN files live in `.frozen-hashes.json`; PR CI fails on
-edits. New sweeps clone an existing config:
+Files under `tests/uat/configs/` are either historical replay evidence
+(first line `# HISTORICAL`) or editable templates (first line
+`# TEMPLATE`). Historical configs are reviewed as evidence, but there is
+no hash ceremony or `.frozen-hashes.json` guard. New sweeps clone an
+existing config:
 
 ```bash
 cp tests/uat/configs/uat-2026-05-02.yaml tests/uat/configs/uat-<new>.yaml
@@ -254,5 +257,5 @@ around this.
 | Compose stack startup timeout | image pull/build or healthcheck exceeded `cleanup.docker_start_timeout_s` | inspect the compose logs and raise the timeout only after confirming the service is healthy |
 | Cleanup command failed | UAT-owned `docker compose down ...` returned non-zero | inspect `uat_lifecycle.log`, then run the logged command manually if safe |
 | Fixed `container_name` collision | a compose file declares a global container name already in use | stop the conflicting developer stack or keep that platform external-only until the compose file is fixed |
-| Validator clean rate breaches floor | bundle quality regression | run `make uat-validate` standalone, inspect rollup TSV |
+| Validator clean rate breaches floor | bundle quality regression | run `make uat-validate` standalone; it validates via `benchbox.validation.bundle` and writes the rollup TSV |
 | Make target missing | new release not synced | `make worktree-pool-status` to check pool freshness |
