@@ -24,2347 +24,581 @@
 # Copyright 2026 Joe Harris / BenchBox Project
 # Licensed under the MIT License.
 #
+# NOTE: Catalog body is compact YAML; parsed data must remain identical.
+
 version: 1
 queries:
-
-# =============================================================================
-# Schema Discovery Queries
-# =============================================================================
-
 - id: schema_list_schemata
   category: schema
   description: List all schemas in the current catalog
-  sql: |2
-    SELECT
-        schema_name,
-        catalog_name
-    FROM information_schema.schemata
-    ORDER BY schema_name;
+  sql: "SELECT\n    schema_name,\n    catalog_name\nFROM information_schema.schemata\nORDER BY schema_name;\n"
   variants:
-    clickhouse: |2
-      SELECT
-          name AS schema_name,
-          'default' AS catalog_name
-      FROM system.databases
-      ORDER BY name;
-
+    clickhouse: "SELECT\n    name AS schema_name,\n    'default' AS catalog_name\nFROM system.databases\nORDER BY name;\n"
 - id: schema_list_tables
   category: schema
   description: List all tables in the current schema
-  sql: |2
-    SELECT
-        table_name,
-        table_type,
-        table_schema
-    FROM information_schema.tables
-    WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-    ORDER BY table_name;
+  sql: "SELECT\n    table_name,\n    table_type,\n    table_schema\nFROM information_schema.tables\nWHERE table_schema NOT IN ('information_schema', 'pg_catalog')\nORDER BY table_name;\n"
   variants:
-    clickhouse: |2
-      SELECT
-          name AS table_name,
-          engine AS table_type,
-          database AS table_schema
-      FROM system.tables
-      WHERE database NOT IN ('system', 'INFORMATION_SCHEMA')
-      ORDER BY name;
-    snowflake: |2
-      SELECT
-          table_name,
-          table_type,
-          table_schema
-      FROM information_schema.tables
-      WHERE table_schema NOT IN ('INFORMATION_SCHEMA')
-      ORDER BY table_name;
-    bigquery: |2
-      SELECT
-          table_name,
-          table_type,
-          table_schema
-      FROM INFORMATION_SCHEMA.TABLES
-      ORDER BY table_name;
-
+    clickhouse: "SELECT\n    name AS table_name,\n    engine AS table_type,\n    database AS table_schema\nFROM system.tables\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA')\nORDER BY name;\n"
+    snowflake: "SELECT\n    table_name,\n    table_type,\n    table_schema\nFROM information_schema.tables\nWHERE table_schema NOT IN ('INFORMATION_SCHEMA')\nORDER BY table_name;\n"
+    bigquery: "SELECT\n    table_name,\n    table_type,\n    table_schema\nFROM INFORMATION_SCHEMA.TABLES\nORDER BY table_name;\n"
 - id: schema_list_tables_filtered
   category: schema
   description: List tables matching a pattern
-  sql: |2
-    SELECT
-        table_name,
-        table_type
-    FROM information_schema.tables
-    WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-      AND table_name LIKE '%line%'
-    ORDER BY table_name;
+  sql: "SELECT\n    table_name,\n    table_type\nFROM information_schema.tables\nWHERE table_schema NOT IN ('information_schema', 'pg_catalog')\n  AND table_name LIKE '%line%'\nORDER BY table_name;\n"
   variants:
-    clickhouse: |2
-      SELECT
-          name AS table_name,
-          engine AS table_type
-      FROM system.tables
-      WHERE database NOT IN ('system', 'INFORMATION_SCHEMA')
-        AND name LIKE '%line%'
-      ORDER BY name;
-
+    clickhouse: "SELECT\n    name AS table_name,\n    engine AS table_type\nFROM system.tables\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA')\n  AND name LIKE '%line%'\nORDER BY name;\n"
 - id: schema_table_count
   category: schema
   description: Count total tables in catalog
-  sql: |2
-    SELECT COUNT(*) AS table_count
-    FROM information_schema.tables
-    WHERE table_schema NOT IN ('information_schema', 'pg_catalog');
+  sql: "SELECT COUNT(*) AS table_count\nFROM information_schema.tables\nWHERE table_schema NOT IN ('information_schema', 'pg_catalog');\n"
   variants:
-    clickhouse: |2
-      SELECT COUNT(*) AS table_count
-      FROM system.tables
-      WHERE database NOT IN ('system', 'INFORMATION_SCHEMA');
-
+    clickhouse: "SELECT COUNT(*) AS table_count\nFROM system.tables\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA');\n"
 - id: schema_list_views
   category: schema
   description: List all views in the catalog
-  sql: |2
-    SELECT
-        table_name AS view_name,
-        table_schema AS view_schema,
-        view_definition
-    FROM information_schema.views
-    ORDER BY table_name;
-  skip_on: [clickhouse]
+  sql: "SELECT\n    table_name AS view_name,\n    table_schema AS view_schema,\n    view_definition\nFROM information_schema.views\nORDER BY table_name;\n"
+  skip_on:
+  - clickhouse
   variants:
-    snowflake: |2
-      SELECT
-          table_name AS view_name,
-          table_schema AS view_schema,
-          view_definition
-      FROM information_schema.views
-      ORDER BY table_name;
-    duckdb: |2
-      SELECT
-          view_name,
-          schema_name AS view_schema,
-          sql AS view_definition
-      FROM duckdb_views()
-      ORDER BY view_name;
-
+    snowflake: "SELECT\n    table_name AS view_name,\n    table_schema AS view_schema,\n    view_definition\nFROM information_schema.views\nORDER BY table_name;\n"
+    duckdb: "SELECT\n    view_name,\n    schema_name AS view_schema,\n    sql AS view_definition\nFROM duckdb_views()\nORDER BY view_name;\n"
 - id: schema_object_types
   category: schema
   description: Count objects by type
-  sql: |2
-    SELECT
-        table_type,
-        COUNT(*) AS object_count
-    FROM information_schema.tables
-    WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-    GROUP BY table_type
-    ORDER BY object_count DESC;
+  sql: "SELECT\n    table_type,\n    COUNT(*) AS object_count\nFROM information_schema.tables\nWHERE table_schema NOT IN ('information_schema', 'pg_catalog')\nGROUP BY table_type\nORDER BY object_count DESC;\n"
   variants:
-    clickhouse: |2
-      SELECT
-          engine AS table_type,
-          COUNT(*) AS object_count
-      FROM system.tables
-      WHERE database NOT IN ('system', 'INFORMATION_SCHEMA')
-      GROUP BY engine
-      ORDER BY object_count DESC;
-
+    clickhouse: "SELECT\n    engine AS table_type,\n    COUNT(*) AS object_count\nFROM system.tables\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA')\nGROUP BY engine\nORDER BY object_count DESC;\n"
 - id: schema_search_tables
   category: schema
   description: Search for tables by partial name match
-  sql: |2
-    SELECT
-        table_schema,
-        table_name,
-        table_type
-    FROM information_schema.tables
-    WHERE table_name LIKE '%order%'
-       OR table_name LIKE '%customer%'
-    ORDER BY table_schema, table_name;
+  sql: "SELECT\n    table_schema,\n    table_name,\n    table_type\nFROM information_schema.tables\nWHERE table_name LIKE '%order%'\n   OR table_name LIKE '%customer%'\nORDER BY table_schema, table_name;\n"
   variants:
-    clickhouse: |2
-      SELECT
-          database AS table_schema,
-          name AS table_name,
-          engine AS table_type
-      FROM system.tables
-      WHERE name LIKE '%order%'
-         OR name LIKE '%customer%'
-      ORDER BY database, name;
-
+    clickhouse: "SELECT\n    database AS table_schema,\n    name AS table_name,\n    engine AS table_type\nFROM system.tables\nWHERE name LIKE '%order%'\n   OR name LIKE '%customer%'\nORDER BY database, name;\n"
 - id: schema_tables_by_schema
   category: schema
   description: Group tables by schema with counts
-  sql: |2
-    SELECT
-        table_schema,
-        COUNT(*) AS table_count,
-        SUM(CASE WHEN table_type = 'BASE TABLE' THEN 1 ELSE 0 END) AS base_tables,
-        SUM(CASE WHEN table_type = 'VIEW' THEN 1 ELSE 0 END) AS views
-    FROM information_schema.tables
-    WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-    GROUP BY table_schema
-    ORDER BY table_count DESC;
+  sql: "SELECT\n    table_schema,\n    COUNT(*) AS table_count,\n    SUM(CASE WHEN table_type = 'BASE TABLE' THEN 1 ELSE 0 END) AS base_tables,\n    SUM(CASE WHEN table_type = 'VIEW' THEN 1 ELSE 0 END) AS views\nFROM information_schema.tables\nWHERE table_schema NOT IN ('information_schema', 'pg_catalog')\nGROUP BY table_schema\nORDER BY table_count DESC;\n"
   variants:
-    clickhouse: |2
-      SELECT
-          database AS table_schema,
-          COUNT(*) AS table_count,
-          countIf(engine != 'View') AS base_tables,
-          countIf(engine = 'View') AS views
-      FROM system.tables
-      WHERE database NOT IN ('system', 'INFORMATION_SCHEMA')
-      GROUP BY database
-      ORDER BY table_count DESC;
-
+    clickhouse: "SELECT\n    database AS table_schema,\n    COUNT(*) AS table_count,\n    countIf(engine != 'View') AS base_tables,\n    countIf(engine = 'View') AS views\nFROM system.tables\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA')\nGROUP BY database\nORDER BY table_count DESC;\n"
 - id: schema_recent_tables
   category: schema
   description: List tables with creation timestamps (where available)
-  sql: |2
-    SELECT
-        table_schema,
-        table_name,
-        table_type
-    FROM information_schema.tables
-    WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-    ORDER BY table_name
-    LIMIT 20;
+  sql: "SELECT\n    table_schema,\n    table_name,\n    table_type\nFROM information_schema.tables\nWHERE table_schema NOT IN ('information_schema', 'pg_catalog')\nORDER BY table_name\nLIMIT 20;\n"
   variants:
-    clickhouse: |2
-      SELECT
-          database AS table_schema,
-          name AS table_name,
-          engine AS table_type,
-          metadata_modification_time
-      FROM system.tables
-      WHERE database NOT IN ('system', 'INFORMATION_SCHEMA')
-      ORDER BY metadata_modification_time DESC
-      LIMIT 20;
-    snowflake: |2
-      SELECT
-          table_schema,
-          table_name,
-          table_type,
-          created
-      FROM information_schema.tables
-      WHERE table_schema NOT IN ('INFORMATION_SCHEMA')
-      ORDER BY created DESC
-      LIMIT 20;
-
-# =============================================================================
-# Column Introspection Queries
-# =============================================================================
-
+    clickhouse: "SELECT\n    database AS table_schema,\n    name AS table_name,\n    engine AS table_type,\n    metadata_modification_time\nFROM system.tables\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA')\nORDER BY metadata_modification_time DESC\nLIMIT 20;\n"
+    snowflake: "SELECT\n    table_schema,\n    table_name,\n    table_type,\n    created\nFROM information_schema.tables\nWHERE table_schema NOT IN ('INFORMATION_SCHEMA')\nORDER BY created DESC\nLIMIT 20;\n"
 - id: column_list_all
   category: column
   description: List all columns for all tables
-  sql: |2
-    SELECT
-        table_schema,
-        table_name,
-        column_name,
-        data_type,
-        ordinal_position
-    FROM information_schema.columns
-    WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-    ORDER BY table_schema, table_name, ordinal_position;
+  sql: "SELECT\n    table_schema,\n    table_name,\n    column_name,\n    data_type,\n    ordinal_position\nFROM information_schema.columns\nWHERE table_schema NOT IN ('information_schema', 'pg_catalog')\nORDER BY table_schema, table_name, ordinal_position;\n"
   variants:
-    clickhouse: |2
-      SELECT
-          database AS table_schema,
-          table AS table_name,
-          name AS column_name,
-          type AS data_type,
-          position AS ordinal_position
-      FROM system.columns
-      WHERE database NOT IN ('system', 'INFORMATION_SCHEMA')
-      ORDER BY database, table, position;
-
+    clickhouse: "SELECT\n    database AS table_schema,\n    table AS table_name,\n    name AS column_name,\n    type AS data_type,\n    position AS ordinal_position\nFROM system.columns\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA')\nORDER BY database, table, position;\n"
 - id: column_for_table
   category: column
   description: List columns for a specific table (lineitem)
-  sql: |2
-    SELECT
-        column_name,
-        data_type,
-        is_nullable,
-        column_default,
-        ordinal_position
-    FROM information_schema.columns
-    WHERE table_name = 'lineitem'
-    ORDER BY ordinal_position;
+  sql: "SELECT\n    column_name,\n    data_type,\n    is_nullable,\n    column_default,\n    ordinal_position\nFROM information_schema.columns\nWHERE table_name = 'lineitem'\nORDER BY ordinal_position;\n"
   variants:
-    clickhouse: |2
-      SELECT
-          name AS column_name,
-          type AS data_type,
-          '' AS is_nullable,
-          default_expression AS column_default,
-          position AS ordinal_position
-      FROM system.columns
-      WHERE table = 'lineitem'
-      ORDER BY position;
-
+    clickhouse: "SELECT\n    name AS column_name,\n    type AS data_type,\n    '' AS is_nullable,\n    default_expression AS column_default,\n    position AS ordinal_position\nFROM system.columns\nWHERE table = 'lineitem'\nORDER BY position;\n"
 - id: column_count_by_table
   category: column
   description: Count columns per table
-  sql: |2
-    SELECT
-        table_schema,
-        table_name,
-        COUNT(*) AS column_count
-    FROM information_schema.columns
-    WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-    GROUP BY table_schema, table_name
-    ORDER BY column_count DESC;
+  sql: "SELECT\n    table_schema,\n    table_name,\n    COUNT(*) AS column_count\nFROM information_schema.columns\nWHERE table_schema NOT IN ('information_schema', 'pg_catalog')\nGROUP BY table_schema, table_name\nORDER BY column_count DESC;\n"
   variants:
-    clickhouse: |2
-      SELECT
-          database AS table_schema,
-          table AS table_name,
-          COUNT(*) AS column_count
-      FROM system.columns
-      WHERE database NOT IN ('system', 'INFORMATION_SCHEMA')
-      GROUP BY database, table
-      ORDER BY column_count DESC;
-
+    clickhouse: "SELECT\n    database AS table_schema,\n    table AS table_name,\n    COUNT(*) AS column_count\nFROM system.columns\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA')\nGROUP BY database, table\nORDER BY column_count DESC;\n"
 - id: column_data_types
   category: column
   description: Distribution of data types across all columns
-  sql: |2
-    SELECT
-        data_type,
-        COUNT(*) AS column_count
-    FROM information_schema.columns
-    WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-    GROUP BY data_type
-    ORDER BY column_count DESC;
+  sql: "SELECT\n    data_type,\n    COUNT(*) AS column_count\nFROM information_schema.columns\nWHERE table_schema NOT IN ('information_schema', 'pg_catalog')\nGROUP BY data_type\nORDER BY column_count DESC;\n"
   variants:
-    clickhouse: |2
-      SELECT
-          type AS data_type,
-          COUNT(*) AS column_count
-      FROM system.columns
-      WHERE database NOT IN ('system', 'INFORMATION_SCHEMA')
-      GROUP BY type
-      ORDER BY column_count DESC;
-
+    clickhouse: "SELECT\n    type AS data_type,\n    COUNT(*) AS column_count\nFROM system.columns\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA')\nGROUP BY type\nORDER BY column_count DESC;\n"
 - id: column_nullable_analysis
   category: column
   description: Count nullable vs non-nullable columns
-  sql: |2
-    SELECT
-        table_name,
-        SUM(CASE WHEN is_nullable = 'YES' THEN 1 ELSE 0 END) AS nullable_count,
-        SUM(CASE WHEN is_nullable = 'NO' THEN 1 ELSE 0 END) AS not_nullable_count
-    FROM information_schema.columns
-    WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-    GROUP BY table_name
-    ORDER BY table_name;
+  sql: "SELECT\n    table_name,\n    SUM(CASE WHEN is_nullable = 'YES' THEN 1 ELSE 0 END) AS nullable_count,\n    SUM(CASE WHEN is_nullable = 'NO' THEN 1 ELSE 0 END) AS not_nullable_count\nFROM information_schema.columns\nWHERE table_schema NOT IN ('information_schema', 'pg_catalog')\nGROUP BY table_name\nORDER BY table_name;\n"
   variants:
-    clickhouse: |2
-      SELECT
-          table AS table_name,
-          0 AS nullable_count,
-          COUNT(*) AS not_nullable_count
-      FROM system.columns
-      WHERE database NOT IN ('system', 'INFORMATION_SCHEMA')
-      GROUP BY table
-      ORDER BY table;
-
+    clickhouse: "SELECT\n    table AS table_name,\n    0 AS nullable_count,\n    COUNT(*) AS not_nullable_count\nFROM system.columns\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA')\nGROUP BY table\nORDER BY table;\n"
 - id: column_search_by_name
   category: column
   description: Find columns matching a pattern
-  sql: |2
-    SELECT
-        table_schema,
-        table_name,
-        column_name,
-        data_type
-    FROM information_schema.columns
-    WHERE column_name LIKE '%price%'
-       OR column_name LIKE '%cost%'
-    ORDER BY table_name, column_name;
+  sql: "SELECT\n    table_schema,\n    table_name,\n    column_name,\n    data_type\nFROM information_schema.columns\nWHERE column_name LIKE '%price%'\n   OR column_name LIKE '%cost%'\nORDER BY table_name, column_name;\n"
   variants:
-    clickhouse: |2
-      SELECT
-          database AS table_schema,
-          table AS table_name,
-          name AS column_name,
-          type AS data_type
-      FROM system.columns
-      WHERE name LIKE '%price%'
-         OR name LIKE '%cost%'
-      ORDER BY table, name;
-
+    clickhouse: "SELECT\n    database AS table_schema,\n    table AS table_name,\n    name AS column_name,\n    type AS data_type\nFROM system.columns\nWHERE name LIKE '%price%'\n   OR name LIKE '%cost%'\nORDER BY table, name;\n"
 - id: column_numeric_columns
   category: column
   description: List all numeric columns
-  sql: |2
-    SELECT
-        table_name,
-        column_name,
-        data_type,
-        numeric_precision,
-        numeric_scale
-    FROM information_schema.columns
-    WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-      AND data_type IN ('integer', 'bigint', 'smallint', 'decimal', 'numeric', 'real', 'double precision', 'float')
-    ORDER BY table_name, column_name;
+  sql: "SELECT\n    table_name,\n    column_name,\n    data_type,\n    numeric_precision,\n    numeric_scale\nFROM information_schema.columns\nWHERE table_schema NOT IN ('information_schema', 'pg_catalog')\n  AND data_type IN ('integer', 'bigint', 'smallint', 'decimal', 'numeric', 'real', 'double precision', 'float')\nORDER BY table_name, column_name;\n"
   variants:
-    duckdb: |2
-      SELECT
-          table_name,
-          column_name,
-          data_type,
-          numeric_precision,
-          numeric_scale
-      FROM information_schema.columns
-      WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-        AND data_type IN ('INTEGER', 'BIGINT', 'SMALLINT', 'DECIMAL', 'DOUBLE', 'FLOAT', 'REAL', 'HUGEINT', 'UINTEGER', 'UBIGINT')
-      ORDER BY table_name, column_name;
-    clickhouse: |2
-      SELECT
-          table AS table_name,
-          name AS column_name,
-          type AS data_type,
-          0 AS numeric_precision,
-          0 AS numeric_scale
-      FROM system.columns
-      WHERE database NOT IN ('system', 'INFORMATION_SCHEMA')
-        AND (type LIKE 'Int%' OR type LIKE 'UInt%' OR type LIKE 'Float%' OR type LIKE 'Decimal%')
-      ORDER BY table, name;
-
+    duckdb: "SELECT\n    table_name,\n    column_name,\n    data_type,\n    numeric_precision,\n    numeric_scale\nFROM information_schema.columns\nWHERE table_schema NOT IN ('information_schema', 'pg_catalog')\n  AND data_type IN ('INTEGER', 'BIGINT', 'SMALLINT', 'DECIMAL', 'DOUBLE', 'FLOAT', 'REAL', 'HUGEINT', 'UINTEGER', 'UBIGINT')\nORDER BY table_name, column_name;\n"
+    clickhouse: "SELECT\n    table AS table_name,\n    name AS column_name,\n    type AS data_type,\n    0 AS numeric_precision,\n    0 AS numeric_scale\nFROM system.columns\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA')\n  AND (type LIKE 'Int%' OR type LIKE 'UInt%' OR type LIKE 'Float%' OR type LIKE 'Decimal%')\nORDER BY table, name;\n"
 - id: column_string_columns
   category: column
   description: List all string/text columns
-  sql: |2
-    SELECT
-        table_name,
-        column_name,
-        data_type,
-        character_maximum_length
-    FROM information_schema.columns
-    WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-      AND data_type IN ('character varying', 'varchar', 'text', 'char', 'character')
-    ORDER BY table_name, column_name;
+  sql: "SELECT\n    table_name,\n    column_name,\n    data_type,\n    character_maximum_length\nFROM information_schema.columns\nWHERE table_schema NOT IN ('information_schema', 'pg_catalog')\n  AND data_type IN ('character varying', 'varchar', 'text', 'char', 'character')\nORDER BY table_name, column_name;\n"
   variants:
-    duckdb: |2
-      SELECT
-          table_name,
-          column_name,
-          data_type,
-          character_maximum_length
-      FROM information_schema.columns
-      WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-        AND data_type = 'VARCHAR'
-      ORDER BY table_name, column_name;
-    clickhouse: |2
-      SELECT
-          table AS table_name,
-          name AS column_name,
-          type AS data_type,
-          0 AS character_maximum_length
-      FROM system.columns
-      WHERE database NOT IN ('system', 'INFORMATION_SCHEMA')
-        AND (type = 'String' OR type LIKE 'FixedString%')
-      ORDER BY table, name;
-
-# =============================================================================
-# Table Statistics Queries
-# =============================================================================
-
+    duckdb: "SELECT\n    table_name,\n    column_name,\n    data_type,\n    character_maximum_length\nFROM information_schema.columns\nWHERE table_schema NOT IN ('information_schema', 'pg_catalog')\n  AND data_type = 'VARCHAR'\nORDER BY table_name, column_name;\n"
+    clickhouse: "SELECT\n    table AS table_name,\n    name AS column_name,\n    type AS data_type,\n    0 AS character_maximum_length\nFROM system.columns\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA')\n  AND (type = 'String' OR type LIKE 'FixedString%')\nORDER BY table, name;\n"
 - id: stats_row_counts
   category: stats
   description: Estimated row counts per table
-  sql: |2
-    SELECT
-        table_schema,
-        table_name,
-        table_type
-    FROM information_schema.tables
-    WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-      AND table_type = 'BASE TABLE'
-    ORDER BY table_name;
+  sql: "SELECT\n    table_schema,\n    table_name,\n    table_type\nFROM information_schema.tables\nWHERE table_schema NOT IN ('information_schema', 'pg_catalog')\n  AND table_type = 'BASE TABLE'\nORDER BY table_name;\n"
   variants:
-    clickhouse: |2
-      SELECT
-          database AS table_schema,
-          name AS table_name,
-          total_rows AS estimated_rows,
-          total_bytes AS size_bytes
-      FROM system.tables
-      WHERE database NOT IN ('system', 'INFORMATION_SCHEMA')
-      ORDER BY total_rows DESC;
-    snowflake: |2
-      SELECT
-          table_schema,
-          table_name,
-          row_count AS estimated_rows,
-          bytes AS size_bytes
-      FROM information_schema.tables
-      WHERE table_schema NOT IN ('INFORMATION_SCHEMA')
-        AND table_type = 'BASE TABLE'
-      ORDER BY row_count DESC;
-    bigquery: |2
-      SELECT
-          table_schema,
-          table_name,
-          row_count AS estimated_rows,
-          size_bytes
-      FROM INFORMATION_SCHEMA.TABLE_STORAGE
-      ORDER BY row_count DESC;
-
+    clickhouse: "SELECT\n    database AS table_schema,\n    name AS table_name,\n    total_rows AS estimated_rows,\n    total_bytes AS size_bytes\nFROM system.tables\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA')\nORDER BY total_rows DESC;\n"
+    snowflake: "SELECT\n    table_schema,\n    table_name,\n    row_count AS estimated_rows,\n    bytes AS size_bytes\nFROM information_schema.tables\nWHERE table_schema NOT IN ('INFORMATION_SCHEMA')\n  AND table_type = 'BASE TABLE'\nORDER BY row_count DESC;\n"
+    bigquery: "SELECT\n    table_schema,\n    table_name,\n    row_count AS estimated_rows,\n    size_bytes\nFROM INFORMATION_SCHEMA.TABLE_STORAGE\nORDER BY row_count DESC;\n"
 - id: stats_table_sizes
   category: stats
   description: Table storage sizes (where available)
-  sql: |2
-    SELECT
-        table_schema,
-        table_name
-    FROM information_schema.tables
-    WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-      AND table_type = 'BASE TABLE'
-    ORDER BY table_name;
+  sql: "SELECT\n    table_schema,\n    table_name\nFROM information_schema.tables\nWHERE table_schema NOT IN ('information_schema', 'pg_catalog')\n  AND table_type = 'BASE TABLE'\nORDER BY table_name;\n"
   variants:
-    clickhouse: |2
-      SELECT
-          database AS table_schema,
-          name AS table_name,
-          total_bytes AS size_bytes,
-          total_rows
-      FROM system.tables
-      WHERE database NOT IN ('system', 'INFORMATION_SCHEMA')
-        AND total_bytes > 0
-      ORDER BY total_bytes DESC;
-    snowflake: |2
-      SELECT
-          table_schema,
-          table_name,
-          bytes AS size_bytes,
-          row_count
-      FROM information_schema.tables
-      WHERE table_schema NOT IN ('INFORMATION_SCHEMA')
-        AND table_type = 'BASE TABLE'
-        AND bytes > 0
-      ORDER BY bytes DESC;
-    duckdb: |2
-      SELECT
-          schema_name AS table_schema,
-          table_name,
-          estimated_size AS size_bytes,
-          estimated_size / 1024 / 1024 AS size_mb
-      FROM duckdb_tables()
-      WHERE schema_name NOT IN ('information_schema', 'pg_catalog')
-      ORDER BY estimated_size DESC;
-
+    clickhouse: "SELECT\n    database AS table_schema,\n    name AS table_name,\n    total_bytes AS size_bytes,\n    total_rows\nFROM system.tables\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA')\n  AND total_bytes > 0\nORDER BY total_bytes DESC;\n"
+    snowflake: "SELECT\n    table_schema,\n    table_name,\n    bytes AS size_bytes,\n    row_count\nFROM information_schema.tables\nWHERE table_schema NOT IN ('INFORMATION_SCHEMA')\n  AND table_type = 'BASE TABLE'\n  AND bytes > 0\nORDER BY bytes DESC;\n"
+    duckdb: "SELECT\n    schema_name AS table_schema,\n    table_name,\n    estimated_size AS size_bytes,\n    estimated_size / 1024 / 1024 AS size_mb\nFROM duckdb_tables()\nWHERE schema_name NOT IN ('information_schema', 'pg_catalog')\nORDER BY estimated_size DESC;\n"
 - id: stats_column_count_summary
   category: stats
   description: Summary statistics about table structures
-  sql: |2
-    SELECT
-        COUNT(DISTINCT table_name) AS total_tables,
-        COUNT(*) AS total_columns,
-        CAST(COUNT(*) AS FLOAT) / COUNT(DISTINCT table_name) AS avg_columns_per_table
-    FROM information_schema.columns
-    WHERE table_schema NOT IN ('information_schema', 'pg_catalog');
+  sql: "SELECT\n    COUNT(DISTINCT table_name) AS total_tables,\n    COUNT(*) AS total_columns,\n    CAST(COUNT(*) AS FLOAT) / COUNT(DISTINCT table_name) AS avg_columns_per_table\nFROM information_schema.columns\nWHERE table_schema NOT IN ('information_schema', 'pg_catalog');\n"
   variants:
-    clickhouse: |2
-      SELECT
-          uniq(table) AS total_tables,
-          COUNT(*) AS total_columns,
-          COUNT(*) / uniq(table) AS avg_columns_per_table
-      FROM system.columns
-      WHERE database NOT IN ('system', 'INFORMATION_SCHEMA');
-
+    clickhouse: "SELECT\n    uniq(table) AS total_tables,\n    COUNT(*) AS total_columns,\n    COUNT(*) / uniq(table) AS avg_columns_per_table\nFROM system.columns\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA');\n"
 - id: stats_schema_summary
   category: stats
   description: Summary of database schema structure
-  sql: |2
-    SELECT
-        table_schema,
-        COUNT(DISTINCT table_name) AS table_count,
-        COUNT(*) AS total_columns
-    FROM information_schema.columns
-    WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-    GROUP BY table_schema
-    ORDER BY table_count DESC;
+  sql: "SELECT\n    table_schema,\n    COUNT(DISTINCT table_name) AS table_count,\n    COUNT(*) AS total_columns\nFROM information_schema.columns\nWHERE table_schema NOT IN ('information_schema', 'pg_catalog')\nGROUP BY table_schema\nORDER BY table_count DESC;\n"
   variants:
-    clickhouse: |2
-      SELECT
-          database AS table_schema,
-          uniq(table) AS table_count,
-          COUNT(*) AS total_columns
-      FROM system.columns
-      WHERE database NOT IN ('system', 'INFORMATION_SCHEMA')
-      GROUP BY database
-      ORDER BY table_count DESC;
-
+    clickhouse: "SELECT\n    database AS table_schema,\n    uniq(table) AS table_count,\n    COUNT(*) AS total_columns\nFROM system.columns\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA')\nGROUP BY database\nORDER BY table_count DESC;\n"
 - id: stats_data_type_summary
   category: stats
   description: Summary of data types used in schema
-  sql: |2
-    SELECT
-        data_type,
-        COUNT(*) AS usage_count,
-        COUNT(DISTINCT table_name) AS tables_using
-    FROM information_schema.columns
-    WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-    GROUP BY data_type
-    ORDER BY usage_count DESC
-    LIMIT 20;
+  sql: "SELECT\n    data_type,\n    COUNT(*) AS usage_count,\n    COUNT(DISTINCT table_name) AS tables_using\nFROM information_schema.columns\nWHERE table_schema NOT IN ('information_schema', 'pg_catalog')\nGROUP BY data_type\nORDER BY usage_count DESC\nLIMIT 20;\n"
   variants:
-    clickhouse: |2
-      SELECT
-          type AS data_type,
-          COUNT(*) AS usage_count,
-          uniq(table) AS tables_using
-      FROM system.columns
-      WHERE database NOT IN ('system', 'INFORMATION_SCHEMA')
-      GROUP BY type
-      ORDER BY usage_count DESC
-      LIMIT 20;
-
+    clickhouse: "SELECT\n    type AS data_type,\n    COUNT(*) AS usage_count,\n    uniq(table) AS tables_using\nFROM system.columns\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA')\nGROUP BY type\nORDER BY usage_count DESC\nLIMIT 20;\n"
 - id: stats_largest_tables
   category: stats
   description: Find tables with most columns
-  sql: |2
-    SELECT
-        table_schema,
-        table_name,
-        COUNT(*) AS column_count
-    FROM information_schema.columns
-    WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-    GROUP BY table_schema, table_name
-    ORDER BY column_count DESC
-    LIMIT 10;
+  sql: "SELECT\n    table_schema,\n    table_name,\n    COUNT(*) AS column_count\nFROM information_schema.columns\nWHERE table_schema NOT IN ('information_schema', 'pg_catalog')\nGROUP BY table_schema, table_name\nORDER BY column_count DESC\nLIMIT 10;\n"
   variants:
-    clickhouse: |2
-      SELECT
-          database AS table_schema,
-          table AS table_name,
-          COUNT(*) AS column_count
-      FROM system.columns
-      WHERE database NOT IN ('system', 'INFORMATION_SCHEMA')
-      GROUP BY database, table
-      ORDER BY column_count DESC
-      LIMIT 10;
-
-# =============================================================================
-# Query Introspection
-# =============================================================================
-
+    clickhouse: "SELECT\n    database AS table_schema,\n    table AS table_name,\n    COUNT(*) AS column_count\nFROM system.columns\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA')\nGROUP BY database, table\nORDER BY column_count DESC\nLIMIT 10;\n"
 - id: query_explain_simple
   category: query
   description: EXPLAIN plan for a simple query
-  sql: |2
-    EXPLAIN SELECT * FROM information_schema.tables LIMIT 10;
+  sql: "EXPLAIN SELECT * FROM information_schema.tables LIMIT 10;\n"
   variants:
-    snowflake: |2
-      EXPLAIN SELECT * FROM information_schema.tables LIMIT 10;
-    bigquery: |2
-      SELECT * FROM INFORMATION_SCHEMA.TABLES LIMIT 10;
-    clickhouse: |2
-      EXPLAIN SELECT * FROM system.tables LIMIT 10;
-
+    snowflake: "EXPLAIN SELECT * FROM information_schema.tables LIMIT 10;\n"
+    bigquery: "SELECT * FROM INFORMATION_SCHEMA.TABLES LIMIT 10;\n"
+    clickhouse: "EXPLAIN SELECT * FROM system.tables LIMIT 10;\n"
 - id: query_explain_join
   category: query
   description: EXPLAIN plan for a join query
-  sql: |2
-    EXPLAIN
-    SELECT t.table_name, c.column_name
-    FROM information_schema.tables t
-    JOIN information_schema.columns c
-      ON t.table_name = c.table_name
-      AND t.table_schema = c.table_schema
-    WHERE t.table_schema NOT IN ('information_schema', 'pg_catalog')
-    LIMIT 100;
+  sql: "EXPLAIN\nSELECT t.table_name, c.column_name\nFROM information_schema.tables t\nJOIN information_schema.columns c\n  ON t.table_name = c.table_name\n  AND t.table_schema = c.table_schema\nWHERE t.table_schema NOT IN ('information_schema', 'pg_catalog')\nLIMIT 100;\n"
   variants:
-    clickhouse: |2
-      EXPLAIN
-      SELECT t.name AS table_name, c.name AS column_name
-      FROM system.tables t
-      JOIN system.columns c ON t.name = c.table AND t.database = c.database
-      WHERE t.database NOT IN ('system', 'INFORMATION_SCHEMA')
-      LIMIT 100;
-    bigquery: |2
-      SELECT t.table_name, c.column_name
-      FROM INFORMATION_SCHEMA.TABLES t
-      JOIN INFORMATION_SCHEMA.COLUMNS c
-        ON t.table_name = c.table_name
-        AND t.table_schema = c.table_schema
-      LIMIT 100;
-
+    clickhouse: "EXPLAIN\nSELECT t.name AS table_name, c.name AS column_name\nFROM system.tables t\nJOIN system.columns c ON t.name = c.table AND t.database = c.database\nWHERE t.database NOT IN ('system', 'INFORMATION_SCHEMA')\nLIMIT 100;\n"
+    bigquery: "SELECT t.table_name, c.column_name\nFROM INFORMATION_SCHEMA.TABLES t\nJOIN INFORMATION_SCHEMA.COLUMNS c\n  ON t.table_name = c.table_name\n  AND t.table_schema = c.table_schema\nLIMIT 100;\n"
 - id: query_explain_aggregate
   category: query
   description: EXPLAIN plan for an aggregate query
-  sql: |2
-    EXPLAIN
-    SELECT
-        table_schema,
-        COUNT(*) AS table_count,
-        SUM(CASE WHEN table_type = 'BASE TABLE' THEN 1 ELSE 0 END) AS base_tables
-    FROM information_schema.tables
-    WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-    GROUP BY table_schema;
+  sql: "EXPLAIN\nSELECT\n    table_schema,\n    COUNT(*) AS table_count,\n    SUM(CASE WHEN table_type = 'BASE TABLE' THEN 1 ELSE 0 END) AS base_tables\nFROM information_schema.tables\nWHERE table_schema NOT IN ('information_schema', 'pg_catalog')\nGROUP BY table_schema;\n"
   variants:
-    clickhouse: |2
-      EXPLAIN
-      SELECT
-          database AS table_schema,
-          COUNT(*) AS table_count,
-          countIf(engine != 'View') AS base_tables
-      FROM system.tables
-      WHERE database NOT IN ('system', 'INFORMATION_SCHEMA')
-      GROUP BY database;
-    bigquery: |2
-      SELECT
-          table_schema,
-          COUNT(*) AS table_count,
-          COUNTIF(table_type = 'BASE TABLE') AS base_tables
-      FROM INFORMATION_SCHEMA.TABLES
-      GROUP BY table_schema;
-
+    clickhouse: "EXPLAIN\nSELECT\n    database AS table_schema,\n    COUNT(*) AS table_count,\n    countIf(engine != 'View') AS base_tables\nFROM system.tables\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA')\nGROUP BY database;\n"
+    bigquery: "SELECT\n    table_schema,\n    COUNT(*) AS table_count,\n    COUNTIF(table_type = 'BASE TABLE') AS base_tables\nFROM INFORMATION_SCHEMA.TABLES\nGROUP BY table_schema;\n"
 - id: query_list_constraints
   category: query
   description: List table constraints (where available)
-  sql: |2
-    SELECT
-        table_schema,
-        table_name,
-        constraint_name,
-        constraint_type
-    FROM information_schema.table_constraints
-    WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-    ORDER BY table_name, constraint_type;
-  skip_on: [clickhouse, bigquery]
+  sql: "SELECT\n    table_schema,\n    table_name,\n    constraint_name,\n    constraint_type\nFROM information_schema.table_constraints\nWHERE table_schema NOT IN ('information_schema', 'pg_catalog')\nORDER BY table_name, constraint_type;\n"
+  skip_on:
+  - clickhouse
+  - bigquery
   variants:
-    duckdb: |2
-      SELECT
-          schema_name AS table_schema,
-          table_name,
-          constraint_text AS constraint_name,
-          constraint_type
-      FROM duckdb_constraints()
-      WHERE schema_name NOT IN ('information_schema', 'pg_catalog')
-      ORDER BY table_name, constraint_type;
-
-# =============================================================================
-# Wide Table Metadata Queries (Complexity Testing)
-# =============================================================================
-# These queries test metadata introspection performance on tables with many columns.
-# Used with MetadataGenerator to stress test column enumeration operations.
-
+    duckdb: "SELECT\n    schema_name AS table_schema,\n    table_name,\n    constraint_text AS constraint_name,\n    constraint_type\nFROM duckdb_constraints()\nWHERE schema_name NOT IN ('information_schema', 'pg_catalog')\nORDER BY table_name, constraint_type;\n"
 - id: wide_table_column_list
   category: wide_table
   description: List all columns from wide benchmark tables
-  sql: |2
-    SELECT
-        table_name,
-        column_name,
-        data_type,
-        ordinal_position
-    FROM information_schema.columns
-    WHERE table_name LIKE 'benchbox_wide_%'
-    ORDER BY table_name, ordinal_position;
+  sql: "SELECT\n    table_name,\n    column_name,\n    data_type,\n    ordinal_position\nFROM information_schema.columns\nWHERE table_name LIKE 'benchbox_wide_%'\nORDER BY table_name, ordinal_position;\n"
   variants:
-    clickhouse: |2
-      SELECT
-          table AS table_name,
-          name AS column_name,
-          type AS data_type,
-          position AS ordinal_position
-      FROM system.columns
-      WHERE table LIKE 'benchbox_wide_%'
-      ORDER BY table, position;
-
+    clickhouse: "SELECT\n    table AS table_name,\n    name AS column_name,\n    type AS data_type,\n    position AS ordinal_position\nFROM system.columns\nWHERE table LIKE 'benchbox_wide_%'\nORDER BY table, position;\n"
 - id: wide_table_column_count
   category: wide_table
   description: Count columns in wide benchmark tables
-  sql: |2
-    SELECT
-        table_name,
-        COUNT(*) AS column_count
-    FROM information_schema.columns
-    WHERE table_name LIKE 'benchbox_wide_%'
-    GROUP BY table_name
-    ORDER BY column_count DESC;
+  sql: "SELECT\n    table_name,\n    COUNT(*) AS column_count\nFROM information_schema.columns\nWHERE table_name LIKE 'benchbox_wide_%'\nGROUP BY table_name\nORDER BY column_count DESC;\n"
   variants:
-    clickhouse: |2
-      SELECT
-          table AS table_name,
-          COUNT(*) AS column_count
-      FROM system.columns
-      WHERE table LIKE 'benchbox_wide_%'
-      GROUP BY table
-      ORDER BY column_count DESC;
-
+    clickhouse: "SELECT\n    table AS table_name,\n    COUNT(*) AS column_count\nFROM system.columns\nWHERE table LIKE 'benchbox_wide_%'\nGROUP BY table\nORDER BY column_count DESC;\n"
 - id: wide_table_type_distribution
   category: wide_table
   description: Analyze data type distribution in wide tables
-  sql: |2
-    SELECT
-        table_name,
-        data_type,
-        COUNT(*) AS type_count,
-        COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (PARTITION BY table_name) AS percentage
-    FROM information_schema.columns
-    WHERE table_name LIKE 'benchbox_wide_%'
-    GROUP BY table_name, data_type
-    ORDER BY table_name, type_count DESC;
+  sql: "SELECT\n    table_name,\n    data_type,\n    COUNT(*) AS type_count,\n    COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (PARTITION BY table_name) AS percentage\nFROM information_schema.columns\nWHERE table_name LIKE 'benchbox_wide_%'\nGROUP BY table_name, data_type\nORDER BY table_name, type_count DESC;\n"
   variants:
-    clickhouse: |2
-      SELECT
-          table AS table_name,
-          type AS data_type,
-          COUNT(*) AS type_count
-      FROM system.columns
-      WHERE table LIKE 'benchbox_wide_%'
-      GROUP BY table, type
-      ORDER BY table, type_count DESC;
-
+    clickhouse: "SELECT\n    table AS table_name,\n    type AS data_type,\n    COUNT(*) AS type_count\nFROM system.columns\nWHERE table LIKE 'benchbox_wide_%'\nGROUP BY table, type\nORDER BY table, type_count DESC;\n"
 - id: wide_table_nullable_analysis
   category: wide_table
   description: Analyze nullable columns in wide tables
-  sql: |2
-    SELECT
-        table_name,
-        SUM(CASE WHEN is_nullable = 'YES' THEN 1 ELSE 0 END) AS nullable_count,
-        SUM(CASE WHEN is_nullable = 'NO' THEN 1 ELSE 0 END) AS not_null_count,
-        COUNT(*) AS total_columns
-    FROM information_schema.columns
-    WHERE table_name LIKE 'benchbox_wide_%'
-    GROUP BY table_name;
+  sql: "SELECT\n    table_name,\n    SUM(CASE WHEN is_nullable = 'YES' THEN 1 ELSE 0 END) AS nullable_count,\n    SUM(CASE WHEN is_nullable = 'NO' THEN 1 ELSE 0 END) AS not_null_count,\n    COUNT(*) AS total_columns\nFROM information_schema.columns\nWHERE table_name LIKE 'benchbox_wide_%'\nGROUP BY table_name;\n"
   variants:
-    clickhouse: |2
-      SELECT
-          table AS table_name,
-          0 AS nullable_count,
-          COUNT(*) AS not_null_count,
-          COUNT(*) AS total_columns
-      FROM system.columns
-      WHERE table LIKE 'benchbox_wide_%'
-      GROUP BY table;
-
+    clickhouse: "SELECT\n    table AS table_name,\n    0 AS nullable_count,\n    COUNT(*) AS not_null_count,\n    COUNT(*) AS total_columns\nFROM system.columns\nWHERE table LIKE 'benchbox_wide_%'\nGROUP BY table;\n"
 - id: wide_table_column_search
   category: wide_table
   description: Search for specific column patterns in wide tables
-  sql: |2
-    SELECT
-        table_name,
-        column_name,
-        data_type,
-        ordinal_position
-    FROM information_schema.columns
-    WHERE table_name LIKE 'benchbox_wide_%'
-      AND (column_name LIKE '%integer%' OR column_name LIKE '%varchar%')
-    ORDER BY table_name, ordinal_position
-    LIMIT 100;
+  sql: "SELECT\n    table_name,\n    column_name,\n    data_type,\n    ordinal_position\nFROM information_schema.columns\nWHERE table_name LIKE 'benchbox_wide_%'\n  AND (column_name LIKE '%integer%' OR column_name LIKE '%varchar%')\nORDER BY table_name, ordinal_position\nLIMIT 100;\n"
   variants:
-    clickhouse: |2
-      SELECT
-          table AS table_name,
-          name AS column_name,
-          type AS data_type,
-          position AS ordinal_position
-      FROM system.columns
-      WHERE table LIKE 'benchbox_wide_%'
-        AND (name LIKE '%integer%' OR name LIKE '%varchar%')
-      ORDER BY table, position
-      LIMIT 100;
-
-# =============================================================================
-# View Hierarchy Queries (Complexity Testing)
-# =============================================================================
-# These queries test metadata introspection on nested view hierarchies.
-# Used with MetadataGenerator to stress test view dependency resolution.
-
+    clickhouse: "SELECT\n    table AS table_name,\n    name AS column_name,\n    type AS data_type,\n    position AS ordinal_position\nFROM system.columns\nWHERE table LIKE 'benchbox_wide_%'\n  AND (name LIKE '%integer%' OR name LIKE '%varchar%')\nORDER BY table, position\nLIMIT 100;\n"
 - id: view_hierarchy_list
   category: view_hierarchy
   description: List all benchmark views in hierarchy
-  sql: |2
-    SELECT
-        table_name AS view_name,
-        view_definition
-    FROM information_schema.views
-    WHERE table_name LIKE 'benchbox_view_%'
-    ORDER BY table_name;
-  skip_on: [clickhouse]
+  sql: "SELECT\n    table_name AS view_name,\n    view_definition\nFROM information_schema.views\nWHERE table_name LIKE 'benchbox_view_%'\nORDER BY table_name;\n"
+  skip_on:
+  - clickhouse
   variants:
-    duckdb: |2
-      SELECT
-          view_name,
-          sql AS view_definition
-      FROM duckdb_views()
-      WHERE view_name LIKE 'benchbox_view_%'
-      ORDER BY view_name;
-
+    duckdb: "SELECT\n    view_name,\n    sql AS view_definition\nFROM duckdb_views()\nWHERE view_name LIKE 'benchbox_view_%'\nORDER BY view_name;\n"
 - id: view_hierarchy_depth_analysis
   category: view_hierarchy
   description: Analyze view naming pattern for depth levels
-  sql: |2
-    SELECT
-        table_name AS view_name,
-        CASE
-            WHEN table_name LIKE '%_d1' THEN 1
-            WHEN table_name LIKE '%_d2' THEN 2
-            WHEN table_name LIKE '%_d3' THEN 3
-            WHEN table_name LIKE '%_d4' THEN 4
-            WHEN table_name LIKE '%_d5' THEN 5
-            ELSE 0
-        END AS depth_level
-    FROM information_schema.views
-    WHERE table_name LIKE 'benchbox_view_%'
-    ORDER BY depth_level, table_name;
-  skip_on: [clickhouse]
+  sql: "SELECT\n    table_name AS view_name,\n    CASE\n        WHEN table_name LIKE '%_d1' THEN 1\n        WHEN table_name LIKE '%_d2' THEN 2\n        WHEN table_name LIKE '%_d3' THEN 3\n        WHEN table_name LIKE '%_d4' THEN 4\n        WHEN table_name LIKE '%_d5' THEN 5\n        ELSE 0\n    END AS depth_level\nFROM information_schema.views\nWHERE table_name LIKE 'benchbox_view_%'\nORDER BY depth_level, table_name;\n"
+  skip_on:
+  - clickhouse
   variants:
-    duckdb: |2
-      SELECT
-          view_name,
-          CASE
-              WHEN view_name LIKE '%_d1' THEN 1
-              WHEN view_name LIKE '%_d2' THEN 2
-              WHEN view_name LIKE '%_d3' THEN 3
-              WHEN view_name LIKE '%_d4' THEN 4
-              WHEN view_name LIKE '%_d5' THEN 5
-              ELSE 0
-          END AS depth_level
-      FROM duckdb_views()
-      WHERE view_name LIKE 'benchbox_view_%'
-      ORDER BY depth_level, view_name;
-
+    duckdb: "SELECT\n    view_name,\n    CASE\n        WHEN view_name LIKE '%_d1' THEN 1\n        WHEN view_name LIKE '%_d2' THEN 2\n        WHEN view_name LIKE '%_d3' THEN 3\n        WHEN view_name LIKE '%_d4' THEN 4\n        WHEN view_name LIKE '%_d5' THEN 5\n        ELSE 0\n    END AS depth_level\nFROM duckdb_views()\nWHERE view_name LIKE 'benchbox_view_%'\nORDER BY depth_level, view_name;\n"
 - id: view_hierarchy_column_introspection
   category: view_hierarchy
   description: List columns exposed by views at each hierarchy level
-  sql: |2
-    SELECT
-        v.table_name AS view_name,
-        c.column_name,
-        c.data_type
-    FROM information_schema.views v
-    JOIN information_schema.columns c
-      ON v.table_name = c.table_name
-      AND v.table_schema = c.table_schema
-    WHERE v.table_name LIKE 'benchbox_view_%'
-    ORDER BY v.table_name, c.ordinal_position;
-  skip_on: [clickhouse]
+  sql: "SELECT\n    v.table_name AS view_name,\n    c.column_name,\n    c.data_type\nFROM information_schema.views v\nJOIN information_schema.columns c\n  ON v.table_name = c.table_name\n  AND v.table_schema = c.table_schema\nWHERE v.table_name LIKE 'benchbox_view_%'\nORDER BY v.table_name, c.ordinal_position;\n"
+  skip_on:
+  - clickhouse
   variants:
-    duckdb: |2
-      SELECT
-          v.view_name,
-          c.column_name,
-          c.data_type
-      FROM duckdb_views() v
-      JOIN information_schema.columns c
-        ON v.view_name = c.table_name
-      WHERE v.view_name LIKE 'benchbox_view_%'
-      ORDER BY v.view_name, c.ordinal_position;
-
+    duckdb: "SELECT\n    v.view_name,\n    c.column_name,\n    c.data_type\nFROM duckdb_views() v\nJOIN information_schema.columns c\n  ON v.view_name = c.table_name\nWHERE v.view_name LIKE 'benchbox_view_%'\nORDER BY v.view_name, c.ordinal_position;\n"
 - id: view_hierarchy_definition_search
   category: view_hierarchy
   description: Search view definitions for source table references
-  sql: |2
-    SELECT
-        table_name AS view_name,
-        view_definition,
-        LENGTH(view_definition) AS definition_length
-    FROM information_schema.views
-    WHERE table_name LIKE 'benchbox_view_%'
-      AND view_definition LIKE '%benchbox%'
-    ORDER BY table_name;
-  skip_on: [clickhouse]
+  sql: "SELECT\n    table_name AS view_name,\n    view_definition,\n    LENGTH(view_definition) AS definition_length\nFROM information_schema.views\nWHERE table_name LIKE 'benchbox_view_%'\n  AND view_definition LIKE '%benchbox%'\nORDER BY table_name;\n"
+  skip_on:
+  - clickhouse
   variants:
-    duckdb: |2
-      SELECT
-          view_name,
-          sql AS view_definition,
-          LENGTH(sql) AS definition_length
-      FROM duckdb_views()
-      WHERE view_name LIKE 'benchbox_view_%'
-        AND sql LIKE '%benchbox%'
-      ORDER BY view_name;
-
-# =============================================================================
-# Complex Type Queries (Complexity Testing)
-# =============================================================================
-# These queries test metadata introspection on complex data types (ARRAY, STRUCT, MAP).
-# Used with MetadataGenerator to stress test type parsing and introspection.
-
+    duckdb: "SELECT\n    view_name,\n    sql AS view_definition,\n    LENGTH(sql) AS definition_length\nFROM duckdb_views()\nWHERE view_name LIKE 'benchbox_view_%'\n  AND sql LIKE '%benchbox%'\nORDER BY view_name;\n"
 - id: complex_type_column_list
   category: complex_type
   description: List columns with complex data types
-  sql: |2
-    SELECT
-        table_name,
-        column_name,
-        data_type
-    FROM information_schema.columns
-    WHERE table_name LIKE 'benchbox_complex_%'
-    ORDER BY table_name, ordinal_position;
+  sql: "SELECT\n    table_name,\n    column_name,\n    data_type\nFROM information_schema.columns\nWHERE table_name LIKE 'benchbox_complex_%'\nORDER BY table_name, ordinal_position;\n"
   variants:
-    clickhouse: |2
-      SELECT
-          table AS table_name,
-          name AS column_name,
-          type AS data_type
-      FROM system.columns
-      WHERE table LIKE 'benchbox_complex_%'
-      ORDER BY table, position;
-
+    clickhouse: "SELECT\n    table AS table_name,\n    name AS column_name,\n    type AS data_type\nFROM system.columns\nWHERE table LIKE 'benchbox_complex_%'\nORDER BY table, position;\n"
 - id: complex_type_array_columns
   category: complex_type
   description: Find all array-type columns
-  sql: |2
-    SELECT
-        table_name,
-        column_name,
-        data_type
-    FROM information_schema.columns
-    WHERE table_name LIKE 'benchbox_%'
-      AND (data_type LIKE '%[]%' OR data_type LIKE 'ARRAY%')
-    ORDER BY table_name, column_name;
+  sql: "SELECT\n    table_name,\n    column_name,\n    data_type\nFROM information_schema.columns\nWHERE table_name LIKE 'benchbox_%'\n  AND (data_type LIKE '%[]%' OR data_type LIKE 'ARRAY%')\nORDER BY table_name, column_name;\n"
   variants:
-    duckdb: |2
-      SELECT
-          table_name,
-          column_name,
-          data_type
-      FROM information_schema.columns
-      WHERE table_name LIKE 'benchbox_%'
-        AND data_type LIKE '%[]'
-      ORDER BY table_name, column_name;
-    clickhouse: |2
-      SELECT
-          table AS table_name,
-          name AS column_name,
-          type AS data_type
-      FROM system.columns
-      WHERE table LIKE 'benchbox_%'
-        AND type LIKE 'Array%'
-      ORDER BY table, name;
-    snowflake: |2
-      SELECT
-          table_name,
-          column_name,
-          data_type
-      FROM information_schema.columns
-      WHERE table_name LIKE 'benchbox_%'
-        AND data_type = 'ARRAY'
-      ORDER BY table_name, column_name;
-    bigquery: |2
-      SELECT
-          table_name,
-          column_name,
-          data_type
-      FROM INFORMATION_SCHEMA.COLUMNS
-      WHERE table_name LIKE 'benchbox_%'
-        AND data_type LIKE 'ARRAY%'
-      ORDER BY table_name, column_name;
-
+    duckdb: "SELECT\n    table_name,\n    column_name,\n    data_type\nFROM information_schema.columns\nWHERE table_name LIKE 'benchbox_%'\n  AND data_type LIKE '%[]'\nORDER BY table_name, column_name;\n"
+    clickhouse: "SELECT\n    table AS table_name,\n    name AS column_name,\n    type AS data_type\nFROM system.columns\nWHERE table LIKE 'benchbox_%'\n  AND type LIKE 'Array%'\nORDER BY table, name;\n"
+    snowflake: "SELECT\n    table_name,\n    column_name,\n    data_type\nFROM information_schema.columns\nWHERE table_name LIKE 'benchbox_%'\n  AND data_type = 'ARRAY'\nORDER BY table_name, column_name;\n"
+    bigquery: "SELECT\n    table_name,\n    column_name,\n    data_type\nFROM INFORMATION_SCHEMA.COLUMNS\nWHERE table_name LIKE 'benchbox_%'\n  AND data_type LIKE 'ARRAY%'\nORDER BY table_name, column_name;\n"
 - id: complex_type_struct_columns
   category: complex_type
   description: Find all struct/object-type columns
-  sql: |2
-    SELECT
-        table_name,
-        column_name,
-        data_type
-    FROM information_schema.columns
-    WHERE table_name LIKE 'benchbox_%'
-      AND (data_type LIKE 'STRUCT%' OR data_type LIKE 'ROW%')
-    ORDER BY table_name, column_name;
+  sql: "SELECT\n    table_name,\n    column_name,\n    data_type\nFROM information_schema.columns\nWHERE table_name LIKE 'benchbox_%'\n  AND (data_type LIKE 'STRUCT%' OR data_type LIKE 'ROW%')\nORDER BY table_name, column_name;\n"
   variants:
-    duckdb: |2
-      SELECT
-          table_name,
-          column_name,
-          data_type
-      FROM information_schema.columns
-      WHERE table_name LIKE 'benchbox_%'
-        AND data_type LIKE 'STRUCT%'
-      ORDER BY table_name, column_name;
-    clickhouse: |2
-      SELECT
-          table AS table_name,
-          name AS column_name,
-          type AS data_type
-      FROM system.columns
-      WHERE table LIKE 'benchbox_%'
-        AND type LIKE 'Tuple%'
-      ORDER BY table, name;
-    snowflake: |2
-      SELECT
-          table_name,
-          column_name,
-          data_type
-      FROM information_schema.columns
-      WHERE table_name LIKE 'benchbox_%'
-        AND data_type = 'OBJECT'
-      ORDER BY table_name, column_name;
-    bigquery: |2
-      SELECT
-          table_name,
-          column_name,
-          data_type
-      FROM INFORMATION_SCHEMA.COLUMNS
-      WHERE table_name LIKE 'benchbox_%'
-        AND data_type LIKE 'STRUCT%'
-      ORDER BY table_name, column_name;
-
+    duckdb: "SELECT\n    table_name,\n    column_name,\n    data_type\nFROM information_schema.columns\nWHERE table_name LIKE 'benchbox_%'\n  AND data_type LIKE 'STRUCT%'\nORDER BY table_name, column_name;\n"
+    clickhouse: "SELECT\n    table AS table_name,\n    name AS column_name,\n    type AS data_type\nFROM system.columns\nWHERE table LIKE 'benchbox_%'\n  AND type LIKE 'Tuple%'\nORDER BY table, name;\n"
+    snowflake: "SELECT\n    table_name,\n    column_name,\n    data_type\nFROM information_schema.columns\nWHERE table_name LIKE 'benchbox_%'\n  AND data_type = 'OBJECT'\nORDER BY table_name, column_name;\n"
+    bigquery: "SELECT\n    table_name,\n    column_name,\n    data_type\nFROM INFORMATION_SCHEMA.COLUMNS\nWHERE table_name LIKE 'benchbox_%'\n  AND data_type LIKE 'STRUCT%'\nORDER BY table_name, column_name;\n"
 - id: complex_type_map_columns
   category: complex_type
   description: Find all map/object-type columns
-  sql: |2
-    SELECT
-        table_name,
-        column_name,
-        data_type
-    FROM information_schema.columns
-    WHERE table_name LIKE 'benchbox_%'
-      AND data_type LIKE 'MAP%'
-    ORDER BY table_name, column_name;
-  skip_on: [snowflake, bigquery]
+  sql: "SELECT\n    table_name,\n    column_name,\n    data_type\nFROM information_schema.columns\nWHERE table_name LIKE 'benchbox_%'\n  AND data_type LIKE 'MAP%'\nORDER BY table_name, column_name;\n"
+  skip_on:
+  - snowflake
+  - bigquery
   variants:
-    duckdb: |2
-      SELECT
-          table_name,
-          column_name,
-          data_type
-      FROM information_schema.columns
-      WHERE table_name LIKE 'benchbox_%'
-        AND data_type LIKE 'MAP%'
-      ORDER BY table_name, column_name;
-    clickhouse: |2
-      SELECT
-          table AS table_name,
-          name AS column_name,
-          type AS data_type
-      FROM system.columns
-      WHERE table LIKE 'benchbox_%'
-        AND type LIKE 'Map%'
-      ORDER BY table, name;
-    databricks: |2
-      SELECT
-          table_name,
-          column_name,
-          data_type
-      FROM information_schema.columns
-      WHERE table_name LIKE 'benchbox_%'
-        AND data_type LIKE 'MAP%'
-      ORDER BY table_name, column_name;
-
+    duckdb: "SELECT\n    table_name,\n    column_name,\n    data_type\nFROM information_schema.columns\nWHERE table_name LIKE 'benchbox_%'\n  AND data_type LIKE 'MAP%'\nORDER BY table_name, column_name;\n"
+    clickhouse: "SELECT\n    table AS table_name,\n    name AS column_name,\n    type AS data_type\nFROM system.columns\nWHERE table LIKE 'benchbox_%'\n  AND type LIKE 'Map%'\nORDER BY table, name;\n"
+    databricks: "SELECT\n    table_name,\n    column_name,\n    data_type\nFROM information_schema.columns\nWHERE table_name LIKE 'benchbox_%'\n  AND data_type LIKE 'MAP%'\nORDER BY table_name, column_name;\n"
 - id: complex_type_distribution
   category: complex_type
   description: Distribution of complex vs scalar types
-  sql: |2
-    SELECT
-        table_name,
-        SUM(CASE
-            WHEN data_type LIKE '%[]%' OR data_type LIKE 'ARRAY%'
-                 OR data_type LIKE 'STRUCT%' OR data_type LIKE 'MAP%'
-            THEN 1 ELSE 0
-        END) AS complex_columns,
-        SUM(CASE
-            WHEN data_type NOT LIKE '%[]%' AND data_type NOT LIKE 'ARRAY%'
-                 AND data_type NOT LIKE 'STRUCT%' AND data_type NOT LIKE 'MAP%'
-            THEN 1 ELSE 0
-        END) AS scalar_columns
-    FROM information_schema.columns
-    WHERE table_name LIKE 'benchbox_%'
-    GROUP BY table_name
-    ORDER BY table_name;
+  sql: "SELECT\n    table_name,\n    SUM(CASE\n        WHEN data_type LIKE '%[]%' OR data_type LIKE 'ARRAY%'\n             OR data_type LIKE 'STRUCT%' OR data_type LIKE 'MAP%'\n        THEN 1 ELSE 0\n    END) AS complex_columns,\n    SUM(CASE\n        WHEN data_type NOT LIKE '%[]%' AND data_type NOT LIKE 'ARRAY%'\n             AND data_type NOT LIKE 'STRUCT%' AND data_type NOT LIKE 'MAP%'\n        THEN 1 ELSE 0\n    END) AS scalar_columns\nFROM information_schema.columns\nWHERE table_name LIKE 'benchbox_%'\nGROUP BY table_name\nORDER BY table_name;\n"
   variants:
-    clickhouse: |2
-      SELECT
-          table AS table_name,
-          countIf(type LIKE 'Array%' OR type LIKE 'Tuple%' OR type LIKE 'Map%') AS complex_columns,
-          countIf(type NOT LIKE 'Array%' AND type NOT LIKE 'Tuple%' AND type NOT LIKE 'Map%') AS scalar_columns
-      FROM system.columns
-      WHERE table LIKE 'benchbox_%'
-      GROUP BY table
-      ORDER BY table;
-
-# =============================================================================
-# Large Catalog Queries (Complexity Testing)
-# =============================================================================
-# These queries test metadata introspection on catalogs with many tables.
-# Used with MetadataGenerator to stress test catalog scanning operations.
-
+    clickhouse: "SELECT\n    table AS table_name,\n    countIf(type LIKE 'Array%' OR type LIKE 'Tuple%' OR type LIKE 'Map%') AS complex_columns,\n    countIf(type NOT LIKE 'Array%' AND type NOT LIKE 'Tuple%' AND type NOT LIKE 'Map%') AS scalar_columns\nFROM system.columns\nWHERE table LIKE 'benchbox_%'\nGROUP BY table\nORDER BY table;\n"
 - id: large_catalog_table_list
   category: large_catalog
   description: List all benchmark catalog tables
-  sql: |2
-    SELECT
-        table_name,
-        table_type
-    FROM information_schema.tables
-    WHERE table_name LIKE 'benchbox_catalog_%'
-    ORDER BY table_name;
+  sql: "SELECT\n    table_name,\n    table_type\nFROM information_schema.tables\nWHERE table_name LIKE 'benchbox_catalog_%'\nORDER BY table_name;\n"
   variants:
-    clickhouse: |2
-      SELECT
-          name AS table_name,
-          engine AS table_type
-      FROM system.tables
-      WHERE name LIKE 'benchbox_catalog_%'
-      ORDER BY name;
-
+    clickhouse: "SELECT\n    name AS table_name,\n    engine AS table_type\nFROM system.tables\nWHERE name LIKE 'benchbox_catalog_%'\nORDER BY name;\n"
 - id: large_catalog_table_count
   category: large_catalog
   description: Count benchmark catalog tables
-  sql: |2
-    SELECT COUNT(*) AS table_count
-    FROM information_schema.tables
-    WHERE table_name LIKE 'benchbox_catalog_%';
+  sql: "SELECT COUNT(*) AS table_count\nFROM information_schema.tables\nWHERE table_name LIKE 'benchbox_catalog_%';\n"
   variants:
-    clickhouse: |2
-      SELECT COUNT(*) AS table_count
-      FROM system.tables
-      WHERE name LIKE 'benchbox_catalog_%';
-
+    clickhouse: "SELECT COUNT(*) AS table_count\nFROM system.tables\nWHERE name LIKE 'benchbox_catalog_%';\n"
 - id: large_catalog_column_count
   category: large_catalog
   description: Total columns across all catalog tables
-  sql: |2
-    SELECT
-        COUNT(*) AS total_columns,
-        COUNT(DISTINCT table_name) AS total_tables,
-        CAST(COUNT(*) AS FLOAT) / NULLIF(COUNT(DISTINCT table_name), 0) AS avg_columns_per_table
-    FROM information_schema.columns
-    WHERE table_name LIKE 'benchbox_catalog_%';
+  sql: "SELECT\n    COUNT(*) AS total_columns,\n    COUNT(DISTINCT table_name) AS total_tables,\n    CAST(COUNT(*) AS FLOAT) / NULLIF(COUNT(DISTINCT table_name), 0) AS avg_columns_per_table\nFROM information_schema.columns\nWHERE table_name LIKE 'benchbox_catalog_%';\n"
   variants:
-    clickhouse: |2
-      SELECT
-          COUNT(*) AS total_columns,
-          uniq(table) AS total_tables,
-          COUNT(*) / nullIf(uniq(table), 0) AS avg_columns_per_table
-      FROM system.columns
-      WHERE table LIKE 'benchbox_catalog_%';
-
+    clickhouse: "SELECT\n    COUNT(*) AS total_columns,\n    uniq(table) AS total_tables,\n    COUNT(*) / nullIf(uniq(table), 0) AS avg_columns_per_table\nFROM system.columns\nWHERE table LIKE 'benchbox_catalog_%';\n"
 - id: large_catalog_pattern_search
   category: large_catalog
   description: Search catalog tables by numeric suffix pattern
-  sql: |2
-    SELECT
-        table_name,
-        table_type
-    FROM information_schema.tables
-    WHERE table_name LIKE 'benchbox_catalog_00%'
-    ORDER BY table_name;
+  sql: "SELECT\n    table_name,\n    table_type\nFROM information_schema.tables\nWHERE table_name LIKE 'benchbox_catalog_00%'\nORDER BY table_name;\n"
   variants:
-    clickhouse: |2
-      SELECT
-          name AS table_name,
-          engine AS table_type
-      FROM system.tables
-      WHERE name LIKE 'benchbox_catalog_00%'
-      ORDER BY name;
-
+    clickhouse: "SELECT\n    name AS table_name,\n    engine AS table_type\nFROM system.tables\nWHERE name LIKE 'benchbox_catalog_00%'\nORDER BY name;\n"
 - id: large_catalog_schema_summary
   category: large_catalog
   description: Summary statistics for large catalog
-  sql: |2
-    SELECT
-        COUNT(DISTINCT t.table_name) AS table_count,
-        COUNT(c.column_name) AS total_columns,
-        AVG(col_counts.column_count) AS avg_columns
-    FROM information_schema.tables t
-    LEFT JOIN information_schema.columns c
-      ON t.table_name = c.table_name
-      AND t.table_schema = c.table_schema
-    LEFT JOIN (
-        SELECT table_name, COUNT(*) AS column_count
-        FROM information_schema.columns
-        WHERE table_name LIKE 'benchbox_catalog_%'
-        GROUP BY table_name
-    ) col_counts ON t.table_name = col_counts.table_name
-    WHERE t.table_name LIKE 'benchbox_catalog_%';
+  sql: "SELECT\n    COUNT(DISTINCT t.table_name) AS table_count,\n    COUNT(c.column_name) AS total_columns,\n    AVG(col_counts.column_count) AS avg_columns\nFROM information_schema.tables t\nLEFT JOIN information_schema.columns c\n  ON t.table_name = c.table_name\n  AND t.table_schema = c.table_schema\nLEFT JOIN (\n    SELECT table_name, COUNT(*) AS column_count\n    FROM information_schema.columns\n    WHERE table_name LIKE 'benchbox_catalog_%'\n    GROUP BY table_name\n) col_counts ON t.table_name = col_counts.table_name\nWHERE t.table_name LIKE 'benchbox_catalog_%';\n"
   variants:
-    clickhouse: |2
-      SELECT
-          uniq(t.name) AS table_count,
-          COUNT(c.name) AS total_columns,
-          AVG(col_counts.column_count) AS avg_columns
-      FROM system.tables t
-      LEFT JOIN system.columns c
-        ON t.name = c.table AND t.database = c.database
-      LEFT JOIN (
-          SELECT table, COUNT(*) AS column_count
-          FROM system.columns
-          WHERE table LIKE 'benchbox_catalog_%'
-          GROUP BY table
-      ) col_counts ON t.name = col_counts.table
-      WHERE t.name LIKE 'benchbox_catalog_%';
-
+    clickhouse: "SELECT\n    uniq(t.name) AS table_count,\n    COUNT(c.name) AS total_columns,\n    AVG(col_counts.column_count) AS avg_columns\nFROM system.tables t\nLEFT JOIN system.columns c\n  ON t.name = c.table AND t.database = c.database\nLEFT JOIN (\n    SELECT table, COUNT(*) AS column_count\n    FROM system.columns\n    WHERE table LIKE 'benchbox_catalog_%'\n    GROUP BY table\n) col_counts ON t.name = col_counts.table\nWHERE t.name LIKE 'benchbox_catalog_%';\n"
 - id: large_catalog_column_type_analysis
   category: large_catalog
   description: Data type distribution across catalog tables
-  sql: |2
-    SELECT
-        data_type,
-        COUNT(*) AS column_count,
-        COUNT(DISTINCT table_name) AS tables_with_type
-    FROM information_schema.columns
-    WHERE table_name LIKE 'benchbox_catalog_%'
-    GROUP BY data_type
-    ORDER BY column_count DESC;
+  sql: "SELECT\n    data_type,\n    COUNT(*) AS column_count,\n    COUNT(DISTINCT table_name) AS tables_with_type\nFROM information_schema.columns\nWHERE table_name LIKE 'benchbox_catalog_%'\nGROUP BY data_type\nORDER BY column_count DESC;\n"
   variants:
-    clickhouse: |2
-      SELECT
-          type AS data_type,
-          COUNT(*) AS column_count,
-          uniq(table) AS tables_with_type
-      FROM system.columns
-      WHERE table LIKE 'benchbox_catalog_%'
-      GROUP BY type
-      ORDER BY column_count DESC;
-
-# =============================================================================
-# Constraint and Relationship Queries (Complexity Testing)
-# =============================================================================
-# These queries test metadata introspection on foreign key and constraint metadata.
-# Used with MetadataGenerator to stress test constraint resolution.
-
+    clickhouse: "SELECT\n    type AS data_type,\n    COUNT(*) AS column_count,\n    uniq(table) AS tables_with_type\nFROM system.columns\nWHERE table LIKE 'benchbox_catalog_%'\nGROUP BY type\nORDER BY column_count DESC;\n"
 - id: constraint_fk_list
   category: constraint
   description: List all benchmark foreign key constraints
-  sql: |2
-    SELECT
-        tc.table_name,
-        tc.constraint_name,
-        tc.constraint_type,
-        kcu.column_name
-    FROM information_schema.table_constraints tc
-    JOIN information_schema.key_column_usage kcu
-      ON tc.constraint_name = kcu.constraint_name
-      AND tc.table_schema = kcu.table_schema
-    WHERE tc.table_name LIKE 'benchbox_fk_%'
-      AND tc.constraint_type = 'FOREIGN KEY'
-    ORDER BY tc.table_name, tc.constraint_name;
-  skip_on: [clickhouse, bigquery]
+  sql: "SELECT\n    tc.table_name,\n    tc.constraint_name,\n    tc.constraint_type,\n    kcu.column_name\nFROM information_schema.table_constraints tc\nJOIN information_schema.key_column_usage kcu\n  ON tc.constraint_name = kcu.constraint_name\n  AND tc.table_schema = kcu.table_schema\nWHERE tc.table_name LIKE 'benchbox_fk_%'\n  AND tc.constraint_type = 'FOREIGN KEY'\nORDER BY tc.table_name, tc.constraint_name;\n"
+  skip_on:
+  - clickhouse
+  - bigquery
   variants:
-    duckdb: |2
-      SELECT
-          table_name,
-          constraint_text AS constraint_name,
-          constraint_type,
-          '' AS column_name
-      FROM duckdb_constraints()
-      WHERE table_name LIKE 'benchbox_fk_%'
-        AND constraint_type = 'FOREIGN KEY'
-      ORDER BY table_name;
-
+    duckdb: "SELECT\n    table_name,\n    constraint_text AS constraint_name,\n    constraint_type,\n    '' AS column_name\nFROM duckdb_constraints()\nWHERE table_name LIKE 'benchbox_fk_%'\n  AND constraint_type = 'FOREIGN KEY'\nORDER BY table_name;\n"
 - id: constraint_pk_list
   category: constraint
   description: List all benchmark primary key constraints
-  sql: |2
-    SELECT
-        tc.table_name,
-        tc.constraint_name,
-        kcu.column_name
-    FROM information_schema.table_constraints tc
-    JOIN information_schema.key_column_usage kcu
-      ON tc.constraint_name = kcu.constraint_name
-      AND tc.table_schema = kcu.table_schema
-    WHERE tc.table_name LIKE 'benchbox_%'
-      AND tc.constraint_type = 'PRIMARY KEY'
-    ORDER BY tc.table_name, kcu.ordinal_position;
-  skip_on: [clickhouse, bigquery]
+  sql: "SELECT\n    tc.table_name,\n    tc.constraint_name,\n    kcu.column_name\nFROM information_schema.table_constraints tc\nJOIN information_schema.key_column_usage kcu\n  ON tc.constraint_name = kcu.constraint_name\n  AND tc.table_schema = kcu.table_schema\nWHERE tc.table_name LIKE 'benchbox_%'\n  AND tc.constraint_type = 'PRIMARY KEY'\nORDER BY tc.table_name, kcu.ordinal_position;\n"
+  skip_on:
+  - clickhouse
+  - bigquery
   variants:
-    duckdb: |2
-      SELECT
-          table_name,
-          constraint_text AS constraint_name,
-          '' AS column_name
-      FROM duckdb_constraints()
-      WHERE table_name LIKE 'benchbox_%'
-        AND constraint_type = 'PRIMARY KEY'
-      ORDER BY table_name;
-
+    duckdb: "SELECT\n    table_name,\n    constraint_text AS constraint_name,\n    '' AS column_name\nFROM duckdb_constraints()\nWHERE table_name LIKE 'benchbox_%'\n  AND constraint_type = 'PRIMARY KEY'\nORDER BY table_name;\n"
 - id: constraint_referential_integrity
   category: constraint
   description: Analyze referential integrity constraints
-  sql: |2
-    SELECT
-        tc.table_name AS child_table,
-        rc.unique_constraint_name,
-        ccu.table_name AS parent_table,
-        kcu.column_name AS fk_column
-    FROM information_schema.table_constraints tc
-    JOIN information_schema.referential_constraints rc
-      ON tc.constraint_name = rc.constraint_name
-      AND tc.table_schema = rc.constraint_schema
-    JOIN information_schema.constraint_column_usage ccu
-      ON rc.unique_constraint_name = ccu.constraint_name
-      AND rc.unique_constraint_schema = ccu.constraint_schema
-    JOIN information_schema.key_column_usage kcu
-      ON tc.constraint_name = kcu.constraint_name
-      AND tc.table_schema = kcu.table_schema
-    WHERE tc.table_name LIKE 'benchbox_fk_%'
-    ORDER BY child_table;
-  skip_on: [clickhouse, bigquery, duckdb, starrocks]
-
+  sql: "SELECT\n    tc.table_name AS child_table,\n    rc.unique_constraint_name,\n    ccu.table_name AS parent_table,\n    kcu.column_name AS fk_column\nFROM information_schema.table_constraints tc\nJOIN information_schema.referential_constraints rc\n  ON tc.constraint_name = rc.constraint_name\n  AND tc.table_schema = rc.constraint_schema\nJOIN information_schema.constraint_column_usage ccu\n  ON rc.unique_constraint_name = ccu.constraint_name\n  AND rc.unique_constraint_schema = ccu.constraint_schema\nJOIN information_schema.key_column_usage kcu\n  ON tc.constraint_name = kcu.constraint_name\n  AND tc.table_schema = kcu.table_schema\nWHERE tc.table_name LIKE 'benchbox_fk_%'\nORDER BY child_table;\n"
+  skip_on:
+  - clickhouse
+  - bigquery
+  - duckdb
+  - starrocks
 - id: constraint_summary
   category: constraint
   description: Summary of constraint types in benchmark tables
-  sql: |2
-    SELECT
-        constraint_type,
-        COUNT(*) AS constraint_count,
-        COUNT(DISTINCT table_name) AS tables_with_constraint
-    FROM information_schema.table_constraints
-    WHERE table_name LIKE 'benchbox_%'
-    GROUP BY constraint_type
-    ORDER BY constraint_count DESC;
-  skip_on: [clickhouse, bigquery]
+  sql: "SELECT\n    constraint_type,\n    COUNT(*) AS constraint_count,\n    COUNT(DISTINCT table_name) AS tables_with_constraint\nFROM information_schema.table_constraints\nWHERE table_name LIKE 'benchbox_%'\nGROUP BY constraint_type\nORDER BY constraint_count DESC;\n"
+  skip_on:
+  - clickhouse
+  - bigquery
   variants:
-    duckdb: |2
-      SELECT
-          constraint_type,
-          COUNT(*) AS constraint_count,
-          COUNT(DISTINCT table_name) AS tables_with_constraint
-      FROM duckdb_constraints()
-      WHERE table_name LIKE 'benchbox_%'
-      GROUP BY constraint_type
-      ORDER BY constraint_count DESC;
-
-# =============================================================================
-# Access Control (ACL) Introspection Queries
-# =============================================================================
-# These queries test metadata introspection performance on privilege/permission
-# metadata. Used to benchmark data governance and security audit workflows.
-#
-# Platform Support Tiers:
-# - Tier 1 (Full): PostgreSQL, Redshift, Firebolt, Synapse, Fabric
-# - Tier 2 (Partial): Databricks (UC), ClickHouse, Snowflake, Trino, Presto
-# - Tier 3 (Limited): BigQuery (dataset-scoped)
-# - Tier 4 (None): DuckDB, SQLite, DataFusion, Spark, Polars
-#
-# Note: Queries return empty results on unsupported platforms rather than failing.
-
+    duckdb: "SELECT\n    constraint_type,\n    COUNT(*) AS constraint_count,\n    COUNT(DISTINCT table_name) AS tables_with_constraint\nFROM duckdb_constraints()\nWHERE table_name LIKE 'benchbox_%'\nGROUP BY constraint_type\nORDER BY constraint_count DESC;\n"
 - id: acl_table_privileges_list
   category: acl
   description: List all table-level privileges in the catalog
-  sql: |2
-    SELECT
-        grantee,
-        table_schema,
-        table_name,
-        privilege_type,
-        is_grantable
-    FROM information_schema.table_privileges
-    WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-    ORDER BY table_name, grantee, privilege_type;
-  skip_on: [sqlite, datafusion, spark, polars, athena]
+  sql: "SELECT\n    grantee,\n    table_schema,\n    table_name,\n    privilege_type,\n    is_grantable\nFROM information_schema.table_privileges\nWHERE table_schema NOT IN ('information_schema', 'pg_catalog')\nORDER BY table_name, grantee, privilege_type;\n"
+  skip_on:
+  - sqlite
+  - datafusion
+  - spark
+  - polars
+  - athena
   variants:
-    duckdb: |2
-      -- DuckDB lacks TABLE_PRIVILEGES introspection; return empty result
-      SELECT
-          CAST(NULL AS VARCHAR) AS grantee,
-          CAST(NULL AS VARCHAR) AS table_schema,
-          CAST(NULL AS VARCHAR) AS table_name,
-          CAST(NULL AS VARCHAR) AS privilege_type,
-          CAST(NULL AS VARCHAR) AS is_grantable
-      WHERE 1=0;
-    clickhouse: |2
-      SELECT
-          user_name AS grantee,
-          database AS table_schema,
-          table AS table_name,
-          access_type AS privilege_type,
-          IF(grant_option = 1, 'YES', 'NO') AS is_grantable
-      FROM system.grants
-      WHERE database NOT IN ('system', 'INFORMATION_SCHEMA')
-        AND table != ''
-      ORDER BY table, user_name, access_type;
-    redshift: |2
-      SELECT
-          identity_name AS grantee,
-          namespace_name AS table_schema,
-          relation_name AS table_name,
-          privilege_type,
-          CASE WHEN admin_option THEN 'YES' ELSE 'NO' END AS is_grantable
-      FROM svv_relation_privileges
-      WHERE namespace_name NOT IN ('information_schema', 'pg_catalog')
-      ORDER BY relation_name, identity_name, privilege_type;
-    synapse: |2
-      SELECT
-          dp.name AS grantee,
-          SCHEMA_NAME(t.schema_id) AS table_schema,
-          t.name AS table_name,
-          p.permission_name AS privilege_type,
-          CASE WHEN p.state = 'W' THEN 'YES' ELSE 'NO' END AS is_grantable
-      FROM sys.database_permissions p
-      JOIN sys.database_principals dp ON p.grantee_principal_id = dp.principal_id
-      JOIN sys.tables t ON p.major_id = t.object_id
-      WHERE p.class = 1
-      ORDER BY t.name, dp.name, p.permission_name;
-    fabric: |2
-      SELECT
-          dp.name AS grantee,
-          SCHEMA_NAME(t.schema_id) AS table_schema,
-          t.name AS table_name,
-          p.permission_name AS privilege_type,
-          CASE WHEN p.state = 'W' THEN 'YES' ELSE 'NO' END AS is_grantable
-      FROM sys.database_permissions p
-      JOIN sys.database_principals dp ON p.grantee_principal_id = dp.principal_id
-      JOIN sys.tables t ON p.major_id = t.object_id
-      WHERE p.class = 1
-      ORDER BY t.name, dp.name, p.permission_name;
-    firebolt: |2
-      SELECT
-          grantee,
-          object_schema AS table_schema,
-          object_name AS table_name,
-          privilege_type,
-          is_grantable
-      FROM information_schema.object_privileges
-      WHERE object_type = 'TABLE'
-      ORDER BY object_name, grantee, privilege_type;
-    bigquery: |2
-      SELECT
-          grantee,
-          table_schema,
-          table_name,
-          privilege_type,
-          'NO' AS is_grantable
-      FROM INFORMATION_SCHEMA.OBJECT_PRIVILEGES
-      WHERE object_type = 'TABLE'
-      ORDER BY table_name, grantee, privilege_type;
-
+    duckdb: "-- DuckDB lacks TABLE_PRIVILEGES introspection; return empty result\nSELECT\n    CAST(NULL AS VARCHAR) AS grantee,\n    CAST(NULL AS VARCHAR) AS table_schema,\n    CAST(NULL AS VARCHAR) AS table_name,\n    CAST(NULL AS VARCHAR) AS privilege_type,\n    CAST(NULL AS VARCHAR) AS is_grantable\nWHERE 1=0;\n"
+    clickhouse: "SELECT\n    user_name AS grantee,\n    database AS table_schema,\n    table AS table_name,\n    access_type AS privilege_type,\n    IF(grant_option = 1, 'YES', 'NO') AS is_grantable\nFROM system.grants\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA')\n  AND table != ''\nORDER BY table, user_name, access_type;\n"
+    redshift: "SELECT\n    identity_name AS grantee,\n    namespace_name AS table_schema,\n    relation_name AS table_name,\n    privilege_type,\n    CASE WHEN admin_option THEN 'YES' ELSE 'NO' END AS is_grantable\nFROM svv_relation_privileges\nWHERE namespace_name NOT IN ('information_schema', 'pg_catalog')\nORDER BY relation_name, identity_name, privilege_type;\n"
+    synapse: "SELECT\n    dp.name AS grantee,\n    SCHEMA_NAME(t.schema_id) AS table_schema,\n    t.name AS table_name,\n    p.permission_name AS privilege_type,\n    CASE WHEN p.state = 'W' THEN 'YES' ELSE 'NO' END AS is_grantable\nFROM sys.database_permissions p\nJOIN sys.database_principals dp ON p.grantee_principal_id = dp.principal_id\nJOIN sys.tables t ON p.major_id = t.object_id\nWHERE p.class = 1\nORDER BY t.name, dp.name, p.permission_name;\n"
+    fabric: "SELECT\n    dp.name AS grantee,\n    SCHEMA_NAME(t.schema_id) AS table_schema,\n    t.name AS table_name,\n    p.permission_name AS privilege_type,\n    CASE WHEN p.state = 'W' THEN 'YES' ELSE 'NO' END AS is_grantable\nFROM sys.database_permissions p\nJOIN sys.database_principals dp ON p.grantee_principal_id = dp.principal_id\nJOIN sys.tables t ON p.major_id = t.object_id\nWHERE p.class = 1\nORDER BY t.name, dp.name, p.permission_name;\n"
+    firebolt: "SELECT\n    grantee,\n    object_schema AS table_schema,\n    object_name AS table_name,\n    privilege_type,\n    is_grantable\nFROM information_schema.object_privileges\nWHERE object_type = 'TABLE'\nORDER BY object_name, grantee, privilege_type;\n"
+    bigquery: "SELECT\n    grantee,\n    table_schema,\n    table_name,\n    privilege_type,\n    'NO' AS is_grantable\nFROM INFORMATION_SCHEMA.OBJECT_PRIVILEGES\nWHERE object_type = 'TABLE'\nORDER BY table_name, grantee, privilege_type;\n"
 - id: acl_table_privileges_filtered
   category: acl
   description: List privileges for benchmark tables only (benchbox_*)
-  sql: |2
-    SELECT
-        grantee,
-        table_schema,
-        table_name,
-        privilege_type,
-        is_grantable
-    FROM information_schema.table_privileges
-    WHERE table_name LIKE 'benchbox_%'
-    ORDER BY table_name, grantee, privilege_type;
-  skip_on: [sqlite, datafusion, spark, polars, athena]
+  sql: "SELECT\n    grantee,\n    table_schema,\n    table_name,\n    privilege_type,\n    is_grantable\nFROM information_schema.table_privileges\nWHERE table_name LIKE 'benchbox_%'\nORDER BY table_name, grantee, privilege_type;\n"
+  skip_on:
+  - sqlite
+  - datafusion
+  - spark
+  - polars
+  - athena
   variants:
-    duckdb: |2
-      -- DuckDB lacks TABLE_PRIVILEGES introspection; return empty result
-      SELECT
-          CAST(NULL AS VARCHAR) AS grantee,
-          CAST(NULL AS VARCHAR) AS table_schema,
-          CAST(NULL AS VARCHAR) AS table_name,
-          CAST(NULL AS VARCHAR) AS privilege_type,
-          CAST(NULL AS VARCHAR) AS is_grantable
-      WHERE 1=0;
-    clickhouse: |2
-      SELECT
-          user_name AS grantee,
-          database AS table_schema,
-          table AS table_name,
-          access_type AS privilege_type,
-          IF(grant_option = 1, 'YES', 'NO') AS is_grantable
-      FROM system.grants
-      WHERE table LIKE 'benchbox_%'
-      ORDER BY table, user_name, access_type;
-    redshift: |2
-      SELECT
-          identity_name AS grantee,
-          namespace_name AS table_schema,
-          relation_name AS table_name,
-          privilege_type,
-          CASE WHEN admin_option THEN 'YES' ELSE 'NO' END AS is_grantable
-      FROM svv_relation_privileges
-      WHERE relation_name LIKE 'benchbox_%'
-      ORDER BY relation_name, identity_name, privilege_type;
-    synapse: |2
-      SELECT
-          dp.name AS grantee,
-          SCHEMA_NAME(t.schema_id) AS table_schema,
-          t.name AS table_name,
-          p.permission_name AS privilege_type,
-          CASE WHEN p.state = 'W' THEN 'YES' ELSE 'NO' END AS is_grantable
-      FROM sys.database_permissions p
-      JOIN sys.database_principals dp ON p.grantee_principal_id = dp.principal_id
-      JOIN sys.tables t ON p.major_id = t.object_id
-      WHERE p.class = 1 AND t.name LIKE 'benchbox_%'
-      ORDER BY t.name, dp.name, p.permission_name;
-    fabric: |2
-      SELECT
-          dp.name AS grantee,
-          SCHEMA_NAME(t.schema_id) AS table_schema,
-          t.name AS table_name,
-          p.permission_name AS privilege_type,
-          CASE WHEN p.state = 'W' THEN 'YES' ELSE 'NO' END AS is_grantable
-      FROM sys.database_permissions p
-      JOIN sys.database_principals dp ON p.grantee_principal_id = dp.principal_id
-      JOIN sys.tables t ON p.major_id = t.object_id
-      WHERE p.class = 1 AND t.name LIKE 'benchbox_%'
-      ORDER BY t.name, dp.name, p.permission_name;
-    firebolt: |2
-      SELECT
-          grantee,
-          object_schema AS table_schema,
-          object_name AS table_name,
-          privilege_type,
-          is_grantable
-      FROM information_schema.object_privileges
-      WHERE object_type = 'TABLE' AND object_name LIKE 'benchbox_%'
-      ORDER BY object_name, grantee, privilege_type;
-    bigquery: |2
-      SELECT
-          grantee,
-          table_schema,
-          table_name,
-          privilege_type,
-          'NO' AS is_grantable
-      FROM INFORMATION_SCHEMA.OBJECT_PRIVILEGES
-      WHERE object_type = 'TABLE' AND table_name LIKE 'benchbox_%'
-      ORDER BY table_name, grantee, privilege_type;
-
+    duckdb: "-- DuckDB lacks TABLE_PRIVILEGES introspection; return empty result\nSELECT\n    CAST(NULL AS VARCHAR) AS grantee,\n    CAST(NULL AS VARCHAR) AS table_schema,\n    CAST(NULL AS VARCHAR) AS table_name,\n    CAST(NULL AS VARCHAR) AS privilege_type,\n    CAST(NULL AS VARCHAR) AS is_grantable\nWHERE 1=0;\n"
+    clickhouse: "SELECT\n    user_name AS grantee,\n    database AS table_schema,\n    table AS table_name,\n    access_type AS privilege_type,\n    IF(grant_option = 1, 'YES', 'NO') AS is_grantable\nFROM system.grants\nWHERE table LIKE 'benchbox_%'\nORDER BY table, user_name, access_type;\n"
+    redshift: "SELECT\n    identity_name AS grantee,\n    namespace_name AS table_schema,\n    relation_name AS table_name,\n    privilege_type,\n    CASE WHEN admin_option THEN 'YES' ELSE 'NO' END AS is_grantable\nFROM svv_relation_privileges\nWHERE relation_name LIKE 'benchbox_%'\nORDER BY relation_name, identity_name, privilege_type;\n"
+    synapse: "SELECT\n    dp.name AS grantee,\n    SCHEMA_NAME(t.schema_id) AS table_schema,\n    t.name AS table_name,\n    p.permission_name AS privilege_type,\n    CASE WHEN p.state = 'W' THEN 'YES' ELSE 'NO' END AS is_grantable\nFROM sys.database_permissions p\nJOIN sys.database_principals dp ON p.grantee_principal_id = dp.principal_id\nJOIN sys.tables t ON p.major_id = t.object_id\nWHERE p.class = 1 AND t.name LIKE 'benchbox_%'\nORDER BY t.name, dp.name, p.permission_name;\n"
+    fabric: "SELECT\n    dp.name AS grantee,\n    SCHEMA_NAME(t.schema_id) AS table_schema,\n    t.name AS table_name,\n    p.permission_name AS privilege_type,\n    CASE WHEN p.state = 'W' THEN 'YES' ELSE 'NO' END AS is_grantable\nFROM sys.database_permissions p\nJOIN sys.database_principals dp ON p.grantee_principal_id = dp.principal_id\nJOIN sys.tables t ON p.major_id = t.object_id\nWHERE p.class = 1 AND t.name LIKE 'benchbox_%'\nORDER BY t.name, dp.name, p.permission_name;\n"
+    firebolt: "SELECT\n    grantee,\n    object_schema AS table_schema,\n    object_name AS table_name,\n    privilege_type,\n    is_grantable\nFROM information_schema.object_privileges\nWHERE object_type = 'TABLE' AND object_name LIKE 'benchbox_%'\nORDER BY object_name, grantee, privilege_type;\n"
+    bigquery: "SELECT\n    grantee,\n    table_schema,\n    table_name,\n    privilege_type,\n    'NO' AS is_grantable\nFROM INFORMATION_SCHEMA.OBJECT_PRIVILEGES\nWHERE object_type = 'TABLE' AND table_name LIKE 'benchbox_%'\nORDER BY table_name, grantee, privilege_type;\n"
 - id: acl_privilege_count_by_type
   category: acl
   description: Count privileges grouped by type (SELECT, INSERT, UPDATE, DELETE, etc.)
-  sql: |2
-    SELECT
-        privilege_type,
-        COUNT(*) AS grant_count
-    FROM information_schema.table_privileges
-    WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-    GROUP BY privilege_type
-    ORDER BY grant_count DESC;
-  skip_on: [sqlite, datafusion, spark, polars, athena]
+  sql: "SELECT\n    privilege_type,\n    COUNT(*) AS grant_count\nFROM information_schema.table_privileges\nWHERE table_schema NOT IN ('information_schema', 'pg_catalog')\nGROUP BY privilege_type\nORDER BY grant_count DESC;\n"
+  skip_on:
+  - sqlite
+  - datafusion
+  - spark
+  - polars
+  - athena
   variants:
-    duckdb: |2
-      -- DuckDB lacks TABLE_PRIVILEGES introspection; return empty result
-      SELECT
-          CAST(NULL AS VARCHAR) AS privilege_type,
-          CAST(0 AS INTEGER) AS grant_count
-      WHERE 1=0;
-    clickhouse: |2
-      SELECT
-          access_type AS privilege_type,
-          COUNT(*) AS grant_count
-      FROM system.grants
-      WHERE database NOT IN ('system', 'INFORMATION_SCHEMA')
-        AND table != ''
-      GROUP BY access_type
-      ORDER BY grant_count DESC;
-    redshift: |2
-      SELECT
-          privilege_type,
-          COUNT(*) AS grant_count
-      FROM svv_relation_privileges
-      WHERE namespace_name NOT IN ('information_schema', 'pg_catalog')
-      GROUP BY privilege_type
-      ORDER BY grant_count DESC;
-    synapse: |2
-      SELECT
-          p.permission_name AS privilege_type,
-          COUNT(*) AS grant_count
-      FROM sys.database_permissions p
-      JOIN sys.tables t ON p.major_id = t.object_id
-      WHERE p.class = 1
-      GROUP BY p.permission_name
-      ORDER BY grant_count DESC;
-    fabric: |2
-      SELECT
-          p.permission_name AS privilege_type,
-          COUNT(*) AS grant_count
-      FROM sys.database_permissions p
-      JOIN sys.tables t ON p.major_id = t.object_id
-      WHERE p.class = 1
-      GROUP BY p.permission_name
-      ORDER BY grant_count DESC;
-    firebolt: |2
-      SELECT
-          privilege_type,
-          COUNT(*) AS grant_count
-      FROM information_schema.object_privileges
-      WHERE object_type = 'TABLE'
-      GROUP BY privilege_type
-      ORDER BY grant_count DESC;
-    bigquery: |2
-      SELECT
-          privilege_type,
-          COUNT(*) AS grant_count
-      FROM INFORMATION_SCHEMA.OBJECT_PRIVILEGES
-      WHERE object_type = 'TABLE'
-      GROUP BY privilege_type
-      ORDER BY grant_count DESC;
-
+    duckdb: "-- DuckDB lacks TABLE_PRIVILEGES introspection; return empty result\nSELECT\n    CAST(NULL AS VARCHAR) AS privilege_type,\n    CAST(0 AS INTEGER) AS grant_count\nWHERE 1=0;\n"
+    clickhouse: "SELECT\n    access_type AS privilege_type,\n    COUNT(*) AS grant_count\nFROM system.grants\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA')\n  AND table != ''\nGROUP BY access_type\nORDER BY grant_count DESC;\n"
+    redshift: "SELECT\n    privilege_type,\n    COUNT(*) AS grant_count\nFROM svv_relation_privileges\nWHERE namespace_name NOT IN ('information_schema', 'pg_catalog')\nGROUP BY privilege_type\nORDER BY grant_count DESC;\n"
+    synapse: "SELECT\n    p.permission_name AS privilege_type,\n    COUNT(*) AS grant_count\nFROM sys.database_permissions p\nJOIN sys.tables t ON p.major_id = t.object_id\nWHERE p.class = 1\nGROUP BY p.permission_name\nORDER BY grant_count DESC;\n"
+    fabric: "SELECT\n    p.permission_name AS privilege_type,\n    COUNT(*) AS grant_count\nFROM sys.database_permissions p\nJOIN sys.tables t ON p.major_id = t.object_id\nWHERE p.class = 1\nGROUP BY p.permission_name\nORDER BY grant_count DESC;\n"
+    firebolt: "SELECT\n    privilege_type,\n    COUNT(*) AS grant_count\nFROM information_schema.object_privileges\nWHERE object_type = 'TABLE'\nGROUP BY privilege_type\nORDER BY grant_count DESC;\n"
+    bigquery: "SELECT\n    privilege_type,\n    COUNT(*) AS grant_count\nFROM INFORMATION_SCHEMA.OBJECT_PRIVILEGES\nWHERE object_type = 'TABLE'\nGROUP BY privilege_type\nORDER BY grant_count DESC;\n"
 - id: acl_grantee_count_per_table
   category: acl
   description: Count distinct grantees per table (measure permission spread)
-  sql: |2
-    SELECT
-        table_name,
-        COUNT(DISTINCT grantee) AS grantee_count,
-        COUNT(*) AS total_grants
-    FROM information_schema.table_privileges
-    WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-    GROUP BY table_name
-    ORDER BY grantee_count DESC
-    LIMIT 20;
-  skip_on: [sqlite, datafusion, spark, polars, athena]
+  sql: "SELECT\n    table_name,\n    COUNT(DISTINCT grantee) AS grantee_count,\n    COUNT(*) AS total_grants\nFROM information_schema.table_privileges\nWHERE table_schema NOT IN ('information_schema', 'pg_catalog')\nGROUP BY table_name\nORDER BY grantee_count DESC\nLIMIT 20;\n"
+  skip_on:
+  - sqlite
+  - datafusion
+  - spark
+  - polars
+  - athena
   variants:
-    duckdb: |2
-      -- DuckDB lacks TABLE_PRIVILEGES introspection; return empty result
-      SELECT
-          CAST(NULL AS VARCHAR) AS table_name,
-          CAST(0 AS INTEGER) AS grantee_count,
-          CAST(0 AS INTEGER) AS total_grants
-      WHERE 1=0;
-    clickhouse: |2
-      SELECT
-          table AS table_name,
-          uniq(user_name) AS grantee_count,
-          COUNT(*) AS total_grants
-      FROM system.grants
-      WHERE database NOT IN ('system', 'INFORMATION_SCHEMA')
-        AND table != ''
-      GROUP BY table
-      ORDER BY grantee_count DESC
-      LIMIT 20;
-    redshift: |2
-      SELECT
-          relation_name AS table_name,
-          COUNT(DISTINCT identity_name) AS grantee_count,
-          COUNT(*) AS total_grants
-      FROM svv_relation_privileges
-      WHERE namespace_name NOT IN ('information_schema', 'pg_catalog')
-      GROUP BY relation_name
-      ORDER BY grantee_count DESC
-      LIMIT 20;
-    synapse: |2
-      SELECT TOP 20
-          t.name AS table_name,
-          COUNT(DISTINCT dp.name) AS grantee_count,
-          COUNT(*) AS total_grants
-      FROM sys.database_permissions p
-      JOIN sys.database_principals dp ON p.grantee_principal_id = dp.principal_id
-      JOIN sys.tables t ON p.major_id = t.object_id
-      WHERE p.class = 1
-      GROUP BY t.name
-      ORDER BY grantee_count DESC;
-    fabric: |2
-      SELECT TOP 20
-          t.name AS table_name,
-          COUNT(DISTINCT dp.name) AS grantee_count,
-          COUNT(*) AS total_grants
-      FROM sys.database_permissions p
-      JOIN sys.database_principals dp ON p.grantee_principal_id = dp.principal_id
-      JOIN sys.tables t ON p.major_id = t.object_id
-      WHERE p.class = 1
-      GROUP BY t.name
-      ORDER BY grantee_count DESC;
-    firebolt: |2
-      SELECT
-          object_name AS table_name,
-          COUNT(DISTINCT grantee) AS grantee_count,
-          COUNT(*) AS total_grants
-      FROM information_schema.object_privileges
-      WHERE object_type = 'TABLE'
-      GROUP BY object_name
-      ORDER BY grantee_count DESC
-      LIMIT 20;
-    bigquery: |2
-      SELECT
-          table_name,
-          COUNT(DISTINCT grantee) AS grantee_count,
-          COUNT(*) AS total_grants
-      FROM INFORMATION_SCHEMA.OBJECT_PRIVILEGES
-      WHERE object_type = 'TABLE'
-      GROUP BY table_name
-      ORDER BY grantee_count DESC
-      LIMIT 20;
-
+    duckdb: "-- DuckDB lacks TABLE_PRIVILEGES introspection; return empty result\nSELECT\n    CAST(NULL AS VARCHAR) AS table_name,\n    CAST(0 AS INTEGER) AS grantee_count,\n    CAST(0 AS INTEGER) AS total_grants\nWHERE 1=0;\n"
+    clickhouse: "SELECT\n    table AS table_name,\n    uniq(user_name) AS grantee_count,\n    COUNT(*) AS total_grants\nFROM system.grants\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA')\n  AND table != ''\nGROUP BY table\nORDER BY grantee_count DESC\nLIMIT 20;\n"
+    redshift: "SELECT\n    relation_name AS table_name,\n    COUNT(DISTINCT identity_name) AS grantee_count,\n    COUNT(*) AS total_grants\nFROM svv_relation_privileges\nWHERE namespace_name NOT IN ('information_schema', 'pg_catalog')\nGROUP BY relation_name\nORDER BY grantee_count DESC\nLIMIT 20;\n"
+    synapse: "SELECT TOP 20\n    t.name AS table_name,\n    COUNT(DISTINCT dp.name) AS grantee_count,\n    COUNT(*) AS total_grants\nFROM sys.database_permissions p\nJOIN sys.database_principals dp ON p.grantee_principal_id = dp.principal_id\nJOIN sys.tables t ON p.major_id = t.object_id\nWHERE p.class = 1\nGROUP BY t.name\nORDER BY grantee_count DESC;\n"
+    fabric: "SELECT TOP 20\n    t.name AS table_name,\n    COUNT(DISTINCT dp.name) AS grantee_count,\n    COUNT(*) AS total_grants\nFROM sys.database_permissions p\nJOIN sys.database_principals dp ON p.grantee_principal_id = dp.principal_id\nJOIN sys.tables t ON p.major_id = t.object_id\nWHERE p.class = 1\nGROUP BY t.name\nORDER BY grantee_count DESC;\n"
+    firebolt: "SELECT\n    object_name AS table_name,\n    COUNT(DISTINCT grantee) AS grantee_count,\n    COUNT(*) AS total_grants\nFROM information_schema.object_privileges\nWHERE object_type = 'TABLE'\nGROUP BY object_name\nORDER BY grantee_count DESC\nLIMIT 20;\n"
+    bigquery: "SELECT\n    table_name,\n    COUNT(DISTINCT grantee) AS grantee_count,\n    COUNT(*) AS total_grants\nFROM INFORMATION_SCHEMA.OBJECT_PRIVILEGES\nWHERE object_type = 'TABLE'\nGROUP BY table_name\nORDER BY grantee_count DESC\nLIMIT 20;\n"
 - id: acl_tables_with_grants
   category: acl
   description: Find all tables that have any explicit grants
-  sql: |2
-    SELECT DISTINCT
-        table_schema,
-        table_name,
-        COUNT(*) AS total_grants
-    FROM information_schema.table_privileges
-    WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-    GROUP BY table_schema, table_name
-    ORDER BY total_grants DESC;
-  skip_on: [sqlite, datafusion, spark, polars, athena, starrocks]
+  sql: "SELECT DISTINCT\n    table_schema,\n    table_name,\n    COUNT(*) AS total_grants\nFROM information_schema.table_privileges\nWHERE table_schema NOT IN ('information_schema', 'pg_catalog')\nGROUP BY table_schema, table_name\nORDER BY total_grants DESC;\n"
+  skip_on:
+  - sqlite
+  - datafusion
+  - spark
+  - polars
+  - athena
+  - starrocks
   variants:
-    duckdb: |2
-      -- DuckDB lacks TABLE_PRIVILEGES introspection; return empty result
-      SELECT
-          CAST(NULL AS VARCHAR) AS table_schema,
-          CAST(NULL AS VARCHAR) AS table_name,
-          CAST(0 AS INTEGER) AS total_grants
-      WHERE 1=0;
-    clickhouse: |2
-      SELECT
-          database AS table_schema,
-          table AS table_name,
-          COUNT(*) AS total_grants
-      FROM system.grants
-      WHERE database NOT IN ('system', 'INFORMATION_SCHEMA')
-        AND table != ''
-      GROUP BY database, table
-      ORDER BY total_grants DESC;
-    redshift: |2
-      SELECT DISTINCT
-          namespace_name AS table_schema,
-          relation_name AS table_name,
-          COUNT(*) AS total_grants
-      FROM svv_relation_privileges
-      WHERE namespace_name NOT IN ('information_schema', 'pg_catalog')
-      GROUP BY namespace_name, relation_name
-      ORDER BY total_grants DESC;
-    synapse: |2
-      SELECT
-          SCHEMA_NAME(t.schema_id) AS table_schema,
-          t.name AS table_name,
-          COUNT(*) AS total_grants
-      FROM sys.database_permissions p
-      JOIN sys.tables t ON p.major_id = t.object_id
-      WHERE p.class = 1
-      GROUP BY SCHEMA_NAME(t.schema_id), t.name
-      ORDER BY total_grants DESC;
-    fabric: |2
-      SELECT
-          SCHEMA_NAME(t.schema_id) AS table_schema,
-          t.name AS table_name,
-          COUNT(*) AS total_grants
-      FROM sys.database_permissions p
-      JOIN sys.tables t ON p.major_id = t.object_id
-      WHERE p.class = 1
-      GROUP BY SCHEMA_NAME(t.schema_id), t.name
-      ORDER BY total_grants DESC;
-    firebolt: |2
-      SELECT
-          object_schema AS table_schema,
-          object_name AS table_name,
-          COUNT(*) AS total_grants
-      FROM information_schema.object_privileges
-      WHERE object_type = 'TABLE'
-      GROUP BY object_schema, object_name
-      ORDER BY total_grants DESC;
-    bigquery: |2
-      SELECT
-          table_schema,
-          table_name,
-          COUNT(*) AS total_grants
-      FROM INFORMATION_SCHEMA.OBJECT_PRIVILEGES
-      WHERE object_type = 'TABLE'
-      GROUP BY table_schema, table_name
-      ORDER BY total_grants DESC;
-
+    duckdb: "-- DuckDB lacks TABLE_PRIVILEGES introspection; return empty result\nSELECT\n    CAST(NULL AS VARCHAR) AS table_schema,\n    CAST(NULL AS VARCHAR) AS table_name,\n    CAST(0 AS INTEGER) AS total_grants\nWHERE 1=0;\n"
+    clickhouse: "SELECT\n    database AS table_schema,\n    table AS table_name,\n    COUNT(*) AS total_grants\nFROM system.grants\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA')\n  AND table != ''\nGROUP BY database, table\nORDER BY total_grants DESC;\n"
+    redshift: "SELECT DISTINCT\n    namespace_name AS table_schema,\n    relation_name AS table_name,\n    COUNT(*) AS total_grants\nFROM svv_relation_privileges\nWHERE namespace_name NOT IN ('information_schema', 'pg_catalog')\nGROUP BY namespace_name, relation_name\nORDER BY total_grants DESC;\n"
+    synapse: "SELECT\n    SCHEMA_NAME(t.schema_id) AS table_schema,\n    t.name AS table_name,\n    COUNT(*) AS total_grants\nFROM sys.database_permissions p\nJOIN sys.tables t ON p.major_id = t.object_id\nWHERE p.class = 1\nGROUP BY SCHEMA_NAME(t.schema_id), t.name\nORDER BY total_grants DESC;\n"
+    fabric: "SELECT\n    SCHEMA_NAME(t.schema_id) AS table_schema,\n    t.name AS table_name,\n    COUNT(*) AS total_grants\nFROM sys.database_permissions p\nJOIN sys.tables t ON p.major_id = t.object_id\nWHERE p.class = 1\nGROUP BY SCHEMA_NAME(t.schema_id), t.name\nORDER BY total_grants DESC;\n"
+    firebolt: "SELECT\n    object_schema AS table_schema,\n    object_name AS table_name,\n    COUNT(*) AS total_grants\nFROM information_schema.object_privileges\nWHERE object_type = 'TABLE'\nGROUP BY object_schema, object_name\nORDER BY total_grants DESC;\n"
+    bigquery: "SELECT\n    table_schema,\n    table_name,\n    COUNT(*) AS total_grants\nFROM INFORMATION_SCHEMA.OBJECT_PRIVILEGES\nWHERE object_type = 'TABLE'\nGROUP BY table_schema, table_name\nORDER BY total_grants DESC;\n"
 - id: acl_column_privileges_list
   category: acl
   description: List column-level privileges (where supported)
-  sql: |2
-    SELECT
-        grantee,
-        table_schema,
-        table_name,
-        column_name,
-        privilege_type
-    FROM information_schema.column_privileges
-    WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-    ORDER BY table_name, column_name, grantee;
-  skip_on: [duckdb, clickhouse, sqlite, datafusion, spark, polars, athena, bigquery, trino, presto, firebolt]
+  sql: "SELECT\n    grantee,\n    table_schema,\n    table_name,\n    column_name,\n    privilege_type\nFROM information_schema.column_privileges\nWHERE table_schema NOT IN ('information_schema', 'pg_catalog')\nORDER BY table_name, column_name, grantee;\n"
+  skip_on:
+  - duckdb
+  - clickhouse
+  - sqlite
+  - datafusion
+  - spark
+  - polars
+  - athena
+  - bigquery
+  - trino
+  - presto
+  - firebolt
   variants:
-    redshift: |2
-      SELECT
-          identity_name AS grantee,
-          namespace_name AS table_schema,
-          relation_name AS table_name,
-          column_name,
-          privilege_type
-      FROM svv_column_privileges
-      ORDER BY relation_name, column_name, identity_name;
-    synapse: |2
-      SELECT
-          dp.name AS grantee,
-          SCHEMA_NAME(t.schema_id) AS table_schema,
-          t.name AS table_name,
-          c.name AS column_name,
-          p.permission_name AS privilege_type
-      FROM sys.database_permissions p
-      JOIN sys.database_principals dp ON p.grantee_principal_id = dp.principal_id
-      JOIN sys.columns c ON p.major_id = c.object_id AND p.minor_id = c.column_id
-      JOIN sys.tables t ON c.object_id = t.object_id
-      WHERE p.class = 1 AND p.minor_id > 0
-      ORDER BY t.name, c.name, dp.name;
-    fabric: |2
-      SELECT
-          dp.name AS grantee,
-          SCHEMA_NAME(t.schema_id) AS table_schema,
-          t.name AS table_name,
-          c.name AS column_name,
-          p.permission_name AS privilege_type
-      FROM sys.database_permissions p
-      JOIN sys.database_principals dp ON p.grantee_principal_id = dp.principal_id
-      JOIN sys.columns c ON p.major_id = c.object_id AND p.minor_id = c.column_id
-      JOIN sys.tables t ON c.object_id = t.object_id
-      WHERE p.class = 1 AND p.minor_id > 0
-      ORDER BY t.name, c.name, dp.name;
-    databricks: |2
-      SELECT
-          grantee,
-          table_schema,
-          table_name,
-          column_name,
-          privilege_type
-      FROM system.information_schema.column_privileges
-      ORDER BY table_name, column_name, grantee;
-    snowflake: |2
-      -- Snowflake column privileges require SHOW GRANTS; use table_privileges as fallback
-      SELECT
-          grantee,
-          table_schema,
-          table_name,
-          '' AS column_name,
-          privilege_type
-      FROM information_schema.table_privileges
-      WHERE table_schema NOT IN ('INFORMATION_SCHEMA')
-      ORDER BY table_name, grantee
-      LIMIT 100;
-
+    redshift: "SELECT\n    identity_name AS grantee,\n    namespace_name AS table_schema,\n    relation_name AS table_name,\n    column_name,\n    privilege_type\nFROM svv_column_privileges\nORDER BY relation_name, column_name, identity_name;\n"
+    synapse: "SELECT\n    dp.name AS grantee,\n    SCHEMA_NAME(t.schema_id) AS table_schema,\n    t.name AS table_name,\n    c.name AS column_name,\n    p.permission_name AS privilege_type\nFROM sys.database_permissions p\nJOIN sys.database_principals dp ON p.grantee_principal_id = dp.principal_id\nJOIN sys.columns c ON p.major_id = c.object_id AND p.minor_id = c.column_id\nJOIN sys.tables t ON c.object_id = t.object_id\nWHERE p.class = 1 AND p.minor_id > 0\nORDER BY t.name, c.name, dp.name;\n"
+    fabric: "SELECT\n    dp.name AS grantee,\n    SCHEMA_NAME(t.schema_id) AS table_schema,\n    t.name AS table_name,\n    c.name AS column_name,\n    p.permission_name AS privilege_type\nFROM sys.database_permissions p\nJOIN sys.database_principals dp ON p.grantee_principal_id = dp.principal_id\nJOIN sys.columns c ON p.major_id = c.object_id AND p.minor_id = c.column_id\nJOIN sys.tables t ON c.object_id = t.object_id\nWHERE p.class = 1 AND p.minor_id > 0\nORDER BY t.name, c.name, dp.name;\n"
+    databricks: "SELECT\n    grantee,\n    table_schema,\n    table_name,\n    column_name,\n    privilege_type\nFROM system.information_schema.column_privileges\nORDER BY table_name, column_name, grantee;\n"
+    snowflake: "-- Snowflake column privileges require SHOW GRANTS; use table_privileges as fallback\nSELECT\n    grantee,\n    table_schema,\n    table_name,\n    '' AS column_name,\n    privilege_type\nFROM information_schema.table_privileges\nWHERE table_schema NOT IN ('INFORMATION_SCHEMA')\nORDER BY table_name, grantee\nLIMIT 100;\n"
 - id: acl_role_list
   category: acl
   description: List all roles in the database
-  sql: |2
-    SELECT
-        rolname AS role_name,
-        rolsuper AS is_superuser,
-        rolcreatedb AS can_create_db,
-        rolcreaterole AS can_create_role
-    FROM pg_roles
-    WHERE rolname NOT LIKE 'pg_%'
-    ORDER BY rolname;
-  skip_on: [sqlite, datafusion, spark, polars, athena, bigquery, trino, presto, starrocks]
+  sql: "SELECT\n    rolname AS role_name,\n    rolsuper AS is_superuser,\n    rolcreatedb AS can_create_db,\n    rolcreaterole AS can_create_role\nFROM pg_roles\nWHERE rolname NOT LIKE 'pg_%'\nORDER BY rolname;\n"
+  skip_on:
+  - sqlite
+  - datafusion
+  - spark
+  - polars
+  - athena
+  - bigquery
+  - trino
+  - presto
+  - starrocks
   variants:
-    duckdb: |2
-      -- DuckDB lacks role introspection; return empty result
-      SELECT
-          CAST(NULL AS VARCHAR) AS role_name,
-          CAST(NULL AS BOOLEAN) AS is_superuser,
-          CAST(NULL AS BOOLEAN) AS can_create_db,
-          CAST(NULL AS BOOLEAN) AS can_create_role
-      WHERE 1=0;
-    clickhouse: |2
-      SELECT
-          name AS role_name,
-          0 AS is_superuser,
-          0 AS can_create_db,
-          0 AS can_create_role
-      FROM system.roles
-      ORDER BY name;
-    redshift: |2
-      SELECT
-          usename AS role_name,
-          usesuper AS is_superuser,
-          usecreatedb AS can_create_db,
-          FALSE AS can_create_role
-      FROM pg_user
-      ORDER BY usename;
-    snowflake: |2
-      -- Snowflake requires SHOW ROLES; using placeholder query
-      SELECT
-          'ACCOUNTADMIN' AS role_name,
-          TRUE AS is_superuser,
-          TRUE AS can_create_db,
-          TRUE AS can_create_role
-      WHERE 1=0;
-    synapse: |2
-      SELECT
-          name AS role_name,
-          CASE WHEN type = 'R' THEN 0 ELSE 1 END AS is_superuser,
-          0 AS can_create_db,
-          0 AS can_create_role
-      FROM sys.database_principals
-      WHERE type IN ('R', 'S', 'U')
-        AND name NOT LIKE '##%'
-        AND name NOT IN ('dbo', 'guest', 'INFORMATION_SCHEMA', 'sys')
-      ORDER BY name;
-    fabric: |2
-      SELECT
-          name AS role_name,
-          CASE WHEN type = 'R' THEN 0 ELSE 1 END AS is_superuser,
-          0 AS can_create_db,
-          0 AS can_create_role
-      FROM sys.database_principals
-      WHERE type IN ('R', 'S', 'U')
-        AND name NOT LIKE '##%'
-        AND name NOT IN ('dbo', 'guest', 'INFORMATION_SCHEMA', 'sys')
-      ORDER BY name;
-    firebolt: |2
-      SELECT DISTINCT
-          grantee AS role_name,
-          FALSE AS is_superuser,
-          FALSE AS can_create_db,
-          FALSE AS can_create_role
-      FROM information_schema.object_privileges
-      ORDER BY grantee;
-    databricks: |2
-      -- Databricks Unity Catalog; requires appropriate privileges
-      SELECT DISTINCT
-          grantee AS role_name,
-          FALSE AS is_superuser,
-          FALSE AS can_create_db,
-          FALSE AS can_create_role
-      FROM system.information_schema.table_privileges
-      WHERE grantee IS NOT NULL
-      ORDER BY grantee;
-
+    duckdb: "-- DuckDB lacks role introspection; return empty result\nSELECT\n    CAST(NULL AS VARCHAR) AS role_name,\n    CAST(NULL AS BOOLEAN) AS is_superuser,\n    CAST(NULL AS BOOLEAN) AS can_create_db,\n    CAST(NULL AS BOOLEAN) AS can_create_role\nWHERE 1=0;\n"
+    clickhouse: "SELECT\n    name AS role_name,\n    0 AS is_superuser,\n    0 AS can_create_db,\n    0 AS can_create_role\nFROM system.roles\nORDER BY name;\n"
+    redshift: "SELECT\n    usename AS role_name,\n    usesuper AS is_superuser,\n    usecreatedb AS can_create_db,\n    FALSE AS can_create_role\nFROM pg_user\nORDER BY usename;\n"
+    snowflake: "-- Snowflake requires SHOW ROLES; using placeholder query\nSELECT\n    'ACCOUNTADMIN' AS role_name,\n    TRUE AS is_superuser,\n    TRUE AS can_create_db,\n    TRUE AS can_create_role\nWHERE 1=0;\n"
+    synapse: "SELECT\n    name AS role_name,\n    CASE WHEN type = 'R' THEN 0 ELSE 1 END AS is_superuser,\n    0 AS can_create_db,\n    0 AS can_create_role\nFROM sys.database_principals\nWHERE type IN ('R', 'S', 'U')\n  AND name NOT LIKE '##%'\n  AND name NOT IN ('dbo', 'guest', 'INFORMATION_SCHEMA', 'sys')\nORDER BY name;\n"
+    fabric: "SELECT\n    name AS role_name,\n    CASE WHEN type = 'R' THEN 0 ELSE 1 END AS is_superuser,\n    0 AS can_create_db,\n    0 AS can_create_role\nFROM sys.database_principals\nWHERE type IN ('R', 'S', 'U')\n  AND name NOT LIKE '##%'\n  AND name NOT IN ('dbo', 'guest', 'INFORMATION_SCHEMA', 'sys')\nORDER BY name;\n"
+    firebolt: "SELECT DISTINCT\n    grantee AS role_name,\n    FALSE AS is_superuser,\n    FALSE AS can_create_db,\n    FALSE AS can_create_role\nFROM information_schema.object_privileges\nORDER BY grantee;\n"
+    databricks: "-- Databricks Unity Catalog; requires appropriate privileges\nSELECT DISTINCT\n    grantee AS role_name,\n    FALSE AS is_superuser,\n    FALSE AS can_create_db,\n    FALSE AS can_create_role\nFROM system.information_schema.table_privileges\nWHERE grantee IS NOT NULL\nORDER BY grantee;\n"
 - id: acl_role_membership
   category: acl
   description: List role-to-role membership (role hierarchy)
-  sql: |2
-    SELECT
-        r.rolname AS role_name,
-        m.rolname AS member_name,
-        am.admin_option
-    FROM pg_auth_members am
-    JOIN pg_roles r ON am.roleid = r.oid
-    JOIN pg_roles m ON am.member = m.oid
-    WHERE r.rolname NOT LIKE 'pg_%'
-    ORDER BY r.rolname, m.rolname;
-  skip_on: [duckdb, sqlite, datafusion, spark, polars, athena, bigquery, trino, presto, firebolt, snowflake, starrocks]
+  sql: "SELECT\n    r.rolname AS role_name,\n    m.rolname AS member_name,\n    am.admin_option\nFROM pg_auth_members am\nJOIN pg_roles r ON am.roleid = r.oid\nJOIN pg_roles m ON am.member = m.oid\nWHERE r.rolname NOT LIKE 'pg_%'\nORDER BY r.rolname, m.rolname;\n"
+  skip_on:
+  - duckdb
+  - sqlite
+  - datafusion
+  - spark
+  - polars
+  - athena
+  - bigquery
+  - trino
+  - presto
+  - firebolt
+  - snowflake
+  - starrocks
   variants:
-    clickhouse: |2
-      SELECT
-          role_name,
-          granted_role_name AS member_name,
-          admin_option
-      FROM system.role_grants
-      ORDER BY role_name, granted_role_name;
-    redshift: |2
-      SELECT
-          pg_get_userbyid(roleid) AS role_name,
-          pg_get_userbyid(member) AS member_name,
-          admin_option
-      FROM pg_auth_members
-      ORDER BY role_name, member_name;
-    synapse: |2
-      SELECT
-          r.name AS role_name,
-          m.name AS member_name,
-          0 AS admin_option
-      FROM sys.database_role_members rm
-      JOIN sys.database_principals r ON rm.role_principal_id = r.principal_id
-      JOIN sys.database_principals m ON rm.member_principal_id = m.principal_id
-      ORDER BY r.name, m.name;
-    fabric: |2
-      SELECT
-          r.name AS role_name,
-          m.name AS member_name,
-          0 AS admin_option
-      FROM sys.database_role_members rm
-      JOIN sys.database_principals r ON rm.role_principal_id = r.principal_id
-      JOIN sys.database_principals m ON rm.member_principal_id = m.principal_id
-      ORDER BY r.name, m.name;
-    databricks: |2
-      -- Databricks UC has limited role hierarchy introspection
-      SELECT
-          CAST(NULL AS VARCHAR) AS role_name,
-          CAST(NULL AS VARCHAR) AS member_name,
-          CAST(NULL AS BOOLEAN) AS admin_option
-      WHERE 1=0;
-
+    clickhouse: "SELECT\n    role_name,\n    granted_role_name AS member_name,\n    admin_option\nFROM system.role_grants\nORDER BY role_name, granted_role_name;\n"
+    redshift: "SELECT\n    pg_get_userbyid(roleid) AS role_name,\n    pg_get_userbyid(member) AS member_name,\n    admin_option\nFROM pg_auth_members\nORDER BY role_name, member_name;\n"
+    synapse: "SELECT\n    r.name AS role_name,\n    m.name AS member_name,\n    0 AS admin_option\nFROM sys.database_role_members rm\nJOIN sys.database_principals r ON rm.role_principal_id = r.principal_id\nJOIN sys.database_principals m ON rm.member_principal_id = m.principal_id\nORDER BY r.name, m.name;\n"
+    fabric: "SELECT\n    r.name AS role_name,\n    m.name AS member_name,\n    0 AS admin_option\nFROM sys.database_role_members rm\nJOIN sys.database_principals r ON rm.role_principal_id = r.principal_id\nJOIN sys.database_principals m ON rm.member_principal_id = m.principal_id\nORDER BY r.name, m.name;\n"
+    databricks: "-- Databricks UC has limited role hierarchy introspection\nSELECT\n    CAST(NULL AS VARCHAR) AS role_name,\n    CAST(NULL AS VARCHAR) AS member_name,\n    CAST(NULL AS BOOLEAN) AS admin_option\nWHERE 1=0;\n"
 - id: acl_grantable_privileges
   category: acl
   description: Find privileges granted WITH GRANT OPTION (admin rights)
-  sql: |2
-    SELECT
-        grantee,
-        table_schema,
-        table_name,
-        privilege_type
-    FROM information_schema.table_privileges
-    WHERE is_grantable = 'YES'
-      AND table_schema NOT IN ('information_schema', 'pg_catalog')
-    ORDER BY table_name, grantee;
-  skip_on: [sqlite, datafusion, spark, polars, athena]
+  sql: "SELECT\n    grantee,\n    table_schema,\n    table_name,\n    privilege_type\nFROM information_schema.table_privileges\nWHERE is_grantable = 'YES'\n  AND table_schema NOT IN ('information_schema', 'pg_catalog')\nORDER BY table_name, grantee;\n"
+  skip_on:
+  - sqlite
+  - datafusion
+  - spark
+  - polars
+  - athena
   variants:
-    duckdb: |2
-      -- DuckDB lacks TABLE_PRIVILEGES introspection; return empty result
-      SELECT
-          CAST(NULL AS VARCHAR) AS grantee,
-          CAST(NULL AS VARCHAR) AS table_schema,
-          CAST(NULL AS VARCHAR) AS table_name,
-          CAST(NULL AS VARCHAR) AS privilege_type
-      WHERE 1=0;
-    clickhouse: |2
-      SELECT
-          user_name AS grantee,
-          database AS table_schema,
-          table AS table_name,
-          access_type AS privilege_type
-      FROM system.grants
-      WHERE grant_option = 1
-        AND database NOT IN ('system', 'INFORMATION_SCHEMA')
-        AND table != ''
-      ORDER BY table, user_name;
-    redshift: |2
-      SELECT
-          identity_name AS grantee,
-          namespace_name AS table_schema,
-          relation_name AS table_name,
-          privilege_type
-      FROM svv_relation_privileges
-      WHERE admin_option = TRUE
-        AND namespace_name NOT IN ('information_schema', 'pg_catalog')
-      ORDER BY relation_name, identity_name;
-    synapse: |2
-      SELECT
-          dp.name AS grantee,
-          SCHEMA_NAME(t.schema_id) AS table_schema,
-          t.name AS table_name,
-          p.permission_name AS privilege_type
-      FROM sys.database_permissions p
-      JOIN sys.database_principals dp ON p.grantee_principal_id = dp.principal_id
-      JOIN sys.tables t ON p.major_id = t.object_id
-      WHERE p.class = 1 AND p.state = 'W'
-      ORDER BY t.name, dp.name;
-    fabric: |2
-      SELECT
-          dp.name AS grantee,
-          SCHEMA_NAME(t.schema_id) AS table_schema,
-          t.name AS table_name,
-          p.permission_name AS privilege_type
-      FROM sys.database_permissions p
-      JOIN sys.database_principals dp ON p.grantee_principal_id = dp.principal_id
-      JOIN sys.tables t ON p.major_id = t.object_id
-      WHERE p.class = 1 AND p.state = 'W'
-      ORDER BY t.name, dp.name;
-    firebolt: |2
-      SELECT
-          grantee,
-          object_schema AS table_schema,
-          object_name AS table_name,
-          privilege_type
-      FROM information_schema.object_privileges
-      WHERE object_type = 'TABLE' AND is_grantable = 'YES'
-      ORDER BY object_name, grantee;
-    bigquery: |2
-      -- BigQuery doesn't have WITH GRANT OPTION concept
-      SELECT
-          CAST(NULL AS STRING) AS grantee,
-          CAST(NULL AS STRING) AS table_schema,
-          CAST(NULL AS STRING) AS table_name,
-          CAST(NULL AS STRING) AS privilege_type
-      WHERE 1=0;
-    snowflake: |2
-      SELECT
-          grantee,
-          table_schema,
-          table_name,
-          privilege_type
-      FROM information_schema.table_privileges
-      WHERE is_grantable = 'YES'
-        AND table_schema NOT IN ('INFORMATION_SCHEMA')
-      ORDER BY table_name, grantee;
-
+    duckdb: "-- DuckDB lacks TABLE_PRIVILEGES introspection; return empty result\nSELECT\n    CAST(NULL AS VARCHAR) AS grantee,\n    CAST(NULL AS VARCHAR) AS table_schema,\n    CAST(NULL AS VARCHAR) AS table_name,\n    CAST(NULL AS VARCHAR) AS privilege_type\nWHERE 1=0;\n"
+    clickhouse: "SELECT\n    user_name AS grantee,\n    database AS table_schema,\n    table AS table_name,\n    access_type AS privilege_type\nFROM system.grants\nWHERE grant_option = 1\n  AND database NOT IN ('system', 'INFORMATION_SCHEMA')\n  AND table != ''\nORDER BY table, user_name;\n"
+    redshift: "SELECT\n    identity_name AS grantee,\n    namespace_name AS table_schema,\n    relation_name AS table_name,\n    privilege_type\nFROM svv_relation_privileges\nWHERE admin_option = TRUE\n  AND namespace_name NOT IN ('information_schema', 'pg_catalog')\nORDER BY relation_name, identity_name;\n"
+    synapse: "SELECT\n    dp.name AS grantee,\n    SCHEMA_NAME(t.schema_id) AS table_schema,\n    t.name AS table_name,\n    p.permission_name AS privilege_type\nFROM sys.database_permissions p\nJOIN sys.database_principals dp ON p.grantee_principal_id = dp.principal_id\nJOIN sys.tables t ON p.major_id = t.object_id\nWHERE p.class = 1 AND p.state = 'W'\nORDER BY t.name, dp.name;\n"
+    fabric: "SELECT\n    dp.name AS grantee,\n    SCHEMA_NAME(t.schema_id) AS table_schema,\n    t.name AS table_name,\n    p.permission_name AS privilege_type\nFROM sys.database_permissions p\nJOIN sys.database_principals dp ON p.grantee_principal_id = dp.principal_id\nJOIN sys.tables t ON p.major_id = t.object_id\nWHERE p.class = 1 AND p.state = 'W'\nORDER BY t.name, dp.name;\n"
+    firebolt: "SELECT\n    grantee,\n    object_schema AS table_schema,\n    object_name AS table_name,\n    privilege_type\nFROM information_schema.object_privileges\nWHERE object_type = 'TABLE' AND is_grantable = 'YES'\nORDER BY object_name, grantee;\n"
+    bigquery: "-- BigQuery doesn't have WITH GRANT OPTION concept\nSELECT\n    CAST(NULL AS STRING) AS grantee,\n    CAST(NULL AS STRING) AS table_schema,\n    CAST(NULL AS STRING) AS table_name,\n    CAST(NULL AS STRING) AS privilege_type\nWHERE 1=0;\n"
+    snowflake: "SELECT\n    grantee,\n    table_schema,\n    table_name,\n    privilege_type\nFROM information_schema.table_privileges\nWHERE is_grantable = 'YES'\n  AND table_schema NOT IN ('INFORMATION_SCHEMA')\nORDER BY table_name, grantee;\n"
 - id: acl_benchmark_role_grants
   category: acl
   description: List all grants to benchmark roles (benchbox_role_*)
-  sql: |2
-    SELECT
-        grantee,
-        table_schema,
-        table_name,
-        privilege_type
-    FROM information_schema.table_privileges
-    WHERE grantee LIKE 'benchbox_role_%'
-    ORDER BY grantee, table_name, privilege_type;
-  skip_on: [sqlite, datafusion, spark, polars, athena]
+  sql: "SELECT\n    grantee,\n    table_schema,\n    table_name,\n    privilege_type\nFROM information_schema.table_privileges\nWHERE grantee LIKE 'benchbox_role_%'\nORDER BY grantee, table_name, privilege_type;\n"
+  skip_on:
+  - sqlite
+  - datafusion
+  - spark
+  - polars
+  - athena
   variants:
-    duckdb: |2
-      -- DuckDB lacks TABLE_PRIVILEGES introspection; return empty result
-      SELECT
-          CAST(NULL AS VARCHAR) AS grantee,
-          CAST(NULL AS VARCHAR) AS table_schema,
-          CAST(NULL AS VARCHAR) AS table_name,
-          CAST(NULL AS VARCHAR) AS privilege_type
-      WHERE 1=0;
-    clickhouse: |2
-      SELECT
-          user_name AS grantee,
-          database AS table_schema,
-          table AS table_name,
-          access_type AS privilege_type
-      FROM system.grants
-      WHERE user_name LIKE 'benchbox_role_%'
-      ORDER BY user_name, table, access_type;
-    redshift: |2
-      SELECT
-          identity_name AS grantee,
-          namespace_name AS table_schema,
-          relation_name AS table_name,
-          privilege_type
-      FROM svv_relation_privileges
-      WHERE identity_name LIKE 'benchbox_role_%'
-      ORDER BY identity_name, relation_name, privilege_type;
-    synapse: |2
-      SELECT
-          dp.name AS grantee,
-          SCHEMA_NAME(t.schema_id) AS table_schema,
-          t.name AS table_name,
-          p.permission_name AS privilege_type
-      FROM sys.database_permissions p
-      JOIN sys.database_principals dp ON p.grantee_principal_id = dp.principal_id
-      JOIN sys.tables t ON p.major_id = t.object_id
-      WHERE p.class = 1 AND dp.name LIKE 'benchbox_role_%'
-      ORDER BY dp.name, t.name, p.permission_name;
-    fabric: |2
-      SELECT
-          dp.name AS grantee,
-          SCHEMA_NAME(t.schema_id) AS table_schema,
-          t.name AS table_name,
-          p.permission_name AS privilege_type
-      FROM sys.database_permissions p
-      JOIN sys.database_principals dp ON p.grantee_principal_id = dp.principal_id
-      JOIN sys.tables t ON p.major_id = t.object_id
-      WHERE p.class = 1 AND dp.name LIKE 'benchbox_role_%'
-      ORDER BY dp.name, t.name, p.permission_name;
-    firebolt: |2
-      SELECT
-          grantee,
-          object_schema AS table_schema,
-          object_name AS table_name,
-          privilege_type
-      FROM information_schema.object_privileges
-      WHERE object_type = 'TABLE' AND grantee LIKE 'benchbox_role_%'
-      ORDER BY grantee, object_name, privilege_type;
-    bigquery: |2
-      SELECT
-          grantee,
-          table_schema,
-          table_name,
-          privilege_type
-      FROM INFORMATION_SCHEMA.OBJECT_PRIVILEGES
-      WHERE object_type = 'TABLE' AND grantee LIKE 'benchbox_role_%'
-      ORDER BY grantee, table_name, privilege_type;
-    snowflake: |2
-      SELECT
-          grantee,
-          table_schema,
-          table_name,
-          privilege_type
-      FROM information_schema.table_privileges
-      WHERE grantee LIKE 'BENCHBOX_ROLE_%'
-      ORDER BY grantee, table_name, privilege_type;
-    databricks: |2
-      SELECT
-          grantee,
-          table_schema,
-          table_name,
-          privilege_type
-      FROM system.information_schema.table_privileges
-      WHERE grantee LIKE 'benchbox_role_%'
-      ORDER BY grantee, table_name, privilege_type;
-
+    duckdb: "-- DuckDB lacks TABLE_PRIVILEGES introspection; return empty result\nSELECT\n    CAST(NULL AS VARCHAR) AS grantee,\n    CAST(NULL AS VARCHAR) AS table_schema,\n    CAST(NULL AS VARCHAR) AS table_name,\n    CAST(NULL AS VARCHAR) AS privilege_type\nWHERE 1=0;\n"
+    clickhouse: "SELECT\n    user_name AS grantee,\n    database AS table_schema,\n    table AS table_name,\n    access_type AS privilege_type\nFROM system.grants\nWHERE user_name LIKE 'benchbox_role_%'\nORDER BY user_name, table, access_type;\n"
+    redshift: "SELECT\n    identity_name AS grantee,\n    namespace_name AS table_schema,\n    relation_name AS table_name,\n    privilege_type\nFROM svv_relation_privileges\nWHERE identity_name LIKE 'benchbox_role_%'\nORDER BY identity_name, relation_name, privilege_type;\n"
+    synapse: "SELECT\n    dp.name AS grantee,\n    SCHEMA_NAME(t.schema_id) AS table_schema,\n    t.name AS table_name,\n    p.permission_name AS privilege_type\nFROM sys.database_permissions p\nJOIN sys.database_principals dp ON p.grantee_principal_id = dp.principal_id\nJOIN sys.tables t ON p.major_id = t.object_id\nWHERE p.class = 1 AND dp.name LIKE 'benchbox_role_%'\nORDER BY dp.name, t.name, p.permission_name;\n"
+    fabric: "SELECT\n    dp.name AS grantee,\n    SCHEMA_NAME(t.schema_id) AS table_schema,\n    t.name AS table_name,\n    p.permission_name AS privilege_type\nFROM sys.database_permissions p\nJOIN sys.database_principals dp ON p.grantee_principal_id = dp.principal_id\nJOIN sys.tables t ON p.major_id = t.object_id\nWHERE p.class = 1 AND dp.name LIKE 'benchbox_role_%'\nORDER BY dp.name, t.name, p.permission_name;\n"
+    firebolt: "SELECT\n    grantee,\n    object_schema AS table_schema,\n    object_name AS table_name,\n    privilege_type\nFROM information_schema.object_privileges\nWHERE object_type = 'TABLE' AND grantee LIKE 'benchbox_role_%'\nORDER BY grantee, object_name, privilege_type;\n"
+    bigquery: "SELECT\n    grantee,\n    table_schema,\n    table_name,\n    privilege_type\nFROM INFORMATION_SCHEMA.OBJECT_PRIVILEGES\nWHERE object_type = 'TABLE' AND grantee LIKE 'benchbox_role_%'\nORDER BY grantee, table_name, privilege_type;\n"
+    snowflake: "SELECT\n    grantee,\n    table_schema,\n    table_name,\n    privilege_type\nFROM information_schema.table_privileges\nWHERE grantee LIKE 'BENCHBOX_ROLE_%'\nORDER BY grantee, table_name, privilege_type;\n"
+    databricks: "SELECT\n    grantee,\n    table_schema,\n    table_name,\n    privilege_type\nFROM system.information_schema.table_privileges\nWHERE grantee LIKE 'benchbox_role_%'\nORDER BY grantee, table_name, privilege_type;\n"
 - id: acl_privilege_summary
   category: acl
   description: Summary of all privileges by type and grantee count
-  sql: |2
-    SELECT
-        privilege_type,
-        COUNT(*) AS total_grants,
-        COUNT(DISTINCT grantee) AS distinct_grantees,
-        COUNT(DISTINCT table_name) AS distinct_tables
-    FROM information_schema.table_privileges
-    WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
-    GROUP BY privilege_type
-    ORDER BY total_grants DESC;
-  skip_on: [sqlite, datafusion, spark, polars, athena]
+  sql: "SELECT\n    privilege_type,\n    COUNT(*) AS total_grants,\n    COUNT(DISTINCT grantee) AS distinct_grantees,\n    COUNT(DISTINCT table_name) AS distinct_tables\nFROM information_schema.table_privileges\nWHERE table_schema NOT IN ('information_schema', 'pg_catalog')\nGROUP BY privilege_type\nORDER BY total_grants DESC;\n"
+  skip_on:
+  - sqlite
+  - datafusion
+  - spark
+  - polars
+  - athena
   variants:
-    duckdb: |2
-      -- DuckDB lacks TABLE_PRIVILEGES introspection; return empty result
-      SELECT
-          CAST(NULL AS VARCHAR) AS privilege_type,
-          CAST(0 AS INTEGER) AS total_grants,
-          CAST(0 AS INTEGER) AS distinct_grantees,
-          CAST(0 AS INTEGER) AS distinct_tables
-      WHERE 1=0;
-    clickhouse: |2
-      SELECT
-          access_type AS privilege_type,
-          COUNT(*) AS total_grants,
-          uniq(user_name) AS distinct_grantees,
-          uniq(table) AS distinct_tables
-      FROM system.grants
-      WHERE database NOT IN ('system', 'INFORMATION_SCHEMA')
-        AND table != ''
-      GROUP BY access_type
-      ORDER BY total_grants DESC;
-    redshift: |2
-      SELECT
-          privilege_type,
-          COUNT(*) AS total_grants,
-          COUNT(DISTINCT identity_name) AS distinct_grantees,
-          COUNT(DISTINCT relation_name) AS distinct_tables
-      FROM svv_relation_privileges
-      WHERE namespace_name NOT IN ('information_schema', 'pg_catalog')
-      GROUP BY privilege_type
-      ORDER BY total_grants DESC;
-    synapse: |2
-      SELECT
-          p.permission_name AS privilege_type,
-          COUNT(*) AS total_grants,
-          COUNT(DISTINCT dp.name) AS distinct_grantees,
-          COUNT(DISTINCT t.name) AS distinct_tables
-      FROM sys.database_permissions p
-      JOIN sys.database_principals dp ON p.grantee_principal_id = dp.principal_id
-      JOIN sys.tables t ON p.major_id = t.object_id
-      WHERE p.class = 1
-      GROUP BY p.permission_name
-      ORDER BY total_grants DESC;
-    fabric: |2
-      SELECT
-          p.permission_name AS privilege_type,
-          COUNT(*) AS total_grants,
-          COUNT(DISTINCT dp.name) AS distinct_grantees,
-          COUNT(DISTINCT t.name) AS distinct_tables
-      FROM sys.database_permissions p
-      JOIN sys.database_principals dp ON p.grantee_principal_id = dp.principal_id
-      JOIN sys.tables t ON p.major_id = t.object_id
-      WHERE p.class = 1
-      GROUP BY p.permission_name
-      ORDER BY total_grants DESC;
-    firebolt: |2
-      SELECT
-          privilege_type,
-          COUNT(*) AS total_grants,
-          COUNT(DISTINCT grantee) AS distinct_grantees,
-          COUNT(DISTINCT object_name) AS distinct_tables
-      FROM information_schema.object_privileges
-      WHERE object_type = 'TABLE'
-      GROUP BY privilege_type
-      ORDER BY total_grants DESC;
-    bigquery: |2
-      SELECT
-          privilege_type,
-          COUNT(*) AS total_grants,
-          COUNT(DISTINCT grantee) AS distinct_grantees,
-          COUNT(DISTINCT table_name) AS distinct_tables
-      FROM INFORMATION_SCHEMA.OBJECT_PRIVILEGES
-      WHERE object_type = 'TABLE'
-      GROUP BY privilege_type
-      ORDER BY total_grants DESC;
-    snowflake: |2
-      SELECT
-          privilege_type,
-          COUNT(*) AS total_grants,
-          COUNT(DISTINCT grantee) AS distinct_grantees,
-          COUNT(DISTINCT table_name) AS distinct_tables
-      FROM information_schema.table_privileges
-      WHERE table_schema NOT IN ('INFORMATION_SCHEMA')
-      GROUP BY privilege_type
-      ORDER BY total_grants DESC;
-    databricks: |2
-      SELECT
-          privilege_type,
-          COUNT(*) AS total_grants,
-          COUNT(DISTINCT grantee) AS distinct_grantees,
-          COUNT(DISTINCT table_name) AS distinct_tables
-      FROM system.information_schema.table_privileges
-      GROUP BY privilege_type
-      ORDER BY total_grants DESC;
+    duckdb: "-- DuckDB lacks TABLE_PRIVILEGES introspection; return empty result\nSELECT\n    CAST(NULL AS VARCHAR) AS privilege_type,\n    CAST(0 AS INTEGER) AS total_grants,\n    CAST(0 AS INTEGER) AS distinct_grantees,\n    CAST(0 AS INTEGER) AS distinct_tables\nWHERE 1=0;\n"
+    clickhouse: "SELECT\n    access_type AS privilege_type,\n    COUNT(*) AS total_grants,\n    uniq(user_name) AS distinct_grantees,\n    uniq(table) AS distinct_tables\nFROM system.grants\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA')\n  AND table != ''\nGROUP BY access_type\nORDER BY total_grants DESC;\n"
+    redshift: "SELECT\n    privilege_type,\n    COUNT(*) AS total_grants,\n    COUNT(DISTINCT identity_name) AS distinct_grantees,\n    COUNT(DISTINCT relation_name) AS distinct_tables\nFROM svv_relation_privileges\nWHERE namespace_name NOT IN ('information_schema', 'pg_catalog')\nGROUP BY privilege_type\nORDER BY total_grants DESC;\n"
+    synapse: "SELECT\n    p.permission_name AS privilege_type,\n    COUNT(*) AS total_grants,\n    COUNT(DISTINCT dp.name) AS distinct_grantees,\n    COUNT(DISTINCT t.name) AS distinct_tables\nFROM sys.database_permissions p\nJOIN sys.database_principals dp ON p.grantee_principal_id = dp.principal_id\nJOIN sys.tables t ON p.major_id = t.object_id\nWHERE p.class = 1\nGROUP BY p.permission_name\nORDER BY total_grants DESC;\n"
+    fabric: "SELECT\n    p.permission_name AS privilege_type,\n    COUNT(*) AS total_grants,\n    COUNT(DISTINCT dp.name) AS distinct_grantees,\n    COUNT(DISTINCT t.name) AS distinct_tables\nFROM sys.database_permissions p\nJOIN sys.database_principals dp ON p.grantee_principal_id = dp.principal_id\nJOIN sys.tables t ON p.major_id = t.object_id\nWHERE p.class = 1\nGROUP BY p.permission_name\nORDER BY total_grants DESC;\n"
+    firebolt: "SELECT\n    privilege_type,\n    COUNT(*) AS total_grants,\n    COUNT(DISTINCT grantee) AS distinct_grantees,\n    COUNT(DISTINCT object_name) AS distinct_tables\nFROM information_schema.object_privileges\nWHERE object_type = 'TABLE'\nGROUP BY privilege_type\nORDER BY total_grants DESC;\n"
+    bigquery: "SELECT\n    privilege_type,\n    COUNT(*) AS total_grants,\n    COUNT(DISTINCT grantee) AS distinct_grantees,\n    COUNT(DISTINCT table_name) AS distinct_tables\nFROM INFORMATION_SCHEMA.OBJECT_PRIVILEGES\nWHERE object_type = 'TABLE'\nGROUP BY privilege_type\nORDER BY total_grants DESC;\n"
+    snowflake: "SELECT\n    privilege_type,\n    COUNT(*) AS total_grants,\n    COUNT(DISTINCT grantee) AS distinct_grantees,\n    COUNT(DISTINCT table_name) AS distinct_tables\nFROM information_schema.table_privileges\nWHERE table_schema NOT IN ('INFORMATION_SCHEMA')\nGROUP BY privilege_type\nORDER BY total_grants DESC;\n"
+    databricks: "SELECT\n    privilege_type,\n    COUNT(*) AS total_grants,\n    COUNT(DISTINCT grantee) AS distinct_grantees,\n    COUNT(DISTINCT table_name) AS distinct_tables\nFROM system.information_schema.table_privileges\nGROUP BY privilege_type\nORDER BY total_grants DESC;\n"
