@@ -197,7 +197,7 @@ class DryRunExecutor:
     def _resolve_execution_mode(database_config: Optional[DatabaseConfig]) -> str:
         """Resolve execution mode from database config or platform default."""
         from benchbox.core.platform_registry import PlatformRegistry
-        from benchbox.core.runner.dataframe_runner import get_execution_mode
+        from benchbox.platforms.adapter_factory import is_dataframe_mode
 
         if not database_config:
             return "sql"
@@ -206,9 +206,8 @@ class DryRunExecutor:
         if explicit_mode is not None:
             return explicit_mode
 
-        mode = get_execution_mode(database_config)
-        if mode != "sql":
-            return mode
+        if is_dataframe_mode(database_config.type, getattr(database_config, "execution_mode", None)):
+            return "dataframe"
 
         try:
             registry_mode = PlatformRegistry.get_default_mode(database_config.type)
@@ -670,7 +669,7 @@ class DryRunExecutor:
         """
         import inspect
 
-        from benchbox.core.runner.dataframe_runner import _get_queries_for_benchmark
+        from benchbox.core.dataframe.query_resolution import get_dataframe_queries_for_benchmark
         from benchbox.platforms.dataframe.platform_checker import (
             DATAFRAME_PLATFORMS,
             DataFrameFamily,
@@ -686,7 +685,7 @@ class DryRunExecutor:
                 family = "pandas" if platform_info.family == DataFrameFamily.PANDAS else "expression"
 
         try:
-            queries = _get_queries_for_benchmark(benchmark_config, benchmark_instance)
+            queries = get_dataframe_queries_for_benchmark(benchmark_config, benchmark_instance)
             result = {}
 
             for query in queries:

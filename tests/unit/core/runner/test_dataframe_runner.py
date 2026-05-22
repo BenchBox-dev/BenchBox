@@ -17,6 +17,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from benchbox.core.dataframe.query_resolution import build_dataframe_query_filter
 from benchbox.core.results.models import BenchmarkResults
 from benchbox.core.results.platform_info import PlatformInfoInput
 from benchbox.core.runner.dataframe_runner import (
@@ -60,9 +61,9 @@ class TestIsDataFrameExecution:
         """Test duckdb is detected as SQL mode."""
         assert is_dataframe_execution(types.SimpleNamespace(type="duckdb")) is False
 
-    def test_polars_without_df_is_sql(self):
-        """Test polars (without -df) is SQL mode."""
-        assert is_dataframe_execution(types.SimpleNamespace(type="polars")) is False
+    def test_polars_default_mode_is_dataframe(self):
+        """Bare polars follows the platform registry default mode."""
+        assert is_dataframe_execution(types.SimpleNamespace(type="polars")) is True
 
     def test_none_config(self):
         """Test None config returns False."""
@@ -87,6 +88,19 @@ class TestGetExecutionMode:
     def test_none_returns_sql(self):
         """Test None config returns 'sql'."""
         assert get_execution_mode(None) == "sql"
+
+
+class TestDataFrameQueryFilter:
+    """Tests for shared DataFrame query subset filtering."""
+
+    def test_prefixed_query_matches_prefixed_and_bare_ids(self):
+        assert build_dataframe_query_filter(["Q14a"]) == {"Q14A", "14A"}
+
+    def test_bare_query_matches_bare_and_prefixed_ids(self):
+        assert build_dataframe_query_filter(["1"]) == {"1", "Q1"}
+
+    def test_none_query_subset_returns_none(self):
+        assert build_dataframe_query_filter(None) is None
 
 
 class TestDataFramePhases:
@@ -329,7 +343,7 @@ class TestModeCoexistence:
             "duckdb": "sql",
             "sqlite": "sql",
             "datafusion": "sql",
-            "polars": "sql",  # Without -df suffix = SQL mode
+            "polars": "dataframe",  # Bare polars follows the registry default mode.
             "polars-df": "dataframe",
             "pandas-df": "dataframe",
             "snowflake": "sql",

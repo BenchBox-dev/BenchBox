@@ -13,7 +13,7 @@ from __future__ import annotations
 import inspect
 import logging
 from abc import abstractmethod
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from unittest.mock import DEFAULT
@@ -28,6 +28,13 @@ from benchbox.core.dataframe import (
     validate_scale_factor,
 )
 from benchbox.core.dataframe.data_loader import DataFrameDataLoader, get_tpch_column_names
+from benchbox.core.dataframe.query_resolution import (
+    benchmark_provides_dataframe_queries,
+    build_dataframe_query_filter_from_config,
+    get_dataframe_queries_for_benchmark,
+    get_tpcds_dataframe_queries,
+    get_tpch_dataframe_queries,
+)
 from benchbox.core.exceptions import InsufficientMemoryError
 from benchbox.core.results import (
     BenchmarkInfoInput,
@@ -109,7 +116,7 @@ def _benchmark_supports_dataframe_workload(benchmark: Any | None) -> bool:
 
 def _benchmark_provides_dataframe_queries(benchmark: Any | None) -> bool:
     """Return True when a benchmark defines a DataFrame query provider hook."""
-    return _benchmark_defines_hook(benchmark, "get_dataframe_queries")
+    return benchmark_provides_dataframe_queries(benchmark)
 
 
 @dataclass
@@ -164,6 +171,7 @@ class BenchmarkExecutionMixin:
     # Default: most DataFrame adapters have no versioned driver package.
     # Subclasses like DataFusionDataFrameAdapter override to SUPPORTED.
     driver_isolation_capability: DriverIsolationCapability = DriverIsolationCapability.NOT_APPLICABLE
+    is_dataframe_adapter: bool = True
 
     # These must be provided by the adapter class
     platform_name: str
@@ -791,19 +799,7 @@ class BenchmarkExecutionMixin:
     @staticmethod
     def _build_query_filter(benchmark_config: BenchmarkConfig) -> set[str] | None:
         """Normalize query subset into a bidirectional filter set (Q1 <-> 1)."""
-        query_subset = getattr(benchmark_config, "queries", None)
-        if not query_subset:
-            return None
-        normalized = set()
-        for q in query_subset:
-            q_str = str(q).strip().upper()
-            if q_str.startswith("Q"):
-                normalized.add(q_str)
-                normalized.add(q_str[1:])
-            else:
-                normalized.add(q_str)
-                normalized.add(f"Q{q_str}")
-        return normalized
+        return build_dataframe_query_filter_from_config(benchmark_config)
 
     def _collect_skip_query_ids(self, benchmark_instance: Any | None) -> set[str]:
         """Collect all query IDs to skip from benchmark and platform-specific sources."""
@@ -1145,52 +1141,12 @@ class BenchmarkExecutionMixin:
         stream_id: int | None = None,
     ) -> list[DataFrameQuery]:
         """Get DataFrame queries for a benchmark in proper execution order."""
-        benchmark_id = normalize_benchmark_id(benchmark_config.name)
-
-        if stream_id is None:
-            stream_id = getattr(benchmark_config, "stream_id", 0)
-
-        # Check registry for pre-defined queries
-        if benchmark_id == "tpch":
-            return self._get_tpch_queries(stream_id)
-        elif benchmark_id == "tpcds":
-            return self._get_tpcds_queries(benchmark_config, benchmark_instance, stream_id)
-        elif benchmark_id == "clickbench":
-            from benchbox.core.clickbench.dataframe_queries import CLICKBENCH_DATAFRAME_QUERIES
-
-            return CLICKBENCH_DATAFRAME_QUERIES.get_all_queries()
-
-        # Try benchmark instance
-        if _benchmark_provides_dataframe_queries(benchmark_instance):
-            benchmark_queries = benchmark_instance.get_dataframe_queries()  # type: ignore[no-untyped-call]
-            if isinstance(benchmark_queries, list):
-                return benchmark_queries
-            if hasattr(benchmark_queries, "get_all_queries"):
-                return benchmark_queries.get_all_queries()
-            logger.warning(
-                "Unsupported DataFrame query container type: %s",
-                type(benchmark_queries).__name__,
-            )
-
-        return []
+        return get_dataframe_queries_for_benchmark(benchmark_config, benchmark_instance, stream_id)
 
     @staticmethod
     def _get_tpch_queries(stream_id: int) -> list[DataFrameQuery]:
         """Get TPC-H DataFrame queries in stream-permuted order."""
-        from benchbox.core.tpch.dataframe_queries import TPCH_DATAFRAME_QUERIES
-        from benchbox.core.tpch.streams import TPCHStreams
-
-        query_permutation = TPCHStreams.PERMUTATION_MATRIX[stream_id % len(TPCHStreams.PERMUTATION_MATRIX)]
-
-        queries: list[DataFrameQuery] = []
-        for query_num in query_permutation:
-            query_id = f"Q{query_num}"
-            query = TPCH_DATAFRAME_QUERIES.get(query_id)
-            if query:
-                queries.append(query)
-            else:
-                logger.warning(f"Query {query_id} not found in TPC-H DataFrame registry")
-        return queries
+        return get_tpch_dataframe_queries(stream_id)
 
     @staticmethod
     def _get_tpcds_queries(
@@ -1199,88 +1155,7 @@ class BenchmarkExecutionMixin:
         stream_id: int,
     ) -> list[DataFrameQuery]:
         """Get TPC-DS DataFrame queries in stream-permuted order with variant resolution."""
-        from benchbox.core.tpcds.dataframe_queries import TPCDS_DATAFRAME_QUERIES
-        from benchbox.core.tpcds.streams import create_standard_streams
-
-        options_map = getattr(benchmark_config, "options", {}) or {}
-        allow_variant_fallback = bool(options_map.get("tpcds_dataframe_variant_fallback", True))
-
-        query_manager = None
-        if benchmark_instance and hasattr(benchmark_instance, "query_manager"):
-            query_manager = benchmark_instance.query_manager
-        elif (
-            benchmark_instance
-            and hasattr(benchmark_instance, "_impl")
-            and hasattr(benchmark_instance._impl, "query_manager")
-        ):
-            query_manager = benchmark_instance._impl.query_manager
-
-        available_query_ids = sorted(
-            int(qid[1:])
-            for qid in TPCDS_DATAFRAME_QUERIES.get_query_ids()
-            if qid.upper().startswith("Q") and qid[1:].isdigit()
-        )
-
-        if query_manager is None:
-            logger.warning("TPC-DS query_manager unavailable; using legacy 99-query DataFrame ordering")
-            from benchbox.core.tpcds.streams import PermutationMode, TPCDSPermutationGenerator
-
-            generator = TPCDSPermutationGenerator(seed=42 + stream_id)
-            query_permutation = generator.generate_permutation(available_query_ids, PermutationMode.TPCDS_STANDARD)
-            queries: list[DataFrameQuery] = []
-            for query_num in query_permutation:
-                query_id = f"Q{query_num}"
-                query = TPCDS_DATAFRAME_QUERIES.get(query_id)
-                if query:
-                    queries.append(query)
-            return queries
-
-        stream_manager = create_standard_streams(
-            query_manager=query_manager,
-            num_streams=1,
-            query_ids=available_query_ids,
-            query_range=(1, 99),
-            base_seed=42 + stream_id,
-        )
-        stream_queries = stream_manager.generate_streams().get(0, [])
-
-        queries = []
-        missing_variants: list[str] = []
-
-        for stream_query in stream_queries:
-            base_query_id = f"Q{stream_query.query_id}"
-            base_query = TPCDS_DATAFRAME_QUERIES.get(base_query_id)
-            if base_query is None:
-                logger.warning("Query %s not found in TPC-DS DataFrame registry", base_query_id)
-                continue
-
-            if stream_query.variant is None:
-                queries.append(base_query)
-                continue
-
-            variant_id = f"{base_query_id}{stream_query.variant.lower()}"
-            variant_query = (
-                TPCDS_DATAFRAME_QUERIES.get(variant_id)
-                or TPCDS_DATAFRAME_QUERIES.get(variant_id.upper())
-                or TPCDS_DATAFRAME_QUERIES.get(variant_id.capitalize())
-            )
-            if variant_query is not None:
-                queries.append(variant_query)
-                continue
-
-            missing_variants.append(variant_id)
-            if allow_variant_fallback:
-                queries.append(replace(base_query, query_id=variant_id))
-
-        if missing_variants and not allow_variant_fallback:
-            missing = ", ".join(sorted(set(missing_variants)))
-            raise RuntimeError(
-                "TPC-DS DataFrame SQL parity check failed: missing variant DataFrame implementations "
-                f"for [{missing}]. Set option tpcds_dataframe_variant_fallback=true to allow "
-                "non-parity fallback execution."
-            )
-
-        return queries
+        return get_tpcds_dataframe_queries(benchmark_config, benchmark_instance, stream_id)
 
     @staticmethod
     def _query_category(query_id: str) -> str:

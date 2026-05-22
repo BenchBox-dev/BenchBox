@@ -1046,7 +1046,10 @@ def _configure_lifecycle_adapter(
     if adapter is not None and hasattr(adapter, "table_mode"):
         adapter.table_mode = table_mode
 
-    is_dataframe_adapter = hasattr(adapter, "family") and adapter.family in ("expression", "pandas")
+    is_dataframe_adapter = getattr(adapter, "is_dataframe_adapter", False) is True
+    if not is_dataframe_adapter and adapter is not None:
+        family = getattr(adapter, "family", None)
+        is_dataframe_adapter = isinstance(family, str) and callable(getattr(adapter, "run_benchmark", None))
     return adapter, is_dataframe_adapter
 
 
