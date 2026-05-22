@@ -124,6 +124,53 @@ class TestChartTypeDescriptions:
             assert len(description) > 10, f"{chart_type} description is too short"
 
 
+class TestVisualizationHelpContract:
+    """Tests for MCP visualization help and namespace contracts."""
+
+    def test_generate_chart_help_includes_current_templates_and_semantic_chart_ids(self):
+        from benchbox.core.visualization.chart_types import ALL_CHART_TYPES
+        from benchbox.core.visualization.templates import list_templates
+        from benchbox.mcp.tools.visualization import MCP_GENERATE_CHART_DESCRIPTION
+
+        for chart_type in ALL_CHART_TYPES:
+            assert chart_type in MCP_GENERATE_CHART_DESCRIPTION
+        for template in list_templates():
+            assert template.name in MCP_GENERATE_CHART_DESCRIPTION
+
+        assert "result-aware semantic chart IDs" in MCP_GENERATE_CHART_DESCRIPTION
+        assert "textcharts primitive" in MCP_GENERATE_CHART_DESCRIPTION
+
+    def test_suggest_charts_help_uses_semantic_namespace(self):
+        from benchbox.core.visualization.chart_types import ALL_CHART_TYPES
+        from benchbox.mcp.tools.visualization import MCP_SUGGEST_CHARTS_DESCRIPTION
+
+        assert "result-aware semantic chart IDs" in MCP_SUGGEST_CHARTS_DESCRIPTION
+        assert "textcharts primitive" in MCP_SUGGEST_CHARTS_DESCRIPTION
+        for chart_type in ALL_CHART_TYPES:
+            assert chart_type in MCP_SUGGEST_CHARTS_DESCRIPTION
+
+    def test_registered_tool_descriptions_use_generated_help(self):
+        from benchbox.mcp.tools.visualization import MCP_GENERATE_CHART_DESCRIPTION, MCP_SUGGEST_CHARTS_DESCRIPTION
+
+        tools = _get_viz_tool_objects()
+
+        assert tools["generate_chart"].description == MCP_GENERATE_CHART_DESCRIPTION
+        assert tools["suggest_charts"].description == MCP_SUGGEST_CHARTS_DESCRIPTION
+
+    def test_textcharts_primitive_ids_are_not_benchbox_chart_ids(self):
+        from benchbox.core.visualization.chart_types import ALL_CHART_TYPES
+        from benchbox.mcp.tools.visualization import _generate_chart_impl
+
+        assert "bar" not in ALL_CHART_TYPES
+        assert "heatmap" not in ALL_CHART_TYPES
+        assert "query_heatmap" in ALL_CHART_TYPES
+
+        result = _generate_chart_impl([], [], chart_type="bar", template=None)
+
+        assert result["error"] is True
+        assert "VALIDATION_ERROR" in result["error_code"]
+
+
 class TestGenerateChartValidation:
     """Tests for generate_chart validation logic."""
 
@@ -403,6 +450,13 @@ class TestSuggestCharts:
 
 def _get_viz_tool_functions(*, results_dir=None, charts_dir=None):
     """Create a fresh MCP server and extract visualization tool functions."""
+    return {
+        name: tool.fn for name, tool in _get_viz_tool_objects(results_dir=results_dir, charts_dir=charts_dir).items()
+    }
+
+
+def _get_viz_tool_objects(*, results_dir=None, charts_dir=None):
+    """Create a fresh MCP server and extract visualization tool objects."""
     from benchbox.mcp import create_server
 
     kwargs = {}
@@ -414,8 +468,9 @@ def _get_viz_tool_functions(*, results_dir=None, charts_dir=None):
     tools = {}
     if hasattr(server, "_tool_manager"):
         tool_dict = getattr(server._tool_manager, "_tools", {})
-        for name, tool in tool_dict.items():
-            tools[name] = tool.fn
+        for name in ("suggest_charts", "generate_chart"):
+            if name in tool_dict:
+                tools[name] = tool_dict[name]
     return tools
 
 

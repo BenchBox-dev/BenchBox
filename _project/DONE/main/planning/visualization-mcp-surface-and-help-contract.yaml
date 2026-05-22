@@ -2,7 +2,7 @@ id: visualization-mcp-surface-and-help-contract
 title: "Visualization hardening: decide MCP charting surface boundaries and generate help from registries"
 worktree: main
 priority: Medium-High
-status: "Not Started"
+status: "Completed"
 category: Visualization
 
 deps:
@@ -31,90 +31,58 @@ description: |
 work:
   - id: w0
     summary: "Revalidate actual MCP tool exposure and help-text drift against the current branch/runtime"
-    status: pending
+    status: done
     notes: |
-      Re-run source and runtime evidence before editing. Record checked SHA,
-      textcharts version, BenchBox MCP registration source, and observed tool
-      list or a clear note that only static source was available.
-
-      Required checks:
-        - `rg -n "textcharts.mcp|textcharts_|create_server\\(|register_visualization_tools\\(|generate_chart|suggest_charts" benchbox pyproject.toml .venv/lib/python*/site-packages/textcharts --glob '*.py' --glob '!build/**' --glob '!docs/_build/**'`.
-        - Inspect `benchbox/mcp/server.py`, `benchbox/mcp/__init__.py`,
-          `benchbox/mcp/tools/visualization.py`, and
-          `.venv/.../textcharts/mcp_server.py`.
-        - If a runtime MCP tool-list command is available in the implementation
-          environment, capture whether textcharts tools and BenchBox tools are
-          exposed together or by separate servers.
-        - Inspect generated FastMCP schemas/docstrings for
-          `generate_chart`/`suggest_charts` if available.
-
-      Decision gate: do not remove, hide, or forward textcharts MCP tools based
-      only on source-level grep. The actual deployed MCP registration path must
-      be observed or the change must be limited to documentation/help text.
+      Revalidated against checked SHA
+      `4d436d76e4f2bd59a2a0588afb66ac672ff0605d` with installed
+      `textcharts==0.1.2`. Source inspection shows BenchBox registers
+      `register_visualization_tools()` from `benchbox/mcp/server.py`; it does
+      not import or forward `textcharts.mcp_server`. The installed dependency
+      exposes a separate `textcharts-mcp` server with `textcharts_*` primitive
+      tools. Runtime FastMCP inspection observed 12 BenchBox tools
+      (`generate_chart`, `suggest_charts`, and other BenchBox tools) and 17
+      separate textcharts tools when creating the textcharts server directly.
 
   - id: w1
     summary: "Record the product contract between raw textcharts MCP tools and BenchBox result-aware MCP tools"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
-      Update `docs/reference/public-contracts.md`, MCP docs, or the MCP server
-      instructions to classify:
-        - BenchBox `generate_chart`/`suggest_charts`: result-file-aware
-          semantic charting;
-        - textcharts MCP tools: raw data primitive rendering, if exposed by the
-          local harness or user configuration;
-        - whether BenchBox intentionally depends on textcharts MCP, ignores it,
-          or documents it as a separate external server.
-
-      The contract must make clear that BenchBox semantic chart IDs such as
-      `query_heatmap` and `power_bar` are not the same namespace as textcharts
-      primitive IDs such as `heatmap` and `bar`.
+      Updated public contracts and MCP reference docs to classify BenchBox
+      `generate_chart`/`suggest_charts` as result-file-aware semantic charting.
+      Textcharts MCP tools are documented as a separate raw primitive server
+      namespace if a user configures that server independently.
 
   - id: w2
     summary: "Generate or centralize MCP chart/template help text from registries"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      Replace hardcoded template lists and stale chart examples in
-      `benchbox/mcp/tools/visualization.py` with generated strings or constants
-      derived from:
-        - `CHART_TYPE_DESCRIPTIONS` / the chosen chart registry;
-        - `list_templates()`;
-        - the product-surface contract from w1.
-
-      Verify that FastMCP still exposes useful tool descriptions. If dynamic
-      function docstrings are not reliable for schema generation, use stable
-      module-level constants built at registration time and add tests for those
-      constants instead of relying on runtime docstring mutation.
+      Added stable module-level MCP help constants in
+      `benchbox/mcp/tools/visualization.py`, derived from
+      `CHART_TYPE_DESCRIPTIONS` and `list_templates()`, and passed them to
+      FastMCP as explicit tool descriptions.
 
   - id: w3
     summary: "Align MCP server instructions and discovery metadata with the chosen chart-surface contract"
     needs: [w1, w2]
-    status: pending
+    status: done
     notes: |
-      Update `benchbox/mcp/server.py` instructions and
-      `benchbox/mcp/tools/discovery.py` visualization metadata so agents see a
-      consistent distinction between:
-        - result-aware chart recommendation/generation;
-        - raw primitive rendering, if applicable;
-        - template-based chart bundles.
-
-      Do not advertise chart types that cannot be generated by BenchBox's own
-      MCP `generate_chart` tool.
+      Updated server instructions and chart discovery metadata to identify the
+      complete BenchBox semantic chart registry, supported ASCII output, and
+      textcharts as an external namespace. Discovery does not advertise raw
+      textcharts primitive IDs as BenchBox chart types.
 
   - id: w4
     summary: "Add regression tests for MCP help, discovery metadata, and chart namespace clarity"
     needs: [w3]
-    status: pending
+    status: done
     notes: |
-      Tests should assert:
-        - MCP help/template lists include every current template from
-          `list_templates()` or explicitly name the list as examples only;
-        - MCP chart examples are valid semantic BenchBox chart IDs;
-        - discovery metadata either includes all semantic chart IDs or is marked
-          as a partial/common subset;
-        - textcharts primitive IDs are not mixed into BenchBox semantic chart
-          ID validation.
+      Added tests asserting MCP help includes every current template and
+      semantic chart ID, registered FastMCP descriptions use the generated
+      help constants, discovery metadata exposes the complete semantic
+      registry, and raw `bar`/`heatmap` primitive IDs are not BenchBox
+      chart IDs.
 
 deferred:
   - summary: "Bundle or proxy the external textcharts MCP server through BenchBox"
@@ -134,6 +102,7 @@ metadata:
   estimated_effort: "1-2 days"
   created_date: "2026-05-21"
   last_updated: "2026-05-21T00:00:00Z"
+  completed_date: "2026-05-22"
   source: "Independent verification of visualization architecture findings M5 and N1"
 
 impact:

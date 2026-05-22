@@ -278,6 +278,14 @@ explicit ID where previously supported, but do not expose support-status claims.
 
 ### Visualization Tools
 
+BenchBox MCP visualization is result-aware semantic charting. `suggest_charts`
+and `generate_chart` read BenchBox result files and accept semantic chart IDs
+from `benchbox.core.visualization.chart_types`, such as `performance_bar`,
+`power_bar`, and `query_heatmap`. These IDs are distinct from raw
+`textcharts_*` primitive MCP tools. BenchBox does not register or proxy the
+external `textcharts-mcp` server; if a client configures that server separately,
+its tools remain a separate raw rendering namespace.
+
 #### `suggest_charts`
 
 | Name | Type | Required | Default | Description |
@@ -293,6 +301,9 @@ explicit ID where previously supported, but do not expose support-status claims.
 | `template` | string or null | No | `null` | Template name for multi-chart output. |
 | `output_dir` | string or null | No | `null` | Output directory relative to charts dir. |
 | `format` | string | No | `ascii` | Output format; current MCP output is ASCII. |
+
+Available `chart_type` values and template names are derived from the
+visualization registries and are discoverable with `list_available(category="charts")`.
 
 ---
 

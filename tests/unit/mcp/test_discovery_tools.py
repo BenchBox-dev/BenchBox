@@ -142,3 +142,38 @@ class TestSystemProfileTool:
 
         version = getattr(benchbox, "__version__", None)
         assert version is not None
+
+
+class TestChartDiscoveryContract:
+    """Tests for visualization discovery metadata."""
+
+    def test_chart_discovery_returns_complete_semantic_registry(self):
+        from benchbox.core.visualization.chart_types import ALL_CHART_TYPES, CHART_TYPE_DESCRIPTIONS
+        from benchbox.mcp.tools.discovery import _list_chart_templates_impl
+
+        result = _list_chart_templates_impl()
+
+        assert result["chart_type_coverage"] == "complete_semantic_registry"
+        assert result["chart_namespace"] == "benchbox_result_aware_semantic_ids"
+        assert set(result["chart_types"]) == set(ALL_CHART_TYPES)
+        assert set(result["chart_types"]) == set(CHART_TYPE_DESCRIPTIONS)
+        assert result["semantic_chart_ids"] == list(ALL_CHART_TYPES)
+
+    def test_chart_discovery_keeps_textcharts_namespace_external(self):
+        from benchbox.mcp.tools.discovery import _list_chart_templates_impl
+
+        result = _list_chart_templates_impl()
+
+        assert "bar" not in result["chart_types"]
+        assert "heatmap" not in result["chart_types"]
+        assert "query_heatmap" in result["chart_types"]
+        assert "textcharts" in result["external_chart_namespaces"]
+        assert "not accepted as BenchBox chart_type" in result["external_chart_namespaces"]["textcharts"]
+
+    def test_chart_discovery_templates_follow_registry(self):
+        from benchbox.core.visualization.templates import list_templates
+        from benchbox.mcp.tools.discovery import _list_chart_templates_impl
+
+        result = _list_chart_templates_impl()
+
+        assert {item["name"] for item in result["templates"]} == {template.name for template in list_templates()}
