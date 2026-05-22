@@ -1,0 +1,75 @@
+canonical_key_order:
+- version
+- run
+- benchmark
+- platform
+- config
+- summary
+- phases
+- queries
+- tables
+- validation
+- comparisons
+- cost
+- normalized_cost
+- execution
+- environment
+- export
+- errors
+query_key_order:
+- id
+- ms
+- rows
+- iter
+- stream
+- run_type
+- status
+- dataframe_skip_summary
+config_key_order:
+- compression
+- seed
+- phases
+- query_subset
+- parallelism
+- tuning_mode
+- tuning_config
+- platform_options
+- platform_option_sources
+- table_mode
+- external_format
+- table_format
+- table_format_compression
+- table_format_partition_cols
+- mode
+- test_type
+phase_key_order:
+- data_generation
+- schema_creation
+- data_loading
+- validation
+- migration
+- power_test
+- throughput_test
+driver_metadata_keys:
+- driver_package
+- driver_version_requested
+- driver_version_resolved
+- driver_version_actual
+- driver_runtime_strategy
+- driver_runtime_path
+- driver_runtime_python_executable
+- driver_auto_install_used
+engine_version_keys:
+- engine_version
+- engine_version_source
+driver_platform_keys:
+- - driver_package
+  - driver_package
+- - driver_version_requested
+  - driver_requested_version
+- - driver_version_resolved
+  - driver_resolved_version
+- - driver_version_actual
+  - driver_actual_version
+- - driver_runtime_strategy
+  - driver_runtime_strategy
