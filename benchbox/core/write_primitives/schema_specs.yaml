@@ -1,0 +1,480 @@
+tables:
+- id: INSERT_OPS_LINEITEM
+  key: insert_ops_lineitem
+  schema:
+    name: insert_ops_lineitem
+    columns:
+    - name: l_orderkey
+      type: INTEGER
+    - name: l_partkey
+      type: INTEGER
+    - name: l_suppkey
+      type: INTEGER
+    - name: l_linenumber
+      type: INTEGER
+    - name: l_quantity
+      type: DECIMAL(15,2)
+    - name: l_extendedprice
+      type: DECIMAL(15,2)
+    - name: l_discount
+      type: DECIMAL(15,2)
+    - name: l_tax
+      type: DECIMAL(15,2)
+    - name: l_returnflag
+      type: VARCHAR(1)
+    - name: l_linestatus
+      type: VARCHAR(1)
+    - name: l_shipdate
+      type: DATE
+    - name: l_commitdate
+      type: DATE
+    - name: l_receiptdate
+      type: DATE
+    - name: l_shipinstruct
+      type: VARCHAR(25)
+    - name: l_shipmode
+      type: VARCHAR(10)
+    - name: l_comment
+      type: VARCHAR(44)
+    primary_key:
+    - l_orderkey
+    - l_linenumber
+- id: INSERT_OPS_ORDERS
+  key: insert_ops_orders
+  schema:
+    name: insert_ops_orders
+    columns:
+    - name: o_orderkey
+      type: INTEGER
+      primary_key: true
+    - name: o_custkey
+      type: INTEGER
+    - name: o_orderstatus
+      type: VARCHAR(1)
+    - name: o_totalprice
+      type: DECIMAL(15,2)
+    - name: o_orderdate
+      type: DATE
+    - name: o_orderpriority
+      type: VARCHAR(15)
+    - name: o_clerk
+      type: VARCHAR(15)
+    - name: o_shippriority
+      type: INTEGER
+    - name: o_comment
+      type: VARCHAR(79)
+- id: INSERT_OPS_ORDERS_SUMMARY
+  key: insert_ops_orders_summary
+  schema:
+    name: insert_ops_orders_summary
+    columns:
+    - name: o_orderkey
+      type: INTEGER
+      nullable: true
+    - name: o_custkey
+      type: INTEGER
+      nullable: true
+    - name: o_orderdate
+      type: DATE
+      nullable: true
+    - name: o_totalprice
+      type: DECIMAL(15,2)
+      nullable: true
+    - name: customer_name
+      type: VARCHAR(25)
+      nullable: true
+    - name: order_count
+      type: INTEGER
+      nullable: true
+- id: INSERT_OPS_LINEITEM_ENRICHED
+  key: insert_ops_lineitem_enriched
+  schema:
+    name: insert_ops_lineitem_enriched
+    columns:
+    - name: l_orderkey
+      type: INTEGER
+    - name: l_partkey
+      type: INTEGER
+    - name: l_suppkey
+      type: INTEGER
+    - name: l_quantity
+      type: DECIMAL(15,2)
+    - name: l_extendedprice
+      type: DECIMAL(15,2)
+    - name: o_orderdate
+      type: DATE
+    - name: c_name
+      type: VARCHAR(25)
+    - name: s_name
+      type: VARCHAR(25)
+    - name: p_name
+      type: VARCHAR(55)
+- id: UPDATE_OPS_ORDERS
+  key: update_ops_orders
+  schema:
+    name: update_ops_orders
+    columns:
+    - name: o_orderkey
+      type: INTEGER
+      primary_key: true
+    - name: o_custkey
+      type: INTEGER
+    - name: o_orderstatus
+      type: VARCHAR(1)
+    - name: o_totalprice
+      type: DECIMAL(15,2)
+    - name: o_orderdate
+      type: DATE
+    - name: o_orderpriority
+      type: VARCHAR(15)
+    - name: o_clerk
+      type: VARCHAR(15)
+    - name: o_shippriority
+      type: INTEGER
+    - name: o_comment
+      type: VARCHAR(79)
+- id: DELETE_OPS_ORDERS
+  key: delete_ops_orders
+  schema:
+    name: delete_ops_orders
+    columns:
+    - name: o_orderkey
+      type: INTEGER
+      primary_key: true
+    - name: o_custkey
+      type: INTEGER
+    - name: o_orderstatus
+      type: VARCHAR(1)
+    - name: o_totalprice
+      type: DECIMAL(15,2)
+    - name: o_orderdate
+      type: DATE
+    - name: o_orderpriority
+      type: VARCHAR(15)
+    - name: o_clerk
+      type: VARCHAR(15)
+    - name: o_shippriority
+      type: INTEGER
+    - name: o_comment
+      type: VARCHAR(79)
+- id: DELETE_OPS_LINEITEM
+  key: delete_ops_lineitem
+  schema:
+    name: delete_ops_lineitem
+    columns:
+    - name: l_orderkey
+      type: INTEGER
+    - name: l_partkey
+      type: INTEGER
+    - name: l_suppkey
+      type: INTEGER
+    - name: l_linenumber
+      type: INTEGER
+    - name: l_quantity
+      type: DECIMAL(15,2)
+    - name: l_extendedprice
+      type: DECIMAL(15,2)
+    - name: l_discount
+      type: DECIMAL(15,2)
+    - name: l_tax
+      type: DECIMAL(15,2)
+    - name: l_returnflag
+      type: VARCHAR(1)
+    - name: l_linestatus
+      type: VARCHAR(1)
+    - name: l_shipdate
+      type: DATE
+    - name: l_commitdate
+      type: DATE
+    - name: l_receiptdate
+      type: DATE
+    - name: l_shipinstruct
+      type: VARCHAR(25)
+    - name: l_shipmode
+      type: VARCHAR(10)
+    - name: l_comment
+      type: VARCHAR(44)
+    primary_key:
+    - l_orderkey
+    - l_linenumber
+- id: DELETE_OPS_SUPPLIER
+  key: delete_ops_supplier
+  schema:
+    name: delete_ops_supplier
+    columns:
+    - name: s_suppkey
+      type: INTEGER
+      primary_key: true
+    - name: s_name
+      type: VARCHAR(25)
+    - name: s_address
+      type: VARCHAR(40)
+    - name: s_nationkey
+      type: INTEGER
+    - name: s_phone
+      type: VARCHAR(15)
+    - name: s_acctbal
+      type: DECIMAL(15,2)
+    - name: s_comment
+      type: VARCHAR(101)
+- id: MERGE_OPS_TARGET
+  key: merge_ops_target
+  schema:
+    name: merge_ops_target
+    columns:
+    - name: o_orderkey
+      type: INTEGER
+      primary_key: true
+    - name: o_custkey
+      type: INTEGER
+    - name: o_orderstatus
+      type: VARCHAR(1)
+    - name: o_totalprice
+      type: DECIMAL(15,2)
+    - name: o_orderdate
+      type: DATE
+    - name: o_orderpriority
+      type: VARCHAR(15)
+    - name: o_clerk
+      type: VARCHAR(15)
+    - name: o_shippriority
+      type: INTEGER
+    - name: o_comment
+      type: VARCHAR(79)
+- id: MERGE_OPS_SOURCE
+  key: merge_ops_source
+  schema:
+    name: merge_ops_source
+    columns:
+    - name: o_orderkey
+      type: INTEGER
+      primary_key: true
+    - name: o_custkey
+      type: INTEGER
+    - name: o_orderstatus
+      type: VARCHAR(1)
+    - name: o_totalprice
+      type: DECIMAL(15,2)
+    - name: o_orderdate
+      type: DATE
+    - name: o_orderpriority
+      type: VARCHAR(15)
+    - name: o_clerk
+      type: VARCHAR(15)
+    - name: o_shippriority
+      type: INTEGER
+    - name: o_comment
+      type: VARCHAR(79)
+- id: MERGE_OPS_LINEITEM_TARGET
+  key: merge_ops_lineitem_target
+  schema:
+    name: merge_ops_lineitem_target
+    columns:
+    - name: l_orderkey
+      type: INTEGER
+    - name: l_partkey
+      type: INTEGER
+    - name: l_suppkey
+      type: INTEGER
+    - name: l_linenumber
+      type: INTEGER
+    - name: l_quantity
+      type: DECIMAL(15,2)
+    - name: l_extendedprice
+      type: DECIMAL(15,2)
+    - name: l_discount
+      type: DECIMAL(15,2)
+    - name: l_tax
+      type: DECIMAL(15,2)
+    - name: l_returnflag
+      type: VARCHAR(1)
+    - name: l_linestatus
+      type: VARCHAR(1)
+    - name: l_shipdate
+      type: DATE
+    - name: l_commitdate
+      type: DATE
+    - name: l_receiptdate
+      type: DATE
+    - name: l_shipinstruct
+      type: VARCHAR(25)
+    - name: l_shipmode
+      type: VARCHAR(10)
+    - name: l_comment
+      type: VARCHAR(44)
+    primary_key:
+    - l_orderkey
+    - l_linenumber
+- id: MERGE_OPS_SUMMARY_TARGET
+  key: merge_ops_summary_target
+  schema:
+    name: merge_ops_summary_target
+    columns:
+    - name: o_orderkey
+      type: INTEGER
+      nullable: true
+    - name: o_custkey
+      type: INTEGER
+      nullable: true
+    - name: o_orderdate
+      type: DATE
+      nullable: true
+    - name: o_totalprice
+      type: DECIMAL(15,2)
+      nullable: true
+    - name: customer_name
+      type: VARCHAR(25)
+      nullable: true
+    - name: order_count
+      type: INTEGER
+      nullable: true
+- id: BULK_LOAD_OPS_TARGET
+  key: bulk_load_ops_target
+  schema:
+    name: bulk_load_ops_target
+    columns:
+    - name: o_orderkey
+      type: INTEGER
+    - name: o_custkey
+      type: INTEGER
+    - name: o_orderstatus
+      type: VARCHAR(1)
+    - name: o_totalprice
+      type: DECIMAL(15,2)
+    - name: o_orderdate
+      type: DATE
+    - name: o_orderpriority
+      type: VARCHAR(15)
+      nullable: true
+    - name: o_clerk
+      type: VARCHAR(15)
+      nullable: true
+    - name: o_shippriority
+      type: INTEGER
+      nullable: true
+    - name: o_comment
+      type: VARCHAR(79)
+      nullable: true
+- id: DDL_TRUNCATE_TARGET
+  key: ddl_truncate_target
+  schema:
+    name: ddl_truncate_target
+    columns:
+    - name: o_orderkey
+      type: INTEGER
+      primary_key: true
+    - name: o_custkey
+      type: INTEGER
+    - name: o_orderdate
+      type: DATE
+- id: SKETCH_OPS_DAILY_USERS
+  key: sketch_ops_daily_users
+  schema:
+    name: sketch_ops_daily_users
+    columns:
+    - name: activity_date
+      type: DATE
+    - name: region
+      type: VARCHAR(25)
+    - name: user_sketch
+      type: BINARY
+      nullable: true
+    - name: rev_sketch
+      type: BINARY
+      nullable: true
+- id: SKETCH_OPS_TOPK
+  key: sketch_ops_topk
+  schema:
+    name: sketch_ops_topk
+    columns:
+    - name: shard_id
+      type: INTEGER
+    - name: topk_sketch
+      type: BINARY
+      nullable: true
+- id: WRITE_OPS_LOG
+  key: write_ops_log
+  schema:
+    name: write_ops_log
+    columns:
+    - name: log_id
+      type: INTEGER
+      primary_key: true
+    - name: operation_id
+      type: VARCHAR(100)
+    - name: operation_category
+      type: VARCHAR(50)
+    - name: timestamp
+      type: TIMESTAMP
+    - name: rows_affected
+      type: INTEGER
+    - name: duration_ms
+      type: DECIMAL(15,2)
+    - name: success
+      type: BOOLEAN
+    - name: error_message
+      type: VARCHAR(500)
+      nullable: true
+- id: BATCH_METADATA
+  key: batch_metadata
+  schema:
+    name: batch_metadata
+    columns:
+    - name: batch_id
+      type: INTEGER
+      primary_key: true
+    - name: operation_id
+      type: VARCHAR(100)
+    - name: file_path
+      type: VARCHAR(500)
+      nullable: true
+    - name: file_size_bytes
+      type: BIGINT
+      nullable: true
+    - name: file_format
+      type: VARCHAR(50)
+      nullable: true
+    - name: compression
+      type: VARCHAR(50)
+      nullable: true
+    - name: row_count
+      type: INTEGER
+    - name: checksum
+      type: VARCHAR(100)
+      nullable: true
+    - name: created_at
+      type: TIMESTAMP
+staging_tables:
+- insert_ops_lineitem
+- insert_ops_orders
+- insert_ops_orders_summary
+- insert_ops_lineitem_enriched
+- update_ops_orders
+- delete_ops_orders
+- delete_ops_lineitem
+- delete_ops_supplier
+- merge_ops_target
+- merge_ops_source
+- merge_ops_lineitem_target
+- merge_ops_summary_target
+- bulk_load_ops_target
+- ddl_truncate_target
+- write_ops_log
+- batch_metadata
+create_order:
+- write_ops_log
+- batch_metadata
+- insert_ops_lineitem
+- insert_ops_orders
+- insert_ops_orders_summary
+- insert_ops_lineitem_enriched
+- update_ops_orders
+- delete_ops_orders
+- delete_ops_lineitem
+- delete_ops_supplier
+- merge_ops_target
+- merge_ops_source
+- merge_ops_lineitem_target
+- merge_ops_summary_target
+- bulk_load_ops_target
+- ddl_truncate_target
