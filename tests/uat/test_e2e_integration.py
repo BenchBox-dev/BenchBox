@@ -18,6 +18,7 @@ from pathlib import Path
 
 import pytest
 
+from benchbox.validation.bundle import ValidationResult
 from tests.uat import orchestrator
 from tests.uat.config import validate_config
 from tests.uat.runner import CellResult
@@ -144,25 +145,18 @@ def test_e2e_validator_status_reaches_cross_scale_check(tmp_path: Path, monkeypa
 
     validated_paths: list[Path] = []
 
-    def fake_validate_runner(argv, check):
-        result_path = Path(argv[2])
-        output_tsv = Path(argv[argv.index("--output") + 1])
+    def fake_validate_bundles(paths):
+        result_path = paths[0]
         validated_paths.append(result_path)
         scale = float(result_path.stem.rsplit("_", 1)[-1])
-        status = "clean" if scale == 0.01 else "error"
-        rows = ["platform\tbenchmark\tscale\tresult_path\tvalidator_status\terror_count\twarning_count\tfirst_error"]
-        plat, bench, scale_text = result_path.stem.split("_", 2)
-        rows.append(f"{plat}\t{bench}\t{scale_text}\t{result_path}\t{status}\t0\t0\t")
-        output_tsv.write_text("\n".join(rows) + "\n", encoding="utf-8")
-
-        class Completed:
-            returncode = 0
-
-        return Completed()
+        validation_result = ValidationResult(str(result_path))
+        if scale != 0.01:
+            validation_result.error("forced validator failure")
+        return [validation_result]
 
     monkeypatch.setattr(
-        "tests.uat.phases.validate.subprocess.run",
-        fake_validate_runner,
+        "tests.uat.phases.validate.validate_bundles",
+        fake_validate_bundles,
     )
 
     result = orchestrator.run_sweep(

@@ -137,8 +137,7 @@ hash equality at PR time.
 
 ## Dependencies
 
-The framework imports `benchbox.core.benchmark_registry` directly (no
-eval, no shell-out). It invokes `scripts/uat_validator_rollup.py` and
-`scripts/validate_submission.py` as subprocesses without modifying
-their public CLIs. It does not import or modify any code under
-`benchbox/`, `results-explorer/`, or `results-data/`.
+The framework imports BenchBox registry and validation library code
+directly (no eval, no shell-out). The validate phase uses
+`benchbox.validation.bundle` in process. It does not import or modify
+code under `results-explorer/` or `results-data/`.

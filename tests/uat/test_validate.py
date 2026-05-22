@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -11,127 +12,136 @@ from tests.uat.phases import validate
 pytestmark = pytest.mark.fast
 
 
+def _minimal_bundle(
+    *,
+    platform: str = "duckdb",
+    benchmark: str = "tpch",
+    compliance_class: str | None = None,
+) -> dict:
+    benchmark_payload = {"id": benchmark, "scale_factor": 0.01}
+    if compliance_class is not None:
+        benchmark_payload["compliance_class"] = compliance_class
+    return {
+        "version": "2.0",
+        "run": {
+            "id": "uat-validate-test",
+            "timestamp": "2026-05-21T00:00:00Z",
+            "total_duration_ms": 100.0,
+        },
+        "benchmark": benchmark_payload,
+        "platform": {"name": platform},
+        "summary": {"validation": "passed", "queries": {"total": 1, "passed": 1, "failed": 0}},
+        "queries": [{"id": "Q1", "ms": 1.0}],
+    }
+
+
+def _write_bundle(path: Path, payload: dict) -> Path:
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
 def _write_tsv(path: Path, statuses: list[str]) -> None:
-    lines = [
-        "platform\tbenchmark\tscale\tresult_path\tvalidator_status\terror_count\twarning_count\tfirst_error",
-    ]
+    lines = [validate.TSV_HEADER]
     for i, status in enumerate(statuses):
         lines.append(f"duckdb\ttpch\t0.01\t/tmp/r{i}.json\t{status}\t0\t0\t")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def test_parse_rollup_all_clean(tmp_path: Path):
-    tsv = tmp_path / "rollup.tsv"
-    _write_tsv(tsv, ["clean", "clean", "clean"])
-    out = validate.parse_rollup(tsv, floor=0.80)
-    assert out.clean_count == 3
-    assert out.clean_rate == 1.0
-    assert out.floor_breached is False
+def test_run_validate_writes_rollup_and_computes_counts_without_subprocess(tmp_path: Path):
+    results_dir = tmp_path / "results"
+    results_dir.mkdir()
+    _write_bundle(results_dir / "clean.json", _minimal_bundle())
+    _write_bundle(results_dir / "warning.json", _minimal_bundle(platform="MysteryDB"))
+    _write_bundle(results_dir / "error.json", {"version": "2.0"})
+    _write_bundle(
+        results_dir / "refused.json",
+        _minimal_bundle(benchmark="tpcds", compliance_class="unofficial_subscale"),
+    )
 
+    out = validate.run_validate(results_dir, output_tsv=tmp_path / "rollup.tsv", floor=0.80)
 
-def test_parse_rollup_breaches_floor(tmp_path: Path):
-    tsv = tmp_path / "rollup.tsv"
-    _write_tsv(tsv, ["clean", "error", "error", "error", "error"])
-    out = validate.parse_rollup(tsv, floor=0.80)
-    assert out.error_count == 4
     assert out.clean_count == 1
-    assert out.clean_rate == 0.2
+    assert out.warning_count == 1
+    assert out.error_count == 1
+    assert out.refused_count == 1
+    assert out.total == 4
+    assert out.clean_rate == pytest.approx(1 / 3)
     assert out.floor_breached is True
     assert out.exit_code() == 1
 
+    text = out.rollup_tsv_path.read_text(encoding="utf-8")
+    assert "clean.json\tclean\t0\t0" in text
+    assert "warning.json\twarning_only\t0\t1" in text
+    assert "error.json\terror\t" in text
+    assert "refused.json\trefused-by-cli\t0\t0\tcompliance_class=unofficial_subscale" in text
+    assert "# overall: total=4 submittable=3 clean=1" in text
+    assert "# platform=duckdb: total=2 submittable=1 clean=1 validator_clean_rate=100.0%" in text
+    assert "# platform=MysteryDB: total=1 submittable=1 clean=0 validator_clean_rate=0.0%" in text
+    assert "# benchmark=tpch: total=2 submittable=2 clean=1 validator_clean_rate=50.0%" in text
+    assert "# benchmark=tpcds: total=1 submittable=0 clean=0 validator_clean_rate=n/a" in text
 
-def test_parse_rollup_excludes_refused_from_denominator(tmp_path: Path):
-    tsv = tmp_path / "rollup.tsv"
-    _write_tsv(tsv, ["clean", "clean", "refused-by-cli"])
-    out = validate.parse_rollup(tsv, floor=0.80)
-    # Denominator is 2 (refused excluded) → clean_rate = 1.0.
+
+def test_run_validate_all_clean_passes_floor(tmp_path: Path):
+    result_path = _write_bundle(tmp_path / "clean.json", _minimal_bundle())
+
+    out = validate.run_validate([result_path], output_tsv=tmp_path / "rollup.tsv", floor=0.80)
+
+    assert out.clean_count == 1
+    assert out.clean_rate == 1.0
+    assert out.floor_breached is False
+    assert out.exit_code() == 0
+
+
+def test_run_validate_excludes_refused_from_denominator(tmp_path: Path):
+    clean = _write_bundle(tmp_path / "clean.json", _minimal_bundle())
+    refused = _write_bundle(
+        tmp_path / "refused.json",
+        _minimal_bundle(benchmark="tpcds", compliance_class="unofficial_nonstandard"),
+    )
+
+    out = validate.run_validate([clean, refused], output_tsv=tmp_path / "rollup.tsv", floor=0.80)
+
     assert out.refused_count == 1
     assert out.clean_rate == 1.0
+    assert out.exit_code() == 0
 
 
-def test_parse_rollup_warning_only_counts_against_clean_rate(tmp_path: Path):
-    tsv = tmp_path / "rollup.tsv"
-    _write_tsv(tsv, ["clean", "warning_only", "warning_only", "warning_only"])
-    out = validate.parse_rollup(tsv, floor=0.80)
-    assert out.clean_rate == 0.25  # only the one clean bundle counts
-
-
-def test_parse_rollup_missing_status_column_errors(tmp_path: Path):
-    tsv = tmp_path / "broken.tsv"
-    tsv.write_text("foo\tbar\n", encoding="utf-8")
-    with pytest.raises(ValueError, match="validator_status"):
-        validate.parse_rollup(tsv)
-
-
-def test_has_rollup_script_in_repo():
-    assert validate.has_rollup_script() is True
-
-
-def test_run_validate_missing_rollup_script_returns_aborted_result(tmp_path: Path):
+def test_run_validate_missing_results_dir_returns_aborted_result(tmp_path: Path):
     out = validate.run_validate(
-        tmp_path / "results",
+        tmp_path / "missing-results",
         output_tsv=tmp_path / "rollup.tsv",
-        rollup_script=tmp_path / "missing.py",
     )
 
     assert out.aborted is True
     assert out.exit_code() == 2
-    assert "validator rollup helper not found" in (out.abort_reason or "")
+    assert "results path not found" in (out.abort_reason or "")
 
 
-def test_run_validate_surfaces_nonzero_subprocess_via_exit_code(tmp_path: Path):
-    """Validator non-zero exit must NOT raise when a TSV is still produced."""
-    tsv = tmp_path / "rollup.tsv"
+def test_run_validate_explicit_missing_file_is_error_row(tmp_path: Path):
+    out = validate.run_validate([tmp_path / "missing.json"], output_tsv=tmp_path / "rollup.tsv")
 
-    def fake_runner(argv, check):
-        _write_tsv(tsv, ["clean", "clean"])
-
-        class Completed:
-            returncode = 7
-
-        return Completed()
-
-    out = validate.run_validate(
-        tmp_path / "results",
-        output_tsv=tsv,
-        runner=fake_runner,
-    )
-    assert out.script_returncode == 7
-    assert out.exit_code() == 7
-    assert out.clean_count == 2
+    assert out.aborted is False
+    assert out.error_count == 1
+    assert out.exit_code() == 1
+    assert "File not found" in out.rollup_tsv_path.read_text(encoding="utf-8")
 
 
-def test_run_validate_paths_preserves_negative_subprocess_returncode(tmp_path: Path):
-    """Signal-style negative return codes must not be masked during path aggregation."""
-    result_paths = (tmp_path / "r0.json", tmp_path / "r1.json")
-    output_tsv = tmp_path / "rollup.tsv"
-    returncodes = iter([-9, 0])
+def test_run_validate_overwrites_stale_rollup(tmp_path: Path):
+    stale_tsv = tmp_path / "rollup.tsv"
+    stale_tsv.write_text("stale\n", encoding="utf-8")
+    result_path = _write_bundle(tmp_path / "clean.json", _minimal_bundle())
 
-    def fake_runner(argv, check):
-        output = Path(argv[argv.index("--output") + 1])
-        _write_tsv(output, ["clean"])
+    out = validate.run_validate([result_path], output_tsv=stale_tsv)
 
-        class Completed:
-            returncode = next(returncodes)
-
-        return Completed()
-
-    out = validate.run_validate(
-        result_paths,
-        output_tsv=output_tsv,
-        runner=fake_runner,
-    )
-
-    assert out.script_returncode == -9
-    assert out.exit_code() == -9
-    assert out.total == 2
+    assert out.exit_code() == 0
+    assert stale_tsv.read_text(encoding="utf-8").startswith(validate.TSV_HEADER)
+    assert "stale" not in stale_tsv.read_text(encoding="utf-8")
 
 
 def test_parse_validator_status_by_path_round_trip(tmp_path: Path):
     tsv = tmp_path / "rollup.tsv"
     _write_tsv(tsv, ["clean", "warning_only", "error"])
     status_by_path = validate.parse_validator_status_by_path(tsv)
-    # _write_tsv writes /tmp/rN.json result_path values.
     keys = {str(p) for p in status_by_path}
     assert str(Path("/tmp/r0.json").resolve()) in keys
     assert status_by_path[Path("/tmp/r0.json").resolve()] == "clean"
@@ -143,8 +153,7 @@ def test_parse_validator_status_by_path_normalizes_relative_paths(tmp_path: Path
     monkeypatch.chdir(tmp_path)
     tsv = tmp_path / "rollup.tsv"
     tsv.write_text(
-        "platform\tbenchmark\tscale\tresult_path\tvalidator_status\terror_count\twarning_count\tfirst_error\n"
-        "duckdb\ttpch\t0.01\tbenchmark_runs/results/r0.json\terror\t0\t0\t\n",
+        f"{validate.TSV_HEADER}\nduckdb\ttpch\t0.01\tbenchmark_runs/results/r0.json\terror\t0\t0\t\n",
         encoding="utf-8",
     )
 
@@ -157,47 +166,3 @@ def test_parse_validator_status_by_path_handles_missing_columns(tmp_path: Path):
     tsv = tmp_path / "rollup.tsv"
     tsv.write_text("foo\tbar\n", encoding="utf-8")
     assert validate.parse_validator_status_by_path(tsv) == {}
-
-
-def test_run_validate_aborts_when_subprocess_fails_and_no_tsv(tmp_path: Path):
-    """No TSV returns an aborted phase result, never CalledProcessError."""
-    missing_tsv = tmp_path / "rollup.tsv"
-
-    def fake_runner(argv, check):
-        class Completed:
-            returncode = 5
-
-        return Completed()
-
-    result = validate.run_validate(
-        tmp_path / "results",
-        output_tsv=missing_tsv,
-        runner=fake_runner,
-    )
-
-    assert result.aborted is True
-    assert result.exit_code() == 2
-    assert "exited 5" in (result.abort_reason or "")
-
-
-def test_run_validate_ignores_stale_tsv_when_subprocess_fails(tmp_path: Path):
-    """A previous rollup must not make a failed validator look parseable."""
-    stale_tsv = tmp_path / "rollup.tsv"
-    _write_tsv(stale_tsv, ["clean"])
-
-    def fake_runner(argv, check):
-        class Completed:
-            returncode = 5
-
-        return Completed()
-
-    result = validate.run_validate(
-        tmp_path / "results",
-        output_tsv=stale_tsv,
-        runner=fake_runner,
-    )
-
-    assert result.aborted is True
-    assert result.exit_code() == 2
-    assert "exited 5" in (result.abort_reason or "")
-    assert not stale_tsv.exists()
