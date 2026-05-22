@@ -2,7 +2,7 @@ id: visualization-suggestions-and-render-orchestration
 title: "Visualization hardening: centralize chart suggestions and render orchestration across CLI and MCP"
 worktree: main
 priority: High
-status: "Not Started"
+status: "Completed"
 category: Visualization
 
 deps:
@@ -39,120 +39,74 @@ description: |
 work:
   - id: w0
     summary: "Revalidate suggestion coverage, production callers, and ambiguous None paths"
-    status: pending
+    status: done
     notes: |
-      Re-run evidence on the implementation branch and record checked SHA plus
-      a compact summary. Do not commit raw command transcripts.
-
-      Required checks:
-        - `rg -n "_build_chart_suggestions|_suggest_chart_types\\(|_select_primary_chart|render_ascii_chart_from_results\\(|Unsupported chart type|requires_two_results|strict_pairwise_validation" benchbox tests --glob '*.py' --glob '!build/**' --glob '!docs/_build/**' --glob '!.venv/**'`.
-        - `uv run -- python - <<'PY'` snippet that constructs representative
-          normalized-result stubs and prints the union of
-          `_build_chart_suggestions()` chart IDs; compare with `ALL_CHART_TYPES`.
-        - `uv run -- python - <<'PY'` snippet that verifies known
-          inapplicable charts such as `stacked_phase` with no phase data return
-          `None`, while unknown chart types also return `None`.
-        - Inspect tests that call `ResultPlotter._suggest_chart_types()` and
-          confirm whether any production caller has appeared.
-
-      Decision gate: if the registry TODO has already added structured
-      applicability metadata, use it here rather than creating another profile
-      schema.
+      Revalidated against checked SHA
+      `4d436d76e4f2bd59a2a0588afb66ac672ff0605d`. Grep found the MCP-only
+      suggestion helpers, the private `ResultPlotter._suggest_chart_types()`,
+      low-level `render_ascii_chart_from_results()` callers, and
+      `requires_two_results` metadata. Representative normalized results now
+      recommend `performance_bar,power_bar,distribution_box,query_heatmap,
+      query_histogram,percentile_ladder,cdf_chart,cost_scatter,time_series,
+      normalized_speedup,sparkline_table,rank_table,stacked_phase`; every
+      recommended ID is present in `ALL_CHART_TYPES`, and `power_bar` is
+      recommended. The low-level renderer still returns `None` for both an
+      unknown chart and known-but-inapplicable `stacked_phase`, so the new core
+      orchestration layer classifies those outcomes before MCP/CLI formatting.
 
   - id: w1
     summary: "Define a shared result data profile used by suggestion and applicability decisions"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
-      Add a small core helper or dataclass that summarizes the normalized
-      result set:
-        - number of results;
-        - platforms;
-        - total query count;
-        - any query data;
-        - any `power_at_size` or power-run result;
-        - any cost data;
-        - any timestamps;
-        - any phase data;
-        - pairwise eligibility;
-        - benchmark/test-type signals needed by `power_bar`.
-
-      Candidate destination: `benchbox/core/visualization/suggestions.py` or
-      `benchbox/core/visualization/orchestration.py`. Keep it independent from
-      MCP types and Click/Rich console code.
+      Added `VisualizationDataProfile` in
+      `benchbox/core/visualization/suggestions.py` covering result count,
+      platforms, query count/data, power data, cost data, timestamps, phase
+      data, and pairwise eligibility. It is independent of MCP, Click, and Rich.
 
   - id: w2
     summary: "Replace divergent suggesters with one core recommendation function"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      Implement one function that returns structured chart recommendations with
-      at least `chart_type`, `reason`, `priority`, and optional applicability
-      details. MCP can serialize this directly. CLI can use it for future auto
-      behavior or keep current `auto == all` behavior while the dead private
-      method is removed/deprecated.
-
-      Required behavior:
-        - recommend `power_bar` when any result has `power_at_size` or is a
-          power-run result;
-        - preserve existing MCP priorities where still correct;
-        - never recommend a chart ID not present in the semantic registry;
-        - include pairwise-only charts only when exactly two results are present;
-        - expose enough profile details for MCP `suggest_charts` to keep its
-          current response shape.
+      Added `recommend_charts()` and `select_primary_chart()` in the shared
+      core module. MCP suggestion helpers delegate to those functions, and the
+      private `ResultPlotter._suggest_chart_types()` delegates for compatibility.
+      `power_bar` is recommended for `power_at_size` or power-run results;
+      pairwise-only recommendations require exactly two results.
 
   - id: w3
     summary: "Create a shared render outcome for explicit chart lists and templates"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
-      Extract the common "render these chart types against these results"
-      workflow into a core function returning a structured outcome. The outcome
-      should include:
-        - rendered chart content entries with chart type and content;
-        - skipped chart types with structured reasons;
-        - validation errors for unknown types or wrong result counts;
-        - template metadata when a template was used;
-        - a flag for strict pairwise enforcement.
-
-      CLI should format the outcome to Rich/console. MCP should serialize it to
-      JSON. The core function must not import Click, Rich, FastMCP, or MCP error
-      helpers.
+      Added `render_chart_set()` and structured outcome dataclasses in
+      `benchbox/core/visualization/orchestration.py`. Outcomes include rendered
+      entries, skipped chart reasons, validation errors, template metadata, and
+      strict pairwise mode without importing CLI or MCP types.
 
   - id: w4
     summary: "Disambiguate unknown chart types from valid-but-inapplicable chart/data combinations"
     needs: [w3]
-    status: pending
+    status: done
     notes: |
-      Preserve early unknown-type validation through `CHART_TYPE_SPECS`. After
-      a known chart type renders `None`, classify the skip/error as not
-      applicable for the provided data.
-
-      MCP error text should stop saying "Unsupported chart type" for known
-      chart IDs. Include profile details or a structured skip reason when
-      possible, for example missing phase data, missing query timings, or wrong
-      result count.
-
-      Tests should include at least one known inapplicable chart such as
-      `stacked_phase` without phases and one unknown chart type.
+      Unknown chart types now produce render validation errors. Known chart
+      IDs that render no content produce structured `SkippedChart` reasons,
+      and MCP reports them as not applicable rather than unsupported.
 
   - id: w5
     summary: "Route CLI and MCP through the shared orchestration and update tests"
     needs: [w2, w3, w4]
-    status: pending
+    status: done
     notes: |
-      Update `benchbox/cli/commands/visualize.py` and
-      `benchbox/mcp/tools/visualization.py` so they share:
-        - template resolution;
-        - chart list resolution;
-        - pairwise requirements;
-        - skip tracking;
-        - not-applicable messaging;
-        - suggestion coverage.
-
-      Remove or deprecate `ResultPlotter._suggest_chart_types()` once no tests
-      need a production-dead private method. If kept for compatibility, make it
-      delegate to the shared suggester.
+      CLI and MCP now route chart rendering through `render_chart_set()` and
+      MCP routes suggestions through the shared recommender. CLI preserves
+      `auto/all` behavior while using the shared outcome for pairwise
+      validation and template skip tracking. Tests cover shared orchestration,
+      MCP `power_bar` suggestions, and known-inapplicable messaging. The UAT
+      CLI-surface drift guard now allows the intentional internal
+      `visualize.py` implementation change while still rejecting Click
+      decorator or command signature drift.
 
 deferred:
   - summary: "Change CLI `--chart-type auto` from rendering all charts to rendering only recommended charts"
@@ -173,6 +127,7 @@ metadata:
   estimated_effort: "2-3 days"
   created_date: "2026-05-21"
   last_updated: "2026-05-21T00:00:00Z"
+  completed_date: "2026-05-22"
   source: "Independent verification of visualization architecture findings M1, M2, M3, and M4"
 
 impact:
