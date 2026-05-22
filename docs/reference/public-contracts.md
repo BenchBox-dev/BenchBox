@@ -202,6 +202,43 @@ Allowed differences:
   matching translation metadata.
 - Exact timing values must not be compared across modes.
 
+## Result Model Extension Policy
+
+`BenchmarkResults` is an internal producer model; schema-v2 result JSON is the
+compatibility boundary. Model cleanup must not move or remove exported keys
+unless the same PR includes loader, validator, explorer, MCP, and public
+submission coverage for the migration.
+
+Platform-specific structured data should use the narrowest existing exported
+location first:
+
+- Platform identity, deployment, cloud, compute, storage, and raw platform
+  details serialize under the `platform` block.
+- Lifecycle stage summaries serialize under `phases.<stage>`.
+- Cross-engine or cross-platform comparisons serialize under `comparisons`.
+- Invocation and validation metadata serialize under `execution` and `summary`.
+- New top-level keys require a public-contract update, schema-validator update,
+  loader behavior, and explorer input policy review in the same PR.
+
+A future `platform_extensions` block is acceptable only for additive structured
+data that has no existing canonical block. Existing fields may move there only
+with an alias period: old exported keys keep loading and writing until all
+documented consumers are migrated. Unknown nested keys inside documented blocks
+may be ignored by read-model consumers, but unknown top-level keys remain
+schema-governed and must not bypass schema-v2 validation.
+
+Current extension inventory:
+
+| Internal field/source | Current exported key | Loader behavior | Downstream consumers | Recommended action |
+|---|---|---|---|---|
+| `native_comparison` | `comparisons.native_duckdb` | Reconstructs `NativeComparison` from `comparisons.native_duckdb`. | Result loader/exporter; public schema validation now accepts the producer key; explorer ignores the comparison block. | Keep exported key; do not move before a comparison read-model design exists. |
+| `ExecutionPhases.migration` | `phases.migration` | Reconstructs summary-level `MigrationPhase`; per-table stats are intentionally not serialized. | Result loader/exporter; explorer reads phase durations from `phases.*`. | Keep as canonical lifecycle-stage location. |
+| Standalone pg_mooncake migration script | Top-level `migration` in script-emitted payloads | Not reconstructed by result loader. | Script-local reports only; not a canonical schema-v2 result extension. | Leave separate or convert in a dedicated PR to `phases.migration`; do not generalize this top-level key. |
+| `platform_info`, `platform_metadata`, `platform_raw_config`, `platform_raw_metadata` | `platform.config`, `platform.raw_config`, `platform.raw_metadata` | Reconstructs platform info and raw metadata blocks. | Loader/exporter, anonymizer, explorer platform/version extraction. | Keep; move internally only if exported keys remain stable. |
+| `platform_deployment`, `platform_cloud`, `platform_compute`, `platform_storage` | `platform.deployment`, `platform.cloud`, `platform.compute`, `platform.storage` | Reconstructs the normalized platform facets. | Loader/exporter, environment compatibility tests, explorer environment facets. | Keep as canonical platform facets. |
+| `execution_context` | `execution` and selected `config` fields | Loader preserves selected execution metadata, not the full internal context. | CLI/MCP/exporter/explorer metadata consumers. | Keep selected exported fields; expand only by explicit schema policy. |
+| `_benchmark_id_override` | `benchmark.id` | Reconstructs from `benchmark.id`. | Filename builder, loader, explorer IDs, result parity tests. | Keep internal compatibility field until builder and loader identity handling are redesigned. |
+
 ## Translation and Validation Mode Policy
 
 Decision from `fail-open-policy-and-translation-strictness`: SQL translation is

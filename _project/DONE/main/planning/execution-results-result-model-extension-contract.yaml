@@ -2,7 +2,7 @@ id: execution-results-result-model-extension-contract
 title: "Execution/results hardening: define result-model extension contract before platform-specific field migration"
 worktree: main
 priority: Medium-High
-status: "Not Started"
+status: "Completed"
 category: Results
 
 deps:
@@ -30,7 +30,7 @@ description: |
 work:
   - id: w0
     summary: "Revalidate BenchmarkResults field count, platform-specific fields, and schema consumers"
-    status: pending
+    status: done
     notes: |
       Re-run the current-tree evidence before proposing schema or model changes.
       Capture checked SHA, commands, and compact results in the implementation
@@ -45,10 +45,22 @@ work:
       implementation PR unless the migration policy explicitly classifies the
       change as backward-compatible or includes a same-PR migration/loader gate.
 
+      Completed 2026-05-22 at checked SHA
+      `185006fde1a04b460e4c30d52d4035afeb1861eb`: dataclass field count is 78;
+      platform/native/migration-related fields are `platform`,
+      `platform_deployment`, `platform_cloud`, `platform_compute`,
+      `platform_storage`, `platform_raw_config`, `platform_raw_metadata`,
+      `platform_info`, `platform_metadata`, and `native_comparison`;
+      `BenchmarkResults` has no `migration` field. Consumer rg returned 2504
+      broad hits. Inspection confirmed `comparisons.native_duckdb`,
+      `phases.migration`, platform metadata blocks, loader reconstruction, MCP
+      result loading, and explorer projection are the relevant compatibility
+      boundaries.
+
   - id: w1
     summary: "Write a result-model extension policy covering platform-specific data and schema-v2 compatibility"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Add a policy section to docs/reference/public-contracts.md or a focused
       result-schema doc that answers:
@@ -67,7 +79,7 @@ work:
   - id: w2
     summary: "Create an extension inventory and migration matrix for current platform-specific fields"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Build a concise inventory covering at least:
         - `native_comparison` and its `comparisons.native_duckdb` export;
@@ -91,7 +103,7 @@ work:
   - id: w3
     summary: "Add consumer tests or fixtures that lock current extension behavior before migration"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       Before changing model shape, add focused tests or fixtures that prove
       current behavior for `comparisons.native_duckdb`, `phases.migration`, and
@@ -107,7 +119,7 @@ work:
   - id: w4
     summary: "Implement only the lowest-risk internal extension cleanup approved by the matrix"
     needs: [w3]
-    status: pending
+    status: done
     notes: |
       Choose one narrow change from the w2 matrix that does not break exported
       result JSON. Examples:
@@ -121,6 +133,10 @@ work:
       If every field move is risky, record that as the outcome and stop after
       policy, inventory, and tests. A "no migration yet" result is acceptable
       if it is evidence-backed.
+
+      Outcome: no existing field was moved. The only code cleanup is accepting
+      the existing producer-emitted top-level `comparisons` key in schema-v2
+      validation. Current extension locations are locked by tests and policy.
 
 deferred:
   - summary: "Move all existing platform-specific result fields into `platform_extensions`"
@@ -138,6 +154,7 @@ metadata:
   estimated_effort: "2-3 days"
   created_date: "2026-05-21"
   last_updated: "2026-05-21T00:00:00Z"
+  completed_date: "2026-05-22"
   source: "Independent verification of execution/results architecture finding #6"
 
 impact:
