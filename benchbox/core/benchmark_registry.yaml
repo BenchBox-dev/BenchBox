@@ -1,0 +1,546 @@
+category_order:
+- TPC
+- Primitives
+- Industry
+- Academic
+- Time Series
+- Real World
+- AI/ML
+- Experimental
+benchmark_order:
+  TPC:
+  - tpch
+  - tpcds
+  - tpcdi
+  Primitives:
+  - read_primitives
+  - write_primitives
+  - transaction_primitives
+  - metadata_primitives
+  - ai_primitives
+  Industry:
+  - clickbench
+  - h2odb
+  - coffeeshop
+  Academic:
+  - ssb
+  - joinorder
+  - joinorder_synthetic
+  - amplab
+  Time Series:
+  - tsbs_devops
+  Real World:
+  - nyctaxi
+  - flightdata
+  AI/ML:
+  - vector_search
+  Experimental:
+  - tpch_skew
+  - tpchavoc
+  - tpcds_obt
+  - datavault
+benchmark_class_names:
+  tpch: TPCH
+  tpcds: TPCDS
+  tpcdi: TPCDI
+  ssb: SSB
+  clickbench: ClickBench
+  h2odb: H2ODB
+  amplab: AMPLab
+  read_primitives: ReadPrimitives
+  write_primitives: WritePrimitives
+  metadata_primitives: MetadataPrimitives
+  ai_primitives: AIPrimitives
+  transaction_primitives: TransactionPrimitives
+  joinorder: JoinOrder
+  joinorder_synthetic: JoinOrderSynthetic
+  coffeeshop: CoffeeShop
+  tpchavoc: TPCHavoc
+  tpch_skew: TPCHSkew
+  tsbs_devops: TSBSDevOps
+  nyctaxi: NYCTaxi
+  flightdata: FlightData
+  datavault: DataVault
+  tpcds_obt: TPCDSOBT
+  vector_search: VectorSearch
+core_class_name_overrides:
+  h2odb: H2OBenchmark
+  vector_search: VectorSearchBenchmark
+benchmark_data_source_probe_ids:
+- read_primitives
+- write_primitives
+- transaction_primitives
+- ai_primitives
+- tpcds_obt
+tpc_official_scale_options:
+- 1.0
+- 10.0
+- 30.0
+- 100.0
+- 300.0
+- 1000.0
+- 3000.0
+- 10000.0
+- 30000.0
+- 100000.0
+benchmark_metadata:
+  tpch:
+    display_name: TPC-H
+    description: Decision Support Benchmark
+    category: TPC
+    support_status: stable
+    num_queries: 22
+    query_description: 22 analytical queries
+    supports_streams: true
+    default_scale: 0.01
+    scale_options:
+    - 0.01
+    - 0.1
+    - 1.0
+    - 10.0
+    - 30.0
+    - 100.0
+    - 300.0
+    - 1000.0
+    - 3000.0
+    - 10000.0
+    - 30000.0
+    - 100000.0
+    min_scale: 0.01
+    complexity: Medium
+    estimated_time_range:
+    - 2
+    - 10
+    supports_dataframe: true
+  tpcds:
+    display_name: TPC-DS
+    description: Decision Support Benchmark
+    category: TPC
+    support_status: stable
+    num_queries: 99
+    query_description: 99 analytical queries
+    supports_streams: true
+    default_scale: 1.0
+    scale_options:
+    - 0.01
+    - 0.1
+    - 1.0
+    - 10.0
+    - 100.0
+    complexity: High
+    estimated_time_range:
+    - 10
+    - 60
+    supports_dataframe: true
+  tpcds_obt:
+    display_name: TPC-DS-OBT
+    description: Single-table TPC-DS (One Big Table) benchmark
+    category: Experimental
+    support_status: experimental
+    num_queries: 17
+    query_description: OBT-adapted analytical queries
+    supports_streams: false
+    default_scale: 1.0
+    scale_options:
+    - 1.0
+    min_scale: 1.0
+    complexity: Medium
+    estimated_time_range:
+    - 5
+    - 20
+    supports_dataframe: true
+  tpcdi:
+    display_name: TPC-DI
+    description: Data Integration Benchmark
+    category: TPC
+    support_status: beta
+    num_queries: 38
+    query_description: ETL Pipeline
+    supports_streams: false
+    default_scale: 0.01
+    scale_options:
+    - 0.01
+    - 0.1
+    - 1.0
+    - 10.0
+    min_scale: 0.01
+    complexity: High
+    estimated_time_range:
+    - 5
+    - 30
+    supports_dataframe: true
+  ssb:
+    display_name: SSB
+    description: Star Schema Benchmark
+    category: Academic
+    support_status: stable
+    num_queries: 13
+    query_description: 13 queries
+    supports_streams: false
+    default_scale: 0.01
+    scale_options:
+    - 0.01
+    - 0.1
+    - 1.0
+    - 10.0
+    min_scale: 0.01
+    complexity: Low
+    estimated_time_range:
+    - 1
+    - 5
+    supports_dataframe: true
+  clickbench:
+    display_name: ClickBench
+    description: Analytics benchmark
+    category: Industry
+    support_status: stable
+    num_queries: 43
+    query_description: 43 queries
+    supports_streams: false
+    default_scale: 1.0
+    scale_options:
+    - 1.0
+    min_scale: 1.0
+    complexity: Medium
+    estimated_time_range:
+    - 5
+    - 15
+    supports_dataframe: true
+  h2odb:
+    display_name: H2ODB
+    description: Data science benchmark
+    category: Industry
+    support_status: beta
+    num_queries: 10
+    query_description: Multiple ML workloads
+    supports_streams: false
+    default_scale: 0.01
+    scale_options:
+    - 0.01
+    - 0.1
+    - 1.0
+    min_scale: 0.01
+    complexity: Medium
+    estimated_time_range:
+    - 3
+    - 15
+    supports_dataframe: true
+  amplab:
+    display_name: AMPLab
+    description: Big data benchmark suite
+    category: Academic
+    support_status: beta
+    num_queries: 8
+    query_description: Multiple workloads
+    supports_streams: false
+    default_scale: 0.01
+    scale_options:
+    - 0.01
+    - 0.1
+    - 1.0
+    min_scale: 0.01
+    complexity: Medium
+    estimated_time_range:
+    - 3
+    - 15
+    supports_dataframe: true
+  read_primitives:
+    display_name: Read Primitives
+    description: Read operation benchmarks testing SELECT queries
+    category: Primitives
+    support_status: beta
+    num_queries: 136
+    query_description: Multiple read test queries
+    supports_streams: false
+    default_scale: 0.01
+    scale_options:
+    - 0.01
+    - 0.1
+    min_scale: 0.01
+    complexity: Low
+    estimated_time_range:
+    - 1
+    - 3
+    supports_dataframe: true
+  write_primitives:
+    display_name: Write Primitives
+    description: Database write operations benchmark
+    category: Primitives
+    support_status: beta
+    num_queries: 12
+    query_description: 12 write operations (INSERT, UPDATE, DELETE, BULK_LOAD, MERGE, DDL, TRANSACTION)
+    supports_streams: false
+    default_scale: 0.01
+    scale_options:
+    - 0.01
+    - 0.1
+    - 1.0
+    min_scale: 0.01
+    complexity: Medium
+    estimated_time_range:
+    - 2
+    - 5
+    supports_dataframe: true
+  metadata_primitives:
+    display_name: Metadata
+    description: Database catalog introspection benchmark
+    category: Primitives
+    support_status: beta
+    num_queries: 62
+    query_description: 62 catalog queries in the full SQL catalog; DataFrame mode runs platform-specific metadata operation
+      subsets
+    supports_streams: false
+    default_scale: 1.0
+    scale_options:
+    - 1.0
+    min_scale: 1.0
+    complexity: Low
+    estimated_time_range:
+    - 1
+    - 2
+    supports_dataframe: true
+  transaction_primitives:
+    display_name: Transactions
+    description: ACID transaction testing benchmark
+    category: Primitives
+    support_status: beta
+    num_queries: 12
+    query_description: 12 transaction operations
+    supports_streams: false
+    default_scale: 0.01
+    scale_options:
+    - 0.01
+    - 0.1
+    - 1.0
+    min_scale: 0.01
+    complexity: Medium
+    estimated_time_range:
+    - 2
+    - 5
+    supports_dataframe: true
+  ai_primitives:
+    display_name: AI Primitives
+    description: AI/ML function benchmarks (Snowflake Cortex, BigQuery ML, Databricks AI)
+    category: Primitives
+    support_status: experimental
+    num_queries: 16
+    query_description: 16 AI/ML function queries
+    supports_streams: false
+    default_scale: 0.01
+    scale_options:
+    - 0.01
+    - 0.1
+    - 1.0
+    min_scale: 0.01
+    complexity: Medium
+    estimated_time_range:
+    - 3
+    - 15
+    supports_dataframe: false
+  joinorder:
+    display_name: JoinOrder
+    description: Canonical IMDb 2013 Join Order Benchmark
+    category: Academic
+    support_status: stable
+    num_queries: 113
+    query_description: 113 queries
+    supports_streams: false
+    default_scale: 1.0
+    scale_options:
+    - 1.0
+    min_scale: 1.0
+    complexity: High
+    estimated_time_range:
+    - 30
+    - 90
+    supports_dataframe: true
+    surface: public
+    data_source: canonical
+    data_manifest: benchbox/core/joinorder/data_manifest.toml
+  joinorder_synthetic:
+    display_name: JoinOrder Synthetic
+    description: Uniformly-random Join Order schema smoke-test data
+    category: Academic
+    support_status: repo_only
+    num_queries: 13
+    query_description: 13 synthetic smoke queries
+    supports_streams: false
+    default_scale: 1.0
+    scale_options:
+    - 0.001
+    - 0.01
+    - 0.1
+    - 0.5
+    - 1.0
+    - 2.0
+    min_scale: 0.001
+    complexity: Medium
+    estimated_time_range:
+    - 2
+    - 10
+    supports_dataframe: true
+    surface: internal
+    data_source: synthetic
+  coffeeshop:
+    display_name: CoffeeShop
+    description: Order line benchmark with regional weighting
+    category: Industry
+    support_status: beta
+    num_queries: 11
+    query_description: 11 analytics queries
+    supports_streams: false
+    default_scale: 0.001
+    scale_options:
+    - 0.001
+    - 0.01
+    - 0.1
+    - 1.0
+    min_scale: 0.001
+    complexity: Medium
+    estimated_time_range:
+    - 3
+    - 12
+    supports_dataframe: true
+  tpchavoc:
+    display_name: TPC-Havoc
+    description: TPC-H syntax variants for optimizer testing
+    category: Experimental
+    support_status: experimental
+    num_queries: 220
+    query_description: 220 query variants (22 queries x 10 variants)
+    supports_streams: false
+    default_scale: 0.01
+    scale_options:
+    - 0.01
+    - 0.1
+    - 1.0
+    - 10.0
+    min_scale: 0.01
+    complexity: High
+    estimated_time_range:
+    - 15
+    - 60
+    supports_dataframe: true
+  tpch_skew:
+    display_name: TPC-H Skew
+    description: TPC-H with configurable data skew distributions
+    category: Experimental
+    support_status: experimental
+    num_queries: 22
+    query_description: 22 TPC-H queries on skewed data (Zipfian, normal, exponential)
+    supports_streams: true
+    default_scale: 0.01
+    scale_options:
+    - 0.01
+    - 0.1
+    - 1.0
+    - 10.0
+    min_scale: 0.01
+    complexity: Medium
+    estimated_time_range:
+    - 2
+    - 15
+    supports_dataframe: true
+  tsbs_devops:
+    display_name: TSBS DevOps
+    description: Time Series Benchmark Suite for DevOps monitoring
+    category: Time Series
+    support_status: beta
+    num_queries: 18
+    query_description: 18 time-series queries (CPU, memory, disk, network)
+    supports_streams: false
+    default_scale: 1.0
+    scale_options:
+    - 0.01
+    - 0.1
+    - 1.0
+    - 10.0
+    min_scale: 0.01
+    complexity: Medium
+    estimated_time_range:
+    - 2
+    - 10
+    supports_dataframe: true
+  nyctaxi:
+    display_name: NYC Taxi
+    description: NYC TLC trip data for OLAP analytics
+    category: Real World
+    support_status: beta
+    num_queries: 25
+    query_description: 25 OLAP queries (temporal, geographic, financial)
+    supports_streams: false
+    default_scale: 1.0
+    scale_options:
+    - 0.01
+    - 0.1
+    - 1.0
+    - 10.0
+    - 100.0
+    min_scale: 0.01
+    complexity: Medium
+    estimated_time_range:
+    - 5
+    - 30
+    supports_dataframe: true
+  flightdata:
+    display_name: Flight Data
+    description: US BTS On-Time Performance data for aviation analytics
+    category: Real World
+    support_status: beta
+    num_queries: 20
+    query_description: 20 OLAP queries (on-time, delays, routes, temporal, carriers)
+    supports_streams: false
+    default_scale: 1.0
+    scale_options:
+    - 0.01
+    - 0.1
+    - 1.0
+    - 10.0
+    - 100.0
+    min_scale: 0.01
+    complexity: Medium
+    estimated_time_range:
+    - 5
+    - 30
+    supports_dataframe: true
+  datavault:
+    display_name: TPC-H Data Vault
+    description: TPC-H adapted for Data Vault 2.0 modeling
+    category: Experimental
+    support_status: experimental
+    num_queries: 22
+    query_description: 22 analytical queries (TPC-H adapted for Hub-Link-Satellite model)
+    supports_streams: false
+    default_scale: 0.01
+    scale_options:
+    - 0.01
+    - 0.1
+    - 1.0
+    - 10.0
+    min_scale: 0.01
+    complexity: High
+    estimated_time_range:
+    - 5
+    - 30
+    supports_dataframe: true
+  vector_search:
+    display_name: Vector Search
+    description: Vector similarity search benchmark (kNN, ANN, filtered)
+    category: AI/ML
+    support_status: beta
+    num_queries: 6
+    query_description: 6 queries (kNN cosine/L2, filtered, recall@k, ANN, multi-category)
+    supports_streams: false
+    default_scale: 0.01
+    scale_options:
+    - 0.01
+    - 0.1
+    - 1.0
+    - 10.0
+    - 100.0
+    min_scale: 0.01
+    complexity: Medium
+    estimated_time_range:
+    - 1
+    - 10
+    supports_dataframe: false
