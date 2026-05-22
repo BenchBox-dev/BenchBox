@@ -1,68 +1,24 @@
-"""AMPLab Big Data Benchmark schema definitions.
+"""AMPLab Big Data Benchmark schema definitions."""
 
-The AMPLab benchmark is designed to test big data processing systems
-using web analytics workloads. It consists of three main tables based
-on web crawl and user interaction data.
+from pathlib import Path
+from typing import Any, cast
 
-The benchmark tests:
-- Scan queries (filtering and aggregation)
-- Join queries (across multiple tables)
-- Complex analytical queries
-
-Tables:
-- rankings: Web page rankings (similar to PageRank)
-- uservisits: User visit logs with source/destination URLs
-- documents: Web page content and metadata
-
-For more information, see:
-- https://amplab.cs.berkeley.edu/benchmark/
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
-
-from typing import cast
+import yaml
 
 from benchbox.core.tuning import BenchmarkTunings, TableTuning, TuningColumn
 
-# Rankings table - web page rankings
-RANKINGS = {
-    "name": "rankings",
-    "columns": [
-        {"name": "pageURL", "type": "VARCHAR(300)", "primary_key": True},
-        {"name": "pageRank", "type": "INTEGER"},
-        {"name": "avgDuration", "type": "INTEGER"},
-    ],
-}
 
-# UserVisits table - user visit logs
-USERVISITS = {
-    "name": "uservisits",
-    "columns": [
-        {"name": "sourceIP", "type": "VARCHAR(15)"},
-        {"name": "destURL", "type": "VARCHAR(100)"},
-        {"name": "visitDate", "type": "DATE"},
-        {"name": "adRevenue", "type": "DECIMAL(8,2)"},
-        {"name": "userAgent", "type": "VARCHAR(256)"},
-        {"name": "countryCode", "type": "VARCHAR(3)"},
-        {"name": "languageCode", "type": "VARCHAR(6)"},
-        {"name": "searchWord", "type": "VARCHAR(32)"},
-        {"name": "duration", "type": "INTEGER"},
-    ],
-}
+def _load_schema_specs() -> dict[str, Any]:
+    with (Path(__file__).with_name("schema_specs.yaml")).open(encoding="utf-8") as handle:
+        return yaml.safe_load(handle) or {}
 
-# Documents table - web page content and metadata
-DOCUMENTS = {
-    "name": "documents",
-    "columns": [
-        {"name": "url", "type": "VARCHAR(300)", "primary_key": True},
-        {"name": "contents", "type": "TEXT"},
-    ],
-}
 
-# All tables in the AMPLab schema
-TABLES = {"rankings": RANKINGS, "uservisits": USERVISITS, "documents": DOCUMENTS}
+_SCHEMA_SPECS = _load_schema_specs()
+_TABLE_DEFS = {entry["id"]: entry for entry in _SCHEMA_SPECS["tables"]}
+globals().update({symbol: entry["schema"] for symbol, entry in _TABLE_DEFS.items()})
+
+TABLES: dict[str, dict] = {entry["key"]: globals()[symbol] for symbol, entry in _TABLE_DEFS.items()}
+_TABLE_ORDER = list(_SCHEMA_SPECS["table_order"])
 
 
 def get_create_table_sql(
@@ -122,7 +78,7 @@ def get_all_create_table_sql(
     from benchbox.core.schema_utils import collect_create_table_sql
 
     return collect_create_table_sql(
-        ["rankings", "documents", "uservisits"],
+        _TABLE_ORDER,
         get_create_table_sql,
         dialect,
         enable_primary_keys=enable_primary_keys,
