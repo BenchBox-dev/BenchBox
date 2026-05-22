@@ -1,0 +1,197 @@
+id: benchmark-base-and-mixin-contract-consolidation
+title: "Consolidate benchmark base and mixin contracts"
+worktree: main
+priority: Medium-High
+status: "Completed"
+category: Code Quality and Technical Debt
+
+deps:
+  needs:
+  - canonical-benchmark-id-resolution
+
+description: |
+  Independent verification at checked SHA e60986923 confirmed the deprecated
+  internal base remains load-bearing for exactly two loader benchmarks:
+
+    datavault -> benchbox.core.datavault.benchmark.DataVaultBenchmark
+    tpcds_obt -> benchbox.core.tpcds_obt.benchmark.TPCDSOBTBenchmark
+
+  `benchbox/core/base_benchmark.py` is labeled deprecated and retained for
+  internal compatibility, but it duplicates result creation and validation
+  helpers from `benchbox/base.py`. Verified duplicated method names include
+  `create_enhanced_benchmark_result`, `create_minimal_benchmark_result`,
+  `_resolve_output_dir`, `validate_preflight`, `validate_manifest`, and
+  `validate_loaded_data`. Their signatures are currently similar, but they are
+  different method objects, and `_attach_performance_snapshot` exists only on
+  the public base.
+
+  Independent verification also confirmed `SimpleBenchmarkMixin` is a
+  docstring-only duck-typed contract. A dummy class inheriting
+  `SimpleBenchmarkMixin` defines successfully and fails only at runtime with
+  `AttributeError: 'BadSimple' object has no attribute 'query_manager'`. This
+  contrasts with `CursorValidationQueryExecutionMixin`, which uses
+  `__init_subclass__` enforcement for required methods.
+
+work:
+- id: w0
+  summary: "Revalidate deprecated-base consumers and simple-mixin enforcement gap"
+  status: done
+  notes: |
+    Re-run a read-only check that iterates loader classes and prints any
+    subclass of `benchbox.core.base_benchmark.BaseBenchmark`. Also define a
+    throwaway `SimpleBenchmarkMixin` consumer with missing attributes and
+    confirm whether failure occurs at class definition or runtime. Keep raw
+    output outside git.
+
+- id: w1
+  summary: "Choose between full migration and shared helper extraction for deprecated-base result/validation logic"
+  needs: [w0]
+  status: done
+  notes: |
+    Evaluate two paths:
+      1. Migrate `datavault` and `tpcds_obt` to `benchbox.base.BaseBenchmark`
+         and delete or drastically shrink `benchbox/core/base_benchmark.py`.
+      2. Extract shared result/validation methods into one mixin/helper used
+         by both bases while migration remains pending.
+    Prefer full migration if constructor/output-dir differences are tractable
+    inside one PR. If not, use shared extraction with a dated migration TODO.
+
+- id: w2
+  summary: "Migrate or de-duplicate result creation and validation helpers"
+  needs: [w1]
+  status: done
+  notes: |
+    Ensure `create_enhanced_benchmark_result`, minimal result creation,
+    preflight validation, manifest validation, and loaded-data validation use
+    one implementation path. Preserve `datavault` and `tpcds_obt` default
+    output-directory semantics, including source-data paths for TPC-DS OBT.
+
+- id: w3
+  summary: "Add an import-boundary test for deprecated-base usage"
+  needs: [w2]
+  status: done
+  notes: |
+    If full migration is completed, assert no loader benchmark subclasses the
+    deprecated base and consider deleting the file. If shared extraction is
+    chosen, assert only the explicitly approved migration stragglers use it
+    and link that approval to a TODO or documented deadline.
+
+- id: w4
+  summary: "Enforce `SimpleBenchmarkMixin` structural requirements at class definition or via Protocol tests"
+  needs: [w0]
+  status: done
+  notes: |
+    Apply the existing `CursorValidationQueryExecutionMixin.__init_subclass__`
+    pattern if practical. If attribute enforcement is too noisy for mixin
+    composition, define a `Protocol` and add focused tests for AMPLab,
+    ClickBench, and SSB. The enforcement should catch missing
+    `query_manager`, `_table_load_order`, `_get_table_schema`, and query
+    execution methods before `_load_data` or `run_benchmark` fails deep at
+    runtime.
+
+- id: w5
+  summary: "Add regression tests for migrated base behavior and mixin contract failures"
+  needs: [w2, w3, w4]
+  status: done
+  notes: |
+    Cover `datavault` and `tpcds_obt` construction, output directory
+    defaults, validation fallback identifiers, and result creation if they
+    migrate. Add a negative test for an invalid `SimpleBenchmarkMixin`
+    consumer and positive coverage for the existing consumers.
+
+metadata:
+  tags:
+  - benchmark-base
+  - mixins
+  - result-validation
+  - architecture-followup
+  estimated_effort: "2-3 days"
+  created_date: "2026-05-22"
+  last_updated: "2026-05-22T00:00:00Z"
+  completed_date: "2026-05-22"
+
+impact:
+  business_value: |
+    Reduces maintenance risk in core benchmark execution and validation paths,
+    especially for future fixes to result metadata and validation behavior.
+  user_impact: |
+    Users see more consistent result and validation behavior across benchmarks,
+    including older experimental benchmarks.
+  technical_debt: |
+    Replaces duplicated base-class implementations and docstring-only mixin
+    requirements with enforceable contracts.
+
+files_affected:
+  modified:
+    - "benchbox/base.py"
+    - "benchbox/core/base_benchmark.py"
+    - "benchbox/core/benchmark_result_validation.py"
+    - "benchbox/core/simple_benchmark_mixin.py"
+    - "tests/unit/core/test_benchmark_api_contract.py"
+
+prior_art:
+- "benchbox/base.py: public BaseBenchmark result/validation helpers - prefer as the future implementation surface."
+- "benchbox/core/base_benchmark.py: deprecated compatibility base - migrate or shrink to a thin shared layer."
+- "benchbox/core/benchmark_mixins.py: CursorValidationQueryExecutionMixin.__init_subclass__ - reuse enforcement style where
+  suitable."
+- "benchbox/core/simple_benchmark_mixin.py: documented SimpleBenchmarkMixin requirements - convert from prose-only to enforced
+  contract."
+- "tests/unit/core/test_benchmark_api_contract.py: import-boundary tests - natural home for deprecated-base boundary assertions."
+
+must_preserve:
+- "Datavault and TPC-DS OBT remain importable loader benchmarks."
+- "TPC-DS OBT keeps separate source-data and OBT output-directory behavior."
+- "Existing AMPLab, ClickBench, and SSB simple benchmark behavior remains unchanged."
+- "Result schema fields and validation helper return types remain backward compatible."
+
+approach: |
+  Start by deciding whether migration is feasible in one bounded PR. If it is,
+  migrate the two deprecated-base consumers and delete the duplicated base. If
+  it is not, extract shared result/validation behavior and add a hard boundary
+  test so the deprecated surface cannot attract new benchmarks. For the simple
+  mixin, reuse the existing runtime contract style instead of inventing a broad
+  framework.
+
+anti_patterns:
+- "DO NOT migrate datavault or tpcds_obt without preserving their current output path conventions."
+- "DO NOT leave two editable copies of result/validation helpers without a boundary test and migration owner."
+- "DO NOT enforce SimpleBenchmarkMixin requirements so broadly that intermediate mixins fail before concrete benchmark classes
+  are defined."
+- "DO NOT refactor unrelated benchmark query logic while changing base contracts."
+
+verification:
+- description: "Base contract and loader parity tests cover deprecated-base migration or boundary."
+  command: "uv run -- python -m pytest tests/unit/core/test_benchmark_api_contract.py tests/unit/core/test_loader_registry_parity.py
+    tests/test_base.py -q"
+  expected_output: "All selected contract tests pass."
+- description: "Simple benchmark consumers still pass their focused tests."
+  command: "uv run -- python -m pytest tests/unit/core -k 'simple or benchmark_api_contract or loader_registry_parity' -q"
+  expected_output: "Focused unit tests pass without runtime AttributeError regressions."
+- description: "Fast suite remains green after base/mixin changes."
+  command: "uv run -- python -m pytest -m fast -q"
+  expected_output: "Fast tests pass."
+
+scope_limit:
+  only_modify:
+    - "benchbox/base.py"
+    - "benchbox/core/base_benchmark.py"
+    - "benchbox/core/benchmark_result_validation.py"
+    - "benchbox/core/simple_benchmark_mixin.py"
+    - "tests/unit/core/"
+    - "_project/TODO/"
+    - "_project/DONE/"
+  do_not_modify:
+    - "benchbox/platforms/"
+    - "benchbox/mcp/"
+    - "landing/"
+    - "benchmark_runs/"
+
+success_metrics:
+- "Deprecated-base usage is either eliminated or explicitly pinned to an approved migration exception."
+- "Result/validation helper changes happen in one implementation path, not two diverging copies."
+- "Invalid SimpleBenchmarkMixin consumers fail at definition or focused contract-test time instead of deep runtime AttributeError."
+
+open_questions:
+- "Is deletion of `benchbox/core/base_benchmark.py` acceptable in the same PR if only internal imports use it?"
+- "Should SimpleBenchmarkMixin enforce attributes, methods, or both, given some attributes are initialized in `__init__` rather
+  than declared on the class?"

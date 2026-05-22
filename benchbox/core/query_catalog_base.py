@@ -43,13 +43,19 @@ class CatalogEntry(Protocol):
     """
 
     @property
-    def sql(self) -> str: ...
+    def sql(self) -> str:
+        """Return the default SQL text for the catalog entry."""
+        ...
 
     @property
-    def variants(self) -> dict[str, str] | None: ...
+    def variants(self) -> dict[str, str] | None:
+        """Return dialect-specific SQL variants when the entry defines them."""
+        ...
 
     @property
-    def skip_on(self) -> list[str] | None: ...
+    def skip_on(self) -> list[str] | None:
+        """Return dialect names where the entry should be skipped."""
+        ...
 
 
 # ---------------------------------------------------------------------------

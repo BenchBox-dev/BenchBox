@@ -40,6 +40,8 @@ QUERY_RUN_TYPES = {
 
 @dataclass
 class TableGenerationStats:
+    """Per-table data generation metrics captured during the generate phase."""
+
     generation_time_ms: int
     status: str
     rows_generated: int
@@ -54,6 +56,8 @@ class TableGenerationStats:
 
 @dataclass
 class DataGenerationPhase:
+    """Aggregate data generation metrics for a benchmark run."""
+
     duration_ms: int
     status: str
     tables_generated: int
@@ -64,6 +68,8 @@ class DataGenerationPhase:
 
 @dataclass
 class TableCreationStats:
+    """Per-table schema creation metrics captured during setup."""
+
     creation_time_ms: int
     status: str
     constraints_applied: int
@@ -75,6 +81,8 @@ class TableCreationStats:
 
 @dataclass
 class SchemaCreationPhase:
+    """Aggregate schema creation metrics for a benchmark run."""
+
     duration_ms: int
     status: str
     tables_created: int
@@ -85,6 +93,8 @@ class SchemaCreationPhase:
 
 @dataclass
 class TableLoadingStats:
+    """Per-table load metrics captured during the load phase."""
+
     rows: int
     load_time_ms: int
     status: str
@@ -97,6 +107,8 @@ class TableLoadingStats:
 
 @dataclass
 class DataLoadingPhase:
+    """Aggregate table loading metrics for a benchmark run."""
+
     duration_ms: int
     status: str
     total_rows_loaded: int
@@ -106,6 +118,8 @@ class DataLoadingPhase:
 
 @dataclass
 class ValidationPhase:
+    """Validation outcomes captured for generated or loaded data."""
+
     duration_ms: int
     row_count_validation: str
     schema_validation: str
@@ -115,6 +129,8 @@ class ValidationPhase:
 
 @dataclass
 class SetupPhase:
+    """Setup phase metrics grouped by lifecycle stage."""
+
     data_generation: DataGenerationPhase | None = None
     schema_creation: SchemaCreationPhase | None = None
     data_loading: DataLoadingPhase | None = None
@@ -123,6 +139,8 @@ class SetupPhase:
 
 @dataclass
 class QueryExecution:
+    """Result and timing metadata for a single query execution."""
+
     query_id: str
     stream_id: str
     execution_order: int
@@ -145,6 +163,8 @@ class QueryExecution:
 
 @dataclass
 class PowerTestPhase:
+    """Power-test execution metrics and per-query results."""
+
     start_time: str
     end_time: str
     duration_ms: int
