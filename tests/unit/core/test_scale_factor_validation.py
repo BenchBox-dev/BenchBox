@@ -96,10 +96,9 @@ def test_every_benchmark_accepts_first_declared_scale(benchmark_id: str) -> None
     validate_scale_factor(benchmark_id, sf)
 
 
-def test_unknown_benchmark_skips_validation() -> None:
-    """Defensive default: unknown benchmark ids do not raise (the runner
-    surfaces a 'no such benchmark' error elsewhere)."""
-    validate_scale_factor("does-not-exist", 999.0)
+def test_unknown_benchmark_raises_clear_error() -> None:
+    with pytest.raises(ValueError, match="Unknown benchmark 'does-not-exist'"):
+        validate_scale_factor("does-not-exist", 999.0)
 
 
 def test_float_tolerance_accepts_imperceptible_drift() -> None:

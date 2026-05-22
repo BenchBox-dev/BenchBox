@@ -160,60 +160,22 @@ class BaseBenchmark(VerbosityMixin, ABC):
         return None
 
     def _get_benchmark_name(self) -> str:
-        """Derive benchmark name from class name.
-
-        Maps class names to benchmark names:
-        - TPCH -> tpch
-        - TPCDS -> tpcds
-        - ClickBench -> clickbench
-        - AMPLab -> amplab
-        - H2ODB -> h2odb
-        - JoinOrder -> joinorder
-        - TPCHavoc -> tpchavoc
-        - NYCTaxi -> nyctaxi
-        - etc.
-
-        Returns:
-            Lowercase benchmark name suitable for directory paths
-        """
+        """Return the canonical registry ID for this benchmark class."""
         class_name = self.__class__.__name__
 
-        # Handle special cases first
-        special_mappings = {
-            "ClickBench": "clickbench",
-            "ClickBenchBenchmark": "clickbench",
-            "AMPLab": "amplab",
-            "AMPLabBenchmark": "amplab",
-            "H2ODB": "h2odb",
-            "H2OBenchmark": "h2odb",
-            "JoinOrder": "joinorder",
-            "JoinOrderBenchmark": "joinorder",
-            "TPCHavoc": "tpchavoc",
-            "TPCHavocBenchmark": "tpchavoc",
-            "TPCHBenchmark": "tpch",
-            "TPCDSBenchmark": "tpcds",
-            "TPCDIBenchmark": "tpcdi",
-            "SSBBenchmark": "ssb",
-            "PrimitivesBenchmark": "primitives",
-            "MergeBenchmark": "merge",
-            "CoffeeShopBenchmark": "coffeeshop",
-            "NYCTaxi": "nyctaxi",
-            "NYCTaxiBenchmark": "nyctaxi",
-            "FlightData": "flightdata",
-            "FlightDataBenchmark": "flightdata",
-            "TSBSDevOps": "tsbs_devops",
-            "TSBSDevOpsBenchmark": "tsbs_devops",
-        }
+        try:
+            from benchbox.core.benchmark_registry import get_benchmark_id_for_class_name
+        except ImportError:
+            benchmark_id = None
+        else:
+            benchmark_id = get_benchmark_id_for_class_name(class_name)
+        if benchmark_id is not None:
+            return benchmark_id
 
-        if class_name in special_mappings:
-            return special_mappings[class_name]
-
-        # Prefer stripping the common suffix before lowercasing to keep
-        # class-based benchmark IDs stable (e.g. ClickBenchBenchmark -> clickbench).
+        # Keep unregistered tests and downstream custom benchmarks working.
         if class_name.endswith("Benchmark"):
             return class_name[:-9].lower()
 
-        # For standard cases, just lowercase (e.g. TPCH -> tpch).
         return class_name.lower()
 
     def get_data_source_benchmark(self) -> Optional[str]:
