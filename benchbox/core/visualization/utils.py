@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from benchbox.utils.scale_factor import format_scale_factor
@@ -24,6 +25,15 @@ def slugify(text: str) -> str:
     while "--" in slug:
         slug = slug.replace("--", "-")
     return slug.strip("-") or "untitled"
+
+
+def natural_query_sort_key(value: str) -> tuple[float, str]:
+    """Sort key for natural ordering of query IDs such as Q1, Q2, Q10."""
+    match = re.match(r"^(\D*)(\d+)(.*)$", value)
+    if match:
+        prefix, num, suffix = match.groups()
+        return (float(num), prefix + suffix)
+    return (float("inf"), value)
 
 
 def build_chart_subtitle(

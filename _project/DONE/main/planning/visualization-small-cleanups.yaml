@@ -1,0 +1,185 @@
+id: visualization-small-cleanups
+title: "Visualization hardening: remove low-risk utility duplication and local import noise"
+worktree: main
+priority: Medium
+status: Completed
+completed_date: "2026-05-21"
+category: Code Quality
+
+deps:
+  needs:
+  - architecture-contract-map-and-support-taxonomy
+
+description: |
+  Independent verification confirmed two low-risk cleanup items in the
+  visualization subsystem:
+
+    - `benchbox/core/visualization/result_plotter.py` imports `re` inside
+      `_sort_results_by_version()` and `_natural_sort_key()`, while
+      `ascii_runtime.py` already imports `re` at module top.
+    - `result_plotter.py` and `ascii_runtime.py` both define an equivalent
+      natural query-ID sort key.
+
+  The original review overstated one detail: `statistics` is already imported
+  at module top in `ascii_runtime.py`, so there is no per-call `statistics`
+  import to fix. This TODO keeps the cleanup narrow and intentionally separate
+  from the registry/orchestration refactors.
+
+work:
+- id: w0
+  summary: "Revalidate local imports and duplicated natural-sort behavior before editing"
+  status: done
+  notes: |
+    Re-run current-tree checks and record checked SHA plus a compact summary
+    in the implementation PR body or TODO completion notes.
+
+    Required checks:
+      - `rg -n "import re|def _natural_sort_key|statistics" benchbox/core/visualization/result_plotter.py benchbox/core/visualization/ascii_runtime.py benchbox/core/visualization/utils.py`.
+      - Compare `ResultPlotter._natural_sort_key()` with
+        `ascii_runtime._natural_sort_key()` and list any divergence before
+        extracting.
+      - Identify tests covering version sorting and query-ID ordering.
+
+    Decision gate: if the implementations have diverged by the time this
+    TODO is implemented, write characterization tests for both behaviors
+    before extracting a shared helper.
+
+- id: w1
+  summary: "Hoist `re` import in result_plotter without changing lazy renderer imports"
+  needs: [w0]
+  status: done
+  notes: |
+    Move `import re` to module scope in
+    `benchbox/core/visualization/result_plotter.py` and remove the two local
+    imports. Do not hoist renderer submodule imports in `ascii_runtime.py`;
+    those are intentionally lazy so command registration stays lightweight.
+
+- id: w2
+  summary: "Extract natural query-ID sorting to visualization utils"
+  needs: [w0]
+  status: done
+  notes: |
+    Move the shared natural query-ID sort key to
+    `benchbox/core/visualization/utils.py`, for example
+    `natural_query_sort_key(value: str) -> tuple[float, str]`.
+
+    Preserve exact behavior:
+      - IDs with digits sort by numeric value;
+      - suffix/prefix text remains the tie-breaker;
+      - IDs without digits sort after numeric IDs;
+      - return type remains compatible with existing sort calls.
+
+    Update `ascii_runtime.py` and `result_plotter.py` to import the helper.
+
+- id: w3
+  summary: "Add focused tests for shared natural sorting and version sorting"
+  needs: [w1, w2]
+  status: done
+  notes: |
+    Tests should cover:
+      - `Q1`, `Q2`, `Q10` natural ordering;
+      - bare numeric IDs if currently supported by callers;
+      - suffix cases such as `Q14a`;
+      - nonnumeric IDs sorting after numeric IDs;
+      - `ResultPlotter._sort_results_by_version()` still sorts platform
+        version labels as before.
+
+    Prefer tests near existing visualization unit tests; avoid broad test
+    rewrites.
+
+deferred:
+- summary: "Rewrite all visualization utility helpers"
+  reason: "Only import placement and duplicated natural sort are in scope."
+- summary: "Change query-ID normalization semantics"
+  reason: "This TODO is about sort keys, not query subset normalization."
+- summary: "Hoist lazy textcharts renderer imports"
+  reason: "The lightweight visualization import boundary is intentional."
+
+metadata:
+  tags:
+  - architecture-review-followup
+  - visualization
+  - cleanup
+  - utils
+  estimated_effort: "0.5-1 day"
+  created_date: "2026-05-21"
+  last_updated: "2026-05-21T00:00:00Z"
+  source: "Independent verification of visualization architecture findings N2 and N3"
+
+impact:
+  business_value: |
+    Lowers maintenance friction in visualization code without changing user
+    behavior.
+  user_impact: |
+    No intentional user-visible change.
+  technical_debt: |
+    Removes a duplicated helper and a small readability/per-call import wart.
+
+files_affected:
+  modified:
+  - "benchbox/core/visualization/result_plotter.py"
+  - "benchbox/core/visualization/ascii_runtime.py"
+  - "benchbox/core/visualization/utils.py"
+  - "tests/unit/visualization/test_viz_utils.py"
+  - "tests/unit/visualization/ascii/test_ascii_charts.py"
+
+prior_art:
+- "benchbox/core/visualization/utils.py: shared subtitle, slug, and power-run helpers - extend this rather than creating another
+  utility module."
+- "benchbox/core/visualization/ascii_runtime.py: current query matrix ordering - preserve chart output order."
+- "benchbox/core/visualization/result_plotter.py: current version and query sort helpers - preserve behavior while removing
+  duplication."
+- "benchbox/core/visualization/__init__.py: lightweight import boundary - do not introduce eager renderer imports through
+  utility extraction."
+
+must_preserve:
+- "Natural query ordering remains unchanged for existing ASCII charts."
+- "ResultPlotter platform version sorting remains unchanged."
+- "Visualization package import remains lightweight."
+- "No chart renderer behavior changes except through identical shared sort helper use."
+
+approach: |
+  Make the smallest mechanical cleanup after characterization. Move `re` to
+  module scope in result_plotter, extract the duplicated natural query sort key
+  into visualization utils, and prove call sites still sort the same examples.
+
+anti_patterns:
+- "DO NOT combine this cleanup with registry or MCP orchestration refactors."
+- "DO NOT change `normalize_query_id()` or query subset matching behavior."
+- "DO NOT hoist lazy textcharts renderer imports."
+- "DO NOT broaden tests into unrelated Results Explorer chart behavior."
+
+verification:
+- description: "Focused visualization utility and ASCII tests pass."
+  command: "uv run -- python -m pytest tests/unit/visualization/test_viz_utils.py tests/unit/visualization/ascii/test_ascii_charts.py
+    -q"
+  expected_output: "Visualization utility and ASCII chart tests pass."
+- description: "No local `re` imports remain in result_plotter methods."
+  command: "rg -n \"import re\" benchbox/core/visualization/result_plotter.py benchbox/core/visualization/ascii_runtime.py"
+  expected_output: "result_plotter.py has only module-level import if needed; ascii_runtime.py retains module-level import."
+- description: "TODO graph remains valid after implementation."
+  command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py validate && uv run --project _project/scripts
+    -- python _project/scripts/todo_cli.py check-graph"
+  expected_output: "TODO validation and graph checks pass."
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/visualization/result_plotter.py"
+  - "benchbox/core/visualization/ascii_runtime.py"
+  - "benchbox/core/visualization/utils.py"
+  - "tests/unit/visualization/test_viz_utils.py"
+  - "tests/unit/visualization/ascii/test_ascii_charts.py"
+  do_not_modify:
+  - "benchbox/mcp/"
+  - "benchbox/cli/commands/visualize.py"
+  - "results-explorer/"
+  - "textcharts package source under .venv/"
+
+success_metrics:
+- "Natural query-ID sort behavior has one implementation in visualization utils."
+- "ResultPlotter no longer imports `re` inside hot-ish helper methods."
+- "Focused tests prove sorting behavior did not change."
+
+open_questions:
+- "Should the shared helper be public in `__all__` or remain an internal utility imported by modules only?"
+- "Should version sorting get its own helper later, or stay local because it is platform-label-specific?"
