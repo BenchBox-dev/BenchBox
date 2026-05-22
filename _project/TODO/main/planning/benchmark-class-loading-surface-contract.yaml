@@ -1,0 +1,179 @@
+id: benchmark-class-loading-surface-contract
+title: "Clarify public versus core benchmark class loading contracts"
+worktree: main
+priority: Medium-High
+status: "Not Started"
+category: Core Functionality
+
+deps:
+  needs:
+    - canonical-benchmark-id-resolution
+
+description: |
+  Independent verification at checked SHA e60986923 confirmed that two functions
+  named `get_benchmark_class` intentionally return different surfaces:
+
+    benchbox.core.benchmark_registry.get_benchmark_class("tpch")
+      -> benchbox.tpch.TPCH
+    benchbox.core.benchmark_loader.get_benchmark_class("tpch")
+      -> benchbox.core.tpch.benchmark.TPCHBenchmark
+
+  The same split was confirmed for `vector_search` and `datavault`. Both
+  returns are callable benchmark classes, so importing the wrong function can
+  silently select the public wrapper surface where a core implementation was
+  expected, or vice versa. Existing tests already alias these functions to keep
+  them straight, which is evidence that the ambiguity is real.
+
+  Independent verification also confirmed the constructor fallback concern in
+  `benchbox/core/benchmark_loader.py`: a class whose constructor accepts
+  `parallel` but raises `TypeError` internally is retried without `parallel`,
+  returning successfully in the mocked harness after constructor calls
+  `[1, None]`. This means "constructor does not accept `parallel`" and
+  "constructor accepted `parallel` but had an internal TypeError" are currently
+  indistinguishable.
+
+work:
+  - id: w0
+    summary: "Revalidate the public/core class surface split and constructor fallback behavior"
+    status: pending
+    notes: |
+      Run a compact read-only check for at least `tpch`, `vector_search`, and
+      `datavault`, printing registry-returned class and loader-returned class.
+      Reproduce the constructor fallback with a mock benchmark class that raises
+      `TypeError` only when `parallel` is provided. Keep raw output in `/tmp`
+      and summarize the behavior in the PR.
+
+  - id: w1
+    summary: "Choose an explicit naming or API strategy for class lookup"
+    needs: [w0]
+    status: pending
+    notes: |
+      Evaluate two options:
+        1. Rename functions to `get_public_benchmark_class` and
+           `get_core_benchmark_class`, preserving compatibility aliases with
+           deprecation notes.
+        2. Collapse lookup into one registry-owned function with
+           `surface=\"public\"|\"core\"`.
+      Prefer the option with the smallest public API churn and clearest import
+      sites. Document which call sites intentionally need wrappers versus core
+      implementations.
+
+  - id: w2
+    summary: "Refactor call sites to use intent-revealing class lookup"
+    needs: [w1]
+    status: pending
+    notes: |
+      Update internal imports in CLI, MCP, tests, and loader code so the call
+      site name communicates public/core intent. Keep backward-compatible
+      aliases only if they are part of the public or semi-public surface, and
+      add comments where alias retention is intentional.
+
+  - id: w3
+    summary: "Replace broad constructor `TypeError` fallback with signature-aware or declared capability handling"
+    needs: [w1]
+    status: pending
+    notes: |
+      Use `inspect.signature()` or a benchmark capability marker to determine
+      whether `parallel` is accepted before instantiation. Ensure a `TypeError`
+      raised from inside `__init__` is not swallowed and retried as if it were a
+      signature mismatch. Keep compatibility for benchmarks that genuinely do
+      not accept `parallel`.
+
+  - id: w4
+    summary: "Add tests that distinguish class surface and constructor failure modes"
+    needs: [w2, w3]
+    status: pending
+    notes: |
+      Add or extend tests so public lookup returns wrappers, core lookup returns
+      core classes, unknown benchmark IDs still fail clearly, and a constructor
+      that raises an internal `TypeError` is surfaced without a misleading
+      fallback attempt.
+
+metadata:
+  tags:
+    - benchmark-loader
+    - public-api
+    - constructor-contract
+    - architecture-followup
+  estimated_effort: "1 day"
+  created_date: "2026-05-22"
+  last_updated: "2026-05-22T00:00:00Z"
+
+impact:
+  business_value: |
+    Reduces the chance that SDK, CLI, or tooling code silently instantiates the
+    wrong benchmark surface and receives confusing constructor errors.
+  user_impact: |
+    Users and maintainers get clearer failure messages when benchmark
+    construction fails.
+  technical_debt: |
+    Makes the public/core benchmark class boundary explicit and removes broad
+    exception-driven feature detection.
+
+files_affected:
+  modified:
+    - "benchbox/core/benchmark_registry.py"
+    - "benchbox/core/benchmark_loader.py"
+    - "benchbox/cli/benchmarks.py"
+    - "benchbox/mcp/tools/discovery.py"
+    - "tests/unit/core/test_loader_registry_parity.py"
+    - "tests/unit/core/test_benchmark_api_contract.py"
+
+prior_art:
+  - "benchbox/core/benchmark_registry.py: get_benchmark_class - currently resolves the top-level wrapper surface."
+  - "benchbox/core/benchmark_loader.py: get_benchmark_class and get_benchmark_instance - currently resolves core classes and retries broad TypeError."
+  - "tests/unit/core/test_loader_registry_parity.py: existing aliases for registry_get_benchmark_class and loader_get_benchmark_class - use as the initial contract location."
+  - "benchbox/cli/benchmarks.py: _show_sample_queries imports loader class lookup - preserve the core implementation requirement."
+
+must_preserve:
+  - "Public wrapper lookup remains available for documented public surfaces."
+  - "Core loader lookup remains available for internal runtime construction."
+  - "Benchmarks that genuinely lack a `parallel` constructor argument still instantiate successfully."
+  - "Import errors and unknown benchmark IDs continue to include available benchmark IDs."
+
+approach: |
+  Rename or parameterize for intent first, then remove the broad constructor
+  fallback. Keep compatibility aliases only where external callers may already
+  import the old name. The key design rule is that function names and exception
+  handling should describe the contract instead of relying on caller memory.
+
+anti_patterns:
+  - "DO NOT keep two same-named functions with different return surfaces without an explicit compatibility story."
+  - "DO NOT catch every constructor TypeError to detect missing `parallel` - because internal constructor bugs must surface directly."
+  - "DO NOT switch CLI preview code to wrapper classes by accident - because sample query preview currently needs core implementation internals."
+  - "DO NOT remove a public alias without checking docs/tests for import expectations."
+
+verification:
+  - description: "Class lookup parity and API contract tests pass."
+    command: "uv run -- python -m pytest tests/unit/core/test_loader_registry_parity.py tests/unit/core/test_benchmark_api_contract.py -q"
+    expected_output: "All selected class lookup tests pass."
+  - description: "Benchmark loader constructor fallback tests pass."
+    command: "uv run -- python -m pytest tests/unit/core/test_loader_registry_parity.py -q"
+    expected_output: "Constructor signature/failure mode tests pass."
+  - description: "Fast suite remains green after loader changes."
+    command: "uv run -- python -m pytest -m fast -q"
+    expected_output: "Fast tests pass."
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/benchmark_registry.py"
+    - "benchbox/core/benchmark_loader.py"
+    - "benchbox/cli/benchmarks.py"
+    - "benchbox/mcp/tools/discovery.py"
+    - "tests/unit/core/test_loader_registry_parity.py"
+    - "tests/unit/core/test_benchmark_api_contract.py"
+    - "_project/TODO/"
+    - "_project/DONE/"
+  do_not_modify:
+    - "benchbox/platforms/"
+    - "benchbox/core/results/"
+    - "benchmark_runs/"
+
+success_metrics:
+  - "Call sites no longer need ambiguous same-name imports to distinguish wrapper versus core class lookup."
+  - "A constructor's internal `TypeError` is reported directly instead of being retried as a missing-`parallel` signature case."
+  - "Compatibility aliases, if retained, are tested and documented as aliases."
+
+open_questions:
+  - "Is `benchbox.core.benchmark_registry.get_benchmark_class` considered public enough to require a deprecation window?"
+  - "Should `parallel` acceptance be a class-level capability marker to avoid repeated signature inspection?"
