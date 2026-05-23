@@ -522,6 +522,8 @@ paths_to_mutate = [
 tests_dir = ["tests/unit/"]
 
 [tool.setuptools.package-data]
+"benchbox.core" = ["benchmark_registry.yaml"]
+"benchbox.core.results" = ["benchmark_specs.yaml"]
 "benchbox.core.primitives.catalog" = ["queries.yaml"]
 "benchbox.data.coffeeshop" = ["*.csv"]
 
