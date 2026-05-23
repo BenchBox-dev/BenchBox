@@ -1,0 +1,444 @@
+1:
+  agg_field: sr_return_amt
+  state: TN
+  year: 2000
+2:
+  year: 2001
+3:
+  agg_column: ss_ext_sales_price
+  manufact_id: 128
+  month: 11
+4:
+  year: 2001
+5:
+  year: 2000
+6:
+  month: 1
+  year: 2001
+7:
+  channel_promo: channel_demo
+  education: College
+  gender: M
+  marital_status: S
+  year: 2000
+8:
+  year: 1998
+  zip_codes:
+  - '24128'
+  - '76232'
+  - '65084'
+  - '87816'
+  - '83926'
+9:
+  quantity_ranges:
+  - - 1
+    - 20
+  - - 21
+    - 40
+  - - 41
+    - 60
+  - - 61
+    - 80
+  - - 81
+    - 100
+10:
+  gender: F
+  month: 2
+  year: 2002
+11:
+  year: 2001
+12:
+  item_categories:
+  - Sports
+  - Books
+  - Home
+  month: 2
+  year: 1999
+13:
+  education: Advanced Degree
+  marital_status: M
+  year: 2001
+14:
+  day: 11
+  year: 1999
+15:
+  quarter: 2
+  year: 2001
+  zip_prefix: '85'
+16:
+  call_center: Bill Bowden
+  county: Williamson County
+  months:
+  - 3
+  state: TN
+  year: 2002
+17:
+  quarter: 1
+  state: OK
+  year: 2001
+18:
+  cd_education_status: College
+  cd_gender: M
+  cd_marital_status: S
+  states:
+  - TX
+  - OH
+  - TX
+  - OR
+  - NM
+  - KY
+  - VA
+  year: 2001
+19:
+  manager_id: 8
+  month: 11
+  year: 1999
+20:
+  item_categories:
+  - Sports
+  - Books
+  - Home
+  month: 2
+  year: 1999
+21:
+  month: 1
+  warehouse_id: 2
+  year: 2000
+22:
+  months:
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  year: 2001
+23:
+  year: 2000
+24:
+  color: chiffon
+  market_id: 8
+25:
+  quarters:
+  - 1
+  - 2
+  - 3
+  year: 2001
+26:
+  education: College
+  gender: M
+  marital_status: S
+  promo_channel: channel_demo
+  year: 2000
+27:
+  education: College
+  gender: M
+  marital_status: S
+  state: TN
+  year: 2002
+28:
+  quantity_ranges:
+  - - 0
+    - 5
+  - - 6
+    - 10
+  - - 11
+    - 15
+  - - 16
+    - 20
+  - - 21
+    - 25
+  - - 26
+    - 30
+29:
+  months:
+  - 1
+  - 2
+  - 3
+  year: 1999
+30:
+  state: GA
+  year: 2002
+31:
+  gmt_offset: -5.0
+  year: 2000
+32:
+  days: 90
+  year: 2000
+33:
+  categories:
+  - Books
+  gmt_offset: -5.0
+  manufacturer_id: 88
+  year: 1998
+34:
+  county: Williamson County
+  state: TN
+  year: 1998
+35:
+  year: 2002
+  years:
+  - 1999
+  - 2000
+  - 2001
+  - 2002
+36:
+  state: TN
+  year: 2001
+37:
+  current_price_max: 98
+  current_price_min: 68
+  month_end: 6
+  month_start: 1
+  year: 2000
+38:
+  year: 2002
+39:
+  months:
+  - 1
+  - 2
+  year: 2001
+40:
+  year: 2000
+41:
+  manufact_ids:
+  - 738
+  - 129
+  - 830
+  - 540
+42:
+  month: 11
+  year: 2000
+43:
+  gmt_offset: -5.0
+  year: 2000
+44:
+  null_col: ss_addr_sk
+  store_sk: 4
+  year: 2001
+45:
+  quarters:
+  - 1
+  - 2
+  - 3
+  year: 2001
+  zip_codes:
+  - '85669'
+  - '86197'
+  - '88274'
+  - '83405'
+  - '86475'
+46:
+  cities:
+  - Fairview
+  - Midway
+  - Fairview
+  - Fairview
+  - Fairview
+  year: 2001
+47:
+  year: 2000
+48:
+  year: 2000
+49:
+  year: 2001
+50:
+  channel: store channel
+  days: 30
+  year: 2001
+51:
+  months:
+  - 1
+  - 2
+  - 3
+  - 4
+  year: 2001
+52:
+  month: 11
+  year: 2000
+53:
+  manufacturer_ids:
+  - 88
+  - 33
+  - 160
+  - 129
+  month: 11
+54:
+  month: 4
+  year: 2000
+55:
+  manager_id: 28
+  month: 11
+  year: 1999
+56:
+  colors:
+  - slate
+  - blanched
+  - burnished
+  gmt_offset: -5.0
+  year: 2001
+57:
+  year: 1999
+58:
+  day: 1
+  year: 2000
+59:
+  d_month_seq: 1212
+  year: 1999
+60:
+  categories:
+  - Music
+  gmt_offset: -5.0
+  year: 2001
+61:
+  category: Jewelry
+  gmt_offset: -5.0
+  month: 11
+  year: 1998
+62:
+  months:
+  - 11
+  - 12
+  year: 1999
+63:
+  manufacturer_ids:
+  - 88
+  - 33
+  - 160
+  - 129
+  month: 11
+64:
+  income_band: 38128
+  year: 1999
+65:
+  year: 2000
+66:
+  month_end: 4
+  month_start: 1
+  ship_carriers:
+  - DIAMOND
+  - AIRBORNE
+  web_names:
+  - pri
+  year: 2001
+67:
+  year: 2001
+68:
+  cities:
+  - Midway
+  - Fairview
+  year: 2001
+69:
+  month: 4
+  states:
+  - KY
+  - GA
+  - NM
+  year: 2001
+70:
+  year: 2001
+71:
+  brand: 'amalgexporti #1'
+  manager_id: 1
+  month: 11
+  year: 1999
+72:
+  buy_potential: '>10000'
+  marital_status: D
+  year: 1999
+73:
+  county: Williamson County
+  state: TN
+  year: 1999
+74:
+  year: 2001
+75:
+  category: Books
+  year: 1999
+76:
+  channel: store
+  year: 2001
+77:
+  channel_type: store channel
+  year: 2001
+78:
+  year: 2000
+79:
+  household_dep_count: 6
+  year: 2000
+80:
+  year: 2000
+81:
+  state: GA
+  year: 2000
+82:
+  month_end: 6
+  month_start: 1
+  price_max: 92
+  price_min: 62
+  year: 2000
+83:
+  dates:
+  - '2000-06-30'
+  - '2000-09-27'
+  - '2000-11-17'
+  year: 2000
+84:
+  city: Edgewood
+  income_band: 38128
+85:
+  year: 1998
+86:
+  year: 2001
+87:
+  month: 4
+  year: 2001
+88:
+  year: 1998
+89:
+  category_id: 1
+  class_id: 1
+  year: 1999
+90:
+  hours:
+  - - 8
+    - 9
+  - - 19
+    - 20
+  year: 2001
+91:
+  month: 11
+  year: 1998
+92:
+  days: 90
+  year: 2000
+93:
+  reason: reason 28
+94:
+  states:
+  - TX
+  - OR
+  - AZ
+  year: 1999
+95:
+  states:
+  - TX
+  - OR
+  - AZ
+  year: 1999
+96:
+  hours:
+  - - 8
+    - 9
+97:
+  month: 4
+  year: 2002
+98:
+  categories:
+  - Sports
+  - Books
+  - Home
+  year: 1999
+99:
+  month: 2
+  year: 1999

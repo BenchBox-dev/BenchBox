@@ -40,6 +40,7 @@ from __future__ import annotations
 
 from csv import reader
 from datetime import date
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory, QueryRegistry
@@ -199,6 +200,10 @@ def aggregation_groupby_impl(
     table_name: str,
     group_cols: tuple[str, ...],
     agg_specs: tuple[tuple[str, str, str], ...],
+    conditions: tuple[tuple[str, str, Any, bool], ...] = (),
+    sort_cols: tuple[str, ...] = (),
+    sort_desc: bool | list[bool] = False,
+    limit: int | None = None,
 ) -> Any:
     """Run a grouped aggregation for either expression-family or pandas-family contexts."""
     table = ctx.get_table(table_name)
@@ -212,18 +217,47 @@ def aggregation_groupby_impl(
             "mean": lambda column: column.mean(),
             "count": lambda column: column.count(),
             "max": lambda column: column.max(),
+            "first": lambda column: column.first(),
+            "median": lambda column: column.quantile(0.5),
+            "q25": lambda column: column.quantile(0.25),
+            "q75": lambda column: column.quantile(0.75),
+            "q95": lambda column: column.quantile(0.95),
+            "std": lambda column: column.std(),
+            "var": lambda column: column.var(),
         }
-        return table.group_by(*group_columns).agg(
+        if conditions:
+            table = table.filter(_expr_combined_filter(ctx, conditions))
+        result = table.group_by(*group_columns).agg(
             *(
                 expression_builders[agg_func](col(column_name)).alias(alias)
                 for column_name, agg_func, alias in agg_specs
             )
         )
+        if sort_cols:
+            result = result.sort(list(sort_cols) if len(sort_cols) > 1 else sort_cols[0], descending=sort_desc)
+        return result.limit(limit) if limit is not None else result
 
     if hasattr(table, "groupby"):
-        return table.groupby(group_columns, as_index=False).agg(
-            **{alias: (column_name, agg_func) for column_name, agg_func, alias in agg_specs}
-        )
+        if conditions:
+            table = table[_pandas_combined_filter(table, conditions)]
+        pandas_aggs = {
+            alias: (
+                column_name,
+                {
+                    "nunique": "nunique",
+                    "q25": lambda series: series.quantile(0.25),
+                    "q75": lambda series: series.quantile(0.75),
+                    "q95": lambda series: series.quantile(0.95),
+                    "median": "median",
+                }.get(agg_func, agg_func),
+            )
+            for column_name, agg_func, alias in agg_specs
+        }
+        result = table.groupby(group_columns, as_index=False).agg(**pandas_aggs)
+        if sort_cols:
+            ascending = [not value for value in sort_desc] if isinstance(sort_desc, list) else not sort_desc
+            result = result.sort_values(list(sort_cols), ascending=ascending)
+        return result.head(limit) if limit is not None else result
 
     raise TypeError(f"Unsupported table type for grouped aggregation: {type(table)!r}")
 
@@ -262,17 +296,33 @@ def _partsupp_map_pandas(ctx: DataFrameContext, max_suppkey: int) -> Any:
 
 
 def _make_groupby_impl(
-    name: str, table_name: str, group_cols: tuple[str, ...], agg_specs: tuple[tuple[str, str, str], ...]
+    name: str,
+    table_name: str,
+    group_cols: tuple[str, ...],
+    agg_specs: tuple[tuple[str, str, str], ...],
+    conditions: tuple[tuple[str, str, Any, bool], ...] = (),
+    sort_cols: tuple[str, ...] = (),
+    sort_desc: bool | list[bool] = False,
+    limit: int | None = None,
 ) -> Any:
     def impl(ctx: DataFrameContext) -> Any:
-        return aggregation_groupby_impl(ctx, table_name=table_name, group_cols=group_cols, agg_specs=agg_specs)
+        return aggregation_groupby_impl(
+            ctx,
+            table_name=table_name,
+            group_cols=group_cols,
+            agg_specs=agg_specs,
+            conditions=conditions,
+            sort_cols=sort_cols,
+            sort_desc=sort_desc,
+            limit=limit,
+        )
 
     impl.__name__ = name
     impl.__qualname__ = name
     return impl
 
 
-for _stem, _table_name, _group_cols, _agg_specs in (
+for _spec in (
     (
         "aggregation_distinct_groupby",
         "lineitem",
@@ -301,10 +351,86 @@ for _stem, _table_name, _group_cols, _agg_specs in (
         ("l_discount",),
         (("l_orderkey", "count", "discount_frequency"), ("l_quantity", "mean", "avg_qty")),
     ),
+    (
+        "aggregation_partition",
+        "lineitem",
+        ("l_shipdate", "l_shipmode"),
+        (("l_quantity", "sum", "daily_quantity"), ("l_orderkey", "count", "shipment_count")),
+        (("l_shipdate", "ge", date(1995, 1, 1), False), ("l_shipdate", "lt", date(1996, 1, 1), False)),
+    ),
+    ("orderby_bigint", "lineitem", ("l_orderkey",), (("l_quantity", "sum", "total_qty"),), (), ("l_orderkey",)),
+    (
+        "topn_aggregate",
+        "lineitem",
+        ("l_orderkey",),
+        (("l_quantity", "sum", "total_quantity"),),
+        (),
+        ("total_quantity",),
+        True,
+        10,
+    ),
+    (
+        "statistical_variance",
+        "orders",
+        ("o_orderpriority",),
+        (
+            ("o_orderkey", "count", "order_count"),
+            ("o_totalprice", "mean", "avg_price"),
+            ("o_totalprice", "var", "price_variance"),
+            ("o_totalprice", "std", "price_stddev"),
+        ),
+        (("o_orderdate", "ge", date(1995, 1, 1), False),),
+    ),
+    (
+        "any_value_simple",
+        "customer",
+        ("c_mktsegment",),
+        (("c_name", "first", "sample_customer"), ("c_custkey", "count", "customer_count")),
+    ),
+    (
+        "any_value_with_filter",
+        "nation",
+        ("n_regionkey",),
+        (
+            ("n_name", "first", "sample_nation"),
+            ("n_comment", "first", "sample_comment"),
+            ("n_nationkey", "count", "nation_count"),
+        ),
+    ),
+    (
+        "groupby_all_simple",
+        "lineitem",
+        ("l_returnflag", "l_linestatus"),
+        (("l_quantity", "sum", "total_qty"), ("l_extendedprice", "mean", "avg_price")),
+    ),
+    (
+        "orderby_all_desc",
+        "part",
+        ("p_brand", "p_type"),
+        (("p_retailprice", "mean", "avg_price"),),
+        (),
+        ("p_brand", "p_type", "avg_price"),
+        True,
+        100,
+    ),
+    (
+        "statistical_percentiles",
+        "lineitem",
+        ("l_returnflag", "l_linestatus"),
+        (
+            ("l_orderkey", "count", "record_count"),
+            ("l_quantity", "q25", "quantity_q1"),
+            ("l_quantity", "median", "quantity_median"),
+            ("l_quantity", "q75", "quantity_q3"),
+            ("l_extendedprice", "q95", "price_p95"),
+        ),
+    ),
+    ("approx_quantile_groupby", "lineitem", ("l_shipmode",), (("l_quantity", "median", "median_quantity"),)),
 ):
+    _stem, _table_name, _group_cols, _agg_specs, *_opts = _spec
     for _family in ("expression", "pandas"):
         globals()[f"{_stem}_{_family}_impl"] = _make_groupby_impl(
-            f"{_stem}_{_family}_impl", _table_name, _group_cols, _agg_specs
+            f"{_stem}_{_family}_impl", _table_name, _group_cols, _agg_specs, *_opts
         )
 
 
@@ -622,22 +748,6 @@ def aggregation_materialize_subquery_expression_impl(ctx: DataFrameContext) -> A
     return order_totals.group_by("c_mktsegment").agg(col("order_total").mean().alias("avg_segment_order"))
 
 
-def aggregation_partition_expression_impl(ctx: DataFrameContext) -> Any:
-    """Aggregates over the partition key."""
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-    lit = ctx.lit
-
-    return (
-        lineitem.filter((col("l_shipdate") >= lit(date(1995, 1, 1))) & (col("l_shipdate") < lit(date(1996, 1, 1))))
-        .group_by("l_shipdate", "l_shipmode")
-        .agg(
-            col("l_quantity").sum().alias("daily_quantity"),
-            col("l_orderkey").count().alias("shipment_count"),
-        )
-    )
-
-
 def aggregation_selective_expression_impl(ctx: DataFrameContext) -> Any:
     """Aggregate on a small subset of rows."""
     lineitem = ctx.get_table("lineitem")
@@ -898,14 +1008,6 @@ def orderby_all_expression_impl(ctx: DataFrameContext) -> Any:
     return customer.sort("c_custkey").select(
         "c_custkey", "c_name", "c_address", "c_nationkey", "c_phone", "c_acctbal", "c_mktsegment"
     )
-
-
-def orderby_bigint_expression_impl(ctx: DataFrameContext) -> Any:
-    """Sort with aggregation results on integer column."""
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-
-    return lineitem.group_by("l_orderkey").agg(col("l_quantity").sum().alias("total_qty")).sort("l_orderkey")
 
 
 def orderby_expression_expression_impl(ctx: DataFrameContext) -> Any:
@@ -1214,19 +1316,6 @@ def exchange_shuffle_expression_impl(ctx: DataFrameContext) -> Any:
 # -----------------------------------------------------------------------------
 
 
-def topn_aggregate_expression_impl(ctx: DataFrameContext) -> Any:
-    """Top 10 limit returning 2 columns after aggregation and computed ordering."""
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-
-    return (
-        lineitem.group_by("l_orderkey")
-        .agg(col("l_quantity").sum().alias("total_quantity"))
-        .sort("total_quantity", descending=True)
-        .limit(10)
-    )
-
-
 def topn_allcols_expression_impl(ctx: DataFrameContext) -> Any:
     """Top-10 limit returning all columns after ordering over all table rows."""
     lineitem = ctx.get_table("lineitem")
@@ -1237,24 +1326,6 @@ def topn_allcols_expression_impl(ctx: DataFrameContext) -> Any:
 # -----------------------------------------------------------------------------
 # Statistical queries
 # -----------------------------------------------------------------------------
-
-
-def statistical_variance_expression_impl(ctx: DataFrameContext) -> Any:
-    """Variance and standard deviation calculations."""
-    orders = ctx.get_table("orders")
-    col = ctx.col
-    lit = ctx.lit
-
-    return (
-        orders.filter(col("o_orderdate") >= lit(date(1995, 1, 1)))
-        .group_by("o_orderpriority")
-        .agg(
-            col("o_orderkey").count().alias("order_count"),
-            col("o_totalprice").mean().alias("avg_price"),
-            col("o_totalprice").var().alias("price_variance"),
-            col("o_totalprice").std().alias("price_stddev"),
-        )
-    )
 
 
 def statistical_correlation_expression_impl(ctx: DataFrameContext) -> Any:
@@ -1415,18 +1486,6 @@ def aggregation_materialize_subquery_pandas_impl(ctx: DataFrameContext) -> Any:
 
     # Second aggregation by segment
     return order_totals.groupby("c_mktsegment", as_index=False).agg(avg_segment_order=("order_total", "mean"))
-
-
-def aggregation_partition_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Aggregates over the partition key."""
-    lineitem = ctx.get_table("lineitem")
-
-    filtered = lineitem[(lineitem["l_shipdate"] >= date(1995, 1, 1)) & (lineitem["l_shipdate"] < date(1996, 1, 1))]
-
-    return filtered.groupby(["l_shipdate", "l_shipmode"], as_index=False).agg(
-        daily_quantity=("l_quantity", "sum"),
-        shipment_count=("l_orderkey", "count"),
-    )
 
 
 def aggregation_selective_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1642,13 +1701,6 @@ def orderby_all_pandas_impl(ctx: DataFrameContext) -> Any:
     return customer.sort_values("c_custkey")[
         ["c_custkey", "c_name", "c_address", "c_nationkey", "c_phone", "c_acctbal", "c_mktsegment"]
     ]
-
-
-def orderby_bigint_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Sort with aggregation results on integer column."""
-    lineitem = ctx.get_table("lineitem")
-
-    return lineitem.groupby("l_orderkey", as_index=False).agg(total_qty=("l_quantity", "sum")).sort_values("l_orderkey")
 
 
 def orderby_expression_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1873,17 +1925,6 @@ def exchange_shuffle_pandas_impl(ctx: DataFrameContext) -> Any:
 # -----------------------------------------------------------------------------
 
 
-def topn_aggregate_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Top 10 limit returning 2 columns after aggregation and computed ordering."""
-    lineitem = ctx.get_table("lineitem")
-
-    return (
-        lineitem.groupby("l_orderkey", as_index=False)
-        .agg(total_quantity=("l_quantity", "sum"))
-        .nlargest(10, "total_quantity")
-    )
-
-
 def topn_allcols_pandas_impl(ctx: DataFrameContext) -> Any:
     """Top-10 limit returning all columns after ordering over all table rows."""
     lineitem = ctx.get_table("lineitem")
@@ -1894,19 +1935,6 @@ def topn_allcols_pandas_impl(ctx: DataFrameContext) -> Any:
 # -----------------------------------------------------------------------------
 # Statistical queries (Pandas)
 # -----------------------------------------------------------------------------
-
-
-def statistical_variance_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Variance and standard deviation calculations."""
-    orders = ctx.get_table("orders")
-
-    filtered = orders[orders["o_orderdate"] >= date(1995, 1, 1)]
-    return filtered.groupby("o_orderpriority", as_index=False).agg(
-        order_count=("o_orderkey", "count"),
-        avg_price=("o_totalprice", "mean"),
-        price_variance=("o_totalprice", "var"),
-        price_stddev=("o_totalprice", "std"),
-    )
 
 
 def statistical_correlation_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -2075,76 +2103,11 @@ def min_max_runtime_filter_pandas_impl(ctx: DataFrameContext) -> Any:
 # -----------------------------------------------------------------------------
 
 
-def any_value_simple_expression_impl(ctx: DataFrameContext) -> Any:
-    """Select any customer name per market segment (faster than MIN/MAX)."""
-    customer = ctx.get_table("customer")
-    col = ctx.col
-
-    return customer.group_by("c_mktsegment").agg(
-        col("c_name").first().alias("sample_customer"),
-        col("c_custkey").count().alias("customer_count"),
-    )
-
-
-def any_value_simple_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Select any customer name per market segment (faster than MIN/MAX)."""
-    customer = ctx.get_table("customer")
-
-    return customer.groupby("c_mktsegment", as_index=False).agg(
-        sample_customer=("c_name", "first"),
-        customer_count=("c_custkey", "count"),
-    )
-
-
-def any_value_with_filter_expression_impl(ctx: DataFrameContext) -> Any:
-    """Any value with additional aggregates."""
-    nation = ctx.get_table("nation")
-    col = ctx.col
-
-    return nation.group_by("n_regionkey").agg(
-        col("n_name").first().alias("sample_nation"),
-        col("n_comment").first().alias("sample_comment"),
-        col("n_nationkey").count().alias("nation_count"),
-    )
-
-
-def any_value_with_filter_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Any value with additional aggregates."""
-    nation = ctx.get_table("nation")
-
-    return nation.groupby("n_regionkey", as_index=False).agg(
-        sample_nation=("n_name", "first"),
-        sample_comment=("n_comment", "first"),
-        nation_count=("n_nationkey", "count"),
-    )
-
-
 # -----------------------------------------------------------------------------
 # GROUP BY ALL queries (modern SQL feature)
 # Note: GROUP BY ALL automatically groups by all non-aggregate columns
 # In DataFrames, we explicitly specify the grouping columns
 # -----------------------------------------------------------------------------
-
-
-def groupby_all_simple_expression_impl(ctx: DataFrameContext) -> Any:
-    """Automatic grouping by all non-aggregate columns."""
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-
-    return lineitem.group_by("l_returnflag", "l_linestatus").agg(
-        col("l_quantity").sum().alias("total_qty"),
-        col("l_extendedprice").mean().alias("avg_price"),
-    )
-
-
-def groupby_all_simple_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Automatic grouping by all non-aggregate columns."""
-    lineitem = ctx.get_table("lineitem")
-
-    return lineitem.groupby(["l_returnflag", "l_linestatus"], as_index=False).agg(
-        total_qty=("l_quantity", "sum"),
-        avg_price=("l_extendedprice", "mean"),
-    )
 
 
 def groupby_all_complex_expression_impl(ctx: DataFrameContext) -> Any:
@@ -2216,31 +2179,6 @@ def orderby_all_simple_pandas_impl(ctx: DataFrameContext) -> Any:
         merged.groupby(["r_name", "n_name"], as_index=False)
         .agg(supplier_count=("s_suppkey", "count"))
         .sort_values(["r_name", "n_name", "supplier_count"])
-    )
-
-
-def orderby_all_desc_expression_impl(ctx: DataFrameContext) -> Any:
-    """ORDER BY ALL with descending direction."""
-    part = ctx.get_table("part")
-    col = ctx.col
-
-    return (
-        part.group_by("p_brand", "p_type")
-        .agg(col("p_retailprice").mean().alias("avg_price"))
-        .sort(["p_brand", "p_type", "avg_price"], descending=True)
-        .limit(100)
-    )
-
-
-def orderby_all_desc_pandas_impl(ctx: DataFrameContext) -> Any:
-    """ORDER BY ALL with descending direction."""
-    part = ctx.get_table("part")
-
-    return (
-        part.groupby(["p_brand", "p_type"], as_index=False)
-        .agg(avg_price=("p_retailprice", "mean"))
-        .sort_values(["p_brand", "p_type", "avg_price"], ascending=False)
-        .head(100)
     )
 
 
@@ -2340,33 +2278,6 @@ def shuffle_union_all_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
 # -----------------------------------------------------------------------------
 
 
-def statistical_percentiles_expression_impl(ctx: DataFrameContext) -> Any:
-    """Percentile calculation functions for distribution analysis."""
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-
-    return lineitem.group_by("l_returnflag", "l_linestatus").agg(
-        col("l_orderkey").count().alias("record_count"),
-        col("l_quantity").quantile(0.25).alias("quantity_q1"),
-        col("l_quantity").quantile(0.5).alias("quantity_median"),
-        col("l_quantity").quantile(0.75).alias("quantity_q3"),
-        col("l_extendedprice").quantile(0.95).alias("price_p95"),
-    )
-
-
-def statistical_percentiles_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Percentile calculation functions for distribution analysis."""
-    lineitem = ctx.get_table("lineitem")
-
-    return lineitem.groupby(["l_returnflag", "l_linestatus"], as_index=False).agg(
-        record_count=("l_orderkey", "count"),
-        quantity_q1=("l_quantity", lambda x: x.quantile(0.25)),
-        quantity_median=("l_quantity", "median"),
-        quantity_q3=("l_quantity", lambda x: x.quantile(0.75)),
-        price_p95=("l_extendedprice", lambda x: x.quantile(0.95)),
-    )
-
-
 # -----------------------------------------------------------------------------
 # Case-insensitive string matching queries
 # -----------------------------------------------------------------------------
@@ -2444,41 +2355,6 @@ def window_unbounded_frame_pandas_impl(ctx: DataFrameContext) -> Any:
 # =============================================================================
 # Intrinsic Queries (Approximate Median, Date Conversion)
 # =============================================================================
-
-
-def approx_quantile_groupby_expression_impl(ctx: DataFrameContext) -> Any:
-    """Approximate median per group via UnifiedExpr.quantile(0.5).
-
-    `UnifiedExpr.quantile()` dispatches to the platform's sketch-backed
-    aggregate where one exists:
-
-    - PySpark: `F.percentile_approx(col, 0.5)` (KLL-equivalent).
-    - DataFusion: `df_f.approx_percentile_cont(col, 0.5)` (T-Digest).
-    - Polars: `.quantile(0.5)` (exact — no sketch alternative; the
-      benchmark surface degrades to exact on Polars).
-
-    See `docs/benchmarks/read-primitives-approximate-functions.md` for
-    the cross-platform DataFrame coverage matrix.
-    """
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-
-    return lineitem.group_by("l_shipmode").agg(col("l_quantity").quantile(0.5).alias("median_quantity"))
-
-
-def approx_quantile_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Approximate median per group — exact fallback for the pandas family.
-
-    Pandas / Modin / cuDF have no sketch-backed quantile at the
-    DataFrame layer, so this implementation returns the exact median.
-    Current Dask exposes Series-level T-Digest quantile only when the
-    optional `crick` dependency is installed, and does not expose a
-    groupby quantile method in the dask-expr API. This query therefore
-    remains exact on Dask too.
-    """
-    lineitem = ctx.get_table("lineitem")
-
-    return lineitem.groupby("l_shipmode", as_index=False).agg(median_quantity=("l_quantity", "median"))
 
 
 # =============================================================================
@@ -4298,160 +4174,7 @@ _CATEGORY_CODES = {
     "W": QueryCategory.WINDOW,
 }
 
-_QUERY_METADATA = """\
-aggregation_distinct|Distinct Aggregation|Distinct count of high cardinality key on a large table|A||SELECT COUNT(DISTINCT o_custkey) FROM orders WHERE o_orderdate >= DATE '1995-01-01'
-aggregation_distinct_groupby|Distinct Aggregation with Group By|Distinct count of high cardinality keys in low cardinality groups|A,G||
-approx_count_distinct_simple|Approximate Distinct Count|HLL distinct count on a high-cardinality key (sketch on Polars/PySpark/DataFusion; exact on Pandas/Modin/cuDF/Dask)|A||SELECT APPROX_COUNT_DISTINCT(o_custkey) FROM orders WHERE o_orderdate >= DATE '1995-01-01'
-approx_count_distinct_groupby|Approximate Distinct Count with Group By|HLL distinct counts per low-cardinality group (sketch on Polars/PySpark/DataFusion; exact on Pandas/Modin/cuDF/Dask)|A,G||
-aggregation_groupby_large|Large Cardinality Group By|Aggregates within high cardinality grouping|A,G||
-aggregation_groupby_small|Small Cardinality Group By|Aggregates within low cardinality grouping|A,G||
-aggregation_materialize|Nested Aggregation|Nested aggregation requiring CTE materialization|A,Q||
-aggregation_materialize_subquery|Subquery Materialization|Complex nested aggregation with joins|A,Q,J||
-aggregation_partition|Partition Key Aggregation|Aggregates over the partition key|A,G||
-aggregation_selective|Selective Aggregation|Aggregate on a small subset of rows|A,F||
-aggregation_simple|Simple Aggregation|Aggregate over all rows in table|A||
-filter_selective|High Selectivity Filter|High selectivity filter - few rows match|F||
-filter_non_selective|Low Selectivity Filter|Low selectivity filter - many rows match|F||
-count_star|Count Star|Metadata-based count optimization vs full table scan|A||
-decimal_arithmetic|Decimal Arithmetic|Decimal precision arithmetic with complex expressions|P||
-orderby_simple|Simple Order By|Simple ORDER BY single column|S||
-orderby_multi|Multi-Column Order By|ORDER BY multiple columns|S||
-orderby_desc|Descending Order By|ORDER BY with descending sort|S||
-topn|Top-N Query|Top-N query with ORDER BY and LIMIT|S||
-limit|Simple Limit|Simple LIMIT without ORDER BY|C||
-limit_ordered|Ordered Limit|LIMIT clause with ordering on large result set|S||
-string_like|String LIKE|String LIKE pattern matching|F||
-string_starts_with|String Starts With|String starts_with pattern matching|F||
-string_ends_with|String Ends With|String ends_with pattern matching|F||
-string_concat|String Concatenation|String concatenation|P||
-string_substring|String Substring|String substring extraction|P||
-window_row_number|Window ROW_NUMBER|Window function ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ...)|W||
-window_rank|Window RANK|Window function RANK() OVER (PARTITION BY ... ORDER BY ...)|W||
-window_sum|Window SUM|Window function SUM() OVER (PARTITION BY ...)|W,A||
-window_running_sum|Window Running Sum|Window function SUM() OVER (ORDER BY ...) - cumulative sum|W,A||
-broadcast_join_two_tables|Broadcast Join (2 tables)|One small table broadcast to join with one large table|J||
-broadcast_join_three_tables|Broadcast Join (3 tables)|Two small tables broadcast to join with one large table|J,M||
-predicate_ordering_aggregation|Predicate Ordering with Aggregation|Order filter predicates by selectivity for aggregation|F,A||
-shuffle_join|Shuffle Join|Data is redistributed based on the join keys|J,A||
-empty_build_join|Empty Build Side Join|Join when build side produces no rows (edge case handling)|J||
-filter_bigint_selective|Bigint Selective Filter|Equality predicate with high selectivity on integer column|F||
-filter_bigint_non_selective|Bigint Non-Selective Filter|Range predicate with low selectivity on large table|F,A||
-filter_bigint_in_list_selective|Bigint IN List Filter|IN-list predicate with highly selective integer values|F|filter_bigint_in_list|
-filter_decimal_selective|Decimal Selective Filter|Compound equality predicate with multiple decimal columns|F||
-filter_decimal_non_selective|Decimal Non-Selective Filter|Range predicate on decimal column with low selectivity|F,A||
-filter_string_selective|String Selective Filter|Exact string equality with high selectivity on varchar column|F||
-filter_string_non_selective|String Non-Selective Filter|String comparison with low selectivity (most rows match)|F,A||
-filter_in_predicate_selective|IN Predicate with Subquery|IN predicate with subquery and selective filtering|F,Q|filter_in_predicate_subquery|
-groupby_bigint_highndv|High NDV GroupBy|GROUP BY with high distinct value count (many groups)|G,A|groupby_highndv|
-groupby_bigint_lowndv|Low NDV GroupBy|GROUP BY with low distinct value count (few groups)|G,A|groupby_lowndv|
-groupby_bigint_pk|Primary Key GroupBy|GROUP BY on primary key (one row per group)|G,A|groupby_pk|
-groupby_decimal_highndv|High NDV Decimal GroupBy|GROUP BY with high cardinality decimal column|G,A||
-groupby_decimal_lowndv|Low NDV Decimal GroupBy|GROUP BY with low cardinality decimal column|G,A||
-orderby_all|Full Table Order By|Sort on full table with simple integer ordering|S||
-orderby_bigint|Bigint Order By|Sort with aggregation results on integer column|S,A||
-orderby_bigint_expression|Expression Order By|Sort on computed expressions with DESC ordering|S,P|orderby_expression|
-orderby_multicol|Multi-Column Complex Order By|Complex multi-column sort with string, date, and decimal columns|S||
-orderby_shortstrings|Short Strings Order By|Sort on short string columns with DISTINCT operation|S||
-shuffle_inner_join_one_to_many_string_with_groupby|Inner Join with GroupBy|Standard inner join with one-to-many relationship|J,G,A|shuffle_inner_join_groupby|
-shuffle_left_join_one_to_many_string_with_groupby|Left Join with GroupBy|LEFT JOIN with preservation of all left-side rows|J,G,A|shuffle_left_join_groupby|
-shuffle_full_join_one_to_many_string_with_groupby|Full Outer Join with GroupBy|FULL OUTER JOIN with string grouping and aggregation|J,G,A|shuffle_full_join_groupby|
-shuffle_1mb_rows|Self Join with Hash Collision|Self-join with hash collision handling on large table|J,A|shuffle_self_join|
-string_equal_predicate|String Equality|Exact string equality with selective matching|F,A|string_equal|
-string_equal_predicate_lower|String Equality (Case Insensitive)|Equality predicate after applying case conversion|F,A|string_equal_lower|
-string_in_predicate|String IN Predicate|IN predicate with string values|F,A||
-string_like_predicate_center|String LIKE Center|Case sensitive matching pattern in any location|F,A|string_like_center|
-string_like_predicate_end|String LIKE Suffix|Case sensitive matching suffix pattern|F,A|string_like_suffix|
-string_like_predicate_start|String LIKE Prefix|Case sensitive matching prefix pattern|F,A|string_like_prefix|
-window_growing_frame|Window Growing Frame|Running sum window aggregation with growing frame size|W,A||
-window_lead_lag_same_frame|Window Lead/Lag|Offset window functions over the same frame|W|window_lead_lag|
-window_multiple_orderings|Window Dense Rank|Window function DENSE_RANK() OVER (PARTITION BY ... ORDER BY ...)|W|window_dense_rank|
-predicate_ordering_aggregation_groupby|Predicate Ordering with GroupBy|Order filter predicates by selectivity for aggregation within a low cardinality grouping|F,G,A|predicate_ordering_groupby|
-predicate_ordering_costs|Predicate Ordering Costs|Order filter predicates by selectivity with result projection only|F,P||
-broadcast_join_four_tables|Broadcast Join (4 tables)|Three small tables broadcast to join with one large table|J,M,A||
-exchange_broadcast|Exchange Broadcast|One small table is copied to all nodes that have the large table|J,A||
-exchange_merge|Exchange Merge|Sorted data from multiple nodes is combined while keeping the sort order|J,S||
-exchange_shuffle|Exchange Shuffle|Data is redistributed based on the join keys so matching rows end up on the same node|J||
-topn_aggregate_2columns|TopN with Aggregation|Top 10 limit returning 2 columns after aggregation and computed ordering|S,A|topn_aggregate|
-topn_ordered_allcols|TopN All Columns|Top-10 limit returning all columns after ordering over all table rows|S,C|topn_allcols|
-statistical_variance_stddev|Variance and StdDev|Variance and standard deviation calculations|A|statistical_variance|
-statistical_correlation|Correlation Analysis|Correlation analysis between numeric columns|A||
-long_predicate|Long Predicate|Query with many conjunctive predicates across multiple tables|F,J,M||
-max_by_simple|MAX_BY Simple|Find the customer with the highest account balance in each nation|A,J||
-min_by_simple|MIN_BY Simple|Find the customer with the lowest account balance in each nation|A,J||
-array_agg_simple|Array Aggregation|Aggregate part keys into arrays per supplier|A||
-array_agg_distinct|Distinct Array Aggregation|Distinct array aggregation|A||
-filter_decimal_in_list_selective|Decimal IN List Filter|IN-list predicate with decimal values and selectivity|F|filter_decimal_in_list|
-filter_string_like|String LIKE Filter|LIKE predicate with substring pattern matching|F||
-orderby_decimal16|Decimal Order By|Multi-column sort with mixed ASC/DESC on decimal columns|S|orderby_decimal|
-min_max_runtime_filter|Min/Max Runtime Filter|Bloom filter and runtime filter effectiveness for join optimization|F,J||
-max_by_complex|MAX_BY Complex|Find the most expensive order for each customer segment|A,J||
-min_by_complex|MIN_BY Complex|Find the cheapest part for each brand|A||
-any_value_simple|ANY_VALUE Simple|Select any customer name per market segment (faster than MIN/MAX)|A,G||
-any_value_with_filter|ANY_VALUE with Filter|Any value with additional aggregates|A,G||
-groupby_all_simple|GROUP BY ALL Simple|Automatic grouping by all non-aggregate columns|A,G||
-groupby_all_complex|GROUP BY ALL Complex|GROUP BY ALL with multiple non-aggregate expressions|A,G||
-orderby_all_simple|ORDER BY ALL Simple|Order by all columns in SELECT list|S,J,A||
-orderby_all_desc|ORDER BY ALL Descending|ORDER BY ALL with descending direction|S,A||
-max_by_with_ties|MAX_BY with Ties|Find the supplier with the highest supply cost for each part|A,J,M||
-min_by_with_ties|MIN_BY with Ties|Find the supplier with the lowest supply cost for each part|A,J,M||
-predicate_ordering_subquery|Predicate Ordering with Subquery|Order filter predicates by selectivity with subquery predicate|F,Q,J||
-shuffle_inner_join_union_all_with_groupby|Union All with GroupBy|Complex join with UNION ALL and different data sources|J,G,A|shuffle_union_all_groupby|
-statistical_percentiles|Statistical Percentiles|Percentile calculation functions for distribution analysis|A,G||
-string_ilike_predicate_start|String ILIKE Prefix|Case insensitive matching prefix pattern|F,A|string_ilike_start|
-string_ilike_predicate_end|String ILIKE Suffix|Case insensitive matching suffix pattern|F,A|string_ilike_end|
-string_like_predicate_multi|String LIKE Multi|Case sensitive matching multipart pattern|F,A|string_like_multi|
-string_ilike_predicate_multi|String ILIKE Multi|Case insensitive matching multipart pattern|F,A|string_ilike_multi|
-string_like_predicate_center_insensitive|String ILIKE Center|Case insensitive matching pattern in any location|F,A|string_like_center_insensitive|
-window_moving_frame|Window Moving Frame|Window aggregations with complex moving frame definitions|W,A||
-window_unbounded_frame|Window Unbounded Frame|Window aggregations with the same unbounded frame definition|W||
-approx_quantile_groupby|Approximate Median|Approximate statistical function (PERCENTILE_CONT for median)|A,G||
-intrinsic_to_date|Date Conversion Filter|Date parsing and conversion function performance|F,A||
-fulltext_simple_search|Simple Text Search|Basic full-text search using string pattern matching|F||
-fulltext_boolean_search|Boolean Text Search|Boolean text search with AND/NOT operators|F,S||
-fulltext_phrase_search|Phrase Text Search|Phrase-based text search with ranking|F,S||
-olap_cube_analysis|OLAP CUBE Analysis|CUBE operation for multidimensional analysis|A,G,J||
-olap_rollup_analysis|OLAP ROLLUP Analysis|ROLLUP operation for hierarchical aggregation|A,G,J,S||
-pivot_basic|Basic Pivot|Pivot ship modes into columns|A,G||
-unpivot_basic|Basic Unpivot|Unpivot part dimensions into rows|P||
-optimizer_distinct_elimination|Optimizer: Distinct Elimination|Test DISTINCT elimination when result is already unique|F,P||
-optimizer_common_subexpression|Optimizer: Common Subexpression|Test Common Subexpression Elimination (CSE)|P,F||
-optimizer_predicate_pushdown|Optimizer: Predicate Pushdown|Test predicate pushdown through joins|J,F||
-optimizer_join_reordering|Optimizer: Join Reordering|Test join reordering based on cardinality|J,A,G||
-optimizer_limit_pushdown|Optimizer: Limit Pushdown|Test limit pushdown through operations|J,S||
-optimizer_aggregate_pushdown|Optimizer: Aggregate Pushdown|Test aggregate pushdown before join|J,A,G||
-optimizer_constant_folding|Optimizer: Constant Folding|Test constant folding at compile time|P||
-optimizer_column_pruning|Optimizer: Column Pruning|Test column pruning at scan|J,F,P||
-optimizer_union_optimization|Optimizer: Union Optimization|Test union optimization with multiple scans|S||
-optimizer_runtime_filter|Optimizer: Runtime Filter|Test runtime filter / dynamic partition pruning|J,F||
-optimizer_groupjoin|Optimizer: Group-Join Fusion|Test join+aggregate fusion into a single grouped-join pass|J,A,G||
-qualify_row_number|QUALIFY ROW_NUMBER|Find top N orders per customer using ROW_NUMBER|J,W,F||
-qualify_dense_rank|QUALIFY DENSE_RANK|Find top N parts by price per category using DENSE_RANK|W,F||
-qualify_ntile|QUALIFY NTILE|Find orders in top quartile per segment using NTILE|J,W,F||
-qualify_percentile|QUALIFY PERCENT_RANK|Find orders in top 10% per priority using PERCENT_RANK|W,F||
-qualify_cume_dist|QUALIFY CUME_DIST|Find lineitems in top 5% quantity per shipdate using CUME_DIST|W,F||
-qualify_lag_lead|QUALIFY LAG/LEAD|Find orders with increasing price using LAG|J,W,F||
-struct_construction|Struct Construction|Construct struct from columns|P||
-struct_access|Struct Field Access|Access struct fields by name|P,F||
-array_contains|Array Contains|Check if array contains a specific value|A,G||
-array_distinct|Array Distinct|Get distinct elements from array|A,G||
-array_length|Array Length|Get array length/cardinality|A,G,S||
-array_min_max|Array Min/Max|Get min and max from array|A,G||
-array_of_struct|Array of Struct|Create array of structs from grouped data|A,G,J||
-array_slice|Array Slice|Get slice/subset of array|A,G,F||
-array_sort|Array Sort|Sort array elements|A,G||
-array_unnest|Array Unnest|Unnest/explode array back to rows|A,G||
-map_construction|Map Construction|Construct map from key-value pairs|A,G||
-map_access|Map Access|Access map values by key|A,G,P||
-map_keys_values|Map Keys/Values|Extract keys and values from map|A,G||
-list_filter|List Filter|Filter array elements by condition|A,G||
-list_transform|List Transform|Transform each array element|A,G||
-list_reduce|List Reduce|Reduce array to single value|A,G||
-json_extract_simple|JSON Extract Simple|Extract from JSON with simple path expressions|P,F||
-json_extract_nested|JSON Extract Nested|Extract from JSON with complex path expressions|P,F||
-json_aggregates|JSON Aggregates|Create JSON arrays and objects from aggregations|A,G,F||
-timeseries_trend_analysis|Timeseries Trend Analysis|Time series aggregation with month-over-month analysis|A,G,W,S||
-asof_join_basic|ASOF Join Basic|ASOF join to find closest prior order for shipments|J,F||
-"""
+_QUERY_METADATA = Path(__file__).with_name("dataframe_query_metadata.csv").read_text(encoding="utf-8")
 
 
 def _impl_for(impl_base: str, family: str) -> Any:

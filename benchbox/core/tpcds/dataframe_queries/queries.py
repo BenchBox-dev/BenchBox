@@ -644,216 +644,16 @@ def _inventory_item_pandas(
     )
 
 
-_HELPER_QUERY_SPECS = [
-    (
-        7,
-        "Promotion Analysis",
-        _promotion_sales_expression,
-        _promotion_sales_pandas,
-        (
-            "store_sales",
-            "ss_cdemo_sk",
-            "ss_sold_date_sk",
-            "ss_item_sk",
-            "ss_promo_sk",
-            "ss_quantity",
-            "ss_list_price",
-            "ss_coupon_amt",
-            "ss_sales_price",
-        ),
-    ),
-    (
-        3,
-        "Date/Item Brand Sales Analysis",
-        _date_item_sales_expression,
-        _date_item_sales_pandas,
-        (
-            (("i_manufact_id", "manufact_id", 128), ("d_moy", "month", 11)),
-            ("d_year", "i_brand", "i_brand_id"),
-            "ss_ext_sales_price",
-            "sum_agg",
-            ("d_year", "sum_agg", "i_brand_id"),
-            (False, True, False),
-        ),
-    ),
-    (
-        42,
-        "Date/Item Category Sales",
-        _date_item_sales_expression,
-        _date_item_sales_pandas,
-        (
-            (("i_manager_id", None, 1), ("d_moy", "month", 11), ("d_year", "year", 2000)),
-            ("d_year", "i_category_id", "i_category"),
-            "ss_ext_sales_price",
-            "sum_sales",
-            ("sum_sales", "d_year", "i_category_id", "i_category"),
-            (True, False, False, False),
-        ),
-    ),
-    (
-        52,
-        "Date/Brand Extended Sales",
-        _date_item_sales_expression,
-        _date_item_sales_pandas,
-        (
-            (("i_manager_id", None, 1), ("d_moy", "month", 11), ("d_year", "year", 2000)),
-            ("d_year", "i_brand", "i_brand_id"),
-            "ss_ext_sales_price",
-            "ext_price",
-            ("d_year", "ext_price", "i_brand_id"),
-            (False, True, False),
-        ),
-    ),
-    (
-        55,
-        "Brand Manager Sales",
-        _date_item_sales_expression,
-        _date_item_sales_pandas,
-        (
-            (("i_manager_id", "manager_id", 28), ("d_moy", "month", 11), ("d_year", "year", 1999)),
-            ("i_brand_id", "i_brand"),
-            "ss_ext_sales_price",
-            "ext_price",
-            ("ext_price", "i_brand_id"),
-            (True, False),
-        ),
-    ),
-    (
-        53,
-        "Store Manufacturer Sales",
-        _manufacturer_month_expression,
-        _manufacturer_month_pandas,
-        ("ss_sales_price", "sum_sales"),
-    ),
-    (
-        63,
-        "Store Manufacturer Profit",
-        _manufacturer_month_expression,
-        _manufacturer_month_pandas,
-        ("ss_net_profit", "sum_profit"),
-    ),
-    (
-        98,
-        "Store Sales Item Band",
-        _item_category_sales_expression,
-        _item_category_sales_pandas,
-        (
-            "store_sales",
-            "ss_item_sk",
-            "ss_sold_date_sk",
-            "ss_ext_sales_price",
-            "categories",
-            1,
-            ("i_item_desc", "i_category", "i_class", "i_current_price"),
-            ("i_category", "i_class", "itemrevenue", "i_item_desc"),
-        ),
-    ),
-    (
-        12,
-        "Web Sales Item Analysis",
-        _item_category_sales_expression,
-        _item_category_sales_pandas,
-        (
-            "web_sales",
-            "ws_item_sk",
-            "ws_sold_date_sk",
-            "ws_ext_sales_price",
-            "item_categories",
-            2,
-            ("i_item_id", "i_item_desc", "i_category", "i_class", "i_current_price"),
-            ("i_category", "i_class", "itemrevenue", "i_item_id"),
-        ),
-    ),
-    (
-        20,
-        "Catalog Sales Item Analysis",
-        _item_category_sales_expression,
-        _item_category_sales_pandas,
-        (
-            "catalog_sales",
-            "cs_item_sk",
-            "cs_sold_date_sk",
-            "cs_ext_sales_price",
-            "item_categories",
-            2,
-            ("i_item_id", "i_item_desc", "i_category", "i_class", "i_current_price"),
-            ("i_category", "i_class", "itemrevenue", "i_item_id"),
-        ),
-    ),
-    (
-        26,
-        "Catalog Sales Promo Analysis",
-        _promotion_sales_expression,
-        _promotion_sales_pandas,
-        (
-            "catalog_sales",
-            "cs_bill_cdemo_sk",
-            "cs_sold_date_sk",
-            "cs_item_sk",
-            "cs_promo_sk",
-            "cs_quantity",
-            "cs_list_price",
-            "cs_coupon_amt",
-            "cs_sales_price",
-        ),
-    ),
-    (
-        32,
-        "Catalog Sales Excess Discount",
-        _excess_discount_expression,
-        _excess_discount_pandas,
-        ("catalog_sales", "cs_item_sk", "cs_sold_date_sk", "cs_ext_discount_amt", 977),
-    ),
-    (
-        37,
-        "Item Inventory Analysis",
-        _inventory_item_expression,
-        _inventory_item_pandas,
-        ("catalog_sales", "cs_item_sk", ("current_price_min", "current_price_max"), (68, 98), True),
-    ),
-    (
-        82,
-        "Store Sales Inventory",
-        _inventory_item_expression,
-        _inventory_item_pandas,
-        ("store_sales", "ss_item_sk", ("price_min", "price_max"), (62, 92), False),
-    ),
-    (
-        92,
-        "Web Sales Excess Discount",
-        _excess_discount_expression,
-        _excess_discount_pandas,
-        ("web_sales", "ws_item_sk", "ws_sold_date_sk", "ws_ext_discount_amt", 350),
-    ),
-    (
-        94,
-        "Web Orders from Multiple Warehouses Not Returned",
-        _web_multi_warehouse_expression,
-        _web_multi_warehouse_pandas,
-        ("anti", False),
-    ),
-    (
-        95,
-        "Web Orders from Multiple Warehouses with Returns",
-        _web_multi_warehouse_expression,
-        _web_multi_warehouse_pandas,
-        ("semi", True),
-    ),
-    (
-        56,
-        "Three-Channel Sales by Item (Color)",
-        _three_channel_item_sales_expression,
-        _three_channel_item_sales_pandas,
-        ("i_color", "colors", ["pale", "chiffon", "thistle"], 1, ("total_sales", "i_item_id")),
-    ),
-    (
-        60,
-        "Three-Channel Sales by Item (Category)",
-        _three_channel_item_sales_expression,
-        _three_channel_item_sales_pandas,
-        ("i_category", "category", "Children", 8, ("i_item_id", "total_sales")),
-    ),
-]
+def _load_helper_query_specs() -> list[dict[str, Any]]:
+    with (Path(__file__).with_name("helper_query_specs.yaml")).open(encoding="utf-8") as handle:
+        payload = yaml.safe_load(handle) or {}
+    specs = payload.get("helper_queries", [])
+    if not isinstance(specs, list):
+        raise ValueError("TPC-DS helper query specs must be a list")
+    return specs
+
+
+_HELPER_QUERY_SPECS = _load_helper_query_specs()
 
 
 def _make_helper_impl(query_id: int, title: str, family: str, helper: Any, helper_args: tuple[Any, ...]) -> Any:
@@ -866,9 +666,15 @@ def _make_helper_impl(query_id: int, title: str, family: str, helper: Any, helpe
     return impl
 
 
-for _qid, _title, _expr_helper, _pandas_helper, _helper_args in _HELPER_QUERY_SPECS:
-    globals()[f"q{_qid}_expression_impl"] = _make_helper_impl(_qid, _title, "expression", _expr_helper, _helper_args)
-    globals()[f"q{_qid}_pandas_impl"] = _make_helper_impl(_qid, _title, "pandas", _pandas_helper, _helper_args)
+for _spec in _HELPER_QUERY_SPECS:
+    _qid = _spec["query_id"]
+    _title = _spec["title"]
+    globals()[f"q{_qid}_expression_impl"] = _make_helper_impl(
+        _qid, _title, "expression", globals()[_spec["expression_helper"]], _spec["args"]
+    )
+    globals()[f"q{_qid}_pandas_impl"] = _make_helper_impl(
+        _qid, _title, "pandas", globals()[_spec["pandas_helper"]], _spec["args"]
+    )
 
 
 _JoinedAggCondition = tuple[Any, ...]
@@ -11125,107 +10931,7 @@ _CATEGORY_CODES = {
     "W": QueryCategory.WINDOW,
 }
 
-_QUERY_METADATA = """\
-Q3|Date/Item Brand Sales|Reports sales for items by brand for a specific month and manufacturer|J,A,S,T
-Q2|Web/Catalog Weekly Sales Year-over-Year|Compares weekly web+catalog sales ratios year-over-year by day of week|M,A,N,T
-Q19|Store Sales Item/Customer Analysis|Reports sales by item brand for customers, filtered by manager and zip codes|M,A,S,T
-Q42|Date/Item Category Sales|Reports sales by item category for a specific month and year|J,A,S,T
-Q43|Store Sales Day Analysis|Reports store sales by day of week for a specific year|J,A,S,T
-Q52|Date/Brand Extended Sales|Reports extended sales by brand for a specific month and year|J,A,S,T
-Q55|Brand Manager Sales|Reports brand sales for items managed by a specific manager|J,A,S,T
-Q96|Store Sales Time Count|Counts store sales for specific time periods|M,A,T
-Q7|Promotion Analysis|Reports promotional impact on store sales for specific customer demographics|M,A,S,T
-Q25|Store/Catalog Sales Item Analysis|Compares store and catalog sales for items in specific quarters|M,A,S,T
-Q53|Store Manufacturer Sales|Reports store sales by manufacturer for specific months|M,A,S,T
-Q63|Store Manufacturer Profit|Reports store profit by manufacturer for specific months|M,A,S,T
-Q65|Store Sales Item Profit|Reports store sales item revenue analysis|M,A,S,T
-Q68|Store Sales Customer Household|Reports customer household purchases by city|M,A,S,T
-Q73|Store Sales Household Vehicle|Reports customer household purchases by vehicle count|M,A,S,T
-Q79|Store Sales Customer/Store Profit|Reports customer profit by store for specific household demographics|M,A,S,T
-Q89|Store Item Sales Profit|Reports monthly store sales average and deviation|M,A,S,T
-Q98|Store Sales Item Band|Reports store sales by item category for specific categories|J,A,S,T
-Q1|Customer Returns Analysis|Finds customers with above-average returns for their state|M,A,Q,T
-Q6|Customer State/Item Analysis|Finds items where customers are concentrated by state|M,A,Q,T
-Q12|Web Sales Item Analysis|Reports web sales by item category|J,A,S,T
-Q15|Catalog Sales Analysis|Reports catalog sales for customers in specific zip codes|M,A,S,T
-Q20|Catalog Sales Item Analysis|Reports catalog sales by item category|J,A,S,T
-Q26|Catalog Sales Promo Analysis|Reports catalog sales promotion effectiveness|M,A,S,T
-Q32|Catalog Sales Excess Discount|Finds items sold with excess discount|J,A,Q,T
-Q82|Store Sales Inventory|Reports items in inventory with specific constraints|M,A,T
-Q92|Web Sales Discount|Finds web items sold with excess discount|J,A,Q,T
-Q37|Item Inventory Analysis|Reports items in inventory within price and date constraints|M,A,T
-Q46|Store Sales Household Analysis|Reports store sales by customer household across cities|M,A,S,T
-Q50|Store Sales Returns Analysis|Analyzes store sales return patterns|M,A,S,T
-Q72|Catalog Sales Inventory|Reports catalog sales vs inventory analysis|M,A,N,T
-Q13|Store Sales Demographics Analysis|Computes aggregate statistics filtered by demographics and geography|M,A,T
-Q34|Store Sales County Household|Analyzes customer purchases by county and household demographics|M,A,Q,T
-Q48|Store Sales Quantity Demographics|Computes sum of store sales quantity filtered by demographics|M,A,T
-Q62|Web Sales Delivery Analysis|Analyzes web sales delivery times by warehouse, ship mode, and web site|M,A,S,T
-Q99|Catalog Sales Delivery Analysis|Analyzes catalog sales delivery times by warehouse, ship mode, and call center|M,A,S,T
-Q45|Web Sales Customer Zip Analysis|Reports web sales by customer zip code with OR filter on zip or item|M,A,S,T
-Q90|Web Sales AM/PM Ratio Analysis|Computes the ratio of AM to PM web sales counts|M,A,T
-Q91|Call Center Returns Analysis|Reports catalog returns by call center with demographic filtering|M,A,S,T
-Q30|Web Returns Customer Analysis|Identifies customers with web return amounts above state average|M,A,S,T
-Q81|Catalog Returns Customer Analysis|Identifies customers with catalog return amounts above state average|M,A,S,T
-Q83|Cross-Channel Returns Analysis|Compares return quantities across store, catalog, and web channels|M,A,S,T
-Q41|Item Dimension Analysis|Finds product names from items matching manufacturer and attribute criteria|F,S,T
-Q86|Web Sales ROLLUP with Rank|Aggregates web sales with ROLLUP and hierarchical ranking|M,A,N,T
-Q36|Gross Margin ROLLUP with Rank|Computes gross margin with ROLLUP and hierarchical ranking by state|M,A,N,T
-Q51|Cumulative Web/Store Sales|Compares cumulative web and store sales where web exceeds store|M,A,N,T
-Q47|Store Sales Rolling Average|Analyzes monthly store sales with rolling average deviation|M,A,N,T
-Q57|Catalog Sales Rolling Average|Analyzes monthly catalog sales with rolling average deviation|M,A,N,T
-Q67|Extensive ROLLUP with Rank|8-column ROLLUP on item/date/store with hierarchical ranking|M,A,N,T
-Q70|Store Sales ROLLUP with Subquery Filter|State/county ROLLUP with top-5 states subquery filter|M,A,N,Q,T
-Q31|Store/Web Quarterly Sales Growth|Compares Q1->Q2 and Q2->Q3 growth between store and web channels by county|M,A,T
-Q33|Three-Channel Sales by Manufacturer|Union of store/catalog/web sales by manufacturer filtered by category|M,A,N,T
-Q56|Three-Channel Sales by Item (Color)|Union of store/catalog/web sales by item filtered by color|M,A,N,T
-Q60|Three-Channel Sales by Item (Category)|Union of store/catalog/web sales by item filtered by category|M,A,N,T
-Q71|Three-Channel Sales by Brand and Time|Union of web/catalog/store sales by brand and meal time|M,A,N,T
-Q74|Store/Web Customer Year-over-Year Growth|Finds customers where web sales growth exceeds store sales growth|M,A,N,T
-Q76|Three-Channel Sales with NULL Column Filter|Sales analysis across channels where specific columns are NULL|M,A,N,T
-Q97|Store/Catalog Customer-Item Overlap|Analyzes customer-item purchase overlap between store and catalog channels|M,A,N,T
-Q49|Three-Channel Return Ratio Ranking|Calculates return and currency ratios per item across channels with ranking|M,A,W,N,T
-Q75|Three-Channel Sales with Returns Year-over-Year|Year-over-year comparison of net sales (sales - returns) by item attributes|M,A,N,T
-Q78|Three-Channel Sales without Returns Comparison|Compares store sales to combined web+catalog sales excluding returned items|M,A,N,T
-Q80|Three-Channel Sales-Returns with ROLLUP|Aggregates sales and returns across channels with ROLLUP for subtotals|M,A,N,T
-Q77|Three-Channel Sales-Returns with Separate CTEs|Aggregates sales and returns separately for each channel with ROLLUP|M,A,N,T
-Q58|Three-Channel Item Sales Balance Check|Items with balanced sales across all channels within 10% range|M,A,N,T
-Q54|Catalog+Web Customer Store Revenue Segments|Segments catalog/web customers by their store sales revenue|M,A,N,T
-Q4|Customer Year-over-Year Comparison|Compares customer totals across store/catalog/web, filtering for catalog growth|M,A,N,T
-Q5|Three-Channel Sales-Returns Union with ROLLUP|Unions sales and returns per channel then aggregates with ROLLUP|M,A,N,T
-Q10|Customer Demographics Multi-Channel|Demographics for customers in store AND (web OR catalog)|M,A,Q,T
-Q11|Store/Web Year-over-Year Customer Comparison|Compares customer totals between store and web channels year-over-year|M,A,N,T
-Q35|Customer Demographics Multi-Channel Quarterly|Demographics with state for customers in store AND (web OR catalog)|M,A,Q,T
-Q38|Three-Channel Customer INTERSECT|Count customers who bought in all three channels on same date|M,Q,T
-Q87|Three-Channel Customer EXCEPT|Count customers who bought from store but NOT catalog/web|M,Q,T
-Q69|Customer Demographics Store-Only|Demographics for customers who only shop in store (NOT web/catalog)|M,A,Q,T
-Q40|Catalog Sales Before/After Returns|Compares catalog sales before/after date accounting for returns|M,A,N,T
-Q16|Catalog Multi-Warehouse Orders Not Returned|Catalog orders shipped from multiple warehouses not returned|M,A,Q,T
-Q17|Store/Catalog Sales-Returns Statistics|Store sales/returns joined with catalog sales with quantity statistics|M,A,N,T
-Q18|Catalog Sales Demographics ROLLUP|Catalog sales with demographics aggregated with ROLLUP on geography|M,A,N,T
-Q29|Store/Catalog Sales-Returns Aggregation|Store sales/returns joined with catalog sales aggregated by item/store|M,A,N,T
-Q27|Store Sales Demographics ROLLUP|Store sales with demographics aggregated with ROLLUP on item/state|M,A,N,T
-Q93|Store Sales Returns Actual Sales|Store sales with returns computing actual sales by customer filtered by reason|M,A,N,T
-Q94|Web Multi-Warehouse Orders Not Returned|Web orders shipped from multiple warehouses that were not returned|M,A,Q,T
-Q44|Store Sales Item Ranking|Ranks items by net profit for a store, finding best and worst performers|M,A,W,T
-Q59|Store Weekly Sales Year-over-Year|Compares weekly sales by day of week between current and prior year|M,A,N,T
-Q61|Promotional Sales Ratio|Compares promotional sales to total sales for a category by GMT offset|M,A,N,T
-Q95|Web Multi-Warehouse Orders With Returns|Web orders shipped from multiple warehouses that were returned|M,A,Q,T
-Q85|Web Sales Returns Demographics|Analyzes web returns by reason with customer demographics filtering|M,A,N,T
-Q66|Web/Catalog Warehouse Monthly Sales|Union of web and catalog sales aggregated by warehouse and month|M,A,N,T
-Q8|Store Sales Zip Code Net Profit|Analyzes store net profit filtered by preferred customer zip codes|M,A,Q,T
-Q9|Store Sales Quantity Bucket Analysis|Computes conditional averages across quantity buckets|A,N,T
-Q14|Cross-channel Item Sales|Finds items sold across all channels with ROLLUP aggregation|M,A,N,T
-Q23|Frequent Items Best Customers|Sum of catalog+web sales for frequent items by best customers|M,A,Q,T
-Q24|Store Sales Returns by Color|Store sales with returns filtered by market and color threshold|M,A,Q,T
-Q28|Store Sales Quantity Bucket Extended|Extended price analysis across 6 quantity buckets with filters|A,N,T
-Q88|Store Sales Time Period Counts|Counts store sales by 8 half-hour time periods with demographics|M,A,N,T
-Q21|Inventory Before/After Date|Compares inventory quantities before and after a specific date by warehouse|M,A,N,T
-Q22|Inventory ROLLUP by Product|Analyzes inventory with ROLLUP by product name, brand, class, category|M,A,N,T
-Q39|Inventory Variance Monthly|Compares inventory variance (coefficient of variation) across consecutive months|M,A,N,T
-Q64|Cross-Sales Income Band|Complex cross-sales analysis with income band filtering and year-over-year comparison|M,A,Q,N,T
-Q84|Customer Income Band Lookup|Customer lookup filtered by city and income band with store returns|M,Q,T
-"""
+_QUERY_METADATA = Path(__file__).with_name("query_metadata.csv").read_text(encoding="utf-8")
 
 
 def _impl_for(query_id: str, family: str) -> Any:
