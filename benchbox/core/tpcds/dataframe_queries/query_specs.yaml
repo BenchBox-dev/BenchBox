@@ -1,4 +1,23 @@
 joined_aggregate:
+  - query_id: 19
+    title: Store Sales Item/Customer Analysis
+    base: date_dim
+    joins:
+      - [store_sales, d_date_sk, ss_sold_date_sk]
+      - [item, ss_item_sk, i_item_sk]
+      - [customer, ss_customer_sk, c_customer_sk]
+      - [customer_address, c_current_addr_sk, ca_address_sk]
+      - [store, ss_store_sk, s_store_sk]
+    filters:
+      - [eq, i_manager_id, {param: manager_id, default: 8}]
+      - [eq, d_moy, {param: month, default: 11}]
+      - [eq, d_year, {param: year, default: 1999}]
+      - [prefix_ne_cols, ca_zip, s_zip, 5]
+    group_by: [i_brand_id, i_brand, i_manufact_id, i_manufact]
+    aggs:
+      - [ext_price, ss_ext_sales_price, sum]
+    sort_by: [ext_price, i_brand, i_brand_id, i_manufact_id, i_manufact]
+    descending: [true, false, false, false, false]
   - query_id: 15
     title: Catalog Sales Analysis
     base: catalog_sales
