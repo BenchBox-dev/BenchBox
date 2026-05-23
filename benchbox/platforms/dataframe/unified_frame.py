@@ -93,13 +93,6 @@ def _is_polars_expr(expr: Any) -> bool:
     return "polars" in type_name and "Expr" in type(expr).__name__
 
 
-def _is_datafusion_expr(expr: Any) -> bool:
-    """Check if an expression is a DataFusion Expr."""
-    type_name = type(expr).__module__
-    class_name = type(expr).__name__
-    return "datafusion" in type_name and class_name == "Expr"
-
-
 class UnifiedStrExpr:
     """Platform-agnostic string expression namespace.
 
@@ -323,6 +316,14 @@ class UnifiedListExpr:
         # Polars: .implode() collects into a list in agg context
         return UnifiedExpr(self._expr.implode())
 
+    def _wrap(self, expr: Any) -> UnifiedListExpr:
+        return UnifiedListExpr(
+            expr,
+            is_pyspark=self._is_pyspark,
+            is_datafusion=self._is_datafusion,
+            is_polars=self._is_polars,
+        )
+
     def contains(self, value: Any) -> UnifiedExpr:
         """Check if list contains a value.
 
@@ -350,12 +351,12 @@ class UnifiedListExpr:
         if self._is_pyspark:
             from pyspark.sql import functions as F  # noqa: N812
 
-            return UnifiedListExpr(F.array_distinct(self._expr), is_pyspark=True)
+            return self._wrap(F.array_distinct(self._expr))
         if self._is_datafusion:
             from datafusion import functions as df_f
 
-            return UnifiedListExpr(df_f.array_distinct(self._expr), is_datafusion=True)
-        return UnifiedListExpr(self._expr.list.unique(), is_polars=True)
+            return self._wrap(df_f.array_distinct(self._expr))
+        return self._wrap(self._expr.list.unique())
 
     def len(self) -> UnifiedExpr:
         """Get list length.
@@ -415,12 +416,12 @@ class UnifiedListExpr:
         if self._is_pyspark:
             from pyspark.sql import functions as F  # noqa: N812
 
-            return UnifiedListExpr(F.sort_array(self._expr, asc=not descending), is_pyspark=True)
+            return self._wrap(F.sort_array(self._expr, asc=not descending))
         if self._is_datafusion:
             from datafusion import functions as df_f
 
-            return UnifiedListExpr(df_f.array_sort(self._expr), is_datafusion=True)
-        return UnifiedListExpr(self._expr.list.sort(descending=descending), is_polars=True)
+            return self._wrap(df_f.array_sort(self._expr))
+        return self._wrap(self._expr.list.sort(descending=descending))
 
     def slice(self, offset: int, length: int) -> UnifiedListExpr:
         """Get a slice of the list.
@@ -436,13 +437,13 @@ class UnifiedListExpr:
             from pyspark.sql import functions as F  # noqa: N812
 
             # PySpark slice is 1-indexed
-            return UnifiedListExpr(F.slice(self._expr, offset + 1, length), is_pyspark=True)
+            return self._wrap(F.slice(self._expr, offset + 1, length))
         if self._is_datafusion:
             from datafusion import functions as df_f, lit as df_lit
 
             # DataFusion array_slice is 1-indexed
-            return UnifiedListExpr(df_f.array_slice(self._expr, df_lit(offset + 1), df_lit(length)), is_datafusion=True)
-        return UnifiedListExpr(self._expr.list.slice(offset, length), is_polars=True)
+            return self._wrap(df_f.array_slice(self._expr, df_lit(offset + 1), df_lit(length)))
+        return self._wrap(self._expr.list.slice(offset, length))
 
     def sum(self) -> UnifiedExpr:
         """Sum all elements in the list."""
@@ -487,7 +488,7 @@ class UnifiedListExpr:
         """
         native_expr = expr._expr if isinstance(expr, UnifiedExpr) else expr
         if self._is_polars:
-            return UnifiedListExpr(self._expr.list.eval(native_expr), is_polars=True)
+            return self._wrap(self._expr.list.eval(native_expr))
         raise NotImplementedError("list.eval() is only supported on Polars")
 
     @property
@@ -505,10 +506,6 @@ class UnifiedListExpr:
         Args:
             name: New column name
         """
-        if self._is_pyspark:
-            return UnifiedExpr(self._expr.alias(name))
-        if self._is_datafusion:
-            return UnifiedExpr(self._expr.alias(name))
         return UnifiedExpr(self._expr.alias(name))
 
 
@@ -776,6 +773,10 @@ class UnifiedExpr:
     def __repr__(self) -> str:
         return f"UnifiedExpr({self._expr})"
 
+    @staticmethod
+    def _unwrap(other: Any) -> Any:
+        return other._expr if isinstance(other, UnifiedExpr) else other
+
     # =========================================================================
     # Arithmetic Operations
     # =========================================================================
@@ -898,23 +899,19 @@ class UnifiedExpr:
         return UnifiedExpr(other_expr + self._expr)
 
     def __sub__(self, other: Any) -> UnifiedExpr:
-        other_expr = other._expr if isinstance(other, UnifiedExpr) else other
-        return UnifiedExpr(self._expr - other_expr)
+        return UnifiedExpr(self._expr - self._unwrap(other))
 
     def __rsub__(self, other: Any) -> UnifiedExpr:
-        other_expr = other._expr if isinstance(other, UnifiedExpr) else other
-        return UnifiedExpr(other_expr - self._expr)
+        return UnifiedExpr(self._unwrap(other) - self._expr)
 
     def __mul__(self, other: Any) -> UnifiedExpr:
-        other_expr = other._expr if isinstance(other, UnifiedExpr) else other
-        return UnifiedExpr(self._expr * other_expr)
+        return UnifiedExpr(self._expr * self._unwrap(other))
 
     def __rmul__(self, other: Any) -> UnifiedExpr:
-        other_expr = other._expr if isinstance(other, UnifiedExpr) else other
-        return UnifiedExpr(other_expr * self._expr)
+        return UnifiedExpr(self._unwrap(other) * self._expr)
 
     def __truediv__(self, other: Any) -> UnifiedExpr:
-        other_expr = other._expr if isinstance(other, UnifiedExpr) else other
+        other_expr = self._unwrap(other)
         # DataFusion: use nullif to prevent DivideByZero errors
         # dividend / nullif(divisor, 0) returns NULL when divisor is 0
         if self._is_datafusion:
@@ -930,7 +927,7 @@ class UnifiedExpr:
         return UnifiedExpr(self._expr / other_expr)
 
     def __rtruediv__(self, other: Any) -> UnifiedExpr:
-        other_expr = other._expr if isinstance(other, UnifiedExpr) else other
+        other_expr = self._unwrap(other)
         # DataFusion: use nullif to prevent DivideByZero errors
         if self._is_datafusion:
             from datafusion import functions as df_f, lit as df_lit
@@ -953,24 +950,19 @@ class UnifiedExpr:
         return result
 
     def __ne__(self, other: Any) -> UnifiedExpr:  # type: ignore[override]
-        other_expr = other._expr if isinstance(other, UnifiedExpr) else other
-        return UnifiedExpr(self._expr != other_expr)
+        return UnifiedExpr(self._expr != self._unwrap(other))
 
     def __lt__(self, other: Any) -> UnifiedExpr:
-        other_expr = other._expr if isinstance(other, UnifiedExpr) else other
-        return UnifiedExpr(self._expr < other_expr)
+        return UnifiedExpr(self._expr < self._unwrap(other))
 
     def __le__(self, other: Any) -> UnifiedExpr:
-        other_expr = other._expr if isinstance(other, UnifiedExpr) else other
-        return UnifiedExpr(self._expr <= other_expr)
+        return UnifiedExpr(self._expr <= self._unwrap(other))
 
     def __gt__(self, other: Any) -> UnifiedExpr:
-        other_expr = other._expr if isinstance(other, UnifiedExpr) else other
-        return UnifiedExpr(self._expr > other_expr)
+        return UnifiedExpr(self._expr > self._unwrap(other))
 
     def __ge__(self, other: Any) -> UnifiedExpr:
-        other_expr = other._expr if isinstance(other, UnifiedExpr) else other
-        return UnifiedExpr(self._expr >= other_expr)
+        return UnifiedExpr(self._expr >= self._unwrap(other))
 
     def __and__(self, other: Any) -> UnifiedExpr:
         """Logical/bitwise AND operator.
@@ -981,7 +973,7 @@ class UnifiedExpr:
         In DataFusion, & is only for boolean logical AND, not bitwise operations.
         For integer columns with power-of-2 masks, we use modulo arithmetic.
         """
-        other_expr = other._expr if isinstance(other, UnifiedExpr) else other
+        other_expr = self._unwrap(other)
 
         if self._is_pyspark and isinstance(other, int):
             # PySpark's & operator only works for boolean columns, not integers
@@ -1015,8 +1007,7 @@ class UnifiedExpr:
         return UnifiedExpr(self._expr & other_expr)
 
     def __or__(self, other: Any) -> UnifiedExpr:
-        other_expr = other._expr if isinstance(other, UnifiedExpr) else other
-        return UnifiedExpr(self._expr | other_expr)
+        return UnifiedExpr(self._expr | self._unwrap(other))
 
     def __invert__(self) -> UnifiedExpr:
         return UnifiedExpr(~self._expr)
