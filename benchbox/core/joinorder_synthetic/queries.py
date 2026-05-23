@@ -12,7 +12,6 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import os
 from pathlib import Path
-from typing import Optional
 
 from benchbox.utils.printing import emit
 
@@ -20,7 +19,7 @@ from benchbox.utils.printing import emit
 class JoinOrderQueryManager:
     """Manager for Join Order Benchmark queries."""
 
-    def __init__(self, queries_dir: Optional[str] = None) -> None:
+    def __init__(self, queries_dir: str | None = None) -> None:
         """Initialize the Join Order query manager.
 
         Args:
@@ -37,11 +36,8 @@ class JoinOrderQueryManager:
             Dictionary mapping query IDs to SQL text
         """
 
-        # If queries_dir is provided, load from files
         if self._queries_dir and os.path.exists(self._queries_dir):
             return self._load_queries_from_files()
-
-        # Otherwise, use embedded queries
         return self._load_embedded_queries()
 
     def _load_queries_from_files(self) -> dict[str, str]:
@@ -50,18 +46,15 @@ class JoinOrderQueryManager:
         Returns:
             Dictionary mapping query IDs to SQL text
         """
-        queries = {}
-        queries_path = Path(self._queries_dir)
+        queries: dict[str, str] = {}
+        queries_path = Path(self._queries_dir or "")
 
-        # Load all query files matching pattern [0-9]+[a-z].sql
         for query_file in sorted(queries_path.glob("*.sql")):
             if query_file.stem.replace(".", "").replace("-", "").isalnum():
                 query_id = query_file.stem
                 try:
-                    with open(query_file, encoding="utf-8") as f:
-                        content = f.read().strip()
-                        if content:
-                            queries[query_id] = content
+                    if content := query_file.read_text(encoding="utf-8").strip():
+                        queries[query_id] = content
                 except Exception as e:
                     emit(f"Warning: Could not load query {query_id}: {e}")
 
