@@ -49,6 +49,10 @@ if TYPE_CHECKING:
     from benchbox.core.dataframe.context import DataFrameContext
 
 
+def _tables(ctx: DataFrameContext, *names: str) -> tuple[Any, ...]:
+    return tuple(ctx.get_table(name) for name in names)
+
+
 def _is_dask_context(ctx: DataFrameContext) -> bool:
     """Return whether a pandas-family context is backed by Dask."""
     platform = ctx.platform.lower().replace("_", "-")
@@ -716,76 +720,211 @@ for _spec in (
 # fmt: on
 
 
+def _sort_key(cols: tuple[str, ...]) -> str | list[str]:
+    return cols[0] if len(cols) == 1 else list(cols)
+
+
+def _ascending(desc: bool | tuple[bool, ...]) -> bool | list[bool]:
+    return [not value for value in desc] if isinstance(desc, tuple) else not desc
+
+
+def _select_sort_limit(frame: Any, cols: tuple[str, ...] = (), sort: tuple[str, ...] = (), desc: Any = False) -> Any:
+    result = frame.select(*cols) if cols else frame
+    return result.sort(_sort_key(sort), descending=desc) if sort else result
+
+
+def _pandas_select_sort_limit(
+    frame: Any, cols: tuple[str, ...] = (), sort: tuple[str, ...] = (), desc: Any = False
+) -> Any:
+    result = frame[list(cols)] if cols else frame
+    return result.sort_values(_sort_key(sort), ascending=_ascending(desc)) if sort else result
+
+
+def _limit(frame: Any, limit: int | None, *, pandas: bool = False) -> Any:
+    return frame.head(limit) if pandas and limit is not None else frame.limit(limit) if limit is not None else frame
+
+
+def _make_select_sort_impls(
+    name: str,
+    table_name: str,
+    cols: tuple[str, ...] = (),
+    sort: tuple[str, ...] = (),
+    desc: bool | tuple[bool, ...] = False,
+    limit: int | None = None,
+    *,
+    distinct: bool = False,
+) -> None:
+    def expression_impl(ctx: DataFrameContext) -> Any:
+        result = _select_sort_limit(ctx.get_table(table_name), cols, sort, desc)
+        result = result.unique() if distinct else result
+        return _limit(result, limit)
+
+    def pandas_impl(ctx: DataFrameContext) -> Any:
+        result = _pandas_select_sort_limit(ctx.get_table(table_name), cols, sort, desc)
+        result = result.drop_duplicates() if distinct else result
+        return _limit(result, limit, pandas=True)
+
+    for family, impl in (("expression", expression_impl), ("pandas", pandas_impl)):
+        impl.__name__ = f"{name}_{family}_impl"
+        impl.__qualname__ = impl.__name__
+        globals()[impl.__name__] = impl
+
+
+for _spec in (
+    ("orderby_simple", "orders", ("o_orderkey", "o_orderdate", "o_totalprice"), ("o_orderdate",), False, 100),
+    (
+        "orderby_multi",
+        "lineitem",
+        ("l_orderkey", "l_linenumber", "l_shipdate", "l_quantity"),
+        ("l_shipdate", "l_orderkey", "l_linenumber"),
+        False,
+        100,
+    ),
+    ("orderby_desc", "orders", ("o_orderkey", "o_totalprice", "o_orderdate"), ("o_totalprice",), True, 100),
+    ("topn", "lineitem", ("l_orderkey", "l_partkey", "l_extendedprice"), ("l_extendedprice",), True, 10),
+    (
+        "orderby_all",
+        "customer",
+        ("c_custkey", "c_name", "c_address", "c_nationkey", "c_phone", "c_acctbal", "c_mktsegment"),
+        ("c_custkey",),
+        False,
+        None,
+    ),
+    (
+        "orderby_multicol",
+        "orders",
+        ("o_orderkey", "o_custkey", "o_orderpriority", "o_orderdate", "o_totalprice"),
+        ("o_orderpriority", "o_orderdate", "o_totalprice"),
+        (False, True, True),
+        100,
+    ),
+    (
+        "orderby_shortstrings",
+        "lineitem",
+        ("l_returnflag", "l_linestatus"),
+        ("l_returnflag", "l_linestatus"),
+        False,
+        None,
+    ),
+    ("topn_allcols", "lineitem", (), ("l_extendedprice",), True, 10),
+):
+    _make_select_sort_impls(*_spec, distinct=_spec[0] == "orderby_shortstrings")
+
+
+def aggregation_distinct_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Distinct count of high cardinality key on a large table."""
+    filtered = ctx.get_table("orders")
+    filtered = filtered[filtered["o_orderdate"] >= date(1995, 1, 1)]
+    return filtered[["o_custkey"]].nunique().to_frame(name="unique_customers").reset_index(drop=True)
+
+
+def approx_count_distinct_simple_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Approximate distinct count fallback for the pandas family.
+
+    Dask uses native `nunique_approx()` (HLL) for this single-value
+    query. Pandas, Modin, and cuDF expose only exact `.nunique()` at
+    the API surface, so the "approximate" label degrades to exact on
+    those platforms.
+    """
+    filtered = ctx.get_table("orders")
+    filtered = filtered[filtered["o_orderdate"] >= date(1995, 1, 1)]
+    if _is_dask_context(ctx):
+        return ctx.scalar_to_df({"unique_customers": filtered["o_custkey"].nunique_approx().compute()})
+    return filtered[["o_custkey"]].nunique().to_frame(name="unique_customers").reset_index(drop=True)
+
+
+def approx_count_distinct_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Approximate distinct count groupby fallback for the pandas family.
+
+    Pandas, Modin, cuDF, and current Dask expose no groupby approximate
+    distinct aggregate matching this query shape. Dask has Series-level
+    `nunique_approx()`, but no groupby equivalent in the dask-expr API,
+    so this query remains an exact fallback for the pandas family.
+    """
+    return globals()["aggregation_distinct_groupby_pandas_impl"](ctx)
+
+
 def aggregation_materialize_expression_impl(ctx: DataFrameContext) -> Any:
     """Nested aggregation requiring CTE materialization."""
-    orders = ctx.get_table("orders")
-    col = ctx.col
+    totals = ctx.get_table("orders").group_by("o_custkey").agg(ctx.col("o_totalprice").sum().alias("customer_total"))
+    return totals.select(ctx.col("customer_total").mean().alias("avg_customer_spending"))
 
-    # First aggregation: sum by customer
-    order_totals = orders.group_by("o_custkey").agg(col("o_totalprice").sum().alias("customer_total"))
 
-    # Second aggregation: average of customer totals
-    return order_totals.select(col("customer_total").mean().alias("avg_customer_spending"))
+def aggregation_materialize_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Nested aggregation requiring CTE materialization."""
+    totals = ctx.get_table("orders").groupby("o_custkey", as_index=False).agg(customer_total=("o_totalprice", "sum"))
+    return ctx.scalar_to_df({"avg_customer_spending": totals["customer_total"].mean()})
 
 
 def aggregation_materialize_subquery_expression_impl(ctx: DataFrameContext) -> Any:
     """Complex nested aggregation requiring materialization of a subquery with joins."""
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-    lit = ctx.lit
-
-    # Build joined data with order totals
-    order_totals = (
-        customer.join(orders, left_on="c_custkey", right_on="o_custkey")
-        .join(lineitem, left_on="o_orderkey", right_on="l_orderkey")
+    col, lit = ctx.col, ctx.lit
+    totals = (
+        ctx.get_table("customer")
+        .join(ctx.get_table("orders"), left_on="c_custkey", right_on="o_custkey")
+        .join(ctx.get_table("lineitem"), left_on="o_orderkey", right_on="l_orderkey")
         .group_by("c_mktsegment", "o_orderkey")
         .agg((col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("order_total"))
     )
+    return totals.group_by("c_mktsegment").agg(col("order_total").mean().alias("avg_segment_order"))
 
-    # Average by segment
-    return order_totals.group_by("c_mktsegment").agg(col("order_total").mean().alias("avg_segment_order"))
+
+def aggregation_materialize_subquery_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Complex nested aggregation requiring materialization of a subquery with joins."""
+    merged = ctx.get_table("customer").merge(ctx.get_table("orders"), left_on="c_custkey", right_on="o_custkey")
+    merged = merged.merge(ctx.get_table("lineitem"), left_on="o_orderkey", right_on="l_orderkey")
+    merged["order_total"] = merged["l_extendedprice"] * (1 - merged["l_discount"])
+    totals = merged.groupby(["c_mktsegment", "o_orderkey"], as_index=False).agg(order_total=("order_total", "sum"))
+    return totals.groupby("c_mktsegment", as_index=False).agg(avg_segment_order=("order_total", "mean"))
 
 
 def aggregation_selective_expression_impl(ctx: DataFrameContext) -> Any:
     """Aggregate on a small subset of rows."""
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-    lit = ctx.lit
-
-    return lineitem.filter((col("l_discount") > lit(0.05)) & (col("l_quantity") < lit(24))).select(
-        (col("l_extendedprice") * col("l_discount")).sum().alias("total_discount_amount")
+    col, lit = ctx.col, ctx.lit
+    return (
+        ctx.get_table("lineitem")
+        .filter((col("l_discount") > lit(0.05)) & (col("l_quantity") < lit(24)))
+        .select((col("l_extendedprice") * col("l_discount")).sum().alias("total_discount_amount"))
     )
+
+
+def aggregation_selective_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Aggregate on a small subset of rows."""
+    lineitem = ctx.get_table("lineitem")
+    filtered = lineitem[(lineitem["l_discount"] > 0.05) & (lineitem["l_quantity"] < 24)]
+    return ctx.scalar_to_df({"total_discount_amount": (filtered["l_extendedprice"] * filtered["l_discount"]).sum()})
 
 
 def aggregation_simple_expression_impl(ctx: DataFrameContext) -> Any:
     """Aggregate over all rows in table."""
-    orders = ctx.get_table("orders")
     col = ctx.col
-
-    return orders.select(
-        col("o_orderkey").count().alias("total_orders"),
-        col("o_totalprice").sum().alias("total_revenue"),
+    return ctx.get_table("orders").select(
+        col("o_orderkey").count().alias("total_orders"), col("o_totalprice").sum().alias("total_revenue")
     )
+
+
+def aggregation_simple_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Aggregate over all rows in table."""
+    orders = ctx.get_table("orders")
+    return ctx.scalar_to_df({"total_orders": len(orders), "total_revenue": orders["o_totalprice"].sum()})
 
 
 def count_star_expression_impl(ctx: DataFrameContext) -> Any:
     """Metadata-based count optimization vs full table scan performance."""
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
+    return ctx.get_table("lineitem").select(ctx.col("l_orderkey").count().alias("total_lineitems"))
 
-    return lineitem.select(col("l_orderkey").count().alias("total_lineitems"))
+
+def count_star_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Metadata-based count optimization vs full table scan performance."""
+    return ctx.scalar_to_df({"total_lineitems": len(ctx.get_table("lineitem"))})
 
 
 def decimal_arithmetic_expression_impl(ctx: DataFrameContext) -> Any:
     """Decimal precision arithmetic with complex expressions."""
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-    lit = ctx.lit
-
+    col, lit = ctx.col, ctx.lit
     return (
-        lineitem.filter(col("l_quantity") > lit(0))
+        ctx.get_table("lineitem")
+        .filter(col("l_quantity") > lit(0))
         .select(
             col("l_orderkey"),
             (col("l_extendedprice") * (lit(1) - col("l_discount")) * (lit(1) + col("l_tax"))).alias("final_price"),
@@ -795,319 +934,305 @@ def decimal_arithmetic_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-def orderby_simple_expression_impl(ctx: DataFrameContext) -> Any:
-    """Simple ORDER BY single column."""
-    orders = ctx.get_table("orders")
-
-    return orders.select("o_orderkey", "o_orderdate", "o_totalprice").sort("o_orderdate").limit(100)
-
-
-def orderby_multi_expression_impl(ctx: DataFrameContext) -> Any:
-    """ORDER BY multiple columns."""
-    lineitem = ctx.get_table("lineitem")
-
-    return (
-        lineitem.select("l_orderkey", "l_linenumber", "l_shipdate", "l_quantity")
-        .sort(["l_shipdate", "l_orderkey", "l_linenumber"])
-        .limit(100)
-    )
-
-
-def orderby_desc_expression_impl(ctx: DataFrameContext) -> Any:
-    """ORDER BY with descending sort."""
-    orders = ctx.get_table("orders")
-
-    return orders.select("o_orderkey", "o_totalprice", "o_orderdate").sort("o_totalprice", descending=True).limit(100)
-
-
-def topn_expression_impl(ctx: DataFrameContext) -> Any:
-    """Top-N query with ORDER BY and LIMIT."""
-    lineitem = ctx.get_table("lineitem")
-
-    return (
-        lineitem.select("l_orderkey", "l_partkey", "l_extendedprice").sort("l_extendedprice", descending=True).limit(10)
-    )
+def decimal_arithmetic_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Decimal precision arithmetic with complex expressions."""
+    filtered = ctx.get_table("lineitem")
+    filtered = filtered[filtered["l_quantity"] > 0].copy()
+    filtered["final_price"] = filtered["l_extendedprice"] * (1 - filtered["l_discount"]) * (1 + filtered["l_tax"])
+    filtered["unit_price"] = filtered["l_extendedprice"] / filtered["l_quantity"]
+    return filtered[["l_orderkey", "final_price", "unit_price"]].head(1000)
 
 
 def string_concat_expression_impl(ctx: DataFrameContext) -> Any:
     """String concatenation."""
-    customer = ctx.get_table("customer")
-    col = ctx.col
-    lit = ctx.lit
+    col, lit = ctx.col, ctx.lit
+    return (
+        ctx.get_table("customer")
+        .select(col("c_custkey"), (col("c_name") + lit(" - ") + col("c_mktsegment")).alias("customer_info"))
+        .limit(100)
+    )
 
-    return customer.select(
-        col("c_custkey"),
-        (col("c_name") + lit(" - ") + col("c_mktsegment")).alias("customer_info"),
-    ).limit(100)
+
+def string_concat_pandas_impl(ctx: DataFrameContext) -> Any:
+    """String concatenation."""
+    result = ctx.get_table("customer").copy()
+    result["customer_info"] = result["c_name"] + " - " + result["c_mktsegment"]
+    return result[["c_custkey", "customer_info"]].head(100)
 
 
 def string_substring_expression_impl(ctx: DataFrameContext) -> Any:
     """String substring extraction."""
-    customer = ctx.get_table("customer")
-    col = ctx.col
+    return (
+        ctx.get_table("customer")
+        .select(ctx.col("c_custkey"), ctx.col("c_phone").str.slice(0, 3).alias("country_code"))
+        .limit(100)
+    )
 
-    return customer.select(
-        col("c_custkey"),
-        col("c_phone").str.slice(0, 3).alias("country_code"),
-    ).limit(100)
+
+def string_substring_pandas_impl(ctx: DataFrameContext) -> Any:
+    """String substring extraction."""
+    result = ctx.get_table("customer").copy()
+    result["country_code"] = result["c_phone"].str[:3]
+    return result[["c_custkey", "country_code"]].head(100)
+
+
+def _window_select(frame: Any, cols: tuple[str, ...]) -> Any:
+    return frame.select(*cols)
 
 
 def window_row_number_expression_impl(ctx: DataFrameContext) -> Any:
     """Window function ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ...)."""
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-
-    return (
-        lineitem.with_columns(
-            ctx.window_row_number(
-                order_by=[("l_extendedprice", False)],
-                partition_by=["l_orderkey"],
-            ).alias("row_num")
-        )
-        .filter(col("row_num") <= 3)
-        .select("l_orderkey", "l_linenumber", "l_extendedprice", "row_num")
+    result = ctx.get_table("lineitem").with_columns(
+        ctx.window_row_number(order_by=[("l_extendedprice", False)], partition_by=["l_orderkey"]).alias("row_num")
     )
+    return _window_select(
+        result.filter(ctx.col("row_num") <= 3), ("l_orderkey", "l_linenumber", "l_extendedprice", "row_num")
+    )
+
+
+def window_row_number_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Window function ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ...)."""
+    result = ctx.get_table("lineitem").sort_values(["l_orderkey", "l_extendedprice"], ascending=[True, False])
+    result["row_num"] = result.groupby("l_orderkey").cumcount() + 1
+    return result[result["row_num"] <= 3][["l_orderkey", "l_linenumber", "l_extendedprice", "row_num"]]
 
 
 def window_rank_expression_impl(ctx: DataFrameContext) -> Any:
     """Window function RANK() OVER (PARTITION BY ... ORDER BY ...)."""
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-
-    return (
-        lineitem.with_columns(
-            ctx.window_rank(
-                order_by=[("l_quantity", False)],
-                partition_by=["l_returnflag"],
-            ).alias("qty_rank")
-        )
-        .filter(col("qty_rank") <= 5)
-        .select("l_orderkey", "l_returnflag", "l_quantity", "qty_rank")
+    result = ctx.get_table("lineitem").with_columns(
+        ctx.window_rank(order_by=[("l_quantity", False)], partition_by=["l_returnflag"]).alias("qty_rank")
     )
+    return _window_select(
+        result.filter(ctx.col("qty_rank") <= 5), ("l_orderkey", "l_returnflag", "l_quantity", "qty_rank")
+    )
+
+
+def window_rank_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Window function RANK() OVER (PARTITION BY ... ORDER BY ...)."""
+    result = ctx.get_table("lineitem").copy()
+    result["qty_rank"] = result.groupby("l_returnflag")["l_quantity"].rank(method="min", ascending=False)
+    return result[result["qty_rank"] <= 5][["l_orderkey", "l_returnflag", "l_quantity", "qty_rank"]]
 
 
 def window_sum_expression_impl(ctx: DataFrameContext) -> Any:
     """Window function SUM() OVER (PARTITION BY ...)."""
-    lineitem = ctx.get_table("lineitem")
+    return (
+        ctx.get_table("lineitem")
+        .with_columns(ctx.window_sum("l_extendedprice", partition_by=["l_orderkey"]).alias("order_total"))
+        .select("l_orderkey", "l_linenumber", "l_extendedprice", "order_total")
+    )
 
-    return lineitem.with_columns(
-        ctx.window_sum("l_extendedprice", partition_by=["l_orderkey"]).alias("order_total")
-    ).select("l_orderkey", "l_linenumber", "l_extendedprice", "order_total")
+
+def window_sum_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Window function SUM() OVER (PARTITION BY ...)."""
+    result = ctx.get_table("lineitem").copy()
+    result["order_total"] = result.groupby("l_orderkey")["l_extendedprice"].transform("sum")
+    return result[["l_orderkey", "l_linenumber", "l_extendedprice", "order_total"]]
 
 
 def window_running_sum_expression_impl(ctx: DataFrameContext) -> Any:
     """Window function SUM() OVER (ORDER BY ...) - cumulative sum."""
-    orders = ctx.get_table("orders")
-
     return (
-        orders.sort("o_orderdate")
+        ctx.get_table("orders")
+        .sort("o_orderdate")
         .with_columns(ctx.window_sum("o_totalprice", order_by=[("o_orderdate", True)]).alias("cumulative_revenue"))
         .select("o_orderkey", "o_orderdate", "o_totalprice", "cumulative_revenue")
         .limit(100)
     )
 
 
+def window_running_sum_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Window function SUM() OVER (ORDER BY ...) - cumulative sum."""
+    result = ctx.get_table("orders").sort_values("o_orderdate").copy()
+    result["cumulative_revenue"] = result["o_totalprice"].cumsum()
+    return result[["o_orderkey", "o_orderdate", "o_totalprice", "cumulative_revenue"]].head(100)
+
+
 def broadcast_join_two_tables_expression_impl(ctx: DataFrameContext) -> Any:
     """One small table broadcast to join with one large table."""
-    supplier = ctx.get_table("supplier")
-    nation = ctx.get_table("nation")
-    col = ctx.col
+    return (
+        ctx.get_table("supplier")
+        .join(ctx.get_table("nation"), left_on="s_nationkey", right_on="n_nationkey")
+        .select(ctx.col("s_suppkey").count().alias("supplier_count"))
+    )
 
-    return supplier.join(nation, left_on="s_nationkey", right_on="n_nationkey").select(
-        col("s_suppkey").count().alias("supplier_count")
+
+def broadcast_join_two_tables_pandas_impl(ctx: DataFrameContext) -> Any:
+    """One small table broadcast to join with one large table."""
+    return ctx.scalar_to_df(
+        {
+            "supplier_count": len(
+                ctx.get_table("supplier").merge(ctx.get_table("nation"), left_on="s_nationkey", right_on="n_nationkey")
+            )
+        }
     )
 
 
 def broadcast_join_three_tables_expression_impl(ctx: DataFrameContext) -> Any:
     """Two small tables broadcast to join with one large table."""
-    supplier = ctx.get_table("supplier")
-    nation = ctx.get_table("nation")
-    region = ctx.get_table("region")
-    col = ctx.col
-
     return (
-        supplier.join(nation, left_on="s_nationkey", right_on="n_nationkey")
-        .join(region, left_on="n_regionkey", right_on="r_regionkey")
+        ctx.get_table("supplier")
+        .join(ctx.get_table("nation"), left_on="s_nationkey", right_on="n_nationkey")
+        .join(ctx.get_table("region"), left_on="n_regionkey", right_on="r_regionkey")
         .group_by("r_name", "n_name")
-        .agg(col("s_suppkey").count().alias("supplier_count"))
+        .agg(ctx.col("s_suppkey").count().alias("supplier_count"))
+    )
+
+
+def broadcast_join_three_tables_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Two small tables broadcast to join with one large table."""
+    merged = ctx.get_table("supplier").merge(ctx.get_table("nation"), left_on="s_nationkey", right_on="n_nationkey")
+    return (
+        merged.merge(ctx.get_table("region"), left_on="n_regionkey", right_on="r_regionkey")
+        .groupby(["r_name", "n_name"], as_index=False)
+        .agg(supplier_count=("s_suppkey", "count"))
     )
 
 
 def predicate_ordering_aggregation_expression_impl(ctx: DataFrameContext) -> Any:
     """Order filter predicates by selectivity for aggregation."""
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-    lit = ctx.lit
+    col, lit = ctx.col, ctx.lit
+    return (
+        ctx.get_table("lineitem")
+        .filter(
+            (col("l_shipdate") >= lit(date(1994, 1, 1)))
+            & (col("l_shipdate") < lit(date(1995, 1, 1)))
+            & (col("l_discount") >= lit(0.05))
+            & (col("l_discount") <= lit(0.07))
+            & (col("l_quantity") < lit(24))
+        )
+        .select(col("l_extendedprice").sum().alias("total_price"))
+    )
 
-    return lineitem.filter(
-        (col("l_shipdate") >= lit(date(1994, 1, 1)))
-        & (col("l_shipdate") < lit(date(1995, 1, 1)))
-        & (col("l_discount") >= lit(0.05))
-        & (col("l_discount") <= lit(0.07))
-        & (col("l_quantity") < lit(24))
-    ).select(col("l_extendedprice").sum().alias("total_price"))
+
+def predicate_ordering_aggregation_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Order filter predicates by selectivity for aggregation."""
+    table = ctx.get_table("lineitem")
+    filtered = table[
+        (table["l_shipdate"] >= date(1994, 1, 1))
+        & (table["l_shipdate"] < date(1995, 1, 1))
+        & (table["l_discount"] >= 0.05)
+        & (table["l_discount"] <= 0.07)
+        & (table["l_quantity"] < 24)
+    ]
+    return ctx.scalar_to_df({"total_price": filtered["l_extendedprice"].sum()})
 
 
 def shuffle_join_expression_impl(ctx: DataFrameContext) -> Any:
     """Data is redistributed based on the join keys."""
-    orders = ctx.get_table("orders")
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-
     return (
-        orders.join(lineitem, left_on="o_orderkey", right_on="l_orderkey")
+        ctx.get_table("orders")
+        .join(ctx.get_table("lineitem"), left_on="o_orderkey", right_on="l_orderkey")
         .group_by("o_orderkey")
-        .agg(col("l_quantity").sum().alias("total_qty"))
+        .agg(ctx.col("l_quantity").sum().alias("total_qty"))
     )
+
+
+def shuffle_join_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Data is redistributed based on the join keys."""
+    merged = ctx.get_table("orders").merge(ctx.get_table("lineitem"), left_on="o_orderkey", right_on="l_orderkey")
+    return merged.groupby("o_orderkey", as_index=False).agg(total_qty=("l_quantity", "sum"))
 
 
 def empty_build_join_expression_impl(ctx: DataFrameContext) -> Any:
     """Join when build side produces no rows (edge case handling)."""
-    lineitem = ctx.get_table("lineitem")
-    orders = ctx.get_table("orders")
-    col = ctx.col
-    lit = ctx.lit
-
-    # Create empty orders set (no orders with negative price)
-    empty_orders = orders.filter(col("o_totalprice") < lit(0)).select("o_orderkey")
-
-    return lineitem.join(empty_orders, left_on="l_orderkey", right_on="o_orderkey", how="left").select(
-        "l_orderkey", "l_partkey", "l_quantity"
+    col, lit = ctx.col, ctx.lit
+    empty_orders = ctx.get_table("orders").filter(col("o_totalprice") < lit(0)).select("o_orderkey")
+    return (
+        ctx.get_table("lineitem")
+        .join(empty_orders, left_on="l_orderkey", right_on="o_orderkey", how="left")
+        .select("l_orderkey", "l_partkey", "l_quantity")
     )
 
 
-# -----------------------------------------------------------------------------
-# Additional Filter queries
-# -----------------------------------------------------------------------------
+def empty_build_join_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Join when build side produces no rows (edge case handling)."""
+    empty_orders = ctx.get_table("orders")
+    empty_orders = empty_orders[empty_orders["o_totalprice"] < 0][["o_orderkey"]]
+    return ctx.get_table("lineitem").merge(empty_orders, left_on="l_orderkey", right_on="o_orderkey", how="left")[
+        ["l_orderkey", "l_partkey", "l_quantity"]
+    ]
 
 
 def filter_in_predicate_subquery_expression_impl(ctx: DataFrameContext) -> Any:
     """IN predicate with subquery and selective filtering."""
-    part = ctx.get_table("part")
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-    lit = ctx.lit
-
-    # Get partkeys with high quantity
-    high_qty_parts = lineitem.filter(col("l_quantity") > lit(45)).select("l_partkey").unique()
-
-    return part.join(high_qty_parts, left_on="p_partkey", right_on="l_partkey", how="semi").select(
-        "p_partkey", "p_name", "p_type", "p_size"
+    high_qty = ctx.get_table("lineitem").filter(ctx.col("l_quantity") > ctx.lit(45)).select("l_partkey").unique()
+    return (
+        ctx.get_table("part")
+        .join(high_qty, left_on="p_partkey", right_on="l_partkey", how="semi")
+        .select("p_partkey", "p_name", "p_type", "p_size")
     )
 
 
-# -----------------------------------------------------------------------------
-# Additional OrderBy queries
-# -----------------------------------------------------------------------------
-
-
-def orderby_all_expression_impl(ctx: DataFrameContext) -> Any:
-    """Sort on full table with simple integer ordering."""
-    customer = ctx.get_table("customer")
-
-    return customer.sort("c_custkey").select(
-        "c_custkey", "c_name", "c_address", "c_nationkey", "c_phone", "c_acctbal", "c_mktsegment"
-    )
+def filter_in_predicate_subquery_pandas_impl(ctx: DataFrameContext) -> Any:
+    """IN predicate with subquery and selective filtering."""
+    high_qty = ctx.get_table("lineitem")[ctx.get_table("lineitem")["l_quantity"] > 45]["l_partkey"].unique()
+    return ctx.get_table("part")[ctx.get_table("part")["p_partkey"].isin(high_qty)][
+        ["p_partkey", "p_name", "p_type", "p_size"]
+    ]
 
 
 def orderby_expression_expression_impl(ctx: DataFrameContext) -> Any:
     """Sort on computed expressions with DESC ordering."""
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-
     return (
-        lineitem.with_columns((col("l_quantity") * col("l_extendedprice")).alias("total_value"))
+        ctx.get_table("lineitem")
+        .with_columns((ctx.col("l_quantity") * ctx.col("l_extendedprice")).alias("total_value"))
         .sort("total_value", descending=True)
         .select("l_orderkey", "l_partkey", "total_value")
         .limit(100)
     )
 
 
-def orderby_multicol_expression_impl(ctx: DataFrameContext) -> Any:
-    """Complex multi-column sort with string, date, and decimal columns."""
-    orders = ctx.get_table("orders")
+def orderby_expression_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Sort on computed expressions with DESC ordering."""
+    result = ctx.get_table("lineitem").copy()
+    result["total_value"] = result["l_quantity"] * result["l_extendedprice"]
+    return result.sort_values("total_value", ascending=False)[["l_orderkey", "l_partkey", "total_value"]].head(100)
 
-    return (
-        orders.sort(
-            ["o_orderpriority", "o_orderdate", "o_totalprice"],
-            descending=[False, True, True],
+
+def _make_shuffle_customer_order_impls(name: str, how: str, aggs: tuple[tuple[str, str, str], ...]) -> None:
+    def expression_impl(ctx: DataFrameContext) -> Any:
+        joined = ctx.get_table("customer").join(
+            ctx.get_table("orders"), left_on="c_custkey", right_on="o_custkey", how=how
         )
-        .select("o_orderkey", "o_custkey", "o_orderpriority", "o_orderdate", "o_totalprice")
-        .limit(100)
-    )
-
-
-def orderby_shortstrings_expression_impl(ctx: DataFrameContext) -> Any:
-    """Sort on short string columns with DISTINCT operation."""
-    lineitem = ctx.get_table("lineitem")
-
-    return lineitem.select("l_returnflag", "l_linestatus").unique().sort(["l_returnflag", "l_linestatus"])
-
-
-# -----------------------------------------------------------------------------
-# Additional Shuffle/Join queries
-# -----------------------------------------------------------------------------
-
-
-def shuffle_inner_join_groupby_expression_impl(ctx: DataFrameContext) -> Any:
-    """Standard inner join with one-to-many relationship."""
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
-    col = ctx.col
-
-    return (
-        customer.join(orders, left_on="c_custkey", right_on="o_custkey")
-        .group_by("c_mktsegment")
-        .agg(
-            col("o_orderkey").count().alias("order_count"),
-            col("o_totalprice").sum().alias("total_revenue"),
+        return joined.group_by("c_mktsegment").agg(
+            *(getattr(ctx.col(col), func)().alias(alias) for col, func, alias in aggs)
         )
-    )
 
-
-def shuffle_left_join_groupby_expression_impl(ctx: DataFrameContext) -> Any:
-    """LEFT JOIN with preservation of all left-side rows."""
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
-    col = ctx.col
-
-    return (
-        customer.join(orders, left_on="c_custkey", right_on="o_custkey", how="left")
-        .group_by("c_mktsegment")
-        .agg(
-            col("o_orderkey").count().alias("order_count"),
-            col("c_custkey").count().alias("total_rows"),
+    def pandas_impl(ctx: DataFrameContext) -> Any:
+        joined = ctx.get_table("customer").merge(
+            ctx.get_table("orders"), left_on="c_custkey", right_on="o_custkey", how=how
         )
-    )
+        return joined.groupby("c_mktsegment", as_index=False).agg(**{alias: (col, func) for col, func, alias in aggs})
+
+    for family, impl in (("expression", expression_impl), ("pandas", pandas_impl)):
+        impl.__name__ = f"{name}_{family}_impl"
+        impl.__qualname__ = impl.__name__
+        globals()[impl.__name__] = impl
 
 
-def shuffle_full_join_groupby_expression_impl(ctx: DataFrameContext) -> Any:
-    """FULL OUTER JOIN with string grouping and aggregation."""
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
-    col = ctx.col
-
-    return (
-        customer.join(orders, left_on="c_custkey", right_on="o_custkey", how="outer")
-        .group_by("c_mktsegment")
-        .agg(
-            col("o_orderkey").count().alias("order_count"),
-            col("c_custkey").count().alias("customer_count"),
-        )
-    )
+_make_shuffle_customer_order_impls(
+    "shuffle_inner_join_groupby",
+    "inner",
+    (("o_orderkey", "count", "order_count"), ("o_totalprice", "sum", "total_revenue")),
+)
+_make_shuffle_customer_order_impls(
+    "shuffle_left_join_groupby", "left", (("o_orderkey", "count", "order_count"), ("c_custkey", "count", "total_rows"))
+)
+_make_shuffle_customer_order_impls(
+    "shuffle_full_join_groupby",
+    "outer",
+    (("o_orderkey", "count", "order_count"), ("c_custkey", "count", "customer_count")),
+)
 
 
 def shuffle_self_join_expression_impl(ctx: DataFrameContext) -> Any:
     """Self-join with hash collision handling on large table."""
-    lineitem = ctx.get_table("lineitem")
     col = ctx.col
-
-    # Self-join on partkey and shipdate
+    lineitem = ctx.get_table("lineitem")
+    other = lineitem.select("l_orderkey", "l_partkey", "l_shipdate").rename({"l_orderkey": "l_orderkey_2"})
     return (
-        lineitem.join(
-            lineitem.select("l_orderkey", "l_partkey", "l_shipdate").rename({"l_orderkey": "l_orderkey_2"}),
-            on=["l_partkey", "l_shipdate"],
-        )
+        lineitem.join(other, on=["l_partkey", "l_shipdate"])
         .filter(col("l_orderkey") != col("l_orderkey_2"))
         .group_by("l_orderkey")
         .agg(col("l_orderkey_2").count().alias("match_count"))
@@ -1115,44 +1240,49 @@ def shuffle_self_join_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# -----------------------------------------------------------------------------
-# Additional String queries
-# -----------------------------------------------------------------------------
-
-
-# -----------------------------------------------------------------------------
-# Additional Window queries
-# -----------------------------------------------------------------------------
+def shuffle_self_join_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Self-join with hash collision handling on large table."""
+    left = ctx.get_table("lineitem")[["l_orderkey", "l_partkey", "l_shipdate"]].copy()
+    right = left.rename(columns={"l_orderkey": "l_orderkey_2"})
+    result = left.merge(right, on=["l_partkey", "l_shipdate"])
+    return (
+        result[result["l_orderkey"] != result["l_orderkey_2"]]
+        .groupby("l_orderkey", as_index=False)
+        .agg(match_count=("l_orderkey_2", "count"))
+        .head(10000)
+    )
 
 
 def window_growing_frame_expression_impl(ctx: DataFrameContext) -> Any:
     """Running sum window aggregation with growing frame size."""
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-    lit = ctx.lit
-
+    col, lit = ctx.col, ctx.lit
     return (
-        lineitem.filter(col("l_orderkey") <= lit(1000))
+        ctx.get_table("lineitem")
+        .filter(col("l_orderkey") <= lit(1000))
         .sort(["l_orderkey", "l_linenumber"])
         .with_columns(
-            ctx.window_sum(
-                "l_quantity",
-                partition_by=["l_orderkey"],
-                order_by=[("l_linenumber", True)],
-            ).alias("running_quantity")
+            ctx.window_sum("l_quantity", partition_by=["l_orderkey"], order_by=[("l_linenumber", True)]).alias(
+                "running_quantity"
+            )
         )
         .select("l_orderkey", "l_linenumber", "l_quantity", "running_quantity")
     )
 
 
+def window_growing_frame_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Running sum window aggregation with growing frame size."""
+    result = ctx.get_table("lineitem")
+    result = result[result["l_orderkey"] <= 1000].copy().sort_values(["l_orderkey", "l_linenumber"])
+    result["running_quantity"] = result.groupby("l_orderkey")["l_quantity"].cumsum()
+    return result[["l_orderkey", "l_linenumber", "l_quantity", "running_quantity"]]
+
+
 def window_lead_lag_expression_impl(ctx: DataFrameContext) -> Any:
     """Offset window functions over the same frame."""
-    orders = ctx.get_table("orders")
-    col = ctx.col
-    lit = ctx.lit
-
+    col, lit = ctx.col, ctx.lit
     return (
-        orders.filter((col("o_orderdate") >= lit(date(1995, 1, 1))) & (col("o_orderdate") < lit(date(1996, 1, 1))))
+        ctx.get_table("orders")
+        .filter((col("o_orderdate") >= lit(date(1995, 1, 1))) & (col("o_orderdate") < lit(date(1996, 1, 1))))
         .sort(["o_custkey", "o_orderdate"])
         .with_columns(
             [
@@ -1168,38 +1298,48 @@ def window_lead_lag_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
 
+def window_lead_lag_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Offset window functions over the same frame."""
+    result = ctx.get_table("orders")
+    result = result[(result["o_orderdate"] >= date(1995, 1, 1)) & (result["o_orderdate"] < date(1996, 1, 1))].copy()
+    result = result.sort_values(["o_custkey", "o_orderdate"])
+    result["prev_order_price"] = result.groupby("o_custkey")["o_totalprice"].shift(1)
+    result["next_order_price"] = result.groupby("o_custkey")["o_totalprice"].shift(-1)
+    return result[["o_orderkey", "o_orderdate", "o_totalprice", "prev_order_price", "next_order_price"]]
+
+
 def window_dense_rank_expression_impl(ctx: DataFrameContext) -> Any:
     """Window function DENSE_RANK() OVER (PARTITION BY ... ORDER BY ...)."""
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-    lit = ctx.lit
-
+    col, lit = ctx.col, ctx.lit
     return (
-        lineitem.filter(col("l_orderkey") <= lit(10000))
+        ctx.get_table("lineitem")
+        .filter(col("l_orderkey") <= lit(10000))
         .with_columns(
-            ctx.window_dense_rank(
-                order_by=[("l_extendedprice", False)],
-                partition_by=["l_orderkey"],
-            ).alias("price_rank")
+            ctx.window_dense_rank(order_by=[("l_extendedprice", False)], partition_by=["l_orderkey"]).alias(
+                "price_rank"
+            )
         )
         .sort(["l_orderkey", "price_rank"])
         .select("l_orderkey", "l_partkey", "l_quantity", "l_extendedprice", "price_rank")
     )
 
 
-# -----------------------------------------------------------------------------
-# Additional Predicate queries
-# -----------------------------------------------------------------------------
+def window_dense_rank_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Window function DENSE_RANK() OVER (PARTITION BY ... ORDER BY ...)."""
+    result = ctx.get_table("lineitem")
+    result = result[result["l_orderkey"] <= 10000].copy()
+    result["price_rank"] = result.groupby("l_orderkey")["l_extendedprice"].rank(method="dense", ascending=False)
+    return result.sort_values(["l_orderkey", "price_rank"])[
+        ["l_orderkey", "l_partkey", "l_quantity", "l_extendedprice", "price_rank"]
+    ]
 
 
 def predicate_ordering_groupby_expression_impl(ctx: DataFrameContext) -> Any:
     """Order filter predicates by selectivity for aggregation within a low cardinality grouping."""
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-    lit = ctx.lit
-
+    col, lit = ctx.col, ctx.lit
     return (
-        lineitem.filter(
+        ctx.get_table("lineitem")
+        .filter(
             (col("l_shipdate") <= lit(date(1998, 9, 1)))
             & (col("l_discount") > lit(0.05))
             & (col("l_tax") < lit(0.08))
@@ -1211,19 +1351,30 @@ def predicate_ordering_groupby_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
 
+def predicate_ordering_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Order filter predicates by selectivity for aggregation within a low cardinality grouping."""
+    table = ctx.get_table("lineitem")
+    filtered = table[
+        (table["l_shipdate"] <= date(1998, 9, 1))
+        & (table["l_discount"] > 0.05)
+        & (table["l_tax"] < 0.08)
+        & (table["l_quantity"] >= 10)
+        & (table["l_quantity"] <= 30)
+    ]
+    return filtered.groupby("l_returnflag", as_index=False).agg(total_qty=("l_quantity", "sum"))
+
+
 def predicate_ordering_costs_expression_impl(ctx: DataFrameContext) -> Any:
     """Order filter predicates by selectivity with result projection only."""
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-    lit = ctx.lit
-
+    col, lit = ctx.col, ctx.lit
     return (
-        lineitem.filter(
+        ctx.get_table("lineitem")
+        .filter(
             (col("l_quantity") > lit(45))
             & (col("l_extendedprice") > lit(50000))
             & (col("l_discount") < lit(0.05))
             & (col("l_shipinstruct") == lit("DELIVER IN PERSON"))
-            & (col("l_shipmode").is_in(["AIR", "AIR REG"]))
+            & col("l_shipmode").is_in(["AIR", "AIR REG"])
         )
         .select(
             "l_orderkey", "l_partkey", "l_quantity", "l_extendedprice", "l_discount", "l_shipinstruct", "l_shipmode"
@@ -1232,78 +1383,93 @@ def predicate_ordering_costs_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# -----------------------------------------------------------------------------
-# Additional Broadcast/Exchange queries
-# -----------------------------------------------------------------------------
+def predicate_ordering_costs_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Order filter predicates by selectivity with result projection only."""
+    table = ctx.get_table("lineitem")
+    return table[
+        (table["l_quantity"] > 45)
+        & (table["l_extendedprice"] > 50000)
+        & (table["l_discount"] < 0.05)
+        & (table["l_shipinstruct"] == "DELIVER IN PERSON")
+        & table["l_shipmode"].isin(["AIR", "AIR REG"])
+    ][["l_orderkey", "l_partkey", "l_quantity", "l_extendedprice", "l_discount", "l_shipinstruct", "l_shipmode"]].head(
+        100
+    )
 
 
 def broadcast_join_four_tables_expression_impl(ctx: DataFrameContext) -> Any:
     """Three small tables broadcast to join with one large table."""
-    partsupp = ctx.get_table("partsupp")
-    supplier = ctx.get_table("supplier")
-    nation = ctx.get_table("nation")
-    region = ctx.get_table("region")
-    part = ctx.get_table("part")
-    col = ctx.col
-    lit = ctx.lit
-
+    col, lit = ctx.col, ctx.lit
     return (
-        partsupp.join(supplier, left_on="ps_suppkey", right_on="s_suppkey")
-        .join(nation, left_on="s_nationkey", right_on="n_nationkey")
-        .join(region, left_on="n_regionkey", right_on="r_regionkey")
-        .join(part, left_on="ps_partkey", right_on="p_partkey")
+        ctx.get_table("partsupp")
+        .join(ctx.get_table("supplier"), left_on="ps_suppkey", right_on="s_suppkey")
+        .join(ctx.get_table("nation"), left_on="s_nationkey", right_on="n_nationkey")
+        .join(ctx.get_table("region"), left_on="n_regionkey", right_on="r_regionkey")
+        .join(ctx.get_table("part"), left_on="ps_partkey", right_on="p_partkey")
         .filter(col("p_size") == lit(15))
         .group_by("r_name", "p_type")
         .agg((col("ps_supplycost") * col("ps_availqty")).sum().alias("total_value"))
     )
 
 
+def broadcast_join_four_tables_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Three small tables broadcast to join with one large table."""
+    merged = ctx.get_table("partsupp").merge(ctx.get_table("supplier"), left_on="ps_suppkey", right_on="s_suppkey")
+    merged = merged.merge(ctx.get_table("nation"), left_on="s_nationkey", right_on="n_nationkey")
+    merged = merged.merge(ctx.get_table("region"), left_on="n_regionkey", right_on="r_regionkey")
+    merged = merged.merge(ctx.get_table("part"), left_on="ps_partkey", right_on="p_partkey")
+    filtered = merged[merged["p_size"] == 15].copy()
+    filtered["total_value"] = filtered["ps_supplycost"] * filtered["ps_availqty"]
+    return filtered.groupby(["r_name", "p_type"], as_index=False).agg(total_value=("total_value", "sum"))
+
+
 def exchange_broadcast_expression_impl(ctx: DataFrameContext) -> Any:
     """One small table is copied to all nodes that have the large table."""
-    lineitem = ctx.get_table("lineitem")
-    part = ctx.get_table("part")
-    col = ctx.col
-    lit = ctx.lit
-
-    # Small parts filtered from part table
-    small_parts = part.filter(col("p_size") == lit(1)).select("p_partkey")
-
+    small_parts = ctx.get_table("part").filter(ctx.col("p_size") == ctx.lit(1)).select("p_partkey")
     return (
-        lineitem.join(small_parts, left_on="l_partkey", right_on="p_partkey")
+        ctx.get_table("lineitem")
+        .join(small_parts, left_on="l_partkey", right_on="p_partkey")
         .group_by("l_orderkey")
-        .agg(col("l_quantity").sum().alias("total_qty"))
+        .agg(ctx.col("l_quantity").sum().alias("total_qty"))
     )
+
+
+def exchange_broadcast_pandas_impl(ctx: DataFrameContext) -> Any:
+    """One small table is copied to all nodes that have the large table."""
+    small_parts = ctx.get_table("part")[ctx.get_table("part")["p_size"] == 1][["p_partkey"]]
+    merged = ctx.get_table("lineitem").merge(small_parts, left_on="l_partkey", right_on="p_partkey")
+    return merged.groupby("l_orderkey", as_index=False).agg(total_qty=("l_quantity", "sum"))
 
 
 def exchange_merge_expression_impl(ctx: DataFrameContext) -> Any:
     """Sorted data from multiple nodes is combined while keeping the sort order."""
-    orders = ctx.get_table("orders")
-    lineitem = ctx.get_table("lineitem")
-
     return (
-        orders.join(lineitem, left_on="o_orderkey", right_on="l_orderkey")
+        ctx.get_table("orders")
+        .join(ctx.get_table("lineitem"), left_on="o_orderkey", right_on="l_orderkey")
         .select("o_orderkey", "l_linenumber", "l_quantity")
         .sort(["o_orderkey", "l_linenumber"])
     )
 
 
+def exchange_merge_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Sorted data from multiple nodes is combined while keeping the sort order."""
+    return (
+        ctx.get_table("orders")
+        .merge(ctx.get_table("lineitem"), left_on="o_orderkey", right_on="l_orderkey")[
+            ["o_orderkey", "l_linenumber", "l_quantity"]
+        ]
+        .sort_values(["o_orderkey", "l_linenumber"])
+    )
+
+
 def exchange_shuffle_expression_impl(ctx: DataFrameContext) -> Any:
     """Data is redistributed based on the join keys so matching rows end up on the same node."""
+    col, lit = ctx.col, ctx.lit
     partsupp = ctx.get_table("partsupp")
-    col = ctx.col
-    lit = ctx.lit
-
-    # Self-join partsupp to find different suppliers for same part
     ps1 = partsupp.select(
-        col("ps_partkey").alias("ps_partkey"),
-        col("ps_suppkey").alias("supp1"),
-        col("ps_supplycost").alias("cost1"),
+        col("ps_partkey").alias("ps_partkey"), col("ps_suppkey").alias("supp1"), col("ps_supplycost").alias("cost1")
     )
-    ps2 = partsupp.select(
-        col("ps_partkey").alias("ps_partkey_2"),
-        col("ps_suppkey").alias("supp2"),
-    )
-
+    ps2 = partsupp.select(col("ps_partkey").alias("ps_partkey_2"), col("ps_suppkey").alias("supp2"))
     return (
         ps1.join(ps2, left_on="ps_partkey", right_on="ps_partkey_2")
         .filter((col("supp1") < col("supp2")) & (col("cost1") > lit(100)))
@@ -1311,38 +1477,26 @@ def exchange_shuffle_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# -----------------------------------------------------------------------------
-# TopN queries
-# -----------------------------------------------------------------------------
-
-
-def topn_allcols_expression_impl(ctx: DataFrameContext) -> Any:
-    """Top-10 limit returning all columns after ordering over all table rows."""
-    lineitem = ctx.get_table("lineitem")
-
-    return lineitem.sort("l_extendedprice", descending=True).limit(10)
-
-
-# -----------------------------------------------------------------------------
-# Statistical queries
-# -----------------------------------------------------------------------------
+def exchange_shuffle_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Data is redistributed based on the join keys so matching rows end up on the same node."""
+    partsupp = ctx.get_table("partsupp")
+    ps1 = partsupp[["ps_partkey", "ps_suppkey", "ps_supplycost"]].rename(
+        columns={"ps_suppkey": "supp1", "ps_supplycost": "cost1"}
+    )
+    ps2 = partsupp[["ps_partkey", "ps_suppkey"]].rename(columns={"ps_suppkey": "supp2"})
+    merged = ps1.merge(ps2, on="ps_partkey")
+    return merged[(merged["supp1"] < merged["supp2"]) & (merged["cost1"] > 100)][["ps_partkey", "supp1", "supp2"]]
 
 
 def statistical_correlation_expression_impl(ctx: DataFrameContext) -> Any:
     """Correlation analysis between numeric columns."""
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-    lit = ctx.lit
-
-    filtered = lineitem.filter(
+    col, lit = ctx.col, ctx.lit
+    filtered = ctx.get_table("lineitem").filter(
         (col("l_shipdate") >= lit(date(1995, 1, 1))) & (col("l_shipdate") < lit(date(1996, 1, 1)))
     )
-
-    # Calculate correlation between quantity and price
     return filtered.select(
         col("l_quantity").mean().alias("avg_quantity"),
         col("l_extendedprice").mean().alias("avg_price"),
-        # Correlation requires special handling - use pearson_corr where available
         (
             (col("l_quantity") * col("l_extendedprice")).mean()
             - col("l_quantity").mean() * col("l_extendedprice").mean()
@@ -1350,22 +1504,26 @@ def statistical_correlation_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# -----------------------------------------------------------------------------
-# Long predicate query
-# -----------------------------------------------------------------------------
+def statistical_correlation_pandas_impl(ctx: DataFrameContext) -> Any:
+    """Correlation analysis between numeric columns."""
+    filtered = ctx.get_table("lineitem")
+    filtered = filtered[(filtered["l_shipdate"] >= date(1995, 1, 1)) & (filtered["l_shipdate"] < date(1996, 1, 1))]
+    return ctx.scalar_to_df(
+        {
+            "avg_quantity": filtered["l_quantity"].mean(),
+            "avg_price": filtered["l_extendedprice"].mean(),
+            "qty_price_correlation": filtered["l_quantity"].corr(filtered["l_extendedprice"]),
+        }
+    )
 
 
 def long_predicate_expression_impl(ctx: DataFrameContext) -> Any:
     """Query with many conjunctive predicates across multiple tables."""
-    lineitem = ctx.get_table("lineitem")
-    orders = ctx.get_table("orders")
-    customer = ctx.get_table("customer")
-    col = ctx.col
-    lit = ctx.lit
-
+    col, lit = ctx.col, ctx.lit
     return (
-        lineitem.join(orders, left_on="l_orderkey", right_on="o_orderkey")
-        .join(customer, left_on="o_custkey", right_on="c_custkey")
+        ctx.get_table("lineitem")
+        .join(ctx.get_table("orders"), left_on="l_orderkey", right_on="o_orderkey")
+        .join(ctx.get_table("customer"), left_on="o_custkey", right_on="c_custkey")
         .filter(
             (col("l_shipdate") >= lit(date(1994, 1, 1)))
             & (col("l_shipdate") < lit(date(1995, 1, 1)))
@@ -1377,595 +1535,16 @@ def long_predicate_expression_impl(ctx: DataFrameContext) -> Any:
             & (col("l_returnflag") == lit("R"))
             & (col("l_linestatus") == lit("F"))
             & (col("o_totalprice") > lit(100000))
-            & (col("c_nationkey").is_in([1, 2, 3, 4, 5]))
+            & col("c_nationkey").is_in([1, 2, 3, 4, 5])
         )
         .select(col("l_orderkey").count().alias("count"))
     )
 
 
-# -----------------------------------------------------------------------------
-# Array operations (semi-structured data)
-# -----------------------------------------------------------------------------
-
-
-def array_agg_simple_expression_impl(ctx: DataFrameContext) -> Any:
-    """Aggregate part keys into arrays per supplier."""
-    partsupp = ctx.get_table("partsupp")
-    col = ctx.col
-
-    return (
-        partsupp.group_by("ps_suppkey")
-        .agg(
-            col("ps_partkey").sort_by("ps_partkey").alias("supplied_parts"),
-            col("ps_partkey").count().alias("part_count"),
-        )
-        .filter(col("part_count") <= 10)
-        .limit(100)
-    )
-
-
-def array_agg_distinct_expression_impl(ctx: DataFrameContext) -> Any:
-    """Distinct array aggregation."""
-    customer = ctx.get_table("customer")
-    col = ctx.col
-
-    return customer.group_by("c_mktsegment").agg(
-        col("c_nationkey").unique().sort().alias("nation_keys"),
-    )
-
-
-# =============================================================================
-# Pandas Family Implementations (Pandas, Modin, Dask)
-# =============================================================================
-
-
-def aggregation_distinct_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Distinct count of high cardinality key on a large table."""
-    orders = ctx.get_table("orders")
-
-    filtered = orders[orders["o_orderdate"] >= date(1995, 1, 1)]
-    return filtered[["o_custkey"]].nunique().to_frame(name="unique_customers").reset_index(drop=True)
-
-
-def approx_count_distinct_simple_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Approximate distinct count fallback for the pandas family.
-
-    Dask uses native `nunique_approx()` (HLL) for this single-value
-    query. Pandas, Modin, and cuDF expose only exact `.nunique()` at
-    the API surface, so the "approximate" label degrades to exact on
-    those platforms.
-    """
-    orders = ctx.get_table("orders")
-
-    filtered = orders[orders["o_orderdate"] >= date(1995, 1, 1)]
-    if _is_dask_context(ctx):
-        return ctx.scalar_to_df({"unique_customers": filtered["o_custkey"].nunique_approx().compute()})
-
-    return filtered[["o_custkey"]].nunique().to_frame(name="unique_customers").reset_index(drop=True)
-
-
-def approx_count_distinct_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Approximate distinct count groupby fallback for the pandas family.
-
-    Pandas, Modin, cuDF, and current Dask expose no groupby approximate
-    distinct aggregate matching this query shape. Dask has Series-level
-    `nunique_approx()`, but no groupby equivalent in the dask-expr API,
-    so this query remains an exact fallback for the pandas family.
-    """
-    return globals()["aggregation_distinct_groupby_pandas_impl"](ctx)
-
-
-def aggregation_materialize_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Nested aggregation requiring CTE materialization."""
-    orders = ctx.get_table("orders")
-
-    # First aggregation
-    order_totals = orders.groupby("o_custkey", as_index=False).agg(customer_total=("o_totalprice", "sum"))
-
-    # Second aggregation - use ctx.scalar_to_df for platform compatibility
-    return ctx.scalar_to_df({"avg_customer_spending": order_totals["customer_total"].mean()})
-
-
-def aggregation_materialize_subquery_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Complex nested aggregation requiring materialization of a subquery with joins."""
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
-    lineitem = ctx.get_table("lineitem")
-
-    # Join tables
-    merged = customer.merge(orders, left_on="c_custkey", right_on="o_custkey")
-    merged = merged.merge(lineitem, left_on="o_orderkey", right_on="l_orderkey")
-
-    # Calculate order total
-    merged["order_total"] = merged["l_extendedprice"] * (1 - merged["l_discount"])
-
-    # First aggregation by segment and order
-    order_totals = merged.groupby(["c_mktsegment", "o_orderkey"], as_index=False).agg(
-        order_total=("order_total", "sum")
-    )
-
-    # Second aggregation by segment
-    return order_totals.groupby("c_mktsegment", as_index=False).agg(avg_segment_order=("order_total", "mean"))
-
-
-def aggregation_selective_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Aggregate on a small subset of rows."""
-    lineitem = ctx.get_table("lineitem")
-
-    filtered = lineitem[(lineitem["l_discount"] > 0.05) & (lineitem["l_quantity"] < 24)]
-    total = (filtered["l_extendedprice"] * filtered["l_discount"]).sum()
-    return ctx.scalar_to_df({"total_discount_amount": total})
-
-
-def aggregation_simple_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Aggregate over all rows in table."""
-    orders = ctx.get_table("orders")
-
-    return ctx.scalar_to_df(
-        {
-            "total_orders": len(orders),
-            "total_revenue": orders["o_totalprice"].sum(),
-        }
-    )
-
-
-def count_star_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Metadata-based count optimization vs full table scan performance."""
-    lineitem = ctx.get_table("lineitem")
-
-    return ctx.scalar_to_df({"total_lineitems": len(lineitem)})
-
-
-def decimal_arithmetic_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Decimal precision arithmetic with complex expressions."""
-    lineitem = ctx.get_table("lineitem")
-
-    filtered = lineitem[lineitem["l_quantity"] > 0].copy()
-    filtered["final_price"] = filtered["l_extendedprice"] * (1 - filtered["l_discount"]) * (1 + filtered["l_tax"])
-    filtered["unit_price"] = filtered["l_extendedprice"] / filtered["l_quantity"]
-
-    return filtered[["l_orderkey", "final_price", "unit_price"]].head(1000)
-
-
-def orderby_simple_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Simple ORDER BY single column."""
-    orders = ctx.get_table("orders")
-
-    return orders[["o_orderkey", "o_orderdate", "o_totalprice"]].sort_values("o_orderdate").head(100)
-
-
-def orderby_multi_pandas_impl(ctx: DataFrameContext) -> Any:
-    """ORDER BY multiple columns."""
-    lineitem = ctx.get_table("lineitem")
-
-    return (
-        lineitem[["l_orderkey", "l_linenumber", "l_shipdate", "l_quantity"]]
-        .sort_values(["l_shipdate", "l_orderkey", "l_linenumber"])
-        .head(100)
-    )
-
-
-def orderby_desc_pandas_impl(ctx: DataFrameContext) -> Any:
-    """ORDER BY with descending sort."""
-    orders = ctx.get_table("orders")
-
-    return orders[["o_orderkey", "o_totalprice", "o_orderdate"]].sort_values("o_totalprice", ascending=False).head(100)
-
-
-def topn_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Top-N query with ORDER BY and LIMIT."""
-    lineitem = ctx.get_table("lineitem")
-
-    return lineitem.nlargest(10, "l_extendedprice")[["l_orderkey", "l_partkey", "l_extendedprice"]]
-
-
-def string_concat_pandas_impl(ctx: DataFrameContext) -> Any:
-    """String concatenation."""
-    customer = ctx.get_table("customer")
-
-    result = customer.copy()
-    result["customer_info"] = result["c_name"] + " - " + result["c_mktsegment"]
-    return result[["c_custkey", "customer_info"]].head(100)
-
-
-def string_substring_pandas_impl(ctx: DataFrameContext) -> Any:
-    """String substring extraction."""
-    customer = ctx.get_table("customer")
-
-    result = customer.copy()
-    result["country_code"] = result["c_phone"].str[:3]
-    return result[["c_custkey", "country_code"]].head(100)
-
-
-def window_row_number_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Window function ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ...)."""
-    lineitem = ctx.get_table("lineitem")
-
-    # Sort and rank within groups
-    sorted_df = lineitem.sort_values(["l_orderkey", "l_extendedprice"], ascending=[True, False])
-    sorted_df["row_num"] = sorted_df.groupby("l_orderkey").cumcount() + 1
-
-    return sorted_df[sorted_df["row_num"] <= 3][["l_orderkey", "l_linenumber", "l_extendedprice", "row_num"]]
-
-
-def window_rank_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Window function RANK() OVER (PARTITION BY ... ORDER BY ...)."""
-    lineitem = ctx.get_table("lineitem")
-
-    # Rank within groups
-    lineitem = lineitem.copy()
-    lineitem["qty_rank"] = lineitem.groupby("l_returnflag")["l_quantity"].rank(method="min", ascending=False)
-
-    return lineitem[lineitem["qty_rank"] <= 5][["l_orderkey", "l_returnflag", "l_quantity", "qty_rank"]]
-
-
-def window_sum_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Window function SUM() OVER (PARTITION BY ...)."""
-    lineitem = ctx.get_table("lineitem")
-
-    lineitem = lineitem.copy()
-    lineitem["order_total"] = lineitem.groupby("l_orderkey")["l_extendedprice"].transform("sum")
-
-    return lineitem[["l_orderkey", "l_linenumber", "l_extendedprice", "order_total"]]
-
-
-def window_running_sum_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Window function SUM() OVER (ORDER BY ...) - cumulative sum."""
-    orders = ctx.get_table("orders")
-
-    sorted_orders = orders.sort_values("o_orderdate").copy()
-    sorted_orders["cumulative_revenue"] = sorted_orders["o_totalprice"].cumsum()
-
-    return sorted_orders[["o_orderkey", "o_orderdate", "o_totalprice", "cumulative_revenue"]].head(100)
-
-
-def broadcast_join_two_tables_pandas_impl(ctx: DataFrameContext) -> Any:
-    """One small table broadcast to join with one large table."""
-    supplier = ctx.get_table("supplier")
-    nation = ctx.get_table("nation")
-
-    merged = supplier.merge(nation, left_on="s_nationkey", right_on="n_nationkey")
-    return ctx.scalar_to_df({"supplier_count": len(merged)})
-
-
-def broadcast_join_three_tables_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Two small tables broadcast to join with one large table."""
-    supplier = ctx.get_table("supplier")
-    nation = ctx.get_table("nation")
-    region = ctx.get_table("region")
-
-    merged = supplier.merge(nation, left_on="s_nationkey", right_on="n_nationkey")
-    merged = merged.merge(region, left_on="n_regionkey", right_on="r_regionkey")
-
-    return merged.groupby(["r_name", "n_name"], as_index=False).agg(supplier_count=("s_suppkey", "count"))
-
-
-def predicate_ordering_aggregation_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Order filter predicates by selectivity for aggregation."""
-    lineitem = ctx.get_table("lineitem")
-
-    filtered = lineitem[
-        (lineitem["l_shipdate"] >= date(1994, 1, 1))
-        & (lineitem["l_shipdate"] < date(1995, 1, 1))
-        & (lineitem["l_discount"] >= 0.05)
-        & (lineitem["l_discount"] <= 0.07)
-        & (lineitem["l_quantity"] < 24)
-    ]
-
-    return ctx.scalar_to_df({"total_price": filtered["l_extendedprice"].sum()})
-
-
-def shuffle_join_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Data is redistributed based on the join keys."""
-    orders = ctx.get_table("orders")
-    lineitem = ctx.get_table("lineitem")
-
-    merged = orders.merge(lineitem, left_on="o_orderkey", right_on="l_orderkey")
-    return merged.groupby("o_orderkey", as_index=False).agg(total_qty=("l_quantity", "sum"))
-
-
-def empty_build_join_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Join when build side produces no rows (edge case handling)."""
-    lineitem = ctx.get_table("lineitem")
-    orders = ctx.get_table("orders")
-
-    empty_orders = orders[orders["o_totalprice"] < 0][["o_orderkey"]]
-    return lineitem.merge(empty_orders, left_on="l_orderkey", right_on="o_orderkey", how="left")[
-        ["l_orderkey", "l_partkey", "l_quantity"]
-    ]
-
-
-# -----------------------------------------------------------------------------
-# Additional Filter queries (Pandas)
-# -----------------------------------------------------------------------------
-
-
-def filter_in_predicate_subquery_pandas_impl(ctx: DataFrameContext) -> Any:
-    """IN predicate with subquery and selective filtering."""
-    part = ctx.get_table("part")
-    lineitem = ctx.get_table("lineitem")
-
-    high_qty_parts = lineitem[lineitem["l_quantity"] > 45]["l_partkey"].unique()
-    return part[part["p_partkey"].isin(high_qty_parts)][["p_partkey", "p_name", "p_type", "p_size"]]
-
-
-# -----------------------------------------------------------------------------
-# Additional OrderBy queries (Pandas)
-# -----------------------------------------------------------------------------
-
-
-def orderby_all_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Sort on full table with simple integer ordering."""
-    customer = ctx.get_table("customer")
-
-    return customer.sort_values("c_custkey")[
-        ["c_custkey", "c_name", "c_address", "c_nationkey", "c_phone", "c_acctbal", "c_mktsegment"]
-    ]
-
-
-def orderby_expression_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Sort on computed expressions with DESC ordering."""
-    lineitem = ctx.get_table("lineitem")
-
-    df = lineitem.copy()
-    df["total_value"] = df["l_quantity"] * df["l_extendedprice"]
-    return df.sort_values("total_value", ascending=False)[["l_orderkey", "l_partkey", "total_value"]].head(100)
-
-
-def orderby_multicol_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Complex multi-column sort with string, date, and decimal columns."""
-    orders = ctx.get_table("orders")
-
-    return orders.sort_values(
-        ["o_orderpriority", "o_orderdate", "o_totalprice"],
-        ascending=[True, False, False],
-    )[["o_orderkey", "o_custkey", "o_orderpriority", "o_orderdate", "o_totalprice"]].head(100)
-
-
-def orderby_shortstrings_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Sort on short string columns with DISTINCT operation."""
-    lineitem = ctx.get_table("lineitem")
-
-    return lineitem[["l_returnflag", "l_linestatus"]].drop_duplicates().sort_values(["l_returnflag", "l_linestatus"])
-
-
-# -----------------------------------------------------------------------------
-# Additional Shuffle/Join queries (Pandas)
-# -----------------------------------------------------------------------------
-
-
-def shuffle_inner_join_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Standard inner join with one-to-many relationship."""
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
-
-    merged = customer.merge(orders, left_on="c_custkey", right_on="o_custkey")
-    return merged.groupby("c_mktsegment", as_index=False).agg(
-        order_count=("o_orderkey", "count"),
-        total_revenue=("o_totalprice", "sum"),
-    )
-
-
-def shuffle_left_join_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
-    """LEFT JOIN with preservation of all left-side rows."""
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
-
-    merged = customer.merge(orders, left_on="c_custkey", right_on="o_custkey", how="left")
-    return merged.groupby("c_mktsegment", as_index=False).agg(
-        order_count=("o_orderkey", "count"),
-        total_rows=("c_custkey", "count"),
-    )
-
-
-def shuffle_full_join_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
-    """FULL OUTER JOIN with string grouping and aggregation."""
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
-
-    merged = customer.merge(orders, left_on="c_custkey", right_on="o_custkey", how="outer")
-    return merged.groupby("c_mktsegment", as_index=False).agg(
-        order_count=("o_orderkey", "count"),
-        customer_count=("c_custkey", "count"),
-    )
-
-
-def shuffle_self_join_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Self-join with hash collision handling on large table."""
-    lineitem = ctx.get_table("lineitem")
-
-    # Create copies for self-join
-    df1 = lineitem[["l_orderkey", "l_partkey", "l_shipdate"]].copy()
-    df2 = lineitem[["l_orderkey", "l_partkey", "l_shipdate"]].copy()
-    df2 = df2.rename(columns={"l_orderkey": "l_orderkey_2"})
-
-    merged = df1.merge(df2, on=["l_partkey", "l_shipdate"])
-    filtered = merged[merged["l_orderkey"] != merged["l_orderkey_2"]]
-    return filtered.groupby("l_orderkey", as_index=False).agg(match_count=("l_orderkey_2", "count")).head(10000)
-
-
-# -----------------------------------------------------------------------------
-# Additional String queries (Pandas)
-# -----------------------------------------------------------------------------
-
-
-# -----------------------------------------------------------------------------
-# Additional Window queries (Pandas)
-# -----------------------------------------------------------------------------
-
-
-def window_growing_frame_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Running sum window aggregation with growing frame size."""
-    lineitem = ctx.get_table("lineitem")
-
-    df = lineitem[lineitem["l_orderkey"] <= 1000].copy()
-    df = df.sort_values(["l_orderkey", "l_linenumber"])
-    df["running_quantity"] = df.groupby("l_orderkey")["l_quantity"].cumsum()
-
-    return df[["l_orderkey", "l_linenumber", "l_quantity", "running_quantity"]]
-
-
-def window_lead_lag_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Offset window functions over the same frame."""
-    orders = ctx.get_table("orders")
-
-    df = orders[(orders["o_orderdate"] >= date(1995, 1, 1)) & (orders["o_orderdate"] < date(1996, 1, 1))].copy()
-    df = df.sort_values(["o_custkey", "o_orderdate"])
-    df["prev_order_price"] = df.groupby("o_custkey")["o_totalprice"].shift(1)
-    df["next_order_price"] = df.groupby("o_custkey")["o_totalprice"].shift(-1)
-
-    return df[["o_orderkey", "o_orderdate", "o_totalprice", "prev_order_price", "next_order_price"]]
-
-
-def window_dense_rank_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Window function DENSE_RANK() OVER (PARTITION BY ... ORDER BY ...)."""
-    lineitem = ctx.get_table("lineitem")
-
-    df = lineitem[lineitem["l_orderkey"] <= 10000].copy()
-    df["price_rank"] = df.groupby("l_orderkey")["l_extendedprice"].rank(method="dense", ascending=False)
-    df = df.sort_values(["l_orderkey", "price_rank"])
-
-    return df[["l_orderkey", "l_partkey", "l_quantity", "l_extendedprice", "price_rank"]]
-
-
-# -----------------------------------------------------------------------------
-# Additional Predicate queries (Pandas)
-# -----------------------------------------------------------------------------
-
-
-def predicate_ordering_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Order filter predicates by selectivity for aggregation within a low cardinality grouping."""
-    lineitem = ctx.get_table("lineitem")
-
-    filtered = lineitem[
-        (lineitem["l_shipdate"] <= date(1998, 9, 1))
-        & (lineitem["l_discount"] > 0.05)
-        & (lineitem["l_tax"] < 0.08)
-        & (lineitem["l_quantity"] >= 10)
-        & (lineitem["l_quantity"] <= 30)
-    ]
-
-    return filtered.groupby("l_returnflag", as_index=False).agg(total_qty=("l_quantity", "sum"))
-
-
-def predicate_ordering_costs_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Order filter predicates by selectivity with result projection only."""
-    lineitem = ctx.get_table("lineitem")
-
-    return lineitem[
-        (lineitem["l_quantity"] > 45)
-        & (lineitem["l_extendedprice"] > 50000)
-        & (lineitem["l_discount"] < 0.05)
-        & (lineitem["l_shipinstruct"] == "DELIVER IN PERSON")
-        & (lineitem["l_shipmode"].isin(["AIR", "AIR REG"]))
-    ][["l_orderkey", "l_partkey", "l_quantity", "l_extendedprice", "l_discount", "l_shipinstruct", "l_shipmode"]].head(
-        100
-    )
-
-
-# -----------------------------------------------------------------------------
-# Additional Broadcast/Exchange queries (Pandas)
-# -----------------------------------------------------------------------------
-
-
-def broadcast_join_four_tables_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Three small tables broadcast to join with one large table."""
-    partsupp = ctx.get_table("partsupp")
-    supplier = ctx.get_table("supplier")
-    nation = ctx.get_table("nation")
-    region = ctx.get_table("region")
-    part = ctx.get_table("part")
-
-    merged = partsupp.merge(supplier, left_on="ps_suppkey", right_on="s_suppkey")
-    merged = merged.merge(nation, left_on="s_nationkey", right_on="n_nationkey")
-    merged = merged.merge(region, left_on="n_regionkey", right_on="r_regionkey")
-    merged = merged.merge(part, left_on="ps_partkey", right_on="p_partkey")
-    filtered = merged[merged["p_size"] == 15]
-
-    filtered = filtered.copy()
-    filtered["total_value"] = filtered["ps_supplycost"] * filtered["ps_availqty"]
-    return filtered.groupby(["r_name", "p_type"], as_index=False).agg(total_value=("total_value", "sum"))
-
-
-def exchange_broadcast_pandas_impl(ctx: DataFrameContext) -> Any:
-    """One small table is copied to all nodes that have the large table."""
-    lineitem = ctx.get_table("lineitem")
-    part = ctx.get_table("part")
-
-    small_parts = part[part["p_size"] == 1][["p_partkey"]]
-    merged = lineitem.merge(small_parts, left_on="l_partkey", right_on="p_partkey")
-
-    return merged.groupby("l_orderkey", as_index=False).agg(total_qty=("l_quantity", "sum"))
-
-
-def exchange_merge_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Sorted data from multiple nodes is combined while keeping the sort order."""
-    orders = ctx.get_table("orders")
-    lineitem = ctx.get_table("lineitem")
-
-    merged = orders.merge(lineitem, left_on="o_orderkey", right_on="l_orderkey")
-    return merged[["o_orderkey", "l_linenumber", "l_quantity"]].sort_values(["o_orderkey", "l_linenumber"])
-
-
-def exchange_shuffle_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Data is redistributed based on the join keys so matching rows end up on the same node."""
-    partsupp = ctx.get_table("partsupp")
-
-    ps1 = partsupp[["ps_partkey", "ps_suppkey", "ps_supplycost"]].rename(
-        columns={"ps_suppkey": "supp1", "ps_supplycost": "cost1"}
-    )
-    ps2 = partsupp[["ps_partkey", "ps_suppkey"]].rename(columns={"ps_suppkey": "supp2"})
-
-    merged = ps1.merge(ps2, on="ps_partkey")
-    return merged[(merged["supp1"] < merged["supp2"]) & (merged["cost1"] > 100)][["ps_partkey", "supp1", "supp2"]]
-
-
-# -----------------------------------------------------------------------------
-# TopN queries (Pandas)
-# -----------------------------------------------------------------------------
-
-
-def topn_allcols_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Top-10 limit returning all columns after ordering over all table rows."""
-    lineitem = ctx.get_table("lineitem")
-
-    return lineitem.nlargest(10, "l_extendedprice")
-
-
-# -----------------------------------------------------------------------------
-# Statistical queries (Pandas)
-# -----------------------------------------------------------------------------
-
-
-def statistical_correlation_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Correlation analysis between numeric columns."""
-    lineitem = ctx.get_table("lineitem")
-
-    filtered = lineitem[(lineitem["l_shipdate"] >= date(1995, 1, 1)) & (lineitem["l_shipdate"] < date(1996, 1, 1))]
-
-    return ctx.scalar_to_df(
-        {
-            "avg_quantity": filtered["l_quantity"].mean(),
-            "avg_price": filtered["l_extendedprice"].mean(),
-            "qty_price_correlation": filtered["l_quantity"].corr(filtered["l_extendedprice"]),
-        }
-    )
-
-
-# -----------------------------------------------------------------------------
-# Long predicate query (Pandas)
-# -----------------------------------------------------------------------------
-
-
 def long_predicate_pandas_impl(ctx: DataFrameContext) -> Any:
     """Query with many conjunctive predicates across multiple tables."""
-    lineitem = ctx.get_table("lineitem")
-    orders = ctx.get_table("orders")
-    customer = ctx.get_table("customer")
-
-    merged = lineitem.merge(orders, left_on="l_orderkey", right_on="o_orderkey")
-    merged = merged.merge(customer, left_on="o_custkey", right_on="c_custkey")
-
+    merged = ctx.get_table("lineitem").merge(ctx.get_table("orders"), left_on="l_orderkey", right_on="o_orderkey")
+    merged = merged.merge(ctx.get_table("customer"), left_on="o_custkey", right_on="c_custkey")
     filtered = merged[
         (merged["l_shipdate"] >= date(1994, 1, 1))
         & (merged["l_shipdate"] < date(1995, 1, 1))
@@ -1977,34 +1556,51 @@ def long_predicate_pandas_impl(ctx: DataFrameContext) -> Any:
         & (merged["l_returnflag"] == "R")
         & (merged["l_linestatus"] == "F")
         & (merged["o_totalprice"] > 100000)
-        & (merged["c_nationkey"].isin([1, 2, 3, 4, 5]))
+        & merged["c_nationkey"].isin([1, 2, 3, 4, 5])
     ]
-
     return ctx.scalar_to_df({"count": len(filtered)})
 
 
-# -----------------------------------------------------------------------------
-# Array operations (Pandas)
-# -----------------------------------------------------------------------------
+def array_agg_simple_expression_impl(ctx: DataFrameContext) -> Any:
+    """Aggregate part keys into arrays per supplier."""
+    col = ctx.col
+    return (
+        ctx.get_table("partsupp")
+        .group_by("ps_suppkey")
+        .agg(
+            col("ps_partkey").sort_by("ps_partkey").alias("supplied_parts"),
+            col("ps_partkey").count().alias("part_count"),
+        )
+        .filter(col("part_count") <= 10)
+        .limit(100)
+    )
 
 
 def array_agg_simple_pandas_impl(ctx: DataFrameContext) -> Any:
     """Aggregate part keys into arrays per supplier."""
-    partsupp = ctx.get_table("partsupp")
-
-    result = partsupp.groupby("ps_suppkey", as_index=False).agg(
-        supplied_parts=("ps_partkey", lambda x: sorted(x)),
-        part_count=("ps_partkey", "count"),
+    result = (
+        ctx.get_table("partsupp")
+        .groupby("ps_suppkey", as_index=False)
+        .agg(supplied_parts=("ps_partkey", lambda x: sorted(x)), part_count=("ps_partkey", "count"))
     )
     return result[result["part_count"] <= 10].head(100)
 
 
+def array_agg_distinct_expression_impl(ctx: DataFrameContext) -> Any:
+    """Distinct array aggregation."""
+    return (
+        ctx.get_table("customer")
+        .group_by("c_mktsegment")
+        .agg(ctx.col("c_nationkey").unique().sort().alias("nation_keys"))
+    )
+
+
 def array_agg_distinct_pandas_impl(ctx: DataFrameContext) -> Any:
     """Distinct array aggregation."""
-    customer = ctx.get_table("customer")
-
-    return customer.groupby("c_mktsegment", as_index=False).agg(
-        nation_keys=("c_nationkey", lambda x: sorted(set(x))),
+    return (
+        ctx.get_table("customer")
+        .groupby("c_mktsegment", as_index=False)
+        .agg(nation_keys=("c_nationkey", lambda x: sorted(set(x))))
     )
 
 
@@ -2069,8 +1665,7 @@ def orderby_decimal_pandas_impl(ctx: DataFrameContext) -> Any:
 
 def min_max_runtime_filter_expression_impl(ctx: DataFrameContext) -> Any:
     """Bloom filter and runtime filter effectiveness for join optimization."""
-    lineitem = ctx.get_table("lineitem")
-    orders = ctx.get_table("orders")
+    lineitem, orders = _tables(ctx, "lineitem", "orders")
     col = ctx.col
     lit = ctx.lit
 
@@ -2086,8 +1681,7 @@ def min_max_runtime_filter_expression_impl(ctx: DataFrameContext) -> Any:
 
 def min_max_runtime_filter_pandas_impl(ctx: DataFrameContext) -> Any:
     """Bloom filter and runtime filter effectiveness for join optimization."""
-    lineitem = ctx.get_table("lineitem")
-    orders = ctx.get_table("orders")
+    lineitem, orders = _tables(ctx, "lineitem", "orders")
 
     date_filtered_orders = orders[
         (orders["o_orderdate"] >= date(1995, 1, 1)) & (orders["o_orderdate"] <= date(1995, 3, 31))
@@ -2152,9 +1746,7 @@ def groupby_all_complex_pandas_impl(ctx: DataFrameContext) -> Any:
 
 def orderby_all_simple_expression_impl(ctx: DataFrameContext) -> Any:
     """Order by all columns in SELECT list."""
-    supplier = ctx.get_table("supplier")
-    nation = ctx.get_table("nation")
-    region = ctx.get_table("region")
+    supplier, nation, region = _tables(ctx, "supplier", "nation", "region")
     col = ctx.col
 
     return (
@@ -2168,9 +1760,7 @@ def orderby_all_simple_expression_impl(ctx: DataFrameContext) -> Any:
 
 def orderby_all_simple_pandas_impl(ctx: DataFrameContext) -> Any:
     """Order by all columns in SELECT list."""
-    supplier = ctx.get_table("supplier")
-    nation = ctx.get_table("nation")
-    region = ctx.get_table("region")
+    supplier, nation, region = _tables(ctx, "supplier", "nation", "region")
 
     merged = supplier.merge(nation, left_on="s_nationkey", right_on="n_nationkey")
     merged = merged.merge(region, left_on="n_regionkey", right_on="r_regionkey")
@@ -2189,8 +1779,7 @@ def orderby_all_simple_pandas_impl(ctx: DataFrameContext) -> Any:
 
 def predicate_ordering_subquery_expression_impl(ctx: DataFrameContext) -> Any:
     """Order filter predicates by selectivity with subquery predicate."""
-    orders = ctx.get_table("orders")
-    customer = ctx.get_table("customer")
+    orders, customer = _tables(ctx, "orders", "customer")
     col = ctx.col
     lit = ctx.lit
 
@@ -2208,8 +1797,7 @@ def predicate_ordering_subquery_expression_impl(ctx: DataFrameContext) -> Any:
 
 def predicate_ordering_subquery_pandas_impl(ctx: DataFrameContext) -> Any:
     """Order filter predicates by selectivity with subquery predicate."""
-    orders = ctx.get_table("orders")
-    customer = ctx.get_table("customer")
+    orders, customer = _tables(ctx, "orders", "customer")
 
     building_customers = customer[(customer["c_mktsegment"] == "BUILDING") & (customer["c_nationkey"] == 1)][
         "c_custkey"
@@ -2226,8 +1814,7 @@ def predicate_ordering_subquery_pandas_impl(ctx: DataFrameContext) -> Any:
 
 def shuffle_union_all_groupby_expression_impl(ctx: DataFrameContext) -> Any:
     """Complex join with UNION ALL and different data sources."""
-    orders = ctx.get_table("orders")
-    lineitem = ctx.get_table("lineitem")
+    orders, lineitem = _tables(ctx, "orders", "lineitem")
     col = ctx.col
     lit = ctx.lit
 
@@ -2254,8 +1841,7 @@ def shuffle_union_all_groupby_expression_impl(ctx: DataFrameContext) -> Any:
 
 def shuffle_union_all_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
     """Complex join with UNION ALL and different data sources."""
-    orders = ctx.get_table("orders")
-    lineitem = ctx.get_table("lineitem")
+    orders, lineitem = _tables(ctx, "orders", "lineitem")
 
     # First source
     orders_source = orders[orders["o_orderdate"] >= date(1995, 1, 1)][["o_custkey"]].copy()
@@ -2482,10 +2068,7 @@ def olap_cube_analysis_expression_impl(ctx: DataFrameContext) -> Any:
     For PySpark, we can use native .cube() method.
     For Polars, we simulate with multiple groupby + union.
     """
-    orders = ctx.get_table("orders")
-    customer = ctx.get_table("customer")
-    nation = ctx.get_table("nation")
-    region = ctx.get_table("region")
+    orders, customer, nation, region = _tables(ctx, "orders", "customer", "nation", "region")
     col = ctx.col
     lit = ctx.lit
 
@@ -2511,10 +2094,7 @@ def olap_cube_analysis_pandas_impl(ctx: DataFrameContext) -> Any:
 
     Pandas-family implementation using groupby.
     """
-    orders = ctx.get_table("orders")
-    customer = ctx.get_table("customer")
-    nation = ctx.get_table("nation")
-    region = ctx.get_table("region")
+    orders, customer, nation, region = _tables(ctx, "orders", "customer", "nation", "region")
 
     # Filter orders
     filtered = orders[(orders["o_orderdate"] >= date(1995, 1, 1)) & (orders["o_orderdate"] < date(1997, 1, 1))]
@@ -2537,10 +2117,7 @@ def olap_rollup_analysis_expression_impl(ctx: DataFrameContext) -> Any:
 
     Expression-family implementation.
     """
-    orders = ctx.get_table("orders")
-    customer = ctx.get_table("customer")
-    nation = ctx.get_table("nation")
-    region = ctx.get_table("region")
+    orders, customer, nation, region = _tables(ctx, "orders", "customer", "nation", "region")
     col = ctx.col
     lit = ctx.lit
 
@@ -2570,10 +2147,7 @@ def olap_rollup_analysis_pandas_impl(ctx: DataFrameContext) -> Any:
 
     Pandas-family implementation.
     """
-    orders = ctx.get_table("orders")
-    customer = ctx.get_table("customer")
-    nation = ctx.get_table("nation")
-    region = ctx.get_table("region")
+    orders, customer, nation, region = _tables(ctx, "orders", "customer", "nation", "region")
 
     # Filter and join
     filtered = orders[orders["o_orderdate"] >= date(1995, 1, 1)]
@@ -2780,8 +2354,7 @@ def optimizer_predicate_pushdown_expression_impl(ctx: DataFrameContext) -> Any:
 
     IMPORTANT: Filter AFTER join to let optimizer push predicates down.
     """
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
+    customer, orders = _tables(ctx, "customer", "orders")
     col = ctx.col
     lit = ctx.lit
 
@@ -2797,8 +2370,7 @@ def optimizer_predicate_pushdown_expression_impl(ctx: DataFrameContext) -> Any:
 
 def optimizer_predicate_pushdown_pandas_impl(ctx: DataFrameContext) -> Any:
     """Test predicate pushdown through joins."""
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
+    customer, orders = _tables(ctx, "customer", "orders")
 
     # Join first, then filter (pandas doesn't optimize, but tests the pattern)
     merged = customer.merge(orders, left_on="c_custkey", right_on="o_custkey")
@@ -2811,9 +2383,7 @@ def optimizer_join_reordering_expression_impl(ctx: DataFrameContext) -> Any:
 
     Write joins in SUBOPTIMAL order (largest table first) - optimizer should reorder.
     """
-    orders = ctx.get_table("orders")
-    customer = ctx.get_table("customer")
-    nation = ctx.get_table("nation")
+    orders, customer, nation = _tables(ctx, "orders", "customer", "nation")
     col = ctx.col
     lit = ctx.lit
 
@@ -2833,9 +2403,7 @@ def optimizer_join_reordering_expression_impl(ctx: DataFrameContext) -> Any:
 
 def optimizer_join_reordering_pandas_impl(ctx: DataFrameContext) -> Any:
     """Test join reordering optimization."""
-    orders = ctx.get_table("orders")
-    customer = ctx.get_table("customer")
-    nation = ctx.get_table("nation")
+    orders, customer, nation = _tables(ctx, "orders", "customer", "nation")
 
     # Join in suboptimal order
     filtered = orders[orders["o_orderdate"] >= date(1995, 1, 1)]
@@ -2853,8 +2421,7 @@ def optimizer_limit_pushdown_expression_impl(ctx: DataFrameContext) -> Any:
 
     Apply limit at the END only - optimizer should push partial limits down.
     """
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
+    customer, orders = _tables(ctx, "customer", "orders")
     col = ctx.col
     lit = ctx.lit
 
@@ -2870,8 +2437,7 @@ def optimizer_limit_pushdown_expression_impl(ctx: DataFrameContext) -> Any:
 
 def optimizer_limit_pushdown_pandas_impl(ctx: DataFrameContext) -> Any:
     """Test limit pushdown through operations."""
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
+    customer, orders = _tables(ctx, "customer", "orders")
 
     merged = customer.merge(orders, left_on="c_custkey", right_on="o_custkey")
     filtered = merged[merged["o_orderdate"] >= date(1995, 1, 1)]
@@ -2887,8 +2453,7 @@ def optimizer_aggregate_pushdown_expression_impl(ctx: DataFrameContext) -> Any:
 
     Join first, THEN aggregate - optimizer can push partial aggregates before join.
     """
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
+    customer, orders = _tables(ctx, "customer", "orders")
     col = ctx.col
     lit = ctx.lit
 
@@ -2907,8 +2472,7 @@ def optimizer_aggregate_pushdown_expression_impl(ctx: DataFrameContext) -> Any:
 
 def optimizer_aggregate_pushdown_pandas_impl(ctx: DataFrameContext) -> Any:
     """Test aggregate pushdown before join."""
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
+    customer, orders = _tables(ctx, "customer", "orders")
 
     merged = customer.merge(orders, left_on="c_custkey", right_on="o_custkey")
     filtered = merged[merged["o_orderdate"] >= date(1995, 1, 1)]
@@ -2960,9 +2524,7 @@ def optimizer_column_pruning_expression_impl(ctx: DataFrameContext) -> Any:
 
     Select only at the very END - optimizer should prune unused columns at scan.
     """
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
-    lineitem = ctx.get_table("lineitem")
+    customer, orders, lineitem = _tables(ctx, "customer", "orders", "lineitem")
     col = ctx.col
     lit = ctx.lit
 
@@ -2980,9 +2542,7 @@ def optimizer_column_pruning_expression_impl(ctx: DataFrameContext) -> Any:
 
 def optimizer_column_pruning_pandas_impl(ctx: DataFrameContext) -> Any:
     """Test column pruning optimization."""
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
-    lineitem = ctx.get_table("lineitem")
+    customer, orders, lineitem = _tables(ctx, "customer", "orders", "lineitem")
 
     merged = customer.merge(orders, left_on="c_custkey", right_on="o_custkey")
     merged = merged.merge(lineitem, left_on="o_orderkey", right_on="l_orderkey")
@@ -3033,8 +2593,7 @@ def optimizer_runtime_filter_expression_impl(ctx: DataFrameContext) -> Any:
 
     Join with highly selective filter on dimension - Spark generates bloom filter.
     """
-    lineitem = ctx.get_table("lineitem")
-    part = ctx.get_table("part")
+    lineitem, part = _tables(ctx, "lineitem", "part")
     col = ctx.col
     lit = ctx.lit
 
@@ -3056,8 +2615,7 @@ def optimizer_runtime_filter_expression_impl(ctx: DataFrameContext) -> Any:
 
 def optimizer_runtime_filter_pandas_impl(ctx: DataFrameContext) -> Any:
     """Test runtime filter / dynamic partition pruning."""
-    lineitem = ctx.get_table("lineitem")
-    part = ctx.get_table("part")
+    lineitem, part = _tables(ctx, "lineitem", "part")
 
     # Selective filter on part table
     selective_parts = part[(part["p_brand"] == "Brand#23") & (part["p_container"] == "MED BOX")]
@@ -3073,8 +2631,7 @@ def optimizer_groupjoin_expression_impl(ctx: DataFrameContext) -> Any:
     fuse these into a single grouped-join pass, never materializing the full
     intermediate result.
     """
-    orders = ctx.get_table("orders")
-    lineitem = ctx.get_table("lineitem")
+    orders, lineitem = _tables(ctx, "orders", "lineitem")
     col = ctx.col
     lit = ctx.lit
 
@@ -3092,8 +2649,7 @@ def optimizer_groupjoin_expression_impl(ctx: DataFrameContext) -> Any:
 
 def optimizer_groupjoin_pandas_impl(ctx: DataFrameContext) -> Any:
     """Test group-join (join+aggregate fusion) optimization."""
-    orders = ctx.get_table("orders")
-    lineitem = ctx.get_table("lineitem")
+    orders, lineitem = _tables(ctx, "orders", "lineitem")
 
     merged = orders.merge(lineitem, left_on="o_orderkey", right_on="l_orderkey")
     merged = merged.copy()
@@ -3114,30 +2670,29 @@ def optimizer_groupjoin_pandas_impl(ctx: DataFrameContext) -> Any:
 # this is equivalent to computing the window function, then filtering rows.
 
 
+def _orders_customer_since_1995_expr(ctx: DataFrameContext) -> Any:
+    return (
+        ctx.get_table("orders")
+        .join(ctx.get_table("customer"), ctx.col("o_custkey") == ctx.col("c_custkey"))
+        .filter(ctx.col("o_orderdate") >= ctx.lit(date(1995, 1, 1)))
+    )
+
+
+def _orders_customer_since_1995_pandas(ctx: DataFrameContext) -> Any:
+    joined = ctx.get_table("orders").merge(ctx.get_table("customer"), left_on="o_custkey", right_on="c_custkey")
+    return joined[joined["o_orderdate"] >= date(1995, 1, 1)].copy()
+
+
 def qualify_row_number_expression_impl(ctx: DataFrameContext) -> Any:
     """Find top 3 orders by total price for each customer using ROW_NUMBER.
 
     Expression-family implementation using window functions.
     """
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
-    col = ctx.col
-    lit = ctx.lit
-
-    # Join orders with customers
-    joined = orders.join(customer, col("o_custkey") == col("c_custkey")).filter(
-        col("o_orderdate") >= lit(date(1995, 1, 1))
+    result = _orders_customer_since_1995_expr(ctx).with_columns(
+        ctx.window_row_number(order_by=[("o_totalprice", False)], partition_by=["c_custkey"]).alias("order_rank")
     )
-
-    # Add row number and filter (QUALIFY equivalent)
     return (
-        joined.with_columns(
-            ctx.window_row_number(
-                order_by=[("o_totalprice", False)],
-                partition_by=["c_custkey"],
-            ).alias("order_rank")
-        )
-        .filter(col("order_rank") <= lit(3))
+        result.filter(ctx.col("order_rank") <= ctx.lit(3))
         .select("c_custkey", "c_name", "o_orderkey", "o_orderdate", "o_totalprice", "order_rank")
         .sort("c_custkey", "order_rank")
     )
@@ -3145,19 +2700,10 @@ def qualify_row_number_expression_impl(ctx: DataFrameContext) -> Any:
 
 def qualify_row_number_pandas_impl(ctx: DataFrameContext) -> Any:
     """Find top 3 orders by total price for each customer using ROW_NUMBER."""
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
-
-    # Join and filter
-    joined = orders.merge(customer, left_on="o_custkey", right_on="c_custkey")
-    filtered = joined[joined["o_orderdate"] >= date(1995, 1, 1)].copy()
-
-    # Add row number within partition
-    filtered["order_rank"] = filtered.groupby("c_custkey")["o_totalprice"].rank(method="first", ascending=False)
-
-    # Filter (QUALIFY equivalent)
+    result = _orders_customer_since_1995_pandas(ctx)
+    result["order_rank"] = result.groupby("c_custkey")["o_totalprice"].rank(method="first", ascending=False)
     cols = ["c_custkey", "c_name", "o_orderkey", "o_orderdate", "o_totalprice", "order_rank"]
-    return filtered[filtered["order_rank"] <= 3][cols].sort_values(["c_custkey", "order_rank"]).reset_index(drop=True)
+    return result[result["order_rank"] <= 3][cols].sort_values(["c_custkey", "order_rank"]).reset_index(drop=True)
 
 
 def qualify_dense_rank_expression_impl(ctx: DataFrameContext) -> Any:
@@ -3165,19 +2711,11 @@ def qualify_dense_rank_expression_impl(ctx: DataFrameContext) -> Any:
 
     Expression-family implementation using window functions.
     """
-    part = ctx.get_table("part")
-    col = ctx.col
-    lit = ctx.lit
-
-    # Add dense rank and filter (QUALIFY equivalent)
+    result = ctx.get_table("part").with_columns(
+        ctx.window_dense_rank(order_by=[("p_retailprice", False)], partition_by=["p_type"]).alias("price_rank")
+    )
     return (
-        part.with_columns(
-            ctx.window_dense_rank(
-                order_by=[("p_retailprice", False)],
-                partition_by=["p_type"],
-            ).alias("price_rank")
-        )
-        .filter(col("price_rank") <= lit(2))
+        result.filter(ctx.col("price_rank") <= ctx.lit(2))
         .select("p_type", "p_name", "p_retailprice", "price_rank")
         .sort("p_type", "price_rank")
     )
@@ -3185,16 +2723,10 @@ def qualify_dense_rank_expression_impl(ctx: DataFrameContext) -> Any:
 
 def qualify_dense_rank_pandas_impl(ctx: DataFrameContext) -> Any:
     """Find top 2 most expensive parts in each category using DENSE_RANK."""
-    part = ctx.get_table("part")
-
-    df = part.copy()
-
-    # Add dense rank within partition
-    df["price_rank"] = df.groupby("p_type")["p_retailprice"].rank(method="dense", ascending=False)
-
-    # Filter (QUALIFY equivalent)
+    result = ctx.get_table("part").copy()
+    result["price_rank"] = result.groupby("p_type")["p_retailprice"].rank(method="dense", ascending=False)
     return (
-        df[df["price_rank"] <= 2][["p_type", "p_name", "p_retailprice", "price_rank"]]
+        result[result["price_rank"] <= 2][["p_type", "p_name", "p_retailprice", "price_rank"]]
         .sort_values(["p_type", "price_rank"])
         .reset_index(drop=True)
     )
@@ -3205,58 +2737,32 @@ def qualify_ntile_expression_impl(ctx: DataFrameContext) -> Any:
 
     Expression-family implementation using window functions.
     """
-    orders = ctx.get_table("orders")
-    customer = ctx.get_table("customer")
-    col = ctx.col
-    lit = ctx.lit
-
-    # Join orders with customers and filter
-    joined = orders.join(customer, col("o_custkey") == col("c_custkey")).filter(
-        col("o_orderdate") >= lit(date(1995, 1, 1))
+    result = _orders_customer_since_1995_expr(ctx).with_columns(
+        ctx.window_ntile(4, order_by=[("o_totalprice", True)], partition_by=["c_mktsegment"]).alias("quartile")
     )
-
-    # Add ntile(4) and filter for quartile 4 (top 25%)
     return (
-        joined.with_columns(
-            ctx.window_ntile(
-                4,
-                order_by=[("o_totalprice", True)],
-                partition_by=["c_mktsegment"],
-            ).alias("quartile")
-        )
-        .filter(col("quartile") == lit(4))
+        result.filter(ctx.col("quartile") == ctx.lit(4))
         .select("c_mktsegment", "o_orderkey", "o_totalprice", "quartile")
-        .sort(col("c_mktsegment"), col("o_totalprice").desc())
+        .sort(ctx.col("c_mktsegment"), ctx.col("o_totalprice").desc())
     )
 
 
 def qualify_ntile_pandas_impl(ctx: DataFrameContext) -> Any:
     """Find orders in top quartile by value for each market segment using NTILE."""
-    orders = ctx.get_table("orders")
-    customer = ctx.get_table("customer")
+    import pandas as pd
 
-    # Join and filter
-    joined = orders.merge(customer, left_on="o_custkey", right_on="c_custkey")
-    filtered = joined[joined["o_orderdate"] >= date(1995, 1, 1)].copy()
-
-    # Add ntile (quartile) - pandas doesn't have built-in ntile, use qcut approach
-    def assign_quartile(group):
-        import pandas as pd
-
-        n = len(group)
-        if n == 0:
-            return group
-        group = group.copy()
-        # Sort by o_totalprice and assign quartiles
-        group = group.sort_values("o_totalprice")
-        group["quartile"] = pd.qcut(range(n), 4, labels=[1, 2, 3, 4], duplicates="drop")
+    def assign_quartile(group: Any) -> Any:
+        group = group.copy().sort_values("o_totalprice")
+        group["quartile"] = pd.qcut(range(len(group)), 4, labels=[1, 2, 3, 4], duplicates="drop") if len(group) else []
         return group
 
-    filtered = filtered.groupby("c_mktsegment", group_keys=False).apply(assign_quartile, include_groups=False)
-
-    # Filter for top quartile
+    result = (
+        _orders_customer_since_1995_pandas(ctx)
+        .groupby("c_mktsegment", group_keys=False)
+        .apply(assign_quartile, include_groups=False)
+    )
     return (
-        filtered[filtered["quartile"] == 4][["c_mktsegment", "o_orderkey", "o_totalprice", "quartile"]]
+        result[result["quartile"] == 4][["c_mktsegment", "o_orderkey", "o_totalprice", "quartile"]]
         .sort_values(["c_mktsegment", "o_totalprice"], ascending=[True, False])
         .reset_index(drop=True)
     )
@@ -3267,42 +2773,29 @@ def qualify_percentile_expression_impl(ctx: DataFrameContext) -> Any:
 
     Expression-family implementation using window functions.
     """
-    orders = ctx.get_table("orders")
-    col = ctx.col
-    lit = ctx.lit
-
-    # Filter orders
-    filtered = orders.filter(col("o_orderdate") >= lit(date(1995, 1, 1)))
-
-    # Add percent_rank and filter for top 10%
-    return (
-        filtered.with_columns(
-            ctx.window_percent_rank(
-                order_by=[("o_totalprice", True)],
-                partition_by=["o_orderpriority"],
-            ).alias("price_percentile")
+    result = (
+        ctx.get_table("orders")
+        .filter(ctx.col("o_orderdate") >= ctx.lit(date(1995, 1, 1)))
+        .with_columns(
+            ctx.window_percent_rank(order_by=[("o_totalprice", True)], partition_by=["o_orderpriority"]).alias(
+                "price_percentile"
+            )
         )
-        .filter(col("price_percentile") >= lit(0.9))
+    )
+    return (
+        result.filter(ctx.col("price_percentile") >= ctx.lit(0.9))
         .select("o_orderpriority", "o_orderkey", "o_totalprice", "price_percentile")
-        .sort(col("o_orderpriority"), col("o_totalprice").desc())
+        .sort(ctx.col("o_orderpriority"), ctx.col("o_totalprice").desc())
     )
 
 
 def qualify_percentile_pandas_impl(ctx: DataFrameContext) -> Any:
     """Find orders in top 10% by value for each order priority using PERCENT_RANK."""
-    orders = ctx.get_table("orders")
-
-    # Filter
-    filtered = orders[orders["o_orderdate"] >= date(1995, 1, 1)].copy()
-
-    # Add percent rank within partition
-    filtered["price_percentile"] = filtered.groupby("o_orderpriority")["o_totalprice"].rank(pct=True)
-
-    # Filter for top 10%
+    result = ctx.get_table("orders")
+    result = result[result["o_orderdate"] >= date(1995, 1, 1)].copy()
+    result["price_percentile"] = result.groupby("o_orderpriority")["o_totalprice"].rank(pct=True)
     return (
-        filtered[filtered["price_percentile"] >= 0.9][
-            ["o_orderpriority", "o_orderkey", "o_totalprice", "price_percentile"]
-        ]
+        result[result["price_percentile"] >= 0.9][["o_orderpriority", "o_orderkey", "o_totalprice", "price_percentile"]]
         .sort_values(["o_orderpriority", "o_totalprice"], ascending=[True, False])
         .reset_index(drop=True)
     )
@@ -3313,24 +2806,18 @@ def qualify_cume_dist_expression_impl(ctx: DataFrameContext) -> Any:
 
     Expression-family implementation using window functions.
     """
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-    lit = ctx.lit
-
-    # Filter lineitems
-    filtered = lineitem.filter(
-        (col("l_shipdate") >= lit(date(1995, 1, 1))) & (col("l_shipdate") < lit(date(1996, 1, 1)))
-    )
-
-    # Add cume_dist and filter for top 5%
-    return (
-        filtered.with_columns(
-            ctx.window_cume_dist(
-                order_by=[("l_quantity", True)],
-                partition_by=["l_shipdate"],
-            ).alias("quantity_cumulative_dist")
+    col, lit = ctx.col, ctx.lit
+    result = (
+        ctx.get_table("lineitem")
+        .filter((col("l_shipdate") >= lit(date(1995, 1, 1))) & (col("l_shipdate") < lit(date(1996, 1, 1))))
+        .with_columns(
+            ctx.window_cume_dist(order_by=[("l_quantity", True)], partition_by=["l_shipdate"]).alias(
+                "quantity_cumulative_dist"
+            )
         )
-        .filter(col("quantity_cumulative_dist") >= lit(0.95))
+    )
+    return (
+        result.filter(col("quantity_cumulative_dist") >= lit(0.95))
         .select("l_shipdate", "l_orderkey", "l_linenumber", "l_quantity", "quantity_cumulative_dist")
         .sort(col("l_shipdate"), col("l_quantity").desc())
     )
@@ -3338,26 +2825,17 @@ def qualify_cume_dist_expression_impl(ctx: DataFrameContext) -> Any:
 
 def qualify_cume_dist_pandas_impl(ctx: DataFrameContext) -> Any:
     """Find lineitems with quantity in top 5% of their ship date using CUME_DIST."""
-    lineitem = ctx.get_table("lineitem")
 
-    # Filter
-    filtered = lineitem[
-        (lineitem["l_shipdate"] >= date(1995, 1, 1)) & (lineitem["l_shipdate"] < date(1996, 1, 1))
-    ].copy()
-
-    # Add cumulative distribution - rank as fraction, ceiling-based
-    def calc_cume_dist(group):
+    def calc_cume_dist(group: Any) -> Any:
         group = group.copy()
-        n = len(group)
-        ranks = group["l_quantity"].rank(method="max")
-        group["quantity_cumulative_dist"] = ranks / n
+        group["quantity_cumulative_dist"] = group["l_quantity"].rank(method="max") / len(group)
         return group
 
-    filtered = filtered.groupby("l_shipdate", group_keys=False).apply(calc_cume_dist, include_groups=False)
-
-    # Filter for top 5%
+    lineitem = ctx.get_table("lineitem")
+    result = lineitem[(lineitem["l_shipdate"] >= date(1995, 1, 1)) & (lineitem["l_shipdate"] < date(1996, 1, 1))].copy()
+    result = result.groupby("l_shipdate", group_keys=False).apply(calc_cume_dist, include_groups=False)
     return (
-        filtered[filtered["quantity_cumulative_dist"] >= 0.95][
+        result[result["quantity_cumulative_dist"] >= 0.95][
             ["l_shipdate", "l_orderkey", "l_linenumber", "l_quantity", "quantity_cumulative_dist"]
         ]
         .sort_values(["l_shipdate", "l_quantity"], ascending=[True, False])
@@ -3370,27 +2848,13 @@ def qualify_lag_lead_expression_impl(ctx: DataFrameContext) -> Any:
 
     Expression-family implementation using window functions.
     """
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
-    col = ctx.col
-    lit = ctx.lit
-
-    # Join orders with customers and filter
-    joined = orders.join(customer, col("o_custkey") == col("c_custkey")).filter(
-        col("o_orderdate") >= lit(date(1995, 1, 1))
-    )
-
-    # Add lag and filter where price increased
-    return (
-        joined.with_columns(
-            ctx.window_lag(
-                "o_totalprice",
-                offset=1,
-                partition_by=["c_custkey"],
-                order_by=[("o_orderdate", True)],
-            ).alias("prev_order_price")
+    result = _orders_customer_since_1995_expr(ctx).with_columns(
+        ctx.window_lag("o_totalprice", offset=1, partition_by=["c_custkey"], order_by=[("o_orderdate", True)]).alias(
+            "prev_order_price"
         )
-        .filter(col("o_totalprice") > col("prev_order_price"))
+    )
+    return (
+        result.filter(ctx.col("o_totalprice") > ctx.col("prev_order_price"))
         .select("c_custkey", "c_name", "o_orderkey", "o_orderdate", "o_totalprice", "prev_order_price")
         .sort("c_custkey", "o_orderdate")
     )
@@ -3398,20 +2862,10 @@ def qualify_lag_lead_expression_impl(ctx: DataFrameContext) -> Any:
 
 def qualify_lag_lead_pandas_impl(ctx: DataFrameContext) -> Any:
     """Find orders where price increased from previous order using LAG."""
-    customer = ctx.get_table("customer")
-    orders = ctx.get_table("orders")
-
-    # Join and filter
-    joined = orders.merge(customer, left_on="o_custkey", right_on="c_custkey")
-    filtered = joined[joined["o_orderdate"] >= date(1995, 1, 1)].copy()
-
-    # Sort and add lag
-    filtered = filtered.sort_values(["c_custkey", "o_orderdate"])
-    filtered["prev_order_price"] = filtered.groupby("c_custkey")["o_totalprice"].shift(1)
-
-    # Filter where price increased
+    result = _orders_customer_since_1995_pandas(ctx).sort_values(["c_custkey", "o_orderdate"])
+    result["prev_order_price"] = result.groupby("c_custkey")["o_totalprice"].shift(1)
     return (
-        filtered[filtered["o_totalprice"] > filtered["prev_order_price"]][
+        result[result["o_totalprice"] > result["prev_order_price"]][
             ["c_custkey", "c_name", "o_orderkey", "o_orderdate", "o_totalprice", "prev_order_price"]
         ]
         .sort_values(["c_custkey", "o_orderdate"])
@@ -3620,8 +3074,7 @@ def array_of_struct_expression_impl(ctx: DataFrameContext) -> Any:
 
     Expression-family implementation using struct in array aggregation.
     """
-    orders = ctx.get_table("orders")
-    lineitem = ctx.get_table("lineitem")
+    orders, lineitem = _tables(ctx, "orders", "lineitem")
     col = ctx.col
     lit = ctx.lit
     struct = ctx.struct
@@ -3644,8 +3097,7 @@ def array_of_struct_expression_impl(ctx: DataFrameContext) -> Any:
 
 def array_of_struct_pandas_impl(ctx: DataFrameContext) -> Any:
     """Array of structs - orders with line items summary."""
-    orders = ctx.get_table("orders")
-    lineitem = ctx.get_table("lineitem")
+    orders, lineitem = _tables(ctx, "orders", "lineitem")
 
     # Filter and join
     filtered_orders = orders[orders["o_orderdate"] == date(1995, 3, 15)]
@@ -3748,8 +3200,8 @@ def array_unnest_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def array_unnest_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Unnest/explode array back to rows."""
     # Filter and aggregate
+    """Unnest/explode array back to rows."""
     partsupp = ctx.get_table("partsupp")
     supplier_parts = _pandas_grouped_list(partsupp[partsupp["ps_suppkey"] <= 10], "ps_suppkey", "ps_partkey", "parts")
 
@@ -4112,8 +3564,7 @@ def asof_join_basic_expression_impl(ctx: DataFrameContext) -> Any:
     Expression-family implementation using join with inequality predicates.
     Note: True ASOF join semantics require specialized support. This is an approximation.
     """
-    lineitem = ctx.get_table("lineitem")
-    orders = ctx.get_table("orders")
+    lineitem, orders = _tables(ctx, "lineitem", "orders")
     col = ctx.col
     lit = ctx.lit
 
@@ -4135,8 +3586,7 @@ def asof_join_basic_expression_impl(ctx: DataFrameContext) -> Any:
 
 def asof_join_basic_pandas_impl(ctx: DataFrameContext) -> Any:
     """ASOF join: find closest prior order for each lineitem shipment."""
-    lineitem = ctx.get_table("lineitem")
-    orders = ctx.get_table("orders")
+    lineitem, orders = _tables(ctx, "lineitem", "orders")
 
     # Filter lineitem
     filtered_lineitem = lineitem[
