@@ -10,37 +10,47 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+from csv import reader
 from dataclasses import dataclass
 from typing import Any
 
-# Default parameters - representative date range from the NYC Taxi dataset
-NYCTAXI_DEFAULT_PARAMS: dict[str, dict[str, Any]] = {
-    "Q1": {"start_date": "2019-01-01", "end_date": "2019-01-31"},
-    "Q2": {"start_date": "2019-01-01", "end_date": "2019-12-31"},
-    "Q3": {"start_date": "2019-01-01", "end_date": "2019-12-31"},
-    "Q4": {"start_date": "2019-01-01", "end_date": "2019-03-31"},
-    "Q5": {"start_date": "2019-01-01", "end_date": "2019-01-31"},
-    "Q6": {"start_date": "2019-01-01", "end_date": "2019-01-31"},
-    "Q7": {"start_date": "2019-01-01", "end_date": "2019-01-31"},
-    "Q8": {"start_date": "2019-01-01", "end_date": "2019-03-31"},
-    "Q9": {"start_date": "2019-01-01", "end_date": "2019-01-31"},
-    "Q10": {"start_date": "2019-01-01", "end_date": "2019-01-31"},
-    "Q11": {"start_date": "2019-01-01", "end_date": "2019-01-31"},
-    "Q12": {"start_date": "2019-01-01", "end_date": "2019-12-31"},
-    "Q13": {"start_date": "2019-01-01", "end_date": "2019-01-31"},
-    "Q14": {"start_date": "2019-01-01", "end_date": "2019-01-31"},
-    "Q15": {"start_date": "2019-01-01", "end_date": "2019-01-31"},
-    "Q16": {"start_date": "2019-01-01", "end_date": "2019-03-31"},
-    "Q17": {"start_date": "2019-01-01", "end_date": "2019-03-31"},
-    "Q18": {"start_date": "2019-01-01", "end_date": "2019-01-31"},
-    "Q19": {"start_date": "2019-01-01", "end_date": "2019-01-07"},
-    "Q20": {"start_date": "2019-01-01", "end_date": "2019-01-31"},
-    "Q21": {"start_date": "2019-01-01", "end_date": "2019-01-31"},
-    "Q22": {"start_date": "2019-01-01", "end_date": "2019-12-31"},
-    "Q23": {"start_date": "2019-06-15", "end_date": "2019-06-16"},
-    "Q24": {"start_date": "2019-01-01", "end_date": "2019-01-31", "zone_id": 132},
-    "Q25": {},
-}
+_PARAM_ROWS = """\
+Q1|2019-01-01|2019-01-31|
+Q2|2019-01-01|2019-12-31|
+Q3|2019-01-01|2019-12-31|
+Q4|2019-01-01|2019-03-31|
+Q5|2019-01-01|2019-01-31|
+Q6|2019-01-01|2019-01-31|
+Q7|2019-01-01|2019-01-31|
+Q8|2019-01-01|2019-03-31|
+Q9|2019-01-01|2019-01-31|
+Q10|2019-01-01|2019-01-31|
+Q11|2019-01-01|2019-01-31|
+Q12|2019-01-01|2019-12-31|
+Q13|2019-01-01|2019-01-31|
+Q14|2019-01-01|2019-01-31|
+Q15|2019-01-01|2019-01-31|
+Q16|2019-01-01|2019-03-31|
+Q17|2019-01-01|2019-03-31|
+Q18|2019-01-01|2019-01-31|
+Q19|2019-01-01|2019-01-07|
+Q20|2019-01-01|2019-01-31|
+Q21|2019-01-01|2019-01-31|
+Q22|2019-01-01|2019-12-31|
+Q23|2019-06-15|2019-06-16|
+Q24|2019-01-01|2019-01-31|zone_id=132
+Q25|||
+"""
+
+NYCTAXI_DEFAULT_PARAMS: dict[str, dict[str, Any]] = {}
+for _query_id, _start, _end, _extra in reader(_PARAM_ROWS.splitlines(), delimiter="|"):
+    _params: dict[str, Any] = {}
+    if _start:
+        _params.update({"start_date": _start, "end_date": _end})
+    if _extra:
+        _key, _value = _extra.split("=", 1)
+        _params[_key] = int(_value)
+    NYCTAXI_DEFAULT_PARAMS[_query_id] = _params
 
 
 @dataclass
