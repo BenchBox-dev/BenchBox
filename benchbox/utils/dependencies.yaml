@@ -1,0 +1,853 @@
+platform_to_extra:
+  polars: polars
+  polars-df: polars
+  modin: modin
+  modin-df: modin
+  dask: dask
+  dask-df: dask
+  pandas: pandas
+  pandas-df: pandas
+  cudf: cudf
+  cudf-df: cudf
+  pyspark: pyspark
+  pyspark-df: pyspark
+  spark: spark
+  lakesail: lakesail
+  velox: velox
+  gluten-velox: velox
+  datafusion: datafusion
+  datafusion-df: datafusion
+  athena: athena
+  bigquery: bigquery
+  snowflake: snowflake
+  databricks: databricks
+  databricks-connect: databricks-connect
+  redshift: redshift
+  synapse: synapse
+  fabric: fabric
+  fabric-lakehouse: fabric
+  fabric_lakehouse: fabric
+  fabric-spark: fabric-spark
+  trino: trino
+  presto: presto
+  clickhouse: clickhouse
+  clickhouse-local: clickhouse-local
+  clickhouse-server: clickhouse-server
+  clickhouse-cloud: clickhouse-cloud
+  firebolt: firebolt
+  databend: databend
+  influxdb: influxdb
+  doris: doris
+  singlestore: singlestore
+  postgresql: postgresql
+  postgres: postgresql
+  questdb: questdb
+dataframe_dependency_groups:
+  pandas:
+    name: pandas
+    description: Pandas DataFrame library for data analysis
+    packages:
+    - pandas
+    install_command: uv add benchbox --extra pandas
+    use_cases:
+    - Data analysis
+    - Data manipulation
+    - DataFrame benchmarking
+    platforms:
+    - Pandas
+  modin:
+    name: modin
+    description: Modin distributed Pandas replacement
+    packages:
+    - modin
+    - pandas
+    install_command: uv add benchbox --extra modin
+    use_cases:
+    - Distributed Pandas
+    - Large datasets
+    - Multi-core processing
+    platforms:
+    - Modin (Ray backend)
+  dask:
+    name: dask
+    description: Dask parallel computing library
+    packages:
+    - dask
+    - pandas
+    install_command: uv add benchbox --extra dask
+    use_cases:
+    - Parallel computing
+    - Out-of-core processing
+    - Large datasets
+    platforms:
+    - Dask
+  pyspark:
+    name: pyspark
+    description: Apache Spark Python interface
+    packages:
+    - pyspark
+    install_command: uv add benchbox --extra pyspark
+    use_cases:
+    - Distributed computing
+    - Big data processing
+    - Spark SQL
+    platforms:
+    - Apache Spark (PySpark)
+  polars:
+    name: polars
+    description: Polars high-performance DataFrame library
+    packages:
+    - polars
+    install_command: uv add benchbox --extra polars
+    use_cases:
+    - High-performance analytics
+    - Lazy evaluation
+    - Rust-powered DataFrame
+    platforms:
+    - Polars
+  datafusion:
+    name: datafusion
+    description: Apache DataFusion query engine
+    packages:
+    - datafusion
+    install_command: uv add benchbox --extra datafusion
+    use_cases:
+    - SQL on DataFrames
+    - Arrow-native processing
+    - Query optimization
+    platforms:
+    - Apache DataFusion
+  dataframe-pandas-family:
+    name: dataframe-pandas-family
+    description: All Pandas-family DataFrame platforms
+    packages:
+    - pandas
+    - modin
+    - dask
+    install_command: uv add benchbox --extra dataframe-pandas-family
+    use_cases:
+    - Pandas ecosystem benchmarking
+    - Pandas API comparison
+    platforms:
+    - Pandas
+    - Modin
+    - Dask
+  dataframe-expression-family:
+    name: dataframe-expression-family
+    description: All expression-based DataFrame platforms
+    packages:
+    - polars
+    - pyspark
+    - datafusion
+    install_command: uv add benchbox --extra dataframe-expression-family
+    use_cases:
+    - Expression API benchmarking
+    - Lazy evaluation comparison
+    platforms:
+    - Polars
+    - PySpark
+    - DataFusion
+  dataframe-all:
+    name: dataframe-all
+    description: All DataFrame platforms
+    packages:
+    - pandas
+    - modin
+    - dask
+    - polars
+    - pyspark
+    - datafusion
+    install_command: uv add benchbox --extra dataframe-all
+    use_cases:
+    - Complete DataFrame benchmarking
+    - Platform comparison
+    platforms:
+    - Pandas
+    - Modin
+    - Dask
+    - Polars
+    - PySpark
+    - DataFusion
+dependency_groups:
+  clickhouse:
+    name: clickhouse
+    description: ClickHouse server driver (clickhouse-driver TCP protocol)
+    packages:
+    - clickhouse-driver
+    install_command: uv add benchbox --extra clickhouse
+    use_cases:
+    - Columnar analytics
+    - High-performance aggregation
+    - Self-hosted ClickHouse
+    platforms:
+    - ClickHouse Server (clickhouse-server)
+  clickhouse-local:
+    name: clickhouse-local
+    description: Embedded ClickHouse via chDB (in-process, no server required)
+    packages:
+    - chdb
+    install_command: uv add benchbox --extra clickhouse-local
+    use_cases:
+    - Embedded ClickHouse
+    - Local analytics
+    - Zero-infrastructure benchmarking
+    platforms:
+    - ClickHouse Local (clickhouse-local)
+  clickhouse-server:
+    name: clickhouse-server
+    description: Self-hosted ClickHouse server driver (clickhouse-driver TCP protocol)
+    packages:
+    - clickhouse-driver
+    install_command: uv add benchbox --extra clickhouse-server
+    use_cases:
+    - Self-hosted ClickHouse
+    - Docker ClickHouse
+    - High-performance columnar analytics
+    platforms:
+    - ClickHouse Server (clickhouse-server)
+  clickhouse-cloud:
+    name: clickhouse-cloud
+    description: ClickHouse Cloud via HTTP connector (clickhouse-connect)
+    packages:
+    - clickhouse-connect
+    install_command: uv add benchbox --extra clickhouse-cloud
+    use_cases:
+    - Managed ClickHouse
+    - Serverless analytics
+    - Cloud OLAP
+    platforms:
+    - ClickHouse Cloud (clickhouse-cloud)
+  databricks:
+    name: databricks
+    description: Databricks SQL Warehouse connector with Unity Catalog
+    packages:
+    - databricks-sql-connector
+    - cloudpathlib
+    install_command: uv add benchbox --extra databricks
+    use_cases:
+    - Lakehouse analytics
+    - Delta Lake workloads
+    - Spark SQL
+    platforms:
+    - Databricks SQL Warehouses
+    - Databricks Clusters
+  databricks-df:
+    name: databricks-df
+    description: Databricks DataFrame mode with Databricks Connect
+    packages:
+    - databricks-sql-connector
+    - databricks-connect
+    - cloudpathlib
+    install_command: uv add benchbox --extra databricks-connect
+    use_cases:
+    - PySpark DataFrame API
+    - Interactive development
+    - DataFrame benchmarks
+    platforms:
+    - Databricks Clusters (via Databricks Connect)
+  databricks-connect:
+    name: databricks-connect
+    description: Databricks Connect for remote PySpark DataFrame execution
+    packages:
+    - databricks-sql-connector
+    - databricks-connect
+    - cloudpathlib
+    install_command: uv add benchbox --extra databricks-connect
+    use_cases:
+    - Remote Spark execution
+    - Local IDE development
+    - DataFrame API
+    platforms:
+    - Databricks Clusters
+  cloud-spark:
+    name: cloud-spark
+    description: All managed cloud Spark platforms with DataFrame support
+    packages:
+    - databricks-sql-connector
+    - databricks-connect
+    - cloudpathlib
+    install_command: uv add benchbox --extra cloud-spark
+    use_cases:
+    - Managed Spark platforms
+    - DataFrame benchmarks
+    - Cloud analytics
+    platforms:
+    - Databricks
+    - EMR (future)
+    - Dataproc (future)
+    - Synapse Spark (future)
+  bigquery:
+    name: bigquery
+    description: Google BigQuery and Cloud Storage integration
+    packages:
+    - google-cloud-bigquery
+    - google-cloud-storage
+    - cloudpathlib
+    install_command: uv add benchbox --extra bigquery
+    use_cases:
+    - Serverless analytics
+    - BigQuery datasets
+    - Google Cloud workflows
+    platforms:
+    - Google BigQuery
+    - Google Cloud Storage
+  redshift:
+    name: redshift
+    description: Amazon Redshift data warehouse connector
+    packages:
+    - redshift-connector
+    - boto3
+    - cloudpathlib
+    install_command: uv add benchbox --extra redshift
+    use_cases:
+    - Data warehouse analytics
+    - AWS analytics
+    - Redshift Spectrum
+    platforms:
+    - Amazon Redshift
+    - Redshift Serverless
+  snowflake:
+    name: snowflake
+    description: Snowflake cloud data platform connector
+    packages:
+    - snowflake-connector-python
+    - cloudpathlib
+    install_command: uv add benchbox --extra snowflake
+    use_cases:
+    - Cloud data warehouse
+    - Multi-cloud analytics
+    - Zero-maintenance DW
+    platforms:
+    - Snowflake
+  trino:
+    name: trino
+    description: Trino distributed SQL query engine connector (Trino only, not PrestoDB)
+    packages:
+    - trino
+    - cloudpathlib
+    install_command: uv add benchbox --extra trino
+    use_cases:
+    - Federated queries
+    - Data lake analytics
+    - Distributed SQL
+    platforms:
+    - Trino
+    - Starburst Enterprise
+  presto:
+    name: presto
+    description: PrestoDB distributed SQL query engine connector (Meta's Presto, not
+      Trino)
+    packages:
+    - presto-python-client
+    - cloudpathlib
+    install_command: uv add benchbox --extra presto
+    use_cases:
+    - Federated queries
+    - Legacy PrestoDB clusters
+    - Distributed SQL
+    platforms:
+    - PrestoDB
+  firebolt:
+    name: firebolt
+    description: Firebolt vectorized analytics database (Core + Cloud)
+    packages:
+    - firebolt-sdk
+    - cloudpathlib
+    install_command: uv add benchbox --extra firebolt
+    use_cases:
+    - Vectorized analytics
+    - Cloud data warehouse
+    - Local development
+    - S3 staging
+    platforms:
+    - Firebolt Core (local)
+    - Firebolt Cloud
+  databend:
+    name: databend
+    description: Databend cloud-native OLAP data warehouse
+    packages:
+    - databend-driver
+    install_command: uv add benchbox --extra databend
+    use_cases:
+    - Cloud-native OLAP
+    - Snowflake-compatible analytics
+    - Object storage backend
+    platforms:
+    - Databend Cloud
+    - Databend Self-Hosted
+  influxdb:
+    name: influxdb
+    description: InfluxDB time series database with FlightSQL support
+    packages:
+    - influxdb3-python
+    - pyarrow
+    install_command: uv add benchbox --extra influxdb
+    use_cases:
+    - Time series analytics
+    - TSBS DevOps benchmarks
+    - FlightSQL queries
+    platforms:
+    - InfluxDB Core (OSS)
+    - InfluxDB Cloud
+  starrocks:
+    name: starrocks
+    description: StarRocks columnar analytics engine via MySQL protocol
+    packages:
+    - pymysql
+    install_command: uv add benchbox --extra starrocks
+    use_cases:
+    - Columnar analytics
+    - Fast OLAP queries
+    - Distributed MPP
+    platforms:
+    - StarRocks
+  singlestore:
+    name: singlestore
+    description: SingleStore distributed SQL database (Helios + self-managed)
+    packages:
+    - singlestoredb
+    install_command: uv add benchbox --extra singlestore
+    use_cases:
+    - Real-time analytics
+    - HTAP workloads
+    - Distributed OLAP
+    - MySQL-compatible analytics
+    platforms:
+    - SingleStore Helios
+    - SingleStore Self-Managed
+  postgresql:
+    name: postgresql
+    description: PostgreSQL open-source relational database connector
+    packages:
+    - psycopg
+    install_command: uv add benchbox --extra postgresql
+    use_cases:
+    - Row-store baseline
+    - OLTP benchmarks
+    - TimescaleDB time-series
+    platforms:
+    - PostgreSQL
+    - TimescaleDB
+  questdb:
+    name: questdb
+    description: QuestDB time-series database connector (via PostgreSQL wire protocol)
+    packages:
+    - psycopg
+    - requests
+    install_command: uv add benchbox --extra questdb
+    use_cases:
+    - Time-series analytics
+    - High-throughput ingestion
+    - Columnar OLAP
+    platforms:
+    - QuestDB
+  synapse:
+    name: synapse
+    description: Azure Synapse Analytics (Dedicated SQL Pool) connector
+    packages:
+    - pyodbc
+    install_command: uv add benchbox --extra synapse
+    use_cases:
+    - Cloud data warehouse
+    - Azure analytics
+    - Enterprise OLAP
+    platforms:
+    - Azure Synapse Dedicated SQL Pool
+  fabric:
+    name: fabric
+    description: Microsoft Fabric Data Warehouse connector with OneLake integration
+    packages:
+    - pyodbc
+    - azure-identity
+    install_command: uv add benchbox --extra fabric
+    use_cases:
+    - Cloud data warehouse
+    - Microsoft analytics
+    - OneLake storage
+    - Delta Lake
+    platforms:
+    - Microsoft Fabric Warehouse
+  fabric-spark:
+    name: fabric-spark
+    description: Microsoft Fabric Spark with Livy API and OneLake storage
+    packages:
+    - azure-identity
+    - azure-storage-file-datalake
+    - requests
+    install_command: uv add benchbox --extra fabric-spark
+    use_cases:
+    - SaaS Spark
+    - Microsoft analytics
+    - OneLake storage
+    - Livy API
+    platforms:
+    - Microsoft Fabric Spark
+  synapse-spark:
+    name: synapse-spark
+    description: Azure Synapse Spark with Livy API and ADLS Gen2 storage
+    packages:
+    - azure-identity
+    - azure-storage-file-datalake
+    - requests
+    install_command: uv add benchbox --extra synapse-spark
+    use_cases:
+    - Enterprise Spark
+    - Azure analytics
+    - ADLS Gen2 storage
+    - Livy API
+    platforms:
+    - Azure Synapse Spark
+  athena:
+    name: athena
+    description: AWS Athena serverless query-on-S3 connector
+    packages:
+    - pyathena
+    - boto3
+    install_command: uv add benchbox --extra athena
+    use_cases:
+    - Serverless analytics
+    - S3 data lake queries
+    - AWS analytics
+    platforms:
+    - AWS Athena
+  glue:
+    name: glue
+    description: AWS Glue managed Spark ETL service
+    packages:
+    - boto3
+    install_command: uv add benchbox --extra glue
+    use_cases:
+    - Serverless ETL
+    - Managed Spark
+    - AWS analytics
+    - Data pipeline
+    platforms:
+    - AWS Glue
+  emr-serverless:
+    name: emr-serverless
+    description: Amazon EMR Serverless managed Spark service
+    packages:
+    - boto3
+    install_command: uv add benchbox --extra emr-serverless
+    use_cases:
+    - Serverless Spark
+    - AWS analytics
+    - Auto-scaling
+    - Sub-second startup
+    platforms:
+    - Amazon EMR Serverless
+  athena-spark:
+    name: athena-spark
+    description: Amazon Athena for Apache Spark interactive sessions
+    packages:
+    - boto3
+    install_command: uv add benchbox --extra athena-spark
+    use_cases:
+    - Interactive Spark
+    - AWS analytics
+    - Session-based
+    - Sub-second startup
+    platforms:
+    - Amazon Athena for Apache Spark
+  dataproc:
+    name: dataproc
+    description: GCP Dataproc managed Spark service
+    packages:
+    - google-cloud-dataproc
+    - google-cloud-storage
+    install_command: uv add benchbox --extra dataproc
+    use_cases:
+    - Managed Spark
+    - GCP analytics
+    - Data pipeline
+    - Cluster computing
+    platforms:
+    - GCP Dataproc
+  dataproc-serverless:
+    name: dataproc-serverless
+    description: GCP Dataproc Serverless fully managed Spark
+    packages:
+    - google-cloud-dataproc
+    - google-cloud-storage
+    install_command: uv add benchbox --extra dataproc-serverless
+    use_cases:
+    - Serverless Spark
+    - GCP analytics
+    - Auto-scaling
+    - No cluster management
+    platforms:
+    - GCP Dataproc Serverless
+  spark:
+    name: spark
+    description: Apache Spark distributed SQL engine
+    packages:
+    - pyspark
+    install_command: uv add benchbox --extra spark
+    use_cases:
+    - Distributed SQL
+    - Big data processing
+    - Spark SQL
+    platforms:
+    - Apache Spark
+    - Spark on YARN
+    - Spark on Kubernetes
+  lakesail:
+    name: lakesail
+    description: LakeSail Sail Spark-compatible engine (uses PySpark Spark Connect
+      client)
+    packages:
+    - pyspark
+    - grpcio
+    - grpcio-status
+    install_command: uv add benchbox --extra lakesail
+    use_cases:
+    - Spark-compatible SQL
+    - High-performance analytics
+    - DataFusion-based
+    platforms:
+    - LakeSail Sail
+  velox:
+    name: velox
+    description: Apache Gluten + Velox Spark acceleration (native C++ engine via Gluten
+      plugin)
+    packages:
+    - pyspark
+    - grpcio
+    - grpcio-status
+    install_command: uv add benchbox --extra velox
+    use_cases:
+    - Spark-compatible SQL
+    - Native C++ acceleration
+    - TPC-H/TPC-DS benchmarking
+    - Accelerated-Spark tier comparison
+    platforms:
+    - Apache Gluten + Velox
+  snowpark-connect:
+    name: snowpark-connect
+    description: Snowpark Connect PySpark-compatible API on Snowflake
+    packages:
+    - snowflake-snowpark-python
+    install_command: uv add benchbox --extra snowpark-connect
+    use_cases:
+    - PySpark API
+    - Snowflake DataFrame
+    - No cluster required
+    - Snowflake native
+    platforms:
+    - Snowflake (via Snowpark)
+  cloudstorage:
+    name: cloudstorage
+    description: Cloud storage helpers for remote paths (cloudpathlib)
+    packages:
+    - cloudpathlib
+    install_command: uv add benchbox --extra cloudstorage
+    use_cases:
+    - Remote output directories
+    - Cloud staging areas
+    - Unity Catalog volumes
+    platforms:
+    - AWS S3
+    - Google Cloud Storage
+    - Azure Storage
+  cloud:
+    name: cloud
+    description: All major cloud data platforms (excludes ClickHouse)
+    packages:
+    - databricks-sql-connector
+    - firebolt-sdk
+    - google-cloud-bigquery
+    - google-cloud-dataproc
+    - google-cloud-storage
+    - redshift-connector
+    - snowflake-connector-python
+    - trino
+    - pyathena
+    - boto3
+    - cloudpathlib
+    install_command: uv add benchbox --extra cloud
+    use_cases:
+    - Multi-cloud benchmarking
+    - Cloud platform comparison
+    - Enterprise analytics
+    platforms:
+    - Databricks
+    - BigQuery
+    - Redshift
+    - Snowflake
+    - Trino
+    - Athena
+    - Firebolt
+    - Dataproc
+    - Glue
+    - EMR Serverless
+  all:
+    name: all
+    description: All supported database platforms and features
+    packages:
+    - clickhouse-driver
+    - databricks-sql-connector
+    - databricks-connect
+    - firebolt-sdk
+    - google-cloud-bigquery
+    - google-cloud-storage
+    - google-cloud-dataproc
+    - redshift-connector
+    - snowflake-connector-python
+    - snowflake-snowpark-python
+    - trino
+    - presto-python-client
+    - psycopg
+    - pyodbc
+    - pyathena
+    - pyspark
+    - grpcio
+    - grpcio-status
+    - boto3
+    - cloudpathlib
+    - azure-identity
+    - azure-storage-file-datalake
+    - requests
+    - influxdb3-python
+    - pyarrow
+    - chdb
+    - clickhouse-connect
+    - databend-driver
+    - pymysql
+    - singlestoredb
+    install_command: uv add benchbox --extra all
+    use_cases:
+    - Complete platform coverage
+    - Testing all adapters
+    - Maximum flexibility
+    platforms:
+    - All supported platforms
+installation_scenarios:
+- name: Local development (core)
+  description: DuckDB + SQLite workflows without external services
+  platforms:
+  - DuckDB
+  - SQLite
+  dependency_groups: []
+  notes: Includes embedded DuckDB engine and local file outputs.
+- name: Cloud storage helpers
+  description: Enable cloud path handling without database adapters
+  platforms:
+  - S3
+  - GCS
+  - Azure
+  dependency_groups:
+  - cloudstorage
+  notes: Install when you need remote output directories or UC volume staging.
+- name: Cloud platforms bundle
+  description: All managed warehouses except ClickHouse
+  platforms:
+  - Databricks
+  - BigQuery
+  - Redshift
+  - Snowflake
+  - Trino
+  - Athena
+  - Firebolt
+  dependency_groups:
+  - cloud
+  notes: Recommended starting point for cloud benchmarking.
+- name: Full platform coverage
+  description: Everything BenchBox supports
+  platforms:
+  - All platforms
+  dependency_groups:
+  - all
+  notes: Installs every optional adapter including ClickHouse.
+- name: Distributed SQL (Presto vs Trino)
+  description: Compare PrestoDB and Trino/Starburst with native drivers
+  platforms:
+  - PrestoDB
+  - Trino
+  dependency_groups:
+  - presto
+  - trino
+  notes: PrestoDB uses presto-python-client with X-Presto-* headers; Trino uses the
+    trino package and X-Trino-* headers.
+- name: Databricks Lakehouse
+  description: Databricks SQL Warehouses and Unity Catalog
+  platforms:
+  - Databricks
+  dependency_groups:
+  - databricks
+  notes: ''
+- name: Google BigQuery
+  description: BigQuery analytics and Cloud Storage integration
+  platforms:
+  - BigQuery
+  - Cloud Storage
+  dependency_groups:
+  - bigquery
+  notes: ''
+- name: Amazon Redshift
+  description: Redshift data warehouse and S3 access
+  platforms:
+  - Redshift
+  - Amazon S3
+  dependency_groups:
+  - redshift
+  notes: ''
+- name: AWS Athena
+  description: Serverless query-on-S3 analytics
+  platforms:
+  - AWS Athena
+  - Amazon S3
+  dependency_groups:
+  - athena
+  notes: Pay-per-query pricing based on data scanned ($5/TB). No infrastructure to
+    manage.
+- name: AWS Glue
+  description: Managed Spark ETL service
+  platforms:
+  - AWS Glue
+  - Amazon S3
+  dependency_groups:
+  - glue
+  notes: Pay-per-DPU pricing (~$0.44/DPU-hour). Serverless Spark with Glue Data Catalog.
+- name: Snowflake Cloud
+  description: Snowflake cloud data platform
+  platforms:
+  - Snowflake
+  dependency_groups:
+  - snowflake
+  notes: ''
+- name: ClickHouse Analytics
+  description: ClickHouse clusters or local server
+  platforms:
+  - ClickHouse
+  dependency_groups:
+  - clickhouse
+  notes: ''
+- name: Firebolt Analytics
+  description: Firebolt Core (local Docker) or Firebolt Cloud
+  platforms:
+  - Firebolt Core
+  - Firebolt Cloud
+  dependency_groups:
+  - firebolt
+  notes: Firebolt Core is free and runs locally via Docker.
+- name: Cloud + ClickHouse combo
+  description: Multi-cloud benchmarks plus ClickHouse parity
+  platforms:
+  - Databricks
+  - BigQuery
+  - Redshift
+  - Snowflake
+  - ClickHouse
+  dependency_groups:
+  - cloud
+  - clickhouse
+  notes: Combines managed warehouses with self-hosted ClickHouse.
+package_import_names:
+  databricks-sql-connector: databricks.sql
+  google-cloud-bigquery: google.cloud.bigquery
+  google-cloud-storage: google.cloud.storage
+  snowflake-connector-python: snowflake.connector
+  snowflake-snowpark-python: snowflake.snowpark
+  presto-python-client: prestodb
+  grpcio: grpc
+  grpcio-status: grpc_status
