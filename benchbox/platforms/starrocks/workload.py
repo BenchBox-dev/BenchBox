@@ -1,3 +1,4 @@
+# ruff: noqa: SIM905
 """Workload execution helpers for StarRocks."""
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from benchbox.platforms.base.data_loading import (
     validate_sql_identifier,
 )
 from benchbox.platforms.base.ddl_helpers import strip_foreign_keys
+from benchbox.platforms.base.sql_execution import execute_sql_query
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 logger = logging.getLogger(__name__)
@@ -362,44 +364,10 @@ class StarRocksWorkloadMixin:
     # platforms (DuckDB, PostgreSQL, SQLite) but require backtick-quoting here.
     # Seeded from the StarRocks and MySQL reserved-word lists with the words
     # most likely to appear as column aliases in benchmark query catalogs.
-    _RESERVED_ALIAS_WORDS: frozenset[str] = frozenset(
-        {
-            "character",
-            "rank",
-            "order",
-            "group",
-            "key",
-            "value",
-            "values",
-            "partition",
-            "range",
-            "rows",
-            "select",
-            "table",
-            "column",
-            "columns",
-            "index",
-            "database",
-            "schema",
-            "status",
-            "type",
-            "default",
-            "primary",
-            "unique",
-            "current_date",
-            "current_time",
-            "current_timestamp",
-            "interval",
-            "match",
-            "natural",
-            "dense_rank",
-            "row_number",
-            "percent_rank",
-            "cume_dist",
-            "ntile",
-            "lead",
-            "lag",
-        }
+    _RESERVED_ALIAS_WORDS: frozenset[str] = frozenset(  # noqa: SIM905
+        "character rank order group key value values partition range rows select table column columns index database "
+        "schema status type default primary unique current_date current_time current_timestamp interval match natural "
+        "dense_rank row_number percent_rank cume_dist ntile lead lag".split()  # noqa: SIM905
     )
 
     _ALIAS_RE = re.compile(r"\bAS\s+(\w+)\b", re.IGNORECASE)
@@ -451,44 +419,9 @@ class StarRocksWorkloadMixin:
 
     # Keywords that cannot be implicit aliases - when one follows a subquery's closing ),
     # we know no alias was provided and we need to inject one.
-    _SQL_KEYWORDS = frozenset(
-        [
-            "WHERE",
-            "HAVING",
-            "GROUP",
-            "ORDER",
-            "LIMIT",
-            "UNION",
-            "EXCEPT",
-            "INTERSECT",
-            "JOIN",
-            "INNER",
-            "LEFT",
-            "RIGHT",
-            "FULL",
-            "CROSS",
-            "ON",
-            "AND",
-            "OR",
-            "NOT",
-            "THEN",
-            "ELSE",
-            "END",
-            "CASE",
-            "WHEN",
-            "SELECT",
-            "FROM",
-            "AS",
-            "IS",
-            "IN",
-            "NULL",
-            "TRUE",
-            "FALSE",
-            "BETWEEN",
-            "LIKE",
-            "ILIKE",
-            "SIMILAR",
-        ]
+    _SQL_KEYWORDS = frozenset(  # noqa: SIM905
+        "WHERE HAVING GROUP ORDER LIMIT UNION EXCEPT INTERSECT JOIN INNER LEFT RIGHT FULL CROSS ON AND OR NOT THEN "
+        "ELSE END CASE WHEN SELECT FROM AS IS IN NULL TRUE FALSE BETWEEN LIKE ILIKE SIMILAR".split()  # noqa: SIM905
     )
 
     def _inject_missing_subquery_aliases(self, query: str) -> str:  # noqa: C901
@@ -638,91 +571,19 @@ class StarRocksWorkloadMixin:
         query = self._translate_ansi_substring(query)
         query = self._translate_ansi_identifiers(query)
         query = self._inject_missing_subquery_aliases(query)
-
-        start_time = mono_time()
-
-        try:
-            # _make_stream_cursor may pass a raw PyMySQL cursor (which has no cursor()
-            # method) rather than the connection wrapper.  Detect and handle both cases.
-            owns_cursor = hasattr(connection, "cursor")
-            cursor = connection.cursor() if owns_cursor else connection
-            try:
-                cursor.execute(query)
-                result = cursor.fetchall()
-            finally:
-                if owns_cursor:
-                    cursor.close()
-
-            execution_time = elapsed_seconds(start_time)
-            actual_row_count = len(result) if result else 0
-
-            # Validate row count if enabled
-            validation_result = None
-            if validate_row_count and benchmark_type:
-                from benchbox.core.validation.query_validation import QueryValidator
-
-                validator = QueryValidator()
-                validation_result = validator.validate_query_result(
-                    benchmark_type=benchmark_type,
-                    query_id=query_id,
-                    actual_row_count=actual_row_count,
-                    scale_factor=scale_factor,
-                    stream_id=stream_id,
-                )
-
-                if validation_result.warning_message:
-                    self.log_verbose(f"Row count validation: {validation_result.warning_message}")
-                elif not validation_result.is_valid:
-                    self.log_verbose(f"Row count validation FAILED: {validation_result.error_message}")
-
-                if not validation_result.is_valid:
-                    return {
-                        "query_id": query_id,
-                        "status": "FAILED",
-                        "execution_time_seconds": execution_time,
-                        "rows_returned": actual_row_count,
-                        "row_count_validation": {
-                            "expected": validation_result.expected_row_count,
-                            "actual": actual_row_count,
-                            "status": "FAILED",
-                            "error": validation_result.error_message,
-                        },
-                        "error": validation_result.error_message,
-                        "first_row": result[0] if result else None,
-                        "translated_query": None,
-                    }
-
-            result_dict = {
-                "query_id": query_id,
-                "status": "SUCCESS",
-                "execution_time_seconds": execution_time,
-                "rows_returned": actual_row_count,
-                "first_row": result[0] if result else None,
-                "translated_query": None,
-            }
-
-            if validation_result:
-                row_count_validation = {
-                    "expected": validation_result.expected_row_count,
-                    "actual": actual_row_count,
-                    "status": "PASSED" if validation_result.is_valid else "SKIPPED",
-                }
-                if validation_result.warning_message:
-                    row_count_validation["warning"] = validation_result.warning_message
-                result_dict["row_count_validation"] = row_count_validation
-
-            return result_dict
-
-        except Exception as e:
-            execution_time = elapsed_seconds(start_time)
-            return {
-                "query_id": query_id,
-                "status": "FAILED",
-                "execution_time_seconds": execution_time,
-                "rows_returned": 0,
-                "error": str(e),
-                "error_type": type(e).__name__,
-            }
+        result = execute_sql_query(
+            connection,
+            query,
+            query_id,
+            log_verbose=self.log_verbose,
+            build_query_result_with_validation=self._build_query_result_with_validation,
+            benchmark_type=benchmark_type,
+            scale_factor=scale_factor,
+            validate_row_count=validate_row_count,
+            stream_id=stream_id,
+        )
+        result.setdefault("translated_query", None)
+        return result
 
 
 class StarRocksStreamLoadHandler(FileFormatHandler):

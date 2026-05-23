@@ -22,20 +22,10 @@ from __future__ import annotations
 import os
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import Any, ClassVar
 
 from benchbox.platforms.base.ddl_helpers import strip_foreign_keys
 from benchbox.platforms.base.ddl_optimizer import BaseDdlOptimizer
-from benchbox.utils.clock import elapsed_seconds, mono_time
-
-if TYPE_CHECKING:
-    from benchbox.core.tuning.interface import (
-        ForeignKeyConfiguration,
-        PlatformOptimizationConfiguration,
-        PrimaryKeyConfiguration,
-        TableTuning,
-        UnifiedTuningConfiguration,
-    )
 
 from ..utils.dependencies import (
     check_platform_dependencies,
@@ -45,11 +35,11 @@ from ..utils.file_format import get_data_extension
 from .base import DriverIsolationCapability, PlatformAdapter
 from .base.data_loading import (
     CsvDialect,
-    DataSourceResolver,
-    normalize_table_paths,
+    DataSourceResolver,  # noqa: F401 - tests patch this module-local name; shared loader resolves it dynamically.
     prepare_local_load_file,
     resolve_csv_dialect,
 )
+from .base.mysql_wire import MySqlWireLifecycleMixin, NoOpTableTuningMixin, build_database_config
 from .base.sql_execution import execute_sql_query
 
 # SQLGlot dialect - SingleStore is MySQL-compatible
@@ -67,22 +57,19 @@ _DEFAULT_PORT = 3306
 # NOTE: Only TPC-H tables are mapped. TPC-DS and other benchmark tables
 # will fall back to SHARD KEY () (random distribution), which is functional
 # but suboptimal for join-heavy queries. Add TPC-DS mappings when needed.
-_TPCH_SHARD_KEYS: dict[str, str] = {
-    "lineitem": "l_orderkey",
-    "orders": "o_orderkey",
-    "customer": "c_custkey",
-    "part": "p_partkey",
-    "supplier": "s_suppkey",
-    "partsupp": "ps_partkey",
-}
+_TPCH_SHARD_KEYS: dict[str, str] = dict(  # noqa: C408
+    lineitem="l_orderkey",
+    orders="o_orderkey",
+    customer="c_custkey",
+    part="p_partkey",
+    supplier="s_suppkey",
+    partsupp="ps_partkey",
+)
 
 # TPC-H sort key columns (primary analytical ordering)
 _TPCH_SORT_KEYS: dict[str, list[str]] = {
+    **{table: [key] for table, key in _TPCH_SHARD_KEYS.items()},
     "lineitem": ["l_orderkey", "l_linenumber"],
-    "orders": ["o_orderkey"],
-    "customer": ["c_custkey"],
-    "part": ["p_partkey"],
-    "supplier": ["s_suppkey"],
     "partsupp": ["ps_partkey", "ps_suppkey"],
 }
 
@@ -112,7 +99,7 @@ def _extract_create_table_name(stmt: str) -> str | None:
     return m.group(1).lower() if m else None
 
 
-class SingleStoreAdapter(BaseDdlOptimizer, PlatformAdapter):
+class SingleStoreAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, BaseDdlOptimizer, PlatformAdapter):
     """SingleStore platform adapter with LOAD DATA LOCAL INFILE bulk loading.
 
     Supports SingleStore 8.0+ with columnstore analytical tables.
@@ -137,6 +124,11 @@ class SingleStoreAdapter(BaseDdlOptimizer, PlatformAdapter):
     _platform_key: ClassVar[str] = "singlestore"
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
+    connection_operation_name = "SingleStore connection"
+    database_exists_rethrow_error_code = 2003
+    connection_runtime_error_code = 2003
+    empty_load_details: ClassVar[dict[str, Any]] = {}
+    reset_table_rows_on_load_error = True
 
     @property
     def platform_name(self) -> str:
@@ -254,14 +246,6 @@ class SingleStoreAdapter(BaseDdlOptimizer, PlatformAdapter):
         if not self._validate_identifier(self.database):
             raise ValueError(f"Invalid database identifier: {self.database}")
 
-    def _validate_identifier(self, identifier: str) -> bool:
-        """Validate SQL identifier to prevent injection."""
-        if not identifier or not isinstance(identifier, str):
-            return False
-        if len(identifier) > 128:
-            return False
-        return bool(re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", identifier))
-
     def _admin_connect(self) -> Any:
         """Create a connection without selecting a database."""
         return _s2.connect(
@@ -272,227 +256,41 @@ class SingleStoreAdapter(BaseDdlOptimizer, PlatformAdapter):
             connect_timeout=10,
         )
 
-    def check_server_database_exists(
-        self,
-        schema: str | None = None,
-        catalog: str | None = None,
-        database: str | None = None,
-        **_kwargs,
-    ) -> bool:
-        """Check if a database exists on the SingleStore server."""
-        db_name = database or self.database
-
-        try:
-            conn = self._admin_connect()
-            try:
-                cursor = conn.cursor()
-                cursor.execute("SHOW DATABASES")
-                databases = [row[0] for row in cursor.fetchall()]
-                cursor.close()
-                return db_name in databases
-            finally:
-                conn.close()
-        except Exception as e:
-            # CR_CONN_HOST_ERROR (2003) means the server is unreachable, not that the
-            # database is absent. Re-raise so callers get an actionable error instead of
-            # silently treating an unreachable server as a missing database.
-            if e.args and e.args[0] == 2003:
-                raise
-            self.logger.debug(f"Failed to check database existence: {e}")
-            return False
-
-    def drop_database(
-        self,
-        schema: str | None = None,
-        catalog: str | None = None,
-        database: str | None = None,
-        **_kwargs,
-    ) -> None:
-        """Drop a database from the SingleStore server."""
-        db_name = database or self.database
-
-        if not self._validate_identifier(db_name):
-            raise ValueError(f"Invalid database identifier: {db_name}")
-
-        conn = self._admin_connect()
-        try:
-            cursor = conn.cursor()
-            # Safety: db_name validated by _validate_identifier() above
-            cursor.execute(f"DROP DATABASE IF EXISTS `{db_name}`")
-            cursor.close()
-            self.logger.info(f"Dropped database: {db_name}")
-        except Exception as e:
-            self.logger.warning(f"Failed to drop database {db_name}: {e}")
-            raise
-        finally:
-            conn.close()
-
-    def _create_database(self) -> None:
-        """Create the target database if it doesn't exist."""
-        if not self._validate_identifier(self.database):
-            raise ValueError(f"Invalid database identifier: {self.database}")
-
-        conn = self._admin_connect()
-        try:
-            cursor = conn.cursor()
-            # Safety: self.database validated by _validate_identifier() above
-            cursor.execute(f"CREATE DATABASE IF NOT EXISTS `{self.database}`")
-            cursor.close()
-            self.logger.info(f"Created database: {self.database}")
-        except Exception as e:
-            self.logger.error(f"Failed to create database: {e}")
-            raise
-        finally:
-            conn.close()
-
-    def create_connection(self, **connection_config) -> Any:
-        """Create SingleStore connection via MySQL protocol (singlestoredb SDK)."""
-        self.log_operation_start("SingleStore connection")
-
-        try:
-            self.handle_existing_database(**connection_config)
-
-            if not self.check_server_database_exists():
-                self._create_database()
-
-            conn = _s2.connect(
-                host=self.host,
-                port=self.port,
-                user=self.username,
-                password=self.password,
-                database=self.database,
-                connect_timeout=10,
-                local_infile=True,
-            )
-
-            # Verify connection
-            cursor = conn.cursor()
-            cursor.execute("SELECT 1")
-            cursor.fetchone()
-            cursor.close()
-
-            self.log_operation_complete(
-                "SingleStore connection",
-                details=f"Connected to {self.host}:{self.port}/{self.database}",
-            )
-            return conn
-        except Exception as e:
-            if e.args and e.args[0] == 2003:
-                raise RuntimeError(
-                    f"Cannot connect to SingleStore at {self.host}:{self.port} — "
-                    f"verify the server is running and connection settings are correct"
-                ) from e
-            raise
-
-    def create_schema(self, benchmark, connection: Any) -> float:
-        """Create schema using benchmark's SQL definitions."""
-        start_time = mono_time()
-        self.log_operation_start("Schema creation", f"benchmark: {benchmark.__class__.__name__}")
-
-        schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="duckdb")
-
-        self.log_very_verbose(f"Executing schema creation script ({len(schema_sql)} characters)")
-
-        cursor = connection.cursor()
-        critical_failures = []
-
-        statements = [s.strip() for s in schema_sql.split(";") if s.strip()]
-        try:
-            for stmt in statements:
-                try:
-                    transformed = self._transform_create_statement(stmt)
-                    cursor.execute(transformed)
-                except Exception as e:
-                    is_create_table = stmt.strip().upper().startswith("CREATE TABLE")
-                    if is_create_table:
-                        critical_failures.append((stmt[:80], str(e)))
-                    self.logger.warning(f"Schema statement failed: {e}")
-            connection.commit()
-        finally:
-            cursor.close()
-
-        if critical_failures:
-            failed_summary = "; ".join(f"{s}: {err}" for s, err in critical_failures)
-            raise RuntimeError(f"{len(critical_failures)} critical CREATE TABLE statement(s) failed: {failed_summary}")
-
-        duration = elapsed_seconds(start_time)
-        self.log_operation_complete("Schema creation", duration, "Schema and tables created")
-        return duration
-
-    def load_data(
-        self,
-        benchmark,
-        connection: Any,
-        data_dir: Path,
-    ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Load benchmark data using LOAD DATA LOCAL INFILE."""
-        start_time = mono_time()
-        table_stats = {}
-        per_table_timings = {}
-
-        self.log_operation_start("Data loading", f"source: {data_dir}")
-
-        resolver = DataSourceResolver(
-            platform_name=self.platform_name,
-            table_mode=self.table_mode,
-            platform_config=self.platform_config,
-            requested_format=self.requested_table_format,
+    def _connect_database(self, **connection_config: Any) -> Any:
+        return _s2.connect(
+            host=self.host,
+            port=self.port,
+            user=self.username,
+            password=self.password,
+            database=self.database,
+            connect_timeout=10,
+            local_infile=True,
         )
-        data_source = resolver.resolve(benchmark, data_dir)
-        if not data_source or not data_source.tables:
-            self.logger.warning("No data files found. Ensure benchmark.generate_data() was called first.")
-            loading_time = elapsed_seconds(start_time)
-            self.log_operation_complete("Data loading", loading_time, "Loaded 0 total rows")
-            return {}, loading_time, {}
 
-        for table_name, table_path in data_source.tables.items():
-            table_name_lower = table_name.lower()
+    def _transform_schema_statement(self, stmt: str, benchmark: Any) -> str:
+        return self._transform_create_statement(stmt)
 
-            if not self._validate_identifier(table_name_lower):
-                raise ValueError(f"Invalid table identifier: {table_name!r}")
+    def _load_table_name(self, table_name: str) -> str:
+        return table_name.lower()
 
-            data_files = [f for f in normalize_table_paths(table_path) if f.exists()]
-            if not data_files:
-                self.logger.warning(f"Data file not found for {table_name_lower}")
-                table_stats[table_name_lower] = 0
-                continue
+    def _handle_invalid_load_table(self, table_name: str, table_stats: dict[str, int]) -> bool:
+        raise ValueError(f"Invalid table identifier: {table_name!r}")
 
-            table_start = mono_time()
-            table_rows = 0
-
-            try:
-                for data_file in data_files:
-                    if data_file.suffix.lower() in _PARQUET_EXTENSIONS:
-                        self.logger.warning(
-                            f"Skipping {data_file.name}: LOAD DATA LOCAL INFILE does not support Parquet"
-                        )
-                        continue
-                    dialect = resolve_csv_dialect(data_source, table_name, data_file, benchmark)
-                    # Strip trailing delimiter for TPC-H .tbl and TPC-DS .dat files:
-                    # both dbgen and dsdgen emit a spurious trailing pipe after every
-                    # record. CSV files must NOT be stripped: a trailing comma means the
-                    # last field is empty/NULL, not a junk terminator.
-                    strip_trailing_delim = get_data_extension(data_file) in (".tbl", ".dat")
-                    table_rows += self._load_data_infile(
-                        connection, table_name_lower, data_file, dialect, strip_trailing_delim
-                    )
-                table_stats[table_name_lower] = table_rows
-                table_duration = elapsed_seconds(table_start)
-                per_table_timings[table_name_lower] = {
-                    "rows": table_rows,
-                    "duration_seconds": table_duration,
-                }
-                self.log_verbose(f"Loaded {table_rows:,} rows into {table_name_lower}")
-
-            except Exception as e:
-                self.logger.error(f"Failed to load {table_name_lower}: {e}")
-                table_stats[table_name_lower] = 0
-
-        loading_time = elapsed_seconds(start_time)
-        total_rows = sum(table_stats.values())
-        self.log_operation_complete("Data loading", loading_time, f"Loaded {total_rows:,} total rows")
-
-        return table_stats, loading_time, per_table_timings
+    def _load_resolved_data_file(
+        self,
+        benchmark: Any,
+        connection: Any,
+        table_name: str,
+        source_table_name: str,
+        data_file: Path,
+        data_source: Any,
+    ) -> int:
+        if data_file.suffix.lower() in _PARQUET_EXTENSIONS:
+            self.logger.warning(f"Skipping {data_file.name}: LOAD DATA LOCAL INFILE does not support Parquet")
+            return 0
+        dialect = resolve_csv_dialect(data_source, source_table_name, data_file, benchmark)
+        strip_trailing_delim = get_data_extension(data_file) in (".tbl", ".dat")
+        return self._load_data_infile(connection, table_name, data_file, dialect, strip_trailing_delim)
 
     def _load_data_infile(
         self,
@@ -596,49 +394,6 @@ class SingleStoreAdapter(BaseDdlOptimizer, PlatformAdapter):
             stream_id=stream_id,
         )
 
-    def get_query_plan(
-        self,
-        connection: Any,
-        query: str,
-        explain_options: dict[str, Any] | None = None,
-    ) -> str:
-        """Get query execution plan using EXPLAIN."""
-        cursor = connection.cursor()
-
-        explain_query = f"EXPLAIN {query}"
-
-        try:
-            cursor.execute(explain_query)
-            plan_rows = cursor.fetchall()
-            cursor.close()
-            return "\n".join(str(row) for row in plan_rows)
-        except Exception as e:
-            cursor.close()
-            return f"Failed to get query plan: {e}"
-
-    def analyze_table(self, connection: Any, table_name: str) -> None:
-        """Run ANALYZE on a table to update statistics."""
-        if not self._validate_identifier(table_name):
-            self.logger.warning(f"Invalid table identifier: {table_name}")
-            return
-
-        cursor = connection.cursor()
-        try:
-            # Safety: table_name validated by _validate_identifier() above
-            cursor.execute(f"ANALYZE TABLE `{table_name}`")
-        except Exception as e:
-            self.logger.warning(f"ANALYZE failed for {table_name}: {e}")
-        finally:
-            cursor.close()
-
-    def close_connection(self, connection: Any) -> None:
-        """Close SingleStore connection."""
-        if connection:
-            try:
-                connection.close()
-            except Exception as e:
-                self.logger.debug(f"Error closing connection: {e}")
-
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
         """Get SingleStore platform information."""
         platform_info: dict[str, Any] = {
@@ -675,38 +430,6 @@ class SingleStoreAdapter(BaseDdlOptimizer, PlatformAdapter):
             platform_info["client_library_version"] = getattr(_s2, "__version__", "unknown")
 
         return platform_info
-
-    def test_connection(self) -> bool:
-        """Test if connection can be established."""
-        try:
-            conn = _s2.connect(
-                host=self.host,
-                port=self.port,
-                user=self.username,
-                password=self.password,
-                connect_timeout=10,
-            )
-            cursor = conn.cursor()
-            cursor.execute("SELECT 1")
-            cursor.fetchone()
-            cursor.close()
-            conn.close()
-            return True
-        except Exception as e:
-            self.logger.debug(f"Connection test failed: {e}")
-            return False
-
-    def _get_existing_tables(self, connection: Any) -> list[str]:
-        """Get list of existing tables in the database."""
-        try:
-            cursor = connection.cursor()
-            cursor.execute("SHOW TABLES")
-            result = cursor.fetchall()
-            cursor.close()
-            return [row[0].lower() for row in result]
-        except Exception as e:
-            self.logger.debug(f"Failed to get existing tables: {e}")
-            return []
 
     # ------------------------------------------------------------------ #
     # DDL transformation - inject columnstore, shard/sort keys
@@ -868,39 +591,6 @@ class SingleStoreAdapter(BaseDdlOptimizer, PlatformAdapter):
         """
         return table_name in _REFERENCE_TABLES
 
-    # ------------------------------------------------------------------ #
-    # Tuning hooks (stubs - DDL carries the analytical optimizations)
-    # ------------------------------------------------------------------ #
-
-    def apply_table_tunings(self, table_tuning: TableTuning, connection: Any) -> None:
-        """Apply tuning configurations to SingleStore tables."""
-
-    def generate_tuning_clause(self, table_tuning: TableTuning | None) -> str:
-        """Generate SingleStore-specific tuning clauses."""
-        return ""
-
-    def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
-        """Apply unified tuning configuration."""
-
-    def apply_platform_optimizations(
-        self,
-        platform_config: PlatformOptimizationConfiguration,
-        connection: Any,
-    ) -> None:
-        """Apply SingleStore-specific optimizations."""
-
-    def apply_constraint_configuration(
-        self,
-        primary_key_config: PrimaryKeyConfiguration,
-        foreign_key_config: ForeignKeyConfiguration,
-        connection: Any,
-    ) -> None:
-        """Apply constraint configurations.
-
-        Note: SingleStore does not enforce foreign key constraints.
-        Primary keys are used for shard-key alignment, not FK enforcement.
-        """
-
     def validate_platform_capabilities(self, benchmark_type: str):
         """Validate SingleStore-specific capabilities for the benchmark."""
         errors = []
@@ -937,57 +627,19 @@ class SingleStoreAdapter(BaseDdlOptimizer, PlatformAdapter):
         except ImportError:
             return None
 
-    def validate_connection_health(self, connection: Any):
-        """Validate SingleStore connection health and capabilities."""
-        errors = []
-        warnings = []
-        connection_info = {}
-
+    def _populate_connection_health_details(
+        self,
+        cursor: Any,
+        warnings: list[str],
+        connection_info: dict[str, Any],
+    ) -> None:
         try:
-            cursor = connection.cursor()
-
-            cursor.execute("SELECT 1 as test_value")
-            result = cursor.fetchone()
-            if result[0] != 1:
-                errors.append("Basic query execution test failed")
-            else:
-                connection_info["basic_query_test"] = "passed"
-
-            try:
-                cursor.execute("SELECT @@memsql_version")
-                version_result = cursor.fetchone()
-                if version_result:
-                    connection_info["server_version"] = version_result[0]
-            except Exception:
-                warnings.append("Could not query SingleStore version")
-
-            try:
-                cursor.execute("SELECT DATABASE()")
-                db_result = cursor.fetchone()
-                if db_result:
-                    connection_info["current_database"] = db_result[0]
-            except Exception:
-                warnings.append("Could not query current database")
-
-            cursor.close()
-        except Exception as e:
-            errors.append(f"Connection health check failed: {str(e)}")
-
-        try:
-            from benchbox.core.validation import ValidationResult
-
-            return ValidationResult(
-                is_valid=len(errors) == 0,
-                errors=errors,
-                warnings=warnings,
-                details={
-                    "platform": self.platform_name,
-                    "connection_type": type(connection).__name__,
-                    **connection_info,
-                },
-            )
-        except ImportError:
-            return None
+            cursor.execute("SELECT @@memsql_version")
+            version_result = cursor.fetchone()
+            if version_result:
+                connection_info["server_version"] = version_result[0]
+        except Exception:
+            warnings.append("Could not query SingleStore version")
 
     def supports_tuning_type(self, tuning_type: Any) -> bool:
         """Check if SingleStore supports a specific tuning type."""
@@ -1013,62 +665,24 @@ def _build_singlestore_config(
     overrides: dict[str, Any],
     info: Any,
 ) -> Any:
-    """Build SingleStore database configuration with credential loading.
-
-    Args:
-        platform: Platform name (should be 'singlestore')
-        options: CLI platform options from --platform-option flags
-        overrides: Runtime overrides from orchestrator
-        info: Platform info from registry
-
-    Returns:
-        DatabaseConfig with credentials loaded
-    """
-    # Intentionally inline - not using build_platform_config because env-var fallback and int coercion
-    # must happen at builder runtime for CLI/test parity. See the Group D TODO investigation notes.
-    from benchbox.core.schemas import DatabaseConfig
-    from benchbox.security.credentials import CredentialManager
-
-    # Load saved credentials
-    cred_manager = CredentialManager()
-    saved_creds = cred_manager.get_platform_credentials("singlestore") or {}
-
-    # Priority: defaults < saved_creds < explicit_options < overrides
-    explicit_options = overrides.get("_explicit_platform_options", {})
-    merged_options: dict[str, Any] = {}
-    merged_options.update(options)
-    merged_options.update(saved_creds)
-    merged_options.update(explicit_options)
-    merged_options.update(overrides)
-
-    name = info.display_name if info else "SingleStore"
-    driver_package = info.driver_package if info else "singlestoredb"
-
-    config_dict = {
-        "type": "singlestore",
-        "name": name,
-        "options": merged_options or {},
-        "driver_package": driver_package,
-        "driver_version": overrides.get("driver_version") or options.get("driver_version"),
-        "driver_auto_install": bool(overrides.get("driver_auto_install", options.get("driver_auto_install", False))),
-        # Platform-specific fields
-        "host": merged_options.get("host") or os.environ.get("SINGLESTORE_HOST", "localhost"),
-        "port": (
-            merged_options.get("port")
-            if merged_options.get("port") is not None
-            else int(os.environ.get("SINGLESTORE_PORT", str(_DEFAULT_PORT)))
-        ),
-        "username": (
-            merged_options.get("username")
+    return build_database_config(
+        platform=platform,
+        options=options,
+        overrides=overrides,
+        info=info,
+        default_name="SingleStore",
+        default_driver_package="singlestoredb",
+        fields={
+            "host": lambda m: m.get("host") or os.environ.get("SINGLESTORE_HOST", "localhost"),
+            "port": lambda m: (
+                m.get("port")
+                if m.get("port") is not None
+                else int(os.environ.get("SINGLESTORE_PORT", str(_DEFAULT_PORT)))
+            ),
+            "username": lambda m: m.get("username")
             or os.environ.get("SINGLESTORE_USER")
-            or os.environ.get("SINGLESTORE_USERNAME", "root")
-        ),
-        "password": merged_options.get("password") or os.environ.get("SINGLESTORE_PASSWORD"),
-        "database": merged_options.get("database") or os.environ.get("SINGLESTORE_DATABASE"),
-        # Benchmark context
-        "benchmark": overrides.get("benchmark"),
-        "scale_factor": overrides.get("scale_factor"),
-        "tuning_config": overrides.get("tuning_config"),
-    }
-
-    return DatabaseConfig(**config_dict)
+            or os.environ.get("SINGLESTORE_USERNAME", "root"),
+            "password": lambda m: m.get("password") or os.environ.get("SINGLESTORE_PASSWORD"),
+            "database": lambda m: m.get("database") or os.environ.get("SINGLESTORE_DATABASE"),
+        },
+    )
