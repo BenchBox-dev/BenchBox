@@ -3,16 +3,6 @@
 All 43 ClickBench queries implemented for both Expression and Pandas families.
 All queries operate on a single flat 'hits' table (no joins).
 
-Categories:
-- Basic aggregation (Q1-Q7): COUNT, SUM, AVG, MIN/MAX, COUNT(DISTINCT)
-- Grouping and ordering (Q8-Q15): GROUP BY with various aggregates
-- User analysis (Q16-Q20): User-centric grouping and point lookups
-- Text and pattern matching (Q21-Q27): LIKE, string filtering
-- String operations (Q28-Q29): LENGTH, REGEXP_REPLACE, HAVING
-- Mathematical operations (Q30): Wide aggregation (90 columns)
-- Complex grouping (Q31-Q36): Multi-column GROUP BY with derived columns
-- Time-based analysis (Q37-Q43): Date filtering, OFFSET, CASE WHEN, DATE_TRUNC
-
 Copyright 2026 Joe Harris / BenchBox Project
 
 Licensed under the MIT License. See LICENSE file in the project root for details.
@@ -28,610 +18,311 @@ from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory
 
 from .registry import register_query
 
-# =============================================================================
-# Basic Aggregation (Q1-Q7)
-# =============================================================================
-
-
-def q1_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q1: COUNT(*) - full table scan count."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    return hits.select(col("WatchID").count().alias("count"))
-
-
-def q1_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q1: COUNT(*) - full table scan count."""
-    import pandas as pd
-
-    hits = ctx.get_table("hits")
-    count = len(hits)
-    if hasattr(count, "compute"):
-        count = count.compute()
-    return pd.DataFrame({"count": [count]})
-
-
-def q2_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q2: COUNT(*) with filter on AdvEngineID."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    lit = ctx.lit
-    return hits.filter(col("AdvEngineID") != lit(0)).select(col("WatchID").count().alias("count"))
-
-
-def q2_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q2: COUNT(*) with filter on AdvEngineID."""
-    import pandas as pd
-
-    hits = ctx.get_table("hits")
-    count = len(hits[hits["AdvEngineID"] != 0])
-    if hasattr(count, "compute"):
-        count = count.compute()
-    return pd.DataFrame({"count": [count]})
-
-
-def q3_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q3: SUM, COUNT, AVG - multi-aggregate full scan."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    return hits.select(
-        col("AdvEngineID").sum().alias("sum_adv"),
-        col("AdvEngineID").count().alias("count"),
-        col("ResolutionWidth").mean().alias("avg_resolution"),
-    )
-
-
-def q3_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q3: SUM, COUNT, AVG - multi-aggregate full scan."""
-    import pandas as pd
-
-    hits = ctx.get_table("hits")
-    result = pd.DataFrame(
-        {
-            "sum_adv": [hits["AdvEngineID"].sum()],
-            "count": [len(hits)],
-            "avg_resolution": [hits["ResolutionWidth"].mean()],
-        }
-    )
-    return result
-
-
-def q4_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q4: AVG(UserID) - average of BIGINT column."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    return hits.select(col("UserID").mean().alias("avg_user_id"))
-
-
-def q4_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q4: AVG(UserID) - average of BIGINT column."""
-    import pandas as pd
-
-    hits = ctx.get_table("hits")
-    return pd.DataFrame({"avg_user_id": [hits["UserID"].mean()]})
-
-
-def q5_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q5: COUNT(DISTINCT UserID)."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    return hits.select(col("UserID").n_unique().alias("uniq_users"))
-
-
-def q5_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q5: COUNT(DISTINCT UserID)."""
-    import pandas as pd
-
-    hits = ctx.get_table("hits")
-    return pd.DataFrame({"uniq_users": [hits["UserID"].nunique()]})
-
-
-def q6_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q6: COUNT(DISTINCT SearchPhrase)."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    return hits.select(col("SearchPhrase").n_unique().alias("uniq_search"))
-
-
-def q6_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q6: COUNT(DISTINCT SearchPhrase)."""
-    import pandas as pd
-
-    hits = ctx.get_table("hits")
-    return pd.DataFrame({"uniq_search": [hits["SearchPhrase"].nunique()]})
-
-
-def q7_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q7: MIN/MAX on EventDate."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    return hits.select(
-        col("EventDate").min().alias("min_date"),
-        col("EventDate").max().alias("max_date"),
-    )
-
-
-def q7_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q7: MIN/MAX on EventDate."""
-    import pandas as pd
-
-    hits = ctx.get_table("hits")
-    return pd.DataFrame({"min_date": [hits["EventDate"].min()], "max_date": [hits["EventDate"].max()]})
-
-
-# =============================================================================
-# Grouping and Ordering (Q8-Q15)
-# =============================================================================
-
-
-def q8_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q8: GROUP BY AdvEngineID with COUNT, filtered and sorted."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    lit = ctx.lit
-    return (
-        hits.filter(col("AdvEngineID") != lit(0))
-        .group_by("AdvEngineID")
-        .agg(col("AdvEngineID").count().alias("c"))
-        .sort("c", descending=True)
-    )
-
-
-def q8_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q8: GROUP BY AdvEngineID with COUNT, filtered and sorted."""
-    hits = ctx.get_table("hits")
-    filtered = hits[hits["AdvEngineID"] != 0]
-    return (
-        filtered.groupby(["AdvEngineID"], as_index=False)
-        .agg(c=("AdvEngineID", "count"))
-        .sort_values("c", ascending=False)
-    )
-
-
-def q9_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q9: COUNT(DISTINCT UserID) by RegionID, top 10."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    return hits.group_by("RegionID").agg(col("UserID").n_unique().alias("u")).sort("u", descending=True).limit(10)
-
-
-def q9_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q9: COUNT(DISTINCT UserID) by RegionID, top 10."""
-    hits = ctx.get_table("hits")
-    return (
-        hits.groupby(["RegionID"], as_index=False)
-        .agg(u=("UserID", "nunique"))
-        .sort_values("u", ascending=False)
-        .head(10)
-    )
-
-
-def q10_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q10: Multi-aggregate by RegionID, top 10."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    return (
-        hits.group_by("RegionID")
-        .agg(
-            col("AdvEngineID").sum().alias("sum_adv"),
-            col("RegionID").count().alias("c"),
-            col("ResolutionWidth").mean().alias("avg_res"),
-            col("UserID").n_unique().alias("uniq_users"),
-        )
-        .sort("c", descending=True)
-        .limit(10)
-    )
-
-
-def q10_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q10: Multi-aggregate by RegionID, top 10."""
-    hits = ctx.get_table("hits")
-    grouped = hits.groupby(["RegionID"], as_index=False).agg(
-        sum_adv=("AdvEngineID", "sum"),
-        c=("RegionID", "count"),
-        avg_res=("ResolutionWidth", "mean"),
-        uniq_users=("UserID", "nunique"),
-    )
-    return grouped.sort_values("c", ascending=False).head(10)
-
-
-def q11_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q11: COUNT(DISTINCT UserID) by MobilePhoneModel, filtered, top 10."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    lit = ctx.lit
-    return (
-        hits.filter(col("MobilePhoneModel") != lit(""))
-        .group_by("MobilePhoneModel")
-        .agg(col("UserID").n_unique().alias("u"))
-        .sort("u", descending=True)
-        .limit(10)
-    )
-
-
-def q11_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q11: COUNT(DISTINCT UserID) by MobilePhoneModel, filtered, top 10."""
-    hits = ctx.get_table("hits")
-    filtered = hits[hits["MobilePhoneModel"] != ""]
-    return (
-        filtered.groupby(["MobilePhoneModel"], as_index=False)
-        .agg(u=("UserID", "nunique"))
-        .sort_values("u", ascending=False)
-        .head(10)
-    )
-
-
-def q12_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q12: COUNT(DISTINCT UserID) by MobilePhone + MobilePhoneModel, top 10."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    lit = ctx.lit
-    return (
-        hits.filter(col("MobilePhoneModel") != lit(""))
-        .group_by("MobilePhone", "MobilePhoneModel")
-        .agg(col("UserID").n_unique().alias("u"))
-        .sort("u", descending=True)
-        .limit(10)
-    )
-
-
-def q12_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q12: COUNT(DISTINCT UserID) by MobilePhone + MobilePhoneModel, top 10."""
-    hits = ctx.get_table("hits")
-    filtered = hits[hits["MobilePhoneModel"] != ""]
-    return (
-        filtered.groupby(["MobilePhone", "MobilePhoneModel"], as_index=False)
-        .agg(u=("UserID", "nunique"))
-        .sort_values("u", ascending=False)
-        .head(10)
-    )
-
-
-def q13_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q13: Top search phrases by count."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    lit = ctx.lit
-    return (
-        hits.filter(col("SearchPhrase") != lit(""))
-        .group_by("SearchPhrase")
-        .agg(col("SearchPhrase").count().alias("c"))
-        .sort("c", descending=True)
-        .limit(10)
-    )
-
-
-def q13_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q13: Top search phrases by count."""
-    hits = ctx.get_table("hits")
-    filtered = hits[hits["SearchPhrase"] != ""]
-    return (
-        filtered.groupby(["SearchPhrase"], as_index=False)
-        .agg(c=("SearchPhrase", "count"))
-        .sort_values("c", ascending=False)
-        .head(10)
-    )
-
-
-def q14_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q14: Top search phrases by unique users."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    lit = ctx.lit
-    return (
-        hits.filter(col("SearchPhrase") != lit(""))
-        .group_by("SearchPhrase")
-        .agg(col("UserID").n_unique().alias("u"))
-        .sort("u", descending=True)
-        .limit(10)
-    )
-
-
-def q14_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q14: Top search phrases by unique users."""
-    hits = ctx.get_table("hits")
-    filtered = hits[hits["SearchPhrase"] != ""]
-    return (
-        filtered.groupby(["SearchPhrase"], as_index=False)
-        .agg(u=("UserID", "nunique"))
-        .sort_values("u", ascending=False)
-        .head(10)
-    )
-
-
-def q15_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q15: SearchEngineID + SearchPhrase count, top 10."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    lit = ctx.lit
-    return (
-        hits.filter(col("SearchPhrase") != lit(""))
-        .group_by("SearchEngineID", "SearchPhrase")
-        .agg(col("SearchPhrase").count().alias("c"))
-        .sort("c", descending=True)
-        .limit(10)
-    )
-
-
-def q15_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q15: SearchEngineID + SearchPhrase count, top 10."""
-    hits = ctx.get_table("hits")
-    filtered = hits[hits["SearchPhrase"] != ""]
-    return (
-        filtered.groupby(["SearchEngineID", "SearchPhrase"], as_index=False)
-        .agg(c=("SearchPhrase", "count"))
-        .sort_values("c", ascending=False)
-        .head(10)
-    )
-
-
-# =============================================================================
-# User Analysis (Q16-Q20)
-# =============================================================================
-
-
-def q16_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q16: Top users by activity count."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    return hits.group_by("UserID").agg(col("UserID").count().alias("c")).sort("c", descending=True).limit(10)
-
-
-def q16_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q16: Top users by activity count."""
-    hits = ctx.get_table("hits")
-    return (
-        hits.groupby(["UserID"], as_index=False).agg(c=("UserID", "count")).sort_values("c", ascending=False).head(10)
-    )
-
-
-def q17_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q17: Top user + search phrase combinations by count."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    return (
-        hits.group_by("UserID", "SearchPhrase")
-        .agg(col("UserID").count().alias("c"))
-        .sort("c", descending=True)
-        .limit(10)
-    )
-
-
-def q17_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q17: Top user + search phrase combinations by count."""
-    hits = ctx.get_table("hits")
-    return (
-        hits.groupby(["UserID", "SearchPhrase"], as_index=False)
-        .agg(c=("UserID", "count"))
-        .sort_values("c", ascending=False)
-        .head(10)
-    )
-
-
-def q18_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q18: User + search phrase group, no order, limit 10."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    return hits.group_by("UserID", "SearchPhrase").agg(col("UserID").count().alias("c")).limit(10)
-
-
-def q18_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q18: User + search phrase group, no order, limit 10."""
-    hits = ctx.get_table("hits")
-    return hits.groupby(["UserID", "SearchPhrase"], as_index=False).agg(c=("UserID", "count")).head(10)
-
-
-def q19_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q19: User + minute + search phrase group, top 10."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    return (
-        hits.with_columns(col("EventTime").dt.minute().alias("m"))
-        .group_by("UserID", "m", "SearchPhrase")
-        .agg(col("UserID").count().alias("c"))
-        .sort("c", descending=True)
-        .limit(10)
-    )
-
-
-def q19_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q19: User + minute + search phrase group, top 10."""
-    hits = ctx.get_table("hits")
-    hits = hits.copy()
-    hits["m"] = hits["EventTime"].dt.minute
-    return (
-        hits.groupby(["UserID", "m", "SearchPhrase"], as_index=False)
-        .agg(c=("UserID", "count"))
-        .sort_values("c", ascending=False)
-        .head(10)
-    )
-
-
-def q20_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q20: Point lookup by UserID."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    lit = ctx.lit
-    return hits.filter(col("UserID") == lit(435090932899640449))
-
-
-def q20_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q20: Point lookup by UserID."""
-    hits = ctx.get_table("hits")
-    return hits[hits["UserID"] == 435090932899640449]
-
-
-# =============================================================================
-# Text and Pattern Matching (Q21-Q27)
-# =============================================================================
-
-
-def q21_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q21: COUNT(*) where URL contains 'google'."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    lit = ctx.lit
-    return hits.filter(col("URL").str.contains(lit("google"))).select(col("WatchID").count().alias("count"))
-
-
-def q21_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q21: COUNT(*) where URL contains 'google'."""
-    import pandas as pd
-
-    hits = ctx.get_table("hits")
-    count = len(hits[hits["URL"].str.contains("google", na=False)])
-    return pd.DataFrame({"count": [count]})
-
-
-def q22_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q22: Top search phrases for google URLs."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    lit = ctx.lit
-    return (
-        hits.filter((col("URL").str.contains(lit("google"))) & (col("SearchPhrase") != lit("")))
-        .group_by("SearchPhrase")
-        .agg(
-            col("URL").min().alias("min_url"),
-            col("SearchPhrase").count().alias("c"),
-        )
-        .sort("c", descending=True)
-        .limit(10)
-    )
-
-
-def q22_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q22: Top search phrases for google URLs."""
-    hits = ctx.get_table("hits")
-    filtered = hits[hits["URL"].str.contains("google", na=False) & (hits["SearchPhrase"] != "")]
-    return (
-        filtered.groupby(["SearchPhrase"], as_index=False)
-        .agg(min_url=("URL", "min"), c=("SearchPhrase", "count"))
-        .sort_values("c", ascending=False)
-        .head(10)
-    )
-
-
-def q23_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q23: Search phrases for Google titles excluding .google. URLs."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    lit = ctx.lit
-    return (
-        hits.filter(
+_DATE_FROM, _DATE_TO = "2013-07-01", "2013-07-31"
+
+
+def _hits(ctx: DataFrameContext) -> Any:
+    return ctx.get_table("hits")
+
+
+def _expr_july_mask(ctx: DataFrameContext, start: str = _DATE_FROM, end: str = _DATE_TO) -> Any:
+    col, lit = ctx.col, ctx.lit
+    return (col("CounterID") == lit(62)) & (col("EventDate") >= lit(start)) & (col("EventDate") <= lit(end))
+
+
+def _expr_filter(ctx: DataFrameContext, hits: Any, code: str) -> Any:
+    col, lit = ctx.col, ctx.lit
+    if not code:
+        return hits
+    if code == "adv_ne_0":
+        return hits.filter(col("AdvEngineID") != lit(0))
+    if code == "phone_model_nonempty":
+        return hits.filter(col("MobilePhoneModel") != lit(""))
+    if code == "search_nonempty":
+        return hits.filter(col("SearchPhrase") != lit(""))
+    if code == "url_google":
+        return hits.filter(col("URL").str.contains(lit("google")))
+    if code == "google_search":
+        return hits.filter((col("URL").str.contains(lit("google"))) & (col("SearchPhrase") != lit("")))
+    if code == "google_title":
+        return hits.filter(
             (col("Title").str.contains(lit("Google")))
             & (~col("URL").str.contains(lit(".google.")))
             & (col("SearchPhrase") != lit(""))
         )
-        .group_by("SearchPhrase")
-        .agg(
-            col("URL").min().alias("min_url"),
-            col("Title").min().alias("min_title"),
-            col("SearchPhrase").count().alias("c"),
-            col("UserID").n_unique().alias("uniq_users"),
+    if code == "user_lookup":
+        return hits.filter(col("UserID") == lit(435090932899640449))
+    if code == "minute_range":
+        return hits.filter(_expr_july_mask(ctx, "2013-07-14", "2013-07-15") & _expr_no_refresh(ctx))
+    mask = _expr_july_mask(ctx)
+    if code == "july_url_pageviews":
+        return hits.filter(mask & _expr_no_refresh(ctx) & (col("URL") != lit("")))
+    if code == "july_title_pageviews":
+        return hits.filter(mask & _expr_no_refresh(ctx) & (col("Title") != lit("")))
+    if code == "july_link_views":
+        return hits.filter(
+            mask & (col("IsRefresh") == lit(0)) & (col("IsLink") != lit(0)) & (col("IsDownload") == lit(0))
         )
-        .sort("c", descending=True)
-        .limit(10)
-    )
-
-
-def q23_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q23: Search phrases for Google titles excluding .google. URLs."""
-    hits = ctx.get_table("hits")
-    filtered = hits[
-        hits["Title"].str.contains("Google", na=False)
-        & ~hits["URL"].str.contains(".google.", na=False, regex=False)
-        & (hits["SearchPhrase"] != "")
-    ]
-    return (
-        filtered.groupby(["SearchPhrase"], as_index=False)
-        .agg(
-            min_url=("URL", "min"),
-            min_title=("Title", "min"),
-            c=("SearchPhrase", "count"),
-            uniq_users=("UserID", "nunique"),
+    if code == "july_source":
+        return hits.filter(mask & (col("IsRefresh") == lit(0)))
+    if code == "july_referer_hash":
+        return hits.filter(
+            mask
+            & (col("IsRefresh") == lit(0))
+            & (col("TraficSourceID").is_in([-1, 6]))
+            & (col("RefererHash") == lit(3594120000172545465))
         )
-        .sort_values("c", ascending=False)
-        .head(10)
-    )
+    if code == "july_url_hash":
+        return hits.filter(mask & _expr_no_refresh(ctx) & (col("URLHash") == lit(2868770270353813622)))
+    raise ValueError(f"Unknown ClickBench expression filter: {code}")
 
 
-def q24_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q24: All columns for google URLs sorted by EventTime, top 10."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    lit = ctx.lit
-    return hits.filter(col("URL").str.contains(lit("google"))).sort("EventTime").limit(10)
+def _expr_no_refresh(ctx: DataFrameContext) -> Any:
+    col, lit = ctx.col, ctx.lit
+    return (col("DontCountHits") == lit(0)) & (col("IsRefresh") == lit(0))
 
 
-def q24_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q24: All columns for google URLs sorted by EventTime, top 10."""
-    hits = ctx.get_table("hits")
-    return hits[hits["URL"].str.contains("google", na=False)].sort_values("EventTime").head(10)
+def _pandas_july_mask(hits: Any, start: str = _DATE_FROM, end: str = _DATE_TO) -> Any:
+    return (hits["CounterID"] == 62) & (hits["EventDate"] >= start) & (hits["EventDate"] <= end)
 
 
-def q25_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q25: Non-empty search phrases sorted by EventTime, top 10."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    lit = ctx.lit
-    return hits.filter(col("SearchPhrase") != lit("")).sort("EventTime").limit(10).select("SearchPhrase")
+def _pandas_filter(hits: Any, code: str) -> Any:
+    if not code:
+        return hits
+    if code == "adv_ne_0":
+        return hits[hits["AdvEngineID"] != 0]
+    if code == "phone_model_nonempty":
+        return hits[hits["MobilePhoneModel"] != ""]
+    if code == "search_nonempty":
+        return hits[hits["SearchPhrase"] != ""]
+    if code == "url_google":
+        return hits[hits["URL"].str.contains("google", na=False)]
+    if code == "google_search":
+        return hits[hits["URL"].str.contains("google", na=False) & (hits["SearchPhrase"] != "")]
+    if code == "google_title":
+        return hits[
+            hits["Title"].str.contains("Google", na=False)
+            & ~hits["URL"].str.contains(".google.", na=False, regex=False)
+            & (hits["SearchPhrase"] != "")
+        ]
+    if code == "user_lookup":
+        return hits[hits["UserID"] == 435090932899640449]
+    if code == "minute_range":
+        return hits[_pandas_july_mask(hits, "2013-07-14", "2013-07-15") & _pandas_no_refresh(hits)]
+    mask = _pandas_july_mask(hits)
+    if code == "july_url_pageviews":
+        return hits[mask & _pandas_no_refresh(hits) & (hits["URL"] != "")]
+    if code == "july_title_pageviews":
+        return hits[mask & _pandas_no_refresh(hits) & (hits["Title"] != "")]
+    if code == "july_link_views":
+        return hits[mask & (hits["IsRefresh"] == 0) & (hits["IsLink"] != 0) & (hits["IsDownload"] == 0)]
+    if code == "july_source":
+        return hits[mask & (hits["IsRefresh"] == 0)]
+    if code == "july_referer_hash":
+        return hits[
+            mask
+            & (hits["IsRefresh"] == 0)
+            & (hits["TraficSourceID"].isin([-1, 6]))
+            & (hits["RefererHash"] == 3594120000172545465)
+        ]
+    if code == "july_url_hash":
+        return hits[mask & _pandas_no_refresh(hits) & (hits["URLHash"] == 2868770270353813622)]
+    raise ValueError(f"Unknown ClickBench pandas filter: {code}")
 
 
-def q25_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q25: Non-empty search phrases sorted by EventTime, top 10."""
-    hits = ctx.get_table("hits")
-    return hits[hits["SearchPhrase"] != ""].sort_values("EventTime").head(10)[["SearchPhrase"]]
+def _pandas_no_refresh(hits: Any) -> Any:
+    return (hits["DontCountHits"] == 0) & (hits["IsRefresh"] == 0)
 
 
-def q26_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q26: Non-empty search phrases sorted by SearchPhrase, top 10."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    lit = ctx.lit
-    return hits.filter(col("SearchPhrase") != lit("")).sort("SearchPhrase").limit(10).select("SearchPhrase")
+def _expr_derive(ctx: DataFrameContext, hits: Any, code: str) -> Any:
+    col, lit = ctx.col, ctx.lit
+    if not code:
+        return hits
+    if code == "minute":
+        return hits.with_columns(col("EventTime").dt.minute().alias("m"))
+    if code == "one":
+        return hits.with_columns(lit(1).alias("one"))
+    if code == "ip_offsets":
+        return hits.with_columns(
+            (col("ClientIP") - lit(1)).alias("ip_m1"),
+            (col("ClientIP") - lit(2)).alias("ip_m2"),
+            (col("ClientIP") - lit(3)).alias("ip_m3"),
+        )
+    if code == "source":
+        return hits.with_columns(
+            ctx.when((col("SearchEngineID") == lit(0)) & (col("AdvEngineID") == lit(0)))
+            .then(col("Referer"))
+            .otherwise(lit(""))
+            .alias("Src")
+        )
+    if code == "trunc_minute":
+        return hits.with_columns(col("EventTime").dt.truncate("1m").alias("M"))
+    raise ValueError(f"Unknown ClickBench expression derived column: {code}")
 
 
-def q26_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q26: Non-empty search phrases sorted by SearchPhrase, top 10."""
-    hits = ctx.get_table("hits")
-    return hits[hits["SearchPhrase"] != ""].sort_values("SearchPhrase").head(10)[["SearchPhrase"]]
+def _pandas_derive(hits: Any, code: str) -> Any:
+    if not code:
+        return hits
+    hits = hits.copy()
+    if code == "minute":
+        hits["m"] = hits["EventTime"].dt.minute
+    elif code == "one":
+        hits["one"] = 1
+    elif code == "ip_offsets":
+        hits["ip_m1"] = hits["ClientIP"] - 1
+        hits["ip_m2"] = hits["ClientIP"] - 2
+        hits["ip_m3"] = hits["ClientIP"] - 3
+    elif code == "source":
+        import numpy as np
+
+        hits["Src"] = np.where((hits["SearchEngineID"] == 0) & (hits["AdvEngineID"] == 0), hits["Referer"], "")
+    elif code == "trunc_minute":
+        hits["M"] = hits["EventTime"].dt.floor("min")
+    else:
+        raise ValueError(f"Unknown ClickBench pandas derived column: {code}")
+    return hits
 
 
-def q27_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q27: Non-empty search phrases sorted by EventTime then SearchPhrase, top 10."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    lit = ctx.lit
-    return (
-        hits.filter(col("SearchPhrase") != lit("")).sort(["EventTime", "SearchPhrase"]).limit(10).select("SearchPhrase")
-    )
+def _agg_parts(token: str) -> tuple[str, str, str, str]:
+    alias, rhs = token.split("=")
+    parts = rhs.split(":")
+    return alias, parts[0], parts[1], parts[2] if len(parts) > 2 else parts[1]
 
 
-def q27_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q27: Non-empty search phrases sorted by EventTime then SearchPhrase, top 10."""
-    hits = ctx.get_table("hits")
-    return hits[hits["SearchPhrase"] != ""].sort_values(["EventTime", "SearchPhrase"]).head(10)[["SearchPhrase"]]
+def _expr_agg(ctx: DataFrameContext, token: str) -> Any:
+    alias, source, op, _ = _agg_parts(token)
+    expr = ctx.col(source)
+    if op == "nunique":
+        expr = expr.n_unique()
+    else:
+        expr = getattr(expr, op)()
+    return expr.alias(alias)
 
 
-# =============================================================================
-# String Operations (Q28-Q29)
-# =============================================================================
+def _pandas_value(hits: Any, source: str, op: str) -> Any:
+    if op == "len":
+        value = len(hits)
+    else:
+        value = getattr(hits[source], op)()
+    return value.compute() if hasattr(value, "compute") else value
+
+
+def _sort_parts(sort_spec: str) -> tuple[str | list[str], bool]:
+    sort_cols, direction = sort_spec.split(":")
+    cols = sort_cols.split(",")
+    return cols[0] if len(cols) == 1 else cols, direction == "desc"
+
+
+def _make_scalar_expression(filter_code: str, agg_spec: str) -> Any:
+    def impl(ctx: DataFrameContext) -> Any:
+        hits = _expr_filter(ctx, _hits(ctx), filter_code)
+        return hits.select(*[_expr_agg(ctx, token) for token in agg_spec.split(";")])
+
+    return impl
+
+
+def _make_scalar_pandas(filter_code: str, agg_spec: str) -> Any:
+    def impl(ctx: DataFrameContext) -> Any:
+        import pandas as pd
+
+        hits = _pandas_filter(_hits(ctx), filter_code)
+        values = {}
+        for token in agg_spec.split(";"):
+            alias, source, _, pandas_op = _agg_parts(token)
+            values[alias] = [_pandas_value(hits, source, pandas_op)]
+        return pd.DataFrame(values)
+
+    return impl
+
+
+def _make_group_expression(
+    filter_code: str,
+    derive_code: str,
+    group_spec: str,
+    agg_spec: str,
+    sort_spec: str,
+    limit_spec: str,
+    offset_spec: str,
+) -> Any:
+    groups, limit, offset = group_spec.split(","), int(limit_spec or 0), int(offset_spec or 0)
+
+    def impl(ctx: DataFrameContext) -> Any:
+        result = _expr_filter(ctx, _hits(ctx), filter_code)
+        result = _expr_derive(ctx, result, derive_code)
+        result = result.group_by(*groups).agg(*[_expr_agg(ctx, token) for token in agg_spec.split(";")])
+        if sort_spec:
+            sort_cols, descending = _sort_parts(sort_spec)
+            result = result.sort(sort_cols, descending=descending)
+        if offset:
+            return result.slice(offset, limit)
+        return result.limit(limit) if limit else result
+
+    return impl
+
+
+def _make_group_pandas(
+    filter_code: str,
+    derive_code: str,
+    group_spec: str,
+    agg_spec: str,
+    sort_spec: str,
+    limit_spec: str,
+    offset_spec: str,
+) -> Any:
+    groups, limit, offset = group_spec.split(","), int(limit_spec or 0), int(offset_spec or 0)
+    agg_kwargs = {
+        alias: (source, "nunique" if pandas_op == "nunique" else pandas_op)
+        for alias, source, _, pandas_op in (_agg_parts(token) for token in agg_spec.split(";"))
+    }
+
+    def impl(ctx: DataFrameContext) -> Any:
+        result = _pandas_derive(_pandas_filter(_hits(ctx), filter_code), derive_code)
+        result = result.groupby(groups, as_index=False).agg(**agg_kwargs)
+        if sort_spec:
+            sort_cols, descending = _sort_parts(sort_spec)
+            result = result.sort_values(sort_cols, ascending=not descending)
+        if offset:
+            return result.iloc[offset : offset + limit]
+        return result.head(limit) if limit else result
+
+    return impl
+
+
+def _make_select_expression(filter_code: str, sort_spec: str, limit_spec: str, select_spec: str) -> Any:
+    def impl(ctx: DataFrameContext) -> Any:
+        result = _expr_filter(ctx, _hits(ctx), filter_code)
+        if sort_spec:
+            sort_cols, descending = _sort_parts(sort_spec)
+            result = result.sort(sort_cols, descending=descending)
+        if limit_spec:
+            result = result.limit(int(limit_spec))
+        return result.select(*select_spec.split(",")) if select_spec else result
+
+    return impl
+
+
+def _make_select_pandas(filter_code: str, sort_spec: str, limit_spec: str, select_spec: str) -> Any:
+    def impl(ctx: DataFrameContext) -> Any:
+        result = _pandas_filter(_hits(ctx), filter_code)
+        if sort_spec:
+            sort_cols, descending = _sort_parts(sort_spec)
+            result = result.sort_values(sort_cols, ascending=not descending)
+        if limit_spec:
+            result = result.head(int(limit_spec))
+        return result[select_spec.split(",")] if select_spec else result
+
+    return impl
 
 
 def q28_expression_impl(ctx: DataFrameContext) -> Any:
     """Q28: AVG URL length by CounterID with HAVING > 100000."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    lit = ctx.lit
+    col, lit = ctx.col, ctx.lit
     return (
-        hits.filter(col("URL") != lit(""))
+        _hits(ctx)
+        .filter(col("URL") != lit(""))
         .with_columns(col("URL").str.len_chars().alias("url_len"))
         .group_by("CounterID")
-        .agg(
-            col("url_len").mean().alias("l"),
-            col("CounterID").count().alias("c"),
-        )
+        .agg(col("url_len").mean().alias("l"), col("CounterID").count().alias("c"))
         .filter(col("c") > lit(100000))
         .sort("l", descending=True)
         .limit(25)
@@ -640,8 +331,7 @@ def q28_expression_impl(ctx: DataFrameContext) -> Any:
 
 def q28_pandas_impl(ctx: DataFrameContext) -> Any:
     """Q28: AVG URL length by CounterID with HAVING > 100000."""
-    hits = ctx.get_table("hits")
-    filtered = hits[hits["URL"] != ""].copy()
+    filtered = _hits(ctx)[_hits(ctx)["URL"] != ""].copy()
     filtered["url_len"] = filtered["URL"].str.len()
     grouped = filtered.groupby(["CounterID"], as_index=False).agg(l=("url_len", "mean"), c=("url_len", "count"))
     return grouped[grouped["c"] > 100000].sort_values("l", ascending=False).head(25)
@@ -649,21 +339,16 @@ def q28_pandas_impl(ctx: DataFrameContext) -> Any:
 
 def q29_expression_impl(ctx: DataFrameContext) -> Any:
     """Q29: Domain extraction from Referer via regex, with HAVING > 100000."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    lit = ctx.lit
+    col, lit = ctx.col, ctx.lit
     return (
-        hits.filter(col("Referer") != lit(""))
+        _hits(ctx)
+        .filter(col("Referer") != lit(""))
         .with_columns(
             col("Referer").str.replace(lit(r"^https?://(?:www\.)?([^/]+)/.*$"), lit("$1")).alias("k"),
             col("Referer").str.len_chars().alias("ref_len"),
         )
         .group_by("k")
-        .agg(
-            col("ref_len").mean().alias("l"),
-            col("k").count().alias("c"),
-            col("Referer").min().alias("min_referer"),
-        )
+        .agg(col("ref_len").mean().alias("l"), col("k").count().alias("c"), col("Referer").min().alias("min_referer"))
         .filter(col("c") > lit(100000))
         .sort("l", descending=True)
         .limit(25)
@@ -672,8 +357,7 @@ def q29_expression_impl(ctx: DataFrameContext) -> Any:
 
 def q29_pandas_impl(ctx: DataFrameContext) -> Any:
     """Q29: Domain extraction from Referer via regex, with HAVING > 100000."""
-    hits = ctx.get_table("hits")
-    filtered = hits[hits["Referer"] != ""].copy()
+    filtered = _hits(ctx)[_hits(ctx)["Referer"] != ""].copy()
     filtered["k"] = filtered["Referer"].str.replace(r"^https?://(?:www\.)?([^/]+)/.*$", r"\1", regex=True)
     filtered["ref_len"] = filtered["Referer"].str.len()
     grouped = filtered.groupby(["k"], as_index=False).agg(
@@ -682,483 +366,94 @@ def q29_pandas_impl(ctx: DataFrameContext) -> Any:
     return grouped[grouped["c"] > 100000].sort_values("l", ascending=False).head(25)
 
 
-# =============================================================================
-# Mathematical Operations (Q30)
-# =============================================================================
-
-
 def q30_expression_impl(ctx: DataFrameContext) -> Any:
     """Q30: Wide aggregation - SUM(ResolutionWidth + N) for N=0..89."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    lit = ctx.lit
-    agg_exprs = [(col("ResolutionWidth") + lit(i)).sum().alias(f"sum_{i}") for i in range(90)]
-    return hits.select(*agg_exprs)
+    col, lit = ctx.col, ctx.lit
+    return _hits(ctx).select(*[(col("ResolutionWidth") + lit(i)).sum().alias(f"sum_{i}") for i in range(90)])
 
 
 def q30_pandas_impl(ctx: DataFrameContext) -> Any:
     """Q30: Wide aggregation - SUM(ResolutionWidth + N) for N=0..89."""
     import pandas as pd
 
-    hits = ctx.get_table("hits")
-    base = hits["ResolutionWidth"]
-    result = {f"sum_{i}": [(base + i).sum()] for i in range(90)}
-    return pd.DataFrame(result)
+    base = _hits(ctx)["ResolutionWidth"]
+    return pd.DataFrame({f"sum_{i}": [(base + i).sum()] for i in range(90)})
 
 
-# =============================================================================
-# Complex Grouping (Q31-Q36)
-# =============================================================================
+_SCALAR_ROWS = """1||count=WatchID:count:len
+2|adv_ne_0|count=WatchID:count:len
+3||sum_adv=AdvEngineID:sum;count=AdvEngineID:count:len;avg_resolution=ResolutionWidth:mean
+4||avg_user_id=UserID:mean
+5||uniq_users=UserID:nunique
+6||uniq_search=SearchPhrase:nunique
+7||min_date=EventDate:min;max_date=EventDate:max
+21|url_google|count=WatchID:count:len
+"""
+
+_GROUP_ROWS = """8|adv_ne_0||AdvEngineID|c=AdvEngineID:count|c:desc||
+9|||RegionID|u=UserID:nunique|u:desc|10|
+10|||RegionID|sum_adv=AdvEngineID:sum;c=RegionID:count;avg_res=ResolutionWidth:mean;uniq_users=UserID:nunique|c:desc|10|
+11|phone_model_nonempty||MobilePhoneModel|u=UserID:nunique|u:desc|10|
+12|phone_model_nonempty||MobilePhone,MobilePhoneModel|u=UserID:nunique|u:desc|10|
+13|search_nonempty||SearchPhrase|c=SearchPhrase:count|c:desc|10|
+14|search_nonempty||SearchPhrase|u=UserID:nunique|u:desc|10|
+15|search_nonempty||SearchEngineID,SearchPhrase|c=SearchPhrase:count|c:desc|10|
+16|||UserID|c=UserID:count|c:desc|10|
+17|||UserID,SearchPhrase|c=UserID:count|c:desc|10|
+18|||UserID,SearchPhrase|c=UserID:count||10|
+19||minute|UserID,m,SearchPhrase|c=UserID:count|c:desc|10|
+22|google_search||SearchPhrase|min_url=URL:min;c=SearchPhrase:count|c:desc|10|
+23|google_title||SearchPhrase|min_url=URL:min;min_title=Title:min;c=SearchPhrase:count;uniq_users=UserID:nunique|c:desc|10|
+31|search_nonempty||SearchEngineID,ClientIP|c=ClientIP:count;sum_refresh=IsRefresh:sum;avg_res=ResolutionWidth:mean|c:desc|10|
+32|search_nonempty||WatchID,ClientIP|c=ClientIP:count;sum_refresh=IsRefresh:sum;avg_res=ResolutionWidth:mean|c:desc|10|
+33|||WatchID,ClientIP|c=ClientIP:count;sum_refresh=IsRefresh:sum;avg_res=ResolutionWidth:mean|c:desc|10|
+34|||URL|c=URL:count|c:desc|10|
+35||one|one,URL|c=URL:count|c:desc|10|
+36||ip_offsets|ClientIP,ip_m1,ip_m2,ip_m3|c=ClientIP:count|c:desc|10|
+37|july_url_pageviews||URL|PageViews=URL:count|PageViews:desc|10|
+38|july_title_pageviews||Title|PageViews=Title:count|PageViews:desc|10|
+39|july_link_views||URL|PageViews=URL:count|PageViews:desc|10|1000
+40|july_source|source|TraficSourceID,SearchEngineID,AdvEngineID,Src,URL|PageViews=URL:count|PageViews:desc|10|1000
+41|july_referer_hash||URLHash,EventDate|PageViews=URLHash:count|PageViews:desc|10|100
+42|july_url_hash||WindowClientWidth,WindowClientHeight|PageViews=WindowClientWidth:count|PageViews:desc|10|10000
+43|minute_range|trunc_minute|M|PageViews=M:count|M:asc||
+"""
+
+_SELECT_ROWS = """20|user_lookup|||
+24|url_google|EventTime:asc|10|
+25|search_nonempty|EventTime:asc|10|SearchPhrase
+26|search_nonempty|SearchPhrase:asc|10|SearchPhrase
+27|search_nonempty|EventTime,SearchPhrase:asc|10|SearchPhrase
+"""
 
 
-def q31_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q31: Multi-agg by SearchEngineID + ClientIP, filtered."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    lit = ctx.lit
-    return (
-        hits.filter(col("SearchPhrase") != lit(""))
-        .group_by("SearchEngineID", "ClientIP")
-        .agg(
-            col("ClientIP").count().alias("c"),
-            col("IsRefresh").sum().alias("sum_refresh"),
-            col("ResolutionWidth").mean().alias("avg_res"),
+def _install_generated_impls() -> None:
+    for row in reader(_SCALAR_ROWS.splitlines(), delimiter="|"):
+        q_num, filter_code, agg_spec = row
+        _install_impl(q_num, _make_scalar_expression(filter_code, agg_spec), _make_scalar_pandas(filter_code, agg_spec))
+    for row in reader(_GROUP_ROWS.splitlines(), delimiter="|"):
+        q_num, filter_code, derive_code, group_spec, agg_spec, sort_spec, limit_spec, offset_spec = row
+        _install_impl(
+            q_num,
+            _make_group_expression(filter_code, derive_code, group_spec, agg_spec, sort_spec, limit_spec, offset_spec),
+            _make_group_pandas(filter_code, derive_code, group_spec, agg_spec, sort_spec, limit_spec, offset_spec),
         )
-        .sort("c", descending=True)
-        .limit(10)
-    )
-
-
-def q31_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q31: Multi-agg by SearchEngineID + ClientIP, filtered."""
-    hits = ctx.get_table("hits")
-    filtered = hits[hits["SearchPhrase"] != ""]
-    return (
-        filtered.groupby(["SearchEngineID", "ClientIP"], as_index=False)
-        .agg(c=("ClientIP", "count"), sum_refresh=("IsRefresh", "sum"), avg_res=("ResolutionWidth", "mean"))
-        .sort_values("c", ascending=False)
-        .head(10)
-    )
-
-
-def q32_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q32: Multi-agg by WatchID + ClientIP, filtered (high cardinality)."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    lit = ctx.lit
-    return (
-        hits.filter(col("SearchPhrase") != lit(""))
-        .group_by("WatchID", "ClientIP")
-        .agg(
-            col("ClientIP").count().alias("c"),
-            col("IsRefresh").sum().alias("sum_refresh"),
-            col("ResolutionWidth").mean().alias("avg_res"),
+    for row in reader(_SELECT_ROWS.splitlines(), delimiter="|"):
+        q_num, filter_code, sort_spec, limit_spec, select_spec = row
+        _install_impl(
+            q_num,
+            _make_select_expression(filter_code, sort_spec, limit_spec, select_spec),
+            _make_select_pandas(filter_code, sort_spec, limit_spec, select_spec),
         )
-        .sort("c", descending=True)
-        .limit(10)
-    )
 
 
-def q32_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q32: Multi-agg by WatchID + ClientIP, filtered (high cardinality)."""
-    hits = ctx.get_table("hits")
-    filtered = hits[hits["SearchPhrase"] != ""]
-    return (
-        filtered.groupby(["WatchID", "ClientIP"], as_index=False)
-        .agg(c=("ClientIP", "count"), sum_refresh=("IsRefresh", "sum"), avg_res=("ResolutionWidth", "mean"))
-        .sort_values("c", ascending=False)
-        .head(10)
-    )
+def _install_impl(q_num: str, expression_impl: Any, pandas_impl: Any) -> None:
+    for family, impl in (("expression", expression_impl), ("pandas", pandas_impl)):
+        impl.__name__ = f"q{q_num}_{family}_impl"
+        globals()[impl.__name__] = impl
 
 
-def q33_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q33: Multi-agg by WatchID + ClientIP, unfiltered (high cardinality)."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    return (
-        hits.group_by("WatchID", "ClientIP")
-        .agg(
-            col("ClientIP").count().alias("c"),
-            col("IsRefresh").sum().alias("sum_refresh"),
-            col("ResolutionWidth").mean().alias("avg_res"),
-        )
-        .sort("c", descending=True)
-        .limit(10)
-    )
-
-
-def q33_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q33: Multi-agg by WatchID + ClientIP, unfiltered (high cardinality)."""
-    hits = ctx.get_table("hits")
-    return (
-        hits.groupby(["WatchID", "ClientIP"], as_index=False)
-        .agg(c=("ClientIP", "count"), sum_refresh=("IsRefresh", "sum"), avg_res=("ResolutionWidth", "mean"))
-        .sort_values("c", ascending=False)
-        .head(10)
-    )
-
-
-def q34_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q34: Top URLs by count (high cardinality text GROUP BY)."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    return hits.group_by("URL").agg(col("URL").count().alias("c")).sort("c", descending=True).limit(10)
-
-
-def q34_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q34: Top URLs by count (high cardinality text GROUP BY)."""
-    hits = ctx.get_table("hits")
-    return hits.groupby(["URL"], as_index=False).agg(c=("URL", "count")).sort_values("c", ascending=False).head(10)
-
-
-def q35_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q35: Literal constant column + URL group by count, top 10."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    lit = ctx.lit
-    return (
-        hits.with_columns(lit(1).alias("one"))
-        .group_by("one", "URL")
-        .agg(col("URL").count().alias("c"))
-        .sort("c", descending=True)
-        .limit(10)
-    )
-
-
-def q35_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q35: Literal constant column + URL group by count, top 10."""
-    hits = ctx.get_table("hits")
-    hits = hits.copy()
-    hits["one"] = 1
-    return (
-        hits.groupby(["one", "URL"], as_index=False).agg(c=("URL", "count")).sort_values("c", ascending=False).head(10)
-    )
-
-
-def q36_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q36: GROUP BY ClientIP and derived columns (ClientIP-1, -2, -3)."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    lit = ctx.lit
-    return (
-        hits.with_columns(
-            (col("ClientIP") - lit(1)).alias("ip_m1"),
-            (col("ClientIP") - lit(2)).alias("ip_m2"),
-            (col("ClientIP") - lit(3)).alias("ip_m3"),
-        )
-        .group_by("ClientIP", "ip_m1", "ip_m2", "ip_m3")
-        .agg(col("ClientIP").count().alias("c"))
-        .sort("c", descending=True)
-        .limit(10)
-    )
-
-
-def q36_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q36: GROUP BY ClientIP and derived columns (ClientIP-1, -2, -3)."""
-    hits = ctx.get_table("hits")
-    hits = hits.copy()
-    hits["ip_m1"] = hits["ClientIP"] - 1
-    hits["ip_m2"] = hits["ClientIP"] - 2
-    hits["ip_m3"] = hits["ClientIP"] - 3
-    return (
-        hits.groupby(["ClientIP", "ip_m1", "ip_m2", "ip_m3"], as_index=False)
-        .agg(c=("ClientIP", "count"))
-        .sort_values("c", ascending=False)
-        .head(10)
-    )
-
-
-# =============================================================================
-# Time-Based Analysis (Q37-Q43)
-# =============================================================================
-
-
-def q37_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q37: Top URLs by page views for CounterID=62, July 2013."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    lit = ctx.lit
-    return (
-        hits.filter(
-            (col("CounterID") == lit(62))
-            & (col("EventDate") >= lit("2013-07-01"))
-            & (col("EventDate") <= lit("2013-07-31"))
-            & (col("DontCountHits") == lit(0))
-            & (col("IsRefresh") == lit(0))
-            & (col("URL") != lit(""))
-        )
-        .group_by("URL")
-        .agg(col("URL").count().alias("PageViews"))
-        .sort("PageViews", descending=True)
-        .limit(10)
-    )
-
-
-def q37_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q37: Top URLs by page views for CounterID=62, July 2013."""
-    hits = ctx.get_table("hits")
-    filtered = hits[
-        (hits["CounterID"] == 62)
-        & (hits["EventDate"] >= "2013-07-01")
-        & (hits["EventDate"] <= "2013-07-31")
-        & (hits["DontCountHits"] == 0)
-        & (hits["IsRefresh"] == 0)
-        & (hits["URL"] != "")
-    ]
-    return (
-        filtered.groupby(["URL"], as_index=False)
-        .agg(PageViews=("URL", "count"))
-        .sort_values("PageViews", ascending=False)
-        .head(10)
-    )
-
-
-def q38_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q38: Top titles by page views for CounterID=62, July 2013."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    lit = ctx.lit
-    return (
-        hits.filter(
-            (col("CounterID") == lit(62))
-            & (col("EventDate") >= lit("2013-07-01"))
-            & (col("EventDate") <= lit("2013-07-31"))
-            & (col("DontCountHits") == lit(0))
-            & (col("IsRefresh") == lit(0))
-            & (col("Title") != lit(""))
-        )
-        .group_by("Title")
-        .agg(col("Title").count().alias("PageViews"))
-        .sort("PageViews", descending=True)
-        .limit(10)
-    )
-
-
-def q38_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q38: Top titles by page views for CounterID=62, July 2013."""
-    hits = ctx.get_table("hits")
-    filtered = hits[
-        (hits["CounterID"] == 62)
-        & (hits["EventDate"] >= "2013-07-01")
-        & (hits["EventDate"] <= "2013-07-31")
-        & (hits["DontCountHits"] == 0)
-        & (hits["IsRefresh"] == 0)
-        & (hits["Title"] != "")
-    ]
-    return (
-        filtered.groupby(["Title"], as_index=False)
-        .agg(PageViews=("Title", "count"))
-        .sort_values("PageViews", ascending=False)
-        .head(10)
-    )
-
-
-def q39_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q39: URL page views with OFFSET 1000 (pagination)."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    lit = ctx.lit
-    sorted_result = (
-        hits.filter(
-            (col("CounterID") == lit(62))
-            & (col("EventDate") >= lit("2013-07-01"))
-            & (col("EventDate") <= lit("2013-07-31"))
-            & (col("IsRefresh") == lit(0))
-            & (col("IsLink") != lit(0))
-            & (col("IsDownload") == lit(0))
-        )
-        .group_by("URL")
-        .agg(col("URL").count().alias("PageViews"))
-        .sort("PageViews", descending=True)
-    )
-    return sorted_result.slice(1000, 10)
-
-
-def q39_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q39: URL page views with OFFSET 1000 (pagination)."""
-    hits = ctx.get_table("hits")
-    filtered = hits[
-        (hits["CounterID"] == 62)
-        & (hits["EventDate"] >= "2013-07-01")
-        & (hits["EventDate"] <= "2013-07-31")
-        & (hits["IsRefresh"] == 0)
-        & (hits["IsLink"] != 0)
-        & (hits["IsDownload"] == 0)
-    ]
-    sorted_result = (
-        filtered.groupby(["URL"], as_index=False)
-        .agg(PageViews=("URL", "count"))
-        .sort_values("PageViews", ascending=False)
-    )
-    return sorted_result.iloc[1000:1010]
-
-
-def q40_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q40: Traffic source analysis with CASE WHEN and OFFSET."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    lit = ctx.lit
-
-    filtered = hits.filter(
-        (col("CounterID") == lit(62))
-        & (col("EventDate") >= lit("2013-07-01"))
-        & (col("EventDate") <= lit("2013-07-31"))
-        & (col("IsRefresh") == lit(0))
-    )
-    # Add conditional Src column: CASE WHEN SearchEngineID=0 AND AdvEngineID=0 THEN Referer ELSE '' END
-    with_src = filtered.with_columns(
-        ctx.when((col("SearchEngineID") == lit(0)) & (col("AdvEngineID") == lit(0)))
-        .then(col("Referer"))
-        .otherwise(lit(""))
-        .alias("Src")
-    )
-    sorted_result = (
-        with_src.group_by("TraficSourceID", "SearchEngineID", "AdvEngineID", "Src", "URL")
-        .agg(col("URL").count().alias("PageViews"))
-        .sort("PageViews", descending=True)
-    )
-    return sorted_result.slice(1000, 10)
-
-
-def q40_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q40: Traffic source analysis with CASE WHEN and OFFSET."""
-    import numpy as np
-
-    hits = ctx.get_table("hits")
-    filtered = hits[
-        (hits["CounterID"] == 62)
-        & (hits["EventDate"] >= "2013-07-01")
-        & (hits["EventDate"] <= "2013-07-31")
-        & (hits["IsRefresh"] == 0)
-    ].copy()
-    filtered["Src"] = np.where(
-        (filtered["SearchEngineID"] == 0) & (filtered["AdvEngineID"] == 0), filtered["Referer"], ""
-    )
-    sorted_result = (
-        filtered.groupby(["TraficSourceID", "SearchEngineID", "AdvEngineID", "Src", "URL"], as_index=False)
-        .agg(PageViews=("URL", "count"))
-        .sort_values("PageViews", ascending=False)
-    )
-    return sorted_result.iloc[1000:1010]
-
-
-def q41_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q41: URLHash + EventDate with IN clause and specific hash, OFFSET 100."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    lit = ctx.lit
-    sorted_result = (
-        hits.filter(
-            (col("CounterID") == lit(62))
-            & (col("EventDate") >= lit("2013-07-01"))
-            & (col("EventDate") <= lit("2013-07-31"))
-            & (col("IsRefresh") == lit(0))
-            & (col("TraficSourceID").is_in([-1, 6]))
-            & (col("RefererHash") == lit(3594120000172545465))
-        )
-        .group_by("URLHash", "EventDate")
-        .agg(col("URLHash").count().alias("PageViews"))
-        .sort("PageViews", descending=True)
-    )
-    return sorted_result.slice(100, 10)
-
-
-def q41_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q41: URLHash + EventDate with IN clause and specific hash, OFFSET 100."""
-    hits = ctx.get_table("hits")
-    filtered = hits[
-        (hits["CounterID"] == 62)
-        & (hits["EventDate"] >= "2013-07-01")
-        & (hits["EventDate"] <= "2013-07-31")
-        & (hits["IsRefresh"] == 0)
-        & (hits["TraficSourceID"].isin([-1, 6]))
-        & (hits["RefererHash"] == 3594120000172545465)
-    ]
-    sorted_result = (
-        filtered.groupby(["URLHash", "EventDate"], as_index=False)
-        .agg(PageViews=("URLHash", "count"))
-        .sort_values("PageViews", ascending=False)
-    )
-    return sorted_result.iloc[100:110]
-
-
-def q42_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q42: Window dimensions for specific URL hash, OFFSET 10000."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    lit = ctx.lit
-    sorted_result = (
-        hits.filter(
-            (col("CounterID") == lit(62))
-            & (col("EventDate") >= lit("2013-07-01"))
-            & (col("EventDate") <= lit("2013-07-31"))
-            & (col("IsRefresh") == lit(0))
-            & (col("DontCountHits") == lit(0))
-            & (col("URLHash") == lit(2868770270353813622))
-        )
-        .group_by("WindowClientWidth", "WindowClientHeight")
-        .agg(col("WindowClientWidth").count().alias("PageViews"))
-        .sort("PageViews", descending=True)
-    )
-    return sorted_result.slice(10000, 10)
-
-
-def q42_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q42: Window dimensions for specific URL hash, OFFSET 10000."""
-    hits = ctx.get_table("hits")
-    filtered = hits[
-        (hits["CounterID"] == 62)
-        & (hits["EventDate"] >= "2013-07-01")
-        & (hits["EventDate"] <= "2013-07-31")
-        & (hits["IsRefresh"] == 0)
-        & (hits["DontCountHits"] == 0)
-        & (hits["URLHash"] == 2868770270353813622)
-    ]
-    sorted_result = (
-        filtered.groupby(["WindowClientWidth", "WindowClientHeight"], as_index=False)
-        .agg(PageViews=("WindowClientWidth", "count"))
-        .sort_values("PageViews", ascending=False)
-    )
-    return sorted_result.iloc[10000:10010]
-
-
-def q43_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q43: Page views by minute with DATE_TRUNC."""
-    hits = ctx.get_table("hits")
-    col = ctx.col
-    lit = ctx.lit
-    return (
-        hits.filter(
-            (col("CounterID") == lit(62))
-            & (col("EventDate") >= lit("2013-07-14"))
-            & (col("EventDate") <= lit("2013-07-15"))
-            & (col("IsRefresh") == lit(0))
-            & (col("DontCountHits") == lit(0))
-        )
-        .with_columns(col("EventTime").dt.truncate("1m").alias("M"))
-        .group_by("M")
-        .agg(col("M").count().alias("PageViews"))
-        .sort("M")
-    )
-
-
-def q43_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q43: Page views by minute with DATE_TRUNC."""
-    hits = ctx.get_table("hits")
-    filtered = hits[
-        (hits["CounterID"] == 62)
-        & (hits["EventDate"] >= "2013-07-14")
-        & (hits["EventDate"] <= "2013-07-15")
-        & (hits["IsRefresh"] == 0)
-        & (hits["DontCountHits"] == 0)
-    ].copy()
-    filtered["M"] = filtered["EventTime"].dt.floor("min")
-    return filtered.groupby(["M"], as_index=False).agg(PageViews=("M", "count")).sort_values("M")
-
-
-# =============================================================================
-# Query Registration
-# =============================================================================
+_install_generated_impls()
 
 _CATEGORY_CODES = {
     "AG": QueryCategory.AGGREGATE,
