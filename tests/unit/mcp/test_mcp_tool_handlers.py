@@ -402,7 +402,7 @@ class TestRunBenchmarkToolSuccess:
 
         with (
             patch("benchbox.mcp.tools.benchmark._get_platform_adapter"),
-            patch("benchbox.mcp.tools.benchmark.get_benchmark_class", return_value=mock_bm_class),
+            patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=mock_bm_class),
             patch("benchbox.mcp.tools.benchmark.ResultExporter", return_value=mock_exporter),
         ):
             result = fn(platform="duckdb", benchmark="tpch", scale_factor=0.01)
@@ -431,7 +431,7 @@ class TestRunBenchmarkToolSuccess:
 
         with (
             patch("benchbox.mcp.tools.benchmark._get_platform_adapter"),
-            patch("benchbox.mcp.tools.benchmark.get_benchmark_class", return_value=mock_bm_class),
+            patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=mock_bm_class),
         ):
             fn(platform="duckdb", benchmark="tpch", scale_factor=0.01, queries="1,6,17")
 
@@ -459,7 +459,7 @@ class TestRunBenchmarkToolSuccess:
 
         with (
             patch("benchbox.mcp.tools.benchmark._get_platform_adapter"),
-            patch("benchbox.mcp.tools.benchmark.get_benchmark_class", return_value=mock_bm_class),
+            patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=mock_bm_class),
             patch("benchbox.mcp.tools.benchmark.ResultExporter", return_value=mock_exporter),
         ):
             fn(platform="duckdb", benchmark="tpch", scale_factor=0.01)
@@ -490,7 +490,7 @@ class TestRunBenchmarkToolSuccess:
 
         with (
             patch("benchbox.mcp.tools.benchmark._get_platform_adapter"),
-            patch("benchbox.mcp.tools.benchmark.get_benchmark_class", return_value=mock_bm_class),
+            patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=mock_bm_class),
             patch("benchbox.mcp.tools.benchmark.ResultExporter", return_value=mock_exporter),
         ):
             result = fn(platform="duckdb", benchmark="tpch", scale_factor=0.01)
@@ -534,7 +534,7 @@ class TestRunBenchmarkToolSuccess:
 
         with (
             patch("benchbox.mcp.tools.benchmark._get_platform_adapter"),
-            patch("benchbox.mcp.tools.benchmark.get_benchmark_class", return_value=mock_bm_class),
+            patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=mock_bm_class),
             patch("benchbox.mcp.tools.benchmark.ResultExporter", return_value=mock_exporter),
         ):
             result = fn(platform="duckdb", benchmark="tpcds", scale_factor=0.01)
@@ -578,7 +578,7 @@ class TestRunBenchmarkToolSuccess:
         with (
             patch("benchbox.mcp.tools.benchmark._get_platform_adapter"),
             patch("benchbox.platforms.is_dataframe_platform", return_value=True),
-            patch("benchbox.mcp.tools.benchmark.get_benchmark_class", return_value=mock_benchmark_class),
+            patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=mock_benchmark_class),
             patch("benchbox.mcp.tools.benchmark.ResultExporter", return_value=mock_exporter),
         ):
             result = fn(platform="polars-df", benchmark="tpch", scale_factor=0.01)
@@ -817,7 +817,7 @@ class TestModeParameterValidation:
 
         with (
             patch("benchbox.mcp.tools.benchmark._get_platform_adapter"),
-            patch("benchbox.mcp.tools.benchmark.get_benchmark_class", return_value=mock_bm_class),
+            patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=mock_bm_class),
             patch("benchbox.mcp.tools.benchmark.ResultExporter", return_value=mock_exporter),
         ):
             result = fn(platform="duckdb", benchmark="tpch", scale_factor=0.01, mode="sql")
@@ -889,7 +889,7 @@ class TestModeParameterValidation:
         mock_bm.generate_data = MagicMock()
         mock_bm_class = MagicMock(return_value=mock_bm)
 
-        with patch("benchbox.mcp.tools.benchmark.get_benchmark_class", return_value=mock_bm_class):
+        with patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=mock_bm_class):
             result = fn(platform="duckdb", benchmark="tpch", scale_factor=0.01, mode="data_only")
 
         assert result["mcp_metadata"]["status"] == "completed"
@@ -975,7 +975,7 @@ class TestPhasesMapping:
 
         with (
             patch("benchbox.mcp.tools.benchmark._get_platform_adapter"),
-            patch("benchbox.mcp.tools.benchmark.get_benchmark_class", return_value=mock_bm_class),
+            patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=mock_bm_class),
             patch("benchbox.mcp.tools.benchmark.ResultExporter", return_value=mock_exporter),
         ):
             fn(platform="duckdb", benchmark="tpch", scale_factor=0.01, phases="power")
@@ -1012,7 +1012,7 @@ class TestPhasesMapping:
 
         with (
             patch("benchbox.mcp.tools.benchmark._get_platform_adapter", mock_get_adapter),
-            patch("benchbox.mcp.tools.benchmark.get_benchmark_class", return_value=mock_bm_class),
+            patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=mock_bm_class),
             patch("benchbox.mcp.tools.benchmark.ResultExporter", return_value=mock_exporter),
         ):
             fn(platform="datafusion", benchmark="tpch", scale_factor=0.01, mode="dataframe")

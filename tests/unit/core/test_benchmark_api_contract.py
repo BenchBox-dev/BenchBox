@@ -28,6 +28,7 @@ from benchbox.core.benchmark_registry import (
     get_benchmark_registry_summary,
     get_benchmark_support_status,
     get_benchmarks_by_support_status,
+    get_public_benchmark_class,
     list_loader_benchmark_ids,
     list_public_benchmark_ids,
 )
@@ -153,6 +154,12 @@ def test_simple_benchmark_mixin_rejects_inherited_abstract_contract_members() ->
 
             def _get_table_schema(self) -> dict[str, dict[str, str]]:
                 return {}
+
+
+def test_public_benchmark_class_lookup_name_returns_public_wrapper() -> None:
+    """The registry's intent-revealing class lookup should return the public wrapper surface."""
+
+    assert get_public_benchmark_class("tpch").__name__ == "TPCH"
 
 
 def test_benchmark_support_status_metadata_matches_contract_map() -> None:

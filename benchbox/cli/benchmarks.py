@@ -340,9 +340,9 @@ class BenchmarkManager:
         """
         try:
             # Load benchmark to get queries
-            from benchbox.core.benchmark_loader import get_benchmark_class
+            from benchbox.core.benchmark_loader import get_core_benchmark_class
 
-            benchmark_class = get_benchmark_class(benchmark_id)
+            benchmark_class = get_core_benchmark_class(benchmark_id)
             default_scale = self.benchmarks.get(benchmark_id, {}).get("default_scale", 0.01)
             benchmark = benchmark_class(scale_factor=default_scale)
 

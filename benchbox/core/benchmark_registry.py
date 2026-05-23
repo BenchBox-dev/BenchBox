@@ -658,8 +658,8 @@ def get_benchmark_id_for_class_name(class_name: str) -> str | None:
     return _BENCHMARK_ID_BY_CLASS_NAME.get(class_name)
 
 
-def get_benchmark_class(benchmark_id: str):
-    """Get the benchmark class from the benchbox module.
+def get_public_benchmark_class(benchmark_id: str):
+    """Get the public benchmark class from the benchbox module.
 
     Uses benchbox module's lazy loading mechanism.
 
@@ -693,6 +693,11 @@ def get_benchmark_class(benchmark_id: str):
             return None
 
 
+def get_benchmark_class(benchmark_id: str):
+    """Compatibility alias for :func:`get_public_benchmark_class`."""
+    return get_public_benchmark_class(benchmark_id)
+
+
 def is_benchmark_available(benchmark_id: str) -> bool:
     """Check if a benchmark is available (can be imported).
 
@@ -702,7 +707,7 @@ def is_benchmark_available(benchmark_id: str) -> bool:
     Returns:
         True if benchmark class can be imported.
     """
-    return get_benchmark_class(benchmark_id) is not None
+    return get_public_benchmark_class(benchmark_id) is not None
 
 
 def list_benchmark_ids() -> list[str]:

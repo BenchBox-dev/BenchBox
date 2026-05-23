@@ -21,9 +21,9 @@ from mcp.types import ToolAnnotations
 
 from benchbox.core.benchmark_registry import (
     get_all_benchmarks,
-    get_benchmark_class,
     get_benchmark_default_scale,
     get_benchmark_surface,
+    get_public_benchmark_class,
 )
 from benchbox.core.results.exporter import ResultExporter
 from benchbox.core.results.schema import build_result_payload
@@ -342,7 +342,7 @@ def _run_benchmark_impl(
                 make_not_found_error("benchmark", benchmark, available=list(all_benchmarks.keys())), execution_id
             )
 
-        benchmark_class = get_benchmark_class(benchmark_lower)
+        benchmark_class = get_public_benchmark_class(benchmark_lower)
         if benchmark_class is None:
             return _make_failed_response(
                 make_error(
@@ -800,7 +800,7 @@ def _populate_sql_query_details(
     platform: str | None,
 ) -> None:
     """Populate response dict with SQL query details."""
-    benchmark_class = get_benchmark_class(benchmark)
+    benchmark_class = get_public_benchmark_class(benchmark)
     if benchmark_class is None:
         response["error"] = f"Benchmark '{benchmark}' requires additional dependencies"
         return

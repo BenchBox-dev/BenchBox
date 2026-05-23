@@ -335,22 +335,36 @@ class TestBenchmarkOrchestrator:
             assert called_kwargs["compression_level"] == 9
 
     def test_get_benchmark_instance_fallback_no_parallel(self):
-        """Test benchmark instance creation fallback for benchmarks without parallel support."""
+        """Test benchmark instance creation for benchmarks without parallel support."""
         config = BenchmarkConfig(name="read_primitives", display_name="Primitives", scale_factor=1.0)
         system_profile = Mock()
         system_profile.cpu_cores_logical = 4
 
-        # Mock the _get_benchmark_class method to return our mock
-        mock_benchmark_class = Mock()
-        mock_instance = Mock()
-        mock_benchmark_class.side_effect = [
-            TypeError("unexpected keyword argument 'parallel'"),
-            mock_instance,
-        ]
+        class NoParallelBenchmark:
+            def __init__(
+                self,
+                *,
+                scale_factor,
+                compress_data,
+                compression_type,
+                compression_level,
+                verbose,
+                quiet,
+            ):
+                self.kwargs = {
+                    "scale_factor": scale_factor,
+                    "compress_data": compress_data,
+                    "compression_type": compression_type,
+                    "compression_level": compression_level,
+                    "verbose": verbose,
+                    "quiet": quiet,
+                }
 
-        with patch.object(self.orchestrator, "_get_benchmark_class", return_value=mock_benchmark_class):
+        with patch.object(self.orchestrator, "_get_benchmark_class", return_value=NoParallelBenchmark):
             result = self.orchestrator._get_benchmark_instance(config, system_profile)
-            assert result == mock_instance
+            assert isinstance(result, NoParallelBenchmark)
+            assert result.kwargs["scale_factor"] == 1.0
+            assert "parallel" not in result.kwargs
 
     def test_get_benchmark_instance_unknown_benchmark(self):
         """Test unknown benchmark handling."""

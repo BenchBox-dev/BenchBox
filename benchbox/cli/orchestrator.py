@@ -14,7 +14,8 @@ if TYPE_CHECKING:
 
 from benchbox.cli.config import DirectoryManager
 from benchbox.core.benchmark_loader import (
-    get_benchmark_class as _core_get_benchmark_class,
+    get_core_benchmark_class,
+    instantiate_benchmark_class,
 )
 
 # Import from common_types to avoid circular imports
@@ -89,7 +90,7 @@ class BenchmarkOrchestrator:
     # -- Private helpers (wrappable in tests) ---------------------------------
     def _get_benchmark_class(self, benchmark_name: str):
         """Resolve a benchmark class by name (via core loader)."""
-        return _core_get_benchmark_class(benchmark_name)
+        return get_core_benchmark_class(benchmark_name)
 
     def _get_benchmark_instance(self, config: BenchmarkConfig, system_profile):
         """Create a benchmark instance honoring parallel and compression fields.
@@ -140,11 +141,7 @@ class BenchmarkOrchestrator:
 
         kwargs.update(benchmark_options)
 
-        try:
-            benchmark_instance = benchmark_class(parallel=cpu_cores, **kwargs)
-        except TypeError:
-            # Fallback for benchmarks without parallel support
-            benchmark_instance = benchmark_class(**kwargs)
+        benchmark_instance = instantiate_benchmark_class(benchmark_class, kwargs, {"parallel": cpu_cores})
 
         data_source = getattr(benchmark_instance, "get_data_source_benchmark", lambda: None)()
         if data_source and self.custom_output_dir is None:

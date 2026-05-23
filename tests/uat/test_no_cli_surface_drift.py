@@ -13,11 +13,17 @@ pytestmark = pytest.mark.fast
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ALLOWED_INTERNAL_CLI_FILES = {
     "benchbox/cli/benchmarks.py",
+    "benchbox/cli/commands/convert.py",
+    "benchbox/cli/commands/run.py",
     "benchbox/cli/commands/submit.py",
     "benchbox/cli/commands/visualize.py",
+    "benchbox/cli/help.py",
+    "benchbox/cli/orchestrator.py",
 }
-FORBIDDEN_CLI_SURFACE_SNIPPETS = ("@click.option", "@click.command")
+FORBIDDEN_CLI_SURFACE_SNIPPETS = ("@click.option", "@click.command", "@click.group")
 FORBIDDEN_CLI_SURFACE_DEFS = {
+    "benchbox/cli/commands/convert.py": "def convert(",
+    "benchbox/cli/commands/run.py": "def run(",
     "benchbox/cli/commands/submit.py": "def submit(",
     "benchbox/cli/commands/visualize.py": "def visualize(",
 }

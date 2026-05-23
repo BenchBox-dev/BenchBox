@@ -35,7 +35,7 @@ def test_run_benchmark_impl_suppresses_transitive_stdout() -> None:
         sys.stdout = captured
         with (
             patch("benchbox.mcp.tools.benchmark.get_all_benchmarks", return_value={"tpch": {"name": "tpch"}}),
-            patch("benchbox.mcp.tools.benchmark.get_benchmark_class", return_value=DummyBenchmark),
+            patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=DummyBenchmark),
             patch("benchbox.mcp.tools.benchmark._get_platform_adapter", return_value=object()),
         ):
             response = _run_benchmark_impl(

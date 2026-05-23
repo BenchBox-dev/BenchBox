@@ -17,9 +17,9 @@ from mcp.types import ToolAnnotations
 
 from benchbox.core.benchmark_registry import (
     BENCHMARK_METADATA,
-    get_benchmark_class,
     get_benchmark_default_scale,
     get_benchmark_surface,
+    get_public_benchmark_class,
     list_public_benchmark_ids,
 )
 from benchbox.mcp.errors import ErrorCode, make_error
@@ -62,7 +62,7 @@ def _collect_benchmark_queries_and_tables(benchmark_lower: str) -> tuple[list[di
     queries: list[dict[str, Any]] = []
     tables: list[str] = []
     try:
-        benchmark_class = get_benchmark_class(benchmark_lower)
+        benchmark_class = get_public_benchmark_class(benchmark_lower)
         if benchmark_class is not None:
             bm = benchmark_class(scale_factor=get_benchmark_default_scale(benchmark_lower))
             if hasattr(bm, "get_queries"):
