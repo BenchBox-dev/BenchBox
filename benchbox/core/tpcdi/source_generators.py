@@ -41,6 +41,10 @@ from typing import Any, Optional
 import pandas as pd
 
 
+def _lines(values: str) -> list[str]:
+    return [line.strip() for line in values.splitlines() if line.strip()]
+
+
 class TPCDISourceDataGenerator:
     """Generator for TPC-DI source system data files.
 
@@ -96,213 +100,173 @@ class TPCDISourceDataGenerator:
 
     def _init_reference_data(self) -> None:
         """Initialize reference data for realistic data generation."""
-
-        # Financial industry reference data
-        self.industries = [
-            "Technology",
-            "Healthcare",
-            "Financial Services",
-            "Manufacturing",
-            "Retail",
-            "Energy",
-            "Telecommunications",
-            "Transportation",
-            "Real Estate",
-            "Media",
-            "Utilities",
-            "Consumer Goods",
-            "Biotechnology",
-            "Aerospace",
-            "Automotive",
-            "Insurance",
-        ]
-
-        self.company_suffixes = [
-            "Inc.",
-            "Corp.",
-            "LLC",
-            "Ltd.",
-            "Co.",
-            "Group",
-            "Holdings",
-        ]
-
-        self.exchanges = ["NYSE", "NASDAQ", "AMEX", "BATS", "OTC"]
-
-        self.security_types = [
-            "Common Stock",
-            "Preferred Stock",
-            "Corporate Bond",
-            "Municipal Bond",
-        ]
-
-        self.trade_types = [
-            "Market Buy",
-            "Market Sell",
-            "Limit Buy",
-            "Limit Sell",
-            "Stop Buy",
-            "Stop Sell",
-            "Stop Limit Buy",
-            "Stop Limit Sell",
-        ]
-
-        self.account_types = ["Cash", "Margin", "Retirement", "Trust", "Corporate"]
-
-        self.statuses = ["Active", "Inactive", "Suspended", "Pending", "Closed"]
-
-        # Geographic data
-        self.countries = [
-            "USA",
-            "Canada",
-            "Mexico",
-            "United Kingdom",
-            "Germany",
-            "France",
-            "Japan",
-            "Australia",
-        ]
-
-        self.us_states = [
-            "AL",
-            "AK",
-            "AZ",
-            "AR",
-            "CA",
-            "CO",
-            "CT",
-            "DE",
-            "FL",
-            "GA",
-            "HI",
-            "ID",
-            "IL",
-            "IN",
-            "IA",
-            "KS",
-            "KY",
-            "LA",
-            "ME",
-            "MD",
-            "MA",
-            "MI",
-            "MN",
-            "MS",
-            "MO",
-            "MT",
-            "NE",
-            "NV",
-            "NH",
-            "NJ",
-            "NM",
-            "NY",
-            "NC",
-            "ND",
-            "OH",
-            "OK",
-            "OR",
-            "PA",
-            "RI",
-            "SC",
-            "SD",
-            "TN",
-            "TX",
-            "UT",
-            "VT",
-            "VA",
-            "WA",
-            "WV",
-            "WI",
-            "WY",
-        ]
-
-        # Name components for realistic customer generation
-        self.first_names = [
-            "James",
-            "Mary",
-            "John",
-            "Patricia",
-            "Robert",
-            "Jennifer",
-            "Michael",
-            "Linda",
-            "William",
-            "Elizabeth",
-            "David",
-            "Barbara",
-            "Richard",
-            "Susan",
-            "Joseph",
-            "Jessica",
-            "Thomas",
-            "Sarah",
-            "Christopher",
-            "Karen",
-            "Charles",
-            "Nancy",
-            "Daniel",
-            "Lisa",
-            "Matthew",
-            "Betty",
-            "Anthony",
-            "Helen",
-            "Mark",
-            "Sandra",
-            "Donald",
-            "Donna",
-        ]
-
-        self.last_names = [
-            "Smith",
-            "Johnson",
-            "Williams",
-            "Brown",
-            "Jones",
-            "Garcia",
-            "Miller",
-            "Davis",
-            "Rodriguez",
-            "Martinez",
-            "Hernandez",
-            "Lopez",
-            "Gonzalez",
-            "Wilson",
-            "Anderson",
-            "Thomas",
-            "Taylor",
-            "Moore",
-            "Jackson",
-            "Martin",
-            "Lee",
-            "Perez",
-            "Thompson",
-            "White",
-            "Harris",
-            "Sanchez",
-            "Clark",
-            "Ramirez",
-            "Lewis",
-            "Robinson",
-            "Walker",
-        ]
-
-        # Credit rating ranges
-        self.credit_ratings = list(range(300, 851))  # FICO score range
-
-        # Tax rate data
-        self.tax_jurisdictions = [
-            "Federal",
-            "California",
-            "New York",
-            "Texas",
-            "Florida",
-            "Illinois",
-            "Pennsylvania",
-            "Ohio",
-            "Georgia",
-            "North Carolina",
-            "Michigan",
-        ]
+        self.industries = _lines(
+            """
+            Technology
+            Healthcare
+            Financial Services
+            Manufacturing
+            Retail
+            Energy
+            Telecommunications
+            Transportation
+            Real Estate
+            Media
+            Utilities
+            Consumer Goods
+            Biotechnology
+            Aerospace
+            Automotive
+            Insurance
+            """
+        )
+        self.company_suffixes = _lines("Inc.\nCorp.\nLLC\nLtd.\nCo.\nGroup\nHoldings")
+        self.exchanges = _lines("NYSE\nNASDAQ\nAMEX\nBATS\nOTC")
+        self.security_types = _lines("Common Stock\nPreferred Stock\nCorporate Bond\nMunicipal Bond")
+        self.trade_types = _lines(
+            """
+            Market Buy
+            Market Sell
+            Limit Buy
+            Limit Sell
+            Stop Buy
+            Stop Sell
+            Stop Limit Buy
+            Stop Limit Sell
+            """
+        )
+        self.account_types = _lines("Cash\nMargin\nRetirement\nTrust\nCorporate")
+        self.statuses = _lines("Active\nInactive\nSuspended\nPending\nClosed")
+        self.countries = _lines("USA\nCanada\nMexico\nUnited Kingdom\nGermany\nFrance\nJapan\nAustralia")
+        self.us_states = _lines(
+            """
+            AL
+            AK
+            AZ
+            AR
+            CA
+            CO
+            CT
+            DE
+            FL
+            GA
+            HI
+            ID
+            IL
+            IN
+            IA
+            KS
+            KY
+            LA
+            ME
+            MD
+            MA
+            MI
+            MN
+            MS
+            MO
+            MT
+            NE
+            NV
+            NH
+            NJ
+            NM
+            NY
+            NC
+            ND
+            OH
+            OK
+            OR
+            PA
+            RI
+            SC
+            SD
+            TN
+            TX
+            UT
+            VT
+            VA
+            WA
+            WV
+            WI
+            WY
+            """
+        )
+        self.first_names = _lines(
+            """
+            James
+            Mary
+            John
+            Patricia
+            Robert
+            Jennifer
+            Michael
+            Linda
+            William
+            Elizabeth
+            David
+            Barbara
+            Richard
+            Susan
+            Joseph
+            Jessica
+            Thomas
+            Sarah
+            Christopher
+            Karen
+            Charles
+            Nancy
+            Daniel
+            Lisa
+            Matthew
+            Betty
+            Anthony
+            Helen
+            Mark
+            Sandra
+            Donald
+            Donna
+            """
+        )
+        self.last_names = _lines(
+            """
+            Smith
+            Johnson
+            Williams
+            Brown
+            Jones
+            Garcia
+            Miller
+            Davis
+            Rodriguez
+            Martinez
+            Hernandez
+            Lopez
+            Gonzalez
+            Wilson
+            Anderson
+            Thomas
+            Taylor
+            Moore
+            Jackson
+            Martin
+            Lee
+            Perez
+            Thompson
+            White
+            Harris
+            Sanchez
+            Clark
+            Ramirez
+            Lewis
+            Robinson
+            Walker
+            """
+        )
+        self.credit_ratings = list(range(300, 851))
+        self.tax_jurisdictions = _lines(
+            "Federal\nCalifornia\nNew York\nTexas\nFlorida\nIllinois\nPennsylvania\nOhio\nGeorgia\nNorth Carolina\nMichigan"
+        )
 
     def generate_all_source_data(self) -> dict[str, list[str]]:
         """Generate all source system data files.
@@ -334,18 +298,7 @@ class TPCDISourceDataGenerator:
         Returns:
             List of file paths for OLTP data files
         """
-        file_paths = []
-
-        # Customer data extract
-        file_paths.append(self._generate_customer_extract())
-
-        # Account data extract
-        file_paths.append(self._generate_account_extract())
-
-        # Trade data extract
-        file_paths.append(self._generate_trade_extract())
-
-        return file_paths
+        return [self._generate_customer_extract(), self._generate_account_extract(), self._generate_trade_extract()]
 
     def _generate_customer_extract(self) -> str:
         """Generate customer data extract from OLTP system."""
@@ -579,12 +532,7 @@ class TPCDISourceDataGenerator:
         Returns:
             List of file paths for HR data files
         """
-        file_paths = []
-
-        # Employee/Broker data
-        file_paths.append(self._generate_employee_xml())
-
-        return file_paths
+        return [self._generate_employee_xml()]
 
     def _generate_employee_xml(self) -> str:
         """Generate employee/broker data in XML format."""
@@ -647,15 +595,7 @@ class TPCDISourceDataGenerator:
         Returns:
             List of file paths for CRM data files
         """
-        file_paths = []
-
-        # Customer relationship data
-        file_paths.append(self._generate_customer_relationships_json())
-
-        # Marketing campaigns
-        file_paths.append(self._generate_marketing_campaigns_json())
-
-        return file_paths
+        return [self._generate_customer_relationships_json(), self._generate_marketing_campaigns_json()]
 
     def _generate_customer_relationships_json(self) -> str:
         """Generate customer relationship data in JSON format."""
@@ -755,18 +695,7 @@ class TPCDISourceDataGenerator:
         Returns:
             List of file paths for external data files
         """
-        file_paths = []
-
-        # Market price data (CSV with pipe delimiter)
-        file_paths.append(self._generate_market_prices())
-
-        # Tax rate data (CSV with tab delimiter)
-        file_paths.append(self._generate_tax_rates())
-
-        # Company data (XML format)
-        file_paths.append(self._generate_company_data_xml())
-
-        return file_paths
+        return [self._generate_market_prices(), self._generate_tax_rates(), self._generate_company_data_xml()]
 
     def _generate_market_prices(self) -> str:
         """Generate market price data with pipe delimiter."""
@@ -1004,61 +933,28 @@ class TPCDISourceDataGenerator:
         Returns:
             Dictionary describing each generated file format
         """
-        return {
-            "oltp_customer_extract.csv": {
-                "format": "CSV",
-                "delimiter": ",",
-                "quote_char": '"',
-                "encoding": "utf-8",
-                "description": "Customer data from OLTP database",
-            },
-            "oltp_account_extract.csv": {
-                "format": "CSV",
-                "delimiter": ",",
-                "quote_char": '"',
-                "encoding": "utf-8",
-                "description": "Account data from OLTP database",
-            },
-            "oltp_trade_extract.txt": {
-                "format": "Fixed-width",
-                "encoding": "utf-8",
-                "description": "Trade data from legacy OLTP system",
-            },
-            "hr_employees.xml": {
-                "format": "XML",
-                "encoding": "utf-8",
-                "description": "Employee/broker data from HR system",
-            },
-            "crm_customer_relationships.json": {
-                "format": "JSON",
-                "encoding": "utf-8",
-                "description": "Customer relationship data from CRM system",
-            },
-            "crm_marketing_campaigns.json": {
-                "format": "JSON",
-                "encoding": "utf-8",
-                "description": "Marketing campaign data from CRM system",
-            },
-            "external_market_prices.csv": {
-                "format": "CSV",
-                "delimiter": "|",
-                "quote_char": '"',
-                "encoding": "utf-8",
-                "description": "Market price data from external provider",
-            },
-            "external_tax_rates.tsv": {
-                "format": "CSV",
-                "delimiter": "\t",
-                "quote_char": '"',
-                "encoding": "utf-8",
-                "description": "Tax rate data from external provider",
-            },
-            "external_company_data.xml": {
-                "format": "XML",
-                "encoding": "utf-8",
-                "description": "Company reference data from external provider",
-            },
-        }
+        rows = """
+        oltp_customer_extract.csv|CSV|,|Customer data from OLTP database
+        oltp_account_extract.csv|CSV|,|Account data from OLTP database
+        oltp_trade_extract.txt|Fixed-width||Trade data from legacy OLTP system
+        hr_employees.xml|XML||Employee/broker data from HR system
+        crm_customer_relationships.json|JSON||Customer relationship data from CRM system
+        crm_marketing_campaigns.json|JSON||Marketing campaign data from CRM system
+        external_market_prices.csv|CSV|PIPE|Market price data from external provider
+        external_tax_rates.tsv|CSV|\\t|Tax rate data from external provider
+        external_company_data.xml|XML||Company reference data from external provider
+        """
+        info = {}
+        for name, format_name, delimiter, description in (
+            line.strip().split("|") for line in rows.splitlines() if line.strip()
+        ):
+            info[name] = {"format": format_name}
+            if delimiter:
+                info[name]["delimiter"] = {"\\t": "\t", "PIPE": "|"}.get(delimiter, delimiter)
+                info[name]["quote_char"] = '"'
+            info[name]["encoding"] = "utf-8"
+            info[name]["description"] = description
+        return info
 
     def _generate_customer_extract_parallel(self) -> str:
         """Generate customer data extract using parallel chunking."""
