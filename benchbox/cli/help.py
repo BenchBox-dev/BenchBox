@@ -9,309 +9,38 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 """
 
 import re
-from typing import Any
+from importlib import resources
+from typing import Any, cast
 
 import click
+import yaml
+
+
+# Static help catalogs live in package data so the CLI keeps import-time public
+# constants without embedding hundreds of command example lines in code.
+def _load_help_catalog() -> dict[str, Any]:
+    with resources.files("benchbox.data").joinpath("cli_help_catalog.yaml").open(encoding="utf-8") as handle:
+        payload = yaml.safe_load(handle) or {}
+    if not isinstance(payload, dict):
+        raise ValueError("cli_help_catalog.yaml must contain a mapping")
+    return cast("dict[str, Any]", payload)
+
+
+_HELP_CATALOG = _load_help_catalog()
 
 # Valid help topics
-HELP_TOPICS = ("all", "examples", "benchmarks")
+HELP_TOPICS = tuple(_HELP_CATALOG["help_topics"])
 
-
-# Command categories for grouped help display
-# Order matters - categories are displayed in this order
+# Command categories for grouped help display. Order matters.
 COMMAND_CATEGORIES: dict[str, tuple[str, list[str]]] = {
-    "core": (
-        "Core",
-        ["run", "run-official", "datagen"],
-    ),
-    "results": (
-        "Results & Analysis",
-        ["results", "report", "aggregate", "export"],
-    ),
-    "comparison": (
-        "Comparison",
-        ["compare", "compare-dataframes", "compare-plans"],
-    ),
-    "visualization": (
-        "Visualization",
-        ["visualize"],
-    ),
-    "plans": (
-        "Query Plans",
-        ["show-plan", "plan-history"],
-    ),
-    "configuration": (
-        "Configuration",
-        ["setup", "platforms", "tuning", "validate"],
-    ),
-    "utilities": (
-        "Utilities",
-        ["shell", "profile", "check-deps", "convert", "calculate-qphh", "benchmarks"],
-    ),
+    key: (str(value[0]), list(value[1]))
+    for key, value in cast("dict[str, list[Any]]", _HELP_CATALOG["command_categories"]).items()
 }
 
-
-# Examples registry - commands can register their examples here
-COMMAND_EXAMPLES: dict[str, dict[str, list[str]]] = {
-    "run": {
-        # === Basic Usage ===
-        "Basic Usage": [
-            "benchbox run --platform duckdb --benchmark tpch",
-            "benchbox run --platform sqlite --benchmark ssb --scale 1",
-            "benchbox run --platform duckdb --benchmark tpcds --scale 10",
-        ],
-        "Driver & Version Management": [
-            "# BenchBox uses whatever driver version is installed in the current environment.",
-            "# When invoked via 'uv run', uv syncs your env to uv.lock first - a version you",
-            "# installed manually (e.g. uv pip install duckdb==1.5.0) may be silently reverted.",
-            "# Use driver_auto_install to reliably switch versions without touching the lock file:",
-            "benchbox run --platform duckdb --benchmark tpch \\",
-            "  --platform-option driver_version=1.5.0 \\",
-            "  --platform-option driver_auto_install=true",
-            "# Or override inline without modifying the lock file:",
-            'uv run --with "duckdb==1.5.0" benchbox run --platform duckdb --benchmark tpch',
-            "# Pin driver for any platform (not just DuckDB):",
-            "benchbox run --platform snowflake --benchmark tpch \\",
-            "  --platform-option driver_version=3.12.0 \\",
-            "  --platform-option driver_auto_install=true \\",
-            "  --output s3://my-bucket/results/",
-            "# Verify which version actually ran: check result JSON field execution.driver_version_actual",
-            "# or watch the 'Running ... [driver X.Y.Z]' line in CLI output.",
-        ],
-        # === Platform-Specific Examples ===
-        "Snowflake": [
-            "benchbox run --platform snowflake --benchmark tpch --output s3://bucket/benchbox/",
-            "benchbox run --platform snowflake --benchmark tpcds --scale 100 \\",
-            "  --platform-option warehouse=BENCHBOX_XL --output s3://my-bucket/results/",
-            "benchbox run --platform snowflake --benchmark tpch --tuning tuned \\",
-            "  --output s3://bucket/benchbox/  # Uses clustering, result caching",
-            "benchbox run --platform snowflake --benchmark tpch --table-mode external \\",
-            "  --platform-option staging_root=s3://bucket/benchbox/  # External tables over staged Parquet",
-        ],
-        "Databricks": [
-            "benchbox run --platform databricks --benchmark tpch \\",
-            "  --output dbfs:/Volumes/catalog/schema/benchbox/",
-            "benchbox run --platform databricks --benchmark tpcds --scale 100 \\",
-            "  --output abfss://container@storage.dfs.core.windows.net/benchbox/",
-            "benchbox run --platform databricks --benchmark tpch --tuning tuned \\",
-            "  --output dbfs:/Volumes/main/default/benchbox/  # Uses Photon, Delta optimization",
-        ],
-        "BigQuery": [
-            "benchbox run --platform bigquery --benchmark tpch --output gs://bucket/benchbox/",
-            "benchbox run --platform bigquery --benchmark tpcds --scale 100 \\",
-            "  --platform-option project_id=my-project --output gs://my-bucket/results/",
-            "benchbox run --platform bigquery --benchmark tpch --tuning tuned \\",
-            "  --output gs://bucket/benchbox/  # Uses partitioning, clustering",
-            "benchbox run --platform bigquery --benchmark tpch --table-mode external \\",
-            "  --platform-option staging_root=gs://bucket/benchbox/  # External table over GCS Parquet",
-        ],
-        "Redshift": [
-            "benchbox run --platform redshift --benchmark tpch --output s3://bucket/benchbox/",
-            "benchbox run --platform redshift --benchmark tpcds --scale 100 \\",
-            "  --platform-option iam_role=arn:aws:iam::123456789012:role/RedshiftRole \\",
-            "  --output s3://my-bucket/results/",
-        ],
-        "Firebolt Core": [
-            "benchbox run --platform firebolt --benchmark tpch \\",
-            "  --platform-option url=http://localhost:3473  # Local Docker",
-            "benchbox run --platform firebolt --benchmark tpch --scale 1 \\",
-            "  --platform-option url=http://localhost:3473 \\",
-            "  --platform-option database=tpch_sf1",
-        ],
-        "Firebolt Cloud": [
-            "benchbox run --platform firebolt --benchmark tpch \\",
-            "  --platform-option client_id=YOUR_CLIENT_ID \\",
-            "  --platform-option client_secret=YOUR_SECRET \\",
-            "  --platform-option account=my-account --platform-option engine=benchmark_engine",
-            "benchbox run --platform firebolt --benchmark tpcds --scale 100 \\",
-            "  --platform-option client_id=$FIREBOLT_CLIENT_ID \\",
-            "  --platform-option client_secret=$FIREBOLT_CLIENT_SECRET \\",
-            "  --platform-option account=production --platform-option engine=large_engine",
-        ],
-        "Presto": [
-            "benchbox run --platform presto --benchmark tpch \\",
-            "  --platform-option host=presto-coordinator.example.com \\",
-            "  --platform-option catalog=hive",
-            "benchbox run --platform presto --benchmark tpcds --scale 100 \\",
-            "  --platform-option host=localhost --platform-option port=8080 \\",
-            "  --platform-option catalog=iceberg --platform-option schema=tpcds_sf100",
-            "benchbox run --platform presto --benchmark tpch \\",
-            "  --platform-option catalog=memory  # In-memory catalog for testing",
-        ],
-        "Trino": [
-            "benchbox run --platform trino --benchmark tpch \\",
-            "  --platform-option host=trino-coordinator.example.com \\",
-            "  --platform-option catalog=hive",
-            "benchbox run --platform trino --benchmark tpcds --scale 100 \\",
-            "  --platform-option host=localhost --platform-option port=8080 \\",
-            "  --platform-option catalog=iceberg --platform-option schema=tpcds_sf100",
-            "benchbox run --platform trino --benchmark tpch \\",
-            "  --platform-option user=benchbox  # Specify Trino user",
-        ],
-        "Athena": [
-            "benchbox run --platform athena --benchmark tpch \\",
-            "  --platform-option s3_staging_dir=s3://my-bucket/athena-results/ \\",
-            "  --platform-option workgroup=primary",
-            "benchbox run --platform athena --benchmark tpcds --scale 100 \\",
-            "  --platform-option region=us-west-2 \\",
-            "  --platform-option s3_staging_dir=s3://athena-staging/results/ \\",
-            "  --platform-option workgroup=benchbox-workgroup",
-            "benchbox run --platform athena --benchmark tpch \\",
-            "  --platform-option database=benchbox_tpch  # Use existing database",
-            "benchbox run --platform athena --benchmark tpch --table-mode external \\",
-            "  --platform-option staging_root=s3://my-bucket/benchbox/  # Skip CTAS materialization",
-            "# Athena Spark: select Spark engine version",
-            "benchbox run --platform athena --benchmark tpch \\",
-            "  --platform-option workgroup=my-spark-workgroup \\",
-            "  --platform-option s3_staging_dir=s3://my-bucket/staging/ \\",
-            '  --platform-option "engine_version=PySpark engine version 3"',
-        ],
-        "Azure Synapse": [
-            "benchbox run --platform azure_synapse --benchmark tpch \\",
-            "  --platform-option server=myworkspace.sql.azuresynapse.net \\",
-            "  --platform-option database=benchbox",
-            "benchbox run --platform azure_synapse --benchmark tpcds --scale 100 \\",
-            "  --platform-option server=myworkspace.sql.azuresynapse.net \\",
-            "  --platform-option database=tpcds_sf100 --platform-option authentication=ActiveDirectoryInteractive",
-            "# Dedicated SQL pool with specific resource class",
-            "benchbox run --platform azure_synapse --benchmark tpch \\",
-            "  --platform-option server=myworkspace.sql.azuresynapse.net \\",
-            "  --platform-option resource_class=staticrc60",
-        ],
-        "Fabric Warehouse": [
-            "benchbox run --platform fabric_warehouse --benchmark tpch \\",
-            "  --platform-option server=workspace-guid.datawarehouse.fabric.microsoft.com \\",
-            "  --platform-option warehouse=BenchmarkWarehouse",
-            "benchbox run --platform fabric_warehouse --benchmark tpcds --scale 100 \\",
-            "  --platform-option workspace=my-workspace \\",
-            "  --platform-option warehouse=TPC_DS_Benchmark",
-            "# Using Azure AD authentication (default)",
-            "benchbox run --platform fabric_warehouse --benchmark tpch \\",
-            "  --platform-option workspace=analytics-workspace \\",
-            "  --platform-option warehouse=PerformanceTests",
-        ],
-        "PostgreSQL": [
-            "benchbox run --platform postgresql --benchmark tpch  # localhost:5432 default",
-            "benchbox run --platform postgresql --benchmark tpch \\",
-            "  --platform-option host=db.example.com --platform-option port=5432 \\",
-            "  --platform-option username=benchbox --platform-option password=secret",
-            "benchbox run --platform postgresql --benchmark tpcds --scale 10 \\",
-            "  --platform-option database=tpcds_benchmark \\",
-            "  --platform-option schema=tpcds_sf10",
-            "benchbox run --platform postgresql --benchmark tpch \\",
-            "  --platform-option sslmode=require  # Secure connection",
-        ],
-        "Local Platforms": [
-            "benchbox run --platform duckdb --benchmark tpch  # Fastest local option",
-            "benchbox run --platform sqlite --benchmark ssb --scale 1  # Baseline comparison",
-            "benchbox run --platform postgresql --benchmark tpch  # Requires local PostgreSQL",
-        ],
-        "DataFrame Platforms": [
-            "benchbox run --platform polars --benchmark tpch --mode dataframe  # Fastest DataFrame",
-            "benchbox run --platform pandas --benchmark tpch --mode dataframe --scale 0.1",
-            "benchbox run --platform datafusion --benchmark tpch --mode dataframe",
-            "benchbox run --platform dask --benchmark tpch --mode dataframe --scale 1  # Distributed",
-            "benchbox run --platform cudf --benchmark tpch --mode dataframe  # GPU-accelerated",
-        ],
-        # === Use-Case Examples ===
-        "Quick Validation (CI/CD)": [
-            "benchbox run --platform duckdb --benchmark tpch --scale 0.01 --queries Q1,Q6",
-            "benchbox run --platform duckdb --benchmark tpch --scale 0.01 \\",
-            "  --phases power --non-interactive  # Headless CI run",
-            "benchbox run --platform snowflake --benchmark tpch --scale 0.01 \\",
-            "  --queries Q1,Q3,Q6 --non-interactive --output s3://ci-bucket/",
-        ],
-        "Full TPC Benchmark": [
-            "benchbox run --platform duckdb --benchmark tpch --scale 10 \\",
-            "  --phases generate,load,warmup,power,throughput",
-            "benchbox run --platform snowflake --benchmark tpcds --scale 100 \\",
-            "  --phases generate,load,power,throughput --tuning tuned \\",
-            "  --output s3://bucket/tpcds-sf100/",
-        ],
-        "Platform Comparison": [
-            "# Run same benchmark on multiple platforms for comparison",
-            "benchbox run --platform duckdb --benchmark tpch --scale 1 --output ./results/duckdb/",
-            "benchbox run --platform polars --benchmark tpch --scale 1 --mode dataframe \\",
-            "  --output ./results/polars/",
-            "benchbox run --platform datafusion --benchmark tpch --scale 1 --mode dataframe \\",
-            "  --output ./results/datafusion/",
-        ],
-        "Data Generation Only": [
-            "benchbox run --benchmark tpch --scale 100 --phases generate  # Generate data only",
-            "benchbox run --benchmark tpcds --scale 10 --phases generate \\",
-            "  --compression zstd:9  # Compressed output",
-        ],
-        "Export and Analysis": [
-            "benchbox export --last --format csv --format html  # Export most recent run",
-            "benchbox export result.json --format csv \\",
-            "  --output-dir ./analysis/  # Custom output location",
-            "# Results can be loaded: python -c \"import json; data = json.load(open('result.json'))\"",
-        ],
-        # === Standard Configuration ===
-        "Query Selection": [
-            "benchbox run --platform duckdb --benchmark tpch --queries Q1,Q6,Q17",
-            "benchbox run --platform duckdb --benchmark tpcds --queries Q1,Q2,Q3,Q4,Q5",
-            "benchbox run --platform duckdb --benchmark tpch --queries Q22  # Single query",
-        ],
-        "Benchmark Phases": [
-            "benchbox run --platform duckdb --benchmark tpch --phases generate",
-            "benchbox run --platform duckdb --benchmark tpch --phases generate,load",
-            "benchbox run --platform duckdb --benchmark tpch --phases power,throughput",
-            "benchbox run --platform duckdb --benchmark tpch --phases warmup,power",
-        ],
-        "Tuning Configuration": [
-            "benchbox run --platform duckdb --benchmark tpch --tuning tuned  # Auto-discovers template",
-            "benchbox run --platform duckdb --benchmark tpch --tuning notuning  # Baseline, no tuning",
-            "benchbox run --platform duckdb --benchmark tpch --tuning auto  # Smart system defaults",
-            "benchbox run --platform duckdb --benchmark tpch \\",
-            "  --tuning ./examples/tunings/duckdb/tpch_tuned.yaml  # Explicit tuning file",
-            "# Tuning modes:",
-            "#   'tuned'    - Auto-discovers examples/tunings/<platform>/<benchmark>_tuned.yaml",
-            "#   'notuning' - Disables all optimizations (baseline comparison)",
-            "#   'auto'     - Uses smart defaults based on system profile",
-            "#   <PATH>     - Loads explicit YAML tuning file",
-        ],
-        "Tuning Discovery": [
-            "benchbox tuning list  # List all available tuning templates",
-            "benchbox tuning list --platform duckdb  # Templates for specific platform",
-            "benchbox tuning show tuned --platform duckdb --benchmark tpch  # Preview resolution",
-            "benchbox tuning show ./my-tuning.yaml  # Preview custom config",
-        ],
-        "Data Regeneration": [
-            "benchbox run --platform duckdb --benchmark tpch --force  # Regenerate all",
-            "benchbox run --platform duckdb --benchmark tpch --force datagen  # Data only",
-            "benchbox run --platform snowflake --benchmark tpch --force upload \\",
-            "  --output s3://bucket/  # Re-upload to cloud",
-            "benchbox run --platform snowflake --benchmark tpch --force datagen,upload \\",
-            "  --output s3://bucket/  # Regenerate and re-upload",
-        ],
-        # === Advanced Options ===
-        "Dry Run (Preview)": [
-            "benchbox run --dry-run ./preview --platform duckdb --benchmark tpch",
-            "benchbox run --dry-run /tmp/test --platform snowflake --benchmark tpcds --scale 100",
-            "benchbox run --dry-run ./preview --benchmark tpch --phases generate  # Data-only preview",
-        ],
-        "Compression (Advanced)": [
-            "benchbox run --platform duckdb --benchmark tpch --compression zstd",
-            "benchbox run --platform duckdb --benchmark tpch --compression zstd:9  # Max compression",
-            "benchbox run --platform duckdb --benchmark tpch --compression gzip:6",
-            "benchbox run --platform duckdb --benchmark tpch --compression none  # Disable",
-        ],
-        "Plan Capture (Advanced)": [
-            "benchbox run --platform duckdb --benchmark tpch --capture-plans",
-            "benchbox run --platform duckdb --benchmark tpch --capture-plans --plan-config sample:0.1",
-            "benchbox run --platform duckdb --benchmark tpch --capture-plans --plan-config first:5",
-            "benchbox run --platform duckdb --benchmark tpch --capture-plans \\",
-            "  --plan-config queries:Q1,Q6,Q17",
-        ],
-        "Validation (Advanced)": [
-            "benchbox run --platform duckdb --benchmark tpch --validation exact",
-            "benchbox run --platform duckdb --benchmark tpch --validation loose  # ±5% tolerance",
-            "benchbox run --platform duckdb --benchmark tpch --validation full  # All checks",
-            "benchbox run --platform duckdb --benchmark tpch --validation disabled",
-        ],
-    },
-}
+# Examples registry - commands can register their examples here.
+COMMAND_EXAMPLES: dict[str, dict[str, list[str]]] = cast(
+    "dict[str, dict[str, list[str]]]", _HELP_CATALOG["command_examples"]
+)
 
 
 class BenchBoxHelpFormatter(click.HelpFormatter):

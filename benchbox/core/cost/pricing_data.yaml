@@ -1,0 +1,308 @@
+metadata:
+  version: '2025.11'
+  last_updated: '2025-11-09'
+  source: Cloud provider public pricing pages
+  currency: USD
+snowflake_credit_prices:
+  standard:
+    aws:
+      us: 2.0
+      eu: 2.5
+      ap: 2.6
+      ca: 2.2
+      other: 2.7
+    azure:
+      us: 2.0
+      eu: 2.5
+      ap: 2.6
+      ca: 2.2
+      other: 2.7
+    gcp:
+      us: 2.0
+      eu: 2.5
+      ap: 2.6
+      ca: 2.2
+      other: 2.7
+  enterprise:
+    aws:
+      us: 3.0
+      eu: 3.75
+      ap: 3.9
+      ca: 3.3
+      other: 4.05
+    azure:
+      us: 3.0
+      eu: 3.75
+      ap: 3.9
+      ca: 3.3
+      other: 4.05
+    gcp:
+      us: 3.0
+      eu: 3.75
+      ap: 3.9
+      ca: 3.3
+      other: 4.05
+  business_critical:
+    aws:
+      us: 4.0
+      eu: 5.0
+      ap: 5.2
+      ca: 4.4
+      other: 5.4
+    azure:
+      us: 4.0
+      eu: 5.0
+      ap: 5.2
+      ca: 4.4
+      other: 5.4
+    gcp:
+      us: 4.0
+      eu: 5.0
+      ap: 5.2
+      ca: 4.4
+      other: 5.4
+athena_price_per_tb: 5.0
+bigquery_on_demand_prices:
+  us: 5.0
+  eu: 5.0
+  asia: 5.0
+  us-single: 5.0
+  eu-single: 5.5
+  asia-single: 5.5
+  australia: 6.0
+  southamerica: 6.25
+  middleeast: 6.0
+  other: 5.5
+redshift_node_prices:
+  dc2.large:
+    us-east-1: 0.25
+    us-east-2: 0.25
+    us-west-1: 0.27
+    us-west-2: 0.25
+    eu-west-1: 0.28
+    eu-west-2: 0.32
+    eu-central-1: 0.3
+    ap-southeast-1: 0.29
+    ap-southeast-2: 0.31
+    ap-northeast-1: 0.29
+    other: 0.3
+  dc2.8xlarge:
+    us-east-1: 6.4
+    us-east-2: 6.4
+    us-west-1: 6.9
+    us-west-2: 6.4
+    eu-west-1: 7.2
+    eu-west-2: 8.2
+    eu-central-1: 7.6
+    ap-southeast-1: 7.4
+    ap-southeast-2: 7.9
+    ap-northeast-1: 7.4
+    other: 7.5
+  ra3.xlplus:
+    us-east-1: 1.086
+    us-east-2: 1.086
+    us-west-1: 1.173
+    us-west-2: 1.086
+    eu-west-1: 1.217
+    eu-west-2: 1.304
+    eu-central-1: 1.282
+    ap-southeast-1: 1.26
+    ap-southeast-2: 1.347
+    ap-northeast-1: 1.26
+    other: 1.25
+  ra3.4xlarge:
+    us-east-1: 3.61
+    us-east-2: 3.61
+    us-west-1: 3.9
+    us-west-2: 3.61
+    eu-west-1: 4.05
+    eu-west-2: 4.34
+    eu-central-1: 4.26
+    ap-southeast-1: 4.19
+    ap-southeast-2: 4.48
+    ap-northeast-1: 4.19
+    other: 4.15
+  ra3.16xlarge:
+    us-east-1: 14.44
+    us-east-2: 14.44
+    us-west-1: 15.6
+    us-west-2: 14.44
+    eu-west-1: 16.2
+    eu-west-2: 17.36
+    eu-central-1: 17.04
+    ap-southeast-1: 16.76
+    ap-southeast-2: 17.92
+    ap-northeast-1: 16.76
+    other: 16.6
+  ds2.xlarge:
+    us-east-1: 0.85
+    us-east-2: 0.85
+    us-west-1: 0.92
+    us-west-2: 0.85
+    eu-west-1: 0.95
+    eu-west-2: 1.02
+    eu-central-1: 1.0
+    other: 1.0
+  ds2.8xlarge:
+    us-east-1: 6.8
+    us-east-2: 6.8
+    us-west-1: 7.35
+    us-west-2: 6.8
+    eu-west-1: 7.6
+    eu-west-2: 8.15
+    eu-central-1: 8.0
+    other: 8.0
+databricks_dbu_prices:
+  aws:
+    standard:
+      all_purpose: 0.4
+      jobs: 0.15
+      sql_warehouse: 0.22
+      ml: 0.4
+    premium:
+      all_purpose: 0.55
+      jobs: 0.2
+      sql_warehouse: 0.22
+      ml: 0.55
+    enterprise:
+      all_purpose: 0.65
+      jobs: 0.2
+      sql_warehouse: 0.3
+      ml: 0.65
+  azure:
+    standard:
+      all_purpose: 0.44
+      jobs: 0.17
+      sql_warehouse: 0.24
+      ml: 0.44
+    premium:
+      all_purpose: 0.6
+      jobs: 0.22
+      sql_warehouse: 0.24
+      ml: 0.6
+    enterprise:
+      all_purpose: 0.71
+      jobs: 0.22
+      sql_warehouse: 0.33
+      ml: 0.71
+  gcp:
+    standard:
+      all_purpose: 0.4
+      jobs: 0.15
+      sql_warehouse: 0.22
+      ml: 0.4
+    premium:
+      all_purpose: 0.55
+      jobs: 0.2
+      sql_warehouse: 0.22
+      ml: 0.55
+    enterprise:
+      all_purpose: 0.65
+      jobs: 0.2
+      sql_warehouse: 0.3
+      ml: 0.65
+synapse_serverless_price_per_tb: 5.0
+synapse_dedicated_dwu_prices:
+  dw100c:
+    us: 1.2
+    eu: 1.44
+    ap: 1.56
+    other: 1.68
+  dw200c:
+    us: 2.4
+    eu: 2.88
+    ap: 3.12
+    other: 3.36
+  dw300c:
+    us: 3.6
+    eu: 4.32
+    ap: 4.68
+    other: 5.04
+  dw400c:
+    us: 4.8
+    eu: 5.76
+    ap: 6.24
+    other: 6.72
+  dw500c:
+    us: 6.0
+    eu: 7.2
+    ap: 7.8
+    other: 8.4
+  dw1000c:
+    us: 12.0
+    eu: 14.4
+    ap: 15.6
+    other: 16.8
+  dw1500c:
+    us: 18.0
+    eu: 21.6
+    ap: 23.4
+    other: 25.2
+  dw2000c:
+    us: 24.0
+    eu: 28.8
+    ap: 31.2
+    other: 33.6
+  dw2500c:
+    us: 30.0
+    eu: 36.0
+    ap: 39.0
+    other: 42.0
+  dw3000c:
+    us: 36.0
+    eu: 43.2
+    ap: 46.8
+    other: 50.4
+  dw5000c:
+    us: 60.0
+    eu: 72.0
+    ap: 78.0
+    other: 84.0
+  dw6000c:
+    us: 72.0
+    eu: 86.4
+    ap: 93.6
+    other: 100.8
+  dw7500c:
+    us: 90.0
+    eu: 108.0
+    ap: 117.0
+    other: 126.0
+  dw10000c:
+    us: 120.0
+    eu: 144.0
+    ap: 156.0
+    other: 168.0
+  dw15000c:
+    us: 180.0
+    eu: 216.0
+    ap: 234.0
+    other: 252.0
+  dw30000c:
+    us: 360.0
+    eu: 432.0
+    ap: 468.0
+    other: 504.0
+fabric_cu_prices:
+  us: 0.18
+  eu: 0.2
+  ap: 0.22
+  other: 0.2
+fabric_sku_cu_map:
+  f2: 2
+  f4: 4
+  f8: 8
+  f16: 16
+  f32: 32
+  f64: 64
+  f128: 128
+  f256: 256
+  f512: 512
+  f1024: 1024
+  f2048: 2048
+firebolt_node_fbu_rates:
+  s: 8.0
+  m: 16.0
+  l: 32.0
+  xl: 64.0
+firebolt_fbu_price: 0.0833
