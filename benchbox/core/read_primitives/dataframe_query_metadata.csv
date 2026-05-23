@@ -1,0 +1,152 @@
+aggregation_distinct|Distinct Aggregation|Distinct count of high cardinality key on a large table|A||SELECT COUNT(DISTINCT o_custkey) FROM orders WHERE o_orderdate >= DATE '1995-01-01'
+aggregation_distinct_groupby|Distinct Aggregation with Group By|Distinct count of high cardinality keys in low cardinality groups|A,G||
+approx_count_distinct_simple|Approximate Distinct Count|HLL distinct count on a high-cardinality key (sketch on Polars/PySpark/DataFusion; exact on Pandas/Modin/cuDF/Dask)|A||SELECT APPROX_COUNT_DISTINCT(o_custkey) FROM orders WHERE o_orderdate >= DATE '1995-01-01'
+approx_count_distinct_groupby|Approximate Distinct Count with Group By|HLL distinct counts per low-cardinality group (sketch on Polars/PySpark/DataFusion; exact on Pandas/Modin/cuDF/Dask)|A,G||
+aggregation_groupby_large|Large Cardinality Group By|Aggregates within high cardinality grouping|A,G||
+aggregation_groupby_small|Small Cardinality Group By|Aggregates within low cardinality grouping|A,G||
+aggregation_materialize|Nested Aggregation|Nested aggregation requiring CTE materialization|A,Q||
+aggregation_materialize_subquery|Subquery Materialization|Complex nested aggregation with joins|A,Q,J||
+aggregation_partition|Partition Key Aggregation|Aggregates over the partition key|A,G||
+aggregation_selective|Selective Aggregation|Aggregate on a small subset of rows|A,F||
+aggregation_simple|Simple Aggregation|Aggregate over all rows in table|A||
+filter_selective|High Selectivity Filter|High selectivity filter - few rows match|F||
+filter_non_selective|Low Selectivity Filter|Low selectivity filter - many rows match|F||
+count_star|Count Star|Metadata-based count optimization vs full table scan|A||
+decimal_arithmetic|Decimal Arithmetic|Decimal precision arithmetic with complex expressions|P||
+orderby_simple|Simple Order By|Simple ORDER BY single column|S||
+orderby_multi|Multi-Column Order By|ORDER BY multiple columns|S||
+orderby_desc|Descending Order By|ORDER BY with descending sort|S||
+topn|Top-N Query|Top-N query with ORDER BY and LIMIT|S||
+limit|Simple Limit|Simple LIMIT without ORDER BY|C||
+limit_ordered|Ordered Limit|LIMIT clause with ordering on large result set|S||
+string_like|String LIKE|String LIKE pattern matching|F||
+string_starts_with|String Starts With|String starts_with pattern matching|F||
+string_ends_with|String Ends With|String ends_with pattern matching|F||
+string_concat|String Concatenation|String concatenation|P||
+string_substring|String Substring|String substring extraction|P||
+window_row_number|Window ROW_NUMBER|Window function ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ...)|W||
+window_rank|Window RANK|Window function RANK() OVER (PARTITION BY ... ORDER BY ...)|W||
+window_sum|Window SUM|Window function SUM() OVER (PARTITION BY ...)|W,A||
+window_running_sum|Window Running Sum|Window function SUM() OVER (ORDER BY ...) - cumulative sum|W,A||
+broadcast_join_two_tables|Broadcast Join (2 tables)|One small table broadcast to join with one large table|J||
+broadcast_join_three_tables|Broadcast Join (3 tables)|Two small tables broadcast to join with one large table|J,M||
+predicate_ordering_aggregation|Predicate Ordering with Aggregation|Order filter predicates by selectivity for aggregation|F,A||
+shuffle_join|Shuffle Join|Data is redistributed based on the join keys|J,A||
+empty_build_join|Empty Build Side Join|Join when build side produces no rows (edge case handling)|J||
+filter_bigint_selective|Bigint Selective Filter|Equality predicate with high selectivity on integer column|F||
+filter_bigint_non_selective|Bigint Non-Selective Filter|Range predicate with low selectivity on large table|F,A||
+filter_bigint_in_list_selective|Bigint IN List Filter|IN-list predicate with highly selective integer values|F|filter_bigint_in_list|
+filter_decimal_selective|Decimal Selective Filter|Compound equality predicate with multiple decimal columns|F||
+filter_decimal_non_selective|Decimal Non-Selective Filter|Range predicate on decimal column with low selectivity|F,A||
+filter_string_selective|String Selective Filter|Exact string equality with high selectivity on varchar column|F||
+filter_string_non_selective|String Non-Selective Filter|String comparison with low selectivity (most rows match)|F,A||
+filter_in_predicate_selective|IN Predicate with Subquery|IN predicate with subquery and selective filtering|F,Q|filter_in_predicate_subquery|
+groupby_bigint_highndv|High NDV GroupBy|GROUP BY with high distinct value count (many groups)|G,A|groupby_highndv|
+groupby_bigint_lowndv|Low NDV GroupBy|GROUP BY with low distinct value count (few groups)|G,A|groupby_lowndv|
+groupby_bigint_pk|Primary Key GroupBy|GROUP BY on primary key (one row per group)|G,A|groupby_pk|
+groupby_decimal_highndv|High NDV Decimal GroupBy|GROUP BY with high cardinality decimal column|G,A||
+groupby_decimal_lowndv|Low NDV Decimal GroupBy|GROUP BY with low cardinality decimal column|G,A||
+orderby_all|Full Table Order By|Sort on full table with simple integer ordering|S||
+orderby_bigint|Bigint Order By|Sort with aggregation results on integer column|S,A||
+orderby_bigint_expression|Expression Order By|Sort on computed expressions with DESC ordering|S,P|orderby_expression|
+orderby_multicol|Multi-Column Complex Order By|Complex multi-column sort with string, date, and decimal columns|S||
+orderby_shortstrings|Short Strings Order By|Sort on short string columns with DISTINCT operation|S||
+shuffle_inner_join_one_to_many_string_with_groupby|Inner Join with GroupBy|Standard inner join with one-to-many relationship|J,G,A|shuffle_inner_join_groupby|
+shuffle_left_join_one_to_many_string_with_groupby|Left Join with GroupBy|LEFT JOIN with preservation of all left-side rows|J,G,A|shuffle_left_join_groupby|
+shuffle_full_join_one_to_many_string_with_groupby|Full Outer Join with GroupBy|FULL OUTER JOIN with string grouping and aggregation|J,G,A|shuffle_full_join_groupby|
+shuffle_1mb_rows|Self Join with Hash Collision|Self-join with hash collision handling on large table|J,A|shuffle_self_join|
+string_equal_predicate|String Equality|Exact string equality with selective matching|F,A|string_equal|
+string_equal_predicate_lower|String Equality (Case Insensitive)|Equality predicate after applying case conversion|F,A|string_equal_lower|
+string_in_predicate|String IN Predicate|IN predicate with string values|F,A||
+string_like_predicate_center|String LIKE Center|Case sensitive matching pattern in any location|F,A|string_like_center|
+string_like_predicate_end|String LIKE Suffix|Case sensitive matching suffix pattern|F,A|string_like_suffix|
+string_like_predicate_start|String LIKE Prefix|Case sensitive matching prefix pattern|F,A|string_like_prefix|
+window_growing_frame|Window Growing Frame|Running sum window aggregation with growing frame size|W,A||
+window_lead_lag_same_frame|Window Lead/Lag|Offset window functions over the same frame|W|window_lead_lag|
+window_multiple_orderings|Window Dense Rank|Window function DENSE_RANK() OVER (PARTITION BY ... ORDER BY ...)|W|window_dense_rank|
+predicate_ordering_aggregation_groupby|Predicate Ordering with GroupBy|Order filter predicates by selectivity for aggregation within a low cardinality grouping|F,G,A|predicate_ordering_groupby|
+predicate_ordering_costs|Predicate Ordering Costs|Order filter predicates by selectivity with result projection only|F,P||
+broadcast_join_four_tables|Broadcast Join (4 tables)|Three small tables broadcast to join with one large table|J,M,A||
+exchange_broadcast|Exchange Broadcast|One small table is copied to all nodes that have the large table|J,A||
+exchange_merge|Exchange Merge|Sorted data from multiple nodes is combined while keeping the sort order|J,S||
+exchange_shuffle|Exchange Shuffle|Data is redistributed based on the join keys so matching rows end up on the same node|J||
+topn_aggregate_2columns|TopN with Aggregation|Top 10 limit returning 2 columns after aggregation and computed ordering|S,A|topn_aggregate|
+topn_ordered_allcols|TopN All Columns|Top-10 limit returning all columns after ordering over all table rows|S,C|topn_allcols|
+statistical_variance_stddev|Variance and StdDev|Variance and standard deviation calculations|A|statistical_variance|
+statistical_correlation|Correlation Analysis|Correlation analysis between numeric columns|A||
+long_predicate|Long Predicate|Query with many conjunctive predicates across multiple tables|F,J,M||
+max_by_simple|MAX_BY Simple|Find the customer with the highest account balance in each nation|A,J||
+min_by_simple|MIN_BY Simple|Find the customer with the lowest account balance in each nation|A,J||
+array_agg_simple|Array Aggregation|Aggregate part keys into arrays per supplier|A||
+array_agg_distinct|Distinct Array Aggregation|Distinct array aggregation|A||
+filter_decimal_in_list_selective|Decimal IN List Filter|IN-list predicate with decimal values and selectivity|F|filter_decimal_in_list|
+filter_string_like|String LIKE Filter|LIKE predicate with substring pattern matching|F||
+orderby_decimal16|Decimal Order By|Multi-column sort with mixed ASC/DESC on decimal columns|S|orderby_decimal|
+min_max_runtime_filter|Min/Max Runtime Filter|Bloom filter and runtime filter effectiveness for join optimization|F,J||
+max_by_complex|MAX_BY Complex|Find the most expensive order for each customer segment|A,J||
+min_by_complex|MIN_BY Complex|Find the cheapest part for each brand|A||
+any_value_simple|ANY_VALUE Simple|Select any customer name per market segment (faster than MIN/MAX)|A,G||
+any_value_with_filter|ANY_VALUE with Filter|Any value with additional aggregates|A,G||
+groupby_all_simple|GROUP BY ALL Simple|Automatic grouping by all non-aggregate columns|A,G||
+groupby_all_complex|GROUP BY ALL Complex|GROUP BY ALL with multiple non-aggregate expressions|A,G||
+orderby_all_simple|ORDER BY ALL Simple|Order by all columns in SELECT list|S,J,A||
+orderby_all_desc|ORDER BY ALL Descending|ORDER BY ALL with descending direction|S,A||
+max_by_with_ties|MAX_BY with Ties|Find the supplier with the highest supply cost for each part|A,J,M||
+min_by_with_ties|MIN_BY with Ties|Find the supplier with the lowest supply cost for each part|A,J,M||
+predicate_ordering_subquery|Predicate Ordering with Subquery|Order filter predicates by selectivity with subquery predicate|F,Q,J||
+shuffle_inner_join_union_all_with_groupby|Union All with GroupBy|Complex join with UNION ALL and different data sources|J,G,A|shuffle_union_all_groupby|
+statistical_percentiles|Statistical Percentiles|Percentile calculation functions for distribution analysis|A,G||
+string_ilike_predicate_start|String ILIKE Prefix|Case insensitive matching prefix pattern|F,A|string_ilike_start|
+string_ilike_predicate_end|String ILIKE Suffix|Case insensitive matching suffix pattern|F,A|string_ilike_end|
+string_like_predicate_multi|String LIKE Multi|Case sensitive matching multipart pattern|F,A|string_like_multi|
+string_ilike_predicate_multi|String ILIKE Multi|Case insensitive matching multipart pattern|F,A|string_ilike_multi|
+string_like_predicate_center_insensitive|String ILIKE Center|Case insensitive matching pattern in any location|F,A|string_like_center_insensitive|
+window_moving_frame|Window Moving Frame|Window aggregations with complex moving frame definitions|W,A||
+window_unbounded_frame|Window Unbounded Frame|Window aggregations with the same unbounded frame definition|W||
+approx_quantile_groupby|Approximate Median|Approximate statistical function (PERCENTILE_CONT for median)|A,G||
+intrinsic_to_date|Date Conversion Filter|Date parsing and conversion function performance|F,A||
+fulltext_simple_search|Simple Text Search|Basic full-text search using string pattern matching|F||
+fulltext_boolean_search|Boolean Text Search|Boolean text search with AND/NOT operators|F,S||
+fulltext_phrase_search|Phrase Text Search|Phrase-based text search with ranking|F,S||
+olap_cube_analysis|OLAP CUBE Analysis|CUBE operation for multidimensional analysis|A,G,J||
+olap_rollup_analysis|OLAP ROLLUP Analysis|ROLLUP operation for hierarchical aggregation|A,G,J,S||
+pivot_basic|Basic Pivot|Pivot ship modes into columns|A,G||
+unpivot_basic|Basic Unpivot|Unpivot part dimensions into rows|P||
+optimizer_distinct_elimination|Optimizer: Distinct Elimination|Test DISTINCT elimination when result is already unique|F,P||
+optimizer_common_subexpression|Optimizer: Common Subexpression|Test Common Subexpression Elimination (CSE)|P,F||
+optimizer_predicate_pushdown|Optimizer: Predicate Pushdown|Test predicate pushdown through joins|J,F||
+optimizer_join_reordering|Optimizer: Join Reordering|Test join reordering based on cardinality|J,A,G||
+optimizer_limit_pushdown|Optimizer: Limit Pushdown|Test limit pushdown through operations|J,S||
+optimizer_aggregate_pushdown|Optimizer: Aggregate Pushdown|Test aggregate pushdown before join|J,A,G||
+optimizer_constant_folding|Optimizer: Constant Folding|Test constant folding at compile time|P||
+optimizer_column_pruning|Optimizer: Column Pruning|Test column pruning at scan|J,F,P||
+optimizer_union_optimization|Optimizer: Union Optimization|Test union optimization with multiple scans|S||
+optimizer_runtime_filter|Optimizer: Runtime Filter|Test runtime filter / dynamic partition pruning|J,F||
+optimizer_groupjoin|Optimizer: Group-Join Fusion|Test join+aggregate fusion into a single grouped-join pass|J,A,G||
+qualify_row_number|QUALIFY ROW_NUMBER|Find top N orders per customer using ROW_NUMBER|J,W,F||
+qualify_dense_rank|QUALIFY DENSE_RANK|Find top N parts by price per category using DENSE_RANK|W,F||
+qualify_ntile|QUALIFY NTILE|Find orders in top quartile per segment using NTILE|J,W,F||
+qualify_percentile|QUALIFY PERCENT_RANK|Find orders in top 10% per priority using PERCENT_RANK|W,F||
+qualify_cume_dist|QUALIFY CUME_DIST|Find lineitems in top 5% quantity per shipdate using CUME_DIST|W,F||
+qualify_lag_lead|QUALIFY LAG/LEAD|Find orders with increasing price using LAG|J,W,F||
+struct_construction|Struct Construction|Construct struct from columns|P||
+struct_access|Struct Field Access|Access struct fields by name|P,F||
+array_contains|Array Contains|Check if array contains a specific value|A,G||
+array_distinct|Array Distinct|Get distinct elements from array|A,G||
+array_length|Array Length|Get array length/cardinality|A,G,S||
+array_min_max|Array Min/Max|Get min and max from array|A,G||
+array_of_struct|Array of Struct|Create array of structs from grouped data|A,G,J||
+array_slice|Array Slice|Get slice/subset of array|A,G,F||
+array_sort|Array Sort|Sort array elements|A,G||
+array_unnest|Array Unnest|Unnest/explode array back to rows|A,G||
+map_construction|Map Construction|Construct map from key-value pairs|A,G||
+map_access|Map Access|Access map values by key|A,G,P||
+map_keys_values|Map Keys/Values|Extract keys and values from map|A,G||
+list_filter|List Filter|Filter array elements by condition|A,G||
+list_transform|List Transform|Transform each array element|A,G||
+list_reduce|List Reduce|Reduce array to single value|A,G||
+json_extract_simple|JSON Extract Simple|Extract from JSON with simple path expressions|P,F||
+json_extract_nested|JSON Extract Nested|Extract from JSON with complex path expressions|P,F||
+json_aggregates|JSON Aggregates|Create JSON arrays and objects from aggregations|A,G,F||
+timeseries_trend_analysis|Timeseries Trend Analysis|Time series aggregation with month-over-month analysis|A,G,W,S||
+asof_join_basic|ASOF Join Basic|ASOF join to find closest prior order for shipments|J,F||
