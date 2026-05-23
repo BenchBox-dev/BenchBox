@@ -1,0 +1,298 @@
+QUERIES:
+  ontime-by-carrier:
+    id: '1'
+    name: On-Time Rate by Carrier
+    description: On-time arrival percentage by airline carrier
+    category: ontime
+    sql: "\n            SELECT\n                f.reporting_airline,\n                a.name AS airline_name,\n          \
+      \      COUNT(*) AS total_flights,\n                SUM(CASE WHEN f.arr_delay <= 15 THEN 1 ELSE 0 END) AS ontime_flights,\n\
+      \                ROUND(100.0 * SUM(CASE WHEN f.arr_delay <= 15 THEN 1 ELSE 0 END) / COUNT(*), 2) AS ontime_pct,\n  \
+      \              ROUND(AVG(CASE WHEN f.arr_delay > 0 THEN f.arr_delay END), 2) AS avg_delay_when_late\n            FROM\
+      \ flights f\n            LEFT JOIN airlines a ON f.reporting_airline = a.code\n            WHERE f.cancelled = 0\n \
+      \             AND f.flight_date >= '{start_date}'\n              AND f.flight_date < '{end_date}'\n            GROUP\
+      \ BY f.reporting_airline, a.name\n            ORDER BY ontime_pct DESC\n        "
+  delay-by-airport:
+    id: '2'
+    name: Average Departure Delay by Origin Airport
+    description: Average departure delay in minutes by origin airport
+    category: ontime
+    sql: "\n            SELECT\n                f.origin,\n                ap.name AS airport_name,\n                ap.city,\n\
+      \                ap.state,\n                COUNT(*) AS total_flights,\n                ROUND(AVG(f.dep_delay), 2) AS\
+      \ avg_dep_delay,\n                ROUND(AVG(f.arr_delay), 2) AS avg_arr_delay,\n                SUM(CASE WHEN f.dep_delay\
+      \ > 15 THEN 1 ELSE 0 END) AS delayed_flights\n            FROM flights f\n            LEFT JOIN airports ap ON f.origin\
+      \ = ap.code\n            WHERE f.cancelled = 0\n              AND f.dep_delay IS NOT NULL\n              AND f.flight_date\
+      \ >= '{start_date}'\n              AND f.flight_date < '{end_date}'\n            GROUP BY f.origin, ap.name, ap.city,\
+      \ ap.state\n            HAVING COUNT(*) >= 100\n            ORDER BY avg_dep_delay DESC\n            LIMIT 50\n    \
+      \    "
+  delay-by-hour:
+    id: '3'
+    name: Delay Pattern by Departure Hour
+    description: Average delay minutes by scheduled departure hour
+    category: ontime
+    sql: "\n            SELECT\n                (f.crs_dep_time / 100) AS dep_hour,\n                COUNT(*) AS total_flights,\n\
+      \                ROUND(AVG(f.dep_delay), 2) AS avg_dep_delay,\n                ROUND(AVG(f.arr_delay), 2) AS avg_arr_delay,\n\
+      \                SUM(CASE WHEN f.dep_delay > 15 THEN 1 ELSE 0 END) AS delayed_count,\n                ROUND(100.0 *\
+      \ SUM(CASE WHEN f.dep_delay > 15 THEN 1 ELSE 0 END) / COUNT(*), 2) AS delay_rate_pct\n            FROM flights f\n \
+      \           WHERE f.cancelled = 0\n              AND f.dep_delay IS NOT NULL\n              AND f.crs_dep_time IS NOT\
+      \ NULL\n              AND f.flight_date >= '{start_date}'\n              AND f.flight_date < '{end_date}'\n        \
+      \    GROUP BY (f.crs_dep_time / 100)\n            ORDER BY dep_hour\n        "
+  best-routes:
+    id: '4'
+    name: Best Performing Routes by On-Time Rate
+    description: Routes with highest on-time arrival percentage (min 50 flights)
+    category: ontime
+    sql: "\n            SELECT\n                f.origin,\n                f.dest,\n                ao.city AS origin_city,\n\
+      \                ad.city AS dest_city,\n                COUNT(*) AS total_flights,\n                ROUND(100.0 * SUM(CASE\
+      \ WHEN f.arr_delay <= 15 THEN 1 ELSE 0 END) / COUNT(*), 2) AS ontime_pct,\n                ROUND(AVG(f.arr_delay), 2)\
+      \ AS avg_arr_delay,\n                ROUND(AVG(f.distance), 0) AS avg_distance_miles\n            FROM flights f\n \
+      \           LEFT JOIN airports ao ON f.origin = ao.code\n            LEFT JOIN airports ad ON f.dest = ad.code\n   \
+      \         WHERE f.cancelled = 0\n              AND f.arr_delay IS NOT NULL\n              AND f.flight_date >= '{start_date}'\n\
+      \              AND f.flight_date < '{end_date}'\n            GROUP BY f.origin, f.dest, ao.city, ad.city\n         \
+      \   HAVING COUNT(*) >= 50\n            ORDER BY ontime_pct DESC\n            LIMIT 25\n        "
+  improvement-trend:
+    id: '5'
+    name: On-Time Performance Trend Over Years
+    description: Annual on-time arrival percentage trend
+    category: ontime
+    sql: "\n            SELECT\n                f.year,\n                COUNT(*) AS total_flights,\n                SUM(CASE\
+      \ WHEN f.cancelled = 1 THEN 1 ELSE 0 END) AS cancelled_flights,\n                ROUND(100.0 * SUM(CASE WHEN f.cancelled\
+      \ = 1 THEN 1 ELSE 0 END) / COUNT(*), 2) AS cancellation_rate_pct,\n                SUM(CASE WHEN f.cancelled = 0 AND\
+      \ f.arr_delay <= 15 THEN 1 ELSE 0 END) AS ontime_flights,\n                ROUND(100.0 * SUM(CASE WHEN f.cancelled =\
+      \ 0 AND f.arr_delay <= 15 THEN 1 ELSE 0 END)\n                    / NULLIF(SUM(CASE WHEN f.cancelled = 0 THEN 1 ELSE\
+      \ 0 END), 0), 2) AS ontime_pct,\n                ROUND(AVG(CASE WHEN f.cancelled = 0 THEN f.arr_delay END), 2) AS avg_arr_delay\n\
+      \            FROM flights f\n            WHERE f.flight_date >= '{start_date}'\n              AND f.flight_date < '{end_date}'\n\
+      \            GROUP BY f.year\n            ORDER BY f.year\n        "
+  delay-causes:
+    id: '6'
+    name: Delay Cause Breakdown
+    description: Distribution of delay causes across all delayed flights
+    category: delay
+    sql: "\n            SELECT\n                SUM(CASE WHEN f.carrier_delay > 0 THEN 1 ELSE 0 END) AS carrier_delay_count,\n\
+      \                ROUND(AVG(CASE WHEN f.carrier_delay > 0 THEN f.carrier_delay END), 2) AS avg_carrier_delay,\n     \
+      \           SUM(CASE WHEN f.weather_delay > 0 THEN 1 ELSE 0 END) AS weather_delay_count,\n                ROUND(AVG(CASE\
+      \ WHEN f.weather_delay > 0 THEN f.weather_delay END), 2) AS avg_weather_delay,\n                SUM(CASE WHEN f.nas_delay\
+      \ > 0 THEN 1 ELSE 0 END) AS nas_delay_count,\n                ROUND(AVG(CASE WHEN f.nas_delay > 0 THEN f.nas_delay END),\
+      \ 2) AS avg_nas_delay,\n                SUM(CASE WHEN f.security_delay > 0 THEN 1 ELSE 0 END) AS security_delay_count,\n\
+      \                ROUND(AVG(CASE WHEN f.security_delay > 0 THEN f.security_delay END), 2) AS avg_security_delay,\n  \
+      \              SUM(CASE WHEN f.late_aircraft_delay > 0 THEN 1 ELSE 0 END) AS late_aircraft_count,\n                ROUND(AVG(CASE\
+      \ WHEN f.late_aircraft_delay > 0 THEN f.late_aircraft_delay END), 2) AS avg_late_aircraft_delay,\n                COUNT(*)\
+      \ AS total_delayed_flights\n            FROM flights f\n            WHERE f.cancelled = 0\n              AND f.arr_delay\
+      \ > 15\n              AND f.flight_date >= '{start_date}'\n              AND f.flight_date < '{end_date}'\n        "
+  cascade-delays:
+    id: '7'
+    name: Late Aircraft (Cascade) Delay Patterns
+    description: Flights delayed due to late incoming aircraft by carrier
+    category: delay
+    sql: "\n            SELECT\n                f.reporting_airline,\n                a.name AS airline_name,\n          \
+      \      COUNT(*) AS total_flights,\n                SUM(CASE WHEN f.late_aircraft_delay > 0 THEN 1 ELSE 0 END) AS cascade_delayed,\n\
+      \                ROUND(100.0 * SUM(CASE WHEN f.late_aircraft_delay > 0 THEN 1 ELSE 0 END) / COUNT(*), 2) AS cascade_rate_pct,\n\
+      \                ROUND(AVG(CASE WHEN f.late_aircraft_delay > 0 THEN f.late_aircraft_delay END), 2) AS avg_cascade_delay,\n\
+      \                ROUND(SUM(CASE WHEN f.late_aircraft_delay > 0 THEN f.late_aircraft_delay ELSE 0 END), 0) AS total_cascade_minutes\n\
+      \            FROM flights f\n            LEFT JOIN airlines a ON f.reporting_airline = a.code\n            WHERE f.cancelled\
+      \ = 0\n              AND f.flight_date >= '{start_date}'\n              AND f.flight_date < '{end_date}'\n         \
+      \   GROUP BY f.reporting_airline, a.name\n            ORDER BY cascade_rate_pct DESC\n        "
+  weather-impact:
+    id: '8'
+    name: Weather Delay Impact by Month
+    description: Average weather delay by month showing seasonal patterns
+    category: delay
+    sql: "\n            SELECT\n                f.month,\n                COUNT(*) AS total_flights,\n                SUM(CASE\
+      \ WHEN f.weather_delay > 0 THEN 1 ELSE 0 END) AS weather_delayed,\n                ROUND(100.0 * SUM(CASE WHEN f.weather_delay\
+      \ > 0 THEN 1 ELSE 0 END) / COUNT(*), 2) AS weather_delay_rate_pct,\n                ROUND(AVG(CASE WHEN f.weather_delay\
+      \ > 0 THEN f.weather_delay END), 2) AS avg_weather_delay_min,\n                ROUND(SUM(COALESCE(f.weather_delay, 0)),\
+      \ 0) AS total_weather_minutes\n            FROM flights f\n            WHERE f.cancelled = 0\n              AND f.flight_date\
+      \ >= '{start_date}'\n              AND f.flight_date < '{end_date}'\n            GROUP BY f.month\n            ORDER\
+      \ BY f.month\n        "
+  recovery-time:
+    id: '9'
+    name: Delay Recovery Analysis
+    description: How much of departure delay is recovered in flight (dep_delay - arr_delay)
+    category: delay
+    sql: "\n            SELECT\n                CASE\n                    WHEN f.dep_delay <= 0 THEN 'No departure delay'\n\
+      \                    WHEN f.dep_delay <= 15 THEN '1-15 min departure delay'\n                    WHEN f.dep_delay <=\
+      \ 30 THEN '16-30 min departure delay'\n                    WHEN f.dep_delay <= 60 THEN '31-60 min departure delay'\n\
+      \                    ELSE '60+ min departure delay'\n                END AS delay_bucket,\n                COUNT(*)\
+      \ AS flight_count,\n                ROUND(AVG(f.dep_delay), 2) AS avg_dep_delay,\n                ROUND(AVG(f.arr_delay),\
+      \ 2) AS avg_arr_delay,\n                ROUND(AVG(f.dep_delay - f.arr_delay), 2) AS avg_minutes_recovered,\n       \
+      \         ROUND(100.0 * SUM(CASE WHEN f.arr_delay < f.dep_delay THEN 1 ELSE 0 END) / COUNT(*), 2) AS pct_recovered\n\
+      \            FROM flights f\n            WHERE f.cancelled = 0\n              AND f.dep_delay IS NOT NULL\n        \
+      \      AND f.arr_delay IS NOT NULL\n              AND f.flight_date >= '{start_date}'\n              AND f.flight_date\
+      \ < '{end_date}'\n            GROUP BY CASE\n                WHEN f.dep_delay <= 0 THEN 'No departure delay'\n     \
+      \           WHEN f.dep_delay <= 15 THEN '1-15 min departure delay'\n                WHEN f.dep_delay <= 30 THEN '16-30\
+      \ min departure delay'\n                WHEN f.dep_delay <= 60 THEN '31-60 min departure delay'\n                ELSE\
+      \ '60+ min departure delay'\n            END\n            ORDER BY avg_dep_delay\n        "
+  busiest-routes:
+    id: '10'
+    name: Busiest Routes by Flight Count
+    description: Top 25 routes ranked by total flight count
+    category: routes
+    sql: "\n            SELECT\n                f.origin,\n                f.dest,\n                ao.city AS origin_city,\n\
+      \                ao.state AS origin_state,\n                ad.city AS dest_city,\n                ad.state AS dest_state,\n\
+      \                COUNT(*) AS total_flights,\n                ROUND(AVG(f.distance), 0) AS avg_distance_miles,\n    \
+      \            ROUND(AVG(f.actual_elapsed_time), 0) AS avg_duration_min,\n                ROUND(100.0 * SUM(CASE WHEN\
+      \ f.arr_delay <= 15 THEN 1 ELSE 0 END) / COUNT(*), 2) AS ontime_pct\n            FROM flights f\n            LEFT JOIN\
+      \ airports ao ON f.origin = ao.code\n            LEFT JOIN airports ad ON f.dest = ad.code\n            WHERE f.cancelled\
+      \ = 0\n              AND f.flight_date >= '{start_date}'\n              AND f.flight_date < '{end_date}'\n         \
+      \   GROUP BY f.origin, f.dest, ao.city, ao.state, ad.city, ad.state\n            ORDER BY total_flights DESC\n     \
+      \       LIMIT 25\n        "
+  route-reliability:
+    id: '11'
+    name: Route Reliability Ranking
+    description: Routes ranked by reliability (on-time + low cancellation)
+    category: routes
+    sql: "\n            SELECT\n                f.origin,\n                f.dest,\n                ao.city AS origin_city,\n\
+      \                ad.city AS dest_city,\n                COUNT(*) AS total_scheduled,\n                SUM(CASE WHEN\
+      \ f.cancelled = 1 THEN 1 ELSE 0 END) AS cancelled_count,\n                ROUND(100.0 * SUM(CASE WHEN f.cancelled =\
+      \ 1 THEN 1 ELSE 0 END) / COUNT(*), 2) AS cancellation_rate_pct,\n                SUM(CASE WHEN f.cancelled = 0 AND f.arr_delay\
+      \ <= 15 THEN 1 ELSE 0 END) AS ontime_count,\n                ROUND(100.0 * SUM(CASE WHEN f.cancelled = 0 AND f.arr_delay\
+      \ <= 15 THEN 1 ELSE 0 END)\n                    / NULLIF(SUM(CASE WHEN f.cancelled = 0 THEN 1 ELSE 0 END), 0), 2) AS\
+      \ ontime_pct,\n                ROUND(AVG(f.distance), 0) AS distance_miles\n            FROM flights f\n           \
+      \ LEFT JOIN airports ao ON f.origin = ao.code\n            LEFT JOIN airports ad ON f.dest = ad.code\n            WHERE\
+      \ f.flight_date >= '{start_date}'\n              AND f.flight_date < '{end_date}'\n            GROUP BY f.origin, f.dest,\
+      \ ao.city, ad.city\n            HAVING COUNT(*) >= 100\n            ORDER BY ontime_pct DESC, cancellation_rate_pct\
+      \ ASC\n            LIMIT 30\n        "
+  distance-delay:
+    id: '12'
+    name: Distance vs Delay Correlation
+    description: Average delay grouped by flight distance buckets
+    category: routes
+    sql: "\n            SELECT\n                CASE\n                    WHEN f.distance < 250 THEN 'Short-haul (<250 mi)'\n\
+      \                    WHEN f.distance < 500 THEN 'Medium-haul (250-499 mi)'\n                    WHEN f.distance < 1000\
+      \ THEN 'Long-haul (500-999 mi)'\n                    WHEN f.distance < 2000 THEN 'Cross-country (1000-1999 mi)'\n  \
+      \                  ELSE 'Ultra-long (2000+ mi)'\n                END AS distance_bucket,\n                COUNT(*) AS\
+      \ total_flights,\n                ROUND(AVG(f.distance), 0) AS avg_distance_miles,\n                ROUND(AVG(f.dep_delay),\
+      \ 2) AS avg_dep_delay,\n                ROUND(AVG(f.arr_delay), 2) AS avg_arr_delay,\n                ROUND(100.0 *\
+      \ SUM(CASE WHEN f.arr_delay <= 15 THEN 1 ELSE 0 END) / COUNT(*), 2) AS ontime_pct\n            FROM flights f\n    \
+      \        WHERE f.cancelled = 0\n              AND f.arr_delay IS NOT NULL\n              AND f.flight_date >= '{start_date}'\n\
+      \              AND f.flight_date < '{end_date}'\n            GROUP BY CASE\n                WHEN f.distance < 250 THEN\
+      \ 'Short-haul (<250 mi)'\n                WHEN f.distance < 500 THEN 'Medium-haul (250-499 mi)'\n                WHEN\
+      \ f.distance < 1000 THEN 'Long-haul (500-999 mi)'\n                WHEN f.distance < 2000 THEN 'Cross-country (1000-1999\
+      \ mi)'\n                ELSE 'Ultra-long (2000+ mi)'\n            END\n            ORDER BY avg_distance_miles\n   \
+      \     "
+  hub-connectivity:
+    id: '13'
+    name: Hub Airport Connectivity
+    description: Number of unique destinations served from each origin airport
+    category: routes
+    sql: "\n            SELECT\n                f.origin,\n                ap.name AS airport_name,\n                ap.city,\n\
+      \                ap.state,\n                COUNT(DISTINCT f.dest) AS unique_destinations,\n                COUNT(DISTINCT\
+      \ f.reporting_airline) AS serving_carriers,\n                COUNT(*) AS total_departures,\n                ROUND(AVG(f.dep_delay),\
+      \ 2) AS avg_dep_delay\n            FROM flights f\n            LEFT JOIN airports ap ON f.origin = ap.code\n       \
+      \     WHERE f.cancelled = 0\n              AND f.flight_date >= '{start_date}'\n              AND f.flight_date < '{end_date}'\n\
+      \            GROUP BY f.origin, ap.name, ap.city, ap.state\n            ORDER BY total_departures DESC\n           \
+      \ LIMIT 30\n        "
+  day-of-week:
+    id: '14'
+    name: Flight Patterns by Day of Week
+    description: Flight volume and delay patterns by day of week
+    category: temporal
+    sql: "\n            SELECT\n                f.day_of_week,\n                CASE f.day_of_week\n                    WHEN\
+      \ 1 THEN 'Monday'\n                    WHEN 2 THEN 'Tuesday'\n                    WHEN 3 THEN 'Wednesday'\n        \
+      \            WHEN 4 THEN 'Thursday'\n                    WHEN 5 THEN 'Friday'\n                    WHEN 6 THEN 'Saturday'\n\
+      \                    WHEN 7 THEN 'Sunday'\n                END AS day_name,\n                COUNT(*) AS total_flights,\n\
+      \                SUM(CASE WHEN f.cancelled = 1 THEN 1 ELSE 0 END) AS cancelled_count,\n                ROUND(AVG(CASE\
+      \ WHEN f.cancelled = 0 THEN f.dep_delay END), 2) AS avg_dep_delay,\n                ROUND(AVG(CASE WHEN f.cancelled\
+      \ = 0 THEN f.arr_delay END), 2) AS avg_arr_delay,\n                ROUND(100.0 * SUM(CASE WHEN f.cancelled = 0 AND f.arr_delay\
+      \ <= 15 THEN 1 ELSE 0 END)\n                    / NULLIF(SUM(CASE WHEN f.cancelled = 0 THEN 1 ELSE 0 END), 0), 2) AS\
+      \ ontime_pct\n            FROM flights f\n            WHERE f.flight_date >= '{start_date}'\n              AND f.flight_date\
+      \ < '{end_date}'\n            GROUP BY f.day_of_week\n            ORDER BY f.day_of_week\n        "
+  seasonal-trends:
+    id: '15'
+    name: Seasonal Performance Trends
+    description: Monthly flight volume and performance aggregated across all years
+    category: temporal
+    sql: "\n            SELECT\n                f.month,\n                CASE f.month\n                    WHEN 1 THEN 'January'\
+      \ WHEN 2 THEN 'February'\n                    WHEN 3 THEN 'March' WHEN 4 THEN 'April'\n                    WHEN 5 THEN\
+      \ 'May' WHEN 6 THEN 'June'\n                    WHEN 7 THEN 'July' WHEN 8 THEN 'August'\n                    WHEN 9\
+      \ THEN 'September' WHEN 10 THEN 'October'\n                    WHEN 11 THEN 'November' WHEN 12 THEN 'December'\n   \
+      \             END AS month_name,\n                COUNT(*) AS total_flights,\n                SUM(CASE WHEN f.cancelled\
+      \ = 1 THEN 1 ELSE 0 END) AS cancelled_count,\n                ROUND(100.0 * SUM(CASE WHEN f.cancelled = 1 THEN 1 ELSE\
+      \ 0 END) / COUNT(*), 2) AS cancellation_rate_pct,\n                ROUND(AVG(CASE WHEN f.cancelled = 0 THEN f.arr_delay\
+      \ END), 2) AS avg_arr_delay,\n                ROUND(100.0 * SUM(CASE WHEN f.cancelled = 0 AND f.arr_delay <= 15 THEN\
+      \ 1 ELSE 0 END)\n                    / NULLIF(SUM(CASE WHEN f.cancelled = 0 THEN 1 ELSE 0 END), 0), 2) AS ontime_pct\n\
+      \            FROM flights f\n            WHERE f.flight_date >= '{start_date}'\n              AND f.flight_date < '{end_date}'\n\
+      \            GROUP BY f.month\n            ORDER BY f.month\n        "
+  holiday-impact:
+    id: '16'
+    name: Holiday Period Delay Impact
+    description: Compare performance during major holiday periods vs normal days
+    category: temporal
+    sql: "\n            SELECT\n                CASE\n                    WHEN (f.month = 11 AND f.day_of_month BETWEEN 21\
+      \ AND 27) THEN 'Thanksgiving Week'\n                    WHEN (f.month = 12 AND f.day_of_month BETWEEN 23 AND 27) THEN\
+      \ 'Christmas'\n                    WHEN (f.month = 1 AND f.day_of_month BETWEEN 1 AND 2)\n                      OR (f.month\
+      \ = 12 AND f.day_of_month = 31) THEN 'New Year'\n                    WHEN (f.month = 7 AND f.day_of_month BETWEEN 3\
+      \ AND 5) THEN 'July 4th'\n                    WHEN (f.month = 5 AND f.day_of_week = 1 AND f.day_of_month BETWEEN 25\
+      \ AND 31) THEN 'Memorial Day'\n                    WHEN (f.month = 9 AND f.day_of_week = 1 AND f.day_of_month BETWEEN\
+      \ 1 AND 7) THEN 'Labor Day'\n                    ELSE 'Regular Day'\n                END AS period,\n              \
+      \  COUNT(*) AS total_flights,\n                ROUND(AVG(CASE WHEN f.cancelled = 0 THEN f.arr_delay END), 2) AS avg_arr_delay,\n\
+      \                ROUND(100.0 * SUM(CASE WHEN f.cancelled = 1 THEN 1 ELSE 0 END) / COUNT(*), 2) AS cancellation_rate_pct,\n\
+      \                ROUND(100.0 * SUM(CASE WHEN f.cancelled = 0 AND f.arr_delay <= 15 THEN 1 ELSE 0 END)\n            \
+      \        / NULLIF(SUM(CASE WHEN f.cancelled = 0 THEN 1 ELSE 0 END), 0), 2) AS ontime_pct\n            FROM flights f\n\
+      \            WHERE f.flight_date >= '{start_date}'\n              AND f.flight_date < '{end_date}'\n            GROUP\
+      \ BY CASE\n                    WHEN (f.month = 11 AND f.day_of_month BETWEEN 21 AND 27) THEN 'Thanksgiving Week'\n \
+      \                   WHEN (f.month = 12 AND f.day_of_month BETWEEN 23 AND 27) THEN 'Christmas'\n                    WHEN\
+      \ (f.month = 1 AND f.day_of_month BETWEEN 1 AND 2)\n                      OR (f.month = 12 AND f.day_of_month = 31)\
+      \ THEN 'New Year'\n                    WHEN (f.month = 7 AND f.day_of_month BETWEEN 3 AND 5) THEN 'July 4th'\n     \
+      \               WHEN (f.month = 5 AND f.day_of_week = 1 AND f.day_of_month BETWEEN 25 AND 31) THEN 'Memorial Day'\n\
+      \                    WHEN (f.month = 9 AND f.day_of_week = 1 AND f.day_of_month BETWEEN 1 AND 7) THEN 'Labor Day'\n\
+      \                    ELSE 'Regular Day'\n                END\n            ORDER BY avg_arr_delay DESC\n        "
+  time-of-day:
+    id: '17'
+    name: Hourly Congestion Pattern
+    description: Flight volume and delay by scheduled departure hour of day
+    category: temporal
+    sql: "\n            SELECT\n                (f.crs_dep_time / 100) AS hour_of_day,\n                COUNT(*) AS total_flights,\n\
+      \                ROUND(AVG(CASE WHEN f.cancelled = 0 THEN f.dep_delay END), 2) AS avg_dep_delay,\n                ROUND(AVG(CASE\
+      \ WHEN f.cancelled = 0 THEN f.arr_delay END), 2) AS avg_arr_delay,\n                SUM(CASE WHEN f.dep_delay > 60 THEN\
+      \ 1 ELSE 0 END) AS severely_delayed,\n                ROUND(100.0 * SUM(CASE WHEN f.cancelled = 0 AND f.arr_delay <=\
+      \ 15 THEN 1 ELSE 0 END)\n                    / NULLIF(SUM(CASE WHEN f.cancelled = 0 THEN 1 ELSE 0 END), 0), 2) AS ontime_pct\n\
+      \            FROM flights f\n            WHERE f.crs_dep_time IS NOT NULL\n              AND f.flight_date >= '{start_date}'\n\
+      \              AND f.flight_date < '{end_date}'\n            GROUP BY (f.crs_dep_time / 100)\n            ORDER BY hour_of_day\n\
+      \        "
+  carrier-ranking:
+    id: '18'
+    name: Carrier On-Time Performance Ranking
+    description: 'Full carrier scorecard: on-time, delays, cancellations'
+    category: carriers
+    sql: "\n            SELECT\n                f.reporting_airline,\n                a.name AS airline_name,\n          \
+      \      COUNT(*) AS total_scheduled,\n                SUM(CASE WHEN f.cancelled = 0 THEN 1 ELSE 0 END) AS operated_flights,\n\
+      \                SUM(CASE WHEN f.cancelled = 1 THEN 1 ELSE 0 END) AS cancelled_flights,\n                ROUND(100.0\
+      \ * SUM(CASE WHEN f.cancelled = 1 THEN 1 ELSE 0 END) / COUNT(*), 2) AS cancellation_rate_pct,\n                ROUND(AVG(CASE\
+      \ WHEN f.cancelled = 0 THEN f.dep_delay END), 2) AS avg_dep_delay,\n                ROUND(AVG(CASE WHEN f.cancelled\
+      \ = 0 THEN f.arr_delay END), 2) AS avg_arr_delay,\n                ROUND(100.0 * SUM(CASE WHEN f.cancelled = 0 AND f.arr_delay\
+      \ <= 15 THEN 1 ELSE 0 END)\n                    / NULLIF(SUM(CASE WHEN f.cancelled = 0 THEN 1 ELSE 0 END), 0), 2) AS\
+      \ ontime_pct,\n                ROUND(AVG(f.distance), 0) AS avg_route_distance_miles\n            FROM flights f\n \
+      \           LEFT JOIN airlines a ON f.reporting_airline = a.code\n            WHERE f.flight_date >= '{start_date}'\n\
+      \              AND f.flight_date < '{end_date}'\n            GROUP BY f.reporting_airline, a.name\n            HAVING\
+      \ COUNT(*) >= 1000\n            ORDER BY ontime_pct DESC\n        "
+  cancellation-rate:
+    id: '19'
+    name: Cancellation Rates by Carrier and Cause
+    description: Cancellation frequency and reason breakdown by carrier
+    category: carriers
+    sql: "\n            SELECT\n                f.reporting_airline,\n                a.name AS airline_name,\n          \
+      \      COUNT(*) AS total_flights,\n                SUM(CASE WHEN f.cancelled = 1 THEN 1 ELSE 0 END) AS total_cancelled,\n\
+      \                ROUND(100.0 * SUM(CASE WHEN f.cancelled = 1 THEN 1 ELSE 0 END) / COUNT(*), 3) AS cancellation_rate_pct,\n\
+      \                SUM(CASE WHEN f.cancellation_code = 'A' THEN 1 ELSE 0 END) AS carrier_cancellations,\n            \
+      \    SUM(CASE WHEN f.cancellation_code = 'B' THEN 1 ELSE 0 END) AS weather_cancellations,\n                SUM(CASE\
+      \ WHEN f.cancellation_code = 'C' THEN 1 ELSE 0 END) AS nas_cancellations,\n                SUM(CASE WHEN f.cancellation_code\
+      \ = 'D' THEN 1 ELSE 0 END) AS security_cancellations\n            FROM flights f\n            LEFT JOIN airlines a ON\
+      \ f.reporting_airline = a.code\n            WHERE f.flight_date >= '{start_date}'\n              AND f.flight_date <\
+      \ '{end_date}'\n            GROUP BY f.reporting_airline, a.name\n            HAVING COUNT(*) >= 100\n            ORDER\
+      \ BY cancellation_rate_pct DESC\n        "
+  market-share:
+    id: '20'
+    name: Carrier Market Share by Route
+    description: Top carriers ranked by flight volume and market share
+    category: carriers
+    sql: "\n            WITH carrier_totals AS (\n                SELECT\n                    f.reporting_airline,\n     \
+      \               a.name AS airline_name,\n                    COUNT(*) AS flight_count,\n                    COUNT(DISTINCT\
+      \ f.origin || '-' || f.dest) AS routes_served,\n                    ROUND(AVG(f.distance), 0) AS avg_distance_miles\n\
+      \                FROM flights f\n                LEFT JOIN airlines a ON f.reporting_airline = a.code\n            \
+      \    WHERE f.cancelled = 0\n                  AND f.flight_date >= '{start_date}'\n                  AND f.flight_date\
+      \ < '{end_date}'\n                GROUP BY f.reporting_airline, a.name\n            ),\n            total AS (\n   \
+      \             SELECT SUM(flight_count) AS grand_total FROM carrier_totals\n            )\n            SELECT\n     \
+      \           ct.reporting_airline,\n                ct.airline_name,\n                ct.flight_count,\n            \
+      \    ct.routes_served,\n                ct.avg_distance_miles,\n                ROUND(100.0 * ct.flight_count / t.grand_total,\
+      \ 2) AS market_share_pct\n            FROM carrier_totals ct\n            CROSS JOIN total t\n            ORDER BY ct.flight_count\
+      \ DESC\n            LIMIT 20\n        "
