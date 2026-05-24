@@ -15,8 +15,10 @@ description: |
   rather than literal block scalars (`sql: |`). A grep across PR 604 found
   ZERO block-scalar SQL keys. The consequence: the SQL is un-greppable with
   any tool expecting normal whitespace, un-lintable, and effectively
-  unreadable in the file. This is the navigability defect the goal's line 19
-  is meant to forbid ("move code without reducing conceptual surface area").
+  unreadable in the file. This is the navigability defect the goal's Objective
+  Function explicitly forbids (_project/goal-shrink-core-code.md:37, "never use
+  escaped newline scalars"; moving SQL out of Python counts only when
+  reviewability and searchability are preserved).
 
   The fix is a pure serialization change -- re-dump the same SQL text as
   literal block scalars -- with no semantic change to the queries.
@@ -99,7 +101,7 @@ metadata:
     - navigability
   estimated_effort: "Small"
   created_date: "2026-05-23"
-  last_updated: "2026-05-23T12:00:00"
+  last_updated: "2026-05-23T16:00:00"
 
 impact:
   technical_debt: |

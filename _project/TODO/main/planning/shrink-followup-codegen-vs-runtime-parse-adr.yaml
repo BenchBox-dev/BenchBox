@@ -51,6 +51,14 @@ open_questions:
     affects: ["w2 success_metric: canonical pattern decision"]
     default: "Lean runtime-parse + lazy-load + caching (consistency with existing loaders, no build step), unless w1 shows a material, measured runtime/findability win for codegen."
 
+deps:
+  needs:
+    # Hard producer->consumer edge: w1 consumes the import-time evidence
+    # measured in registry-lazy w0 ("Gather the import-time evidence already
+    # measured in [[shrink-followup-registry-lazy-cached-load]] w0"). That PR
+    # must merge before this ADR's analysis can proceed.
+    - shrink-followup-registry-lazy-cached-load
+
 must_preserve:
   - "No code behavior change in this item -- it is a decision artifact only"
 
@@ -86,7 +94,7 @@ metadata:
     - catalog
   estimated_effort: "Small"
   created_date: "2026-05-23"
-  last_updated: "2026-05-23T12:00:00"
+  last_updated: "2026-05-23T16:00:00"
 
 impact:
   technical_debt: |

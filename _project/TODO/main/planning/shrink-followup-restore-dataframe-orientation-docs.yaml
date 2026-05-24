@@ -24,7 +24,10 @@ description: |
   NOT handled here -- it is the documentation deliverable of
   [[shrink-followup-joinorder-benchmark-semantics]] w2 (path a). This item
   covers ClickBench and any other genuinely-lost orientation context in
-  #599-#602, to avoid double-touching the joinorder surface.
+  #599-#602, to avoid double-touching the joinorder surface. That separation is
+  enforced structurally by scope_limit below: benchbox/core/joinorder/ is
+  deliberately NOT in only_modify, so this item cannot edit the joinorder
+  docstrings even by accident.
 
 work:
   - id: w1
@@ -82,7 +85,7 @@ metadata:
     - nit
   estimated_effort: "Small"
   created_date: "2026-05-23"
-  last_updated: "2026-05-23T12:00:00"
+  last_updated: "2026-05-23T16:00:00"
 
 impact:
   technical_debt: |

@@ -44,6 +44,12 @@ work:
     needs: [w2]
     status: pending
 
+open_questions:
+  - question: "Pydantic v2 models or jsonschema documents for the shared validator?"
+    gating: false
+    affects: ["w2 success_metric: shared validator implementation"]
+    default: "Pydantic v2 (a direct dependency, pyproject.toml; typed models double as loader return types and give field-level errors). Use jsonschema (present transitively at 4.26.0) only if a non-Python consumer needs the schema document."
+
 must_preserve:
   - "Existing loader guards and typed dataclass containers keep working"
   - "tests/unit/core/primitives/test_loader_parity.py behavior is preserved"
@@ -66,8 +72,11 @@ verification:
 
 scope_limit:
   only_modify:
-    - "benchbox/core/"
-    - "tests/"
+    - "benchbox/core/catalog_schema.py"   # new: single shared validator module (Pydantic models or jsonschema docs)
+    - "tests/unit/core/"                   # validation test + deliberately-broken fixture
+    - "Makefile"                            # w3: preflight / CI wiring
+  # The 6+ existing loaders and migrated catalogs are READ-ONLY references for
+  # w1's inventory; this item validates them, it does not rewrite them.
 
 prior_art:
   - "benchbox/core/write_primitives/catalog/loader.py — existing structural guards + typed container; extend with field-level schema"
@@ -82,7 +91,7 @@ metadata:
     - ci
   estimated_effort: "Medium"
   created_date: "2026-05-23"
-  last_updated: "2026-05-23T12:00:00"
+  last_updated: "2026-05-23T16:00:00"
 
 impact:
   technical_debt: |
@@ -95,5 +104,5 @@ success_metrics:
 
 files_affected:
   added:
-    - "benchbox/core/ (shared catalog schema module)"
-    - "tests/ (catalog schema validation test + broken fixture)"
+    - "benchbox/core/catalog_schema.py (shared catalog schema module)"
+    - "tests/unit/core/ (catalog schema validation test + broken fixture)"
