@@ -48,7 +48,7 @@ Original campaign baseline: 234,211 Python code lines.
 - uncredited relocation: 0
 - repair-only delta: 0
 - generated-Python delta: 0
-- PR number: pending
+- PR number: #608
 - merge status: pending; campaign accounting not credited until merge
 - residual risk: Q1/Q6 variant bodies now use closure builders rather than top-level `def` bodies; exported callable names,
   registry identities, descriptions, categories, and deterministic expression/pandas outputs are preserved by verification.
