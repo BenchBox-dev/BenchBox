@@ -1,0 +1,131 @@
+id: shrink-followup-joinorder-benchmark-semantics
+title: "Prove JoinOrder DataFrame translations preserve benchmark-measured operation, not just rows"
+worktree: main
+priority: High
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  Highest-severity finding from the shrink-campaign review. PRs #587 (113-query
+  JOB) and #588 (13-query synthetic) removed the hand-written DataFrame
+  translations and set `_HAND_TRANSLATED_DATAFRAME_QUERY_IDS = set()`
+  (benchbox/core/joinorder/dataframe_queries.py:39), promoting the generated
+  translation factory (lines 427-447) to sole authority.
+
+  The standing oracle tests
+  (tests/unit/core/joinorder/test_dataframe_query_capabilities.py:93-157)
+  assert *result-equivalence*: each generated pandas and expression impl
+  returns the same rows as a DuckDB oracle executing the canonical SQL, and
+  `get_untranslated_dataframe_query_ids() == []`. That is genuine and
+  sufficient to refute the "untested" charge from the original review.
+
+  But result-equivalence is NOT benchmark-equivalence. The Join Order
+  Benchmark exists to stress the optimizer's ability to reorder joins across
+  113 query shapes. A generator that emits a deterministic, topology-fixed
+  join sequence passes every row-equality test while measuring a different
+  thing: multi-join *execution* with a fixed plan, not optimizer join-ordering
+  quality. This is "right results, wrong thing measured" -- unfalsifiable by
+  any row assertion -- and it touches the goal's "preserve benchmark
+  semantics" non-negotiable. Neither the campaign nor the original review
+  caught it.
+
+work:
+  - id: w1
+    summary: "Characterize what JoinOrder DataFrame mode actually measures today"
+    status: pending
+    notes: |
+      Read the generated factories (`_make_generated_expression_impl`,
+      `_make_generated_pandas_impl`, joinorder/dataframe_queries.py:427-447)
+      and `_execute_joinorder_expression_query` / `_execute_joinorder_pandas_query`.
+      Determine whether join order is fixed by the query topology in the
+      generator, or deferred to the engine (polars/pandas) -- and whether the
+      engine even exposes optimizer join-reordering the way the SQL backend
+      does. Record the finding; it decides w2.
+
+  - id: w2
+    summary: "Decide: document semantic reclassification, or add a structural plan-shape test"
+    needs: [w1]
+    status: pending
+    notes: |
+      GATING. Two mitigations:
+      (a) If DataFrame JoinOrder is inherently execution-focused (likely --
+          DataFrame engines plan differently than a SQL optimizer), document
+          the reclassification: "JoinOrder DataFrame mode measures multi-join
+          execution, not optimizer ordering." Restore that distinction to the
+          module docstring (this is the PR #588 note the review flagged).
+      (b) If it is meant to preserve optimizer-stress, add a structural test
+          asserting the generated plan is NOT deterministically sequenced
+          (e.g. logical-plan cardinality/shape snapshot per query).
+      Pick based on w1; (a) is cheaper and likely correct.
+
+  - id: w3
+    summary: "Implement the chosen mitigation"
+    needs: [w2]
+    status: pending
+
+open_questions:
+  - question: "Does DataFrame JoinOrder even attempt optimizer-stress, or is it inherently execution-focused?"
+    gating: true
+    affects: ["w2 success_metric: reclassify vs structural-test"]
+    default: "Assume execution-focused (DataFrame engines plan differently than a SQL optimizer); reclassify and document (path a), which is cheaper and most likely accurate."
+
+must_preserve:
+  - "The oracle tests at tests/unit/core/joinorder/test_dataframe_query_capabilities.py:93-157 keep passing"
+  - "get_untranslated_dataframe_query_ids() == [] (113/113 JOB coverage) remains true"
+  - "Generated impls keep their explicit __name__/__doc__"
+
+approach: |
+  This is primarily an analysis + documentation/test task, not a translator
+  rewrite. Lead with w1 -- the empirical question of whether join order is
+  fixed -- because it determines whether there is a real regression or just a
+  missing semantic label. Do NOT reintroduce hand-translations as a reflex.
+
+anti_patterns:
+  - "DO NOT treat the row-equality oracle tests as evidence of benchmark equivalence -- because they prove same rows, not same measured operation -- assert plan shape or document the reclassification instead"
+  - "DO NOT reintroduce the 13/113 hand-translations to 'fix' this without measuring -- because the generator may be perfectly correct once the benchmark intent is reclassified -- decide via w1/w2 first"
+
+verification:
+  - description: "JoinOrder DataFrame test module passes"
+    command: "uv run -- python -m pytest tests/unit/core/joinorder/ -q"
+    expected_output: "all pass"
+  - description: "Chosen mitigation present (semantic note or structural test)"
+    command: "grep -rnE 'multi-join execution|optimizer ordering|plan.shape|not deterministically' benchbox/core/joinorder/ tests/unit/core/joinorder/"
+    expected_output: "matching reclassification doc or structural assertion found"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/joinorder/"
+    - "tests/unit/core/joinorder/"
+
+prior_art:
+  - "tests/unit/core/joinorder/test_dataframe_query_capabilities.py:93-157 — extend the oracle suite with a plan-shape assertion (path b) rather than a new test harness"
+  - "benchbox/core/joinorder/dataframe_queries.py:427-447 — the generator factory under scrutiny; reclassification doc attaches here"
+
+metadata:
+  tags:
+    - shrink
+    - joinorder
+    - benchmark-semantics
+    - correctness
+  estimated_effort: "Small"
+  created_date: "2026-05-23"
+  last_updated: "2026-05-23T12:00:00"
+
+impact:
+  technical_debt: |
+    A benchmarking tool that silently measures the wrong operation is worse
+    than one that errors. Either the semantic label is corrected (cheap, high
+    clarity) or a structural guard is added (catches future generator drift).
+  user_impact: |
+    Users comparing DataFrame vs SQL JoinOrder results must know whether they
+    are comparing optimizer quality or execution throughput. Today the answer
+    is undocumented.
+
+success_metrics:
+  - "Documented answer to whether JoinOrder DataFrame mode measures optimizer ordering or multi-join execution"
+  - "Either a restored semantic note in the module docstring, or a structural plan-shape test guarding against deterministic-sequencing drift"
+
+files_affected:
+  modified:
+    - "benchbox/core/joinorder/dataframe_queries.py"
+    - "tests/unit/core/joinorder/test_dataframe_query_capabilities.py"
