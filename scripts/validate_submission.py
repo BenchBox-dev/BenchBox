@@ -12,9 +12,9 @@ import importlib.util
 import sys
 from pathlib import Path
 
-# Direct script execution puts scripts/ on sys.path, not the checkout root.
-# Add the root explicitly so the mirrored validator package is importable
-# without installing BenchBox.
+# `uv run --no-project -- python scripts/validate_submission.py` executes with
+# scripts/ on sys.path, not the checkout root. Add the root explicitly so the
+# mirrored `benchbox.validation` package is importable without installing BenchBox.
 CHECKOUT_ROOT = Path(__file__).resolve().parents[1]
 if str(CHECKOUT_ROOT) not in sys.path:
     sys.path.insert(0, str(CHECKOUT_ROOT))
