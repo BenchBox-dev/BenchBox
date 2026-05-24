@@ -135,6 +135,32 @@ def test_visualize_cli_multiple_chart_types(tmp_path):
     assert result.exception is None
 
 
+def test_visualize_cli_continues_after_one_renderer_fails(tmp_path, monkeypatch):
+    """A failing chart renderer should not prevent later chart types from rendering."""
+    from benchbox.core.visualization import ascii_api
+
+    result_file = tmp_path / "test_result.json"
+    result_file.write_text(SAMPLE_RESULT_JSON)
+
+    def fake_renderer(results, chart_type, *, options=None, subtitle=None):
+        if chart_type == "performance_bar":
+            raise RuntimeError("boom")
+        return f"rendered {chart_type}"
+
+    monkeypatch.setattr(ascii_api, "render_ascii_chart_from_results", fake_renderer)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        visualize_module.visualize,
+        [str(result_file), "--chart-type", "performance_bar", "--chart-type", "power_bar"],
+    )
+
+    assert result.exit_code == 0
+    assert result.exception is None
+    assert "rendered power_bar" in result.output
+    assert "Warning: Could not render performance_bar: boom" in result.output
+
+
 def test_visualize_cli_theme_option(tmp_path):
     """Test that theme option is accepted."""
     result_file = tmp_path / "test_result.json"

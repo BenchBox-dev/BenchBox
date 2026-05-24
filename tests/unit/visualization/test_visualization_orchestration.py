@@ -66,6 +66,33 @@ def test_render_chart_set_template_tracks_rendered_and_skipped_charts() -> None:
     assert {skipped.chart_type for skipped in outcome.skipped}.issubset(set(outcome.template.chart_types))
 
 
+def test_render_chart_set_continues_after_renderer_exception(monkeypatch: pytest.MonkeyPatch) -> None:
+    from benchbox.core.visualization import ascii_api
+
+    result = make_normalized_result(queries=[SimpleNamespace(query_id="Q1", execution_time_ms=10.0)])
+
+    def fake_renderer(results, chart_type, *, options=None, subtitle=None):
+        if chart_type == "performance_bar":
+            raise RuntimeError("boom")
+        return f"rendered {chart_type}"
+
+    monkeypatch.setattr(ascii_api, "render_ascii_chart_from_results", fake_renderer)
+
+    outcome = render_chart_set(
+        [result],
+        ["performance_bar", "power_bar"],
+        options=ChartOptions(use_color=False),
+    )
+
+    assert outcome.validation_error is None
+    assert outcome.chart_types_rendered == ["power_bar"]
+    assert len(outcome.skipped) == 1
+    skipped = outcome.skipped[0]
+    assert skipped.chart_type == "performance_bar"
+    assert skipped.reason == "renderer failed"
+    assert skipped.details == {"exception_type": "RuntimeError", "message": "boom"}
+
+
 def test_non_comparison_templates_skip_pairwise_charts_without_failing() -> None:
     result = make_normalized_result(
         raw={"benchmark": {"test_type": "power"}},
