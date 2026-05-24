@@ -5,40 +5,42 @@ from __future__ import annotations
 from benchbox.core.tuning import BenchmarkTunings, TableTuning, TuningColumn
 
 from .models import Table
-from .tables import *  # noqa: F401,F403 - re-exported table definitions
+from .tables import _TABLES
 
-TABLES = [
+_TABLE_ORDER = (
     # Dimension tables with no foreign keys (must be created first)
-    DATE_DIM,
-    TIME_DIM,
-    ITEM,
-    CUSTOMER_DEMOGRAPHICS,
-    INCOME_BAND,
-    HOUSEHOLD_DEMOGRAPHICS,
-    CUSTOMER_ADDRESS,
-    STORE,
-    WAREHOUSE,
-    WEB_SITE,
-    WEB_PAGE,
-    PROMOTION,
-    REASON,
-    CALL_CENTER,
-    CATALOG_PAGE,
-    SHIP_MODE,
+    "DATE_DIM",
+    "TIME_DIM",
+    "ITEM",
+    "CUSTOMER_DEMOGRAPHICS",
+    "INCOME_BAND",
+    "HOUSEHOLD_DEMOGRAPHICS",
+    "CUSTOMER_ADDRESS",
+    "STORE",
+    "WAREHOUSE",
+    "WEB_SITE",
+    "WEB_PAGE",
+    "PROMOTION",
+    "REASON",
+    "CALL_CENTER",
+    "CATALOG_PAGE",
+    "SHIP_MODE",
     # Dimension tables with foreign keys
-    CUSTOMER,  # references DATE_DIM, CUSTOMER_DEMOGRAPHICS, HOUSEHOLD_DEMOGRAPHICS, CUSTOMER_ADDRESS
+    "CUSTOMER",
     # Fact tables (must be created after their referenced dimension tables)
-    STORE_SALES,  # references multiple dimension tables
-    WEB_SALES,  # references multiple dimension tables
-    CATALOG_SALES,  # references multiple dimension tables
-    INVENTORY,  # references DATE_DIM, ITEM, WAREHOUSE
+    "STORE_SALES",
+    "WEB_SALES",
+    "CATALOG_SALES",
+    "INVENTORY",
     # Return tables (must be created after their corresponding sales tables)
-    STORE_RETURNS,  # references STORE_SALES and dimension tables
-    WEB_RETURNS,  # references WEB_SALES and dimension tables
-    CATALOG_RETURNS,  # references CATALOG_SALES and dimension tables
+    "STORE_RETURNS",
+    "WEB_RETURNS",
+    "CATALOG_RETURNS",
     # Metadata tables (no dependencies)
-    DBGEN_VERSION,  # metadata about data generation
-]
+    "DBGEN_VERSION",
+)
+
+TABLES = [_TABLES[name] for name in _TABLE_ORDER]
 
 # Map of table names to Table objects
 TABLES_BY_NAME = {table.name: table for table in TABLES}

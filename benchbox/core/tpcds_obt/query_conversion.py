@@ -10,63 +10,34 @@ from pathlib import Path
 from typing import Any
 
 import sqlglot
+import yaml
 from sqlglot import exp
 
 from benchbox.core.tpcds_obt.schema import OBT_TABLE_NAME, get_column_lineage
 
 TEMPLATE_DIR = Path(__file__).resolve().parents[3] / "_sources" / "tpc-ds" / "query_templates"
+
+
+def _load_query_specs() -> dict[str, Any]:
+    with (Path(__file__).with_name("query_specs.yaml")).open(encoding="utf-8") as handle:
+        return yaml.safe_load(handle) or {}
+
+
+_QUERY_SPECS = _load_query_specs()
+
 # Queries that cannot be converted to OBT:
 # - Inventory fact table: Q21, Q22, Q37, Q39, Q72, Q82 (separate fact domain)
 # - Require external dimension tables: Q46, Q64, Q68, Q84 (customer's CURRENT address/demographics)
-BLOCKED_QUERY_IDS = {21, 22, 37, 39, 46, 64, 68, 72, 82, 84}
+BLOCKED_QUERY_IDS = set(_QUERY_SPECS["blocked_query_ids"])
 
 # Column prefix → source table mapping (multi-char prefixes before single-char to avoid shadowing).
-_PREFIX_TO_TABLE: dict[str, str] = {
-    "ss_": "store_sales",
-    "sr_": "store_returns",
-    "ws_": "web_sales",
-    "wr_": "web_returns",
-    "cs_": "catalog_sales",
-    "cr_": "catalog_returns",
-    "sm_": "ship_mode",
-    "ca_": "customer_address",
-    "hd_": "household_demographics",
-    "cd_": "customer_demographics",
-    "d_": "date_dim",
-    "t_": "time_dim",
-    "i_": "item",
-    "s_": "store",
-    "p_": "promotion",
-    "r_": "reason",
-    "w_": "warehouse",
-}
+_PREFIX_TO_TABLE = _QUERY_SPECS["prefix_to_table"]
 
 # Dimension table → static role prefix (for tables whose role doesn't depend on the fact column).
-_DIM_STATIC_ROLE: dict[str, str] = {
-    "item": "item_",
-    "store": "store_",
-    "promotion": "promo_",
-    "reason": "reason_",
-    "web_site": "web_site_",
-    "web_page": "web_page_",
-    "call_center": "call_center_",
-    "catalog_page": "catalog_page_",
-    "ship_mode": "ship_mode_",
-    "warehouse": "warehouse_",
-}
-_IDENTIFIER_DEFAULT_FACT_TABLES = {
-    "ss_": "store_sales",
-    "sr_": "store_returns",
-    "ws_": "web_sales",
-    "wr_": "web_returns",
-    "cs_": "catalog_sales",
-    "cr_": "catalog_returns",
-}
-_CHANNEL_FACT_TABLES = {
-    "store": "store_sales",
-    "web": "web_sales",
-    "catalog": "catalog_sales",
-}
+_DIM_STATIC_ROLE = _QUERY_SPECS["dim_static_role"]
+_IDENTIFIER_DEFAULT_FACT_TABLES = _QUERY_SPECS["identifier_default_fact_tables"]
+_CHANNEL_FACT_TABLES = _QUERY_SPECS["channel_fact_tables"]
+_ROLE_PREFIX_MAP = _QUERY_SPECS["role_prefix_map"]
 
 
 @dataclass(frozen=True)
@@ -118,40 +89,8 @@ class ColumnMapper:
         lineage = get_column_lineage()
         self.fact_map: dict[tuple[str, str], str] = {}
         self.dimension_map: dict[tuple[str, str, str], str] = {}
-        self._role_prefix_map = {
-            "promotion": "promo_",
-            "reason": "reason_",
-            "store": "store_",
-            "item": "item_",
-            "call_center": "call_center_",
-            "catalog_page": "catalog_page_",
-            "ship_mode": "ship_mode_",
-            "warehouse": "warehouse_",
-            "web_site": "web_site_",
-            "web_page": "web_page_",
-            "sold_date": "sold_date_",
-            "sold_time": "sold_time_",
-            "ship_date": "ship_date_",
-            "ship_time": "ship_time_",
-            "return_date": "return_date_",
-            "return_time": "return_time_",
-            "bill_customer": "bill_customer_",
-            "bill_cdemo": "bill_cdemo_",
-            "bill_hdemo": "bill_hdemo_",
-            "bill_address": "bill_addr_",
-            "ship_customer": "ship_customer_",
-            "ship_cdemo": "ship_cdemo_",
-            "ship_hdemo": "ship_hdemo_",
-            "ship_address": "ship_addr_",
-            "returning_customer": "returning_customer_",
-            "returning_cdemo": "returning_cdemo_",
-            "returning_hdemo": "returning_hdemo_",
-            "returning_address": "returning_addr_",
-            "refunded_customer": "refunded_customer_",
-            "refunded_cdemo": "refunded_cdemo_",
-            "refunded_hdemo": "refunded_hdemo_",
-            "refunded_address": "refunded_addr_",
-        }
+        self._role_prefix_map = _ROLE_PREFIX_MAP
+
         self.obt_columns = set(lineage.keys())
 
         for obt_name, meta in lineage.items():

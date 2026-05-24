@@ -1,0 +1,18 @@
+table_codes:
+  customer: c
+  lineitem: L
+  nation: n
+  orders: O
+  part: P
+  partsupp: S
+  region: r
+  supplier: s
+base_row_counts:
+  customer: 150000
+  lineitem: 6001215
+  nation: 25
+  orders: 1500000
+  part: 200000
+  partsupp: 800000
+  region: 5
+  supplier: 10000

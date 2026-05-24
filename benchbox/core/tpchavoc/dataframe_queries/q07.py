@@ -19,6 +19,7 @@ from benchbox.core.tpch.dataframe_queries import (
     q7_expression_impl as _q7_expr_base,
     q7_pandas_impl as _q7_pandas_base,
 )
+from benchbox.core.tpchavoc.dataframe_queries.loader import load_variant_specs
 
 # ---------------------------------------------------------------------------
 # v1: baseline
@@ -607,31 +608,7 @@ def q7_v10_pandas_impl(ctx: DataFrameContext) -> Any:
 # Registry
 # ---------------------------------------------------------------------------
 
-_IMPL_PAIRS = [
-    (q7_v1_expression_impl, q7_v1_pandas_impl),
-    (q7_v2_expression_impl, q7_v2_pandas_impl),
-    (q7_v3_expression_impl, q7_v3_pandas_impl),
-    (q7_v4_expression_impl, q7_v4_pandas_impl),
-    (q7_v5_expression_impl, q7_v5_pandas_impl),
-    (q7_v6_expression_impl, q7_v6_pandas_impl),
-    (q7_v7_expression_impl, q7_v7_pandas_impl),
-    (q7_v8_expression_impl, q7_v8_pandas_impl),
-    (q7_v9_expression_impl, q7_v9_pandas_impl),
-    (q7_v10_expression_impl, q7_v10_pandas_impl),
-]
-
-_DESCRIPTIONS = [
-    "Baseline: direct delegation to TPC-H Q7 implementation",
-    "Pre-filter: filter lineitem by date before joining",
-    "Column prune: select only needed columns from each table",
-    "Intermediate vars: named DataFrames for each join and filter step",
-    "Pre-compute derived: add volume column before groupby",
-    "Chained style: maximum method chaining",
-    "Join reorder: start from lineitem→supplier instead of supplier→lineitem",
-    "Filter combination: pre-filter lineitem and apply nation filter after join",
-    "Explicit sort: descending=[False, False, False] explicitly specified",
-    "Alternative formula: volume = price - price*disc instead of price*(1-disc)",
-]
+_IMPL_PAIRS, _DESCRIPTIONS = load_variant_specs(__file__, globals())
 
 Q7_VARIANTS: list[DataFrameQuery] = [
     DataFrameQuery(

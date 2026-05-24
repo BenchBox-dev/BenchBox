@@ -23,6 +23,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import yaml
+
 from benchbox.core.results.builder import normalize_benchmark_id
 from benchbox.core.results.environment import (
     build_environment_payload,
@@ -39,77 +41,20 @@ SCHEMA_VERSION = CURRENT_SCHEMA_VERSION
 
 logger = logging.getLogger(__name__)
 
-CANONICAL_KEY_ORDER = [
-    "version",
-    "run",
-    "benchmark",
-    "platform",
-    "config",
-    "summary",
-    "phases",
-    "queries",
-    "tables",
-    "validation",
-    "comparisons",
-    "cost",
-    "normalized_cost",
-    "execution",
-    "environment",
-    "export",
-    "errors",
-]
 
-QUERY_KEY_ORDER = ["id", "ms", "rows", "iter", "stream", "run_type", "status", "dataframe_skip_summary"]
-CONFIG_KEY_ORDER = [
-    "compression",
-    "seed",
-    "phases",
-    "query_subset",
-    "parallelism",
-    "tuning_mode",
-    "tuning_config",
-    "platform_options",
-    "platform_option_sources",
-    "table_mode",
-    "external_format",
-    "table_format",
-    "table_format_compression",
-    "table_format_partition_cols",
-    "mode",
-    "test_type",
-]
-PHASE_KEY_ORDER = [
-    "data_generation",
-    "schema_creation",
-    "data_loading",
-    "validation",
-    "migration",
-    "power_test",
-    "throughput_test",
-]
-DRIVER_METADATA_KEYS = (
-    "driver_package",
-    "driver_version_requested",
-    "driver_version_resolved",
-    "driver_version_actual",
-    "driver_runtime_strategy",
-    "driver_runtime_path",
-    "driver_runtime_python_executable",
-    "driver_auto_install_used",
-)
-ENGINE_VERSION_KEYS = (
-    "engine_version",
-    "engine_version_source",
-)
+def _load_schema_specs() -> dict[str, Any]:
+    with (Path(__file__).with_name("schema_specs.yaml")).open(encoding="utf-8") as handle:
+        return yaml.safe_load(handle) or {}
 
-# Maps driver metadata source keys to their result JSON destination keys.
-_DRIVER_PLATFORM_KEYS = [
-    ("driver_package", "driver_package"),
-    ("driver_version_requested", "driver_requested_version"),
-    ("driver_version_resolved", "driver_resolved_version"),
-    ("driver_version_actual", "driver_actual_version"),
-    ("driver_runtime_strategy", "driver_runtime_strategy"),
-]
+
+_SCHEMA_SPECS = _load_schema_specs()
+CANONICAL_KEY_ORDER = list(_SCHEMA_SPECS["canonical_key_order"])
+QUERY_KEY_ORDER = list(_SCHEMA_SPECS["query_key_order"])
+CONFIG_KEY_ORDER = list(_SCHEMA_SPECS["config_key_order"])
+PHASE_KEY_ORDER = list(_SCHEMA_SPECS["phase_key_order"])
+DRIVER_METADATA_KEYS = tuple(_SCHEMA_SPECS["driver_metadata_keys"])
+ENGINE_VERSION_KEYS = tuple(_SCHEMA_SPECS["engine_version_keys"])
+_DRIVER_PLATFORM_KEYS = [tuple(item) for item in _SCHEMA_SPECS["driver_platform_keys"]]
 
 
 def order_dict(d: dict[str, Any], key_order: list[str]) -> dict[str, Any]:

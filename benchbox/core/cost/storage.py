@@ -4,66 +4,22 @@ This module provides rough storage cost estimates based on data size and duratio
 Storage pricing varies by platform, region, and storage tier.
 """
 
+from pathlib import Path
 from typing import Any
+
+import yaml
 
 from benchbox.core.cost.pricing import _map_region_to_tier
 
-# Storage pricing per TB per month (USD)
-# Source: Public cloud provider pricing (2025)
-STORAGE_PRICES_PER_TB_MONTH = {
-    "snowflake": {
-        "us": 23.00,  # On-demand storage
-        "eu": 25.00,
-        "ap": 26.00,
-        "ca": 24.00,
-        "other": 27.00,
-    },
-    "bigquery": {
-        "us": 20.00,  # Active storage
-        "eu": 22.00,
-        "ap": 23.00,
-        "ca": 21.00,
-        "other": 24.00,
-    },
-    "redshift": {
-        "us": 24.00,  # RA3 managed storage
-        "eu": 26.00,
-        "ap": 27.00,
-        "ca": 25.00,
-        "other": 28.00,
-    },
-    "databricks": {
-        "us": 23.00,  # Delta Lake storage
-        "eu": 25.00,
-        "ap": 26.00,
-        "ca": 24.00,
-        "other": 27.00,
-    },
-    "duckdb": {
-        "us": 0.00,  # Local storage
-        "eu": 0.00,
-        "ap": 0.00,
-        "ca": 0.00,
-        "other": 0.00,
-    },
-    "clickhouse": {
-        "us": 0.00,  # Local storage
-        "eu": 0.00,
-        "ap": 0.00,
-        "ca": 0.00,
-        "other": 0.00,
-    },
-}
 
-# Storage pricing notes by platform
-STORAGE_NOTES = {
-    "snowflake": "On-demand storage pricing. Time Travel and Fail-safe may incur additional costs.",
-    "bigquery": "Active storage pricing. Long-term storage (90+ days) costs $10/TB/month.",
-    "redshift": "RA3 managed storage pricing. Dense node storage included in compute cost.",
-    "databricks": "Delta Lake storage on underlying cloud provider (S3/ADLS/GCS).",
-    "duckdb": "Local storage, no cloud costs.",
-    "clickhouse": "Local storage, no cloud costs.",
-}
+def _load_storage_specs() -> dict[str, Any]:
+    with (Path(__file__).with_name("storage_specs.yaml")).open(encoding="utf-8") as handle:
+        return yaml.safe_load(handle) or {}
+
+
+_STORAGE_SPECS = _load_storage_specs()
+STORAGE_PRICES_PER_TB_MONTH = _STORAGE_SPECS["prices_per_tb_month"]
+STORAGE_NOTES = _STORAGE_SPECS["notes"]
 
 
 def estimate_storage_cost(

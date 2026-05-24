@@ -1,0 +1,14 @@
+file_optional_fields:
+- converted_from
+- converted_at
+- compression
+- row_groups
+- conversion_options
+manifest_optional_fields:
+- benchmark
+- scale_factor
+- format_preference
+- compression
+- parallel
+- created_at
+- generator_version

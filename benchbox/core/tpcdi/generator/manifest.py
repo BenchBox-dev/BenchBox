@@ -3,14 +3,20 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
+
+import yaml
 
 from benchbox.utils.datagen_manifest import DataGenerationManifest
 from benchbox.utils.file_format import detect_compression, validate_tbl_compression_consistency
 
-_TPCDI_CSV_METADATA = {
-    "csv_normalize_booleans": True,
-    "csv_null_marker": "",
-}
+
+def _load_manifest_specs() -> dict[str, Any]:
+    with (Path(__file__).with_name("manifest_specs.yaml")).open(encoding="utf-8") as handle:
+        return yaml.safe_load(handle) or {}
+
+
+_TPCDI_CSV_METADATA = _load_manifest_specs()["csv_metadata"]
 
 
 class ManifestMixin:

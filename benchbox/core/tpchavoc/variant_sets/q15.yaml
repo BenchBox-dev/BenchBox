@@ -1,0 +1,396 @@
+variants:
+- id: 1
+  description: 'Scalar subqueries: Use scalar subqueries instead of view'
+  sql: |2
+
+    select
+        s_suppkey,
+        s_name,
+        s_address,
+        s_phone,
+        (select sum(l_extendedprice * (1 - l_discount))
+         from lineitem l2
+         where l2.l_suppkey = s_suppkey
+           and l2.l_shipdate >= date '1996-01-01'
+           and l2.l_shipdate < date '1996-01-01' + interval '3' month) as total_revenue
+    from
+        supplier
+    where
+        (select sum(l_extendedprice * (1 - l_discount))
+         from lineitem l3
+         where l3.l_suppkey = s_suppkey
+           and l3.l_shipdate >= date '1996-01-01'
+           and l3.l_shipdate < date '1996-01-01' + interval '3' month) =
+        (select max(supplier_revenue.total_revenue)
+         from (select l_suppkey,
+                      sum(l_extendedprice * (1 - l_discount)) as total_revenue
+               from lineitem
+               where l_shipdate >= date '1996-01-01'
+                 and l_shipdate < date '1996-01-01' + interval '3' month
+               group by l_suppkey) supplier_revenue)
+    order by
+        s_suppkey
+- id: 2
+  description: 'HAVING clause: Use HAVING for filtering maximum revenue'
+  sql: |2
+
+    select
+        s_suppkey,
+        s_name,
+        s_address,
+        s_phone,
+        sum(l_extendedprice * (1 - l_discount)) as total_revenue
+    from
+        supplier,
+        lineitem
+    where
+        s_suppkey = l_suppkey
+        and l_shipdate >= date '1996-01-01'
+        and l_shipdate < date '1996-01-01' + interval '3' month
+    group by
+        s_suppkey,
+        s_name,
+        s_address,
+        s_phone
+    having
+        sum(l_extendedprice * (1 - l_discount)) >=
+        (select max(supplier_revenue.total_revenue)
+         from (select sum(l_extendedprice * (1 - l_discount)) as total_revenue
+               from lineitem
+               where l_shipdate >= date '1996-01-01'
+                 and l_shipdate < date '1996-01-01' + interval '3' month
+               group by l_suppkey) supplier_revenue)
+    order by
+        s_suppkey
+- id: 3
+  description: 'Explicit JOINs: Replace comma-separated tables with explicit JOINs'
+  sql: |2
+
+    with revenue as (
+        select
+            l_suppkey as supplier_no,
+            sum(l_extendedprice * (1 - l_discount)) as total_revenue
+        from
+            lineitem
+        where
+            l_shipdate >= date '1996-01-01'
+            and l_shipdate < date '1996-01-01' + interval '3' month
+        group by
+            l_suppkey
+    )
+    select
+        s.s_suppkey,
+        s.s_name,
+        s.s_address,
+        s.s_phone,
+        r.total_revenue
+    from
+        supplier s
+        inner join revenue r on s.s_suppkey = r.supplier_no
+        inner join (
+            select max(total_revenue) as max_revenue
+            from revenue
+        ) max_rev on r.total_revenue = max_rev.max_revenue
+    order by
+        s.s_suppkey
+- id: 4
+  description: 'UNION ALL: Split query into parts and union'
+  sql: |2
+
+    select * from (
+        select
+            s_suppkey,
+            s_name,
+            s_address,
+            s_phone,
+            coalesce(rev_data.total_revenue, 0) as total_revenue,
+            1 as result_group
+        from
+            supplier
+            left join (
+                select
+                    l_suppkey,
+                    sum(l_extendedprice * (1 - l_discount)) as total_revenue
+                from
+                    lineitem
+                where
+                    l_shipdate >= date '1996-01-01'
+                    and l_shipdate < date '1996-01-01' + interval '3' month
+                group by
+                    l_suppkey
+            ) rev_data on s_suppkey = rev_data.l_suppkey
+        where
+            coalesce(rev_data.total_revenue, 0) =
+            (select max(total_revenue)
+             from (select l_suppkey, sum(l_extendedprice * (1 - l_discount)) as total_revenue
+                   from lineitem
+                   where l_shipdate >= date '1996-01-01'
+                     and l_shipdate < date '1996-01-01' + interval '3' month
+                   group by l_suppkey) max_calc)
+
+        union all
+
+        select
+            s_suppkey,
+            s_name,
+            s_address,
+            s_phone,
+            0 as total_revenue,
+            2 as result_group
+        from
+            supplier
+        where
+            false -- This part will never execute, but maintains UNION structure
+    ) combined_results
+    where result_group = 1
+    order by
+        s_suppkey
+- id: 5
+  description: 'CTE: Use common table expressions for modular design'
+  sql: |2
+
+    with revenue_calculation as (
+        select
+            l_suppkey as supplier_no,
+            sum(l_extendedprice * (1 - l_discount)) as total_revenue
+        from
+            lineitem
+        where
+            l_shipdate >= date '1996-01-01'
+            and l_shipdate < date '1996-01-01' + interval '3' month
+        group by
+            l_suppkey
+    ),
+    max_revenue as (
+        select
+            max(total_revenue) as max_total_revenue
+        from
+            revenue_calculation
+    ),
+    top_suppliers as (
+        select
+            rc.supplier_no,
+            rc.total_revenue
+        from
+            revenue_calculation rc
+            cross join max_revenue mr
+        where
+            rc.total_revenue = mr.max_total_revenue
+    )
+    select
+        s.s_suppkey,
+        s.s_name,
+        s.s_address,
+        s.s_phone,
+        ts.total_revenue
+    from
+        supplier s
+        inner join top_suppliers ts on s.s_suppkey = ts.supplier_no
+    order by
+        s.s_suppkey
+- id: 6
+  description: 'Derived table: Use derived tables instead of views'
+  sql: |2
+
+    select
+        s_suppkey,
+        s_name,
+        s_address,
+        s_phone,
+        revenue_table.total_revenue
+    from
+        supplier,
+        (select
+            l_suppkey as supplier_no,
+            sum(l_extendedprice * (1 - l_discount)) as total_revenue
+         from
+            lineitem
+         where
+            l_shipdate >= date '1996-01-01'
+            and l_shipdate < date '1996-01-01' + interval '3' month
+         group by
+            l_suppkey) as revenue_table
+    where
+        s_suppkey = revenue_table.supplier_no
+        and revenue_table.total_revenue = (
+            select
+                max(max_calc.total_revenue)
+            from
+                (select
+                    l_suppkey,
+                    sum(l_extendedprice * (1 - l_discount)) as total_revenue
+                 from
+                    lineitem
+                 where
+                    l_shipdate >= date '1996-01-01'
+                    and l_shipdate < date '1996-01-01' + interval '3' month
+                 group by
+                    l_suppkey) as max_calc
+        )
+    order by
+        s_suppkey
+- id: 7
+  description: 'FILTER clause (OLAP): Use FILTER for conditional aggregation'
+  sql: |2
+
+    with revenue_with_filter as (
+        select
+            l_suppkey as supplier_no,
+            sum(l_extendedprice * (1 - l_discount)) filter (
+                where l_shipdate >= date '1996-01-01'
+                  and l_shipdate < date '1996-01-01' + interval '3' month
+            ) as total_revenue
+        from
+            lineitem
+        where
+            l_shipdate >= date '1996-01-01'
+            and l_shipdate < date '1996-01-01' + interval '3' month
+        group by
+            l_suppkey
+    )
+    select
+        s.s_suppkey,
+        s.s_name,
+        s.s_address,
+        s.s_phone,
+        r.total_revenue
+    from
+        supplier s,
+        revenue_with_filter r
+    where
+        s.s_suppkey = r.supplier_no
+        and r.total_revenue = (
+            select max(total_revenue) from revenue_with_filter
+        )
+    order by
+        s.s_suppkey
+- id: 8
+  description: 'EXISTS pattern: Use EXISTS for membership testing'
+  sql: |2
+
+    select
+        s_suppkey,
+        s_name,
+        s_address,
+        s_phone,
+        (select sum(l_extendedprice * (1 - l_discount))
+         from lineitem
+         where l_suppkey = s_suppkey
+           and l_shipdate >= date '1996-01-01'
+           and l_shipdate < date '1996-01-01' + interval '3' month) as total_revenue
+    from
+        supplier
+    where
+        exists (
+            select 1
+            from (
+                select
+                    l_suppkey,
+                    sum(l_extendedprice * (1 - l_discount)) as total_revenue
+                from
+                    lineitem
+                where
+                    l_shipdate >= date '1996-01-01'
+                    and l_shipdate < date '1996-01-01' + interval '3' month
+                group by
+                    l_suppkey
+            ) rev_calc
+            where rev_calc.l_suppkey = s_suppkey
+              and rev_calc.total_revenue = (
+                  select max(max_calc.total_revenue)
+                  from (
+                      select sum(l_extendedprice * (1 - l_discount)) as total_revenue
+                      from lineitem
+                      where l_shipdate >= date '1996-01-01'
+                        and l_shipdate < date '1996-01-01' + interval '3' month
+                      group by l_suppkey
+                  ) max_calc
+              )
+        )
+    order by
+        s_suppkey
+- id: 9
+  description: 'Window functions (OLAP): Use window functions for ranking'
+  sql: |2
+
+    with revenue_ranked as (
+        select
+            l_suppkey as supplier_no,
+            sum(l_extendedprice * (1 - l_discount)) as total_revenue,
+            rank() over (order by sum(l_extendedprice * (1 - l_discount)) desc) as revenue_rank,
+            max(sum(l_extendedprice * (1 - l_discount))) over () as max_revenue
+        from
+            lineitem
+        where
+            l_shipdate >= date '1996-01-01'
+            and l_shipdate < date '1996-01-01' + interval '3' month
+        group by
+            l_suppkey
+    )
+    select
+        s.s_suppkey,
+        s.s_name,
+        s.s_address,
+        s.s_phone,
+        rr.total_revenue
+    from
+        supplier s
+        inner join revenue_ranked rr on s.s_suppkey = rr.supplier_no
+    where
+        rr.revenue_rank = 1
+    order by
+        s.s_suppkey
+- id: 10
+  description: 'CASE expressions: Use CASE for conditional logic'
+  sql: |2
+
+    select
+        s_suppkey,
+        s_name,
+        s_address,
+        s_phone,
+        case
+            when revenue_calc.total_revenue is not null then revenue_calc.total_revenue
+            else 0
+        end as total_revenue
+    from
+        supplier,
+        (select
+            l_suppkey,
+            case
+                when sum(case when l_shipdate >= date '1996-01-01'
+                                 and l_shipdate < date '1996-01-01' + interval '3' month
+                             then l_extendedprice * (1 - l_discount)
+                             else 0
+                         end) > 0
+                then sum(case when l_shipdate >= date '1996-01-01'
+                                 and l_shipdate < date '1996-01-01' + interval '3' month
+                             then l_extendedprice * (1 - l_discount)
+                             else 0
+                         end)
+                else 0
+            end as total_revenue
+         from
+            lineitem
+         where
+            l_shipdate >= date '1996-01-01'
+            and l_shipdate < date '1996-01-01' + interval '3' month
+         group by
+            l_suppkey) as revenue_calc
+    where
+        s_suppkey = revenue_calc.l_suppkey
+        and case
+            when revenue_calc.total_revenue = (
+                select max(max_calc.total_revenue)
+                from (
+                    select sum(l_extendedprice * (1 - l_discount)) as total_revenue
+                    from lineitem
+                    where l_shipdate >= date '1996-01-01'
+                      and l_shipdate < date '1996-01-01' + interval '3' month
+                    group by l_suppkey
+                ) max_calc
+            ) then 1
+            else 0
+        end = 1
+    order by
+        s_suppkey

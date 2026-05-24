@@ -1,0 +1,41 @@
+variants:
+- id: 1
+  expression_impl: q10_v1_expression_impl
+  pandas_impl: q10_v1_pandas_impl
+  description: 'Baseline: direct delegation to TPC-H Q10 implementation'
+- id: 2
+  expression_impl: q10_v2_expression_impl
+  pandas_impl: q10_v2_pandas_impl
+  description: 'Pre-filter: filter orders by date and lineitem by returnflag before joining'
+- id: 3
+  expression_impl: q10_v3_expression_impl
+  pandas_impl: q10_v3_pandas_impl
+  description: 'Column prune: select only needed columns from each table'
+- id: 4
+  expression_impl: q10_v4_expression_impl
+  pandas_impl: q10_v4_pandas_impl
+  description: 'Intermediate vars: named DataFrames for each join and filter step'
+- id: 5
+  expression_impl: q10_v5_expression_impl
+  pandas_impl: q10_v5_pandas_impl
+  description: 'Pre-compute derived: add revenue column before groupby'
+- id: 6
+  expression_impl: q10_v6_expression_impl
+  pandas_impl: q10_v6_pandas_impl
+  description: 'Chained style: maximum method chaining'
+- id: 7
+  expression_impl: q10_v7_expression_impl
+  pandas_impl: q10_v7_pandas_impl
+  description: "Join reorder: start from orders\u2192customer instead of customer\u2192orders"
+- id: 8
+  expression_impl: q10_v8_expression_impl
+  pandas_impl: q10_v8_pandas_impl
+  description: 'Filter combination: combine date and returnflag filter in single call after joins'
+- id: 9
+  expression_impl: q10_v9_expression_impl
+  pandas_impl: q10_v9_pandas_impl
+  description: 'Explicit sort: descending=True explicitly specified'
+- id: 10
+  expression_impl: q10_v10_expression_impl
+  pandas_impl: q10_v10_pandas_impl
+  description: 'Alternative formula: revenue = price - price*disc'

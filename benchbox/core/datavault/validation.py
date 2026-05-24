@@ -12,21 +12,22 @@ import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
+
+import yaml
 
 logger = logging.getLogger(__name__)
 
 
+def _load_validation_specs() -> dict[str, Any]:
+    with (Path(__file__).with_name("validation_specs.yaml")).open(encoding="utf-8") as handle:
+        return yaml.safe_load(handle) or {}
+
+
+_VALIDATION_SPECS = _load_validation_specs()
+
 # TPC-H base row counts at SF=1 (from TPC-H specification)
-TPCH_BASE_COUNTS = {
-    "region": 5,
-    "nation": 25,
-    "customer": 150_000,
-    "supplier": 10_000,
-    "part": 200_000,
-    "partsupp": 800_000,
-    "orders": 1_500_000,
-    "lineitem": 6_001_215,  # Approximate - varies slightly
-}
+TPCH_BASE_COUNTS = dict(_VALIDATION_SPECS["tpch_base_counts"])
 
 
 # Data Vault expected row counts relative to TPC-H
@@ -35,30 +36,7 @@ TPCH_BASE_COUNTS = {
 # Links have same count as source relationship table
 # Satellites have same count as their parent hub/link
 DATAVAULT_ROW_EXPECTATIONS = {
-    # Hubs - 1:1 with source business keys
-    "hub_region": ("region", 1.0),
-    "hub_nation": ("nation", 1.0),
-    "hub_customer": ("customer", 1.0),
-    "hub_supplier": ("supplier", 1.0),
-    "hub_part": ("part", 1.0),
-    "hub_order": ("orders", 1.0),
-    "hub_lineitem": ("lineitem", 1.0),
-    # Links - based on relationship cardinality
-    "link_nation_region": ("nation", 1.0),  # Each nation links to one region
-    "link_customer_nation": ("customer", 1.0),  # Each customer links to one nation
-    "link_supplier_nation": ("supplier", 1.0),  # Each supplier links to one nation
-    "link_part_supplier": ("partsupp", 1.0),  # Part-supplier combinations
-    "link_order_customer": ("orders", 1.0),  # Each order links to one customer
-    "link_lineitem": ("lineitem", 1.0),  # Each lineitem links order+part+supplier
-    # Satellites - same count as parent hub/link
-    "sat_region": ("region", 1.0),
-    "sat_nation": ("nation", 1.0),
-    "sat_customer": ("customer", 1.0),
-    "sat_supplier": ("supplier", 1.0),
-    "sat_part": ("part", 1.0),
-    "sat_partsupp": ("partsupp", 1.0),
-    "sat_order": ("orders", 1.0),
-    "sat_lineitem": ("lineitem", 1.0),
+    table: tuple(expectation) for table, expectation in _VALIDATION_SPECS["datavault_row_expectations"].items()
 }
 
 

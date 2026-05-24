@@ -19,6 +19,7 @@ from benchbox.core.tpch.dataframe_queries import (
     q2_expression_impl as _q2_expr_base,
     q2_pandas_impl as _q2_pandas_base,
 )
+from benchbox.core.tpchavoc.dataframe_queries.loader import load_variant_specs
 
 # ---------------------------------------------------------------------------
 # v1: baseline
@@ -625,31 +626,7 @@ def q2_v10_pandas_impl(ctx: DataFrameContext) -> Any:
 # Registry
 # ---------------------------------------------------------------------------
 
-_IMPL_PAIRS = [
-    (q2_v1_expression_impl, q2_v1_pandas_impl),
-    (q2_v2_expression_impl, q2_v2_pandas_impl),
-    (q2_v3_expression_impl, q2_v3_pandas_impl),
-    (q2_v4_expression_impl, q2_v4_pandas_impl),
-    (q2_v5_expression_impl, q2_v5_pandas_impl),
-    (q2_v6_expression_impl, q2_v6_pandas_impl),
-    (q2_v7_expression_impl, q2_v7_pandas_impl),
-    (q2_v8_expression_impl, q2_v8_pandas_impl),
-    (q2_v9_expression_impl, q2_v9_pandas_impl),
-    (q2_v10_expression_impl, q2_v10_pandas_impl),
-]
-
-_DESCRIPTIONS = [
-    "Baseline: direct delegation to TPC-H Q2 implementation",
-    "Pre-filter: filter part and region tables before joining",
-    "Column prune: project subquery to only needed columns early",
-    "Intermediate vars: named DataFrames for each join step",
-    "Pre-compute derived: add supply_value column before min aggregation",
-    "Chained style: maximum method chaining, no named intermediates",
-    "Join reorder: subquery starts from region→nation→supplier→partsupp",
-    "Filter combination: combined region+type filter in single predicate",
-    "Explicit sort: descending=[True, False, False, False] with explicit flags",
-    "Alternative formula: build min-cost subquery from part outward",
-]
+_IMPL_PAIRS, _DESCRIPTIONS = load_variant_specs(__file__, globals())
 
 Q2_VARIANTS: list[DataFrameQuery] = [
     DataFrameQuery(

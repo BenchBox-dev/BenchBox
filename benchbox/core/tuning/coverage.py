@@ -13,32 +13,34 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Mapping
 
-TUNED_TEMPLATE = "tuned_template"
-BASIC_CONSTRAINTS = "basic_constraints"
-UNTUNED = "untuned"
-VALID_STATUSES = frozenset({TUNED_TEMPLATE, BASIC_CONSTRAINTS, UNTUNED})
+import yaml
 
-DECISION_AUTHOR = "author"
-DECISION_WAIVED = "waived"
-DECISION_DONE = "done"
-VALID_DECISIONS = frozenset({DECISION_AUTHOR, DECISION_WAIVED, DECISION_DONE})
+_SPEC = yaml.safe_load((Path(__file__).with_suffix(".yaml")).read_text(encoding="utf-8"))
+_STATUS_BY_KEY = {status["key"]: status for status in _SPEC["statuses"]}
+_DECISION_BY_KEY = {decision["key"]: decision for decision in _SPEC["decisions"]}
 
-STATUS_RANK = {
-    UNTUNED: 0,
-    BASIC_CONSTRAINTS: 1,
-    TUNED_TEMPLATE: 2,
-}
+TUNED_TEMPLATE = _STATUS_BY_KEY["tuned_template"]["value"]
+BASIC_CONSTRAINTS = _STATUS_BY_KEY["basic_constraints"]["value"]
+UNTUNED = _STATUS_BY_KEY["untuned"]["value"]
+VALID_STATUSES = frozenset(status["value"] for status in _SPEC["statuses"])
+
+DECISION_AUTHOR = _DECISION_BY_KEY["author"]["value"]
+DECISION_WAIVED = _DECISION_BY_KEY["waived"]["value"]
+DECISION_DONE = _DECISION_BY_KEY["done"]["value"]
+VALID_DECISIONS = frozenset(decision["value"] for decision in _SPEC["decisions"])
+
+STATUS_RANK = {status["value"]: status["rank"] for status in _SPEC["statuses"]}
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 TUNING_TEMPLATE_ROOT = REPO_ROOT / "examples" / "tunings"
-MATRIX_COLUMNS = ("platform", "benchmark", "status", "decision", "reason", "template_path")
+MATRIX_COLUMNS = tuple(_SPEC["matrix_columns"])
 
 # The 2026-05-05 handoff called these out as high-priority tuned-template gaps.
 HIGH_PRIORITY_AUTHOR_BACKLOG = frozenset(
-    {
-        ("duckdb", "flightdata"),
-        ("duckdb", "nyctaxi"),
-    }
+    (entry["platform"], entry["benchmark"]) for entry in _SPEC["high_priority_author_backlog"]
+)
+_RUNTIME_STATUS_MARKERS: tuple[tuple[str, str], ...] = tuple(
+    (status["runtime_marker"], status["value"]) for status in _SPEC["statuses"]
 )
 
 
@@ -240,12 +242,9 @@ def parse_uat_cell_log_stem(
 
 def status_from_log_text(text: str) -> str | None:
     """Extract the tuning resolver status recorded in one runtime log."""
-    if "Tuning: auto-discovered template" in text:
-        return TUNED_TEMPLATE
-    if "Tuning: using basic constraints" in text:
-        return BASIC_CONSTRAINTS
-    if "Tuning disabled:" in text:
-        return UNTUNED
+    for marker, status in _RUNTIME_STATUS_MARKERS:
+        if marker in text:
+            return status
     return None
 
 

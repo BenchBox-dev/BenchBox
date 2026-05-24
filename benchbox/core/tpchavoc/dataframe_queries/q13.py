@@ -20,6 +20,7 @@ from benchbox.core.tpch.dataframe_queries import (
     q13_expression_impl as _q13_expr_base,
     q13_pandas_impl as _q13_pandas_base,
 )
+from benchbox.core.tpchavoc.dataframe_queries.loader import load_variant_specs
 
 # ---------------------------------------------------------------------------
 # v1: baseline - delegate directly to TPC-H base implementation
@@ -480,31 +481,7 @@ def q13_v10_pandas_impl(ctx: DataFrameContext) -> Any:
 # Registry
 # ---------------------------------------------------------------------------
 
-_IMPL_PAIRS = [
-    (q13_v1_expression_impl, q13_v1_pandas_impl),
-    (q13_v2_expression_impl, q13_v2_pandas_impl),
-    (q13_v3_expression_impl, q13_v3_pandas_impl),
-    (q13_v4_expression_impl, q13_v4_pandas_impl),
-    (q13_v5_expression_impl, q13_v5_pandas_impl),
-    (q13_v6_expression_impl, q13_v6_pandas_impl),
-    (q13_v7_expression_impl, q13_v7_pandas_impl),
-    (q13_v8_expression_impl, q13_v8_pandas_impl),
-    (q13_v9_expression_impl, q13_v9_pandas_impl),
-    (q13_v10_expression_impl, q13_v10_pandas_impl),
-]
-
-_DESCRIPTIONS = [
-    "Baseline: direct delegation to TPC-H Q13 implementation",
-    "Pre-filter: filter orders to exclude special requests before left join",
-    "Column prune: select only needed columns before joining",
-    "Intermediate vars: explicit DataFrames for filter, join, count, distribute steps",
-    "Pre-compute derived: filter valid orders before building distribution",
-    "Chained style: maximum method chaining, no named intermediates",
-    "Join reorder: pre-aggregate order counts then left join to all customers",
-    "Filter combination: pattern stored in variable, mask applied separately",
-    "Explicit sort: descending=[True, True] passed explicitly",
-    "Alternative formula: pre-aggregate order counts with fill_null(0) for zero-order customers",
-]
+_IMPL_PAIRS, _DESCRIPTIONS = load_variant_specs(__file__, globals())
 
 Q13_VARIANTS: list[DataFrameQuery] = [
     DataFrameQuery(

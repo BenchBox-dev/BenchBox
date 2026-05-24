@@ -1,0 +1,2737 @@
+tables:
+- id: STORE
+  name: store
+  columns:
+  - - s_store_sk
+    - INTEGER
+    - null
+    - false
+    - true
+    - null
+  - - s_store_id
+    - CHAR
+    - 16
+    - false
+    - false
+    - null
+  - - s_rec_start_date
+    - DATE
+    - null
+    - true
+    - false
+    - null
+  - - s_rec_end_date
+    - DATE
+    - null
+    - true
+    - false
+    - null
+  - - s_closed_date_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - s_store_name
+    - VARCHAR
+    - 50
+    - true
+    - false
+    - null
+  - - s_number_employees
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - s_floor_space
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - s_hours
+    - CHAR
+    - 20
+    - true
+    - false
+    - null
+  - - s_manager
+    - VARCHAR
+    - 40
+    - true
+    - false
+    - null
+  - - s_market_id
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - s_geography_class
+    - VARCHAR
+    - 100
+    - true
+    - false
+    - null
+  - - s_market_desc
+    - VARCHAR
+    - 100
+    - true
+    - false
+    - null
+  - - s_market_manager
+    - VARCHAR
+    - 40
+    - true
+    - false
+    - null
+  - - s_division_id
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - s_division_name
+    - VARCHAR
+    - 50
+    - true
+    - false
+    - null
+  - - s_company_id
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - s_company_name
+    - VARCHAR
+    - 50
+    - true
+    - false
+    - null
+  - - s_street_number
+    - VARCHAR
+    - 10
+    - true
+    - false
+    - null
+  - - s_street_name
+    - VARCHAR
+    - 60
+    - true
+    - false
+    - null
+  - - s_street_type
+    - CHAR
+    - 15
+    - true
+    - false
+    - null
+  - - s_suite_number
+    - CHAR
+    - 10
+    - true
+    - false
+    - null
+  - - s_city
+    - VARCHAR
+    - 60
+    - true
+    - false
+    - null
+  - - s_county
+    - VARCHAR
+    - 30
+    - true
+    - false
+    - null
+  - - s_state
+    - CHAR
+    - 2
+    - true
+    - false
+    - null
+  - - s_zip
+    - CHAR
+    - 10
+    - true
+    - false
+    - null
+  - - s_country
+    - VARCHAR
+    - 20
+    - true
+    - false
+    - null
+  - - s_gmt_offset
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - s_tax_percentage
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+- id: DATE_DIM
+  name: date_dim
+  columns:
+  - - d_date_sk
+    - INTEGER
+    - null
+    - false
+    - true
+    - null
+  - - d_date_id
+    - CHAR
+    - 16
+    - false
+    - false
+    - null
+  - - d_date
+    - DATE
+    - null
+    - false
+    - false
+    - null
+  - - d_month_seq
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - d_week_seq
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - d_quarter_seq
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - d_year
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - d_dow
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - d_moy
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - d_dom
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - d_qoy
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - d_fy_year
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - d_fy_quarter_seq
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - d_fy_week_seq
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - d_day_name
+    - CHAR
+    - 9
+    - true
+    - false
+    - null
+  - - d_quarter_name
+    - CHAR
+    - 6
+    - true
+    - false
+    - null
+  - - d_holiday
+    - CHAR
+    - 1
+    - true
+    - false
+    - null
+  - - d_weekend
+    - CHAR
+    - 1
+    - true
+    - false
+    - null
+  - - d_following_holiday
+    - CHAR
+    - 1
+    - true
+    - false
+    - null
+  - - d_first_dom
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - d_last_dom
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - d_same_day_ly
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - d_same_day_lq
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - d_current_day
+    - CHAR
+    - 1
+    - true
+    - false
+    - null
+  - - d_current_week
+    - CHAR
+    - 1
+    - true
+    - false
+    - null
+  - - d_current_month
+    - CHAR
+    - 1
+    - true
+    - false
+    - null
+  - - d_current_quarter
+    - CHAR
+    - 1
+    - true
+    - false
+    - null
+  - - d_current_year
+    - CHAR
+    - 1
+    - true
+    - false
+    - null
+- id: TIME_DIM
+  name: time_dim
+  columns:
+  - - t_time_sk
+    - INTEGER
+    - null
+    - false
+    - true
+    - null
+  - - t_time_id
+    - CHAR
+    - 16
+    - false
+    - false
+    - null
+  - - t_time
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - t_hour
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - t_minute
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - t_second
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - t_am_pm
+    - CHAR
+    - 2
+    - true
+    - false
+    - null
+  - - t_shift
+    - CHAR
+    - 20
+    - true
+    - false
+    - null
+  - - t_sub_shift
+    - CHAR
+    - 20
+    - true
+    - false
+    - null
+  - - t_meal_time
+    - CHAR
+    - 20
+    - true
+    - false
+    - null
+- id: ITEM
+  name: item
+  columns:
+  - - i_item_sk
+    - INTEGER
+    - null
+    - false
+    - true
+    - null
+  - - i_item_id
+    - CHAR
+    - 16
+    - false
+    - false
+    - null
+  - - i_rec_start_date
+    - DATE
+    - null
+    - true
+    - false
+    - null
+  - - i_rec_end_date
+    - DATE
+    - null
+    - true
+    - false
+    - null
+  - - i_item_desc
+    - VARCHAR
+    - 200
+    - true
+    - false
+    - null
+  - - i_current_price
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - i_wholesale_cost
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - i_brand_id
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - i_brand
+    - CHAR
+    - 50
+    - true
+    - false
+    - null
+  - - i_class_id
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - i_class
+    - CHAR
+    - 50
+    - true
+    - false
+    - null
+  - - i_category_id
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - i_category
+    - CHAR
+    - 50
+    - true
+    - false
+    - null
+  - - i_manufact_id
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - i_manufact
+    - CHAR
+    - 50
+    - true
+    - false
+    - null
+  - - i_size
+    - CHAR
+    - 20
+    - true
+    - false
+    - null
+  - - i_formulation
+    - CHAR
+    - 20
+    - true
+    - false
+    - null
+  - - i_color
+    - CHAR
+    - 20
+    - true
+    - false
+    - null
+  - - i_units
+    - CHAR
+    - 10
+    - true
+    - false
+    - null
+  - - i_container
+    - CHAR
+    - 10
+    - true
+    - false
+    - null
+  - - i_manager_id
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - i_product_name
+    - CHAR
+    - 50
+    - true
+    - false
+    - null
+- id: CUSTOMER
+  name: customer
+  columns:
+  - - c_customer_sk
+    - INTEGER
+    - null
+    - false
+    - true
+    - null
+  - - c_customer_id
+    - CHAR
+    - 16
+    - false
+    - false
+    - null
+  - - c_current_cdemo_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - c_current_hdemo_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - c_current_addr_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - c_first_shipto_date_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - c_first_sales_date_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - c_salutation
+    - CHAR
+    - 10
+    - true
+    - false
+    - null
+  - - c_first_name
+    - CHAR
+    - 20
+    - true
+    - false
+    - null
+  - - c_last_name
+    - CHAR
+    - 30
+    - true
+    - false
+    - null
+  - - c_preferred_cust_flag
+    - CHAR
+    - 1
+    - true
+    - false
+    - null
+  - - c_birth_day
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - c_birth_month
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - c_birth_year
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - c_birth_country
+    - VARCHAR
+    - 20
+    - true
+    - false
+    - null
+  - - c_login
+    - CHAR
+    - 13
+    - true
+    - false
+    - null
+  - - c_email_address
+    - CHAR
+    - 50
+    - true
+    - false
+    - null
+  - - c_last_review_date_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+- id: CUSTOMER_DEMOGRAPHICS
+  name: customer_demographics
+  columns:
+  - - cd_demo_sk
+    - INTEGER
+    - null
+    - false
+    - true
+    - null
+  - - cd_gender
+    - CHAR
+    - 1
+    - true
+    - false
+    - null
+  - - cd_marital_status
+    - CHAR
+    - 1
+    - true
+    - false
+    - null
+  - - cd_education_status
+    - CHAR
+    - 20
+    - true
+    - false
+    - null
+  - - cd_purchase_estimate
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - cd_credit_rating
+    - CHAR
+    - 10
+    - true
+    - false
+    - null
+  - - cd_dep_count
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - cd_dep_employed_count
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - cd_dep_college_count
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+- id: HOUSEHOLD_DEMOGRAPHICS
+  name: household_demographics
+  columns:
+  - - hd_demo_sk
+    - INTEGER
+    - null
+    - false
+    - true
+    - null
+  - - hd_income_band_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - hd_buy_potential
+    - CHAR
+    - 15
+    - true
+    - false
+    - null
+  - - hd_dep_count
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - hd_vehicle_count
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+- id: INCOME_BAND
+  name: income_band
+  columns:
+  - - ib_income_band_sk
+    - INTEGER
+    - null
+    - false
+    - true
+    - null
+  - - ib_lower_bound
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - ib_upper_bound
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+- id: PROMOTION
+  name: promotion
+  columns:
+  - - p_promo_sk
+    - INTEGER
+    - null
+    - false
+    - true
+    - null
+  - - p_promo_id
+    - CHAR
+    - 16
+    - false
+    - false
+    - null
+  - - p_start_date_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - p_end_date_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - p_item_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - p_cost
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - p_response_target
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - p_promo_name
+    - CHAR
+    - 50
+    - true
+    - false
+    - null
+  - - p_channel_dmail
+    - CHAR
+    - 1
+    - true
+    - false
+    - null
+  - - p_channel_email
+    - CHAR
+    - 1
+    - true
+    - false
+    - null
+  - - p_channel_catalog
+    - CHAR
+    - 1
+    - true
+    - false
+    - null
+  - - p_channel_tv
+    - CHAR
+    - 1
+    - true
+    - false
+    - null
+  - - p_channel_radio
+    - CHAR
+    - 1
+    - true
+    - false
+    - null
+  - - p_channel_press
+    - CHAR
+    - 1
+    - true
+    - false
+    - null
+  - - p_channel_event
+    - CHAR
+    - 1
+    - true
+    - false
+    - null
+  - - p_channel_demo
+    - CHAR
+    - 1
+    - true
+    - false
+    - null
+  - - p_channel_details
+    - VARCHAR
+    - 100
+    - true
+    - false
+    - null
+  - - p_purpose
+    - CHAR
+    - 15
+    - true
+    - false
+    - null
+  - - p_discount_active
+    - CHAR
+    - 1
+    - true
+    - false
+    - null
+- id: CUSTOMER_ADDRESS
+  name: customer_address
+  columns:
+  - - ca_address_sk
+    - INTEGER
+    - null
+    - false
+    - true
+    - null
+  - - ca_address_id
+    - CHAR
+    - 16
+    - false
+    - false
+    - null
+  - - ca_street_number
+    - CHAR
+    - 10
+    - true
+    - false
+    - null
+  - - ca_street_name
+    - VARCHAR
+    - 60
+    - true
+    - false
+    - null
+  - - ca_street_type
+    - CHAR
+    - 15
+    - true
+    - false
+    - null
+  - - ca_suite_number
+    - CHAR
+    - 10
+    - true
+    - false
+    - null
+  - - ca_city
+    - VARCHAR
+    - 60
+    - true
+    - false
+    - null
+  - - ca_county
+    - VARCHAR
+    - 30
+    - true
+    - false
+    - null
+  - - ca_state
+    - CHAR
+    - 2
+    - true
+    - false
+    - null
+  - - ca_zip
+    - CHAR
+    - 10
+    - true
+    - false
+    - null
+  - - ca_country
+    - VARCHAR
+    - 20
+    - true
+    - false
+    - null
+  - - ca_gmt_offset
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - ca_location_type
+    - CHAR
+    - 20
+    - true
+    - false
+    - null
+- id: WAREHOUSE
+  name: warehouse
+  columns:
+  - - w_warehouse_sk
+    - INTEGER
+    - null
+    - false
+    - true
+    - null
+  - - w_warehouse_id
+    - CHAR
+    - 16
+    - false
+    - false
+    - null
+  - - w_warehouse_name
+    - VARCHAR
+    - 20
+    - true
+    - false
+    - null
+  - - w_warehouse_sq_ft
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - w_street_number
+    - CHAR
+    - 10
+    - true
+    - false
+    - null
+  - - w_street_name
+    - VARCHAR
+    - 60
+    - true
+    - false
+    - null
+  - - w_street_type
+    - CHAR
+    - 15
+    - true
+    - false
+    - null
+  - - w_suite_number
+    - CHAR
+    - 10
+    - true
+    - false
+    - null
+  - - w_city
+    - VARCHAR
+    - 60
+    - true
+    - false
+    - null
+  - - w_county
+    - VARCHAR
+    - 30
+    - true
+    - false
+    - null
+  - - w_state
+    - CHAR
+    - 2
+    - true
+    - false
+    - null
+  - - w_zip
+    - CHAR
+    - 10
+    - true
+    - false
+    - null
+  - - w_country
+    - VARCHAR
+    - 20
+    - true
+    - false
+    - null
+  - - w_gmt_offset
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+- id: WEB_SITE
+  name: web_site
+  columns:
+  - - web_site_sk
+    - INTEGER
+    - null
+    - false
+    - true
+    - null
+  - - web_site_id
+    - CHAR
+    - 16
+    - false
+    - false
+    - null
+  - - web_rec_start_date
+    - DATE
+    - null
+    - true
+    - false
+    - null
+  - - web_rec_end_date
+    - DATE
+    - null
+    - true
+    - false
+    - null
+  - - web_name
+    - VARCHAR
+    - 50
+    - true
+    - false
+    - null
+  - - web_open_date_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - web_close_date_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - web_class
+    - VARCHAR
+    - 50
+    - true
+    - false
+    - null
+  - - web_manager
+    - VARCHAR
+    - 40
+    - true
+    - false
+    - null
+  - - web_mkt_id
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - web_mkt_class
+    - VARCHAR
+    - 50
+    - true
+    - false
+    - null
+  - - web_mkt_desc
+    - VARCHAR
+    - 100
+    - true
+    - false
+    - null
+  - - web_market_manager
+    - VARCHAR
+    - 40
+    - true
+    - false
+    - null
+  - - web_company_id
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - web_company_name
+    - CHAR
+    - 50
+    - true
+    - false
+    - null
+  - - web_street_number
+    - CHAR
+    - 10
+    - true
+    - false
+    - null
+  - - web_street_name
+    - VARCHAR
+    - 60
+    - true
+    - false
+    - null
+  - - web_street_type
+    - CHAR
+    - 15
+    - true
+    - false
+    - null
+  - - web_suite_number
+    - CHAR
+    - 10
+    - true
+    - false
+    - null
+  - - web_city
+    - VARCHAR
+    - 60
+    - true
+    - false
+    - null
+  - - web_county
+    - VARCHAR
+    - 30
+    - true
+    - false
+    - null
+  - - web_state
+    - CHAR
+    - 2
+    - true
+    - false
+    - null
+  - - web_zip
+    - CHAR
+    - 10
+    - true
+    - false
+    - null
+  - - web_country
+    - VARCHAR
+    - 20
+    - true
+    - false
+    - null
+  - - web_gmt_offset
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - web_tax_percentage
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+- id: WEB_PAGE
+  name: web_page
+  columns:
+  - - wp_web_page_sk
+    - INTEGER
+    - null
+    - false
+    - true
+    - null
+  - - wp_web_page_id
+    - CHAR
+    - 16
+    - false
+    - false
+    - null
+  - - wp_rec_start_date
+    - DATE
+    - null
+    - true
+    - false
+    - null
+  - - wp_rec_end_date
+    - DATE
+    - null
+    - true
+    - false
+    - null
+  - - wp_creation_date_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - wp_access_date_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - wp_autogen_flag
+    - CHAR
+    - 1
+    - true
+    - false
+    - null
+  - - wp_customer_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - wp_url
+    - VARCHAR
+    - 100
+    - true
+    - false
+    - null
+  - - wp_type
+    - CHAR
+    - 50
+    - true
+    - false
+    - null
+  - - wp_char_count
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - wp_link_count
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - wp_image_count
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - wp_max_ad_count
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+- id: REASON
+  name: reason
+  columns:
+  - - r_reason_sk
+    - INTEGER
+    - null
+    - false
+    - true
+    - null
+  - - r_reason_id
+    - CHAR
+    - 16
+    - false
+    - false
+    - null
+  - - r_reason_desc
+    - CHAR
+    - 100
+    - true
+    - false
+    - null
+- id: CALL_CENTER
+  name: call_center
+  columns:
+  - - cc_call_center_sk
+    - INTEGER
+    - null
+    - false
+    - true
+    - null
+  - - cc_call_center_id
+    - CHAR
+    - 16
+    - false
+    - false
+    - null
+  - - cc_rec_start_date
+    - DATE
+    - null
+    - true
+    - false
+    - null
+  - - cc_rec_end_date
+    - DATE
+    - null
+    - true
+    - false
+    - null
+  - - cc_closed_date_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - cc_open_date_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - cc_name
+    - VARCHAR
+    - 50
+    - true
+    - false
+    - null
+  - - cc_class
+    - VARCHAR
+    - 50
+    - true
+    - false
+    - null
+  - - cc_employees
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - cc_sq_ft
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - cc_hours
+    - CHAR
+    - 20
+    - true
+    - false
+    - null
+  - - cc_manager
+    - VARCHAR
+    - 40
+    - true
+    - false
+    - null
+  - - cc_mkt_id
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - cc_mkt_class
+    - CHAR
+    - 50
+    - true
+    - false
+    - null
+  - - cc_mkt_desc
+    - VARCHAR
+    - 100
+    - true
+    - false
+    - null
+  - - cc_market_manager
+    - VARCHAR
+    - 40
+    - true
+    - false
+    - null
+  - - cc_division
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - cc_division_name
+    - VARCHAR
+    - 50
+    - true
+    - false
+    - null
+  - - cc_company
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - cc_company_name
+    - CHAR
+    - 50
+    - true
+    - false
+    - null
+  - - cc_street_number
+    - CHAR
+    - 10
+    - true
+    - false
+    - null
+  - - cc_street_name
+    - VARCHAR
+    - 60
+    - true
+    - false
+    - null
+  - - cc_street_type
+    - CHAR
+    - 15
+    - true
+    - false
+    - null
+  - - cc_suite_number
+    - CHAR
+    - 10
+    - true
+    - false
+    - null
+  - - cc_city
+    - VARCHAR
+    - 60
+    - true
+    - false
+    - null
+  - - cc_county
+    - VARCHAR
+    - 30
+    - true
+    - false
+    - null
+  - - cc_state
+    - CHAR
+    - 2
+    - true
+    - false
+    - null
+  - - cc_zip
+    - CHAR
+    - 10
+    - true
+    - false
+    - null
+  - - cc_country
+    - VARCHAR
+    - 20
+    - true
+    - false
+    - null
+  - - cc_gmt_offset
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - cc_tax_percentage
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+- id: CATALOG_PAGE
+  name: catalog_page
+  columns:
+  - - cp_catalog_page_sk
+    - INTEGER
+    - null
+    - false
+    - true
+    - null
+  - - cp_catalog_page_id
+    - CHAR
+    - 16
+    - false
+    - false
+    - null
+  - - cp_start_date_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - cp_end_date_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - cp_department
+    - VARCHAR
+    - 50
+    - true
+    - false
+    - null
+  - - cp_catalog_number
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - cp_catalog_page_number
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - cp_description
+    - VARCHAR
+    - 100
+    - true
+    - false
+    - null
+  - - cp_type
+    - VARCHAR
+    - 100
+    - true
+    - false
+    - null
+- id: SHIP_MODE
+  name: ship_mode
+  columns:
+  - - sm_ship_mode_sk
+    - INTEGER
+    - null
+    - false
+    - true
+    - null
+  - - sm_ship_mode_id
+    - CHAR
+    - 16
+    - false
+    - false
+    - null
+  - - sm_type
+    - CHAR
+    - 30
+    - true
+    - false
+    - null
+  - - sm_code
+    - CHAR
+    - 10
+    - true
+    - false
+    - null
+  - - sm_carrier
+    - CHAR
+    - 20
+    - true
+    - false
+    - null
+  - - sm_contract
+    - CHAR
+    - 20
+    - true
+    - false
+    - null
+- id: STORE_SALES
+  name: store_sales
+  columns:
+  - - ss_sold_date_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - date_dim
+      - d_date_sk
+  - - ss_sold_time_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - time_dim
+      - t_time_sk
+  - - ss_item_sk
+    - INTEGER
+    - null
+    - false
+    - false
+    - - item
+      - i_item_sk
+  - - ss_customer_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - customer
+      - c_customer_sk
+  - - ss_cdemo_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - customer_demographics
+      - cd_demo_sk
+  - - ss_hdemo_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - household_demographics
+      - hd_demo_sk
+  - - ss_addr_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - customer_address
+      - ca_address_sk
+  - - ss_store_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - store
+      - s_store_sk
+  - - ss_promo_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - promotion
+      - p_promo_sk
+  - - ss_ticket_number
+    - INTEGER
+    - null
+    - false
+    - true
+    - null
+  - - ss_quantity
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - ss_wholesale_cost
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - ss_list_price
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - ss_sales_price
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - ss_ext_discount_amt
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - ss_ext_sales_price
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - ss_ext_wholesale_cost
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - ss_ext_list_price
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - ss_ext_tax
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - ss_coupon_amt
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - ss_net_paid
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - ss_net_paid_inc_tax
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - ss_net_profit
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+- id: STORE_RETURNS
+  name: store_returns
+  columns:
+  - - sr_returned_date_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - date_dim
+      - d_date_sk
+  - - sr_return_time_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - time_dim
+      - t_time_sk
+  - - sr_item_sk
+    - INTEGER
+    - null
+    - false
+    - false
+    - - item
+      - i_item_sk
+  - - sr_customer_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - customer
+      - c_customer_sk
+  - - sr_cdemo_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - customer_demographics
+      - cd_demo_sk
+  - - sr_hdemo_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - household_demographics
+      - hd_demo_sk
+  - - sr_addr_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - customer_address
+      - ca_address_sk
+  - - sr_store_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - store
+      - s_store_sk
+  - - sr_reason_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - reason
+      - r_reason_sk
+  - - sr_ticket_number
+    - INTEGER
+    - null
+    - false
+    - true
+    - - store_sales
+      - ss_ticket_number
+  - - sr_return_quantity
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - sr_return_amt
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - sr_return_tax
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - sr_return_amt_inc_tax
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - sr_fee
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - sr_return_ship_cost
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - sr_refunded_cash
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - sr_reversed_charge
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - sr_store_credit
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - sr_net_loss
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+- id: WEB_SALES
+  name: web_sales
+  columns:
+  - - ws_sold_date_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - date_dim
+      - d_date_sk
+  - - ws_sold_time_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - time_dim
+      - t_time_sk
+  - - ws_ship_date_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - date_dim
+      - d_date_sk
+  - - ws_item_sk
+    - INTEGER
+    - null
+    - false
+    - false
+    - - item
+      - i_item_sk
+  - - ws_bill_customer_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - customer
+      - c_customer_sk
+  - - ws_bill_cdemo_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - customer_demographics
+      - cd_demo_sk
+  - - ws_bill_hdemo_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - household_demographics
+      - hd_demo_sk
+  - - ws_bill_addr_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - customer_address
+      - ca_address_sk
+  - - ws_ship_customer_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - customer
+      - c_customer_sk
+  - - ws_ship_cdemo_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - customer_demographics
+      - cd_demo_sk
+  - - ws_ship_hdemo_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - household_demographics
+      - hd_demo_sk
+  - - ws_ship_addr_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - customer_address
+      - ca_address_sk
+  - - ws_web_page_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - web_page
+      - wp_web_page_sk
+  - - ws_web_site_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - web_site
+      - web_site_sk
+  - - ws_ship_mode_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - ship_mode
+      - sm_ship_mode_sk
+  - - ws_warehouse_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - warehouse
+      - w_warehouse_sk
+  - - ws_promo_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - promotion
+      - p_promo_sk
+  - - ws_order_number
+    - INTEGER
+    - null
+    - false
+    - true
+    - null
+  - - ws_quantity
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - ws_wholesale_cost
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - ws_list_price
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - ws_sales_price
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - ws_ext_discount_amt
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - ws_ext_sales_price
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - ws_ext_wholesale_cost
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - ws_ext_list_price
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - ws_ext_tax
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - ws_coupon_amt
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - ws_ext_ship_cost
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - ws_net_paid
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - ws_net_paid_inc_tax
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - ws_net_paid_inc_ship
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - ws_net_paid_inc_ship_tax
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - ws_net_profit
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+- id: WEB_RETURNS
+  name: web_returns
+  columns:
+  - - wr_returned_date_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - date_dim
+      - d_date_sk
+  - - wr_returned_time_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - time_dim
+      - t_time_sk
+  - - wr_item_sk
+    - INTEGER
+    - null
+    - false
+    - false
+    - - item
+      - i_item_sk
+  - - wr_refunded_customer_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - customer
+      - c_customer_sk
+  - - wr_refunded_cdemo_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - customer_demographics
+      - cd_demo_sk
+  - - wr_refunded_hdemo_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - household_demographics
+      - hd_demo_sk
+  - - wr_refunded_addr_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - customer_address
+      - ca_address_sk
+  - - wr_returning_customer_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - customer
+      - c_customer_sk
+  - - wr_returning_cdemo_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - customer_demographics
+      - cd_demo_sk
+  - - wr_returning_hdemo_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - household_demographics
+      - hd_demo_sk
+  - - wr_returning_addr_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - customer_address
+      - ca_address_sk
+  - - wr_web_page_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - web_page
+      - wp_web_page_sk
+  - - wr_reason_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - reason
+      - r_reason_sk
+  - - wr_order_number
+    - INTEGER
+    - null
+    - false
+    - true
+    - - web_sales
+      - ws_order_number
+  - - wr_return_quantity
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - wr_return_amt
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - wr_return_tax
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - wr_return_amt_inc_tax
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - wr_fee
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - wr_return_ship_cost
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - wr_refunded_cash
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - wr_reversed_charge
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - wr_account_credit
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - wr_net_loss
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+- id: CATALOG_SALES
+  name: catalog_sales
+  columns:
+  - - cs_sold_date_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - date_dim
+      - d_date_sk
+  - - cs_sold_time_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - time_dim
+      - t_time_sk
+  - - cs_ship_date_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - date_dim
+      - d_date_sk
+  - - cs_bill_customer_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - customer
+      - c_customer_sk
+  - - cs_bill_cdemo_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - customer_demographics
+      - cd_demo_sk
+  - - cs_bill_hdemo_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - household_demographics
+      - hd_demo_sk
+  - - cs_bill_addr_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - customer_address
+      - ca_address_sk
+  - - cs_ship_customer_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - customer
+      - c_customer_sk
+  - - cs_ship_cdemo_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - customer_demographics
+      - cd_demo_sk
+  - - cs_ship_hdemo_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - household_demographics
+      - hd_demo_sk
+  - - cs_ship_addr_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - customer_address
+      - ca_address_sk
+  - - cs_call_center_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - call_center
+      - cc_call_center_sk
+  - - cs_catalog_page_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - catalog_page
+      - cp_catalog_page_sk
+  - - cs_ship_mode_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - ship_mode
+      - sm_ship_mode_sk
+  - - cs_warehouse_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - warehouse
+      - w_warehouse_sk
+  - - cs_item_sk
+    - INTEGER
+    - null
+    - false
+    - false
+    - - item
+      - i_item_sk
+  - - cs_promo_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - promotion
+      - p_promo_sk
+  - - cs_order_number
+    - INTEGER
+    - null
+    - false
+    - true
+    - null
+  - - cs_quantity
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - cs_wholesale_cost
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - cs_list_price
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - cs_sales_price
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - cs_ext_discount_amt
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - cs_ext_sales_price
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - cs_ext_wholesale_cost
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - cs_ext_list_price
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - cs_ext_tax
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - cs_coupon_amt
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - cs_ext_ship_cost
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - cs_net_paid
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - cs_net_paid_inc_tax
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - cs_net_paid_inc_ship
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - cs_net_paid_inc_ship_tax
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - cs_net_profit
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+- id: CATALOG_RETURNS
+  name: catalog_returns
+  columns:
+  - - cr_returned_date_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - date_dim
+      - d_date_sk
+  - - cr_returned_time_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - time_dim
+      - t_time_sk
+  - - cr_item_sk
+    - INTEGER
+    - null
+    - false
+    - false
+    - - item
+      - i_item_sk
+  - - cr_refunded_customer_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - customer
+      - c_customer_sk
+  - - cr_refunded_cdemo_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - customer_demographics
+      - cd_demo_sk
+  - - cr_refunded_hdemo_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - household_demographics
+      - hd_demo_sk
+  - - cr_refunded_addr_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - customer_address
+      - ca_address_sk
+  - - cr_returning_customer_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - customer
+      - c_customer_sk
+  - - cr_returning_cdemo_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - customer_demographics
+      - cd_demo_sk
+  - - cr_returning_hdemo_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - household_demographics
+      - hd_demo_sk
+  - - cr_returning_addr_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - customer_address
+      - ca_address_sk
+  - - cr_call_center_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - call_center
+      - cc_call_center_sk
+  - - cr_catalog_page_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - catalog_page
+      - cp_catalog_page_sk
+  - - cr_ship_mode_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - ship_mode
+      - sm_ship_mode_sk
+  - - cr_warehouse_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - warehouse
+      - w_warehouse_sk
+  - - cr_reason_sk
+    - INTEGER
+    - null
+    - true
+    - false
+    - - reason
+      - r_reason_sk
+  - - cr_order_number
+    - INTEGER
+    - null
+    - false
+    - true
+    - - catalog_sales
+      - cs_order_number
+  - - cr_return_quantity
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+  - - cr_return_amount
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - cr_return_tax
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - cr_return_amt_inc_tax
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - cr_fee
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - cr_return_ship_cost
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - cr_refunded_cash
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - cr_reversed_charge
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - cr_store_credit
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+  - - cr_net_loss
+    - DECIMAL
+    - null
+    - true
+    - false
+    - null
+- id: INVENTORY
+  name: inventory
+  columns:
+  - - inv_date_sk
+    - INTEGER
+    - null
+    - false
+    - false
+    - - date_dim
+      - d_date_sk
+  - - inv_item_sk
+    - INTEGER
+    - null
+    - false
+    - false
+    - - item
+      - i_item_sk
+  - - inv_warehouse_sk
+    - INTEGER
+    - null
+    - false
+    - false
+    - - warehouse
+      - w_warehouse_sk
+  - - inv_quantity_on_hand
+    - INTEGER
+    - null
+    - true
+    - false
+    - null
+- id: DBGEN_VERSION
+  name: dbgen_version
+  columns:
+  - - dv_version
+    - VARCHAR
+    - 16
+    - true
+    - false
+    - null
+  - - dv_create_date
+    - VARCHAR
+    - 10
+    - true
+    - false
+    - null
+  - - dv_create_time
+    - VARCHAR
+    - 10
+    - true
+    - false
+    - null
+  - - dv_cmdline_args
+    - VARCHAR
+    - 200
+    - true
+    - false
+    - null

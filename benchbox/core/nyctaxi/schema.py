@@ -1,28 +1,10 @@
-"""NYC Taxi OLAP benchmark schema definition.
-
-Defines the schema for NYC TLC trip data:
-- trips: Yellow Taxi (TPEP) fact table
-- green_trips: Green Taxi (LPEP) fact table
-- hvfhv_trips: High Volume For-Hire Vehicle (Uber/Lyft) fact table
-- taxi_zones: Dimension table for location lookups
-
-Architecture: Separate tables per taxi type (Option A).
-  - Each table matches its source schema exactly (no NULLable columns)
-  - Existing Yellow Taxi queries against `trips` are untouched
-  - Cross-type analytics use UNION ALL on common columns
-
-Based on NYC Taxi & Limousine Commission data dictionaries:
-https://www.nyc.gov/assets/tlc/downloads/pdf/data_dictionary_trip_records_yellow.pdf
-https://www.nyc.gov/assets/tlc/downloads/pdf/data_dictionary_trip_records_green.pdf
-https://www.nyc.gov/assets/tlc/downloads/pdf/data_dictionary_trip_records_hvfhs.pdf
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+"""NYC Taxi OLAP benchmark schema definition."""
 
 from enum import Enum
+from pathlib import Path
 from typing import Any
+
+import yaml
 
 from benchbox.sql_compat.local_exemptions import compat_local
 
@@ -35,159 +17,17 @@ class TaxiType(Enum):
     HVFHV = "hvfhv"
 
 
-# Schema definition with column specifications
-NYC_TAXI_SCHEMA = {
-    "trips": {
-        "description": "NYC taxi trip records (Yellow and Green taxi data)",
-        "columns": {
-            "trip_id": {"type": "BIGINT", "description": "Unique trip identifier"},
-            "vendor_id": {"type": "INTEGER", "description": "TPEP/LPEP provider (1=CMT, 2=VTS)"},
-            "pickup_datetime": {"type": "TIMESTAMP", "description": "Meter engaged timestamp"},
-            "dropoff_datetime": {"type": "TIMESTAMP", "description": "Meter disengaged timestamp"},
-            "passenger_count": {"type": "DOUBLE", "description": "Number of passengers (stored as float in TLC CSV)"},
-            "trip_distance": {"type": "DOUBLE", "description": "Trip distance in miles"},
-            "pickup_location_id": {"type": "INTEGER", "description": "TLC Taxi Zone for pickup"},
-            "dropoff_location_id": {"type": "INTEGER", "description": "TLC Taxi Zone for dropoff"},
-            "rate_code_id": {
-                "type": "DOUBLE",
-                "description": "Rate code (1=Standard, 2=JFK, etc.) - stored as float in TLC CSV",
-            },
-            "store_and_fwd_flag": {"type": "VARCHAR(1)", "description": "Store and forward flag (Y/N)"},
-            "payment_type": {"type": "INTEGER", "description": "Payment type (1=Credit, 2=Cash, etc.)"},
-            "fare_amount": {"type": "DOUBLE", "description": "Time-and-distance fare"},
-            "extra": {"type": "DOUBLE", "description": "Extra charges (rush hour, overnight)"},
-            "mta_tax": {"type": "DOUBLE", "description": "MTA tax ($0.50)"},
-            "tip_amount": {"type": "DOUBLE", "description": "Tip amount (credit card only)"},
-            "tolls_amount": {"type": "DOUBLE", "description": "Total tolls paid"},
-            "improvement_surcharge": {"type": "DOUBLE", "description": "Improvement surcharge ($0.30)"},
-            "congestion_surcharge": {"type": "DOUBLE", "description": "Congestion surcharge"},
-            "airport_fee": {"type": "DOUBLE", "description": "Airport fee"},
-            "total_amount": {"type": "DOUBLE", "description": "Total trip amount"},
-        },
-        "primary_key": ["trip_id"],
-        "partition_by": "pickup_datetime",
-        "order_by": ["pickup_datetime", "pickup_location_id"],
-        "indexes": ["pickup_datetime", "pickup_location_id", "dropoff_location_id"],
-    },
-    "taxi_zones": {
-        "description": "NYC TLC taxi zone lookup table",
-        "columns": {
-            "location_id": {"type": "INTEGER", "description": "Unique zone identifier"},
-            "borough": {"type": "VARCHAR(64)", "description": "NYC borough name"},
-            "zone": {"type": "VARCHAR(128)", "description": "Zone name"},
-            "service_zone": {"type": "VARCHAR(64)", "description": "Service zone (Boro Zone, Yellow Zone, Airports)"},
-        },
-        "primary_key": ["location_id"],
-    },
-    "green_trips": {
-        "description": "NYC Green Taxi (LPEP) trip records - outer-borough street hail",
-        "columns": {
-            "trip_id": {"type": "BIGINT", "description": "Unique trip identifier"},
-            "vendor_id": {"type": "INTEGER", "description": "LPEP provider (1=CMT, 2=VTS)"},
-            "pickup_datetime": {"type": "TIMESTAMP", "description": "Meter engaged timestamp"},
-            "dropoff_datetime": {"type": "TIMESTAMP", "description": "Meter disengaged timestamp"},
-            "store_and_fwd_flag": {"type": "VARCHAR(1)", "description": "Store and forward flag (Y/N)"},
-            "rate_code_id": {
-                "type": "DOUBLE",
-                "description": "Rate code (1=Standard, 2=JFK, etc.) - stored as float in TLC CSV",
-            },
-            "pickup_location_id": {"type": "INTEGER", "description": "TLC Taxi Zone for pickup"},
-            "dropoff_location_id": {"type": "INTEGER", "description": "TLC Taxi Zone for dropoff"},
-            "passenger_count": {"type": "DOUBLE", "description": "Number of passengers (stored as float in TLC CSV)"},
-            "trip_distance": {"type": "DOUBLE", "description": "Trip distance in miles"},
-            "fare_amount": {"type": "DOUBLE", "description": "Time-and-distance fare"},
-            "extra": {"type": "DOUBLE", "description": "Extra charges"},
-            "mta_tax": {"type": "DOUBLE", "description": "MTA tax ($0.50)"},
-            "tip_amount": {"type": "DOUBLE", "description": "Tip amount"},
-            "tolls_amount": {"type": "DOUBLE", "description": "Total tolls paid"},
-            "ehail_fee": {"type": "DOUBLE", "description": "eHail fee (Green Taxi only)"},
-            "improvement_surcharge": {"type": "DOUBLE", "description": "Improvement surcharge ($0.30)"},
-            "total_amount": {"type": "DOUBLE", "description": "Total trip amount"},
-            "payment_type": {"type": "INTEGER", "description": "Payment type (1=Credit, 2=Cash, etc.)"},
-            "trip_type": {"type": "INTEGER", "description": "Trip type (1=Street-hail, 2=Dispatch)"},
-            "congestion_surcharge": {"type": "DOUBLE", "description": "Congestion surcharge"},
-        },
-        "primary_key": ["trip_id"],
-        "partition_by": "pickup_datetime",
-        "order_by": ["pickup_datetime", "pickup_location_id"],
-        "indexes": ["pickup_datetime", "pickup_location_id", "dropoff_location_id"],
-    },
-    "hvfhv_trips": {
-        "description": "NYC High Volume For-Hire Vehicle trips (Uber/Lyft) - available Feb 2019+",
-        "columns": {
-            "trip_id": {"type": "BIGINT", "description": "Unique trip identifier"},
-            "hvfhs_license_num": {
-                "type": "VARCHAR(8)",
-                "description": "TLC license number (HV0002=Juno, HV0003=Uber, HV0004=Via, HV0005=Lyft)",
-            },
-            "dispatching_base_num": {
-                "type": "VARCHAR(8)",
-                "description": "TLC base license number that dispatched the trip",
-            },
-            "originating_base_num": {
-                "type": "VARCHAR(8)",
-                "description": "Base that received the original trip request",
-            },
-            "request_datetime": {"type": "TIMESTAMP", "description": "When trip was requested"},
-            "on_scene_datetime": {"type": "TIMESTAMP", "description": "When driver arrived at pickup"},
-            "pickup_datetime": {"type": "TIMESTAMP", "description": "Pickup timestamp"},
-            "dropoff_datetime": {"type": "TIMESTAMP", "description": "Dropoff timestamp"},
-            "pickup_location_id": {"type": "INTEGER", "description": "TLC Taxi Zone for pickup"},
-            "dropoff_location_id": {"type": "INTEGER", "description": "TLC Taxi Zone for dropoff"},
-            "trip_miles": {"type": "DOUBLE", "description": "Trip distance in miles"},
-            "trip_time": {"type": "INTEGER", "description": "Trip duration in seconds"},
-            "base_passenger_fare": {"type": "DOUBLE", "description": "Base passenger fare before tips/tolls/fees"},
-            "tolls": {"type": "DOUBLE", "description": "Total tolls paid"},
-            "bcf": {"type": "DOUBLE", "description": "Black Car Fund contribution"},
-            "sales_tax": {"type": "DOUBLE", "description": "NYS sales tax"},
-            "congestion_surcharge": {"type": "DOUBLE", "description": "Congestion surcharge"},
-            "airport_fee": {"type": "DOUBLE", "description": "Airport fee"},
-            "tips": {"type": "DOUBLE", "description": "Tip amount"},
-            "driver_pay": {"type": "DOUBLE", "description": "Driver pay (before tips)"},
-            "shared_request_flag": {"type": "VARCHAR(1)", "description": "Did passenger request shared ride? (Y/N)"},
-            "shared_match_flag": {
-                "type": "VARCHAR(1)",
-                "description": "Was trip matched with another passenger? (Y/N)",
-            },
-            "access_a_ride_flag": {
-                "type": "VARCHAR(1)",
-                "description": "Was trip administered for MTA Access-a-Ride? (Y/N)",
-            },
-            "wav_request_flag": {
-                "type": "VARCHAR(1)",
-                "description": "Did passenger request wheelchair accessible vehicle? (Y/N)",
-            },
-            "wav_match_flag": {"type": "VARCHAR(1)", "description": "Was trip fulfilled with WAV? (Y/N)"},
-        },
-        "primary_key": ["trip_id"],
-        "partition_by": "pickup_datetime",
-        "order_by": ["pickup_datetime", "pickup_location_id"],
-        "indexes": ["pickup_datetime", "pickup_location_id", "dropoff_location_id", "hvfhs_license_num"],
-    },
-}
+def _load_schema_specs() -> dict[str, Any]:
+    with (Path(__file__).with_name("schema_specs.yaml")).open(encoding="utf-8") as handle:
+        return yaml.safe_load(handle) or {}
 
-# Table order for creation (dimension tables first)
-TABLE_ORDER = ["taxi_zones", "trips", "green_trips", "hvfhv_trips"]
 
-# Rate code descriptions
-RATE_CODES = {
-    1: "Standard rate",
-    2: "JFK",
-    3: "Newark",
-    4: "Nassau or Westchester",
-    5: "Negotiated fare",
-    6: "Group ride",
-}
-
-# Payment type descriptions
-PAYMENT_TYPES = {
-    1: "Credit card",
-    2: "Cash",
-    3: "No charge",
-    4: "Dispute",
-    5: "Unknown",
-    6: "Voided trip",
-}
+_SCHEMA_SPECS = _load_schema_specs()
+NYC_TAXI_SCHEMA: dict[str, dict[str, Any]] = _SCHEMA_SPECS["schema"]
+TABLE_ORDER: list[str] = list(_SCHEMA_SPECS["table_order"])
+RATE_CODES: dict[int, str] = _SCHEMA_SPECS["rate_codes"]
+PAYMENT_TYPES: dict[int, str] = _SCHEMA_SPECS["payment_types"]
+_TYPE_MAPPINGS: dict[str, dict[str, str]] = _SCHEMA_SPECS["type_mappings"]
 
 
 def get_create_tables_sql(
@@ -303,44 +143,10 @@ def _map_type_to_dialect(type_name: str, dialect: str) -> str:
     """Map generic SQL types to dialect-specific types."""
     type_upper = type_name.upper()
 
-    if dialect == "clickhouse":
-        type_map = {
-            "TIMESTAMP": "DateTime64(3)",
-            "BIGINT": "Int64",
-            "INTEGER": "Int32",
-            "DOUBLE": "Float64",
-            "VARCHAR(1)": "FixedString(1)",
-            "VARCHAR(8)": "String",
-            "VARCHAR(64)": "String",
-            "VARCHAR(128)": "String",
-        }
-        return type_map.get(type_upper, type_name)
-
-    elif dialect == "duckdb":
-        type_map = {
-            "TIMESTAMP": "TIMESTAMP",
-            "BIGINT": "BIGINT",
-            "INTEGER": "INTEGER",
-            "DOUBLE": "DOUBLE",
-            "VARCHAR(1)": "VARCHAR(1)",
-            "VARCHAR(8)": "VARCHAR(8)",
-            "VARCHAR(64)": "VARCHAR",
-            "VARCHAR(128)": "VARCHAR",
-        }
-        return type_map.get(type_upper, type_name)
-
-    elif dialect in ("postgres", "postgresql", "timescale"):
-        type_map = {
-            "TIMESTAMP": "TIMESTAMPTZ",
-            "BIGINT": "BIGINT",
-            "INTEGER": "INTEGER",
-            "DOUBLE": "DOUBLE PRECISION",
-            "VARCHAR(1)": "CHAR(1)",
-            "VARCHAR(8)": "VARCHAR(8)",
-            "VARCHAR(64)": "TEXT",
-            "VARCHAR(128)": "TEXT",
-        }
-        return type_map.get(type_upper, type_name)
+    if dialect in ("postgresql", "timescale"):
+        dialect = "postgres"
+    if dialect in _TYPE_MAPPINGS:
+        return _TYPE_MAPPINGS[dialect].get(type_upper, type_name)
 
     # Standard SQL
     return type_name

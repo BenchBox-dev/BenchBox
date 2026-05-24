@@ -19,6 +19,7 @@ from benchbox.core.tpch.dataframe_queries import (
     q5_expression_impl as _q5_expr_base,
     q5_pandas_impl as _q5_pandas_base,
 )
+from benchbox.core.tpchavoc.dataframe_queries.loader import load_variant_specs
 
 # ---------------------------------------------------------------------------
 # v1: baseline
@@ -552,31 +553,7 @@ def q5_v10_pandas_impl(ctx: DataFrameContext) -> Any:
 # Registry
 # ---------------------------------------------------------------------------
 
-_IMPL_PAIRS = [
-    (q5_v1_expression_impl, q5_v1_pandas_impl),
-    (q5_v2_expression_impl, q5_v2_pandas_impl),
-    (q5_v3_expression_impl, q5_v3_pandas_impl),
-    (q5_v4_expression_impl, q5_v4_pandas_impl),
-    (q5_v5_expression_impl, q5_v5_pandas_impl),
-    (q5_v6_expression_impl, q5_v6_pandas_impl),
-    (q5_v7_expression_impl, q5_v7_pandas_impl),
-    (q5_v8_expression_impl, q5_v8_pandas_impl),
-    (q5_v9_expression_impl, q5_v9_pandas_impl),
-    (q5_v10_expression_impl, q5_v10_pandas_impl),
-]
-
-_DESCRIPTIONS = [
-    "Baseline: direct delegation to TPC-H Q5 implementation",
-    "Pre-filter: filter region and orders by date before joining",
-    "Column prune: select only needed columns from each table",
-    "Intermediate vars: one named DataFrame per join step",
-    "Pre-compute derived: add revenue column before groupby",
-    "Chained style: maximum method chaining",
-    "Join reorder: start from nation→region to get Asia nations first",
-    "Filter combination: single combined date+region filter",
-    "Explicit sort: descending=True explicitly specified",
-    "Alternative formula: revenue = price - price*disc",
-]
+_IMPL_PAIRS, _DESCRIPTIONS = load_variant_specs(__file__, globals())
 
 Q5_VARIANTS: list[DataFrameQuery] = [
     DataFrameQuery(

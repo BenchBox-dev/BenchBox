@@ -19,6 +19,7 @@ from benchbox.core.tpch.dataframe_queries import (
     q11_expression_impl as _q11_expr_base,
     q11_pandas_impl as _q11_pandas_base,
 )
+from benchbox.core.tpchavoc.dataframe_queries.loader import load_variant_specs
 
 # ---------------------------------------------------------------------------
 # v1: baseline
@@ -512,31 +513,7 @@ def q11_v10_pandas_impl(ctx: DataFrameContext) -> Any:
 # Registry
 # ---------------------------------------------------------------------------
 
-_IMPL_PAIRS = [
-    (q11_v1_expression_impl, q11_v1_pandas_impl),
-    (q11_v2_expression_impl, q11_v2_pandas_impl),
-    (q11_v3_expression_impl, q11_v3_pandas_impl),
-    (q11_v4_expression_impl, q11_v4_pandas_impl),
-    (q11_v5_expression_impl, q11_v5_pandas_impl),
-    (q11_v6_expression_impl, q11_v6_pandas_impl),
-    (q11_v7_expression_impl, q11_v7_pandas_impl),
-    (q11_v8_expression_impl, q11_v8_pandas_impl),
-    (q11_v9_expression_impl, q11_v9_pandas_impl),
-    (q11_v10_expression_impl, q11_v10_pandas_impl),
-]
-
-_DESCRIPTIONS = [
-    "Baseline: direct delegation to TPC-H Q11 implementation",
-    "Pre-filter: filter nation and join with supplier before partsupp",
-    "Column prune: select only needed columns from each table",
-    "Intermediate vars: named DataFrames for each join and filter step",
-    "Pre-compute derived: add value column before total calculation",
-    "Chained style: maximum method chaining",
-    "Join reorder: start from nation→supplier→partsupp",
-    "Filter combination: nation filter applied as separate mask variable",
-    "Explicit sort: descending=True explicitly specified",
-    "Alternative formula: availqty * supplycost (commuted multiplication)",
-]
+_IMPL_PAIRS, _DESCRIPTIONS = load_variant_specs(__file__, globals())
 
 Q11_VARIANTS: list[DataFrameQuery] = [
     DataFrameQuery(

@@ -1,0 +1,309 @@
+core_tables:
+- id: DIMCUSTOMER
+  key: DimCustomer
+  schema:
+    name: DimCustomer
+    columns:
+    - name: SK_CustomerID
+      type: BIGINT
+      primary_key: true
+    - name: CustomerID
+      type: BIGINT
+    - name: TaxID
+      type: VARCHAR(20)
+    - name: Status
+      type: VARCHAR(10)
+    - name: LastName
+      type: VARCHAR(30)
+    - name: FirstName
+      type: VARCHAR(30)
+    - name: MiddleInitial
+      type: VARCHAR(1)
+    - name: Gender
+      type: VARCHAR(1)
+    - name: Tier
+      type: TINYINT
+    - name: DOB
+      type: DATE
+    - name: AddressLine1
+      type: VARCHAR(80)
+    - name: AddressLine2
+      type: VARCHAR(80)
+    - name: PostalCode
+      type: VARCHAR(12)
+    - name: City
+      type: VARCHAR(25)
+    - name: StateProv
+      type: VARCHAR(20)
+    - name: Country
+      type: VARCHAR(24)
+    - name: Phone1
+      type: VARCHAR(30)
+    - name: Phone2
+      type: VARCHAR(30)
+    - name: Phone3
+      type: VARCHAR(30)
+    - name: Email1
+      type: VARCHAR(50)
+    - name: Email2
+      type: VARCHAR(50)
+    - name: NationalTaxRateDesc
+      type: VARCHAR(50)
+    - name: NationalTaxRate
+      type: DECIMAL(6,5)
+    - name: LocalTaxRateDesc
+      type: VARCHAR(50)
+    - name: LocalTaxRate
+      type: DECIMAL(6,5)
+    - name: AgencyID
+      type: VARCHAR(30)
+    - name: CreditRating
+      type: BIGINT
+    - name: NetWorth
+      type: BIGINT
+    - name: MarketingNameplate
+      type: VARCHAR(100)
+    - name: IsCurrent
+      type: BOOLEAN
+    - name: BatchID
+      type: BIGINT
+    - name: EffectiveDate
+      type: DATE
+    - name: EndDate
+      type: DATE
+- id: DIMACCOUNT
+  key: DimAccount
+  schema:
+    name: DimAccount
+    columns:
+    - name: SK_AccountID
+      type: BIGINT
+      primary_key: true
+    - name: AccountID
+      type: BIGINT
+    - name: SK_BrokerID
+      type: BIGINT
+    - name: SK_CustomerID
+      type: BIGINT
+    - name: Status
+      type: VARCHAR(10)
+    - name: AccountDesc
+      type: VARCHAR(50)
+    - name: TaxStatus
+      type: TINYINT
+    - name: IsCurrent
+      type: BOOLEAN
+    - name: BatchID
+      type: BIGINT
+    - name: EffectiveDate
+      type: DATE
+    - name: EndDate
+      type: DATE
+- id: DIMSECURITY
+  key: DimSecurity
+  schema:
+    name: DimSecurity
+    columns:
+    - name: SK_SecurityID
+      type: BIGINT
+      primary_key: true
+    - name: Symbol
+      type: VARCHAR(15)
+    - name: Issue
+      type: VARCHAR(6)
+    - name: Status
+      type: VARCHAR(10)
+    - name: Name
+      type: VARCHAR(70)
+    - name: ExchangeID
+      type: VARCHAR(6)
+    - name: SK_CompanyID
+      type: BIGINT
+    - name: SharesOutstanding
+      type: BIGINT
+    - name: FirstTrade
+      type: DATE
+    - name: FirstTradeOnExchange
+      type: DATE
+    - name: Dividend
+      type: DECIMAL(10,2)
+    - name: IsCurrent
+      type: BOOLEAN
+    - name: BatchID
+      type: BIGINT
+    - name: EffectiveDate
+      type: DATE
+    - name: EndDate
+      type: DATE
+- id: DIMCOMPANY
+  key: DimCompany
+  schema:
+    name: DimCompany
+    columns:
+    - name: SK_CompanyID
+      type: BIGINT
+      primary_key: true
+    - name: CompanyID
+      type: BIGINT
+    - name: Status
+      type: VARCHAR(10)
+    - name: Name
+      type: VARCHAR(60)
+    - name: Industry
+      type: VARCHAR(50)
+    - name: SPrating
+      type: VARCHAR(4)
+    - name: isLowGrade
+      type: BOOLEAN
+    - name: MarketCap
+      type: DECIMAL(15,2)
+    - name: CEO
+      type: VARCHAR(100)
+    - name: AddressLine1
+      type: VARCHAR(80)
+    - name: AddressLine2
+      type: VARCHAR(80)
+    - name: PostalCode
+      type: VARCHAR(12)
+    - name: City
+      type: VARCHAR(25)
+    - name: StateProv
+      type: VARCHAR(20)
+    - name: Country
+      type: VARCHAR(24)
+    - name: Description
+      type: VARCHAR(150)
+    - name: FoundingDate
+      type: DATE
+    - name: IsCurrent
+      type: BOOLEAN
+    - name: BatchID
+      type: BIGINT
+    - name: EffectiveDate
+      type: DATE
+    - name: EndDate
+      type: DATE
+- id: FACTTRADE
+  key: FactTrade
+  schema:
+    name: FactTrade
+    columns:
+    - name: TradeID
+      type: BIGINT
+      primary_key: true
+    - name: SK_BrokerID
+      type: BIGINT
+    - name: SK_CreateDateID
+      type: BIGINT
+    - name: SK_CreateTimeID
+      type: BIGINT
+    - name: SK_CloseDateID
+      type: BIGINT
+    - name: SK_CloseTimeID
+      type: BIGINT
+    - name: Status
+      type: VARCHAR(10)
+    - name: Type
+      type: VARCHAR(12)
+    - name: CashFlag
+      type: BOOLEAN
+    - name: SK_SecurityID
+      type: BIGINT
+    - name: SK_CompanyID
+      type: BIGINT
+    - name: Quantity
+      type: BIGINT
+    - name: BidPrice
+      type: DECIMAL(8,2)
+    - name: SK_CustomerID
+      type: BIGINT
+    - name: SK_AccountID
+      type: BIGINT
+    - name: ExecutedBy
+      type: VARCHAR(64)
+    - name: TradePrice
+      type: DECIMAL(8,2)
+    - name: Fee
+      type: DECIMAL(10,2)
+    - name: Commission
+      type: DECIMAL(10,2)
+    - name: Tax
+      type: DECIMAL(10,2)
+    - name: BatchID
+      type: BIGINT
+- id: DIMDATE
+  key: DimDate
+  schema:
+    name: DimDate
+    columns:
+    - name: SK_DateID
+      type: BIGINT
+      primary_key: true
+    - name: DateValue
+      type: DATE
+    - name: DateDesc
+      type: VARCHAR(20)
+    - name: CalendarYearID
+      type: BIGINT
+    - name: CalendarYearDesc
+      type: VARCHAR(20)
+    - name: CalendarQtrID
+      type: BIGINT
+    - name: CalendarQtrDesc
+      type: VARCHAR(20)
+    - name: CalendarMonthID
+      type: BIGINT
+    - name: CalendarMonthDesc
+      type: VARCHAR(20)
+    - name: CalendarWeekID
+      type: BIGINT
+    - name: CalendarWeekDesc
+      type: VARCHAR(20)
+    - name: DayOfWeekNum
+      type: BIGINT
+    - name: DayOfWeekDesc
+      type: VARCHAR(10)
+    - name: FiscalYearID
+      type: BIGINT
+    - name: FiscalYearDesc
+      type: VARCHAR(20)
+    - name: FiscalQtrID
+      type: BIGINT
+    - name: FiscalQtrDesc
+      type: VARCHAR(20)
+    - name: HolidayFlag
+      type: BOOLEAN
+- id: DIMTIME
+  key: DimTime
+  schema:
+    name: DimTime
+    columns:
+    - name: SK_TimeID
+      type: BIGINT
+      primary_key: true
+    - name: TimeValue
+      type: TIME
+    - name: HourID
+      type: BIGINT
+    - name: HourDesc
+      type: VARCHAR(20)
+    - name: MinuteID
+      type: BIGINT
+    - name: MinuteDesc
+      type: VARCHAR(20)
+    - name: SecondID
+      type: BIGINT
+    - name: SecondDesc
+      type: VARCHAR(20)
+    - name: MarketHoursFlag
+      type: BOOLEAN
+    - name: OfficeHoursFlag
+      type: BOOLEAN
+core_table_order:
+- DimDate
+- DimTime
+- DimCompany
+- DimSecurity
+- DimCustomer
+- DimAccount
+- FactTrade

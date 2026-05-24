@@ -16,6 +16,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Union
 
+import yaml
+
 from benchbox.base import BaseBenchmark
 from benchbox.core.ai_primitives.cost import (
     CostEstimate,
@@ -29,22 +31,18 @@ from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
 logger = logging.getLogger(__name__)
 
 
+def _load_specs() -> dict[str, Any]:
+    with (Path(__file__).with_name("specs.yaml")).open(encoding="utf-8") as handle:
+        return yaml.safe_load(handle) or {}
+
+
+_SPECS = _load_specs()
+
 # Platforms that support AI functions
-SUPPORTED_PLATFORMS = {"snowflake", "bigquery", "databricks"}
+SUPPORTED_PLATFORMS = set(_SPECS["supported_platforms"])
 
 # Platforms where AI queries should be skipped
-UNSUPPORTED_PLATFORMS = {
-    "duckdb",
-    "clickhouse",
-    "sqlite",
-    "postgresql",
-    "datafusion",
-    "trino",
-    "presto",
-    "redshift",
-    "synapse",
-    "fabric",
-}
+UNSUPPORTED_PLATFORMS = set(_SPECS["unsupported_platforms"])
 
 
 @dataclass

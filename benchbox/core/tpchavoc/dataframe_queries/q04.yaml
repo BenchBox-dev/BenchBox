@@ -1,0 +1,41 @@
+variants:
+- id: 1
+  expression_impl: q4_v1_expression_impl
+  pandas_impl: q4_v1_pandas_impl
+  description: 'Baseline: direct delegation to TPC-H Q4 implementation'
+- id: 2
+  expression_impl: q4_v2_expression_impl
+  pandas_impl: q4_v2_pandas_impl
+  description: 'Pre-filter: pre-filter orders and lineitem before semi-join'
+- id: 3
+  expression_impl: q4_v3_expression_impl
+  pandas_impl: q4_v3_pandas_impl
+  description: 'Column prune: select only needed columns before semi-join'
+- id: 4
+  expression_impl: q4_v4_expression_impl
+  pandas_impl: q4_v4_pandas_impl
+  description: 'Intermediate vars: named DataFrames for each step'
+- id: 5
+  expression_impl: q4_v5_expression_impl
+  pandas_impl: q4_v5_pandas_impl
+  description: 'Pre-compute derived: compute late flag column before filtering'
+- id: 6
+  expression_impl: q4_v6_expression_impl
+  pandas_impl: q4_v6_pandas_impl
+  description: 'Chained style: maximum method chaining'
+- id: 7
+  expression_impl: q4_v7_expression_impl
+  pandas_impl: q4_v7_pandas_impl
+  description: 'Join reorder: use inner join + unique instead of semi-join'
+- id: 8
+  expression_impl: q4_v8_expression_impl
+  pandas_impl: q4_v8_pandas_impl
+  description: 'Filter combination: combine date range into single predicate variable'
+- id: 9
+  expression_impl: q4_v9_expression_impl
+  pandas_impl: q4_v9_pandas_impl
+  description: 'Explicit sort: descending=False explicitly specified'
+- id: 10
+  expression_impl: q4_v10_expression_impl
+  pandas_impl: q4_v10_pandas_impl
+  description: 'Alternative formula: use size() instead of count() aggregation'
