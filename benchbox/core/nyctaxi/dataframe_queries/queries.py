@@ -6,7 +6,6 @@ from csv import reader
 from typing import Any
 
 import numpy as np
-import pandas as pd
 
 from benchbox.core.dataframe.context import DataFrameContext
 from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory
@@ -489,6 +488,8 @@ def q23_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q23_pandas_impl(ctx: DataFrameContext) -> Any:
+    import pandas as pd
+
     trips = _pandas_window(ctx, "Q23", "2019-06-15", "2019-06-16")
     return pd.DataFrame(
         {
@@ -542,6 +543,8 @@ def q25_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q25_pandas_impl(ctx: DataFrameContext) -> Any:
+    import pandas as pd
+
     return pd.DataFrame({"total_trips": [len(ctx.get_table("trips"))]})
 
 
