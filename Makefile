@@ -971,8 +971,10 @@ pr-status:
 		--template '{{range .}}#{{.number}} {{.title}} ({{.headRefName}}){{"\n"}}  auto-merge: {{if .autoMergeRequest}}ON{{else}}OFF{{end}}{{"\n"}}  checks: {{range .statusCheckRollup}}{{.name}}={{.conclusion}} {{end}}{{"\n\n"}}{{end}}'
 
 # Discover candidate bot/agent review comments on merged PRs without making changes.
-# Default --author filter is the chatgpt-codex-connector bot; override with --author
-# (or by editing DEFAULT_REVIEW_AUTHORS in the script) to add other reviewers.
+# Also reports merged PRs whose Codex review hit usage limits and still need a
+# fresh @codex review trigger. Default --author filter is the
+# chatgpt-codex-connector bot; override with --author (or by editing
+# DEFAULT_REVIEW_AUTHORS in the script) to add other reviewers.
 pr-review-followups-list:
 	@uv run --project _project/scripts -- python _project/scripts/pr_review_followups.py list \
 		--base "$(PR_REVIEW_BASE)" \
@@ -1000,6 +1002,11 @@ pr-review-followups-list:
 #                                    the default, so the reply is posted.
 #   PR_REVIEW_SUBMIT=0               skip final pr-open. Same accepted values
 #                                    as PR_REVIEW_REPLY above.
+#   PR_REVIEW_USAGE_LIMIT_RETRY=0    skip the top-level Codex usage-limit
+#                                    retry step. By default, the routine posts
+#                                    @codex review on merged PRs with no later
+#                                    trigger and keeps later-triggered PRs
+#                                    visible until a review result appears.
 #   PR_REVIEW_RESUME=1               re-drive the routine on a branch that
 #                                    already carries per-comment commits from
 #                                    a prior crashed sweep. Implies

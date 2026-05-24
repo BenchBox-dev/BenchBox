@@ -51,6 +51,27 @@ historical DONE verification commands when they are still executable
 documentation, and skips future reprocessing only after it has posted a reply
 containing the `benchbox-pr-review-followup-actioned` marker.
 
+The routine also checks top-level PR timeline comments for Codex code-review
+usage-limit failures. Those comments are not inline findings, so there is no
+code change to action. Instead, `make pr-review-followups-list` reports merged
+PRs whose latest usage-limit failure has no later `@codex review` trigger or
+Codex review result, and `make pr-review-followups` posts the fresh
+`@codex review` trigger for each PR that does not already have one. PRs with
+a later trigger but no later Codex review result remain visible as
+`awaiting-review-result`; they are not considered actually reviewed until the
+bot posts a later Codex review result. Set `PR_REVIEW_USAGE_LIMIT_RETRY=0`
+only when deliberately auditing inline review threads without re-requesting
+missed Codex reviews.
+
+Coverage boundary: this sweep operates over merged PRs returned by
+`gh pr list --state merged --base <PR_REVIEW_BASE>` inside the selected
+`PR_REVIEW_SINCE` / `PR_REVIEW_UNTIL` window. It is not the policy source for
+which PRs Codex reviews. Codex review triggering is controlled by the GitHub
+integration: PRs opened for review, drafts marked ready, and explicit
+`@codex review` comments request review. Draft-only PRs, PRs outside the
+configured base/window, and quota failures can therefore be absent from the
+inline finding queue until they are made ready or explicitly retried.
+
 If the routine crashes mid-sweep (transient `gh api` failures and pre-commit
 hook auto-fixes will normally retry; anything else exits with a non-zero
 status), re-drive it on the same worktree with `PR_REVIEW_RESUME=1`:
