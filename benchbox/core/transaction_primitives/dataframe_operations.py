@@ -729,6 +729,10 @@ class DataFrameTransactionOperationsManager:
 
         return pa.Table.from_pandas(dataframe.toPandas() if hasattr(dataframe, "toPandas") else dataframe)
 
+    @staticmethod
+    def _write_row_count(dataframe: Any) -> int:
+        return dataframe.count() if hasattr(dataframe, "count") else len(dataframe)
+
     def _read_delta_snapshot(
         self, table_path: str, *, version: int | None = None, timestamp: str | None = None
     ) -> tuple[int, list[str]]:
@@ -747,13 +751,15 @@ class DataFrameTransactionOperationsManager:
         arrow_table = DeltaTable(table_path, **kwargs).to_pyarrow_table()
         return arrow_table.num_rows, arrow_table.schema.names
 
-    def _write_transaction_dataframe(self, table_path: str, dataframe: Any, mode: str = "append") -> int:
+    def _write_transaction_dataframe(
+        self, table_path: str, dataframe: Any, mode: str = "append", *, count_rows: bool = False
+    ) -> int | None:
         if self._capabilities.table_format == "delta" and self.spark_session:
-            rows_written = dataframe.count() if hasattr(dataframe, "count") else len(dataframe)
+            rows_written = self._write_row_count(dataframe) if count_rows else None
             dataframe.write.format("delta").mode(mode).save(table_path)
             return rows_written
         if self._capabilities.table_format == "iceberg" and self.spark_session:
-            rows_written = dataframe.count() if hasattr(dataframe, "count") else len(dataframe)
+            rows_written = self._write_row_count(dataframe) if count_rows else None
             writer = dataframe.writeTo(table_path)
             writer.overwritePartitions() if mode == "overwrite" else writer.append()
             return rows_written
@@ -762,7 +768,7 @@ class DataFrameTransactionOperationsManager:
 
         arrow_table = self._arrow_table_from_dataframe(dataframe)
         write_deltalake(table_path, arrow_table, mode=mode)
-        return arrow_table.num_rows
+        return arrow_table.num_rows if count_rows else None
 
     def _read_transaction_table_count(self, table_path: str) -> int:
         if self._capabilities.table_format in {"delta", "iceberg"} and self.spark_session:
@@ -1183,7 +1189,9 @@ class DataFrameTransactionOperationsManager:
 
         try:
             version_before = self.get_table_version(table_path_str)
-            rows_written = self._write_transaction_dataframe(table_path_str, dataframe)
+            rows_written = self._write_transaction_dataframe(table_path_str, dataframe, count_rows=True)
+            if rows_written is None:
+                raise RuntimeError("Unable to determine rows written for read-your-writes validation")
 
             # Read back immediately
             version_after = self.get_table_version(table_path_str)
