@@ -37,12 +37,16 @@ from benchbox.core.joinorder_synthetic.queries import JoinOrderQueryManager
 
 _QUERY_MANAGER = JoinOrderQueryManager()
 _PARENTHESIZED_LIKE_PATTERN = re.compile(r"(NOT\s+LIKE|LIKE)\s+'%\(([^%()]+)\)%'", re.IGNORECASE)
+_Q6A_ACTOR_NAME_PATTERN = re.compile(r"n\.name\s+LIKE\s+'%Downey%Robert%'", re.IGNORECASE)
 
 
 def _query_sql(query_id: str) -> str:
-    return _PARENTHESIZED_LIKE_PATTERN.sub(
+    sql = _PARENTHESIZED_LIKE_PATTERN.sub(
         lambda match: f"{match.group(1)} '%{match.group(2)}%'", _QUERY_MANAGER.get_query(query_id)
     )
+    if query_id == "6a":
+        sql = _Q6A_ACTOR_NAME_PATTERN.sub("n.name LIKE '%Downey%' AND n.name LIKE '%Robert%'", sql)
+    return sql
 
 
 def _join_predicates(tree: exp.Select) -> tuple[list[tuple[str, str]], list[exp.Expression], list[exp.Expression]]:
