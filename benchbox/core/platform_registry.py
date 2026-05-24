@@ -111,6 +111,13 @@ _NATIVE_IMPORT_ERROR_MARKERS = (
 )
 
 
+def _is_internal_module_miss(missing_name: str, module_path: str | None = None) -> bool:
+    """Return whether a ModuleNotFoundError names BenchBox code, not an SDK dependency."""
+    if module_path is not None and (missing_name == module_path or missing_name.startswith(f"{module_path}.")):
+        return True
+    return missing_name == "benchbox" or missing_name.startswith("benchbox.")
+
+
 _PLATFORM_METADATA_JSON = """{
 "duckdb": {"display_name": "DuckDB", "description": "Columnar OLAP engine • Single-node • In-memory", "category": "analytical", "libraries": [{"name": "duckdb", "required": true}], "requirements": ["duckdb>=0.8.0"], "installation_command": "uv add duckdb", "adoption": "mainstream", "supports": ["olap", "in_memory", "columnar"], "driver_package": "duckdb", "capabilities": {"supports_sql": true, "supports_dataframe": false, "default_mode": "sql", "platform_family": "duckdb", "default_deployment": "local", "deployment_modes": {"local": {"mode": "local", "display_name": "DuckDB Local", "description": "Embedded in-process DuckDB", "requires_credentials": false, "requires_cloud_storage": false, "requires_network": false, "default_for_platform": true, "dependencies": ["duckdb"], "auth_methods": []}}}, "support_status": "stable"},
 "datafusion": {"display_name": "DataFusion", "description": "Arrow-based SQL • Single-node • In-memory", "category": "analytical", "libraries": [{"name": "datafusion", "required": true}], "requirements": ["datafusion>=34.0.0"], "installation_command": "uv add datafusion", "adoption": "emerging", "supports": ["olap", "in_memory", "columnar", "arrow", "dataframe"], "driver_package": "datafusion", "capabilities": {"supports_sql": true, "supports_dataframe": true, "default_mode": "sql"}, "support_status": "stable"},
@@ -838,10 +845,20 @@ class PlatformRegistry:
         }
 
     @classmethod
-    def classify_optional_import_error(cls, exc: BaseException) -> OptionalAdapterImportStatus:
+    def classify_optional_import_error(
+        cls,
+        exc: BaseException,
+        *,
+        module_path: str | None = None,
+    ) -> OptionalAdapterImportStatus:
         """Classify an optional adapter import failure without raising it."""
         message = str(exc).lower()
-        if isinstance(exc, ModuleNotFoundError) or "no module named" in message:
+        if isinstance(exc, ModuleNotFoundError):
+            missing_name = exc.name or ""
+            if _is_internal_module_miss(missing_name, module_path):
+                return "broken_adapter_import"
+            return "missing_optional_dependency"
+        if "no module named" in message:
             return "missing_optional_dependency"
         if isinstance(exc, OSError) or any(marker in message for marker in _NATIVE_IMPORT_ERROR_MARKERS):
             return "native_library_load_failure"
@@ -1310,7 +1327,7 @@ def _diagnose_optional_adapter_entry(
             platform_name=name,
             module_path=module_path,
             class_name=class_name,
-            status=PlatformRegistry.classify_optional_import_error(exc),
+            status=PlatformRegistry.classify_optional_import_error(exc, module_path=module_path),
             support_status=support_status,
             error_type=type(exc).__name__,
             error_message=str(exc),
@@ -1360,7 +1377,7 @@ def _try_register_adapter(name: str, module_path: str, class_name: str) -> None:
             platform_name=name,
             module_path=module_path,
             class_name=class_name,
-            status=PlatformRegistry.classify_optional_import_error(exc),
+            status=PlatformRegistry.classify_optional_import_error(exc, module_path=module_path),
             support_status=support_status,
             error_type=type(exc).__name__,
             error_message=str(exc),

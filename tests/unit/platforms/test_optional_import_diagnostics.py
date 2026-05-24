@@ -21,7 +21,10 @@ def setup_function() -> None:
 
 def test_lazy_adapter_diagnostics_missing_dependency(monkeypatch):
     def fake_import_module(module_path: str, package: str):
-        raise ModuleNotFoundError("No module named 'snowflake.connector'")
+        raise ModuleNotFoundError(
+            "No module named 'snowflake.connector'",
+            name="snowflake.connector",
+        )
 
     monkeypatch.setattr(platform_module.importlib, "import_module", fake_import_module)
 
@@ -29,6 +32,22 @@ def test_lazy_adapter_diagnostics_missing_dependency(monkeypatch):
 
     diagnostics = platform_module.get_lazy_adapter_diagnostics()
     assert diagnostics["SnowflakeAdapter"]["status"] == "missing_optional_dependency"
+    assert diagnostics["SnowflakeAdapter"]["error_type"] == "ModuleNotFoundError"
+
+
+def test_lazy_adapter_diagnostics_missing_adapter_module_is_broken(monkeypatch):
+    def fake_import_module(module_path: str, package: str):
+        raise ModuleNotFoundError(
+            "No module named 'benchbox.platforms.snowflake'",
+            name="benchbox.platforms.snowflake",
+        )
+
+    monkeypatch.setattr(platform_module.importlib, "import_module", fake_import_module)
+
+    assert platform_module._load_lazy_adapter("SnowflakeAdapter") is None
+
+    diagnostics = platform_module.get_lazy_adapter_diagnostics()
+    assert diagnostics["SnowflakeAdapter"]["status"] == "broken_adapter_import"
     assert diagnostics["SnowflakeAdapter"]["error_type"] == "ModuleNotFoundError"
 
 
