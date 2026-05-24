@@ -1,0 +1,119 @@
+id: shrink-followup-generated-impl-findability
+title: "Give globals()-generated dataframe query impls static findability and ty visibility"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Technical Debt
+
+description: |
+  The dataframe-query shrink (notably PR #603) replaced families of
+  near-identical query functions with generators that inject impls into the
+  module namespace:
+
+    benchbox/core/read_primitives/dataframe_queries.py:307,393,456,578  (writes)
+    benchbox/core/read_primitives/dataframe_queries.py:1385,4329         (dynamic dispatch reads)
+    benchbox/core/joinorder/dataframe_queries.py:446-447                  (same pattern)
+
+  This is the correct mechanism for collapsing repeated implementation
+  families (it is exactly what the goal endorses) and the generated impls set
+  real __name__/__doc__, so stack traces are fine. The legitimate residual
+  cost: the impls are not grep-able as `def <name>`, and the dispatch sites
+  (`globals()[f"{impl_base}_{family}_impl"]`) are Any-typed and invisible to
+  `ty`. The fix must restore findability/typing WITHOUT reverting to explicit
+  per-query defs (which would re-inflate the surface the factory removed).
+
+work:
+  - id: w1
+    summary: "Assess ty coverage of the dispatch sites and enumerate the generated-name families"
+    status: pending
+    notes: |
+      Confirm the dispatch returns Any (run `make typecheck` and inspect the
+      reveal at the dispatch lines). List every generated-name family and the
+      factory that produces it, in both read_primitives and joinorder.
+
+  - id: w2
+    summary: "Decide: explicit typed registry, vs globals()+Protocol+generated-name index"
+    needs: [w1]
+    status: pending
+    notes: |
+      GATING. Options:
+      (a) Populate an explicit `dict[str, QueryImpl]` registry (typed via a
+          Protocol) instead of injecting into globals(); dispatch reads the
+          dict and is fully typed.
+      (b) Keep globals() injection but add: a typed Protocol for the impl
+          signature, a generated-name index (module docstring or a tuple of
+          produced names), and a typed accessor wrapping the globals() read.
+      Prefer (a) if it does not complicate the call sites.
+
+  - id: w3
+    summary: "Implement the chosen path; ty sees typed dispatch, names discoverable"
+    needs: [w2]
+    status: pending
+
+open_questions:
+  - question: "Can a typed registry replace globals() injection without re-introducing per-query boilerplate?"
+    gating: true
+    affects: ["w2 success_metric: registry vs globals+Protocol"]
+    default: "Prefer an explicit typed registry dict; fall back to globals()+Protocol+index only if the registry materially complicates the dispatch call sites."
+
+must_preserve:
+  - "Generated impls keep explicit __name__/__doc__"
+  - "All dataframe query tests pass (read_primitives and joinorder)"
+  - "No re-inflation: line count does not return toward the pre-factory baseline"
+
+approach: |
+  Reuse the existing QueryRegistry abstraction (joinorder already constructs
+  one) rather than inventing a new container. The Protocol for the impl
+  signature is the typing anchor that makes the dispatch ty-visible. Start in
+  read_primitives (the densest globals() user), then apply the same shape to
+  joinorder.
+
+anti_patterns:
+  - "DO NOT revert to one explicit `def` per query -- because that undoes the shrink the factory achieved -- use a typed registry/Protocol instead"
+  - "DO NOT silence the dispatch with `# type: ignore` -- because that hides the problem rather than fixing findability -- make the dispatch actually typed"
+
+verification:
+  - description: "Type check is clean and the dispatch is no longer Any"
+    command: "make typecheck"
+    expected_output: "0 errors; dispatch site resolves to the Protocol type"
+  - description: "Generated impl names are statically discoverable"
+    command: "grep -rnE 'QueryImpl|registry\\[|GENERATED_IMPL_NAMES|Protocol' benchbox/core/read_primitives/dataframe_queries.py"
+    expected_output: "typed registry/index present"
+  - description: "Dataframe query tests pass"
+    command: "uv run -- python -m pytest tests/unit/core/read_primitives/ tests/unit/core/joinorder/ -q"
+    expected_output: "all pass"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/read_primitives/dataframe_queries.py"
+    - "benchbox/core/joinorder/dataframe_queries.py"
+    - "tests/"
+
+prior_art:
+  - "benchbox/core/joinorder/dataframe_queries.py:QueryRegistry — reuse this container for an explicit typed registry"
+  - "benchbox/core/joinorder/dataframe_queries.py:427-447 — the factory already sets __name__/__doc__; extend with Protocol typing"
+
+metadata:
+  tags:
+    - shrink
+    - typing
+    - findability
+    - dataframe-queries
+  estimated_effort: "Medium"
+  created_date: "2026-05-23"
+  last_updated: "2026-05-23T12:00:00"
+
+impact:
+  technical_debt: |
+    Restores IDE/grep navigation and static type coverage over the generated
+    query families without sacrificing the line reduction the factory bought.
+
+success_metrics:
+  - "Dispatch sites are statically typed (no Any) and ty-clean"
+  - "Generated impl names discoverable via a typed registry or explicit index"
+  - "Line count does not regress toward the pre-factory baseline"
+
+files_affected:
+  modified:
+    - "benchbox/core/read_primitives/dataframe_queries.py"
+    - "benchbox/core/joinorder/dataframe_queries.py"
