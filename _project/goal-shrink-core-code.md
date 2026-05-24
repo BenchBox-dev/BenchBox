@@ -48,7 +48,7 @@ Unresolved TODOs, ADRs, and user decisions default to the conservative path. Aut
 
 ## Ledger and Credit
 
-Use one tracked ledger fragment per PR: `_project/shrink-ledger/<branch-slug>.md`; start from `_project/shrink-ledger/TEMPLATE.md`.
+Use one tracked ledger fragment per PR: `_project/shrink-ledger/<branch-slug>.md`; start from `_project/shrink-ledger/TEMPLATE.md`. `_project/*` is ignored by default, so stage new fragments explicitly by path with `git add -f`.
 
 Each fragment uses YAML frontmatter plus markdown body and doubles as the PR body:
 
