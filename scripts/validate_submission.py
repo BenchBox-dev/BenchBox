@@ -313,7 +313,7 @@ def _validate_translation_section(data: dict, vr: ValidationResult) -> None:
         vr.error("execution.translation must be an object when present")
         return
 
-    translation_status = _normalize_status(translation)
+    translation_status = _normalize_status(translation.get("status"))
     if translation_status is None:
         vr.error("execution.translation.status is required when execution.translation is present")
     elif translation_status in PUBLIC_NON_CLEAN_TRANSLATION_STATUSES:
