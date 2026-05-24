@@ -16,6 +16,7 @@ from typing import Any
 
 
 def _value(value: str) -> Any:
+    """Coerce plain decimal strings to integers for compact parameters."""
     return int(value) if value.isdecimal() else value
 
 
