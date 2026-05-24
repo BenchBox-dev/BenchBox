@@ -5,6 +5,9 @@ Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
+import importlib
+import sys
+
 import pytest
 
 from benchbox.core.dataframe.query import QueryCategory
@@ -16,6 +19,19 @@ pytestmark = [
 
 
 ALL_QUERY_IDS = [f"Q{i}" for i in range(1, 26)]
+
+
+def test_registry_import_does_not_require_pandas(monkeypatch):
+    """Expression-family installs can list NYC Taxi DataFrame queries without pandas."""
+    module_prefix = "benchbox.core.nyctaxi.dataframe_queries"
+    for name in tuple(sys.modules):
+        if name == module_prefix or name.startswith(f"{module_prefix}."):
+            monkeypatch.delitem(sys.modules, name, raising=False)
+    monkeypatch.setitem(sys.modules, "pandas", None)
+
+    module = importlib.import_module(module_prefix)
+
+    assert len(module.NYCTAXI_DATAFRAME_QUERIES) == 25
 
 
 class TestNYCTaxiQueryRegistry:

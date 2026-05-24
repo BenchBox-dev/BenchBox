@@ -21,7 +21,7 @@ class RenderedChart:
 
 @dataclass(frozen=True)
 class SkippedChart:
-    """One chart skipped because it was not applicable to the input data."""
+    """One chart skipped or failed during a chart set render."""
 
     chart_type: str
     reason: str
@@ -124,7 +124,18 @@ def render_chart_set(
             )
             continue
 
-        content = render_ascii_chart_from_results(results, chart_type, options=opts, subtitle=subtitle)
+        try:
+            content = render_ascii_chart_from_results(results, chart_type, options=opts, subtitle=subtitle)
+        except Exception as exc:
+            skipped.append(
+                SkippedChart(
+                    chart_type=chart_type,
+                    reason="renderer failed",
+                    details={"exception_type": type(exc).__name__, "message": str(exc)},
+                )
+            )
+            continue
+
         if content:
             rendered.append(RenderedChart(chart_type=chart_type, content=content))
         else:

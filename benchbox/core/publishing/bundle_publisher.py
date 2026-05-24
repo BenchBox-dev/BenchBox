@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from benchbox.core.results.loader import load_result_file
-from benchbox.core.results.status import result_non_clean_reason
+from benchbox.core.results.status import bundle_non_clean_reason, result_non_clean_reason
 from benchbox.validation.bundle import COMPANION_SUFFIXES
 
 from .store import PublicationRecord, PublicationStore, build_reference
@@ -182,11 +182,11 @@ class _BundleMetadata:
 def _validate_source_bundle_for_publication(bundle_path: Path) -> list[str]:
     """Return publication-blocking errors for source bundles that are not clean passes."""
     try:
-        result, _data = load_result_file(bundle_path)
+        result, data = load_result_file(bundle_path)
     except Exception as exc:
         return [f"Source bundle is not a loadable schema-v2 result bundle: {exc}"]
 
-    reason = result_non_clean_reason(result)
+    reason = bundle_non_clean_reason(data) or result_non_clean_reason(result)
     if reason:
         return [f"Source bundle is not a clean pass: {reason}"]
     return []

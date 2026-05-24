@@ -103,11 +103,39 @@ def test_publication_rejects_non_clean_validation_status(tmp_path: Path, validat
     assert not (tmp_path / "published" / source.name).exists()
 
 
+def test_publication_rejects_missing_validation_status(tmp_path: Path) -> None:
+    source = tmp_path / "tpch_sf1_duckdb_sql_test.json"
+    _write_bundle(source, "tpch")
+    payload = json.loads(source.read_text(encoding="utf-8"))
+    del payload["summary"]["validation"]
+    source.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = BundlePublisher(destination=tmp_path / "published").publish(source)
+
+    assert result.success is False
+    assert result.errors == ["Source bundle is not a clean pass: validation_status=not_run"]
+    assert not (tmp_path / "published" / source.name).exists()
+
+
 def test_publication_rejects_translation_fallback_even_when_validation_passed(tmp_path: Path) -> None:
     source = tmp_path / "tpch_sf1_duckdb_sql_test.json"
     _write_bundle(source, "tpch")
     payload = json.loads(source.read_text(encoding="utf-8"))
     payload["execution"]["translation"] = {"status": "fallback", "strict_mode": False}
+    source.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = BundlePublisher(destination=tmp_path / "published").publish(source)
+
+    assert result.success is False
+    assert result.errors == ["Source bundle is not a clean pass: translation_status=fallback"]
+    assert not (tmp_path / "published" / source.name).exists()
+
+
+def test_publication_rejects_raw_scalar_translation_fallback(tmp_path: Path) -> None:
+    source = tmp_path / "tpch_sf1_duckdb_sql_test.json"
+    _write_bundle(source, "tpch")
+    payload = json.loads(source.read_text(encoding="utf-8"))
+    payload["execution"]["translation"] = "fallback"
     source.write_text(json.dumps(payload), encoding="utf-8")
 
     result = BundlePublisher(destination=tmp_path / "published").publish(source)

@@ -400,12 +400,27 @@ class TestPlatformRegistry:
 
     @patch("benchbox.core.platform_registry.importlib.import_module")
     def test_optional_adapter_diagnostics_missing_dependency(self, mock_import):
-        mock_import.side_effect = ModuleNotFoundError("No module named 'snowflake.connector'")
+        mock_import.side_effect = ModuleNotFoundError(
+            "No module named 'snowflake.connector'",
+            name="snowflake.connector",
+        )
 
         diagnostics = PlatformRegistry.diagnose_optional_adapter_imports(["snowflake"])
 
         assert diagnostics["snowflake"]["status"] == "missing_optional_dependency"
         assert diagnostics["snowflake"]["available"] is False
+        assert diagnostics["snowflake"]["error_type"] == "ModuleNotFoundError"
+
+    @patch("benchbox.core.platform_registry.importlib.import_module")
+    def test_optional_adapter_diagnostics_missing_adapter_module_is_broken(self, mock_import):
+        mock_import.side_effect = ModuleNotFoundError(
+            "No module named 'benchbox.platforms.snowflake'",
+            name="benchbox.platforms.snowflake",
+        )
+
+        diagnostics = PlatformRegistry.diagnose_optional_adapter_imports(["snowflake"])
+
+        assert diagnostics["snowflake"]["status"] == "broken_adapter_import"
         assert diagnostics["snowflake"]["error_type"] == "ModuleNotFoundError"
 
     @patch("benchbox.core.platform_registry.importlib.import_module")

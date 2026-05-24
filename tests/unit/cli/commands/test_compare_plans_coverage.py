@@ -206,6 +206,9 @@ def test_output_html_helpers() -> None:
     comparisons = [("q1", _Cmp(similarity=_Sim(0.92), summary="ok"))]
     html1 = cp._output_summary_html(_Summary())
     assert "Query Plan Comparison Report" in html1
+    assert "Performance Regressions" in html1
+    assert "15.00" in html1
+    assert "+50.0%" in html1
 
     results = SimpleNamespace(run_id="run")
     html2 = cp._output_html(comparisons, single_query=False, results1=results, results2=results)

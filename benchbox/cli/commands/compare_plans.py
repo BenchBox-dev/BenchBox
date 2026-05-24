@@ -280,6 +280,21 @@ def _output_summary_html(summary: PlanComparisonSummary) -> str:
             if diff.change_type != "unchanged"
         ],
     )
+    regressions = [corr for corr in summary.performance_correlations if corr.is_regression]
+    if regressions:
+        body += "<h2>Performance Regressions</h2>"
+        body += _html_table(
+            ["Query", "Baseline (ms)", "Current (ms)", "Change"],
+            [
+                [
+                    reg.query_id,
+                    f"{reg.baseline_time_ms:.2f}",
+                    f"{reg.current_time_ms:.2f}",
+                    f"+{reg.perf_change_pct:.1f}%",
+                ]
+                for reg in regressions
+            ],
+        )
     return _html_document("Query Plan Comparison Report", body)
 
 

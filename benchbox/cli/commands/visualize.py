@@ -83,8 +83,11 @@ def _render_ascii_charts(
         print_ansi(chart.content)
         console.print()
 
-    if template_name:
-        for skipped in outcome.skipped:
+    for skipped in outcome.skipped:
+        if skipped.reason == "renderer failed":
+            message = skipped.details.get("message") or skipped.details.get("exception_type") or skipped.reason
+            console.print(f"[yellow]Warning: Could not render {skipped.chart_type}: {message}[/yellow]")
+        elif template_name:
             console.print(f"[yellow]Skipped {skipped.chart_type}: {skipped.reason}.[/yellow]")
 
 

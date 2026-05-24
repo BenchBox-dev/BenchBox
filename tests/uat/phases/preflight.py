@@ -99,7 +99,7 @@ def host_load_1m() -> float | None:
 
 def requested_platforms_from_config(config: UATConfig) -> tuple[str, ...]:
     """Resolve the platforms requested by a validated UAT config."""
-    platform_groups_default = ("sql",) if config.platforms.groups is None and not config.platforms.include else ()
+    platform_groups_default = ("sql",) if config.platforms.uses_implicit_group_default else ()
     return tuple(
         resolve_platforms(
             groups=config.platforms.groups if config.platforms.groups is not None else platform_groups_default,

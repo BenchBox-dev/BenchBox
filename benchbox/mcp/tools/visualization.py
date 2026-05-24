@@ -41,6 +41,31 @@ def _template_name_help() -> str:
     return ", ".join(t.name for t in list_templates())
 
 
+def _renderer_failure_error(
+    skipped: Any | None,
+    *,
+    chart_type: str | None = None,
+    template_name: str | None = None,
+) -> dict[str, Any] | None:
+    if skipped is None or skipped.reason != "renderer failed":
+        return None
+
+    message = skipped.details.get("message") or skipped.details.get("exception_type") or skipped.reason
+    details: dict[str, Any] = {"skip": skipped.as_dict()}
+    if chart_type is not None:
+        details["chart_type"] = chart_type
+    if template_name is not None:
+        details["template"] = template_name
+    if "exception_type" in skipped.details:
+        details["exception_type"] = skipped.details["exception_type"]
+
+    return make_error(
+        ErrorCode.INTERNAL_ERROR,
+        f"ASCII chart generation failed: {message}",
+        details=details,
+    )
+
+
 MCP_SUGGEST_CHARTS_DESCRIPTION = (
     "Analyze BenchBox result files and suggest result-aware semantic chart IDs. "
     f"{BENCHBOX_CHART_NAMESPACE_NOTE} "
@@ -117,6 +142,13 @@ def _generate_ascii_chart(
             separator = "\n" + "─" * 60 + "\n\n"
 
             if not outcome.rendered:
+                renderer_failure = next(
+                    (skipped for skipped in outcome.skipped if skipped.reason == "renderer failed"),
+                    None,
+                )
+                if error := _renderer_failure_error(renderer_failure, template_name=template_name):
+                    return error
+
                 return make_error(
                     ErrorCode.VALIDATION_ERROR,
                     "No charts were applicable for the provided template inputs",
@@ -143,7 +175,11 @@ def _generate_ascii_chart(
             }
 
         if not outcome.rendered:
-            skipped = outcome.skipped[0].as_dict() if outcome.skipped else {"chart_type": chart_type}
+            skipped_chart = outcome.skipped[0] if outcome.skipped else None
+            if error := _renderer_failure_error(skipped_chart, chart_type=chart_type):
+                return error
+
+            skipped = skipped_chart.as_dict() if skipped_chart is not None else {"chart_type": chart_type}
             return make_error(
                 ErrorCode.VALIDATION_ERROR,
                 f"Chart type '{chart_type}' is not applicable for the provided result data",

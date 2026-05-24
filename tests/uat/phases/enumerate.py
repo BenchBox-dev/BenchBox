@@ -71,8 +71,8 @@ def enumerate_cells_with_pruning(
     # Default groups apply only when neither `groups` nor `include` is set.
     # Otherwise an explicit `include` would otherwise be unioned with the
     # default group, producing too-large matrices.
-    platform_groups_default = ("sql",) if config.platforms.groups is None and not config.platforms.include else ()
-    benchmark_groups_default = ("all",) if config.benchmarks.groups is None and not config.benchmarks.include else ()
+    platform_groups_default = ("sql",) if config.platforms.uses_implicit_group_default else ()
+    benchmark_groups_default = ("all",) if config.benchmarks.uses_implicit_group_default else ()
     platform_list = resolve_platforms(
         groups=config.platforms.groups if config.platforms.groups is not None else platform_groups_default,
         include=config.platforms.include,

@@ -10,6 +10,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import ast
 import importlib
+import importlib.util
 from collections.abc import Iterable
 from typing import Optional, Type
 
@@ -122,6 +123,13 @@ _LAZY_CONSTANTS = {
 _clickhouse_module_cache = None
 
 
+def _resolve_lazy_module_path(module_path: str) -> str:
+    """Return the absolute module path used for import diagnostics."""
+    if module_path.startswith(".") and __package__ is not None:
+        return importlib.util.resolve_name(module_path, __package__)
+    return module_path
+
+
 def _load_lazy_adapter(name: str) -> Optional[Type[PlatformAdapter]]:
     """Load a lazily-imported adapter class.
 
@@ -137,6 +145,7 @@ def _load_lazy_adapter(name: str) -> Optional[Type[PlatformAdapter]]:
     module_path = _LAZY_ADAPTERS.get(name)
     if module_path is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    diagnostic_module_path = _resolve_lazy_module_path(module_path)
 
     try:
         module = importlib.import_module(module_path, __package__)
@@ -157,7 +166,7 @@ def _load_lazy_adapter(name: str) -> Optional[Type[PlatformAdapter]]:
         _lazy_adapter_diagnostics[name] = {
             "adapter": name,
             "module_path": module_path,
-            "status": PlatformRegistry.classify_optional_import_error(exc),
+            "status": PlatformRegistry.classify_optional_import_error(exc, module_path=diagnostic_module_path),
             "error_type": type(exc).__name__,
             "error_message": str(exc),
         }
@@ -240,9 +249,10 @@ def diagnose_optional_adapter_imports(platform_names: Optional[Iterable[str]] = 
 # Import local platform adapters (core/light dependencies).
 def _load_optional_adapter(module_path: str, class_name: str) -> Optional[Type[PlatformAdapter]]:
     try:
-        return getattr(importlib.import_module(module_path, __package__), class_name)
-    except (AttributeError, ImportError):
+        module = importlib.import_module(module_path, __package__)
+    except ImportError:
         return None
+    return getattr(module, class_name, None)
 
 
 DuckDBAdapter = _load_optional_adapter(".duckdb", "DuckDBAdapter")

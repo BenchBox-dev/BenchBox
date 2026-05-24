@@ -35,6 +35,35 @@ pytestmark = [
 ]
 
 
+class _SparkWriteBuilder:
+    def __init__(self) -> None:
+        self.format_name: str | None = None
+        self.mode_name: str | None = None
+        self.saved_path: str | None = None
+
+    def format(self, format_name: str) -> _SparkWriteBuilder:
+        self.format_name = format_name
+        return self
+
+    def mode(self, mode_name: str) -> _SparkWriteBuilder:
+        self.mode_name = mode_name
+        return self
+
+    def save(self, path: str) -> None:
+        self.saved_path = path
+
+
+class _SparkTransactionFrame:
+    def __init__(self, rows: int = 3) -> None:
+        self.rows = rows
+        self.count_calls = 0
+        self.write = _SparkWriteBuilder()
+
+    def count(self) -> int:
+        self.count_calls += 1
+        return self.rows
+
+
 class TestTransactionOperationType:
     """Tests for TransactionOperationType enum."""
 
@@ -579,6 +608,52 @@ class TestNewOperationTypes:
         assert DELTA_LAKE_TRANSACTION_CAPABILITIES.supports_operation(TransactionOperationType.CONFLICT_RESOLUTION)
         assert DELTA_LAKE_TRANSACTION_CAPABILITIES.supports_operation(TransactionOperationType.SNAPSHOT_ISOLATION)
         assert DELTA_LAKE_TRANSACTION_CAPABILITIES.supports_operation(TransactionOperationType.READ_YOUR_WRITES)
+
+
+class TestTransactionWriteCounting:
+    """Tests for row-counting behavior in Spark transaction writes."""
+
+    def test_concurrent_write_does_not_count_spark_input(self):
+        manager = DataFrameTransactionOperationsManager("delta-lake", spark_session=object())
+        manager.get_table_version = lambda _path: 1
+        frame = _SparkTransactionFrame(rows=5)
+
+        result = manager.execute_concurrent_write("/tmp/table", [frame])
+
+        assert result.success is True
+        assert result.rows_affected == 1
+        assert frame.count_calls == 0
+        assert frame.write.format_name == "delta"
+        assert frame.write.mode_name == "append"
+        assert frame.write.saved_path == "/tmp/table"
+
+    def test_conflict_resolution_does_not_count_spark_input(self):
+        manager = DataFrameTransactionOperationsManager("delta-lake", spark_session=object())
+        manager.get_table_version = lambda _path: 1
+        frame = _SparkTransactionFrame(rows=5)
+
+        result = manager.execute_conflict_resolution("/tmp/table", frame, resolution_strategy="overwrite")
+
+        assert result.success is True
+        assert result.rows_affected == 1
+        assert frame.count_calls == 0
+        assert frame.write.format_name == "delta"
+        assert frame.write.mode_name == "overwrite"
+        assert frame.write.saved_path == "/tmp/table"
+
+    def test_read_your_writes_counts_spark_input_for_validation(self):
+        manager = DataFrameTransactionOperationsManager("delta-lake", spark_session=object())
+        manager.get_table_version = lambda _path: 1
+        manager._read_transaction_table_count = lambda _path: 7
+        frame = _SparkTransactionFrame(rows=5)
+
+        result = manager.execute_read_your_writes("/tmp/table", frame)
+
+        assert result.success is True
+        assert result.rows_affected == 5
+        assert result.metrics["rows_written"] == 5
+        assert result.metrics["reads_own_writes"] is True
+        assert frame.count_calls == 1
 
 
 class TestBenchmarkRegistryDataframeFlag:

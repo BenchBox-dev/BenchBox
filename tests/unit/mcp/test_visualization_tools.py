@@ -577,6 +577,39 @@ class TestGenerateChartIntegration:
         assert "Unsupported chart type" not in result["message"]
         assert result["details"]["skip"]["chart_type"] == "stacked_phase"
 
+    def test_renderer_failure_returns_internal_error_for_single_chart(self, tmp_path, monkeypatch):
+        """Renderer exceptions should not be misclassified as not-applicable charts."""
+        from benchbox.core.visualization import ascii_api
+
+        results_dir = tmp_path / "benchmark_runs" / "results"
+        results_dir.mkdir(parents=True)
+
+        result_file = results_dir / "test_result.json"
+        result_file.write_text("""{
+            "benchmark": {"name": "TPC-H", "scale_factor": 1},
+            "platform": {"name": "DuckDB"},
+            "config": {"mode": "sql"},
+            "results": {
+                "queries": {"details": [{"id": "Q1", "execution_time_ms": 100}]},
+                "timing": {"total_ms": 1000, "avg_ms": 100}
+            }
+        }""")
+
+        def failing_renderer(results, chart_type, *, options=None, subtitle=None):
+            raise RuntimeError("boom")
+
+        monkeypatch.setattr(ascii_api, "render_ascii_chart_from_results", failing_renderer)
+
+        tools = _get_viz_tool_functions(results_dir=results_dir)
+        generate_chart = tools.get("generate_chart")
+
+        result = generate_chart(result_files="test_result.json", chart_type="performance_bar")
+
+        assert result["error"] is True
+        assert "INTERNAL_ERROR" in result["error_code"]
+        assert "boom" in result["message"]
+        assert result["details"]["skip"]["reason"] == "renderer failed"
+
     def test_rejects_pairwise_chart_without_two_results(self, tmp_path):
         """Pairwise chart types require exactly two result files."""
         results_dir = tmp_path / "benchmark_runs" / "results"
