@@ -8,16 +8,39 @@ Usage:
 
 from __future__ import annotations
 
+import importlib.util
 import sys
 from pathlib import Path
 
-from benchbox.validation.bundle import (
-    ValidationResult,
-    discover_bundles,
-    format_pr_comment,
-    format_summary,
-    validate_bundles,
-)
+# `uv run --no-project -- python scripts/validate_submission.py` executes with
+# scripts/ on sys.path, not the checkout root. Add the root explicitly so the
+# mirrored `benchbox.validation` package is importable without installing BenchBox.
+CHECKOUT_ROOT = Path(__file__).resolve().parents[1]
+if str(CHECKOUT_ROOT) not in sys.path:
+    sys.path.insert(0, str(CHECKOUT_ROOT))
+
+try:
+    from benchbox.validation.bundle import (
+        ValidationResult,
+        discover_bundles,
+        format_pr_comment,
+        format_summary,
+        validate_bundles,
+    )
+except ImportError:
+    bundle_path = CHECKOUT_ROOT / "benchbox" / "validation" / "bundle.py"
+    spec = importlib.util.spec_from_file_location("_benchbox_validation_bundle", bundle_path)
+    if spec is None or spec.loader is None:
+        raise
+    bundle = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = bundle
+    spec.loader.exec_module(bundle)
+
+    ValidationResult = bundle.ValidationResult
+    discover_bundles = bundle.discover_bundles
+    format_pr_comment = bundle.format_pr_comment
+    format_summary = bundle.format_summary
+    validate_bundles = bundle.validate_bundles
 
 __all__ = [
     "ValidationResult",
