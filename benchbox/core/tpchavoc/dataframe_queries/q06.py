@@ -1,15 +1,13 @@
 """TPC-Havoc DataFrame variants for Q6.
 
-Implements 10 structurally diverse variants of TPC-H Q6 (Forecasting Revenue Change).
-Q6 is a single-table filter + scalar aggregate (no joins, no groupby).
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
+Q6 is a single-table predicate plus scalar aggregate. The variants keep the
+existing filter sequencing, column-pruning, precomputed-revenue, and formula
+differences explicit while sharing repeated predicate and scalar-result code.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from benchbox.core.dataframe.context import DataFrameContext
@@ -19,509 +17,258 @@ from benchbox.core.tpch.dataframe_queries import (
     q6_expression_impl as _q6_expr_base,
     q6_pandas_impl as _q6_pandas_base,
 )
-from benchbox.core.tpchavoc.dataframe_queries.loader import load_variant_specs
 
-# ---------------------------------------------------------------------------
-# v1: baseline
-# ---------------------------------------------------------------------------
+VariantImpl = Callable[[DataFrameContext], Any]
 
-
-def q6_v1_expression_impl(ctx: DataFrameContext) -> Any:
-    return _q6_expr_base(ctx)
-
-
-def q6_v1_pandas_impl(ctx: DataFrameContext) -> Any:
-    return _q6_pandas_base(ctx)
-
-
-# ---------------------------------------------------------------------------
-# v2: pre-filter - apply each WHERE clause separately before revenue computation
-# ---------------------------------------------------------------------------
+_NEEDED_COLUMNS = ["l_shipdate", "l_discount", "l_quantity", "l_extendedprice"]
+_DESCRIPTIONS = [
+    "Baseline: direct delegation to TPC-H Q6 implementation",
+    "Pre-filter: apply each WHERE predicate separately before revenue computation",
+    "Column prune: select only needed columns before filtering",
+    "Intermediate vars: named DataFrames for date, discount, quantity filter steps",
+    "Pre-compute derived: add revenue column before summing",
+    "Chained style: maximum method chaining, no named intermediates",
+    "Aggregation alternative: discount+quantity filter first, then date filter",
+    "Filter combination: two compound predicates ANDed together",
+    "Explicit select: explicit revenue column selection before sum",
+    "Alternative formula: commuted discount*price instead of price*discount",
+]
 
 
-def q6_v2_expression_impl(ctx: DataFrameContext) -> Any:
-    lineitem = ctx.get_table("lineitem")
+def _q6_expr_predicate(ctx: DataFrameContext, params: dict[str, Any]) -> Any:
     col = ctx.col
     lit = ctx.lit
-
-    params = get_tpch_parameters(6)
-    start_date = params["start_date"]
-    end_date = params["end_date"]
-    discount_low = params["discount_low"]
-    discount_high = params["discount_high"]
-    quantity_limit = params["quantity_limit"]
-
-    # Apply each predicate separately
-    filtered = (
-        lineitem.filter(col("l_shipdate") >= lit(start_date))
-        .filter(col("l_shipdate") < lit(end_date))
-        .filter(col("l_discount") >= lit(discount_low))
-        .filter(col("l_discount") <= lit(discount_high))
-        .filter(col("l_quantity") < lit(quantity_limit))
-    )
-    return filtered.select((col("l_extendedprice") * col("l_discount")).alias("revenue")).sum()
-
-
-def q6_v2_pandas_impl(ctx: DataFrameContext) -> Any:
-    import pandas as pd
-
-    lineitem = ctx.get_table("lineitem")
-    params = get_tpch_parameters(6)
-    start_date = params["start_date"]
-    end_date = params["end_date"]
-    discount_low = params["discount_low"]
-    discount_high = params["discount_high"]
-    quantity_limit = params["quantity_limit"]
-
-    # Chained boolean masks applied sequentially
-    mask = lineitem["l_shipdate"] >= start_date
-    mask = mask & (lineitem["l_shipdate"] < end_date)
-    mask = mask & (lineitem["l_discount"] >= discount_low)
-    mask = mask & (lineitem["l_discount"] <= discount_high)
-    mask = mask & (lineitem["l_quantity"] < quantity_limit)
-    filtered = lineitem[mask]
-
-    revenue = (filtered["l_extendedprice"] * filtered["l_discount"]).sum()
-    revenue_val = revenue.compute() if hasattr(revenue, "compute") else revenue
-    return pd.DataFrame({"revenue": [revenue_val]})
-
-
-# ---------------------------------------------------------------------------
-# v3: column prune - select only needed columns before filtering
-# ---------------------------------------------------------------------------
-
-
-def q6_v3_expression_impl(ctx: DataFrameContext) -> Any:
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-    lit = ctx.lit
-
-    params = get_tpch_parameters(6)
-    start_date = params["start_date"]
-    end_date = params["end_date"]
-    discount_low = params["discount_low"]
-    discount_high = params["discount_high"]
-    quantity_limit = params["quantity_limit"]
-
-    needed = ["l_shipdate", "l_discount", "l_quantity", "l_extendedprice"]
     return (
-        lineitem.select(needed)
-        .filter(
-            (col("l_shipdate") >= lit(start_date))
-            & (col("l_shipdate") < lit(end_date))
-            & (col("l_discount") >= lit(discount_low))
-            & (col("l_discount") <= lit(discount_high))
-            & (col("l_quantity") < lit(quantity_limit))
-        )
-        .select((col("l_extendedprice") * col("l_discount")).alias("revenue"))
-        .sum()
+        (col("l_shipdate") >= lit(params["start_date"]))
+        & (col("l_shipdate") < lit(params["end_date"]))
+        & (col("l_discount") >= lit(params["discount_low"]))
+        & (col("l_discount") <= lit(params["discount_high"]))
+        & (col("l_quantity") < lit(params["quantity_limit"]))
     )
 
 
-def q6_v3_pandas_impl(ctx: DataFrameContext) -> Any:
-    import pandas as pd
-
-    lineitem = ctx.get_table("lineitem")
-    params = get_tpch_parameters(6)
-    start_date = params["start_date"]
-    end_date = params["end_date"]
-    discount_low = params["discount_low"]
-    discount_high = params["discount_high"]
-    quantity_limit = params["quantity_limit"]
-
-    needed = ["l_shipdate", "l_discount", "l_quantity", "l_extendedprice"]
-    pruned = lineitem[needed]
-    filtered = pruned[
-        (pruned["l_shipdate"] >= start_date)
-        & (pruned["l_shipdate"] < end_date)
-        & (pruned["l_discount"] >= discount_low)
-        & (pruned["l_discount"] <= discount_high)
-        & (pruned["l_quantity"] < quantity_limit)
-    ]
-    revenue = (filtered["l_extendedprice"] * filtered["l_discount"]).sum()
-    revenue_val = revenue.compute() if hasattr(revenue, "compute") else revenue
-    return pd.DataFrame({"revenue": [revenue_val]})
-
-
-# ---------------------------------------------------------------------------
-# v4: intermediate vars - named intermediate DataFrames for each step
-# ---------------------------------------------------------------------------
-
-
-def q6_v4_expression_impl(ctx: DataFrameContext) -> Any:
-    lineitem = ctx.get_table("lineitem")
+def _q6_expr_revenue(ctx: DataFrameContext, *, commuted: bool = False) -> Any:
     col = ctx.col
-    lit = ctx.lit
-
-    params = get_tpch_parameters(6)
-    start_date = params["start_date"]
-    end_date = params["end_date"]
-    discount_low = params["discount_low"]
-    discount_high = params["discount_high"]
-    quantity_limit = params["quantity_limit"]
-
-    # Step 1: date filter
-    date_filtered = lineitem.filter((col("l_shipdate") >= lit(start_date)) & (col("l_shipdate") < lit(end_date)))
-    # Step 2: discount filter
-    discount_filtered = date_filtered.filter(
-        (col("l_discount") >= lit(discount_low)) & (col("l_discount") <= lit(discount_high))
-    )
-    # Step 3: quantity filter
-    final_filtered = discount_filtered.filter(col("l_quantity") < lit(quantity_limit))
-    # Step 4: compute revenue
-    return final_filtered.select((col("l_extendedprice") * col("l_discount")).alias("revenue")).sum()
+    left, right = ("l_discount", "l_extendedprice") if commuted else ("l_extendedprice", "l_discount")
+    return (col(left) * col(right)).alias("revenue")
 
 
-def q6_v4_pandas_impl(ctx: DataFrameContext) -> Any:
-    import pandas as pd
-
-    lineitem = ctx.get_table("lineitem")
-    params = get_tpch_parameters(6)
-    start_date = params["start_date"]
-    end_date = params["end_date"]
-    discount_low = params["discount_low"]
-    discount_high = params["discount_high"]
-    quantity_limit = params["quantity_limit"]
-
-    date_filtered = lineitem[(lineitem["l_shipdate"] >= start_date) & (lineitem["l_shipdate"] < end_date)]
-    discount_filtered = date_filtered[
-        (date_filtered["l_discount"] >= discount_low) & (date_filtered["l_discount"] <= discount_high)
-    ]
-    final_filtered = discount_filtered[discount_filtered["l_quantity"] < quantity_limit]
-    revenue = (final_filtered["l_extendedprice"] * final_filtered["l_discount"]).sum()
-    revenue_val = revenue.compute() if hasattr(revenue, "compute") else revenue
-    return pd.DataFrame({"revenue": [revenue_val]})
+def _q6_expr_sum(frame: Any, ctx: DataFrameContext, *, commuted: bool = False) -> Any:
+    return frame.select(_q6_expr_revenue(ctx, commuted=commuted)).sum()
 
 
-# ---------------------------------------------------------------------------
-# v5: pre-compute derived - add revenue column before summing
-# ---------------------------------------------------------------------------
+def _make_q6_expression_impl(variant: int) -> VariantImpl:
+    def impl(ctx: DataFrameContext) -> Any:
+        if variant == 1:
+            return _q6_expr_base(ctx)
+
+        lineitem = ctx.get_table("lineitem")
+        col = ctx.col
+        lit = ctx.lit
+        params = get_tpch_parameters(6)
+
+        if variant == 2:
+            filtered = (
+                lineitem.filter(col("l_shipdate") >= lit(params["start_date"]))
+                .filter(col("l_shipdate") < lit(params["end_date"]))
+                .filter(col("l_discount") >= lit(params["discount_low"]))
+                .filter(col("l_discount") <= lit(params["discount_high"]))
+                .filter(col("l_quantity") < lit(params["quantity_limit"]))
+            )
+            return _q6_expr_sum(filtered, ctx)
+
+        if variant == 3:
+            return _q6_expr_sum(lineitem.select(_NEEDED_COLUMNS).filter(_q6_expr_predicate(ctx, params)), ctx)
+
+        if variant == 4:
+            date_filtered = lineitem.filter(
+                (col("l_shipdate") >= lit(params["start_date"])) & (col("l_shipdate") < lit(params["end_date"]))
+            )
+            discount_filtered = date_filtered.filter(
+                (col("l_discount") >= lit(params["discount_low"])) & (col("l_discount") <= lit(params["discount_high"]))
+            )
+            final_filtered = discount_filtered.filter(col("l_quantity") < lit(params["quantity_limit"]))
+            return _q6_expr_sum(final_filtered, ctx)
+
+        if variant == 5:
+            return (
+                lineitem.filter(_q6_expr_predicate(ctx, params))
+                .with_columns(_q6_expr_revenue(ctx))
+                .select("revenue")
+                .sum()
+            )
+
+        if variant == 6:
+            return ctx.get_table("lineitem").filter(_q6_expr_predicate(ctx, params)).select(_q6_expr_revenue(ctx)).sum()
+
+        if variant == 7:
+            by_discount_qty = lineitem.filter(
+                (col("l_discount") >= lit(params["discount_low"]))
+                & (col("l_discount") <= lit(params["discount_high"]))
+                & (col("l_quantity") < lit(params["quantity_limit"]))
+            )
+            by_date = by_discount_qty.filter(
+                (col("l_shipdate") >= lit(params["start_date"])) & (col("l_shipdate") < lit(params["end_date"]))
+            )
+            return _q6_expr_sum(by_date, ctx)
+
+        if variant == 8:
+            date_pred = (col("l_shipdate") >= lit(params["start_date"])) & (col("l_shipdate") < lit(params["end_date"]))
+            rest_pred = (
+                (col("l_discount") >= lit(params["discount_low"]))
+                & (col("l_discount") <= lit(params["discount_high"]))
+                & (col("l_quantity") < lit(params["quantity_limit"]))
+            )
+            return _q6_expr_sum(lineitem.filter(date_pred & rest_pred), ctx)
+
+        if variant == 9:
+            filtered = lineitem.filter(_q6_expr_predicate(ctx, params))
+            revenue_col = _q6_expr_revenue(ctx)
+            return filtered.select(revenue_col).sum()
+
+        return _q6_expr_sum(lineitem.filter(_q6_expr_predicate(ctx, params)), ctx, commuted=True)
+
+    impl.__name__ = f"q6_v{variant}_expression_impl"
+    impl.__qualname__ = impl.__name__
+    return impl
 
 
-def q6_v5_expression_impl(ctx: DataFrameContext) -> Any:
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-    lit = ctx.lit
-
-    params = get_tpch_parameters(6)
-    start_date = params["start_date"]
-    end_date = params["end_date"]
-    discount_low = params["discount_low"]
-    discount_high = params["discount_high"]
-    quantity_limit = params["quantity_limit"]
-
+def _q6_pandas_predicate(lineitem: Any, params: dict[str, Any]) -> Any:
     return (
-        lineitem.filter(
-            (col("l_shipdate") >= lit(start_date))
-            & (col("l_shipdate") < lit(end_date))
-            & (col("l_discount") >= lit(discount_low))
-            & (col("l_discount") <= lit(discount_high))
-            & (col("l_quantity") < lit(quantity_limit))
-        )
-        .with_columns((col("l_extendedprice") * col("l_discount")).alias("revenue"))
-        .select("revenue")
-        .sum()
+        (lineitem["l_shipdate"] >= params["start_date"])
+        & (lineitem["l_shipdate"] < params["end_date"])
+        & (lineitem["l_discount"] >= params["discount_low"])
+        & (lineitem["l_discount"] <= params["discount_high"])
+        & (lineitem["l_quantity"] < params["quantity_limit"])
     )
 
 
-def q6_v5_pandas_impl(ctx: DataFrameContext) -> Any:
+def _q6_pandas_frame(value: Any) -> Any:
     import pandas as pd
 
-    lineitem = ctx.get_table("lineitem")
-    params = get_tpch_parameters(6)
-    start_date = params["start_date"]
-    end_date = params["end_date"]
-    discount_low = params["discount_low"]
-    discount_high = params["discount_high"]
-    quantity_limit = params["quantity_limit"]
-
-    filtered = lineitem[
-        (lineitem["l_shipdate"] >= start_date)
-        & (lineitem["l_shipdate"] < end_date)
-        & (lineitem["l_discount"] >= discount_low)
-        & (lineitem["l_discount"] <= discount_high)
-        & (lineitem["l_quantity"] < quantity_limit)
-    ].copy()
-    # Pre-compute derived column
-    filtered["revenue"] = filtered["l_extendedprice"] * filtered["l_discount"]
-    revenue_val = filtered["revenue"].sum()
-    revenue_val = revenue_val.compute() if hasattr(revenue_val, "compute") else revenue_val
-    return pd.DataFrame({"revenue": [revenue_val]})
+    value = value.compute() if hasattr(value, "compute") else value
+    return pd.DataFrame({"revenue": [value]})
 
 
-# ---------------------------------------------------------------------------
-# v6: chained style - maximum chaining, no intermediate variables
-# ---------------------------------------------------------------------------
+def _q6_pandas_sum(frame: Any, *, commuted: bool = False) -> Any:
+    left, right = ("l_discount", "l_extendedprice") if commuted else ("l_extendedprice", "l_discount")
+    return _q6_pandas_frame((frame[left] * frame[right]).sum())
 
 
-def q6_v6_expression_impl(ctx: DataFrameContext) -> Any:
-    col = ctx.col
-    lit = ctx.lit
-    p = get_tpch_parameters(6)
-    return (
-        ctx.get_table("lineitem")
-        .filter(
-            (col("l_shipdate") >= lit(p["start_date"]))
-            & (col("l_shipdate") < lit(p["end_date"]))
-            & (col("l_discount") >= lit(p["discount_low"]))
-            & (col("l_discount") <= lit(p["discount_high"]))
-            & (col("l_quantity") < lit(p["quantity_limit"]))
-        )
-        .select((col("l_extendedprice") * col("l_discount")).alias("revenue"))
-        .sum()
-    )
+def _make_q6_pandas_impl(variant: int) -> VariantImpl:
+    def impl(ctx: DataFrameContext) -> Any:
+        if variant == 1:
+            return _q6_pandas_base(ctx)
+
+        lineitem = ctx.get_table("lineitem")
+        params = get_tpch_parameters(6)
+
+        if variant == 2:
+            mask = lineitem["l_shipdate"] >= params["start_date"]
+            mask = mask & (lineitem["l_shipdate"] < params["end_date"])
+            mask = mask & (lineitem["l_discount"] >= params["discount_low"])
+            mask = mask & (lineitem["l_discount"] <= params["discount_high"])
+            mask = mask & (lineitem["l_quantity"] < params["quantity_limit"])
+            return _q6_pandas_sum(lineitem[mask])
+
+        if variant == 3:
+            pruned = lineitem[_NEEDED_COLUMNS]
+            return _q6_pandas_sum(pruned[_q6_pandas_predicate(pruned, params)])
+
+        if variant == 4:
+            date_filtered = lineitem[
+                (lineitem["l_shipdate"] >= params["start_date"]) & (lineitem["l_shipdate"] < params["end_date"])
+            ]
+            discount_filtered = date_filtered[
+                (date_filtered["l_discount"] >= params["discount_low"])
+                & (date_filtered["l_discount"] <= params["discount_high"])
+            ]
+            return _q6_pandas_sum(discount_filtered[discount_filtered["l_quantity"] < params["quantity_limit"]])
+
+        if variant == 5:
+            filtered = lineitem[_q6_pandas_predicate(lineitem, params)].copy()
+            filtered["revenue"] = filtered["l_extendedprice"] * filtered["l_discount"]
+            return _q6_pandas_frame(filtered["revenue"].sum())
+
+        if variant == 6:
+            li = ctx.get_table("lineitem")
+            return _q6_pandas_sum(li[_q6_pandas_predicate(li, params)])
+
+        if variant == 7:
+            by_discount_qty = lineitem[
+                (lineitem["l_discount"] >= params["discount_low"])
+                & (lineitem["l_discount"] <= params["discount_high"])
+                & (lineitem["l_quantity"] < params["quantity_limit"])
+            ]
+            filtered = by_discount_qty[
+                (by_discount_qty["l_shipdate"] >= params["start_date"])
+                & (by_discount_qty["l_shipdate"] < params["end_date"])
+            ]
+            return _q6_pandas_sum(filtered)
+
+        if variant == 8:
+            date_mask = (lineitem["l_shipdate"] >= params["start_date"]) & (lineitem["l_shipdate"] < params["end_date"])
+            rest_mask = (
+                (lineitem["l_discount"] >= params["discount_low"])
+                & (lineitem["l_discount"] <= params["discount_high"])
+                & (lineitem["l_quantity"] < params["quantity_limit"])
+            )
+            return _q6_pandas_sum(lineitem[date_mask & rest_mask])
+
+        if variant == 9:
+            filtered = lineitem[_q6_pandas_predicate(lineitem, params)]
+            revenue_series = filtered["l_extendedprice"] * filtered["l_discount"]
+            return _q6_pandas_frame(revenue_series.sum())
+
+        return _q6_pandas_sum(lineitem[_q6_pandas_predicate(lineitem, params)], commuted=True)
+
+    impl.__name__ = f"q6_v{variant}_pandas_impl"
+    impl.__qualname__ = impl.__name__
+    return impl
 
 
-def q6_v6_pandas_impl(ctx: DataFrameContext) -> Any:
-    import pandas as pd
+q6_v1_expression_impl = _make_q6_expression_impl(1)
+q6_v1_pandas_impl = _make_q6_pandas_impl(1)
+q6_v2_expression_impl = _make_q6_expression_impl(2)
+q6_v2_pandas_impl = _make_q6_pandas_impl(2)
+q6_v3_expression_impl = _make_q6_expression_impl(3)
+q6_v3_pandas_impl = _make_q6_pandas_impl(3)
+q6_v4_expression_impl = _make_q6_expression_impl(4)
+q6_v4_pandas_impl = _make_q6_pandas_impl(4)
+q6_v5_expression_impl = _make_q6_expression_impl(5)
+q6_v5_pandas_impl = _make_q6_pandas_impl(5)
+q6_v6_expression_impl = _make_q6_expression_impl(6)
+q6_v6_pandas_impl = _make_q6_pandas_impl(6)
+q6_v7_expression_impl = _make_q6_expression_impl(7)
+q6_v7_pandas_impl = _make_q6_pandas_impl(7)
+q6_v8_expression_impl = _make_q6_expression_impl(8)
+q6_v8_pandas_impl = _make_q6_pandas_impl(8)
+q6_v9_expression_impl = _make_q6_expression_impl(9)
+q6_v9_pandas_impl = _make_q6_pandas_impl(9)
+q6_v10_expression_impl = _make_q6_expression_impl(10)
+q6_v10_pandas_impl = _make_q6_pandas_impl(10)
 
-    p = get_tpch_parameters(6)
-    li = ctx.get_table("lineitem")
-    filtered = li[
-        (li["l_shipdate"] >= p["start_date"])
-        & (li["l_shipdate"] < p["end_date"])
-        & (li["l_discount"] >= p["discount_low"])
-        & (li["l_discount"] <= p["discount_high"])
-        & (li["l_quantity"] < p["quantity_limit"])
-    ]
-    revenue = (filtered["l_extendedprice"] * filtered["l_discount"]).sum()
-    revenue_val = revenue.compute() if hasattr(revenue, "compute") else revenue
-    return pd.DataFrame({"revenue": [revenue_val]})
-
-
-# ---------------------------------------------------------------------------
-# v7: aggregation alternative - split into date-discount vs quantity filters
-# ---------------------------------------------------------------------------
-
-
-def q6_v7_expression_impl(ctx: DataFrameContext) -> Any:
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-    lit = ctx.lit
-
-    params = get_tpch_parameters(6)
-    start_date = params["start_date"]
-    end_date = params["end_date"]
-    discount_low = params["discount_low"]
-    discount_high = params["discount_high"]
-    quantity_limit = params["quantity_limit"]
-
-    # Split into discount+quantity filter first, then date filter
-    by_discount_qty = lineitem.filter(
-        (col("l_discount") >= lit(discount_low))
-        & (col("l_discount") <= lit(discount_high))
-        & (col("l_quantity") < lit(quantity_limit))
-    )
-    by_date = by_discount_qty.filter((col("l_shipdate") >= lit(start_date)) & (col("l_shipdate") < lit(end_date)))
-    return by_date.select((col("l_extendedprice") * col("l_discount")).alias("revenue")).sum()
-
-
-def q6_v7_pandas_impl(ctx: DataFrameContext) -> Any:
-    import pandas as pd
-
-    lineitem = ctx.get_table("lineitem")
-    params = get_tpch_parameters(6)
-    start_date = params["start_date"]
-    end_date = params["end_date"]
-    discount_low = params["discount_low"]
-    discount_high = params["discount_high"]
-    quantity_limit = params["quantity_limit"]
-
-    # Discount and quantity filter first
-    by_discount_qty = lineitem[
-        (lineitem["l_discount"] >= discount_low)
-        & (lineitem["l_discount"] <= discount_high)
-        & (lineitem["l_quantity"] < quantity_limit)
-    ]
-    # Then date filter
-    filtered = by_discount_qty[
-        (by_discount_qty["l_shipdate"] >= start_date) & (by_discount_qty["l_shipdate"] < end_date)
-    ]
-
-    revenue = (filtered["l_extendedprice"] * filtered["l_discount"]).sum()
-    revenue_val = revenue.compute() if hasattr(revenue, "compute") else revenue
-    return pd.DataFrame({"revenue": [revenue_val]})
-
-
-# ---------------------------------------------------------------------------
-# v8: filter combination - use AND of two compound predicates
-# ---------------------------------------------------------------------------
-
-
-def q6_v8_expression_impl(ctx: DataFrameContext) -> Any:
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-    lit = ctx.lit
-
-    params = get_tpch_parameters(6)
-    start_date = params["start_date"]
-    end_date = params["end_date"]
-    discount_low = params["discount_low"]
-    discount_high = params["discount_high"]
-    quantity_limit = params["quantity_limit"]
-
-    date_pred = (col("l_shipdate") >= lit(start_date)) & (col("l_shipdate") < lit(end_date))
-    rest_pred = (
-        (col("l_discount") >= lit(discount_low))
-        & (col("l_discount") <= lit(discount_high))
-        & (col("l_quantity") < lit(quantity_limit))
-    )
-    return (
-        lineitem.filter(date_pred & rest_pred)
-        .select((col("l_extendedprice") * col("l_discount")).alias("revenue"))
-        .sum()
-    )
-
-
-def q6_v8_pandas_impl(ctx: DataFrameContext) -> Any:
-    import pandas as pd
-
-    lineitem = ctx.get_table("lineitem")
-    params = get_tpch_parameters(6)
-    start_date = params["start_date"]
-    end_date = params["end_date"]
-    discount_low = params["discount_low"]
-    discount_high = params["discount_high"]
-    quantity_limit = params["quantity_limit"]
-
-    date_mask = (lineitem["l_shipdate"] >= start_date) & (lineitem["l_shipdate"] < end_date)
-    rest_mask = (
-        (lineitem["l_discount"] >= discount_low)
-        & (lineitem["l_discount"] <= discount_high)
-        & (lineitem["l_quantity"] < quantity_limit)
-    )
-    filtered = lineitem[date_mask & rest_mask]
-    revenue = (filtered["l_extendedprice"] * filtered["l_discount"]).sum()
-    revenue_val = revenue.compute() if hasattr(revenue, "compute") else revenue
-    return pd.DataFrame({"revenue": [revenue_val]})
-
-
-# ---------------------------------------------------------------------------
-# v9: explicit sort (not applicable for scalar; use explicit select instead)
-# ---------------------------------------------------------------------------
-
-
-def q6_v9_expression_impl(ctx: DataFrameContext) -> Any:
-    """Variant using explicit column selection before aggregation."""
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-    lit = ctx.lit
-
-    params = get_tpch_parameters(6)
-    start_date = params["start_date"]
-    end_date = params["end_date"]
-    discount_low = params["discount_low"]
-    discount_high = params["discount_high"]
-    quantity_limit = params["quantity_limit"]
-
-    # Explicit select of revenue expression, then alias and sum
-    filtered = lineitem.filter(
-        (col("l_shipdate") >= lit(start_date))
-        & (col("l_shipdate") < lit(end_date))
-        & (col("l_discount") >= lit(discount_low))
-        & (col("l_discount") <= lit(discount_high))
-        & (col("l_quantity") < lit(quantity_limit))
-    )
-    revenue_col = (col("l_extendedprice") * col("l_discount")).alias("revenue")
-    return filtered.select(revenue_col).sum()
-
-
-def q6_v9_pandas_impl(ctx: DataFrameContext) -> Any:
-    import pandas as pd
-
-    lineitem = ctx.get_table("lineitem")
-    params = get_tpch_parameters(6)
-    start_date = params["start_date"]
-    end_date = params["end_date"]
-    discount_low = params["discount_low"]
-    discount_high = params["discount_high"]
-    quantity_limit = params["quantity_limit"]
-
-    filtered = lineitem[
-        (lineitem["l_shipdate"] >= start_date)
-        & (lineitem["l_shipdate"] < end_date)
-        & (lineitem["l_discount"] >= discount_low)
-        & (lineitem["l_discount"] <= discount_high)
-        & (lineitem["l_quantity"] < quantity_limit)
-    ]
-    # Explicit assignment into a new column before summing
-    revenue_series = filtered["l_extendedprice"] * filtered["l_discount"]
-    revenue_val = revenue_series.sum()
-    revenue_val = revenue_val.compute() if hasattr(revenue_val, "compute") else revenue_val
-    return pd.DataFrame({"revenue": [revenue_val]})
-
-
-# ---------------------------------------------------------------------------
-# v10: alternative formula - price*(1-disc) != price*disc but here Q6 is
-#      specifically revenue = price*discount; algebraic alt: disc*(price)
-# ---------------------------------------------------------------------------
-
-
-def q6_v10_expression_impl(ctx: DataFrameContext) -> Any:
-    """Alternative formula: revenue computed as disc * price (commutative)."""
-    lineitem = ctx.get_table("lineitem")
-    col = ctx.col
-    lit = ctx.lit
-
-    params = get_tpch_parameters(6)
-    start_date = params["start_date"]
-    end_date = params["end_date"]
-    discount_low = params["discount_low"]
-    discount_high = params["discount_high"]
-    quantity_limit = params["quantity_limit"]
-
-    return (
-        lineitem.filter(
-            (col("l_shipdate") >= lit(start_date))
-            & (col("l_shipdate") < lit(end_date))
-            & (col("l_discount") >= lit(discount_low))
-            & (col("l_discount") <= lit(discount_high))
-            & (col("l_quantity") < lit(quantity_limit))
-        )
-        # Commuted: discount * extendedprice instead of extendedprice * discount
-        .select((col("l_discount") * col("l_extendedprice")).alias("revenue"))
-        .sum()
-    )
-
-
-def q6_v10_pandas_impl(ctx: DataFrameContext) -> Any:
-    import pandas as pd
-
-    lineitem = ctx.get_table("lineitem")
-    params = get_tpch_parameters(6)
-    start_date = params["start_date"]
-    end_date = params["end_date"]
-    discount_low = params["discount_low"]
-    discount_high = params["discount_high"]
-    quantity_limit = params["quantity_limit"]
-
-    filtered = lineitem[
-        (lineitem["l_shipdate"] >= start_date)
-        & (lineitem["l_shipdate"] < end_date)
-        & (lineitem["l_discount"] >= discount_low)
-        & (lineitem["l_discount"] <= discount_high)
-        & (lineitem["l_quantity"] < quantity_limit)
-    ]
-    # Commuted multiplication
-    revenue = (filtered["l_discount"] * filtered["l_extendedprice"]).sum()
-    revenue_val = revenue.compute() if hasattr(revenue, "compute") else revenue
-    return pd.DataFrame({"revenue": [revenue_val]})
-
-
-# ---------------------------------------------------------------------------
-# Registry
-# ---------------------------------------------------------------------------
-
-_IMPL_PAIRS, _DESCRIPTIONS = load_variant_specs(__file__, globals())
+_IMPL_PAIRS = [
+    (q6_v1_expression_impl, q6_v1_pandas_impl),
+    (q6_v2_expression_impl, q6_v2_pandas_impl),
+    (q6_v3_expression_impl, q6_v3_pandas_impl),
+    (q6_v4_expression_impl, q6_v4_pandas_impl),
+    (q6_v5_expression_impl, q6_v5_pandas_impl),
+    (q6_v6_expression_impl, q6_v6_pandas_impl),
+    (q6_v7_expression_impl, q6_v7_pandas_impl),
+    (q6_v8_expression_impl, q6_v8_pandas_impl),
+    (q6_v9_expression_impl, q6_v9_pandas_impl),
+    (q6_v10_expression_impl, q6_v10_pandas_impl),
+]
 
 Q6_VARIANTS: list[DataFrameQuery] = [
     DataFrameQuery(
-        query_id=f"Q6v{v}",
-        query_name=f"TPC-H Q6 Variant {v}",
-        description=_DESCRIPTIONS[v - 1],
+        query_id=f"Q6v{variant}",
+        query_name=f"TPC-H Q6 Variant {variant}",
+        description=_DESCRIPTIONS[variant - 1],
         categories=[QueryCategory.AGGREGATE, QueryCategory.FILTER],
         expression_impl=expr_impl,
         pandas_impl=pandas_impl,
     )
-    for v, (expr_impl, pandas_impl) in enumerate(_IMPL_PAIRS, start=1)
+    for variant, (expr_impl, pandas_impl) in enumerate(_IMPL_PAIRS, start=1)
 ]
