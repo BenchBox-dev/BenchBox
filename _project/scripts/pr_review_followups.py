@@ -29,14 +29,15 @@ from typing import Any, Callable, Sequence
 DEFAULT_REVIEW_AUTHORS = ("chatgpt-codex-connector[bot]", "chatgpt-codex-connector")
 ACTION_MARKER = "benchbox-pr-review-followup-actioned"
 ACTION_MARKER_REGEX = re.compile(rf"(?m)^<!--\s*{re.escape(ACTION_MARKER)}\b")
+CODEX_USAGE_LIMIT_REVIEW_TEXT = "You have reached your Codex usage limits for code reviews"
+CODEX_REVIEW_TRIGGER_BODY = "@codex review"
+CODEX_REVIEW_RESULT_MARKERS = ("### 💡 Codex Review", "Codex Review:")
 DEFAULT_COMMIT_MESSAGE = "fix: address stale PR review follow-ups"
 PER_COMMENT_COMMIT_PREFIX = "fix(pr-followup)"
 MAX_REPLY_SUMMARY_CHARS = 8000
 PROMPT_TEMPLATE_PATH = Path(__file__).resolve().parent / "prompts" / "pr_review_followup.md"
 MIN_EXECUTOR_VERSION = (0, 20, 0)
-PER_COMMENT_COMMIT_SUBJECT_REGEX = re.compile(
-    rf"^{re.escape(PER_COMMENT_COMMIT_PREFIX)}: PR #(\d+) comment (\d+) "
-)
+PER_COMMENT_COMMIT_SUBJECT_REGEX = re.compile(rf"^{re.escape(PER_COMMENT_COMMIT_PREFIX)}: PR #(\d+) comment (\d+) ")
 GH_API_RETRY_ATTEMPTS = 3
 # Sleep schedule (seconds) consumed in order between retries. Three values are
 # defined so the schedule remains stable if the attempt cap is later raised; at
@@ -72,10 +73,30 @@ class ReviewComment:
 
 
 @dataclass(frozen=True)
+class IssueComment:
+    id: int
+    body: str
+    html_url: str
+    user_login: str
+    created_at: str
+
+
+@dataclass(frozen=True)
 class PendingComment:
     pr: PullRequest
     comment: ReviewComment
     replies: tuple[ReviewComment, ...]
+
+
+@dataclass(frozen=True)
+class UsageLimitReviewRetry:
+    pr: PullRequest
+    usage_comment: IssueComment
+    trigger_comment: IssueComment | None = None
+
+    @property
+    def needs_trigger(self) -> bool:
+        return self.trigger_comment is None
 
 
 @dataclass(frozen=True)
@@ -113,7 +134,9 @@ class CommandRunner:
         )
 
 
-def checked(runner: CommandRunner, args: Sequence[str], input_text: str | None = None) -> subprocess.CompletedProcess[str]:
+def checked(
+    runner: CommandRunner, args: Sequence[str], input_text: str | None = None
+) -> subprocess.CompletedProcess[str]:
     result = runner.run(args, input_text=input_text)
     if result.returncode != 0:
         raise CommandError(args, result)
@@ -242,6 +265,18 @@ def review_comment_from_api(item: dict[str, Any]) -> ReviewComment:
     )
 
 
+def issue_comment_from_api(item: dict[str, Any]) -> IssueComment:
+    user = item.get("user")
+    user_login = user.get("login") if isinstance(user, dict) else ""
+    return IssueComment(
+        id=int(item["id"]),
+        body=str(item.get("body") or ""),
+        html_url=str(item.get("html_url") or ""),
+        user_login=str(user_login or ""),
+        created_at=str(item.get("created_at") or ""),
+    )
+
+
 def fetch_pr_review_comments(runner: CommandRunner, *, repo: str, pr_number: int) -> list[ReviewComment]:
     """REST fallback: fetch review comments for a single PR.
 
@@ -261,6 +296,22 @@ def fetch_pr_review_comments(runner: CommandRunner, *, repo: str, pr_number: int
         ],
     )
     return [review_comment_from_api(row) for row in rows]
+
+
+def fetch_pr_issue_comments(runner: CommandRunner, *, repo: str, pr_number: int) -> list[IssueComment]:
+    """Fetch top-level PR timeline comments for review-trigger bookkeeping."""
+    rows = gh_json_lines(
+        runner,
+        [
+            "gh",
+            "api",
+            "--paginate",
+            f"repos/{repo}/issues/{pr_number}/comments?per_page=100",
+            "--jq",
+            ".[] | @json",
+        ],
+    )
+    return [issue_comment_from_api(row) for row in rows]
 
 
 REVIEW_COMMENTS_GRAPHQL_QUERY = """
@@ -354,8 +405,8 @@ def fetch_review_comments_via_graphql(
             payload = json.loads(result.stdout) if result.stdout.strip() else {}
         except json.JSONDecodeError:
             return None
-        pr = (((payload.get("data") or {}).get("repository") or {}).get("pullRequest") or {})
-        threads = (pr.get("reviewThreads") or {})
+        pr = ((payload.get("data") or {}).get("repository") or {}).get("pullRequest") or {}
+        threads = pr.get("reviewThreads") or {}
         for thread in threads.get("nodes") or []:
             for node in (thread.get("comments") or {}).get("nodes") or []:
                 if node.get("databaseId") is None:
@@ -370,9 +421,7 @@ def fetch_review_comments_via_graphql(
     return [review_comment_from_api(row) for row in rows]
 
 
-def load_pr_review_comments(
-    runner: CommandRunner, *, repo: str, pr_number: int
-) -> list[ReviewComment]:
+def load_pr_review_comments(runner: CommandRunner, *, repo: str, pr_number: int) -> list[ReviewComment]:
     """Prefer GraphQL; fall back to REST on any failure for resilience."""
     via_graphql = fetch_review_comments_via_graphql(runner, repo=repo, pr_number=pr_number)
     if via_graphql is not None:
@@ -425,6 +474,87 @@ def pending_comments_for_pr(
     return pending
 
 
+def _comment_sort_key(comment: IssueComment) -> tuple[dt.datetime, int]:
+    parsed = parse_github_time(comment.created_at) or dt.datetime.min.replace(tzinfo=dt.timezone.utc)
+    return (parsed, comment.id)
+
+
+def is_usage_limit_review_comment(comment: IssueComment, *, author_logins: set[str]) -> bool:
+    return comment.user_login in author_logins and CODEX_USAGE_LIMIT_REVIEW_TEXT in comment.body
+
+
+def is_review_trigger_comment(comment: IssueComment) -> bool:
+    return comment.body.strip().lower() == CODEX_REVIEW_TRIGGER_BODY
+
+
+def is_review_result_comment(comment: IssueComment, *, author_logins: set[str]) -> bool:
+    return comment.user_login in author_logins and any(marker in comment.body for marker in CODEX_REVIEW_RESULT_MARKERS)
+
+
+def usage_limit_review_retry_for_pr(
+    pr: PullRequest,
+    comments: Sequence[IssueComment],
+    *,
+    author_logins: set[str],
+) -> UsageLimitReviewRetry | None:
+    """Return follow-up state when Codex hit review quota without a later result.
+
+    Codex review quota failures are top-level PR comments, not inline review
+    findings, so the normal review-thread scanner cannot action them. A PR
+    needs a fresh review trigger when its latest quota-limit comment has no
+    later `@codex review` trigger and no later actual Codex review result. If
+    a later trigger exists but no review result exists yet, the PR remains in
+    the follow-up queue as awaiting-review-result so operators can see it is
+    not actually reviewed yet without spamming duplicate triggers.
+    """
+    usage_comments = [
+        comment for comment in comments if is_usage_limit_review_comment(comment, author_logins=author_logins)
+    ]
+    if not usage_comments:
+        return None
+
+    latest_usage = max(usage_comments, key=_comment_sort_key)
+    usage_time, usage_id = _comment_sort_key(latest_usage)
+    latest_trigger: IssueComment | None = None
+    for comment in comments:
+        comment_time, comment_id = _comment_sort_key(comment)
+        if (comment_time, comment_id) <= (usage_time, usage_id):
+            continue
+        if is_review_result_comment(comment, author_logins=author_logins):
+            return None
+        if is_review_trigger_comment(comment):
+            if latest_trigger is None or _comment_sort_key(comment) > _comment_sort_key(latest_trigger):
+                latest_trigger = comment
+    return UsageLimitReviewRetry(pr=pr, usage_comment=latest_usage, trigger_comment=latest_trigger)
+
+
+def discover_usage_limit_review_retries(
+    runner: CommandRunner,
+    *,
+    repo: str,
+    base: str,
+    limit_prs: int,
+    since: dt.datetime | None,
+    until: dt.datetime | None,
+    author_logins: set[str],
+) -> list[UsageLimitReviewRetry]:
+    retries: list[UsageLimitReviewRetry] = []
+    pull_requests = discover_merged_pull_requests(
+        runner,
+        repo=repo,
+        base=base,
+        limit=limit_prs,
+        since=since,
+        until=until,
+    )
+    for pr in pull_requests:
+        comments = fetch_pr_issue_comments(runner, repo=repo, pr_number=pr.number)
+        retry = usage_limit_review_retry_for_pr(pr, comments, author_logins=author_logins)
+        if retry is not None:
+            retries.append(retry)
+    return retries
+
+
 def discover_pending_comments(
     runner: CommandRunner,
     *,
@@ -469,6 +599,21 @@ def print_pending_table(pending: Sequence[PendingComment]) -> None:
         print(f"#{item.pr.number:<5}  {item.comment.id:>12}  {path:<52}  {first_body_line(item.comment.body)}")
 
 
+def print_usage_limit_retry_table(retries: Sequence[UsageLimitReviewRetry]) -> None:
+    if not retries:
+        print("No PRs need usage-limit review follow-up.")
+        return
+    print("\nPRs needing usage-limit review follow-up:")
+    print(f"{'PR':>6}  {'Comment':>12}  {'Status':<22}  {'Merged':<20}  Title")
+    print(f"{'-' * 6}  {'-' * 12}  {'-' * 22}  {'-' * 20}  {'-' * 40}")
+    for item in retries:
+        status = "needs-trigger" if item.needs_trigger else "awaiting-review-result"
+        print(
+            f"#{item.pr.number:<5}  {item.usage_comment.id:>12}  "
+            f"{status:<22}  {item.pr.merged_at[:20]:<20}  {item.pr.title[:80]}"
+        )
+
+
 def git_state_snapshot(runner: CommandRunner) -> str:
     """Snapshot of local Git state used as a disposition baseline.
 
@@ -499,9 +644,7 @@ def local_commit_count(runner: CommandRunner, base_ref: str) -> int:
     return int(result.stdout.strip() or "0")
 
 
-def discover_locally_committed_pairs(
-    runner: CommandRunner, base_ref: str
-) -> set[tuple[int, int]]:
+def discover_locally_committed_pairs(runner: CommandRunner, base_ref: str) -> set[tuple[int, int]]:
     """Return (pr_number, comment_id) pairs for per-comment commits already on HEAD.
 
     Used by `--resume` to skip pending comments whose fix already landed
@@ -649,15 +792,8 @@ def commit_message_for_result(result: ActionResult) -> str:
     # stays intact.
     if len(subject) > 100:
         keep = 100 - (len(subject) - len(headline)) - 1
-        subject = (
-            f"{PER_COMMENT_COMMIT_PREFIX}: PR #{pr.number} comment {comment.id} — "
-            f"{headline[: max(keep, 1)]}…"
-        )
-    body = (
-        f"Disposition: {result.disposition}\n"
-        f"Source: {comment.html_url}\n"
-        f"Path: {comment.path}\n"
-    )
+        subject = f"{PER_COMMENT_COMMIT_PREFIX}: PR #{pr.number} comment {comment.id} — {headline[: max(keep, 1)]}…"
+    body = f"Disposition: {result.disposition}\nSource: {comment.html_url}\nPath: {comment.path}\n"
     return f"{subject}\n\n{body}"
 
 
@@ -683,9 +819,7 @@ def _porcelain_paths_with_worktree_mods(porcelain: str) -> set[str]:
     return paths
 
 
-def commit_changes_for_result(
-    runner: CommandRunner, result: ActionResult
-) -> bool:
+def commit_changes_for_result(runner: CommandRunner, result: ActionResult) -> bool:
     """Stage + commit executor-produced changes for one comment.
 
     Returns True when a commit was created. Called *before* the GitHub reply
@@ -827,6 +961,28 @@ def reply_to_comment(
     print(f"Replied to PR #{pr_number} comment {comment_id}.")
 
 
+def trigger_usage_limit_review_retry(
+    runner: CommandRunner,
+    *,
+    repo: str,
+    retry: UsageLimitReviewRetry,
+) -> None:
+    checked(
+        runner,
+        [
+            "gh",
+            "pr",
+            "comment",
+            str(retry.pr.number),
+            "--repo",
+            repo,
+            "--body",
+            CODEX_REVIEW_TRIGGER_BODY,
+        ],
+    )
+    print(f"Triggered Codex review retry on PR #{retry.pr.number}.")
+
+
 def ensure_clean_start(runner: CommandRunner, *, allow_dirty: bool, base_ref: str) -> None:
     changed = git_changed_paths(runner)
     local_commits = local_commit_count(runner, base_ref)
@@ -921,24 +1077,35 @@ def run_action_loop(args: argparse.Namespace, runner: CommandRunner) -> int:
         until=until,
         author_logins=authors,
     )
+    usage_limit_retries: list[UsageLimitReviewRetry] = []
+    if args.retry_usage_limit_reviews:
+        usage_limit_retries = discover_usage_limit_review_retries(
+            runner,
+            repo=repo,
+            base=args.base,
+            limit_prs=args.limit_prs,
+            since=since,
+            until=until,
+            author_logins=authors,
+        )
     if resume and args.command == "run":
         already = discover_locally_committed_pairs(runner, f"origin/{args.base}")
         if already:
             before = len(pending)
-            pending = [
-                item for item in pending
-                if (item.pr.number, item.comment.id) not in already
-            ]
-            print(
-                f"--resume: skipping {before - len(pending)} comment(s) already "
-                f"committed locally on this branch."
-            )
+            pending = [item for item in pending if (item.pr.number, item.comment.id) not in already]
+            print(f"--resume: skipping {before - len(pending)} comment(s) already committed locally on this branch.")
     if args.max_comments > 0:
         pending = pending[: args.max_comments]
 
     print_pending_table(pending)
+    print_usage_limit_retry_table(usage_limit_retries)
     if args.command == "list" or args.dry_run:
         return 0
+    retried_usage_limit_reviews = [retry for retry in usage_limit_retries if retry.needs_trigger]
+    for retry in retried_usage_limit_reviews:
+        trigger_usage_limit_review_retry(runner, repo=repo, retry=retry)
+    if retried_usage_limit_reviews:
+        print(f"\nTriggered {len(retried_usage_limit_reviews)} usage-limit review retry request(s).")
     if not pending:
         finalize_changes(
             runner,
@@ -991,6 +1158,17 @@ def build_parser() -> argparse.ArgumentParser:
         sub.add_argument("--since", default=os.environ.get("PR_REVIEW_SINCE"))
         sub.add_argument("--until", default=os.environ.get("PR_REVIEW_UNTIL"))
         sub.add_argument("--author", action="append", default=list(DEFAULT_REVIEW_AUTHORS))
+        sub.add_argument(
+            "--no-usage-limit-review-retry",
+            dest="retry_usage_limit_reviews",
+            action="store_false",
+            default=os.environ.get("PR_REVIEW_USAGE_LIMIT_RETRY", "1").lower() not in {"0", "false", "no"},
+            help=(
+                "Do not scan top-level PR comments for Codex usage-limit review failures. "
+                "By default the list command reports them and the run command posts a fresh "
+                "`@codex review` trigger when no later trigger or review result exists."
+            ),
+        )
     run_parser = subparsers.choices["run"]
     run_parser.add_argument("--dry-run", action="store_true")
     run_parser.add_argument("--allow-dirty", action="store_true")
