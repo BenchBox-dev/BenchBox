@@ -6,11 +6,7 @@ from pathlib import Path
 import click
 
 from benchbox.cli.shared import console
-from benchbox.core.query_plans.comparison import (
-    PlanComparisonSummary,
-    compare_query_plans,
-    generate_plan_comparison_summary,
-)
+from benchbox.core.query_plans.comparison import compare_query_plans, generate_plan_comparison_summary
 from benchbox.core.query_plans.visualization import render_comparison
 from benchbox.core.results.loader import load_result_file
 
@@ -28,15 +24,7 @@ from benchbox.core.results.loader import load_result_file
 @click.option("--regression-threshold", type=float, default=20.0)
 @click.pass_context
 def compare_plans(
-    ctx,
-    run1_path: Path,
-    run2_path: Path,
-    query_id: str | None,
-    output_format: str,
-    output_file: Path | None,
-    threshold: float,
-    show_summary: bool,
-    regression_threshold: float,
+    ctx, run1_path, run2_path, query_id, output_format, output_file, threshold, show_summary, regression_threshold
 ):
     """Compare query plans between benchmark runs. Deprecated; use `benchbox compare --include-plans`."""
     try:
@@ -49,12 +37,11 @@ def compare_plans(
         query_ids = _resolve_query_ids(query_id, results1, results2, ctx)
         comparisons = _build_comparisons(query_ids, results1, results2, threshold, query_id)
         if not comparisons:
-            message = (
+            console.print(
                 f"[green]Success:[/green] All queries have similarity >= {threshold:.1%}"
                 if threshold > 0.0
                 else "[yellow]No plans available for comparison[/yellow]"
             )
-            console.print(message)
             return
         _emit_comparisons(comparisons, output_format, output_file, query_id, results1, results2)
     except FileNotFoundError as e:
@@ -71,11 +58,7 @@ def compare_plans(
 
 
 def _run_summary_mode(
-    results1,
-    results2,
-    output_format: str,
-    output_file: Path | None,
-    regression_threshold: float,
+    results1, results2, output_format: str, output_file: Path | None, regression_threshold: float
 ) -> None:
     summary = generate_plan_comparison_summary(results1, results2, regression_threshold_pct=regression_threshold)
     writers = {
@@ -93,12 +76,7 @@ def _collect_query_ids(results) -> set[str]:
     return {execution.query_id for phase in results.phases.values() for execution in phase.queries}
 
 
-def _resolve_query_ids(
-    query_id: str | None,
-    results1,
-    results2,
-    ctx,
-) -> list[str]:
+def _resolve_query_ids(query_id: str | None, results1, results2, ctx) -> list[str]:
     if query_id:
         return [query_id]
     common = sorted(_collect_query_ids(results1) & _collect_query_ids(results2))
@@ -109,11 +87,7 @@ def _resolve_query_ids(
 
 
 def _build_comparisons(
-    query_ids: list[str],
-    results1,
-    results2,
-    threshold: float,
-    explicit_query_id: str | None,
+    query_ids: list[str], results1, results2, threshold: float, explicit_query_id: str | None
 ) -> list:
     comparisons = []
     for qid in query_ids:
@@ -138,14 +112,7 @@ def _warn_if_explicit(explicit_query_id: str | None, message: str) -> None:
         console.print(f"[yellow]Warning:[/yellow] {message}")
 
 
-def _emit_comparisons(
-    comparisons: list,
-    output_format: str,
-    output_file: Path | None,
-    explicit_query_id: str | None,
-    results1,
-    results2,
-) -> None:
+def _emit_comparisons(comparisons, output_format, output_file, explicit_query_id, results1, results2) -> None:
     writers = {
         "json": lambda: _output_json(comparisons, return_string=output_file is not None),
         "html": lambda: _output_html(comparisons, explicit_query_id is not None, results1, results2),
@@ -158,20 +125,14 @@ def _emit_comparisons(
 
 
 def _find_query_execution(results, query_id: str):
-    for phase_results in results.phases.values():
-        for exec_result in phase_results.queries:
-            if exec_result.query_id == query_id:
-                return exec_result
-    return None
+    return next((e for phase in results.phases.values() for e in phase.queries if e.query_id == query_id), None)
 
 
 def _output_text(comparisons: list, single_query: bool, return_string: bool = False) -> str | None:
     if single_query:
         rendered = str(render_comparison(comparisons[0][1]))
-        if return_string:
-            return rendered
-        console.print(rendered)
-        return None
+        console.print(rendered) if not return_string else None
+        return rendered if return_string else None
 
     lines = ["Query Plan Comparison Summary", "Query  Similarity  Type  Prop  Struct  Status"]
     for query_id, comparison in comparisons:
@@ -181,7 +142,7 @@ def _output_text(comparisons: list, single_query: bool, return_string: bool = Fa
             f"{sim.type_mismatches or '-'}  {sim.property_mismatches or '-'}  "
             f"{sim.structure_mismatches or '-'}  {_status_label(sim.overall_similarity)}"
         )
-    lines.extend(["", *_comparison_count_lines(comparisons)])
+    lines.extend(["", f"Summary: {len(comparisons)} queries compared"])
     output = "\n".join(lines)
     if return_string:
         return output
@@ -189,18 +150,9 @@ def _output_text(comparisons: list, single_query: bool, return_string: bool = Fa
     return None
 
 
-def _comparison_count_lines(comparisons: list) -> list[str]:
-    return [f"Summary: {len(comparisons)} queries compared"]
-
-
 def _status_label(similarity: float) -> str:
-    if similarity >= 0.95:
-        return "Nearly Identical"
-    elif similarity >= 0.75:
-        return "Very Similar"
-    elif similarity >= 0.50:
-        return "Somewhat Similar"
-    return "Different"
+    labels = ((0.95, "Nearly Identical"), (0.75, "Very Similar"), (0.50, "Somewhat Similar"), (0.0, "Different"))
+    return next(label for cutoff, label in labels if similarity >= cutoff)
 
 
 def _output_json(comparisons: list, return_string: bool = False) -> str | None:
@@ -230,8 +182,7 @@ def _output_json(comparisons: list, return_string: bool = False) -> str | None:
     return None
 
 
-def _output_summary_text(summary: PlanComparisonSummary, return_string: bool = False) -> str | None:
-    regressions = [corr for corr in summary.performance_correlations if corr.is_regression]
+def _output_summary_text(summary, return_string: bool = False) -> str | None:
     lines = [
         "PLAN COMPARISON SUMMARY",
         f"Baseline: {summary.baseline_run_id}",
@@ -247,7 +198,7 @@ def _output_summary_text(summary: PlanComparisonSummary, return_string: bool = F
             f"  {diff.query_id}: {diff.change_type} ({diff.similarity:.1%})\n    {diff.details[:80]}"
             for diff in changed
         )
-    lines.extend(_summary_regression_lines(regressions))
+    lines.extend(_summary_regression_lines([corr for corr in summary.performance_correlations if corr.is_regression]))
     text = "\n".join(lines)
     if return_string:
         return text
@@ -264,14 +215,14 @@ def _summary_regression_lines(regressions: list) -> list[str]:
     ]
 
 
-def _output_summary_json(summary: PlanComparisonSummary, return_string: bool = False) -> str | None:
+def _output_summary_json(summary, return_string: bool = False) -> str | None:
     if return_string:
         return json.dumps(summary.to_dict(), indent=2)
     console.print_json(data=summary.to_dict())
     return None
 
 
-def _output_summary_html(summary: PlanComparisonSummary) -> str:
+def _output_summary_html(summary) -> str:
     body = _html_table(
         ["Query", "Change", "Similarity", "Details"],
         [
@@ -280,8 +231,7 @@ def _output_summary_html(summary: PlanComparisonSummary) -> str:
             if diff.change_type != "unchanged"
         ],
     )
-    regressions = [corr for corr in summary.performance_correlations if corr.is_regression]
-    if regressions:
+    if regressions := [corr for corr in summary.performance_correlations if corr.is_regression]:
         body += "<h2>Performance Regressions</h2>"
         body += _html_table(
             ["Query", "Baseline (ms)", "Current (ms)", "Change"],

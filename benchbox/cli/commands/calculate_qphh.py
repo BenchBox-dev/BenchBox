@@ -25,5 +25,4 @@ def calculate_qphh(power_results, throughput_results, scale_factor, output_forma
 
     from benchbox.cli.commands.metrics import _compute_qphh_result, _emit_qphh_output
 
-    result = _compute_qphh_result(power_results, throughput_results, scale_factor)
-    _emit_qphh_output(result, output_format, output_file)
+    _emit_qphh_output(_compute_qphh_result(power_results, throughput_results, scale_factor), output_format, output_file)

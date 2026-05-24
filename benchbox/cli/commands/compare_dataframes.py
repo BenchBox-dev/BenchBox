@@ -2,20 +2,11 @@
 
 import json
 import sys
-import warnings
 from pathlib import Path
 
 import click
 
 from benchbox.cli.shared import console
-
-
-def _show_deprecation_warning() -> None:
-    warnings.warn(
-        "The 'compare-dataframes' command is deprecated. Use 'benchbox compare -p <platform1> -p <platform2>' instead.",
-        DeprecationWarning,
-        stacklevel=3,
-    )
 
 
 @click.command("compare-dataframes", hidden=True, deprecated=True)
@@ -52,12 +43,18 @@ def compare_dataframes(
         _list_available_platforms()
         return
 
-    _show_deprecation_warning()
     console.print("[yellow]⚠ DEPRECATED: This command is deprecated. Use 'benchbox compare' instead.[/yellow]\n")
 
     if not platforms and not vs_sql:
         console.print("[red]Error: Specify at least one platform with --platforms or use --vs-sql[/red]")
         console.print("\nRun with --list-platforms to see available platforms")
+        sys.exit(1)
+
+    data_dir = data_dir or Path(f"benchmark_runs/{benchmark}/sf{str(scale).replace('.', '')}/data")
+    if not data_dir.exists():
+        console.print(f"[red]Error: Data directory not found: {data_dir}[/red]")
+        console.print("\n[dim]Generate data first with:[/dim]")
+        console.print(f"  benchbox run --platform duckdb --benchmark {benchmark} --scale {scale}")
         sys.exit(1)
 
     from benchbox.core.dataframe.benchmark_suite import BenchmarkConfig
@@ -68,26 +65,14 @@ def compare_dataframes(
         warmup_iterations=warmup,
         benchmark_iterations=iterations,
     )
-    data_dir = data_dir or Path(f"benchmark_runs/{benchmark}/sf{str(scale).replace('.', '')}/data")
-    if not data_dir.exists():
-        console.print(f"[red]Error: Data directory not found: {data_dir}[/red]")
-        console.print("\n[dim]Generate data first with:[/dim]")
-        console.print(f"  benchbox run --platform duckdb --benchmark {benchmark} --scale {scale}")
-        sys.exit(1)
-
     if vs_sql:
-        _run_sql_vs_dataframe(
-            config,
-            vs_sql,
-            platforms[0] if platforms else "polars-df",
-            data_dir,
-            output,
-            output_format,
-            generate_charts,
-            theme,
+        source, plotter_class = _run_sql_vs_dataframe(
+            config, vs_sql, platforms[0] if platforms else "polars-df", data_dir, output, output_format
         )
     else:
-        _run_platform_comparison(config, list(platforms), data_dir, output, output_format, generate_charts, theme)
+        source, plotter_class = _run_platform_comparison(config, list(platforms), data_dir, output, output_format)
+
+    _generate_charts(plotter_class, source, output, generate_charts, theme)
 
 
 def _list_available_platforms() -> None:
@@ -95,37 +80,22 @@ def _list_available_platforms() -> None:
     from benchbox.platforms import list_available_dataframe_platforms
 
     console.print("\n[bold]DataFrame Platforms[/bold]\n")
+    feature_attrs = [
+        ("lazy", "supports_lazy"),
+        ("streaming", "supports_streaming"),
+        ("gpu", "supports_gpu"),
+        ("distributed", "supports_distributed"),
+    ]
     for platform, available in list_available_dataframe_platforms().items():
         cap = PLATFORM_CAPABILITIES.get(platform)
         status = "installed" if available else "not installed"
         family = cap.family if cap else "unknown"
         category = cap.category.value if cap else "unknown"
-        console.print(f"  {platform:15s} ({status}, {family}, {category}) [{_capability_features(cap)}]")
+        features = ", ".join(name for name, attr in feature_attrs if cap and getattr(cap, attr)) or "standard"
+        console.print(f"  {platform:15s} ({status}, {family}, {category}) [{features}]")
 
 
-def _capability_features(cap) -> str:
-    features = [
-        name
-        for name, attr in [
-            ("lazy", "supports_lazy"),
-            ("streaming", "supports_streaming"),
-            ("gpu", "supports_gpu"),
-            ("distributed", "supports_distributed"),
-        ]
-        if cap and getattr(cap, attr)
-    ]
-    return ", ".join(features) or "standard"
-
-
-def _run_platform_comparison(
-    config,
-    platforms: list[str],
-    data_dir: Path,
-    output_dir: Path | None,
-    output_format: str,
-    generate_charts: bool,
-    theme: str,
-) -> None:
+def _run_platform_comparison(config, platforms: list[str], data_dir: Path, output_dir: Path | None, output_format: str):
     from benchbox.core.dataframe.benchmark_suite import DataFrameBenchmarkSuite, DataFrameComparisonPlotter
 
     console.print("\n[bold]DataFrame Platform Comparison[/bold]")
@@ -147,40 +117,27 @@ def _run_platform_comparison(
         sys.exit(1)
 
     summary = suite.get_summary(results)
-    if output_format == "text":
-        _print_text_summary(results, summary)
-    elif output_format == "json":
-        content = json.dumps(
-            {
-                "config": {
-                    "scale_factor": config.scale_factor,
-                    "query_ids": config.query_ids,
-                    "iterations": config.benchmark_iterations,
-                },
-                "results": [r.to_dict() for r in results],
-                "summary": summary.to_dict(),
+    if output_format == "json":
+        payload = {
+            "config": {
+                "scale_factor": config.scale_factor,
+                "query_ids": config.query_ids,
+                "iterations": config.benchmark_iterations,
             },
-            indent=2,
-        )
-        _write_comparison_output(content, output_dir, "comparison.json", "Results saved to")
+            "results": [r.to_dict() for r in results],
+            "summary": summary.to_dict(),
+        }
+        _write_output(json.dumps(payload, indent=2), output_dir, "comparison.json", "Results saved to")
+    elif output_format == "markdown":
+        _write_output(suite._generate_markdown_report(results), output_dir, "comparison.md", "Report saved to")
     else:
-        _write_comparison_output(
-            suite._generate_markdown_report(results), output_dir, "comparison.md", "Report saved to"
-        )
-
-    _generate_charts(DataFrameComparisonPlotter, results, output_dir, generate_charts, theme)
+        _print_text_summary(results, summary)
+    return results, DataFrameComparisonPlotter
 
 
 def _run_sql_vs_dataframe(
-    config,
-    sql_platform: str,
-    df_platform: str,
-    data_dir: Path,
-    output_dir: Path | None,
-    output_format: str,
-    generate_charts: bool,
-    theme: str,
-) -> None:
+    config, sql_platform: str, df_platform: str, data_dir: Path, output_dir: Path | None, fmt: str
+):
     from benchbox.core.dataframe.benchmark_suite import SQLVsDataFrameBenchmark, SQLVsDataFramePlotter
 
     console.print("\n[bold]SQL vs DataFrame Comparison[/bold]")
@@ -194,21 +151,16 @@ def _run_sql_vs_dataframe(
         console.print(f"[red]Benchmark failed: {e}[/red]")
         sys.exit(1)
 
-    if output_format == "text":
-        _print_sql_vs_df_summary(summary)
-    elif output_format == "json":
-        _write_comparison_output(
-            json.dumps(summary.to_dict(), indent=2), output_dir, "sql_vs_dataframe.json", "Results saved to"
-        )
+    if fmt == "json":
+        _write_output(json.dumps(summary.to_dict(), indent=2), output_dir, "sql_vs_dataframe.json", "Results saved to")
+    elif fmt == "markdown":
+        _write_output(benchmark.generate_report(summary), output_dir, "sql_vs_dataframe.md", "Report saved to")
     else:
-        _write_comparison_output(
-            benchmark.generate_report(summary), output_dir, "sql_vs_dataframe.md", "Report saved to"
-        )
-
-    _generate_charts(SQLVsDataFramePlotter, summary, output_dir, generate_charts, theme)
+        _print_sql_vs_df_summary(summary)
+    return summary, SQLVsDataFramePlotter
 
 
-def _write_comparison_output(content: str, output_dir: Path | None, filename: str, label: str) -> None:
+def _write_output(content: str, output_dir: Path | None, filename: str, label: str) -> None:
     if not output_dir:
         console.print(content)
         return

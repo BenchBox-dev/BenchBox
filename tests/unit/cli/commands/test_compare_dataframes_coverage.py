@@ -216,7 +216,6 @@ def test_run_sql_vs_dataframe_markdown(monkeypatch: pytest.MonkeyPatch, tmp_path
     assert (tmp_path / "sql_vs_dataframe.md").exists()
 
 
-def test_helper_printers_and_warning() -> None:
-    cdf._show_deprecation_warning()
+def test_helper_printers() -> None:
     cdf._print_text_summary([_FakeResult("polars-df")], _FakeSummary())
     cdf._print_sql_vs_df_summary(_FakeSQLSummary())

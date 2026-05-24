@@ -30,6 +30,9 @@ from benchbox.cli.onboarding import (
 )
 from benchbox.core.dataframe.tuning import DataFrameTuningConfiguration
 
+__import__("benchbox.cli.commands.tuning_group")
+_tuning_group_module = sys.modules["benchbox.cli.commands.tuning_group"]
+
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
@@ -246,7 +249,7 @@ class TestDfTuningHelpers:
 
     def test_create_profile_config_gpu_warns_for_non_cudf(self):
         """GPU profile should still enable GPU config and warn for non-cuDF platforms."""
-        with patch("benchbox.cli.commands.df_tuning.console.print") as mock_print:
+        with patch.object(_tuning_group_module.console, "print") as mock_print:
             config = _create_profile_config("polars", "gpu")
 
         assert config.gpu.enabled is True
@@ -277,7 +280,7 @@ class TestDfTuningCli:
 
         assert result.exit_code == 0
         assert output_path.exists()
-        assert "Sample DataFrame tuning configuration created" in result.output
+        assert "Tuning configuration created" in result.output
         assert "optimized" in result.output.lower()
 
     def test_validate_command_reports_success(self, tmp_path: Path):
@@ -293,8 +296,8 @@ class TestDfTuningCli:
         }
 
         with (
-            patch("benchbox.cli.commands.df_tuning.load_dataframe_tuning", return_value=config),
-            patch("benchbox.cli.commands.df_tuning.validate_dataframe_tuning", return_value=[]),
+            patch.object(_tuning_group_module, "load_dataframe_tuning", return_value=config),
+            patch.object(_tuning_group_module, "validate_dataframe_tuning", return_value=[]),
         ):
             result = runner.invoke(cli, ["df-tuning", "validate", str(config_path), "--platform", "polars"])
 
@@ -309,10 +312,10 @@ class TestDfTuningCli:
         issues = [{"severity": "error", "message": "bad config"}]
 
         with (
-            patch("benchbox.cli.commands.df_tuning.load_dataframe_tuning", return_value=MagicMock()),
-            patch("benchbox.cli.commands.df_tuning.validate_dataframe_tuning", return_value=issues),
-            patch("benchbox.cli.commands.df_tuning.format_issues", return_value="formatted issues"),
-            patch("benchbox.cli.commands.df_tuning.has_errors", return_value=True),
+            patch.object(_tuning_group_module, "load_dataframe_tuning", return_value=MagicMock()),
+            patch.object(_tuning_group_module, "validate_dataframe_tuning", return_value=issues),
+            patch.object(_tuning_group_module, "format_issues", return_value="formatted issues"),
+            patch.object(_tuning_group_module, "has_errors", return_value=True),
         ):
             result = runner.invoke(cli, ["df-tuning", "validate", str(config_path), "--platform", "polars"])
 
@@ -326,9 +329,10 @@ class TestDfTuningCli:
         config.execution.streaming_mode = True
 
         with (
-            patch("benchbox.cli.commands.df_tuning.detect_system_profile", return_value=MagicMock()),
-            patch(
-                "benchbox.cli.commands.df_tuning.get_profile_summary",
+            patch.object(_tuning_group_module, "detect_system_profile", return_value=MagicMock()),
+            patch.object(
+                _tuning_group_module,
+                "get_profile_summary",
                 return_value={
                     "cpu_cores": 8,
                     "available_memory_gb": 16.0,
@@ -336,7 +340,7 @@ class TestDfTuningCli:
                     "has_gpu": False,
                 },
             ),
-            patch("benchbox.cli.commands.df_tuning.get_smart_defaults", return_value=config),
+            patch.object(_tuning_group_module, "get_smart_defaults", return_value=config),
         ):
             result = runner.invoke(cli, ["df-tuning", "show-defaults", "--platform", "polars"])
 

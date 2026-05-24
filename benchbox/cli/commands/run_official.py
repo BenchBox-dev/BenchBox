@@ -23,11 +23,6 @@ TPC_ALLOWED_SCALE_FACTORS = {1, 10, 30, 100, 300, 1000, 3000, 10000, 30000, 1000
 @click.pass_context
 def run_official(ctx, benchmark, platform, scale, phases, streams, seed, output_dir, verbose, validate_results):
     """Run TPC-compliant official benchmark tests. Deprecated; use `benchbox run --official`."""
-    console.print(
-        "[yellow]DeprecationWarning: 'benchbox run-official' is deprecated. "
-        "Use 'benchbox run --official' instead.[/yellow]\n"
-    )
-
     if scale not in TPC_ALLOWED_SCALE_FACTORS:
         console.print(f"[red]Error: Scale factor {scale} is not TPC-compliant[/red]")
         console.print(f"Allowed scale factors: {sorted(TPC_ALLOWED_SCALE_FACTORS)}")
@@ -41,23 +36,6 @@ def run_official(ctx, benchmark, platform, scale, phases, streams, seed, output_
         console.print("[red]Error: --streams is required for throughput test[/red]")
         sys.exit(1)
 
-    _print_official_summary(benchmark, platform, scale, phases, streams, seed)
-    run_args = _run_args(benchmark, platform, scale, phases, seed, output_dir, verbose, validate_results)
-
-    if streams:
-        console.print(
-            f"[yellow]Note: Stream configuration ({streams} streams) will be applied "
-            "if supported by the benchmark[/yellow]"
-        )
-
-    try:
-        ctx.invoke(run, **run_args)
-    except Exception as e:
-        console.print(f"[red]Benchmark execution failed: {e}[/red]")
-        sys.exit(1)
-
-
-def _print_official_summary(benchmark, platform, scale, phases, streams, seed) -> None:
     console.print("[bold blue]TPC-Compliant Official Benchmark Run[/bold blue]")
     for label, value in [
         ("Benchmark", f"TPC-{benchmark.upper()}"),
@@ -70,21 +48,22 @@ def _print_official_summary(benchmark, platform, scale, phases, streams, seed) -
         if value is not None:
             console.print(f"{label}: {value}")
     console.print("")
+    if streams:
+        console.print(f"[yellow]Note: Stream configuration ({streams} streams) applies when supported[/yellow]")
 
-
-def _run_args(benchmark, platform, scale, phases, seed, output_dir, verbose, validate_results) -> dict:
-    args = {
-        "platform": platform,
-        "benchmark": benchmark,
-        "scale": scale,
-        "phases": phases,
-        "official": True,
-    }
-    optional = {
-        "seed": seed,
-        "output": output_dir,
-        "verbose": True if verbose else None,
-        "validate_results": True if validate_results else None,
-    }
-    args.update({key: value for key, value in optional.items() if value is not None})
-    return args
+    try:
+        ctx.invoke(
+            run,
+            platform=platform,
+            benchmark=benchmark,
+            scale=scale,
+            phases=phases,
+            official=True,
+            seed=seed,
+            output=output_dir,
+            verbose=verbose,
+            validate_results=validate_results,
+        )
+    except Exception as e:
+        console.print(f"[red]Benchmark execution failed: {e}[/red]")
+        sys.exit(1)
