@@ -728,15 +728,24 @@ def _ascending(desc: bool | tuple[bool, ...]) -> bool | list[bool]:
     return [not value for value in desc] if isinstance(desc, tuple) else not desc
 
 
-def _select_sort_limit(frame: Any, cols: tuple[str, ...] = (), sort: tuple[str, ...] = (), desc: Any = False) -> Any:
+def _select_sort_limit(
+    frame: Any, cols: tuple[str, ...] = (), sort: tuple[str, ...] = (), desc: Any = False, *, distinct: bool = False
+) -> Any:
     result = frame.select(*cols) if cols else frame
+    result = result.unique() if distinct else result
     return result.sort(_sort_key(sort), descending=desc) if sort else result
 
 
 def _pandas_select_sort_limit(
-    frame: Any, cols: tuple[str, ...] = (), sort: tuple[str, ...] = (), desc: Any = False
+    frame: Any,
+    cols: tuple[str, ...] = (),
+    sort: tuple[str, ...] = (),
+    desc: Any = False,
+    *,
+    distinct: bool = False,
 ) -> Any:
     result = frame[list(cols)] if cols else frame
+    result = result.drop_duplicates() if distinct else result
     return result.sort_values(_sort_key(sort), ascending=_ascending(desc)) if sort else result
 
 
@@ -755,13 +764,11 @@ def _make_select_sort_impls(
     distinct: bool = False,
 ) -> None:
     def expression_impl(ctx: DataFrameContext) -> Any:
-        result = _select_sort_limit(ctx.get_table(table_name), cols, sort, desc)
-        result = result.unique() if distinct else result
+        result = _select_sort_limit(ctx.get_table(table_name), cols, sort, desc, distinct=distinct)
         return _limit(result, limit)
 
     def pandas_impl(ctx: DataFrameContext) -> Any:
-        result = _pandas_select_sort_limit(ctx.get_table(table_name), cols, sort, desc)
-        result = result.drop_duplicates() if distinct else result
+        result = _pandas_select_sort_limit(ctx.get_table(table_name), cols, sort, desc, distinct=distinct)
         return _limit(result, limit, pandas=True)
 
     for family, impl in (("expression", expression_impl), ("pandas", pandas_impl)):

@@ -947,6 +947,48 @@ class TestExpressionOrderBy:
         # Limit is 1000, we have 10 rows
         assert len(result) == 10
 
+    def test_orderby_shortstrings_distinct_precedes_sort(self):
+        """DISTINCT must run before ORDER BY for expression-family generated queries."""
+        from benchbox.core.read_primitives.dataframe_queries import get_dataframe_queries
+
+        class TrackingFrame:
+            def __init__(self):
+                self.calls = []
+
+            def select(self, *cols):
+                self.calls.append(("select", cols))
+                return self
+
+            def unique(self):
+                self.calls.append(("unique",))
+                return self
+
+            def sort(self, by, descending=False):
+                self.calls.append(("sort", by, descending))
+                return self
+
+            def limit(self, n):
+                self.calls.append(("limit", n))
+                return self
+
+        class TrackingContext:
+            def __init__(self):
+                self.frame = TrackingFrame()
+
+            def get_table(self, name):
+                assert name == "lineitem"
+                return self.frame
+
+        ctx = TrackingContext()
+        query = get_dataframe_queries().get("orderby_shortstrings")
+
+        assert query.expression_impl(ctx) is ctx.frame
+        assert ctx.frame.calls == [
+            ("select", ("l_returnflag", "l_linestatus")),
+            ("unique",),
+            ("sort", ["l_returnflag", "l_linestatus"], False),
+        ]
+
 
 # =============================================================================
 # Expression-Family (Polars) Execution Tests - Window Functions
