@@ -68,6 +68,14 @@ def test_uat_did_not_modify_benchbox_cli_surface():
     assert not forbidden, f"Unexpected CLI surface changes: {forbidden}"
 
 
+def test_cli_surface_guard_fails_when_base_ref_is_missing(monkeypatch: pytest.MonkeyPatch):
+    missing_base = "refs/heads/__benchbox_missing_base__"
+    monkeypatch.setenv("BENCHBOX_BASE_REF", missing_base)
+
+    with pytest.raises(AssertionError, match=f"base ref {missing_base!r} is not available"):
+        _verified_base_ref()
+
+
 def _verified_base_ref() -> str:
     inside = _git("rev-parse", "--is-inside-work-tree", check=False)
     if inside.returncode != 0 or inside.stdout.strip() != "true":
@@ -76,7 +84,7 @@ def _verified_base_ref() -> str:
     base = os.environ.get("BENCHBOX_BASE_REF", "origin/develop")
     verified = _git("rev-parse", "--verify", f"{base}^{{commit}}", check=False)
     if verified.returncode != 0:
-        pytest.skip(f"CLI surface drift guard base ref {base!r} is not available")
+        raise AssertionError(f"CLI surface drift guard base ref {base!r} is not available")
     return base
 
 
