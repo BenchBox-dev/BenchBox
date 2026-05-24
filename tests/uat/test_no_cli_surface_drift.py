@@ -35,6 +35,7 @@ ALLOWED_HIDDEN_COMPAT_CLI_FILES = {
     "benchbox/cli/commands/run_official.py",
     "benchbox/cli/commands/tuning.py",
 }
+ALLOWED_INTERNAL_CLI_FILES = ALLOWED_INTERNAL_CLI_FILES | ALLOWED_HIDDEN_COMPAT_CLI_FILES
 FORBIDDEN_CLI_SURFACE_DECORATORS = {"argument", "command", "group", "option"}
 FORBIDDEN_CLI_SURFACE_FUNCTIONS = {
     "benchbox/cli/commands/convert.py": "convert",
